@@ -44,7 +44,7 @@ func GenerateChecksum(b []byte) ([]byte) {
 func GeneratePrivateKey() {
 	length := 32
 	
-	random := GenerateRandomKey(n)
+	random := GenerateRandomKey(length)
 	checksum := GenerateChecksum(random)
 	
 	result := append(random, checksum...))
