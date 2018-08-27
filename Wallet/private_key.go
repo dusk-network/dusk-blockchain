@@ -3,6 +3,13 @@ import (
 	"fmt"
 )
 
+/*	input: int
+	output: []byte
+	
+	Utilizes crypto/rand CSRPNG to produce a pseudo-random sequence of bytes. On Linux, Reader uses getrandom(2),
+	when available, otherwise falling back to /dev/urandom. On Windows, Reader uses CryptGenRandom API.
+*/
+
 func GenerateRandomKey(n int) ([]byte) {
 
 	b := make([]byte, n)
@@ -16,12 +23,23 @@ func GenerateRandomKey(n int) ([]byte) {
 	return b
 }
 
+/*	input: []byte
+	output: []byte
+	
+	Utilizes doubleSHA3 function to produce truncated 2 checksum bytes of the resulting hash.
+*/
+
 func GenerateChecksum(b []byte) ([]byte) {
 
-	checksum := doubleSHA(b)[0:4]
+	checksum := doubleSHA3(b)[0:4]
 	
 	return checksum
 }
+
+/*	input:
+	output: []byte
+	
+*/
 
 func GeneratePrivateKey() {
 	length := 32
