@@ -26,7 +26,7 @@ func GenerateRandomKey(n int) ([]byte) {
 /*	input: []byte
 	output: []byte
 	
-	Utilizes doubleSHA3 function to produce truncated 2 checksum bytes of the resulting hash.
+	Utilizes doubleSHA3 function to produce 2 bytes of truncated checksum of the resulting hash.
 */
 
 func GenerateChecksum(b []byte) ([]byte) {
