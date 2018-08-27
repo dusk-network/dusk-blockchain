@@ -37,8 +37,7 @@ func GenerateChecksum(b []byte) ([]byte) {
 }
 
 /*	input:
-	output: []byte
-	
+	output: []byte	
 */
 
 func GeneratePrivateKey() {
