@@ -1,7 +1,7 @@
 ## Private Address Specification
-publickey = {}(32 byte)
+privatekey = {}(32 byte)
 
-doublehash = sha3(sha3(publickey)) = {}(32 byte)
+doublehash = sha3(sha3(privatekey)) = {}(32 byte)
 
 checksum = doublehash[0:4] = {}(4 byte)
 
