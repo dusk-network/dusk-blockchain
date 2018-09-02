@@ -13,7 +13,7 @@ mnemonicphrase = (mnemonicsequence / 24) = 24 * 11 bit segments = {}(33 byte)
 
 salt = "mnemonic" + password = {}(? byte)
 
-extendedprivatekey = pbkdf2_hmac(mnemonicsequence + salt; sha512; 2048 rounds) = {}(64 byte)
+extendedprivatekey = pbkdf2_hmac(mnemonicsequence + salt; function = sha512; roundnumber = 2048) = {}(64 byte)
 
 
 
