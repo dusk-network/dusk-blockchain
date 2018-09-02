@@ -1,7 +1,7 @@
 ### Encrypted Private Key Specification
 Based on [NEP-2](https://github.com/neo-project/proposals/blob/master/nep-2.mediawiki) (NEO Enhancement Proposal) specification.
 
-Encryption:
+**Encryption:**
 
 privatekey = {}(32byte)
 
@@ -24,3 +24,5 @@ encryptedhalf2 = aes256encrypt(block = privatekey[16:32] XOR derivedhalf1[16:32]
 prefix = {}(? byte)
 
 encryptedprivatekey = prefix + encryptedhalf1 + encryptedhalf2 + checksum = {}(? byte)
+
+**Decryption:**
