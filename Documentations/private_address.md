@@ -1,14 +1,14 @@
 ## Private Address Specification
-seed = {}(32 byte)
+publickey = {}(32 byte)
 
-doublehash = sha3(sha3(seed)) = {}(32 byte)
+doublehash = sha3(sha3(publickey)) = {}(32 byte)
 
 checksum = doublehash[0:4] = {}(4 byte)
 
 prefix = {}(? byte)
 
-privatekey = prefix + seed + checksum = {}(? byte)
+privateaddress = prefix + seed + checksum = {}(? byte)
 
-privateaddress = base58(privatekey) = {}(? byte)
+privateaddressWIF = base58(privatekey) = {}(? byte)
 
 
