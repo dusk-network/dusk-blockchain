@@ -1,7 +1,7 @@
 ## Public Address Specification
-seed = {}(32 byte)
+privatekey = {}(32 byte)
 
-publickey = ECpoint(seed) = {}(65 byte)
+publickey = ECpoint(privatekey) = {}(65 byte)
 
 publickeyhash = ripemd160(sha3(publickey)) = {}(20 byte)
 
