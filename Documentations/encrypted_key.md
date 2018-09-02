@@ -25,4 +25,6 @@ prefix = {}(? byte)
 
 encryptedprivatekey = prefix + encryptedhalf1 + encryptedhalf2 + checksum = {}(? byte)
 
+encryptedprivatekeyWIF = base58(encryptedprivatekey) = {}(? byte)
+
 **Decryption:**
