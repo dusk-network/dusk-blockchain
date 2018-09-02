@@ -28,3 +28,18 @@ encryptedprivatekey = prefix + encryptedhalf1 + encryptedhalf2 + checksum = {}(?
 encryptedprivatekeyWIF = base58(encryptedprivatekey) = {}(? byte)
 
 **Decryption:**
+
+salt = checksum + password = {}(? byte)
+
+key = scrypt(salt) = {}(64 byte)
+
+derivedhalf1 = key[0:32] = {}(32 byte)
+
+derivedhalf2 = key[32:64] = {}(32 byte)
+
+privatekeyhalf1 = aes256decrypt(block = encryptedhalf1]; key = derivedhalf2[0:16]) XOR derivedhalf1[0:16] = {}(16 byte)
+
+privatekeyhalf2 = aes256decrypt(block = encryptedhalf2]; key = derivedhalf2[16:32]) XOR derivedhalf1[16:32] = {}(16 byte)
+
+privatekey = privatekeyhalf1 + privatekeyhalf2 = {}(32 byte)
+
