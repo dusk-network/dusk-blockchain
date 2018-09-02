@@ -1,4 +1,4 @@
-## Private Address Documentation
+## Private Address Specification
 seed = {}(32 byte)
 
 doublehash = sha3(sha3(seed)) = {}(32 byte)
