@@ -1,7 +1,7 @@
 ### Mnemonic Phrase Specification
 Based on [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki) (Bitcoin Improvement Proposal) specification.
 
-The specification below highlights the use of 32 byte seed, however, an extended private key can be generated with various seed sizes (16 byte, 20 byte, 24 byte, 28 byte and 32 byte) with a varying checksum size as a result (4 bit, 5 bit, 6 bit, 7 bit and 8 bit).
+The specification below highlights the use of 32 byte seed, however, an extended private key can be generated with various seed sizes (16 byte, 20 byte, 24 byte, 28 byte and 32 byte) with a varying checksum size as a result (4 bit, 5 bit, 6 bit, 7 bit and 8 bit respectively).
 
 **Mnemonic Phrase Generation:**
 
