@@ -9,6 +9,14 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
+var (
+	// PubKeyPrefix is the prefix needed to produce an Adress
+	// that starts with DUSKpub
+	// This will usually be followed by a number of 1s
+	// which is the padding
+	PubKeyPrefix = big.NewInt((int64(0x265CC5580E64)))
+)
+
 // PubKey is a wrapper around the ed25519 public key
 type PubKey struct {
 	ed25519.PublicKey
@@ -21,20 +29,19 @@ func (p *PubKey) Verify(message, sig []byte) bool {
 
 // Address returns the Base58 encoding of a public key
 // Format will start with DUSK
-func (p *PubKey) Address() (string, error) {
+func (p *PubKey) PublicAddress() (string, error) {
 	if len(p.PublicKey) != 32 {
 		return "", errors.New("Pubkey length does not equal 32")
 	}
-	return pubKeyToAddress(p.PublicKey)
+	return KeyToAddress(PubKeyPrefix, p.PublicKey, 2)
 }
 
-func pubKeyToAddress(pub []byte) (string, error) {
+func KeyToAddress(prefix *big.Int, pub []byte, padding int) (string, error) {
 	buf := new(bytes.Buffer)
 
-	prefix := big.NewInt(int64(0xFB07A4))
-
 	buf.Write(prefix.Bytes())
-	buf.WriteByte(0x00)
+	pad := make([]byte, padding)
+	buf.Write(pad)
 	buf.Write(pub)
 
 	checksum, err := Checksum(pub)

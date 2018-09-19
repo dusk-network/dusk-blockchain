@@ -5,10 +5,17 @@ import (
 	"crypto"
 	"crypto/rand"
 	"errors"
+	"math/big"
 	"strconv"
 
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/sha3"
+)
+
+var (
+	//PrivKeyPrefix is the prefix needed to produce a WIF
+	// that starts with DUSKpriv
+	PrivKeyPrefix = big.NewInt((int64(0x265CC557D4C1F1)))
 )
 
 // PrivateKey wraps around the native ed25519 private key
@@ -22,6 +29,14 @@ type PrivateKey struct {
 // to return a PubKey
 func (p *PrivateKey) Public() *PubKey {
 	return &p.PubKey
+}
+
+// WIF refers to the Wallet Import Format for the private Key
+func (p *PrivateKey) WIF() (string, error) {
+	if len(p.PrivateKey) != 32 {
+		return "", errors.New("PrivKey length does not equal 32")
+	}
+	return KeyToAddress(PrivKeyPrefix, p.PrivateKey, 1)
 }
 
 // Sign Wraps around the native ed25519 function
