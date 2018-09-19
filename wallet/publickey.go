@@ -1,11 +1,10 @@
 package wallet
 
 import (
-	"bytes"
 	"errors"
 	"math/big"
 
-	"github.com/decred/base58"
+	"github.com/toghrulmaharramov/dusk-go/crypto"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -33,23 +32,5 @@ func (p *PubKey) PublicAddress() (string, error) {
 	if len(p.PublicKey) != 32 {
 		return "", errors.New("Pubkey length does not equal 32")
 	}
-	return KeyToAddress(PubKeyPrefix, p.PublicKey, 2)
-}
-
-func KeyToAddress(prefix *big.Int, pub []byte, padding int) (string, error) {
-	buf := new(bytes.Buffer)
-
-	buf.Write(prefix.Bytes())
-	pad := make([]byte, padding)
-	buf.Write(pad)
-	buf.Write(pub)
-
-	checksum, err := Checksum(pub)
-	if err != nil {
-		return "", errors.New("Could not calculate the checksum")
-	}
-	buf.Write(checksum)
-
-	WIF := base58.Encode(buf.Bytes())
-	return WIF, nil
+	return crypto.KeyToAddress(PubKeyPrefix, p.PublicKey, 2)
 }

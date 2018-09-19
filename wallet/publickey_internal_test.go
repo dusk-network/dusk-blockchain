@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/toghrulmaharramov/dusk-go/crypto"
 )
 
 func TestCorrectVerif(t *testing.T) {
@@ -31,7 +32,7 @@ func TestWrongMessage(t *testing.T) {
 func TestPubKeyToAddress(t *testing.T) {
 	key := []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
-	addr, err := KeyToAddress(PubKeyPrefix, key, 2)
+	addr, err := crypto.KeyToAddress(PubKeyPrefix, key, 2)
 	assert.Equal(t, nil, err)
 	assert.Equal(t, "DUSKpub1JBG1FrnwDwtaZnXP3z6NazsXzS3j9B5vBPhszfa3xDpLeCFQkj2M", addr)
 }
