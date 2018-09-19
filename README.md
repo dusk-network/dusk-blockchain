@@ -5,26 +5,30 @@ A local branch of the reference implementation of Dusk. Please check out the whi
 ## Creating a New Key Pair
 
 ```
-privateKey, _ := wallet.NewPrivateKeyPair()
+    entropy,_ = crypto.RandEntropy(32)
 
-publicKey := privateKey.Public()
+    privateKey, _ := wallet.NewPrivateKey(entropy) // 7ea55e73267...
+
+    publicKey := privateKey.Public() // d194f142b2e5...
 ```
 
 ## Generating the Public Address and Private WIF
 
 ```
-PublicAddress, _ := publicKey.PublicAddress() // DUSKpub1JBG1FrnwDwtaZnXP3z6NazsXzS3j9B5vBPhszfa3xDpLeCFQkj2M
+    PublicAddress, _ := publicKey.PublicAddress() // DUSKpub1JBG1FrnwDwtaZnXP3z6NazsXzS3j9B5vBPhszfa3xDpLeCFQkj2M
 
-WIF, _:= privateKey.WIF() // DUSKpriv1WCxh37LxDgeLk45Khnyo9cdBG6NC3Ax12ZpGFgD8Mgd7KfapGDg
+    WIF, _:= privateKey.WIF() // DUSKpriv1WCxh37LxDgeLk45Khnyo9cdBG6NC3Ax12ZpGFgD8Mgd7KfapGDg
 ```
 
 ## Sign and Verify
 
 ```
-    //Sign
-    message := []byte("hello world")
-    signature, _ :=privateKey.Sign(message)
+    // Sign
 
-    //Verify
-    valid := publicKey.Verify(message, signature)
+    message := []byte("hello world")
+    signature, _ := privateKey.Sign(message)
+
+    // Verify
+
+    valid := publicKey.Verify(message, signature) // true
 ```

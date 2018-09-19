@@ -11,11 +11,7 @@ import (
 	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
 )
 
-func RandEntropy(n int) ([]byte, error) {
-
-	if n < 32 {
-		return nil, errors.New("n should be more than 32 bytes")
-	}
+func RandEntropy(n uint32) ([]byte, error) {
 
 	b := make([]byte, n)
 	a, err := rand.Read(b)
@@ -23,8 +19,8 @@ func RandEntropy(n int) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("Error generating entropy " + err.Error())
 	}
-	if a != n {
-		return nil, errors.New("Error expected to read" + strconv.Itoa(n) + " bytes instead read " + strconv.Itoa(a) + " bytes")
+	if uint32(a) != n {
+		return nil, errors.New("Error expected to read" + strconv.Itoa(int(n)) + " bytes instead read " + strconv.Itoa(a) + " bytes")
 	}
 	return b, nil
 }

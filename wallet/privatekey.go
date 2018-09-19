@@ -54,12 +54,10 @@ func (p *PrivateKey) Sign(message []byte) (sig []byte, err error) {
 }
 
 // NewPrivateKey returns a new PrivateKey
-func NewPrivateKey() (*PrivateKey, error) {
+func NewPrivateKey(entropy []byte) (*PrivateKey, error) {
 
-	entropy, err := crypto.RandEntropy(32)
-
-	if err != nil {
-		return nil, err
+	if len(entropy) < 32 {
+		return nil, errors.New("Entropy should be >= 32 bytes")
 	}
 	r := bytes.NewReader(entropy)
 
