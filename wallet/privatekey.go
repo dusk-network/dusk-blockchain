@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"golang.org/x/crypto/ed25519"
+	"golang.org/x/crypto/sha3"
 )
 
 // PrivateKey wraps around the native ed25519 private key
@@ -74,4 +75,34 @@ func randEntropy(n int) ([]byte, error) {
 		return nil, errors.New("Error expected to read" + strconv.Itoa(n) + " bytes instead read " + strconv.Itoa(a) + " bytes")
 	}
 	return b, nil
+}
+
+func Checksum(data []byte) ([]byte, error) {
+	hash, err := DoubleSha3256(data)
+	if err != nil {
+		return nil, err
+	}
+	return hash[:4], nil
+}
+
+func Sha3256(data []byte) ([]byte, error) {
+	hasher := sha3.New256()
+	hasher.Reset()
+	_, err := hasher.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	return hasher.Sum(nil), nil
+}
+
+func DoubleSha3256(data []byte) ([]byte, error) {
+	h, err := Sha3256(data)
+	if err != nil {
+		return nil, err
+	}
+	hash, err := Sha3256(h)
+	if err != nil {
+		return nil, err
+	}
+	return hash, nil
 }
