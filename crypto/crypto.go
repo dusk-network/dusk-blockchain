@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/decred/base58"
+	"github.com/toghrulmaharramov/dusk-go/crypto/base58"
 	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
 )
 

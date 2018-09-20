@@ -8,7 +8,7 @@ import (
 
 	"github.com/toghrulmaharramov/dusk-go/crypto"
 
-	"golang.org/x/crypto/ed25519"
+	"github.com/toghrulmaharramov/dusk-go/ec/ed25519"
 )
 
 var (
