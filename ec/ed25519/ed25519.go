@@ -216,3 +216,17 @@ func Verify(publicKey PublicKey, message, sig []byte) bool {
 	R.ToBytes(&checkR)
 	return bytes.Equal(sig[:32], checkR[:])
 }
+
+// ScalarRed32 is a wrapper around ScReduce32
+// providing a better API;using a slice and not an array, added checks
+// plus returning an error instead of panicing
+func ScalarRed32(seed []byte) ([]byte, error) {
+
+	if l := len(seed); l != SeedSize {
+		return nil, errors.New("bad seed length, expected " + strconv.Itoa(SeedSize) + " got " + strconv.Itoa(l))
+	}
+
+	sr := sliceTo32Arr(seed)
+	edwards25519.ScReduce32(sr)
+	return arrToSlice(sr), nil
+}
