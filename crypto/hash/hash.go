@@ -4,24 +4,15 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-func Sha3256(data []byte) ([]byte, error) {
-	hasher := sha3.New256()
-	hasher.Reset()
-	_, err := hasher.Write(data)
-	if err != nil {
-		return nil, err
-	}
-	return hasher.Sum(nil), nil
-}
+// Sha3256 takes a byte slice
+// and returns the SHA3-256 hash
+func Sha3256(bs []byte) ([]byte, error) {
 
-func DoubleSha3256(data []byte) ([]byte, error) {
-	h, err := Sha3256(data)
+	h := sha3.New256()
+	_, err := h.Write(bs)
 	if err != nil {
 		return nil, err
 	}
-	hash, err := Sha3256(h)
-	if err != nil {
-		return nil, err
-	}
-	return hash, nil
+	return h.Sum(nil), err
+
 }

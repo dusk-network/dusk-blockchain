@@ -48,7 +48,7 @@ func New(seed []byte) (k *Key, err error) {
 		}
 	}
 	// PrivateViewKey Derivation
-	PrivateView, err = hash.Keccak256(PrivateSpend)
+	PrivateView, err = hash.Sha3256(PrivateSpend)
 	if err != nil {
 		return nil, err
 	}
