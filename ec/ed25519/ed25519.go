@@ -230,3 +230,14 @@ func ScalarRed32(seed []byte) ([]byte, error) {
 	edwards25519.ScReduce32(sr)
 	return arrToSlice(sr), nil
 }
+
+// IsLessThanOrder Is a Wrapper around ScMinimal which returns true if the given scalar is less than the order of the
+// curve.
+func IsLessThanOrder(s []byte) bool {
+
+	if l := len(s); l != SeedSize {
+		return false // this will trigger the reduce function and return a bad seed error
+	}
+	sr := sliceTo32Arr(s)
+	return edwards25519.ScMinimal(sr)
+}
