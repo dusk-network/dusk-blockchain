@@ -1,34 +1,39 @@
 # dusk-go
-A local branch of the reference implementation of Dusk. Please check out the whitepaper at: https://github.com/dusk-network/whitepaper/releases/download/v0.3/dusk-whitepaper.pdf.
 
 
-## Creating a New Key Pair
 
-```
-    entropy,_ = crypto.RandEntropy(32)
+F :
 
-    privateKey, _ := wallet.NewPrivateKey(entropy) // 7ea55e73267...
+    - Restricted devnet without block processing + more
 
-    publicKey := privateKey.Public() // d194f142b2e5...
-```
 
-## Generating the Public Address and Private WIF
+K: 
 
-```
-    PublicAddress, _ := publicKey.PublicAddress() // DUSKpub1JBG1FrnwDwtaZnXP3z6NazsXzS3j9B5vBPhszfa3xDpLeCFQkj2M
+    - Ristretto:
 
-    WIF, _:= privateKey.WIF() // DUSKpriv1WCxh37LxDgeLk45Khnyo9cdBG6NC3Ax12ZpGFgD8Mgd7KfapGDg
-```
+        - Implement the hash to point seen in CurveDalek as current impl is not uniform, we saw this in the monero repo also, where 
 
-## Sign and Verify
+        - Remove vartime scalar multiplication(Do this last) 
 
-```
-    // Sign
+        - Implement against the Previous `Key` abstract, we can remove co-factor * order multiplication now and checking whether in subgroup
 
-    message := []byte("hello world")
-    signature, _ := privateKey.Sign(message)
+        - Extra : Check for optimisations against the Rust curve2519 implementation. (Ongoing)
 
-    // Verify
+    - RingCT
 
-    valid := publicKey.Verify(message, signature) // true
-```
+        - Pederson Commitment (Hidden input/output)
+
+        - BulletProof reference from Java with multiple inputs (Proof input/out between range) Replacing range proof
+
+        - Ring Signature (Signing and Verification)
+
+    - Re-Implement Stealth on top of Ristretto as there is a new API
+
+
+
+    Note:
+
+        Public address is not the same as the stealth address.
+
+
+        This seems pretty expensive;https://github.com/monero-project/monero/commit/c42917624849daeac0b4bc2fb1cd1f2539470b28
