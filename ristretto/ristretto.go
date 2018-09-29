@@ -23,6 +23,10 @@
 // 7237005577332262213973186563042994240857116359379907606001950938285454250989.
 // The Scalar type implement the numbers modulo l and also has an API similar
 // to math/big.
+
+// Adapted and modified from go-ristretto
+// TODO: Remove vartime scalar operations when finished
+
 package ristretto
 
 import (
@@ -128,11 +132,32 @@ func (p *Point) Rand() *Point {
 
 // Sets p to the point derived from the buffer using SHA512 and Elligator2.
 // Returns p.
+//
+// NOTE curve25519-dalek uses a different (more conservative) method to derive
+// a point from raw data with a hash.  This is implemented in
+// Point.DeriveDalek().
 func (p *Point) Derive(buf []byte) *Point {
 	var ptBuf [32]byte
 	h := sha512.Sum512(buf)
 	copy(ptBuf[:], h[:32])
 	return p.SetElligator(&ptBuf)
+}
+
+// Sets p to the point derived from the buffer using SHA512 and Elligator2
+// in the fashion of curve25519-dalek.
+//
+// NOTE See also Derive(), which is a different method which is twice as fast,
+// but which might not be as secure as this method.
+func (p *Point) DeriveDalek(data []byte) *Point {
+	hash := sha512.Sum512(data)
+	var p2 Point
+	var buf [32]byte
+	copy(buf[:], hash[:32])
+	p.SetElligator(&buf)
+	copy(buf[:], hash[32:])
+	p2.SetElligator(&buf)
+	p.Add(p, &p2)
+	return p
 }
 
 // Returns 1 if p == q and 0 otherwise.

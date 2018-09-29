@@ -297,46 +297,46 @@ func (p *ExtendedPoint) RistrettoInto(buf *[32]byte) *ExtendedPoint {
 	var d, u1, u2, isr, i1, i2, zInv, denInv, nx, ny, s FieldElement
 	var b int32
 
-	d.add(&p.Z, &p.Y)
-	u1.sub(&p.Z, &p.Y)
-	u1.Mul(&u1, &d)
+	d.add(&p.Z, &p.Y)  // Z0 + Y0
+	u1.sub(&p.Z, &p.Y) // Z0 - Y0
+	u1.Mul(&u1, &d)    // u1 = Z0^2 - Y0^2 Line1
 
-	u2.Mul(&p.X, &p.Y)
+	u2.Mul(&p.X, &p.Y) // u2 = X0 * Y0 Line2
 
-	isr.Square(&u2)
-	isr.Mul(&isr, &u1)
-	isr.InvSqrt(&isr)
+	isr.Square(&u2)    // isr = u2^2
+	isr.Mul(&isr, &u1) // isr = u2^2 * u1
+	isr.InvSqrt(&isr)  // isr = invSqrt(u2^2 * u1) Line3
 
-	i1.Mul(&isr, &u1)
-	i2.Mul(&isr, &u2)
+	i1.Mul(&isr, &u1) // i1 = isr * u1 Line4 (In paper i1 = D_1)
+	i2.Mul(&isr, &u2) // i2 = isr * u2 Line5 (In paper i2 = D_2)
 
-	zInv.Mul(&i1, &i2)
-	zInv.Mul(&zInv, &p.T)
+	zInv.Mul(&i1, &i2)    // zInv = i1 *i2
+	zInv.Mul(&zInv, &p.T) // zInv = i1 * i2 * T // Line6
 
-	d.Mul(&zInv, &p.T)
+	d.Mul(&zInv, &p.T) // Line7 temp variable Zinv * T
 
-	nx.Mul(&p.Y, &feI)
-	ny.Mul(&p.X, &feI)
-	denInv.Mul(&feInvSqrtMinusDMinusOne, &i1)
+	nx.Mul(&p.Y, &feI)                        // nx = Y * sqrt(a) // Ristretto requires a=+=1 (Line7.1)
+	ny.Mul(&p.X, &feI)                        // ny = X * sqrt(a) (Line7.1)
+	denInv.Mul(&feInvSqrtMinusDMinusOne, &i1) // denInv = 1/sqrt(a-d) * i1 (Line7.2)
 
 	b = 1 - d.IsNegativeI()
-	nx.ConditionalSet(&p.X, b)
-	ny.ConditionalSet(&p.Y, b)
-	denInv.ConditionalSet(&i2, b)
+	nx.ConditionalSet(&p.X, b)    // if d is positive, set nx = X Line8.1
+	ny.ConditionalSet(&p.Y, b)    // if d is positive, set ny = Y Line8.1
+	denInv.ConditionalSet(&i2, b) // if d is positive, set denInv = i2
 
-	d.Mul(&nx, &zInv)
+	d.Mul(&nx, &zInv) // X * Zinv Line9
 	b = d.IsNegativeI()
 	d.Neg(&ny)
-	ny.ConditionalSet(&d, b)
+	ny.ConditionalSet(&d, b) // if X * Zinv is negative, set Y = -Y
 
-	s.sub(&p.Z, &ny)
-	s.Mul(&s, &denInv)
+	s.sub(&p.Z, &ny)   // S = Z - Y
+	s.Mul(&s, &denInv) // S = (Z - Y)denInv // Line10 (Z-Y)D -- Note a = -1
 
 	b = s.IsNegativeI()
 	d.Neg(&s)
-	s.ConditionalSet(&d, b)
+	s.ConditionalSet(&d, b) // Line10 Absolute Value
 
-	s.BytesInto(buf)
+	s.BytesInto(buf) // Line 11 encoding
 	return p
 }
 
