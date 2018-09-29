@@ -11,13 +11,13 @@ K:
 
     - Ristretto:
 
-        - Implement the hash to point seen in CurveDalek as current impl is not uniform, we saw this in the monero repo also, where 
+        - Implement the hash to point seen in CurveDalek as current impl is not uniform (Done)
 
         - Remove vartime scalar multiplication(Do this last) 
 
-        - Implement against the Previous `Key` abstract, we can remove co-factor * order multiplication now and checking whether in subgroup
+        - Implement against the Previous `Key` abstract, we can remove co-factor * order multiplication now and checking whether in subgroup (Done)
 
-        - Extra : Check for optimisations against the Rust curve2519 implementation. (Ongoing)
+        - Extra : Check for optimisations against the Rust curve2519 implementation. (Ongoing)(Done once)
 
     - RingCT
 
@@ -27,7 +27,9 @@ K:
 
         - Ring Signature (Signing and Verification)
 
-    - Re-Implement Stealth on top of Ristretto as there is a new API
+    - Re-Implement Stealth on top of Ristretto as there is a new API (Done)
+
+    - Re-Implement Bulletproof on top of Ristretto as there is a new API
 
 
 
