@@ -72,6 +72,19 @@ func TestBadEntropyLength(t *testing.T) {
 
 }
 
+func TestPubAddrToKey(t *testing.T) {
+
+	en, _ := crypto.RandEntropy(32)
+	k, _ := key.New(en)
+	addr, _ := k.PublicAddress()
+
+	decK, err := key.PubAddrToKey(addr)
+	assert.Equal(t, nil, err)
+
+	assert.Equal(t, k.PublicView.Bytes(), decK.PublicView.Bytes())
+	assert.Equal(t, k.PublicSpend.Bytes(), decK.PublicSpend.Bytes())
+}
+
 func TestStealth(t *testing.T) {
 	en, _ := crypto.RandEntropy(32)
 	Alice, _ := key.New(en)

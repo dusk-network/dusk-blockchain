@@ -2,6 +2,7 @@ package key
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 
 	"github.com/toghrulmaharramov/dusk-go/crypto"
@@ -93,7 +94,11 @@ func (k *Key) PublicAddress() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = buf.Write(checksum)
+
+	cs := make([]byte, 4)
+	binary.BigEndian.PutUint32(cs, checksum)
+
+	_, err = buf.Write(cs)
 	if err != nil {
 		return "", err
 	}
@@ -104,7 +109,61 @@ func (k *Key) PublicAddress() (string, error) {
 // PubAddrToKey will take a public address
 // and return a Key object
 func PubAddrToKey(pa string) (*Key, error) {
-	return nil, nil
+
+	// Base58 Decode
+	byt, err := base58.Decode(pa)
+	if err != nil {
+		return nil, err
+	}
+
+	var np byte
+	var checksum [4]byte
+	var ps [32]byte
+	var pv [32]byte
+
+	r := bytes.NewReader(byt)
+
+	binary.Read(r, binary.BigEndian, &np)
+	binary.Read(r, binary.BigEndian, &ps)
+	binary.Read(r, binary.BigEndian, &pv)
+	binary.Read(r, binary.BigEndian, &checksum)
+
+	// check net prefix
+
+	if np != netPrefix {
+		return nil, errors.New("Unrecognised network prefix")
+	}
+
+	// compare the checksum
+
+	buf := new(bytes.Buffer)
+	buf.WriteByte(np)
+	buf.Write(ps[:])
+	buf.Write(pv[:])
+
+	want := binary.BigEndian.Uint32(checksum[:])
+	ok := crypto.CompareChecksum(buf.Bytes(), want)
+	if !ok {
+		return nil, errors.New("Invalid Checksum")
+	}
+
+	// Assign values to Key struct
+
+	k := Key{
+		PublicView:  &ristretto.Point{},
+		PublicSpend: &ristretto.Point{},
+	}
+
+	ok = k.PublicView.SetBytes(&pv)
+	if !ok {
+		return nil, errors.New("Could not Set Public View Bytes")
+	}
+	ok = k.PublicSpend.SetBytes(&ps)
+	if !ok {
+		return nil, errors.New("Could not Set Public View Bytes")
+	}
+
+	return &k, nil
 }
 
 // StealthAddress Returns P, R, error
