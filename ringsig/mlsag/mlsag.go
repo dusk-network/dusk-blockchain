@@ -1,19 +1,11 @@
 package mlsag
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
-
-// // String conforms to the stringer interface
-// func (e *Element) String() string {
-// 	c := hex.EncodeToString(e.c.Bytes())
-// 	r := hex.EncodeToString(e.r[0].Bytes())
-// 	return "c is " + c + " r is " + r
-// }
 
 // RingSignature is the collection of signatures
 type RingSignature struct {
@@ -25,25 +17,15 @@ type RingSignature struct {
 
 // Sign will create the MLSAG components that can be used to verify the owner
 // Returns keyimage, a c val,
-
-// FIXME: We are going to differ from the paper, by setting j = 0 for owner and then sorting s and pubKeys to shuffle
-func Sign(m []byte, mixin []ristretto.Point) RingSignature {
-
-	// secretKey
-	var sK ristretto.Scalar
-	sK.Rand()
+func Sign(m []byte, mixin []ristretto.Point, sK ristretto.Scalar) RingSignature {
 
 	// pubKey pK such that pK = sK * G
 	var pK ristretto.Point
 	pK.ScalarMultBase(&sK)
 
-	// secret index j
+	// secret j index
 	rand.Seed(time.Now().UnixNano())
-	j := rand.Intn(len(mixin))
-	fmt.Println("J is ", j)
-
-	// append owners key at random position
-	pubKeys := insertElAtPosition(mixin, pK, j)
+	j := rand.Intn(len(mixin) + 1)
 
 	// Hp(pK)
 	var hPK ristretto.Point
@@ -58,12 +40,16 @@ func Sign(m []byte, mixin []ristretto.Point) RingSignature {
 	alpha.Rand()
 
 	// generate s_i where i =/= j and s_i E Zq
-	sVals := make([]ristretto.Scalar, len(pubKeys))
-	for i := 0; i < len(sVals); i++ {
+	sVals := make([]ristretto.Scalar, len(mixin)+1)
+	for i := 1; i < len(sVals); i++ {
 		var s ristretto.Scalar
 		s.Rand()
 		sVals[i] = s
 	}
+
+	// TODO:Remove this later on to have only one c value
+	// to save space, as noted in the paper
+	cVals := make([]ristretto.Scalar, len(mixin)+1)
 
 	// Lj = alpha * G
 	var Lj ristretto.Point
@@ -74,68 +60,42 @@ func Sign(m []byte, mixin []ristretto.Point) RingSignature {
 	Rj.ScalarMult(&hPK, &alpha)
 
 	// c_j+1 = Hs(m, Lj, Rj)
-	var prevC ristretto.Scalar
+	var cPlus1 ristretto.Scalar
 	var hCon []byte
 	hCon = append(hCon, m...)
 	hCon = append(hCon, Lj.Bytes()...)
 	hCon = append(hCon, Rj.Bytes()...)
-	prevC.Derive(hCon)
+	cPlus1.Derive(hCon)
 
-	var c0 ristretto.Scalar // c0 is the first c val
+	jPlus1 := (j + 1) % len(cVals)
+	cVals[jPlus1] = cPlus1
 
-	// start at c = j+2 as j + 1 is already calculated
-	for index := j + 2; ; index++ {
+	pubKeys := make([]ristretto.Point, len(mixin)+1)
+	pubKeys[j] = pK // add signer
 
-		i := index % (len(pubKeys) - 1)
+	for i := j + 1; ; i++ {
 
-		fmt.Println("i is", i, "j is", j)
-
-		var L1, L2, L, R1, R2, R, tmpPubKey, HTmpPubKey ristretto.Point
-
-		tmpPubKey = pubKeys[i]
-		HTmpPubKey.Derive(tmpPubKey.Bytes())
-		s := sVals[i]
-
-		// XXX : we do not need to check who the owner is at this point?
-
-		//  L = sG + cP
-		L1.ScalarMultBase(&s)
-		L2.ScalarMult(&tmpPubKey, &prevC)
-		L.Add(&L1, &L2)
-
-		// R = s * Hp(P) + prevC * I
-		R1.ScalarMult(&HTmpPubKey, &s)
-		R2.ScalarMult(&I, &prevC)
-		R.Add(&R1, &R2)
-		fmt.Println("Generated Cs", prevC)
-		hCon = []byte{}
-		hCon = append(hCon, m...)
-		hCon = append(hCon, L.Bytes()...)
-		hCon = append(hCon, R.Bytes()...)
-		prevC.Derive(hCon)
-
-		// save this for verification, as we need first C val
-		if i == 0 {
-			c0 = prevC
-
-		}
-
-		// this means our prevC is now equal to the value for j+1
-		// and we have made a complete cycle
-		if i == j+1 {
+		l := i % (len(pubKeys))
+		if l == j {
 			break
 		}
 
+		k := (i + 1) % (len(pubKeys))
+
+		c, _, _ := computeCLR(m, I, pubKeys[l], sVals[l], cPlus1)
+
+		cVals[k] = c
+		cPlus1 = c
 	}
 
-	// calculate s_j = alpha - prevC * privKey
+	// calculate s_j = alpha - cPlus1 * privKey
 	var sj ristretto.Scalar
-	sj.Mul(&prevC, &sK).Neg(&sj).Add(&sj, &alpha)
+	sj.Mul(&cPlus1, &sK).Neg(&sj).Add(&sj, &alpha)
 	sVals[j] = sj
 
 	ringsig := RingSignature{
 		I:       I,
-		C:       c0,
+		C:       cVals[0],
 		S:       sVals,
 		PubKeys: pubKeys,
 	}
@@ -145,13 +105,12 @@ func Sign(m []byte, mixin []ristretto.Point) RingSignature {
 func Verify(m []byte, ringsig RingSignature) bool {
 	// Two conditions are that:
 
-	// c_n+1 = c1 in 1 i mod n XXX : is this needed?
+	// c_n+1 = c1 in 1 i mod n
 	// For all i, c_i+1 = H(m, L_i, R_i)
 
 	numPubKeys := len(ringsig.PubKeys)
-	fmt.Println("Num keys", numPubKeys)
-	currC := ringsig.C // this is first c value
-	I := ringsig.I
+
+	currC := ringsig.C // this is first c value c[0]
 
 	Ls := make([]ristretto.Point, numPubKeys)
 	Rs := make([]ristretto.Point, numPubKeys)
@@ -159,54 +118,76 @@ func Verify(m []byte, ringsig RingSignature) bool {
 
 	for i := 0; i < numPubKeys; i++ {
 
-		var L1, L2, L, R1, R2, R, tmpPubKey, HTmpPubKey ristretto.Point
+		// First calculate Cs, Ls, Rs
 
-		// calculate L and R
-		tmpPubKey = ringsig.PubKeys[i]
-		HTmpPubKey.Derive(tmpPubKey.Bytes())
-		s := ringsig.S[i]
+		cPlus1, L, R := computeCLR(m, ringsig.I, ringsig.PubKeys[i], ringsig.S[i], currC)
 
-		//  L = sG + cP
-		L1.ScalarMultBase(&s)
-		L2.ScalarMult(&tmpPubKey, &currC)
-		L.Add(&L1, &L2)
+		k := (i + 1) % numPubKeys
+
+		Cs[k] = cPlus1
+
 		Ls[i] = L
-
-		// R = s * Hp(P) + currC * I
-		R1.ScalarMult(&HTmpPubKey, &s)
-		R2.ScalarMult(&I, &currC)
-		R.Add(&R1, &R2)
 		Rs[i] = R
 
-		hCon := []byte{}
-		hCon = append(hCon, m...)
-		hCon = append(hCon, L.Bytes()...)
-		hCon = append(hCon, R.Bytes()...)
-		currC.Derive(hCon)
+		currC = cPlus1
+	}
 
-		// We need to calc and keep all C, L, R values and
+	// check that c_i+1 = h(m || L_i || R_i)
 
-		nextItem := (i + 1) % (numPubKeys - 1)
-		Cs[nextItem] = currC
+	if len(Ls) != len(Rs) && len(Rs) != len(Cs) {
+		return false
+	}
+
+	for i := range Cs {
+		h := []byte{}
+		h = append(h, m...)
+		h = append(h, Ls[i].Bytes()...)
+		h = append(h, Rs[i].Bytes()...)
+
+		var cPlus1 ristretto.Scalar
+		cPlus1.Derive(h)
+
+		k := (i + 1) % len(Cs)
+
+		if !Cs[k].Equals(&cPlus1) {
+			return false
+		}
 
 	}
 
-	for i := 0; i < len(Cs); i++ {
-		fmt.Println(len(Cs), numPubKeys)
-		fmt.Println("Verifying Cs", Cs[i])
+	// c_n+1 = c[0]
+	if Cs[0] != ringsig.C {
+		return false
 	}
 
 	return true
 }
 
-// inserts an element into the slice at index
-func insertElAtPosition(slice []ristretto.Point, element ristretto.Point, index int) []ristretto.Point {
+// returns C, L, R
+func computeCLR(message []byte, I ristretto.Point, pubKey ristretto.Point, s ristretto.Scalar, c ristretto.Scalar) (ristretto.Scalar, ristretto.Point, ristretto.Point) {
+	var L1, L2, L, R1, R2, R, tmpPubKey, HTmpPubKey ristretto.Point
 
-	newSlice := make([]ristretto.Point, index+1)
-	copy(newSlice, slice[:index])
-	newSlice[index] = element
+	var cPlus1 ristretto.Scalar
 
-	slice = append(newSlice, slice[index:]...)
+	tmpPubKey = pubKey
 
-	return slice
+	HTmpPubKey.Derive(tmpPubKey.Bytes())
+
+	//  L_j = s_j*G + c_j*P_j
+	L1.ScalarMultBase(&s)
+	L2.ScalarMult(&tmpPubKey, &c)
+	L.Add(&L1, &L2)
+
+	// R_j = s_j * Hp(P_j) + c_j * I
+	R1.ScalarMult(&HTmpPubKey, &s)
+	R2.ScalarMult(&I, &c)
+	R.Add(&R1, &R2)
+
+	hCon := []byte{}
+	hCon = append(hCon, message...)
+	hCon = append(hCon, L.Bytes()...)
+	hCon = append(hCon, R.Bytes()...)
+	cPlus1.Derive(hCon)
+
+	return cPlus1, L, R
 }
