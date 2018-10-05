@@ -1,5 +1,6 @@
 package mlsag
 
+// This package references the MLSAG described on pg4: https://lab.getmonero.org/pubs/MRL-0005.pdf
 import (
 	"math/rand"
 	"time"
