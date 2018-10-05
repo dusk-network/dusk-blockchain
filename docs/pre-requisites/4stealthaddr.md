@@ -45,3 +45,5 @@
                     checksum = Keccak256(t)[:4]
 
                     StealthAddress = Base58(t + checksum)
+
+Note: scReduce32(x) is simply x mod l . To do this simply we would need to use divide and branches, however this implementation would leak information about the seed because division asm and branches take varying amounts of time to complete. We need a constant time.

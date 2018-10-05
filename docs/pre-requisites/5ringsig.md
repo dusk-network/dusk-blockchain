@@ -2,7 +2,7 @@
 
 ## Introduction 
 
-    A ring signatura es a type of signature scheme, where the signer chooses a set of people who will participate in the signature scheme with them. The set is known as the `ring`. The people chosen do not need to know that they are chosen, and do not need to actively participate in the scheme (non-interactive); the signer only needs their public keys. 
+    A ring signature is a type of signature scheme, where the signer chooses a set of people who will participate in the signature scheme with them. The set is known as the `ring`. The people chosen do not need to know that they are chosen, and do not need to actively participate in the scheme (non-interactive); the signer only needs their public keys. 
 
     The reason for using a ring signature which is based upon a group signature, is due to anonymity. An outside party cannot be certain which member of the ring signed the message, however they can validate that the message was signed by someone in the ring.
 
