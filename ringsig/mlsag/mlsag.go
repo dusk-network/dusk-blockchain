@@ -48,8 +48,6 @@ func Sign(m []byte, mixin []ristretto.Point, sK ristretto.Scalar) RingSignature 
 		sVals[i] = s
 	}
 
-	// TODO:Remove this later on to have only one c value
-	// to save space, as noted in the paper
 	cVals := make([]ristretto.Scalar, len(mixin)+1)
 
 	// Lj = alpha * G
