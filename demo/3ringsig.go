@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/toghrulmaharramov/dusk-go/ringsig/mlsag"
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
@@ -31,17 +32,17 @@ func ringsig() {
 		mixin = append(mixin, ranPoint)
 	}
 
-	// start := time.Now()
+	start := time.Now()
 	rs := mlsag.Sign(Transaction, mixin, sK)
-	// elapsed := time.Since(start)
-	// fmt.Println("Time taken to Sign ", elapsed)
+	elapsed := time.Since(start)
+	fmt.Println("Time taken to Sign ", elapsed)
+
+	start = time.Now()
+	res := mlsag.Verify(Transaction, rs)
+	elapsed = time.Since(start)
+	fmt.Println("Time taken to Verify ", elapsed)
 
 	fmt.Println("Key Image is ", rs.I)
-
-	// start = time.Now()
-	res := mlsag.Verify([]byte("hello world"), rs)
-	// elapsed = time.Since(start)
-	// fmt.Println("Time taken to Verify ", elapsed)
 
 	if res {
 		fmt.Println("Signature is valid")
