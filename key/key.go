@@ -202,6 +202,27 @@ func (k *Key) StealthAddress() (ristretto.Point, ristretto.Point, error) {
 	return P, R, nil
 }
 
+// DidReceiveTx takes the P and R values and then
+// checks whether the tx was intended for the key
+// assosciated
+func (k *Key) DidReceiveTx(P, R ristretto.Point) (*ristretto.Scalar, bool) {
+	Dprime := R.ScalarMult(&R, k.PrivateView)
+
+	var s ristretto.Scalar
+	fprime := s.Derive(Dprime.Bytes())
+
+	var Fprime ristretto.Point
+	Fprime.ScalarMultBase(fprime)
+
+	Pprime := Fprime.Add(k.PublicSpend, &Fprime)
+
+	if P.Equals(Pprime) {
+		x := fprime.Add(fprime, k.PrivateSpend)
+		return x, true
+	}
+	return nil, false
+}
+
 func privateToPublic(s *ristretto.Scalar) *ristretto.Point {
 	var p ristretto.Point
 	return p.ScalarMultBase(s)

@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/toghrulmaharramov/dusk-go/crypto"
 	"github.com/toghrulmaharramov/dusk-go/key"
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
 
 func TestNewAddress(t *testing.T) {
@@ -93,16 +92,6 @@ func TestStealth(t *testing.T) {
 	P, R, err := Alice.StealthAddress()
 	assert.Equal(t, nil, err)
 
-	Dprime := R.ScalarMult(&R, Alice.PrivateView)
-
-	var s ristretto.Scalar
-	fprime := s.Derive(Dprime.Bytes())
-
-	var G ristretto.Point
-
-	Fprime := G.ScalarMultBase(fprime)
-
-	Pprime := Fprime.Add(Alice.PublicSpend, Fprime)
-
-	assert.Equal(t, Pprime.Bytes(), P.Bytes())
+	_, ok := Alice.DidReceiveTx(P, R)
+	assert.Equal(t, true, ok)
 }
