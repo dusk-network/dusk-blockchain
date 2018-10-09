@@ -1,5 +1,5 @@
 package main
 
-func main() {
-	ringsig()
-}
+// func main() {
+// 	ringsig()
+// }
