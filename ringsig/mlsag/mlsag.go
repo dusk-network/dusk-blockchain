@@ -2,8 +2,11 @@ package mlsag
 
 // This package references the MLSAG described on pg4: https://lab.getmonero.org/pubs/MRL-0005.pdf
 import (
+	"bytes"
 	"math/rand"
 	"time"
+
+	"github.com/toghrulmaharramov/dusk-go/util/bytesutil"
 
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
@@ -60,11 +63,9 @@ func Sign(m []byte, mixin []ristretto.Point, sK ristretto.Scalar) RingSignature 
 
 	// c_j+1 = Hs(m, Lj, Rj)
 	var cPlus1 ristretto.Scalar
-	var hCon []byte
-	hCon = append(hCon, m...)
-	hCon = append(hCon, Lj.Bytes()...)
-	hCon = append(hCon, Rj.Bytes()...)
-	cPlus1.Derive(hCon)
+	buf := new(bytes.Buffer)
+	bytesutil.Append(buf, m, Lj.Bytes(), Rj.Bytes())
+	cPlus1.Derive(buf.Bytes())
 
 	jPlus1 := (j + 1) % len(cVals)
 	cVals[jPlus1] = cPlus1
@@ -102,8 +103,8 @@ func Sign(m []byte, mixin []ristretto.Point, sK ristretto.Scalar) RingSignature 
 }
 
 func Verify(m []byte, ringsig RingSignature) bool {
-	// Two conditions are that:
 
+	// Two conditions are that:
 	// c_n+1 = c1 in 1 i mod n
 	// For all i, c_i+1 = H(m, L_i, R_i)
 
@@ -138,13 +139,12 @@ func Verify(m []byte, ringsig RingSignature) bool {
 	}
 
 	for i := range Cs {
-		h := []byte{}
-		h = append(h, m...)
-		h = append(h, Ls[i].Bytes()...)
-		h = append(h, Rs[i].Bytes()...)
+
+		buf := new(bytes.Buffer)
+		bytesutil.Append(buf, m, Ls[i].Bytes(), Rs[i].Bytes())
 
 		var cPlus1 ristretto.Scalar
-		cPlus1.Derive(h)
+		cPlus1.Derive(buf.Bytes())
 
 		k := (i + 1) % len(Cs)
 
@@ -182,11 +182,9 @@ func computeCLR(message []byte, I ristretto.Point, pubKey ristretto.Point, s ris
 	R2.ScalarMult(&I, &c)
 	R.Add(&R1, &R2)
 
-	hCon := []byte{}
-	hCon = append(hCon, message...)
-	hCon = append(hCon, L.Bytes()...)
-	hCon = append(hCon, R.Bytes()...)
-	cPlus1.Derive(hCon)
+	buf := new(bytes.Buffer)
+	bytesutil.Append(buf, message, L.Bytes(), R.Bytes())
+	cPlus1.Derive(buf.Bytes())
 
 	return cPlus1, L, R
 }
