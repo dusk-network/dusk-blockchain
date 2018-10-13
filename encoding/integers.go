@@ -142,7 +142,7 @@ func (l intList) PutUint64(w io.Writer, o binary.ByteOrder, v uint64) error {
 // and then deserializes the number accordingly.
 func ReadVarInt(r io.Reader) (uint64, error) {
 	// Get discriminant from variable int
-	d, err := intSerializer.Uint8(r)
+	d, err := IntSerializer.Uint8(r)
 	if err != nil {
 		return 0, err
 	}
@@ -150,7 +150,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 	var rv uint64
 	switch d {
 	case 0xff:
-		v, err := intSerializer.Uint64(r, le)
+		v, err := IntSerializer.Uint64(r, le)
 		if err != nil {
 			return 0, err
 		}
@@ -161,7 +161,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 			return 0, fmt.Errorf("ReadCompact() : non-canonical encoding")
 		}
 	case 0xfe:
-		v, err := intSerializer.Uint32(r, le)
+		v, err := IntSerializer.Uint32(r, le)
 		if err != nil {
 			return 0, err
 		}
@@ -172,7 +172,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 			return 0, fmt.Errorf("ReadCompact() : non-canonical encoding")
 		}
 	case 0xfd:
-		v, err := intSerializer.Uint16(r, le)
+		v, err := IntSerializer.Uint16(r, le)
 		if err != nil {
 			return 0, err
 		}
@@ -192,25 +192,47 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 // WriteVarInt writes a CompactSize integer with a number of bytes depending on it's value
 func WriteVarInt(w io.Writer, v uint64) error {
 	if v < 0xfd {
-		return intSerializer.PutUint8(w, uint8(v))
+		return IntSerializer.PutUint8(w, uint8(v))
 	}
 
 	if v <= 1<<16-1 {
-		if err := intSerializer.PutUint8(w, 0xfd); err != nil {
+		if err := IntSerializer.PutUint8(w, 0xfd); err != nil {
 			return err
 		}
-		return intSerializer.PutUint16(w, le, uint16(v))
+		return IntSerializer.PutUint16(w, le, uint16(v))
 	}
 
 	if v <= 1<<32-1 {
-		if err := intSerializer.PutUint8(w, 0xfe); err != nil {
+		if err := IntSerializer.PutUint8(w, 0xfe); err != nil {
 			return err
 		}
-		return intSerializer.PutUint32(w, le, uint32(v))
+		return IntSerializer.PutUint32(w, le, uint32(v))
 	}
 
-	if err := intSerializer.PutUint8(w, 0xff); err != nil {
+	if err := IntSerializer.PutUint8(w, 0xff); err != nil {
 		return err
 	}
-	return intSerializer.PutUint64(w, le, v)
+	return IntSerializer.PutUint64(w, le, v)
+}
+
+// VarIntSerializeSize returns the number of bytes needed to serialize a CompactSize int
+// the size of v
+func VarIntSerializeSize(v uint64) int {
+	// Small enough to write in 1 byte (uint8)
+	if v < 0xfd {
+		return 1
+	}
+
+	// Discriminant byte plus 2 (uint16)
+	if v <= 1<<16-1 {
+		return 3
+	}
+
+	// Discriminant byte plus 4 (uint32)
+	if v <= 1<<32-1 {
+		return 5
+	}
+
+	// Discriminant byte plus 8 (uint64)
+	return 9
 }
