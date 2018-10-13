@@ -24,7 +24,7 @@ type intList chan []byte
 const intListCap = 1024
 
 // Declare an intList with a length of intListCap
-var intSerializer intList = make(chan []byte, intListCap)
+var IntSerializer intList = make(chan []byte, intListCap)
 
 // Borrow returns a buffer of length 8.
 func (l intList) Borrow() []byte {

@@ -15,7 +15,7 @@ type hashList chan []byte
 const hashListCap = 1024
 
 // Declare a hashList with a length of hashListCap
-var hashSerializer hashList = make(chan []byte, hashListCap)
+var HashSerializer hashList = make(chan []byte, hashListCap)
 
 // Borrow a 32 byte buffer from the hashList. If none are available, allocate one.
 func (l hashList) Borrow() []byte {
