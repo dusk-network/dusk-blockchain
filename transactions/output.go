@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"encoding/binary"
+	"github.com/toghrulmaharramov/dusk-go/encoding"
 	"io"
 )
 
@@ -11,12 +12,13 @@ type Output struct {
 }
 
 func (o *Output) Encode(w io.Writer) error {
-
-	err := binary.Write(w, binary.LittleEndian, o.Amount)
-	if err != nil {
+	if err := intSerializer.PutUint64(w, binary.LittleEndian, o.Amount); err != nil {
 		return err
 	}
 
-	err = binary.Write(w, binary.LittleEndian, o.P)
-	return err
+	if err := encoding.WriteHash(w, o.P); err != nil {
+		return err
+	}
+
+	return nil
 }
