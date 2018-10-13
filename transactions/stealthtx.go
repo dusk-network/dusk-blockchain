@@ -1,5 +1,10 @@
 package transactions
 
+import (
+	"encoding/binary"
+	"io"
+)
+
 type Stealth struct {
 	Version uint8          // 1 byte
 	Type    uint8          // 1 byte
@@ -13,14 +18,20 @@ type TypeAttributes struct {
 	Outputs  []Output // n * 40 bytes
 }
 
-type Input struct {
-	KeyImage  []byte // 32 bytes
-	TxID      []byte // 32 bytes
-	Index     uint8  // 1 byte
-	Signature []byte // ~2500 bytes
-}
+func (s *Stealth) Encode(w io.Writer) error {
+	err := binary.Write(w, binary.LittleEndian, s.Version)
+	if err != nil {
+		return err
+	}
+	err = binary.Write(w, binary.LittleEndian, s.Type)
+	if err != nil {
+		return err
+	}
+	err = binary.Write(w, binary.LittleEndian, s.R)
+	if err != nil {
+		return err
+	}
+	err = s.TA.Encode(w)
+	return err
 
-type Output struct {
-	Amount uint64 // 8 bytes
-	P      []byte // 32 bytes
 }
