@@ -5,11 +5,6 @@ import (
 	"io"
 )
 
-var (
-	intSerializer = encoding.IntSerializer
-	hashSerializer = encoding.HashSerializer
-)
-
 type Stealth struct {
 	Version uint8          // 1 byte
 	Type    uint8          // 1 byte
@@ -17,26 +12,54 @@ type Stealth struct {
 	TA      TypeAttributes // (m * 2565) + 32 + (n * 40) m = # inputs, n = # of outputs
 }
 
-type TypeAttributes struct {
-	Inputs   []Input  //  m * 2565 bytes
-	TxPubKey []byte   // 32 bytes
-	Outputs  []Output // n * 40 bytes
-}
-
+// Encode will serialize a stealthtx in byte format to w.
 func (s *Stealth) Encode(w io.Writer) error {
-	if err := intSerializer.PutUint8(w, s.Version); err != nil {
+	// Version
+	if err := encoding.PutUint8(w, s.Version); err != nil {
 		return err
 	}
 
-	if err := intSerializer.PutUint8(w, s.Type); err != nil {
+	// Type
+	if err := encoding.PutUint8(w, s.Type); err != nil {
 		return err
 	}
 
+	// R
 	if err := encoding.WriteHash(w, s.R); err != nil {
 		return err
 	}
 
+	// TA
 	err := s.TA.Encode(w)
+	return err
+}
+
+// Decode will deserialize a stealthtx from r and populate the Stealth object it was passed.
+func (s *Stealth) Decode(r io.Reader) error {
+	// Version
+	version, err := encoding.Uint8(r)
+	if err != nil {
+		return err
+	}
+	s.Version = version
+
+	// Type
+	txType, err := encoding.Uint8(r)
+	if err != nil {
+		return err
+	}
+	s.Type = txType
+
+	// R
+	R, err := encoding.ReadHash(r)
+	if err != nil {
+		return err
+	}
+	s.R = append(s.R, R...)
+
+	// TA
+	err = s.TA.Decode(r)
+
 	return err
 }
 
@@ -47,25 +70,26 @@ func (s *Stealth) Encode(w io.Writer) error {
 func (s *Stealth) GetEncodeSize() uint64 {
 	var size uint64
 
-	size += 1 // Version
-	size += 1 // Type
+	size += 1  // Version
+	size += 1  // Type
 	size += 32 // R
 
 	// TA
 	// Inputs
 	lenIn := uint64(len(s.TA.Inputs))
 	size += uint64(encoding.VarIntSerializeSize(lenIn)) // Inputs length prefix
-	size += 65 * lenIn // KeyImage, TxID, Index * amount of Inputs
+	size += 65 * lenIn                                  // KeyImage, TxID, Index * amount of Inputs
 	for _, input := range s.TA.Inputs {
 		lenSig := uint64(len(input.Signature))
 		size += uint64(encoding.VarIntSerializeSize(lenSig)) // Signature length prefix
-		size += lenSig // Signature
+		size += lenSig                                       // Signature
 	}
 
+	// Outputs
 	lenOut := uint64(len(s.TA.Outputs))
-	size += 32 // TxPubKey
+	size += 32                                           // TxPubKey
 	size += uint64(encoding.VarIntSerializeSize(lenOut)) // Outputs length prefix
-	size += 40 * lenOut // Outputs
+	size += 40 * lenOut                                  // Outputs
 
 	return size
 }
