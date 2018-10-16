@@ -5,6 +5,7 @@ package bulletproof
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
@@ -54,7 +55,7 @@ func vecExp(a, b []ristretto.Scalar) (ristretto.Point, error) {
 		return result, errors.New("length of scalar a does not equal length of scalar b")
 	}
 
-	if len(a) <= N*M {
+	if len(a) < N*M {
 		return result, errors.New("length of scalar a is not less than N*M")
 	}
 
@@ -77,7 +78,7 @@ func vecExp(a, b []ristretto.Scalar) (ristretto.Point, error) {
 // Given a scalar, construct a vector of powers
 func vecPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 
-	var res []ristretto.Scalar
+	res := make([]ristretto.Scalar, n)
 
 	if n == 0 {
 		return res
@@ -165,7 +166,7 @@ func vecSub(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 		return nil, errors.New("Length of a does not equal b")
 	}
 
-	var res []ristretto.Scalar
+	res := make([]ristretto.Scalar, len(a))
 
 	for i := 0; i < len(a); i++ {
 		res[i].Sub(&a[i], &b[i])
@@ -221,7 +222,7 @@ func scInv(a ristretto.Scalar) *ristretto.Scalar {
 // hashCacheMash will take an existing hashCache
 // add n amount of byte slices
 // then return it all using hashToScalar
-func hashCacheMash(hashCache ristretto.Scalar, mashes ...[]byte) *ristretto.Scalar {
+func hashCacheMash(hashCache ristretto.Scalar, mashes ...[]byte) ristretto.Scalar {
 
 	data := []byte{}
 	data = append(data, hashCache.Bytes()...)
@@ -230,7 +231,7 @@ func hashCacheMash(hashCache ristretto.Scalar, mashes ...[]byte) *ristretto.Scal
 		data = append(data, mash...)
 	}
 
-	var s *ristretto.Scalar
+	var s ristretto.Scalar
 	s.Derive(data)
 	return s
 }
@@ -311,6 +312,98 @@ func Prove(v, gamma ristretto.Scalar) (Proof, error) {
 		return Proof{}, errors.New("Wrong Value for AL")
 	}
 
+	// PAPER LINES 38-39
+	var alpha ristretto.Scalar
+	alpha.Rand()
+
+	var alpG ristretto.Point
+	alpG.ScalarMultBase(&alpha)
+
+	A, err := vecExp(aL[:], aR[:])
+	if err != nil {
+		fmt.Println(len(aL), len(aR), M*N)
+		return Proof{}, err
+	}
+	A.Add(&A, &alpG)
+
+	// PAPER LINES 40-42
+	var sL, sR [N]ristretto.Scalar
+	for i := 0; i < N; i++ {
+		var randA ristretto.Scalar
+		randA.Rand()
+		sL[i] = randA
+
+		var randB ristretto.Scalar
+		randB.Rand()
+		sR[i] = randB
+	}
+
+	var rho ristretto.Scalar
+	rho.Rand()
+	S, err := vecExp(sL[:], sR[:])
+	if err != nil {
+		return Proof{}, err
+	}
+	var rhoG ristretto.Point
+	rhoG.ScalarMultBase(&rho)
+	S.Add(&S, &rhoG)
+
+	// PAPER LINES 43-45
+	hashCache = hashCacheMash(hashCache, A.Bytes(), S.Bytes())
+	y := hashCache
+	hashCache.Derive(hashCache.Bytes())
+	z := hashCache
+
+	var t0, tempZ ristretto.Scalar
+
+	tempZ = z
+	vp1 := vecPowers(one, N)
+	vpy := vecPowers(y, N)
+	if err != nil {
+		return Proof{}, err
+	}
+	ip, err := innerProduct(vp1, vpy)
+	if err != nil {
+		return Proof{}, err
+	}
+	t0.Add(&t0, tempZ.Mul(&z, &ip))
+	tempZ = z
+	t0.Add(&t0, tempZ.Square(&tempZ).Mul(&tempZ, &v))
+
+	k := computeK(&y, &z)
+	t0.Add(&t0, &k)
+
+	// DEBUG: Test the value of t0 has the correct form
+
+	hd, err := hadamard(aR[:], vecPowers(y, N))
+	if err != nil {
+		return Proof{}, err
+	}
+	ipt0, err := innerProduct(aL[:], hd)
+	if err != nil {
+		return Proof{}, err
+	}
+	test_t0 := ipt0
+
+	vS, err := vecSub(aL[:], aR[:])
+	if err != nil {
+		return Proof{}, err
+	}
+	ipt1, err := innerProduct(vS, vecPowers(y, N))
+	if err != nil {
+		return Proof{}, err
+	}
+	test_t0.Add(&test_t0, &ipt1)
+
+	var two ristretto.Scalar
+	two.SetBigInt(big.NewInt(2))
+	ipt2, err := innerProduct(vecPowers(two, N), aL[:])
+	test_t0.Add(&test_t0, &ipt2)
+
+	test_t0.Add(&test_t0, &k)
+	if test_t0.Equals(&t0) {
+		return Proof{}, errors.New("Wrong value for t0")
+	}
 	return Proof{}, nil
 }
 
