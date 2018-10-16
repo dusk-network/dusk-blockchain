@@ -1,37 +1,38 @@
 package transactions
 
 import (
-	"encoding/binary"
+	"github.com/toghrulmaharramov/dusk-go/encoding"
 	"io"
 )
 
 func (t *TypeAttributes) Encode(w io.Writer) error {
 
-	//Inputs
-	lenIn := len(t.Inputs)
-	err := binary.Write(w, binary.LittleEndian, uint64(lenIn)) // replace with varuint
-	if err != nil {
+	// Inputs
+	lenIn := uint64(len(t.Inputs))
+	if err := encoding.WriteVarInt(w, lenIn); err != nil {
 		return err
 	}
 
 	for _, in := range t.Inputs {
-		err = in.Encode(w)
-		if err != nil {
+		if err := in.Encode(w); err != nil {
 			return err
 		}
 	}
 
-	err = binary.Write(w, binary.LittleEndian, t.TxPubKey)
-	if err != nil {
+	if err := encoding.WriteHash(w, t.TxPubKey); err != nil {
 		return err
 	}
-	lenOut := len(t.Outputs)
-	err = binary.Write(w, binary.LittleEndian, uint64(lenOut)) // replace with varuint
+
+	lenOut := uint64(len(t.Outputs))
+	if err := encoding.WriteVarInt(w, lenOut); err != nil {
+		return err
+	}
+
 	for _, out := range t.Outputs {
-		err = out.Encode(w)
-		if err != nil {
+		if err := out.Encode(w); err != nil {
 			return err
 		}
 	}
-	return err
+
+	return nil
 }
