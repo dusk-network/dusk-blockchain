@@ -1,4 +1,4 @@
-// Variable length byte data serialization functions
+// Variable length data serialization functions
 package encoding
 
 import "io"
@@ -26,5 +26,21 @@ func WriteVarBytes(w io.Writer, b []byte) error {
 	}
 
 	_, err := w.Write(b)
+	return err
+}
+
+// Convenience functions for strings. They will point to the functions above and
+// handle type conversion.
+
+func ReadString(r io.Reader) (string, error) {
+	b, err := ReadVarBytes(r)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func WriteString(w io.Writer, s string) error {
+	err := WriteVarBytes(w, []byte(s))
 	return err
 }

@@ -6,16 +6,17 @@ import (
 	"io"
 )
 
-// hashList is a simple free list of buffers that can be used for deserializing hashes
-// in a more efficient way.
+// Set up a free list of buffers for use by the functions in this source file.
+// This approach will reduce the amount of memory allocations when the software is
+// deserializing hashes and will help to increase performance.
 type hashList chan []byte
 
 // Amount of buffers we can fit in the list. At maximum capacity this list will take up
 // 8 * 1024 = 8192 bytes or 8KB of memory.
 const hashListCap = 1024
 
-// Declare a hashList with a length of hashListCap
-var HashSerializer hashList = make(chan []byte, hashListCap)
+// Declare a hashList with a length of hashListCap.
+var hashSerializer hashList = make(chan []byte, hashListCap)
 
 // Borrow a 32 byte buffer from the hashList. If none are available, allocate one.
 func (l hashList) Borrow() []byte {
@@ -42,19 +43,18 @@ func (l hashList) Return(b []byte) {
 	}
 }
 
-// Hash deserialization function. Hashes are stored as a slice of 32 bytes, so we can
-// use the free list to get it out.
-func (l hashList) ReadHash(r io.Reader) ([]byte, error) {
-	b := l.Borrow()[:32]
-	defer l.Return(b)
+// Hash deserialization function. Will read the content from r and return it as a slice of bytes.
+func ReadHash(r io.Reader) ([]byte, error) {
+	b := hashSerializer.Borrow()[:32]
+	defer hashSerializer.Return(b)
 	if _, err := io.ReadFull(r, b); err != nil {
 		return nil, err
 	}
-	return b, nil
+	return b[:32], nil
 }
 
 // WriteHash will check the hash length and then write the data to w. If an error
-// is encountered, return it
+// is encountered, return it.
 func WriteHash(w io.Writer, hash []byte) error {
 	if len(hash) != 32 {
 		return fmt.Errorf("hash is not proper size - expected 32 bytes, is actually %d bytes", len(hash))

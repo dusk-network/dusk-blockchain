@@ -12,21 +12,19 @@ var (
 	le = binary.LittleEndian
 )
 
-// intList is a simple free list of buffers that can be used by integer
-// serialization functions, converting them to and from their binary encoding.
-// This approach allows for concurrent serialization to happen without having
-// a lot of memory allocations going on at the same time. Slices of bytes
-// must be borrowed and returned with a length of 8 bytes.
+// Set up a free list of buffers for use by the functions in this source file.
+// This approach will reduce the amount of memory allocations when the software is
+// serializing/deserializing integers and will help to increase performance.
 type intList chan []byte
 
 // Amount of buffers we can fit in the list. At maximum capacity this list will take up
 // 8 * 1024 = 8192 bytes or 8KB of memory.
 const intListCap = 1024
 
-// Declare an intList with a length of intListCap
-var IntSerializer intList = make(chan []byte, intListCap)
+// Declare an intList with a length of intListCap.
+var intSerializer intList = make(chan []byte, intListCap)
 
-// Borrow returns a buffer of length 8.
+// Borrow returns a buffer of length 8. If none are available, allocate one.
 func (l intList) Borrow() []byte {
 	var b []byte
 	select {
@@ -54,22 +52,20 @@ func (l intList) Return(b []byte) {
 // Base integer serialization functions
 
 // Read single byte
-func (l intList) Uint8(r io.Reader) (uint8, error) {
-	b := l.Borrow()[:1]
-	defer l.Return(b)
+func Uint8(r io.Reader) (uint8, error) {
+	b := intSerializer.Borrow()[:1]
+	defer intSerializer.Return(b)
 	if _, err := io.ReadFull(r, b); err != nil {
-		l.Return(b)
 		return 0, err
 	}
 	return b[0], nil
 }
 
 // Read two bytes
-func (l intList) Uint16(r io.Reader, o binary.ByteOrder) (uint16, error) {
-	b := l.Borrow()[:2]
-	defer l.Return(b)
+func Uint16(r io.Reader, o binary.ByteOrder) (uint16, error) {
+	b := intSerializer.Borrow()[:2]
+	defer intSerializer.Return(b)
 	if _, err := io.ReadFull(r, b); err != nil {
-		l.Return(b)
 		return 0, err
 	}
 	rv := o.Uint16(b)
@@ -77,11 +73,10 @@ func (l intList) Uint16(r io.Reader, o binary.ByteOrder) (uint16, error) {
 }
 
 // Read four bytes
-func (l intList) Uint32(r io.Reader, o binary.ByteOrder) (uint32, error) {
-	b := l.Borrow()[:4]
-	defer l.Return(b)
+func Uint32(r io.Reader, o binary.ByteOrder) (uint32, error) {
+	b := intSerializer.Borrow()[:4]
+	defer intSerializer.Return(b)
 	if _, err := io.ReadFull(r, b); err != nil {
-		l.Return(b)
 		return 0, err
 	}
 	rv := o.Uint32(b)
@@ -89,11 +84,10 @@ func (l intList) Uint32(r io.Reader, o binary.ByteOrder) (uint32, error) {
 }
 
 // Read eight bytes
-func (l intList) Uint64(r io.Reader, o binary.ByteOrder) (uint64, error) {
-	b := l.Borrow()[:8]
-	defer l.Return(b)
+func Uint64(r io.Reader, o binary.ByteOrder) (uint64, error) {
+	b := intSerializer.Borrow()[:8]
+	defer intSerializer.Return(b)
 	if _, err := io.ReadFull(r, b); err != nil {
-		l.Return(b)
 		return 0, err
 	}
 	rv := o.Uint64(b)
@@ -101,36 +95,36 @@ func (l intList) Uint64(r io.Reader, o binary.ByteOrder) (uint64, error) {
 }
 
 // Write single byte
-func (l intList) PutUint8(w io.Writer, v uint8) error {
-	b := l.Borrow()[:1]
-	defer l.Return(b)
+func PutUint8(w io.Writer, v uint8) error {
+	b := intSerializer.Borrow()[:1]
+	defer intSerializer.Return(b)
 	b[0] = v
 	_, err := w.Write(b)
 	return err
 }
 
 // Write two bytes
-func (l intList) PutUint16(w io.Writer, o binary.ByteOrder, v uint16) error {
-	b := l.Borrow()[:2]
-	defer l.Return(b)
+func PutUint16(w io.Writer, o binary.ByteOrder, v uint16) error {
+	b := intSerializer.Borrow()[:2]
+	defer intSerializer.Return(b)
 	o.PutUint16(b, v)
 	_, err := w.Write(b)
 	return err
 }
 
 // Write four bytes
-func (l intList) PutUint32(w io.Writer, o binary.ByteOrder, v uint32) error {
-	b := l.Borrow()[:4]
-	defer l.Return(b)
+func PutUint32(w io.Writer, o binary.ByteOrder, v uint32) error {
+	b := intSerializer.Borrow()[:4]
+	defer intSerializer.Return(b)
 	o.PutUint32(b, v)
 	_, err := w.Write(b)
 	return err
 }
 
 // Write eight bytes
-func (l intList) PutUint64(w io.Writer, o binary.ByteOrder, v uint64) error {
-	b := l.Borrow()[:8]
-	defer l.Return(b)
+func PutUint64(w io.Writer, o binary.ByteOrder, v uint64) error {
+	b := intSerializer.Borrow()[:8]
+	defer intSerializer.Return(b)
 	o.PutUint64(b, v)
 	_, err := w.Write(b)
 	return err
@@ -142,7 +136,7 @@ func (l intList) PutUint64(w io.Writer, o binary.ByteOrder, v uint64) error {
 // and then deserializes the number accordingly.
 func ReadVarInt(r io.Reader) (uint64, error) {
 	// Get discriminant from variable int
-	d, err := IntSerializer.Uint8(r)
+	d, err := Uint8(r)
 	if err != nil {
 		return 0, err
 	}
@@ -150,7 +144,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 	var rv uint64
 	switch d {
 	case 0xff:
-		v, err := IntSerializer.Uint64(r, le)
+		v, err := Uint64(r, le)
 		if err != nil {
 			return 0, err
 		}
@@ -161,7 +155,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 			return 0, fmt.Errorf("ReadCompact() : non-canonical encoding")
 		}
 	case 0xfe:
-		v, err := IntSerializer.Uint32(r, le)
+		v, err := Uint32(r, le)
 		if err != nil {
 			return 0, err
 		}
@@ -172,7 +166,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 			return 0, fmt.Errorf("ReadCompact() : non-canonical encoding")
 		}
 	case 0xfd:
-		v, err := IntSerializer.Uint16(r, le)
+		v, err := Uint16(r, le)
 		if err != nil {
 			return 0, err
 		}
@@ -192,27 +186,27 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 // WriteVarInt writes a CompactSize integer with a number of bytes depending on it's value
 func WriteVarInt(w io.Writer, v uint64) error {
 	if v < 0xfd {
-		return IntSerializer.PutUint8(w, uint8(v))
+		return PutUint8(w, uint8(v))
 	}
 
 	if v <= 1<<16-1 {
-		if err := IntSerializer.PutUint8(w, 0xfd); err != nil {
+		if err := PutUint8(w, 0xfd); err != nil {
 			return err
 		}
-		return IntSerializer.PutUint16(w, le, uint16(v))
+		return PutUint16(w, le, uint16(v))
 	}
 
 	if v <= 1<<32-1 {
-		if err := IntSerializer.PutUint8(w, 0xfe); err != nil {
+		if err := PutUint8(w, 0xfe); err != nil {
 			return err
 		}
-		return IntSerializer.PutUint32(w, le, uint32(v))
+		return PutUint32(w, le, uint32(v))
 	}
 
-	if err := IntSerializer.PutUint8(w, 0xff); err != nil {
+	if err := PutUint8(w, 0xff); err != nil {
 		return err
 	}
-	return IntSerializer.PutUint64(w, le, v)
+	return PutUint64(w, le, v)
 }
 
 // VarIntSerializeSize returns the number of bytes needed to serialize a CompactSize int
