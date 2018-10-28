@@ -5,25 +5,28 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
 	"net"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
 )
 
-// RPCServer provides a RPC server to the Dusk daemon
-type RPCServer struct {
+// Server provides a RPC server to the Dusk daemon
+type Server struct {
 	Started  bool         // Indicates whether or not server has started
 	AuthSHA  []byte       // Hash of the auth credentials
-	Config   RPCConfig    // Configuration struct for RPC server
+	Config   Config       // Configuration struct for RPC server
 	Listener net.Listener // RPC Server listener
+	StopChan chan string  // Channel to quit the daemon on 'stopnode' command
 }
 
 // NewRPCServer instantiates a new RPCServer.
-func NewRPCServer(cfg *RPCConfig) (*RPCServer, error) {
-	rpc := RPCServer{
-		Config: *cfg,
+func NewRPCServer(cfg *Config) (*Server, error) {
+	srv := Server{
+		Config:   *cfg,
+		StopChan: make(chan string),
 	}
 
 	if cfg.RPCUser != "" && cfg.RPCPassword != "" {
@@ -34,14 +37,14 @@ func NewRPCServer(cfg *RPCConfig) (*RPCServer, error) {
 			return nil, err
 		}
 
-		rpc.AuthSHA = authSHA
+		srv.AuthSHA = authSHA
 	}
 
-	return &rpc, nil
+	return &srv, nil
 }
 
 // CheckAuth checks whether supplied credentials match the server credentials.
-func (s *RPCServer) CheckAuth(r *http.Request) (bool, error) {
+func (s *Server) CheckAuth(r *http.Request) (bool, error) {
 	authHeader := r.Header["Authorization"]
 	if len(authHeader) <= 0 {
 		return false, nil
@@ -66,16 +69,16 @@ func AuthFail(w http.ResponseWriter) {
 }
 
 // Start the RPC Server and begin listening on specified port.
-func (s *RPCServer) Start() error {
+func (s *Server) Start() error {
 	s.Started = true
-	RPCServeMux := http.NewServeMux()
+	ServeMux := http.NewServeMux()
 	httpServer := &http.Server{
-		Handler:     RPCServeMux,
+		Handler:     ServeMux,
 		ReadTimeout: time.Second * 10,
 	}
 
 	// HTTP handler
-	RPCServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	ServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Connection", "close")
 		w.Header().Set("Content-Type", "application/json")
 		r.Close = true
@@ -83,33 +86,36 @@ func (s *RPCServer) Start() error {
 		// Check authentication
 		isAdmin, err := s.CheckAuth(r)
 		if err != nil {
-			AuthFail(w)
-			return
+			// AuthFail(w)
 		}
 
 		s.HandleRequest(w, r, isAdmin)
 	})
 
 	// Set up listener
-	l, err := net.Listen("tcp", ":9999")
+	l, err := net.Listen("tcp", "localhost:9999")
 	if err != nil {
 		return err
 	}
 
+	// Assign to Server
 	s.Listener = l
 
 	// Start listening
 	go func(l net.Listener) {
+		fmt.Fprintf(os.Stdout, "RPC server listening on port %v\n", s.Config.RPCPort)
 		httpServer.Serve(l)
+		fmt.Fprintf(os.Stdout, "RPC server stopped listening\n")
 	}(s.Listener)
 
 	return nil
 }
 
-func (s *RPCServer) Stop() error {
+// Stop will close the RPC server
+func (s *Server) Stop() error {
 	s.Started = false
 	if err := s.Listener.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "error shutting down RPC, %v", err)
+		fmt.Fprintf(os.Stderr, "error shutting down RPC, %v\n", err)
 		return err
 	}
 
