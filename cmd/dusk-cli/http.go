@@ -8,8 +8,8 @@ import (
 	"net/http"
 )
 
-// Simple function to send POST request to RPC server
-func SendPostRequest(JSON []byte, cfg *Config) ([]byte, error) {
+// SendPostRequest is a simple function to send POST request to RPC server and handle the response
+func SendPostRequest(JSON []byte, cfg *Config) (*Response, error) {
 	// Generate a request to the daemon RPC server
 	url := "http://localhost:" + cfg.RPCPort
 	body := bytes.NewReader(JSON)
@@ -47,10 +47,10 @@ func SendPostRequest(JSON []byte, cfg *Config) ([]byte, error) {
 	}
 
 	// Unmarshal response
-	var resp json.RawMessage
+	var resp Response
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	return &resp, nil
 }
