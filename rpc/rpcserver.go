@@ -3,23 +3,23 @@ package rpc
 import (
 	"crypto/subtle"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
+	"golang.org/x/crypto/sha3"
 )
 
 // Server provides a RPC server to the Dusk daemon
 type Server struct {
-	Started  bool         // Indicates whether or not server has started
-	AuthSHA  []byte       // Hash of the auth credentials
-	Config   Config       // Configuration struct for RPC server
-	Listener net.Listener // RPC Server listener
-	StopChan chan string  // Channel to quit the daemon on 'stopnode' command
+	Started   bool         // Indicates whether or not server has started
+	AuthSHA   []byte       // Hash of the auth credentials
+	Config    Config       // Configuration struct for RPC server
+	Listener  net.Listener // RPC Server listener
+	StartTime int64        // Time when the RPC server started up
+	StopChan  chan string  // Channel to quit the daemon on 'stopnode' command
 }
 
 // NewRPCServer instantiates a new RPCServer.
@@ -29,48 +29,34 @@ func NewRPCServer(cfg *Config) (*Server, error) {
 		StopChan: make(chan string),
 	}
 
-	if cfg.RPCUser != "" && cfg.RPCPassword != "" {
-		login := cfg.RPCUser + ":" + cfg.RPCPassword
+	if cfg.RPCUser != "" && cfg.RPCPass != "" {
+		login := cfg.RPCUser + ":" + cfg.RPCPass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
-		authSHA, err := hash.Sha3256([]byte(auth))
-		if err != nil {
-			return nil, err
-		}
+		authSHA := sha3.Sum256([]byte(auth))
 
-		srv.AuthSHA = authSHA
+		srv.AuthSHA = authSHA[:]
 	}
 
 	return &srv, nil
 }
 
 // CheckAuth checks whether supplied credentials match the server credentials.
-func (s *Server) CheckAuth(r *http.Request) (bool, error) {
+func (s *Server) CheckAuth(r *http.Request) bool {
 	authHeader := r.Header["Authorization"]
 	if len(authHeader) <= 0 {
-		return false, nil
+		return false
 	}
 
-	authSHA, err := hash.Sha3256([]byte(authHeader[0]))
-	if err != nil {
-		return false, err
-	}
-
+	authSHA := sha3.Sum256([]byte(authHeader[0]))
 	if cmp := subtle.ConstantTimeCompare(authSHA[:], s.AuthSHA[:]); cmp == 1 {
-		return true, nil
+		return true
 	}
 
-	return false, errors.New("RPC auth failure")
-}
-
-// AuthFail returns a message back to the caller indicated that authentication failed.
-func AuthFail(w http.ResponseWriter) {
-	w.Header().Add("WWW-Authenticate", `Basic realm="duskd RPC"`)
-	http.Error(w, "401 Unauthorized", http.StatusUnauthorized)
+	return false
 }
 
 // Start the RPC Server and begin listening on specified port.
 func (s *Server) Start() error {
-	s.Started = true
 	ServeMux := http.NewServeMux()
 	httpServer := &http.Server{
 		Handler:     ServeMux,
@@ -84,16 +70,12 @@ func (s *Server) Start() error {
 		r.Close = true
 
 		// Check authentication
-		isAdmin, err := s.CheckAuth(r)
-		if err != nil {
-			// AuthFail(w)
-		}
-
+		isAdmin := s.CheckAuth(r)
 		s.HandleRequest(w, r, isAdmin)
 	})
 
 	// Set up listener
-	l, err := net.Listen("tcp", "localhost:9999")
+	l, err := net.Listen("tcp", "localhost:"+s.Config.RPCPort)
 	if err != nil {
 		return err
 	}
@@ -107,6 +89,11 @@ func (s *Server) Start() error {
 		httpServer.Serve(l)
 		fmt.Fprintf(os.Stdout, "RPC server stopped listening\n")
 	}(s.Listener)
+
+	s.Started = true
+
+	// Mark start time
+	s.StartTime = time.Now().Unix()
 
 	return nil
 }

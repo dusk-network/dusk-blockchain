@@ -10,16 +10,14 @@ import (
 
 // JSONRequest defines a JSON-RPC request.
 type JSONRequest struct {
-	// ID string
 	Method string
 	Params []string
 }
 
 // JSONResponse defines a JSON-RPC response to a method call.
 type JSONResponse struct {
-	// ID string
 	Result interface{}
-	Error  error
+	Error  string
 }
 
 // HandleRequest takes a JSON-RPC request and parses it, then returns the result to the
@@ -45,29 +43,49 @@ func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
 	}
 
 	// Parse and run passed method
-	result := s.RunCmd(&req)
+	result, err := s.RunCmd(&req, isAdmin)
+	if err != nil {
+		// Request was unauthorized, so return a http.Error
+		w.Header().Add("WWW-Authenticate", `Basic realm="duskd admin RPC"`)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+	}
 
 	msg, err := json.Marshal(result)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error marshaling response: %v", err)
+		fmt.Fprintf(os.Stderr, "error marshaling response: %v\n", err)
 	}
 
 	if _, err := w.Write(msg); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing reply: %v", err)
+		fmt.Fprintf(os.Stderr, "error writing reply: %v\n", err)
 		return
 	}
 }
 
 // RunCmd parses and runs the specified method. Server is included as the receiver in case
 // the method needs to modify anything on the RPC server.
-func (s *Server) RunCmd(r *JSONRequest) *JSONResponse {
-	resp := JSONResponse{}
+func (s *Server) RunCmd(r *JSONRequest, isAdmin bool) (*JSONResponse, error) {
+	var resp JSONResponse
+
 	// Get method
-	fn := RPCCmd[r.Method]
+	fn, ok := RPCCmd[r.Method]
+	if !ok {
+		resp.Error = "method unrecognized\n"
+		return &resp, nil
+	}
+
+	// Check if it is an admin-only method first if caller is not admin
+	if !isAdmin {
+		if RPCAdminCmd[r.Method] {
+			return nil, fmt.Errorf("unauthorized call to method %v", r.Method)
+		}
+	}
 
 	// Run method and return result
 	result, err := fn(s, r.Params)
+	if err != nil {
+		resp.Error = err.Error()
+	}
+
 	resp.Result = result
-	resp.Error = err
-	return &resp
+	return &resp, nil
 }

@@ -1,13 +1,21 @@
 package rpc
 
+import "time"
+
 // Handler defines a method bound to an RPC command.
 type Handler func(*Server, []string) (interface{}, error)
 
 // RPCCmd maps method names to their actual functions.
 var RPCCmd = map[string]Handler{
 	"version":  Version,
-	"stopnode": StopNode,
 	"ping":     Pong,
+	"uptime":   Uptime,
+	"stopnode": StopNode,
+}
+
+// RPCAdminCmd holds all admin methods.
+var RPCAdminCmd = map[string]bool{
+	"stopnode": true,
 }
 
 // Version will return the version of the client.
@@ -31,4 +39,9 @@ var StopNode = func(s *Server, params []string) (interface{}, error) {
 // Pong simply returns "pong" to let the caller know the server is up.
 var Pong = func(s *Server, params []string) (interface{}, error) {
 	return "pong", nil
+}
+
+// Uptime returns the server uptime.
+var Uptime = func(s *Server, params []string) (interface{}, error) {
+	return time.Now().Unix() - s.StartTime, nil
 }
