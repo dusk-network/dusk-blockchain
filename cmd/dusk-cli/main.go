@@ -20,7 +20,7 @@ dusk-cli [options] help <command> - Show information about command and exit
 
 Options:
 --help, -h
-	Show this help message.
+	Shows information about flags and exits.
 
 -conf=<file>
 	Specify alternative config file to use (default: dusk.conf)
@@ -33,19 +33,6 @@ Options:
 
 -rpcpass=<pass>
 	Specify RPC password (default: loaded from config)`
-
-var commands = `Dusk CLI Commands:
-help
-	Print this help message
-
-version 
-	Print node version
-
-exit
-	Exits this CLI program
-
-stopnode
-	Quits duskd, then exits CLI program`
 
 var conf = flag.String("conf", "dusk.conf",
 	"Specify alternative config file to use (default: dusk.conf)")
@@ -66,28 +53,30 @@ func main() {
 
 	// See if duskd is running by sending a simple 'ping' command
 	if _, err := HandleCommand("ping", []string{}, cfg); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintf(os.Stderr, "duskd does not appear to be running on port %v, exiting...\n", cfg.RPCPort)
+		fmt.Fprintf(os.Stderr, "duskd does not appear to be running on port %v: %v\n", cfg.RPCPort, err)
 		return
 	}
 
+	args := flag.Args()
+
 	// First off, check if the program was ran with any arguments. If so, just run the specified
 	// command and exit like a standard cli utility.
-	if len(os.Args) > 1 {
-		if os.Args[1] == "help" {
-			if len(os.Args) > 2 {
-				fmt.Println(cmdMap[os.Args[2]].Help)
+	if len(args) > 1 {
+		if args[1] == "help" {
+			if len(args) > 2 {
+				fmt.Println(cmdMap[args[2]].Help)
 				return
 			}
-			fmt.Println(commands)
+			fmt.Print(ShowCommands())
 			return
 		}
 
-		method := os.Args[1]
-		params := os.Args[2:]
+		method := args[1]
+		params := args[2:]
 		resp, err := HandleCommand(method, params, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error handling command %v: %v", method, err)
+			return
 		}
 
 		fmt.Println(resp.Result)
@@ -96,8 +85,10 @@ func main() {
 	}
 
 	// If ran without a command, open up terminal interface and start taking commands.
-	// Additionally, log the overview before doing so.
+	// Additionally, log the overview and commands before doing so.
 	fmt.Println(overview)
+	fmt.Println(ShowCommands())
+
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
 		input := s.Text()
@@ -113,7 +104,7 @@ func main() {
 				fmt.Println(cmdMap[params[0]].Help)
 				continue
 			}
-			fmt.Println(commands)
+			fmt.Print(ShowCommands())
 			continue
 		}
 
@@ -124,6 +115,7 @@ func main() {
 		resp, err := HandleCommand(method, params, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error handling command %v: %v", method, err)
+			continue
 		}
 
 		fmt.Println(resp.Result)

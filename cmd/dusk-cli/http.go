@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/toghrulmaharramov/dusk-go/rpc"
 )
 
 // SendPostRequest is a simple function to send POST request to RPC server and handle the response
-func SendPostRequest(JSON []byte, cfg *Config) (*Response, error) {
+func SendPostRequest(JSON []byte, cfg *rpc.Config) (*rpc.JSONResponse, error) {
 	// Generate a request to the daemon RPC server
 	url := "http://localhost:" + cfg.RPCPort
 	body := bytes.NewReader(JSON)
@@ -20,7 +22,7 @@ func SendPostRequest(JSON []byte, cfg *Config) (*Response, error) {
 
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(cfg.RPCUser, cfg.RPCPassword)
+	req.SetBasicAuth(cfg.RPCUser, cfg.RPCPass)
 
 	// Create client
 	client := http.Client{}
@@ -47,7 +49,7 @@ func SendPostRequest(JSON []byte, cfg *Config) (*Response, error) {
 	}
 
 	// Unmarshal response
-	var resp Response
+	var resp rpc.JSONResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, err
 	}

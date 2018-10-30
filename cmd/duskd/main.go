@@ -12,9 +12,9 @@ import (
 
 func main() {
 	conf := rpc.Config{
-		RPCUser:     "dusk123",
-		RPCPassword: "duskpass",
-		RPCPort:     "9999",
+		RPCUser: "dusk123",
+		RPCPass: "duskpass",
+		RPCPort: "9999",
 	}
 
 	srv, err := rpc.NewRPCServer(&conf)

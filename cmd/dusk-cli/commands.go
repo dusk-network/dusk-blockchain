@@ -1,7 +1,14 @@
 package main
 
-// Command defines a CLI command and holds it's explanation and required parameters.
+import (
+	"errors"
+
+	"github.com/toghrulmaharramov/dusk-go/rpc"
+)
+
+// Command defines a CLI command and holds it's properties.
 type Command struct {
+	Method string
 	Help   string
 	Params []string
 }
@@ -9,32 +16,43 @@ type Command struct {
 // cmdMap is a mapping of CLI command method names and their corresponding structs.
 var cmdMap = make(map[string]Command)
 
-var versionCmd = Command{
-	Help: "Print node version.",
-}
+// commands is an array of all the commands available to call in the CLI.
+var commands = []Command{
+	Command{
+		Method: "version",
+		Help:   "Print node version.",
+	},
 
-var exitCmd = Command{
-	Help: "Exit this program. Exiting this program does not mean that the node will shut down.",
-}
+	Command{
+		Method: "exit",
+		Help:   "Exit this program. Exiting this program does not mean that the node will shut down.",
+	},
 
-var stopNodeCmd = Command{
-	Help: "Shuts down the node and exits this program.",
-}
+	Command{
+		Method: "stopnode",
+		Help:   "Shuts down the node and exits this program.",
+	},
 
-var pingCmd = Command{
-	Help: "Ping RPC server to verify that it's up",
+	Command{
+		Method: "ping",
+		Help:   "Ping RPC server to verify that it's up",
+	},
+
+	Command{
+		Method: "uptime",
+		Help:   "Show RPC server uptime in seconds",
+	},
 }
 
 func init() {
-	cmdMap["version"] = versionCmd
-	cmdMap["exit"] = exitCmd
-	cmdMap["stopnode"] = stopNodeCmd
-	cmdMap["ping"] = pingCmd
+	for _, cmd := range commands {
+		cmdMap[cmd.Method] = cmd
+	}
 }
 
 // HandleCommand takes the passed method and parameters, marshals them into a JSON
 // request and sends a POST request to the RPC server.
-func HandleCommand(method string, params []string, cfg *Config) (*Response, error) {
+func HandleCommand(method string, params []string, cfg *rpc.Config) (*rpc.JSONResponse, error) {
 	// Marshal passed method and params
 	msg, err := MarshalCmd(method, params)
 	if err != nil {
@@ -48,9 +66,22 @@ func HandleCommand(method string, params []string, cfg *Config) (*Response, erro
 	}
 
 	// Handle result
-	if resp.Error != nil {
-		return nil, resp.Error
+	if resp.Error != "" {
+		return nil, errors.New(resp.Error)
 	}
 
 	return resp, nil
+}
+
+// ShowCommands iterates over the commands array and creates a string with all commands
+// and their descriptions to be printed to the terminal.
+func ShowCommands() string {
+	var res string
+	res += "Dusk CLI Commands:\n\n"
+	for _, cmd := range commands {
+		res += cmd.Method + "\n"
+		res += "	" + cmd.Help + "\n\n"
+	}
+
+	return res
 }
