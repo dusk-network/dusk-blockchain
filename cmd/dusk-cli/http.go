@@ -43,9 +43,15 @@ func SendPostRequest(JSON []byte, cfg *rpc.Config) (*rpc.JSONResponse, error) {
 	// Handle error codes
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
 		if len(respBytes) == 0 {
-			return nil, fmt.Errorf("%d %s", httpResp.StatusCode, http.StatusText(httpResp.StatusCode))
+			return &rpc.JSONResponse{
+				Result: "error",
+				Error:  fmt.Sprintf("%d %s", httpResp.StatusCode, http.StatusText(httpResp.StatusCode)),
+			}, nil
 		}
-		return nil, fmt.Errorf("%s", respBytes)
+		return &rpc.JSONResponse{
+			Result: "error",
+			Error:  fmt.Sprintf("%d %v: %s", httpResp.StatusCode, http.StatusText(httpResp.StatusCode), respBytes),
+		}, nil
 	}
 
 	// Unmarshal response

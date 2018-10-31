@@ -61,18 +61,18 @@ func main() {
 
 	// First off, check if the program was ran with any arguments. If so, just run the specified
 	// command and exit like a standard cli utility.
-	if len(args) > 1 {
-		if args[1] == "help" {
-			if len(args) > 2 {
-				fmt.Println(cmdMap[args[2]].Help)
+	if len(args) > 0 {
+		if args[0] == "help" {
+			if len(args) > 1 {
+				fmt.Println(cmdMap[args[1]].Help)
 				return
 			}
 			fmt.Print(ShowCommands())
 			return
 		}
 
-		method := args[1]
-		params := args[2:]
+		method := args[0]
+		params := args[1:]
 		resp, err := HandleCommand(method, params, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error handling command %v: %v", method, err)
@@ -104,7 +104,7 @@ func main() {
 				fmt.Println(cmdMap[params[0]].Help)
 				continue
 			}
-			fmt.Print(ShowCommands())
+			fmt.Println(ShowCommands())
 			continue
 		}
 

@@ -42,6 +42,13 @@ var commands = []Command{
 		Method: "uptime",
 		Help:   "Show RPC server uptime in seconds",
 	},
+
+	// This command is mainly here for testing parameter passing. It can be removed.
+	Command{
+		Method: "hash",
+		Help:   "Return the hash for each string passed",
+		Params: []string{"text..."},
+	},
 }
 
 func init() {
@@ -80,7 +87,15 @@ func ShowCommands() string {
 	res += "Dusk CLI Commands:\n\n"
 	for _, cmd := range commands {
 		res += cmd.Method + "\n"
-		res += "	" + cmd.Help + "\n\n"
+		res += "	" + cmd.Help + "\n"
+		if len(cmd.Params) > 0 {
+			var params string
+			for _, p := range cmd.Params {
+				params += "[" + p + "]"
+			}
+
+			res += "	Params: " + params + "\n"
+		}
 	}
 
 	return res

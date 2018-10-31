@@ -19,7 +19,7 @@ func LoadConfig() (*rpc.Config, error) {
 	}
 
 	// Create config file if it doesn't exist yet
-	if err := cfg.LoadConfig(); err != nil {
+	if err := cfg.Load(); err != nil {
 		return nil, err
 	}
 
