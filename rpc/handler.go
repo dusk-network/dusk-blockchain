@@ -16,7 +16,7 @@ type JSONRequest struct {
 
 // JSONResponse defines a JSON-RPC response to a method call.
 type JSONResponse struct {
-	Result interface{}
+	Result string
 	Error  string
 }
 
@@ -69,7 +69,8 @@ func (s *Server) RunCmd(r *JSONRequest, isAdmin bool) (*JSONResponse, error) {
 	// Get method
 	fn, ok := RPCCmd[r.Method]
 	if !ok {
-		resp.Error = "method unrecognized\n"
+		resp.Result = "error"
+		resp.Error = "method unrecognized"
 		return &resp, nil
 	}
 

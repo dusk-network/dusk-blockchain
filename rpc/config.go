@@ -16,8 +16,8 @@ type Config struct {
 	RPCPort string // Port to bind the RPC server on
 }
 
-// LoadConfig will load a config file into cfg.
-func (cfg *Config) LoadConfig() error {
+// Load will load a config file into cfg.
+func (cfg *Config) Load() error {
 	// Retrieve binary path
 	appPath, err := os.Executable()
 	if err != nil {
