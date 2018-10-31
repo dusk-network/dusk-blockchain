@@ -1,4 +1,5 @@
 // Hash serialization functions
+
 package encoding
 
 import (
@@ -43,7 +44,8 @@ func (l hashList) Return(b []byte) {
 	}
 }
 
-// Hash deserialization function. Will read the content from r and return it as a slice of bytes.
+// ReadHash is a hash deserialization function. Will read the content from r and
+// return it as a slice of bytes.
 func ReadHash(r io.Reader) ([]byte, error) {
 	b := hashSerializer.Borrow()[:32]
 	defer hashSerializer.Return(b)

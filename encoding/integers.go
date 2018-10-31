@@ -1,4 +1,5 @@
 // Serialization functions for integers and CompactSize integers
+
 package encoding
 
 import (
@@ -51,7 +52,7 @@ func (l intList) Return(b []byte) {
 
 // Base integer serialization functions
 
-// Read single byte
+// Uint8 will read single byte
 func Uint8(r io.Reader) (uint8, error) {
 	b := intSerializer.Borrow()[:1]
 	defer intSerializer.Return(b)
@@ -61,7 +62,7 @@ func Uint8(r io.Reader) (uint8, error) {
 	return b[0], nil
 }
 
-// Read two bytes
+// Uint16 will read two bytes
 func Uint16(r io.Reader, o binary.ByteOrder) (uint16, error) {
 	b := intSerializer.Borrow()[:2]
 	defer intSerializer.Return(b)
@@ -72,7 +73,7 @@ func Uint16(r io.Reader, o binary.ByteOrder) (uint16, error) {
 	return rv, nil
 }
 
-// Read four bytes
+// Uint32 will read four bytes
 func Uint32(r io.Reader, o binary.ByteOrder) (uint32, error) {
 	b := intSerializer.Borrow()[:4]
 	defer intSerializer.Return(b)
@@ -83,7 +84,7 @@ func Uint32(r io.Reader, o binary.ByteOrder) (uint32, error) {
 	return rv, nil
 }
 
-// Read eight bytes
+// Uint64 will read eight bytes
 func Uint64(r io.Reader, o binary.ByteOrder) (uint64, error) {
 	b := intSerializer.Borrow()[:8]
 	defer intSerializer.Return(b)
@@ -94,7 +95,7 @@ func Uint64(r io.Reader, o binary.ByteOrder) (uint64, error) {
 	return rv, nil
 }
 
-// Write single byte
+// PutUint8 will write a single byte
 func PutUint8(w io.Writer, v uint8) error {
 	b := intSerializer.Borrow()[:1]
 	defer intSerializer.Return(b)
@@ -103,7 +104,7 @@ func PutUint8(w io.Writer, v uint8) error {
 	return err
 }
 
-// Write two bytes
+// PutUint16 will write two bytes
 func PutUint16(w io.Writer, o binary.ByteOrder, v uint16) error {
 	b := intSerializer.Borrow()[:2]
 	defer intSerializer.Return(b)
@@ -112,7 +113,7 @@ func PutUint16(w io.Writer, o binary.ByteOrder, v uint16) error {
 	return err
 }
 
-// Write four bytes
+// PutUint32 will write four bytes
 func PutUint32(w io.Writer, o binary.ByteOrder, v uint32) error {
 	b := intSerializer.Borrow()[:4]
 	defer intSerializer.Return(b)
@@ -121,7 +122,7 @@ func PutUint32(w io.Writer, o binary.ByteOrder, v uint32) error {
 	return err
 }
 
-// Write eight bytes
+// PutUint64 will write eight bytes
 func PutUint64(w io.Writer, o binary.ByteOrder, v uint64) error {
 	b := intSerializer.Borrow()[:8]
 	defer intSerializer.Return(b)
@@ -210,7 +211,7 @@ func WriteVarInt(w io.Writer, v uint64) error {
 }
 
 // VarIntSerializeSize returns the number of bytes needed to serialize a CompactSize int
-// the size of v
+// of size v
 func VarIntSerializeSize(v uint64) int {
 	// Small enough to write in 1 byte (uint8)
 	if v < 0xfd {

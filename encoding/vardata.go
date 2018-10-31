@@ -1,4 +1,5 @@
 // Variable length data serialization functions
+
 package encoding
 
 import "io"
@@ -32,6 +33,8 @@ func WriteVarBytes(w io.Writer, b []byte) error {
 // Convenience functions for strings. They will point to the functions above and
 // handle type conversion.
 
+// ReadString reads the data with ReadVarBytes and returns it as a string
+// by simple type conversion.
 func ReadString(r io.Reader) (string, error) {
 	b, err := ReadVarBytes(r)
 	if err != nil {
@@ -40,6 +43,7 @@ func ReadString(r io.Reader) (string, error) {
 	return string(b), nil
 }
 
+// WriteString will write string s as a slice of bytes through WriteVarBytes.
 func WriteString(w io.Writer, s string) error {
 	err := WriteVarBytes(w, []byte(s))
 	return err

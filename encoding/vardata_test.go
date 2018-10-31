@@ -2,10 +2,11 @@ package encoding
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Simple test case for WriteVarBytes and ReadVarBytes. This test case won't do much,

@@ -3,9 +3,10 @@ package encoding
 import (
 	"bytes"
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/toghrulmaharramov/dusk-go/crypto"
-	"testing"
 )
 
 // Basic test. This won't do much as it's already in byte representation, but is more intended to show

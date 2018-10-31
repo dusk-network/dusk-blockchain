@@ -3,8 +3,9 @@ package encoding
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Default serialization test
@@ -106,9 +107,9 @@ func TestSignedInteger(t *testing.T) {
 // Testing all the CompactSize formats
 func TestCompactSize(t *testing.T) {
 	a := uint64(1)
-	b := uint64(2^8)
-	c := uint64(2^16)
-	d := uint64(2^32)
+	b := uint64(2 ^ 8)
+	c := uint64(2 ^ 16)
+	d := uint64(2 ^ 32)
 
 	// Serialize
 	buf := new(bytes.Buffer)
