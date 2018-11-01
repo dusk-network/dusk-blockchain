@@ -47,7 +47,7 @@ func main() {
 	// Load config, parse flags
 	cfg, err := LoadConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error loading config - %v", err)
+		fmt.Fprintf(os.Stderr, "error loading config - %v\n", err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func main() {
 		params := args[1:]
 		resp, err := HandleCommand(method, params, cfg)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error handling command %v: %v", method, err)
+			fmt.Fprintf(os.Stderr, "error handling command %v: %v\n", method, err)
 			return
 		}
 
@@ -114,7 +114,7 @@ func main() {
 
 		resp, err := HandleCommand(method, params, cfg)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error handling command %v: %v", method, err)
+			fmt.Fprintf(os.Stderr, "error handling command %v: %v\n", method, err)
 			continue
 		}
 
