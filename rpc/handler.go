@@ -10,14 +10,14 @@ import (
 
 // JSONRequest defines a JSON-RPC request.
 type JSONRequest struct {
-	Method string
-	Params []string
+	Method string   `json:"method"`
+	Params []string `json:"params,omitempty"`
 }
 
 // JSONResponse defines a JSON-RPC response to a method call.
 type JSONResponse struct {
-	Result string
-	Error  string
+	Result string `json:"result"`
+	Error  string `json:"error"`
 }
 
 // HandleRequest takes a JSON-RPC request and parses it, then returns the result to the

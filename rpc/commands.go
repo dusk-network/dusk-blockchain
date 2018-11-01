@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/toghrulmaharramov/dusk-go/crypto/base58"
@@ -50,7 +51,7 @@ var Pong = func(s *Server, params []string) (string, error) {
 
 // Uptime returns the server uptime.
 var Uptime = func(s *Server, params []string) (string, error) {
-	return string(time.Now().Unix() - s.StartTime), nil
+	return strconv.FormatInt(time.Now().Unix()-s.StartTime, 10), nil
 }
 
 // Hash will return the SHA3-256 hash of each word passed.
