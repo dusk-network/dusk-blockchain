@@ -1,4 +1,4 @@
-package bulletproof
+package rangeproof
 
 // H is The other basepoint for use in Pedersen Commitments
 // H = G.HashToEC(), where G is the basepoint

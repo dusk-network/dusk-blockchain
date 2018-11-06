@@ -1,4 +1,4 @@
-package bulletproof
+package rangeproof
 
 import (
 	"math/big"

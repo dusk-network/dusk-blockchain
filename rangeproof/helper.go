@@ -1,4 +1,4 @@
-package bulletproof
+package rangeproof
 
 // // Key represents a scalar or point
 // type Key [32]byte

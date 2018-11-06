@@ -1,7 +1,4 @@
-// Package bulletproof is a reference implementation of the bulletproof used at monero
-// with some optimisations from the basic ed25519 curve functions in golang
-// Reference found here: https://github.com/monero-project/monero/blob/master/src/ringct/bulletproofs.cc
-package bulletproof
+package rangeproof
 
 import (
 	"errors"
