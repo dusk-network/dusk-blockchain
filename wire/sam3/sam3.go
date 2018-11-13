@@ -16,12 +16,11 @@ type SAM struct {
 
 // Default SAM bridge return messages
 const (
-	sessionOK            = "SESSION STATUS RESULT=OK DESTINATION="
 	sessionDuplicateID   = "SESSION STATUS RESULT=DUPLICATED_ID\n"
 	sessionDuplicateDest = "SESSION STATUS RESULT=DUPLICATED_DEST\n"
 	sessionInvalidKey    = "SESSION STATUS RESULT=INVALID_KEY\n"
-	sessionI2PError      = "SESSION STATUS RESULT=I2P_ERROR MESSAGE="
-	sessionCloseOK       = "SESSION STATUS RESULT=OK\n"
+	sessionI2PError      = "SESSION STATUS RESULT=I2P_ERROR"
+	sessionOK            = "SESSION STATUS RESULT=OK"
 )
 
 // NewSAM creates a new SAM control socket on the I2P router.
@@ -59,6 +58,7 @@ func (s *SAM) NewKeys() (I2PKeys, error) {
 	msg := []byte("DEST GENERATE SIGNATURE_TYPE=ECDSA_SHA256_P256\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
+		s.Close()
 		return I2PKeys{}, err
 	}
 
@@ -71,6 +71,7 @@ func (s *SAM) NewKeys() (I2PKeys, error) {
 		} else if strings.HasPrefix(field, "PRIV=") {
 			keys.Priv = field[5:]
 		} else {
+			s.Close()
 			return I2PKeys{}, errors.New("failed to parse keys")
 		}
 	}
@@ -84,6 +85,7 @@ func (s *SAM) Lookup(name string) (string, error) {
 	msg := []byte("NAMING LOOKUP NAME=" + name + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
+		s.Close()
 		return "", err
 	}
 
@@ -95,12 +97,15 @@ func (s *SAM) Lookup(name string) (string, error) {
 		case field == "RESULT=OK":
 			continue
 		case field == "RESULT=INVALID_KEY":
+			s.Close()
 			return "", errors.New("invalid key")
 		case field == "RESULT=KEY_NOT_FOUND":
+			s.Close()
 			return "", errors.New("unable to resolve " + name)
 		case strings.HasPrefix(field, "VALUE="):
 			addr = field[6:]
 		case strings.HasPrefix(field, "MESSAGE="):
+			s.Close()
 			return "", errors.New(field[8:])
 		default:
 			continue

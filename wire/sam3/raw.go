@@ -95,22 +95,19 @@ func (s *SAM) NewRawSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt []
 		return nil, err
 	}
 
-	// Format I2CP options
-	var sOpt string
-	for _, opt := range I2CPOpt {
-		sOpt += " OPTION=" + opt
-	}
-
 	// Write SESSION CREATE message
 	msg := []byte("SESSION CREATE STYLE=RAW ID=" + id + " DESTINATION=" + keys.Priv + " " +
-		strings.Join(SAMOpt, " ") + sOpt + "\n")
+		strings.Join(SAMOpt, " ") + " " + strings.Join(I2CPOpt, " ") + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
+		s.Close()
 		return nil, err
 	}
 
 	// Check for any returned errors
+	fmt.Println(text)
 	if err := s.HandleResponse(text); err != nil {
+		s.Close()
 		return nil, err
 	}
 

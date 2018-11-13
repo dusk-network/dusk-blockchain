@@ -11,11 +11,11 @@ import (
 // MasterSession allows the user to set up a master session, with the ability to run
 // any of the 3 protocols (datagram, raw, stream) simultaneously on the same socket.
 type MasterSession struct {
-	ID         string             // Session ID
-	Keys       I2PKeys            // I2P keys
-	Conn       net.Conn           // Connection to the SAM bridge
-	Sessions   map[string]Session // Maps session IDs to their structs for easy access
-	SessionIDs []string           // All sessions on the master session by ID
+	ID       string             // Session ID
+	Keys     I2PKeys            // I2P keys
+	Conn     net.Conn           // Connection to the SAM bridge
+	Sessions map[string]Session // Maps session IDs to their structs for easy access
+	SIDs     []string           // All sessions on the master session by ID
 }
 
 // Options that can't be passed to a master session on creation.
@@ -60,19 +60,22 @@ func (s *SAM) NewMasterSession(id string, keys I2PKeys, I2CPOpt []string) (*Mast
 	buf := make([]byte, 4096)
 	n, err := s.Conn.Read(buf)
 	if err != nil {
+		s.Close()
 		return nil, err
 	}
 
 	// Check for any returned errors
 	text := string(buf[:n])
 	if err := s.HandleResponse(text); err != nil {
+		s.Close()
 		return nil, err
 	}
 
 	master := MasterSession{
-		ID:   id,
-		Keys: keys,
-		Conn: s.Conn,
+		ID:       id,
+		Keys:     keys,
+		Conn:     s.Conn,
+		Sessions: make(map[string]Session),
 	}
 
 	s.Session = &master
@@ -167,19 +170,22 @@ func (s *MasterSession) Add(style string, id string, SAMOpt []string) (Session, 
 		}
 
 		// Write SESSION ADD message
-		msg := []byte("SESSION ADD STYLE=RAW ID=" + id + " " + strings.Join(SAMOpt, " ") + "\n")
+		msg := []byte("SESSION ADD STYLE=RAW ID=" + id + " PORT=" + sendPort + " " +
+			strings.Join(SAMOpt, " ") + "\n")
 		text, err := SendToBridge(msg, s.Conn)
 		if err != nil {
+			s.Close()
 			return nil, err
 		}
 
 		// Check for any returned errors
 		if err := s.HandleResponse(text); err != nil {
+			s.Close()
 			return nil, err
 		}
 
 		// Populate master session and create RawSession struct
-		s.SessionIDs = append(s.SessionIDs, id)
+		s.SIDs = append(s.SIDs, id)
 		sess := RawSession{
 			ID:       id,
 			Keys:     s.Keys,
@@ -262,19 +268,22 @@ func (s *MasterSession) Add(style string, id string, SAMOpt []string) (Session, 
 		}
 
 		// Write SESSION ADD message
-		msg := []byte("SESSION ADD STYLE=DATAGRAM ID=" + id + " " + strings.Join(SAMOpt, " ") + "\n")
+		msg := []byte("SESSION ADD STYLE=DATAGRAM ID=" + id + " PORT=" + sendPort + " " +
+			strings.Join(SAMOpt, " ") + "\n")
 		text, err := SendToBridge(msg, s.Conn)
 		if err != nil {
+			s.Close()
 			return nil, err
 		}
 
 		// Check for any returned errors
 		if err := s.HandleResponse(text); err != nil {
+			s.Close()
 			return nil, err
 		}
 
 		// Populate master session and create RawSession struct
-		s.SessionIDs = append(s.SessionIDs, id)
+		s.SIDs = append(s.SIDs, id)
 		sess := DatagramSession{
 			ID:       id,
 			Keys:     s.Keys,
@@ -301,25 +310,20 @@ func (s *MasterSession) Add(style string, id string, SAMOpt []string) (Session, 
 
 		// Write SESSION ADD message
 		msg := []byte("SESSION ADD STYLE=STREAM ID=" + id + " " + strings.Join(SAMOpt, " ") + "\n")
-		if err := WriteMessage(msg, s.Conn); err != nil {
-			return nil, err
-		}
-
-		// Read response
-		buf := make([]byte, 4096)
-		n, err := s.Conn.Read(buf)
+		text, err := SendToBridge(msg, s.Conn)
 		if err != nil {
+			s.Close()
 			return nil, err
 		}
 
 		// Check for any returned errors
-		text := string(buf[:n])
 		if err := s.HandleResponse(text); err != nil {
+			s.Close()
 			return nil, err
 		}
 
 		// Populate master session and create RawSession struct
-		s.SessionIDs = append(s.SessionIDs, id)
+		s.SIDs = append(s.SIDs, id)
 		sess := StreamSession{
 			ID:   id,
 			Keys: s.Keys,
@@ -339,10 +343,12 @@ func (s *MasterSession) Remove(id string) error {
 	msg := []byte("SESSION REMOVE ID=" + id + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
+		s.Close()
 		return err
 	}
 
 	if err := s.HandleResponse(text); err != nil {
+		s.Close()
 		return err
 	}
 
@@ -351,18 +357,17 @@ func (s *MasterSession) Remove(id string) error {
 
 	// Remove subsession from array, and moving elements to keep the slice in one piece.
 	// This is done to ensure we properly remove all sessions when calling Close.
-	ss := s.SessionIDs
-	for i, sess := range ss {
+	for i, sess := range s.SIDs {
 		if sess == id {
-			ss[i] = "" // Clear ID
+			s.SIDs[i] = "" // Clear ID
 
 			// Move element to end of slice
-			if i != len(ss)-1 {
-				ss[i], ss[len(ss)-1] = ss[len(ss)-1], ss[i]
+			if i != len(s.SIDs)-1 {
+				s.SIDs[i], s.SIDs[len(s.SIDs)-1] = s.SIDs[len(s.SIDs)-1], s.SIDs[i]
 			}
 
 			// Cut the element out of the slice
-			ss = ss[:len(ss)-1]
+			s.SIDs = s.SIDs[:len(s.SIDs)-1]
 		}
 	}
 
@@ -380,7 +385,7 @@ func (s *MasterSession) HandleResponse(text string) error {
 		return errors.New("invalid key")
 	case strings.HasPrefix(text, sessionI2PError):
 		return fmt.Errorf("I2P error: %v", text[len(sessionI2PError):])
-	case text == sessionCloseOK:
+	case strings.HasPrefix(text, sessionOK):
 		return nil
 	default:
 		return fmt.Errorf("unable to parse SAMv3 reply: %v", text)
@@ -389,17 +394,23 @@ func (s *MasterSession) HandleResponse(text string) error {
 
 // Close closes the master session and the corresponding I2P session.
 func (s *MasterSession) Close() error {
-	// Close all subsessions first
-	for {
-		// Keep deleting on zero index until we encounter an empty element
-		if s.SessionIDs[0] == "" {
-			break
-		}
+	if len(s.SIDs) > 0 {
+		// Close all subsessions first
+		for {
+			// Keep deleting on zero index until the slice is empty
+			if len(s.SIDs) == 0 {
+				break
+			}
 
-		s.Remove(s.SessionIDs[0])
+			if err := s.Remove(s.SIDs[0]); err != nil {
+				WriteMessage([]byte("EXIT"), s.Conn)
+				s.Conn.Close()
+				return err
+			}
+		}
 	}
 
-	// Close connection to SAM bridge and shut down I2P session.
+	// Close connection to SAM bridge.
 	WriteMessage([]byte("EXIT"), s.Conn)
 	err := s.Conn.Close()
 	return err

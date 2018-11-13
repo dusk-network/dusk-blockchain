@@ -90,22 +90,18 @@ func (s *SAM) NewDatagramSession(id string, keys I2PKeys, SAMOpt []string, I2CPO
 		return nil, err
 	}
 
-	// Format I2CP options
-	var sOpt string
-	for _, opt := range I2CPOpt {
-		sOpt += " OPTION=" + opt
-	}
-
 	// Write SESSION CREATE message
 	msg := []byte("SESSION CREATE STYLE=DATAGRAM ID=" + id + " DESTINATION=" + keys.Priv + " " +
-		strings.Join(SAMOpt, " ") + sOpt + "\n")
+		strings.Join(SAMOpt, " ") + " " + strings.Join(I2CPOpt, " ") + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
+		s.Close()
 		return nil, err
 	}
 
 	// Check for any returned errors
 	if err := s.HandleResponse(text); err != nil {
+		s.Close()
 		return nil, err
 	}
 
@@ -171,6 +167,7 @@ func (s *DatagramSession) Write(b []byte, addr string) (int, error) {
 	header := []byte("3.3 " + s.ID + " " + addr + " FROM_PORT=" + s.FromPort + " TO_PORT=" + s.ToPort + "\n")
 	msg := append(header, b...)
 	n, err := s.UDPConn.WriteToUDP(msg, s.RUDPAddr)
+
 	return n, err
 }
 
