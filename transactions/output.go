@@ -2,10 +2,12 @@ package transactions
 
 import (
 	"encoding/binary"
-	"github.com/toghrulmaharramov/dusk-go/encoding"
 	"io"
+
+	"github.com/toghrulmaharramov/dusk-go/encoding"
 )
 
+// Output defines an output in a stealth transaction.
 type Output struct {
 	Amount uint64 // 8 bytes
 	P      []byte // 32 bytes

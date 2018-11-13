@@ -11,5 +11,5 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Project settings for GoLand
-.idea/
+# Project settings for VSCode
+.vscode/

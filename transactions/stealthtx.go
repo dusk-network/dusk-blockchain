@@ -1,10 +1,12 @@
 package transactions
 
 import (
-	"github.com/toghrulmaharramov/dusk-go/encoding"
 	"io"
+
+	"github.com/toghrulmaharramov/dusk-go/encoding"
 )
 
+// Stealth defines a stealth transaction.
 type Stealth struct {
 	Version uint8          // 1 byte
 	Type    uint8          // 1 byte
@@ -70,8 +72,8 @@ func (s *Stealth) Decode(r io.Reader) error {
 func (s *Stealth) GetEncodeSize() uint64 {
 	var size uint64
 
-	size += 1  // Version
-	size += 1  // Type
+	size++     // Version
+	size++     // Type
 	size += 32 // R
 
 	// TA
