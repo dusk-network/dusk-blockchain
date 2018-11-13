@@ -8,4 +8,4 @@ The SAM library is merely an API - it needs to be paired with an I2P router to w
 
 ### Testing
 
-To test this module, you should have an I2P router active on your system that can handle SAM 3.3 (currently, only the Java implementation supports up to 3.3). The testing files will be written out later.
+To test this module, you should have an I2P router active on your system that can handle SAM 3.3 (currently, only the Java implementation supports up to 3.3). Make sure you turn on the SAM application bridge inside the router, and give it about 5-10 minutes to start up fully so that it will accept SAM messages and build tunnels for you. It is also advised that, if you are testing with a timeout, you should set this from anywhere between 2-5 minutes in case of extreme delay from the socket (happens mostly around startup, but messages can sometimes take 60 seconds to arrive from the SAM socket). Make sure your SAM bridge is on port `7656`, as that is where the testing files will try to connect to the router.
