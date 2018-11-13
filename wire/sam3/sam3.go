@@ -85,7 +85,6 @@ func (s *SAM) Lookup(name string) (string, error) {
 	msg := []byte("NAMING LOOKUP NAME=" + name + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
-		s.Close()
 		return "", err
 	}
 
@@ -97,15 +96,12 @@ func (s *SAM) Lookup(name string) (string, error) {
 		case field == "RESULT=OK":
 			continue
 		case field == "RESULT=INVALID_KEY":
-			s.Close()
 			return "", errors.New("invalid key")
 		case field == "RESULT=KEY_NOT_FOUND":
-			s.Close()
 			return "", errors.New("unable to resolve " + name)
 		case strings.HasPrefix(field, "VALUE="):
 			addr = field[6:]
 		case strings.HasPrefix(field, "MESSAGE="):
-			s.Close()
 			return "", errors.New(field[8:])
 		default:
 			continue

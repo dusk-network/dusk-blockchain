@@ -30,28 +30,14 @@ func (s *SAM) NewStreamSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt
 		}
 	}
 
-	// Format I2CP options
-	var sOpt string
-	for _, opt := range I2CPOpt {
-		sOpt += " OPTION=" + opt
-	}
-
 	// Write SESSION CREATE message
 	msg := []byte("SESSION CREATE STYLE=STREAM ID=" + id + " DESTINATION=" + keys.Priv + " " +
-		strings.Join(SAMOpt, " ") + sOpt + "\n")
-	if err := WriteMessage(msg, s.Conn); err != nil {
-		return nil, err
-	}
-
-	// Read response
-	buf := make([]byte, 4096)
-	n, err := s.Conn.Read(buf)
+		strings.Join(SAMOpt, " ") + " " + strings.Join(I2CPOpt, " ") + "\n")
+	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check for any returned errors
-	text := string(buf[:n])
 	if err := s.HandleResponse(text); err != nil {
 		return nil, err
 	}
@@ -71,19 +57,19 @@ func (s *SAM) NewStreamSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt
 // HandleResponse is a convenience method for handling stream session responses
 // from the SAM control socket.
 func (ss *StreamSession) HandleResponse(text string) error {
-	result := strings.TrimLeft(text, "STREAM STATUS ")
+	result := strings.TrimPrefix(text, "STREAM STATUS ")
 	switch result {
-	case "RESULT=OK":
+	case "RESULT=OK\n":
 		return nil
-	case "RESULT=CANT_REACH_PEER":
+	case "RESULT=CANT_REACH_PEER\n":
 		return errors.New("can not reach peer")
-	case "RESULT=I2P_ERROR":
+	case "RESULT=I2P_ERROR\n":
 		return errors.New("I2P internal error")
-	case "RESULT=INVALID_KEY":
+	case "RESULT=INVALID_KEY\n":
 		return errors.New("invalid key")
-	case "RESULT=INVALID_ID":
+	case "RESULT=INVALID_ID\n":
 		return errors.New("invalid tunnel ID")
-	case "RESULT=TIMEOUT":
+	case "RESULT=TIMEOUT\n":
 		return errors.New("timeout")
 	default:
 		return errors.New("unknown error: " + result)
@@ -96,7 +82,7 @@ func (ss *StreamSession) Close() error {
 	// themselves, keep closing the StreamConn on the zero index
 	// until a nil pointer is encountered.
 	for {
-		if ss.Streams[0] == nil {
+		if len(ss.Streams) == 0 {
 			break
 		}
 
@@ -254,6 +240,7 @@ func (sc *StreamConn) Close() error {
 
 			ss[len(ss)-1] = nil
 			ss = ss[:len(ss)-1]
+			sc.Session.Streams = ss
 		}
 	}
 

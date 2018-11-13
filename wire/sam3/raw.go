@@ -13,7 +13,7 @@ type RawSession struct {
 	ID       string       // Session name
 	Keys     I2PKeys      // I2P keys
 	Conn     net.Conn     // Connection to the SAM control socket
-	UDPConn  *net.UDPConn // Used to deliver datagrams
+	UDPConn  *net.UDPConn // Used to deliver and read datagrams
 	RUDPAddr *net.UDPAddr // The SAM control socket UDP address
 	FromPort string       // FROM_PORT specified on creation
 	ToPort   string       // TO_PORT specified on creation
@@ -96,8 +96,9 @@ func (s *SAM) NewRawSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt []
 	}
 
 	// Write SESSION CREATE message
-	msg := []byte("SESSION CREATE STYLE=RAW ID=" + id + " DESTINATION=" + keys.Priv + " " +
-		strings.Join(SAMOpt, " ") + " " + strings.Join(I2CPOpt, " ") + "\n")
+	_, localPort, err := net.SplitHostPort(udpConn.LocalAddr().String())
+	msg := []byte("SESSION CREATE STYLE=RAW ID=" + id + " DESTINATION=" + keys.Priv +
+		" PORT=" + localPort + " " + strings.Join(SAMOpt, " ") + " " + strings.Join(I2CPOpt, " ") + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
 		s.Close()
@@ -105,7 +106,6 @@ func (s *SAM) NewRawSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt []
 	}
 
 	// Check for any returned errors
-	fmt.Println(text)
 	if err := s.HandleResponse(text); err != nil {
 		s.Close()
 		return nil, err
@@ -127,7 +127,7 @@ func (s *SAM) NewRawSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt []
 	return &sess, nil
 }
 
-// Read reads one raw datagram sent to the destination of the DatagramSession.
+// Read one raw datagram sent to the destination of the DatagramSession.
 func (s *RawSession) Read() ([]byte, string, string, error) {
 	buf := make([]byte, 32768+67) // Max datagram size + max SAM bridge message size
 	n, sAddr, err := s.UDPConn.ReadFromUDP(buf)
@@ -136,29 +136,37 @@ func (s *RawSession) Read() ([]byte, string, string, error) {
 	}
 
 	// Only accept incoming UDP messages from the SAM socket we're connected to.
-	if !bytes.Equal(sAddr.IP, s.RUDPAddr.IP) {
+	if !sAddr.IP.Equal(s.RUDPAddr.IP) {
 		return nil, "", "", fmt.Errorf("datagram received from wrong address: expected %v, actual %v",
 			s.RUDPAddr.IP, sAddr.IP)
 	}
 
-	// Split message lines first
+	// If a header is included, split message lines first
 	i := bytes.IndexByte(buf, byte('\n'))
-	msg, data := string(buf[:i]), buf[i+1:n]
+	var msg string
+	var data []byte
+	if i != -1 {
+		msg, data = string(buf[:i]), buf[i+1:n]
+	} else {
+		data = buf[:n]
+	}
 
-	// Split message into fields
-	fields := strings.Split(msg, " ")
-
-	// Handle message
 	fromPort := "0" // Default FROM_PORT
 	toPort := "0"   // Default TO_PORT
-	for _, field := range fields {
-		switch {
-		case strings.Contains(field, "FROM_PORT="):
-			fromPort = strings.TrimPrefix(field, "FROM_PORT=")
-		case strings.Contains(field, "TO_PORT="):
-			toPort = strings.TrimPrefix(field, "TO_PORT=")
-		default:
-			continue // SIZE is not important as we could determine this from ReadFromUDP
+	if msg != "" {
+		// Split message into fields
+		fields := strings.Split(msg, " ")
+
+		// Handle message
+		for _, field := range fields {
+			switch {
+			case strings.Contains(field, "FROM_PORT="):
+				fromPort = strings.TrimPrefix(field, "FROM_PORT=")
+			case strings.Contains(field, "TO_PORT="):
+				toPort = strings.TrimPrefix(field, "TO_PORT=")
+			default:
+				continue // SIZE is not important as we could determine this from ReadFromUDP
+			}
 		}
 	}
 

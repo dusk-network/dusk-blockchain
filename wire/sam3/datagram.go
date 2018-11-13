@@ -91,8 +91,9 @@ func (s *SAM) NewDatagramSession(id string, keys I2PKeys, SAMOpt []string, I2CPO
 	}
 
 	// Write SESSION CREATE message
-	msg := []byte("SESSION CREATE STYLE=DATAGRAM ID=" + id + " DESTINATION=" + keys.Priv + " " +
-		strings.Join(SAMOpt, " ") + " " + strings.Join(I2CPOpt, " ") + "\n")
+	_, localPort, err := net.SplitHostPort(udpConn.LocalAddr().String())
+	msg := []byte("SESSION CREATE STYLE=DATAGRAM ID=" + id + " DESTINATION=" + keys.Priv +
+		" PORT=" + localPort + " " + strings.Join(SAMOpt, " ") + " " + strings.Join(I2CPOpt, " ") + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
 		s.Close()
@@ -120,7 +121,7 @@ func (s *SAM) NewDatagramSession(id string, keys I2PKeys, SAMOpt []string, I2CPO
 	return &sess, nil
 }
 
-// ReadFrom reads one datagram sent to the destination of the DatagramSession.
+// Read one datagram sent to the destination of the DatagramSession.
 func (s *DatagramSession) Read() ([]byte, string, string, string, error) {
 	buf := make([]byte, 32768+4168) // Max datagram size + max SAM bridge message size.
 	n, sAddr, err := s.UDPConn.ReadFromUDP(buf)
@@ -129,7 +130,7 @@ func (s *DatagramSession) Read() ([]byte, string, string, string, error) {
 	}
 
 	// Only accept incoming UDP messages from the SAM socket we're connected to.
-	if !bytes.Equal(sAddr.IP, s.RUDPAddr.IP) {
+	if !sAddr.IP.Equal(s.RUDPAddr.IP) {
 		return nil, "", "", "", fmt.Errorf("datagram received from wrong address: expected %v, actual %v",
 			s.RUDPAddr.IP, sAddr.IP)
 	}
