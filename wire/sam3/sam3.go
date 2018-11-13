@@ -137,6 +137,8 @@ func (s *SAM) Close() error {
 		if err := s.Session.Close(); err != nil {
 			return err
 		}
+
+		s.Session = nil
 	} else {
 		// Session will write EXIT to socket automatically on closing.
 		// If no session is open, do it here.

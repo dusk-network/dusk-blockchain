@@ -82,8 +82,8 @@ func (s *SAM) NewMasterSession(id string, keys I2PKeys, I2CPOpt []string) (*Mast
 	return &master, nil
 }
 
-// Add a subsession on the master session.
-func (s *MasterSession) Add(style string, id string, SAMOpt []string) (Session, error) {
+// AddRaw adds a RAW subsession on the master session.
+func (s *MasterSession) AddRaw(id string, SAMOpt []string) (*RawSession, error) {
 	// Make sure DESTINATION isn't passed
 	for _, opt := range SAMOpt {
 		flag := strings.Split(opt, "=")[0]
@@ -92,249 +92,264 @@ func (s *MasterSession) Add(style string, id string, SAMOpt []string) (Session, 
 		}
 	}
 
-	// Make sure style is in uppercase and handle accordingly
-	su := strings.ToUpper(style)
-	switch su {
-	case "RAW":
-		// Set defaults first
-		udpPort := "7655" // Default SAM UDP port (FROM_PORT/LISTEN_PORT)
-		sendPort := "0"   // Default send port (TO_PORT/PORT)
-		protocol := "18"  // Default protocol for raw sessions
-		lHost, _, err := net.SplitHostPort(s.Conn.LocalAddr().String())
-		if err != nil {
-			return nil, err
-		}
-
-		rHost, _, err := net.SplitHostPort(s.Conn.RemoteAddr().String())
-		if err != nil {
-			return nil, err
-		}
-
-		// Check user options
-		for _, opt := range SAMOpt {
-			flag := strings.Split(opt, "=")[0]
-
-			if flag == "PORT" || flag == "TO_PORT" {
-				sendPort = strings.Split(opt, "=")[1]
-				n, err := strconv.Atoi(sendPort)
-				if err != nil {
-					return nil, err
-				}
-
-				if n > 65535 || n < 0 {
-					return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
-				}
-			}
-
-			if flag == "FROM_PORT" || flag == "LISTEN_PORT" {
-				udpPort = strings.Split(opt, "=")[1]
-				n, err := strconv.Atoi(udpPort)
-				if err != nil {
-					return nil, err
-				}
-
-				if n > 65535 || n < 0 {
-					return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
-				}
-			}
-
-			// If passed, verify protocol.
-			if flag == "PROTOCOL" || flag == "LISTEN_PROTOCOL" {
-				protocol = strings.Split(opt, "=")[1]
-				pInt, err := strconv.Atoi(protocol)
-				if err != nil {
-					return nil, err
-				}
-
-				// Check if it's within bounds, and make sure it's not specified as streaming protocol.
-				if pInt < 0 || pInt > 255 || pInt == 6 {
-					return nil, fmt.Errorf("Bad RAW LISTEN_PROTOCOL %d", pInt)
-				}
-			}
-		}
-
-		// Set up connections to populate session struct with
-		lUDPAddr, err := net.ResolveUDPAddr("udp4", lHost+":"+sendPort)
-		if err != nil {
-			return nil, err
-		}
-
-		udpConn, err := net.ListenUDP("udp4", lUDPAddr)
-		if err != nil {
-			return nil, err
-		}
-
-		rUDPAddr, err := net.ResolveUDPAddr("udp4", rHost+":"+udpPort)
-		if err != nil {
-			return nil, err
-		}
-
-		// Write SESSION ADD message
-		msg := []byte("SESSION ADD STYLE=RAW ID=" + id + " PORT=" + sendPort + " " +
-			strings.Join(SAMOpt, " ") + "\n")
-		text, err := SendToBridge(msg, s.Conn)
-		if err != nil {
-			s.Close()
-			return nil, err
-		}
-
-		// Check for any returned errors
-		if err := s.HandleResponse(text); err != nil {
-			s.Close()
-			return nil, err
-		}
-
-		// Populate master session and create RawSession struct
-		s.SIDs = append(s.SIDs, id)
-		sess := RawSession{
-			ID:       id,
-			Keys:     s.Keys,
-			Conn:     s.Conn,
-			UDPConn:  udpConn,
-			RUDPAddr: rUDPAddr,
-			FromPort: udpPort,
-			ToPort:   sendPort,
-			Protocol: protocol,
-		}
-
-		s.Sessions[id] = &sess
-		return &sess, nil
-	case "DATAGRAM":
-		// Set defaults first
-		udpPort := "7655" // Default SAM UDP port (FROM_PORT/LISTEN_PORT)
-		sendPort := "0"   // Default send port (TO_PORT/PORT)
-		lHost, _, err := net.SplitHostPort(s.Conn.LocalAddr().String())
-		if err != nil {
-			return nil, err
-		}
-
-		rHost, _, err := net.SplitHostPort(s.Conn.RemoteAddr().String())
-		if err != nil {
-			return nil, err
-		}
-
-		// Check user options
-		for _, opt := range SAMOpt {
-			flag := strings.Split(opt, "=")[0]
-
-			if flag == "PORT" || flag == "TO_PORT" {
-				sendPort = strings.Split(opt, "=")[1]
-				n, err := strconv.Atoi(sendPort)
-				if err != nil {
-					return nil, err
-				}
-
-				if n > 65535 || n < 0 {
-					return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
-				}
-			}
-
-			if flag == "FROM_PORT" || flag == "LISTEN_PORT" {
-				udpPort = strings.Split(opt, "=")[1]
-				n, err := strconv.Atoi(udpPort)
-				if err != nil {
-					return nil, err
-				}
-
-				if n > 65535 || n < 0 {
-					return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
-				}
-			}
-
-			if flag == "HOST" {
-				lHost = strings.Split(opt, "=")[1]
-			}
-
-			// Handle improper flags
-			if flag == "PROTOCOL" || flag == "LISTEN_PROTOCOL" || flag == "HEADER" {
-				return nil, fmt.Errorf("invalid flag %v for a datagram session", flag)
-			}
-		}
-
-		// Set up connections to populate session struct with
-		lUDPAddr, err := net.ResolveUDPAddr("udp4", lHost+":"+sendPort)
-		if err != nil {
-			return nil, err
-		}
-
-		udpConn, err := net.ListenUDP("udp4", lUDPAddr)
-		if err != nil {
-			return nil, err
-		}
-
-		rUDPAddr, err := net.ResolveUDPAddr("udp4", rHost+":"+udpPort)
-		if err != nil {
-			return nil, err
-		}
-
-		// Write SESSION ADD message
-		msg := []byte("SESSION ADD STYLE=DATAGRAM ID=" + id + " PORT=" + sendPort + " " +
-			strings.Join(SAMOpt, " ") + "\n")
-		text, err := SendToBridge(msg, s.Conn)
-		if err != nil {
-			s.Close()
-			return nil, err
-		}
-
-		// Check for any returned errors
-		if err := s.HandleResponse(text); err != nil {
-			s.Close()
-			return nil, err
-		}
-
-		// Populate master session and create RawSession struct
-		s.SIDs = append(s.SIDs, id)
-		sess := DatagramSession{
-			ID:       id,
-			Keys:     s.Keys,
-			Conn:     s.Conn,
-			UDPConn:  udpConn,
-			RUDPAddr: rUDPAddr,
-			FromPort: udpPort,
-			ToPort:   sendPort,
-		}
-
-		s.Sessions[id] = &sess
-		return &sess, nil
-	case "STREAM":
-		// Check user options
-		for _, opt := range SAMOpt {
-			flag := strings.Split(opt, "=")[0]
-
-			// Handle improper flags
-			if flag == "PROTOCOL" || flag == "LISTEN_PROTOCOL" || flag == "PORT" ||
-				flag == "HOST" || flag == "HEADER" {
-				return nil, fmt.Errorf("invalid flag %v for a streaming session", flag)
-			}
-		}
-
-		// Write SESSION ADD message
-		msg := []byte("SESSION ADD STYLE=STREAM ID=" + id + " " + strings.Join(SAMOpt, " ") + "\n")
-		text, err := SendToBridge(msg, s.Conn)
-		if err != nil {
-			s.Close()
-			return nil, err
-		}
-
-		// Check for any returned errors
-		if err := s.HandleResponse(text); err != nil {
-			s.Close()
-			return nil, err
-		}
-
-		// Populate master session and create RawSession struct
-		s.SIDs = append(s.SIDs, id)
-		sess := StreamSession{
-			ID:   id,
-			Keys: s.Keys,
-			Conn: s.Conn,
-		}
-
-		s.Sessions[id] = &sess
-		return &sess, nil
-	default:
-		return nil, fmt.Errorf("session style %v not recognized by SAM", su)
+	// Set defaults first
+	udpPort := "7655" // Default SAM UDP port (FROM_PORT/LISTEN_PORT)
+	sendPort := "0"   // Default send port (TO_PORT/PORT)
+	protocol := "18"  // Default protocol for raw sessions
+	lHost, _, err := net.SplitHostPort(s.Conn.LocalAddr().String())
+	if err != nil {
+		return nil, err
 	}
+
+	rHost, _, err := net.SplitHostPort(s.Conn.RemoteAddr().String())
+	if err != nil {
+		return nil, err
+	}
+
+	// Check user options
+	for _, opt := range SAMOpt {
+		flag := strings.Split(opt, "=")[0]
+
+		if flag == "PORT" || flag == "TO_PORT" {
+			sendPort = strings.Split(opt, "=")[1]
+			n, err := strconv.Atoi(sendPort)
+			if err != nil {
+				return nil, err
+			}
+
+			if n > 65535 || n < 0 {
+				return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
+			}
+		}
+
+		if flag == "FROM_PORT" || flag == "LISTEN_PORT" {
+			udpPort = strings.Split(opt, "=")[1]
+			n, err := strconv.Atoi(udpPort)
+			if err != nil {
+				return nil, err
+			}
+
+			if n > 65535 || n < 0 {
+				return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
+			}
+		}
+
+		// If passed, verify protocol.
+		if flag == "PROTOCOL" || flag == "LISTEN_PROTOCOL" {
+			protocol = strings.Split(opt, "=")[1]
+			pInt, err := strconv.Atoi(protocol)
+			if err != nil {
+				return nil, err
+			}
+
+			// Check if it's within bounds, and make sure it's not specified as streaming protocol.
+			if pInt < 0 || pInt > 255 || pInt == 6 {
+				return nil, fmt.Errorf("Bad RAW LISTEN_PROTOCOL %d", pInt)
+			}
+		}
+	}
+
+	// Set up connections to populate session struct with
+	lUDPAddr, err := net.ResolveUDPAddr("udp4", lHost+":"+sendPort)
+	if err != nil {
+		return nil, err
+	}
+
+	udpConn, err := net.ListenUDP("udp4", lUDPAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	rUDPAddr, err := net.ResolveUDPAddr("udp4", rHost+":"+udpPort)
+	if err != nil {
+		return nil, err
+	}
+
+	// Write SESSION ADD message
+	msg := []byte("SESSION ADD STYLE=RAW ID=" + id + " PORT=" + sendPort + " " +
+		strings.Join(SAMOpt, " ") + "\n")
+	text, err := SendToBridge(msg, s.Conn)
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+
+	// Check for any returned errors
+	if err := s.HandleResponse(text); err != nil {
+		s.Close()
+		return nil, err
+	}
+
+	// Populate master session and create RawSession struct
+	s.SIDs = append(s.SIDs, id)
+	sess := RawSession{
+		ID:       id,
+		Keys:     s.Keys,
+		Conn:     s.Conn,
+		UDPConn:  udpConn,
+		RUDPAddr: rUDPAddr,
+		FromPort: udpPort,
+		ToPort:   sendPort,
+		Protocol: protocol,
+	}
+
+	s.Sessions[id] = &sess
+	return &sess, nil
+}
+
+// AddDatagram adds a DATAGRAM subsession on the master session.
+func (s *MasterSession) AddDatagram(id string, SAMOpt []string) (*DatagramSession, error) {
+	// Make sure DESTINATION isn't passed
+	for _, opt := range SAMOpt {
+		flag := strings.Split(opt, "=")[0]
+		if flag == "DESTINATION" {
+			return nil, errors.New("subsession may not contain DESTINATION flag")
+		}
+	}
+
+	// Set defaults first
+	udpPort := "7655" // Default SAM UDP port (FROM_PORT/LISTEN_PORT)
+	sendPort := "0"   // Default send port (TO_PORT/PORT)
+	lHost, _, err := net.SplitHostPort(s.Conn.LocalAddr().String())
+	if err != nil {
+		return nil, err
+	}
+
+	rHost, _, err := net.SplitHostPort(s.Conn.RemoteAddr().String())
+	if err != nil {
+		return nil, err
+	}
+
+	// Check user options
+	for _, opt := range SAMOpt {
+		flag := strings.Split(opt, "=")[0]
+
+		if flag == "PORT" || flag == "TO_PORT" {
+			sendPort = strings.Split(opt, "=")[1]
+			n, err := strconv.Atoi(sendPort)
+			if err != nil {
+				return nil, err
+			}
+
+			if n > 65535 || n < 0 {
+				return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
+			}
+		}
+
+		if flag == "FROM_PORT" || flag == "LISTEN_PORT" {
+			udpPort = strings.Split(opt, "=")[1]
+			n, err := strconv.Atoi(udpPort)
+			if err != nil {
+				return nil, err
+			}
+
+			if n > 65535 || n < 0 {
+				return nil, fmt.Errorf("invalid port %d specified, should be between 0-65535", n)
+			}
+		}
+
+		if flag == "HOST" {
+			lHost = strings.Split(opt, "=")[1]
+		}
+
+		// Handle improper flags
+		if flag == "PROTOCOL" || flag == "LISTEN_PROTOCOL" || flag == "HEADER" {
+			return nil, fmt.Errorf("invalid flag %v for a datagram session", flag)
+		}
+	}
+
+	// Set up connections to populate session struct with
+	lUDPAddr, err := net.ResolveUDPAddr("udp4", lHost+":"+sendPort)
+	if err != nil {
+		return nil, err
+	}
+
+	udpConn, err := net.ListenUDP("udp4", lUDPAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	rUDPAddr, err := net.ResolveUDPAddr("udp4", rHost+":"+udpPort)
+	if err != nil {
+		return nil, err
+	}
+
+	// Write SESSION ADD message
+	msg := []byte("SESSION ADD STYLE=DATAGRAM ID=" + id + " PORT=" + sendPort + " " +
+		strings.Join(SAMOpt, " ") + "\n")
+	text, err := SendToBridge(msg, s.Conn)
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+
+	// Check for any returned errors
+	if err := s.HandleResponse(text); err != nil {
+		s.Close()
+		return nil, err
+	}
+
+	// Populate master session and create RawSession struct
+	s.SIDs = append(s.SIDs, id)
+	sess := DatagramSession{
+		ID:       id,
+		Keys:     s.Keys,
+		Conn:     s.Conn,
+		UDPConn:  udpConn,
+		RUDPAddr: rUDPAddr,
+		FromPort: udpPort,
+		ToPort:   sendPort,
+	}
+
+	s.Sessions[id] = &sess
+	return &sess, nil
+}
+
+// AddStream adds a STREAM subsession on the master session
+func (s *MasterSession) AddStream(id string, SAMOpt []string) (*StreamSession, error) {
+	// Make sure DESTINATION isn't passed
+	for _, opt := range SAMOpt {
+		flag := strings.Split(opt, "=")[0]
+		if flag == "DESTINATION" {
+			return nil, errors.New("subsession may not contain DESTINATION flag")
+		}
+	}
+
+	// Check user options
+	for _, opt := range SAMOpt {
+		flag := strings.Split(opt, "=")[0]
+
+		// Handle improper flags
+		if flag == "PROTOCOL" || flag == "LISTEN_PROTOCOL" || flag == "PORT" ||
+			flag == "HOST" || flag == "HEADER" {
+			return nil, fmt.Errorf("invalid flag %v for a streaming session", flag)
+		}
+	}
+
+	// Write SESSION ADD message
+	msg := []byte("SESSION ADD STYLE=STREAM ID=" + id + " " + strings.Join(SAMOpt, " ") + "\n")
+	text, err := SendToBridge(msg, s.Conn)
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+
+	// Check for any returned errors
+	if err := s.HandleResponse(text); err != nil {
+		s.Close()
+		return nil, err
+	}
+
+	// Populate master session and create RawSession struct
+	s.SIDs = append(s.SIDs, id)
+	sess := StreamSession{
+		ID:   id,
+		Keys: s.Keys,
+		Conn: s.Conn,
+	}
+
+	s.Sessions[id] = &sess
+	return &sess, nil
 }
 
 // Remove a subsession from the master session.

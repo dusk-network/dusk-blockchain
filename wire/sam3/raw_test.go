@@ -4,6 +4,9 @@ import (
 	"testing"
 )
 
+// Test the sending and receiving of non-repliable datagrams.
+// This will open 2 SAM sessions on the I2P router and make them
+// talk to each other.
 func TestRaw(t *testing.T) {
 	sam, err := NewSAM("127.0.0.1:7656")
 	if err != nil {
@@ -15,7 +18,7 @@ func TestRaw(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rawSession, err := sam.NewRawSession("raw3", keys, []string{}, mediumShuffle)
+	rawSession, err := sam.NewRawSession("raw", keys, []string{}, mediumShuffle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +34,7 @@ func TestRaw(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rawSession2, err := sam2.NewRawSession("raw4", keys2, []string{}, mediumShuffle)
+	rawSession2, err := sam2.NewRawSession("raw2", keys2, []string{}, mediumShuffle)
 	if err != nil {
 		t.Fatal(err)
 	}

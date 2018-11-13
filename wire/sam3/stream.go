@@ -234,11 +234,11 @@ func (sc *StreamConn) Close() error {
 	ss := sc.Session.Streams
 	for i, conn := range ss {
 		if conn == sc {
+			ss[i] = nil
 			if i != len(ss)-1 {
 				ss[i], ss[len(ss)-1] = ss[len(ss)-1], ss[i]
 			}
 
-			ss[len(ss)-1] = nil
 			ss = ss[:len(ss)-1]
 			sc.Session.Streams = ss
 		}
