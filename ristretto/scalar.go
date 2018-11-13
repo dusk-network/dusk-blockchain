@@ -1933,7 +1933,12 @@ func (s *Scalar) Mul(a, b *Scalar) *Scalar {
 }
 
 // Sets s to 1/t.  Returns s.
-func (s *Scalar) Inverse(t *Scalar) *Scalar {
+func (s *Scalar) Inverse() *Scalar {
+	inv := Scalar{}
+	inv.inverse(s)
+	return &inv
+}
+func (s *Scalar) inverse(t *Scalar) *Scalar {
 	var t0, t1, t2, t3, t4, t5 Scalar
 
 	t1.Square(t)

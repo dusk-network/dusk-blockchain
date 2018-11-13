@@ -125,13 +125,13 @@ func TestScMulAdd(t *testing.T) {
 
 func TestScInverse(t *testing.T) {
 	var bi1, bi2 big.Int
-	var s1, s2 ristretto.Scalar
+	var s1 ristretto.Scalar
 	for i := 0; i < 100; i++ {
 		bi1.Rand(rnd, &biL)
 		bi2.ModInverse(&bi1, &biL)
 		s1.SetBigInt(&bi1)
-		if s2.Inverse(&s1).BigInt().Cmp(&bi2) != 0 {
-			t.Fatalf("1/%v = %v != %v", &bi1, &bi2, &s2)
+		if s1.Inverse().BigInt().Cmp(&bi2) != 0 {
+			t.Fatalf("1/%v = %v", &bi1, &bi2)
 		}
 	}
 }
@@ -230,7 +230,7 @@ func BenchmarkScSquare(b *testing.B) {
 func BenchmarkScInverse(b *testing.B) {
 	var s ristretto.Scalar
 	for n := 0; n < b.N; n++ {
-		s.Inverse(&s)
+		s.Inverse()
 	}
 }
 
