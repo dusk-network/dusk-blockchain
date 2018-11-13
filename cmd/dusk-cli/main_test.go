@@ -12,21 +12,23 @@ import (
 )
 
 func TestMethod(t *testing.T) {
-	cfg, err := StartServer()
+	cfg, srv, err := StartServer()
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
+
+	defer srv.Stop()
 
 	// Make command
 	ping, err := MarshalCmd("ping", []string{})
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	// Send it off..
 	resp, err := SendPostRequest(ping, cfg)
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	// Make sure we got the right response
@@ -34,33 +36,35 @@ func TestMethod(t *testing.T) {
 }
 
 func TestMethodWithParams(t *testing.T) {
-	cfg, err := StartServer()
+	cfg, srv, err := StartServer()
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
+
+	defer srv.Stop()
 
 	// Make command
 	hashCmd, err := MarshalCmd("hash", []string{"foo"})
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	// Send off
 	resp, err := SendPostRequest(hashCmd, cfg)
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	// Make another command
 	hashCmd2, err := MarshalCmd("hash", []string{"bar", "baz"})
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	// Send off
 	resp2, err := SendPostRequest(hashCmd2, cfg)
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	// Trim whitespaces and split results
@@ -83,9 +87,12 @@ func TestMethodWithParams(t *testing.T) {
 
 func TestAdminRestriction(t *testing.T) {
 	// Discard config, we don't need it
-	if _, err := StartServer(); err != nil {
-		t.Fail()
+	_, srv, err := StartServer()
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	defer srv.Stop()
 
 	// Make new config with different credentials
 	cfg := rpc.Config{
@@ -97,13 +104,13 @@ func TestAdminRestriction(t *testing.T) {
 	// Make admin command and send it
 	stopNode, err := MarshalCmd("stopnode", []string{})
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	// This should give us an error response
 	resp, err := SendPostRequest(stopNode, &cfg)
 	if err != nil {
-		t.Fail()
+		t.Fatal(err)
 	}
 
 	t.Log(resp.Error)
@@ -113,20 +120,20 @@ func TestAdminRestriction(t *testing.T) {
 }
 
 // Convenience function for setting up RPC server
-func StartServer() (*rpc.Config, error) {
+func StartServer() (*rpc.Config, *rpc.Server, error) {
 	cfg := rpc.Config{}
 	if err := cfg.Load(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	srv, err := rpc.NewRPCServer(&cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := srv.Start(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &cfg, nil
+	return &cfg, srv, nil
 }
