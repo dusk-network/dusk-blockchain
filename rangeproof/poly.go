@@ -12,7 +12,7 @@ type polynomial struct {
 	t0, t1, t2     ristretto.Scalar
 }
 
-func computePoly(aL, aR, sR, sL [N]ristretto.Scalar, y, z, v ristretto.Scalar) polynomial {
+func computePoly(aL, aR, sL, sR [N]ristretto.Scalar, y, z, v ristretto.Scalar) polynomial {
 
 	// calculate l_0
 	l0, _ := vecSubScal(aL[:], z)
@@ -32,7 +32,9 @@ func computePoly(aL, aR, sR, sL [N]ristretto.Scalar, y, z, v ristretto.Scalar) p
 	zsqTwoN, _ := vecScal(twoN, zsq)
 
 	r0, _ := vecAddScal(aR[:], z)
+
 	r0, _ = hadamard(r0, yN)
+
 	r0, _ = vecAdd(r0, zsqTwoN)
 
 	// calculate r_1
@@ -107,6 +109,7 @@ func (p *polynomial) computeR(x ristretto.Scalar) []ristretto.Scalar {
 
 // t_0 = z^2 * v + D(y,z)
 func (p *polynomial) computeT0(y, z, v ristretto.Scalar) ristretto.Scalar {
+
 	delta, _ := computeDelta(y, z)
 
 	var zsq ristretto.Scalar
@@ -116,6 +119,8 @@ func (p *polynomial) computeT0(y, z, v ristretto.Scalar) ristretto.Scalar {
 	zsqv.Mul(&zsq, &v)
 
 	var t0 ristretto.Scalar
+	t0.SetZero()
+
 	t0.Add(&delta, &zsqv)
 
 	return t0
@@ -131,12 +136,8 @@ func computeDelta(y, z ristretto.Scalar) (ristretto.Scalar, error) {
 	var two ristretto.Scalar
 	two.SetBigInt(big.NewInt(2))
 
-	vpy := vecPowers(y, N)
-	vp1 := vecPowers(one, N)
-	vp2 := vecPowers(two, N)
-
-	oneDotYn, _ := innerProduct(vp1, vpy)
-	oneDot2n, _ := innerProduct(vp1, vp2)
+	oneDotYn := sumOfPowers(y, N)
+	oneDot2n := sumOfPowers(two, N)
 
 	var zsq ristretto.Scalar
 	zsq.Square(&z)
