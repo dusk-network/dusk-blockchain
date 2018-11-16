@@ -20,9 +20,10 @@ func TestProveBulletProof(t *testing.T) {
 	_ = p
 
 	// Verify
-	// ok, err := Verify(p)
-	// assert.Equal(t, nil, err)
-	// assert.Equal(t, true, ok)
+	ok, err := Verify(p)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, true, ok)
+
 }
 
 func TestComputeTau(t *testing.T) {
@@ -41,6 +42,20 @@ func TestComputeTau(t *testing.T) {
 
 	assert.Equal(t, int64(6), res.BigInt().Int64())
 
+}
+
+func TestComputeMu(t *testing.T) {
+	var one ristretto.Scalar
+	one.SetOne()
+
+	var expected ristretto.Scalar
+	expected.SetBigInt(big.NewInt(2))
+
+	res := computeMu(one, one, one)
+
+	ok := expected.Equals(&res)
+
+	assert.Equal(t, true, ok)
 }
 
 /*

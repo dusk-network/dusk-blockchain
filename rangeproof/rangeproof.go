@@ -84,7 +84,8 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 	// compute taux which is just the polynomial for the blinding factors at a point x
 	taux := computeTaux(x, z, cV.BlindingFactor, cT1.BlindingFactor, cT2.BlindingFactor)
 
-	// TODO: compute mu
+	// compute mu
+	mu := computeMu(x, cA.BlindingFactor, cS.BlindingFactor)
 
 	// compute l dot r
 	l := poly.computeL(x)
@@ -118,6 +119,7 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 		r:    r,
 		t:    t,
 		taux: taux,
+		mu:   mu,
 	}, nil
 }
 
@@ -187,6 +189,18 @@ func computeTaux(x, z, vBlind, t1Blind, t2Blind ristretto.Scalar) ristretto.Scal
 	return res
 }
 
+// alpha is the blinding factor for A
+// rho is the blinding factor for S
+// mu = alpha + rho * x
+func computeMu(x, alpha, rho ristretto.Scalar) ristretto.Scalar {
+
+	var mu ristretto.Scalar
+
+	mu.MulAdd(&rho, &x, &alpha)
+
+	return mu
+}
+
 // Verify takes a bullet proof and
 // returns true only if the proof was valid
 func Verify(p Proof) (bool, error) {
@@ -210,8 +224,6 @@ func Verify(p Proof) (bool, error) {
 	hs.Append(p.S.Bytes())
 
 	y, z := computeYAndZ(hs)
-	_ = y
-	_ = z
 
 	hs.Append(z.Bytes())
 	hs.Append(p.T1.Bytes())
@@ -255,7 +267,7 @@ func Verify(p Proof) (bool, error) {
 		return false, err
 	}
 
-	deltaG.ScalarMult(&ped.BaseVector.Bases[0], &delta)
+	deltaG.ScalarMult(&ped.BaseVector.Bases[1], &delta)
 
 	var RHS1 ristretto.Point
 	var RHS2 ristretto.Point
@@ -265,7 +277,6 @@ func Verify(p Proof) (bool, error) {
 	RHS.Add(&RHS1, &RHS2)
 
 	if !LHS.Equals(&RHS) {
-		fmt.Println(LHS, RHS)
 		return false, errors.New("LHS != RHS; proof that t0 is correct is wrong")
 	}
 
