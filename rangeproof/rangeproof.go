@@ -3,6 +3,7 @@ package rangeproof
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/pedersen"
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
@@ -15,17 +16,6 @@ const N = 64
 // M is the maximum number of outputs
 // for one bulletproof
 const M = 1
-
-var zeroK ristretto.Scalar
-
-// curve base points
-var (
-	// TODO:For Gi and Hi, we do not have an API with Ristretto for it
-	// use the CompletedPoints for now.
-
-	Gi = [N]ristretto.Point{}
-	Hi = [N]ristretto.Point{}
-)
 
 // Proof is the constructed BulletProof
 type Proof struct {
@@ -43,8 +33,6 @@ type Proof struct {
 	r []ristretto.Scalar // []scalar
 }
 
-//cX means a commitment to the value x
-
 func Prove(v ristretto.Scalar) (Proof, error) {
 
 	ped := pedersen.New([]byte("dusk.BulletProof.vec1")) // XXX: this will set the generator, should we use the standard base
@@ -58,8 +46,12 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 	// update Fiat-Shamir
 	hs.Append(cV.Value.Bytes())
 
-	// compute Bitcomments aL and aR to v
+	// Compute Bitcomments aL and aR to v
 	BitCommitment := BitCommit(v.BigInt())
+	ok, err := BitCommitment.Ensure(v.BigInt())
+	if !ok || err != nil {
+		return Proof{}, errors.New("Error Committing value v to Bit slices aL and aR ")
+	}
 
 	// Compute A
 	cA := computeA(ped, BitCommitment.AL, BitCommitment.AR)
@@ -82,7 +74,7 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 	cT2 := ped.CommitToScalars(poly.t2)
 
 	// update Fiat-Shamir
-	hs.Append(z.Bytes()) // XXX: why do we not add y to hashcache as it is a part of the transcript
+	hs.Append(z.Bytes())
 	hs.Append(cT1.Value.Bytes())
 	hs.Append(cT2.Value.Bytes())
 
@@ -99,14 +91,19 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 	r := poly.computeR(x)
 	t, _ := innerProduct(l, r)
 
-	tPoly := poly.eval(x)
-	if !t.Equals(&tPoly) {
-		return Proof{}, errors.New("The t value computed from the t-poly, does not match the t value computed from the inner product of l and r")
+	testT0 := testT0(BitCommitment.AL, BitCommitment.AR, y, z)
+	if !testT0.Equals(&poly.t0) {
+		return Proof{}, errors.New("Test t0 value does not match the value calculated from the polynomial")
 	}
 
 	polyt0 := poly.computeT0(y, z, v)
 	if !polyt0.Equals(&poly.t0) {
-		return Proof{}, errors.New("Mismatched values for t0")
+		return Proof{}, errors.New("t0 value from delta function, does not match the polynomial t0 value(Correct)")
+	}
+
+	tPoly := poly.eval(x)
+	if !t.Equals(&tPoly) {
+		return Proof{}, errors.New("The t value computed from the t-poly, does not match the t value computed from the inner product of l and r")
 	}
 
 	// TODO: calculate inner product proof
@@ -275,4 +272,32 @@ func Verify(p Proof) (bool, error) {
 	// prove l(x) and r(x) is correct
 
 	return true, nil
+}
+
+// DEBUG
+
+func testT0(aL, aR [N]ristretto.Scalar, y, z ristretto.Scalar) ristretto.Scalar {
+
+	aLMinusZ, _ := vecSubScal(aL[:], z)
+
+	aRPlusZ, _ := vecAddScal(aR[:], z)
+
+	yN := vecPowers(y, N)
+
+	hada, _ := hadamard(yN, aRPlusZ)
+
+	var two ristretto.Scalar
+	two.SetBigInt(big.NewInt(2))
+	twoN := vecPowers(two, N)
+
+	var zsq ristretto.Scalar
+	zsq.Square(&z)
+
+	zsqMul2n, _ := vecScal(twoN, zsq)
+
+	rightIP, _ := vecAdd(zsqMul2n, hada)
+
+	iP, _ := innerProduct(aLMinusZ, rightIP)
+
+	return iP
 }

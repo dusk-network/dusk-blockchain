@@ -2,7 +2,6 @@ package rangeproof
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
@@ -71,8 +70,6 @@ func (b *BitCommitment) Ensure(v *big.Int) (bool, error) {
 			testAR = testAR.Add(testAR, basePow)
 		}
 	}
-
-	fmt.Println(v, testAL, testAR)
 
 	if testAL.Cmp(v) != 0 {
 		return false, errors.New("Wrong Value for AL")
