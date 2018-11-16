@@ -12,7 +12,7 @@ import (
 // Given two scalar arrays, construct the inner product
 func innerProduct(a, b []ristretto.Scalar) (ristretto.Scalar, error) {
 
-	var res ristretto.Scalar
+	res := ristretto.Scalar{}
 	res.SetZero()
 
 	if len(a) != len(b) {
