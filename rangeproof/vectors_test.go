@@ -40,3 +40,21 @@ func TestVectorAdd(t *testing.T) {
 		assert.Equal(t, true, ok)
 	}
 }
+
+func TestVectorPowers(t *testing.T) {
+	var two ristretto.Scalar
+	two.SetBigInt(big.NewInt(2))
+
+	n := 128
+
+	powers := vecPowers(two, uint8(n))
+
+	for i := 0; i < n; i++ {
+		basePow, e := big.NewInt(2), big.NewInt(int64(i))
+		basePow.Exp(basePow, e, nil)
+
+		ok := basePow.Cmp(powers[i].BigInt())
+
+		assert.Equal(t, 0, ok)
+	}
+}

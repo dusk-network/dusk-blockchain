@@ -2,6 +2,7 @@ package rangeproof
 
 import (
 	"errors"
+	"math/big"
 
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
@@ -144,7 +145,7 @@ func vecPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 	res[1] = a
 
 	for i := uint8(2); i < n; i++ {
-		res[i].Add(&res[i-1], &a)
+		res[i].Mul(&res[i-1], &a)
 	}
 
 	return res
@@ -160,7 +161,7 @@ func hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 	res := make([]ristretto.Scalar, len(a))
 
 	for i := 0; i < len(a); i++ {
-		res[i].Add(&a[i], &b[i])
+		res[i].Mul(&a[i], &b[i])
 	}
 	return res, nil
 }
@@ -178,4 +179,56 @@ func hadamard2(a, b []ristretto.Point) ([]ristretto.Point, error) {
 	}
 
 	return res, nil
+}
+
+func sumPowersSlow(x ristretto.Scalar, n uint32) ristretto.Scalar {
+	var sum big.Int
+
+	xInt := x.BigInt()
+
+	for i := uint32(0); i < n; i++ {
+		var xi big.Int
+		var e = big.NewInt(int64(i))
+		xi.Exp(xInt, e, nil)
+		sum.Add(&sum, &xi)
+	}
+
+	var res ristretto.Scalar
+	res.SetBigInt(&sum)
+	return res
+}
+
+func sumOfPowers(x ristretto.Scalar, n uint32) ristretto.Scalar {
+
+	var res ristretto.Scalar
+
+	if n == 0 || n == 1 {
+		var s ristretto.Scalar
+		s.SetBigInt(big.NewInt(int64(n)))
+		return s
+	}
+
+	if !isPower2(n) {
+		return sumPowersSlow(x, n)
+	}
+
+	m := n
+
+	res.SetOne()
+	res.Add(&res, &x)
+
+	factor := x
+
+	for m > 2 {
+		factor = *factor.Square(&factor)
+
+		res = *res.MulAdd(&res, &factor, &res)
+		m = m / 2
+	}
+
+	return res
+}
+
+func isPower2(n uint32) bool {
+	return (n & (n - 1)) == 0
 }
