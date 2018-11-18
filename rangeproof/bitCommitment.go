@@ -72,11 +72,11 @@ func (b *BitCommitment) Ensure(v *big.Int) (bool, error) {
 	}
 
 	if testAL.Cmp(v) != 0 {
-		return false, errors.New("Wrong Value for AL")
+		return false, errors.New("[BitCommit(Ensure)]: Wrong Value for AL")
 	}
 
 	if testAR.Cmp(v) != 0 {
-		return false, errors.New("Wrong Value for AL")
+		return false, errors.New("[BitCommit(Ensure)]: Wrong Value for AL")
 	}
 
 	return true, nil

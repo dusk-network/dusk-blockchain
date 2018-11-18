@@ -110,7 +110,7 @@ func (p *polynomial) computeR(x ristretto.Scalar) []ristretto.Scalar {
 // t_0 = z^2 * v + D(y,z)
 func (p *polynomial) computeT0(y, z, v ristretto.Scalar) ristretto.Scalar {
 
-	delta, _ := computeDelta(y, z)
+	delta := computeDelta(y, z)
 
 	var zsq ristretto.Scalar
 	zsq.Square(&z)
@@ -127,7 +127,7 @@ func (p *polynomial) computeT0(y, z, v ristretto.Scalar) ristretto.Scalar {
 }
 
 // D(y,z) - This is the data shared by both prover and verifier
-func computeDelta(y, z ristretto.Scalar) (ristretto.Scalar, error) {
+func computeDelta(y, z ristretto.Scalar) ristretto.Scalar {
 	var res ristretto.Scalar
 	res.SetZero()
 
@@ -154,5 +154,5 @@ func computeDelta(y, z ristretto.Scalar) (ristretto.Scalar, error) {
 	res.Mul(&zMinusZsq, &oneDotYn)
 	res.Sub(&res, &zcuOneDot2n)
 
-	return res, nil
+	return res
 }

@@ -94,31 +94,30 @@ func vecPowerSum(a ristretto.Scalar, n uint64) ristretto.Scalar {
 	return res
 }
 
-// vecExp takes two scalar arrays and returns a vector commitment C
-// the calculation goes as follows C = aG + bH
-// Where H is the Hash of the Generator G
-func vecExp(a, b []ristretto.Scalar) (ristretto.Point, error) {
+// vecExp essentially creates a vector commitment
+//XXX: move thid functionality to Pedersen package
+func vecExp(a []ristretto.Scalar, b []ristretto.Point) (ristretto.Point, error) {
 	result := ristretto.Point{} // defaults to zero
+	result.SetZero()
 
 	if len(a) != len(b) {
-		return result, errors.New("length of scalar a does not equal length of scalar b")
+		return result, errors.New("length of slice of scalars a does not equal length of slices of points b")
 	}
 
 	if len(a) < N*M {
 		return result, errors.New("length of scalar a is not less than N*M")
 	}
 
-	// aG+bH
+	for i := range b {
 
-	for i := range a {
-		var aG ristretto.Point
-		aG.ScalarMultBase(&a[i])
+		scalar := a[i]
+		point := b[i]
 
-		var bH ristretto.Point
-		bH.SetBytes(&H)
-		bH.ScalarMult(&bH, &b[i])
+		var sum ristretto.Point
+		sum.ScalarMult(&point, &scalar)
 
-		result.Add(&aG, &bH)
+		result.Add(&result, &sum)
+
 	}
 
 	return result, nil
@@ -179,6 +178,17 @@ func hadamard2(a, b []ristretto.Point) ([]ristretto.Point, error) {
 	}
 
 	return res, nil
+}
+
+// given a scalar,a, scaToVec will return a slice of size n, with all elements equal to a
+func scaToVec(a ristretto.Scalar, n uint8) []ristretto.Scalar {
+	res := make([]ristretto.Scalar, n)
+
+	for i := uint8(0); i < n; i++ {
+		res[i] = a
+	}
+
+	return res
 }
 
 func sumPowersSlow(x ristretto.Scalar, n uint32) ristretto.Scalar {
