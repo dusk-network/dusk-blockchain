@@ -18,6 +18,7 @@ const N = 64
 const M = 1
 
 // Proof is the constructed BulletProof
+// XXX: For now we are not including the aggregated case, or the inner product proof to shorten the transmitted variables
 type Proof struct {
 	V  ristretto.Point // Curve points 32 bytes, multi-proof but limit size to one
 	A  ristretto.Point // Curve point 32 bytes
@@ -33,7 +34,11 @@ type Proof struct {
 	r []ristretto.Scalar // []scalar
 }
 
+// Prove will take a scalar as a parameter and
+// using zero knowledge, prove that it is [0, 2^N)
 func Prove(v ristretto.Scalar) (Proof, error) {
+
+	// XXX: check if v is more than (2^N)-1
 
 	ped := pedersen.New([]byte("dusk.BulletProof.vec1")) // XXX: this will set the generator, should we use the standard base
 
@@ -50,7 +55,7 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 	BitCommitment := BitCommit(v.BigInt())
 	ok, err := BitCommitment.Ensure(v.BigInt())
 	if !ok || err != nil {
-		return Proof{}, errors.New("Error Committing value v to Bit slices aL and aR ")
+		return Proof{}, err
 	}
 
 	// Compute A
@@ -94,17 +99,17 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 
 	testT0 := testT0(BitCommitment.AL, BitCommitment.AR, y, z)
 	if !testT0.Equals(&poly.t0) {
-		return Proof{}, errors.New("Test t0 value does not match the value calculated from the polynomial")
+		return Proof{}, errors.New("[Prove]: Test t0 value does not match the value calculated from the polynomial")
 	}
 
 	polyt0 := poly.computeT0(y, z, v)
 	if !polyt0.Equals(&poly.t0) {
-		return Proof{}, errors.New("t0 value from delta function, does not match the polynomial t0 value(Correct)")
+		return Proof{}, errors.New("[Prove]: t0 value from delta function, does not match the polynomial t0 value(Correct)")
 	}
 
 	tPoly := poly.eval(x)
 	if !t.Equals(&tPoly) {
-		return Proof{}, errors.New("The t value computed from the t-poly, does not match the t value computed from the inner product of l and r")
+		return Proof{}, errors.New("[Prove]: The t value computed from the t-poly, does not match the t value computed from the inner product of l and r")
 	}
 
 	// TODO: calculate inner product proof
@@ -201,6 +206,129 @@ func computeMu(x, alpha, rho ristretto.Scalar) ristretto.Scalar {
 	return mu
 }
 
+// P = A + xS + Si(y,z)
+func computeP(A, S ristretto.Point, x, y, z ristretto.Scalar) ristretto.Point {
+
+	var P ristretto.Point
+	P.SetZero()
+
+	var xS ristretto.Point
+	xS.ScalarMult(&S, &x)
+
+	Si := computeSi(y, z)
+
+	fmt.Println("[ComputeSI]: ", Si.Bytes())
+
+	P.Add(&A, &xS)
+	P.Add(&P, &Si)
+
+	return P
+}
+
+// P = A + xS + Si(y,z)
+func computeSi(y, z ristretto.Scalar) ristretto.Point {
+
+	genData := []byte("dusk.BulletProof.vec1")
+	ped := pedersen.New(genData)
+	ped.BaseVector.Compute(65)
+
+	genData = append(genData, uint8(1))
+
+	ped2 := pedersen.New(genData)
+	ped2.BaseVector.Compute(64)
+
+	Hprime := computeHprime(ped2.BaseVector.Bases, y)
+
+	yN := vecPowers(y, N)
+
+	zYn, _ := vecScal(yN, z)
+
+	var zsq ristretto.Scalar
+	zsq.Square(&z)
+
+	var two ristretto.Scalar
+	two.SetBigInt(big.NewInt(2))
+	twoN := vecPowers(two, N)
+
+	zsq2n, _ := vecScal(twoN, zsq)
+
+	leftIP, _ := vecAdd(zsq2n, zYn)
+
+	leftSi, _ := vecExp(leftIP, Hprime)
+
+	// -z<1, G>
+	var minusZ ristretto.Scalar
+	minusZ.Neg(&z)
+
+	G := ped.BaseVector.Bases[1:]
+
+	rightSi, _ := vecExp(scaToVec(minusZ, N), G)
+
+	var Si ristretto.Point
+	Si.SetZero()
+
+	Si.Add(&leftSi, &rightSi)
+
+	return Si
+}
+
+// computeHprime will take a a slice of points H, with a scalar y
+// and return a slice of points Hprime,  such that Hprime = y^-n * H
+func computeHprime(H []ristretto.Point, y ristretto.Scalar) []ristretto.Point {
+	Hprimes := make([]ristretto.Point, len(H))
+
+	yInv := y.Inverse()
+	invYInt := yInv.BigInt()
+
+	for i, p := range H {
+		// compute y^-i
+		var invYPowInt big.Int
+		invYPowInt.Exp(invYInt, big.NewInt(int64(i)), nil)
+
+		var invY ristretto.Scalar
+		invY.SetBigInt(&invYPowInt)
+
+		var hprime ristretto.Point
+		hprime.ScalarMult(&p, &invY)
+
+		Hprimes = append(Hprimes, hprime)
+	}
+
+	return Hprimes
+}
+
+// P = lG + rH
+func computeLGRH(y, mu ristretto.Scalar, l, r []ristretto.Scalar) ristretto.Point {
+
+	var P ristretto.Point
+	P.SetZero()
+
+	genData := []byte("dusk.BulletProof.vec1")
+	ped := pedersen.New(genData)
+	ped.BaseVector.Compute(65)
+
+	genData = append(genData, uint8(1))
+
+	ped2 := pedersen.New(genData)
+	ped2.BaseVector.Compute(64)
+
+	Hprime := computeHprime(ped2.BaseVector.Bases, y)
+	G := ped.BaseVector.Bases[1:]
+
+	rH, _ := vecExp(r, Hprime)
+	lG, _ := vecExp(l, G)
+
+	P.Add(&lG, &rH)
+
+	var blindingFactor ristretto.Point
+	blindingFactor = ped.BaseVector.Bases[0]
+	blindingFactor.ScalarMult(&blindingFactor, &mu)
+
+	P.Add(&blindingFactor, &P)
+
+	return P
+}
+
 // Verify takes a bullet proof and
 // returns true only if the proof was valid
 func Verify(p Proof) (bool, error) {
@@ -209,12 +337,11 @@ func Verify(p Proof) (bool, error) {
 	ped.BaseVector.Compute(2)
 
 	if len(p.l) != len(p.r) {
-		return false, errors.New("Sizes of l and r do not match")
+		return false, errors.New("[Verify]: Sizes of l and r do not match")
 	}
 
 	if len(p.l) <= 0 {
-		fmt.Println("size of l is ", p.l)
-		return false, errors.New("size of l or r cannot be zero; empty proof")
+		return false, errors.New("[Verify]: size of l or r cannot be zero; empty proof")
 	}
 
 	// Reconstruct the challenges
@@ -262,10 +389,7 @@ func Verify(p Proof) (bool, error) {
 	zsqV.ScalarMult(&p.V, &zsq)
 
 	var deltaG ristretto.Point
-	delta, err := computeDelta(y, z)
-	if err != nil {
-		return false, err
-	}
+	delta := computeDelta(y, z)
 
 	deltaG.ScalarMult(&ped.BaseVector.Bases[1], &delta)
 
@@ -277,10 +401,17 @@ func Verify(p Proof) (bool, error) {
 	RHS.Add(&RHS1, &RHS2)
 
 	if !LHS.Equals(&RHS) {
-		return false, errors.New("LHS != RHS; proof that t0 is correct is wrong")
+		return false, errors.New("[Verify]: LHS != RHS; proof that t0 is correct is wrong")
 	}
 
 	// prove l(x) and r(x) is correct
+
+	Pleft := computeP(p.A, p.S, x, y, z)
+	PRight := computeLGRH(y, p.mu, p.l, p.r)
+
+	if !Pleft.Equals(&PRight) {
+		return false, errors.New("[Verify]: Proof for l(x),r(x) is wrong")
+	}
 
 	return true, nil
 }

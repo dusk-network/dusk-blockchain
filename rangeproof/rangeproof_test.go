@@ -10,20 +10,39 @@ import (
 
 func TestProveBulletProof(t *testing.T) {
 
-	var amount ristretto.Scalar
-	amount.SetBigInt(big.NewInt(200))
+	n := 30000
 
-	// Prove
-	p, err := Prove(amount)
+	twoN := retRangeLimit()
 
-	assert.Equal(t, nil, err)
-	_ = p
+	for i := 0; i < n; i++ {
 
-	// Verify
-	ok, err := Verify(p)
-	assert.Equal(t, nil, err)
-	assert.Equal(t, true, ok)
+		var amount ristretto.Scalar
+		amount.Rand()
 
+		cmp := amount.BigInt().Cmp(twoN)
+		if cmp != -1 {
+			continue
+		}
+
+		// Prove
+		p, err := Prove(amount)
+
+		assert.Equal(t, nil, err)
+
+		// Verify
+		ok, err := Verify(p)
+		assert.Equal(t, nil, err)
+		assert.Equal(t, true, ok)
+	}
+
+}
+
+func retRangeLimit() *big.Int {
+
+	var basePow, e = big.NewInt(2), big.NewInt(int64(N))
+	basePow.Exp(basePow, e, nil)
+
+	return basePow
 }
 
 func TestComputeTau(t *testing.T) {
