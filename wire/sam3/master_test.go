@@ -40,19 +40,28 @@ func TestSubsessions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Close master session
-	master.Close()
+	// Make sure the master session contains all IDs
+	assert.Equal(t, 3, len(master.SIDs))
+
+	// Close session
+	if err := sam.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make sure the master session closes all it's subsessions on Close
 	assert.Empty(t, master.SIDs)
 }
 
-func TestSubsessionStreamConnectAccept(t *testing.T) {
+// Set up subsessions of each type and test their functionality
+// as subsessions, as well as the capability of a master session
+// to run all three simultaneously.
+func TestAll(t *testing.T) {
 	sam, err := NewSAM("127.0.0.1:7656")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	defer sam.Close()
 	keys, err := sam.NewKeys()
 	if err != nil {
 		t.Fatal(err)
@@ -63,18 +72,55 @@ func TestSubsessionStreamConnectAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer master.Close()
-	stream, err := master.AddStream("stream", []string{})
+	raw, err := master.AddRaw("ruu", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stream2, err := master.AddStream("stream2", []string{})
+	dg, err := master.AddDatagram("duu", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// First, start accepting on stream2
+	stream, err := master.AddStream("suu", []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sam2, err := NewSAM("127.0.0.1:7656")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer sam2.Close()
+	keys2, err := sam2.NewKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	master2, err := sam2.NewMasterSession("master2", keys2, mediumShuffle)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw2, err := master2.AddRaw("rpp", []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dg2, err := master2.AddDatagram("dpp", []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream2, err := master2.AddStream("spp", []string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Streaming
+
+	// Start accepting on stream2
 	go func() {
 		conn, err := stream2.Accept(false)
 		if err != nil {
@@ -82,17 +128,19 @@ func TestSubsessionStreamConnectAccept(t *testing.T) {
 		}
 
 		buf := make([]byte, 4096)
-		if _, err := conn.Read(buf); err != nil {
+		n, err := conn.Read(buf)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		t.Log(string(buf))
+		assert.Equal(t, "Test\n", string(buf[:n]))
 		if _, err := conn.Write([]byte("Test 2\n")); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	conn, err := stream.Connect(keys.Addr)
+	// Write to stream2
+	conn, err := stream.Connect(stream2.Keys.Addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,11 +149,41 @@ func TestSubsessionStreamConnectAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Read it
+	// Read response
 	buf := make([]byte, 4096)
-	if _, err := conn.Read(buf); err != nil {
+	n, err := conn.Read(buf)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(string(buf))
+	assert.Equal(t, "Test 2\n", string(buf[:n]))
+
+	// Non-repliable datagrams
+
+	if _, err := raw.Write([]byte("Foo\n"), raw2.Keys.Addr); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read message
+	msg, err := raw2.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "Foo\n", string(msg))
+
+	// Repliable datagrams
+
+	if _, err := dg.Write([]byte("Bar\n"), dg2.Keys.Addr); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read message
+	msg2, dest, err := dg2.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "Bar\n", string(msg2))
+	assert.Equal(t, dg.Keys.Addr, dest)
 }

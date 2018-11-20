@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// SAM control socket
+// SAM socket
 type SAM struct {
 	Address string   // IPv4:port
 	Conn    net.Conn // Connection to the router
@@ -23,7 +23,7 @@ const (
 	sessionOK            = "SESSION STATUS RESULT=OK"
 )
 
-// NewSAM creates a new SAM control socket on the I2P router.
+// NewSAM creates a new SAM socket on the I2P router.
 func NewSAM(address string) (*SAM, error) {
 	conn, err := net.Dial("tcp4", address)
 	if err != nil {

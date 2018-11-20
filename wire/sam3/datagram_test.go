@@ -1,6 +1,10 @@
 package sam3
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 // Test the sending and receiving of repliable datagrams.
 // This will open 2 SAM sessions on the I2P router and make them
@@ -27,6 +31,7 @@ func TestDatagram(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer sam2.Close()
 	keys2, err := sam2.NewKeys()
 	if err != nil {
 		t.Fatal(err)
@@ -41,10 +46,11 @@ func TestDatagram(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, _, _, _, err := dgSession.Read()
+	msg, dest, err := dgSession.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(string(msg))
+	assert.Equal(t, "Test", string(msg))
+	assert.Equal(t, dgSession2.Keys.Addr, dest)
 }

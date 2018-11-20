@@ -8,15 +8,15 @@ import (
 	"strings"
 )
 
-// The DatagramSession implements net.PacketConn. It can send and receive
-// signed datagrams. The maximum size is 32KB. Note that around 427 bytes
+// DatagramSession can send and receive signed datagrams.
+// The maximum size is 32KB. Note that around 427 bytes
 // will be taken up by signature data.
 type DatagramSession struct {
 	ID       string       // Session name
 	Keys     I2PKeys      // I2P keys
-	Conn     net.Conn     // Connection to the SAM control socket
+	Conn     net.Conn     // Connection to the SAM socket
 	UDPConn  *net.UDPConn // Used to deliver datagrams
-	RUDPAddr *net.UDPAddr // The SAM control socket UDP address
+	RUDPAddr *net.UDPAddr // The SAM socket UDP address
 	FromPort string       // FROM_PORT specified on creation
 	ToPort   string       // TO_PORT specified on creation
 }
@@ -122,16 +122,16 @@ func (s *SAM) NewDatagramSession(id string, keys I2PKeys, SAMOpt []string, I2CPO
 }
 
 // Read one datagram sent to the destination of the DatagramSession.
-func (s *DatagramSession) Read() ([]byte, string, string, string, error) {
+func (s *DatagramSession) Read() ([]byte, string, error) {
 	buf := make([]byte, 32768+4168) // Max datagram size + max SAM bridge message size.
 	n, sAddr, err := s.UDPConn.ReadFromUDP(buf)
 	if err != nil {
-		return nil, "", "", "", err
+		return nil, "", err
 	}
 
 	// Only accept incoming UDP messages from the SAM socket we're connected to.
 	if !sAddr.IP.Equal(s.RUDPAddr.IP) {
-		return nil, "", "", "", fmt.Errorf("datagram received from wrong address: expected %v, actual %v",
+		return nil, "", fmt.Errorf("datagram received from wrong address: expected %v, actual %v",
 			s.RUDPAddr.IP, sAddr.IP)
 	}
 
@@ -140,32 +140,16 @@ func (s *DatagramSession) Read() ([]byte, string, string, string, error) {
 	msg, data := string(buf[:i]), buf[i+1:n]
 
 	// Split message into fields
-	fields := strings.Split(msg, " ")
+	dest := strings.Split(msg, " ")[0]
 
-	// Handle message
-	var dest string
-	fromPort := "0" // Default FROM_PORT
-	toPort := "0"   // Default TO_PORT
-	for _, field := range fields {
-		switch {
-		case strings.Contains(field, "DESTINATION="):
-			dest = strings.TrimPrefix(field, "DESTINATION=")
-		case strings.Contains(field, "FROM_PORT="):
-			fromPort = strings.TrimPrefix(field, "FROM_PORT=")
-		case strings.Contains(field, "TO_PORT="):
-			toPort = strings.TrimPrefix(field, "TO_PORT=")
-		default:
-			continue // SIZE is not important as we could determine this from ReadFromUDP
-		}
-	}
-
-	return data, dest, fromPort, toPort, nil
+	return data, dest, nil
 }
 
 // WriteTo sends one signed datagram to the destination specified. At the time of
 // writing, maximum size is 31 kilobyte, but this may change in the future.
 func (s *DatagramSession) Write(b []byte, addr string) (int, error) {
-	header := []byte("3.3 " + s.ID + " " + addr + " FROM_PORT=" + s.FromPort + " TO_PORT=" + s.ToPort + "\n")
+	header := []byte("3.3 " + s.ID + " " + addr + " FROM_PORT=" + s.FromPort +
+		" TO_PORT=" + s.ToPort + "\n")
 	msg := append(header, b...)
 	n, err := s.UDPConn.WriteToUDP(msg, s.RUDPAddr)
 

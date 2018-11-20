@@ -17,7 +17,7 @@ type StreamSession struct {
 	Streams []*StreamConn // All open connections in the StreamSession go here
 }
 
-// NewStreamSession creates a new StreamSession on the SAM control socket.
+// NewStreamSession creates a new StreamSession on the SAM socket.
 func (s *SAM) NewStreamSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt []string) (*StreamSession, error) {
 	// Check user options
 	for _, opt := range SAMOpt {
@@ -55,21 +55,21 @@ func (s *SAM) NewStreamSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt
 }
 
 // HandleResponse is a convenience method for handling stream session responses
-// from the SAM control socket.
+// from the SAM socket.
 func (ss *StreamSession) HandleResponse(text string) error {
 	result := strings.TrimPrefix(text, "STREAM STATUS ")
-	switch result {
-	case "RESULT=OK\n":
+	switch {
+	case result == "RESULT=OK\n":
 		return nil
-	case "RESULT=CANT_REACH_PEER\n":
-		return errors.New("can not reach peer")
-	case "RESULT=I2P_ERROR\n":
+	case strings.Contains(result, "RESULT=CANT_REACH_PEER"):
+		return errors.New("can't reach peer:" + result[22:])
+	case strings.Contains(result, "RESULT=I2P_ERROR"):
 		return errors.New("I2P internal error")
-	case "RESULT=INVALID_KEY\n":
+	case result == "RESULT=INVALID_KEY\n":
 		return errors.New("invalid key")
-	case "RESULT=INVALID_ID\n":
+	case result == "RESULT=INVALID_ID\n":
 		return errors.New("invalid tunnel ID")
-	case "RESULT=TIMEOUT\n":
+	case result == "RESULT=TIMEOUT\n":
 		return errors.New("timeout")
 	default:
 		return errors.New("unknown error: " + result)
@@ -100,7 +100,7 @@ type StreamConn struct {
 	Session    *StreamSession // The StreamSession this connection is running on.
 	LocalAddr  string         // Our destination
 	RemoteAddr string         // Destination of the streaming counterparty
-	Conn       net.Conn       // Connection to the SAM control socket
+	Conn       net.Conn       // Connection to the SAM socket
 }
 
 const acceptMessageLen = 4127 // Max key size + FROM_PORT/TO_PORT information
@@ -119,8 +119,10 @@ func (sc *StreamConn) Write(buf []byte) (int, error) {
 
 // Connect dials to an I2P destination and starts streaming with it if successful.
 func (ss *StreamSession) Connect(addr string) (*StreamConn, error) {
+	// Get new SAM socket for the StreamConn
 	s, err := NewSAM(ss.Conn.RemoteAddr().String())
 
+	// Send message to SAM
 	msg := []byte("STREAM CONNECT ID=" + ss.ID + " DESTINATION=" + addr + " SILENT=false\n")
 	text, err := SendToBridge(msg, s.Conn) // will return once the counterparty accepts or rejects
 	if err != nil {
@@ -133,12 +135,15 @@ func (ss *StreamSession) Connect(addr string) (*StreamConn, error) {
 		return nil, err
 	}
 
-	return &StreamConn{
+	sc := StreamConn{
 		Session:    ss,
 		LocalAddr:  ss.Keys.Addr,
 		RemoteAddr: addr,
 		Conn:       s.Conn,
-	}, nil
+	}
+
+	ss.Streams = append(ss.Streams, &sc)
+	return &sc, nil
 }
 
 // Accept incoming connections to your streaming session.
@@ -198,34 +203,25 @@ func (ss *StreamSession) Accept(silent bool) (*StreamConn, error) {
 	return &sc, nil
 }
 
-// Forward incoming connections to another destination.
-func (ss *StreamSession) Forward(dest string, port string) (*StreamConn, error) {
+// Forward incoming streams to another destination.
+// This function only returns a connection to the new socket,
+// As all the data transmission is handled by the bridge.
+func (ss *StreamSession) Forward(addr string, port string) (net.Conn, error) {
 	// Get new SAM socket for the stream
 	s, err := NewSAM(ss.Conn.RemoteAddr().String())
 
-	// Listen on new SAM socket
-	l, err := net.Listen("tcp4", s.Conn.LocalAddr().String())
-	if err != nil {
-		return nil, err
-	}
-
 	// Send message to SAM
-	msg := []byte("STREAM FORWARD ID=" + ss.ID + " PORT=" + port + " HOST=" + dest + " SILENT=false\n")
+	msg := []byte("STREAM FORWARD ID=" + ss.ID + " PORT=" + port + " HOST=" + addr + " SILENT=false\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := ss.HandleResponse(text); err != nil {
-		l.Close()
 		return nil, err
 	}
 
-	return &StreamConn{
-		Session:   ss,
-		Conn:      s.Conn,
-		LocalAddr: ss.Keys.Addr,
-	}, nil
+	return s.Conn, nil
 }
 
 // Close the StreamConn.

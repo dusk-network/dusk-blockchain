@@ -18,17 +18,6 @@ type MasterSession struct {
 	SIDs     []string           // All sessions on the master session by ID
 }
 
-// Options that can't be passed to a master session on creation.
-var invalidOpt = map[string]bool{
-	"PORT":            true,
-	"HOST":            true,
-	"FROM_PORT":       true,
-	"TO_PORT":         true,
-	"PROTOCOL":        true,
-	"LISTEN_PORT":     true,
-	"LISTEN_PROTOCOL": true,
-}
-
 // Session is implemented by any session struct in this package.
 // It's intended for record-keeping purposes on the MasterSession struct,
 // and shouldn't be used for anything else, as most other structs also implement
@@ -39,14 +28,6 @@ type Session interface {
 
 // NewMasterSession creates a new master session on the SAM bridge.
 func (s *SAM) NewMasterSession(id string, keys I2PKeys, I2CPOpt []string) (*MasterSession, error) {
-	// Don't allow any options other than I2CP options.
-	for _, opt := range I2CPOpt {
-		flag := strings.Split(opt, "=")[0]
-		if invalidOpt[flag] {
-			return nil, fmt.Errorf("master session options may not contain %v", flag)
-		}
-	}
-
 	// Format session creation message
 	msg := []byte("SESSION CREATE STYLE=MASTER ID=" + id + " DESTINATION=" + keys.Priv + " " +
 		strings.Join(I2CPOpt, " ") + "\n")
@@ -84,14 +65,6 @@ func (s *SAM) NewMasterSession(id string, keys I2PKeys, I2CPOpt []string) (*Mast
 
 // AddRaw adds a RAW subsession on the master session.
 func (s *MasterSession) AddRaw(id string, SAMOpt []string) (*RawSession, error) {
-	// Make sure DESTINATION isn't passed
-	for _, opt := range SAMOpt {
-		flag := strings.Split(opt, "=")[0]
-		if flag == "DESTINATION" {
-			return nil, errors.New("subsession may not contain DESTINATION flag")
-		}
-	}
-
 	// Set defaults first
 	udpPort := "7655" // Default SAM UDP port (FROM_PORT/LISTEN_PORT)
 	sendPort := "0"   // Default send port (TO_PORT/PORT)
@@ -166,7 +139,8 @@ func (s *MasterSession) AddRaw(id string, SAMOpt []string) (*RawSession, error) 
 	}
 
 	// Write SESSION ADD message
-	msg := []byte("SESSION ADD STYLE=RAW ID=" + id + " PORT=" + sendPort + " " +
+	_, localPort, err := net.SplitHostPort(udpConn.LocalAddr().String())
+	msg := []byte("SESSION ADD STYLE=RAW ID=" + id + " PORT=" + localPort + " " +
 		strings.Join(SAMOpt, " ") + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
@@ -275,7 +249,8 @@ func (s *MasterSession) AddDatagram(id string, SAMOpt []string) (*DatagramSessio
 	}
 
 	// Write SESSION ADD message
-	msg := []byte("SESSION ADD STYLE=DATAGRAM ID=" + id + " PORT=" + sendPort + " " +
+	_, localPort, err := net.SplitHostPort(udpConn.LocalAddr().String())
+	msg := []byte("SESSION ADD STYLE=DATAGRAM ID=" + id + " PORT=" + localPort + " " +
 		strings.Join(SAMOpt, " ") + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
@@ -358,12 +333,10 @@ func (s *MasterSession) Remove(id string) error {
 	msg := []byte("SESSION REMOVE ID=" + id + "\n")
 	text, err := SendToBridge(msg, s.Conn)
 	if err != nil {
-		s.Close()
 		return err
 	}
 
 	if err := s.HandleResponse(text); err != nil {
-		s.Close()
 		return err
 	}
 

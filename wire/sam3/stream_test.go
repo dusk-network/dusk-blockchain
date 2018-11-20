@@ -49,18 +49,19 @@ func TestStreamConnectAccept(t *testing.T) {
 		}
 
 		buf := make([]byte, 4096)
-		if _, err := conn.Read(buf); err != nil {
+		n, err := conn.Read(buf)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		t.Log(string(buf))
+		assert.Equal(t, "Test\n", string(buf[:n]))
 		if _, err := conn.Write([]byte("Test 2\n")); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
 	// Then connect on stream and write to stream2
-	conn, err := stream.Connect(keys2.Addr)
+	conn, err := stream.Connect(stream2.Keys.Addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,13 +70,14 @@ func TestStreamConnectAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Read it
+	// Read response
 	buf := make([]byte, 4096)
-	if _, err := conn.Read(buf); err != nil {
+	n, err := conn.Read(buf)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log(string(buf))
+	assert.Equal(t, "Test 2\n", string(buf[:n]))
 	if err := sam.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -86,24 +88,4 @@ func TestStreamConnectAccept(t *testing.T) {
 
 	assert.Empty(t, stream.Streams)
 	assert.Empty(t, stream2.Streams)
-}
-
-// Test out the Forward method in the stream source file.
-func TestStreamForward(t *testing.T) {
-	sam, err := NewSAM("127.0.0.1:7656")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keys, err := sam.NewKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	stream, err := sam.NewStreamSession("stream", keys, []string{}, mediumShuffle)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer stream.Close()
 }

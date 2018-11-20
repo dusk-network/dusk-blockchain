@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-// WriteMessage writes msg to the specified conn (which should be the SAM control socket)
+// WriteMessage writes msg to the specified conn (which should be the SAM socket)
 func WriteMessage(msg []byte, conn net.Conn) error {
 	for i, j := 0, 0; i != len(msg); j++ {
 		// Stop after 15 tries

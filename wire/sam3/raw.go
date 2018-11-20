@@ -1,20 +1,20 @@
 package sam3
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 )
 
-// RawSession defines a RAW session on the SAM bridge.
+// RawSession can send and receive non-repliable
+// datagrams. The maximum size is 32KB.
 type RawSession struct {
 	ID       string       // Session name
 	Keys     I2PKeys      // I2P keys
-	Conn     net.Conn     // Connection to the SAM control socket
+	Conn     net.Conn     // Connection to the SAM socket
 	UDPConn  *net.UDPConn // Used to deliver and read datagrams
-	RUDPAddr *net.UDPAddr // The SAM control socket UDP address
+	RUDPAddr *net.UDPAddr // The SAM socket UDP address
 	FromPort string       // FROM_PORT specified on creation
 	ToPort   string       // TO_PORT specified on creation
 	Protocol string       // PROTOCOL specified on creation
@@ -128,58 +128,29 @@ func (s *SAM) NewRawSession(id string, keys I2PKeys, SAMOpt []string, I2CPOpt []
 }
 
 // Read one raw datagram sent to the destination of the DatagramSession.
-func (s *RawSession) Read() ([]byte, string, string, error) {
+func (s *RawSession) Read() ([]byte, error) {
 	buf := make([]byte, 32768+67) // Max datagram size + max SAM bridge message size
 	n, sAddr, err := s.UDPConn.ReadFromUDP(buf)
 	if err != nil {
-		return nil, "", "", err
+		return nil, err
 	}
 
 	// Only accept incoming UDP messages from the SAM socket we're connected to.
 	if !sAddr.IP.Equal(s.RUDPAddr.IP) {
-		return nil, "", "", fmt.Errorf("datagram received from wrong address: expected %v, actual %v",
+		return nil, fmt.Errorf("datagram received from wrong address: expected %v, actual %v",
 			s.RUDPAddr.IP, sAddr.IP)
 	}
 
-	// If a header is included, split message lines first
-	i := bytes.IndexByte(buf, byte('\n'))
-	var msg string
-	var data []byte
-	if i != -1 {
-		msg, data = string(buf[:i]), buf[i+1:n]
-	} else {
-		data = buf[:n]
-	}
-
-	fromPort := "0" // Default FROM_PORT
-	toPort := "0"   // Default TO_PORT
-	if msg != "" {
-		// Split message into fields
-		fields := strings.Split(msg, " ")
-
-		// Handle message
-		for _, field := range fields {
-			switch {
-			case strings.Contains(field, "FROM_PORT="):
-				fromPort = strings.TrimPrefix(field, "FROM_PORT=")
-			case strings.Contains(field, "TO_PORT="):
-				toPort = strings.TrimPrefix(field, "TO_PORT=")
-			default:
-				continue // SIZE is not important as we could determine this from ReadFromUDP
-			}
-		}
-	}
-
-	return data, fromPort, toPort, nil
+	return buf[:n], nil
 }
 
 // Write sends one raw datagram to the destination specified. At the time of writing,
 // maximum size is 32 kilobyte, but this may change in the future.
-func (s *RawSession) Write(b []byte, addr string) (n int, err error) {
-	header := []byte("3.3 " + s.ID + " " + addr + " FROM_PORT=" + s.FromPort + " TO_PORT=" + s.ToPort +
-		" PROTOCOL=" + s.Protocol + "\n")
+func (s *RawSession) Write(b []byte, addr string) (int, error) {
+	header := []byte("3.3 " + s.ID + " " + addr + " FROM_PORT=" + s.FromPort +
+		" TO_PORT=" + s.ToPort + " PROTOCOL=" + s.Protocol + "\n")
 	msg := append(header, b...)
-	n, err = s.UDPConn.WriteToUDP(msg, s.RUDPAddr)
+	n, err := s.UDPConn.WriteToUDP(msg, s.RUDPAddr)
 
 	return n, err
 }
