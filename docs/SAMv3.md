@@ -387,11 +387,11 @@ Like a datagram session, it contains the ID, keys, connection to the bridge, as 
 To send non-repliable datagrams, use the `Write` method:
 
 ```go
-func (s *RawSession) Write(b []byte, addr string) (n int, err error) {
-	header := []byte("3.3 " + s.ID + " " + addr + " FROM_PORT=" + s.FromPort + " TO_PORT=" + s.ToPort +
-		" PROTOCOL=" + s.Protocol + "\n")
+func (s *RawSession) Write(b []byte, addr string) (int, error) {
+	header := []byte("3.3 " + s.ID + " " + addr + " FROM_PORT=" + s.FromPort +
+		" TO_PORT=" + s.ToPort + " PROTOCOL=" + s.Protocol + "\n")
 	msg := append(header, b...)
-	n, err = s.UDPConn.WriteToUDP(msg, s.RUDPAddr)
+	n, err := s.UDPConn.WriteToUDP(msg, s.RUDPAddr)
 
 	return n, err
 }
