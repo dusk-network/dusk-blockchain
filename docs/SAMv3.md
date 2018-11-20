@@ -12,11 +12,11 @@ To test this module, you should have an I2P router active on your system that ca
 
 **A note about forwarding**
 
-The SAM streaming library has a possibility to forward incoming streams to another destination. However, testing this out on a single SAM bridge proves to be quite difficult - hence why there are no tests included for this. An attempt at creating 3 streaming sessions and trying to set one up for forwarding will result in connection resets and throw tests off. This function is better tested with multiple devices, for which I'll most likely include code later.
+The SAM streaming library has a possibility to forward incoming streams to another destination. However, testing this out on a single router proves to be quite difficult - hence why there are no tests included for this. An attempt at creating 3 streaming sessions and trying to set one up for forwarding will result in connection resets and throw tests off. This function is better tested with multiple devices, for which I'll most likely include code later.
 
 ## Usage
 
-The SAM library has a few basic lines of code for setup if you want to use it. 
+The SAM library has a few basic lines of code for setup. 
 
 **Error handling will be omitted for clarity in this documentation.**
 
@@ -34,13 +34,15 @@ This sets you up with a connection to the router's SAM bridge and gives you a se
 
 ### Streaming sessions
 
-Streaming sessions allow the continuous streaming of data between two peers until one of them closes the socket.
+Streaming sessions allow the continuous streaming of data between two peers until one of them closes the connection.
 
 A streaming session can be opened on the socket by using this code:
 
 ```go
 stream, err := sam.NewStreamSession("stream", keys, []string{}, mediumShuffle)
 ```
+
+By calling the `NewStreamSession` method on `sam`, we can open a stream session on the SAM bridge. The `keys` parameter will set the session destination to our earlier generated keys. The `mediumShuffle` parameter is a preset slice of options to pass to the router (all such options can be found in the `presets.go` file). Any other session creation will work pretty much exactly like this.
 
 If successful, `stream` will contain a struct with information and methods needed to make use of the streaming session. Let's take a look at the `StreamSession` struct.
 
@@ -89,7 +91,7 @@ func (ss *StreamSession) Connect(addr string) (*StreamConn, error) {
 }
 ```
 
-As per the SAMv3 specification, the function will open another socket connection to host the stream on, and will then send the `STREAM CONNECT` message to the bridge. The bridge will then attempt to establish a streaming connection with `addr`. The response will be handled by the `HandleReponse` method, and if successful, it will return a pointer to a `StreamConn`, which contains information and methods for reading from and writing to a stream. This pointer will also be added to the `Streams` field of the `StreamSession`. 
+As per the SAMv3 specification, the function will open another socket connection to host the stream on, and will then send the `STREAM CONNECT` message to the bridge. The bridge will then attempt to establish a streaming connection with `addr`. The response will be handled by the `HandleReponse` method, and if successful, it will return a pointer to a `StreamConn`, which contains information and methods for reading from and writing to a stream. The connection should now be open and both parties will be able to start streaming data. This pointer will also be added to the `Streams` field of the `StreamSession`. 
 
 **ACCEPT**
 
@@ -287,7 +289,7 @@ type DatagramSession struct {
 }
 ```
 
-The session will contain all basic information: ID, keys, a connection to the bridge. Additionally, it will contain a UDP connection and a UDP address to send and receive datagrams with. Lastly, the `FROM_PORT` and `TO_PORT` will be saved as well, which can be specified in the `SAMOpt` parameter in `NewDatagramSession` (which is passed `[]string{}` in the above function - they will be 0 as per the standard).
+The session will contain all basic information: ID, keys, and a connection to the bridge. Additionally, it will contain a UDP connection and a UDP address to send and receive datagrams with. Lastly, the `FROM_PORT` and `TO_PORT` will be saved as well, which can be specified in the `SAMOpt` parameter in `NewDatagramSession` (which is passed `[]string{}` in the above function - they will be 0 as per the standard).
 
 To send datagrams, use the `Write` method:
 
@@ -382,7 +384,7 @@ type RawSession struct {
 }
 ```
 
-Like a datagram session, it contains the ID, keys, connection to the bridge, as well as a UDP conection and a UDP address for sending and receiving non-repliable datagrams. The ports are included as well, and additionally, a raw session can also define a `PROTOCOL` on setup, passed through `SAMOpt`.
+Like a datagram session, it contains the ID, keys, and a connection to the bridge, as well as a UDP conection and a UDP address for sending and receiving non-repliable datagrams. The ports are included as well, and additionally, a raw session can also define a `PROTOCOL` on setup, passed through `SAMOpt`.
 
 To send non-repliable datagrams, use the `Write` method:
 
@@ -397,7 +399,7 @@ func (s *RawSession) Write(b []byte, addr string) (int, error) {
 }
 ```
 
-Nearly identical to the `Write` method on `DatagramSession`, although a protocol number is also included in the message. Return the amount of bytes written, and an error if applicable.
+Nearly identical to the `Write` method on `DatagramSession`, although a protocol number is also included in the message. Returns the amount of bytes written, and an error if applicable.
 
 To receive non-repliable datagrams, use the `Read` method:
 
@@ -448,7 +450,7 @@ This will write the `EXIT` command to the socket, and close the connection with 
 
 ### Master sessions
 
-A master session allows you to host any of the other sessions as subsession on the same socket connection, allowing you to have one I2P address for all your incoming and outgoing data transmissions, and preventing the socket connection from closing if you end a subsession.
+A master session allows you to host any of the other sessions as subsessions on the same socket connection, allowing you to have one I2P address for all your incoming and outgoing data transmissions, and preventing the socket connection from closing if you end a subsession.
 
 To set up a master session after obtaining a socket connection and a pair of keys, use the following code:
 
@@ -456,7 +458,7 @@ To set up a master session after obtaining a socket connection and a pair of key
 master, err := sam.NewMasterSession("master", keys, mediumShuffle)
 ```
 
-By calling the `NewMasterSession` method on the `sam` object we got earlier, and using our `keys`, we can open a master session on the SAM bridge. The `mediumShuffle` parameter is a preset slice of options to pass to the router (all such options can be found in the `presets.go` file). Let's take a look at the `MasterSession` struct:
+This will return a `MasterSession` struct, and an error if applicable. Note that master sessions only take 3 arguments, as the `SAMOpt` parameter is left out. SAM options are not valid when creating master sessions, and should be left for the creation of subsessions. Let's take a look at the `MasterSession` struct:
 
 ```go
 type MasterSession struct {
@@ -475,7 +477,7 @@ The `MasterSession` then allows you to add subsessions on the socket. There are 
 * Datagram sessions - `master.AddDatagram("dg", []string{})`
 * Raw sessions - `master.AddRaw("raw", []string{})`
 
-The functions will return their respective sessions, as well as an error object, in case an error is encountered. You can then use these sessions as you would normally.
+The functions will return their respective sessions, as well as an error object, in case an error is encountered. Note that these functions only take two parameters: the ID and the SAM options. I2CP options are not valid when creating subsessions. After calling any of these functions, you can then use the returned session as you would normally.
 
 To close a subsession, call the `Remove` method on the `MasterSession`, passing the ID of the subsession. An example of closing a subsession:
 
