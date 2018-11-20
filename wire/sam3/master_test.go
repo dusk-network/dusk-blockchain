@@ -72,17 +72,17 @@ func TestAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := master.AddRaw("ruu", []string{})
+	raw, err := master.AddRaw("raw", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dg, err := master.AddDatagram("duu", []string{})
+	dg, err := master.AddDatagram("dg", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stream, err := master.AddStream("suu", []string{})
+	stream, err := master.AddStream("stream", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,17 +103,17 @@ func TestAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw2, err := master2.AddRaw("rpp", []string{})
+	raw2, err := master2.AddRaw("raw2", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dg2, err := master2.AddDatagram("dpp", []string{})
+	dg2, err := master2.AddDatagram("dg2", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	stream2, err := master2.AddStream("spp", []string{})
+	stream2, err := master2.AddStream("stream2", []string{})
 	if err != nil {
 		t.Fatal(err)
 	}
