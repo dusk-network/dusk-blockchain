@@ -30,7 +30,7 @@ keys, err := sam.NewKeys()
 defer sam.Close()
 ```
 
-This sets you up with a connection to the router's SAM bridge and gives you a set of keys to start a session with. Make sure you add `defer sam.Close()` whenever you open up a connection with the router, to make sure everything will properly exit after you're done. There are three options available:
+This sets you up with a connection to the router's SAM bridge and gives you a set of keys to start a session with. Make sure you add `defer sam.Close()` whenever you open up a connection with the router, to make sure everything will properly exit after you're done (of course, this is dependent on how long you wish to keep the connection open - you can also manually close it with `sam.Close()` later on, or by calling the `Close` method on the open session). There are three options available:
 
 ### Streaming sessions
 
