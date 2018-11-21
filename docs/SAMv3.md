@@ -30,7 +30,7 @@ keys, err := sam.NewKeys()
 defer sam.Close()
 ```
 
-This sets you up with a connection to the router's SAM bridge and gives you a set of keys to start a session with. Make sure you add `defer sam.Close()` whenever you open up a connection with the router, to make sure everything will properly exit after you're done (of course, this is dependent on how long you wish to keep the connection open - you can also manually close it with `sam.Close()` later on, or by calling the `Close` method on the open session). There are three options available:
+This sets you up with a connection to the router's SAM bridge and gives you a set of keys to start a session with. Make sure you add `defer sam.Close()` whenever you open up a connection with the router, to make sure everything will properly exit after you're done (of course, this is dependent on how long you wish to keep the connection open - you can also manually close it with `sam.Close()` later on, or by calling the `Close` method on the open session). There are four options available:
 
 ### Streaming sessions
 
@@ -183,6 +183,8 @@ func (ss *StreamSession) Forward(addr string, port string) (net.Conn, error) {
 
 This also works much like the previous functions, but instead sends a `STREAM FORWARD` command to the socket. If no errors are returned, the function will simply return a connection, which can be closed once the user wishes to stop forwarding connections. The SAM bridge will handle all the redirection, so on the user's end, not much else is to be done here.
 
+**USING A STREAM CONNECTION**
+
 Let's now take a look at the `StreamConn` struct.
 
 ```go
@@ -194,7 +196,7 @@ type StreamConn struct {
 }
 ```
 
-A `StreamConn` will contain a pointer back to the session it belongs to, as well as the local and remote address of the stream connection. At the bottom, a `net.Conn` is kept on which the reading and writing occurs.
+A `StreamConn` will contain a pointer back to the session it belongs to, as well as the local and remote address of the stream connection. At the bottom, a `net.Conn` is kept on which the reading and writing occurs. This `net.Conn` is a connection with the socket opened prior to making a connection with a peer.
 
 To write to a stream, use the `Write` method:
 
@@ -343,7 +345,7 @@ func (s *DatagramSession) Read() ([]byte, string, error) {
 }
 ```
 
-This will read from the `UDPConn` on the `DatagramSession`, which is where datagrams will be delivered. It will split the header data and the message, and return the message, the destination it was sent from, and an error if applicable.
+This will read from the `UDPConn` on the `DatagramSession`, which is where datagrams will be delivered. It will split the header data and the message, and return the message, the destination it was sent from, and an error if applicable. Keep in mind that this function will block until a datagram is received.
 
 To close the datagram session, simply call the `Close` method:
 
@@ -430,7 +432,7 @@ func (s *RawSession) Read() ([]byte, error) {
 }
 ```
 
-Again, much like the `Read` method on `DatagramSession`, but with much less header handling. Raw sessions do allow the inclusion of headers in the datagram, but they do not include the destination, and any further information is negligible, so it is discarded (and unless specified on session creation, non-repliable datagrams will never include a header).
+Again, much like the `Read` method on `DatagramSession`, but with much less header handling. Raw sessions do allow the inclusion of headers in the datagram, but they do not include the destination, and any further information is negligible, so it is discarded (and unless specified on session creation, non-repliable datagrams will never include a header). Again, be aware that the `Read` function will block until a datagram is received.
 
 Finally, to close a `RawSession`, simply call the `Close` method:
 
@@ -450,7 +452,7 @@ This will write the `EXIT` command to the socket, and close the connection with 
 
 ### Master sessions
 
-A master session allows you to host any of the other sessions as subsessions on the same socket connection, allowing you to have one I2P address for all your incoming and outgoing data transmissions, and preventing the socket connection from closing if you end a subsession.
+A master session allows you to host any of the above mentioned sessions as subsessions on the same socket connection, allowing you to have one I2P address for all your incoming and outgoing datagrams and streams, and preventing the socket connection from closing if you end a subsession.
 
 To set up a master session after obtaining a socket connection and a pair of keys, use the following code:
 
@@ -470,14 +472,14 @@ type MasterSession struct {
 }
 ```
 
-The master session will contain it's ID, keys, a connection to the socket, as well as a map of IDs linked to their respective subsessions, and an array of all subsession IDs running on this master session.
+The master session will contain it's ID, keys, a connection to the socket, as well as a map of IDs linked to their respective subsessions, and an array of all subsession IDs running on this master session. These subsession records are mostly kept for proper cleanup.
 
-The `MasterSession` then allows you to add subsessions on the socket. There are three types of subsessions you can open:
+The `MasterSession` then allows you to add subsessions on the socket. The types of subsessions you can open are identical to the sessions discussed earlier in this document:
 * Streaming sessions - `master.AddStream("stream", []string{})`
 * Datagram sessions - `master.AddDatagram("dg", []string{})`
 * Raw sessions - `master.AddRaw("raw", []string{})`
 
-The functions will return their respective sessions, as well as an error object, in case an error is encountered. Note that these functions only take two parameters: the ID and the SAM options. I2CP options are not valid when creating subsessions. After calling any of these functions, you can then use the returned session as you would normally.
+The functions will return their respective sessions, as well as an error object, in case an error is encountered. Note that these functions only take two parameters: the ID and the SAM options. I2CP options are not valid when creating subsessions, as they are inherited from whatever was passed to the master session (varying privacy between subsessions is therefore not possible). After calling any of these functions, you can then use the returned session as you would normally.
 
 To close a subsession, call the `Remove` method on the `MasterSession`, passing the ID of the subsession. An example of closing a subsession:
 
@@ -485,7 +487,7 @@ To close a subsession, call the `Remove` method on the `MasterSession`, passing 
 master.Remove("stream")
 ```
 
-This will remove the subsession with the ID "stream" from the master session.
+This will remove the subsession with the ID "stream" from the master session, and clear it from the `Sessions` and `SIDs` fields of the `MasterSession` struct.
 
 Finally, to close a master session, call the `Close` method:
 
