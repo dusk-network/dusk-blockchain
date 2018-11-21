@@ -208,9 +208,9 @@ func BenchmarkCompare(b *testing.B) {
 	elapsed2 := end2.Sub(start2)
 	b.Logf("%.2f", elapsed2.Seconds())
 
-	diff := elapsed1.Seconds() - elapsed2.Seconds()
-	increase := (diff / elapsed1.Seconds()) * 100
-	b.Logf("%.1f%% time decrease when using dusk lib", increase)
+	div := elapsed1.Seconds() / elapsed2.Seconds()
+	increase := (div - 1) * 100
+	b.Logf("%.1f%% performance increase when using dusk lib", increase)
 }
 
 // Benchmark the dusk encoding lib (to see benchmark stats for this approach)
