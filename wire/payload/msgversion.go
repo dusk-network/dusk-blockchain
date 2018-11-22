@@ -27,7 +27,7 @@ func NewMsgVersion(dest string) *MsgVersion {
 	}
 }
 
-// Encode a version message and write it to w.
+// Encode a MsgVersion struct and write to w.
 // Implements the Payload interface.
 func (m *MsgVersion) Encode(w io.Writer) error {
 	if err := encoding.PutUint32(w, binary.LittleEndian, m.Version); err != nil {
@@ -41,7 +41,7 @@ func (m *MsgVersion) Encode(w io.Writer) error {
 	return nil
 }
 
-// Decode a version message and read it into r.
+// Decode a MsgVersion from r.
 // Implements the Payload interface
 func (m *MsgVersion) Decode(r io.Reader) error {
 	v, err := encoding.Uint32(r, binary.LittleEndian)

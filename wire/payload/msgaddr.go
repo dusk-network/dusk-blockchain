@@ -27,7 +27,7 @@ func (m *MsgAddr) AddAddr(dest string) {
 	m.DestList = append(m.DestList, dest)
 }
 
-// Encode an address message.
+// Encode a MsgAddr struct and write to w.
 // Implements payload interface.
 func (m *MsgAddr) Encode(w io.Writer) error {
 	if err := encoding.WriteVarInt(w, uint64(len(m.DestList))); err != nil {
@@ -43,7 +43,7 @@ func (m *MsgAddr) Encode(w io.Writer) error {
 	return nil
 }
 
-// Decode an address message.
+// Decode a MsgAddr from r.
 // Implements payload interface.
 func (m *MsgAddr) Decode(r io.Reader) error {
 	n, err := encoding.ReadVarInt(r)

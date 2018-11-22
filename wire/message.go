@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/toghrulmaharramov/dusk-go/crypto"
+	"github.com/toghrulmaharramov/dusk-go/wire/commands"
 	"github.com/toghrulmaharramov/dusk-go/wire/payload"
 
 	"github.com/toghrulmaharramov/dusk-go/encoding"
@@ -17,7 +18,7 @@ import (
 type Payload interface {
 	Encode(w io.Writer) error
 	Decode(r io.Reader) error
-	Command() Cmd
+	Command() commands.Cmd
 }
 
 // WriteMessage will write a Dusk wire message to w.
@@ -80,20 +81,42 @@ func ReadMessage(r io.Reader, magic uint32) (Payload, error) {
 	}
 
 	switch hdr.Command {
-	case Version:
+	case commands.Version:
 		m := &payload.MsgVersion{}
 		err := m.Decode(payloadBuf)
 		return m, err
-	case VerAck:
-		m := &payload.MsgVerAck{}
+	case commands.VerAck:
+		return payload.NewMsgVerAck(), nil
+	case commands.Ping:
+		return payload.NewMsgPing(), nil
+	case commands.Pong:
+		return payload.NewMsgPong(), nil
+	case commands.Addr:
+		m := payload.NewMsgAddr()
 		err := m.Decode(payloadBuf)
 		return m, err
-	case Ping:
-		m := &payload.MsgPing{}
+	case commands.GetAddr:
+		return payload.NewMsgGetAddr(), nil
+	case commands.GetData:
+		m := payload.NewMsgGetData()
 		err := m.Decode(payloadBuf)
 		return m, err
-	case Pong:
-		m := &payload.MsgPong{}
+	// case commands.GetBlocks:
+	case commands.Tx:
+		m := &payload.MsgTx{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	// case commands.Block:
+	case commands.Inv:
+		m := payload.NewMsgInv()
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.NotFound:
+		m := payload.NewMsgNotFound()
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Reject:
+		m := &payload.MsgReject{}
 		err := m.Decode(payloadBuf)
 		return m, err
 	default:

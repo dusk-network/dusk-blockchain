@@ -26,7 +26,7 @@ func (h *Header) Decode(r io.Reader) error {
 		return err
 	}
 
-	buf := make([]byte, commands.CommandSize)
+	buf := make([]byte, commands.Size)
 	if _, err := r.Read(buf); err != nil {
 		return err
 	}
