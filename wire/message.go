@@ -27,7 +27,8 @@ func WriteMessage(w io.Writer, magic uint32, p Payload) error {
 		return err
 	}
 
-	if err := binary.Write(w, binary.LittleEndian, p.Command()); err != nil {
+	byteCmd := commands.CmdToByteArray(p.Command())
+	if err := binary.Write(w, binary.LittleEndian, byteCmd); err != nil {
 		return err
 	}
 
@@ -59,7 +60,7 @@ func WriteMessage(w io.Writer, magic uint32, p Payload) error {
 
 // ReadMessage will read a Dusk wire message from r and return the payload.
 func ReadMessage(r io.Reader, magic uint32) (Payload, error) {
-	buf := make([]byte, 0, HeaderSize)
+	buf := make([]byte, HeaderSize)
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return nil, err
 	}
@@ -68,6 +69,10 @@ func ReadMessage(r io.Reader, magic uint32) (Payload, error) {
 	var hdr Header
 	if err := hdr.Decode(hdrBuf); err != nil {
 		return nil, err
+	}
+
+	if magic != hdr.Magic {
+		return nil, errors.New("magic mismatch")
 	}
 
 	pBuf := make([]byte, 0, hdr.Length)
