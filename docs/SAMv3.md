@@ -1,6 +1,6 @@
 # SAM 3.3
 
-The SAM library is found in wire/sam3, and is a full Golang implementation based loosely on [this](https://bitbucket.org/kallevedin/sam3/overview). The full specifications of SAM can be found [here](https://geti2p.net/en/docs/api/samv3).
+The SAM library is found in peer/sam3, and is a full Golang implementation based loosely on [this](https://bitbucket.org/kallevedin/sam3/overview). The full specifications of SAM can be found [here](https://geti2p.net/en/docs/api/samv3).
 
 The goal of this refactor is to make the codebase more easily maintanable, provide better code readability and make use of better practices to construct the library. Additionally, this library is extended to include functions for SAM version 3.3, allowing the use of `MASTER` sessions and subsessions on one single socket.
 
