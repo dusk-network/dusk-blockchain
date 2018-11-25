@@ -9,8 +9,11 @@ type hashCacher struct {
 }
 
 // Append will add a new value to the current cache
-func (h *hashCacher) Append(x []byte) {
-	h.cache = append(h.cache, x...)
+func (h *hashCacher) Append(vals ...[]byte) {
+
+	for _, x := range vals {
+		h.cache = append(h.cache, x...)
+	}
 }
 
 // Result will return the current byte slice in
