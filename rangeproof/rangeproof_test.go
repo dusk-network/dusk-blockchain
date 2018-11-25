@@ -2,6 +2,7 @@ package rangeproof
 
 import (
 	"math/big"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,19 +11,14 @@ import (
 
 func TestProveBulletProof(t *testing.T) {
 
-	n := 30000
-
-	twoN := retRangeLimit()
+	n := 20
 
 	for i := 0; i < n; i++ {
 
 		var amount ristretto.Scalar
-		amount.Rand()
 
-		cmp := amount.BigInt().Cmp(twoN)
-		if cmp != -1 {
-			continue
-		}
+		n := rand.Int63()
+		amount.SetBigInt(big.NewInt(n))
 
 		// Prove
 		p, err := Prove(amount)
@@ -35,14 +31,6 @@ func TestProveBulletProof(t *testing.T) {
 		assert.Equal(t, true, ok)
 	}
 
-}
-
-func retRangeLimit() *big.Int {
-
-	var basePow, e = big.NewInt(2), big.NewInt(int64(N))
-	basePow.Exp(basePow, e, nil)
-
-	return basePow
 }
 
 func TestComputeTau(t *testing.T) {
