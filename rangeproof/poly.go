@@ -3,6 +3,8 @@ package rangeproof
 import (
 	"math/big"
 
+	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
+
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
 
@@ -15,7 +17,7 @@ type polynomial struct {
 func computePoly(aL, aR, sL, sR [N]ristretto.Scalar, y, z, v ristretto.Scalar) polynomial {
 
 	// calculate l_0
-	l0, _ := vecSubScal(aL[:], z)
+	l0, _ := vector.SubScalar(aL[:], z)
 
 	// calculate l_1
 	l1 := sL
@@ -24,21 +26,21 @@ func computePoly(aL, aR, sL, sR [N]ristretto.Scalar, y, z, v ristretto.Scalar) p
 
 	var two ristretto.Scalar
 	two.SetBigInt(big.NewInt(2))
-	twoN := vecPowers(two, N)
-	yN := vecPowers(y, N)
+	twoN := vector.ScalarPowers(two, N)
+	yN := vector.ScalarPowers(y, N)
 
 	var zsq ristretto.Scalar
 	zsq.Square(&z)
-	zsqTwoN, _ := vecScal(twoN, zsq)
+	zsqTwoN, _ := vector.MulScalar(twoN, zsq)
 
-	r0, _ := vecAddScal(aR[:], z)
+	r0, _ := vector.AddScalar(aR[:], z)
 
-	r0, _ = hadamard(r0, yN)
+	r0, _ = vector.Hadamard(r0, yN)
 
-	r0, _ = vecAdd(r0, zsqTwoN)
+	r0, _ = vector.Add(r0, zsqTwoN)
 
 	// calculate r_1
-	r1, _ := hadamard(yN, sR[:])
+	r1, _ := vector.Hadamard(yN, sR[:])
 
 	// calculate t0 // t_0 = <l_0, r_0>
 	t0, _ := innerProduct(l0, r0)
@@ -89,9 +91,9 @@ func (p *polynomial) computeL(x ristretto.Scalar) []ristretto.Scalar {
 
 	lLeft := p.l0
 
-	lRight, _ := vecScal(p.l1, x)
+	lRight, _ := vector.MulScalar(p.l1, x)
 
-	l, _ := vecAdd(lLeft, lRight)
+	l, _ := vector.Add(lLeft, lRight)
 
 	return l
 }
@@ -100,9 +102,9 @@ func (p *polynomial) computeL(x ristretto.Scalar) []ristretto.Scalar {
 func (p *polynomial) computeR(x ristretto.Scalar) []ristretto.Scalar {
 	rLeft := p.r0
 
-	rRight, _ := vecScal(p.r1, x)
+	rRight, _ := vector.MulScalar(p.r1, x)
 
-	r, _ := vecAdd(rLeft, rRight)
+	r, _ := vector.Add(rLeft, rRight)
 
 	return r
 }
@@ -136,8 +138,8 @@ func computeDelta(y, z ristretto.Scalar) ristretto.Scalar {
 	var two ristretto.Scalar
 	two.SetBigInt(big.NewInt(2))
 
-	oneDotYn := sumOfPowers(y, N)
-	oneDot2n := sumOfPowers(two, N)
+	oneDotYn := vector.ScalarPowersSum(y, N)
+	oneDot2n := vector.ScalarPowersSum(two, N)
 
 	var zsq ristretto.Scalar
 	zsq.Square(&z)
