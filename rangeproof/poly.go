@@ -17,7 +17,7 @@ type polynomial struct {
 func computePoly(aL, aR, sL, sR [N]ristretto.Scalar, y, z, v ristretto.Scalar) polynomial {
 
 	// calculate l_0
-	l0, _ := vector.SubScalar(aL[:], z)
+	l0 := vector.SubScalar(aL[:], z)
 
 	// calculate l_1
 	l1 := sL
@@ -31,9 +31,9 @@ func computePoly(aL, aR, sL, sR [N]ristretto.Scalar, y, z, v ristretto.Scalar) p
 
 	var zsq ristretto.Scalar
 	zsq.Square(&z)
-	zsqTwoN, _ := vector.MulScalar(twoN, zsq)
+	zsqTwoN := vector.MulScalar(twoN, zsq)
 
-	r0, _ := vector.AddScalar(aR[:], z)
+	r0 := vector.AddScalar(aR[:], z)
 
 	r0, _ = vector.Hadamard(r0, yN)
 
@@ -91,7 +91,7 @@ func (p *polynomial) computeL(x ristretto.Scalar) []ristretto.Scalar {
 
 	lLeft := p.l0
 
-	lRight, _ := vector.MulScalar(p.l1, x)
+	lRight := vector.MulScalar(p.l1, x)
 
 	l, _ := vector.Add(lLeft, lRight)
 
@@ -102,7 +102,7 @@ func (p *polynomial) computeL(x ristretto.Scalar) []ristretto.Scalar {
 func (p *polynomial) computeR(x ristretto.Scalar) []ristretto.Scalar {
 	rLeft := p.r0
 
-	rRight, _ := vector.MulScalar(p.r1, x)
+	rRight := vector.MulScalar(p.r1, x)
 
 	r, _ := vector.Add(rLeft, rRight)
 

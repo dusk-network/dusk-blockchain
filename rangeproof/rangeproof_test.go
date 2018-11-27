@@ -11,7 +11,7 @@ import (
 
 func TestProveBulletProof(t *testing.T) {
 
-	n := 20
+	n := 10
 
 	for i := 0; i < n; i++ {
 
@@ -21,7 +21,7 @@ func TestProveBulletProof(t *testing.T) {
 		amount.SetBigInt(big.NewInt(n))
 
 		// Prove
-		p, err := Prove(amount)
+		p, err := Prove(amount, false)
 
 		assert.Equal(t, nil, err)
 
@@ -65,8 +65,30 @@ func TestComputeMu(t *testing.T) {
 	assert.Equal(t, true, ok)
 }
 
-/*
-TODO: test values over the N threshold and named errors named errors
-input: 2^N+1
-output: error: value too large
-*/
+func BenchmarkProve(b *testing.B) {
+
+	var amount ristretto.Scalar
+
+	amount.SetBigInt(big.NewInt(100000))
+
+	for i := 0; i < 100; i++ {
+
+		// Prove
+		Prove(amount, false)
+	}
+
+}
+func BenchmarkVerify(b *testing.B) {
+
+	var amount ristretto.Scalar
+
+	amount.SetBigInt(big.NewInt(100000))
+	p, _ := Prove(amount, false)
+
+	for i := 0; i < 100; i++ {
+
+		// Verify
+		Verify(p)
+	}
+
+}

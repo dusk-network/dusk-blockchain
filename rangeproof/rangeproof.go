@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/pedersen"
+	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
 
@@ -35,38 +36,30 @@ type Proof struct {
 
 // Prove will take a scalar as a parameter and
 // using zero knowledge, prove that it is [0, 2^N)
-func Prove(v ristretto.Scalar) (Proof, error) {
+func Prove(v ristretto.Scalar, debug bool) (Proof, error) {
 
-	// XXX: check if v is more than (2^N)-1, proof would fail even if it was, but better to have an explicit error
-
-	ped := pedersen.New([]byte("dusk.BulletProof.vec1")) // XXX: this will set the generator, should we use the standard base
+	ped := pedersen.New([]byte("dusk.BulletProof.vec1"))
 
 	// Hash for Fiat-Shamir
 	hs := hashCacher{cache: []byte{}}
 
 	// compute commmitment to v
-	cV := ped.CommitToScalars(v)
+	V := ped.CommitToScalars(v)
 
 	// update Fiat-Shamir
-	hs.Append(cV.Value.Bytes())
+	hs.Append(V.Value.Bytes())
 
 	// Compute Bitcommits aL and aR to v
 	BitCommitment := BitCommit(v.BigInt())
 
-	// CHECK : check that the commitments to the value v (aL and aR) are correct
-	ok, err := BitCommitment.Ensure(v.BigInt())
-	if !ok || err != nil {
-		return Proof{}, err
-	}
-
 	// Compute A
-	cA := computeA(ped, BitCommitment.AL, BitCommitment.AR)
+	A := computeA(ped, BitCommitment.AL, BitCommitment.AR)
 
 	// Compute S
-	cS, sL, sR := computeS(ped)
+	S, sL, sR := computeS(ped)
 
 	// update Fiat-Shamir
-	hs.Append(cA.Value.Bytes(), cS.Value.Bytes())
+	hs.Append(A.Value.Bytes(), S.Value.Bytes())
 
 	// compute y and z
 	y, z := computeYAndZ(hs)
@@ -75,20 +68,20 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 	poly := computePoly(BitCommitment.AL, BitCommitment.AR, sL, sR, y, z, v)
 
 	// Compute T1 and T2
-	cT1 := ped.CommitToScalars(poly.t1)
-	cT2 := ped.CommitToScalars(poly.t2)
+	T1 := ped.CommitToScalars(poly.t1)
+	T2 := ped.CommitToScalars(poly.t2)
 
 	// update Fiat-Shamir
-	hs.Append(z.Bytes(), cT1.Value.Bytes(), cT2.Value.Bytes())
+	hs.Append(z.Bytes(), T1.Value.Bytes(), T2.Value.Bytes())
 
 	// compute x
 	x := computeX(hs)
 
 	// compute taux which is just the polynomial for the blinding factors at a point x
-	taux := computeTaux(x, z, cV.BlindingFactor, cT1.BlindingFactor, cT2.BlindingFactor)
+	taux := computeTaux(x, z, V.BlindingFactor, T1.BlindingFactor, T2.BlindingFactor)
 
 	// compute mu
-	mu := computeMu(x, cA.BlindingFactor, cS.BlindingFactor)
+	mu := computeMu(x, A.BlindingFactor, S.BlindingFactor)
 
 	// compute l dot r
 	l := poly.computeL(x)
@@ -96,45 +89,43 @@ func Prove(v ristretto.Scalar) (Proof, error) {
 	t, _ := innerProduct(l, r)
 
 	// DEBUG
-	testT0 := testT0(BitCommitment.AL, BitCommitment.AR, y, z)
-	if !testT0.Equals(&poly.t0) {
-		return Proof{}, errors.New("[Prove]: Test t0 value does not match the value calculated from the polynomial")
-	}
+	if debug {
+		err := debugProve(v, x, y, z, l, r, BitCommitment.AL, BitCommitment.AR, sL, sR)
+		if err != nil {
+			return Proof{}, err
+		}
+		// DEBUG T0
+		testT0 := debugT0(BitCommitment.AL, BitCommitment.AR, y, z)
+		if !testT0.Equals(&poly.t0) {
+			return Proof{}, errors.New("[Prove]: Test t0 value does not match the value calculated from the polynomial")
+		}
 
-	polyt0 := poly.computeT0(y, z, v)
-	if !polyt0.Equals(&poly.t0) {
-		return Proof{}, errors.New("[Prove]: t0 value from delta function, does not match the polynomial t0 value(Correct)")
-	}
+		polyt0 := poly.computeT0(y, z, v)
+		if !polyt0.Equals(&poly.t0) {
+			return Proof{}, errors.New("[Prove]: t0 value from delta function, does not match the polynomial t0 value(Correct)")
+		}
 
-	tPoly := poly.eval(x)
-	if !t.Equals(&tPoly) {
-		return Proof{}, errors.New("[Prove]: The t value computed from the t-poly, does not match the t value computed from the inner product of l and r")
-	}
+		tPoly := poly.eval(x)
+		if !t.Equals(&tPoly) {
+			return Proof{}, errors.New("[Prove]: The t value computed from the t-poly, does not match the t value computed from the inner product of l and r")
+		}
 
-	ok = testLxG(poly.computeL(x), x, z, BitCommitment.AL, BitCommitment.AR, sL)
-	if !ok {
-		return Proof{}, errors.New("[Prove]: <l(x), G> is constructed incorrectly")
-	}
-
-	ok = testRxHPrime(poly.computeR(x), x, y, z, BitCommitment.AR, sR)
-	if !ok {
-		return Proof{}, errors.New("[Prove]: <r(x), H'> is constructed incorrectly")
-	}
-
-	ok = testizeOfV(v.BigInt())
-	if !ok {
-		return Proof{}, errors.New("[Prove]: Value v is more than 2^N - 1")
+		// Debug aL and aR
+		err = BitCommitment.Debug(v.BigInt())
+		if err != nil {
+			return Proof{}, err
+		}
 	}
 	// End DEBUG
 
 	// TODO: calculate inner product proof
 
 	return Proof{
-		V:    cV.Value,
-		A:    cA.Value,
-		S:    cS.Value,
-		T1:   cT1.Value,
-		T2:   cT2.Value,
+		V:    V.Value,
+		A:    A.Value,
+		S:    S.Value,
+		T1:   T1.Value,
+		T2:   T2.Value,
 		l:    l,
 		r:    r,
 		t:    t,
@@ -258,22 +249,22 @@ func computeSi(y, z ristretto.Scalar) ristretto.Point {
 
 	Hprime := computeHprime(ped2.BaseVector.Bases, y)
 
-	yN := vecPowers(y, N)
+	yN := vector.ScalarPowers(y, N)
 
-	zYn, _ := vecScal(yN, z)
+	zYn := vector.MulScalar(yN, z)
 
 	var zsq ristretto.Scalar
 	zsq.Square(&z)
 
 	var two ristretto.Scalar
 	two.SetBigInt(big.NewInt(2))
-	twoN := vecPowers(two, N)
+	twoN := vector.ScalarPowers(two, N)
 
-	zsq2n, _ := vecScal(twoN, zsq)
+	zsq2n := vector.MulScalar(twoN, zsq)
 
-	leftIP, _ := vecAdd(zsq2n, zYn)
+	leftIP, _ := vector.Add(zsq2n, zYn)
 
-	leftSi, _ := vecExp(leftIP, Hprime)
+	leftSi, _ := vector.Exp(leftIP, Hprime, N, M)
 
 	// -z<1, G>
 	var minusZ ristretto.Scalar
@@ -281,7 +272,7 @@ func computeSi(y, z ristretto.Scalar) ristretto.Point {
 
 	G := ped.BaseVector.Bases[1:]
 
-	rightSi, _ := vecExp(scaToVec(minusZ, N), G)
+	rightSi, _ := vector.Exp(vector.FromScalar(minusZ, N), G, N, M)
 
 	var Si ristretto.Point
 	Si.SetZero()
@@ -334,8 +325,8 @@ func computeLGRH(y, mu ristretto.Scalar, l, r []ristretto.Scalar) ristretto.Poin
 	Hprime := computeHprime(ped2.BaseVector.Bases, y)
 	G := ped.BaseVector.Bases[1:]
 
-	rH, _ := vecExp(r, Hprime)
-	lG, _ := vecExp(l, G)
+	rH, _ := vector.Exp(r, Hprime, N, M)
+	lG, _ := vector.Exp(l, G, N, M)
 
 	P.Add(&lG, &rH)
 	return P
@@ -428,128 +419,4 @@ func VerifyT0(x, y, z, t, taux ristretto.Scalar, Blind, G1, V, T1, T2 ristretto.
 		return false, errors.New("[Verify]: LHS != RHS; proof that t0 is correct is wrong")
 	}
 	return true, nil
-}
-
-// DEBUG
-
-func testT0(aL, aR [N]ristretto.Scalar, y, z ristretto.Scalar) ristretto.Scalar {
-
-	aLMinusZ, _ := vecSubScal(aL[:], z)
-
-	aRPlusZ, _ := vecAddScal(aR[:], z)
-
-	yN := vecPowers(y, N)
-
-	hada, _ := hadamard(yN, aRPlusZ)
-
-	var two ristretto.Scalar
-	two.SetBigInt(big.NewInt(2))
-	twoN := vecPowers(two, N)
-
-	var zsq ristretto.Scalar
-	zsq.Square(&z)
-
-	zsqMul2n, _ := vecScal(twoN, zsq)
-
-	rightIP, _ := vecAdd(zsqMul2n, hada)
-
-	iP, _ := innerProduct(aLMinusZ, rightIP)
-
-	return iP
-}
-
-// <l(x), G> =  <aL, G> + x<sL, G> +<-z1, G>
-func testLxG(l []ristretto.Scalar, x, z ristretto.Scalar, aL, aR, sL [N]ristretto.Scalar) bool {
-	var P ristretto.Point
-	P.SetZero()
-
-	genData := []byte("dusk.BulletProof.vec1")
-	ped := pedersen.New(genData)
-	ped.BaseVector.Compute(65)
-
-	G := ped.BaseVector.Bases[1:]
-
-	lG, _ := vecExp(l, G)
-
-	// <aL,G>
-	aLG, _ := vecExp(aL[:], G)
-
-	// x<sL, G>
-	sLG, _ := vecExp(sL[:], G)
-	var xsLG ristretto.Point
-	xsLG.ScalarMult(&sLG, &x)
-	// <-z1, G>
-	var zNeg ristretto.Scalar
-	zNeg.Neg(&z)
-	zNegG, _ := vecExp(scaToVec(zNeg, N), G)
-
-	var rhs ristretto.Point
-	rhs.SetZero()
-	rhs.Add(&aLG, &xsLG)
-	rhs.Add(&rhs, &zNegG)
-
-	return lG.Equals(&rhs)
-}
-
-// < r(x), H'> = <aR, H> + x<sR, H> + <z*y^n + z^2 * 2^n , H'>
-func testRxHPrime(r []ristretto.Scalar, x, y, z ristretto.Scalar, aR, sR [N]ristretto.Scalar) bool {
-
-	genData := []byte("dusk.BulletProof.vec1")
-
-	genData = append(genData, uint8(1))
-
-	ped2 := pedersen.New(genData)
-	ped2.BaseVector.Compute(64)
-
-	H := ped2.BaseVector.Bases
-
-	Hprime := computeHprime(ped2.BaseVector.Bases, y)
-
-	// <r(x), H'>
-	rH, _ := vecExp(r, Hprime)
-
-	// <aR,H>
-	aRH, _ := vecExp(aR[:], H)
-
-	// x<sR, H>
-	sRH, _ := vecExp(sR[:], H)
-	var xsRH ristretto.Point
-	xsRH.ScalarMult(&sRH, &x)
-
-	// y^n
-	yN := vecPowers(y, N)
-
-	// 2^n
-	var two ristretto.Scalar
-	two.SetBigInt(big.NewInt(2))
-	twoN := vecPowers(two, N)
-
-	// z^2 * 2^n
-	var zsq ristretto.Scalar
-	zsq.Square(&z)
-	zsqMul2n, _ := vecScal(twoN, zsq)
-
-	// z*y^n
-	zMulYn, _ := vecScal(yN, z)
-
-	// p = z*y^n + z^2 * 2^n
-	p, _ := vecAdd(zsqMul2n, zMulYn)
-
-	// k = <p , H'>
-	k, _ := vecExp(p, Hprime)
-
-	var rhs ristretto.Point
-	rhs.Add(&aRH, &xsRH)
-	rhs.Add(&rhs, &k)
-
-	return rH.Equals(&rhs)
-}
-
-func testizeOfV(v *big.Int) bool {
-	var twoN, e, one = big.NewInt(2), big.NewInt(int64(N)), big.NewInt(int64(1))
-	twoN.Exp(twoN, e, nil)
-	twoN.Sub(twoN, one)
-
-	cmp := v.Cmp(twoN)
-	return (cmp == -1)
 }
