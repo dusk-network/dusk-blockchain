@@ -1,13 +1,12 @@
-package rangeproof
+package vector
 
 import (
 	"errors"
-	"math/big"
 
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
 
-func vecAdd(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
+func Add(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 	if len(a) != len(b) {
 		return nil, errors.New("Length of a does not equal b")
 	}
@@ -20,7 +19,7 @@ func vecAdd(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 
 	return res, nil
 }
-func vecAddScal(a []ristretto.Scalar, b ristretto.Scalar) ([]ristretto.Scalar, error) {
+func AddScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 
 	res := make([]ristretto.Scalar, len(a))
 
@@ -28,10 +27,11 @@ func vecAddScal(a []ristretto.Scalar, b ristretto.Scalar) ([]ristretto.Scalar, e
 		res[i].Add(&a[i], &b)
 	}
 
-	return res, nil
+	return res
 }
 
-func vecSub(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
+// Sub subtracts a vector a from a vector b
+func Sub(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 	if len(a) != len(b) {
 		return nil, errors.New("Length of a does not equal b")
 	}
@@ -44,7 +44,13 @@ func vecSub(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 
 	return res, nil
 }
-func vecSubScal(a []ristretto.Scalar, b ristretto.Scalar) ([]ristretto.Scalar, error) {
+
+// SubScalar Subtracts a scalars value b, from every element in the slice a
+func SubScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
+
+	if b.IsNonZeroI() == 0 {
+		return a
+	}
 
 	res := make([]ristretto.Scalar, len(a))
 
@@ -52,10 +58,10 @@ func vecSubScal(a []ristretto.Scalar, b ristretto.Scalar) ([]ristretto.Scalar, e
 		res[i].Sub(&a[i], &b)
 	}
 
-	return res, nil
+	return res
 }
 
-func vecScal(a []ristretto.Scalar, b ristretto.Scalar) ([]ristretto.Scalar, error) {
+func MulScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 
 	res := make([]ristretto.Scalar, len(a))
 
@@ -63,40 +69,11 @@ func vecScal(a []ristretto.Scalar, b ristretto.Scalar) ([]ristretto.Scalar, erro
 		res[i].Mul(&a[i], &b)
 	}
 
-	return res, nil
-}
-
-// Given a scalar, return the sum of its powers from 0 to n-1
-func vecPowerSum(a ristretto.Scalar, n uint64) ristretto.Scalar {
-
-	res := ristretto.Scalar{}
-	res.SetZero()
-
-	if n == 0 {
-		return res
-	}
-
-	res.SetOne()
-
-	if n == 1 {
-		return res
-	}
-
-	prev := a
-
-	for i := uint64(1); i < n; i++ {
-		if i > 1 {
-			prev.Mul(&prev, &a)
-		}
-		res.Add(&res, &prev)
-	}
-
 	return res
 }
 
-// vecExp essentially creates a vector commitment
-//XXX: move thid functionality to Pedersen package
-func vecExp(a []ristretto.Scalar, b []ristretto.Point) (ristretto.Point, error) {
+// Exp exponentiates and sums a vector a to b, creating a commitment
+func Exp(a []ristretto.Scalar, b []ristretto.Point, N, M int) (ristretto.Point, error) {
 	result := ristretto.Point{} // defaults to zero
 	result.SetZero()
 
@@ -125,7 +102,7 @@ func vecExp(a []ristretto.Scalar, b []ristretto.Point) (ristretto.Point, error) 
 
 // Given a scalar, construct a vector of powers
 // vecPowers(5, 3) = <5^0, 5^1, 5^2>
-func vecPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
+func ScalarPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 
 	res := make([]ristretto.Scalar, n)
 
@@ -133,9 +110,9 @@ func vecPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 		return res
 	}
 
-	// id
+	// identity
 	var k ristretto.Scalar
-	k.SetBytes(&Identity)
+	k.SetOne() // Identity point
 	res[0] = k
 
 	if n == 1 {
@@ -151,7 +128,7 @@ func vecPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 }
 
 // Given two scalar arrays, construct the Hadamard product
-func hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
+func Hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 
 	if len(a) != len(b) {
 		return nil, errors.New("Length of a does not equal length of b")
@@ -166,7 +143,7 @@ func hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 }
 
 // Given two curvepoint arrays, construct the Hadamard product
-func hadamard2(a, b []ristretto.Point) ([]ristretto.Point, error) {
+func Hadamard2(a, b []ristretto.Point) ([]ristretto.Point, error) {
 
 	if len(a) != len(b) {
 		return nil, errors.New("Length of a does not equal length of b")
@@ -181,7 +158,7 @@ func hadamard2(a, b []ristretto.Point) ([]ristretto.Point, error) {
 }
 
 // given a scalar,a, scaToVec will return a slice of size n, with all elements equal to a
-func scaToVec(a ristretto.Scalar, n uint8) []ristretto.Scalar {
+func FromScalar(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 	res := make([]ristretto.Scalar, n)
 
 	for i := uint8(0); i < n; i++ {
@@ -191,54 +168,29 @@ func scaToVec(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 	return res
 }
 
-func sumPowersSlow(x ristretto.Scalar, n uint32) ristretto.Scalar {
-	var sum big.Int
+func ScalarPowersSum(a ristretto.Scalar, n uint64) ristretto.Scalar {
 
-	xInt := x.BigInt()
+	res := ristretto.Scalar{}
+	res.SetZero()
 
-	for i := uint32(0); i < n; i++ {
-		var xi big.Int
-		var e = big.NewInt(int64(i))
-		xi.Exp(xInt, e, nil)
-		sum.Add(&sum, &xi)
+	if n == 0 {
+		return res
 	}
-
-	var res ristretto.Scalar
-	res.SetBigInt(&sum)
-	return res
-}
-
-func sumOfPowers(x ristretto.Scalar, n uint32) ristretto.Scalar {
-
-	var res ristretto.Scalar
-
-	if n == 0 || n == 1 {
-		var s ristretto.Scalar
-		s.SetBigInt(big.NewInt(int64(n)))
-		return s
-	}
-
-	if !isPower2(n) {
-		return sumPowersSlow(x, n)
-	}
-
-	m := n
 
 	res.SetOne()
-	res.Add(&res, &x)
 
-	factor := x
+	if n == 1 {
+		return res
+	}
 
-	for m > 2 {
-		factor = *factor.Square(&factor)
+	prev := a
 
-		res = *res.MulAdd(&res, &factor, &res)
-		m = m / 2
+	for i := uint64(1); i < n; i++ {
+		if i > 1 {
+			prev.Mul(&prev, &a)
+		}
+		res.Add(&res, &prev)
 	}
 
 	return res
-}
-
-func isPower2(n uint32) bool {
-	return (n & (n - 1)) == 0
 }
