@@ -13,8 +13,7 @@ type BitCommitment struct {
 }
 
 // BitCommit will take the value v producing aL and aR
-// TODO: clean up this function, looks a bit messy at the moment
-// and not necessarily efficient
+// N.B. This has been specialised for N <= 64
 func BitCommit(v *big.Int) BitCommitment {
 
 	bc := BitCommitment{}
@@ -23,32 +22,34 @@ func BitCommit(v *big.Int) BitCommitment {
 	zero.SetZero()
 	var one ristretto.Scalar
 	one.SetOne()
+	var minusOne ristretto.Scalar
+	minusOne.Neg(&one)
 
-	tempV := big.NewInt(v.Int64())
+	num := v.Uint64()
 
-	for i := N - 1; i >= 0; i-- {
-		var basePow, e = big.NewInt(2), big.NewInt(int64(i))
-		basePow.Exp(basePow, e, nil)
+	for i := 0; i < N; i++ {
 
-		tV := big.NewInt(0) // we don't want to edit the tempV value, so we have this dummy val
+		var rem uint64
 
-		if (tV.Div(tempV, basePow)).Cmp(big.NewInt(0)) == 0 {
+		rem = num % 2
+		num = num >> 1
+
+		if rem == 0 {
 			bc.AL[i] = zero
+			bc.AR[i] = minusOne
 		} else {
-
 			bc.AL[i] = one
-			tempV.Sub(tempV, basePow)
+			bc.AR[i] = zero
 		}
-		var aRi ristretto.Scalar
-		aRi.Sub(&bc.AL[i], &one)
-		bc.AR[i] = aRi
+
 	}
+
 	return bc
 }
 
-// Ensure makes sure we have calculated
+// Debug makes sure we have calculated
 // the correct aR and aL values
-func (b *BitCommitment) Ensure(v *big.Int) (bool, error) {
+func (b *BitCommitment) Debug(v *big.Int) error {
 
 	var zero ristretto.Scalar
 	zero.SetZero()
@@ -72,12 +73,12 @@ func (b *BitCommitment) Ensure(v *big.Int) (bool, error) {
 	}
 
 	if testAL.Cmp(v) != 0 {
-		return false, errors.New("[BitCommit(Ensure)]: Wrong Value for AL")
+		return errors.New("[BitCommit(Debug)]: Wrong Value for AL")
 	}
 
 	if testAR.Cmp(v) != 0 {
-		return false, errors.New("[BitCommit(Ensure)]: Wrong Value for AL")
+		return errors.New("[BitCommit(Debug)]: Wrong Value for AL")
 	}
 
-	return true, nil
+	return nil
 }

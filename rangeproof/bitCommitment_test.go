@@ -39,9 +39,9 @@ func TestEnsure(t *testing.T) {
 
 		value := big.NewInt(expected)
 		Commitment := rangeproof.BitCommit(value)
-		ok, err := Commitment.Ensure(value)
+		err := Commitment.Debug(value)
 
 		assert.Equal(t, nil, err)
-		assert.Equal(t, true, ok)
+
 	}
 }
