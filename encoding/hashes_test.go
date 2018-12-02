@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/toghrulmaharramov/dusk-go/crypto"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
 )
 
 // Basic test. This won't do much as it's already in byte representation, but is more intended to show

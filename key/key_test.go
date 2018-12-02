@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/toghrulmaharramov/dusk-go/crypto"
-	"github.com/toghrulmaharramov/dusk-go/key"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/key"
 )
 
 func TestNewAddress(t *testing.T) {

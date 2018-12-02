@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 )
 
 func TestMsgRejectEncodeDecode(t *testing.T) {

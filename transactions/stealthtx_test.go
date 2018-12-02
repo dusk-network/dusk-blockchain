@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
 )
 
 // Test if GetEncodeSize returns the right size for the buffer

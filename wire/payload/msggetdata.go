@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/toghrulmaharramov/dusk-go/encoding"
-	"github.com/toghrulmaharramov/dusk-go/transactions"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 )
 
 // MsgGetData defines a getdata message on the Dusk wire protocol.
