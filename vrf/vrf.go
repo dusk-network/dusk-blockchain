@@ -84,12 +84,12 @@ func Compute(m []byte, sk *[SecretKeySize]byte) []byte {
 // The vrf value is the same as returned by Compute(d, sk).
 //
 // Prove_x(d) = tuple(c=h(d, g^r, H(d)^r), t=r-c*x, ii=H(d)^x) where r = h(x, d) is used as a source of randomness
-// x = secret key, d = data, c = data with randomness, r = randomness, t = r-c,
+// x = secret key, d = data, c = data with randomness, r = randomness, t = delta of randomness and data w/randomness,
 func Prove(d []byte, sk *[SecretKeySize]byte) ([]byte, []byte) { // Return vrf, proof
 	var cH, rH [SecretKeySize]byte // cH = hash of data with randomness
 	// rH = hash of randomness
 	var c, r, t ristretto.Scalar
-	var ii, gr, hr ristretto.Point // ii = encrypted data, gr and hr = encrypted randomness
+	var ii, gr, hr ristretto.Point // ii = data, gr and hr = randomness
 	var grB, hrB, iiB [Size]byte
 
 	// Two separate 32 byte hashes from the 64 byte secret key
@@ -121,13 +121,13 @@ func Prove(d []byte, sk *[SecretKeySize]byte) ([]byte, []byte) { // Return vrf, 
 	hash.Write(grB[:])
 	hash.Write(hrB[:])
 	hash.Write(d)
-	hash.Read(cH[:]) // Hash of data with randomness
+	hash.Read(cH[:]) // Hash of data w/randomness
 	hash.Reset()
 	c.SetReduced(&cH)
 
 	var minusC ristretto.Scalar
 	minusC.Neg(&c)
-	t.MulAdd(&xSc, &minusC, &r) // t=r-c*x = Encrypted delta of randomness and data with randomness
+	t.MulAdd(&xSc, &minusC, &r) // t=r-c*x = Delta of randomness and data w/randomness
 
 	var proof = make([]byte, ProofSize)
 	copy(proof[:32], c.Bytes())
@@ -156,9 +156,9 @@ func Verify(pkBytes, d, vrfBytes, proof []byte) bool {
 
 	copy(vrf[:], vrfBytes)
 	copy(pk[:], pkBytes)
-	copy(c[:32], proof[:32])   // Retrieve c = Encrypted composite of data and randomness
-	copy(t[:32], proof[32:64]) // Retrieve t = Encrypted delta of data with randomness and randomness
-	copy(iiB[:], proof[64:96]) // Retrieve ii = Encrypted data
+	copy(c[:32], proof[:32])   // Retrieve c = Data with randomness
+	copy(t[:32], proof[32:64]) // Retrieve t = Delta of randomness and data w/randomness
+	copy(iiB[:], proof[64:96]) // Retrieve ii = Data
 
 	// First verify the vrf with vrf == h(d, ii)
 
