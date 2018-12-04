@@ -1,6 +1,5 @@
 // Package vrf implements a verifiable random function using the Ristretto form
 // of Edwards25519, SHA3 and the Elligator2 map.
-
 package vrf
 
 import (
@@ -10,18 +9,18 @@ import (
 )
 
 const (
-	PublicKeySize    = 32
-	SecretKeySize    = 64
-	Size             = 32
+	publicKeySize    = 32
+	secretKeySize    = 64
+	size             = 32
 	intermediateSize = 32
-	ProofSize        = 32 + 32 + intermediateSize
+	proofSize        = 32 + 32 + intermediateSize
 )
 
 // GenerateKey creates a public/secret key pair.
-func GenerateKey() (*[PublicKeySize]byte, *[SecretKeySize]byte) {
+func GenerateKey() (*[publicKeySize]byte, *[secretKeySize]byte) {
 	var secretKey ristretto.Scalar
-	var pk = new([PublicKeySize]byte)
-	var sk = new([SecretKeySize]byte)
+	var pk = new([publicKeySize]byte)
+	var sk = new([secretKeySize]byte)
 	var digest [64]byte
 
 	secretKey.Rand() // Generate a new secret key
@@ -49,7 +48,7 @@ func GenerateKey() (*[PublicKeySize]byte, *[SecretKeySize]byte) {
 	return pk, sk
 }
 
-func expandSecret(sk *[SecretKeySize]byte) (*[32]byte, *[32]byte) {
+func expandSecret(sk *[secretKeySize]byte) (*[32]byte, *[32]byte) {
 	var x, skhr = new([32]byte), new([32]byte)
 	hash := sha3.NewShake256()
 	hash.Write(sk[:32])
@@ -61,20 +60,21 @@ func expandSecret(sk *[SecretKeySize]byte) (*[32]byte, *[32]byte) {
 	return x, skhr
 }
 
-func Compute(m []byte, sk *[SecretKeySize]byte) []byte {
+// Compute creates the VRF value of data and secret key
+func Compute(d []byte, sk *[secretKeySize]byte) []byte {
 	var ii ristretto.Point
 	var mScalar ristretto.Scalar
-	var iiB, vrf [Size]byte
+	var iiB, vrf [size]byte
 
 	x, _ := expandSecret(sk)
-	p := hashToCurve(m)
+	dP := hashToCurve(d)
 
 	mScalar.SetBytes(x)
-	ii.ScalarMult(p, &mScalar)
+	ii.ScalarMult(dP, &mScalar)
 	ii.BytesInto(&iiB)
 	hash := sha3.NewShake256()
-	hash.Write(iiB[:]) // const length: Size
-	hash.Write(m)
+	hash.Write(iiB[:]) // const length: size
+	hash.Write(d)
 
 	hash.Read(vrf[:])
 	return vrf[:]
@@ -85,12 +85,12 @@ func Compute(m []byte, sk *[SecretKeySize]byte) []byte {
 //
 // Prove_x(d) = tuple(c=h(d, g^r, H(d)^r), t=r-c*x, ii=H(d)^x) where r = h(x, d) is used as a source of randomness
 // x = secret key, d = data, c = data with randomness, r = randomness, t = delta of randomness and data w/randomness,
-func Prove(d []byte, sk *[SecretKeySize]byte) ([]byte, []byte) { // Return vrf, proof
-	var cH, rH [SecretKeySize]byte // cH = hash of data with randomness
+func Prove(d []byte, sk *[secretKeySize]byte) ([]byte, []byte) { // Return vrf, proof
+	var cH, rH [secretKeySize]byte // cH = hash of data with randomness
 	// rH = hash of randomness
 	var c, r, t ristretto.Scalar
 	var ii, gr, hr ristretto.Point // ii = data, gr and hr = randomness
-	var grB, hrB, iiB [Size]byte
+	var grB, hrB, iiB [size]byte
 
 	// Two separate 32 byte hashes from the 64 byte secret key
 	x, skhr := expandSecret(sk)
@@ -129,7 +129,7 @@ func Prove(d []byte, sk *[SecretKeySize]byte) ([]byte, []byte) { // Return vrf, 
 	minusC.Neg(&c)
 	t.MulAdd(&xSc, &minusC, &r) // t=r-c*x = Delta of randomness and data w/randomness
 
-	var proof = make([]byte, ProofSize)
+	var proof = make([]byte, proofSize)
 	copy(proof[:32], c.Bytes())
 	copy(proof[32:64], t.Bytes())
 	copy(proof[64:96], iiB[:])
@@ -137,7 +137,7 @@ func Prove(d []byte, sk *[SecretKeySize]byte) ([]byte, []byte) { // Return vrf, 
 	// VRF_x(d) = h(d, H(d)^x)) where x = secret key and d = data
 	hash.Write(iiB[:])
 	hash.Write(d)
-	var vrf = make([]byte, Size)
+	var vrf = make([]byte, size)
 	hash.Read(vrf[:])
 	return vrf, proof
 }
@@ -146,10 +146,10 @@ func Prove(d []byte, sk *[SecretKeySize]byte) ([]byte, []byte) { // Return vrf, 
 //
 // Check(P, d, vrf, (c,t,ii)) = vrf == h(d, ii) && c == h(d, g^t*pkP^c, H(d)^t*ii^c)
 func Verify(pkBytes, d, vrfBytes, proof []byte) bool {
-	var pk, iiB, vrf, ABytes, BBytes, hCheck [Size]byte
+	var pk, iiB, vrf, ABytes, BBytes, hCheck [size]byte
 	var scZero, cRef, c, t ristretto.Scalar
 
-	if len(proof) != ProofSize || len(vrfBytes) != Size || len(pkBytes) != PublicKeySize {
+	if len(proof) != proofSize || len(vrfBytes) != size || len(pkBytes) != publicKeySize {
 		return false
 	}
 	scZero.SetZero() // Scalar zero
