@@ -55,12 +55,10 @@ func (g *Generator) Iterate() ristretto.Point {
 
 // Compute will generate num amount of points, which will act as point generators
 // using the initial data.
-func (g *Generator) Compute(num uint8) {
-	bases := []ristretto.Point{}
+func (g *Generator) Compute(num uint32) {
 
-	for i := uint8(0); i < num; i++ {
-		bases = append(bases, g.Iterate())
+	for i := uint32(0); i < num; i++ {
+		g.Bases = append(g.Bases, g.Iterate())
 	}
 
-	g.Bases = bases
 }

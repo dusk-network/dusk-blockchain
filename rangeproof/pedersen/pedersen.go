@@ -62,8 +62,10 @@ func (p *Pedersen) commitToScalars(blind *ristretto.Scalar, scalars ...ristretto
 	}
 
 	if len(p.BaseVector.Bases) < n {
-		diff := len(p.BaseVector.Bases) - n
-		p.BaseVector.Compute(uint8(diff))
+
+		diff := n - len(p.BaseVector.Bases)
+
+		p.BaseVector.Compute(uint32(diff))
 		// num of scalars to commit should be equal or less than the number of precompued generators
 	}
 
@@ -118,11 +120,13 @@ func (p *Pedersen) CommitToVectors(vectors ...[]ristretto.Scalar) Commitment {
 	for i, vector := range vectors {
 		if i == 0 {
 			// Commit to vector + blinding factor
+
 			commit := p.commitToScalars(&blind, vector...)
 			sum.Add(&sum, &commit)
 		} else {
 
 			// new generator -- XXX: we could use a hashing function here instead
+			// XXX: Does this clash with generators iterate() function?
 			genData := append(p.GenData, uint8(i))
 			ped2 := New(genData)
 
