@@ -6,6 +6,9 @@ import (
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
 
+// Add adds two scalar slices a and b,
+// returning the resulting slice and an error
+// if a and b were different sizes
 func Add(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 	if len(a) != len(b) {
 		return nil, errors.New("Length of a does not equal b")
@@ -19,6 +22,9 @@ func Add(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 
 	return res, nil
 }
+
+// AddScalar takes a scalar slice a and a scalar, b
+// then adds b to every element in a
 func AddScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 
 	res := make([]ristretto.Scalar, len(a))
@@ -102,7 +108,7 @@ func Exp(a []ristretto.Scalar, b []ristretto.Point, N, M int) (ristretto.Point, 
 
 // Given a scalar, construct a vector of powers
 // vecPowers(5, 3) = <5^0, 5^1, 5^2>
-func ScalarPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
+func ScalarPowers(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 
 	res := make([]ristretto.Scalar, n)
 
@@ -120,14 +126,14 @@ func ScalarPowers(a ristretto.Scalar, n uint8) []ristretto.Scalar {
 	}
 	res[1] = a
 
-	for i := uint8(2); i < n; i++ {
+	for i := uint32(2); i < n; i++ {
 		res[i].Mul(&res[i-1], &a)
 	}
 
 	return res
 }
 
-// Given two scalar arrays, construct the Hadamard product
+// Hadamard takes two scalar arrays and construct the Hadamard product
 func Hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 
 	if len(a) != len(b) {
@@ -142,26 +148,11 @@ func Hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 	return res, nil
 }
 
-// Given two curvepoint arrays, construct the Hadamard product
-func Hadamard2(a, b []ristretto.Point) ([]ristretto.Point, error) {
-
-	if len(a) != len(b) {
-		return nil, errors.New("Length of a does not equal length of b")
-	}
-
-	res := make([]ristretto.Point, len(a))
-	for i := 0; i < len(a); i++ {
-		res[i].Add(&a[i], &b[i])
-	}
-
-	return res, nil
-}
-
-// given a scalar,a, scaToVec will return a slice of size n, with all elements equal to a
-func FromScalar(a ristretto.Scalar, n uint8) []ristretto.Scalar {
+// FromScalar takes a scalar,a, scaToVec will return a slice of size n, with all elements equal to a
+func FromScalar(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 	res := make([]ristretto.Scalar, n)
 
-	for i := uint8(0); i < n; i++ {
+	for i := uint32(0); i < n; i++ {
 		res[i] = a
 	}
 
@@ -193,4 +184,30 @@ func ScalarPowersSum(a ristretto.Scalar, n uint64) ristretto.Scalar {
 	}
 
 	return res
+}
+
+// SplitPoints will split a slice x using n
+// Result will be two slices a and b where a = [0,n) and b = [n, len(x))
+func SplitPoints(x []ristretto.Point, n uint32) ([]ristretto.Point, []ristretto.Point, error) {
+	if len(x) <= 0 {
+		return nil, nil, errors.New("Original vector has length of zero")
+	}
+	if n >= uint32(len(x)) {
+		return nil, nil, errors.New("n is larger than the size of the slice x")
+	}
+	return x[:n], x[n:], nil
+}
+
+// SplitScalars will split a slice x using n
+// Result will be two slices a and b where a = [0,n) and b = [n, len(x))
+// Method same as above
+// XXX: use unit test to make sure they output same sizes
+func SplitScalars(x []ristretto.Scalar, n uint32) ([]ristretto.Scalar, []ristretto.Scalar, error) {
+	if len(x) <= 0 {
+		return nil, nil, errors.New("Original vector has length of zero")
+	}
+	if n >= uint32(len(x)) {
+		return nil, nil, errors.New("n is larger than the size of the slice x")
+	}
+	return x[:n], x[n:], nil
 }
