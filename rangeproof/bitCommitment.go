@@ -9,14 +9,17 @@ import (
 
 // BitCommitment will be a struct used to hold the values aL and aR
 type BitCommitment struct {
-	AL, AR [N]ristretto.Scalar
+	AL, AR []ristretto.Scalar
 }
 
 // BitCommit will take the value v producing aL and aR
 // N.B. This has been specialised for N <= 64
 func BitCommit(v *big.Int) BitCommitment {
 
-	bc := BitCommitment{}
+	bc := BitCommitment{
+		AL: make([]ristretto.Scalar, N),
+		AR: make([]ristretto.Scalar, N),
+	}
 
 	var zero ristretto.Scalar
 	zero.SetZero()
