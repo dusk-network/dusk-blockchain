@@ -1,9 +1,9 @@
 package rangeproof
 
 import (
-	"errors"
-	"fmt"
 	"math/big"
+
+	"github.com/pkg/errors"
 
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/pedersen"
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
@@ -92,8 +92,10 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 	y, z := computeYAndZ(hs)
 
 	// compute polynomial
-	poly := computePoly(aLs, aRs, sL, sR, y, z)
-
+	poly, err := computePoly(aLs, aRs, sL, sR, y, z)
+	if err != nil {
+		return Proof{}, err
+	}
 	// Compute T1 and T2
 	T1 := ped.CommitToScalars(poly.t1)
 	T2 := ped.CommitToScalars(poly.t2)
@@ -111,11 +113,20 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 	mu := computeMu(x, A.BlindingFactor, S.BlindingFactor)
 
 	// compute l dot r
-	l := poly.computeL(x)
-	r := poly.computeR(x)
-	t, _ := innerProduct(l, r)
+	l, err := poly.computeL(x)
+	if err != nil {
+		return Proof{}, err
+	}
+	r, err := poly.computeR(x)
+	if err != nil {
+		return Proof{}, err
+	}
+	t, err := innerProduct(l, r)
+	if err != nil {
+		return Proof{}, err
+	}
 
-	// DEBUG
+	// START DEBUG
 	if debug {
 		err := debugProve(x, y, z, v, l, r, aLs, aRs, sL, sR)
 		if err != nil {
@@ -147,7 +158,7 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 		return Proof{}, errors.New("One of the challenge scalars, x, y, or z was equal to zero. Generate proof again")
 	}
 
-	// // TODO: calculate inner product proof
+	// TODO: calculate inner product proof
 	u := ristretto.Point{}
 	u.Rand()
 
@@ -166,6 +177,8 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 		S:       S.Value,
 		T1:      T1.Value,
 		T2:      T2.Value,
+		l:       l,
+		r:       r,
 		t:       t,
 		taux:    taux,
 		mu:      mu,
@@ -234,11 +247,8 @@ func computeTaux(x, z, t1Blind, t2Blind ristretto.Scalar, vBlinds []pedersen.Com
 	zNBlindSum.SetZero()
 
 	for i := range vBlinds {
-
 		zNBlindSum.MulAdd(&zN, &vBlinds[i].BlindingFactor, &zNBlindSum)
-
 		zN.Mul(&zN, &z)
-
 	}
 
 	var res ristretto.Scalar
@@ -261,7 +271,7 @@ func computeMu(x, alpha, rho ristretto.Scalar) ristretto.Scalar {
 }
 
 // P = -mu*BlindingFactor + A + xS + Si(y,z)
-func computeP(Blind, A, S ristretto.Point, mu, x, y, z ristretto.Scalar) ristretto.Point {
+func computeP(Blind, A, S ristretto.Point, mu, x, y, z ristretto.Scalar) (ristretto.Point, error) {
 
 	var P ristretto.Point
 	P.SetZero()
@@ -269,8 +279,10 @@ func computeP(Blind, A, S ristretto.Point, mu, x, y, z ristretto.Scalar) ristret
 	var xS ristretto.Point
 	xS.ScalarMult(&S, &x)
 
-	Si := computeSi(y, z)
-
+	Si, err := computeSi(y, z)
+	if err != nil {
+		return ristretto.Point{}, errors.Wrap(err, "[computeP]")
+	}
 	// Add -mu * blindingFactor
 	var muB ristretto.Point
 	muB.ScalarMult(&Blind, &mu)
@@ -280,11 +292,14 @@ func computeP(Blind, A, S ristretto.Point, mu, x, y, z ristretto.Scalar) ristret
 	P.Add(&P, &muB)
 	P.Add(&P, &Si)
 
-	return P
+	return P, nil
 }
 
-// P = A + xS + Si(y,z)
-func computeSi(y, z ristretto.Scalar) ristretto.Point {
+// Si = -z<1,G> + z<1,H> + <(y^-nm Had z^2 *(z^0 * 2^n ... z^m-1 * 2^n)), H>
+func computeSi(y, z ristretto.Scalar) (ristretto.Point, error) {
+
+	var yinv ristretto.Scalar
+	yinv.Inverse(&y)
 
 	genData := []byte("dusk.BulletProof.vec1")
 	ped := pedersen.New(genData)
@@ -295,50 +310,37 @@ func computeSi(y, z ristretto.Scalar) ristretto.Point {
 	ped2 := pedersen.New(genData)
 	ped2.BaseVector.Compute(uint32(N * M))
 
-	Hprime := computeHprime(ped2.BaseVector.Bases, y)
-
-	yNM := vector.ScalarPowers(y, uint32(N*M))
-
-	var two ristretto.Scalar
-	two.SetBigInt(big.NewInt(2))
-	twoN := vector.ScalarPowers(two, N)
-
-	// z *  y^nm
-	zyNM := vector.MulScalar(yNM, z)
-
-	// a = <z *  y^nm, h'>
-	a, _ := vector.Exp(zyNM, Hprime, N, M)
-
-	// sum( (< <z^(j+1),2^n>, H') ) from j = 1 to j = m
-	var zM ristretto.Scalar
-	zM = z
-
-	sumZm2N := make([]ristretto.Scalar, N)
-
-	for i := 0; i < M; i++ {
-		zM.Mul(&zM, &z)
-		zMTwoN := vector.MulScalar(twoN, zM)
-		sumZm2N, _ = vector.Add(sumZm2N, zMTwoN)
-	}
-
-	// b = <sum..., H'>
-	b, err := vector.Exp(sumZm2N, Hprime[:N], N, 1)
-	if err != nil {
-		fmt.Println("[computeSi err]", err)
-	}
-	// c = -z<1, G>
-	var minusZ ristretto.Scalar
-	minusZ.Neg(&z)
+	H := ped2.BaseVector.Bases
 	G := ped.BaseVector.Bases[1:]
-	c, _ := vector.Exp(vector.FromScalar(minusZ, N), G, N, M)
+
+	yinvNM := vector.ScalarPowers(yinv, uint32(N*M))
+
+	concatZM2N := sumZMTwoN(z)
+	concatZM2N, err := vector.Hadamard(yinvNM, concatZM2N)
+	if err != nil {
+		return ristretto.Point{}, errors.Wrap(err, "[ComputeSI] - concatZM2N")
+	}
+	a, err := vector.Exp(concatZM2N, H, N, M)
+	if err != nil {
+		return ristretto.Point{}, errors.Wrap(err, "[ComputeSI] - a")
+	}
+
+	// b =  z<1,H> - z<1, G> = z( <1,H> - <1,G>)
+	var b ristretto.Point
+	b.SetZero()
+
+	for i := range H {
+		b.Add(&b, &H[i])
+		b.Sub(&b, &G[i])
+	}
+	b.ScalarMult(&b, &z)
 
 	var Si ristretto.Point
 	Si.SetZero()
 
 	Si.Add(&a, &b)
-	Si.Add(&Si, &c)
 
-	return Si
+	return Si, nil
 }
 
 // computeHprime will take a a slice of points H, with a scalar y
@@ -369,7 +371,7 @@ func computeHprime(H []ristretto.Point, y ristretto.Scalar) []ristretto.Point {
 }
 
 // P = lG + rH
-func computeLGRH(y, mu ristretto.Scalar, l, r []ristretto.Scalar) ristretto.Point {
+func computeLGRH(y, mu ristretto.Scalar, l, r []ristretto.Scalar) (ristretto.Point, error) {
 
 	var P ristretto.Point
 	P.SetZero()
@@ -386,11 +388,18 @@ func computeLGRH(y, mu ristretto.Scalar, l, r []ristretto.Scalar) ristretto.Poin
 	Hprime := computeHprime(ped2.BaseVector.Bases, y)
 	G := ped.BaseVector.Bases[1:]
 
-	rH, _ := vector.Exp(r, Hprime, N, M)
-	lG, _ := vector.Exp(l, G, N, M)
+	rH, err := vector.Exp(r, Hprime, N, M)
+	if err != nil {
+		return ristretto.Point{}, errors.Wrap(err, "[computeLGRH] - rH")
+	}
+	lG, err := vector.Exp(l, G, N, M)
+	if err != nil {
+		return ristretto.Point{}, errors.Wrap(err, "[computeLGRH] - lG")
+	}
 
 	P.Add(&lG, &rH)
-	return P
+
+	return P, nil
 }
 
 // Verify takes a bullet proof and
@@ -403,42 +412,41 @@ func Verify(p Proof) (bool, error) {
 	if len(p.l) != len(p.r) {
 		return false, errors.New("[Verify]: Sizes of l and r do not match")
 	}
-
 	if len(p.l) <= 0 {
-		fmt.Println("l", len(p.l), "r", len(p.r))
 		return false, errors.New("[Verify]: size of l or r cannot be zero; empty proof")
 	}
 
 	// Reconstruct the challenges
 	hs := hashCacher{[]byte{}}
-
 	for _, V := range p.V {
 		hs.Append(V.Value.Bytes())
 	}
+
 	hs.Append(p.A.Bytes(), p.S.Bytes())
-
 	y, z := computeYAndZ(hs)
-
 	hs.Append(z.Bytes(), p.T1.Bytes(), p.T2.Bytes())
 	x := computeX(hs)
 
 	// compute l dot r
-	t, _ := innerProduct(p.l, p.r)
-
-	// compute tG + tauH = Z^2 * V + delta(y,z) -- Prove t0 is correct
-	_, err := VerifyT0(x, y, z, t, p.taux, ped.BaseVector.Bases[0], ped.BaseVector.Bases[1], p.T1, p.T2, p.V)
+	t, err := innerProduct(p.l, p.r)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "[Verify] - t")
+	}
+	// compute tG + tauH = Z^2 * V + delta(y,z) -- Prove t0 is correct
+	_, err = VerifyT0(x, y, z, t, p.taux, ped.BaseVector.Bases[0], ped.BaseVector.Bases[1], p.T1, p.T2, p.V)
+	if err != nil {
+		return false, errors.Wrap(err, "[Verify] - T0")
 	}
 
-	// prove l(x) and r(x) is correct
-	Pleft := computeLGRH(y, p.mu, p.l, p.r)
-
-	fmt.Println("PLEFT", Pleft.Bytes())
-
-	PRight := computeP(ped.BaseVector.Bases[0], p.A, p.S, p.mu, x, y, z)
-	fmt.Println("PRIGHT", PRight.Bytes())
-
+	// prove l(x) and r(x) is correct <lG, rH> = A+ xS + z<1,H> - z<1,G> + sum...
+	Pleft, err := computeLGRH(y, p.mu, p.l, p.r)
+	if err != nil {
+		return false, errors.Wrap(err, "[Verify] - Pleft")
+	}
+	PRight, err := computeP(ped.BaseVector.Bases[0], p.A, p.S, p.mu, x, y, z)
+	if err != nil {
+		return false, errors.Wrap(err, "[Verify] - PRight")
+	}
 	if !Pleft.Equals(&PRight) {
 		return false, errors.New("[Verify]: Proof for l(x),r(x) is wrong")
 	}

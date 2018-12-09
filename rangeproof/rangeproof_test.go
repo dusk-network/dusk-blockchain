@@ -11,43 +11,29 @@ import (
 
 func TestProveBulletProof(t *testing.T) {
 
-	n := 10
+	m := 2 // XXX: for now needs to be a multiple of two
 
-	for i := 0; i < n; i++ {
+	amounts := []ristretto.Scalar{}
+
+	for i := 0; i < m; i++ {
 
 		var amount ristretto.Scalar
 
 		n := rand.Int63()
 		amount.SetBigInt(big.NewInt(n))
 
-		// Prove
-		p, err := Prove(amount, false)
-
-		assert.Equal(t, nil, err)
-
-		// Verify
-		ok, err := Verify(p)
-		assert.Equal(t, nil, err)
-		assert.Equal(t, true, ok)
+		amounts = append(amounts, amount)
 	}
 
-}
+	// t.Fail()
+	// Prove
+	p, err := Prove(amounts, true)
+	assert.Equal(t, nil, err)
 
-func TestComputeTau(t *testing.T) {
-	a := ristretto.Scalar{}
-	a.SetBigInt(big.NewInt(1))
-	b := ristretto.Scalar{}
-	b.SetBigInt(big.NewInt(2))
-	c := ristretto.Scalar{}
-	c.SetBigInt(big.NewInt(1))
-	d := ristretto.Scalar{}
-	d.SetBigInt(big.NewInt(1))
-	e := ristretto.Scalar{}
-	e.SetBigInt(big.NewInt(1))
-
-	res := computeTaux(a, b, c, d, e)
-
-	assert.Equal(t, int64(6), res.BigInt().Int64())
+	// Verify
+	ok, err := Verify(p)
+	assert.Equal(t, nil, err)
+	assert.Equal(t, true, ok)
 
 }
 
@@ -74,7 +60,7 @@ func BenchmarkProve(b *testing.B) {
 	for i := 0; i < 100; i++ {
 
 		// Prove
-		Prove(amount, false)
+		Prove([]ristretto.Scalar{amount}, false)
 	}
 
 }
@@ -83,7 +69,7 @@ func BenchmarkVerify(b *testing.B) {
 	var amount ristretto.Scalar
 
 	amount.SetBigInt(big.NewInt(100000))
-	p, _ := Prove(amount, false)
+	p, _ := Prove([]ristretto.Scalar{amount}, false)
 
 	for i := 0; i < 100; i++ {
 
