@@ -2,7 +2,6 @@ package rangeproof
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
@@ -45,18 +44,24 @@ type IPProof struct {
 
 // NewIP creates a new Inner product struct
 // making relevant checks on the given parameters
-func NewIP(G, H []ristretto.Point, a, b []ristretto.Scalar, u ristretto.Point) (*IP, error) {
+func NewIP(G, H []ristretto.Point, l, r []ristretto.Scalar, u ristretto.Point) (*IP, error) {
+
+	// XXX: N.B. l and r are pointers
+	// Alternative would be to not edit these directly in the Create proof method
+	a := make([]ristretto.Scalar, N*M)
+	copy(a, l)
+	b := make([]ristretto.Scalar, N*M)
+	copy(b, r)
 
 	n := len(G)
 
 	if n == 0 {
-		return nil, errors.New("[IPProof]: size of G equals zero")
+		return nil, errors.New("[IPProof]: size of n (NM) equals zero")
 	}
 	if len(H) != n {
 		return nil, errors.New("[IPProof]: size of H does not equal n")
 	}
 	if len(a) != n {
-		fmt.Println(n, len(a))
 		return nil, errors.New("[IPProof]: size of a does not equal n")
 	}
 	if len(b) != n {
@@ -66,7 +71,7 @@ func NewIP(G, H []ristretto.Point, a, b []ristretto.Scalar, u ristretto.Point) (
 	// XXX : When n is not a power of two, will the bulletproof struct pad it
 	// or will the inner product proof struct?
 	if !isPower2(uint32(n)) {
-		return nil, errors.New("[IPProof]: size of n is not a power of 2")
+		return nil, errors.New("[IPProof]: size of n (NM) is not a power of 2")
 	}
 
 	return &IP{
@@ -83,19 +88,11 @@ func NewIP(G, H []ristretto.Point, a, b []ristretto.Scalar, u ristretto.Point) (
 func (i *IP) Create() (*IPProof, error) {
 
 	hs := hashCacher{[]byte{}}
-	_ = hs
 
 	n := uint32(len(i.G))
 
 	Lj := make([]ristretto.Point, 0) // XXX: Performance, will constantly allocate mem. N.B. size will be log(M*N)
 	Rj := make([]ristretto.Point, 0)
-	a := ristretto.Scalar{}
-	b := ristretto.Scalar{}
-
-	_ = Lj
-	_ = Rj
-	_ = a
-	_ = b
 
 	for n > 1 {
 
@@ -120,12 +117,10 @@ func (i *IP) Create() (*IPProof, error) {
 
 		e1, err := vector.Exp(aL, GR, int(n), 1)
 		if err != nil {
-			fmt.Println("[IPPROOF]", err)
 			return nil, err
 		}
 		e2, err := vector.Exp(bR, HL, int(n), 1)
 		if err != nil {
-			fmt.Println("[IPPROOF]", err)
 			return nil, err
 		}
 		var e3 ristretto.Point
@@ -142,12 +137,10 @@ func (i *IP) Create() (*IPProof, error) {
 
 		e4, err := vector.Exp(aR, GL, int(n), 1)
 		if err != nil {
-			fmt.Println("[IPPROOF]", err)
 			return nil, err
 		}
 		e5, err := vector.Exp(bL, HR, int(n), 1)
 		if err != nil {
-			fmt.Println("[IPPROOF]", err)
 			return nil, err
 		}
 		var e6 ristretto.Point

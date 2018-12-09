@@ -3,6 +3,8 @@ package rangeproof
 import (
 	"math/big"
 
+	"github.com/pkg/errors"
+
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
 
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
@@ -14,10 +16,10 @@ type polynomial struct {
 	t0, t1, t2     ristretto.Scalar
 }
 
-func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) polynomial {
+func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) (*polynomial, error) {
 
 	// calculate l_0
-	l0 := vector.SubScalar(aL[:], z)
+	l0 := vector.SubScalar(aL, z)
 
 	// calculate l_1
 
@@ -31,27 +33,44 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) polyn
 
 	r0 := vector.AddScalar(aR[:], z)
 
-	r0, _ = vector.Hadamard(r0, yNM)
-
-	r0, _ = vector.Add(r0, zMTwoN)
-
+	r0, err := vector.Hadamard(r0, yNM)
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputePoly] - r0 (1)")
+	}
+	r0, err = vector.Add(r0, zMTwoN)
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputePoly] - r0 (2)")
+	}
 	// calculate r_1
-	r1, _ := vector.Hadamard(yNM, sR[:])
+	r1, err := vector.Hadamard(yNM, sR[:])
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputePoly] - r1")
+	}
 
 	// calculate t0 // t_0 = <l_0, r_0>
-	t0, _ := innerProduct(l0, r0)
+	t0, err := innerProduct(l0, r0)
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputePoly] - t0")
+	}
 
 	// calculate t1 // t_1 = <l_0, r_1> + <l_1, r_0>
-	t1Left, _ := innerProduct(l1[:], r0[:])
-	t1Right, _ := innerProduct(l0, r1)
-
+	t1Left, err := innerProduct(l1[:], r0[:])
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputePoly] - t1Left")
+	}
+	t1Right, err := innerProduct(l0, r1)
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputePoly] - t1Right")
+	}
 	var t1 ristretto.Scalar
 	t1.Add(&t1Left, &t1Right)
 
 	// calculate t2 // t_2 = <l_1, r_1>
-	t2, _ := innerProduct(l1[:], r1[:])
-
-	return polynomial{
+	t2, err := innerProduct(l1[:], r1[:])
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputePoly] - t2")
+	}
+	return &polynomial{
 		l0: l0,
 		l1: l1[:],
 		r0: r0,
@@ -59,7 +78,7 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) polyn
 		t0: t0,
 		t1: t1,
 		t2: t2,
-	}
+	}, nil
 }
 
 // evalute the polynomial with coefficients t
@@ -83,26 +102,30 @@ func (p *polynomial) eval(x ristretto.Scalar) ristretto.Scalar {
 }
 
 // l = l_0 + l_1 * x
-func (p *polynomial) computeL(x ristretto.Scalar) []ristretto.Scalar {
+func (p *polynomial) computeL(x ristretto.Scalar) ([]ristretto.Scalar, error) {
 
 	lLeft := p.l0
 
 	lRight := vector.MulScalar(p.l1, x)
 
-	l, _ := vector.Add(lLeft, lRight)
-
-	return l
+	l, err := vector.Add(lLeft, lRight)
+	if err != nil {
+		return nil, errors.Wrap(err, "[ComputeL]")
+	}
+	return l, nil
 }
 
 // r = r_0 + r_1 * x
-func (p *polynomial) computeR(x ristretto.Scalar) []ristretto.Scalar {
+func (p *polynomial) computeR(x ristretto.Scalar) ([]ristretto.Scalar, error) {
 	rLeft := p.r0
 
 	rRight := vector.MulScalar(p.r1, x)
 
-	r, _ := vector.Add(rLeft, rRight)
-
-	return r
+	r, err := vector.Add(rLeft, rRight)
+	if err != nil {
+		return nil, errors.Wrap(err, "[computeR]")
+	}
+	return r, nil
 }
 
 // t_0 = z^2 * v + D(y,z)
@@ -116,7 +139,7 @@ func (p *polynomial) computeT0(y, z ristretto.Scalar, v []ristretto.Scalar) rist
 	var sumZnV ristretto.Scalar
 	sumZnV.SetZero()
 
-	for i, _ := range v {
+	for i := range v {
 		sumZnV.MulAdd(&zN, &v[i], &sumZnV)
 		zN.Mul(&zN, &z)
 	}

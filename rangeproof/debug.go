@@ -1,8 +1,9 @@
 package rangeproof
 
 import (
-	"errors"
 	"math/big"
+
+	"github.com/pkg/errors"
 
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
 
@@ -13,14 +14,14 @@ import (
 // Put all debug functions here
 
 func debugProve(x, y, z ristretto.Scalar, v, l, r []ristretto.Scalar, aL, aR, sL, sR []ristretto.Scalar) error {
-	ok := debugLxG(l, x, z, aL, aR, sL)
+	ok, err := debugLxG(l, x, z, aL, aR, sL)
 	if !ok {
-		return errors.New("[DEBUG]: <l(x), G> is constructed incorrectly")
+		return errors.Wrap(err, "[DEBUG]: <l(x), G> is constructed incorrectly")
 	}
 
-	ok = debugRxHPrime(r, x, y, z, aR, sR)
+	ok, err = debugRxHPrime(r, x, y, z, aR, sR)
 	if !ok {
-		return errors.New("[DEBUG]: <r(x), H'> is constructed incorrectly")
+		return errors.Wrap(err, "[DEBUG]: <r(x), H'> is constructed incorrectly")
 	}
 
 	for i := range v {
@@ -56,7 +57,8 @@ func debugT0(aL, aR []ristretto.Scalar, y, z ristretto.Scalar) ristretto.Scalar 
 }
 
 // <l(x), G> =  <aL, G> + x<sL, G> +<-z1, G>
-func debugLxG(l []ristretto.Scalar, x, z ristretto.Scalar, aL, aR, sL []ristretto.Scalar) bool {
+func debugLxG(l []ristretto.Scalar, x, z ristretto.Scalar, aL, aR, sL []ristretto.Scalar) (bool, error) {
+
 	var P ristretto.Point
 	P.SetZero()
 
@@ -66,37 +68,40 @@ func debugLxG(l []ristretto.Scalar, x, z ristretto.Scalar, aL, aR, sL []ristrett
 
 	G := ped.BaseVector.Bases[1:]
 
-	lG, _ := vector.Exp(l, G, N, M)
-
+	lG, err := vector.Exp(l, G, N, M)
+	if err != nil {
+		return false, errors.Wrap(err, "<l(x), G>")
+	}
 	// <aL,G>
 	aLG, err := vector.Exp(aL, G, N, M)
 	if err != nil {
-		return false
+		return false, errors.Wrap(err, "<aL,G>")
 	}
 	// x<sL, G>
 	sLG, err := vector.Exp(sL, G, N, M)
 	if err != nil {
-		return false
+		return false, errors.Wrap(err, "x<sL, G>")
 	}
 	var xsLG ristretto.Point
 	xsLG.ScalarMult(&sLG, &x)
+
 	// <-z1, G>
 	var zNeg ristretto.Scalar
 	zNeg.Neg(&z)
 	zNegG, err := vector.Exp(vector.FromScalar(zNeg, uint32(N*M)), G, N, M)
 	if err != nil {
-		return false
+		return false, errors.Wrap(err, "<-z1, G>")
 	}
 	var rhs ristretto.Point
 	rhs.SetZero()
 	rhs.Add(&aLG, &xsLG)
 	rhs.Add(&rhs, &zNegG)
 
-	return lG.Equals(&rhs)
+	return lG.Equals(&rhs), nil
 }
 
 // < r(x), H'> = <aR, H> + x<sR, H> + <z*y^(n*m), H'> + sum( (< <z^(j+1),2^n>, H') ) from j = 1 to j = m
-func debugRxHPrime(r []ristretto.Scalar, x, y, z ristretto.Scalar, aR, sR []ristretto.Scalar) bool {
+func debugRxHPrime(r []ristretto.Scalar, x, y, z ristretto.Scalar, aR, sR []ristretto.Scalar) (bool, error) {
 
 	genData := []byte("dusk.BulletProof.vec1")
 
@@ -107,22 +112,24 @@ func debugRxHPrime(r []ristretto.Scalar, x, y, z ristretto.Scalar, aR, sR []rist
 
 	H := ped2.BaseVector.Bases
 
-	Hprime := computeHprime(ped2.BaseVector.Bases, y)
+	Hprime := computeHprime(H, y)
 
 	// <r(x), H'>
 	rH, err := vector.Exp(r, Hprime, N, M)
 	if err != nil {
-		return false
+		return false, errors.Wrap(err, "<r(x), H'>")
 	}
+
 	// <aR,H>
 	aRH, err := vector.Exp(aR, H, N, M)
 	if err != nil {
-		return false
+		return false, errors.Wrap(err, "<aR,H>")
 	}
 	// x<sR, H>
 	sRH, err := vector.Exp(sR, H, N, M)
 	if err != nil {
-		return false
+
+		return false, errors.Wrap(err, "x<sR, H>")
 	}
 	var xsRH ristretto.Point
 	xsRH.SetZero()
@@ -137,19 +144,22 @@ func debugRxHPrime(r []ristretto.Scalar, x, y, z ristretto.Scalar, aR, sR []rist
 	// p = <z*y^nm , H'>
 	p, err := vector.Exp(zMulYn, Hprime, N, M)
 	if err != nil {
-		return false
+		return false, errors.Wrap(err, "<z*y^nm , H'>")
 	}
-	// k = sum( (< <z^(j+1),2^n>, H') ) from j = 1 to j = m
+	// k = sum( (< <z^(j+1) * 2^n>, H') ) from j = 1 to j = m
 	k, err := vector.Exp(sumZMTwoN(z), Hprime, N, M)
 	if err != nil {
-		return false
+		return false, errors.Wrap(err, "k = sum()...")
 	}
+
 	var rhs ristretto.Point
+	rhs.SetZero()
+
 	rhs.Add(&aRH, &xsRH)
 	rhs.Add(&rhs, &p)
 	rhs.Add(&rhs, &k)
 
-	return rH.Equals(&rhs)
+	return rH.Equals(&rhs), nil
 }
 
 // debugsizeOfV returns true if v is less than 2^N - 1

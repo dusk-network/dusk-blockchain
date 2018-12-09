@@ -2,9 +2,9 @@ package transactions
 
 import (
 	"bytes"
-	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/toghrulmaharramov/dusk-go/crypto"
 )
@@ -99,16 +99,12 @@ func TestEncodeDecode(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	fmt.Println(buf.Bytes())
-
 	// Deserialize
 	var newStealth Stealth
 
 	if err := newStealth.Decode(buf); err != nil {
 		t.Fatalf("%v", err)
 	}
-
-	fmt.Println(newStealth.R)
 
 	// Compare
 	assert.Equal(t, s, newStealth)

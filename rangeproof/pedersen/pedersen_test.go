@@ -1,7 +1,6 @@
 package pedersen_test
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -20,7 +19,6 @@ func TestPedersenScalar(t *testing.T) {
 
 	assert.NotEqual(t, nil, commitment)
 
-	fmt.Println(commitment.Value, commitment.BlindingFactor)
 }
 
 func TestMultipleScalarCommit(t *testing.T) {
@@ -101,8 +99,6 @@ func TestPedersenVector(t *testing.T) {
 	expected.Add(&expected, &H2one)
 	expected.Add(&expected, &B0two)
 	expected.Add(&expected, &B1two)
-
-	fmt.Println(comm.Value, comm.BlindingFactor)
 
 	assert.Equal(t, expected.Bytes(), []byte(comm.Value.Bytes()))
 }
