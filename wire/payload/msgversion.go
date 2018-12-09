@@ -12,18 +12,20 @@ import (
 // MsgVersion declares a version message on the Dusk wire protocol.
 // This is used by a node to advertise itself to peers on the network.
 type MsgVersion struct {
-	Version   uint32
-	Timestamp uint32
-	Dest      string
+	Version     uint32
+	Timestamp   uint32
+	FromAddress *NetAddress
+	ToAddress   *NetAddress
 }
 
 // NewMsgVersion returns a populated MsgVersion struct. The node's
 // I2P address should be passed as an argument.
-func NewMsgVersion(dest string) *MsgVersion {
+func NewMsgVersion(dest string, version uint32, from *NetAddress, to *NetAddress) *MsgVersion {
 	return &MsgVersion{
-		Version:   1, // Get this from somewhere else in the future
-		Timestamp: uint32(time.Now().Unix()),
-		Dest:      dest, // Possibly make and use a getter function instead
+		Version:     version,
+		Timestamp:   uint32(time.Now().Unix()),
+		FromAddress: from,
+		ToAddress:   to,
 	}
 }
 
@@ -38,7 +40,11 @@ func (m *MsgVersion) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteString(w, m.Dest); err != nil {
+	if err := m.FromAddress.Encode(w); err != nil {
+		return err
+	}
+
+	if err := m.ToAddress.Encode(w); err != nil {
 		return err
 	}
 
@@ -58,14 +64,20 @@ func (m *MsgVersion) Decode(r io.Reader) error {
 		return err
 	}
 
-	d, err := encoding.ReadString(r)
-	if err != nil {
+	var from NetAddress
+	var to NetAddress
+	if err := from.Decode(r); err != nil {
+		return err
+	}
+
+	if err := to.Decode(r); err != nil {
 		return err
 	}
 
 	m.Version = v
 	m.Timestamp = t
-	m.Dest = d
+	m.FromAddress = &from
+	m.ToAddress = &to
 	return nil
 }
 

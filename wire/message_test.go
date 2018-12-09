@@ -10,13 +10,13 @@ import (
 
 func TestWriteReadMessage(t *testing.T) {
 	// TODO: add actual I2P address
-	msg := payload.NewMsgVersion("placeholder")
+	msg := payload.NewMsgVersion("placeholder", ProtocolVersion)
 	buf := new(bytes.Buffer)
-	if err := WriteMessage(buf, 0x91919191, msg); err != nil {
+	if err := WriteMessage(buf, DevNet, msg); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2, err := ReadMessage(buf, 0x91919191)
+	_, msg2, err := ReadMessage(buf, DevNet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,11 +28,11 @@ func TestWriteReadMessageNoPayload(t *testing.T) {
 	msg := payload.NewMsgVerAck()
 	bs := make([]byte, 0, HeaderSize)
 	buf := bytes.NewBuffer(bs)
-	if err := WriteMessage(buf, 0x91919191, msg); err != nil {
+	if err := WriteMessage(buf, DevNet, msg); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2, err := ReadMessage(buf, 0x91919191)
+	_, msg2, err := ReadMessage(buf, DevNet)
 	if err != nil {
 		t.Fatal(err)
 	}
