@@ -1,8 +1,6 @@
 package generator
 
 import (
-	"encoding/binary"
-
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
 )
 
@@ -11,7 +9,6 @@ import (
 type Generator struct {
 	data  []byte
 	Bases []ristretto.Point
-	i     uint64
 }
 
 // New will generate a generator which
@@ -20,14 +17,7 @@ func New(data []byte) *Generator {
 	return &Generator{
 		data:  data,
 		Bases: []ristretto.Point{},
-		i:     0,
 	}
-}
-
-// Reset will set i back to zero
-// NOTE: Do not use this on the same Pedersen commitment
-func (g *Generator) Reset() {
-	g.i = 0
 }
 
 //Clear will clear all of the Bases
@@ -37,18 +27,19 @@ func (g *Generator) Clear() {
 }
 
 // Iterate will generate a new point using
-// `data` and current index `i`
+// the previous point's bytes as a seed or the original
+// nonce data, if no previous point is available
 func (g *Generator) Iterate() ristretto.Point {
 
 	p := ristretto.Point{}
 
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(g.i))
-	input := append(g.data, b...)
+	if len(g.Bases) == 0 {
+		p.Derive(g.data)
+		return p
+	}
 
-	p.Derive(input)
-
-	g.i++
+	prevPoint := g.Bases[len(g.Bases)-1]
+	p.Derive(prevPoint.Bytes())
 
 	return p
 }

@@ -20,7 +20,7 @@ func TestGeneratorsLen(t *testing.T) {
 	assert.Equal(t, 64, len(generators.Bases))
 
 }
-func TestGeneratorsReset(t *testing.T) {
+func TestGeneratorsClear(t *testing.T) {
 
 	gens := generator.New([]byte("some data"))
 
@@ -32,7 +32,7 @@ func TestGeneratorsReset(t *testing.T) {
 
 	assert.NotEqual(t, expected, actual)
 
-	gens.Reset()
+	gens.Clear()
 
 	gens.Compute(64)
 	actual = gens.Bases
