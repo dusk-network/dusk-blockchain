@@ -17,7 +17,7 @@ type Header struct {
 }
 
 // HeaderSize defines the size of a Dusk wire message header in bytes.
-const HeaderSize = 4 + 393 + 12 + 4 + 4
+const HeaderSize = 4 + 12 + 4 + 4
 
 // Decode will decode a header from a Dusk wire message.
 func (h *Header) Decode(r io.Reader) error {

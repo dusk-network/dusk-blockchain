@@ -106,12 +106,22 @@ func ReadMessage(r io.Reader, magic DuskNetwork) (*Header, Payload, error) {
 		m := payload.NewMsgGetData()
 		err := m.Decode(payloadBuf)
 		return &hdr, m, err
-	// case commands.GetBlocks:
+	case commands.GetBlocks:
+		m := &payload.MsgGetBlocks{}
+		err := m.Decode(payloadBuf)
+		return &hdr, m, err
+	case commands.GetHeaders:
+		m := &payload.MsgGetHeaders{}
+		err := m.Decode(payloadBuf)
+		return &hdr, m, err
 	case commands.Tx:
 		m := &payload.MsgTx{}
 		err := m.Decode(payloadBuf)
 		return &hdr, m, err
 	// case commands.Block:
+	// case commands.Headers:
+	case commands.MemPool:
+		return &hdr, payload.NewMsgMemPool(), nil
 	case commands.Inv:
 		m := payload.NewMsgInv()
 		err := m.Decode(payloadBuf)

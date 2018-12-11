@@ -8,19 +8,22 @@ const Size = 12
 
 // A list of all valid protocol commands
 const (
-	Version   Cmd = "version"
-	VerAck    Cmd = "verack"
-	Ping      Cmd = "ping"
-	Pong      Cmd = "pong"
-	Addr      Cmd = "addr"
-	GetAddr   Cmd = "getaddr"
-	GetData   Cmd = "getdata"
-	GetBlocks Cmd = "getblocks"
-	Tx        Cmd = "tx"
-	Block     Cmd = "block"
-	Inv       Cmd = "inv"
-	NotFound  Cmd = "notfound"
-	Reject    Cmd = "reject"
+	Version    Cmd = "version"
+	VerAck     Cmd = "verack"
+	Ping       Cmd = "ping"
+	Pong       Cmd = "pong"
+	Addr       Cmd = "addr"
+	GetAddr    Cmd = "getaddr"
+	GetData    Cmd = "getdata"
+	GetBlocks  Cmd = "getblocks"
+	GetHeaders Cmd = "getheaders"
+	Tx         Cmd = "tx"
+	Block      Cmd = "block"
+	Headers    Cmd = "headers"
+	MemPool    Cmd = "mempool"
+	Inv        Cmd = "inv"
+	NotFound   Cmd = "notfound"
+	Reject     Cmd = "reject"
 )
 
 // CmdToByteArray turns a Cmd to a byte array of size 12,

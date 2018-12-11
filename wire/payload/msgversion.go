@@ -20,7 +20,7 @@ type MsgVersion struct {
 
 // NewMsgVersion returns a populated MsgVersion struct. The node's
 // I2P address should be passed as an argument.
-func NewMsgVersion(dest string, version uint32, from *NetAddress, to *NetAddress) *MsgVersion {
+func NewMsgVersion(version uint32, from *NetAddress, to *NetAddress) *MsgVersion {
 	return &MsgVersion{
 		Version:     version,
 		Timestamp:   uint32(time.Now().Unix()),
