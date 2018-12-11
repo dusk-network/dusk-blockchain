@@ -18,7 +18,8 @@ For messages that do carry a payload, it will be either taken in through the cre
 // Let's say we have established a TCP connection with a peer here
 
 // Make NetAddress structs for `from` and `to` fields
-from := payload.NewNetAddress(wire.GetLocalIP(), cfg.Port)
+ip, err := wire.GetLocalIP() // Error handling omitted for clarity
+from := payload.NewNetAddress(ip, cfg.Port)
 to := payload.NewNetAddress(peer.Addr, peer.Port)
 
 // This will create a `version` message with the current running protocol version, as well as the local and remote network addresses formatted as NetAddress structs
