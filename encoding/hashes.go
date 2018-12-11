@@ -52,7 +52,7 @@ func ReadHash(r io.Reader) ([]byte, error) {
 	if _, err := io.ReadFull(r, b); err != nil {
 		return nil, err
 	}
-	return b[:32], nil
+	return append([]byte{}, b[:32]...), nil
 }
 
 // WriteHash will check the hash length and then write the data to w. If an error
