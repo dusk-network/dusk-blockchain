@@ -47,7 +47,6 @@ func (n *NetAddress) Decode(r io.Reader) error {
 	}
 
 	n.IP = net.IP(ip[:])
-
 	port, err := encoding.Uint16(r, binary.LittleEndian)
 	if err != nil {
 		return err

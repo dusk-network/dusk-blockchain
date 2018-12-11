@@ -18,7 +18,7 @@ func TestWriteReadMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, msg2, err := ReadMessage(buf, DevNet)
+	msg2, err := ReadMessage(buf, DevNet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestWriteReadMessageNoPayload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, msg2, err := ReadMessage(buf, DevNet)
+	msg2, err := ReadMessage(buf, DevNet)
 	if err != nil {
 		t.Fatal(err)
 	}

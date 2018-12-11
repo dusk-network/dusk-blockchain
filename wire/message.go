@@ -59,82 +59,82 @@ func WriteMessage(w io.Writer, magic DuskNetwork, p Payload) error {
 }
 
 // ReadMessage will read a Dusk wire message from r and return the associated payload.
-func ReadMessage(r io.Reader, magic DuskNetwork) (*Header, Payload, error) {
+func ReadMessage(r io.Reader, magic DuskNetwork) (Payload, error) {
 	buf := make([]byte, HeaderSize)
 	if _, err := io.ReadFull(r, buf); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	hdrBuf := bytes.NewReader(buf)
 	var hdr Header
 	if err := hdr.Decode(hdrBuf); err != nil {
-		return &hdr, nil, err
+		return nil, err
 	}
 
 	if magic != hdr.Magic {
-		return nil, nil, errors.New("magic mismatch")
+		return nil, errors.New("magic mismatch")
 	}
 
 	pBuf := make([]byte, 0, hdr.Length)
 	payloadBuf := bytes.NewBuffer(pBuf)
 	if _, err := io.Copy(payloadBuf, r); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if !crypto.CompareChecksum(payloadBuf.Bytes(), hdr.Checksum) {
-		return nil, nil, errors.New("checksum mismatch")
+		return nil, errors.New("checksum mismatch")
 	}
 
 	switch hdr.Command {
 	case commands.Version:
 		m := &payload.MsgVersion{}
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	case commands.VerAck:
-		return &hdr, payload.NewMsgVerAck(), nil
+		return payload.NewMsgVerAck(), nil
 	case commands.Ping:
-		return &hdr, payload.NewMsgPing(), nil
+		return payload.NewMsgPing(), nil
 	case commands.Pong:
-		return &hdr, payload.NewMsgPong(), nil
+		return payload.NewMsgPong(), nil
 	case commands.Addr:
 		m := payload.NewMsgAddr()
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	case commands.GetAddr:
-		return &hdr, payload.NewMsgGetAddr(), nil
+		return payload.NewMsgGetAddr(), nil
 	case commands.GetData:
 		m := payload.NewMsgGetData()
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	case commands.GetBlocks:
 		m := &payload.MsgGetBlocks{}
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	case commands.GetHeaders:
 		m := &payload.MsgGetHeaders{}
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	case commands.Tx:
 		m := &payload.MsgTx{}
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	// case commands.Block:
 	// case commands.Headers:
 	case commands.MemPool:
-		return &hdr, payload.NewMsgMemPool(), nil
+		return payload.NewMsgMemPool(), nil
 	case commands.Inv:
 		m := payload.NewMsgInv()
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	case commands.NotFound:
 		m := payload.NewMsgNotFound()
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	case commands.Reject:
 		m := &payload.MsgReject{}
 		err := m.Decode(payloadBuf)
-		return &hdr, m, err
+		return m, err
 	default:
-		return &hdr, nil, fmt.Errorf("unknown command %v", hdr.Command)
+		return nil, fmt.Errorf("unknown command %v", hdr.Command)
 	}
 }
