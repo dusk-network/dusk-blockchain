@@ -29,7 +29,7 @@ func (t *TypeAttributes) Encode(w io.Writer) error {
 	}
 
 	// TxPubKey
-	if err := encoding.WriteHash(w, t.TxPubKey); err != nil {
+	if err := encoding.Write256(w, t.TxPubKey); err != nil {
 		return err
 	}
 
@@ -66,11 +66,9 @@ func (t *TypeAttributes) Decode(r io.Reader) error {
 	}
 
 	// TxPubKey
-	txPubKey, err := encoding.ReadHash(r)
-	if err != nil {
+	if err := encoding.Read256(r, &t.TxPubKey); err != nil {
 		return err
 	}
-	t.TxPubKey = txPubKey
 
 	// Outputs
 	outputCount, err := encoding.ReadVarInt(r)

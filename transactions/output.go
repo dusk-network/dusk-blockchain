@@ -15,11 +15,11 @@ type Output struct {
 
 // Encode will serialize an Output struct to w in byte format.
 func (o *Output) Encode(w io.Writer) error {
-	if err := encoding.PutUint64(w, binary.LittleEndian, o.Amount); err != nil {
+	if err := encoding.WriteUint64(w, binary.LittleEndian, o.Amount); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteHash(w, o.P); err != nil {
+	if err := encoding.Write256(w, o.P); err != nil {
 		return err
 	}
 
@@ -29,17 +29,13 @@ func (o *Output) Encode(w io.Writer) error {
 // Decode will deserialize an Output struct and populate the passed Output struct
 // with it's details.
 func (o *Output) Decode(r io.Reader) error {
-	amount, err := encoding.Uint64(r, binary.LittleEndian)
-	if err != nil {
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &o.Amount); err != nil {
 		return err
 	}
-	o.Amount = amount
 
-	P, err := encoding.ReadHash(r)
-	if err != nil {
+	if err := encoding.Read256(r, &o.P); err != nil {
 		return err
 	}
-	o.P = P
 
 	return nil
 }
