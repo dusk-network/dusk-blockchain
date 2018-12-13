@@ -2,21 +2,25 @@
 
 package encoding
 
-import "io"
+import (
+	"fmt"
+	"io"
+)
 
 // ReadVarBytes will read a CompactSize int denoting the length, then
-// proceeds to read that amount of bytes into r and passes it back as a slice.
-func ReadVarBytes(r io.Reader) ([]byte, error) {
+// proceeds to read that amount of bytes from r into b.
+func ReadVarBytes(r io.Reader, b *[]byte) error {
 	c, err := ReadVarInt(r)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	b := make([]byte, c)
-	if _, err = io.ReadFull(r, b); err != nil {
-		return nil, err
+	*b = make([]byte, c)
+	n, err := r.Read(*b)
+	if err != nil || n != len(*b) {
+		return fmt.Errorf("encoding: ReadVarBytes read %v/%v bytes - %v", n, c, err)
 	}
-	return b, nil
+	return nil
 }
 
 // WriteVarBytes will serialize a CompactSize int denoting the length, then
@@ -35,16 +39,16 @@ func WriteVarBytes(w io.Writer, b []byte) error {
 
 // ReadString reads the data with ReadVarBytes and returns it as a string
 // by simple type conversion.
-func ReadString(r io.Reader) (string, error) {
-	b, err := ReadVarBytes(r)
-	if err != nil {
-		return "", err
+func ReadString(r io.Reader, s *string) error {
+	var b []byte
+	if err := ReadVarBytes(r, &b); err != nil {
+		return err
 	}
-	return string(b), nil
+	*s = string(b)
+	return nil
 }
 
 // WriteString will write string s as a slice of bytes through WriteVarBytes.
 func WriteString(w io.Writer, s string) error {
-	err := WriteVarBytes(w, []byte(s))
-	return err
+	return WriteVarBytes(w, []byte(s))
 }

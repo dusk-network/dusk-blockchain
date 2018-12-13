@@ -21,13 +21,13 @@ func TestVarBytesEncodeDecode(t *testing.T) {
 	// Serialize
 	buf := new(bytes.Buffer)
 	if err := WriteVarBytes(buf, bs); err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 
 	// Deserialize
-	rbs, err := ReadVarBytes(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
+	var rbs []byte
+	if err := ReadVarBytes(buf, &rbs); err != nil {
+		t.Fatal(err)
 	}
 
 	// Compare
@@ -44,20 +44,20 @@ func TestVarStringEncodeDecode(t *testing.T) {
 	// Serialize
 	buf := new(bytes.Buffer)
 	if err := WriteString(buf, str); err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 
 	// Deserialize
-	rstr, err := ReadString(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
+	var rstr string
+	if err := ReadString(buf, &rstr); err != nil {
+		t.Fatal(err)
 	}
 
 	// Compare
 	assert.Equal(t, str, rstr)
 }
 
-//https://stackoverflow.com/a/31832326/5203311
+// https://stackoverflow.com/a/31832326/5203311
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func randBytes(n int) []byte {

@@ -18,35 +18,35 @@ func TestIntegerEncodeDecode(t *testing.T) {
 	// Serialize
 	buf := new(bytes.Buffer)
 
-	if err := PutUint8(buf, a); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint8(buf, a); err != nil {
+		t.Fatal(err)
 	}
-	if err := PutUint16(buf, binary.LittleEndian, b); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint16(buf, binary.LittleEndian, b); err != nil {
+		t.Fatal(err)
 	}
-	if err := PutUint32(buf, binary.LittleEndian, c); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint32(buf, binary.LittleEndian, c); err != nil {
+		t.Fatal(err)
 	}
-	if err := PutUint64(buf, binary.LittleEndian, d); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint64(buf, binary.LittleEndian, d); err != nil {
+		t.Fatal(err)
 	}
 
 	// Deserialize
-	e, err := Uint8(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
+	var e uint8
+	var f uint16
+	var g uint32
+	var h uint64
+	if err := ReadUint8(buf, &e); err != nil {
+		t.Fatal(err)
 	}
-	f, err := Uint16(buf, binary.LittleEndian)
-	if err != nil {
-		t.Fatalf("%v", err)
+	if err := ReadUint16(buf, binary.LittleEndian, &f); err != nil {
+		t.Fatal(err)
 	}
-	g, err := Uint32(buf, binary.LittleEndian)
-	if err != nil {
-		t.Fatalf("%v", err)
+	if err := ReadUint32(buf, binary.LittleEndian, &g); err != nil {
+		t.Fatal(err)
 	}
-	h, err := Uint64(buf, binary.LittleEndian)
-	if err != nil {
-		t.Fatalf("%v", err)
+	if err := ReadUint64(buf, binary.LittleEndian, &h); err != nil {
+		t.Fatal(err)
 	}
 
 	// Compare
@@ -66,35 +66,35 @@ func TestSignedInteger(t *testing.T) {
 	// Serialize
 	buf := new(bytes.Buffer)
 
-	if err := PutUint8(buf, uint8(a)); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint8(buf, uint8(a)); err != nil {
+		t.Fatal(err)
 	}
-	if err := PutUint16(buf, binary.LittleEndian, uint16(b)); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint16(buf, binary.LittleEndian, uint16(b)); err != nil {
+		t.Fatal(err)
 	}
-	if err := PutUint32(buf, binary.LittleEndian, uint32(c)); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint32(buf, binary.LittleEndian, uint32(c)); err != nil {
+		t.Fatal(err)
 	}
-	if err := PutUint64(buf, binary.LittleEndian, uint64(d)); err != nil {
-		t.Fatalf("%v", err)
+	if err := WriteUint64(buf, binary.LittleEndian, uint64(d)); err != nil {
+		t.Fatal(err)
 	}
 
 	// Deserialize
-	e, err := Uint8(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
+	var e uint8
+	var f uint16
+	var g uint32
+	var h uint64
+	if err := ReadUint8(buf, &e); err != nil {
+		t.Fatal(err)
 	}
-	f, err := Uint16(buf, binary.LittleEndian)
-	if err != nil {
-		t.Fatalf("%v", err)
+	if err := ReadUint16(buf, binary.LittleEndian, &f); err != nil {
+		t.Fatal(err)
 	}
-	g, err := Uint32(buf, binary.LittleEndian)
-	if err != nil {
-		t.Fatalf("%v", err)
+	if err := ReadUint32(buf, binary.LittleEndian, &g); err != nil {
+		t.Fatal(err)
 	}
-	h, err := Uint64(buf, binary.LittleEndian)
-	if err != nil {
-		t.Fatalf("%v", err)
+	if err := ReadUint64(buf, binary.LittleEndian, &h); err != nil {
+		t.Fatal(err)
 	}
 
 	// Compare with type conversion
@@ -102,51 +102,4 @@ func TestSignedInteger(t *testing.T) {
 	assert.Equal(t, b, int16(f))
 	assert.Equal(t, c, int32(g))
 	assert.Equal(t, d, int64(h))
-}
-
-// Testing all the CompactSize formats
-func TestCompactSize(t *testing.T) {
-	a := uint64(1)
-	b := uint64(2 ^ 8)
-	c := uint64(2 ^ 16)
-	d := uint64(2 ^ 32)
-
-	// Serialize
-	buf := new(bytes.Buffer)
-	if err := WriteVarInt(buf, uint64(a)); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := WriteVarInt(buf, uint64(b)); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := WriteVarInt(buf, uint64(c)); err != nil {
-		t.Fatalf("%v", err)
-	}
-	if err := WriteVarInt(buf, uint64(d)); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	// Deserialize
-	e, err := ReadVarInt(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	f, err := ReadVarInt(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	g, err := ReadVarInt(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	h, err := ReadVarInt(buf)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	// Compare
-	assert.Equal(t, a, e)
-	assert.Equal(t, b, f)
-	assert.Equal(t, c, g)
-	assert.Equal(t, d, h)
 }
