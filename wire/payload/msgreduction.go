@@ -12,9 +12,9 @@ import (
 // MsgReduction defines a reduction message on the Dusk wire protocol.
 type MsgReduction struct {
 	Score     uint64
-	BlockHash []byte // 32 bytes
-	SigEd     []byte // 64 bytes
-	PubKey    []byte // 32 bytes
+	BlockHash []byte // Hash of the block being reduced (32 bytes)
+	SigEd     []byte // Ed25519 signature of the blok hash (64 bytes)
+	PubKey    []byte // Sender public key (32 bytes)
 }
 
 // NewMsgReduction returns a MsgReduction struct populated with the specified information.

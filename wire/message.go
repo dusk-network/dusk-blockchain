@@ -126,6 +126,30 @@ func ReadMessage(r io.Reader, magic DuskNetwork) (Payload, error) {
 		m := payload.NewMsgInv()
 		err := m.Decode(payloadBuf)
 		return m, err
+	case commands.CertificateReq:
+		m := &payload.MsgCertificateReq{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Certificate:
+		m := &payload.MsgCertificate{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Score:
+		m := &payload.MsgScore{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Candidate:
+		m := &payload.MsgCandidate{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Reduction:
+		m := &payload.MsgReduction{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Binary:
+		m := &payload.MsgBinary{}
+		err := m.Decode(payloadBuf)
+		return m, err
 	case commands.NotFound:
 		m := payload.NewMsgNotFound()
 		err := m.Decode(payloadBuf)
