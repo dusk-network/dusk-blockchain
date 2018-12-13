@@ -30,13 +30,13 @@ func NewMsgVersion(version uint32, from *NetAddress, to *NetAddress) *MsgVersion
 }
 
 // Encode a MsgVersion struct and write to w.
-// Implements the Payload interface.
+// Implements Payload interface.
 func (m *MsgVersion) Encode(w io.Writer) error {
-	if err := encoding.PutUint32(w, binary.LittleEndian, m.Version); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, m.Version); err != nil {
 		return err
 	}
 
-	if err := encoding.PutUint32(w, binary.LittleEndian, m.Timestamp); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, m.Timestamp); err != nil {
 		return err
 	}
 
@@ -52,15 +52,13 @@ func (m *MsgVersion) Encode(w io.Writer) error {
 }
 
 // Decode a MsgVersion from r.
-// Implements the Payload interface
+// Implements Payload interface.
 func (m *MsgVersion) Decode(r io.Reader) error {
-	v, err := encoding.Uint32(r, binary.LittleEndian)
-	if err != nil {
+	if err := encoding.ReadUint32(r, binary.LittleEndian, &m.Version); err != nil {
 		return err
 	}
 
-	t, err := encoding.Uint32(r, binary.LittleEndian)
-	if err != nil {
+	if err := encoding.ReadUint32(r, binary.LittleEndian, &m.Timestamp); err != nil {
 		return err
 	}
 
@@ -74,15 +72,13 @@ func (m *MsgVersion) Decode(r io.Reader) error {
 		return err
 	}
 
-	m.Version = v
-	m.Timestamp = t
 	m.FromAddress = &from
 	m.ToAddress = &to
 	return nil
 }
 
 // Command returns the command string associated with the version message.
-// Implements the Payload interface.
+// Implements Payload interface.
 func (m *MsgVersion) Command() commands.Cmd {
 	return commands.Version
 }

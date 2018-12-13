@@ -23,7 +23,7 @@ type Payload interface {
 
 // WriteMessage will write a Dusk wire message to w.
 func WriteMessage(w io.Writer, magic DuskNetwork, p Payload) error {
-	if err := encoding.PutUint32(w, binary.LittleEndian, uint32(magic)); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, uint32(magic)); err != nil {
 		return err
 	}
 
@@ -43,11 +43,11 @@ func WriteMessage(w io.Writer, magic DuskNetwork, p Payload) error {
 		return err
 	}
 
-	if err := encoding.PutUint32(w, binary.LittleEndian, payloadLength); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, payloadLength); err != nil {
 		return err
 	}
 
-	if err := encoding.PutUint32(w, binary.LittleEndian, checksum); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, checksum); err != nil {
 		return err
 	}
 

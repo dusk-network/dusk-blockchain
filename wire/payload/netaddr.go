@@ -24,15 +24,15 @@ func NewNetAddress(ip string, port uint16) *NetAddress {
 	}
 }
 
-// Encode a NetAddress to w.
+// Encode a NetAddress struct and write to w.
 func (n *NetAddress) Encode(w io.Writer) error {
 	var ip [16]byte
 	copy(ip[:], n.IP.To16())
-	if err := binary.Write(w, binary.LittleEndian, ip); err != nil {
+	if _, err := w.Write(ip[:]); err != nil {
 		return err
 	}
 
-	if err := encoding.PutUint16(w, binary.LittleEndian, n.Port); err != nil {
+	if err := encoding.WriteUint16(w, binary.LittleEndian, n.Port); err != nil {
 		return err
 	}
 
@@ -42,20 +42,19 @@ func (n *NetAddress) Encode(w io.Writer) error {
 // Decode a NetAddress from r.
 func (n *NetAddress) Decode(r io.Reader) error {
 	var ip [16]byte
-	if err := binary.Read(r, binary.LittleEndian, &ip); err != nil {
+	if _, err := io.ReadFull(r, ip[:]); err != nil {
 		return err
 	}
 
 	n.IP = net.IP(ip[:])
-	port, err := encoding.Uint16(r, binary.LittleEndian)
-	if err != nil {
+	if err := encoding.ReadUint16(r, binary.LittleEndian, &n.Port); err != nil {
 		return err
 	}
 
-	n.Port = port
 	return nil
 }
 
+// String returns the IP address and port as a string.
 func (n *NetAddress) String() string {
 	ip := n.IP.String()
 	port := strconv.FormatUint(uint64(n.Port), 10)

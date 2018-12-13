@@ -25,11 +25,11 @@ func NewMsgGetHeaders(locator []byte, stop []byte) *MsgGetHeaders {
 // Encode a MsgGetHeaders struct and write to w.
 // Implements payload interface.
 func (m *MsgGetHeaders) Encode(w io.Writer) error {
-	if err := encoding.WriteHash(w, m.Locator); err != nil {
+	if err := encoding.Write256(w, m.Locator); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteHash(w, m.HashStop); err != nil {
+	if err := encoding.Write256(w, m.HashStop); err != nil {
 		return err
 	}
 
@@ -39,18 +39,14 @@ func (m *MsgGetHeaders) Encode(w io.Writer) error {
 // Decode a MsgGetHeaders from r.
 // Implements payload interface.
 func (m *MsgGetHeaders) Decode(r io.Reader) error {
-	locator, err := encoding.ReadHash(r)
-	if err != nil {
+	if err := encoding.Read256(r, &m.Locator); err != nil {
 		return err
 	}
 
-	stop, err := encoding.ReadHash(r)
-	if err != nil {
+	if err := encoding.Read256(r, &m.HashStop); err != nil {
 		return err
 	}
 
-	m.Locator = locator
-	m.HashStop = stop
 	return nil
 }
 

@@ -56,7 +56,7 @@ func (m *MsgReject) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.PutUint8(w, uint8(m.RejectCode)); err != nil {
+	if err := encoding.WriteUint8(w, uint8(m.RejectCode)); err != nil {
 		return err
 	}
 
@@ -65,7 +65,7 @@ func (m *MsgReject) Encode(w io.Writer) error {
 	}
 
 	if m.Data != nil {
-		if err := encoding.WriteHash(w, m.Data); err != nil {
+		if err := encoding.Write256(w, m.Data); err != nil {
 			return err
 		}
 	}
@@ -76,13 +76,12 @@ func (m *MsgReject) Encode(w io.Writer) error {
 // Decode a MsgReject from r.
 // Implements payload interface.
 func (m *MsgReject) Decode(r io.Reader) error {
-	msg, err := encoding.ReadString(r)
-	if err != nil {
+	if err := encoding.ReadString(r, &m.Message); err != nil {
 		return err
 	}
 
-	code, err := encoding.Uint8(r)
-	if err != nil {
+	var code uint8
+	if err := encoding.ReadUint8(r, &code); err != nil {
 		return err
 	}
 
@@ -93,13 +92,12 @@ func (m *MsgReject) Decode(r io.Reader) error {
 		return fmt.Errorf("invalid reject code %v", code)
 	}
 
-	reason, err := encoding.ReadString(r)
-	if err != nil {
+	m.RejectCode = RejectCode(code)
+	if err := encoding.ReadString(r, &m.Reason); err != nil {
 		return err
 	}
 
-	data, err := encoding.ReadHash(r)
-	if err != nil {
+	if err := encoding.Read256(r, &m.Data); err != nil {
 		// If we get an EOF error, there was no data left in the reader,
 		// and we can simply discard the error.
 		if err != io.EOF {
@@ -107,13 +105,6 @@ func (m *MsgReject) Decode(r io.Reader) error {
 		}
 	}
 
-	if data != nil {
-		m.Data = data
-	}
-
-	m.Message = msg
-	m.RejectCode = RejectCode(code)
-	m.Reason = reason
 	return nil
 }
 
