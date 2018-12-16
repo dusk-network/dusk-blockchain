@@ -18,7 +18,7 @@ For messages that do carry a payload, it will be either taken in through the cre
 // Let's say we have established a TCP connection with a peer here
 
 // Make NetAddress structs for `from` and `to` fields
-ip, err := wire.GetLocalIP() // Error handling omitted for clarity
+ip, err := util.GetLocalIP() // Error handling omitted for clarity
 from := payload.NewNetAddress(ip, cfg.Port)
 to := payload.NewNetAddress(peer.Addr, peer.Port)
 

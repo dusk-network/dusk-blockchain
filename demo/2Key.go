@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto"
-	"github.com/toghrulmaharramov/dusk-go/key"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/key"
 )
 
 /*

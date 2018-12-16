@@ -4,11 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto/base58"
-	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
-
 	"github.com/stretchr/testify/assert"
-	"github.com/toghrulmaharramov/dusk-go/rpc"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto/base58"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/rpc"
 )
 
 func TestMethod(t *testing.T) {

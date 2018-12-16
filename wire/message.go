@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
-	"github.com/toghrulmaharramov/dusk-go/wire/payload"
-
-	"github.com/toghrulmaharramov/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
 )
 
 // Payload defines the message payload.
@@ -22,7 +22,7 @@ type Payload interface {
 }
 
 // WriteMessage will write a Dusk wire message to w.
-func WriteMessage(w io.Writer, magic DuskNetwork, p Payload) error {
+func WriteMessage(w io.Writer, magic protocol.DuskNetwork, p Payload) error {
 	if err := encoding.WriteUint32(w, binary.LittleEndian, uint32(magic)); err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func WriteMessage(w io.Writer, magic DuskNetwork, p Payload) error {
 }
 
 // ReadMessage will read a Dusk wire message from r and return the associated payload.
-func ReadMessage(r io.Reader, magic DuskNetwork) (Payload, error) {
+func ReadMessage(r io.Reader, magic protocol.DuskNetwork) (Payload, error) {
 	buf := make([]byte, HeaderSize)
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return nil, err

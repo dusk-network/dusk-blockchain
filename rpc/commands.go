@@ -4,9 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto/base58"
-
-	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto/base58"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto/hash"
 )
 
 // Handler defines a method bound to an RPC command.

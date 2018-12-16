@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/toghrulmaharramov/dusk-go/encoding"
-	"github.com/toghrulmaharramov/dusk-go/transactions"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 )
 
 // MsgGetData defines a getdata message on the Dusk wire protocol.
@@ -31,7 +31,16 @@ func (m *MsgGetData) AddTx(tx transactions.Stealth) {
 	m.Vectors = append(m.Vectors, vect)
 }
 
-// AddBlock (add when block structure is defined)
+// AddBlock will add a block inventory vector to MsgGetData.
+func (m *MsgGetData) AddBlock(hash []byte) {
+	// Finish this when block structure is defined.
+	vect := InvVect{
+		Type: InvBlock,
+		Hash: hash,
+	}
+
+	m.Vectors = append(m.Vectors, vect)
+}
 
 // Encode a MsgGetData struct and write to w.
 // Implements payload interface.

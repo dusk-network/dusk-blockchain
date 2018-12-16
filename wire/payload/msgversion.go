@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/toghrulmaharramov/dusk-go/encoding"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 )
 
 // MsgVersion declares a version message on the Dusk wire protocol.
@@ -32,7 +32,7 @@ func NewMsgVersion(version uint32, from *NetAddress, to *NetAddress) *MsgVersion
 // Encode a MsgVersion struct and write to w.
 // Implements Payload interface.
 func (m *MsgVersion) Encode(w io.Writer) error {
-	if err := encoding.WriteUint32(w, binary.LittleEndian, m.Version); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, uint32(m.Version)); err != nil {
 		return err
 	}
 

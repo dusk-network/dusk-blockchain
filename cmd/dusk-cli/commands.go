@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 
-	"github.com/toghrulmaharramov/dusk-go/rpc"
+	"gitlab.dusk.network/dusk-core/dusk-go/rpc"
 )
 
 // Command defines a CLI command and holds it's properties.
