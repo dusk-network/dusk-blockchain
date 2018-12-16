@@ -26,6 +26,7 @@ var G1Base *bn256.G1
 // base point.
 var G2Str = "012ecca446ff6f3d4d03c76e9b5c752f28bc37b364cb05ac4a37eb32e1c32459708f25386f72c9462b81597d65ae2092c4b97792155dcdaad32b8a6dd41792534c2db10ef5233b0fe3962b9ee6a4bbc2b5bde01a54f3513d42df972e128f31bf12274e5747e8cafacc3716cc8699db79b22f0e4ff3c23e898f694420a3be3087a5"
 
+// G1BaseInt is the big.Int representation of G1Base. This is useful during point compression
 var G1BaseInt *big.Int
 
 // G2Base is the base point specified for the G2 group. If one wants to use a
@@ -162,6 +163,7 @@ func VerifyBatch(pkeys []*PublicKey, msgList [][]byte, signature *Sig) error {
 	}
 
 	var left *bn256.GT
+	// TODO: I suspect that this could be sped up by doing the addition through a pool of goroutines
 	for i := range msgList {
 		HM, err := hashToPoint(msgList[i])
 		if err != nil {
