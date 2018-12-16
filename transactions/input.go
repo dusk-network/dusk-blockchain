@@ -1,10 +1,12 @@
 package transactions
 
 import (
-	"github.com/toghrulmaharramov/dusk-go/encoding"
 	"io"
+
+	"github.com/toghrulmaharramov/dusk-go/encoding"
 )
 
+// Input defines an input in a stealth transaction.
 type Input struct {
 	KeyImage  []byte // 32 bytes
 	TxID      []byte // 32 bytes

@@ -49,11 +49,11 @@ func (cfg *Config) Load() error {
 	for _, field := range fields {
 		switch {
 		case strings.Contains(field, "rpcport="):
-			cfg.RPCPort = strings.TrimLeft(field, "rpcport=")
+			cfg.RPCPort = strings.TrimPrefix(field, "rpcport=")
 		case strings.Contains(field, "rpcuser="):
-			cfg.RPCUser = strings.TrimLeft(field, "rpcuser=")
+			cfg.RPCUser = strings.TrimPrefix(field, "rpcuser=")
 		case strings.Contains(field, "rpcpass="):
-			cfg.RPCPass = strings.TrimLeft(field, "rpcpass=")
+			cfg.RPCPass = strings.TrimPrefix(field, "rpcpass=")
 		default:
 			break
 		}
