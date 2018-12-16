@@ -83,6 +83,7 @@ func (s *NodeServer) setupPeerConfig() error {
 		StartHeight: LocalHeight,
 		//OnHeader:    s.sm.OnHeaders,
 		//OnBlock:     s.sm.OnBlock,
+		//OnMemPool:   s.sm.OnMemPool,
 	}
 	return nil
 }
