@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/toghrulmaharramov/dusk-go/rangeproof"
+	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof"
 )
 
 func TestBitCommitToValue(t *testing.T) {

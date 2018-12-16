@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/toghrulmaharramov/dusk-go/rpc"
+	"gitlab.dusk.network/dusk-core/dusk-go/rpc"
 )
 
 // SendPostRequest is a simple function to send POST request to RPC server and handle the response

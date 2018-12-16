@@ -1,8 +1,8 @@
 package pedersen
 
 import (
-	generator "github.com/toghrulmaharramov/dusk-go/rangeproof/generators"
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	generator "gitlab.dusk.network/dusk-core/dusk-go/rangeproof/generators"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 type Pedersen struct {

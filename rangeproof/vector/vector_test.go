@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 func TestVectorAdd(t *testing.T) {

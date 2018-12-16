@@ -3,7 +3,7 @@ package transactions
 import (
 	"io"
 
-	"github.com/toghrulmaharramov/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
 )
 
 // Input defines an input in a stealth transaction.

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"math/bits"
 
-	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/vector"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 // XXX : eventually we will move this function out of the

@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 var biL big.Int

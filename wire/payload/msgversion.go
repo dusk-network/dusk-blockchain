@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/toghrulmaharramov/dusk-go/encoding"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 )
 
 // MsgVersion declares a version message on the Dusk wire protocol.

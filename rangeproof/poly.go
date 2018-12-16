@@ -5,9 +5,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
+	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/vector"
 
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 // Polynomial construction

@@ -36,7 +36,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/toghrulmaharramov/dusk-go/ristretto/edwards25519"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto/edwards25519"
 )
 
 // Represents an element of the Ristretto group over Edwards25519.

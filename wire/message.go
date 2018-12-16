@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
-	"github.com/toghrulmaharramov/dusk-go/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/payload"
 
-	"github.com/toghrulmaharramov/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
 )
 
 // Payload defines the message payload.

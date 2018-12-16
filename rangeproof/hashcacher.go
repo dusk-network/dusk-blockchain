@@ -1,6 +1,6 @@
 package rangeproof
 
-import "github.com/toghrulmaharramov/dusk-go/ristretto"
+import "gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 
 // hashCacher will be used for the Fiat-Shamir
 // transform and will cache the necesarry values of the transcript

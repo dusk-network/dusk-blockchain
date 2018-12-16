@@ -3,7 +3,7 @@ package vector
 import (
 	"errors"
 
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 // Add adds two scalar slices a and b,

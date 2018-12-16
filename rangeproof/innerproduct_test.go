@@ -4,12 +4,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/toghrulmaharramov/dusk-go/rangeproof/pedersen"
+	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/pedersen"
 
-	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
+	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/vector"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 func TestInnerProduct(t *testing.T) {

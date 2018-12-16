@@ -1,7 +1,7 @@
 package generator
 
 import (
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
 // This package will generate the generators for the pedersens and the bulletproof

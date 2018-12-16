@@ -3,8 +3,8 @@ package payload
 import (
 	"io"
 
-	"github.com/toghrulmaharramov/dusk-go/transactions"
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 )
 
 // MsgTx defines a Dusk wire message containing a transaction.
