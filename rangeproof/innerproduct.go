@@ -2,6 +2,7 @@ package rangeproof
 
 import (
 	"errors"
+	"math/bits"
 
 	"github.com/toghrulmaharramov/dusk-go/rangeproof/vector"
 	"github.com/toghrulmaharramov/dusk-go/ristretto"
@@ -37,6 +38,7 @@ type IP struct {
 
 // IPProof represents an inner product proof
 type IPProof struct {
+	IP   IP
 	L    []ristretto.Point
 	R    []ristretto.Point
 	a, b ristretto.Scalar
@@ -44,14 +46,18 @@ type IPProof struct {
 
 // NewIP creates a new Inner product struct
 // making relevant checks on the given parameters
-func NewIP(G, H []ristretto.Point, l, r []ristretto.Scalar, u ristretto.Point) (*IP, error) {
+func NewIP(GVec, HVec []ristretto.Point, l, r []ristretto.Scalar, u ristretto.Point) (*IP, error) {
 
 	// XXX: N.B. l and r are pointers
 	// Alternative would be to not edit these directly in the Create proof method
-	a := make([]ristretto.Scalar, N*M)
+	a := make([]ristretto.Scalar, len(l))
 	copy(a, l)
-	b := make([]ristretto.Scalar, N*M)
+	b := make([]ristretto.Scalar, len(r))
 	copy(b, r)
+	G := make([]ristretto.Point, len(GVec))
+	copy(G, GVec)
+	H := make([]ristretto.Point, len(HVec))
+	copy(H, HVec)
 
 	n := len(G)
 
@@ -193,11 +199,85 @@ func (i *IP) Create() (*IPProof, error) {
 	}
 
 	return &IPProof{
-		L: Lj,
-		R: Rj,
-		a: i.a[len(i.a)-1],
-		b: i.b[len(i.b)-1],
+		IP: *i,
+		L:  Lj,
+		R:  Rj,
+		a:  i.a[len(i.a)-1],
+		b:  i.b[len(i.b)-1],
 	}, nil
+}
+
+// taken from rust implementation
+func (i *IPProof) verifScalars() ([]ristretto.Scalar, []ristretto.Scalar, []ristretto.Scalar) {
+	// generate scalars for verification
+
+	if len(i.L) != len(i.R) {
+		return nil, nil, nil
+	}
+
+	lgN := len(i.L)
+	n := uint32(1 << uint(lgN))
+
+	hs := hashCacher{[]byte{}}
+
+	// 1. compute x's
+	xChals := make([]ristretto.Scalar, 0, lgN)
+	for k := range i.L {
+		hs.Append(i.L[k].Bytes(), i.R[k].Bytes())
+		xChals = append(xChals, hs.Derive())
+	}
+
+	// 2. compute inverse of x's
+	invXChals := make([]ristretto.Scalar, 0, lgN)
+
+	var invProd ristretto.Scalar // this will be the product of all of the inverses
+	invProd.SetOne()
+
+	for k := range xChals {
+
+		var xinv ristretto.Scalar
+		xinv.Inverse(&xChals[k])
+
+		invProd.Mul(&invProd, &xinv)
+
+		invXChals = append(invXChals, xinv)
+	}
+
+	// 3. compute x^2 and inv(x)^2
+	chalSq := make([]ristretto.Scalar, 0, lgN)
+	invChalSq := make([]ristretto.Scalar, 0, lgN)
+
+	for k := range xChals {
+		var sq ristretto.Scalar
+		var invSq ristretto.Scalar
+
+		sq.Square(&xChals[k])
+		invSq.Square(&invXChals[k])
+
+		chalSq = append(chalSq, sq)
+		invChalSq = append(invChalSq, invSq)
+	}
+
+	// 4. compute s
+
+	s := make([]ristretto.Scalar, 0, n)
+
+	// push the inverse product
+	s = append(s, invProd)
+
+	for i := uint32(1); i < n; i++ {
+
+		lgI := 32 - 1 - bits.LeadingZeros32(i)
+		k := uint32(1 << uint(lgI))
+
+		uLgISq := chalSq[(lgN-1)-lgI]
+
+		var sRes ristretto.Scalar
+		sRes.Mul(&s[i-k], &uLgISq)
+		s = append(s, sRes)
+	}
+
+	return chalSq, invChalSq, s
 }
 
 func isPower2(n uint32) bool {
