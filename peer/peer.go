@@ -257,6 +257,28 @@ loop:
 			p.OnGetData(msg)
 		case *payload.MsgTx:
 			p.OnTx(msg)
+		case *payload.MsgBinary:
+			p.OnBinary(msg)
+		case *payload.MsgCandidate:
+			p.OnCandidate(msg)
+		case *payload.MsgCertificate:
+			p.OnCertificate(msg)
+		case *payload.MsgCertificateReq:
+			p.OnCertificateReq(msg)
+		case *payload.MsgMemPool:
+			p.OnMemPool(msg)
+		case *payload.MsgNotFound:
+			p.OnNotFound(msg)
+		case *payload.MsgPing:
+			p.OnPing(msg)
+		case *payload.MsgPong:
+			p.OnPong(msg)
+		case *payload.MsgReduction:
+			p.OnReduction(msg)
+		case *payload.MsgReject:
+			p.OnReject(msg)
+		case *payload.MsgScore:
+			p.OnScore(msg)
 		default:
 			fmt.Println("Cannot recognise message", msg.Command()) //Do not disconnect peer, just Log Message
 		}
@@ -286,6 +308,7 @@ func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 		fmt.Println("That was an getdata Message please pass func down through config", msg.Command())
 	}
 }
+
 func (p *Peer) OnTx(msg *payload.MsgTx) {
 
 	p.inch <- func() {
@@ -316,7 +339,6 @@ func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
 			p.config.OnGetHeaders(msg)
 		}
 		fmt.Println("That was a getheaders message, please pass func down through config", msg.Command())
-
 	}
 }
 
@@ -327,7 +349,6 @@ func (p *Peer) OnAddr(msg *payload.MsgAddr) {
 			p.config.OnAddr(p, msg)
 		}
 		fmt.Println("That was a addr message, please pass func down through config", msg.Command())
-
 	}
 }
 
@@ -338,7 +359,6 @@ func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
 			p.config.OnGetAddr(p, msg)
 		}
 		fmt.Println("That was a getaddr message, please pass func down through config", msg.Command())
-
 	}
 }
 
@@ -358,6 +378,7 @@ func (p *Peer) OnBlocks(msg *payload.MsgBlock) {
 		if p.config.OnBlock != nil {
 			p.config.OnBlock(p, msg)
 		}
+		fmt.Println("That was a blocks message, please pass func down through config", msg.Command())
 	}
 }
 
@@ -379,11 +400,121 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 
 // OnHeaders Listener
 func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
-	fmt.Println("We have received the headers")
 	p.inch <- func() {
 		if p.config.OnHeader != nil {
 			p.config.OnHeader(p, msg)
 		}
+		fmt.Println("That was a headers message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnBinary Listener
+func (p *Peer) OnBinary(msg *payload.MsgBinary) {
+	p.inch <- func() {
+		if p.config.OnBinary != nil {
+			p.config.OnBinary(p, msg)
+		}
+		fmt.Println("That was a binary message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnCandidate Listener
+func (p *Peer) OnCandidate(msg *payload.MsgCandidate) {
+	p.inch <- func() {
+		if p.config.OnCandidate != nil {
+			p.config.OnCandidate(p, msg)
+		}
+		fmt.Println("That was a candidate message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnCertificate Listener
+func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
+	p.inch <- func() {
+		if p.config.OnCertificate != nil {
+			p.config.OnCertificate(p, msg)
+		}
+		fmt.Println("That was a certificate message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnCertificateReq Listener
+func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
+	p.inch <- func() {
+		if p.config.OnCertificateReq != nil {
+			p.config.OnCertificateReq(p, msg)
+		}
+		fmt.Println("That was a certificatereq message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnMemPool Listener
+func (p *Peer) OnMemPool(msg *payload.MsgMemPool) {
+	p.inch <- func() {
+		if p.config.OnMemPool != nil {
+			p.config.OnMemPool(p, msg)
+		}
+		fmt.Println("That was a mempool message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnNotFound Listener
+func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
+	p.inch <- func() {
+		if p.config.OnNotFound != nil {
+			p.config.OnNotFound(p, msg)
+		}
+		fmt.Println("That was a notfound message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnPing Listener
+func (p *Peer) OnPing(msg *payload.MsgPing) {
+	p.inch <- func() {
+		if p.config.OnPing != nil {
+			p.config.OnPing(p, msg)
+		}
+		fmt.Println("That was a ping message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnPong Listener
+func (p *Peer) OnPong(msg *payload.MsgPong) {
+	p.inch <- func() {
+		if p.config.OnPong != nil {
+			p.config.OnPong(msg)
+		}
+		fmt.Println("That was a pong message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnReduction Listener
+func (p *Peer) OnReduction(msg *payload.MsgReduction) {
+	p.inch <- func() {
+		if p.config.OnReduction != nil {
+			p.config.OnReduction(p, msg)
+		}
+		fmt.Println("That was a reduction message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnReject Listener
+func (p *Peer) OnReject(msg *payload.MsgReject) {
+	p.inch <- func() {
+		if p.config.OnReject != nil {
+			p.config.OnReject(p, msg)
+		}
+		fmt.Println("That was a reject message, please pass func down through config", msg.Command())
+	}
+}
+
+// OnScore Listener
+func (p *Peer) OnScore(msg *payload.MsgScore) {
+	p.inch <- func() {
+		if p.config.OnScore != nil {
+			p.config.OnScore(p, msg)
+		}
+		fmt.Println("That was a score message, please pass func down through config", msg.Command())
 	}
 }
 
