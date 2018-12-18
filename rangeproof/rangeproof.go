@@ -6,6 +6,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/fiatshamir"
+	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/innerproduct"
 	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/pedersen"
 	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/vector"
 	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
@@ -39,7 +41,7 @@ type Proof struct {
 	l []ristretto.Scalar // []scalar
 	r []ristretto.Scalar // []scalar
 
-	IPProof *IPProof
+	IPProof *innerproduct.Proof
 }
 
 // Prove will take a scalar as a parameter and
@@ -58,7 +60,7 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 	ped := pedersen.New([]byte("dusk.BulletProof.vec1"))
 
 	// Hash for Fiat-Shamir
-	hs := hashCacher{cache: []byte{}}
+	hs := fiatshamir.HashCacher{[]byte{}}
 
 	for _, amount := range v {
 		// compute commmitment to v
@@ -122,7 +124,7 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 	if err != nil {
 		return Proof{}, errors.Wrap(err, "[Prove] - r")
 	}
-	t, err := innerProduct(l, r)
+	t, err := vector.InnerProduct(l, r)
 	if err != nil {
 		return Proof{}, errors.Wrap(err, "[Prove] - t")
 	}
@@ -162,25 +164,13 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 	hs.Append(x.Bytes(), taux.Bytes(), mu.Bytes(), t.Bytes())
 
 	// TODO: calculate inner product proof
-	u := ristretto.Point{}
+	Q := ristretto.Point{}
 	w := hs.Derive()
-	u.ScalarMult(&ped.BaseVector.Bases[0], &w)
+	Q.ScalarMult(&ped.BaseVector.Bases[0], &w)
 
-	var yinv ristretto.Scalar
-	yinv.Inverse(&y)
-	yinvNM := vector.ScalarPowers(yinv, uint32(N*M))
+	Hpf := vector.ScalarPowers(y, uint32(N*M))
 
-	bprime := make([]ristretto.Scalar, 0)
-	for i := range r {
-		yinvNM[i].Mul(&r[i], &yinvNM[i])
-		bprime = append(bprime, yinvNM[i])
-	}
-
-	ip, err := NewIP(ped.BaseVector.Bases[1:], ped.BaseVector.Bases[1:], l, bprime, u)
-	if err != nil {
-		return Proof{}, errors.Wrap(err, "[Prove] - IP")
-	}
-	ipproof, err := ip.Create()
+	ip, err := innerproduct.Generate(ped.BaseVector.Bases[1:], ped.BaseVector.Bases[1:], l, r, Hpf, Q)
 	if err != nil {
 		return Proof{}, errors.Wrap(err, "[Prove] -  ipproof")
 	}
@@ -196,7 +186,7 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 		t:       t,
 		taux:    taux,
 		mu:      mu,
-		IPProof: ipproof,
+		IPProof: ip,
 	}, nil
 }
 
@@ -227,7 +217,7 @@ func computeS(ped *pedersen.Pedersen) (pedersen.Commitment, []ristretto.Scalar, 
 	return cS, sL, sR
 }
 
-func computeYAndZ(hs hashCacher) (ristretto.Scalar, ristretto.Scalar) {
+func computeYAndZ(hs fiatshamir.HashCacher) (ristretto.Scalar, ristretto.Scalar) {
 
 	var y ristretto.Scalar
 	y.Derive(hs.Result())
@@ -237,7 +227,7 @@ func computeYAndZ(hs hashCacher) (ristretto.Scalar, ristretto.Scalar) {
 
 	return y, z
 }
-func computeX(hs hashCacher) ristretto.Scalar {
+func computeX(hs fiatshamir.HashCacher) ristretto.Scalar {
 	var x ristretto.Scalar
 	x.Derive(hs.Result())
 	return x
@@ -440,7 +430,7 @@ func Verify(p Proof) (bool, error) {
 	}
 
 	// Reconstruct the challenges
-	hs := hashCacher{[]byte{}}
+	hs := fiatshamir.HashCacher{[]byte{}}
 	for _, V := range p.V {
 		hs.Append(V.Value.Bytes())
 	}
@@ -456,7 +446,7 @@ func Verify(p Proof) (bool, error) {
 	c.Rand()
 
 	// compute l dot r
-	t, err := innerProduct(p.l, p.r)
+	t, err := vector.InnerProduct(p.l, p.r)
 	if err != nil {
 		return false, errors.Wrap(err, "[Verify] - t")
 	}
@@ -481,7 +471,13 @@ func Verify(p Proof) (bool, error) {
 
 	// Start of megacheck
 
-	xSq, xInvSq, s := p.IPProof.verifScalars()
+	xSq, xInvSq, s := p.IPProof.VerifScalars()
+	sInv := make([]ristretto.Scalar, len(s))
+	copy(sInv, s)
+	// reverse s
+	for i, j := 0, len(sInv)-1; i < j; i, j = i+1, j-1 {
+		sInv[i], sInv[j] = sInv[j], sInv[i]
+	}
 
 	scalars := make([]ristretto.Scalar, 0)
 	points := make([]ristretto.Point, 0)
@@ -527,7 +523,7 @@ func Verify(p Proof) (bool, error) {
 
 	var tMinAB ristretto.Scalar
 	var ab ristretto.Scalar
-	ab.Mul(&p.IPProof.a, &p.IPProof.a)
+	ab.Mul(&p.IPProof.A, &p.IPProof.B)
 	tMinAB.Sub(&p.t, &ab)
 
 	var bpScal ristretto.Scalar
@@ -535,20 +531,20 @@ func Verify(p Proof) (bool, error) {
 	scalars = append(scalars, bpScal)
 
 	// -z1 - as = g
-	as := vector.MulScalar(s, p.IPProof.a)
+	as := vector.MulScalar(s, p.IPProof.A)
 	var minusZ ristretto.Scalar
 	minusZ.Neg(&z)
 	g := vector.AddScalar(as, minusZ)
 	scalars = append(scalars, g...)
 
-	// h =  (z + y^-nm) Had ( z^2 *(z^0 * 2^n ... z^m-1 * 2^n)- b/s) = zy Had (zAnd2 - bs)
+	// h =  (z + y^-nm) Had ( z^2 *(z^0 * 2^n ... z^m-1 * 2^n)- b/s) = zy Had (zAnd2 - bsInv)
 	var yinv ristretto.Scalar
 	yinv.Inverse(&y)
 	yinvNM := vector.ScalarPowers(yinv, uint32(N*M))
 	zy := vector.AddScalar(yinvNM, z)
 
 	zAnd2 := sumZMTwoN(z)
-	bs := vector.MulScalar(s, p.IPProof.b)
+	bs := vector.MulScalar(sInv, p.IPProof.B)
 
 	zAnd2SubBs, err := vector.Sub(zAnd2, bs)
 	if err != nil {

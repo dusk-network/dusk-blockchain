@@ -130,7 +130,7 @@ func TestScInverse(t *testing.T) {
 		bi1.Rand(rnd, &biL)
 		bi2.ModInverse(&bi1, &biL)
 		s1.SetBigInt(&bi1)
-		if s1.Inverse().BigInt().Cmp(&bi2) != 0 {
+		if s1.Inverse(&s1).BigInt().Cmp(&bi2) != 0 {
 			t.Fatalf("1/%v = %v", &bi1, &bi2)
 		}
 	}
@@ -230,7 +230,7 @@ func BenchmarkScSquare(b *testing.B) {
 func BenchmarkScInverse(b *testing.B) {
 	var s ristretto.Scalar
 	for n := 0; n < b.N; n++ {
-		s.Inverse()
+		s.Inverse(&s)
 	}
 }
 
