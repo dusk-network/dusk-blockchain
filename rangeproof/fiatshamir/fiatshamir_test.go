@@ -1,4 +1,4 @@
-package rangeproof
+package fiatshamir
 
 import (
 	"testing"
@@ -6,15 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEmptyHashCacher(t *testing.T) {
-	hs := hashCacher{cache: []byte{}}
+func TestEmptyfiatshamir.HashCacher(t *testing.T) {
+	hs := fiatshamir.HashCacher{cache: []byte{}}
 	assert.Equal(t, []byte{}, hs.Result())
 }
-func TestHashCacher(t *testing.T) {
+func Testfiatshamir.HashCacher(t *testing.T) {
 
 	arr := []string{"hello", "world", "good", "bye"}
 
-	hs := hashCacher{cache: []byte{}}
+	hs := fiatshamir.HashCacher{cache: []byte{}}
 
 	expected := ""
 
