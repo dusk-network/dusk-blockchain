@@ -48,17 +48,17 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) (*pol
 	}
 
 	// calculate t0 // t_0 = <l_0, r_0>
-	t0, err := innerProduct(l0, r0)
+	t0, err := vector.InnerProduct(l0, r0)
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - t0")
 	}
 
 	// calculate t1 // t_1 = <l_0, r_1> + <l_1, r_0>
-	t1Left, err := innerProduct(l1[:], r0[:])
+	t1Left, err := vector.InnerProduct(l1[:], r0[:])
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - t1Left")
 	}
-	t1Right, err := innerProduct(l0, r1)
+	t1Right, err := vector.InnerProduct(l0, r1)
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - t1Right")
 	}
@@ -66,7 +66,7 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) (*pol
 	t1.Add(&t1Left, &t1Right)
 
 	// calculate t2 // t_2 = <l_1, r_1>
-	t2, err := innerProduct(l1[:], r1[:])
+	t2, err := vector.InnerProduct(l1[:], r1[:])
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - t2")
 	}

@@ -51,7 +51,7 @@ func debugT0(aL, aR []ristretto.Scalar, y, z ristretto.Scalar) ristretto.Scalar 
 
 	rightIP, _ := vector.Add(zMTwoN, hada)
 
-	iP, _ := innerProduct(aLMinusZ, rightIP)
+	iP, _ := vector.InnerProduct(aLMinusZ, rightIP)
 
 	return iP
 }

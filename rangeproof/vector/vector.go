@@ -78,6 +78,23 @@ func MulScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 	return res
 }
 
+// Given two scalar arrays, construct the inner product
+func InnerProduct(a, b []ristretto.Scalar) (ristretto.Scalar, error) {
+
+	res := ristretto.Scalar{}
+	res.SetZero()
+
+	if len(a) != len(b) {
+		return res, errors.New("[Inner Product]:Length of a does not equal length of b")
+	}
+
+	for i := 0; i < len(a); i++ {
+		res.MulAdd(&a[i], &b[i], &res)
+	}
+
+	return res, nil
+}
+
 // Exp exponentiates and sums a vector a to b, creating a commitment
 func Exp(a []ristretto.Scalar, b []ristretto.Point, N, M int) (ristretto.Point, error) {
 	result := ristretto.Point{} // defaults to zero
