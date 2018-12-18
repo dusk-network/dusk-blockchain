@@ -19,7 +19,7 @@ var (
 	netPrefix = byte(0xEF)
 )
 
-// Key represents the ed25519 32 byte private/public spend/view keys
+// Key represents the 32 byte private/public spend/view keys
 type Key struct {
 	PrivateSpend *ristretto.Scalar // 32 byte
 	PublicSpend  *ristretto.Point  // 32 byte

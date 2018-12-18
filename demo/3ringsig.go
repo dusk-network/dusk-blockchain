@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/ringsig/mlsag"
+	"gitlab.dusk.network/dusk-core/dusk-go/core//transactions/ringsig/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
 )
 
