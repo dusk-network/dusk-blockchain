@@ -8,10 +8,10 @@ import (
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/wire/payload"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
 )
 
 // Payload defines the message payload.
@@ -22,8 +22,8 @@ type Payload interface {
 }
 
 // WriteMessage will write a Dusk wire message to w.
-func WriteMessage(w io.Writer, magic uint32, p Payload) error {
-	if err := encoding.PutUint32(w, binary.LittleEndian, magic); err != nil {
+func WriteMessage(w io.Writer, magic protocol.DuskNetwork, p Payload) error {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, uint32(magic)); err != nil {
 		return err
 	}
 
@@ -43,11 +43,11 @@ func WriteMessage(w io.Writer, magic uint32, p Payload) error {
 		return err
 	}
 
-	if err := encoding.PutUint32(w, binary.LittleEndian, payloadLength); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, payloadLength); err != nil {
 		return err
 	}
 
-	if err := encoding.PutUint32(w, binary.LittleEndian, checksum); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, checksum); err != nil {
 		return err
 	}
 
@@ -58,8 +58,8 @@ func WriteMessage(w io.Writer, magic uint32, p Payload) error {
 	return nil
 }
 
-// ReadMessage will read a Dusk wire message from r and return the payload.
-func ReadMessage(r io.Reader, magic uint32) (Payload, error) {
+// ReadMessage will read a Dusk wire message from r and return the associated payload.
+func ReadMessage(r io.Reader, magic protocol.DuskNetwork) (Payload, error) {
 	buf := make([]byte, HeaderSize)
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return nil, err
@@ -106,14 +106,48 @@ func ReadMessage(r io.Reader, magic uint32) (Payload, error) {
 		m := payload.NewMsgGetData()
 		err := m.Decode(payloadBuf)
 		return m, err
-	// case commands.GetBlocks:
+	case commands.GetBlocks:
+		m := &payload.MsgGetBlocks{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.GetHeaders:
+		m := &payload.MsgGetHeaders{}
+		err := m.Decode(payloadBuf)
+		return m, err
 	case commands.Tx:
 		m := &payload.MsgTx{}
 		err := m.Decode(payloadBuf)
 		return m, err
 	// case commands.Block:
+	// case commands.Headers:
+	case commands.MemPool:
+		return payload.NewMsgMemPool(), nil
 	case commands.Inv:
 		m := payload.NewMsgInv()
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.CertificateReq:
+		m := &payload.MsgCertificateReq{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Certificate:
+		m := &payload.MsgCertificate{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Score:
+		m := &payload.MsgScore{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Candidate:
+		m := &payload.MsgCandidate{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Reduction:
+		m := &payload.MsgReduction{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Binary:
+		m := &payload.MsgBinary{}
 		err := m.Decode(payloadBuf)
 		return m, err
 	case commands.NotFound:

@@ -31,7 +31,16 @@ func (m *MsgGetData) AddTx(tx transactions.Stealth) {
 	m.Vectors = append(m.Vectors, vect)
 }
 
-// AddBlock (add when block structure is defined)
+// AddBlock will add a block inventory vector to MsgGetData.
+func (m *MsgGetData) AddBlock(hash []byte) {
+	// Finish this when block structure is defined.
+	vect := InvVect{
+		Type: InvBlock,
+		Hash: hash,
+	}
+
+	m.Vectors = append(m.Vectors, vect)
+}
 
 // Encode a MsgGetData struct and write to w.
 // Implements payload interface.
@@ -41,11 +50,11 @@ func (m *MsgGetData) Encode(w io.Writer) error {
 	}
 
 	for _, vect := range m.Vectors {
-		if err := encoding.PutUint8(w, uint8(vect.Type)); err != nil {
+		if err := encoding.WriteUint8(w, uint8(vect.Type)); err != nil {
 			return err
 		}
 
-		if err := encoding.WriteHash(w, vect.Hash); err != nil {
+		if err := encoding.Write256(w, vect.Hash); err != nil {
 			return err
 		}
 	}
@@ -63,8 +72,8 @@ func (m *MsgGetData) Decode(r io.Reader) error {
 
 	m.Vectors = make([]InvVect, n)
 	for i := uint64(0); i < n; i++ {
-		t, err := encoding.Uint8(r)
-		if err != nil {
+		var t uint8
+		if err := encoding.ReadUint8(r, &t); err != nil {
 			return err
 		}
 
@@ -72,14 +81,9 @@ func (m *MsgGetData) Decode(r io.Reader) error {
 			return fmt.Errorf("invalid inventory vector type %v", t)
 		}
 
-		h, err := encoding.ReadHash(r)
-		if err != nil {
+		m.Vectors[i].Type = InvType(t)
+		if err := encoding.Read256(r, &m.Vectors[i].Hash); err != nil {
 			return err
-		}
-
-		m.Vectors[i] = InvVect{
-			Type: InvType(t),
-			Hash: h,
 		}
 	}
 

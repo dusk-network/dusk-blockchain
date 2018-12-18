@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"testing"
 	"time"
 
@@ -100,6 +101,8 @@ func TestEncodeDecode(t *testing.T) {
 	if err := s.Encode(buf); err != nil {
 		t.Fatalf("%v", err)
 	}
+
+	fmt.Println(buf.Bytes())
 
 	// Deserialize
 	var newStealth Stealth

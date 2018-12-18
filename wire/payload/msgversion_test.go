@@ -5,11 +5,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
 )
 
 func TestMsgVersionEncodeDecode(t *testing.T) {
-	// TODO: add actual I2P address
-	msg := NewMsgVersion("placeholder")
+	pver := protocol.ProtocolVersion
+
+	addr1 := NewNetAddress("202.108.250.180", 9999)
+	addr2 := NewNetAddress("224.164.2.18", 9999)
+
+	msg := NewMsgVersion(pver, addr1, addr2)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {

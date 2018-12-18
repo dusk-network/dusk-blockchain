@@ -4,10 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/crypto/base58"
 	"gitlab.dusk.network/dusk-core/dusk-go/crypto/hash"
-
-	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/rpc"
 )
 
