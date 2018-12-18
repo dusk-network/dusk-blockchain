@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
 )
 
 func TestMsgVersionEncodeDecode(t *testing.T) {
-	var pver uint32
-	pver = 10000
+	pver := protocol.ProtocolVersion
 
 	addr1 := NewNetAddress("202.108.250.180", 9999)
 	addr2 := NewNetAddress("224.164.2.18", 9999)

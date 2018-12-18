@@ -5,9 +5,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/toghrulmaharramov/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 
-	"github.com/toghrulmaharramov/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
 )
 
 // MsgScore defines a score message on the Dusk wire protocol.

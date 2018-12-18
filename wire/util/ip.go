@@ -1,18 +1,17 @@
-package wire
+package util
 
 import (
 	"net"
 )
 
-// GetLocalIP will return the machine's external IP address as a string.
+// GetLocalIP will return the machine's external IP address.
 // https://stackoverflow.com/a/37382208
-func GetLocalIP() (string, error) {
+func GetLocalIP() (net.IP, error) {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP.String(), nil
+	return localAddr.IP, nil
 }
