@@ -10,10 +10,13 @@ import (
 func TestMsgAddrEncodeDecode(t *testing.T) {
 	msg := NewMsgAddr()
 
-	// TODO: add actual I2P addresses
-	msg.AddAddr("placeholder")
-	msg.AddAddr("placeholder2")
-	msg.AddAddr("placeholder3")
+	addr1 := NewNetAddress("224.176.128.1", 9999)
+	addr2 := NewNetAddress("224.164.2.18", 9999)
+	addr3 := NewNetAddress("202.108.250.180", 9999)
+
+	msg.AddAddr(addr1)
+	msg.AddAddr(addr2)
+	msg.AddAddr(addr3)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {

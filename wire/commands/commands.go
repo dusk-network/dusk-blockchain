@@ -4,26 +4,42 @@ package commands
 type Cmd string
 
 // Size is the size of a command field in bytes
-const Size = 12
+const Size = 14
 
 // A list of all valid protocol commands
 const (
-	Version   Cmd = "version"
-	VerAck    Cmd = "verack"
-	Ping      Cmd = "ping"
-	Pong      Cmd = "pong"
-	Addr      Cmd = "addr"
-	GetAddr   Cmd = "getaddr"
-	GetData   Cmd = "getdata"
-	GetBlocks Cmd = "getblocks"
-	Tx        Cmd = "tx"
-	Block     Cmd = "block"
-	Inv       Cmd = "inv"
-	NotFound  Cmd = "notfound"
-	Reject    Cmd = "reject"
+	// Standard commands
+	Version Cmd = "version"
+	VerAck  Cmd = "verack"
+	Ping    Cmd = "ping"
+	Pong    Cmd = "pong"
+
+	// Data exchange commands
+	Addr           Cmd = "addr"
+	GetAddr        Cmd = "getaddr"
+	GetData        Cmd = "getdata"
+	GetBlocks      Cmd = "getblocks"
+	GetHeaders     Cmd = "getheaders"
+	Tx             Cmd = "tx"
+	Block          Cmd = "block"
+	Headers        Cmd = "headers"
+	MemPool        Cmd = "mempool"
+	Inv            Cmd = "inv"
+	CertificateReq Cmd = "certificatereq"
+	Certificate    Cmd = "certificate"
+
+	// Consensus commands
+	Score     Cmd = "score"
+	Candidate Cmd = "candidate"
+	Reduction Cmd = "reduction"
+	Binary    Cmd = "binary"
+
+	// Error commands
+	NotFound Cmd = "notfound"
+	Reject   Cmd = "reject"
 )
 
-// CmdToByteArray turns a Cmd to a byte array of size 12,
+// CmdToByteArray turns a Cmd to a byte array of size 14,
 // to prepare it for sending over the wire protocol.
 func CmdToByteArray(cmd Cmd) [Size]byte {
 	bs := [Size]byte{}
@@ -34,7 +50,7 @@ func CmdToByteArray(cmd Cmd) [Size]byte {
 	return bs
 }
 
-// ByteArrayToCmd turns a byte array of size 12 into a Cmd,
+// ByteArrayToCmd turns a byte array of size 14 into a Cmd,
 // for populating a received message header.
 func ByteArrayToCmd(cmd [Size]byte) Cmd {
 	buf := []byte{}

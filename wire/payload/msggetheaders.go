@@ -7,24 +7,24 @@ import (
 	"github.com/toghrulmaharramov/dusk-go/wire/commands"
 )
 
-// MsgGetBlocks defines a getblocks message on the Dusk wire protocol.
-type MsgGetBlocks struct {
+// MsgGetHeaders defines a getheaders message on the Dusk wire protocol.
+type MsgGetHeaders struct {
 	Locator  []byte
 	HashStop []byte
 }
 
-// NewMsgGetBlocks returns a MsgGetBlocks struct with the specified
+// NewMsgGetHeaders returns a MsgGetHeaders struct with the specified
 // locator and stop hash.
-func NewMsgGetBlocks(locator []byte, stop []byte) *MsgGetBlocks {
-	return &MsgGetBlocks{
+func NewMsgGetHeaders(locator []byte, stop []byte) *MsgGetHeaders {
+	return &MsgGetHeaders{
 		Locator:  locator,
 		HashStop: stop,
 	}
 }
 
-// Encode a MsgGetBlocks struct and write to w.
+// Encode a MsgGetHeaders struct and write to w.
 // Implements payload interface.
-func (m *MsgGetBlocks) Encode(w io.Writer) error {
+func (m *MsgGetHeaders) Encode(w io.Writer) error {
 	if err := encoding.Write256(w, m.Locator); err != nil {
 		return err
 	}
@@ -36,9 +36,9 @@ func (m *MsgGetBlocks) Encode(w io.Writer) error {
 	return nil
 }
 
-// Decode a MsgGetBlocks from r.
+// Decode a MsgGetHeaders from r.
 // Implements payload interface.
-func (m *MsgGetBlocks) Decode(r io.Reader) error {
+func (m *MsgGetHeaders) Decode(r io.Reader) error {
 	if err := encoding.Read256(r, &m.Locator); err != nil {
 		return err
 	}
@@ -50,8 +50,8 @@ func (m *MsgGetBlocks) Decode(r io.Reader) error {
 	return nil
 }
 
-// Command returns the command string associated with the getblocks message.
+// Command returns the command string associated with the GetHeaders message.
 // Implements the Payload interface.
-func (m *MsgGetBlocks) Command() commands.Cmd {
-	return commands.GetBlocks
+func (m *MsgGetHeaders) Command() commands.Cmd {
+	return commands.GetHeaders
 }
