@@ -1,0 +1,2 @@
+# Block Reduction Phase
+### Preliminaries
