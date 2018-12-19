@@ -8,24 +8,28 @@ import (
 
 // MsgBlock defines a block message on the Dusk wire protocol.
 type MsgBlock struct {
-	BlockHeader []byte
-	// TODO: Block
+	Block *Block
 }
 
-// Finish this when block structure is defined.
+// NewMsgBlock will return a MsgBlock with the specified block
+// as it's contents.
+func NewMsgBlock(b *Block) *MsgBlock {
+	return &MsgBlock{
+		Block: b,
+	}
+}
 
 // Encode a MsgBlock struct and write to w.
 // Implements payload interface.
 func (m *MsgBlock) Encode(w io.Writer) error {
-	// Implement when Block structure is known
-	return nil
+	return m.Block.Encode(w)
 }
 
 // Decode a MsgBlock from r.
 // Implements payload interface.
 func (m *MsgBlock) Decode(r io.Reader) error {
-	// Implement when Block structure is known
-	return nil
+	m.Block = &Block{}
+	return m.Block.Decode(r)
 }
 
 // Command returns the command string associated with the MsgBlock message.

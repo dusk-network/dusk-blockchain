@@ -3,24 +3,62 @@ package payload
 import (
 	"io"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
 // MsgHeaders defines a headers message on the Dusk wire protocol.
 type MsgHeaders struct {
+	Headers []*BlockHeader
 }
 
-// Finish this when block structure is defined
+// NewMsgHeaders will return an empty MsgHeaders struct.
+func NewMsgHeaders() *MsgHeaders {
+	return &MsgHeaders{}
+}
+
+// AddHeader will add a block header to the MsgHeaders struct.
+func (m *MsgHeaders) AddHeader(header *BlockHeader) {
+	m.Headers = append(m.Headers, header)
+}
+
+// Clear the MsgHeaders struct.
+func (m *MsgHeaders) Clear() {
+	m.Headers = nil
+}
 
 // Encode implements payload interface.
 func (m *MsgHeaders) Encode(w io.Writer) error {
-	// Implement when Block structure is known
+	lHeaders := uint64(len(m.Headers))
+	if err := encoding.WriteVarInt(w, lHeaders); err != nil {
+		return err
+	}
+
+	for _, hdr := range m.Headers {
+		if err := hdr.Encode(w); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Decode implements payload interface.
 func (m *MsgHeaders) Decode(r io.Reader) error {
-	// Implement when Block structure is known
+	lHeaders, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return err
+	}
+
+	m.Headers = make([]*BlockHeader, lHeaders)
+	for i := uint64(0); i < lHeaders; i++ {
+		m.Headers[i] = &BlockHeader{}
+		if err := m.Headers[i].Decode(r); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
