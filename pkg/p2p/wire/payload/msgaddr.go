@@ -3,8 +3,8 @@ package payload
 import (
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // MsgAddr defines a Dusk wire message containing IP addresses

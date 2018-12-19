@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/rpc"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
 )
 
 // LoadConfig will load a config file into a Config struct,

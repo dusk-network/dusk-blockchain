@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
 // stall detector will keep track of all pendingMessages

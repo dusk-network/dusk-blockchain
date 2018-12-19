@@ -5,8 +5,8 @@ import (
 	"net"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/connmgr"
-	"gitlab.dusk.network/dusk-core/dusk-go/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	//"gitlab.dusk.network/dusk-core/dusk-go/syncmanager"
 )
 

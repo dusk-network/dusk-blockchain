@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/pedersen"
-	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/pedersen"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 func TestPedersenScalar(t *testing.T) {

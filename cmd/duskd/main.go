@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/rpc"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
 )
 
 var conf = flag.String("conf", "dusk.conf",

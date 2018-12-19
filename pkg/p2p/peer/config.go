@@ -1,8 +1,8 @@
 package peer
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 // LocalConfig specifies the properties that should be available for each remote peer

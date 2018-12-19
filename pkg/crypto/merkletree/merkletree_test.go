@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
 type TestPayload struct {

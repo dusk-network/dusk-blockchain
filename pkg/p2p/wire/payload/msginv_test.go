@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
 func TestMsgInvEncodeDecode(t *testing.T) {

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"math/bits"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/fiatshamir"
-	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/vector"
-	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/fiatshamir"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 // This is a reference of the innerProduct implementation at rust

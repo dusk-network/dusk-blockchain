@@ -3,7 +3,7 @@ package payload
 import (
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
 // MsgPing has no payload.

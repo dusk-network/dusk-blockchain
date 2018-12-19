@@ -1,8 +1,9 @@
 package payload
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
 	"io"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
 // MsgBlock defines a block message on the Dusk wire protocol.

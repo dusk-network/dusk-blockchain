@@ -6,9 +6,9 @@ import (
 	"math/rand"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/util/bytesutil"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/bytesutil"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 // RingSignature is the collection of signatures

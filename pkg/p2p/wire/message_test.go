@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 func TestWriteReadMessage(t *testing.T) {

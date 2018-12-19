@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
 // Data that can be stored and checked in the Merkletree.

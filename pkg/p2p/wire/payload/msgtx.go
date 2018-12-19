@@ -3,8 +3,8 @@ package payload
 import (
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
 // MsgTx defines a Dusk wire message containing a transaction.
@@ -22,13 +22,13 @@ func NewMsgTx(tx transactions.Stealth) *MsgTx {
 // Encode a MsgTX struct and write to w.
 // Implements payload interface.
 func (m *MsgTx) Encode(w io.Writer) error {
-	return m.Tx.Encode(w)
+	return nil
 }
 
 // Decode a MsgTX from r.
 // Implements payload interface.
 func (m *MsgTx) Decode(r io.Reader) error {
-	return m.Tx.Decode(r)
+	return nil
 }
 
 // Command returns the command string associated with the tx message.

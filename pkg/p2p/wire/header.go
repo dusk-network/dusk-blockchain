@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 // Header defines a Dusk wire message header.

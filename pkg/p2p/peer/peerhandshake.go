@@ -5,9 +5,9 @@ import (
 	"net"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/util"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
 
 func (p *Peer) Handshake() error {

@@ -4,7 +4,8 @@ package vrf
 
 import (
 	"bytes"
-	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 	"golang.org/x/crypto/sha3"
 )
 

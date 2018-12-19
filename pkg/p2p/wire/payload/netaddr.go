@@ -6,7 +6,7 @@ import (
 	"net"
 	"strconv"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // NetAddress holds an IP and a port number of a Dusk network peer.

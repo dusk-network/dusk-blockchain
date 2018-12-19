@@ -13,12 +13,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/peer/stall"
-	"gitlab.dusk.network/dusk-core/dusk-go/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/commands"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 const (

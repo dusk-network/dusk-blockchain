@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/crypto/base58"
-	"gitlab.dusk.network/dusk-core/dusk-go/crypto/hash"
-	"gitlab.dusk.network/dusk-core/dusk-go/rpc"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/base58"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
 )
 
 func TestMethod(t *testing.T) {
