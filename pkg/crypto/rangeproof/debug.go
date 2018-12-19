@@ -5,10 +5,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/vector"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/rangeproof/pedersen"
-	"gitlab.dusk.network/dusk-core/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/pedersen"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 // Put all debug functions here

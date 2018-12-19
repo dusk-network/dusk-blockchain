@@ -6,15 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEmptyfiatshamir.HashCacher(t *testing.T) {
-	hs := fiatshamir.HashCacher{cache: []byte{}}
+func TestEmptyHashCacher(t *testing.T) {
+	hs := HashCacher{[]byte{}}
 	assert.Equal(t, []byte{}, hs.Result())
 }
-func Testfiatshamir.HashCacher(t *testing.T) {
+func TestHashCacher(t *testing.T) {
 
 	arr := []string{"hello", "world", "good", "bye"}
 
-	hs := fiatshamir.HashCacher{cache: []byte{}}
+	hs := HashCacher{[]byte{}}
 
 	expected := ""
 
