@@ -10,38 +10,46 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
+// CertData holds a public address and a proof.
 type CertData struct {
 	PubAddress []byte // 32 bytes
 	Proof      []byte // 32 bytes
 }
 
+// Step defines the certificate information for a step in the consensus.
 type Step struct {
 	StepNum uint32
 	Data    []*CertData
 }
 
+// Certificate defines a block certificate made as a result from the consensus.
 type Certificate struct {
 	Signature []byte // Batched BLS signatures (32 bytes)
 	Steps     []*Step
 	Hash      []byte // Certificate hash (32 bytes)
 }
 
+// NewCertificate returns a Certificate struct with the provided signature.
 func NewCertificate(sig []byte) *Certificate {
 	return &Certificate{
 		Signature: sig,
 	}
 }
 
+// AddStep adds a step to the Certificate struct.
 func (c *Certificate) AddStep(step *Step) {
 	c.Steps = append(c.Steps, step)
 }
 
+// NewStep returns a Step struct with StepNum n.
 func NewStep(n uint32) *Step {
 	return &Step{
 		StepNum: n,
 	}
 }
 
+// AddData will add a combination of a public address and a proof as a CertData
+// struct into Step s.
 func (s *Step) AddData(pubAddr, proof []byte) {
 	data := &CertData{
 		PubAddress: pubAddr,
@@ -51,6 +59,7 @@ func (s *Step) AddData(pubAddr, proof []byte) {
 	s.Data = append(s.Data, data)
 }
 
+// SetHash will set the Certificate hash.
 func (c *Certificate) SetHash() error {
 	buf := new(bytes.Buffer)
 	if err := c.EncodeHashable(buf); err != nil {
@@ -66,6 +75,8 @@ func (c *Certificate) SetHash() error {
 	return nil
 }
 
+// EncodeHashable will encode all fields needed from the CertificateStruct to create
+// a certificate hash. Result will be written to w.
 func (c *Certificate) EncodeHashable(w io.Writer) error {
 	if err := encoding.Write256(w, c.Signature); err != nil {
 		return err
@@ -100,6 +111,7 @@ func (c *Certificate) EncodeHashable(w io.Writer) error {
 	return nil
 }
 
+// Encode a Certificate struct and write to w.
 func (c *Certificate) Encode(w io.Writer) error {
 	if err := c.EncodeHashable(w); err != nil {
 		return err
@@ -112,6 +124,7 @@ func (c *Certificate) Encode(w io.Writer) error {
 	return nil
 }
 
+// Decode a Certificate struct from r into c.
 func (c *Certificate) Decode(r io.Reader) error {
 	if err := encoding.Read256(r, &c.Signature); err != nil {
 		return err

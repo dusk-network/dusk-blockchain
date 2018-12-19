@@ -9,6 +9,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+// BlockHeader defines a block header on a Dusk block.
 type BlockHeader struct {
 	Timestamp int64  // Block timestamp
 	PrevBlock []byte // Hash of previous block (32 bytes)
@@ -19,6 +20,8 @@ type BlockHeader struct {
 	Hash []byte // Hash of this block
 }
 
+// SetHash will set this block header's hash by encoding all the relevant
+// fields and then hashing the result.
 func (b *BlockHeader) SetHash() error {
 	buf := new(bytes.Buffer)
 	if err := b.EncodeHashable(buf); err != nil {
@@ -34,6 +37,8 @@ func (b *BlockHeader) SetHash() error {
 	return nil
 }
 
+// EncodeHashable will encode all the fields needed from a BlockHeader to create
+// a block hash. Result will be written to w.
 func (b *BlockHeader) EncodeHashable(w io.Writer) error {
 	if err := encoding.WriteUint64(w, binary.LittleEndian, uint64(b.Timestamp)); err != nil {
 		return err
@@ -58,6 +63,7 @@ func (b *BlockHeader) EncodeHashable(w io.Writer) error {
 	return nil
 }
 
+// Encode a BlockHeader struct and write to w.
 func (b *BlockHeader) Encode(w io.Writer) error {
 	if err := b.EncodeHashable(w); err != nil {
 		return err
@@ -70,6 +76,7 @@ func (b *BlockHeader) Encode(w io.Writer) error {
 	return nil
 }
 
+// Decode a Blockheader struct from r into b.
 func (b *BlockHeader) Decode(r io.Reader) error {
 	var timestamp uint64
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &timestamp); err != nil {
