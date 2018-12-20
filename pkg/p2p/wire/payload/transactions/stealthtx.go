@@ -2,7 +2,6 @@ package transactions
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
@@ -176,22 +175,25 @@ func (s *Stealth) Decode(r io.Reader) error {
 
 // CalculateHash implements merkletree.Payload
 func (s Stealth) CalculateHash() ([]byte, error) {
-	if s.Hash == nil {
-		if err := s.SetHash(); err != nil {
-			return nil, fmt.Errorf("CalculateHash(): error setting tx hash - %v", err)
-		}
+	buf := new(bytes.Buffer)
+	if err := s.EncodeHashable(buf); err != nil {
+		return nil, err
 	}
 
-	return s.Hash, nil
+	return hash.Sha3256(buf.Bytes())
 }
 
 // Equals implements merkletree.Payload
 func (s Stealth) Equals(other merkletree.Payload) (bool, error) {
-	if s.Hash == nil {
-		if err := s.SetHash(); err != nil {
-			return false, fmt.Errorf("Equals(): error setting tx hash - %v", err)
-		}
+	h, err := s.CalculateHash()
+	if err != nil {
+		return false, err
 	}
 
-	return bytes.Compare(s.Hash, other.(Stealth).Hash) == 0, nil
+	otherHash, err := other.(Stealth).CalculateHash()
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Compare(h, otherHash) == 0, nil
 }
