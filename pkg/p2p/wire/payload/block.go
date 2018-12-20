@@ -3,7 +3,6 @@ package payload
 import (
 	"errors"
 	"io"
-	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
@@ -59,8 +58,8 @@ func (b *Block) SetPrevBlock(prevBlock *Block) error {
 }*/
 
 // SetTime will set the block timestamp.
-func (b *Block) SetTime() {
-	b.Header.Timestamp = time.Now().Unix()
+func (b *Block) SetTime(time int64) {
+	b.Header.Timestamp = time
 }
 
 // SetRoot will set the block merkle root hash.

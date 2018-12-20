@@ -3,6 +3,7 @@ package payload
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -106,7 +107,7 @@ func TestMsgInvEncodeDecodeBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	block.SetTime()
+	block.SetTime(time.Now().Unix())
 	if err := block.SetHash(); err != nil {
 		t.Fatal(err)
 	}
