@@ -22,24 +22,41 @@ type Block struct {
 // NewBlock will return an empty Block with an empty BlockHeader.
 func NewBlock() *Block {
 	return &Block{
-		Header: &BlockHeader{},
+		Header: &BlockHeader{
+			// CertImage should take up space from creation to
+			// ensure proper decoding during block selection.
+			CertImage: make([]byte, 32),
+		},
 	}
 }
 
 // SetPrevBlock will set all the fields of the Block struct that are
-// derived from the previous block.
+// taken from the previous block.
 func (b *Block) SetPrevBlock(prevBlock *Block) error {
+	b.Header.Height = prevBlock.Header.Height + 1
 	b.Header.PrevBlock = prevBlock.Header.Hash
-	// Set seed here properly once we know more about it
-	// For now, just hash the prevBlock seed
-	h, err := hash.Sha3256(prevBlock.Header.Seed)
+
+	// Remove when BLS code is completed
+	seedHash, err := hash.Sha3256(prevBlock.Header.Seed)
 	if err != nil {
 		return err
 	}
 
-	b.Header.Seed = h
+	b.Header.Seed = seedHash
 	return nil
 }
+
+// SetSeed will sign the previous block seed with a BLS signature and
+// put it in the block. Implement when BLS code is completed
+/*func (b *Block) SetSeed(prevSeed []byte, sk *bls.SecretKey) error {
+	sig, err := bls.Sign(sk, prevSeed)
+	if err != nil {
+		return err
+	}
+
+	b.Header.Seed = sig
+	return nil
+}*/
 
 // SetTime will set the block timestamp.
 func (b *Block) SetTime() {
