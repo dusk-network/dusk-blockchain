@@ -4,17 +4,16 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/toghrulmaharramov/dusk-go/crypto/hash"
+	"gitlab.com/dusk-go/crypto/hash"
 )
 
-// Data that can be stored and checked in the Merkletree.
-// Types implementing this interface can be items of the Merkletree
+// Payload represents the data that can be stored and checked in the Merkletree.
 type Payload interface {
 	CalculateHash() ([]byte, error)
 	Equals(other Payload) (bool, error)
 }
 
-// Merkletree struct representing the data structure.
+// Tree struct representing the Merkletree data structure.
 // It includes a pointer to the Root of the tree, list of pointers to the Leaves and the MerkleRoot
 type Tree struct {
 	Root       *Node
@@ -22,7 +21,7 @@ type Tree struct {
 	Leaves     []*Node
 }
 
-// The Node of the Merkletree which includes pointers to the Parent, the immediate Left and Right children
+// Node of the Merkletree which includes pointers to the Parent, the immediate Left and Right children
 // and whether it is a leaf or not
 type Node struct {
 	Parent *Node
@@ -54,7 +53,7 @@ func VerifyNode(n *Node) ([]byte, error) {
 	return hash.Sha3256(append(leftBytes, rightBytes...))
 }
 
-// Helper for calculating the hash of a node
+// CalculateNodeHash is the helper for calculating the hash of a node
 func CalculateNodeHash(n *Node) ([]byte, error) {
 	if n.IsLeaf {
 		return n.Data.CalculateHash()
@@ -63,7 +62,7 @@ func CalculateNodeHash(n *Node) ([]byte, error) {
 	return hash.Sha3256(append(n.Left.Hash, n.Right.Hash...))
 }
 
-// Constructor-like function for a Merkletree using the Payload/Content pl
+// NewTree is the constructor-like function for a Merkletree using the Payload/Content pl
 func NewTree(pl []Payload) (*Tree, error) {
 	root, leaves, err := create(pl)
 	if err != nil {
@@ -77,7 +76,7 @@ func NewTree(pl []Payload) (*Tree, error) {
 	}, nil
 }
 
-// Helper to map the Payload array recursively into a Hash tree with a root and a set of leaf nodes
+// create is the helper to map the Payload array recursively into a Hash tree with a root and a set of leaf nodes
 // returns an error if the Payload array is empty
 func create(pl []Payload) (*Node, []*Node, error) {
 	if len(pl) == 0 {
@@ -116,7 +115,7 @@ func create(pl []Payload) (*Node, []*Node, error) {
 	return root, leaves, nil
 }
 
-// Helper function that for a set of leafs nodes, recursively builds the intermediate and root level of a Tree. Returns the resulting root node
+// createIntermediate is the helper function that for a set of leafs nodes, recursively builds the intermediate and root level of a Tree. Returns the resulting root node
 func createIntermediate(nl []*Node) (*Node, error) {
 	var nodes []*Node
 	for i := 0; i < len(nl); i += 2 {
@@ -149,7 +148,7 @@ func createIntermediate(nl []*Node) (*Node, error) {
 	return createIntermediate(nodes)
 }
 
-// Helper to rebuild a Tree with only the Data contained in the leafs
+// RebuildTree is an helper to rebuild a Tree with only the Data contained in the leafs
 func (t *Tree) RebuildTree() error {
 	var pl []Payload
 	for _, node := range t.Leaves {
@@ -159,7 +158,7 @@ func (t *Tree) RebuildTree() error {
 	return t.RebuildTreeUsing(pl)
 }
 
-// Helper to replace the Data in the Markletree and rebuild the Tree entirely
+// RebuildTreeUsing is the helper to replace the Data in the Markletree and rebuild the Tree entirely
 // The root gets replaced but the Merkletree survives the operation
 // Returns an error if there is no payload
 func (t *Tree) RebuildTreeUsing(pl []Payload) error {
@@ -174,7 +173,7 @@ func (t *Tree) RebuildTreeUsing(pl []Payload) error {
 	return nil
 }
 
-// Verify each Node's hash and check if the resulted root hash is correct compared to the reported root hash of the merkle tree
+// VerifyTree verifies each Node's hash and check if the resulted root hash is correct compared to the reported root hash of the merkle tree
 func VerifyTree(t *Tree) (bool, error) {
 	calculatedRoot, err := VerifyNode(t.Root)
 	if err != nil {
@@ -188,6 +187,7 @@ func VerifyTree(t *Tree) (bool, error) {
 	return false, nil
 }
 
+// VerifyContent is the Merkletree struct function used to verify the content carried by the merkletree
 func (t *Tree) VerifyContent(data Payload) (bool, error) {
 	for _, leaf := range t.Leaves {
 		ok, err := leaf.Data.Equals(data)
