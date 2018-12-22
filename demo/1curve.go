@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/toghrulmaharramov/dusk-go/ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 // func main() {

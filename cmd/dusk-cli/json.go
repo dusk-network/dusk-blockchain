@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/toghrulmaharramov/dusk-go/rpc"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
 )
 
 // MarshalCmd simply puts the passed parameters into a Request struct

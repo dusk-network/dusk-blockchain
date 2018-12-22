@@ -1,54 +1,41 @@
-#Encoding
+# Encoding
 
-The encoding library provides methods to serialize different data types for storage and transfer over the wire protocol.
-The library is mostly built to enhance performance of the operations needed to do this. Though not standard, I believe
-this way of setting it up will end up increasing performance quite a bit for the software as it is running - for example
-while a node will be synchronizing (deserializing a lot of blocks until it is up to the current height) or just while
-it is validating, especially once the network will start to increase in size (serializing blocks with great amounts
-of transactions).
+The encoding library provides methods to serialize different data types for storage and transfer over the wire protocol. The library wraps around the standard `Read` and `Write` functions of an `io.Reader` or `io.Writer`, to provide simple methods for any basic data type. The library is built to mimick the way the `binary.Read` and `binary.Write` functions work, but aims to simplify the code to gain processing speed, and avoid reflection-based encoding/decoding. As a general rule, for encoding a variable, you should pass it by value, and for decoding a value, you should pass it by reference. For an example of this, please refer to the tests or any implementation of this library in the codebase.
 
-As a result of this, some readability is sacrificed (it's quite a ways around the standard library methods for 
-serializing binary data), and consequently the usage is a little bit different from Go standards. However I believe the 
-efficiency tradeoff here is definitely worth the workaround, especially so when the network increases in size.
+## Methods
 
-##Methods
+### Integers (integers.go)
 
-###Integers (integers.go)
-
-####Standard
-
-Functions are provided for integers of any size (between 8 and 64 bit). All integers will need to be passed and 
-retrieved as their unsigned format. Signed integers can be converted to and from their unsigned format by simple type 
-conversion. Integer serialization makes use of a free list of buffers.
+Functions are provided for integers of any size (between 8 and 64 bit). All integers will need to be passed and retrieved as their unsigned format. Signed integers can be converted to and from their unsigned format by simple type conversion.
 
 The functions are declared like this:
 
 **Reading**
-- `Uint8(r io.Reader) (uint8, error)`
-- `Uint16(r io.Reader, o binary.ByteOrder) (uint16, error)`
-- `Uint32(r io.Reader, o binary.ByteOrder) (uint32, error)`
-- `Uint64(r io.Reader, o binary.ByteOrder) (uint64, error)`
+- `ReadUint8(r io.Reader, v *uint8) error`
+- `ReadUint16(r io.Reader, o binary.ByteOrder, v *uint16) error`
+- `ReadUint32(r io.Reader, o binary.ByteOrder, v *uint32) error`
+- `ReadUint64(r io.Reader, o binary.ByteOrder, v *uint64) error`
 
 **Writing**
-- `PutUint8(w io.Writer, v uint8) error`
-- `PutUint16(w io.Writer, o binary.ByteOrder, v uint16) error`
-- `PutUint32(w io.Writer, o binary.ByteOrder, v uint32) error`
-- `PutUint64(w io.Writer, o binary.ByteOrder, v uint64) error`
+- `WriteUint8(w io.Writer, v uint8) error`
+- `WriteUint16(w io.Writer, o binary.ByteOrder, v uint16) error`
+- `WriteUint32(w io.Writer, o binary.ByteOrder, v uint32) error`
+- `WriteUint64(w io.Writer, o binary.ByteOrder, v uint64) error`
 
 Usage of this module will be as follows. Let's take a uint64 for example:
 
 ```go
+// Error handling omitted for clarity
 var x uint64 = 5
 
 buf := new(bytes.Buffer)
 
 err := encoding.PutUint64(buf, binary.LittleEndian, x)
-// Handle error
 
 // buf.Bytes() = [5 0 0 0 0 0 0 0]
 
-y, err := encoding.Uint64(buf, binary.LittleEndian)
-// Handle error
+var y uint64
+err := encoding.Uint64(buf, binary.LittleEndian, &y)
 
 // y = 5
 ```
@@ -56,58 +43,88 @@ y, err := encoding.Uint64(buf, binary.LittleEndian)
 For an int64 you would write:
 
 ```go
+// Error handling omitted for clarity
 var x int64 = -5
 
 buf := new(bytes.Buffer)
 
 err := encoding.PutUint64(buf, binary.LittleEndian, uint64(x))
-// Handle error
 
 // buf.Bytes() = [251 255 255 255 255 255 255 255]
 
-uy, err := encoding.Uint64(buf, binary.LittleEndian)
-// Handle error
+var y uint64
+err := encoding.Uint64(buf, binary.LittleEndian, &y)
+z := int64(y)
 
-y := int64(uy)
-
-// y = -5
+// z = -5
 ```
 
-####CompactSize
+The encoding module uses this same function template for all other data structures, *except for CompactSize integers*, which are explained below.
+
+### CompactSize integers (varint.go)
 
 The library provides an implementation of CompactSize integers as described in the 
 [Bitcoin Developer Reference](https://bitcoin.org/en/developer-reference#compactsize-unsigned-integers).
 The functions implemented are as follows:
 - `ReadVarInt(r io.Reader) (uint64, error)` for reading CompactSize integers
 - `WriteVarInt(w io.Writer, v uint64) error` for writing CompactSize integers
-- `VarIntSerializeSize(v uint64) error` for determining how many bytes an integer will take up through CompactSize
-encoding
+- `VarIntEncodeSize(v uint64) error` for determining how many bytes an integer will take up through CompactSize encoding
 
-For reading and writing CompactSize integers, the functions make use of the integer serialization functions.
+For reading and writing CompactSize integers, the functions make use of the aforementioned integer serialization functions. CompactSize integers are best used when serializing an array of variable size, for example when serializing the inputs and outputs of a transaction.
 
-###Hashes (hashes.go)
+A quick usage example:
 
-As hashes are stored as byte slices of length 32, they get a seperate source file to provide a free list of buffers.
-The functions are quite straightforward.
-- `ReadHash(r io.Reader) ([]byte, error)` to read a hash
-- `WriteHash(w io.Writer, b []byte) error` to write a hash
+```go
+// Error handling omitted for clarity
 
-###Strings and byte slices (vardata.go)
+x := []int{5, 2, 98, 200}
+l := len(x)
+buf := new(bytes.Buffer)
+err := encoding.WriteVarInt(buf, uint64(l))
 
-Functions in this source file will make use of CompactSize integers for embedding and reading length prefixes.
-For byte slices of variable length (like a signature) there are two functions.
+// And then, to get it out...
+n, err := encoding.ReadVarInt(buf)
+```
 
-- `ReadVarBytes(r io.Reader) ([]byte, error)` to read byte data
+### Booleans (miscdata.go)
+
+Booleans can be written and read much like integers, but they have their own function so that they can be passed without any conversion beforehand. The functions are:
+- `ReadBool(r io.Reader, b *bool) error` to read a bool
+- `WriteBool(w io.Writer, b bool) error` to write a bool
+
+Boolean functions use the standard template as demonstrated at the Integers section.
+
+### 256-bit and 512-bit data structures (miscdata.go)
+
+For data that is either 256 or 512 bits long (such as hashes and signatures), seperate functions are defined.
+
+For 256-bit data:
+- `Read256(r io.Reader, b *[]byte) error` to read 256 bits of data
+- `Write256(w io.Writer, b []byte) error` to write 256 bits of data
+
+For 512-bit data:
+- `Read512(r io.Reader, b *[]byte) error` to read 512 bits of data
+- `Write512(w io.Writer, b []byte) error` to write 512 bits of data
+
+256-bit and 512-bit functions use the standard template as demonstrated at the Integers section.
+
+### Strings and byte slices (vardata.go)
+
+Functions in this source file will make use of CompactSize integers for embedding and reading length prefixes. For byte slices of variable length there are two functions.
+
+- `ReadVarBytes(r io.Reader, b *[]byte) error` to read byte data
 - `WriteVarBytes(w io.Writer, b []byte) error` to write byte data
 
 For strings of variable length (like a message) there are two convenience functions, which point to the functions
 above.
 
-- `ReadString(r io.Reader) (string, error)`
+- `ReadString(r io.Reader, s *string) error`
 - `WriteString(w io.Writer, s string) error`
 
 Writing a string will simply convert it to a byte slice, and reading it will take the byte slice and convert it
 to a string.
+
+String and byte slice functions use the standard template as demonstrated at the Integers section.
 
 ###Arrays/slices
 
@@ -117,15 +134,16 @@ serialized in a for loop.
 The method is as follows (I will take a slice of strings for this example):
 
 ```go
-arr := []string{"foo", "bar", "baz"}
+// Error handling omitted for clarity
+
+slice := []string{"foo", "bar", "baz"}
 
 buf := new(bytes.Buffer)
-err := encoding.WriteVarInt(buf, uint64(len(arr)))
+err := encoding.WriteVarInt(buf, uint64(len(slice)))
 // Handle error
 
-for _, str := range arr {
+for _, str := range slice {
 	err := encoding.WriteString(buf, str)
-	// Handle error
 }
 
 // buf.Bytes() = [3 3 102 111 111 3 98 97 114 3 98 97 122]
@@ -133,11 +151,10 @@ for _, str := range arr {
 count, err := ReadVarInt(buf)
 // Handle error
 
-// Make new array with len count
-newArr := make([]string, count)
+// Make new array with len 0 and cap count
+newSlice := make([]string, 0, count)
 for i := uint64(0); i < count; i++ {
-	newArr[i], err := encoding.ReadString(buf)
-	// Handle error
+	err := encoding.ReadString(buf, *newSlice[i])
 }
 
 // newArr = ["foo" "bar" "baz"]
@@ -152,6 +169,8 @@ populate the respective fields.
 A more advanced example can be found in the transactions folder. I will demonstrate a small one here:
 
 ```go
+// Error handling omitted for clarity
+
 type S struct {
 	Str string
 	A []uint64
@@ -160,56 +179,32 @@ type S struct {
 
 func (s *S) Encode(w io.Writer) error {
 	// Str
-	err := WriteString(w, s.Str)
-	// Handle error
+	err := encoding.WriteString(w, s.Str)
 	
 	// A
-	err := WriteVarInt(w, uint64(len(s.A)))
-	// Handle error
+	err := encoding.WriteVarInt(w, uint64(len(s.A)))
 	for _, n := range s.A {
-		err := PutUint64(w, binary.LittleEndian, n)
-		// Handle error
+		err := encoding.WriteUint64(w, binary.LittleEndian, n)
 	}
 	
 	// B
-	var b uint8
-    if s.B == false {
-        b = 0
-    } else {
-        b = 1
-    }
-	err := PutUint8(w, b)
-	return err
+	err := encoding.WriteBool(w, s.B)
 }
 
 func (s *S) Decode(r io.Reader) error {
 	// Str
-	str, err := ReadString(r)
-	// Handle error
-	s.Str = str
+	err := encoding.ReadString(r, &s.Str)
 	
 	// A
-	count, err := ReadVarInt(r)
-	// Handle error
+	count, err := encoding.ReadVarInt(r)
 	
-	s.A = make([]uint64, count)
+	s.A = make([]uint64, 0, count)
 	for i := uint64(0); i < length; i++ {
-		n, err := Uint64(r, binary.LittleEndian)
-		// Handle error
-		
-		// Populate
-		s.A[i] = n
+		n, err := encoding.ReadUint64(r, binary.LittleEndian, &s.A[i])
 	}
 	
 	// B
-	var b bool
-	n, err := Uint8(r)
-	if n == 0 {
-		b = false
-	} else {
-		b = true
-	}
-	s.B = b
+	err := encoding.ReadBool(r, &s.B)
 	
     return nil
 }
@@ -224,5 +219,4 @@ count := StealthTX.GetEncodeSize()
 bs := make([]byte, 0, count)
 buf := bytes.NewBuffer(bs)
 err := StealthTX.Encode(buf)
-// etc.
 ```
