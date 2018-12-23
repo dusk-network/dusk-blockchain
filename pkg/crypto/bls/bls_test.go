@@ -2,17 +2,14 @@ package bls
 
 import (
 	"crypto/rand"
+	"io"
+	"math/big"
 	"testing"
 
+	"github.com/cloudflare/bn256"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var initialized bool
-
-func init() {
-	// we should wait for BLS to be initialized first
-	initialized = G2Base != nil
-}
 
 func randomMessage() []byte {
 	msg := make([]byte, 32)
@@ -21,8 +18,6 @@ func randomMessage() []byte {
 }
 
 // TestSignVerify
-// NOTE: Sometimes the test does not succeed due to some mishup in the initialization of the rand.Reader. In these cases, the underline bn256 library yields a segfault since it does not check for the error.
-// We should fork bn256 and patch it.
 func TestSignVerify(t *testing.T) {
 	msg := randomMessage()
 	pub, priv, err := GenKeyPair(rand.Reader)
@@ -31,6 +26,14 @@ func TestSignVerify(t *testing.T) {
 	sig, err := Sign(priv, msg)
 	require.NoError(t, err)
 	require.NoError(t, Verify(pub, msg, sig))
+
+	// Testing that changing the message, the signature is no longer valid
+	require.NotNil(t, Verify(pub, randomMessage(), sig))
+
+	// Testing that using a random PK, the signature cannot be verified
+	pub2, _, err := GenKeyPair(rand.Reader)
+	require.NoError(t, err)
+	require.NotNil(t, Verify(pub2, msg, sig))
 }
 
 // TestCombine checks for the Batched form of the BLS signature
@@ -63,7 +66,47 @@ func TestCombine(t *testing.T) {
 
 	sig3 := Aggregate(sig1, sig2)
 	pkeys := []*PublicKey{pub1, pub2}
-	require.NoError(t, VerifyBatch(pkeys, [][]byte{msg1, msg2}, sig3))
+	require.NoError(t, VerifyBatch(pkeys, [][]byte{msg1, msg2}, sig3, false))
+}
+
+func TestHashToPoint(t *testing.T) {
+	msg := []byte("test data")
+	g1, err := hashToPoint(msg)
+	assert.Equal(t, nil, err)
+	assert.NotEqual(t, nil, g1)
+}
+
+func randomInt(r io.Reader) *big.Int {
+	for {
+		k, _ := rand.Int(r, bn256.Order)
+		if k.Sign() > 0 {
+			return k
+		}
+	}
+}
+func TestRogueKey(t *testing.T) {
+	reader := rand.Reader
+	pub, _, err := GenKeyPair(reader)
+	require.NoError(t, err)
+
+	alpha := randomInt(reader)
+	// g₂^alpha
+	g2Alpha := NewG2().ScalarBaseMult(alpha)
+
+	// pk^-1
+	rogueGx := NewG2()
+	rogueGx.Neg(pub.gx)
+
+	pRogue := NewG2()
+	pRogue.Add(g2Alpha, rogueGx)
+
+	sk, pk := &SecretKey{alpha}, &PublicKey{pRogue}
+
+	msg := []byte("test data")
+	rogueSignature, err := Sign(sk, msg)
+	require.NoError(t, err)
+
+	require.NoError(t, VerifyBatch([]*PublicKey{pub, pk}, [][]byte{msg, msg}, rogueSignature, true))
 }
 
 /*

@@ -5,57 +5,74 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"io"
 	"math/big"
 
 	"github.com/cloudflare/bn256"
+	"gitlab.dusk.network/pkg/errors"
 	"golang.org/x/crypto/sha3"
 )
 
-// G1Str is the hexadecimal string representing the base specified for the G1
-// base point. It is taken from the cloudfare's bn256 implementation.
-var G1Str = "00000000000000000000000000000000000000000000000000000000000000018fb501e34aa387f9aa6fecb86184dc21ee5b88d120b5b59e185cac6c5e089665"
+var (
+	// g1Str is the hexadecimal string representing the base specified for the G1 base point. It is taken from the cloudflare's bn256 implementation.
+	g1Str = "00000000000000000000000000000000000000000000000000000000000000018fb501e34aa387f9aa6fecb86184dc21ee5b88d120b5b59e185cac6c5e089665"
 
-// G1Base is the base point specified for the G1 group. If one wants to use a
-// different point, set this variable before using any public methods / structs
-// of this package.
-var G1Base *bn256.G1
+	// g1Base is the base point specified for the G1 group. If one wants to use a
+	// different point, set this variable before using any public methods / structs of this package.
+	g1Base *bn256.G1
 
-// G2Str is the hexadecimal string representing the base specified for the G1
-// base point.
-var G2Str = "012ecca446ff6f3d4d03c76e9b5c752f28bc37b364cb05ac4a37eb32e1c32459708f25386f72c9462b81597d65ae2092c4b97792155dcdaad32b8a6dd41792534c2db10ef5233b0fe3962b9ee6a4bbc2b5bde01a54f3513d42df972e128f31bf12274e5747e8cafacc3716cc8699db79b22f0e4ff3c23e898f694420a3be3087a5"
+	// g1BaseInt is the big.Int representation of G1Base. This is useful during point compression
+	g1BaseInt *big.Int
 
-// G1BaseInt is the big.Int representation of G1Base. This is useful during point compression
-var G1BaseInt *big.Int
+	// g2Str is the hexadecimal string representing the base specified for the G1 base point.
+	g2Str = "012ecca446ff6f3d4d03c76e9b5c752f28bc37b364cb05ac4a37eb32e1c32459708f25386f72c9462b81597d65ae2092c4b97792155dcdaad32b8a6dd41792534c2db10ef5233b0fe3962b9ee6a4bbc2b5bde01a54f3513d42df972e128f31bf12274e5747e8cafacc3716cc8699db79b22f0e4ff3c23e898f694420a3be3087a5"
 
-// G2Base is the base point specified for the G2 group. If one wants to use a
-// different point, set this variable before using any public methods / structs
-// of this package.
-var G2Base *bn256.G2
+	// g2Base is the base point specified for the G2 group. If one wants to use a
+	// different point, set this variable before using any public methods / structs of this package.
+	g2Base *bn256.G2
 
+	// g2BaseInt is the big.Int representation of the G2Base
+	g2BaseInt *big.Int
+)
+
+// TODO: We should probably transform BLS in a struct and delegate initialization to the
 func init() {
-	buff, err := hex.DecodeString(G1Str)
-	if err != nil {
-		panic("bn256: can't decode base point on G1. Fatal error")
-	}
-	G1Base = new(bn256.G1)
-	G1BaseInt = new(big.Int).SetBytes(buff)
+	g1Base, g1BaseInt = newG1Base(g1Str)
+	g2Base, g2BaseInt = newG2Base(g2Str)
+}
 
-	_, err = G1Base.Unmarshal(buff)
+// newG1Base is the initialization function for the G1Base point for BN256. It takes as input the HEX string representation of a base point
+func newG1Base(strRepr string) (*bn256.G1, *big.Int) {
+	buff, err := hex.DecodeString(strRepr)
 	if err != nil {
-		panic("bn256: can't decode base point on G1. Fatal error")
+		panic(errors.Wrap(err, "bn256: can't decode base point on G1. Fatal error"))
+	}
+	g1Base = new(bn256.G1)
+	g1BaseInt = new(big.Int).SetBytes(buff)
+
+	_, err = g1Base.Unmarshal(buff)
+	if err != nil {
+		panic(errors.Wrap(err, "bn256: can't decode base point on G1. Fatal error"))
 	}
 
-	buff, err = hex.DecodeString(G2Str)
+	return g1Base, g1BaseInt
+}
+
+// newG2Base is the initialization function for the G2Base point for BN256
+func newG2Base(strRepr string) (*bn256.G2, *big.Int) {
+	buff, err := hex.DecodeString(strRepr)
 	if err != nil {
-		panic("bn256: can't decode base point on G2. Fatal error.")
+		panic(errors.Wrap(err, "bn256: can't decode base point on G2. Fatal error"))
 	}
-	G2Base = new(bn256.G2)
-	_, err = G2Base.Unmarshal(buff)
+	g2Base = new(bn256.G2)
+	g2BaseInt = new(big.Int).SetBytes(buff)
+
+	_, err = g2Base.Unmarshal(buff)
 	if err != nil {
-		panic("bn256: can't decode base point on G2. Fatal error.")
+		panic(errors.Wrap(err, "bn256: can't decode base point on G2. Fatal error"))
 	}
+
+	return g2Base, g2BaseInt
 }
 
 // CompactSize is 32bit
@@ -122,7 +139,7 @@ func Verify(pkey *PublicKey, msg []byte, signature *Sig) error {
 	}
 
 	left := bn256.Pair(HM, pkey.gx).Marshal()
-	right := bn256.Pair(signature.e, G2Base).Marshal()
+	right := bn256.Pair(signature.e, g2Base).Marshal()
 	// if subtle.ConstantTimeCompare(left, right) == 1 {
 	if !bytes.Equal(left, right) {
 		return errors.New("bls: Invalid Signature")
@@ -132,8 +149,7 @@ func Verify(pkey *PublicKey, msg []byte, signature *Sig) error {
 }
 
 // Aggregate combines signatures on distinct messages.
-// TODO: The messages must
-// be distinct, otherwise the scheme is vulnerable to chosen-key attack.
+// TODO: The messages must be distinct, otherwise the scheme is vulnerable to chosen-key attack.
 func Aggregate(one, other *Sig) *Sig {
 	res := NewG1()
 	res.Add(one.e, other.e)
@@ -157,8 +173,8 @@ func Batch(sigs ...*Sig) (*Sig, error) {
 
 // VerifyBatch verifies a batch of messages signed with aggregated signature
 // the rogue-key attack is prevented by making all messages distinct
-func VerifyBatch(pkeys []*PublicKey, msgList [][]byte, signature *Sig) error {
-	if !distinct(msgList) {
+func VerifyBatch(pkeys []*PublicKey, msgList [][]byte, signature *Sig, allowDistinct bool) error {
+	if !allowDistinct && distinct(msgList) {
 		return errors.New("bls: Messages are not distinct")
 	}
 
@@ -177,9 +193,9 @@ func VerifyBatch(pkeys []*PublicKey, msgList [][]byte, signature *Sig) error {
 		}
 	}
 
-	right := bn256.Pair(signature.e, G2Base)
+	right := bn256.Pair(signature.e, g2Base)
 
-	//TODO: Not sure why we could not use subtle.ConstantTimeCompare(left.Marshal(), right.Marshal()) == 1
+	//NOTE: Not sure why we could not use subtle.ConstantTimeCompare(left.Marshal(), right.Marshal()) == 1
 	if !bytes.Equal(left.Marshal(), right.Marshal()) {
 		return errors.New("bls: Invalid Signature")
 	}
@@ -245,6 +261,8 @@ func (pk *PublicKey) UnmarshalBinary(data []byte) error {
 // point.
 var Hash = sha3.New256
 
+// hashToPoint is non-deterministic. Hashing to the BN curve should be deterministic to allow for repeatability of the hashing
+// TODO: implement the Elligator algorithm for deterministic random-looking hashing to BN256 point. See https://eprint.iacr.org/2014/043.pdf
 func hashToPoint(msg []byte) (*bn256.G1, error) {
 	h := Hash()
 	_, err := h.Write(msg)
@@ -253,10 +271,8 @@ func hashToPoint(msg []byte) (*bn256.G1, error) {
 	}
 
 	hashed := h.Sum(nil)
-
-	reader := bytes.NewBuffer(hashed)
-	_, HM, err := bn256.RandomG1(reader)
-	return HM, err
+	k := new(big.Int).SetBytes(hashed)
+	return NewG1().ScalarBaseMult(k), nil
 }
 
 func encodeToText(data []byte) []byte {
