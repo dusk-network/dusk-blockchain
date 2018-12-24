@@ -40,7 +40,7 @@ func (b *Blockchain) AcceptTx(tx *transactions.Stealth) error {
 	// Implement when database is added
 
 	// Check if this transaction is already in the mempool
-	if b.memPool.Exists(tx.Hash) {
+	if b.memPool.Exists(tx.Hex()) {
 		return errors.New("duplicate tx")
 	}
 
@@ -99,7 +99,7 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	// Clear out all matching entries in mempool
 	for _, v := range block.Txs {
 		tx := v.(*transactions.Stealth)
-		if b.memPool.Exists(tx.Hash) {
+		if b.memPool.Exists(tx.Hex()) {
 			b.memPool.RemoveTx(tx)
 		}
 	}

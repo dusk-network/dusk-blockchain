@@ -37,14 +37,13 @@ func (m *MemPool) RemoveTx(tx *transactions.Stealth) {
 
 // GetTx will get a transaction from the mempool using the passed hash.
 // This function is safe for concurrent access.
-func (m *MemPool) GetTx(hash []byte) (*transactions.Stealth, error) {
-	hex := hex.EncodeToString(hash)
+func (m *MemPool) GetTx(hash string) (*transactions.Stealth, error) {
 	m.lock.RLock()
-	tx, exists := m.txs[hex]
+	tx, exists := m.txs[hash]
 	m.lock.RUnlock()
 
 	if !exists {
-		return nil, fmt.Errorf("tx %v is not in the mempool", hex)
+		return nil, fmt.Errorf("tx %v is not in the mempool", hash)
 	}
 
 	return tx, nil
@@ -52,10 +51,9 @@ func (m *MemPool) GetTx(hash []byte) (*transactions.Stealth, error) {
 
 // Exists checks by hash whether a transaction exists in the mempool.
 // This function is safe for concurrent access.
-func (m *MemPool) Exists(hash []byte) bool {
-	hex := hex.EncodeToString(hash)
+func (m *MemPool) Exists(hash string) bool {
 	m.lock.RLock()
-	_, exists := m.txs[hex]
+	_, exists := m.txs[hash]
 	m.lock.RUnlock()
 	return exists
 }
