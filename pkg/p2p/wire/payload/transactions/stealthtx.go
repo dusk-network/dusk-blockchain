@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/hex"
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
@@ -13,11 +14,11 @@ import (
 
 // Stealth defines a stealth transaction.
 type Stealth struct {
-	Version  uint8  // 1 byte
-	Type     TxType // 1 byte
-	Inputs   []*Input
-	TxPubKey []byte // 32 bytes
-	Outputs  []*Output
+	Version uint8  // 1 byte
+	Type    TxType // 1 byte
+	R       []byte // 32 bytes
+	Inputs  []*Input
+	Outputs []*Output
 
 	Hash []byte // 32 bytes
 }
@@ -44,13 +45,13 @@ func (s *Stealth) AddOutput(output *Output) {
 func (s *Stealth) AddTxPubKey(pk []byte) {
 	// This should be adjusted in the future to work as described in
 	// the documentation - this is merely a placeholder
-	s.TxPubKey = pk
+	s.R = pk
 }
 
 // Clear all transaction fields
 func (s *Stealth) Clear() {
 	s.Inputs = nil
-	s.TxPubKey = nil
+	s.R = nil
 	s.Outputs = nil
 	s.Hash = nil
 }
@@ -82,6 +83,10 @@ func (s *Stealth) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
+	if err := encoding.Write256(w, s.R); err != nil {
+		return err
+	}
+
 	lIn := uint64(len(s.Inputs))
 	if err := encoding.WriteVarInt(w, lIn); err != nil {
 		return err
@@ -91,10 +96,6 @@ func (s *Stealth) EncodeHashable(w io.Writer) error {
 		if err := input.Encode(w); err != nil {
 			return err
 		}
-	}
-
-	if err := encoding.Write256(w, s.TxPubKey); err != nil {
-		return err
 	}
 
 	lOut := uint64(len(s.Outputs))
@@ -135,6 +136,10 @@ func (s *Stealth) Decode(r io.Reader) error {
 		return err
 	}
 
+	if err := encoding.Read256(r, &s.R); err != nil {
+		return err
+	}
+
 	s.Type = TxType(t)
 	lIn, err := encoding.ReadVarInt(r)
 	if err != nil {
@@ -147,10 +152,6 @@ func (s *Stealth) Decode(r io.Reader) error {
 		if err := s.Inputs[i].Decode(r); err != nil {
 			return err
 		}
-	}
-
-	if err := encoding.Read256(r, &s.TxPubKey); err != nil {
-		return err
 	}
 
 	lOut, err := encoding.ReadVarInt(r)
@@ -171,6 +172,11 @@ func (s *Stealth) Decode(r io.Reader) error {
 	}
 
 	return nil
+}
+
+// Hex returns the tx hash as a hexadecimal string
+func (s *Stealth) Hex() string {
+	return hex.EncodeToString(s.Hash)
 }
 
 // CalculateHash implements merkletree.Payload
