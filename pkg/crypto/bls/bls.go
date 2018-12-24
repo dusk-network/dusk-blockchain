@@ -181,15 +181,15 @@ func VerifyBatch(pkeys []*PublicKey, msgList [][]byte, signature *Sig, allowDist
 	var left *bn256.GT
 	// TODO: I suspect that this could be sped up by doing the addition through a pool of goroutines
 	for i := range msgList {
-		HM, err := hashToPoint(msgList[i])
+		h0m, err := hashToPoint(msgList[i])
 		if err != nil {
 			return err
 		}
 
 		if i == 0 {
-			left = bn256.Pair(HM, pkeys[i].gx)
+			left = bn256.Pair(h0m, pkeys[i].gx)
 		} else {
-			left.Add(left, bn256.Pair(HM, pkeys[i].gx))
+			left.Add(left, bn256.Pair(h0m, pkeys[i].gx))
 		}
 	}
 
@@ -257,20 +257,20 @@ func (pk *PublicKey) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-// Hash is the hash function used to digest a message before mapping it to a
+// H0 is the hash function used to digest a message before mapping it to a
 // point.
-var Hash = sha3.New256
+var H0 = sha3.New256
 
 // hashToPoint is non-deterministic. Hashing to the BN curve should be deterministic to allow for repeatability of the hashing
 // TODO: implement the Elligator algorithm for deterministic random-looking hashing to BN256 point. See https://eprint.iacr.org/2014/043.pdf
 func hashToPoint(msg []byte) (*bn256.G1, error) {
-	h := Hash()
-	_, err := h.Write(msg)
+	h0 := H0()
+	_, err := h0.Write(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	hashed := h.Sum(nil)
+	hashed := h0.Sum(nil)
 	k := new(big.Int).SetBytes(hashed)
 	return NewG1().ScalarBaseMult(k), nil
 }
