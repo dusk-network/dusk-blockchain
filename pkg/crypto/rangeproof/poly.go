@@ -22,16 +22,14 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) (*pol
 	l0 := vector.SubScalar(aL, z)
 
 	// calculate l_1
-
 	l1 := sL
 
 	// calculate r_0
-
 	yNM := vector.ScalarPowers(y, uint32(N*M))
 
 	zMTwoN := sumZMTwoN(z)
 
-	r0 := vector.AddScalar(aR[:], z)
+	r0 := vector.AddScalar(aR, z)
 
 	r0, err := vector.Hadamard(r0, yNM)
 	if err != nil {
@@ -41,8 +39,9 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) (*pol
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - r0 (2)")
 	}
+
 	// calculate r_1
-	r1, err := vector.Hadamard(yNM, sR[:])
+	r1, err := vector.Hadamard(yNM, sR)
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - r1")
 	}
@@ -54,7 +53,7 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) (*pol
 	}
 
 	// calculate t1 // t_1 = <l_0, r_1> + <l_1, r_0>
-	t1Left, err := vector.InnerProduct(l1[:], r0[:])
+	t1Left, err := vector.InnerProduct(l1, r0)
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - t1Left")
 	}
@@ -66,7 +65,7 @@ func computePoly(aL, aR, sL, sR []ristretto.Scalar, y, z ristretto.Scalar) (*pol
 	t1.Add(&t1Left, &t1Right)
 
 	// calculate t2 // t_2 = <l_1, r_1>
-	t2, err := vector.InnerProduct(l1[:], r1[:])
+	t2, err := vector.InnerProduct(l1, r1)
 	if err != nil {
 		return nil, errors.Wrap(err, "[ComputePoly] - t2")
 	}
@@ -129,25 +128,27 @@ func (p *polynomial) computeR(x ristretto.Scalar) ([]ristretto.Scalar, error) {
 }
 
 // t_0 = z^2 * v + D(y,z)
-func (p *polynomial) computeT0(y, z ristretto.Scalar, v []ristretto.Scalar) ristretto.Scalar {
+func (p *polynomial) computeT0(y, z ristretto.Scalar, v []ristretto.Scalar, n, m uint32) ristretto.Scalar {
 
-	delta := computeDelta(y, z)
+	delta := computeDelta(y, z, n, uint32(m))
 
-	var zN ristretto.Scalar
-	zN.Square(&z)
+	var zSq ristretto.Scalar
+	zSq.Square(&z)
 
-	var sumZnV ristretto.Scalar
-	sumZnV.SetZero()
+	zM := vector.ScalarPowers(z, uint32(len(v)))
+	zM = vector.MulScalar(zM, zSq)
+
+	var sumZmV ristretto.Scalar
+	sumZmV.SetZero()
 
 	for i := range v {
-		sumZnV.MulAdd(&zN, &v[i], &sumZnV)
-		zN.Mul(&zN, &z)
+		sumZmV.MulAdd(&zM[i], &v[i], &sumZmV)
 	}
 
 	var t0 ristretto.Scalar
 	t0.SetZero()
 
-	t0.Add(&delta, &sumZnV)
+	t0.Add(&delta, &sumZmV)
 
 	return t0
 }
@@ -168,49 +169,65 @@ func sumZMTwoN(z ristretto.Scalar) []ristretto.Scalar {
 	for i := 0; i < M*N; i++ {
 		res[i].SetZero()
 		for j := 1; j <= M; j++ {
-			if (i > (j-1)*N) && (i < j*N) {
+			if (i >= (j-1)*N) && (i < j*N) {
 				res[i].MulAdd(&zM[j+1], &twoN[i-(j-1)*N], &res[i])
 			}
 		}
 
 	}
 	return res
+
+	// Below is the old variation of the above code , for clarity on what the above is doing
+
+	// res := make([]ristretto.Scalar, 0, N*M)
+
+	// var zSq ristretto.Scalar
+	// zSq.Square(&z)
+
+	// zM := vector.ScalarPowers(z, uint32(M))
+	// zM = vector.MulScalar(zM, z)
+
+	// var two ristretto.Scalar
+	// two.SetBigInt(big.NewInt(2))
+	// twoN := vector.ScalarPowers(two, N)
+
+	// for i := 0; i < M; i++ {
+	// 	a := vector.MulScalar(twoN, zM[i])
+	// 	res = append(res, a...)
+	// }
+
+	// return res
+
 }
 
 // D(y,z) - This is the data shared by both prover and verifier
-func computeDelta(y, z ristretto.Scalar) ristretto.Scalar {
+// ported from rust impl
+func computeDelta(y, z ristretto.Scalar, n, m uint32) ristretto.Scalar {
+
 	var res ristretto.Scalar
 	res.SetZero()
 
-	var one ristretto.Scalar
-	one.SetOne()
+	sumY := vector.ScalarPowersSum(y, uint64(n*m))
+	sumZ := vector.ScalarPowersSum(z, uint64(m))
 
 	var two ristretto.Scalar
 	two.SetBigInt(big.NewInt(2))
-
-	oneDotYNM := vector.ScalarPowersSum(y, uint64(N*M))
-	oneDot2N := vector.ScalarPowersSum(two, uint64(N))
-
+	sum2 := vector.ScalarPowersSum(two, uint64(n))
 	var zsq ristretto.Scalar
 	zsq.Square(&z)
 
-	var zM ristretto.Scalar
-	zM = zsq
+	var zcu ristretto.Scalar
+	zcu.Mul(&z, &zsq)
 
-	var zMinusZsq ristretto.Scalar
-	zMinusZsq.Sub(&z, &zsq)
+	var resA, resB ristretto.Scalar
+	resA.Sub(&z, &zsq)
 
-	var sumZ ristretto.Scalar
-	for i := 1; i <= M; i++ {
-		zM.Mul(&zM, &z)
-		sumZ.Add(&sumZ, &zM)
-	}
+	resA.Mul(&resA, &sumY)
 
-	var zMOneDot2N ristretto.Scalar
-	zMOneDot2N.Mul(&oneDot2N, &zM)
+	resB.Mul(&sum2, &sumZ)
+	resB.Mul(&resB, &zcu)
 
-	res.Mul(&zMinusZsq, &oneDotYNM)
-	res.Sub(&res, &zMOneDot2N)
+	res.Sub(&resA, &resB)
 
 	return res
 }
