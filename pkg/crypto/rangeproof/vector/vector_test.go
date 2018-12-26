@@ -71,6 +71,34 @@ func TestSumPowersNEqualZeroOne(t *testing.T) {
 
 }
 
+func TestNeg(t *testing.T) {
+
+	var one ristretto.Scalar
+	one.SetBigInt(big.NewInt(1))
+	var two ristretto.Scalar
+	two.SetBigInt(big.NewInt(2))
+	var three ristretto.Scalar
+	three.SetBigInt(big.NewInt(3))
+
+	a := []ristretto.Scalar{one, two, three}
+
+	var minusOne ristretto.Scalar
+	minusOne.SetBigInt(big.NewInt(-1))
+	var minusTwo ristretto.Scalar
+	minusTwo.SetBigInt(big.NewInt(-2))
+	var minusThree ristretto.Scalar
+	minusThree.SetBigInt(big.NewInt(-3))
+
+	expect := []ristretto.Scalar{minusOne, minusTwo, minusThree}
+
+	res := Neg(a)
+
+	for i := range res {
+		ok := res[i].Equals(&expect[i])
+		assert.Equal(t, true, ok)
+	}
+
+}
 func TestInnerProduct(t *testing.T) {
 	var one ristretto.Scalar
 	one.SetBigInt(big.NewInt(1))
