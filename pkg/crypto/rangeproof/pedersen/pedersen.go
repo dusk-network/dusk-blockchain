@@ -8,6 +8,8 @@ import (
 type Pedersen struct {
 	BaseVector *generator.Generator
 	GenData    []byte
+	BlindPoint ristretto.Point // This point will be used to Commit the blinders for the blinding scalars
+	BasePoint  ristretto.Point // This point will be used to Commit the amounts for the amount scalars
 }
 
 // New will setup the BaseVector
@@ -17,9 +19,17 @@ type Pedersen struct {
 func New(genData []byte) *Pedersen {
 	gen := generator.New(genData)
 
+	var blindPoint ristretto.Point
+	var basePoint ristretto.Point
+
+	blindPoint.Derive([]byte("blindPoint"))
+	basePoint.SetBase()
+
 	return &Pedersen{
 		BaseVector: gen,
 		GenData:    genData,
+		BlindPoint: blindPoint,
+		BasePoint:  basePoint,
 	}
 }
 
@@ -33,32 +43,18 @@ type Commitment struct {
 	BlindingFactor ristretto.Scalar
 }
 
-// Add will add commm to c, but keep the original blinding factor of c
-func (c *Commitment) Add(comm Commitment) {
-
-	if c.BlindingFactor.IsNonZeroI() == 0 { // 0 means blinding factor is zero
-
-		// If we get here, then user has used the commitment struct without setting a value
-		// so set value to zero and generate a random blindig factor
-
-		s := ristretto.Scalar{}
-		s.Rand()
-
-		c.Value.SetZero()
-	}
-
-	c.Value.Add(&c.Value, &comm.Value)
-
-}
-
 func (p *Pedersen) commitToScalars(blind *ristretto.Scalar, scalars ...ristretto.Scalar) ristretto.Point {
 
 	n := len(scalars)
 
+	var sum ristretto.Point
+	sum.SetZero()
+
 	if blind != nil {
-		n++
-		// prepend blinding factor to slice of scalars
-		scalars = append([]ristretto.Scalar{*blind}, scalars...)
+
+		var blindPoint ristretto.Point
+		blindPoint.ScalarMult(&p.BlindPoint, blind)
+		sum.Add(&sum, &blindPoint)
 	}
 
 	if len(p.BaseVector.Bases) < n {
@@ -66,20 +62,13 @@ func (p *Pedersen) commitToScalars(blind *ristretto.Scalar, scalars ...ristretto
 		diff := n - len(p.BaseVector.Bases)
 
 		p.BaseVector.Compute(uint32(diff))
-		// num of scalars to commit should be equal or less than the number of precompued generators
+		// num of scalars to commit should be equal or less than the number of precomputed generators
 	}
-
-	var sum ristretto.Point
-	sum.SetZero()
 
 	for i := 0; i < n; i++ {
 
-		var bi ristretto.Scalar
+		bi := scalars[i]
 
-		// commitment for the blinding factor
-		bi = scalars[i]
-
-		// for each scalar, we commit to a point on the main generator, We do not change generator here
 		Hi := p.BaseVector.Bases[i]
 
 		// H_i * b_i
@@ -92,13 +81,23 @@ func (p *Pedersen) commitToScalars(blind *ristretto.Scalar, scalars ...ristretto
 	return sum
 }
 
-func (p *Pedersen) CommitToScalars(scalars ...ristretto.Scalar) Commitment {
+// CommitToScalar generates a Commitment to a scalar v, s.t. V = v * Base + blind * BlindingPoint
+func (p *Pedersen) CommitToScalar(v ristretto.Scalar) Commitment {
 
-	// Generate random blinding factor
+	// generate random blinder
 	blind := ristretto.Scalar{}
 	blind.Rand()
 
-	sum := p.commitToScalars(&blind, scalars...)
+	// v * Base
+	var vBase ristretto.Point
+	vBase.ScalarMult(&p.BasePoint, &v)
+	// blind * BlindPoint
+	var blindPoint ristretto.Point
+	blindPoint.ScalarMult(&p.BlindPoint, &blind)
+
+	var sum ristretto.Point
+	sum.SetZero()
+	sum.Add(&vBase, &blindPoint)
 
 	return Commitment{
 		Value:          sum,
@@ -119,14 +118,13 @@ func (p *Pedersen) CommitToVectors(vectors ...[]ristretto.Scalar) Commitment {
 
 	for i, vector := range vectors {
 		if i == 0 {
-			// Commit to vector + blinding factor
 
+			// Commit to vector + blinding factor
 			commit := p.commitToScalars(&blind, vector...)
 			sum.Add(&sum, &commit)
 		} else {
 
-			// new generator -- XXX: we could use a hashing function here instead
-			// XXX: Does this clash with generators iterate() function?
+			// new generator -- XXX: we could use a hashing function here instead of appending i to it?
 			genData := append(p.GenData, uint8(i))
 			ped2 := New(genData)
 
