@@ -11,14 +11,21 @@ import (
 
 func TestProofCreation(t *testing.T) {
 
-	const n = 128
-	P, G, H, Hpf, a, b, Q := testHelpCreate(n, t)
+	var n uint32 = 1
 
-	proof, err := Generate(G, H, a, b, Hpf, Q)
-	assert.Equal(t, nil, err)
+	for i := 1; i < 12; i++ {
 
-	ok := proof.Verify(G, H, proof.L, proof.R, Hpf, Q, P, n)
-	assert.Equal(t, true, ok)
+		P, G, H, Hpf, a, b, Q := testHelpCreate(n, t)
+
+		proof, err := Generate(G, H, a, b, Hpf, Q)
+		assert.Equal(t, nil, err)
+
+		ok := proof.Verify(G, H, proof.L, proof.R, Hpf, Q, P, int(n))
+		assert.Equal(t, true, ok)
+
+		n = n * 2
+	}
+
 }
 
 // given an n returns P, G,H,HprimeFactors a, b, Q

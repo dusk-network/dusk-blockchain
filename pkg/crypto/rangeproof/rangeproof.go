@@ -36,11 +36,9 @@ type Proof struct {
 	taux ristretto.Scalar //scalar
 	mu   ristretto.Scalar //scalar
 	t    ristretto.Scalar
-
 	// XXX: Remove once debugging is completed
-	l []ristretto.Scalar // []scalar
-	r []ristretto.Scalar // []scalar
-
+	l       []ristretto.Scalar // []scalar
+	r       []ristretto.Scalar // []scalar
 	IPProof *innerproduct.Proof
 }
 
@@ -56,15 +54,16 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 
 	// commitment to values v
 	Vs := make([]pedersen.Commitment, 0, M)
-
-	ped := pedersen.New([]byte("dusk.BulletProof.vec1"))
+	genData := []byte("dusk.BulletProof.vec1")
+	ped := pedersen.New(genData)
+	ped.BaseVector.Compute(uint32((N * M)))
 
 	// Hash for Fiat-Shamir
 	hs := fiatshamir.HashCacher{[]byte{}}
 
 	for _, amount := range v {
 		// compute commmitment to v
-		V := ped.CommitToScalars(amount)
+		V := ped.CommitToScalar(amount)
 
 		Vs = append(Vs, V)
 
@@ -99,19 +98,18 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 	if err != nil {
 		return Proof{}, errors.Wrap(err, "[Prove] - poly")
 	}
+
 	// Compute T1 and T2
-	T1 := ped.CommitToScalars(poly.t1)
-	T2 := ped.CommitToScalars(poly.t2)
+	T1 := ped.CommitToScalar(poly.t1)
+	T2 := ped.CommitToScalar(poly.t2)
 
 	// update Fiat-Shamir
 	hs.Append(z.Bytes(), T1.Value.Bytes(), T2.Value.Bytes())
 
 	// compute x
 	x := computeX(hs)
-
 	// compute taux which is just the polynomial for the blinding factors at a point x
 	taux := computeTaux(x, z, T1.BlindingFactor, T2.BlindingFactor, Vs)
-
 	// compute mu
 	mu := computeMu(x, A.BlindingFactor, S.BlindingFactor)
 
@@ -136,18 +134,20 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 			return Proof{}, errors.Wrap(err, "[Prove] - debugProve")
 		}
 
-		// // DEBUG T0
-		testT0 := debugT0(aLs, aRs, y, z)
+		// DEBUG T0
+		testT0, err := debugT0(aLs, aRs, y, z)
+		if err != nil {
+			return Proof{}, errors.Wrap(err, "[Prove] - testT0")
+
+		}
 		if !testT0.Equals(&poly.t0) {
 			return Proof{}, errors.New("[Prove]: Test t0 value does not match the value calculated from the polynomial")
 		}
 
-		// XXX: This is not passing tests, however we do not need it
-		// If cannot be fixed, we will remove it from code.
-		// polyt0 := poly.computeT0(y, z, v)
-		// if !polyt0.Equals(&poly.t0) {
-		// 	return Proof{}, errors.New("[Prove]: t0 value from delta function, does not match the polynomial t0 value(Correct)")
-		// }
+		polyt0 := poly.computeT0(y, z, v, N, uint32(M))
+		if !polyt0.Equals(&poly.t0) {
+			return Proof{}, errors.New("[Prove]: t0 value from delta function, does not match the polynomial t0 value(Correct)")
+		}
 
 		tPoly := poly.eval(x)
 		if !t.Equals(&tPoly) {
@@ -163,14 +163,23 @@ func Prove(v []ristretto.Scalar, debug bool) (Proof, error) {
 
 	hs.Append(x.Bytes(), taux.Bytes(), mu.Bytes(), t.Bytes())
 
-	// TODO: calculate inner product proof
+	// calculate inner product proof
 	Q := ristretto.Point{}
 	w := hs.Derive()
-	Q.ScalarMult(&ped.BaseVector.Bases[0], &w)
+	Q.ScalarMult(&ped.BasePoint, &w)
 
-	Hpf := vector.ScalarPowers(y, uint32(N*M))
+	var yinv ristretto.Scalar
+	yinv.Inverse(&y)
+	Hpf := vector.ScalarPowers(yinv, uint32(N*M))
 
-	ip, err := innerproduct.Generate(ped.BaseVector.Bases[1:], ped.BaseVector.Bases[1:], l, r, Hpf, Q)
+	genData = append(genData, uint8(1))
+	ped2 := pedersen.New(genData)
+	ped2.BaseVector.Compute(uint32(N * M))
+
+	H := ped2.BaseVector.Bases
+	G := ped.BaseVector.Bases
+
+	ip, err := innerproduct.Generate(G, H, l, r, Hpf, Q)
 	if err != nil {
 		return Proof{}, errors.Wrap(err, "[Prove] -  ipproof")
 	}
@@ -307,7 +316,7 @@ func computeSi(y, z ristretto.Scalar) (ristretto.Point, error) {
 
 	genData := []byte("dusk.BulletProof.vec1")
 	ped := pedersen.New(genData)
-	ped.BaseVector.Compute(uint32((N * M) + 1))
+	ped.BaseVector.Compute(uint32((N * M)))
 
 	genData = append(genData, uint8(1))
 
@@ -315,11 +324,12 @@ func computeSi(y, z ristretto.Scalar) (ristretto.Point, error) {
 	ped2.BaseVector.Compute(uint32(N * M))
 
 	H := ped2.BaseVector.Bases
-	G := ped.BaseVector.Bases[1:]
+	G := ped.BaseVector.Bases
 
 	yinvNM := vector.ScalarPowers(yinv, uint32(N*M))
 
 	concatZM2N := sumZMTwoN(z)
+
 	concatZM2N, err := vector.Hadamard(yinvNM, concatZM2N)
 	if err != nil {
 		return ristretto.Point{}, errors.Wrap(err, "[ComputeSI] - concatZM2N")
@@ -382,15 +392,16 @@ func computeLGRH(y, mu ristretto.Scalar, l, r []ristretto.Scalar) (ristretto.Poi
 
 	genData := []byte("dusk.BulletProof.vec1")
 	ped := pedersen.New(genData)
-	ped.BaseVector.Compute(uint32((N * M) + 1))
+	ped.BaseVector.Compute(uint32(N * M))
 
 	genData = append(genData, uint8(1))
 
 	ped2 := pedersen.New(genData)
 	ped2.BaseVector.Compute(uint32(N * M))
 
-	Hprime := computeHprime(ped2.BaseVector.Bases, y)
-	G := ped.BaseVector.Bases[1:]
+	H := ped2.BaseVector.Bases
+	Hprime := computeHprime(H, y)
+	G := ped.BaseVector.Bases
 
 	rH, err := vector.Exp(r, Hprime, N, M)
 	if err != nil {
@@ -412,15 +423,15 @@ func Verify(p Proof) (bool, error) {
 
 	genData := []byte("dusk.BulletProof.vec1")
 	ped := pedersen.New(genData)
-	ped.BaseVector.Compute(uint32((N * M) + 1))
+	ped.BaseVector.Compute(uint32(N * M))
 
 	genData = append(genData, uint8(1))
 
 	ped2 := pedersen.New(genData)
 	ped2.BaseVector.Compute(uint32(N * M))
 
+	G := ped.BaseVector.Bases
 	H := ped2.BaseVector.Bases
-	G := ped.BaseVector.Bases[1:]
 
 	if len(p.l) != len(p.r) {
 		return false, errors.New("[Verify]: Sizes of l and r do not match")
@@ -442,26 +453,15 @@ func Verify(p Proof) (bool, error) {
 	hs.Append(x.Bytes(), p.taux.Bytes(), p.mu.Bytes(), p.t.Bytes())
 	w := hs.Derive()
 
-	var c ristretto.Scalar
-	c.Rand()
-
-	// compute l dot r
-	t, err := vector.InnerProduct(p.l, p.r)
-	if err != nil {
-		return false, errors.Wrap(err, "[Verify] - t")
-	}
-	// compute tG + tauH = Z^2 * V + delta(y,z) -- Prove t0 is correct
-	_, err = VerifyT0(x, y, z, t, p.taux, ped.BaseVector.Bases[0], ped.BaseVector.Bases[1], p.T1, p.T2, p.V)
-	if err != nil {
-		return false, errors.Wrap(err, "[Verify] - T0")
-	}
+	// var c ristretto.Scalar
+	// c.Rand()
 
 	// prove l(x) and r(x) is correct <lG, rH> = A+ xS + z<1,H> - z<1,G> + sum...
 	Pleft, err := computeLGRH(y, p.mu, p.l, p.r)
 	if err != nil {
 		return false, errors.Wrap(err, "[Verify] - Pleft")
 	}
-	PRight, err := computeP(ped.BaseVector.Bases[0], p.A, p.S, p.mu, x, y, z)
+	PRight, err := computeP(ped.BlindPoint, p.A, p.S, p.mu, x, y, z)
 	if err != nil {
 		return false, errors.Wrap(err, "[Verify] - PRight")
 	}
@@ -469,211 +469,152 @@ func Verify(p Proof) (bool, error) {
 		return false, errors.New("[Verify]: Proof for l(x),r(x) is wrong")
 	}
 
-	// Start of megacheck
-
-	xSq, xInvSq, s := p.IPProof.VerifScalars()
-	sInv := make([]ristretto.Scalar, len(s))
-	copy(sInv, s)
-	// reverse s
-	for i, j := 0, len(sInv)-1; i < j; i, j = i+1, j-1 {
-		sInv[i], sInv[j] = sInv[j], sInv[i]
+	ok := verifyT0(x, y, z, p.taux, p.t, ped.BasePoint, ped.BlindPoint, p.T1, p.T2, p.V)
+	if !ok {
+		fmt.Println("a")
+		return false, errors.New("Check1 failed")
 	}
 
-	scalars := make([]ristretto.Scalar, 0)
-	points := make([]ristretto.Point, 0)
+	// PRight, err = computeP(ped.BlindPoint, p.A, p.S, p.mu, x, y, z)
+	// if err != nil {
+	// 	fmt.Println("b")
+	// 	return false, errors.Wrap(err, "[Verify] - PRight")
+	// }
 
-	// 1
-	var one ristretto.Scalar
-	one.SetOne()
-	scalars = append(scalars, one)
-
-	// x
-	scalars = append(scalars, x)
-
-	// cx
-	var cx ristretto.Scalar
-	cx.Mul(&c, &x)
-	scalars = append(scalars, cx)
-
-	// cx * x
-	var cxsq ristretto.Scalar
-	cxsq.Mul(&cx, &x)
-	scalars = append(scalars, cxsq)
-
-	// xSq
-	scalars = append(scalars, xSq...)
-
-	// xInvSq
-	scalars = append(scalars, xInvSq...)
-
-	// -mu - c * taux = -(mu + c * taux)
-	var muCtauX ristretto.Scalar
-	var cTaux ristretto.Scalar
-	cTaux.Mul(&c, &p.taux)
-	muCtauX.Add(&p.mu, &cTaux)
-	muCtauX.Neg(&muCtauX)
-	scalars = append(scalars, muCtauX)
-
-	// w * (t-ab) + c * (delta(y,z) - t) = bpScal
-	delta := computeDelta(y, z)
-
-	var cDelMinT ristretto.Scalar
-	cDelMinT.Sub(&delta, &p.t)
-	cDelMinT.Mul(&cDelMinT, &c)
-
-	var tMinAB ristretto.Scalar
-	var ab ristretto.Scalar
-	ab.Mul(&p.IPProof.A, &p.IPProof.B)
-	tMinAB.Sub(&p.t, &ab)
-
-	var bpScal ristretto.Scalar
-	bpScal.MulSub(&w, &tMinAB, &bpScal)
-	scalars = append(scalars, bpScal)
-
-	// -z1 - as = g
-	as := vector.MulScalar(s, p.IPProof.A)
-	var minusZ ristretto.Scalar
-	minusZ.Neg(&z)
-	g := vector.AddScalar(as, minusZ)
-	scalars = append(scalars, g...)
-
-	// h =  (z + y^-nm) Had ( z^2 *(z^0 * 2^n ... z^m-1 * 2^n)- b/s) = zy Had (zAnd2 - bsInv)
-	var yinv ristretto.Scalar
-	yinv.Inverse(&y)
-	yinvNM := vector.ScalarPowers(yinv, uint32(N*M))
-	zy := vector.AddScalar(yinvNM, z)
-
-	zAnd2 := sumZMTwoN(z)
-	bs := vector.MulScalar(sInv, p.IPProof.B)
-
-	zAnd2SubBs, err := vector.Sub(zAnd2, bs)
+	ok, err = verifyIP(PRight, p.IPProof, p.mu, x, y, z, p.t, w, p.A, ped.BasePoint, ped.BlindPoint, p.S, G, H)
 	if err != nil {
-		return false, errors.Wrap(err, "[Verify]")
+		fmt.Println("c")
+		return false, err
+	}
+	if !ok {
+		fmt.Println("d")
+		return false, errors.Wrap(err, "<lx, rx> check Failed")
 	}
 
-	h, err := vector.Hadamard(zy, zAnd2SubBs)
-	if err != nil {
-		return false, errors.Wrap(err, "[Verify]")
-	}
-	scalars = append(scalars, h...)
-
-	// cz^2 ..., cz^(m+1) = czM
-	zM := vector.ScalarPowers(z, uint32(M))
-
-	var czsq ristretto.Scalar
-	czsq.Square(&z)
-	czsq.Mul(&czsq, &c)
-
-	czM := vector.MulScalar(zM, czsq)
-	scalars = append(scalars, czM...)
-
-	// POINTS
-
-	// A
-	points = append(points, p.A)
-
-	// S
-	points = append(points, p.S)
-
-	// T1
-	points = append(points, p.T1)
-
-	// T2
-	points = append(points, p.T2)
-
-	// Lj
-	points = append(points, p.IPProof.L...)
-
-	// Rj
-	points = append(points, p.IPProof.R...)
-
-	// Blinding Point
-	points = append(points, ped.BaseVector.Bases[0])
-
-	// Generator Point
-	points = append(points, ped.BaseVector.Bases[1])
-
-	// Set of Generator Points without blinder
-	points = append(points, G...)
-
-	// Set of Points for second vector of points
-	points = append(points, H...)
-
-	// Commitment values
-	for _, V := range p.V {
-
-		points = append(points, V.Value)
-
-	}
-
-	result, err := vector.Exp(scalars, points, len(scalars), 1)
-
-	if err != nil {
-		return false, errors.Wrap(err, "[Verify]")
-	}
-
-	var iden ristretto.Point
-	iden.SetZero()
-
-	ok := result.EqualsI(&iden)
-
-	fmt.Println("iden", iden.Bytes())
-	fmt.Println("res", result.Bytes())
-
-	fmt.Println("res", ok)
-
-	if ok != 1 {
-		return false, errors.New("Megacheck failed")
-	}
 	return true, nil
 }
 
-func VerifyT0(x, y, z, t, taux ristretto.Scalar, Blind, G1, T1, T2 ristretto.Point, V []pedersen.Commitment) (bool, error) {
-	// LHS
-	var tG ristretto.Point
-	tG.ScalarMult(&G1, &t)
-	var tauH ristretto.Point
-	tauH.ScalarMult(&Blind, &taux)
+func verifyT0(x, y, z, taux, t ristretto.Scalar, G, H, T1, T2 ristretto.Point, V []pedersen.Commitment) bool {
 
-	var LHS ristretto.Point
-	LHS.Add(&tG, &tauH)
+	delta := computeDelta(y, z, N, uint32(M))
 
-	// RHS
-	var cT1x ristretto.Point
-	cT1x.ScalarMult(&T1, &x)
+	var c1, c2, c3, c4 ristretto.Point
 
-	var xsq ristretto.Scalar
-	xsq.Square(&x)
+	// Scalars
+	var tMinusDelta ristretto.Scalar
+	tMinusDelta.Sub(&t, &delta)
 
-	var cT2xsq ristretto.Point
-	cT2xsq.ScalarMult(&T2, &xsq)
+	var xSq ristretto.Scalar
+	xSq.Square(&x)
+
+	// summing up individual components
+	c1.ScalarMult(&G, &tMinusDelta)
+
+	c2.ScalarMult(&H, &taux)
+
+	c3.ScalarMult(&T1, &x)
+
+	c4.ScalarMult(&T2, &xSq)
 
 	var zM ristretto.Scalar
 	zM = z
 
 	var zMV ristretto.Point
-	var sumzMV ristretto.Point
+	var c5 ristretto.Point
 
 	for i := 0; i < M; i++ {
 		zM.Mul(&zM, &z)
 		zMV.ScalarMult(&V[i].Value, &zM)
-		sumzMV.Add(&sumzMV, &zMV)
+		c5.Add(&c5, &zMV)
 	}
 
-	var deltaG ristretto.Point
-	delta := computeDelta(y, z)
+	var sum ristretto.Point
+	sum.SetZero()
+	sum.Add(&c1, &c2)
+	sum.Add(&sum, &c3)
+	sum.Add(&sum, &c4)
+	sum.Add(&sum, &c5)
 
-	deltaG.ScalarMult(&G1, &delta)
+	var zero ristretto.Point
+	zero.SetZero()
 
-	var RHS1 ristretto.Point
-	var RHS2 ristretto.Point
-	var RHS ristretto.Point
-	RHS1.Add(&sumzMV, &deltaG)
-	RHS2.Add(&cT2xsq, &cT1x)
-	RHS.Add(&RHS1, &RHS2)
+	return sum.Equals(&zero)
+}
 
-	if !LHS.Equals(&RHS) {
-		return false, errors.New("[Verify]: LHS != RHS; proof that t0 is correct is wrong")
+func verifyIP(P ristretto.Point, ipproof *innerproduct.Proof, mu, x, y, z, t, w ristretto.Scalar, A, G, H, S ristretto.Point, GVec, HVec []ristretto.Point) (bool, error) {
+
+	uSq, uInvSq, s := ipproof.VerifScalars()
+
+	sInv := make([]ristretto.Scalar, len(s))
+	copy(sInv, s)
+
+	// reverse s
+	for i, j := 0, len(sInv)-1; i < j; i, j = i+1, j-1 {
+		sInv[i], sInv[j] = sInv[j], sInv[i]
 	}
+
+	var tw ristretto.Scalar
+	tw.Mul(&t, &w)
+
+	var c1 ristretto.Point
+	c1.ScalarMult(&G, &tw)
+
+	as := vector.MulScalar(s, ipproof.A)
+
+	c2, err := vector.Exp(as, GVec, len(GVec), 1)
+	if err != nil {
+		return false, err
+	}
+
+	var yinv ristretto.Scalar
+	yinv.Inverse(&y)
+	Hpf := vector.ScalarPowers(yinv, uint32(N*M))
+
+	bDivS := vector.MulScalar(sInv, ipproof.B)
+	YbDivS, err := vector.Hadamard(bDivS, Hpf)
+	if err != nil {
+		return false, err
+	}
+
+	c3, err := vector.Exp(YbDivS, HVec, len(HVec), 1)
+	if err != nil {
+		return false, err
+	}
+	var abw ristretto.Scalar
+	abw.Mul(&ipproof.A, &ipproof.B)
+	abw.Mul(&abw, &w)
+
+	var c4 ristretto.Point
+	c4.ScalarMult(&G, &abw)
+
+	c5, err := vector.Exp(uSq, ipproof.L, len(ipproof.L), 1)
+	if err != nil {
+		return false, err
+	}
+
+	c6, err := vector.Exp(uInvSq, ipproof.R, len(ipproof.R), 1)
+	if err != nil {
+		return false, err
+	}
+
+	var sum ristretto.Point
+	sum.SetZero()
+	sum.Add(&P, &c1)
+	sum.Sub(&sum, &c2)
+	sum.Sub(&sum, &c3)
+	sum.Sub(&sum, &c4)
+	sum.Add(&sum, &c5)
+	sum.Add(&sum, &c6)
+
+	var zero ristretto.Point
+	zero.SetZero()
+
+	ok := sum.Equals(&zero)
+
+	if !ok {
+		return false, errors.New("sum is not zero")
+	}
+
 	return true, nil
+
 }
