@@ -9,6 +9,11 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
+/*
+// tests pass but not when we add c
+// lets try adding c to the first equation to see if it passes
+// Also for the two check process once, multiply both checks by a random c and see if it still passes
+*/
 func TestProveBulletProof(t *testing.T) {
 
 	m := 4 // XXX: for now needs to be a multiple of two

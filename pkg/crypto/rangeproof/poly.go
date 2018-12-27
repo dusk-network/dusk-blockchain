@@ -156,6 +156,7 @@ func (p *polynomial) computeT0(y, z ristretto.Scalar, v []ristretto.Scalar, n, m
 // calculates sum( z^(1+j) * ( 0^(j-1)n || 2 ^n || 0^(m-j)n ) ) from j = 1 to j=M (71)
 // implementation taken directly from java implementation.
 // XXX: Look into ways to speed this up, and improve readability
+// XXX: pass n and m as parameters
 func sumZMTwoN(z ristretto.Scalar) []ristretto.Scalar {
 
 	res := make([]ristretto.Scalar, N*M)
