@@ -1,7 +1,6 @@
 package rangeproof
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/pkg/errors"
@@ -236,6 +235,7 @@ func computeYAndZ(hs fiatshamir.HashCacher) (ristretto.Scalar, ristretto.Scalar)
 
 	return y, z
 }
+
 func computeX(hs fiatshamir.HashCacher) ristretto.Scalar {
 	var x ristretto.Scalar
 	x.Derive(hs.Result())
@@ -471,27 +471,18 @@ func Verify(p Proof) (bool, error) {
 
 	ok := verifyT0(x, y, z, p.taux, p.t, ped.BasePoint, ped.BlindPoint, p.T1, p.T2, p.V)
 	if !ok {
-		fmt.Println("a")
 		return false, errors.New("Check1 failed")
 	}
 
-	// PRight, err = computeP(ped.BlindPoint, p.A, p.S, p.mu, x, y, z)
-	// if err != nil {
-	// 	fmt.Println("b")
-	// 	return false, errors.Wrap(err, "[Verify] - PRight")
-	// }
-
 	ok, err = verifyIP(PRight, p.IPProof, p.mu, x, y, z, p.t, w, p.A, ped.BasePoint, ped.BlindPoint, p.S, G, H)
 	if err != nil {
-		fmt.Println("c")
 		return false, err
 	}
 	if !ok {
-		fmt.Println("d")
 		return false, errors.Wrap(err, "<lx, rx> check Failed")
 	}
 
-	return true, nil
+	return megacheck(p.IPProof, p.mu, x, y, z, p.t, p.taux, w, p.A, ped.BasePoint, ped.BlindPoint, p.S, p.T1, p.T2, G, H, p.V)
 }
 
 func verifyT0(x, y, z, taux, t ristretto.Scalar, G, H, T1, T2 ristretto.Point, V []pedersen.Commitment) bool {
@@ -617,4 +608,131 @@ func verifyIP(P ristretto.Point, ipproof *innerproduct.Proof, mu, x, y, z, t, w 
 
 	return true, nil
 
+}
+
+func megacheck(ipproof *innerproduct.Proof, mu, x, y, z, t, taux, w ristretto.Scalar, A, G, H, S, T1, T2 ristretto.Point, GVec, HVec []ristretto.Point, V []pedersen.Commitment) (bool, error) {
+
+	var c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11 ristretto.Point
+	// Start of megacheck
+	uSq, uInvSq, s := ipproof.VerifScalars()
+	sInv := make([]ristretto.Scalar, len(s))
+	copy(sInv, s)
+
+	// reverse s
+	for i, j := 0, len(sInv)-1; i < j; i, j = i+1, j-1 {
+		sInv[i], sInv[j] = sInv[j], sInv[i]
+	}
+
+	// Scalars
+
+	// g vector scalars : as + z
+	as := vector.MulScalar(s, ipproof.A)
+	g := vector.AddScalar(as, z)
+
+	c1, err := vector.Exp(g, GVec, len(GVec), 1)
+	if err != nil {
+		return false, err
+	}
+
+	// h vector scalars : y Had (bsInv - zM2N) - z
+	bs := vector.MulScalar(sInv, ipproof.B)
+	zAnd2 := sumZMTwoN(z)
+	h, err := vector.Sub(bs, zAnd2)
+	if err != nil {
+		return false, errors.Wrap(err, "[h1]")
+	}
+
+	var yinv ristretto.Scalar
+	yinv.Inverse(&y)
+	Hpf := vector.ScalarPowers(yinv, uint32(N*M))
+
+	h, err = vector.Hadamard(h, Hpf)
+	if err != nil {
+		return false, errors.Wrap(err, "[h2]")
+	}
+	h = vector.SubScalar(h, z)
+
+	c2, err = vector.Exp(h, HVec, len(HVec), 1)
+	if err != nil {
+		return false, err
+	}
+
+	// G basepoint gbp : w(ab-t) + t-D(y,z)
+	delta := computeDelta(y, z, N, uint32(M))
+	var tMinusDelta ristretto.Scalar
+	tMinusDelta.Sub(&t, &delta)
+
+	var abMinusT ristretto.Scalar
+	abMinusT.Mul(&ipproof.A, &ipproof.B)
+	abMinusT.Sub(&abMinusT, &t)
+
+	var gBP ristretto.Scalar
+	gBP.MulAdd(&w, &abMinusT, &tMinusDelta)
+
+	c3.ScalarMult(&G, &gBP)
+
+	// H basepoint hbp : mu + taux
+	var hBP ristretto.Scalar
+	hBP.Add(&mu, &taux)
+
+	c4.ScalarMult(&H, &hBP)
+
+	// 1
+	c5 = A
+
+	// x
+	c6.ScalarMult(&S, &x)
+
+	// uSq challenges
+	c7, err = vector.Exp(uSq, ipproof.L, len(ipproof.L), 1)
+	if err != nil {
+		return false, err
+	}
+
+	// uInvSq challenges
+	c8, err = vector.Exp(uInvSq, ipproof.R, len(ipproof.R), 1)
+	if err != nil {
+		return false, err
+	}
+
+	// commmitments to V
+	zM := vector.ScalarPowers(z, uint32(M))
+	var zSq ristretto.Scalar
+	zSq.Square(&z)
+	zM = vector.MulScalar(zM, zSq)
+	c9.SetZero()
+	for i := range zM {
+		var temp ristretto.Point
+		temp.ScalarMult(&V[i].Value, &zM[i])
+		c9.Add(&c9, &temp)
+	}
+
+	c10.ScalarMult(&T1, &x)
+
+	var xSq ristretto.Scalar
+	xSq.Square(&x)
+	c11.ScalarMult(&T2, &xSq)
+
+	var sum ristretto.Point
+	sum.SetZero()
+	sum.Add(&c1, &c2)
+	sum.Add(&sum, &c3)
+	sum.Add(&sum, &c4)
+	sum.Sub(&sum, &c5)
+	sum.Sub(&sum, &c6)
+	sum.Sub(&sum, &c7)
+	sum.Sub(&sum, &c8)
+	sum.Sub(&sum, &c9)
+	sum.Sub(&sum, &c10)
+	sum.Sub(&sum, &c11)
+
+	var zero ristretto.Point
+	zero.SetZero()
+
+	ok := zero.Equals(&sum)
+	if !ok {
+
+		return false, errors.New("Megacheck failed")
+	}
+	return true, nil
 }
