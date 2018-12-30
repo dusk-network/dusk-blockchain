@@ -59,6 +59,7 @@ func VerifyApk(pks []*PublicKey, msg []byte, signature *Sig) error {
 
 	var apkPk *bn256.G2
 
+	// Compute
 	for i := range pks {
 		pkGxI := pks[i].gx
 		h1 := H1()

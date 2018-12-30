@@ -88,12 +88,12 @@ func TestRogueKey(t *testing.T) {
 	reader := rand.Reader
 	pub, _, err := GenKeyPair(reader)
 	require.NoError(t, err)
-
+	// α is the pseudo-secret key of the attacker
 	alpha := randomInt(reader)
-	// g₂^alpha
+	// g₂ᵅ
 	g2Alpha := NewG2().ScalarBaseMult(alpha)
 
-	// pk^-1
+	// pk⁻¹
 	rogueGx := NewG2()
 	rogueGx.Neg(pub.gx)
 
@@ -107,6 +107,33 @@ func TestRogueKey(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, VerifyBatch([]*PublicKey{pub, pk}, [][]byte{msg, msg}, rogueSignature, true))
+}
+
+func TestApkAggregation(t *testing.T) {
+	reader := rand.Reader
+	msg := []byte("Get Funky Tonight")
+
+	pub1, priv1, err := GenKeyPair(reader)
+	require.NoError(t, err)
+
+	pub2, priv2, err := GenKeyPair(reader)
+	require.NoError(t, err)
+
+	sig1, err := Sign(priv1, msg)
+	require.NoError(t, err)
+	require.NoError(t, Verify(pub1, msg, sig1))
+
+	sig2, err := Sign(priv2, msg)
+	require.NoError(t, err)
+	require.NoError(t, Verify(pub2, msg, sig2))
+
+	pubs := []*PublicKey{pub1, pub2}
+	sigs := []*Sig{sig1, sig2}
+
+	apkSig, err := AggregateApk(pubs, sigs)
+	require.NoErrorf(t, err, "BLS-APK: APK Aggregation yields error")
+
+	require.NoError(t, VerifyApk(pubs, msg, apkSig))
 }
 
 /*
