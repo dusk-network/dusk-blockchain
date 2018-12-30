@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type testValues struct {
@@ -23,7 +25,8 @@ func initTestPairs() {
 	data := make([]byte, 32)
 	for i := 0; i < n; i++ {
 		rand.Read(data)
-		testPairs = append(testPairs, testValues{dec: data, enc: Base58Encoding(data)})
+		encodedData, _ := Base58Encoding(data)
+		testPairs = append(testPairs, testValues{dec: data, enc: encodedData})
 	}
 }
 
@@ -39,12 +42,20 @@ func randAlphabet() *Alphabet {
 		bts[i] = bts[j]
 		bts[j] = byte(i)
 	}
-	return NewAlphabet(string(bts[:58]))
+	alphabet, err := NewAlphabet(string(bts[:58]))
+	if err != nil {
+		return nil
+	}
+	return alphabet
 }
 
 func TestEncodingAndDecoding(t *testing.T) {
 	for k := 0; k < 10; k++ {
 		testEncDecLoop(t, randAlphabet())
+	}
+	BTCAlphabet, err := NewAlphabet(ab)
+	if err != nil {
+		t.Fail()
 	}
 	testEncDecLoop(t, BTCAlphabet)
 }
@@ -84,7 +95,8 @@ func TestBase58WithBitcoinAddresses(t *testing.T) {
 		if err != nil {
 			t.Errorf("Test %d, expected success, got error %s\n", ii, err)
 		}
-		chk := Base58Encoding(num)
+		chk, err := Base58Encoding(num)
+		assert.Equal(t, nil, err)
 		if vv != string(chk) {
 			t.Errorf("Test %d, expected=%s got=%s Address did base58 encode/decode correctly.", ii, vv, chk)
 		}

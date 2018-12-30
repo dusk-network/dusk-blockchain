@@ -1,5 +1,7 @@
 package base58
 
+import "errors"
+
 // Alphabet is a a b58 alphabet.
 type Alphabet struct {
 	decode [128]int8
@@ -9,9 +11,9 @@ type Alphabet struct {
 // NewAlphabet creates a new alphabet from the passed string.
 //
 // It panics if the passed string is not 58 bytes long or isn't valid ASCII.
-func NewAlphabet(s string) *Alphabet {
+func NewAlphabet(s string) (*Alphabet, error) {
 	if len(s) != 58 {
-		panic("base58 alphabets must be 58 bytes long")
+		return nil, errors.New("base58 alphabets must be 58 bytes long")
 	}
 	ret := new(Alphabet)
 	copy(ret.encode[:], s)
@@ -21,8 +23,8 @@ func NewAlphabet(s string) *Alphabet {
 	for i, b := range ret.encode {
 		ret.decode[b] = int8(i)
 	}
-	return ret
+	return ret, nil
 }
 
-// BTCAlphabet is the bitcoin base58 alphabet.
-var BTCAlphabet = NewAlphabet("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+// base alphabet
+var ab = ("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")

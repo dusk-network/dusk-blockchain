@@ -12,7 +12,7 @@ var (
 )
 
 // Encode encodes the passed bytes into a base58 encoded string.
-func Encode(bin []byte) string {
+func Encode(bin []byte) (string, error) {
 	return Base58Encoding(bin)
 }
 
@@ -23,8 +23,13 @@ func EncodeAlphabet(bin []byte, alphabet *Alphabet) string {
 }
 
 // Base58Encoding encodes the passed bytes into a base58 encoded string.
-func Base58Encoding(bin []byte) string {
-	return Base58EncodingAlphabet(bin, BTCAlphabet)
+func Base58Encoding(bin []byte) (string, error) {
+
+	BTCAlphabet, err := NewAlphabet(ab)
+	if err != nil {
+		return "", nil
+	}
+	return Base58EncodingAlphabet(bin, BTCAlphabet), nil
 }
 
 // Base58EncodingAlphabet encodes the passed bytes into a base58 encoded
@@ -85,6 +90,11 @@ func DecodeAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 
 // Base58Decoding decodes the base58 encoded bytes.
 func Base58Decoding(str string) ([]byte, error) {
+
+	BTCAlphabet, err := NewAlphabet(ab)
+	if err != nil {
+		return nil, err
+	}
 	return Base58DecodingAlphabet(str, BTCAlphabet)
 }
 
