@@ -41,6 +41,13 @@ func (m *MsgGetData) AddBlock(block *Block) {
 	m.Vectors = append(m.Vectors, vect)
 }
 
+// AddBlocks will add blocks inventory vector to MsgGetData.
+func (m *MsgGetData) AddBlocks(blocks []*Block) {
+	for _, block := range blocks {
+		m.AddBlock(block)
+	}
+}
+
 // Encode a MsgGetData struct and write to w.
 // Implements payload interface.
 func (m *MsgGetData) Encode(w io.Writer) error {

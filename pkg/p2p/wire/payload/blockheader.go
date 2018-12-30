@@ -116,3 +116,9 @@ func (b *BlockHeader) Decode(r io.Reader) error {
 
 	return nil
 }
+
+func (b *BlockHeader) Bytes() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := b.Encode(buf)
+	return buf.Bytes(), err
+}

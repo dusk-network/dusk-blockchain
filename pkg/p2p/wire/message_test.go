@@ -15,11 +15,11 @@ func TestWriteReadMessage(t *testing.T) {
 
 	msg := payload.NewMsgVersion(protocol.ProtocolVersion, addr1, addr2)
 	buf := new(bytes.Buffer)
-	if err := WriteMessage(buf, protocol.DevNet, msg); err != nil {
+	if err := WriteMessage(buf, protocol.MainNet, msg); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2, err := ReadMessage(buf, protocol.DevNet)
+	msg2, err := ReadMessage(buf, protocol.MainNet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,11 +31,11 @@ func TestWriteReadMessageNoPayload(t *testing.T) {
 	msg := payload.NewMsgVerAck()
 	bs := make([]byte, 0, HeaderSize)
 	buf := bytes.NewBuffer(bs)
-	if err := WriteMessage(buf, protocol.DevNet, msg); err != nil {
+	if err := WriteMessage(buf, protocol.MainNet, msg); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2, err := ReadMessage(buf, protocol.DevNet)
+	msg2, err := ReadMessage(buf, protocol.MainNet)
 	if err != nil {
 		t.Fatal(err)
 	}

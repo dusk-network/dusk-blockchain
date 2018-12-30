@@ -133,7 +133,6 @@ func (d *Detector) addMessage(cmd commands.Cmd) []commands.Cmd {
 	case commands.GetAddr:
 		// We now will expect a Headers Message
 		cmds = append(cmds, commands.Addr)
-
 	case commands.GetData:
 		// We will now expect a block/tx message
 		// We can optimise this by including the exact inventory type, however it is not needed

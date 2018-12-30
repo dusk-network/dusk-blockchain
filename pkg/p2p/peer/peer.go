@@ -13,11 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
@@ -100,7 +100,7 @@ func (p *Peer) Write(msg wire.Payload) error {
 	return wire.WriteMessage(p.conn, p.config.Net, msg)
 }
 
-// Read to a peer
+// Read from a peer
 func (p *Peer) Read() (wire.Payload, error) {
 	return wire.ReadMessage(p.conn, p.config.Net)
 }
@@ -119,7 +119,7 @@ func (p *Peer) Disconnect() {
 	close(p.quitch)
 	p.conn.Close()
 
-	fmt.Println("Disconnected Peer with address", p.RemoteAddr().String())
+	fmt.Println("Disconnected peer with address", p.RemoteAddr().String())
 }
 
 // Exposed API functions below
@@ -189,7 +189,7 @@ loop:
 		case <-p.quitch:
 			break loop
 		case <-p.Detector.Quitch:
-			fmt.Println("Peer stalled, disconnecting")
+			fmt.Printf("Peer %s stalled, disconnecting.\n", p.addr)
 			break loop
 		}
 	}
@@ -219,7 +219,7 @@ loop:
 		idleTimer.Stop()
 
 		if err != nil {
-			fmt.Println("Err on read", err) // This will also happen if Peer is disconnected
+			fmt.Println("Err on read:", err) // This will also happen if Peer is disconnected
 			break loop
 		}
 
@@ -305,7 +305,7 @@ func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 
 	p.inch <- func() {
 		// fmt.Println(msg.Hashes)
-		fmt.Println("That was an getdata Message please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'getdata' message from %s.\n", p.addr)
 	}
 }
 
@@ -317,7 +317,7 @@ func (p *Peer) OnTx(msg *payload.MsgTx) {
 		id := msg.Tx
 		getdata.AddTx(id)
 		p.Write(getdata)
-		fmt.Println("That was an tx Message please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'tx' message from %s.\n", p.addr)
 	}
 }
 
@@ -327,7 +327,7 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 		if p.config.OnInv != nil {
 			p.config.OnInv(p, msg)
 		}
-		fmt.Println("That was an inv Message please pass func down through config", msg.Command())
+		fmt.Printf("Received an 'inv' message from %s.\n", p.addr)
 	}
 }
 
@@ -336,9 +336,9 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
 	p.inch <- func() {
 		if p.config.OnGetHeaders != nil {
-			p.config.OnGetHeaders(msg)
+			p.config.OnGetHeaders(p, msg)
 		}
-		fmt.Println("That was a getheaders message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'getheaders' message from %s.\n", p.addr)
 	}
 }
 
@@ -348,7 +348,7 @@ func (p *Peer) OnAddr(msg *payload.MsgAddr) {
 		if p.config.OnAddr != nil {
 			p.config.OnAddr(p, msg)
 		}
-		fmt.Println("That was a addr message, please pass func down through config", msg.Command())
+		fmt.Printf("Received an 'addr' message from %s.\n", p.addr)
 	}
 }
 
@@ -358,7 +358,7 @@ func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
 		if p.config.OnGetAddr != nil {
 			p.config.OnGetAddr(p, msg)
 		}
-		fmt.Println("That was a getaddr message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'getaddr' message from %s.\n", p.addr)
 	}
 }
 
@@ -368,7 +368,7 @@ func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
 		if p.config.OnGetBlocks != nil {
 			p.config.OnGetBlocks(msg)
 		}
-		fmt.Println("That was a getblocks message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'getblocks' message from %s.\n", p.addr)
 	}
 }
 
@@ -378,7 +378,7 @@ func (p *Peer) OnBlocks(msg *payload.MsgBlock) {
 		if p.config.OnBlock != nil {
 			p.config.OnBlock(p, msg)
 		}
-		fmt.Println("That was a blocks message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'blocks' message from %s.\n", p.addr)
 	}
 }
 
@@ -401,10 +401,10 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 // OnHeaders Listener
 func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
 	p.inch <- func() {
-		if p.config.OnHeader != nil {
-			p.config.OnHeader(p, msg)
+		if p.config.OnHeaders != nil {
+			p.config.OnHeaders(p, msg)
 		}
-		fmt.Println("That was a headers message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'headers' message from %s.\n", p.addr)
 	}
 }
 
@@ -414,7 +414,7 @@ func (p *Peer) OnBinary(msg *payload.MsgBinary) {
 		if p.config.OnBinary != nil {
 			p.config.OnBinary(p, msg)
 		}
-		fmt.Println("That was a binary message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'binary' message from %s.\n", p.addr)
 	}
 }
 
@@ -424,7 +424,7 @@ func (p *Peer) OnCandidate(msg *payload.MsgCandidate) {
 		if p.config.OnCandidate != nil {
 			p.config.OnCandidate(p, msg)
 		}
-		fmt.Println("That was a candidate message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'candidate' message from %s.\n", p.addr)
 	}
 }
 
@@ -434,7 +434,7 @@ func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
 		if p.config.OnCertificate != nil {
 			p.config.OnCertificate(p, msg)
 		}
-		fmt.Println("That was a certificate message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'certificate' message from %s.\n", p.addr)
 	}
 }
 
@@ -444,7 +444,7 @@ func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
 		if p.config.OnCertificateReq != nil {
 			p.config.OnCertificateReq(p, msg)
 		}
-		fmt.Println("That was a certificatereq message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'certificatereq' message from %s.\n", p.addr)
 	}
 }
 
@@ -454,17 +454,26 @@ func (p *Peer) OnMemPool(msg *payload.MsgMemPool) {
 		if p.config.OnMemPool != nil {
 			p.config.OnMemPool(p, msg)
 		}
-		fmt.Println("That was a mempool message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'mempool' message from %s.\n", p.addr)
 	}
 }
 
 // OnNotFound Listener
 func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
+	// Remove the message we initially requested from the Detector
+	//TODO: Make a separate function and check whether we need more payload.InvXxx types (e.g. InvHdr)
+	for _, vector := range msg.Vectors {
+		if vector.Type == payload.InvBlock {
+			p.Detector.RemoveMessage(commands.GetHeaders)
+		} else {
+			p.Detector.RemoveMessage(commands.Tx)
+		}
+	}
 	p.inch <- func() {
 		if p.config.OnNotFound != nil {
 			p.config.OnNotFound(p, msg)
 		}
-		fmt.Println("That was a notfound message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'notfound' message from %s.\n", p.addr)
 	}
 }
 
@@ -474,7 +483,7 @@ func (p *Peer) OnPing(msg *payload.MsgPing) {
 		if p.config.OnPing != nil {
 			p.config.OnPing(p, msg)
 		}
-		fmt.Println("That was a ping message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'ping' message from %s.\n", p.addr)
 	}
 }
 
@@ -484,7 +493,7 @@ func (p *Peer) OnPong(msg *payload.MsgPong) {
 		if p.config.OnPong != nil {
 			p.config.OnPong(msg)
 		}
-		fmt.Println("That was a pong message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'pong' message from %s.\n", p.addr)
 	}
 }
 
@@ -494,7 +503,7 @@ func (p *Peer) OnReduction(msg *payload.MsgReduction) {
 		if p.config.OnReduction != nil {
 			p.config.OnReduction(p, msg)
 		}
-		fmt.Println("That was a reduction message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'reduction' message from %s.\n", p.addr)
 	}
 }
 
@@ -504,7 +513,7 @@ func (p *Peer) OnReject(msg *payload.MsgReject) {
 		if p.config.OnReject != nil {
 			p.config.OnReject(p, msg)
 		}
-		fmt.Println("That was a reject message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'reject' message from %s.\n", p.addr)
 	}
 }
 
@@ -514,17 +523,18 @@ func (p *Peer) OnScore(msg *payload.MsgScore) {
 		if p.config.OnScore != nil {
 			p.config.OnScore(p, msg)
 		}
-		fmt.Println("That was a score message, please pass func down through config", msg.Command())
+		fmt.Printf("Received a 'score' message from %s.\n", p.addr)
 	}
 }
 
-// RequestHeaders will write a getheaders to peer
+// RequestHeaders will write a MsgGetHeaders to peer
 func (p *Peer) RequestHeaders(hash []byte) error {
-	fmt.Println("Sending header request")
+	fmt.Println("Sending 'getheaders' msg")
 	c := make(chan error, 0)
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetHeaders)
-		getHeaders := payload.NewMsgGetHeaders(hash, []byte{})
+		stop := make([]byte, 32)
+		getHeaders := payload.NewMsgGetHeaders(hash, stop)
 		p.Write(getHeaders)
 	}
 
@@ -539,7 +549,7 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetData)
 		getdata := payload.NewMsgGetData()
-		getdata.AddTx(tx)
+		getdata.AddTx(&tx)
 		err := p.Write(getdata)
 		c <- err
 	}
@@ -547,15 +557,23 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 	return <-c
 }
 
-// RequestBlocks will ask a peer for a block
-func (p *Peer) RequestBlocks(hash []byte) error {
-	fmt.Println("Requesting hash from peer")
+// RequestBlocks will ask a peer for blocks
+func (p *Peer) RequestBlocks(hashes [][]byte) error {
+	fmt.Println("Requesting block from peer")
 	c := make(chan error, 0)
+
+	blocks := make([]*payload.Block, len(hashes))
+	for _, hash := range hashes {
+		// Create a block from requested hash
+		block := payload.NewBlock()
+		block.Header.Hash = hash
+		blocks = append(blocks, block)
+	}
 
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetData)
 		getdata := payload.NewMsgGetData()
-		getdata.AddBlock(hash)
+		getdata.AddBlocks(blocks)
 		err := p.Write(getdata)
 		c <- err
 	}
