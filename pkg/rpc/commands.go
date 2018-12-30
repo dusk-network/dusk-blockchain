@@ -64,7 +64,10 @@ var Hash = func(s *Server, params []string) (string, error) {
 			return "", err
 		}
 
-		text := base58.Base58Encoding(hash)
+		text, err := base58.Base58Encoding(hash)
+		if err != nil {
+			return "", err
+		}
 		hashes += text + " "
 	}
 
