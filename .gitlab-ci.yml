@@ -1,7 +1,7 @@
 image: golang:1.11
 
 variables:
-  REPO_NAME: gitlab.dusk.network/dusk-core/dusk-go
+  REPO_NAME: gitlab.dusk.network/dusk-core/dusk-go/pkg
 
 before_script:
   - mkdir -p $GOPATH/src/$(dirname $REPO_NAME)
