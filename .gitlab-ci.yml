@@ -1,20 +1,60 @@
-image: golang:1.11
+image: golang:latest
 
-variables:
-  REPO_NAME: gitlab.dusk.network/dusk-core/dusk-go/pkg
-
-before_script:
-  - mkdir -p $GOPATH/src/$(dirname $REPO_NAME)
-  - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_NAME
-  - cd $GOPATH/src/$REPO_NAME
-  - go get -v -d -t ./...
+cache:
+  paths:
+    - /apt-cache
+    - /go/src/github.com
+    - /go/src/golang.org
+    - /go/src/google.golang.org
+    - /go/src/gopkg.in
 
 stages:
-    - test
+  - test
+  - build
 
-format:
-    stage: test
-    script:
-      - go fmt $(go list ./... | grep -v /vendor/)
-      - go vet $(go list ./... | grep -v /vendor/)
-      - go test -race $(go list ./... | grep -v /vendor/)
+before_script:
+  - mkdir -p /go/src/gitlab.dusk.network/dusk-core/dusk-go /go/src/_/builds
+  - cp -r $CI_PROJECT_DIR /go/src/gitlab.dusk.network/dusk-core/dusk-go
+ # - ln -s /go/src/gitlab.dusk.network/dusk-core/dusk-go/builds /go/src/_/builds/dusk-go
+  - export CC=clang-5.0
+  - make dep
+
+unit_tests:
+  stage: test
+  script:
+    - make test
+
+race_detector:
+  stage: test
+  script:
+    - make race
+
+memory_sanitizer:
+  stage: test
+  script:
+    - make msan
+
+code_coverage:
+  stage: test
+  script:
+    - make coverage
+
+code_coverage_report:
+  stage: test
+  script:
+    - make coverhtml
+  only:
+  - master
+
+lint_code:
+  stage: test
+  script:
+    - make lint
+
+# build:
+#   stage: build
+#   script:
+#     - make
+#   artifacts:
+#     paths:
+#     - demo-tools
