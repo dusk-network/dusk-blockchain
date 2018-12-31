@@ -1,4 +1,4 @@
-image: golang:latest
+image: golang:1.11
 
 variables:
   REPO_NAME: gitlab.dusk.network/dusk-core/dusk-go
