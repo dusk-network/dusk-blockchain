@@ -16,7 +16,7 @@ before_script:
   - mkdir -p /go/src/gitlab.dusk.network/dusk-core/dusk-go /go/src/_/builds
   - cp -r $CI_PROJECT_DIR /go/src/gitlab.dusk.network/dusk-core/dusk-go
  # - ln -s /go/src/gitlab.dusk.network/dusk-core/dusk-go/builds /go/src/_/builds/dusk-go
-  - export CC=clang
+  - export CC=clang-5.0
   - make dep
 
 unit_tests:
