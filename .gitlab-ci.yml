@@ -10,7 +10,7 @@ cache:
 
 stages:
   - test
-  - build
+  # - build
 
 before_script:
   - mkdir -p /go/src/gitlab.dusk.network/dusk-core/dusk-go /go/src/_/builds
