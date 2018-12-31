@@ -14,9 +14,11 @@ race: dep ## Run data race detector
 msan: dep ## Run memory sanitizer
 	@go test -msan -short ${PKG_LIST}
 coverage: ## Generate global code coverage report
+	chmod u+x coverage.sh
 	./coverage.sh;
 coverhtml: ## Generate global code coverage report in HTML
-	./tools/coverage.sh html;
+	chmod u+x coverage.sh
+	./coverage.sh html;
 dep: ## Get the dependencies
 	@go get -v -d ./...
 	@go get -u github.com/golang/lint/golint
