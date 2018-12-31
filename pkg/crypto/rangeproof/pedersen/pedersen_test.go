@@ -23,6 +23,7 @@ func TestPedersenScalar(t *testing.T) {
 
 func TestPedersenVector(t *testing.T) {
 	ped := pedersen.New([]byte("some data"))
+	// ped.BaseVector.Compute(4) // since values are not precomputed, we will compute two of them here
 	var one ristretto.Scalar
 	one.SetOne()
 
@@ -37,15 +38,15 @@ func TestPedersenVector(t *testing.T) {
 	blind := comm.BlindingFactor
 
 	H0 := ped.BlindPoint // blind
-	H1 := ped.BasePoint
-	H2 := ped.BaseVector.Bases[2]
+	H1 := ped.BaseVector.Bases[0]
+	H2 := ped.BaseVector.Bases[1]
 
 	ped = pedersen.New(append(ped.GenData, uint8(1)))
 
-	ped.BaseVector.Compute(2) // since values are not precomputed, we will compute two of them here
+	ped.BaseVector.Compute(4) // since values are not precomputed, we will compute two of them here
 
-	B0 := ped.BlindPoint
-	B1 := ped.BasePoint
+	B0 := ped.BaseVector.Bases[0]
+	B1 := ped.BaseVector.Bases[1]
 
 	var H0blind ristretto.Point
 	H0blind.ScalarMult(&H0, &blind)
