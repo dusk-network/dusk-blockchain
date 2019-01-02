@@ -1,11 +1,12 @@
 package generator
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 )
 
 // This package will generate the generators for the pedersens and the bulletproof
-
+// Generator holds the information to generate a set of points
+// based on an initial byte slice; data
 type Generator struct {
 	data  []byte
 	Bases []ristretto.Point

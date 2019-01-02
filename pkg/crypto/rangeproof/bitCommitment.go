@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math/big"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 )
 
 // BitCommitment will be a struct used to hold the values aL and aR

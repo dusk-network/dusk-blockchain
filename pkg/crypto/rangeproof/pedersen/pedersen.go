@@ -1,15 +1,17 @@
 package pedersen
 
 import (
+	ristretto "github.com/bwesterb/go-ristretto"
 	generator "gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/generators"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
+// Pedersen represents a pedersen struct which holds
+// the necessary information to commit a vector or a scalar to a point
 type Pedersen struct {
 	BaseVector *generator.Generator
 	GenData    []byte
-	BlindPoint ristretto.Point // This point will be used to Commit the blinders for the blinding scalars
-	BasePoint  ristretto.Point // This point will be used to Commit the amounts for the amount scalars
+	BlindPoint ristretto.Point
+	BasePoint  ristretto.Point
 }
 
 // New will setup the BaseVector
@@ -105,6 +107,9 @@ func (p *Pedersen) CommitToScalar(v ristretto.Scalar) Commitment {
 	}
 }
 
+// CommitToVectors will take n set of vectors and form a commitment to them s.t.
+// V = aH + <v1, G1> + <v2, G2> + <v3, G3>
+// where a is a scalar, v1 is a vector of scalars, and G1 is a vector of points
 func (p *Pedersen) CommitToVectors(vectors ...[]ristretto.Scalar) Commitment {
 
 	// Generate random blinding factor

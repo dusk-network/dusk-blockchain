@@ -5,9 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 // Polynomial construction

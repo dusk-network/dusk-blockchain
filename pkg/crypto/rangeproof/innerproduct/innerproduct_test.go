@@ -3,10 +3,10 @@ package innerproduct
 import (
 	"testing"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/pedersen"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 func TestProofCreation(t *testing.T) {
