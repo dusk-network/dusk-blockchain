@@ -17,6 +17,8 @@ type Proof struct {
 	A, B ristretto.Scalar // a and b are capitalised so that they are exported, in paper it is `a``b`
 }
 
+// Generate generates an inner product proof or an error
+// if proof cannot be constucted
 func Generate(GVec, HVec []ristretto.Point, aVec, bVec, HprimeFactors []ristretto.Scalar, Q ristretto.Point) (*Proof, error) {
 	n := uint32(len(GVec))
 
@@ -257,22 +259,24 @@ func Generate(GVec, HVec []ristretto.Point, aVec, bVec, HprimeFactors []ristrett
 	}, nil
 }
 
-func (i *Proof) VerifScalars() ([]ristretto.Scalar, []ristretto.Scalar, []ristretto.Scalar) {
+// VerifScalars generates the challenge squared, the inverse challenge squared
+// and s for a given inner product proof
+func (proof *Proof) VerifScalars() ([]ristretto.Scalar, []ristretto.Scalar, []ristretto.Scalar) {
 	// generate scalars for verification
 
-	if len(i.L) != len(i.R) {
+	if len(proof.L) != len(proof.R) {
 		return nil, nil, nil
 	}
 
-	lgN := len(i.L)
+	lgN := len(proof.L)
 	n := uint32(1 << uint(lgN))
 
 	hs := fiatshamir.HashCacher{Cache: []byte{}}
 
 	// 1. compute x's
 	xChals := make([]ristretto.Scalar, 0, lgN)
-	for k := range i.L {
-		hs.Append(i.L[k].Bytes(), i.R[k].Bytes())
+	for k := range proof.L {
+		hs.Append(proof.L[k].Bytes(), proof.R[k].Bytes())
 		xChals = append(xChals, hs.Derive())
 	}
 
@@ -328,6 +332,7 @@ func (i *Proof) VerifScalars() ([]ristretto.Scalar, []ristretto.Scalar, []ristre
 	return chalSq, invChalSq, s
 }
 
+// Verify is used for unit tests and verifies that a given proof evaluates to the point P
 func (proof *Proof) Verify(G, H, L, R []ristretto.Point, HprimeFactor []ristretto.Scalar, Q, P ristretto.Point, n int) bool {
 	uSq, uInvSq, s := proof.VerifScalars()
 
