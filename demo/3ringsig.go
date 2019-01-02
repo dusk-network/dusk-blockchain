@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ringsig/mlsag"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 /*

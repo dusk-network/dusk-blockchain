@@ -3,7 +3,7 @@ package vector
 import (
 	"errors"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 )
 
 // Add adds two scalar slices a and b,

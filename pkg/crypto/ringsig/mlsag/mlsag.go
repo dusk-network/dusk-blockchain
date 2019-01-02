@@ -8,7 +8,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/bytesutil"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 )
 
 // RingSignature is the collection of signatures

@@ -5,10 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/base58"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 const (
