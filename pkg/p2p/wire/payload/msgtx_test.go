@@ -5,54 +5,39 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 func TestMsgTxEncodeDecode(t *testing.T) {
 	byte32 := []byte{1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4}
 
-	// Input
 	sig, _ := crypto.RandEntropy(2000)
-	in := transactions.Input{
-		KeyImage:  byte32,
+	in := &transactions.Input{
 		TxID:      byte32,
 		Index:     1,
 		Signature: sig,
 	}
 
-	// Output
-	out := transactions.Output{
-		Amount: 200,
-		P:      byte32,
-	}
+	txPubKey, _ := crypto.RandEntropy(32)
+	s := transactions.NewTX()
+	s.AddInput(in)
+	s.AddTxPubKey(txPubKey)
 
-	// Type attribute
-	ta := transactions.TypeAttributes{
-		Inputs:   []transactions.Input{in},
-		TxPubKey: byte32,
-		Outputs:  []transactions.Output{out},
-	}
-
-	R, _ := crypto.RandEntropy(32)
-	s := transactions.Stealth{
-		Version: 1,
-		Type:    1,
-		R:       R,
-		TA:      ta,
+	out := transactions.NewOutput(200, byte32)
+	s.AddOutput(out)
+	if err := s.SetHash(); err != nil {
+		t.Fatal(err)
 	}
 
 	msg := NewMsgTx(s)
 
-	size := s.GetEncodeSize()
-	bs := make([]byte, 0, size)
-	buf := bytes.NewBuffer(bs)
-
+	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2 := MsgTx{}
+	msg2 := &MsgTx{}
 	if err := msg2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}

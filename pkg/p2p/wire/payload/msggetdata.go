@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 // MsgGetData defines a getdata message on the Dusk wire protocol.
 type MsgGetData struct {
-	Vectors []InvVect
+	Vectors []*InvVect
 }
 
 // NewMsgGetData will return an empty MsgGetData struct.
@@ -22,21 +22,20 @@ func NewMsgGetData() *MsgGetData {
 }
 
 // AddTx will add a tx inventory vector to MsgGetData.
-func (m *MsgGetData) AddTx(tx transactions.Stealth) {
-	vect := InvVect{
+func (m *MsgGetData) AddTx(tx *transactions.Stealth) {
+	vect := &InvVect{
 		Type: InvTx,
-		Hash: tx.R,
+		Hash: tx.Hash,
 	}
 
 	m.Vectors = append(m.Vectors, vect)
 }
 
 // AddBlock will add a block inventory vector to MsgGetData.
-func (m *MsgGetData) AddBlock(hash []byte) {
-	// Finish this when block structure is defined.
-	vect := InvVect{
+func (m *MsgGetData) AddBlock(block *Block) {
+	vect := &InvVect{
 		Type: InvBlock,
-		Hash: hash,
+		Hash: block.Header.Hash,
 	}
 
 	m.Vectors = append(m.Vectors, vect)
@@ -70,8 +69,9 @@ func (m *MsgGetData) Decode(r io.Reader) error {
 		return err
 	}
 
-	m.Vectors = make([]InvVect, n)
+	m.Vectors = make([]*InvVect, n)
 	for i := uint64(0); i < n; i++ {
+		m.Vectors[i] = &InvVect{}
 		var t uint8
 		if err := encoding.ReadUint8(r, &t); err != nil {
 			return err

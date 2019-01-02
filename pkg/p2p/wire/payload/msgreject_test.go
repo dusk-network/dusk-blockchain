@@ -12,7 +12,7 @@ func TestMsgRejectEncodeDecode(t *testing.T) {
 	byte32 := []byte{1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4}
 
 	msg := NewMsgReject(string(commands.Tx), RejectInvalid, "invalid")
-	msg.AddData(byte32)
+	msg.SetData(byte32)
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		t.Fatal(err)
