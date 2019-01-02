@@ -10,7 +10,7 @@ type Alphabet struct {
 
 // NewAlphabet creates a new alphabet from the passed string.
 //
-// It panics if the passed string is not 58 bytes long or isn't valid ASCII.
+// It returns an error if the passed string is not 58 bytes long or isn't valid ASCII.
 func NewAlphabet(s string) (*Alphabet, error) {
 	if len(s) != 58 {
 		return nil, errors.New("base58 alphabets must be 58 bytes long")
