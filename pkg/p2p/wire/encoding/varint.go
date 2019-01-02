@@ -91,7 +91,7 @@ func WriteVarInt(w io.Writer, v uint64) error {
 
 // VarIntEncodeSize returns the number of bytes needed to serialize a CompactSize int
 // of size v
-func VarIntEncodeSize(v uint64) int {
+func VarIntEncodeSize(v uint64) uint64 {
 	// Small enough to write in 1 byte (uint8)
 	if v < 0xfd {
 		return 1

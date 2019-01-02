@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -34,13 +35,14 @@ func NewMsgReject(msg string, code RejectCode, reason string) *MsgReject {
 		Message:    msg,
 		RejectCode: code,
 		Reason:     reason,
+		Data:       make([]byte, 32),
 	}
 }
 
-// AddData will add data to the reject message if it's relevant.
+// SetData will set the data for the reject message.
 // This function is only used in case of a transaction or block rejection,
 // so it will always be 32 bytes.
-func (m *MsgReject) AddData(hash []byte) error {
+func (m *MsgReject) SetData(hash []byte) error {
 	if len(hash) != 32 {
 		return errors.New("reject data needs to be a hash (32 bytes)")
 	}
@@ -64,10 +66,8 @@ func (m *MsgReject) Encode(w io.Writer) error {
 		return err
 	}
 
-	if m.Data != nil {
-		if err := encoding.Write256(w, m.Data); err != nil {
-			return err
-		}
+	if err := encoding.Write256(w, m.Data); err != nil {
+		return err
 	}
 
 	return nil
@@ -100,7 +100,7 @@ func (m *MsgReject) Decode(r io.Reader) error {
 	if err := encoding.Read256(r, &m.Data); err != nil {
 		// If we get an EOF error, there was no data left in the reader,
 		// and we can simply discard the error.
-		if err != io.EOF {
+		if !strings.Contains(err.Error(), "EOF") {
 			return err
 		}
 	}

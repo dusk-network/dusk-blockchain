@@ -118,8 +118,14 @@ func ReadMessage(r io.Reader, magic protocol.DuskNetwork) (Payload, error) {
 		m := &payload.MsgTx{}
 		err := m.Decode(payloadBuf)
 		return m, err
-	// case commands.Block:
-	// case commands.Headers:
+	case commands.Block:
+		m := &payload.MsgBlock{}
+		err := m.Decode(payloadBuf)
+		return m, err
+	case commands.Headers:
+		m := payload.NewMsgHeaders()
+		err := m.Decode(payloadBuf)
+		return m, err
 	case commands.MemPool:
 		return payload.NewMsgMemPool(), nil
 	case commands.Inv:

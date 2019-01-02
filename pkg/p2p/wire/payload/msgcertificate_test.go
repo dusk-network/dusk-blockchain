@@ -14,8 +14,19 @@ func TestMsgCertificateEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cert, err := crypto.RandEntropy(100)
-	if err != nil {
+	rand1, _ := crypto.RandEntropy(32)
+	rand2, _ := crypto.RandEntropy(32)
+
+	sig, _ := crypto.RandEntropy(32)
+
+	cert := NewCertificate(sig)
+	for i := 1; i < 4; i++ {
+		step := NewStep(uint32(i))
+		step.AddData(rand1, rand2)
+		cert.AddStep(step)
+	}
+
+	if err := cert.SetHash(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -42,9 +53,16 @@ func TestMsgCertificateChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cert, err := crypto.RandEntropy(100)
-	if err != nil {
-		t.Fatal(err)
+	rand1, _ := crypto.RandEntropy(32)
+	rand2, _ := crypto.RandEntropy(32)
+
+	sig, _ := crypto.RandEntropy(32)
+
+	cert := NewCertificate(sig)
+	for i := 1; i < 4; i++ {
+		step := NewStep(uint32(i))
+		step.AddData(rand1, rand2)
+		cert.AddStep(step)
 	}
 
 	if _, err := NewMsgCertificate(200, wrongHash, cert); err == nil {

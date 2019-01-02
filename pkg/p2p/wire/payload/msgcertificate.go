@@ -11,15 +11,15 @@ import (
 
 // MsgCertificate defines a certificate message on the Dusk wire protocol.
 type MsgCertificate struct {
-	BlockHeight uint64 // Block height of the requested certificate
-	BlockHash   []byte // Block hash of the requested certificate (32 bytes)
-	BlockCert   []byte // Block certificate (variable size)
+	BlockHeight uint64       // Block height of the requested certificate
+	BlockHash   []byte       // Block hash of the requested certificate (32 bytes)
+	BlockCert   *Certificate // Block certificate (variable size)
 }
 
 // NewMsgCertificate returns a MsgCertificate struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewMsgCertificate(height uint64, hash, cert []byte) (*MsgCertificate, error) {
+func NewMsgCertificate(height uint64, hash []byte, cert *Certificate) (*MsgCertificate, error) {
 	if len(hash) != 32 {
 		return nil, errors.New("wire: supplied block hash for certificate message is improper length")
 	}
@@ -42,7 +42,7 @@ func (m *MsgCertificate) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(w, m.BlockCert); err != nil {
+	if err := m.BlockCert.Encode(w); err != nil {
 		return err
 	}
 
@@ -60,7 +60,8 @@ func (m *MsgCertificate) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &m.BlockCert); err != nil {
+	m.BlockCert = &Certificate{}
+	if err := m.BlockCert.Decode(r); err != nil {
 		return err
 	}
 
