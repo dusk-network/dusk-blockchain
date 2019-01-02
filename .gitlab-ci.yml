@@ -16,7 +16,6 @@ before_script:
   - mkdir -p /go/src/gitlab.dusk.network/dusk-core/dusk-go /go/src/_/builds
   - cp -r $CI_PROJECT_DIR /go/src/gitlab.dusk.network/dusk-core/dusk-go
  # - ln -s /go/src/gitlab.dusk.network/dusk-core/dusk-go/builds /go/src/_/builds/dusk-go
-  # - export CC=clang-5.0
   - make dep
 
 unit_tests:
@@ -28,24 +27,6 @@ race_detector:
   stage: test
   script:
     - make race
-
-# memory_sanitizer:
-#   stage: test
-#   script:
-#     - make msan
-
-code_coverage:
-  stage: test
-  script:
-    - make coverage
-
-code_coverage_report:
-  stage: test
-  script:
-    - make coverhtml
-  only:
-  - master
-
 lint_code:
   stage: test
   script:
