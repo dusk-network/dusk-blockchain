@@ -13,28 +13,28 @@ var (
 
 // Encode encodes the passed bytes into a base58 encoded string.
 func Encode(bin []byte) (string, error) {
-	return Base58Encoding(bin)
+	return Encoding(bin)
 }
 
 // EncodeAlphabet encodes the passed bytes into a base58 encoded string with the
 // passed alphabet.
 func EncodeAlphabet(bin []byte, alphabet *Alphabet) string {
-	return Base58EncodingAlphabet(bin, alphabet)
+	return EncodingAlphabet(bin, alphabet)
 }
 
-// Base58Encoding encodes the passed bytes into a base58 encoded string.
-func Base58Encoding(bin []byte) (string, error) {
+// Encoding encodes the passed bytes into a base58 encoded string.
+func Encoding(bin []byte) (string, error) {
 
 	BTCAlphabet, err := NewAlphabet(ab)
 	if err != nil {
 		return "", nil
 	}
-	return Base58EncodingAlphabet(bin, BTCAlphabet), nil
+	return EncodingAlphabet(bin, BTCAlphabet), nil
 }
 
-// Base58EncodingAlphabet encodes the passed bytes into a base58 encoded
+// EncodingAlphabet encodes the passed bytes into a base58 encoded
 // string with the passed alphabet.
-func Base58EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
+func EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
 	zero := alphabet.encode[0]
 
 	binsz := len(bin)
@@ -80,27 +80,27 @@ func Base58EncodingAlphabet(bin []byte, alphabet *Alphabet) string {
 
 // Decode decodes the base58 encoded bytes.
 func Decode(str string) ([]byte, error) {
-	return Base58Decoding(str)
+	return Decoding(str)
 }
 
 // DecodeAlphabet decodes the base58 encoded bytes using the given b58 alphabet.
 func DecodeAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
-	return Base58DecodingAlphabet(str, alphabet)
+	return DecodingAlphabet(str, alphabet)
 }
 
-// Base58Decoding decodes the base58 encoded bytes.
-func Base58Decoding(str string) ([]byte, error) {
+// Decoding decodes the base58 encoded bytes.
+func Decoding(str string) ([]byte, error) {
 
 	BTCAlphabet, err := NewAlphabet(ab)
 	if err != nil {
 		return nil, err
 	}
-	return Base58DecodingAlphabet(str, BTCAlphabet)
+	return DecodingAlphabet(str, BTCAlphabet)
 }
 
-// Base58DecodingAlphabet decodes the base58 encoded bytes using the given
+// DecodingAlphabet decodes the base58 encoded bytes using the given
 // b58 alphabet.
-func Base58DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
+func DecodingAlphabet(str string, alphabet *Alphabet) ([]byte, error) {
 	if len(str) == 0 {
 		return nil, fmt.Errorf("zero length string")
 	}
