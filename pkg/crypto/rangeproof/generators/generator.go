@@ -5,6 +5,7 @@ import (
 )
 
 // This package will generate the generators for the pedersens and the bulletproof
+
 // Generator holds the information to generate a set of points
 // based on an initial byte slice; data
 type Generator struct {
