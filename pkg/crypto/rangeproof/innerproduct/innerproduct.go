@@ -267,7 +267,7 @@ func (i *Proof) VerifScalars() ([]ristretto.Scalar, []ristretto.Scalar, []ristre
 	lgN := len(i.L)
 	n := uint32(1 << uint(lgN))
 
-	hs := fiatshamir.HashCacher{[]byte{}}
+	hs := fiatshamir.HashCacher{Cache: []byte{}}
 
 	// 1. compute x's
 	xChals := make([]ristretto.Scalar, 0, lgN)

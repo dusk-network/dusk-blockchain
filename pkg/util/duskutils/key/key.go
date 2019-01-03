@@ -102,7 +102,7 @@ func (k *Key) PublicAddress() (string, error) {
 		return "", err
 	}
 
-	return base58.Encode(buf.Bytes()), nil
+	return base58.Encode(buf.Bytes())
 }
 
 // PubAddrToKey will take a public address

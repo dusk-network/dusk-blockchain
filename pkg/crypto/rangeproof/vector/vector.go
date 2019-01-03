@@ -51,6 +51,21 @@ func Sub(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 	return res, nil
 }
 
+// Neg Negates a vector a
+func Neg(a []ristretto.Scalar) []ristretto.Scalar {
+	if len(a) == 0 {
+		return a
+	}
+
+	res := make([]ristretto.Scalar, len(a))
+
+	for i := range a {
+		res[i].Neg(&a[i])
+	}
+
+	return res
+}
+
 // SubScalar Subtracts a scalars value b, from every element in the slice a
 func SubScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 
@@ -133,9 +148,12 @@ func ScalarPowers(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 		return res
 	}
 
-	// identity
+	if a.IsNonZeroI() == 0 {
+		return res
+	}
+
 	var k ristretto.Scalar
-	k.SetOne() // Identity point
+	k.SetOne()
 	res[0] = k
 
 	if n == 1 {
@@ -145,32 +163,6 @@ func ScalarPowers(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 
 	for i := uint32(2); i < n; i++ {
 		res[i].Mul(&res[i-1], &a)
-	}
-
-	return res
-}
-
-// Hadamard takes two scalar arrays and construct the Hadamard product
-func Hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
-
-	if len(a) != len(b) {
-		return nil, errors.New("Length of a does not equal length of b")
-	}
-
-	res := make([]ristretto.Scalar, len(a))
-
-	for i := 0; i < len(a); i++ {
-		res[i].Mul(&a[i], &b[i])
-	}
-	return res, nil
-}
-
-// FromScalar takes a scalar,a, scaToVec will return a slice of size n, with all elements equal to a
-func FromScalar(a ristretto.Scalar, n uint32) []ristretto.Scalar {
-	res := make([]ristretto.Scalar, n)
-
-	for i := uint32(0); i < n; i++ {
-		res[i] = a
 	}
 
 	return res
@@ -198,6 +190,32 @@ func ScalarPowersSum(a ristretto.Scalar, n uint64) ristretto.Scalar {
 			prev.Mul(&prev, &a)
 		}
 		res.Add(&res, &prev)
+	}
+
+	return res
+}
+
+// Hadamard takes two scalar arrays and construct the Hadamard product
+func Hadamard(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
+
+	if len(a) != len(b) {
+		return nil, errors.New("Length of a does not equal length of b")
+	}
+
+	res := make([]ristretto.Scalar, len(a))
+
+	for i := 0; i < len(a); i++ {
+		res[i].Mul(&a[i], &b[i])
+	}
+	return res, nil
+}
+
+// FromScalar takes a scalar,a, scaToVec will return a slice of size n, with all elements equal to a
+func FromScalar(a ristretto.Scalar, n uint32) []ristretto.Scalar {
+	res := make([]ristretto.Scalar, n)
+
+	for i := uint32(0); i < n; i++ {
+		res[i] = a
 	}
 
 	return res
