@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-        ristretto "github.com/bwesterb/go-ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
 )
 
