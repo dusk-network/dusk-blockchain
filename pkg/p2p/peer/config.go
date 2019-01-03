@@ -8,7 +8,7 @@ import (
 // LocalConfig specifies the properties that should be available for each remote peer
 
 type LocalConfig struct {
-	Net         protocol.DuskNetwork
+	Net         protocol.Magic
 	UserAgent   string
 	Services    protocol.ServiceFlag
 	Nonce       uint32
@@ -16,9 +16,9 @@ type LocalConfig struct {
 	Relay       bool
 	Port        uint16
 	// Pointer to config will keep the startheight updated for each MsgVersion we plan to send
-	StartHeight      func() uint32
-	OnHeader         func(*Peer, *payload.MsgHeaders)
-	OnGetHeaders     func(*payload.MsgGetHeaders) // returns HeaderMessage
+	StartHeight      func() uint64
+	OnHeaders        func(*Peer, *payload.MsgHeaders)
+	OnGetHeaders     func(*Peer, *payload.MsgGetHeaders)
 	OnAddr           func(*Peer, *payload.MsgAddr)
 	OnGetAddr        func(*Peer, *payload.MsgGetAddr)
 	OnInv            func(*Peer, *payload.MsgInv)

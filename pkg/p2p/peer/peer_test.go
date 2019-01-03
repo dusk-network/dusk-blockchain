@@ -6,39 +6,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CityOfZion/neo-go/pkg/peer"
-	"github.com/CityOfZion/neo-go/pkg/wire"
-	"github.com/CityOfZion/neo-go/pkg/wire/payload"
-	"github.com/CityOfZion/neo-go/pkg/wire/protocol"
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 func returnConfig() peer.LocalConfig {
 
-	DefaultHeight := func() uint32 {
+	DefaultHeight := func() uint64 {
 		return 10
 	}
 
-	OnAddr := func(p *peer.Peer, msg *payload.AddrMessage) {}
-	OnHeader := func(p *peer.Peer, msg *payload.HeadersMessage) {}
-	OnGetHeaders := func(msg *payload.GetHeadersMessage) {}
-	OnInv := func(p *peer.Peer, msg *payload.InvMessage) {}
-	OnGetData := func(msg *payload.GetDataMessage) {}
-	OnBlock := func(p *peer.Peer, msg *payload.BlockMessage) {}
-	OnGetBlocks := func(msg *payload.GetBlocksMessage) {}
+	OnAddr := func(p *peer.Peer, msg *payload.MsgAddr) {}
+	OnHeaders := func(p *peer.Peer, msg *payload.MsgHeaders) {}
+	OnGetHeaders := func(p *peer.Peer, msg *payload.MsgGetHeaders) {}
+	OnInv := func(p *peer.Peer, msg *payload.MsgInv) {}
+	OnGetData := func(msg *payload.MsgGetData) {}
+	OnBlock := func(p *peer.Peer, msg *payload.MsgBlock) {}
+	OnGetBlocks := func(msg *payload.MsgGetBlocks) {}
 
 	return peer.LocalConfig{
 		Net:         protocol.MainNet,
-		UserAgent:   "NEO-GO-Default",
+		UserAgent:   protocol.UserAgent,
 		Services:    protocol.NodePeerService,
 		Nonce:       1200,
 		ProtocolVer: 0,
 		Relay:       false,
-		Port:        10332,
-		// pointer to config will keep the startheight updated for each version
-		//Message we plan to send
+		Port:        10333,
+		// pointer to config will keep the startheight updated for each MsgVersion
+		// we plan to send
 		StartHeight:  DefaultHeight,
-		OnHeader:     OnHeader,
+		OnHeaders:    OnHeaders,
 		OnAddr:       OnAddr,
 		OnGetHeaders: OnGetHeaders,
 		OnInv:        OnInv,
@@ -52,13 +52,13 @@ func TestHandshake(t *testing.T) {
 	address := ":20338"
 	go func() {
 
-		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
+		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
 		p := peer.NewPeer(conn, true, returnConfig())
 		err = p.Run()
-		verack, err := payload.NewVerackMessage()
+		verack := payload.NewMsgVerAck()
 		if err != nil {
 			t.Fail()
 		}
@@ -87,9 +87,10 @@ func TestHandshake(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		tcpAddrMe := &net.TCPAddr{IP: net.ParseIP("82.2.97.142"), Port: 20338}
-		nonce := uint32(100)
-		messageVer, err := payload.NewVersionMessage(tcpAddrMe, 2595770, false, protocol.DefaultVersion, protocol.UserAgent, nonce, protocol.NodePeerService)
+		fromAddr := payload.NewNetAddress("82.2.97.142", 20338)
+		toAddr := payload.NewNetAddress("127.0.0.1", 20338)
+
+		messageVer := payload.NewMsgVersion(protocol.ProtocolVersion, fromAddr, toAddr)
 
 		if err != nil {
 			t.Fatal(err)
@@ -104,14 +105,14 @@ func TestHandshake(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		version, ok := readmsg.(*payload.VersionMessage)
+		version, ok := readmsg.(*payload.MsgVersion)
 		if !ok {
 			t.Fatal(err)
 		}
 
 		assert.NotEqual(t, nil, version)
 
-		messageVrck, err := payload.NewVerackMessage()
+		messageVrck := payload.NewMsgVerAck()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +130,7 @@ func TestHandshake(t *testing.T) {
 
 		assert.NotEqual(t, nil, readmsg)
 
-		verk, ok := readmsg.(*payload.VerackMessage)
+		verk, ok := readmsg.(*payload.MsgVerAck)
 		if !ok {
 			t.Fatal(err)
 		}
@@ -181,7 +182,7 @@ func TestPeerDisconnect(t *testing.T) {
 	fmt.Println("Calling disconnect")
 	p.Disconnect()
 	fmt.Println("Disconnect finished calling")
-	verack, _ := payload.NewVerackMessage()
+	verack := payload.NewMsgVerAck()
 
 	fmt.Println(" We good here")
 

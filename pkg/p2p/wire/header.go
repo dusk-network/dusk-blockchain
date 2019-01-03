@@ -11,10 +11,10 @@ import (
 
 // Header defines a Dusk wire message header.
 type Header struct {
-	Magic    protocol.DuskNetwork // 4 bytes
-	Command  commands.Cmd         // 14 bytes
-	Length   uint32               // 4 bytes
-	Checksum uint32               // 4 bytes
+	Magic    protocol.Magic // 4 bytes
+	Command  commands.Cmd   // 14 bytes
+	Length   uint32         // 4 bytes
+	Checksum uint32         // 4 bytes
 }
 
 // HeaderSize defines the size of a Dusk wire message header in bytes.
@@ -26,7 +26,7 @@ func (h *Header) Decode(r io.Reader) error {
 	if err := encoding.ReadUint32(r, binary.LittleEndian, &magic); err != nil {
 		return err
 	}
-	h.Magic = protocol.DuskNetwork(magic)
+	h.Magic = protocol.Magic(magic)
 
 	var cmdBuf [commands.Size]byte
 	if _, err := r.Read(cmdBuf[:]); err != nil {

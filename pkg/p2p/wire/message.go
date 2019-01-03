@@ -22,7 +22,7 @@ type Payload interface {
 }
 
 // WriteMessage will write a Dusk wire message to w.
-func WriteMessage(w io.Writer, magic protocol.DuskNetwork, p Payload) error {
+func WriteMessage(w io.Writer, magic protocol.Magic, p Payload) error {
 	if err := encoding.WriteUint32(w, binary.LittleEndian, uint32(magic)); err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func WriteMessage(w io.Writer, magic protocol.DuskNetwork, p Payload) error {
 }
 
 // ReadMessage will read a Dusk wire message from r and return the associated payload.
-func ReadMessage(r io.Reader, magic protocol.DuskNetwork) (Payload, error) {
+func ReadMessage(r io.Reader, magic protocol.Magic) (Payload, error) {
 	buf := make([]byte, HeaderSize)
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func ReadMessage(r io.Reader, magic protocol.DuskNetwork) (Payload, error) {
 
 	pBuf := make([]byte, 0, hdr.Length)
 	payloadBuf := bytes.NewBuffer(pBuf)
-	if _, err := io.Copy(payloadBuf, r); err != nil {
+	if _, err := io.CopyN(payloadBuf, r, int64(hdr.Length)); err != nil {
 		return nil, err
 	}
 

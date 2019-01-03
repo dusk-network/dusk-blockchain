@@ -62,8 +62,8 @@ func (m *MsgHeaders) Decode(r io.Reader) error {
 	return nil
 }
 
-// Command returns the command string associated with the getaddr message.
+// Command returns the command string associated with the getheaders message.
 // Implements payload interface.
 func (m *MsgHeaders) Command() commands.Cmd {
-	return commands.GetAddr
+	return commands.Headers
 }

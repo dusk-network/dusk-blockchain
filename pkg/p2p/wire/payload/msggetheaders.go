@@ -50,7 +50,7 @@ func (m *MsgGetHeaders) Decode(r io.Reader) error {
 	return nil
 }
 
-// Command returns the command string associated with the GetHeaders message.
+// Command returns the command string associated with the ReadHeaders message.
 // Implements the Payload interface.
 func (m *MsgGetHeaders) Command() commands.Cmd {
 	return commands.GetHeaders

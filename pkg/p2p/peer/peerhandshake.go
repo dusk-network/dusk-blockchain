@@ -32,12 +32,12 @@ func (p *Peer) Handshake() error {
 		return errHandShakeTimeout
 	}
 
-	// TODO: Use a more dynamical and configurable logging library than fmt.Println
+	// TODO: Use a more dynamical and configurable logging library instead of fmt.Println
 	// Log the handshake
 	if p.inbound {
-		fmt.Println("Inbound handshake with ", p.RemoteAddr().String(), " successful")
+		fmt.Println("Inbound handshake with", p.RemoteAddr().String(), "successful")
 	} else {
-		fmt.Println("Outbound handshake with ", p.RemoteAddr().String(), " successful")
+		fmt.Println("Outbound handshake with", p.RemoteAddr().String(), "successful")
 	}
 	return nil
 }
@@ -88,7 +88,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 	//sh := p.config.StartHeight()
 	//services := p.config.Services
 	version := p.config.ProtocolVer
-	localIP, err := util.GetLocalIP()
+	localIP, err := util.GetOutboundIP()
 	if err != nil {
 		return err
 	}
