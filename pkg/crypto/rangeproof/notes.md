@@ -86,4 +86,6 @@ Bug when y is set to zero for RxH debug  (Although the proof should not pass if 
 
 
 N.B. libsecp256 lib uses a different nonce for blinding point and one for other points. Doing this could potentilly
-make the API better in terms of G[1:]
+make the API better in terms of G[1:] (Fixed)
+
+We can add an object which we can pass around, which caches a lot of commonly used constructions. We could alternatively make the object global, with some variables like pedersen struct, but for zM and HprimeFactors, it would need to be created in Verify or Prove function

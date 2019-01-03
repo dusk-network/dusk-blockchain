@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 )
 
 // func main() {
@@ -29,7 +29,7 @@ import (
 // 	// CPUIntensiveGo()
 // }
 
-func GenerateKeyPair() {
+func generateKeyPair() {
 
 	// sK
 	var s ristretto.Scalar
@@ -49,7 +49,7 @@ func GenerateKeyPair() {
 
 }
 
-func HashToPoint(x []byte) {
+func hashToPoint(x []byte) {
 
 	// Derive Point
 	var pDer ristretto.Point
@@ -65,7 +65,7 @@ func HashToPoint(x []byte) {
 	fmt.Println("Derived Scalar:", hex.EncodeToString(sDer.Bytes()))
 }
 
-func CPUIntensive() {
+func cPUIntensive() {
 	// slow me down
 	start := time.Now()
 
@@ -100,7 +100,7 @@ func CPUIntensive() {
 	fmt.Println(elapsed)
 }
 
-func CPUIntensiveGo() {
+func cPUIntensiveGo() {
 	// slow me down
 	start := time.Now()
 

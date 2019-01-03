@@ -39,7 +39,7 @@ var Hash = func(s *Server, params []string) (string, error) {
 			return "", err
 		}
 
-		text := base58.Base58Encoding(hash)
+		text := base58.Encoding(hash)
 		hashes += text + " "
 	}
 

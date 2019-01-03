@@ -83,6 +83,7 @@ func (s *NodeServer) setupPeerConfig() error {
 	return nil
 }
 
+// Run starts the server and adds the necessary configurations
 func (s *NodeServer) Run() error {
 
 	// Add all other run based methods for modules
@@ -131,8 +132,13 @@ func setup() {
 	<-make(chan struct{})
 }
 
+<<<<<<< HEAD
 func LocalHeight() uint64 {
 	//TODO: Read from database
+=======
+// LocalHeight returns the current height of the localNode
+func LocalHeight() uint32 { // TODO: height could be endless. Use big.Int ??
+>>>>>>> f69f9420bdac60c5179ec31d9a1cd0e7cf13d562
 	return 10
 }
 

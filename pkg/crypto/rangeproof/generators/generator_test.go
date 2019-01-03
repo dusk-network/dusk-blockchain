@@ -3,9 +3,9 @@ package generator_test
 import (
 	"testing"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
 	generator "gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/generators"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 func TestGeneratorsLen(t *testing.T) {
