@@ -165,6 +165,6 @@ func ReadMessage(r io.Reader, magic protocol.Magic) (Payload, error) {
 		err := m.Decode(payloadBuf)
 		return m, err
 	default:
-		return nil, fmt.Errorf("unknown command %v", hdr.Command)
+		return nil, fmt.Errorf("Unknown command %v", hdr.Command)
 	}
 }

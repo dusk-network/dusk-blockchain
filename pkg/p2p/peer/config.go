@@ -6,7 +6,6 @@ import (
 )
 
 // LocalConfig specifies the properties that should be available for each remote peer
-
 type LocalConfig struct {
 	Net         protocol.Magic
 	UserAgent   string
@@ -22,7 +21,8 @@ type LocalConfig struct {
 	OnAddr           func(*Peer, *payload.MsgAddr)
 	OnGetAddr        func(*Peer, *payload.MsgGetAddr)
 	OnInv            func(*Peer, *payload.MsgInv)
-	OnGetData        func(*payload.MsgGetData)
+	OnGetData        func(*Peer, *payload.MsgGetData)
+	OnTx             func(*Peer, *payload.MsgTx)
 	OnBlock          func(*Peer, *payload.MsgBlock)
 	OnGetBlocks      func(*payload.MsgGetBlocks)
 	OnBinary         func(*Peer, *payload.MsgBinary)

@@ -3,7 +3,7 @@ package vector
 import (
 	"errors"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 )
 
 // Add adds two scalar slices a and b,
@@ -51,6 +51,21 @@ func Sub(a, b []ristretto.Scalar) ([]ristretto.Scalar, error) {
 	return res, nil
 }
 
+// Neg Negates a vector a
+func Neg(a []ristretto.Scalar) []ristretto.Scalar {
+	if len(a) == 0 {
+		return a
+	}
+
+	res := make([]ristretto.Scalar, len(a))
+
+	for i := range a {
+		res[i].Neg(&a[i])
+	}
+
+	return res
+}
+
 // SubScalar Subtracts a scalars value b, from every element in the slice a
 func SubScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 
@@ -67,6 +82,8 @@ func SubScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 	return res
 }
 
+// MulScalar take a scalar b, and a vector a
+// then multiplies every element in the scalar vector by b
 func MulScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 
 	res := make([]ristretto.Scalar, len(a))
@@ -78,7 +95,7 @@ func MulScalar(a []ristretto.Scalar, b ristretto.Scalar) []ristretto.Scalar {
 	return res
 }
 
-// Given two scalar arrays, construct the inner product
+// InnerProduct takes two scalar arrays and constructs the inner product
 func InnerProduct(a, b []ristretto.Scalar) (ristretto.Scalar, error) {
 
 	res := ristretto.Scalar{}
@@ -123,7 +140,7 @@ func Exp(a []ristretto.Scalar, b []ristretto.Point, N, M int) (ristretto.Point, 
 	return result, nil
 }
 
-// Given a scalar, construct a vector of powers
+// ScalarPowers constructs a vector of powers
 // vecPowers(5, 3) = <5^0, 5^1, 5^2>
 func ScalarPowers(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 
@@ -133,9 +150,12 @@ func ScalarPowers(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 		return res
 	}
 
-	// identity
+	if a.IsNonZeroI() == 0 {
+		return res
+	}
+
 	var k ristretto.Scalar
-	k.SetOne() // Identity point
+	k.SetOne()
 	res[0] = k
 
 	if n == 1 {
@@ -145,6 +165,34 @@ func ScalarPowers(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 
 	for i := uint32(2); i < n; i++ {
 		res[i].Mul(&res[i-1], &a)
+	}
+
+	return res
+}
+
+// ScalarPowersSum constructs the Scalar power and then sums up each value
+func ScalarPowersSum(a ristretto.Scalar, n uint64) ristretto.Scalar {
+
+	res := ristretto.Scalar{}
+	res.SetZero()
+
+	if n == 0 {
+		return res
+	}
+
+	res.SetOne()
+
+	if n == 1 {
+		return res
+	}
+
+	prev := a
+
+	for i := uint64(1); i < n; i++ {
+		if i > 1 {
+			prev.Mul(&prev, &a)
+		}
+		res.Add(&res, &prev)
 	}
 
 	return res
@@ -171,33 +219,6 @@ func FromScalar(a ristretto.Scalar, n uint32) []ristretto.Scalar {
 
 	for i := uint32(0); i < n; i++ {
 		res[i] = a
-	}
-
-	return res
-}
-
-func ScalarPowersSum(a ristretto.Scalar, n uint64) ristretto.Scalar {
-
-	res := ristretto.Scalar{}
-	res.SetZero()
-
-	if n == 0 {
-		return res
-	}
-
-	res.SetOne()
-
-	if n == 1 {
-		return res
-	}
-
-	prev := a
-
-	for i := uint64(1); i < n; i++ {
-		if i > 1 {
-			prev.Mul(&prev, &a)
-		}
-		res.Add(&res, &prev)
 	}
 
 	return res

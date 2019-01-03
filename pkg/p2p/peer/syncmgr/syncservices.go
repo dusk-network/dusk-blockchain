@@ -1,4 +1,4 @@
-package syncmanager
+package syncmgr
 
 import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/blockchain"

@@ -5,31 +5,36 @@ import (
 	"math/rand"
 	"testing"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
+/*
+// tests pass but not when we add c
+// lets try adding c to the first equation to see if it passes
+// Also for the two check process once, multiply both checks by a random c and see if it still passes
+*/
 func TestProveBulletProof(t *testing.T) {
 
-	m := 2 // XXX: for now needs to be a multiple of two
+	m := 4 // XXX: for now needs to be a multiple of two
 
 	amounts := []ristretto.Scalar{}
 
 	for i := 0; i < m; i++ {
 
 		var amount ristretto.Scalar
-
 		n := rand.Int63()
 		amount.SetBigInt(big.NewInt(n))
 
 		amounts = append(amounts, amount)
 	}
 
-	// t.Fail()
 	// Prove
+	// t.Fail()
 	p, err := Prove(amounts, true)
-	assert.Equal(t, nil, err)
-
+	if err != nil {
+		assert.FailNowf(t, err.Error(), "Prove function failed %s", "")
+	}
 	// Verify
 	ok, err := Verify(p)
 	assert.Equal(t, nil, err)

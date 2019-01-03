@@ -2,7 +2,7 @@ package connmgr
 
 import (
 	"errors"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 	"net"
 	"net/http"
@@ -40,14 +40,14 @@ func New(cfg Config) *Connmgr {
 
 		ip, err := util.GetOutboundIP()
 		if err != nil {
-			fmt.Println("Error getting local ip ", err)
+			log.WithField("prefix", "connmgr").Error("Failed to get local ip", err)
 		}
 
 		addrPort := ip.String() + ":" + cfg.Port
 		listener, err := net.Listen("tcp", addrPort)
 
 		if err != nil {
-			fmt.Println("Error connecting to outbound ", err)
+			log.WithField("prefix", "connmgr").Error("Failed to connect to outbound", err)
 		}
 
 		defer func() {
@@ -78,18 +78,19 @@ func (c *Connmgr) NewRequest() {
 	// Fetch address
 	addr, err := c.config.GetAddress()
 	if err != nil {
-		fmt.Println("Error getting address", err)
+		log.WithField("prefix", "connmgr").Error("Failed to get address", err)
 	}
 
 	// empty request item
 	r := &Request{}
 
 	r.Addr = addr
-	fmt.Println("Connecting")
+	log.WithField("prefix", "connmgr").Info("Connecting")
 	c.Connect(r)
 
 }
 
+// Connect connects to a specific address
 func (c *Connmgr) Connect(r *Request) error {
 
 	r.Retries++
@@ -109,17 +110,18 @@ func (c *Connmgr) Connect(r *Request) error {
 	return c.connected(r)
 }
 
-func (cm *Connmgr) Disconnect(addr string) {
+// Disconnect disconnects from a specific address
+func (c *Connmgr) Disconnect(addr string) {
 
 	// fetch from connected list
-	r, ok := cm.ConnectedList[addr]
+	r, ok := c.ConnectedList[addr]
 
 	if !ok {
 		// If not in connected, check pending
-		r, ok = cm.PendingList[addr]
+		r, ok = c.PendingList[addr]
 	}
 
-	cm.disconnected(r)
+	c.disconnected(r)
 
 }
 
@@ -136,9 +138,9 @@ func (c *Connmgr) Dial(addr string) (net.Conn, error) {
 	return conn, nil
 }
 
-func (cm *Connmgr) failed(r *Request) {
+func (c *Connmgr) failed(r *Request) {
 
-	cm.actionch <- func() {
+	c.actionch <- func() {
 		// priority to check if it is permanent or inbound
 		// if so then these peers are valuable in NEO and so we will just retry another time
 		if r.Inbound || r.Permanent {
@@ -146,19 +148,21 @@ func (cm *Connmgr) failed(r *Request) {
 			multiplier := time.Duration(r.Retries * 10)
 			time.AfterFunc(multiplier*time.Second,
 				func() {
-					cm.Connect(r)
+					c.Connect(r)
 				},
 			)
 			// if not then we should check if this request has had maxRetries
 			// if it has then get a new address
 			// if not then call Connect on it again
 		} else if r.Retries > maxRetries {
-			if cm.config.GetAddress != nil {
-				go cm.NewRequest()
+			if c.config.GetAddress != nil {
+				go c.NewRequest()
 			}
-			fmt.Println("This peer has been tried the maximum amount of times and a source of new address has not been specified.")
+			log.WithField(
+				"prefix", "connmgr",
+			).Error("This peer has been tried the maximum amount of times and a source of new address has not been specified.")
 		} else {
-			go cm.Connect(r)
+			go c.Connect(r)
 		}
 
 	}
@@ -169,11 +173,9 @@ func (cm *Connmgr) failed(r *Request) {
 // we take the addr from peer, which is also it's key in the map
 // and we use it to remove it from the connectedList
 func (c *Connmgr) disconnected(r *Request) error {
-
 	errChan := make(chan error, 0)
 
 	c.actionch <- func() {
-
 		var err error
 
 		if r == nil {
@@ -198,11 +200,9 @@ func (c *Connmgr) disconnected(r *Request) error {
 //Connected is called when the connection manager
 // makes a successful connection.
 func (c *Connmgr) connected(r *Request) error {
-
 	errorChan := make(chan error, 0)
 
 	c.actionch <- func() {
-
 		var err error
 
 		// This should not be the case, since we connected
@@ -225,22 +225,21 @@ func (c *Connmgr) connected(r *Request) error {
 		}
 
 		if err != nil {
-			fmt.Println("Error connected", err)
+			log.Error("Error connected", err)
 		}
 
 		errorChan <- err
 	}
+
 	return <-errorChan
 }
 
 // Pending is synchronous, we do not want to continue with logic
 // until we are certain it has been added to the pendingList
 func (c *Connmgr) pending(r *Request) error {
-
 	errChan := make(chan error, 0)
 
 	c.actionch <- func() {
-
 		var err error
 
 		if r == nil {
@@ -254,6 +253,7 @@ func (c *Connmgr) pending(r *Request) error {
 	return <-errChan
 }
 
+// Run starts the Connection Manager as a daemon
 func (c *Connmgr) Run() {
 	go c.loop()
 }

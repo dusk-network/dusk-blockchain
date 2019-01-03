@@ -1,7 +1,6 @@
 package peer_test
 
 import (
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -23,7 +22,7 @@ func returnConfig() peer.LocalConfig {
 	OnHeaders := func(p *peer.Peer, msg *payload.MsgHeaders) {}
 	OnGetHeaders := func(p *peer.Peer, msg *payload.MsgGetHeaders) {}
 	OnInv := func(p *peer.Peer, msg *payload.MsgInv) {}
-	OnGetData := func(msg *payload.MsgGetData) {}
+	OnGetData := func(p *peer.Peer, msg *payload.MsgGetData) {}
 	OnBlock := func(p *peer.Peer, msg *payload.MsgBlock) {}
 	OnGetBlocks := func(msg *payload.MsgGetBlocks) {}
 
@@ -179,13 +178,9 @@ func TestPeerDisconnect(t *testing.T) {
 	inbound := true
 	config := returnConfig()
 	p := peer.NewPeer(conn, inbound, config)
-	fmt.Println("Calling disconnect")
+
 	p.Disconnect()
-	fmt.Println("Disconnect finished calling")
 	verack := payload.NewMsgVerAck()
-
-	fmt.Println(" We good here")
-
 	err := p.Write(verack)
 
 	assert.NotEqual(t, err, nil)

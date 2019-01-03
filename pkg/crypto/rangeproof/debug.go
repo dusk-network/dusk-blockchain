@@ -5,15 +5,15 @@ import (
 
 	"github.com/pkg/errors"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/pedersen"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 // Put all debug functions here
-
 func debugProve(x, y, z ristretto.Scalar, v, l, r []ristretto.Scalar, aL, aR, sL, sR []ristretto.Scalar) error {
+
 	ok, err := debugLxG(l, x, z, aL, aR, sL)
 	if !ok {
 		return errors.Wrap(err, "[DEBUG]: <l(x), G> is constructed incorrectly")
@@ -37,7 +37,7 @@ func debugProve(x, y, z ristretto.Scalar, v, l, r []ristretto.Scalar, aL, aR, sL
 
 // DEBUG
 
-func debugT0(aL, aR []ristretto.Scalar, y, z ristretto.Scalar) ristretto.Scalar {
+func debugT0(aL, aR []ristretto.Scalar, y, z ristretto.Scalar) (ristretto.Scalar, error) {
 
 	aLMinusZ := vector.SubScalar(aL, z)
 
@@ -45,15 +45,24 @@ func debugT0(aL, aR []ristretto.Scalar, y, z ristretto.Scalar) ristretto.Scalar 
 
 	yNM := vector.ScalarPowers(y, uint32(N*M))
 
-	hada, _ := vector.Hadamard(yNM, aRPlusZ)
+	hada, err := vector.Hadamard(yNM, aRPlusZ)
+	if err != nil {
+		return ristretto.Scalar{}, err
+	}
 
 	zMTwoN := sumZMTwoN(z)
 
-	rightIP, _ := vector.Add(zMTwoN, hada)
+	rightIP, err := vector.Add(zMTwoN, hada)
+	if err != nil {
+		return ristretto.Scalar{}, err
+	}
 
-	iP, _ := vector.InnerProduct(aLMinusZ, rightIP)
+	iP, err := vector.InnerProduct(aLMinusZ, rightIP)
+	if err != nil {
+		return ristretto.Scalar{}, err
+	}
 
-	return iP
+	return iP, nil
 }
 
 // <l(x), G> =  <aL, G> + x<sL, G> +<-z1, G>
@@ -64,9 +73,9 @@ func debugLxG(l []ristretto.Scalar, x, z ristretto.Scalar, aL, aR, sL []ristrett
 
 	genData := []byte("dusk.BulletProof.vec1")
 	ped := pedersen.New(genData)
-	ped.BaseVector.Compute(uint32((N * M) + 1))
+	ped.BaseVector.Compute(uint32((N * M)))
 
-	G := ped.BaseVector.Bases[1:]
+	G := ped.BaseVector.Bases
 
 	lG, err := vector.Exp(l, G, N, M)
 	if err != nil {

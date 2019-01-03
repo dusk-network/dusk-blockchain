@@ -85,7 +85,7 @@ func (m *MsgGetData) Decode(r io.Reader) error {
 		}
 
 		if InvType(t) != InvTx && InvType(t) != InvBlock {
-			return fmt.Errorf("invalid inventory vector type %v", t)
+			return fmt.Errorf("Invalid inventory vector type %v", t)
 		}
 
 		m.Vectors[i].Type = InvType(t)

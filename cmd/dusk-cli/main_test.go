@@ -72,11 +72,11 @@ func TestMethodWithParams(t *testing.T) {
 
 	// Hash words for comparison
 	fooHash, _ := hash.Sha3256([]byte("foo"))
-	fooText := base58.Base58Encoding(fooHash)
+	fooText := base58.Encoding(fooHash)
 	barHash, _ := hash.Sha3256([]byte("bar"))
-	barText := base58.Base58Encoding(barHash)
+	barText := base58.Encoding(barHash)
 	bazHash, _ := hash.Sha3256([]byte("baz"))
-	bazText := base58.Base58Encoding(bazHash)
+	bazText := base58.Encoding(bazHash)
 
 	// Compare
 	assert.Equal(t, foo, fooText)

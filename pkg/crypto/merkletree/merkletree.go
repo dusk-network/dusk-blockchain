@@ -7,14 +7,14 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
-// Data that can be stored and checked in the Merkletree.
+// Payload is data that can be stored and checked in the Merkletree.
 // Types implementing this interface can be items of the Merkletree
 type Payload interface {
 	CalculateHash() ([]byte, error)
 	Equals(other Payload) (bool, error)
 }
 
-// Merkletree struct representing the data structure.
+// Tree struct representing the merkletree data structure.
 // It includes a pointer to the Root of the tree, list of pointers to the Leaves and the MerkleRoot
 type Tree struct {
 	Root       *Node
@@ -22,7 +22,7 @@ type Tree struct {
 	Leaves     []*Node
 }
 
-// The Node of the Merkletree which includes pointers to the Parent, the immediate Left and Right children
+// Node of the Merkletree which includes pointers to the Parent, the immediate Left and Right children
 // and whether it is a leaf or not
 type Node struct {
 	Parent *Node
@@ -54,7 +54,7 @@ func VerifyNode(n *Node) ([]byte, error) {
 	return hash.Sha3256(append(leftBytes, rightBytes...))
 }
 
-// Helper for calculating the hash of a node
+// CalculateNodeHash is a helper function for calculating the hash of a node
 func CalculateNodeHash(n *Node) ([]byte, error) {
 	if n.IsLeaf {
 		return n.Data.CalculateHash()
@@ -63,7 +63,7 @@ func CalculateNodeHash(n *Node) ([]byte, error) {
 	return hash.Sha3256(append(n.Left.Hash, n.Right.Hash...))
 }
 
-// Constructor-like function for a Merkletree using the Payload/Content pl
+// NewTree constructs a merkletree using the Payload/Content pl
 func NewTree(pl []Payload) (*Tree, error) {
 	root, leaves, err := create(pl)
 	if err != nil {
@@ -149,7 +149,7 @@ func createIntermediate(nl []*Node) (*Node, error) {
 	return createIntermediate(nodes)
 }
 
-// Helper to rebuild a Tree with only the Data contained in the leafs
+// RebuildTree is a helper method to rebuild a Tree with only the Data contained in the leafs
 func (t *Tree) RebuildTree() error {
 	var pl []Payload
 	for _, node := range t.Leaves {
@@ -159,7 +159,7 @@ func (t *Tree) RebuildTree() error {
 	return t.RebuildTreeUsing(pl)
 }
 
-// Helper to replace the Data in the Markletree and rebuild the Tree entirely
+// RebuildTreeUsing is a helper method to replace the Data in the Markletree and rebuild the Tree entirely
 // The root gets replaced but the Merkletree survives the operation
 // Returns an error if there is no payload
 func (t *Tree) RebuildTreeUsing(pl []Payload) error {
@@ -174,7 +174,7 @@ func (t *Tree) RebuildTreeUsing(pl []Payload) error {
 	return nil
 }
 
-// Verify each Node's hash and check if the resulted root hash is correct compared to the reported root hash of the merkle tree
+// VerifyTree Verifies each Node's hash and check if the resulted root hash is correct compared to the reported root hash of the merkle tree
 func VerifyTree(t *Tree) (bool, error) {
 	calculatedRoot, err := VerifyNode(t.Root)
 	if err != nil {
@@ -188,6 +188,7 @@ func VerifyTree(t *Tree) (bool, error) {
 	return false, nil
 }
 
+//VerifyContent verifies whether a piece of data is in the merkle tree
 func (t *Tree) VerifyContent(data Payload) (bool, error) {
 	for _, leaf := range t.Leaves {
 		ok, err := leaf.Data.Equals(data)

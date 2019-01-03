@@ -43,9 +43,11 @@ func createOneHundredBlocks() {
 	}
 
 	// AddHeaders
-	for _, block := range blocks {
-		db.AddHeader(block.Header)
+	hdrs := make([]*payload.BlockHeader, len(blocks))
+	for i, block := range blocks {
+		hdrs[i] = block.Header
 	}
+	db.AddHeaders(hdrs)
 }
 
 func createBlockFixture(height int, prevBlock []byte, txTotal int) (*payload.Block, error) {

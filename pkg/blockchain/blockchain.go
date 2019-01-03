@@ -5,44 +5,45 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
-	"sort"
-
+	log "github.com/sirupsen/logrus"
+	cnf "github.com/spf13/viper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
 
 var (
-	ErrNoBlockchainDb    = errors.New("Blockchain database is not available.")
-	ErrInitialisedCheck  = errors.New("Could not check if blockchain db is already initialised.")
-	ErrBlockValidation   = errors.New("Block failed sanity check.")
-	ErrBlockVerification = errors.New("Block failed to be consistent with the current blockchain.")
+	errNoBlockchainDb    = errors.New("Blockchain database is not available")
+	errInitialisedCheck  = errors.New("Failed to check if blockchain db is already initialised")
+	errBlockValidation   = errors.New("Block failed sanity check")
+	errBlockVerification = errors.New("Block failed to be consistent with the current blockchain")
 )
 
-// Blockchain holds the state of the chain
+// Chain holds the state of the chain
 type Chain struct {
 	db  *database.BlockchainDB
 	net protocol.Magic
 }
 
+// New sets up a new Dusk block chain
 func New(net protocol.Magic) (*Chain, error) {
-	db, err := database.NewBlockchainDB("test") //TODO: external path configuration
+	db, err := database.NewBlockchainDB(cnf.GetString("net.database.dirpath"))
 	if err != nil {
-		fmt.Println(err)
-		return nil, ErrNoBlockchainDb
+		log.WithField("prefix", "blockchain").Error(err)
+		return nil, errNoBlockchainDb
 	}
 
 	marker := []byte("HasBeenInitialisedAlready")
 	initialised, err := db.Has(marker)
 	if err != nil {
-		return nil, ErrInitialisedCheck
+		return nil, errInitialisedCheck
 	}
 
 	//TODO: Find out if initialisation check can be done with check on existing genesis block
 	if !initialised {
 		// This is a new db
-		fmt.Println("New Blockchain database initialisation")
+		log.WithField("prefix", "blockchain").Info("New Blockchain database initialisation")
 		db.Put(marker, []byte{})
 
 		// We add the genesis block into the db
@@ -51,7 +52,7 @@ func New(net protocol.Magic) (*Chain, error) {
 
 			genesisBlock, err := hex.DecodeString(GenesisBlock)
 			if err != nil {
-				fmt.Println("Could not add genesis header into db")
+				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header to db")
 				db.Delete(marker)
 				return nil, err
 			}
@@ -60,32 +61,35 @@ func New(net protocol.Magic) (*Chain, error) {
 			err = b.Decode(r)
 
 			if err != nil {
-				fmt.Println("Could not Decode genesis block")
+				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header to db")
 				db.Delete(marker)
 				return nil, err
 			}
-			err = db.AddHeader(b.Header)
+
+			err = db.AddHeaders([]*payload.BlockHeader{b.Header})
 			if err != nil {
-				fmt.Println("Could not add genesis header")
+				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header")
 				db.Delete(marker)
 				return nil, err
 			}
+
+			// No transactions in genesis block iirc
 
 			// Cast []Payload to []Stealth
-			stealths := make([]transactions.Stealth, len(b.Txs))
-			for i, t := range b.Txs {
-				stealths[i] = t.(transactions.Stealth)
-			}
+			//stealths := make([]transactions.Stealth, len(b.Txs))
+			//for i, t := range b.Txs {
+			//	stealths[i] = t.(transactions.Stealth)
+			//}
 
-			err = db.AddTransactions(b.Header.Hash, stealths)
-			if err != nil {
-				fmt.Println("Could not add Genesis Transactions")
-				db.Delete(marker)
-				return nil, err
-			}
+			//err = db.AddTransactions(b.Header.Hash, stealths)
+			//if err != nil {
+			//	fmt.Println("Could not add Genesis Transactions")
+			//	db.Delete(marker)
+			//	return nil, err
+			//}
 		}
 		if net == protocol.TestNet {
-			fmt.Println("TODO: Setup the genesisBlock for TestNet")
+			log.WithField("prefix", "blockchain").Error("TODO: Setup the genesis block for TestNet")
 			return nil, nil
 		}
 	}
@@ -93,13 +97,14 @@ func New(net protocol.Magic) (*Chain, error) {
 	return &Chain{db, net}, nil
 }
 
+// AddBlock adds a block to the block chain
 func (c *Chain) AddBlock(msg *payload.MsgBlock) error {
 	if !validateBlock(msg) {
-		return ErrBlockValidation
+		return errBlockValidation
 	}
 
 	if !c.verifyBlock(msg) {
-		return ErrBlockVerification
+		return errBlockVerification
 	}
 
 	fmt.Println("Block Hash is ", hex.EncodeToString(msg.Block.Header.Hash))
@@ -128,7 +133,7 @@ func (c *Chain) verifyBlock(msg *payload.MsgBlock) bool {
 	return true
 }
 
-//addHeaders is not safe for concurrent access
+// ValidateHeaders does some sanity checks on headers
 func (c *Chain) ValidateHeaders(msg *payload.MsgHeaders) error {
 	table := database.NewTable(c.db, database.HEADER)
 	latestHash, err := c.db.Get(database.LATESTHEADER)
@@ -145,12 +150,7 @@ func (c *Chain) ValidateHeaders(msg *payload.MsgHeaders) error {
 		return err
 	}
 
-	// Sort the headers
-	sortedHeaders := msg.Headers
-	sort.Slice(sortedHeaders,
-		func(i, j int) bool {
-			return sortedHeaders[i].Height < sortedHeaders[j].Height
-		})
+	sortedHeaders := util.SortHeadersByHeight(msg.Headers)
 
 	// Do checks on headers
 	for _, currentHeader := range sortedHeaders {
@@ -185,19 +185,18 @@ func (c *Chain) ValidateHeaders(msg *payload.MsgHeaders) error {
 	return nil
 }
 
+// AddHeaders writes the headers to the db in batch (Atomic and Isolated)
 func (c *Chain) AddHeaders(msg *payload.MsgHeaders) error {
-	for _, header := range msg.Headers {
-		if err := c.db.AddHeader(header); err != nil {
-			return err
-		}
-	}
-	return nil
+	return c.db.AddHeaders(msg.Headers)
+
 }
 
+// GetHeaders reads the headers from the db
 func (c *Chain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
 	return c.db.ReadHeaders(start, stop)
 }
 
+// GetLatestHeaderHash gets the latest added header of the block chain
 func (c *Chain) GetLatestHeaderHash() ([]byte, error) {
 	return c.db.Get(database.LATESTHEADER)
 }

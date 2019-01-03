@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type testValues struct {
@@ -23,7 +25,8 @@ func initTestPairs() {
 	data := make([]byte, 32)
 	for i := 0; i < n; i++ {
 		rand.Read(data)
-		testPairs = append(testPairs, testValues{dec: data, enc: Base58Encoding(data)})
+		encodedData, _ := Encoding(data)
+		testPairs = append(testPairs, testValues{dec: data, enc: encodedData})
 	}
 }
 
@@ -39,12 +42,20 @@ func randAlphabet() *Alphabet {
 		bts[i] = bts[j]
 		bts[j] = byte(i)
 	}
-	return NewAlphabet(string(bts[:58]))
+	alphabet, err := NewAlphabet(string(bts[:58]))
+	if err != nil {
+		return nil
+	}
+	return alphabet
 }
 
 func TestEncodingAndDecoding(t *testing.T) {
 	for k := 0; k < 10; k++ {
 		testEncDecLoop(t, randAlphabet())
+	}
+	BTCAlphabet, err := NewAlphabet(ab)
+	if err != nil {
+		t.Fail()
 	}
 	testEncDecLoop(t, BTCAlphabet)
 }
@@ -54,9 +65,9 @@ func testEncDecLoop(t *testing.T, alph *Alphabet) {
 		var b = make([]byte, j)
 		for i := 0; i < 100; i++ {
 			rand.Read(b)
-			fe := Base58EncodingAlphabet(b, alph)
+			fe := EncodingAlphabet(b, alph)
 
-			fd, ferr := Base58DecodingAlphabet(fe, alph)
+			fd, ferr := DecodingAlphabet(fe, alph)
 			if ferr != nil {
 				t.Errorf(" error: %v", ferr)
 			}
@@ -80,31 +91,32 @@ func TestBase58WithBitcoinAddresses(t *testing.T) {
 	for ii, vv := range testAddr {
 		// num := Base58Decode([]byte(vv))
 		// chk := Base58Encode(num)
-		num, err := Base58Decoding(vv)
+		num, err := Decoding(vv)
 		if err != nil {
 			t.Errorf("Test %d, expected success, got error %s\n", ii, err)
 		}
-		chk := Base58Encoding(num)
+		chk, err := Encoding(num)
+		assert.Equal(t, nil, err)
 		if vv != string(chk) {
 			t.Errorf("Test %d, expected=%s got=%s Address did base58 encode/decode correctly.", ii, vv, chk)
 		}
 	}
 }
 
-func BenchmarkBase58Encoding(b *testing.B) {
+func BenchmarkEncoding(b *testing.B) {
 	initTestPairs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Base58Encoding(testPairs[i].dec)
+		Encoding(testPairs[i].dec)
 	}
 }
 
-func BenchmarkBase58Decoding(b *testing.B) {
+func BenchmarkDecoding(b *testing.B) {
 	initTestPairs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Base58Decoding(testPairs[i].enc)
+		Decoding(testPairs[i].enc)
 	}
 }

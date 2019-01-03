@@ -7,11 +7,10 @@ const (
 	// ProtocolVersion is the current protocol version
 	ProtocolVersion uint32 = 10000
 
-	// Basic user agent token in the following format: /Name:Version/Name:Version/.../
-	//TODO: Think of a better token name
-	UserAgent = "/Dusk:1.0/GO:1.11/"
+	// UserAgent is a basic user agent token in the following format: /Name:Version/Name:Version/.../
+	UserAgent = "/Dusk:1.0/GO:1.11/" //TODO: Think of a better token name
 
-	// ServiceFlag indicates the Node's type
+	// NodePeerService indicates the Node's type
 	NodePeerService ServiceFlag = 1
 	// BloomFilerService ServiceFlag = 2 // Not implemented
 	// PrunedNode        ServiceFlag = 3 // Not implemented
@@ -22,6 +21,8 @@ const (
 type Magic uint32
 
 const (
+	// MainNet identifies the production network of the Dusk blockchain
 	MainNet Magic = 7630401
+	// TestNet identifies the test network of the Dusk blockchain
 	TestNet Magic = 0x74746e41
 )

@@ -10,13 +10,11 @@ import (
 )
 
 func TestNewAddress(t *testing.T) {
-
-	en := []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-
+	en := []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 	k, err := key.New(en)
 	assert.Equal(t, nil, err)
 
-	want := "3PXJRmur5X1FhAD8qRi1UZ5S2np4FUdRikq3Q395LgVQV2cKrM1fC8TG1tDk88ueLrQ5Y9VeGKikJo2GLvNVNTaWk8E8RiB"
+	want := "3PXJRmur5X1FhAD8qRi1UZ5S2np4FUdRikq3Q395LgVQV156kWZHS5DUmDPUkGZ15UJrqXfMwcNZjr5xRA2aqj89yJkeDGR"
 	got, err := k.PublicAddress()
 	assert.Equal(t, nil, err)
 	assert.Equal(t, want, got)
@@ -30,7 +28,7 @@ func TestRandomAddresses(t *testing.T) {
 	for i := 0; i < 100; i++ {
 
 		// Generate entropy
-		en, err := crypto.RandEntropy(32)
+		en, err := crypto.RandEntropy(64)
 		assert.Equal(t, nil, err)
 
 		// Generate keys
@@ -54,7 +52,7 @@ func TestBadEntropyLength(t *testing.T) {
 	for i := 0; i < 1e5; i++ {
 
 		n := rand.Intn(1e3)
-		if n == 32 {
+		if n == 64 {
 			continue
 		}
 
@@ -64,7 +62,7 @@ func TestBadEntropyLength(t *testing.T) {
 		assert.NotEqual(t, nil, err)
 
 		if k != nil {
-			assert.Fail(t, "key should not be generated when entropy does not equal 32 bytes")
+			assert.Fail(t, "key should not be generated when entropy does not equal 64 bytes")
 		}
 
 	}
@@ -73,7 +71,7 @@ func TestBadEntropyLength(t *testing.T) {
 
 func TestPubAddrToKey(t *testing.T) {
 
-	en, _ := crypto.RandEntropy(32)
+	en, _ := crypto.RandEntropy(64)
 	k, _ := key.New(en)
 	addr, _ := k.PublicAddress()
 
@@ -85,7 +83,7 @@ func TestPubAddrToKey(t *testing.T) {
 }
 
 func TestStealth(t *testing.T) {
-	en, _ := crypto.RandEntropy(32)
+	en, _ := crypto.RandEntropy(64)
 	Alice, _ := key.New(en)
 
 	// Generate random Stealth Address

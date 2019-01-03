@@ -84,3 +84,11 @@ func TestTableClose(t *testing.T) {
 	assert.Equal(t, nil, err)
 	cleanup(table)
 }
+
+func TestTableBatchGet(t *testing.T) {
+	//TODO
+}
+
+func TestTableBatchDelete(t *testing.T) {
+	//TODO
+}

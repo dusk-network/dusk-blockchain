@@ -1,15 +1,16 @@
-// The syncmanager will use a modified verison of the initial block download in bitcoin
+// The sync manager will use a modified verison of the initial block download in bitcoin
 // Seen here: https://en.bitcoinwiki.org/wiki/Bitcoin_Core_0.11_(ch_5):_Initial_Block_Download
 // MovingWindow is a desired featured from the original codebase
 
-package syncmanager
+package syncmgr
 
 import (
 	"encoding/hex"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/blockchain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermanager"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/addrmgr"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
@@ -24,18 +25,22 @@ var (
 	maxBlockRequestPerPeer = 16
 )
 
+// Syncmanager holds pointers to peer- and address-manager and keeps the state of
+// synchronisation of headers and blocks
 type Syncmanager struct {
-	pmgr              *peermanager.PeerMgr
+	pmgr              *peermgr.PeerMgr
+	amgr              *addrmgr.Addrmgr
 	Mode              int // 1 = headersFirst, 2 = Blocks, 3 = Maintain
 	chain             *blockchain.Chain
 	headers           [][]byte
 	inflightBlockReqs map[string]*peer.Peer // When we send a req for block, we will put hash in here, along with peer who we requested it from
 }
 
-// New will setup the syncmanager with the required parameters
+// New will setup the sync manager with the required parameters
 func New(cfg Config) *Syncmanager {
 	return &Syncmanager{
-		peermanager.New(),
+		peermgr.New(),
+		addrmgr.New(),
 		1,
 		cfg.Chain,
 		[][]byte{},
@@ -43,45 +48,49 @@ func New(cfg Config) *Syncmanager {
 	}
 }
 
+// AddPeer adds a peer for the peer manager to use
 func (s *Syncmanager) AddPeer(peer *peer.Peer) error {
 	return s.pmgr.AddPeer(peer)
 }
 
+// OnGetHeaders receives 'getheader' msgs from a peer, reads them from the chain db
+// and sends them to the requesting peer.
 func (s *Syncmanager) OnGetHeaders(p *peer.Peer, msg *payload.MsgGetHeaders) {
-	fmt.Println("Sync manager OnGetHeaders called")
+	log.WithField("prefix", "syncmgr").Debug("Syncmgr OnGetHeaders called")
 	// The caller peer wants some headers from our blockchain.
 	msgHeaders, err := getHeaders(*s.chain, msg)
 	if err == nil {
-		if len(msgHeaders.Headers) > 0 {
-			err = p.Write(msgHeaders)
-		} else {
-			//TODO: Needs refactoring. MsgNotFound is for InvTypes, not for Headers.
-			// We could just send an empty 'headers' msg back.
-			hashes := [][]byte{msg.Locator, msg.HashStop}
-			sendMsgNotFound(p, payload.InvBlock, hashes)
-		}
-	}
-	if err != nil {
-		fmt.Printf("Could not send '%s' to requesting peer %s: %s.", commands.Headers, p.RemoteAddr().String(), err)
+		p.Write(msgHeaders)
+	} else {
+		log.WithField("prefix", "syncmgr").Errorf("Failed to send '%s' to requesting peer %s: %s", commands.Headers, p.RemoteAddr().String(), err)
 	}
 }
 
+// OnHeaders receives 'headers' msgs from an other peer and adds them to the chain.
 func (s *Syncmanager) OnHeaders(p *peer.Peer, msg *payload.MsgHeaders) {
-	fmt.Println("Sync manager OnHeaders called")
+	log.WithField("prefix", "syncmgr").Debug("Sync manager OnHeaders called")
+
+	// Any headers received?
+	if len(msg.Headers) < 1 {
+		log.WithField("prefix", "syncmgr").Infof("'%s' msg is empty", commands.Headers)
+		return
+	}
+
 	// On receipt of Headers check what mode we are in
 	// HeadersMode, we check if there is 2k. If so call again. If not then change mode into BlocksOnly
 	if s.Mode == 1 {
 		err := s.HeadersFirstMode(p, msg)
 		if err != nil {
-			fmt.Println("Error reading block headers:", err)
-			return // We should custom name error so, that we can do something on WrongHash Error, Peer disconnect error
+			log.WithField("prefix", "syncmgr").Error("Failed to read block headers:", err)
+			return // TODO:We should custom name error so, that we can do something on WrongHash Error, Peer disconnect error
 		}
 		return
 	}
 }
 
+// HeadersFirstMode receives 'headers' msgs from an other peer and adds them to the chain.
 func (s *Syncmanager) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) error {
-	fmt.Println("Headers first mode")
+	log.WithField("prefix", "syncmgr").Debug("Headers first mode")
 
 	// Validate Headers
 	err := s.chain.ValidateHeaders(msg)
@@ -89,7 +98,7 @@ func (s *Syncmanager) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) er
 	if err != nil {
 		// Re-request headers from a different peer
 		s.pmgr.Disconnect(p)
-		fmt.Println("Error validating headers:", err)
+		log.WithField("prefix", "syncmgr").Error("Failed to validate headers:", err)
 		return err
 	}
 
@@ -99,7 +108,7 @@ func (s *Syncmanager) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) er
 		// Try addding them into the db again?
 		// Since this is simply a db insert, any problems here means trouble
 		//TODO: Should we Switch off system or warn the user that the system is corrupted?
-		fmt.Println("Error Adding headers", err)
+		log.WithField("prefix", "syncmgr").Error("Failed to add headers", err)
 
 		//TODO: Batching is not yet implemented,
 		// So here we would need to remove headers which have been added
@@ -116,7 +125,7 @@ func (s *Syncmanager) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) er
 	s.headers = append(s.headers, hashes...)
 
 	if len(msg.Headers) == 2*1e3 { // should be less than 2000, leave it as this for tests
-		fmt.Println("Switching to BlocksOnly Mode")
+		log.WithField("prefix", "syncmgr").Debug("Switching to BlocksOnly Mode")
 		s.Mode = 2 // switch to BlocksOnly. XXX: because HeadersFirst is not in parallel, no race condition here.
 		return s.RequestMoreBlocks()
 	}
@@ -125,6 +134,7 @@ func (s *Syncmanager) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) er
 	return err
 }
 
+// RequestMoreBlocks request blocks from an other peer and keeps an admin of the requested blocks and peers.
 func (s *Syncmanager) RequestMoreBlocks() error {
 	var blockReq [][]byte
 	var reqAmount int
@@ -141,7 +151,7 @@ func (s *Syncmanager) RequestMoreBlocks() error {
 		return err // alternatively we could make RequestBlocks blocking, then make sure it is not triggered when a block is received
 	}
 
-	//XXX: Possible race condition, between us requesting the block and adding it to
+	//TODO: Possible race condition, between us requesting the block and adding it to
 	// the inflight block map? Give that node a medal.
 
 	for _, hash := range s.headers {
@@ -154,6 +164,13 @@ func (s *Syncmanager) RequestMoreBlocks() error {
 	return err
 }
 
+// OnGetData receives 'getdata' msgs from a peer.
+// This could be a request for a specifx Tx or Block and will be read from the chain db.
+// and send to the requesting peer.
+func (s *Syncmanager) OnGetData(p *peer.Peer, msg *payload.MsgGetData) {
+	// TODO
+}
+
 // OnBlock receives a block from a peer, then passes it to the blockchain to process.
 // For now we will only use this simple setup, to allow us to test the other parts of the system.
 // See Issue #24
@@ -161,13 +178,16 @@ func (s *Syncmanager) OnBlock(p *peer.Peer, msg *payload.MsgBlock) {
 	err := s.chain.AddBlock(msg)
 	if err != nil {
 		// Put headers back in front of queue to fetch block for.
-		fmt.Println("Block had an error", err)
+		log.WithField("prefix", "syncmgr").Error("Block had an error", err)
 	}
 }
 
-// OnBlock receives a block from a peer, then passes it to the blockchain to process.
-// For now we will only use this simple setup, to allow us to test the other parts of the system.
-// See Issue #24
+// OnAddr receives a known node address within the network from a peer then passes it to the address manager
+func (s *Syncmanager) OnAddr(p *peer.Peer, msg *payload.MsgAddr) {
+	s.amgr.OnAddr(p, msg)
+}
+
+// OnMemPool (TODO)
 func (s *Syncmanager) OnMemPool(p *peer.Peer, msg *payload.MsgMemPool) {
 	//err := s.chain.AddMempool(msg)
 	//if err != nil {
@@ -176,16 +196,16 @@ func (s *Syncmanager) OnMemPool(p *peer.Peer, msg *payload.MsgMemPool) {
 	//}
 }
 
-func sendMsgNotFound(p *peer.Peer, invType payload.InvType, hashes [][]byte) {
-	msg := payload.NewMsgNotFound()
-	var vectors []payload.InvVect
-	for _, hash := range hashes {
-		invVect := payload.InvVect{invType, hash}
-		vectors = append(vectors, invVect)
-	}
-	msg.Vectors = vectors
-	err := p.Write(msg)
-	if err != nil {
-		fmt.Printf("Could not send '%s' to requesting peer %s: %s.", commands.NotFound, p.RemoteAddr().String(), err)
-	}
-}
+//func sendMsgNotFound(p *peer.Peer, invType payload.InvType, hashes [][]byte) {
+//	msg := payload.NewMsgNotFound()
+//	var vectors []payload.InvVect
+//	for _, hash := range hashes {
+//		invVect := payload.InvVect{invType, hash}
+//		vectors = append(vectors, invVect)
+//	}
+//	msg.Vectors = vectors
+//	err := p.Write(msg)
+//	if err != nil {
+//		log.WithField("prefix","syncmgr").Errorf("Failed to send '%s' to requesting peer %s: %s", commands.NotFound, p.RemoteAddr().String(), err)
+//	}
+//}

@@ -1,7 +1,7 @@
 package peer
 
 import (
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"time"
 
@@ -10,6 +10,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
 
+// Handshake either sends or receives a handshake.
+// Sending involves writing a 'version' msg to an other peer.
+// Receiving processes a received 'version' msg by sending our 'version' with a 'verack' msg.
 func (p *Peer) Handshake() error {
 
 	handshakeErr := make(chan error, 1)
@@ -32,12 +35,11 @@ func (p *Peer) Handshake() error {
 		return errHandShakeTimeout
 	}
 
-	// TODO: Use a more dynamical and configurable logging library instead of fmt.Println
 	// Log the handshake
 	if p.inbound {
-		fmt.Println("Inbound handshake with", p.RemoteAddr().String(), "successful")
+		log.WithField("prefix", "peer").Infof("Inbound handshake with %s successful", p.RemoteAddr().String())
 	} else {
-		fmt.Println("Outbound handshake with", p.RemoteAddr().String(), "successful")
+		log.WithField("prefix", "peer").Infof("Outbound handshake with %s successful", p.RemoteAddr().String())
 	}
 	return nil
 }

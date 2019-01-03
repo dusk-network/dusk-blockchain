@@ -96,11 +96,8 @@ func TestDisconnect(t *testing.T) {
 	cm := connmgr.New(cfg)
 
 	cm.Run()
-
 	cm.NewRequest()
-
 	cm.Disconnect(address)
 
 	assert.Equal(t, 0, len(cm.ConnectedList))
-
 }
