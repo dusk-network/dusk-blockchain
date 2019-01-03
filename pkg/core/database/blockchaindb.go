@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"fmt"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
@@ -57,10 +58,11 @@ func (bdb *BlockchainDB) AddHeader(header *payload.BlockHeader) error {
 	return latestHeaderTable.Put(LATESTHEADER, header.Hash)
 }
 
-func (bdb *BlockchainDB) AddTransactions(blockhash []byte, txs []transactions.Stealth) error {
+func (bdb *BlockchainDB) AddBlockTransactions(block *payload.Block) error {
 
 	// SHOULD BE DONE IN BATCH!!!!
-	for i, tx := range txs {
+	for i, v := range block.Txs {
+		tx := v.(*transactions.Stealth)
 		buf := new(bytes.Buffer)
 		fmt.Println(tx.Hash)
 		err := tx.Encode(buf)
@@ -83,7 +85,7 @@ func (bdb *BlockchainDB) AddTransactions(blockhash []byte, txs []transactions.St
 		// This is the index
 		// Key: [TX] + BLOCKHASH + I <- i is the incrementer from the for loop
 		// Value: TXHASH
-		blockhashKey := append(append(TX, blockhash...))
+		blockhashKey := append(append(TX, block.Header.Hash...))
 		blockhashKey = append(blockhashKey, Uint32ToBytes(uint32(i))...)
 
 		err = bdb.Put(blockhashKey, txhash)

@@ -2,9 +2,10 @@ package database
 
 import (
 	"encoding/binary"
+	"os"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
-	"os"
 )
 
 var (

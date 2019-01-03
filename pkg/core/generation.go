@@ -1,22 +1,18 @@
-package consensus
+package core
 
 import (
 	"encoding/binary"
 	"math/rand"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
 // Generate will check if a bid's score is under the treshold, then constructs
 // a candidate block and broadcasts it.
-func Generate(bid uint64, prevBlock *payload.Block, secret []byte, mempool *core.MemPool) (bool, error) {
+func (b *Blockchain) Generate(bid uint64, secret []byte) (bool, error) {
 	// Get tau here from config later
 	tau := uint64(200)
 
@@ -26,8 +22,14 @@ func Generate(bid uint64, prevBlock *payload.Block, secret []byte, mempool *core
 		return false, err
 	}
 
+	// Get previous header
+	prevHeader, err := b.GetLatestHeader()
+	if err != nil {
+		return false, err
+	}
+
 	// Generate Y from function parameters
-	if _, err := generateY(bid, prevBlock.Header.Seed, secret); err != nil {
+	if _, err := generateY(bid, prevHeader.Seed, secret); err != nil {
 		return false, err
 	}
 
@@ -38,7 +40,7 @@ func Generate(bid uint64, prevBlock *payload.Block, secret []byte, mempool *core
 	}
 
 	candidateBlock := payload.NewBlock()
-	if err := candidateBlock.SetPrevBlock(prevBlock); err != nil {
+	if err := candidateBlock.SetPrevBlock(prevHeader); err != nil {
 		return false, err
 	}
 
@@ -47,7 +49,8 @@ func Generate(bid uint64, prevBlock *payload.Block, secret []byte, mempool *core
 	candidateBlock.SetTime(time.Now().Unix())
 
 	// Generate coinbase/reward beforehand
-	txs := mempool.GetAllTxs()
+	// Coinbase is still not decided
+	txs := b.memPool.GetAllTxs()
 	for _, tx := range txs {
 		candidateBlock.AddTx(tx)
 	}
