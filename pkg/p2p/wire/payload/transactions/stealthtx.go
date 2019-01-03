@@ -6,10 +6,8 @@ import (
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // Stealth defines a stealth transaction.
