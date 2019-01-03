@@ -8,7 +8,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/bytesutil"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+	ristretto "github.com/bwesterb/go-ristretto"
 )
 
 // RingSignature is the collection of signatures
@@ -102,6 +102,8 @@ func Sign(m []byte, mixin []ristretto.Point, sK ristretto.Scalar) RingSignature 
 	return ringsig
 }
 
+// Verify takes a message and a ringsig
+// returns true if the message was signed by a member of the ring
 func Verify(m []byte, ringsig RingSignature) bool {
 
 	// Two conditions are that:
