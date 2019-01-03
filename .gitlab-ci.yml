@@ -1,0 +1,41 @@
+image: golang:latest
+
+cache:
+  paths:
+    - /apt-cache
+    - /go/src/github.com
+    - /go/src/golang.org
+    - /go/src/google.golang.org
+    - /go/src/gopkg.in
+
+stages:
+  - test
+  # - build
+
+before_script:
+  - mkdir -p /go/src/gitlab.dusk.network/dusk-core/dusk-go /go/src/_/builds
+  - cp -r $CI_PROJECT_DIR /go/src/gitlab.dusk.network/dusk-core/dusk-go
+ # - ln -s /go/src/gitlab.dusk.network/dusk-core/dusk-go/builds /go/src/_/builds/dusk-go
+  - make dep
+
+unit_tests:
+  stage: test
+  script:
+    - make test
+
+race_detector:
+  stage: test
+  script:
+    - make race
+lint_code:
+  stage: test
+  script:
+    - make lint
+
+# build:
+#   stage: build
+#   script:
+#     - make
+#   artifacts:
+#     paths:
+#     - demo-tools

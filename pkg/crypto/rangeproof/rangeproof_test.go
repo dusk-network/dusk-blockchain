@@ -5,8 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 /*

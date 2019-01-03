@@ -1,6 +1,6 @@
 package fiatshamir
 
-import "gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
+import ristretto "github.com/bwesterb/go-ristretto"
 
 // HashCacher will be used for the Fiat-Shamir
 // transform and will cache the necesarry values of the transcript

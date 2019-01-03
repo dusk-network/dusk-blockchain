@@ -5,11 +5,11 @@ import (
 
 	"github.com/pkg/errors"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/fiatshamir"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/innerproduct"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/pedersen"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/ristretto"
 )
 
 // N is number of bits in range
