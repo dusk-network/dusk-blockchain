@@ -18,7 +18,7 @@ import (
 // 	StealthEx()
 // }
 
-func StealthEx() {
+func stealthEx() {
 
 	Alice, _ := randKey()
 	Bob, _ := randKey()
