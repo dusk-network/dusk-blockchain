@@ -11,9 +11,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
-const (
-	KeySize = 32
-)
+// KeySize is the size of a public key
+const KeySize = 32
 
 var (
 	netPrefix = byte(0xEF)
@@ -30,10 +29,6 @@ type Key struct {
 // New will generate a new Key from the seed
 func New(seed []byte) (k *Key, err error) {
 
-	if len(seed) != 32 {
-		return nil, errors.New("Seed size should be 32 bytes")
-	}
-
 	// PrivateSpendKey Derivation
 	PrivateSpend, err := reduceToScalar(seed)
 	if err != nil {
@@ -41,7 +36,7 @@ func New(seed []byte) (k *Key, err error) {
 	}
 
 	// PrivateViewKey Derivation
-	pv, err := hash.Sha3256(PrivateSpend.Bytes())
+	pv, err := hash.Sha3512(PrivateSpend.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -231,17 +226,12 @@ func reduceToScalar(s []byte) (*ristretto.Scalar, error) {
 
 	var sc ristretto.Scalar
 
-	if len(s) == 32 {
-		var buf [32]byte
-		copy(buf[:], s)
-		sc.SetReduce32(&buf)
-		return &sc, nil
-	} else if len(s) == 64 {
+	if len(s) == 64 {
 		var buf [64]byte
 		copy(buf[:], s)
 		sc.SetReduced(&buf)
 		return &sc, nil
 	}
 
-	return nil, errors.New("seed must be of length 32 or 64 bytes")
+	return nil, errors.New("seed must be 64 bytes")
 }
