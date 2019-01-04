@@ -26,7 +26,7 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 
 	for step := uint8(1); step < maxSteps; step++ {
 		var retHash []byte
-		var votes []*payload.MsgBinary
+		var msgs []*payload.MsgBinary
 		var err error
 		if err := b.committeeVoteBinary(reductionThreshold1, step, blockHash, empty); err != nil {
 			return false, nil, err
@@ -75,9 +75,9 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 			return false, nil, err
 		}
 
-		empty, retHash, votes, err = b.countVotesBinary(reductionThreshold1, reductionVoteThreshold1, step, reductionTime1)
+		empty, retHash, msgs, err = b.countVotesBinary(reductionThreshold1, reductionVoteThreshold1, step, reductionTime1)
 		if retHash == nil {
-			result, err := b.commonCoin(votes, step)
+			result, err := b.commonCoin(msgs, step)
 			if err != nil {
 				return false, nil, err
 			}
@@ -93,9 +93,9 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 	return true, emptyBlock.Header.Hash, nil
 }
 
-func (b *Blockchain) commonCoin(allVotes []*payload.MsgBinary, step uint8) (uint64, error) {
+func (b *Blockchain) commonCoin(allMsgs []*payload.MsgBinary, step uint8) (uint64, error) {
 	var lenHash, _ = new(big.Int).SetString("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0)
-	for i, vote := range allVotes {
+	for i, vote := range allMsgs {
 		votes, h, err := b.processMsgBinary(reductionThreshold1, step, vote)
 		if err != nil {
 			return 0, err
@@ -166,7 +166,7 @@ func (b *Blockchain) countVotesBinary(threshold float64, voteThreshold uint64, s
 	timerAmount time.Duration) (bool, []byte, []*payload.MsgBinary, error) {
 	counts := make(map[string]int)
 	var voters []*ed25519.PublicKey
-	var allVotes []*payload.MsgBinary
+	var allMsgs []*payload.MsgBinary
 	timer := time.NewTimer(timerAmount)
 
 	for {
@@ -200,19 +200,19 @@ func (b *Blockchain) countVotesBinary(threshold float64, voteThreshold uint64, s
 			counts[hashStr] += votes
 
 			// Save vote for common coin
-			allVotes = append(allVotes, m)
+			allMsgs = append(allMsgs, m)
 
 			// If a block exceeds the vote threshold, we will return it's hash
 			// and end the loop.
 			if counts[hashStr] > int(float64(voteThreshold)*threshold) {
 				timer.Stop()
-				return m.Empty, hash, allVotes, nil
+				return m.Empty, hash, allMsgs, nil
 			}
 		}
 	}
 end:
 
-	return false, nil, allVotes, nil
+	return false, nil, allMsgs, nil
 }
 
 func (b *Blockchain) processMsgBinary(threshold float64, step uint8, msg *payload.MsgBinary) (int, []byte, error) {
