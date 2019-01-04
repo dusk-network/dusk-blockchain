@@ -117,6 +117,7 @@ func (b *BlockHeader) Decode(r io.Reader) error {
 	return nil
 }
 
+// Bytes returns the block header, encoded as a slice of bytes.
 func (b *BlockHeader) Bytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	err := b.Encode(buf)

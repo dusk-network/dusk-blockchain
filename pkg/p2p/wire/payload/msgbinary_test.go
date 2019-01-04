@@ -2,34 +2,41 @@ package payload
 
 import (
 	"bytes"
+	"crypto/rand"
 	"testing"
+
+	"golang.org/x/crypto/ed25519"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
 func TestMsgBinaryEncodeDecode(t *testing.T) {
+	pk, sk, err := bls.GenKeyPair(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sigBLS, err := crypto.RandEntropy(32)
+	sigBLS, err := bls.Sign(sk, hash)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sigEd, err := crypto.RandEntropy(64)
+	edpk, edsk, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sigEd := ed25519.Sign(edsk, hash)
 
-	msg, err := NewMsgBinary(200, true, hash, sigBLS, sigEd, pubKey)
+	msg, err := NewMsgBinary(sigBLS, true, hash, hash, sigEd, &edpk, sigBLS, pk, 200, 230000, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,27 +54,29 @@ func TestMsgBinaryEncodeDecode(t *testing.T) {
 
 // Check to see whether length checks are working.
 func TestMsgBinaryChecks(t *testing.T) {
+	pk, sk, err := bls.GenKeyPair(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	sigBLS, err := bls.Sign(sk, hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	edpk, edsk, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sigEd := ed25519.Sign(edsk, hash)
+
 	wrongHash, err := crypto.RandEntropy(33)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sigBLS, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	wrongSigBLS, err := crypto.RandEntropy(35)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sigEd, err := crypto.RandEntropy(64)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,29 +86,15 @@ func TestMsgBinaryChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	wrongPubKey, err := crypto.RandEntropy(30)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := NewMsgBinary(200, true, wrongHash, sigBLS, sigEd, pubKey); err == nil {
+	if _, err := NewMsgBinary(sigBLS, true, wrongHash, hash, sigEd, &edpk, sigBLS, pk, 200, 230000, 4); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewMsgBinary(200, true, hash, wrongSigBLS, sigEd, pubKey); err == nil {
-		t.Fatal("check for sig did not work")
+	if _, err := NewMsgBinary(sigBLS, true, hash, wrongHash, sigEd, &edpk, sigBLS, pk, 200, 230000, 4); err == nil {
+		t.Fatal("check for prevhash did not work")
 	}
 
-	if _, err := NewMsgBinary(200, true, hash, sigBLS, wrongSigEd, pubKey); err == nil {
-		t.Fatal("check for pubkey did not work")
-	}
-
-	if _, err := NewMsgBinary(200, true, hash, sigBLS, sigEd, wrongPubKey); err == nil {
-		t.Fatal("check for pubkey did not work")
+	if _, err := NewMsgBinary(sigBLS, true, hash, hash, wrongSigEd, &edpk, sigBLS, pk, 200, 230000, 4); err == nil {
+		t.Fatal("check for siged did not work")
 	}
 }

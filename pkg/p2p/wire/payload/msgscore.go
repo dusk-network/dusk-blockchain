@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 
+	"golang.org/x/crypto/ed25519"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -12,26 +14,22 @@ import (
 // MsgScore defines a score message on the Dusk wire protocol.
 type MsgScore struct {
 	Score         uint64
-	Proof         []byte // variable size
-	CandidateHash []byte // Block candidate hash (32 bytes)
-	SigEd         []byte // Ed25519 signature of the score, proof and candidate hash (64 bytes)
-	PubKey        []byte // Sender public key (32 bytes)
+	Proof         []byte             // variable size
+	CandidateHash []byte             // Block candidate hash (32 bytes)
+	SigEd         []byte             // Ed25519 signature of the score, proof and candidate hash (64 bytes)
+	PubKey        *ed25519.PublicKey // Sender public key (32 bytes)
 }
 
 // NewMsgScore returns a MsgScore struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewMsgScore(score uint64, proof, candidateHash, sig, pubKey []byte) (*MsgScore, error) {
+func NewMsgScore(score uint64, proof, candidateHash, sig []byte, pubKey *ed25519.PublicKey) (*MsgScore, error) {
 	if len(candidateHash) != 32 {
 		return nil, errors.New("wire: supplied candidate hash for score message is improper length")
 	}
 
 	if len(sig) != 64 {
 		return nil, errors.New("wire: supplied sig for score message is improper length")
-	}
-
-	if len(pubKey) != 32 {
-		return nil, errors.New("wire: supplied pubkey for score message is improper length")
 	}
 
 	return &MsgScore{
@@ -62,7 +60,7 @@ func (m *MsgScore) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, m.PubKey); err != nil {
+	if err := encoding.Write256(w, []byte(*m.PubKey)); err != nil {
 		return err
 	}
 
@@ -88,9 +86,12 @@ func (m *MsgScore) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &m.PubKey); err != nil {
+	var pub []byte
+	if err := encoding.Read256(r, &pub); err != nil {
 		return err
 	}
+
+	*m.PubKey = ed25519.PublicKey(pub)
 
 	return nil
 }

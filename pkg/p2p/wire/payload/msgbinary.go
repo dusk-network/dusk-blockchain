@@ -35,6 +35,10 @@ func NewMsgBinary(score *bls.Sig, empty bool, hash, prevBlockHash, sigEd []byte,
 		return nil, errors.New("wire: supplied candidate hash for binary message is improper length")
 	}
 
+	if len(prevBlockHash) != 32 {
+		return nil, errors.New("wire: supplied previous block hash for binary message is improper length")
+	}
+
 	if len(sigEd) != 64 {
 		return nil, errors.New("wire: supplied sig for binary message is improper length")
 	}
