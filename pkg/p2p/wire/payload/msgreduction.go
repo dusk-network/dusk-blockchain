@@ -36,6 +36,10 @@ func NewMsgReduction(score *bls.Sig, hash, prevBlockHash, sigEd []byte, pubKeyEd
 		return nil, errors.New("wire: supplied candidate hash for reduction message is improper length")
 	}
 
+	if len(sigEd) != 64 {
+		return nil, errors.New("wire: supplied sig for reduction message is improper length")
+	}
+
 	return &MsgReduction{
 		Score:         score,
 		Stake:         stake,
