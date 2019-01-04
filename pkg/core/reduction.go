@@ -2,7 +2,6 @@ package core
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"time"
 
@@ -29,38 +28,27 @@ type role struct {
 // BlockReduction is the main function that runs during block reduction phase.
 // Once the reduction phase is finished, the function will return a block hash,
 // to then be used for the binary agreement phase.
-func (b *Blockchain) BlockReduction(seed []byte, round uint64, blockHash []byte) ([]byte, error) {
+func (b *Blockchain) BlockReduction(blockHash []byte) ([]byte, error) {
 	// Step 1
 
 	// Prepare empty block
-	prevBlockHash, err := b.GetLatestHeaderHash()
+	emptyBlock, err := payload.NewEmptyBlock(b.lastHeader)
 	if err != nil {
 		return nil, err
 	}
 
-	headerData, err := b.db.Get(prevBlockHash)
-	if err != nil {
-		return nil, err
-	}
-
-	r := bytes.NewReader(headerData)
-	prevHeader := &payload.BlockHeader{}
-	if err := prevHeader.Decode(r); err != nil {
-		return nil, err
-	}
-
-	emptyBlock, err := payload.NewEmptyBlock(prevHeader)
-	if err != nil {
-		return nil, err
+	// If no candidate block was found, then we use the empty block
+	if blockHash == nil {
+		blockHash = emptyBlock.Header.Hash
 	}
 
 	// Vote on passed block
-	if err := b.committeeVote(seed, round, reductionThreshold1, 1, blockHash); err != nil {
+	if err := b.committeeVote(reductionThreshold1, 1, blockHash); err != nil {
 		return nil, err
 	}
 
 	// Receive all other votes
-	retHash, err := b.countVotes(seed, round, reductionThreshold1, 1, reductionTime1)
+	retHash, err := b.countVotes(reductionThreshold1, 1, reductionTime1)
 	if err != nil {
 		return nil, err
 	}
@@ -70,16 +58,16 @@ func (b *Blockchain) BlockReduction(seed []byte, round uint64, blockHash []byte)
 	// If retHash is nil, no clear winner was found within the time limit.
 	// So we will vote on an empty block instead.
 	if retHash == nil {
-		if err := b.committeeVote(seed, round, reductionThreshold2, 2, emptyBlock.Header.Hash); err != nil {
+		if err := b.committeeVote(reductionThreshold2, 2, emptyBlock.Header.Hash); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := b.committeeVote(seed, round, reductionThreshold2, 2, retHash); err != nil {
+		if err := b.committeeVote(reductionThreshold2, 2, retHash); err != nil {
 			return nil, err
 		}
 	}
 
-	retHash2, err := b.countVotes(seed, round, reductionThreshold2, 2, reductionTime2)
+	retHash2, err := b.countVotes(reductionThreshold2, 2, reductionTime2)
 	if err != nil {
 		return nil, err
 	}
@@ -93,14 +81,14 @@ func (b *Blockchain) BlockReduction(seed []byte, round uint64, blockHash []byte)
 	return retHash2, nil
 }
 
-func (b *Blockchain) committeeVote(seed []byte, round uint64, threshold float64, step uint8, blockHash []byte) error {
+func (b *Blockchain) committeeVote(threshold float64, step uint8, blockHash []byte) error {
 	role := &role{
 		part:  "committee",
-		round: round,
+		round: b.round,
 		step:  step,
 	}
 
-	score, j, err := b.sortition(seed, role, threshold)
+	score, j, err := b.sortition(role, threshold)
 	if err != nil {
 		return err
 	}
@@ -121,7 +109,7 @@ func (b *Blockchain) committeeVote(seed []byte, round uint64, threshold float64,
 
 		// Create message to gossip
 		msg, err := payload.NewMsgReduction(score, blockHash, prevBlockHash, []byte{}, []byte{},
-			sigBLS, b.BLSPubKey, b.stakeWeight, round, step)
+			sigBLS, b.BLSPubKey, b.stakeWeight, b.round, step)
 		if err != nil {
 			return err
 		}
@@ -133,7 +121,7 @@ func (b *Blockchain) committeeVote(seed []byte, round uint64, threshold float64,
 	return nil
 }
 
-func (b *Blockchain) countVotes(seed []byte, round uint64, threshold float64, step uint8, timerAmount time.Duration) ([]byte, error) {
+func (b *Blockchain) countVotes(threshold float64, step uint8, timerAmount time.Duration) ([]byte, error) {
 	counts := make(map[string]int)
 	var voters [][]byte
 	timer := time.NewTimer(timerAmount)
@@ -145,7 +133,7 @@ func (b *Blockchain) countVotes(seed []byte, round uint64, threshold float64, st
 			goto end
 		case m := <-b.reductionChan:
 			// Verify the message score and get back it's contents
-			votes, pk, hash, err := b.processMsgReduction(seed, round, threshold, step, m)
+			votes, pk, hash, err := b.processMsgReduction(threshold, step, m)
 			if err != nil {
 				return nil, err
 			}
@@ -181,8 +169,7 @@ end:
 	return nil, nil
 }
 
-func (b *Blockchain) processMsgReduction(seed []byte, round uint64, threshold float64, step uint8,
-	msg *payload.MsgReduction) (int, []byte, []byte, error) {
+func (b *Blockchain) processMsgReduction(threshold float64, step uint8, msg *payload.MsgReduction) (int, []byte, []byte, error) {
 	// Verify signature and message
 	// Add once Ed25519 code is added
 	// if !edwards25519.Verify(msg.PubKey, msg.SigEd) {
@@ -191,7 +178,7 @@ func (b *Blockchain) processMsgReduction(seed []byte, round uint64, threshold fl
 
 	role := &role{
 		part:  "committee",
-		round: round,
+		round: b.round,
 		step:  step,
 	}
 
@@ -207,7 +194,7 @@ func (b *Blockchain) processMsgReduction(seed []byte, round uint64, threshold fl
 	}
 
 	// Make sure their score is valid, and calculate their amount of votes.
-	votes, err := b.verifySortition(seed, msg.Score, msg.PubKeyBLS, role, threshold, msg.Stake)
+	votes, err := b.verifySortition(msg.Score, msg.PubKeyBLS, role, threshold, msg.Stake)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -217,52 +204,4 @@ func (b *Blockchain) processMsgReduction(seed []byte, round uint64, threshold fl
 	}
 
 	return votes, msg.PubKeyEd, msg.BlockHash, nil
-}
-
-func (b *Blockchain) sortition(seed []byte, role *role, threshold float64) (*bls.Sig, int, error) {
-	// Construct message
-	msg := append(seed, []byte(role.part)...)
-	binary.LittleEndian.PutUint64(msg, role.round)
-	binary.LittleEndian.PutUint64(msg, uint64(role.step))
-
-	// Generate score and votes
-	score, err := bls.Sign(b.BLSSecretKey, msg)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	j := calcNormDist(threshold, b.stakeWeight, b.totalStakeWeight, score)
-
-	return score, j, nil
-}
-
-func (b *Blockchain) verifySortition(seed []byte, score *bls.Sig, pk *bls.PublicKey, role *role, threshold float64, weight uint64) (int, error) {
-	valid, err := verifyScore(score, pk, seed, role)
-	if err != nil {
-		return 0, err
-	}
-
-	if valid {
-		j := calcNormDist(threshold, weight, b.totalStakeWeight, score)
-		return j, nil
-	}
-
-	return 0, nil
-}
-
-func verifyScore(score *bls.Sig, pk *bls.PublicKey, seed []byte, role *role) (bool, error) {
-	// Construct message
-	msg := append(seed, []byte(role.part)...)
-	binary.LittleEndian.PutUint64(msg, role.round)
-	binary.LittleEndian.PutUint64(msg, uint64(role.step))
-
-	if err := bls.Verify(pk, msg, score); err != nil {
-		if err.Error() == "bls: Invalid Signature" {
-			return false, nil
-		}
-
-		return false, err
-	}
-
-	return true, nil
 }

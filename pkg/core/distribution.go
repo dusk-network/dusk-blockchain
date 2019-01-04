@@ -7,8 +7,6 @@ import (
 	"gonum.org/v1/gonum/stat/distuv"
 )
 
-// calcNormDist is used for block reduction. It uses a normal
-// distribution function.
 func calcNormDist(threshold float64, weight, totalWeight uint64, score *bls.Sig) int {
 	// Calculate probability (sigma)
 	p := threshold / float64(totalWeight)

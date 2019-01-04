@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 
@@ -20,6 +21,8 @@ var (
 	ErrInitialisedCheck  = errors.New("could not check if blockchain db is already initialised")
 	ErrBlockValidation   = errors.New("block failed sanity check")
 	ErrBlockVerification = errors.New("block failed to be consistent with the current blockchain")
+
+	candidateTimer = 20 * time.Second
 )
 
 // Blockchain defines a processor for blocks and transactions which
@@ -28,7 +31,7 @@ var (
 // transactions. Properly verified transactions and blocks will be
 // added to the memory pool and the database respectively.
 type Blockchain struct {
-	// Basic stuff
+	// Basic fields
 	memPool *MemPool
 	db      *database.BlockchainDB
 	net     protocol.Magic
@@ -41,15 +44,24 @@ type Blockchain struct {
 	// EdPubKey
 	// EdSecretKey
 
-	// Block generator stuff
+	// Consensus related
+	currSeed   []byte               // Seed of the current round of consensus
+	round      uint64               // Current round (block height + 1)
+	lastHeader *payload.BlockHeader // Last validated block on the chain
+	quitChan   chan int             // Channel used to stop consensus loops
+	roundChan  chan int             // Channel used to signify start of a new round
+
+	// Block generator related fields
 	generator bool
+	gQuitChan chan int
 	bidWeight uint64
 
-	// Provisioner stuff
+	// Provisioner related fields
 	provisioner      bool
 	reductionChan    chan *payload.MsgReduction
-	stakeWeight      uint64
-	totalStakeWeight uint64
+	candidateChan    chan *payload.MsgCandidate
+	stakeWeight      uint64 // The amount of DUSK staked by the node
+	totalStakeWeight uint64 // The total amount of DUSK staked
 }
 
 // NewBlockchain will return a new Blockchain instance with an
@@ -109,13 +121,60 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain.memPool.Init()
 	chain.db = db
 	chain.net = net
+
+	// Consensus set-up
 	chain.reductionChan = make(chan *payload.MsgReduction)
+	chain.candidateChan = make(chan *payload.MsgCandidate)
+	chain.quitChan = make(chan int)
+	chain.roundChan = make(chan int)
+	chain.lastHeader, err = chain.GetLatestHeader()
+	if err != nil {
+		return nil, err
+	}
+
+	chain.height = chain.lastHeader.Height
+	chain.round = chain.height + 1
+	chain.currSeed = chain.lastHeader.Seed
 
 	return chain, nil
 }
 
+// Loop function for provisioner nodes
 func (b *Blockchain) provisionerLoop() {
+	b.provisioner = true
 
+	for {
+		select {
+		case <-b.quitChan:
+			b.provisioner = false
+			return
+		case <-b.roundChan:
+			// Should add a check here if we're staking, and if not
+			// then create a staking transaction
+
+			timer := time.NewTimer(candidateTimer)
+			var retHash []byte
+			var err error
+			select {
+			case <-timer.C:
+				retHash, err = b.BlockReduction(nil)
+			case m := <-b.candidateChan:
+				timer.Stop()
+				retHash, err = b.BlockReduction(m.CandidateHash)
+			}
+
+			if err != nil {
+				// Log
+				b.provisioner = false
+				return
+			}
+
+			fmt.Println(retHash)
+
+			// BinaryAgreement
+			// CountVotes
+		}
+	}
 }
 
 func (b *Blockchain) generatorLoop() {
@@ -360,4 +419,31 @@ func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
 	}
 
 	return prevHeader, nil
+}
+
+// StartProvisioning will set the node to provisioner status,
+// and will start participating in block reduction and binary agreement
+// phases of the protocol.
+func (b *Blockchain) StartProvisioning() error {
+	// Can't generate and provision at the same time
+	if b.generator {
+		return errors.New("can't start provisioning: currently generating blocks")
+	}
+
+	if b.provisioner {
+		return errors.New("already provisioning")
+	}
+
+	go b.provisionerLoop()
+	return nil
+}
+
+// StopProvisioning will stop the provisioning process
+func (b *Blockchain) StopProvisioning() error {
+	if !b.provisioner {
+		return errors.New("not provisioning")
+	}
+
+	b.quitChan <- 1
+	return nil
 }
