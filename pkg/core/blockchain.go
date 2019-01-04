@@ -55,12 +55,12 @@ type Blockchain struct {
 
 	// Block generator related fields
 	generator bool
-	gQuitChan chan int
 	bidWeight uint64
 
 	// Provisioner related fields
 	provisioner      bool
 	reductionChan    chan *payload.MsgReduction
+	binaryChan       chan *payload.MsgBinary
 	candidateChan    chan *payload.MsgCandidate
 	stakeWeight      uint64 // The amount of DUSK staked by the node
 	totalStakeWeight uint64 // The total amount of DUSK staked
@@ -126,6 +126,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 
 	// Consensus set-up
 	chain.reductionChan = make(chan *payload.MsgReduction)
+	chain.binaryChan = make(chan *payload.MsgBinary)
 	chain.candidateChan = make(chan *payload.MsgCandidate)
 	chain.quitChan = make(chan int)
 	chain.roundChan = make(chan int)
@@ -155,14 +156,16 @@ func (b *Blockchain) provisionerLoop() {
 			// then create a staking transaction
 
 			timer := time.NewTimer(candidateTimer)
+			var empty bool
 			var retHash []byte
+			var finalHash []byte
 			var err error
 			select {
 			case <-timer.C:
-				retHash, err = b.BlockReduction(nil)
+				empty, retHash, err = b.blockReduction(nil)
 			case m := <-b.candidateChan:
 				timer.Stop()
-				retHash, err = b.BlockReduction(m.CandidateHash)
+				empty, retHash, err = b.blockReduction(m.CandidateHash)
 			}
 
 			if err != nil {
@@ -171,10 +174,17 @@ func (b *Blockchain) provisionerLoop() {
 				return
 			}
 
-			fmt.Println(retHash)
-
-			// BinaryAgreement
-			// CountVotes
+			empty, finalHash, err = b.binaryAgreement(retHash, empty)
+			if !empty {
+				// Do set reduction
+				if bytes.Compare(finalHash, retHash) == 0 {
+					// send final block with set of signatures
+				} else {
+					// send tentative block with set of signatures
+				}
+			} else {
+				// send tentative block without set of signatures
+			}
 		}
 	}
 }
@@ -312,6 +322,7 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	b.round = block.Header.Height + 1
 	b.currSeed = block.Header.Seed
 	b.lastHeader = block.Header
+	// Should update total stake weight/generator merkle tree here as well
 
 	// Set off consensus functions if participating
 	if b.provisioner || b.generator {
