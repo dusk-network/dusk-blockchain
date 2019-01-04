@@ -43,16 +43,16 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 
 		if retHash == nil {
 			retHash = blockHash
-		} else {
-			if !empty {
-				if step == 1 {
-					if err := b.committeeVoteBinary(reductionThreshold1, maxSteps, retHash, empty); err != nil {
-						return false, nil, err
-					}
-				}
+		}
 
-				return empty, retHash, nil
+		if !empty {
+			if step == 1 {
+				if err := b.committeeVoteBinary(reductionThreshold1, maxSteps, retHash, empty); err != nil {
+					return false, nil, err
+				}
 			}
+
+			return empty, retHash, nil
 		}
 
 		step++
@@ -64,10 +64,10 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 		if retHash == nil {
 			retHash = emptyBlock.Header.Hash
 			empty = true
-		} else {
-			if empty {
-				return empty, retHash, nil
-			}
+		}
+
+		if empty {
+			return empty, retHash, nil
 		}
 
 		step++
@@ -84,9 +84,10 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 
 			if result == 0 {
 				retHash = blockHash
-			} else {
-				retHash = emptyBlock.Header.Hash
+				continue
 			}
+
+			retHash = emptyBlock.Header.Hash
 		}
 	}
 
@@ -169,11 +170,11 @@ func (b *Blockchain) countVotesBinary(threshold float64, voteThreshold uint64, s
 	var allMsgs []*payload.MsgBinary
 	timer := time.NewTimer(timerAmount)
 
+end:
 	for {
-	start:
 		select {
 		case <-timer.C:
-			goto end
+			break end
 		case m := <-b.binaryChan:
 			// Verify the message score and get back it's contents
 			votes, hash, err := b.processMsgBinary(threshold, step, m)
@@ -184,13 +185,13 @@ func (b *Blockchain) countVotesBinary(threshold float64, voteThreshold uint64, s
 			// If votes is zero, then the reduction message was most likely
 			// faulty, so we will ignore it.
 			if votes == 0 {
-				goto start
+				break
 			}
 
 			// Check if this node's vote is already recorded
 			for _, voter := range voters {
 				if voter == m.PubKeyEd {
-					goto start
+					break
 				}
 			}
 
@@ -210,7 +211,6 @@ func (b *Blockchain) countVotesBinary(threshold float64, voteThreshold uint64, s
 			}
 		}
 	}
-end:
 
 	return false, nil, allMsgs, nil
 }

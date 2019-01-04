@@ -179,12 +179,15 @@ func (b *Blockchain) provisionerLoop() {
 				// Do set reduction
 				if bytes.Compare(finalHash, retHash) == 0 {
 					// send final block with set of signatures
-				} else {
-					// send tentative block with set of signatures
+					break
 				}
-			} else {
-				// send tentative block without set of signatures
+
+				// send tentative block with set of signatures
+				break
 			}
+
+			// send tentative block without set of signatures
+			break
 		}
 	}
 }

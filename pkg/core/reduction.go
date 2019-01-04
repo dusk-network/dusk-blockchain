@@ -59,13 +59,11 @@ func (b *Blockchain) blockReduction(blockHash []byte) (bool, []byte, error) {
 	// If retHash is nil, no clear winner was found within the time limit.
 	// So we will vote on an empty block instead.
 	if retHash == nil {
-		if err := b.committeeVoteReduction(reductionThreshold2, 2, emptyBlock.Header.Hash); err != nil {
-			return false, nil, err
-		}
-	} else {
-		if err := b.committeeVoteReduction(reductionThreshold2, 2, retHash); err != nil {
-			return false, nil, err
-		}
+		retHash = emptyBlock.Header.Hash
+	}
+
+	if err := b.committeeVoteReduction(reductionThreshold2, 2, retHash); err != nil {
+		return false, nil, err
 	}
 
 	retHash2, err := b.countVotesReduction(reductionThreshold2, reductionVoteThreshold2, 2, reductionTime2)
@@ -131,11 +129,11 @@ func (b *Blockchain) countVotesReduction(threshold float64, voteThreshold uint64
 	var voters []*ed25519.PublicKey
 	timer := time.NewTimer(timerAmount)
 
+end:
 	for {
-	start:
 		select {
 		case <-timer.C:
-			goto end
+			break end
 		case m := <-b.reductionChan:
 			// Verify the message score and get back it's contents
 			votes, hash, err := b.processMsgReduction(threshold, step, m)
@@ -146,13 +144,13 @@ func (b *Blockchain) countVotesReduction(threshold float64, voteThreshold uint64
 			// If votes is zero, then the reduction message was most likely
 			// faulty, so we will ignore it.
 			if votes == 0 {
-				goto start
+				break
 			}
 
 			// Check if this node's vote is already recorded
 			for _, voter := range voters {
 				if voter == m.PubKeyEd {
-					goto start
+					break
 				}
 			}
 
@@ -169,7 +167,6 @@ func (b *Blockchain) countVotesReduction(threshold float64, voteThreshold uint64
 			}
 		}
 	}
-end:
 
 	return nil, nil
 }
