@@ -24,7 +24,7 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 		return false, nil, err
 	}
 
-	for step := uint8(3); step < maxSteps; step++ {
+	for step := uint8(1); step < maxSteps; step++ {
 		var retHash []byte
 		var votes []*payload.MsgBinary
 		var err error
@@ -37,7 +37,7 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 			return false, nil, err
 		}
 
-		// if step > 3 {
+		// if step > 1 {
 
 		// }
 
@@ -45,7 +45,7 @@ func (b *Blockchain) binaryAgreement(blockHash []byte, empty bool) (bool, []byte
 			retHash = blockHash
 		} else {
 			if !empty {
-				if step == 3 {
+				if step == 1 {
 					if err := b.committeeVoteBinary(reductionThreshold1, maxSteps, retHash, empty); err != nil {
 						return false, nil, err
 					}
