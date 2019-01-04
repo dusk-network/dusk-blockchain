@@ -8,6 +8,8 @@ import (
 	"sort"
 	"time"
 
+	"golang.org/x/crypto/ed25519"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -41,8 +43,8 @@ type Blockchain struct {
 	// in the network validation.
 	BLSPubKey    *bls.PublicKey
 	BLSSecretKey *bls.SecretKey
-	// EdPubKey
-	// EdSecretKey
+	EdPubKey     *ed25519.PublicKey
+	EdSecretKey  *ed25519.PrivateKey
 
 	// Consensus related
 	currSeed   []byte               // Seed of the current round of consensus
@@ -177,8 +179,23 @@ func (b *Blockchain) provisionerLoop() {
 	}
 }
 
+// Placeholder at the moment, just to get structure down
 func (b *Blockchain) generatorLoop() {
+	b.generator = true
 
+	for {
+		select {
+		case <-b.quitChan:
+			b.generator = false
+			return
+		case <-b.roundChan:
+			if err := b.Generate(nil); err != nil {
+				// Log
+				b.generator = false
+				return
+			}
+		}
+	}
 }
 
 // AcceptTx attempt to verify a transaction once it is received from
@@ -288,6 +305,17 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 
 	if err := b.db.AddBlockTransactions(block); err != nil {
 		return err
+	}
+
+	// Update variables
+	b.height = block.Header.Height
+	b.round = block.Header.Height + 1
+	b.currSeed = block.Header.Seed
+	b.lastHeader = block.Header
+
+	// Set off consensus functions if participating
+	if b.provisioner || b.generator {
+		b.roundChan <- 1
 	}
 
 	// TODO: Relay

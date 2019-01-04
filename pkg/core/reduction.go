@@ -2,8 +2,11 @@ package core
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"time"
+
+	"golang.org/x/crypto/ed25519"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 
@@ -94,21 +97,24 @@ func (b *Blockchain) committeeVote(threshold float64, step uint8, blockHash []by
 	}
 
 	if j > 0 {
-		prevBlockHash, err := b.GetLatestHeaderHash()
-		if err != nil {
-			return err
-		}
-
-		// TODO: Make Ed25519 sig
-
 		// Sign block hash with BLS
 		sigBLS, err := bls.Sign(b.BLSSecretKey, blockHash)
 		if err != nil {
 			return err
 		}
 
+		// Create message to sign with ed25519
+		var edMsg []byte // Add score when bls signatures are completed
+		binary.LittleEndian.PutUint64(edMsg, b.round)
+		edMsg = append(edMsg, byte(step))
+		edMsg = append(edMsg, b.lastHeader.Hash...)
+		// Add sigBLS once completed
+
+		// Sign with ed25519
+		sigEd := ed25519.Sign(*b.EdSecretKey, edMsg)
+
 		// Create message to gossip
-		msg, err := payload.NewMsgReduction(score, blockHash, prevBlockHash, []byte{}, []byte{},
+		msg, err := payload.NewMsgReduction(score, blockHash, b.lastHeader.Hash, sigEd, b.EdPubKey,
 			sigBLS, b.BLSPubKey, b.stakeWeight, b.round, step)
 		if err != nil {
 			return err
@@ -123,7 +129,7 @@ func (b *Blockchain) committeeVote(threshold float64, step uint8, blockHash []by
 
 func (b *Blockchain) countVotes(threshold float64, step uint8, timerAmount time.Duration) ([]byte, error) {
 	counts := make(map[string]int)
-	var voters [][]byte
+	var voters []*ed25519.PublicKey
 	timer := time.NewTimer(timerAmount)
 
 	for {
@@ -146,7 +152,7 @@ func (b *Blockchain) countVotes(threshold float64, step uint8, timerAmount time.
 
 			// Check if this node's vote is already recorded
 			for _, voter := range voters {
-				if bytes.Compare(voter, pk) == 0 {
+				if voter == pk {
 					goto start
 				}
 			}
@@ -169,12 +175,11 @@ end:
 	return nil, nil
 }
 
-func (b *Blockchain) processMsgReduction(threshold float64, step uint8, msg *payload.MsgReduction) (int, []byte, []byte, error) {
-	// Verify signature and message
-	// Add once Ed25519 code is added
-	// if !edwards25519.Verify(msg.PubKey, msg.SigEd) {
-	//	return 0, nil, nil, errors.New("mismatch between signature and public key")
-	// }
+func (b *Blockchain) processMsgReduction(threshold float64, step uint8, msg *payload.MsgReduction) (int, *ed25519.PublicKey, []byte, error) {
+	// Verify message
+	if !verifyReductionSignatures(msg) {
+		return 0, nil, nil, nil
+	}
 
 	role := &role{
 		part:  "committee",
@@ -204,4 +209,26 @@ func (b *Blockchain) processMsgReduction(threshold float64, step uint8, msg *pay
 	}
 
 	return votes, msg.PubKeyEd, msg.BlockHash, nil
+}
+
+func verifyReductionSignatures(msg *payload.MsgReduction) bool {
+	// Construct message
+	var edMsg []byte // Add score when bls signatures are completed
+	binary.LittleEndian.PutUint64(edMsg, msg.Round)
+	edMsg = append(edMsg, byte(msg.Step))
+	edMsg = append(edMsg, msg.PrevBlockHash...)
+	// Add bls block sig once completed
+
+	// Check ed25519
+	if !ed25519.Verify(*msg.PubKeyEd, edMsg, msg.SigEd) {
+		return false
+	}
+
+	// Check BLS
+	if err := bls.Verify(msg.PubKeyBLS, msg.BlockHash, msg.SigBLS); err != nil {
+		return false
+	}
+
+	// Passed all checks
+	return true
 }

@@ -12,39 +12,30 @@ import (
 
 // Generate will check if a bid's score is under the treshold, then constructs
 // a candidate block and broadcasts it.
-func (b *Blockchain) Generate(bid uint64, secret []byte) (bool, error) {
+func (b *Blockchain) Generate(secret []byte) error {
 	// Get tau here from config later
 	tau := uint64(200)
 
-	// Generate BLS keys
-	blsPub, _, err := bls.GenKeyPair(nil)
-	if err != nil {
-		return false, err
-	}
-
-	// Get previous header
-	prevHeader, err := b.GetLatestHeader()
-	if err != nil {
-		return false, err
-	}
-
 	// Generate Y from function parameters
-	if _, err := generateY(bid, prevHeader.Seed, secret); err != nil {
-		return false, err
+	if _, err := generateY(b.bidWeight, b.lastHeader.Seed, secret); err != nil {
+		return err
 	}
 
 	// Gamma function (change out later)
 	score := rand.Uint64()
 	if score >= tau {
-		return false, nil
+		return nil
 	}
 
 	candidateBlock := payload.NewBlock()
-	if err := candidateBlock.SetPrevBlock(prevHeader); err != nil {
-		return false, err
+	if err := candidateBlock.SetPrevBlock(b.lastHeader); err != nil {
+		return err
 	}
 
-	// Set seed with BLS once completed
+	// Set seed with BLS
+	if err := candidateBlock.SetSeed(b.lastHeader.Seed, b.BLSSecretKey); err != nil {
+		return err
+	}
 
 	candidateBlock.SetTime(time.Now().Unix())
 
@@ -56,35 +47,28 @@ func (b *Blockchain) Generate(bid uint64, secret []byte) (bool, error) {
 	}
 
 	if err := candidateBlock.SetRoot(); err != nil {
-		return false, err
+		return err
 	}
 
 	if err := candidateBlock.SetHash(); err != nil {
-		return false, err
+		return err
 	}
 
-	// Set to sign with BLS once completed
-	sig, err := hash.Sha3256(candidateBlock.Header.Hash)
+	// Sign with BLS
+	sig, err := bls.Sign(b.BLSSecretKey, candidateBlock.Header.Hash)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	binPub, err := blsPub.MarshalBinary()
-	if err != nil {
-		return false, err
-	}
-
-	// Change binPub[:32] when compressed BLS signatures are implemented
-	if _, err := payload.NewMsgCandidate(candidateBlock.Header.Hash, sig, binPub[:32]); err != nil {
-		return false, err
+	if _, err := payload.NewMsgCandidate(candidateBlock.Header.Hash, sig, b.BLSPubKey); err != nil {
+		return err
 	}
 
 	payload.NewMsgBlock(candidateBlock)
 
 	// Propagate msgs
 
-	// Successfully propagated block candidate
-	return true, nil
+	return nil
 }
 
 func generateY(bid uint64, prevSeed, secret []byte) ([]byte, error) {
