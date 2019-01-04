@@ -4,36 +4,29 @@ import (
 	"errors"
 	"io"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // MsgCandidate defines a candidate message on the Dusk wire protocol.
 type MsgCandidate struct {
-	CandidateHash []byte // Hash of the candidate block (32 bytes)
-	SigEd         []byte // Ed25519 signature (64 bytes)
-	PubKey        []byte // Sender public key (32 bytes)
+	CandidateHash []byte         // Hash of the candidate block (32 bytes)
+	SigBLS        *bls.Sig       // BLS signature (32 bytes)
+	PubKey        *bls.PublicKey // Sender public key (32 bytes)
 }
 
 // NewMsgCandidate returns a MsgCandidate struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewMsgCandidate(candidateHash, sig, pubKey []byte) (*MsgCandidate, error) {
+func NewMsgCandidate(candidateHash []byte, sig *bls.Sig, pubKey *bls.PublicKey) (*MsgCandidate, error) {
 	if len(candidateHash) != 32 {
 		return nil, errors.New("wire: supplied candidate hash for candidate message is improper length")
 	}
 
-	if len(sig) != 64 {
-		return nil, errors.New("wire: supplied sig for candidate message is improper length")
-	}
-
-	if len(pubKey) != 32 {
-		return nil, errors.New("wire: supplied pubkey for candidate message is improper length")
-	}
-
 	return &MsgCandidate{
 		CandidateHash: candidateHash,
-		SigEd:         sig,
+		SigBLS:        sig,
 		PubKey:        pubKey,
 	}, nil
 }
@@ -45,11 +38,16 @@ func (m *MsgCandidate) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write512(w, m.SigEd); err != nil {
+	// if err := encoding.Write512(w, m.SigBLS); err != nil {
+	// 	return err
+	// }
+
+	pubBLS, err := m.PubKey.MarshalBinary()
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(w, m.PubKey); err != nil {
+	if err := encoding.Write256(w, pubBLS); err != nil {
 		return err
 	}
 
@@ -63,13 +61,16 @@ func (m *MsgCandidate) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read512(r, &m.SigEd); err != nil {
+	// if err := encoding.Read512(r, &m.SigBLS); err != nil {
+	// 	return err
+	// }
+
+	var pub []byte
+	if err := encoding.Read256(r, &pub); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &m.PubKey); err != nil {
-		return err
-	}
+	m.PubKey.UnmarshalBinary(pub)
 
 	return nil
 }

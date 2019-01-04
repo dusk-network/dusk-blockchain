@@ -22,6 +22,6 @@ const (
 type Magic uint32
 
 const (
-	MainNet Magic = 7630401
+	MainNet Magic = 0x7630401f
 	TestNet Magic = 0x74746e41
 )

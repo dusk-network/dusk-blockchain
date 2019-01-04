@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 
+	"golang.org/x/crypto/ed25519"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
@@ -13,28 +15,25 @@ import (
 
 // MsgReduction defines a reduction message on the Dusk wire protocol.
 type MsgReduction struct {
-	Score         *bls.Sig       // Sortition score of the sender
-	Stake         uint64         // Sender's stake amount
-	Round         uint64         // Current round
-	Step          uint8          // Current step
-	BlockHash     []byte         // Hash of the block being voted on (32 bytes)
-	PrevBlockHash []byte         // Hash of the previous block (32 bytes)
-	SigEd         []byte         // Ed25519 signature of the block hash, score, step, round and last block hash (64 bytes)
-	SigBLS        *bls.Sig       // BLS signature of the voted block hash
-	PubKeyEd      []byte         // Sender Ed25519 public key (32 bytes)
-	PubKeyBLS     *bls.PublicKey // Sender BLS public key (32 bytes)
+	Score         *bls.Sig           // Sortition score of the sender
+	Stake         uint64             // Sender's stake amount
+	Round         uint64             // Current round
+	Step          uint8              // Current step
+	BlockHash     []byte             // Hash of the block being voted on (32 bytes)
+	PrevBlockHash []byte             // Hash of the previous block (32 bytes)
+	SigEd         []byte             // Ed25519 signature of the block hash, score, step, round and last block hash (64 bytes)
+	SigBLS        *bls.Sig           // BLS signature of the voted block hash
+	PubKeyEd      *ed25519.PublicKey // Sender Ed25519 public key (32 bytes)
+	PubKeyBLS     *bls.PublicKey     // Sender BLS public key (32 bytes)
 }
 
 // NewMsgReduction returns a MsgReduction struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewMsgReduction(score *bls.Sig, hash, prevBlockHash, sigEd, pubKeyEd []byte, sigBLS *bls.Sig, pubKeyBLS *bls.PublicKey, stake, round uint64, step uint8) (*MsgReduction, error) {
+func NewMsgReduction(score *bls.Sig, hash, prevBlockHash, sigEd []byte, pubKeyEd *ed25519.PublicKey,
+	sigBLS *bls.Sig, pubKeyBLS *bls.PublicKey, stake, round uint64, step uint8) (*MsgReduction, error) {
 	if len(hash) != 32 {
 		return nil, errors.New("wire: supplied candidate hash for reduction message is improper length")
-	}
-
-	if len(pubKeyEd) != 32 {
-		return nil, errors.New("wire: supplied pubkey for reduction message is improper length")
 	}
 
 	return &MsgReduction{
@@ -84,11 +83,18 @@ func (m *MsgReduction) Encode(w io.Writer) error {
 
 	// SigBLS
 
-	if err := encoding.Write256(w, m.PubKeyEd); err != nil {
+	if err := encoding.Write256(w, []byte(*m.PubKeyEd)); err != nil {
 		return err
 	}
 
-	// PubKeyBLS
+	pubBLS, err := m.PubKeyBLS.MarshalBinary()
+	if err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(w, pubBLS); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -126,11 +132,21 @@ func (m *MsgReduction) Decode(r io.Reader) error {
 
 	// SigBLS
 
-	if err := encoding.Read256(r, &m.PubKeyEd); err != nil {
+	var pubEd []byte
+	if err := encoding.Read256(r, &pubEd); err != nil {
 		return err
 	}
 
-	// PubKeyBLS
+	*m.PubKeyEd = ed25519.PublicKey(pubEd)
+
+	var pubBLS []byte
+	if err := encoding.Read256(r, &pubBLS); err != nil {
+		return err
+	}
+
+	if err := m.PubKeyBLS.UnmarshalBinary(pubBLS); err != nil {
+		return err
+	}
 
 	return nil
 }

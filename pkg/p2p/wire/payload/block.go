@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -76,16 +77,16 @@ func (b *Block) SetPrevBlock(prevHeader *BlockHeader) error {
 }
 
 // SetSeed will sign the previous block seed with a BLS signature and
-// put it in the block. Implement when BLS code is completed
-/*func (b *Block) SetSeed(prevSeed []byte, sk *bls.SecretKey) error {
-	sig, err := bls.Sign(sk, prevSeed)
+// put it in the block.
+func (b *Block) SetSeed(prevSeed []byte, sk *bls.SecretKey) error {
+	_, err := bls.Sign(sk, prevSeed)
 	if err != nil {
 		return err
 	}
 
-	b.Header.Seed = sig
+	b.Header.Seed = []byte{0, 0} // Set to marshaled sig once implemented
 	return nil
-}*/
+}
 
 // SetTime will set the block timestamp.
 func (b *Block) SetTime(time int64) {
