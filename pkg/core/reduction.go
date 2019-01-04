@@ -29,9 +29,6 @@ type role struct {
 // BlockReduction is the main function that runs during block reduction phase.
 // Once the reduction phase is finished, the function will return a block hash,
 // to then be used for the binary agreement phase.
-// During reduction phase, it does not yet matter if we know whether we are voting
-// on empty blocks or not, so it will always be set to false in the committeeVote
-// function calls.
 func (b *Blockchain) blockReduction(blockHash []byte) (bool, []byte, error) {
 	// Step 1
 

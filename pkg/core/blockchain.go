@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	ErrNoBlockchainDb    = errors.New("blockchain database is not available")
-	ErrInitialisedCheck  = errors.New("could not check if blockchain db is already initialised")
-	ErrBlockValidation   = errors.New("block failed sanity check")
-	ErrBlockVerification = errors.New("block failed to be consistent with the current blockchain")
+	errNoBlockchainDb    = errors.New("blockchain database is not available")
+	errInitialisedCheck  = errors.New("could not check if blockchain db is already initialised")
+	errBlockValidation   = errors.New("block failed sanity check")
+	errBlockVerification = errors.New("block failed to be consistent with the current blockchain")
 
 	candidateTimer = 20 * time.Second
 )
@@ -72,13 +72,13 @@ type Blockchain struct {
 func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	db, err := database.NewBlockchainDB("test") // TODO: external path configuration
 	if err != nil {
-		return nil, ErrNoBlockchainDb
+		return nil, errNoBlockchainDb
 	}
 
 	marker := []byte("HasBeenInitialisedAlready")
 	init, err := db.Has(marker)
 	if err != nil {
-		return nil, ErrInitialisedCheck
+		return nil, errInitialisedCheck
 	}
 
 	if !init {
@@ -366,7 +366,8 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 	return nil
 }
 
-//addHeaders is not safe for concurrent access
+//ValidateHeaders will validate headers that were received through the wire.
+// addHeaders is not safe for concurrent access
 func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
 	table := database.NewTable(b.db, database.HEADER)
 	latestHash, err := b.db.Get(database.LATESTHEADER)
@@ -423,6 +424,7 @@ func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
 	return nil
 }
 
+// AddHeaders will add block headers to the database.
 func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
 	for _, header := range msg.Headers {
 		if err := b.db.AddHeader(header); err != nil {
@@ -432,14 +434,19 @@ func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
 	return nil
 }
 
+// GetHeaders will retrieve block headers from the database, starting and
+// stopping at the provided locators.
 func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
 	return b.db.ReadHeaders(start, stop)
 }
 
+// GetLatestHeaderHash gets the block hash of the most recent block.
 func (b *Blockchain) GetLatestHeaderHash() ([]byte, error) {
 	return b.db.Get(database.LATESTHEADER)
 }
 
+// GetLatestHeader will get the most recent block hash and return it as
+// a block header struct.
 func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
 	prevHeaderHash, err := b.GetLatestHeaderHash()
 	if err != nil {
