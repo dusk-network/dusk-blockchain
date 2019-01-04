@@ -427,14 +427,14 @@ func megacheckWithC(ipproof *innerproduct.Proof, mu, x, y, z, t, taux, w ristret
 	if err != nil {
 		return false, err
 	}
-	c7.ScalarMult(&c7, &c)
+	c7.PublicScalarMult(&c7, &c)
 
 	// scalar : uInvSq challenges points: Rj
 	c8, err = vector.Exp(uInvSq, ipproof.R, len(ipproof.R), 1)
 	if err != nil {
 		return false, err
 	}
-	c8.ScalarMult(&c8, &c)
+	c8.PublicScalarMult(&c8, &c)
 
 	// scalar: z_j+2  points: Vj
 	zM := vector.ScalarPowers(z, uint32(M))
@@ -444,17 +444,17 @@ func megacheckWithC(ipproof *innerproduct.Proof, mu, x, y, z, t, taux, w ristret
 	c9.SetZero()
 	for i := range zM {
 		var temp ristretto.Point
-		temp.ScalarMult(&V[i].Value, &zM[i])
+		temp.PublicScalarMult(&V[i].Value, &zM[i])
 		c9.Add(&c9, &temp)
 	}
 
 	// scalar : x point: T1
-	c10.ScalarMult(&T1, &x)
+	c10.PublicScalarMult(&T1, &x)
 
 	// scalar : xSq point: T2
 	var xSq ristretto.Scalar
 	xSq.Square(&x)
-	c11.ScalarMult(&T2, &xSq)
+	c11.PublicScalarMult(&T2, &xSq)
 
 	var sum ristretto.Point
 	sum.SetZero()

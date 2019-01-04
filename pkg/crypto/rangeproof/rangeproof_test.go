@@ -76,6 +76,8 @@ func BenchmarkVerify(b *testing.B) {
 	amount.SetBigInt(big.NewInt(100000))
 	p, _ := Prove([]ristretto.Scalar{amount}, false)
 
+	b.ResetTimer()
+
 	for i := 0; i < 100; i++ {
 
 		// Verify
