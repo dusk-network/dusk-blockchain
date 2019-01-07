@@ -5,7 +5,6 @@ import (
 	"io"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -62,29 +61,17 @@ func NewEmptyBlock(prevHeader *BlockHeader) (*Block, error) {
 // SetPrevBlock will set all the fields of the Block struct that are
 // taken from the previous block.
 func (b *Block) SetPrevBlock(prevHeader *BlockHeader) error {
-	b.Header.Height = prevHeader.Height + 1
+	b.Header.Height = prevHeader.Height + 1 // XXX: Can we move this else where, as it sets the currentHeight and not PrevHeight, as the func name suggests
 	b.Header.PrevBlock = prevHeader.Hash
 
-	// Remove when BLS code is completed
-	// This is here to make tests pass
-	seedHash, err := hash.Sha3256(prevHeader.Seed)
-	if err != nil {
-		return err
-	}
-
-	b.Header.Seed = seedHash
 	return nil
 }
 
-// SetSeed will sign the previous block seed with a BLS signature and
-// put it in the block.
-func (b *Block) SetSeed(prevSeed []byte, sk *bls.SecretKey) error {
-	_, err := bls.Sign(sk, prevSeed)
-	if err != nil {
-		return err
-	}
+// SetSeed will set the seed for the current block
+func (b *Block) SetSeed(Seed []byte) error {
 
-	b.Header.Seed = []byte{0, 0} // Set to marshaled sig once implemented
+	b.Header.Seed = Seed
+
 	return nil
 }
 

@@ -2,10 +2,7 @@ package payload
 
 import (
 	"bytes"
-	"crypto/rand"
 	"testing"
-
-	"golang.org/x/crypto/ed25519"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -27,12 +24,17 @@ func TestMsgScoreEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pk, _, err := ed25519.GenerateKey(rand.Reader)
+	pk, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg, err := NewMsgScore(200, proof, hash, sig, &pk)
+	seed, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg, err := NewMsgScore(200, proof, hash, sig, pk, seed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,16 +77,20 @@ func TestMsgScoreChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pk, _, err := ed25519.GenerateKey(rand.Reader)
+	pk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := NewMsgScore(200, proof, wrongHash, sig, &pk); err == nil {
+	if _, err := NewMsgScore(200, proof, wrongHash, sig, pk, seed); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewMsgScore(200, proof, hash, wrongSig, &pk); err == nil {
+	if _, err := NewMsgScore(200, proof, hash, wrongSig, pk, seed); err == nil {
 		t.Fatal("check for sig did not work")
 	}
 }

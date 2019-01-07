@@ -5,32 +5,30 @@ import (
 	"errors"
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"golang.org/x/crypto/ed25519"
 )
 
 // MsgBinary defines a binary agreement message on the Dusk wire protocol.
 type MsgBinary struct {
-	Score         *bls.Sig           // Sortition score of sender
-	Empty         bool               // Whether or not this block is an empty block
-	Stake         uint64             // Sender's stake amount
-	Round         uint64             // Current round
-	Step          uint8              // Current step
-	BlockHash     []byte             // Hash of the block being voted on (32 bytes)
-	PrevBlockHash []byte             // Hash of the previous block (32 bytes)
-	SigEd         []byte             // Ed25519 signature of the block hash, score, step, round and last block hash (64 bytes)
-	SigBLS        *bls.Sig           // BLS signature of the voted block hash
-	PubKeyEd      *ed25519.PublicKey // Sender Ed25519 public key (32 bytes)
-	PubKeyBLS     *bls.PublicKey     // Sender BLS public key (32 bytes)
+	Score         []byte // Sortition score of sender
+	Empty         bool   // Whether or not this block is an empty block
+	Stake         uint64 // Sender's stake amount
+	Round         uint64 // Current round
+	Step          uint8  // Current step
+	BlockHash     []byte // Hash of the block being voted on (32 bytes)
+	PrevBlockHash []byte // Hash of the previous block (32 bytes)
+	SigEd         []byte // Ed25519 signature of the block hash, score, step, round and last block hash (64 bytes)
+	SigBLS        []byte // BLS signature of the voted block hash
+	PubKeyEd      []byte // Sender Ed25519 public key (32 bytes)
+	PubKeyBLS     []byte // Sender BLS public key (32 bytes)
 }
 
 // NewMsgBinary returns a MsgBinary struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewMsgBinary(score *bls.Sig, empty bool, hash, prevBlockHash, sigEd []byte, pubKeyEd *ed25519.PublicKey,
-	sigBLS *bls.Sig, pubKeyBLS *bls.PublicKey, stake, round uint64, step uint8) (*MsgBinary, error) {
+func NewMsgBinary(score []byte, empty bool, hash, prevBlockHash, sigEd []byte, pubKeyEd []byte,
+	sigBLS []byte, pubKeyBLS []byte, stake, round uint64, step uint8) (*MsgBinary, error) {
 	if len(hash) != 32 {
 		return nil, errors.New("wire: supplied candidate hash for binary message is improper length")
 	}
@@ -61,9 +59,9 @@ func NewMsgBinary(score *bls.Sig, empty bool, hash, prevBlockHash, sigEd []byte,
 // Encode a MsgBinary struct and write to w.
 // Implements Payload interface.
 func (m *MsgBinary) Encode(w io.Writer) error {
-	// if err := encoding.Write256(w, m.Score); err != nil {
-	// 	return err
-	// }
+	if err := encoding.Write256(w, m.Score); err != nil {
+		return err
+	}
 
 	if err := encoding.WriteBool(w, m.Empty); err != nil {
 		return err
@@ -93,18 +91,15 @@ func (m *MsgBinary) Encode(w io.Writer) error {
 		return err
 	}
 
-	// SigBLS
-
-	if err := encoding.Write256(w, []byte(*m.PubKeyEd)); err != nil {
+	if err := encoding.Write256(w, m.SigBLS); err != nil {
 		return err
 	}
 
-	pubBLS, err := m.PubKeyBLS.MarshalBinary()
-	if err != nil {
+	if err := encoding.Write256(w, m.PubKeyEd); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(w, pubBLS); err != nil {
+	if err := encoding.Write256(w, m.PubKeyBLS); err != nil {
 		return err
 	}
 
@@ -114,9 +109,10 @@ func (m *MsgBinary) Encode(w io.Writer) error {
 // Decode a MsgBinary from r.
 // Implements Payload interface.
 func (m *MsgBinary) Decode(r io.Reader) error {
-	// if err := encoding.Read256(r, &m.Score); err != nil {
-	// 	return err
-	// }
+
+	if err := encoding.Read256(r, &m.Score); err != nil {
+		return err
+	}
 
 	if err := encoding.ReadBool(r, &m.Empty); err != nil {
 		return err
@@ -146,21 +142,15 @@ func (m *MsgBinary) Decode(r io.Reader) error {
 		return err
 	}
 
-	// SigBLS
-
-	var pubEd []byte
-	if err := encoding.Read256(r, &pubEd); err != nil {
+	if err := encoding.Read256(r, &m.SigBLS); err != nil {
 		return err
 	}
 
-	*m.PubKeyEd = ed25519.PublicKey(pubEd)
-
-	var pubBLS []byte
-	if err := encoding.Read256(r, &pubBLS); err != nil {
+	if err := encoding.Read256(r, &m.PubKeyEd); err != nil {
 		return err
 	}
 
-	if err := m.PubKeyBLS.UnmarshalBinary(pubBLS); err != nil {
+	if err := encoding.Read256(r, &m.PubKeyBLS); err != nil {
 		return err
 	}
 
