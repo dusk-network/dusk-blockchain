@@ -122,7 +122,7 @@ func (p *Peer) Disconnect() {
 	close(p.quitch)
 	p.conn.Close()
 
-	log.WithField("prefix", "peer").Info("Disconnected peer with address", p.addr)
+	log.WithField("prefix", "peer").Infof("Disconnected peer with address %s", p.addr)
 }
 
 // Port returns the port
@@ -222,7 +222,7 @@ loop:
 func (p *Peer) ReadLoop() {
 
 	idleTimer := time.AfterFunc(idleTimeout, func() {
-		log.WithField("prefix", "peer").Info("Timing out peer", p.addr)
+		log.WithField("prefix", "peer").Infof("Timing out peer %s", p.addr)
 		p.Disconnect()
 	})
 
@@ -237,7 +237,8 @@ loop:
 		idleTimer.Stop()
 
 		if err != nil {
-			log.WithField("prefix", "peer").Info("Err on read:", err) // This will also happen if Peer is disconnected
+			// This will also happen if Peer is disconnected
+			log.WithField("prefix", "peer").Infof("Connection to %s has been closed", p.addr)
 			break loop
 		}
 
@@ -317,6 +318,10 @@ func (p *Peer) WriteLoop() {
 		}
 	}
 }
+
+/**
+ * Received data requests from other peers
+ */
 
 // OnGetData Listener. Is called after receiving a 'getdata' msg
 func (p *Peer) OnGetData(msg *payload.MsgGetData) {
@@ -562,11 +567,15 @@ func (p *Peer) OnScore(msg *payload.MsgScore) {
 	}
 }
 
+/**
+ * Requesting data from other peers
+ */
+
 // RequestHeaders will ask a peer for headers.
 // It will put a function on the outgoing peer queue to send a 'getheaders' msg
 // to an other peer. An error from this function will return this error from RequestHeaders.
 func (p *Peer) RequestHeaders(hash []byte) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg", commands.GetHeaders)
+	log.WithField("prefix", "peer").Infof("Sending '%s' msg requesting headers from %s", commands.GetHeaders, p.addr)
 	c := make(chan error)
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetHeaders)
@@ -583,7 +592,7 @@ func (p *Peer) RequestHeaders(hash []byte) error {
 // It will put a function on the outgoing peer queue to send a 'getdata' msg
 // to an other peer. An error from this function will return this error from RequestTx.
 func (p *Peer) RequestTx(tx transactions.Stealth) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting transactions", commands.GetData)
+	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting transactions from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
 	p.outch <- func() {
@@ -598,10 +607,10 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 }
 
 // RequestBlocks will ask a peer for blocks.
-// It will put a function on the outgoing peer queue to send a 'getdata' msg
-// to an other peer. An error from this function will return this error from RequestBlocks.
+// It will put a function on the outgoing peer queue to send a 'getdata' msg to an other peer.
+// The same possible function error will be returned from this method.
 func (p *Peer) RequestBlocks(hashes [][]byte) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting blocks", commands.GetData)
+	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
 	blocks := make([]*payload.Block, len(hashes))
@@ -617,6 +626,23 @@ func (p *Peer) RequestBlocks(hashes [][]byte) error {
 		getdata := payload.NewMsgGetData()
 		getdata.AddBlocks(blocks)
 		err := p.Write(getdata)
+		c <- err
+	}
+
+	return <-c
+}
+
+// RequestAddresses will ask a peer for addresses.
+// It will put a function on the outgoing peer queue to send a 'getaddr' msg to an other peer.
+// The same possible function error will be returned from this method.
+func (p *Peer) RequestAddresses() error {
+	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting addresses from %s", commands.GetAddr, p.addr)
+	c := make(chan error)
+
+	p.outch <- func() {
+		p.Detector.AddMessage(commands.GetAddr)
+		getaddr := payload.NewMsgGetAddr()
+		err := p.Write(getaddr)
 		c <- err
 	}
 

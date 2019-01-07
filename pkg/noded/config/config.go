@@ -54,7 +54,6 @@ func setDefaults(envNet string) {
 	// Peer
 	cnf.SetDefault("net.peer.port", "10333") //TODO: To be decided
 	cnf.SetDefault("net.peer.dialtimeout", 0)
-	//cnf.SetDefault("net.peer.seeds", []string{"192.168.178.57:10111", "192.168.178.57:10222"}) //TODO: What about default peer.seeds
 
 	// Database
 	cnf.SetDefault("net.database.dirpath", userHomeDir()+userHomeDuskDir+"/"+strings.ToLower(envNet)+"/db")

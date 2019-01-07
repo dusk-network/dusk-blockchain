@@ -27,7 +27,10 @@ net = "DevNet"
     #port = "10333"
     # Default dialTimeout is 0
     #dialTimeout = 0
-    seeds = [ "192.168.178.57:10111", "192.168.178.57:10222" ]
+    seeds = [ "192.168.178.57:10111", "192.168.178.57:10222", "192.168.178.57:10444"]
+    min = 3
+    max = 10
+    minGetAddr = 5
 
     [DevNet.database]
     #dirpath = "D:/temp/.dusk/dev/bcdb"

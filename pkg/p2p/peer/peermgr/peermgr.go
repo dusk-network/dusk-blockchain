@@ -58,6 +58,17 @@ func (pm *PeerMgr) RequestBlocks(hashes [][]byte) (*peer.Peer, error) {
 	return pm.peers[0], pm.peers[0].RequestBlocks(hashes)
 }
 
+// RequestAddresses will request the addrs from the most available peer.
+// As of now, it requests from the first peer in the list, TODO
+func (pm *PeerMgr) RequestAddresses() error {
+
+	if len(pm.peers) == 0 {
+		return errors.New("Peer Manager currently has no peers")
+	}
+
+	return pm.peers[0].RequestAddresses()
+}
+
 // AddPeer will add a new peer for the PeerManager to use
 func (pm *PeerMgr) AddPeer(p *peer.Peer) error { //TODO: What error
 	pm.peers = append(pm.peers, p)

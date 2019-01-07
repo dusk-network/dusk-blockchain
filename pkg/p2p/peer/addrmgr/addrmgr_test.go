@@ -169,7 +169,7 @@ func TestGetAddress(t *testing.T) {
 
 	ipports := []string{addr.String(), addr2.String(), addr3.String()}
 
-	assert.Contains(t, ipports, fetchAddr)
+	assert.Contains(t, ipports, fetchAddr.String())
 }
 
 // ipV6Address returns a valid IPv6 address as net.IP

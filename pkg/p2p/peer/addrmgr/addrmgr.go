@@ -1,7 +1,7 @@
 package addrmgr
 
 import (
-	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"math/rand"
 	"sync"
@@ -144,23 +144,22 @@ func (a *Addrmgr) FetchMoreAddresses() bool {
 }
 
 // ConnectionComplete will be called by the server when we have done the handshake
-// and Not when we have successfully Connected with net.Conn
-// It is to tell the AddrMgr that we have connected to a peer
-// This peer should already be known to the AddrMgr because
-// We send it to the Connmgr
-func (a *Addrmgr) ConnectionComplete(addressport string, inbound bool) {
+// and NOT when we have successfully connected with net.Conn.
+// It is to tell the AddrMgr that we have connected to a peer.
+// This peer should already be known to the AddrMgr because we send it to the Connmgr
+func (a *Addrmgr) ConnectionComplete(addr string, inbound bool) {
 	a.addrmtx.Lock()
 	defer a.addrmtx.Unlock()
 
-	// if addrmgr does not know this, then we just return
-	if _, ok := a.knownList[addressport]; !ok {
-		log.Info("Connected to an unknown address:port ", addressport)
+	// If addrmgr does not know this address, then we just return
+	if _, ok := a.knownList[addr]; !ok {
+		log.Infof("Connected to an unknown addr:port %s", addr)
 		return
 	}
 
-	na := a.knownList[addressport]
+	na := a.knownList[addr]
 
-	// move it from newAddrs List to GoodAddr List
+	// Move it from newAddrs List to goodAddrs List
 	stats := a.goodAddrs[na]
 	stats.lastSuccess = time.Now()
 	stats.lastTried = time.Now()
@@ -178,19 +177,19 @@ func (a *Addrmgr) ConnectionComplete(addressport string, inbound bool) {
 }
 
 // Failed will be called by ConnMgr
-// It is used to tell the AddrMgr that they had tried connecting an address an have failed
+// It is used to tell the AddrMgr that they had tried connecting an address and have failed
 // This is concurrent safe
-func (a *Addrmgr) Failed(addressport string) {
+func (a *Addrmgr) Failed(addr string) {
 	a.addrmtx.Lock()
 	defer a.addrmtx.Unlock()
 
 	// if addrmgr does not know this, then we just return
-	if _, ok := a.knownList[addressport]; !ok {
-		log.Info("Connected to an unknown address:port ", addressport)
+	if _, ok := a.knownList[addr]; !ok {
+		log.Info("Connected to an unknown address:port ", addr)
 		return
 	}
 
-	na := a.knownList[addressport]
+	na := a.knownList[addr]
 
 	// HMM: logic here could be simpler if we make it one list instead
 
@@ -248,17 +247,17 @@ func (a *Addrmgr) OnGetAddr(p *peer.Peer, msg *payload.MsgGetAddr) {
 
 // NewAddr will return an address for the external caller to connect to.
 // In our case, it will be the connection manager.
-func (a *Addrmgr) NewAddr() (string, error) {
+func (a *Addrmgr) NewAddr() (*payload.NetAddress, error) {
 	// For now it just returns a random value from unconnected
 	// TODO: When an address is tried, the address manager is notified.
 	// When asked for a new address, this should be taken into account
 	// when choosing a new one, also the number of retries.
 	unconnected := a.Unconnected()
 	if len(unconnected) == 0 {
-		return "", errors.New("No Addresses to give")
+		return nil, fmt.Errorf("Failed to issue a new peer address to connect to")
 	}
 	randInt := rand.Intn(len(unconnected))
-	return unconnected[randInt].String(), nil
+	return &unconnected[randInt], nil
 }
 
 // https://www.dotnetperls.com/duplicates-go

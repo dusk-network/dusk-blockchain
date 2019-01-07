@@ -1,30 +1,13 @@
 package connmgr_test
 
 import (
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr"
 )
 
-func TestDial(t *testing.T) {
-	cfg := connmgr.Config{
-		GetAddress:   nil,
-		OnConnection: nil,
-		OnAccept:     nil,
-		Port:         "",
-		DialTimeout:  0,
-	}
-
-	cm := connmgr.New(cfg)
-	cm.Run()
-
-	ipport := "google.com:80" // google unlikely to go offline, a better approach to test Dialing is welcome.
-
-	conn, err := cm.Dial(ipport)
-	assert.Equal(t, nil, err)
-	assert.NotEqual(t, nil, conn)
-}
 func TestConnect(t *testing.T) {
 	cfg := connmgr.Config{
 		GetAddress:   nil,
@@ -41,16 +24,16 @@ func TestConnect(t *testing.T) {
 
 	r := connmgr.Request{Addr: ipport}
 
-	cm.Connect(&r)
-
+	err := cm.Connect(&r)
+	assert.Equal(t, nil, err)
 	assert.Equal(t, 1, len(cm.ConnectedList))
 
 }
 func TestNewRequest(t *testing.T) {
 
-	address := "google.com:80"
+	address := payload.NewNetAddress("216.58.212.174", 80)
 
-	var getAddr = func() (string, error) {
+	var getAddr = func() (*payload.NetAddress, error) {
 		return address, nil
 	}
 
@@ -68,7 +51,7 @@ func TestNewRequest(t *testing.T) {
 
 	cm.NewRequest()
 
-	if _, ok := cm.ConnectedList[address]; ok {
+	if _, ok := cm.ConnectedList[address.String()]; ok {
 		assert.Equal(t, true, ok)
 		assert.Equal(t, 1, len(cm.ConnectedList))
 		return
@@ -79,9 +62,9 @@ func TestNewRequest(t *testing.T) {
 }
 func TestDisconnect(t *testing.T) {
 
-	address := "google.com:80"
+	address := payload.NewNetAddress("216.58.212.174", 80)
 
-	var getAddr = func() (string, error) {
+	var getAddr = func() (*payload.NetAddress, error) {
 		return address, nil
 	}
 
@@ -97,7 +80,7 @@ func TestDisconnect(t *testing.T) {
 
 	cm.Run()
 	cm.NewRequest()
-	cm.Disconnect(address)
+	cm.Disconnect(address.String())
 
 	assert.Equal(t, 0, len(cm.ConnectedList))
 }

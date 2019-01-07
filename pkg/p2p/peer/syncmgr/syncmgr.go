@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/blockchain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/addrmgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -25,11 +24,10 @@ var (
 	maxBlockRequestPerPeer = 16
 )
 
-// Syncmanager holds pointers to peer- and address-manager and keeps the state of
+// Syncmgr holds pointers to peer- and address-manager and keeps the state of
 // synchronisation of headers and blocks
-type Syncmanager struct {
+type Syncmgr struct {
 	pmgr              *peermgr.PeerMgr
-	amgr              *addrmgr.Addrmgr
 	Mode              int // 1 = headersFirst, 2 = Blocks, 3 = Maintain
 	chain             *blockchain.Chain
 	headers           [][]byte
@@ -37,10 +35,9 @@ type Syncmanager struct {
 }
 
 // New will setup the sync manager with the required parameters
-func New(cfg Config) *Syncmanager {
-	return &Syncmanager{
+func New(cfg Config) *Syncmgr {
+	return &Syncmgr{
 		peermgr.New(),
-		addrmgr.New(),
 		1,
 		cfg.Chain,
 		[][]byte{},
@@ -49,13 +46,13 @@ func New(cfg Config) *Syncmanager {
 }
 
 // AddPeer adds a peer for the peer manager to use
-func (s *Syncmanager) AddPeer(peer *peer.Peer) error {
+func (s *Syncmgr) AddPeer(peer *peer.Peer) error {
 	return s.pmgr.AddPeer(peer)
 }
 
-// OnGetHeaders receives 'getheader' msgs from a peer, reads them from the chain db
+// OnGetHeaders receives 'getheaders' msgs from a peer, reads them from the chain db
 // and sends them to the requesting peer.
-func (s *Syncmanager) OnGetHeaders(p *peer.Peer, msg *payload.MsgGetHeaders) {
+func (s *Syncmgr) OnGetHeaders(p *peer.Peer, msg *payload.MsgGetHeaders) {
 	log.WithField("prefix", "syncmgr").Debug("Syncmgr OnGetHeaders called")
 	// The caller peer wants some headers from our blockchain.
 	msgHeaders, err := getHeaders(*s.chain, msg)
@@ -67,7 +64,7 @@ func (s *Syncmanager) OnGetHeaders(p *peer.Peer, msg *payload.MsgGetHeaders) {
 }
 
 // OnHeaders receives 'headers' msgs from an other peer and adds them to the chain.
-func (s *Syncmanager) OnHeaders(p *peer.Peer, msg *payload.MsgHeaders) {
+func (s *Syncmgr) OnHeaders(p *peer.Peer, msg *payload.MsgHeaders) {
 	log.WithField("prefix", "syncmgr").Debug("Sync manager OnHeaders called")
 
 	// Any headers received?
@@ -89,7 +86,7 @@ func (s *Syncmanager) OnHeaders(p *peer.Peer, msg *payload.MsgHeaders) {
 }
 
 // HeadersFirstMode receives 'headers' msgs from an other peer and adds them to the chain.
-func (s *Syncmanager) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) error {
+func (s *Syncmgr) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) error {
 	log.WithField("prefix", "syncmgr").Debug("Headers first mode")
 
 	// Validate Headers
@@ -135,7 +132,7 @@ func (s *Syncmanager) HeadersFirstMode(p *peer.Peer, msg *payload.MsgHeaders) er
 }
 
 // RequestMoreBlocks request blocks from an other peer and keeps an admin of the requested blocks and peers.
-func (s *Syncmanager) RequestMoreBlocks() error {
+func (s *Syncmgr) RequestMoreBlocks() error {
 	var blockReq [][]byte
 	var reqAmount int
 
@@ -164,17 +161,22 @@ func (s *Syncmanager) RequestMoreBlocks() error {
 	return err
 }
 
+// RequestAddresses request addresses from an other peer
+func (s *Syncmgr) RequestAddresses() error {
+	return s.pmgr.RequestAddresses()
+}
+
 // OnGetData receives 'getdata' msgs from a peer.
 // This could be a request for a specifx Tx or Block and will be read from the chain db.
 // and send to the requesting peer.
-func (s *Syncmanager) OnGetData(p *peer.Peer, msg *payload.MsgGetData) {
+func (s *Syncmgr) OnGetData(p *peer.Peer, msg *payload.MsgGetData) {
 	// TODO
 }
 
 // OnBlock receives a block from a peer, then passes it to the blockchain to process.
 // For now we will only use this simple setup, to allow us to test the other parts of the system.
 // See Issue #24
-func (s *Syncmanager) OnBlock(p *peer.Peer, msg *payload.MsgBlock) {
+func (s *Syncmgr) OnBlock(p *peer.Peer, msg *payload.MsgBlock) {
 	err := s.chain.AddBlock(msg)
 	if err != nil {
 		// Put headers back in front of queue to fetch block for.
@@ -182,30 +184,11 @@ func (s *Syncmanager) OnBlock(p *peer.Peer, msg *payload.MsgBlock) {
 	}
 }
 
-// OnAddr receives a known node address within the network from a peer then passes it to the address manager
-func (s *Syncmanager) OnAddr(p *peer.Peer, msg *payload.MsgAddr) {
-	s.amgr.OnAddr(p, msg)
-}
-
 // OnMemPool (TODO)
-func (s *Syncmanager) OnMemPool(p *peer.Peer, msg *payload.MsgMemPool) {
+func (s *Syncmgr) OnMemPool(p *peer.Peer, msg *payload.MsgMemPool) {
 	//err := s.chain.AddMempool(msg)
 	//if err != nil {
 	//	// Put headers back in front of queue to fetch block for.
 	//	fmt.Println("Block had an error", err)
 	//}
 }
-
-//func sendMsgNotFound(p *peer.Peer, invType payload.InvType, hashes [][]byte) {
-//	msg := payload.NewMsgNotFound()
-//	var vectors []payload.InvVect
-//	for _, hash := range hashes {
-//		invVect := payload.InvVect{invType, hash}
-//		vectors = append(vectors, invVect)
-//	}
-//	msg.Vectors = vectors
-//	err := p.Write(msg)
-//	if err != nil {
-//		log.WithField("prefix","syncmgr").Errorf("Failed to send '%s' to requesting peer %s: %s", commands.NotFound, p.RemoteAddr().String(), err)
-//	}
-//}

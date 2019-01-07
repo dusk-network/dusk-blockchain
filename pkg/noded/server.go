@@ -2,19 +2,20 @@ package noded
 
 import (
 	"errors"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	cnf "github.com/spf13/viper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/blockchain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/addrmgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/syncmgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 	"net"
-	"os"
+	"strconv"
+	"strings"
 )
 
 // NodeServer acts as P2P server and sets up the blockchain.
@@ -23,8 +24,9 @@ import (
 // - Synchronization manager: manages the synchronization of peers via messages
 type NodeServer struct {
 	chain      *blockchain.Chain
-	sm         *syncmgr.Syncmanager
 	cm         *connmgr.Connmgr
+	sm         *syncmgr.Syncmgr
+	am         *addrmgr.Addrmgr
 	peercfg    peer.LocalConfig
 	latestHash []byte
 }
@@ -32,9 +34,11 @@ type NodeServer struct {
 func (s *NodeServer) setupConnMgr() error {
 	// Connection Manager - Integrate
 	s.cm = connmgr.New(connmgr.Config{
-		GetAddress:   nil,
+		GetAddress:   s.GetAddress,
 		OnConnection: s.OnConn,
+		OnFail:       s.OnFail,
 		OnAccept:     s.OnAccept,
+		OnMinGetAddr: s.OnMinGetAddr,
 		Port:         cnf.GetString("net.peer.port"),
 	})
 
@@ -58,7 +62,7 @@ func (s *NodeServer) setupChain() error {
 	return err
 }
 
-func (s *NodeServer) setupSyncManager() error {
+func (s *NodeServer) setupSyncMgr() error {
 	// Sync Manager - Integrate
 	s.sm = syncmgr.New(syncmgr.Config{
 		Chain:    s.chain,
@@ -67,51 +71,39 @@ func (s *NodeServer) setupSyncManager() error {
 	return nil
 }
 
+func (s *NodeServer) setupAddrMgr() {
+	s.am = addrmgr.New()
+	// Add the (permanent) seed addresses to the Address Manager
+	var netAddrs []*payload.NetAddress
+	addrs := cnf.GetStringSlice("net.peer.seeds")
+	for _, addr := range addrs {
+		s := strings.Split(addr, ":")
+		port, _ := strconv.ParseUint(s[1], 10, 16)
+		netAddrs = append(netAddrs, payload.NewNetAddress(s[0], uint16(port)))
+	}
+	s.am.AddAddrs(netAddrs)
+}
+
 func (s *NodeServer) setupPeerConfig() error {
 	// Peer config struct - Integrate
 	s.peercfg = peer.LocalConfig{
-		Net:         protocol.MainNet,
-		UserAgent:   protocol.UserAgent,
-		Services:    protocol.NodePeerService,
-		Nonce:       1200,
-		ProtocolVer: protocol.ProtocolVersion,
-		Relay:       false,
-		Port:        uint16(cnf.GetInt("net.peer.port")),
-		StartHeight: LocalHeight,
-		// TODO: Discuss if ALL msgs should be handled via the syncmgr?
+		Net:          protocol.MainNet,
+		UserAgent:    protocol.UserAgent,
+		Services:     protocol.NodePeerService,
+		Nonce:        1200,
+		ProtocolVer:  protocol.ProtocolVersion,
+		Relay:        false,
+		Port:         uint16(cnf.GetInt("net.peer.port")),
+		StartHeight:  LocalHeight,
 		OnGetHeaders: s.sm.OnGetHeaders,
 		OnHeaders:    s.sm.OnHeaders,
 		OnGetData:    s.sm.OnGetData,
 		OnBlock:      s.sm.OnBlock,
-		OnAddr:       s.sm.OnAddr,
+		OnGetAddr:    s.am.OnGetAddr,
+		OnAddr:       s.am.OnAddr,
 		OnMemPool:    s.sm.OnMemPool,
 	}
 	return nil
-}
-
-// Run starts the server and adds the necessary configurations
-func (s *NodeServer) Run() error {
-
-	// Add all other run based methods for modules
-
-	// Connmgr - Run
-	s.cm.Run()
-
-	//Iterate through seed list and connect to first available one
-	// TODO: Find out if one peer sync is enough or try all seeds to become fully synced to tip of chain
-	ip, _ := util.GetOutboundIP()
-	toAddr := ip.String() + ":10111"
-	err := s.cm.Connect(&connmgr.Request{
-		Addr: toAddr,
-	})
-	if err != nil {
-		return err
-	}
-
-	addr := payload.NetAddress{ip, s.peercfg.Port}
-	log.WithField("prefix", "noded").Infof("Node server is running on %s", addr.String())
-
-	return err
 }
 
 // Start loads the configuration, sets up a set of managers that together control the server
@@ -122,42 +114,64 @@ func Start() {
 }
 
 func setup() {
+	done := make(chan bool, 1)
 
 	server := NodeServer{}
-	err := server.setupConnMgr()
-	if err != nil {
-		log.WithField("prefix", "noded").Error("Failed to setup the Connection Manager:", err)
-		os.Exit(0) //TODO: Exit gracefully (done channel ??)
+
+	if err := server.setupConnMgr(); err != nil {
+		log.WithField("prefix", "noded").Errorf("Failed to setup the Connection Manager: %s", err)
+		done <- true
 	}
 
-	err = server.setupChain()
-	if err != nil {
-		log.WithField("prefix", "noded").Error("Failed to setup the Blockchain:", err)
-		os.Exit(0) //TODO: Exit gracefully (done channel ??)
+	if err := server.setupChain(); err != nil {
+		log.WithField("prefix", "noded").Errorf("Failed to setup the Blockchain: %s", err)
+		done <- true
 	}
 
-	err = server.setupSyncManager()
-	if err != nil {
-		log.WithField("prefix", "noded").Error("Failed to setup the Synchronisation Manager:", err)
-		os.Exit(0) //TODO: Exit gracefully (done channel ??)
+	if err := server.setupSyncMgr(); err != nil {
+		log.WithField("prefix", "noded").Errorf("Failed to setup the Synchronisation Manager: %s", err)
+		done <- true
 	}
 
-	err = server.setupPeerConfig()
-	if err != nil {
-		log.WithField("prefix", "noded").Error("Failed to setup the Peer configuration:", err)
-		os.Exit(0) //TODO: Exit gracefully (done channel ??)
+	server.setupAddrMgr()
+
+	if err := server.setupPeerConfig(); err != nil {
+		log.WithField("prefix", "noded").Errorf("Failed to setup the Peer configuration: %s", err)
+		done <- true
 	}
 
-	err = server.Run()
-	if err != nil {
+	if err := server.Run(); err != nil {
 		log.WithField("prefix", "noded").Error(err)
-		os.Exit(0) //TODO: Exit gracefully (done channel ??)
+		done <- true
+	} else {
+		ip, _ := util.GetOutboundIP()
+		nodeAddr := payload.NetAddress{ip, server.peercfg.Port}
+		log.WithField("prefix", "noded").Infof("Node server is running on %s", nodeAddr.String())
+
+		// TODO: This is here just to quickly test the system
+		//	err = p.RequestHeaders(s.latestHash)
+		//	log.WithField("prefix", "noded").Info("For tests, we are only fetching first 2k batch")
+		//	if err != nil {
+		//		log.WithField("prefix", "noded").Error(err.Error())
+		//	}
 	}
 
-	// Block the channel to prevent the server from stopping.
-	// It's anonymous so server can only be stopped by Ctrl-C.
-	// TODO: Use a named channel ('done') to gracefully shut down when setup failed.
-	<-make(chan struct{})
+	// Prevent the server from stopping.
+	// Server can only be stopped by 'done <- true' or Ctrl-C.
+	<-done
+}
+
+// Run starts the server
+// TODO: error?
+func (s *NodeServer) Run() error {
+	var err error
+
+	// Run the Connection Manager
+	s.cm.Run()
+	// This is the first and only statically created request for a peer (other requests will be event driven)
+	s.cm.NewRequest()
+
+	return err
 }
 
 // LocalHeight returns the current height of the localNode
@@ -165,9 +179,9 @@ func LocalHeight() uint64 {
 	return 10
 }
 
-// GetAddress is not implemented yet
-func (s *NodeServer) GetAddress() (string, error) {
-	return "", nil
+// GetAddress gets a new address from Address Manager
+func (s *NodeServer) GetAddress() (*payload.NetAddress, error) {
+	return s.am.NewAddr()
 }
 
 // OnConn is called when a successful outbound connection has been made
@@ -178,11 +192,12 @@ func (s *NodeServer) OnConn(conn net.Conn, addr string) {
 	err := p.Run()
 
 	if err != nil {
-		log.WithField("prefix", "noded").Error("Failed to run peer:" + err.Error())
+		log.WithField("prefix", "noded").Errorf("Failed to run peer: %s", err.Error())
 	}
 
 	if err == nil {
 		s.sm.AddPeer(p)
+		s.am.ConnectionComplete(conn.RemoteAddr().String(), false)
 	}
 
 	// TODO: This is here just to quickly test the system
@@ -190,6 +205,18 @@ func (s *NodeServer) OnConn(conn net.Conn, addr string) {
 	log.WithField("prefix", "noded").Info("For tests, we are only fetching first 2k batch")
 	if err != nil {
 		log.WithField("prefix", "noded").Error(err.Error())
+	}
+}
+
+// OnFail is called when outbound connection failed
+func (s *NodeServer) OnFail(addr string) {
+	s.am.Failed(addr)
+}
+
+// OnMinGetAddr is called when the minimum of new addresses has exceeded
+func (s *NodeServer) OnMinGetAddr() {
+	if err := s.sm.RequestAddresses(); err != nil {
+		log.WithField("prefix", "noded").Error("Failed to get addresses from peer after exceeding limit")
 	}
 }
 
@@ -201,13 +228,13 @@ func (s *NodeServer) OnAccept(conn net.Conn) {
 
 	err := p.Run()
 	if err != nil {
-		fmt.Println("Error running peer " + err.Error())
+		log.WithField("prefix", "noded").Errorf("Failed to run peer: %s", err.Error())
 	}
 
 	if err == nil {
 		s.sm.AddPeer(p)
+		s.am.ConnectionComplete(conn.RemoteAddr().String(), true)
 	}
 
-	//s.cm.NewRequest()
 	log.WithField("prefix", "noded").Infof("Start listening for requests from node address %s", conn.RemoteAddr().String())
 }
