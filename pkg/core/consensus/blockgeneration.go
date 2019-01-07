@@ -52,7 +52,7 @@ func GenerateBlock(ctx *Context, k []byte) (*payload.MsgScore, *payload.MsgBlock
 		candidateBlock.Header.Hash, // candidateHash
 		sig,                        // sig
 		[]byte(*ctx.Keys.EdPubKey), // pubKey
-		ctx.GetLastHeader().Seed,   // seed for this round // XXX(TOG): could we use round number/Block height?
+		ctx.Seed,                   // seed for this round // XXX(TOG): could we use round number/Block height?
 	)
 
 	// Create block msg

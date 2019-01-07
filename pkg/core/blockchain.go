@@ -8,10 +8,6 @@ import (
 	"sort"
 	"time"
 
-	"golang.org/x/crypto/ed25519"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
@@ -39,13 +35,6 @@ type Blockchain struct {
 	net     protocol.Magic
 	height  uint64
 
-	// User info, for sending transactions and participating
-	// in the network validation.
-	BLSPubKey    *bls.PublicKey
-	BLSSecretKey *bls.SecretKey
-	EdPubKey     *ed25519.PublicKey
-	EdSecretKey  *ed25519.PrivateKey
-
 	// Consensus related
 	currSeed   []byte               // Seed of the current round of consensus
 	round      uint64               // Current round (block height + 1)
@@ -61,7 +50,7 @@ type Blockchain struct {
 	provisioner      bool
 	reductionChan    chan *payload.MsgReduction
 	binaryChan       chan *payload.MsgBinary
-	candidateChan    chan *payload.MsgCandidate
+	candidateChan    chan *payload.MsgScore
 	stakeWeight      uint64 // The amount of DUSK staked by the node
 	totalStakeWeight uint64 // The total amount of DUSK staked
 }
@@ -127,7 +116,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	// Consensus set-up
 	chain.reductionChan = make(chan *payload.MsgReduction)
 	chain.binaryChan = make(chan *payload.MsgBinary)
-	chain.candidateChan = make(chan *payload.MsgCandidate)
+	chain.candidateChan = make(chan *payload.MsgScore)
 	chain.quitChan = make(chan int)
 	chain.roundChan = make(chan int)
 	chain.lastHeader, err = chain.GetLatestHeader()
