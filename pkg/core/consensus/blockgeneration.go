@@ -39,8 +39,14 @@ func GenerateBlock(ctx *Context, k []byte) (*payload.MsgScore, *payload.MsgBlock
 		return nil, nil, err
 	}
 
-	// Sign block hash with Ed25519
-	sig, err := ctx.EDSign(ctx.Keys.EdSecretKey, candidateBlock.Header.Hash)
+	// Sign msg score content with Ed25519
+	buf := make([]byte, 0, 40)
+	binary.LittleEndian.PutUint64(buf, ctx.Q)
+	buf = append(buf, zkBytes...)
+	buf = append(buf, candidateBlock.Header.Hash...)
+	buf = append(buf, ctx.GetLastHeader().Seed...)
+
+	sig, err := ctx.EDSign(ctx.Keys.EdSecretKey, buf)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -108,7 +114,7 @@ func generateX(d uint64, k []byte) ([]byte, error) {
 
 	M, err := generateM(k)
 
-	dM := make([]byte, 40)
+	dM := make([]byte, 0, 40)
 	binary.LittleEndian.PutUint64(dM, d)
 
 	dM = append(dM, M...)
