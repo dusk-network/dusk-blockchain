@@ -22,7 +22,7 @@ func TestGenerateY(t *testing.T) {
 	d := uint64(20)
 	S := []byte{0, 1, 1, 1, 1, 1}
 	k := []byte{0, 1, 1}
-	expect := "bfe1730438950d94a35925c3ca6f1a92465757ff4fce78a5bf34ce6345a6c4ab"
+	expect := "3c107a3cc86f5faa11f51371cf4b105bac3c72100e9bddeb4a892576e3b6941f"
 
 	hash, err := generateY(d, S, k)
 	assert.Equal(t, nil, err)

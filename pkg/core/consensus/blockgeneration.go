@@ -87,7 +87,10 @@ func generateParams(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	Q := GenerateScore(ctx.d, Y)
+	Q, err := GenerateScore(ctx.d, Y)
+	if err != nil {
+		return err
+	}
 
 	ctx.M = M
 	ctx.X = X
@@ -114,7 +117,8 @@ func generateX(d uint64, k []byte) ([]byte, error) {
 
 	M, err := generateM(k)
 
-	dM := make([]byte, 0, 40)
+	dM := make([]byte, 8, 40)
+
 	binary.LittleEndian.PutUint64(dM, d)
 
 	dM = append(dM, M...)
