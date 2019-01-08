@@ -46,7 +46,7 @@ func TestBlockGeneration(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 
-		ctx, err := NewContext(200, randtestKeys(t))
+		ctx, err := NewGeneratorContext(200, randtestKeys(t))
 		assert.Equal(t, nil, err)
 
 		k, err := crypto.RandEntropy(32)

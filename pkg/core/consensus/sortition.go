@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"encoding/binary"
+	"errors"
 	"math/big"
 
 	"gonum.org/v1/gonum/stat/distuv"
@@ -19,7 +20,11 @@ func sortition(ctx *Context, role *role) error {
 		return err
 	}
 
-	votes := calcVotes(ctx.Threshold, ctx.weight, ctx.W, score)
+	votes, err := calcVotes(ctx.Threshold, ctx.weight, ctx.W, score)
+	if err != nil {
+		return err
+	}
+
 	ctx.votes = votes
 	ctx.Score = score
 
@@ -33,7 +38,11 @@ func verifySortition(ctx *Context, score, pk []byte, role *role, stake uint64) (
 	}
 
 	if valid {
-		votes := calcVotes(ctx.Threshold, stake, ctx.W, score)
+		votes, err := calcVotes(ctx.Threshold, stake, ctx.W, score)
+		if err != nil {
+			return 0, err
+		}
+
 		return votes, nil
 	}
 
@@ -57,30 +66,43 @@ func verifyScore(ctx *Context, score, pk []byte, role *role) (bool, error) {
 	return true, nil
 }
 
-func calcVotes(threshold float64, stake, totalStake uint64, score []byte) int {
+func calcVotes(threshold, stake, totalStake uint64, score []byte) (int, error) {
+	if threshold > totalStake {
+		return 0, errors.New("threshold size should not exceed maximum stake weight")
+	}
+
+	if stake < 100 {
+		return 0, errors.New("stake not big enough")
+	}
+
 	// Calculate probability (sigma)
-	p := threshold / float64(totalStake)
+	p := float64(threshold) / float64(totalStake)
+	if p > 1 || p < 0 {
+		return 0, errors.New("p should be between 0 and 1")
+	}
 
 	// Calculate score divided by 2^256
 	var lenHash, _ = new(big.Int).SetString("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0)
 	scoreNum := new(big.Int).SetBytes(score)
 	target, _ := new(big.Rat).SetFrac(scoreNum, lenHash).Float64()
 
-	votes := float64(0.0)
-	for {
-		dist := distuv.Normal{
-			Mu:    float64(stake),
-			Sigma: p,
-		}
+	dist := distuv.Normal{
+		Mu:    float64(stake / 100),
+		Sigma: p,
+	}
 
-		p1 := dist.Prob(votes)
-		p2 := dist.Prob(votes + 1.0)
-		if p1 > target && target > p2 {
+	pos := float64(0.0)
+	votes := 0
+	for {
+		p1 := dist.Prob(pos)
+		p2 := dist.Prob(pos + 0.01)
+		if target >= p1 && target <= p2 {
 			break
 		}
 
-		votes += 1.0
+		pos += 0.01
+		votes++
 	}
 
-	return int(votes)
+	return votes, nil
 }

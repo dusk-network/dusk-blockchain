@@ -44,7 +44,7 @@ func GenerateBlock(ctx *Context, k []byte) (*payload.MsgScore, *payload.MsgBlock
 	binary.LittleEndian.PutUint64(buf, ctx.Q)
 	buf = append(buf, zkBytes...)
 	buf = append(buf, candidateBlock.Header.Hash...)
-	buf = append(buf, ctx.GetLastHeader().Seed...)
+	buf = append(buf, ctx.LastHeader.Seed...)
 
 	sig, err := ctx.EDSign(ctx.Keys.EdSecretKey, buf)
 	if err != nil {
@@ -79,11 +79,11 @@ func generateParams(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	Y, err := generateY(ctx.d, ctx.GetLastHeader().Seed, ctx.k)
+	Y, err := generateY(ctx.d, ctx.LastHeader.Seed, ctx.k)
 	if err != nil {
 		return err
 	}
-	Z, err := generateZ(ctx.GetLastHeader().Seed, ctx.k)
+	Z, err := generateZ(ctx.LastHeader.Seed, ctx.k)
 	if err != nil {
 		return err
 	}
@@ -172,13 +172,13 @@ func newCandidateBlock(ctx *Context) (*payload.Block, error) {
 
 	candidateBlock := payload.NewBlock()
 
-	err := candidateBlock.SetPrevBlock(ctx.GetLastHeader())
+	err := candidateBlock.SetPrevBlock(ctx.LastHeader)
 	if err != nil {
 		return nil, err
 	}
 
 	// Seed is the candidate signature of the previous seed
-	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.GetLastHeader().Seed)
+	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.LastHeader.Seed)
 	if err != nil {
 		return nil, err
 	}

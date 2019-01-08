@@ -16,14 +16,14 @@ type role struct {
 }
 
 // BlockReduction is the main function that runs during block reduction phase.
-// Once the reduction phase is finished, the function will return a block hash,
-// to then be used for the binary agreement phase.
+// Once the reduction phase is finished, the context object holds a block hash
+// that will then be voted on in the binary agreement phase.
 func BlockReduction(ctx *Context, c chan *payload.MsgReduction) error {
 	// Step 1
 	ctx.step = 1
 
 	// Prepare empty block
-	emptyBlock, err := payload.NewEmptyBlock(ctx.GetLastHeader())
+	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		return err
 	}
@@ -93,10 +93,10 @@ func committeeVoteReduction(ctx *Context) error {
 
 		// Create message to sign with ed25519
 		var edMsg []byte
-		copy(edMsg, ctx.Score)
+		edMsg = append(edMsg, ctx.Score...)
 		binary.LittleEndian.PutUint64(edMsg, ctx.Round)
 		edMsg = append(edMsg, byte(ctx.step))
-		edMsg = append(edMsg, ctx.GetLastHeader().Hash...)
+		edMsg = append(edMsg, ctx.LastHeader.Hash...)
 		edMsg = append(edMsg, sigBLS...)
 
 		// Sign with ed25519
@@ -111,7 +111,7 @@ func committeeVoteReduction(ctx *Context) error {
 			return err
 		}
 
-		msg, err := payload.NewMsgReduction(ctx.Score, ctx.BlockHash, ctx.GetLastHeader().Hash, sigEd,
+		msg, err := payload.NewMsgReduction(ctx.Score, ctx.BlockHash, ctx.LastHeader.Hash, sigEd,
 			[]byte(*ctx.Keys.EdPubKey), sigBLS, blsPubBytes, ctx.weight, ctx.Round, ctx.step)
 		if err != nil {
 			return err
@@ -164,7 +164,7 @@ end:
 
 			// If a block exceeds the vote threshold, we will return it's hash
 			// and end the loop.
-			if counts[hashStr] > int(float64(ctx.VoteLimit)*ctx.Threshold) {
+			if counts[hashStr] > int(ctx.VoteLimit) {
 				timer.Stop()
 				ctx.BlockHash = hash
 				return nil
@@ -189,7 +189,7 @@ func processMsgReduction(ctx *Context, msg *payload.MsgReduction) (int, []byte, 
 	}
 
 	// Check if we're on the same chain
-	if bytes.Compare(msg.PrevBlockHash, ctx.GetLastHeader().Hash) != 0 {
+	if bytes.Compare(msg.PrevBlockHash, ctx.LastHeader.Hash) != 0 {
 		// Either an old message or a malformed message
 		return 0, nil, nil
 	}
@@ -210,7 +210,7 @@ func processMsgReduction(ctx *Context, msg *payload.MsgReduction) (int, []byte, 
 func verifySignaturesReduction(ctx *Context, msg *payload.MsgReduction) bool {
 	// Construct message
 	var edMsg []byte
-	copy(edMsg, msg.Score)
+	edMsg = append(edMsg, msg.Score...)
 	binary.LittleEndian.PutUint64(edMsg, msg.Round)
 	edMsg = append(edMsg, byte(msg.Step))
 	edMsg = append(edMsg, msg.PrevBlockHash...)

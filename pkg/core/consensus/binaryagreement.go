@@ -11,9 +11,11 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
-func binaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error {
+// BinaryAgreement is the main function that runs during the binary agreement
+// phase of the consensus.
+func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error {
 	// Prepare empty block
-	emptyBlock, err := payload.NewEmptyBlock(ctx.GetLastHeader())
+	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		return err
 	}
@@ -145,10 +147,10 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
 
 		// Create message to sign with ed25519
 		var edMsg []byte
-		copy(edMsg, ctx.Score)
+		edMsg = append(edMsg, ctx.Score...)
 		binary.LittleEndian.PutUint64(edMsg, ctx.Round)
 		edMsg = append(edMsg, byte(ctx.step))
-		edMsg = append(edMsg, ctx.GetLastHeader().Hash...)
+		edMsg = append(edMsg, ctx.LastHeader.Hash...)
 		edMsg = append(edMsg, sigBLS...)
 
 		// Sign with ed25519
@@ -163,7 +165,7 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
 			return nil, err
 		}
 
-		msg, err := payload.NewMsgBinary(ctx.Score, ctx.empty, ctx.BlockHash, ctx.GetLastHeader().Hash, sigEd,
+		msg, err := payload.NewMsgBinary(ctx.Score, ctx.empty, ctx.BlockHash, ctx.LastHeader.Hash, sigEd,
 			[]byte(*ctx.Keys.EdPubKey), sigBLS, blsPubBytes, ctx.W, ctx.Round, ctx.step)
 		if err != nil {
 			return nil, err
@@ -223,7 +225,7 @@ end:
 
 			// If a block exceeds the vote threshold, we will return it's hash
 			// and end the loop.
-			if counts[hashStr] > int(float64(ctx.VoteLimit)*ctx.Threshold) {
+			if counts[hashStr] > int(ctx.VoteLimit) {
 				timer.Stop()
 				ctx.empty = m.Empty
 				ctx.BlockHash = hash
@@ -249,7 +251,7 @@ func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (int, []byte, error)
 	}
 
 	// Check if we're on the same chain
-	if bytes.Compare(msg.PrevBlockHash, ctx.GetLastHeader().Hash) != 0 {
+	if bytes.Compare(msg.PrevBlockHash, ctx.LastHeader.Hash) != 0 {
 		// Either an old message or a malformed message
 		return 0, nil, nil
 	}
@@ -270,7 +272,7 @@ func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (int, []byte, error)
 func verifySignaturesBinary(ctx *Context, msg *payload.MsgBinary) bool {
 	// Construct message
 	var edMsg []byte
-	copy(edMsg, msg.Score)
+	edMsg = append(edMsg, msg.Score...)
 	binary.LittleEndian.PutUint64(edMsg, msg.Round)
 	edMsg = append(edMsg, byte(msg.Step))
 	edMsg = append(edMsg, msg.PrevBlockHash...)

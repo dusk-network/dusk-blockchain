@@ -7,14 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewContext(t *testing.T) {
+func TestNewGeneratorContext(t *testing.T) {
 
 	tau := rand.Uint64()
 
 	keys, err := NewRandKeys()
 	assert.Equal(t, err, nil)
 
-	ctx, err := NewContext(tau, keys)
+	ctx, err := NewGeneratorContext(tau, keys)
 	assert.NotEqual(t, ctx, nil)
 	assert.Equal(t, err, nil)
 
@@ -28,7 +28,7 @@ func TestReset(t *testing.T) {
 	keys, err := NewRandKeys()
 	assert.Equal(t, err, nil)
 
-	ctx, err := NewContext(tau, keys)
+	ctx, err := NewGeneratorContext(tau, keys)
 
 	// check consensus values were resetted
 	assert.Nil(t, ctx.X, nil, nil)
