@@ -35,9 +35,11 @@ func NewBlock() *Block {
 func NewEmptyBlock(prevHeader *BlockHeader) (*Block, error) {
 	block := &Block{
 		Header: &BlockHeader{
-			// CertImage should take up space from creation to
+			Height: prevHeader.Height + 1,
+			// CertImage and TxRoot should take up space from creation to
 			// ensure proper decoding during block selection.
 			CertImage: make([]byte, 32),
+			TxRoot:    make([]byte, 32),
 		},
 	}
 
@@ -52,8 +54,10 @@ func NewEmptyBlock(prevHeader *BlockHeader) (*Block, error) {
 	}
 
 	block.Header.Seed = seedHash
-	block.SetRoot()
 	block.SetTime(time.Now().Unix())
+	if err := block.SetHash(); err != nil {
+		return nil, err
+	}
 
 	return block, nil
 }
