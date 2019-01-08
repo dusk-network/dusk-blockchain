@@ -4,13 +4,28 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
-//XXX: remove this test and function, once gamma func has been implemented
 func TestPDF(t *testing.T) {
+	// Add Fixed Test vectors
+	for i := 0; i < 100; i++ {
 
-	Y := []byte{0, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+		Y, _ := crypto.RandEntropy(32)
 
-	res := GenerateScore(22000, Y)
-	assert.Equal(t, uint64(18446744073709534890), res)
+		res, err := GenerateScore(22000, Y)
+		assert.NotEqual(t, uint64(0), res)
+		assert.Equal(t, nil, err)
+
+	}
+
+}
+func TestWrongYLen(t *testing.T) {
+
+	Y, _ := crypto.RandEntropy(33)
+
+	res, err := GenerateScore(22000, Y)
+	assert.NotEqual(t, nil, err)
+	assert.Equal(t, uint64(0), res)
+
 }
