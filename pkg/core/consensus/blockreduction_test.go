@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -28,19 +29,23 @@ func TestProcessMsgReduction(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create a reduction phase voting message and get their amount of votes
 	votes, msg, err := newVoteReduction(seed, 500, totalWeight, round, ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Process the message
 	retVotes, _, err := processMsgReduction(ctx, msg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Votes should be equal
 	assert.Equal(t, votes, retVotes)
 }
 
+// Test functionality of vote counting with a clear outcome
 func TestReductionVoteCountDecisive(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
@@ -65,12 +70,14 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set up voting phase
 	c := make(chan *payload.MsgReduction)
 	_, msg, err := newVoteReduction(seed, 400, totalWeight, round, ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Start listening for votes
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -81,6 +88,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 		wg.Done()
 	}()
 
+	// Send the vote out, and block until the counting function returns
 	c <- msg
 	wg.Wait()
 
@@ -88,6 +96,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 	assert.NotNil(t, ctx.BlockHash)
 }
 
+// Test functionality of vote counting when no clear outcome is reached
 func TestReductionVoteCountIndecisive(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
@@ -112,7 +121,10 @@ func TestReductionVoteCountIndecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// This will take a few seconds...
+	// Adjust timer to reduce waiting times
+	ctx.Lambda = 1 * time.Second
+
+	// Let the timer run out
 	c := make(chan *payload.MsgReduction)
 	if err := countVotesReduction(ctx, c); err != nil {
 		t.Fatal(err)
@@ -143,7 +155,7 @@ func newVoteReduction(seed []byte, weight, totalWeight, round uint64, prevHeader
 	ctx.weight = weight
 	ctx.LastHeader = prevHeader
 
-	// Create empty block
+	// Create empty block and set it as our context blockhash
 	emptyBlock, err := payload.NewEmptyBlock(prevHeader)
 	if err != nil {
 		return 0, nil, err
