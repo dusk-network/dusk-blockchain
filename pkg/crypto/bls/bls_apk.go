@@ -7,13 +7,11 @@
 package bls
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
 
-	"github.com/cloudflare/bn256"
+	"gitlab.dusk.network/dusk-core/bn256"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
-	"gitlab.dusk.network/pkg/errors"
 )
 
 // Apk is the short aggregated public key struct
@@ -21,8 +19,8 @@ type Apk struct {
 	gx *bn256.G2
 }
 
-// ApkSig is the plain public key model of the BLS signature
-type ApkSig struct {
+// Signature is the plain public key model of the BLS signature
+type Signature struct {
 	e *bn256.G1
 }
 
@@ -44,8 +42,8 @@ func pkt(pk *PublicKey) (*bn256.G2, error) {
 		return nil, err
 	}
 
-	//TODO: maybe a bit inefficient to recrete G2 instances instead of mutating the underlying group
-	return NewG2().ScalarMult(pk.gx, t), nil
+	//TODO: maybe a bit inefficient to recreate G2 instances instead of mutating the underlying group
+	return newG2().ScalarMult(pk.gx, t), nil
 }
 
 // NewApk creates an Apk either from a public key or scratch
@@ -86,32 +84,22 @@ func AggregateApk(pks []*PublicKey) *Apk {
 }
 
 // apkWrap turns a BLS Signature into its modified construction
-func apkSigWrap(pk *PublicKey, signature *Sig) (*ApkSig, error) {
+func apkSigWrap(pk *PublicKey, signature *Sig) (*Signature, error) {
 	// creating tᵢ by hashing PKᵢ
 	t, err := h1(pk)
 	if err != nil {
 		return nil, err
 	}
 
-	sigma := NewG1()
-	fmt.Printf(
-		"Sigma pre-mul %d HEX: %v...\n",
-		len(signature.e.Marshal()),
-		hex.EncodeToString(signature.e.Marshal()[0:10]),
-	)
+	sigma := newG1()
 
 	sigma.ScalarMult(signature.e, t)
-	fmt.Printf(
-		"Sigma post-mul %d HEX: %v...\n",
-		len(sigma.Marshal()),
-		hex.EncodeToString(sigma.Marshal()[0:10]),
-	)
 
-	return &ApkSig{e: sigma}, nil
+	return &Signature{e: sigma}, nil
 }
 
-// ApkSign creates a signature from the private key and the public key pk
-func ApkSign(sk *SecretKey, pk *PublicKey, msg []byte) (*ApkSig, error) {
+// Sign creates a signature from the private key and the public key pk
+func SafeSign(sk *SecretKey, pk *PublicKey, msg []byte) (*Signature, error) {
 	sig, err := Sign(sk, msg)
 	if err != nil {
 		return nil, err
@@ -121,37 +109,36 @@ func ApkSign(sk *SecretKey, pk *PublicKey, msg []byte) (*ApkSig, error) {
 }
 
 // Add creates an aggregated signature from a normal BLS Signature and related public key
-func (apkSig *ApkSig) Add(pk *PublicKey, sig *Sig) error {
+func (sigma *Signature) Add(pk *PublicKey, sig *Sig) error {
 	other, err := apkSigWrap(pk, sig)
 	if err != nil {
 		return err
 	}
 
-	apkSig.Aggregate(other)
+	sigma.Aggregate(other)
 	return nil
 }
 
-// Aggregate two ApkSig
-func (apkSig *ApkSig) Aggregate(other *ApkSig) *ApkSig {
-	apkSig.e.Add(apkSig.e, other.e)
-	return apkSig
+// Aggregate two Signature
+func (sigma *Signature) Aggregate(other *Signature) *Signature {
+	sigma.e.Add(sigma.e, other.e)
+	return sigma
 }
 
 // VerifyApk is the verification step of an aggregated apk signature
-func VerifyApk(apk *Apk, msg []byte, signature *ApkSig) error {
-	return verify(apk.gx, msg, signature.e)
+func VerifyApk(apk *Apk, msg []byte, sigma *Signature) error {
+	return verify(apk.gx, msg, sigma.e)
 }
 
 // VerifyApkBatch is the verification step of a batch of aggregated apk signatures
 // TODO: add the possibility to handle non distinct messages (at batch level after aggregating APK)
-func VerifyApkBatch(apks []*Apk, msgs [][]byte, asig *ApkSig) error {
+func VerifyApkBatch(apks []*Apk, msgs [][]byte, asig *Signature) error {
 	if len(msgs) != len(apks) {
-		msg := fmt.Sprintf(
+		return fmt.Errorf(
 			"BLS Verify APK Batch: the nr of Public Keys (%d) and the nr. of messages (%d) do not match",
 			len(apks),
 			len(msgs),
 		)
-		return errors.New(msg)
 	}
 
 	pks := make([]*bn256.G2, len(apks))

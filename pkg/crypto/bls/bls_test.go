@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/cloudflare/bn256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.dusk.network/dusk-core/bn256"
 )
 
 func randomMessage() []byte {
@@ -91,13 +91,13 @@ func TestRogueKey(t *testing.T) {
 	// α is the pseudo-secret key of the attacker
 	alpha := randomInt(reader)
 	// g₂ᵅ
-	g2Alpha := NewG2().ScalarBaseMult(alpha)
+	g2Alpha := newG2().ScalarBaseMult(alpha)
 
 	// pk⁻¹
-	rogueGx := NewG2()
+	rogueGx := newG2()
 	rogueGx.Neg(pub.gx)
 
-	pRogue := NewG2()
+	pRogue := newG2()
 	pRogue.Add(g2Alpha, rogueGx)
 
 	sk, pk := &SecretKey{alpha}, &PublicKey{pRogue}
@@ -116,7 +116,7 @@ func TestMarshalPk(t *testing.T) {
 
 	pkByteRepr := pub.Marshal()
 
-	g2 := NewG2()
+	g2 := newG2()
 	g2.Unmarshal(pkByteRepr)
 
 	g2ByteRepr := g2.Marshal()
@@ -136,7 +136,7 @@ func TestApkVerificationSingleKey(t *testing.T) {
 
 	apk := NewApk(pub1)
 
-	signature, err := ApkSign(priv1, pub1, msg)
+	signature, err := SafeSign(priv1, pub1, msg)
 	require.NoError(t, err)
 	require.NoError(t, VerifyApk(apk, msg, signature))
 }
@@ -154,9 +154,9 @@ func TestApkVerification(t *testing.T) {
 	apk := NewApk(pub1)
 	apk.Add(pub2)
 
-	signature, err := ApkSign(priv1, pub1, msg)
+	signature, err := SafeSign(priv1, pub1, msg)
 	require.NoError(t, err)
-	sig2, err := ApkSign(priv2, pub2, msg)
+	sig2, err := SafeSign(priv2, pub2, msg)
 	require.NoError(t, err)
 
 	signature.Aggregate(sig2)
@@ -176,9 +176,9 @@ func TestApkBatchVerification(t *testing.T) {
 	apk := NewApk(pub1)
 	apk.Add(pub2)
 
-	sigma, err := ApkSign(priv1, pub1, msg)
+	sigma, err := SafeSign(priv1, pub1, msg)
 	require.NoError(t, err)
-	sig2_1, err := ApkSign(priv2, pub2, msg)
+	sig2_1, err := SafeSign(priv2, pub2, msg)
 	require.NoError(t, err)
 	sig := sigma.Aggregate(sig2_1)
 	require.NoError(t, VerifyApk(apk, msg, sig))
@@ -188,9 +188,9 @@ func TestApkBatchVerification(t *testing.T) {
 	require.NoError(t, err)
 	apk2 := NewApk(pub2)
 	apk2.Add(pub3)
-	sig2_2, err := ApkSign(priv2, pub2, msg2)
+	sig2_2, err := SafeSign(priv2, pub2, msg2)
 	require.NoError(t, err)
-	sig3_2, err := ApkSign(priv3, pub3, msg2)
+	sig3_2, err := SafeSign(priv3, pub3, msg2)
 	sig2 := sig2_2.Aggregate(sig3_2)
 	require.NoError(t, VerifyApk(apk2, msg2, sig2))
 
@@ -200,42 +200,8 @@ func TestApkBatchVerification(t *testing.T) {
 		[][]byte{msg, msg2},
 		sigma,
 	))
-	/*
-	 */
 }
 
-/*
-func TestApkAggregation(t *testing.T) {
-	reader := rand.Reader
-	msg := []byte("Get Funky Tonight")
-
-	pub1, priv1, err := GenKeyPair(reader)
-	require.NoError(t, err)
-
-	pub2, priv2, err := GenKeyPair(reader)
-	require.NoError(t, err)
-
-	sig1, err := ApkSign(priv1, pub1, msg)
-	require.NoError(t, err)
-	require.NoError(t, Verify(pub1, msg, sig1))
-
-	sig2, err := Sign(priv2, msg)
-	require.NoError(t, err)
-	require.NoError(t, Verify(pub2, msg, sig2))
-
-	pubs := []*PublicKey{pub1, pub2}
-	apk, err := AggregateApk(pubs)
-	require.NoErrorf(t, err, "BLS-APK: APK Public Key Aggregation yields error")
-
-	sigs, err := []*Sig{sig1, sig2}
-	require.NoErrorf(t, err, "BLS-APK: APK Signature Aggregation yields error")
-	apkSig, err := AggregateApkSignatures(sigs)
-
-	require.NoError(t, VerifyApk(pubs, msg, apkSig))
-}
-*/
-
-/*
 func TestCompress(t *testing.T) {
 	msg := randomMessage()
 	pub, priv, err := GenKeyPair(rand.Reader)
@@ -243,11 +209,33 @@ func TestCompress(t *testing.T) {
 
 	sig, err := Sign(priv, msg)
 	require.NoError(t, err)
-
 	require.NoError(t, Verify(pub, msg, sig))
 
-	check, err := ZipVerify([]*PublicKey{pub}, [][]byte{msg}, sig)
-	require.NoError(t, err)
-	require.Truef(t, check, "The compressed form of the signature does not work")
+	sigb := sig.Compress()
+	sigTest := &Sig{e: newG1()}
+	require.NoError(t, sigTest.Decompress(sigb))
+
+	require.Equal(t, sig.e.Marshal(), sigTest.e.Marshal())
+
+	// require.Equal(t, expected, sig.e.Marshal())
+	// check, err := ZipVerify([]*PublicKey{pub}, [][]byte{msg}, sig)
+	// require.NoError(t, err)
+	// require.Truef(t, check, "The compressed form of the signature does not work")
 }
-*/
+
+func TestCompressNegative(t *testing.T) {
+	sigi, _ := new(big.Int).SetString("4182773077326556947337520923199448906869380994374425209427767883513621864194882999289032108531554108092911166882669083617738348444738725911430569647299733", 10)
+	sigbx := sigi.Bytes()
+	sig := newG1()
+	_, err := sig.Unmarshal(sigbx)
+
+	require.NoError(t, err)
+
+	// require.NoError(t, Verify(pub, msg, sig))
+
+	sigb := sig.Compress()
+	decompressedG, err := bn256.Decompress(sigb)
+	require.NoError(t, err)
+	decompressed := decompressedG.Marshal()
+	require.Equal(t, sigbx, decompressed)
+}
