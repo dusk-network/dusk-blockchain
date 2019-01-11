@@ -11,6 +11,7 @@
 net = "DevNet"
 
 [DevNet]
+    magic = 1953721920 # Selfmade magic. Used decimal as toml doesn't understand hex. Consider using yaml.
 
     [DevNet.logging]
     # Default log filepath is <user home>/.dusk/<env.net>/noded/noded.log
@@ -23,11 +24,11 @@ net = "DevNet"
     #tty = true
 
     [DevNet.peer]
-    # Default port is 10333 // TODO: Discuss this
+    # Default port is 10333 #TODO: Discuss this
     #port = "10333"
     # Default dialTimeout is 0
     #dialTimeout = 0
-    seeds = [ "192.168.178.57:10111", "192.168.178.57:10222", "192.168.178.57:10444"]
+    seeds = [ "192.168.178.57:10111"] #Should of course have more addresses. For dev testing it's annoying!
     min = 3
     max = 10
     minGetAddr = 5

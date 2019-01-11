@@ -1,4 +1,4 @@
-package blockchain
+package core
 
 // GenesisBlock for mainnet
 // TODO: Discuss what Dusk Genesis block to generate

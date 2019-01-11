@@ -1,4 +1,4 @@
-package peer
+package peermgr
 
 import (
 	log "github.com/sirupsen/logrus"
@@ -85,11 +85,11 @@ func (p *Peer) outboundHandShake() error {
 func (p *Peer) writeLocalMsgVersion() error {
 	//nonce := p.config.Nonce
 	//relay := p.config.Relay
-	fromPort := uint16(p.config.Port)
+	fromPort := uint16(p.Port())
 	//ua := p.config.UserAgent
 	//sh := p.config.StartHeight()
 	//services := p.config.Services
-	version := p.config.ProtocolVer
+	version := p.ProtocolVersion()
 	localIP, err := util.GetOutboundIP()
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 }
 
 func (p *Peer) readRemoteMsgVersion() error {
-	readmsg, err := wire.ReadMessage(p.conn, p.config.Net)
+	readmsg, err := wire.ReadMessage(p.conn, p.Net())
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (p *Peer) readRemoteMsgVersion() error {
 }
 
 func (p *Peer) readVerack() error {
-	readmsg, err := wire.ReadMessage(p.conn, p.config.Net)
+	readmsg, err := wire.ReadMessage(p.conn, p.Net())
 
 	if err != nil {
 		return err

@@ -3,7 +3,7 @@ package event
 // MonEventType defines the monitoring event types
 type MonEventType uint8
 
-// Mnitoring events
+// Monitoring events
 const (
 	MinPeersExcd        MonEventType = 0x01
 	MaxPeersExcd        MonEventType = 0x02

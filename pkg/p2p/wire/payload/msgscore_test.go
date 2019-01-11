@@ -24,12 +24,17 @@ func TestMsgScoreEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
+	pk, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg, err := NewMsgScore(200, proof, hash, sig, pubKey)
+	seed, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg, err := NewMsgScore(200, proof, hash, sig, pk, seed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,25 +77,20 @@ func TestMsgScoreChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
+	pk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	wrongPubKey, err := crypto.RandEntropy(30)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := NewMsgScore(200, proof, wrongHash, sig, pubKey); err == nil {
+	if _, err := NewMsgScore(200, proof, wrongHash, sig, pk, seed); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewMsgScore(200, proof, hash, wrongSig, pubKey); err == nil {
+	if _, err := NewMsgScore(200, proof, hash, wrongSig, pk, seed); err == nil {
 		t.Fatal("check for sig did not work")
-	}
-
-	if _, err := NewMsgScore(200, proof, hash, sig, wrongPubKey); err == nil {
-		t.Fatal("check for pubkey did not work")
 	}
 }

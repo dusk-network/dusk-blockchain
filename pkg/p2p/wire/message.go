@@ -144,10 +144,6 @@ func ReadMessage(r io.Reader, magic protocol.Magic) (Payload, error) {
 		m := &payload.MsgScore{}
 		err := m.Decode(payloadBuf)
 		return m, err
-	case commands.Candidate:
-		m := &payload.MsgCandidate{}
-		err := m.Decode(payloadBuf)
-		return m, err
 	case commands.Reduction:
 		m := &payload.MsgReduction{}
 		err := m.Decode(payloadBuf)

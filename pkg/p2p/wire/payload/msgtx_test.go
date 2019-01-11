@@ -13,18 +13,14 @@ func TestMsgTxEncodeDecode(t *testing.T) {
 	byte32 := []byte{1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4}
 
 	sig, _ := crypto.RandEntropy(2000)
-	in := &transactions.Input{
-		TxID:      byte32,
-		Index:     1,
-		Signature: sig,
-	}
 
 	txPubKey, _ := crypto.RandEntropy(32)
 	s := transactions.NewTX()
+	in := transactions.NewInput(txPubKey, txPubKey, 0, sig)
 	s.AddInput(in)
 	s.AddTxPubKey(txPubKey)
 
-	out := transactions.NewOutput(200, byte32)
+	out := transactions.NewOutput(200, byte32, sig)
 	s.AddOutput(out)
 	if err := s.SetHash(); err != nil {
 		t.Fatal(err)

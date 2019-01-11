@@ -9,27 +9,29 @@ import (
 )
 
 func TestMsgBinaryEncodeDecode(t *testing.T) {
+
+	pk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	sigBLS, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	edpk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
 	sigEd, err := crypto.RandEntropy(64)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	msg, err := NewMsgBinary(200, true, hash, sigBLS, sigEd, pubKey)
+	msg, err := NewMsgBinary(sigBLS, true, hash, hash, sigEd, edpk, sigBLS, pk, 200, 230000, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,12 +49,11 @@ func TestMsgBinaryEncodeDecode(t *testing.T) {
 
 // Check to see whether length checks are working.
 func TestMsgBinaryChecks(t *testing.T) {
-	hash, err := crypto.RandEntropy(32)
+	pk, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	wrongHash, err := crypto.RandEntropy(33)
+	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,12 +63,17 @@ func TestMsgBinaryChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wrongSigBLS, err := crypto.RandEntropy(35)
+	edpk, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sigEd, err := crypto.RandEntropy(64)
+	sigEd, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wrongHash, err := crypto.RandEntropy(33)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,29 +83,15 @@ func TestMsgBinaryChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	wrongPubKey, err := crypto.RandEntropy(30)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := NewMsgBinary(200, true, wrongHash, sigBLS, sigEd, pubKey); err == nil {
+	if _, err := NewMsgBinary(sigBLS, true, wrongHash, hash, sigEd, edpk, sigBLS, pk, 200, 230000, 4); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewMsgBinary(200, true, hash, wrongSigBLS, sigEd, pubKey); err == nil {
-		t.Fatal("check for sig did not work")
+	if _, err := NewMsgBinary(sigBLS, true, hash, wrongHash, sigEd, edpk, sigBLS, pk, 200, 230000, 4); err == nil {
+		t.Fatal("check for prevhash did not work")
 	}
 
-	if _, err := NewMsgBinary(200, true, hash, sigBLS, wrongSigEd, pubKey); err == nil {
-		t.Fatal("check for pubkey did not work")
-	}
-
-	if _, err := NewMsgBinary(200, true, hash, sigBLS, sigEd, wrongPubKey); err == nil {
-		t.Fatal("check for pubkey did not work")
+	if _, err := NewMsgBinary(sigBLS, true, hash, hash, wrongSigEd, edpk, sigBLS, pk, 200, 230000, 4); err == nil {
+		t.Fatal("check for siged did not work")
 	}
 }

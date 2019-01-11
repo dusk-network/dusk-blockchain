@@ -1,61 +1,62 @@
-package peer_test
+package peermgr_test
 
 import (
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"io/ioutil"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-func returnConfig() peer.LocalConfig {
+func init() {
+	log.SetOutput(ioutil.Discard)
+}
 
-	DefaultHeight := func() uint64 {
-		return 10
-	}
+func createResponseHandler() peermgr.ResponseHandler {
 
-	OnAddr := func(p *peer.Peer, msg *payload.MsgAddr) {}
-	OnHeaders := func(p *peer.Peer, msg *payload.MsgHeaders) {}
-	OnGetHeaders := func(p *peer.Peer, msg *payload.MsgGetHeaders) {}
-	OnInv := func(p *peer.Peer, msg *payload.MsgInv) {}
-	OnGetData := func(p *peer.Peer, msg *payload.MsgGetData) {}
-	OnBlock := func(p *peer.Peer, msg *payload.MsgBlock) {}
-	OnGetBlocks := func(msg *payload.MsgGetBlocks) {}
+	//DefaultHeight := func() uint64 {
+	//	return 10
+	//}
 
-	return peer.LocalConfig{
-		Net:         protocol.MainNet,
-		UserAgent:   protocol.UserAgent,
-		Services:    protocol.NodePeerService,
-		Nonce:       1200,
-		ProtocolVer: 0,
-		Relay:       false,
-		Port:        10333,
-		// pointer to config will keep the startheight updated for each MsgVersion
-		// we plan to send
-		StartHeight:  DefaultHeight,
+	OnAddr := func(p *peermgr.Peer, msg *payload.MsgAddr) {}
+	OnHeaders := func(p *peermgr.Peer, msg *payload.MsgHeaders) {}
+	OnGetHeaders := func(p *peermgr.Peer, msg *payload.MsgGetHeaders) {}
+	//OnInv := func(p *peermgr.Peer, msg *payload.MsgInv) {}
+	OnGetData := func(p *peermgr.Peer, msg *payload.MsgGetData) {}
+	//OnBlock := func(p *peermgr.Peer, msg *payload.MsgBlock) {}
+	OnGetBlocks := func(p *peermgr.Peer, msg *payload.MsgGetBlocks) {}
+
+	return peermgr.ResponseHandler{
 		OnHeaders:    OnHeaders,
 		OnAddr:       OnAddr,
 		OnGetHeaders: OnGetHeaders,
-		OnInv:        OnInv,
-		OnGetData:    OnGetData,
-		OnBlock:      OnBlock,
-		OnGetBlocks:  OnGetBlocks,
+		//OnInv:        OnInv,
+		OnGetData: OnGetData,
+		//OnBlock:      OnBlock,
+		OnGetBlocks: OnGetBlocks,
 	}
 }
 
+// TODO: Test is an integration test, not unit test.
+// Let's find an integration test lib or mocking.
 func TestHandshake(t *testing.T) {
 	address := ":20338"
+	viper.Set("net.magic", "1953721920")
 	go func() {
 
 		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
-		p := peer.NewPeer(conn, true, returnConfig())
+		rspHndlr := createResponseHandler()
+		p := peermgr.NewPeer(conn, true, rspHndlr)
 		err = p.Run()
 		verack := payload.NewMsgVerAck()
 		if err != nil {
@@ -95,12 +96,12 @@ func TestHandshake(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := wire.WriteMessage(conn, protocol.MainNet, messageVer); err != nil {
+		if err := wire.WriteMessage(conn, protocol.DevNet, messageVer); err != nil {
 			t.Fatal(err)
 			return
 		}
 
-		readmsg, err := wire.ReadMessage(conn, protocol.MainNet)
+		readmsg, err := wire.ReadMessage(conn, protocol.DevNet)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -118,11 +119,11 @@ func TestHandshake(t *testing.T) {
 
 		assert.NotEqual(t, nil, messageVrck)
 
-		if err := wire.WriteMessage(conn, protocol.MainNet, messageVrck); err != nil {
+		if err := wire.WriteMessage(conn, protocol.DevNet, messageVrck); err != nil {
 			t.Fatal(err)
 		}
 
-		readmsg, err = wire.ReadMessage(conn, protocol.MainNet)
+		readmsg, err = wire.ReadMessage(conn, protocol.DevNet)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,14 +141,14 @@ func TestHandshake(t *testing.T) {
 
 }
 
-func TestConfigurations(t *testing.T) {
+func TestResponseHandler(t *testing.T) {
 	_, conn := net.Pipe()
 
 	inbound := true
 
-	config := returnConfig()
+	rspHndlr := createResponseHandler()
 
-	p := peer.NewPeer(conn, inbound, config)
+	p := peermgr.NewPeer(conn, inbound, rspHndlr)
 
 	// test inbound
 	assert.Equal(t, inbound, p.Inbound())
@@ -155,14 +156,7 @@ func TestConfigurations(t *testing.T) {
 	// handshake not done, should be false
 	assert.Equal(t, false, p.IsVerackReceived())
 
-	assert.Equal(t, config.Services, p.Services())
-
-	assert.Equal(t, config.UserAgent, p.UserAgent())
-
-	assert.Equal(t, config.Relay, p.CanRelay())
-
 	assert.WithinDuration(t, time.Now(), p.CreatedAt(), 1*time.Second)
-
 }
 
 func TestHandshakeCancelled(t *testing.T) {
@@ -176,8 +170,8 @@ func TestPeerDisconnect(t *testing.T) {
 
 	_, conn := net.Pipe()
 	inbound := true
-	config := returnConfig()
-	p := peer.NewPeer(conn, inbound, config)
+	rspHndlr := createResponseHandler()
+	p := peermgr.NewPeer(conn, inbound, rspHndlr)
 
 	p.Disconnect()
 	verack := payload.NewMsgVerAck()
@@ -195,8 +189,8 @@ func TestNotifyDisconnect(t *testing.T) {
 
 	_, conn := net.Pipe()
 	inbound := true
-	config := returnConfig()
-	p := peer.NewPeer(conn, inbound, config)
+	rspHndlr := createResponseHandler()
+	p := peermgr.NewPeer(conn, inbound, rspHndlr)
 
 	p.Disconnect()
 	p.NotifyDisconnect()

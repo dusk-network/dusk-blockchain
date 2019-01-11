@@ -18,10 +18,10 @@ func init() {
 }
 
 func TestNewAddrs(t *testing.T) {
-
 	addrmgr := addrmgr.New()
 	assert.NotEqual(t, nil, addrmgr)
 }
+
 func TestAddAddrs(t *testing.T) {
 
 	addrmgr := addrmgr.New()

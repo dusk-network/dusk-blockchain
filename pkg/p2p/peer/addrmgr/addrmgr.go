@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
@@ -227,13 +227,13 @@ func (a *Addrmgr) Failed(addr string) {
 }
 
 // OnAddr is the responder for the Config file when a OnAddr is received by a peer
-func (a *Addrmgr) OnAddr(p *peer.Peer, msg *payload.MsgAddr) {
+func (a *Addrmgr) OnAddr(p *peermgr.Peer, msg *payload.MsgAddr) {
 	a.AddAddrs(msg.Addresses)
 }
 
 // OnGetAddr is called when a peer sends a request for the addressList.
 // We will give them the best addresses we have from good.
-func (a *Addrmgr) OnGetAddr(p *peer.Peer, msg *payload.MsgGetAddr) {
+func (a *Addrmgr) OnGetAddr(p *peermgr.Peer, msg *payload.MsgGetAddr) {
 	a.addrmtx.RLock()
 	defer a.addrmtx.RUnlock()
 	// Push most recent peers to peer

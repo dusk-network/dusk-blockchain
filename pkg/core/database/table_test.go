@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb/errors"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 )
 
 var (

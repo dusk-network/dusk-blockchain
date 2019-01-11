@@ -15,13 +15,14 @@ type MsgScore struct {
 	Proof         []byte // variable size
 	CandidateHash []byte // Block candidate hash (32 bytes)
 	SigEd         []byte // Ed25519 signature of the score, proof and candidate hash (64 bytes)
-	PubKey        []byte // Sender public key (32 bytes)
+	PubKey        []byte // ed25519 Sender public key (32 bytes)
+	SeedHash      []byte // Seed hash of the current round
 }
 
 // NewMsgScore returns a MsgScore struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewMsgScore(score uint64, proof, candidateHash, sig, pubKey []byte) (*MsgScore, error) {
+func NewMsgScore(score uint64, proof, candidateHash, sig, pubKey, seedHash []byte) (*MsgScore, error) {
 	if len(candidateHash) != 32 {
 		return nil, errors.New("wire: supplied candidate hash for score message is improper length")
 	}
@@ -30,16 +31,13 @@ func NewMsgScore(score uint64, proof, candidateHash, sig, pubKey []byte) (*MsgSc
 		return nil, errors.New("wire: supplied sig for score message is improper length")
 	}
 
-	if len(pubKey) != 32 {
-		return nil, errors.New("wire: supplied pubkey for score message is improper length")
-	}
-
 	return &MsgScore{
 		Score:         score,
 		Proof:         proof,
 		CandidateHash: candidateHash,
 		SigEd:         sig,
 		PubKey:        pubKey,
+		SeedHash:      seedHash,
 	}, nil
 }
 
@@ -66,6 +64,10 @@ func (m *MsgScore) Encode(w io.Writer) error {
 		return err
 	}
 
+	if err := encoding.Write256(w, m.SeedHash); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -89,6 +91,10 @@ func (m *MsgScore) Decode(r io.Reader) error {
 	}
 
 	if err := encoding.Read256(r, &m.PubKey); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, &m.SeedHash); err != nil {
 		return err
 	}
 

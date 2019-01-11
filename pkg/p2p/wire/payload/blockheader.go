@@ -15,7 +15,7 @@ type BlockHeader struct {
 	Timestamp int64  // Block timestamp
 
 	PrevBlock []byte // Hash of previous block (32 bytes)
-	Seed      []byte // BLS signature of the previous block seed (32 bytes)
+	Seed      []byte // Marshaled BLS signature or hash of the previous block seed (32 bytes)
 	TxRoot    []byte // Root hash of the merkle tree containing all txes (32 bytes)
 
 	Hash      []byte // Hash of all previous fields
@@ -117,7 +117,7 @@ func (b *BlockHeader) Decode(r io.Reader) error {
 	return nil
 }
 
-// Bytes returns the encoded bytes of a block header
+// Bytes returns the block header, encoded as a slice of bytes.
 func (b *BlockHeader) Bytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	err := b.Encode(buf)

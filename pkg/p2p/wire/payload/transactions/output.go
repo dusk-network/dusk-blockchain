@@ -9,15 +9,17 @@ import (
 
 // Output defines an output in a stealth transaction.
 type Output struct {
-	Amount      uint64 // 8 bytes
-	Destination []byte // 32 bytes
+	Amount uint64 // 8 bytes
+	P      []byte // 32 bytes
+	BP     []byte // Variable size
 }
 
-// NewOutput will construct an Output object from the specified information.
-func NewOutput(amount uint64, dest []byte) *Output {
+// NewOutput constructs a new Output from the passed parameters.
+func NewOutput(amount uint64, dest []byte, proof []byte) *Output {
 	return &Output{
-		Amount:      amount,
-		Destination: dest,
+		Amount: amount,
+		P:      dest,
+		BP:     proof,
 	}
 }
 
@@ -27,7 +29,11 @@ func (o *Output) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, o.Destination); err != nil {
+	if err := encoding.Write256(w, o.P); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(w, o.BP); err != nil {
 		return err
 	}
 
@@ -40,7 +46,11 @@ func (o *Output) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &o.Destination); err != nil {
+	if err := encoding.Read256(r, &o.P); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadVarBytes(r, &o.BP); err != nil {
 		return err
 	}
 

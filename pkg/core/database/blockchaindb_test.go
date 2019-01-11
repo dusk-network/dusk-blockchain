@@ -9,9 +9,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
@@ -81,7 +81,7 @@ func TestAddHeaders(t *testing.T) {
 	assert.Equal(t, dbLatestHeightHash, dbLatestHeaderHash)
 }
 
-func TestAddTransactions(t *testing.T) {
+func TestAddBlockTransactions(t *testing.T) {
 	db, _ := database.NewBlockchainDB(path)
 	defer cleanup(db)
 
@@ -96,7 +96,8 @@ func TestAddTransactions(t *testing.T) {
 	for i, tx := range b.Txs {
 		stealths[i] = *tx.(*transactions.Stealth)
 	}
-	db.AddTransactions(h.Hash, stealths)
+	//db.AddTransactions(h.Hash, stealths)
+	db.AddBlockTransactions(b)
 
 	// Run through the txs
 	for i, tx := range stealths {
@@ -142,9 +143,10 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 	for i := 0; i < total; i++ {
 		txID, _ := crypto.RandEntropy(32)
 		sig, _ := crypto.RandEntropy(2000)
-		in := &transactions.Input{TxID: txID, Index: 1, Signature: sig}
+		key, _ := crypto.RandEntropy(32)
+		in := transactions.NewInput(key, txID, 1, sig)
 		dest, _ := crypto.RandEntropy(32)
-		out := transactions.NewOutput(200, dest)
+		out := transactions.NewOutput(200, dest, sig)
 		txPubKey, _ := crypto.RandEntropy(32)
 		s := transactions.NewTX()
 		s.AddInput(in)

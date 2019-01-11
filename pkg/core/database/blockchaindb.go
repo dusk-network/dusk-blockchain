@@ -82,30 +82,32 @@ func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
 	return nil
 }
 
-// AddTransactions adds a batch of transactions to the database
+// AddBlockTransactions adds a block to the database
 // A transaction is linked to the block by its hash in the key
-func (bdb *BlockchainDB) AddTransactions(blockhash []byte, txs []transactions.Stealth) error {
+func (bdb *BlockchainDB) AddBlockTransactions(block *payload.Block) error {
+	//TODO: add batch of transactions so we can use database batch writes
 
 	// batch will consist of a tx and index record for each tx in txs
-	kv := make(batchValues, len(txs)*2)
+	kv := make(batchValues, len(block.Txs)*2)
 
-	// This is the main mapping
-	// Key: [TX] + TXHASH
-	for i, tx := range txs {
+	for i, v := range block.Txs {
+		tx := v.(*transactions.Stealth)
 		buf := new(bytes.Buffer)
 		err := tx.Encode(buf)
 		if err != nil {
 			log.WithField("prefix", "database").Errorf(errAddTransactionDbStr, tx)
 			return err
 		}
-		b := buf.Bytes()
-		headerHash := append(TX, tx.Hash...)
-		kv[string(headerHash)] = b
+		// This is the main mapping
+		// Key: [TX] + TXHASH
+		txBytes := buf.Bytes()
+		txKey := append(TX, tx.Hash...)
+		kv[string(txKey)] = txBytes
 
 		// This is the index
 		// Key: [TX] + BLOCKHASH + I <- i is the incrementer from the for loop
 		// Value: TXHASH
-		blockhashKey := append(append(TX, blockhash...))
+		blockhashKey := append(append(TX, block.Header.Hash...))
 		blockhashKey = append(blockhashKey, Uint32ToBytes(uint32(i))...)
 
 		kv[string(blockhashKey)] = tx.Hash

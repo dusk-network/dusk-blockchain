@@ -9,22 +9,33 @@ import (
 )
 
 func TestMsgReductionEncodeDecode(t *testing.T) {
+
+	blspk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	edpk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sig, err := crypto.RandEntropy(64)
+	sigBLS, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
+	sigEd, err := crypto.RandEntropy(64)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg, err := NewMsgReduction(200, hash, sig, pubKey)
+	msg, err := NewMsgReduction(sigBLS, hash, hash, sigEd, edpk, sigBLS, blspk, 200, 23000, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +53,27 @@ func TestMsgReductionEncodeDecode(t *testing.T) {
 
 // Check to see whether length checks are working.
 func TestMsgReductionChecks(t *testing.T) {
+	blspk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	edpk, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	hash, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sigBLS, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sigEd, err := crypto.RandEntropy(64)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,35 +83,20 @@ func TestMsgReductionChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sig, err := crypto.RandEntropy(64)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	wrongSig, err := crypto.RandEntropy(62)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pubKey, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	wrongPubKey, err := crypto.RandEntropy(30)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := NewMsgReduction(200, wrongHash, sig, pubKey); err == nil {
+	if _, err := NewMsgReduction(sigBLS, wrongHash, hash, sigEd, edpk, sigBLS, blspk, 200, 23000, 1); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewMsgReduction(200, hash, wrongSig, pubKey); err == nil {
-		t.Fatal("check for sig did not work")
+	if _, err := NewMsgReduction(sigBLS, hash, wrongHash, sigEd, edpk, sigBLS, blspk, 200, 23000, 1); err == nil {
+		t.Fatal("check for prevhash did not work")
 	}
 
-	if _, err := NewMsgReduction(200, hash, sig, wrongPubKey); err == nil {
-		t.Fatal("check for pubkey did not work")
+	if _, err := NewMsgReduction(sigBLS, hash, hash, wrongSig, edpk, sigBLS, blspk, 200, 23000, 1); err == nil {
+		t.Fatal("check for siged did not work")
 	}
 }

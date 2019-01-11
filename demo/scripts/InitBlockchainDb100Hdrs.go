@@ -3,9 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"testing"
@@ -74,7 +74,7 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		sig, _ := crypto.RandEntropy(2000)
 		in := &transactions.Input{TxID: txID, Index: 1, Signature: sig}
 		dest, _ := crypto.RandEntropy(32)
-		out := transactions.NewOutput(200, dest)
+		out := transactions.NewOutput(200, dest, sig)
 		txPubKey, _ := crypto.RandEntropy(32)
 		s := transactions.NewTX()
 		s.AddInput(in)

@@ -2,23 +2,21 @@ package transactions
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/hex"
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // Stealth defines a stealth transaction.
 type Stealth struct {
-	Version  uint8  // 1 byte
-	Type     TxType // 1 byte
-	Inputs   []*Input
-	TxPubKey []byte // 32 bytes
-	Outputs  []*Output
+	Version uint8  // 1 byte
+	Type    TxType // 1 byte
+	R       []byte // 32 bytes
+	Inputs  []*Input
+	Outputs []*Output
 
 	Hash []byte // 32 bytes
 }
@@ -45,13 +43,13 @@ func (s *Stealth) AddOutput(output *Output) {
 func (s *Stealth) AddTxPubKey(pk []byte) {
 	// This should be adjusted in the future to work as described in
 	// the documentation - this is merely a placeholder
-	s.TxPubKey = pk
+	s.R = pk
 }
 
 // Clear all transaction fields
 func (s *Stealth) Clear() {
 	s.Inputs = nil
-	s.TxPubKey = nil
+	s.R = nil
 	s.Outputs = nil
 	s.Hash = nil
 }
@@ -83,6 +81,10 @@ func (s *Stealth) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
+	if err := encoding.Write256(w, s.R); err != nil {
+		return err
+	}
+
 	lIn := uint64(len(s.Inputs))
 	if err := encoding.WriteVarInt(w, lIn); err != nil {
 		return err
@@ -92,10 +94,6 @@ func (s *Stealth) EncodeHashable(w io.Writer) error {
 		if err := input.Encode(w); err != nil {
 			return err
 		}
-	}
-
-	if err := encoding.Write256(w, s.TxPubKey); err != nil {
-		return err
 	}
 
 	lOut := uint64(len(s.Outputs))
@@ -136,6 +134,10 @@ func (s *Stealth) Decode(r io.Reader) error {
 		return err
 	}
 
+	if err := encoding.Read256(r, &s.R); err != nil {
+		return err
+	}
+
 	s.Type = TxType(t)
 	lIn, err := encoding.ReadVarInt(r)
 	if err != nil {
@@ -148,10 +150,6 @@ func (s *Stealth) Decode(r io.Reader) error {
 		if err := s.Inputs[i].Decode(r); err != nil {
 			return err
 		}
-	}
-
-	if err := encoding.Read256(r, &s.TxPubKey); err != nil {
-		return err
 	}
 
 	lOut, err := encoding.ReadVarInt(r)
@@ -174,24 +172,32 @@ func (s *Stealth) Decode(r io.Reader) error {
 	return nil
 }
 
+// Hex returns the tx hash as a hexadecimal string
+func (s *Stealth) Hex() string {
+	return hex.EncodeToString(s.Hash)
+}
+
 // CalculateHash implements merkletree.Payload
 func (s Stealth) CalculateHash() ([]byte, error) {
-	if s.Hash == nil {
-		if err := s.SetHash(); err != nil {
-			return nil, fmt.Errorf("CalculateHash(): error setting tx hash - %v", err)
-		}
+	buf := new(bytes.Buffer)
+	if err := s.EncodeHashable(buf); err != nil {
+		return nil, err
 	}
 
-	return s.Hash, nil
+	return hash.Sha3256(buf.Bytes())
 }
 
 // Equals implements merkletree.Payload
 func (s Stealth) Equals(other merkletree.Payload) (bool, error) {
-	if s.Hash == nil {
-		if err := s.SetHash(); err != nil {
-			return false, fmt.Errorf("Equals(): error setting tx hash - %v", err)
-		}
+	h, err := s.CalculateHash()
+	if err != nil {
+		return false, err
 	}
 
-	return bytes.Compare(s.Hash, other.(Stealth).Hash) == 0, nil
+	otherHash, err := other.(Stealth).CalculateHash()
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Compare(h, otherHash) == 0, nil
 }

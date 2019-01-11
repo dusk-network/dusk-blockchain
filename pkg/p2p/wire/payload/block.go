@@ -3,6 +3,7 @@ package payload
 import (
 	"errors"
 	"io"
+	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
@@ -29,33 +30,50 @@ func NewBlock() *Block {
 	}
 }
 
-// SetPrevBlock will set all the fields of the Block struct that are
-// taken from the previous block.
-func (b *Block) SetPrevBlock(prevBlock *Block) error {
-	b.Header.Height = prevBlock.Header.Height + 1
-	b.Header.PrevBlock = prevBlock.Header.Hash
-
-	// Remove when BLS code is completed
-	seedHash, err := hash.Sha3256(prevBlock.Header.Seed)
-	if err != nil {
-		return err
+// NewEmptyBlock will return a fully populated empty block, to be used
+// for consensus purposes. Use NewBlock in any other circumstance.
+func NewEmptyBlock(prevHeader *BlockHeader) (*Block, error) {
+	block := &Block{
+		Header: &BlockHeader{
+			// CertImage should take up space from creation to
+			// ensure proper decoding during block selection.
+			CertImage: make([]byte, 32),
+		},
 	}
 
-	b.Header.Seed = seedHash
+	if err := block.SetPrevBlock(prevHeader); err != nil {
+		return nil, err
+	}
+
+	// Set seed to hash of previous seed
+	seedHash, err := hash.Sha3256(prevHeader.Seed)
+	if err != nil {
+		return nil, err
+	}
+
+	block.Header.Seed = seedHash
+	block.SetRoot()
+	block.SetTime(time.Now().Unix())
+
+	return block, nil
+}
+
+// SetPrevBlock will set all the fields of the Block struct that are
+// taken from the previous block.
+func (b *Block) SetPrevBlock(prevHeader *BlockHeader) error {
+	b.Header.Height = prevHeader.Height + 1 // XXX: Can we move this else where, as it sets the currentHeight and not PrevHeight, as the func name suggests
+	b.Header.PrevBlock = prevHeader.Hash
+
 	return nil
 }
 
-// SetSeed will sign the previous block seed with a BLS signature and
-// put it in the block. Implement when BLS code is completed
-/*func (b *Block) SetSeed(prevSeed []byte, sk *bls.SecretKey) error {
-	sig, err := bls.Sign(sk, prevSeed)
-	if err != nil {
-		return err
-	}
+// SetSeed will set the seed for the current block
+func (b *Block) SetSeed(Seed []byte) error {
 
-	b.Header.Seed = sig
+	b.Header.Seed = Seed
+
 	return nil
-}*/
+}
 
 // SetTime will set the block timestamp.
 func (b *Block) SetTime(time int64) {
