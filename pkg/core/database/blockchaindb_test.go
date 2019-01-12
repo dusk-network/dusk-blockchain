@@ -85,35 +85,31 @@ func TestAddBlockTransactions(t *testing.T) {
 	db, _ := database.NewBlockchainDB(path)
 	defer cleanup(db)
 
-	blocks, err := createBlockFixtures(1, 2)
-	b := blocks[0]
+	blocks, err := createBlockFixtures(2, 2)
 	if err != nil {
 		t.FailNow()
 	}
-	h := b.Header
 
-	stealths := make([]transactions.Stealth, len(b.Txs))
-	for i, tx := range b.Txs {
-		stealths[i] = *tx.(*transactions.Stealth)
-	}
-	//db.AddTransactions(h.Hash, stealths)
-	db.AddBlockTransactions(b)
+	db.AddBlockTransactions(blocks)
 
-	// Run through the txs
-	for i, tx := range stealths {
-		buf := new(bytes.Buffer)
-		tx.Encode(buf)
-		txBytes := buf.Bytes()
+	// Run through the txs and assert them
+	for _, b := range blocks {
+		for i, v := range b.Txs {
+			tx := v.(transactions.Stealth)
+			buf := new(bytes.Buffer)
+			tx.Encode(buf)
+			txBytes := buf.Bytes()
 
-		txKey := append(database.TX, tx.Hash...)
-		dbTxBytes, _ := db.Get(txKey)
+			txKey := append(database.TX, tx.Hash...)
+			dbTxBytes, _ := db.Get(txKey)
 
-		blockhashKey := append(database.TX, h.Hash...)
-		blockhashKey = append(blockhashKey, database.Uint32ToBytes(uint32(i))...)
-		dbTxHash, _ := db.Get(blockhashKey)
+			blockhashKey := append(database.TX, b.Header.Hash...)
+			blockhashKey = append(blockhashKey, database.Uint32ToBytes(uint32(i))...)
+			dbTxHash, _ := db.Get(blockhashKey)
 
-		assert.Equal(t, txBytes, dbTxBytes)
-		assert.Equal(t, tx.Hash, dbTxHash)
+			assert.Equal(t, txBytes, dbTxBytes)
+			assert.Equal(t, tx.Hash, dbTxHash)
+		}
 	}
 }
 
@@ -153,7 +149,7 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		s.AddOutput(out)
 		s.AddTxPubKey(txPubKey)
 		s.SetHash()
-		txs[i] = s
+		txs[i] = *s
 	}
 	return txs
 }

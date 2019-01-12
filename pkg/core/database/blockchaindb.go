@@ -17,17 +17,16 @@ type BlockchainDB struct {
 const maxRetrievableHeaders = 2000
 
 var (
-	// TX is the prefix for a transaction key
-	TX = []byte{0x01}
+	// HEADER is the prefix for a header key
+	HEADER = []byte{0x01}
 	// BLOCKHEIGHT is the prefix for a block height key
 	BLOCKHEIGHT = []byte{0x02}
-	// HEADER is the prefix for a header key
-	HEADER = []byte{0x03}
-	// LATESTHEADER is the prefix for the latest header key
-	LATESTHEADER = []byte{0x04}
+	// TX is the prefix for a transaction key
+	TX = []byte{0x03}
 	// UTXO is the prefix for a utxo key
-	UTXO = []byte{0x05}
-
+	UTXO = []byte{0x04}
+	// LATESTHEADER is the prefix for the latest header key
+	LATESTHEADER           = []byte{0x05}
 	errAddBlockHeaderDbStr = "Failed to add block header to db."
 	errAddTransactionDbStr = "Failed to add transaction to db."
 )
@@ -44,10 +43,9 @@ func NewBlockchainDB(path string) (*BlockchainDB, error) {
 
 // AddHeaders adds a batch of block headers to the database
 func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
-
 	sortedHdrs := util.SortHeadersByHeight(hdrs)
 
-	// batch will consist of a header and blockheight record for each header in hdrs, plus one for the latest header
+	// batchValues will consist of a header and blockheight record for each header in hdrs, plus one for the latest header
 	kv := make(batchValues, len(sortedHdrs)*2+1)
 
 	// This is the main mapping
@@ -82,39 +80,40 @@ func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
 	return nil
 }
 
-// AddBlockTransactions adds a block to the database
-// A transaction is linked to the block by its hash in the key
-func (bdb *BlockchainDB) AddBlockTransactions(block *payload.Block) error {
-	//TODO: add batch of transactions so we can use database batch writes
+// AddBlockTransactions add blocks to the database.
+// A block transaction is linked to the header by the header hash in the transaction key
+func (bdb *BlockchainDB) AddBlockTransactions(blocks []*payload.Block) error {
+	// batchValues will consist of a tx and index record for each tx in a block
+	kv := make(batchValues, len(blocks)*2)
 
-	// batch will consist of a tx and index record for each tx in txs
-	kv := make(batchValues, len(block.Txs)*2)
+	for _, b := range blocks {
 
-	for i, v := range block.Txs {
-		tx := v.(*transactions.Stealth)
-		buf := new(bytes.Buffer)
-		err := tx.Encode(buf)
-		if err != nil {
-			log.WithField("prefix", "database").Errorf(errAddTransactionDbStr, tx)
-			return err
+		for j, v := range b.Txs {
+			tx := v.(transactions.Stealth)
+			buf := new(bytes.Buffer)
+			err := tx.Encode(buf)
+			if err != nil {
+				log.WithField("prefix", "database").Errorf(errAddTransactionDbStr, tx)
+				return err
+			}
+			// This is the main mapping
+			// Key: [TX] + TXHASH
+			txBytes := buf.Bytes()
+			txKey := append(TX, tx.Hash...)
+			kv[string(txKey)] = txBytes
+
+			// This is the index
+			// Key: [TX] + HEADER HASH + I <- i is the incrementer from the for loop
+			// Value: TXHASH
+			blockhashKey := append(append(TX, b.Header.Hash...))
+			blockhashKey = append(blockhashKey, Uint32ToBytes(uint32(j))...)
+
+			kv[string(blockhashKey)] = tx.Hash
 		}
-		// This is the main mapping
-		// Key: [TX] + TXHASH
-		txBytes := buf.Bytes()
-		txKey := append(TX, tx.Hash...)
-		kv[string(txKey)] = txBytes
-
-		// This is the index
-		// Key: [TX] + BLOCKHASH + I <- i is the incrementer from the for loop
-		// Value: TXHASH
-		blockhashKey := append(append(TX, block.Header.Hash...))
-		blockhashKey = append(blockhashKey, Uint32ToBytes(uint32(i))...)
-
-		kv[string(blockhashKey)] = tx.Hash
 	}
 
-	err := bdb.Write(&kv)
-	if err != nil {
+	// Atomic database write of the transactions
+	if err := bdb.Write(&kv); err != nil {
 		log.WithField("prefix", "database").Error(errAddTransactionDbStr)
 		return err
 	}

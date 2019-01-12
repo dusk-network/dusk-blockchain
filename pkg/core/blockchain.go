@@ -77,7 +77,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 		log.WithField("prefix", "blockchain").Info("New Blockchain database initialisation")
 		db.Put(marker, []byte{})
 
-		// Add genesis block
+		// Add Genesis block (No transactions in Genesis block)
 		if net == protocol.DevNet {
 			genesisBlock, err := hex.DecodeString(GenesisBlock)
 			if err != nil {
@@ -100,13 +100,6 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 				db.Delete(marker)
 				return nil, err
 			}
-
-			// No transactions in Genesis block so will do nothing
-			if err := db.AddBlockTransactions(b); err != nil {
-				db.Delete(marker)
-				return nil, err
-			}
-
 		}
 
 		if net == protocol.TestNet {
@@ -319,7 +312,7 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 		return err
 	}
 
-	if err := b.db.AddBlockTransactions(block); err != nil {
+	if err := b.db.AddBlockTransactions([]*payload.Block{block}); err != nil {
 		return err
 	}
 
