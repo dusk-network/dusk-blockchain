@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	cnf "github.com/spf13/viper"
 	"sort"
 	"time"
 
@@ -15,10 +17,10 @@ import (
 )
 
 var (
-	errNoBlockchainDb    = errors.New("blockchain database is not available")
-	errInitialisedCheck  = errors.New("could not check if blockchain db is already initialised")
-	errBlockValidation   = errors.New("block failed sanity check")
-	errBlockVerification = errors.New("block failed to be consistent with the current blockchain")
+	errNoBlockchainDb    = errors.New("Blockchain database is not available")
+	errInitialisedCheck  = errors.New("Failed to check if blockchain db is already initialised")
+	errBlockValidation   = errors.New("Block failed sanity check")
+	errBlockVerification = errors.New("Block failed to be consistent with the current blockchain")
 
 	candidateTimer = 20 * time.Second
 )
@@ -55,12 +57,12 @@ type Blockchain struct {
 	totalStakeWeight uint64 // The total amount of DUSK staked
 }
 
-// NewBlockchain will return a new Blockchain instance with an
-// initialized mempool. This Blockchain instance should then be
-// ready to process incoming transactions and blocks.
+// NewBlockchain will return a new Blockchain instance with an initialized mempool.
+// This Blockchain instance should then be ready to process incoming transactions and blocks.
 func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
-	db, err := database.NewBlockchainDB("test") // TODO: external path configuration
+	db, err := database.NewBlockchainDB(cnf.GetString("net.database.dirpath"))
 	if err != nil {
+		log.WithField("prefix", "blockchain").Error(err)
 		return nil, errNoBlockchainDb
 	}
 
@@ -72,12 +74,14 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 
 	if !init {
 		// This is a new db, so initialise it
+		log.WithField("prefix", "blockchain").Info("New Blockchain database initialisation")
 		db.Put(marker, []byte{})
 
-		// Add genesis block
-		if net == protocol.MainNet {
+		// Add Genesis block (No transactions in Genesis block)
+		if net == protocol.DevNet {
 			genesisBlock, err := hex.DecodeString(GenesisBlock)
 			if err != nil {
+				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header to db")
 				db.Delete(marker)
 				return nil, err
 			}
@@ -85,16 +89,14 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 			r := bytes.NewReader(genesisBlock)
 			b := payload.NewBlock()
 			if err := b.Decode(r); err != nil {
+				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header to db")
 				db.Delete(marker)
 				return nil, err
 			}
 
-			if err := db.AddHeader(b.Header); err != nil {
-				db.Delete(marker)
-				return nil, err
-			}
-
-			if err := db.AddBlockTransactions(b); err != nil {
+			err = db.AddHeaders([]*payload.BlockHeader{b.Header})
+			if err != nil {
+				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header")
 				db.Delete(marker)
 				return nil, err
 			}
@@ -104,12 +106,17 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 			fmt.Println("TODO: Setup the genesisBlock for TestNet")
 			return nil, nil
 		}
+
+		if net == protocol.MainNet {
+			fmt.Println("TODO: Setup the genesisBlock for MainNet")
+			return nil, nil
+		}
 	}
 
 	chain := &Blockchain{}
 
 	// Set up mempool and populate struct fields
-	chain.memPool.Init()
+	//chain.memPool.Init() //TODO: TV commented this line because of no memPool instance (yet)
 	chain.db = db
 	chain.net = net
 
@@ -131,74 +138,74 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	return chain, nil
 }
 
-// Loop function for provisioner nodes
-func (b *Blockchain) provisionerLoop() {
-	b.provisioner = true
-
-	for {
-		select {
-		case <-b.quitChan:
-			b.provisioner = false
-			return
-		case <-b.roundChan:
-			// Should add a check here if we're staking, and if not
-			// then create a staking transaction
-
-			timer := time.NewTimer(candidateTimer)
-			var empty bool
-			var retHash []byte
-			var finalHash []byte
-			var err error
-			select {
-			case <-timer.C:
-				empty, retHash, err = b.blockReduction(nil)
-			case m := <-b.candidateChan:
-				timer.Stop()
-				empty, retHash, err = b.blockReduction(m.CandidateHash)
-			}
-
-			if err != nil {
-				// Log
-				b.provisioner = false
-				return
-			}
-
-			empty, finalHash, err = b.binaryAgreement(retHash, empty)
-			if !empty {
-				// Do set reduction
-				if bytes.Compare(finalHash, retHash) == 0 {
-					// send final block with set of signatures
-					break
-				}
-
-				// send tentative block with set of signatures
-				break
-			}
-
-			// send tentative block without set of signatures
-			break
-		}
-	}
-}
+//// Loop function for provisioner nodes
+//func (b *Blockchain) provisionerLoop() {
+//	b.provisioner = true
+//
+//	for {
+//		select {
+//		case <-b.quitChan:
+//			b.provisioner = false
+//			return
+//		case <-b.roundChan:
+//			// Should add a check here if we're staking, and if not
+//			// then create a staking transaction
+//
+//			timer := time.NewTimer(candidateTimer)
+//			var empty bool
+//			var retHash []byte
+//			var finalHash []byte
+//			var err error
+//			select {
+//			case <-timer.C:
+//				empty, retHash, err = b.blockReduction(nil)
+//			case m := <-b.candidateChan:
+//				timer.Stop()
+//				empty, retHash, err = b.blockReduction(m.CandidateHash)
+//			}
+//
+//			if err != nil {
+//				// Log
+//				b.provisioner = false
+//				return
+//			}
+//
+//			empty, finalHash, err = b.binaryAgreement(retHash, empty)
+//			if !empty {
+//				// Do set reduction
+//				if bytes.Compare(finalHash, retHash) == 0 {
+//					// send final block with set of signatures
+//					break
+//				}
+//
+//				// send tentative block with set of signatures
+//				break
+//			}
+//
+//			// send tentative block without set of signatures
+//			break
+//		}
+//	}
+//}
 
 // Placeholder at the moment, just to get structure down
-func (b *Blockchain) generatorLoop() {
-	b.generator = true
-
-	for {
-		select {
-		case <-b.quitChan:
-			b.generator = false
-			return
-		case <-b.roundChan:
-			if err := b.Generate(nil); err != nil {
-				// Log
-				b.generator = false
-				return
-			}
-		}
-	}
-}
+//func (b *Blockchain) generatorLoop() {
+//	b.generator = true
+//
+//	for {
+//		select {
+//		case <-b.quitChan:
+//			b.generator = false
+//			return
+//		case <-b.roundChan:
+//			if err := b.Generate(nil); err != nil {
+//				// Log
+//				b.generator = false
+//				return
+//			}
+//		}
+//	}
+//}
 
 // AcceptTx attempt to verify a transaction once it is received from
 // the network. If the verification passes, this transaction will
@@ -301,11 +308,11 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Add to database
-	if err := b.db.AddHeader(block.Header); err != nil {
+	if err := b.db.AddHeaders([]*payload.BlockHeader{block.Header}); err != nil {
 		return err
 	}
 
-	if err := b.db.AddBlockTransactions(block); err != nil {
+	if err := b.db.AddBlockTransactions([]*payload.Block{block}); err != nil {
 		return err
 	}
 
@@ -418,10 +425,8 @@ func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
 
 // AddHeaders will add block headers to the database.
 func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
-	for _, header := range msg.Headers {
-		if err := b.db.AddHeader(header); err != nil {
-			return err
-		}
+	if err := b.db.AddHeaders(msg.Headers); err != nil {
+		return err
 	}
 	return nil
 }
@@ -445,7 +450,8 @@ func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
 		return nil, err
 	}
 
-	prevHeaderBytes, err := b.db.Get(prevHeaderHash)
+	prevHeaderKey := append(append(database.HEADER, prevHeaderHash...))
+	prevHeaderBytes, err := b.db.Get(prevHeaderKey)
 	if err != nil {
 		return nil, err
 	}
@@ -472,7 +478,7 @@ func (b *Blockchain) StartProvisioning() error {
 		return errors.New("already provisioning")
 	}
 
-	go b.provisionerLoop()
+	//go b.provisionerLoop()
 	return nil
 }
 

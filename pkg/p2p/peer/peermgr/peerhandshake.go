@@ -1,7 +1,7 @@
-package peer
+package peermgr
 
 import (
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"time"
 
@@ -10,6 +10,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
 
+// Handshake either sends or receives a handshake.
+// Sending involves writing a 'version' msg to an other peer.
+// Receiving processes a received 'version' msg by sending our 'version' with a 'verack' msg.
 func (p *Peer) Handshake() error {
 
 	handshakeErr := make(chan error, 1)
@@ -32,12 +35,11 @@ func (p *Peer) Handshake() error {
 		return errHandShakeTimeout
 	}
 
-	// TODO: Use a more dynamical and configurable logging library instead of fmt.Println
 	// Log the handshake
 	if p.inbound {
-		fmt.Println("Inbound handshake with", p.RemoteAddr().String(), "successful")
+		log.WithField("prefix", "peer").Infof("Inbound handshake with %s successful", p.RemoteAddr().String())
 	} else {
-		fmt.Println("Outbound handshake with", p.RemoteAddr().String(), "successful")
+		log.WithField("prefix", "peer").Infof("Outbound handshake with %s successful", p.RemoteAddr().String())
 	}
 	return nil
 }
@@ -83,11 +85,11 @@ func (p *Peer) outboundHandShake() error {
 func (p *Peer) writeLocalMsgVersion() error {
 	//nonce := p.config.Nonce
 	//relay := p.config.Relay
-	fromPort := uint16(p.config.Port)
+	fromPort := uint16(p.Port())
 	//ua := p.config.UserAgent
 	//sh := p.config.StartHeight()
 	//services := p.config.Services
-	version := p.config.ProtocolVer
+	version := p.ProtocolVersion()
 	localIP, err := util.GetOutboundIP()
 	if err != nil {
 		return err
@@ -104,7 +106,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 }
 
 func (p *Peer) readRemoteMsgVersion() error {
-	readmsg, err := wire.ReadMessage(p.conn, p.config.Net)
+	readmsg, err := wire.ReadMessage(p.conn, p.Net())
 	if err != nil {
 		return err
 	}
@@ -117,7 +119,7 @@ func (p *Peer) readRemoteMsgVersion() error {
 }
 
 func (p *Peer) readVerack() error {
-	readmsg, err := wire.ReadMessage(p.conn, p.config.Net)
+	readmsg, err := wire.ReadMessage(p.conn, p.Net())
 
 	if err != nil {
 		return err

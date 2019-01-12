@@ -1,106 +1,73 @@
 package connmgr_test
 
 import (
-	"testing"
-
+	"bou.ke/monkey"
+	log "github.com/sirupsen/logrus"
+	cnf "github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"io/ioutil"
+	"net"
+	"reflect"
+	"testing"
 )
 
-func TestDial(t *testing.T) {
-	cfg := connmgr.Config{
-		GetAddress:   nil,
-		OnConnection: nil,
-		OnAccept:     nil,
-		Port:         "",
-		DialTimeout:  0,
-	}
+const tmpUnitTestDir = "/.dusk/unittest"
 
-	cm := connmgr.New(cfg)
-	cm.Run()
-
-	ipport := "google.com:80" // google unlikely to go offline, a better approach to test Dialing is welcome.
-
-	conn, err := cm.Dial(ipport)
-	assert.Equal(t, nil, err)
-	assert.NotEqual(t, nil, conn)
+func init() {
+	log.SetOutput(ioutil.Discard)
 }
-func TestConnect(t *testing.T) {
-	cfg := connmgr.Config{
-		GetAddress:   nil,
-		OnConnection: nil,
-		OnAccept:     nil,
-		Port:         "",
-		DialTimeout:  0,
-	}
 
-	cm := connmgr.New(cfg)
+func TestConnect(t *testing.T) {
+	cm := connmgr.GetInstance()
 	cm.Run()
+
+	var c *connmgr.Connmgr
+	monkey.PatchInstanceMethod(reflect.TypeOf(c), "OnConnection", func(_ *connmgr.Connmgr, _ net.Conn, _ string) {
+		return
+	})
 
 	ipport := "google.com:80"
 
 	r := connmgr.Request{Addr: ipport}
 
-	cm.Connect(&r)
-
+	err := cm.Connect(&r)
+	assert.Equal(t, nil, err)
 	assert.Equal(t, 1, len(cm.ConnectedList))
-
 }
+
 func TestNewRequest(t *testing.T) {
 
-	address := "google.com:80"
+	address := payload.NewNetAddress("216.58.212.174", 80)
+	cnf.Set("net.peer.seeds", address.String())
 
-	var getAddr = func() (string, error) {
-		return address, nil
-	}
+	var c *connmgr.Connmgr
+	monkey.PatchInstanceMethod(reflect.TypeOf(c), "OnConnection", func(_ *connmgr.Connmgr, _ net.Conn, _ string) {
+		return
+	})
 
-	cfg := connmgr.Config{
-		GetAddress:   getAddr,
-		OnConnection: nil,
-		OnAccept:     nil,
-		Port:         "",
-		DialTimeout:  0,
-	}
-
-	cm := connmgr.New(cfg)
-
+	cm := connmgr.New()
 	cm.Run()
-
 	cm.NewRequest()
 
-	if _, ok := cm.ConnectedList[address]; ok {
+	if _, ok := cm.ConnectedList[address.String()]; ok {
 		assert.Equal(t, true, ok)
 		assert.Equal(t, 1, len(cm.ConnectedList))
 		return
 	}
 
 	assert.Fail(t, "Could not find the address in the connected lists")
-
 }
+
 func TestDisconnect(t *testing.T) {
-
-	address := "google.com:80"
-
-	var getAddr = func() (string, error) {
-		return address, nil
-	}
-
-	cfg := connmgr.Config{
-		GetAddress:   getAddr,
-		OnConnection: nil,
-		OnAccept:     nil,
-		Port:         "",
-		DialTimeout:  0,
-	}
-
-	cm := connmgr.New(cfg)
-
+	address := payload.NewNetAddress("216.58.212.174", 80)
+	cm := connmgr.New()
+	_, conn := net.Pipe()
+	cm.ConnectedList[address.String()] = &connmgr.Request{Conn: conn, Addr: address.String()}
 	cm.Run()
-
 	cm.NewRequest()
-
-	cm.Disconnect(address)
+	cm.Disconnect(address.String())
 
 	assert.Equal(t, 0, len(cm.ConnectedList))
-
 }

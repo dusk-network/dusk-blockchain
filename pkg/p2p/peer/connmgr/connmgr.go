@@ -3,7 +3,12 @@ package connmgr
 import (
 	"errors"
 	"fmt"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
+	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/addrmgr"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr/event"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/syncmgr"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"net"
 	"net/http"
 	"time"
@@ -12,7 +17,7 @@ import (
 var (
 	// maxOutboundConn is the maximum number of active peers
 	// that the connection manager will try to have
-	maxOutboundConn = 10
+	maxOutboundConn = 10 //TODO: We have this already in noded.toml (DevNet.peer.max)
 
 	// maxRetries is the maximum amount of successive retries that
 	// we can have before we stop dialing that peer
@@ -21,81 +26,53 @@ var (
 
 // Connmgr manages pending/active/failed cnnections
 type Connmgr struct {
-	config        Config
 	PendingList   map[string]*Request
 	ConnectedList map[string]*Request
 	actionch      chan func()
+	conevtch      chan event.MonEventType
 }
 
-//New creates a new connection manager
-func New(cfg Config) *Connmgr {
+// New creates a new connection manager
+func New() *Connmgr {
 	cnnmgr := &Connmgr{
-		cfg,
-		make(map[string]*Request),
-		make(map[string]*Request),
-		make(chan func(), 300),
+		PendingList:   make(map[string]*Request),
+		ConnectedList: make(map[string]*Request),
+		actionch:      make(chan func(), 300),
+		conevtch:      make(chan event.MonEventType),
 	}
-
-	go func() {
-
-		ip, err := util.GetOutboundIP()
-		if err != nil {
-			fmt.Println("Error getting local ip ", err)
-		}
-
-		addrPort := ip.String() + ":" + cfg.Port
-		listener, err := net.Listen("tcp", addrPort)
-
-		if err != nil {
-			fmt.Println("Error connecting to outbound ", err)
-		}
-
-		defer func() {
-			listener.Close()
-		}()
-
-		for {
-
-			conn, err := listener.Accept()
-
-			if err != nil {
-				continue
-			}
-			// TODO(kev): in the OnAccept the connection address will be added to AddrMgr
-			go cfg.OnAccept(conn)
-		}
-
-	}()
-
 	return cnnmgr
 }
 
-// NewRequest will make a new connection
-// Gets the address from address func in config
-// Then dials it and assigns it to pending
+// NewRequest will make a new peer connection.
+// It gets the address from GetAddress func in config, dials it and assigns it to pending
 func (c *Connmgr) NewRequest() {
 
-	// Fetch address
-	addr, err := c.config.GetAddress()
-	if err != nil {
-		fmt.Println("Error getting address", err)
+	// Fetch address from newAddrs from Address Manager
+	addr, err := c.GetAddress()
+	// When newAddrs is empty an OutOfPeerAddr is triggered
+	if addr == nil || err != nil {
+		c.conevtch <- event.OutOfPeerAddr
+		return
 	}
 
 	// empty request item
 	r := &Request{}
 
-	r.Addr = addr
-	fmt.Println("Connecting")
-	c.Connect(r)
+	r.Addr = addr.String()
+	log.WithField("prefix", "connmgr").Infof("Connecting to peer %s", addr)
 
+	// Asynchronous, no error returned.
+	// Will create connection from newAddrs and adds it to the ConnectedList
+	c.Connect(r)
 }
 
+// Connect connects to a specific address
 func (c *Connmgr) Connect(r *Request) error {
-
 	r.Retries++
 
-	conn, err := c.Dial(r.Addr)
+	conn, err := c.dial(r.Addr)
 	if err != nil {
+		c.pending(r)
 		c.failed(r)
 		return err
 	}
@@ -109,71 +86,72 @@ func (c *Connmgr) Connect(r *Request) error {
 	return c.connected(r)
 }
 
-func (cm *Connmgr) Disconnect(addr string) {
+// Disconnect disconnects from a specific address
+func (c *Connmgr) Disconnect(addr string) {
 
 	// fetch from connected list
-	r, ok := cm.ConnectedList[addr]
+	r, ok := c.ConnectedList[addr]
 
 	if !ok {
 		// If not in connected, check pending
-		r, ok = cm.PendingList[addr]
+		r, ok = c.PendingList[addr]
 	}
 
-	cm.disconnected(r)
+	c.disconnected(r)
 
 }
 
-// Dial is used to dial up connections given the address in the form ip:port
-func (c *Connmgr) Dial(addr string) (net.Conn, error) {
+// dial is used to dial up connections given the address in the form ip:port
+func (c *Connmgr) dial(addr string) (net.Conn, error) {
 	dialTimeout := 1 * time.Second
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
 		if !isConnected() {
-			return nil, errors.New("Fatal Error: You do not seem to be connected to the internet")
+			return nil, errors.New("Failed to connect. Please check connection to the Internet")
 		}
 		return conn, err
 	}
 	return conn, nil
 }
 
-func (cm *Connmgr) failed(r *Request) {
+func (c *Connmgr) failed(r *Request) {
 
-	cm.actionch <- func() {
+	c.actionch <- func() {
 		// priority to check if it is permanent or inbound
-		// if so then these peers are valuable in NEO and so we will just retry another time
+		// if so then these peers are valuable in DUSK and so we will just retry another time
 		if r.Inbound || r.Permanent {
 
 			multiplier := time.Duration(r.Retries * 10)
 			time.AfterFunc(multiplier*time.Second,
 				func() {
-					cm.Connect(r)
+					c.Connect(r)
 				},
 			)
 			// if not then we should check if this request has had maxRetries
-			// if it has then get a new address
-			// if not then call Connect on it again
 		} else if r.Retries > maxRetries {
-			if cm.config.GetAddress != nil {
-				go cm.NewRequest()
-			}
-			fmt.Println("This peer has been tried the maximum amount of times and a source of new address has not been specified.")
+			delete(c.PendingList, r.Addr)
+			c.monitorThresholds()
+			log.WithField("prefix", "connmgr").
+				Warnf("%s has been tried the maximum amount of times", r.Addr)
+			// As a NewRequest (monitor fills the ConnectedList) is asynchronous it could be faster than OnFail.
+			// OnFail is too late to delete the failed connection from the Address Manager's newAddrs.
+			// Effect is that an already tried and failed peer connection could be tried a second time.
+			// TODO: low prio, but don't forget
+			c.OnFail(r.Addr)
+			// if not then call Connect on it again
 		} else {
-			go cm.Connect(r)
+			go c.Connect(r)
 		}
-
 	}
-
 }
 
 // Disconnected is called when a peer disconnects.
 // we take the addr from peer, which is also it's key in the map
 // and we use it to remove it from the connectedList
 func (c *Connmgr) disconnected(r *Request) error {
-
 	errChan := make(chan error, 0)
 
 	c.actionch <- func() {
-
 		var err error
 
 		if r == nil {
@@ -195,14 +173,11 @@ func (c *Connmgr) disconnected(r *Request) error {
 	return <-errChan
 }
 
-//Connected is called when the connection manager
-// makes a successful connection.
+// connected is called when the connection manager makes a successful connection.
 func (c *Connmgr) connected(r *Request) error {
-
 	errorChan := make(chan error, 0)
 
 	c.actionch <- func() {
-
 		var err error
 
 		// This should not be the case, since we connected
@@ -211,36 +186,35 @@ func (c *Connmgr) connected(r *Request) error {
 			err = errors.New("Request object as nil inside of the connected function")
 		}
 
-		// reset retries to 0
+		// Reset retries to 0
 		r.Retries = 0
 
-		// add to connectedList
+		// Add to connectedList
 		c.ConnectedList[r.Addr] = r
 
-		// remove from pending if it was there
+		// Remove from pending if it was there
 		delete(c.PendingList, r.Addr)
 
-		if c.config.OnConnection != nil {
-			c.config.OnConnection(r.Conn, r.Addr)
-		}
+		c.OnConnection(r.Conn, r.Addr)
+
+		c.monitorThresholds()
 
 		if err != nil {
-			fmt.Println("Error connected", err)
+			log.Error("Error connected", err)
 		}
 
 		errorChan <- err
 	}
+
 	return <-errorChan
 }
 
 // Pending is synchronous, we do not want to continue with logic
 // until we are certain it has been added to the pendingList
 func (c *Connmgr) pending(r *Request) error {
-
 	errChan := make(chan error, 0)
 
 	c.actionch <- func() {
-
 		var err error
 
 		if r == nil {
@@ -254,7 +228,9 @@ func (c *Connmgr) pending(r *Request) error {
 	return <-errChan
 }
 
+// Run starts the Connection Manager as a daemon
 func (c *Connmgr) Run() {
+	go c.monEvtLoop()
 	go c.loop()
 }
 
@@ -264,6 +240,75 @@ func (c *Connmgr) loop() {
 		case f := <-c.actionch:
 			f()
 		}
+	}
+}
+
+// OnConnection is called when a successful outbound connection has been made
+func (c *Connmgr) OnConnection(conn net.Conn, addr string) {
+	log.WithField("prefix", "noded").Infof("A connection to node %s was created", addr)
+
+	sm, _ := syncmgr.GetInstance()
+	p := sm.CreatePeer(conn, false)
+	err := p.Run()
+
+	if err != nil {
+		log.WithField("prefix", "noded").Errorf("Failed to run peer: %s", err.Error())
+	}
+
+	if err == nil {
+		am := addrmgr.GetInstance()
+		am.ConnectionComplete(conn.RemoteAddr().String(), false)
+	}
+
+	// This is here just to quickly test the system
+	chain, _ := core.GetBcInstance()
+	latestHash, _ := chain.GetLatestHeaderHash()
+	err = p.RequestHeaders(latestHash)
+	log.Info("For tests, we are only fetching first 2k batch")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
+// OnAccept is called when a successful inbound connection has been made
+func (c *Connmgr) OnAccept(conn net.Conn) {
+	log.WithField("prefix", "noded").Infof("Peer %s wants to connect", conn.RemoteAddr().String())
+
+	sm, _ := syncmgr.GetInstance()
+	p := sm.CreatePeer(conn, true)
+
+	err := p.Run()
+	if err != nil {
+		log.WithField("prefix", "noded").Errorf("Failed to run peer: %s", err.Error())
+	}
+
+	if err == nil {
+		//sm, _ := syncmgr.GetBcInstance()
+		//sm.AddPeer(p)
+		am := addrmgr.GetInstance()
+		am.ConnectionComplete(conn.RemoteAddr().String(), true)
+	}
+
+	log.WithField("prefix", "noded").Infof("Start listening for requests from node address %s", conn.RemoteAddr().String())
+}
+
+// GetAddress gets a new address from Address Manager
+func (c *Connmgr) GetAddress() (*payload.NetAddress, error) {
+	am := addrmgr.GetInstance()
+	return am.NewAddr()
+}
+
+// OnFail is called when outbound connection failed
+func (c *Connmgr) OnFail(addr string) {
+	am := addrmgr.GetInstance()
+	am.Failed(addr)
+}
+
+// OnMinGetAddr is called when the minimum of new addresses has exceeded
+func (c *Connmgr) OnMinGetAddr() {
+	sm, _ := syncmgr.GetInstance()
+	if err := sm.RequestAddresses(); err != nil {
+		log.WithField("prefix", "noded").Error("Failed to get addresses from peer after exceeding limit")
 	}
 }
 

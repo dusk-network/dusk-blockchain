@@ -89,7 +89,7 @@ func (m *MsgReject) Decode(r io.Reader) error {
 		RejectCode(code) != RejectInvalid &&
 		RejectCode(code) != RejectObsolete &&
 		RejectCode(code) != RejectDuplicate {
-		return fmt.Errorf("invalid reject code %v", code)
+		return fmt.Errorf("Invalid reject code %v", code)
 	}
 
 	m.RejectCode = RejectCode(code)

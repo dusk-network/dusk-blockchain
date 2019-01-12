@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb/errors"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 )
 
 var (
@@ -83,4 +83,12 @@ func TestTableClose(t *testing.T) {
 	err := table.Close()
 	assert.Equal(t, nil, err)
 	cleanup(table)
+}
+
+func TestTableBatchGet(t *testing.T) {
+	//TODO
+}
+
+func TestTableBatchDelete(t *testing.T) {
+	//TODO
 }

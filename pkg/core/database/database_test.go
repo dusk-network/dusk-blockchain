@@ -6,14 +6,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb/errors"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 )
 
-const path = "temp"
+const (
+	tmpDuskDir = "/.dusk"
+)
+
+var (
+	basepath = os.TempDir() + tmpDuskDir
+	path     = basepath + "/unittest/noded/"
+)
 
 func cleanup(db database.Database) {
 	db.Close()
-	os.RemoveAll(path)
+	os.RemoveAll(basepath)
 }
 
 func TestDbCreate(t *testing.T) {
@@ -75,6 +82,7 @@ func TestDbHas(t *testing.T) {
 	cleanup(db)
 
 }
+
 func TestDbClose(t *testing.T) {
 	db, _ := database.NewDatabase("temp")
 	err := db.Close()

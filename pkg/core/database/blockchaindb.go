@@ -2,12 +2,13 @@ package database
 
 import (
 	"bytes"
-	"fmt"
-
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
 
+// BlockchainDB holds a database interface and the path to the physical db dir.
 type BlockchainDB struct {
 	Database
 	path string
@@ -16,14 +17,21 @@ type BlockchainDB struct {
 const maxRetrievableHeaders = 2000
 
 var (
-	// TX, HEADER AND UTXO are the prefixes for the db
-	TX           = []byte{0x01}
-	BLOCKHEIGHT  = []byte{0x02}
-	HEADER       = []byte{0x03}
-	LATESTHEADER = []byte{0x04}
-	UTXO         = []byte{0x05}
+	// HEADER is the prefix for a header key
+	HEADER = []byte{0x01}
+	// BLOCKHEIGHT is the prefix for a block height key
+	BLOCKHEIGHT = []byte{0x02}
+	// TX is the prefix for a transaction key
+	TX = []byte{0x03}
+	// UTXO is the prefix for a utxo key
+	UTXO = []byte{0x04}
+	// LATESTHEADER is the prefix for the latest header key
+	LATESTHEADER           = []byte{0x05}
+	errAddBlockHeaderDbStr = "Failed to add block header to db."
+	errAddTransactionDbStr = "Failed to add transaction to db."
 )
 
+// NewBlockchainDB returns a pointer to a newly created or existing blockchain db.
 func NewBlockchainDB(path string) (*BlockchainDB, error) {
 	db, err := NewDatabase(path)
 	if err != nil {
@@ -33,67 +41,83 @@ func NewBlockchainDB(path string) (*BlockchainDB, error) {
 	return &BlockchainDB{db, path}, nil
 }
 
-func (bdb *BlockchainDB) AddHeader(header *payload.BlockHeader) error {
-	headerTable := NewTable(bdb, HEADER)
+// AddHeaders adds a batch of block headers to the database
+func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
+	sortedHdrs := util.SortHeadersByHeight(hdrs)
 
-	fmt.Printf("Adding block header (height=%d)\n", header.Height)
+	// batchValues will consist of a header and blockheight record for each header in hdrs, plus one for the latest header
+	kv := make(batchValues, len(sortedHdrs)*2+1)
 
 	// This is the main mapping
 	// Key: HEADER + blockheader hash, Value: blockheader bytes
-	hashKey := header.Hash
-	headerBytes, err := header.Bytes()
-	headerTable.Put(hashKey, headerBytes)
+	for _, h := range sortedHdrs {
+		b, _ := h.Bytes()
+		headerHash := append(HEADER, h.Hash...)
+		kv[string(headerHash)] = b
+	}
 
 	// This is the secondary mapping
-	// Key: HEADER + block height, Value: blockhash
-	heightTable := NewTable(bdb, BLOCKHEIGHT)
-	heightBytes := Uint64ToBytes(header.Height)
-	err = heightTable.Put(heightBytes, hashKey)
+	// Key: BLOCKHEIGHT + block height, Value: blockhash
+	for _, h := range sortedHdrs {
+		heightBytes := append(BLOCKHEIGHT, Uint64ToBytes(h.Height)...)
+		kv[string(heightBytes)] = h.Hash
+	}
+
+	// This is the third mapping
+	kv[string(LATESTHEADER)] = sortedHdrs[len(sortedHdrs)-1].Hash
+
+	err := bdb.Write(&kv)
 	if err != nil {
+		log.WithField("prefix", "database").
+			Errorf(errAddBlockHeaderDbStr+" (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
 		return err
 	}
-	// This is the third mapping
-	// WARNING: This assumes that headers are adding in order.
-	latestHeaderTable := NewTable(bdb, []byte{})
-	return latestHeaderTable.Put(LATESTHEADER, header.Hash)
+
+	log.WithField("prefix", "database").
+		Infof("Adding block headers (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
+	//	Info("Adding block headers (start height=%d, end height=%d)", uint64(sortedHdrs[0].Height), uint64(sortedHdrs[len(sortedHdrs)-1].Height))
+
+	return nil
 }
 
-func (bdb *BlockchainDB) AddBlockTransactions(block *payload.Block) error {
+// AddBlockTransactions add blocks to the database.
+// A block transaction is linked to the header by the header hash in the transaction key
+func (bdb *BlockchainDB) AddBlockTransactions(blocks []*payload.Block) error {
+	// batchValues will consist of a tx and index record for each tx in a block
+	kv := make(batchValues, len(blocks)*2)
 
-	// SHOULD BE DONE IN BATCH!!!!
-	for i, v := range block.Txs {
-		tx := v.(*transactions.Stealth)
-		buf := new(bytes.Buffer)
-		fmt.Println(tx.Hash)
-		err := tx.Encode(buf)
-		if err != nil {
-			fmt.Println("Error adding transaction with bytes ", tx)
-			return err
-		}
-		txBytes := buf.Bytes()
-		txhash := tx.Hash
+	for _, b := range blocks {
 
-		// This is the original mapping
-		// Key: [TX] + TXHASH
-		txKey := append(TX, txhash...)
-		err = bdb.Put(txKey, txBytes)
-		if err != nil {
-			fmt.Println("Error could not add tx into db ", txBytes)
-			return err
-		}
+		for j, v := range b.Txs {
+			tx := v.(transactions.Stealth)
+			buf := new(bytes.Buffer)
+			err := tx.Encode(buf)
+			if err != nil {
+				log.WithField("prefix", "database").Errorf(errAddTransactionDbStr, tx)
+				return err
+			}
+			// This is the main mapping
+			// Key: [TX] + TXHASH
+			txBytes := buf.Bytes()
+			txKey := append(TX, tx.Hash...)
+			kv[string(txKey)] = txBytes
 
-		// This is the index
-		// Key: [TX] + BLOCKHASH + I <- i is the incrementer from the for loop
-		// Value: TXHASH
-		blockhashKey := append(append(TX, block.Header.Hash...))
-		blockhashKey = append(blockhashKey, Uint32ToBytes(uint32(i))...)
+			// This is the index
+			// Key: [TX] + HEADER HASH + I <- i is the incrementer from the for loop
+			// Value: TXHASH
+			blockhashKey := append(append(TX, b.Header.Hash...))
+			blockhashKey = append(blockhashKey, Uint32ToBytes(uint32(j))...)
 
-		err = bdb.Put(blockhashKey, txhash)
-		if err != nil {
-			fmt.Println("Error could not add tx index into db")
-			return err
+			kv[string(blockhashKey)] = tx.Hash
 		}
 	}
+
+	// Atomic database write of the transactions
+	if err := bdb.Write(&kv); err != nil {
+		log.WithField("prefix", "database").Error(errAddTransactionDbStr)
+		return err
+	}
+
 	return nil
 }
 

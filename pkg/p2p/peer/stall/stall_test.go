@@ -1,12 +1,18 @@
 package stall
 
 import (
+	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
+
+func init() {
+	log.SetOutput(ioutil.Discard)
+}
 
 func TestAddRemoveMessage(t *testing.T) {
 
