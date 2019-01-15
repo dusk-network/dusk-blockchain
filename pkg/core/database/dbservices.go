@@ -2,31 +2,38 @@ package database
 
 import (
 	"bytes"
+	"github.com/syndtr/goleveldb/leveldb/util"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
 // getBlockHeaderRange gets a range of block headers
 func getBlockHeaderRange(db *BlockchainDB, start uint64, stop uint64) ([]*payload.BlockHeader, error) {
-	var bhCur *payload.BlockHeader
-	var headers = make([]*payload.BlockHeader, stop-start+1)
+	var hdrCur *payload.BlockHeader
+	var headers = make([]*payload.BlockHeader, 0, stop-start+1)
 	var err error
 
 	if stop == 0 {
-		bhCur, err = getBlockHeaderByHeight(db, stop)
+		hdrCur, err = getBlockHeaderByHeight(db, stop)
 		if err != nil {
 			return nil, err
 		}
-		stop = bhCur.Height
+		stop = hdrCur.Height
 	}
 
 	var curHeight = start
-	for start <= stop {
-		bhCur, err = getBlockHeaderByHeight(db, curHeight)
+	var noMoreHdrs = false
+	for curHeight <= stop || noMoreHdrs {
+		hdrCur, err = getBlockHeaderByHeight(db, curHeight)
 		if err != nil {
 			return nil, err
 		}
+		// Stop acquiring headers if the last call gave none
+		if hdrCur == nil {
+			noMoreHdrs = true
+			continue
+		}
 
-		headers = append(headers, bhCur)
+		headers = append(headers, hdrCur)
 		curHeight++
 	}
 
@@ -35,6 +42,7 @@ func getBlockHeaderRange(db *BlockchainDB, start uint64, stop uint64) ([]*payloa
 
 // getBlockHeaderByHeight gives the block header that belongs to the given block height.
 // It will return the latest block header if height is 0.
+// Note: only the header of a complete block is returned, so a block with transactions.
 func getBlockHeaderByHeight(db *BlockchainDB, height uint64) (*payload.BlockHeader, error) {
 	var hash []byte
 	var header payload.BlockHeader
@@ -60,9 +68,17 @@ func getBlockHeaderByHeight(db *BlockchainDB, height uint64) (*payload.BlockHead
 	if err != nil {
 		return nil, err
 	}
+
 	err = header.Decode(bytes.NewReader(headerBytes))
 	if err != nil {
 		return nil, err
+	}
+
+	// Check if header belongs to existing block
+	txHdrHashKey := append(TX, header.Hash...)
+	txIter := db.NewIterator(util.BytesPrefix(txHdrHashKey), nil)
+	if height != 0 && !txIter.First() {
+		return nil, nil
 	}
 
 	return &header, nil
@@ -84,7 +100,7 @@ func getHeightByBlockHash(db *BlockchainDB, hash []byte) (uint64, error) {
 	return header.Height, nil
 }
 
-// Get the latest header
+// Get the latest block hash
 func getLatestBlockHash(db *BlockchainDB) ([]byte, error) {
 	hash, err := db.Get(LATESTHEADER)
 	if err != nil {

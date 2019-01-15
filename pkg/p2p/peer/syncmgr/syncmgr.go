@@ -1,4 +1,4 @@
-// The sync manager will use a modified verison of the initial block download in bitcoin
+// The sync manager will use a modified version of the initial block download in bitcoin
 // Seen here: https://en.bitcoinwiki.org/wiki/Bitcoin_Core_0.11_(ch_5):_Initial_Block_Download
 // MovingWindow is a desired featured from the original codebase
 
@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/addrmgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -35,17 +36,26 @@ type Syncmgr struct {
 	inflightBlockReqs map[string]*peermgr.Peer // When we send a req for block, we will put hash in here, along with peer who we requested it from
 }
 
+func new() *Syncmgr {
+	return &Syncmgr{
+		pmgr:              peermgr.New(),
+		Mode:              1,
+		headers:           [][]byte{},
+		inflightBlockReqs: make(map[string]*peermgr.Peer, 2000),
+	}
+}
+
 // CreatePeer is called after a connection to a peer was successful.
 func (s *Syncmgr) CreatePeer(con net.Conn, inbound bool) *peermgr.Peer {
 	p := peermgr.NewPeer(con, inbound, s.pcfg)
-	s.AddPeer(p)
+	s.addPeer(p)
 
 	// TODO: set the unchangeable states
 	return p
 }
 
-// AddPeer adds a peer for the peer manager to use
-func (s *Syncmgr) AddPeer(peer *peermgr.Peer) {
+// addPeer adds a peer for the peer manager to use
+func (s *Syncmgr) addPeer(peer *peermgr.Peer) {
 	s.pmgr.AddPeer(peer)
 }
 
@@ -72,7 +82,7 @@ func (s *Syncmgr) OnHeaders(p *peermgr.Peer, msg *payload.MsgHeaders) {
 		return
 	}
 
-	// On receipt of Headers check what mode we are in
+	// On receipt of Headers check what mode we are in.
 	// HeadersMode, we check if there is 2k. If so call again. If not then change mode into BlocksOnly
 	if s.Mode == 1 {
 		err := s.HeadersFirstMode(p, msg)
@@ -89,9 +99,7 @@ func (s *Syncmgr) HeadersFirstMode(p *peermgr.Peer, msg *payload.MsgHeaders) err
 	log.WithField("prefix", "syncmgr").Debug("Headers first mode")
 
 	// Validate Headers
-	err := s.chain.ValidateHeaders(msg)
-
-	if err != nil {
+	if err := s.chain.ValidateHeaders(msg); err != nil {
 		// Re-request headers from a different peer
 		s.pmgr.Disconnect(p)
 		log.WithField("prefix", "syncmgr").Error("Failed to validate headers:", err)
@@ -99,34 +107,26 @@ func (s *Syncmgr) HeadersFirstMode(p *peermgr.Peer, msg *payload.MsgHeaders) err
 	}
 
 	// Add Headers into db
-	err = s.chain.AddHeaders(msg)
-	if err != nil {
-		// Try addding them into the db again?
-		// Since this is simply a db insert, any problems here means trouble
-		//TODO: Should we Switch off system or warn the user that the system is corrupted?
+	if err := s.chain.AddHeaders(msg); err != nil {
 		log.WithField("prefix", "syncmgr").Error("Failed to add headers", err)
-
-		//TODO: Batching is not yet implemented,
-		// So here we would need to remove headers which have been added
-		// from the slice
 		return err
 	}
 
 	// Add header hashes into slice
 	// Request first batch of blocks here
-	hashes := make([][]byte, len(msg.Headers))
+	hashes := make([][]byte, 0, len(msg.Headers))
 	for _, header := range msg.Headers {
 		hashes = append(hashes, header.Hash)
 	}
 	s.headers = append(s.headers, hashes...)
 
-	if len(msg.Headers) == 2*1e3 { // should be less than 2000, leave it as this for tests
+	if len(msg.Headers) == 2*1e3 { // Should be less than 2000, leave it as this for tests
 		log.WithField("prefix", "syncmgr").Debug("Switching to BlocksOnly Mode")
-		s.Mode = 2 // switch to BlocksOnly. XXX: because HeadersFirst is not in parallel, no race condition here.
+		s.Mode = 2 // Switch to BlocksOnly. XXX: because HeadersFirst is not in parallel, no race condition here.
 		return s.RequestMoreBlocks()
 	}
 	latestHeader := msg.Headers[len(msg.Headers)-1]
-	_, err = s.pmgr.RequestHeaders(latestHeader.Hash)
+	_, err := s.pmgr.RequestHeaders(latestHeader.Hash)
 	return err
 }
 
@@ -137,11 +137,11 @@ func (s *Syncmgr) RequestMoreBlocks() error {
 
 	if len(s.headers) >= maxBlockRequestPerPeer {
 		reqAmount = maxBlockRequestPerPeer
-		blockReq = s.headers[:reqAmount]
 	} else {
 		reqAmount = len(s.headers)
-		blockReq = s.headers[:reqAmount]
 	}
+	blockReq = s.headers[:reqAmount]
+
 	peer, err := s.pmgr.RequestBlocks(blockReq)
 	if err != nil { // This could happen if the peermanager has no valid peers to connect to. We should wait a bit and re-request
 		return err // alternatively we could make RequestBlocks blocking, then make sure it is not triggered when a block is received
@@ -156,7 +156,7 @@ func (s *Syncmgr) RequestMoreBlocks() error {
 	}
 	s.headers = s.headers[reqAmount:]
 	// NONONO: Here we do not pass all of the hashes to peermanager because
-	// it is not the peermanagers responsibility to mange inflight blocks
+	// it is not the peermanagers responsibility to manage inflight blocks
 	return err
 }
 
@@ -166,10 +166,29 @@ func (s *Syncmgr) RequestAddresses() error {
 }
 
 // OnGetData receives 'getdata' msgs from a peer.
-// This could be a request for a specifx Tx or Block and will be read from the chain db.
+// This could be a request for a specific Tx or Block and will be read from the chain db.
 // and send to the requesting peer.
 func (s *Syncmgr) OnGetData(p *peermgr.Peer, msg *payload.MsgGetData) {
-	// TODO
+	log.WithField("prefix", "syncmgr").Debug("Syncmgr OnGetData called")
+	// The caller peer wants some txs and/or blocks from our blockchain.
+	for _, vector := range msg.Vectors {
+		switch vector.Type {
+		case payload.InvTx:
+			//tx := transactions.NewTX()
+			//tx.Hash = vector.Hash
+			//s.chain.GetTx()
+		case payload.InvBlock:
+			block, err := s.chain.GetBlockByHash(vector.Hash)
+			if err == nil {
+				msg := payload.NewMsgBlock(block)
+				p.Write(msg)
+			} else {
+				log.WithField("prefix", "syncmgr").Fatalf("Failed to read Block by hash %x", vector.Hash)
+			}
+		default:
+			log.WithField("prefix", "peer").Errorf("Unknown InvType in '%s' msg from %s", commands.Inv, p.RemoteAddr().String())
+		}
+	}
 }
 
 // OnBlock receives a block from a peer, then passes it to the blockchain to process.
@@ -182,6 +201,18 @@ func (s *Syncmgr) OnBlock(p *peermgr.Peer, msg *payload.MsgBlock) {
 	//	// Put headers back in front of queue to fetch block for.
 	//	log.WithField("prefix", "syncmgr").Error("Block had an error", err)
 	//}
+}
+
+// OnGetAddr receives a getaddr msg from a peer, then passes it to the Address Manager to process.
+func (s *Syncmgr) OnGetAddr(p *peermgr.Peer, msg *payload.MsgGetAddr) {
+	am := addrmgr.GetInstance()
+	am.OnGetAddr(p, msg)
+}
+
+// OnAddr receives a addr msg from a peer, then passes it to the Address Manager to process.
+func (s *Syncmgr) OnAddr(p *peermgr.Peer, msg *payload.MsgAddr) {
+	am := addrmgr.GetInstance()
+	am.OnAddr(p, msg)
 }
 
 // OnMemPool (TODO)

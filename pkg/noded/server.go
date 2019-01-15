@@ -2,7 +2,7 @@ package noded
 
 import (
 	log "github.com/sirupsen/logrus"
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr"
@@ -43,7 +43,7 @@ func setup() {
 
 	ip, _ := util.GetOutboundIP()
 
-	nodeAddr := payload.NetAddress{ip, uint16(cnf.GetInt("net.peer.port"))}
+	nodeAddr := payload.NetAddress{ip, uint16(cfg.GetInt("net.peer.port"))}
 	log.WithField("prefix", "noded").Infof("Node server is running on %s", nodeAddr.String())
 
 	// Prevent the server from stopping.

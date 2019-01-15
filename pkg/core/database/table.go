@@ -1,5 +1,11 @@
 package database
 
+import (
+	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
+)
+
 // Table is an abstract data structure built on top of a db
 type Table struct {
 	prefix []byte
@@ -41,6 +47,11 @@ func (t *Table) Get(key []byte) ([]byte, error) {
 func (t *Table) Delete(key []byte) error {
 	key = append(t.prefix, key...)
 	return t.db.Delete(key)
+}
+
+// NewIterator returns an iterator of range of keys
+func (t *Table) NewIterator(slice *util.Range, ro *opt.ReadOptions) iterator.Iterator {
+	return t.db.NewIterator(slice, ro)
 }
 
 // Close closes the db

@@ -103,9 +103,9 @@ func TestAddBlockTransactions(t *testing.T) {
 			txKey := append(database.TX, tx.Hash...)
 			dbTxBytes, _ := db.Get(txKey)
 
-			blockhashKey := append(database.TX, b.Header.Hash...)
-			blockhashKey = append(blockhashKey, database.Uint32ToBytes(uint32(i))...)
-			dbTxHash, _ := db.Get(blockhashKey)
+			txHashKey := append(database.TX, b.Header.Hash...)
+			txHashKey = append(txHashKey, database.Uint32ToBytes(uint32(i))...)
+			dbTxHash, _ := db.Get(txHashKey)
 
 			assert.Equal(t, txBytes, dbTxBytes)
 			assert.Equal(t, tx.Hash, dbTxHash)

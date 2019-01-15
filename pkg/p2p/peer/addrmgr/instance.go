@@ -1,7 +1,7 @@
 package addrmgr
 
 import (
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"strconv"
 	"strings"
@@ -27,7 +27,7 @@ func GetInstance() *Addrmgr {
 func getPermanentAddresses() []*payload.NetAddress {
 	// Add the (permanent) seed addresses to the Address Manager
 	var netAddrs []*payload.NetAddress
-	addrs := cnf.GetStringSlice("net.peer.seeds")
+	addrs := cfg.GetStringSlice("net.peer.seeds")
 	for _, addr := range addrs {
 		s := strings.Split(addr, ":")
 		port, _ := strconv.ParseUint(s[1], 10, 16)

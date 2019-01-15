@@ -17,7 +17,7 @@ net = "DevNet"
     # Default log filepath is <user home>/.dusk/<env.net>/noded/noded.log
     #filepath = "D:/temp/.dusk/dev/noded/noded.log"
     # Default log level is info (log levels: trace, debug, info, warning, error, fatal and panic)
-    #level = "debug"
+    level = "debug"
     # Default log date format is 2006-01-02 15:04:05 (See: https://golang.org/src/time/format.go)
     #timestampFormat = "2006-01-02 15:04:05"
     # Write log file for a TTY device (to see coloured log text). Default is false
@@ -25,15 +25,20 @@ net = "DevNet"
 
     [DevNet.peer]
     # Default port is 10333 #TODO: Discuss this
-    #port = "10333"
+    #port =
     # Default dialTimeout is 0
-    #dialTimeout = 0
-    seeds = [ "192.168.178.57:10111"] #Should of course have more addresses. For dev testing it's annoying!
+    #dialTimeout =
+    seeds = [ "192.168.178.57:10111" ]
     min = 3
     max = 10
     minGetAddr = 5
 
+    [DevNet.monitoring]
+    # Disable events for a certain time to be triggered again. Default is 1 minute.
+    #evtDisableDuration = "2m"
+
     [DevNet.database]
+    # Default is <user home>/.dusk/<env.net>/db
     #dirpath = "D:/temp/.dusk/dev/bcdb"
 
 
@@ -51,6 +56,10 @@ net = "DevNet"
 
     [TestNet.peer]
     seeds = [ "192.168.178.57:10111", "192.168.178.57:10222" ]
+
+    [TestNet.monitoring]
+    # Disable events for a certain time to be triggered again. Default is 1 minute.
+    evtDisableDuration = "2m"
 
     [TestNet.database]
     dirpath = "D:/temp/.dusk/test/bcdb"

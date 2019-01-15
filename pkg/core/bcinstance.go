@@ -1,7 +1,7 @@
 package core
 
 import (
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"sync"
 )
@@ -15,7 +15,7 @@ func GetBcInstance() (*Blockchain, error) {
 
 	if instance == nil {
 		once.Do(func() {
-			instance, err = NewBlockchain(protocol.Magic(cnf.GetInt("net.magic")))
+			instance, err = NewBlockchain(protocol.Magic(cfg.GetInt("net.magic")))
 		})
 	}
 	if err != nil {

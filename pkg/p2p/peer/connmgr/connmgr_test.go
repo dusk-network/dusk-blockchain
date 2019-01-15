@@ -3,7 +3,7 @@ package connmgr_test
 import (
 	"bou.ke/monkey"
 	log "github.com/sirupsen/logrus"
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -40,7 +40,7 @@ func TestConnect(t *testing.T) {
 func TestNewRequest(t *testing.T) {
 
 	address := payload.NewNetAddress("216.58.212.174", 80)
-	cnf.Set("net.peer.seeds", address.String())
+	cfg.Set("net.peer.seeds", address.String())
 
 	var c *connmgr.Connmgr
 	monkey.PatchInstanceMethod(reflect.TypeOf(c), "OnConnection", func(_ *connmgr.Connmgr, _ net.Conn, _ string) {

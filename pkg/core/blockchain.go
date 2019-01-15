@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"sort"
 	"time"
 
@@ -60,7 +60,9 @@ type Blockchain struct {
 // NewBlockchain will return a new Blockchain instance with an initialized mempool.
 // This Blockchain instance should then be ready to process incoming transactions and blocks.
 func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
-	db, err := database.NewBlockchainDB(cnf.GetString("net.database.dirpath"))
+	dbPath := cfg.GetString("net.database.dirpath")
+	log.WithField("prefix", "blockchain").Debugf("Path to database: %s", dbPath)
+	db, err := database.NewBlockchainDB(dbPath)
 	if err != nil {
 		log.WithField("prefix", "blockchain").Error(err)
 		return nil, errNoBlockchainDb
@@ -421,48 +423,6 @@ func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
 		latestHeader = currentHeader
 	}
 	return nil
-}
-
-// AddHeaders will add block headers to the database.
-func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
-	if err := b.db.AddHeaders(msg.Headers); err != nil {
-		return err
-	}
-	return nil
-}
-
-// GetHeaders will retrieve block headers from the database, starting and
-// stopping at the provided locators.
-func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
-	return b.db.ReadHeaders(start, stop)
-}
-
-// GetLatestHeaderHash gets the block hash of the most recent block.
-func (b *Blockchain) GetLatestHeaderHash() ([]byte, error) {
-	return b.db.Get(database.LATESTHEADER)
-}
-
-// GetLatestHeader will get the most recent block hash and return it as
-// a block header struct.
-func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
-	prevHeaderHash, err := b.GetLatestHeaderHash()
-	if err != nil {
-		return nil, err
-	}
-
-	prevHeaderKey := append(append(database.HEADER, prevHeaderHash...))
-	prevHeaderBytes, err := b.db.Get(prevHeaderKey)
-	if err != nil {
-		return nil, err
-	}
-
-	prevHeaderBuf := bytes.NewReader(prevHeaderBytes)
-	prevHeader := &payload.BlockHeader{}
-	if err := prevHeader.Decode(prevHeaderBuf); err != nil {
-		return nil, err
-	}
-
-	return prevHeader, nil
 }
 
 // StartProvisioning will set the node to provisioner status,

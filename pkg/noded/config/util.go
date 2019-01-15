@@ -5,7 +5,8 @@ import (
 	"runtime"
 )
 
-func userHomeDir() string {
+// UserHomeDir give the user's home dir for any OS
+func UserHomeDir() string {
 	if runtime.GOOS == "windows" {
 		home := os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")
 		if home == "" {

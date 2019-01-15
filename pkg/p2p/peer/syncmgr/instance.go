@@ -15,7 +15,7 @@ func GetInstance() (*Syncmgr, error) {
 
 	if instance == nil {
 		once.Do(func() {
-			instance = &Syncmgr{pmgr: peermgr.New(), Mode: 1, headers: [][]byte{}, inflightBlockReqs: make(map[string]*peermgr.Peer, 2000)}
+			instance = new()
 			instance.chain, err = core.GetBcInstance()
 			instance.pcfg = instance.setupPeerResponseHandler()
 		})
@@ -35,7 +35,7 @@ func (s *Syncmgr) setupPeerResponseHandler() peermgr.ResponseHandler {
 		//OnTx:	          s.OnTx,
 		OnGetHeaders: s.OnGetHeaders,
 		//OnAddr:           s.OnAddr,
-		//OnGetAddr:        s.OnGetAddr,
+		OnGetAddr: s.OnGetAddr,
 		//OnGetBlocks:      s.OnGetBlocks,
 		OnBlock: s.OnBlock,
 		//OnBinary:         s.OnBinary,

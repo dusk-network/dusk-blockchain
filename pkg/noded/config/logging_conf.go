@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/sirupsen/logrus"
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"github.com/x-cray/logrus-prefixed-formatter"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
@@ -19,8 +19,8 @@ const (
 func configureLogging() error {
 
 	// Get the logging config.
-	logFilepath := cnf.GetString("net.logging.filepath")
-	level := cnf.GetString("net.logging.level")
+	logFilepath := cfg.GetString("net.logging.filepath")
+	level := cfg.GetString("net.logging.level")
 
 	// Create a log file if not yet exist
 	logFilepath = createLogFile(logFilepath, "net")
@@ -43,10 +43,10 @@ func configureLogging() error {
 
 	// Use a custom formatter TODO: ext. configuration
 	logrus.SetFormatter(&prefixed.TextFormatter{
-		TimestampFormat: cnf.GetString("net.logging.timestampformat"),
+		TimestampFormat: cfg.GetString("net.logging.timestampformat"),
 		FullTimestamp:   true,
 		ForceFormatting: true,
-		ForceColors:     cnf.GetBool("net.logging.tty"),
+		ForceColors:     cfg.GetBool("net.logging.tty"),
 	})
 
 	return nil
@@ -56,7 +56,7 @@ func createLogFile(logFilepath, envNet string) string {
 	var err error
 
 	if logFilepath == "" {
-		logFilepath = userHomeDir() + userHomeDuskDir + "/" + strings.ToLower(envNet) + "/noded/noded.log"
+		logFilepath = UserHomeDir() + userHomeDuskDir + "/" + strings.ToLower(envNet) + "/noded/noded.log"
 	}
 
 	// Stat returns file info. It will return an error if there is no log file.

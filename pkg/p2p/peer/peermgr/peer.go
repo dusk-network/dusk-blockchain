@@ -7,7 +7,7 @@ package peermgr
 import (
 	"errors"
 	log "github.com/sirupsen/logrus"
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -114,8 +114,8 @@ func NewPeer(con net.Conn, inbound bool, respHndlr ResponseHandler) *Peer {
 	p.outch = make(chan func(), outputBufferSize)
 	p.quitch = make(chan struct{}, 1)
 	p.inbound = inbound
-	p.port = uint16(cnf.GetInt("net.port"))
-	p.net = protocol.Magic(uint32(cnf.GetInt("net.magic")))
+	p.port = uint16(cfg.GetInt("net.port"))
+	p.net = protocol.Magic(uint32(cfg.GetInt("net.magic")))
 	p.conn = con
 	p.createdAt = time.Now()
 	p.addr = p.conn.RemoteAddr().String()
@@ -365,7 +365,6 @@ func (p *Peer) WriteLoop() {
 func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetData, p.addr)
 	p.inch <- func() {
-		//TODO: Function that checks whether peer asks txs or blocks
 		if p.hndlr.OnGetData != nil {
 			p.hndlr.OnGetData(p, msg)
 		}
@@ -600,8 +599,6 @@ func (p *Peer) OnScore(msg *payload.MsgScore) {
  */
 
 // RequestHeaders will ask a peer for headers.
-// It will put a function on the outgoing peer queue to send a 'getheaders' msg
-// to an other peer. An error from this function will return this error from RequestHeaders.
 func (p *Peer) RequestHeaders(hash []byte) error {
 	log.WithField("prefix", "peer").Infof("Sending '%s' msg requesting headers from %s", commands.GetHeaders, p.addr)
 	c := make(chan error)
@@ -635,13 +632,13 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 }
 
 // RequestBlocks will ask a peer for blocks.
-// It will put a function on the outgoing peer queue to send a 'getdata' msg to an other peer.
+// It will put a function on the outgoing peer queue to send a 'getblocks' msg to an other peer.
 // The same possible function error will be returned from this method.
 func (p *Peer) RequestBlocks(hashes [][]byte) error {
 	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
-	blocks := make([]*payload.Block, len(hashes))
+	blocks := make([]*payload.Block, 0, len(hashes))
 	for _, hash := range hashes {
 		// Create a block from requested hash
 		block := payload.NewBlock()

@@ -1,7 +1,7 @@
 package config
 
 import (
-	cnf "github.com/spf13/viper"
+	cfg "github.com/spf13/viper"
 	"log"
 	"strings"
 )
@@ -14,17 +14,17 @@ const (
 // It's also aware of some default configuration settings.
 func LoadConfig() error {
 
-	cnf.SetConfigName("noded")            // Name of config file without file extension
-	cnf.AddConfigPath("cmd/noded/config") // Path of config file
-	cnf.AutomaticEnv()
+	cfg.SetConfigName("noded")            // Name of config file without file extension
+	cfg.AddConfigPath("cmd/noded/config") // Path of config file
+	cfg.AutomaticEnv()
 
-	err := cnf.ReadInConfig()
+	err := cfg.ReadInConfig()
 	if err != nil {
 		log.Fatalf(errConfigRead, err)
 	}
-	cnf.BindEnv("Env.Net", "DUSK.ENV.NET")
+	cfg.BindEnv("Env.Net", "DUSK.ENV.NET")
 
-	envNet := cnf.GetString("Env.Net")
+	envNet := cfg.GetString("Env.Net")
 	if envNet == "" {
 		log.Fatalf(errConfigRead,
 			"Please set at least:\n"+
@@ -34,7 +34,7 @@ func LoadConfig() error {
 		)
 	}
 
-	cnf.RegisterAlias(envNet, "net")
+	cfg.RegisterAlias(envNet, "net")
 
 	setDefaults(envNet)
 
@@ -47,15 +47,18 @@ func LoadConfig() error {
 
 func setDefaults(envNet string) {
 	// Logging
-	cnf.SetDefault("net.logging.filepath", userHomeDir()+userHomeDuskDir+"/"+strings.ToLower(envNet)+"/noded/noded.log")
-	cnf.SetDefault("net.logging.level", "info")
-	cnf.SetDefault("net.logging.timestampformat", "2006-01-02 15:04:05")
-	cnf.SetDefault("net.logging.tty", false)
+	cfg.SetDefault("net.logging.filepath", UserHomeDir()+userHomeDuskDir+"/"+strings.ToLower(envNet)+"/noded/noded.log")
+	cfg.SetDefault("net.logging.level", "info")
+	cfg.SetDefault("net.logging.timestampformat", "2006-01-02 15:04:05")
+	cfg.SetDefault("net.logging.tty", false)
 	// Peer
-	cnf.SetDefault("net.peer.port", "10333") //TODO: To be decided
-	cnf.SetDefault("net.peer.dialtimeout", 0)
+	cfg.SetDefault("net.peer.port", "10333") //TODO: To be decided
+	cfg.SetDefault("net.peer.dialtimeout", 0)
 
 	// Database
-	cnf.SetDefault("net.database.dirpath", userHomeDir()+userHomeDuskDir+"/"+strings.ToLower(envNet)+"/db")
+	cfg.SetDefault("net.database.dirpath", UserHomeDir()+userHomeDuskDir+"/"+strings.ToLower(envNet)+"/db")
+
+	// Monitoring Events
+	cfg.SetDefault("net.monitoring.evtDisableDuration", "1m")
 
 }

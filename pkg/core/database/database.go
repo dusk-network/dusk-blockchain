@@ -4,7 +4,9 @@ import (
 	"encoding/binary"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/syndtr/goleveldb/leveldb/util"
 	"os"
 )
 
@@ -23,6 +25,7 @@ type Database interface {
 	Write(bvs *batchValues) error
 	Get(key []byte) ([]byte, error)
 	Delete(key []byte) error
+	NewIterator(slice *util.Range, ro *opt.ReadOptions) iterator.Iterator
 	Close() error
 }
 
@@ -75,6 +78,11 @@ func (l *LDB) Get(key []byte) ([]byte, error) {
 // Delete deletes the value for the given key
 func (l *LDB) Delete(key []byte) error {
 	return l.db.Delete(key, nil)
+}
+
+// NewIterator returns an iterator of range of keys
+func (l *LDB) NewIterator(slice *util.Range, ro *opt.ReadOptions) iterator.Iterator {
+	return l.db.NewIterator(slice, ro)
 }
 
 // Close closes the db

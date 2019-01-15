@@ -13,9 +13,7 @@ var once sync.Once
 
 // GetInstance creates a Connmgr instance as a Singleton
 func GetInstance() *Connmgr {
-
 	if instance == nil {
-
 		once.Do(func() {
 			instance = New()
 		})
@@ -26,7 +24,6 @@ func GetInstance() *Connmgr {
 }
 
 func loop() {
-
 	go func() {
 
 		ip, err := util.GetOutboundIP()
