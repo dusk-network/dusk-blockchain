@@ -5,10 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	cnf "github.com/spf13/viper"
 	"sort"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	cnf "github.com/spf13/viper"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -116,14 +117,15 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain := &Blockchain{}
 
 	// Set up mempool and populate struct fields
-	//chain.memPool.Init() //TODO: TV commented this line because of no memPool instance (yet)
+	chain.memPool = &MemPool{}
+	chain.memPool.Init()
 	chain.db = db
 	chain.net = net
 
 	// Consensus set-up
-	chain.reductionChan = make(chan *payload.MsgReduction)
-	chain.binaryChan = make(chan *payload.MsgBinary)
-	chain.candidateChan = make(chan *payload.MsgScore)
+	chain.reductionChan = make(chan *payload.MsgReduction, 100)
+	chain.binaryChan = make(chan *payload.MsgBinary, 100)
+	chain.candidateChan = make(chan *payload.MsgScore, 1)
 	chain.quitChan = make(chan int)
 	chain.roundChan = make(chan int)
 	chain.lastHeader, err = chain.GetLatestHeader()

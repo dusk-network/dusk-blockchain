@@ -37,14 +37,16 @@ type Context struct {
 	Q          uint64
 
 	// Provisioner values
-	Score     []byte // Sortition score
-	votes     int    // Sortition votes
-	BlockHash []byte // Block hash currently being voted on by this node
-	empty     bool   // Whether or not the block being voted on is empty
-	weight    uint64 // Amount this node has staked
-	W         uint64 // Total stake weight of the network
-	step      uint8  // Current step
-	MaxSteps  uint8  // Max number of steps allowed in a phase
+	Score        []byte   // Sortition score
+	votes        int      // Sortition votes
+	Signatures   [][]byte // Block hash signatures of nodes who have voted in the current step
+	SigThreshold uint8    // Amount of signatures needed in a comparison message to make it valid
+	BlockHash    []byte   // Block hash currently being voted on by this node
+	empty        bool     // Whether or not the block being voted on is empty
+	weight       uint64   // Amount this node has staked
+	W            uint64   // Total stake weight of the network
+	step         uint8    // Current step
+	MaxSteps     uint8    // Max number of steps allowed in a phase
 
 	GetAllTXs func() []*transactions.Stealth
 

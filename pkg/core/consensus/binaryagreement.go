@@ -43,6 +43,7 @@ func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error 
 			ctx.Lambda = ctx.Lambda * 2
 		}
 
+		// Coin-flipped-to-0 step
 		if ctx.BlockHash == nil {
 			ctx.BlockHash = startHash
 		}
@@ -65,6 +66,8 @@ func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error 
 		}
 
 		_, err = countVotesBinary(ctx, c)
+
+		// Coin-flipped-to-1 step
 		if ctx.BlockHash == nil {
 			ctx.BlockHash = emptyBlock.Header.Hash
 			empty = true
@@ -83,6 +86,8 @@ func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error 
 
 		msgs, err = countVotesBinary(ctx, c)
 		msgs = append(msgs, vote)
+
+		// CommonCoin step
 		if ctx.BlockHash == nil {
 			result, err := commonCoin(ctx, msgs)
 			if err != nil {
@@ -190,11 +195,11 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
 	timer := time.NewTimer(ctx.Lambda)
 
-end:
 	for {
 		select {
 		case <-timer.C:
-			break end
+			ctx.BlockHash = nil
+			return allMsgs, nil
 		case m := <-c:
 			// Verify the message score and get back it's contents
 			votes, hash, err := processMsgBinary(ctx, m)
@@ -233,9 +238,6 @@ end:
 			}
 		}
 	}
-
-	ctx.BlockHash = nil
-	return allMsgs, nil
 }
 
 func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (int, []byte, error) {

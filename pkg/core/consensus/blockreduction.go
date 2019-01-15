@@ -132,11 +132,11 @@ func countVotesReduction(ctx *Context, c chan *payload.MsgReduction) error {
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
 	timer := time.NewTimer(ctx.Lambda)
 
-end:
 	for {
 		select {
 		case <-timer.C:
-			break end
+			ctx.BlockHash = nil
+			return nil
 		case m := <-c:
 			// Verify the message score and get back it's contents
 			votes, hash, err := processMsgReduction(ctx, m)
@@ -171,9 +171,6 @@ end:
 			}
 		}
 	}
-
-	ctx.BlockHash = nil
-	return nil
 }
 
 func processMsgReduction(ctx *Context, msg *payload.MsgReduction) (int, []byte, error) {

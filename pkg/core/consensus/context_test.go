@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 func TestNewGeneratorContext(t *testing.T) {
@@ -38,4 +40,18 @@ func TestReset(t *testing.T) {
 	assert.Nil(t, ctx.k, nil, nil)
 	assert.Equal(t, uint64(0), ctx.Q)
 	assert.Equal(t, uint64(0), ctx.d)
+}
+
+// Convenience function for provisioner tests
+func provisionerContext() (*Context, error) {
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := NewRandKeys()
+	totalWeight := uint64(500000)
+	round := uint64(150000)
+	ctx, err := NewProvisionerContext(totalWeight, round, seed, protocol.TestNet, keys)
+	if err != nil {
+		return nil, err
+	}
+
+	return ctx, nil
 }
