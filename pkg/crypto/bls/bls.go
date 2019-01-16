@@ -1,3 +1,8 @@
+// Package bls implements the compact BLS Multisignature construction which preappends the public key to the signature
+// according to the *plain public-key model*.
+// The form implemented uses an array of distinct keys (as in https://crypto.stanford.edu/~dabo/pubs/papers/BLSmultisig.html)
+// instead of the aggregated form (as in https://eprint.iacr.org/2018/483.pdf where {pk₁,...,pkₙ} would be appended to each pkᵢ
+//according to apk ← ∏ⁿᵢ₌₁ pk^H₁(pkᵢ, {pk₁,...,pkₙ})
 package bls
 
 import (
@@ -31,10 +36,20 @@ var (
 	g2Base *bn256.G2
 )
 
-// TODO: We should probably transform BLS in a struct and delegate initialization to the
+// TODO: We should probably transform BLS in a struct and delegate initialization to the code user. The motivation is that they might want to use a different curve altogether
 func init() {
 	g1Base = newG1Base(g1Str)
 	g2Base = newG2Base(g2Str)
+}
+
+// newG1 is the constructor for the G1 group as in the BN256 curve
+func newG1() *bn256.G1 {
+	return new(bn256.G1)
+}
+
+// newG2 is the constructor for the G2 group as in the BN256 curve
+func newG2() *bn256.G2 {
+	return new(bn256.G2)
 }
 
 // newG1Base is the initialization function for the G1Base point for BN256. It takes as input the HEX string representation of a base point
@@ -69,9 +84,6 @@ func newG2Base(strRepr string) *bn256.G2 {
 	return g2Base
 }
 
-// CompactSize is 32bit
-const CompactSize = 32
-
 // SecretKey has "x" as secret for the BLS signature
 type SecretKey struct {
 	x *big.Int
@@ -82,19 +94,19 @@ type PublicKey struct {
 	gx *bn256.G2
 }
 
-// Sig is the BLS Signature Struct
-type Sig struct {
+// Apk is the short aggregated public key struct
+type Apk struct {
+	gx *bn256.G2
+}
+
+// Signature is the plain public key model of the BLS signature being resilient to rogue key attack
+type Signature struct {
 	e *bn256.G1
 }
 
-// newG1 is the constructor for the G1 group as in the BN256 curve
-func newG1() *bn256.G1 {
-	return new(bn256.G1)
-}
-
-// newG2 is the constructor for the G2 group as in the BN256 curve
-func newG2() *bn256.G2 {
-	return new(bn256.G2)
+// UnsafeSignature is the BLS Signature Struct not resilient to rogue-key attack
+type UnsafeSignature struct {
+	e *bn256.G1
 }
 
 // GenKeyPair generates Public and Private Keys
@@ -111,21 +123,255 @@ func GenKeyPair(randReader io.Reader) (*PublicKey, *SecretKey, error) {
 	return &PublicKey{gx}, &SecretKey{x}, nil
 }
 
-// Sign the messages
-func Sign(key *SecretKey, msg []byte) (*Sig, error) {
+//hashFn is the hash function used to digest a message before mapping it to a point.
+var hashFn = sha3.New256
+
+// h0 is the hash-to-curve-point function
+// Hₒ : M -> Gₒ
+// TODO: implement the Elligator algorithm for deterministic random-looking hashing to BN256 point. See https://eprint.iacr.org/2014/043.pdf
+func h0(msg []byte) (*bn256.G1, error) {
+	hashed, err := hash.PerformHash(hashFn(), msg)
+	if err != nil {
+		return nil, err
+	}
+	k := new(big.Int).SetBytes(hashed)
+	return newG1().ScalarBaseMult(k), nil
+}
+
+// h1 is the hashing function used in the modified BLS multi-signature construction
+// H₁: G₂->R
+func h1(pk *PublicKey) (*big.Int, error) {
+	// marshalling G2 into a []byte
+	pkb := pk.Marshal()
+	// hashing into Z
+	h, err := hash.PerformHash(hashFn(), pkb)
+	if err != nil {
+		return nil, err
+	}
+
+	return new(big.Int).SetBytes(h), nil
+}
+
+func pkt(pk *PublicKey) (*bn256.G2, error) {
+	t, err := h1(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	//TODO: maybe a bit inefficient to recreate G2 instances instead of mutating the underlying group
+	return newG2().ScalarMult(pk.gx, t), nil
+}
+
+// NewApk creates an Apk either from a public key or scratch
+func NewApk(pk *PublicKey) *Apk {
+	if pk == nil {
+		return nil
+	}
+
+	gx, _ := pkt(pk)
+	return &Apk{gx}
+}
+
+// AggregateApk aggregates the public key according to the following formula:
+// apk ← ∏ⁿᵢ₌₁ pk^H₁(pkᵢ)
+func AggregateApk(pks []*PublicKey) *Apk {
+	var apk *Apk
+	for i, pk := range pks {
+		if i == 0 {
+			apk = NewApk(pk)
+		} else {
+			apk.Add(pk)
+		}
+	}
+
+	return apk
+}
+
+// Add aggregates a Public Key to the Apk struct
+// according to the formula pk^H₁(pkᵢ)
+func (apk *Apk) Add(pk *PublicKey) error {
+	gxt, err := pkt(pk)
+	if err != nil {
+		return err
+	}
+
+	apk.gx.Add(apk.gx, gxt)
+	return nil
+}
+
+// Sign creates a signature from the private key and the public key pk
+func Sign(sk *SecretKey, pk *PublicKey, msg []byte) (*Signature, error) {
+	sig, err := UnsafeSign(sk, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return apkSigWrap(pk, sig)
+}
+
+// Add creates an aggregated signature from a normal BLS Signature and related public key
+func (sigma *Signature) Add(pk *PublicKey, sig *UnsafeSignature) error {
+	other, err := apkSigWrap(pk, sig)
+	if err != nil {
+		return err
+	}
+
+	sigma.Aggregate(other)
+	return nil
+}
+
+// Aggregate two Signature
+func (sigma *Signature) Aggregate(other *Signature) *Signature {
+	sigma.e.Add(sigma.e, other.e)
+	return sigma
+}
+
+// Compress the signature to the 32 byte form
+func (sigma *Signature) Compress() []byte {
+	return sigma.e.Compress()
+}
+
+// Decompress reconstructs the 64 byte signature from the compressed form
+func (sigma *Signature) Decompress(x []byte) error {
+	e, err := bn256.Decompress(x)
+	if err != nil {
+		return err
+	}
+	sigma.e = e
+	return nil
+}
+
+// Marshal a Signature into a byte array
+func (sigma *Signature) Marshal() []byte {
+	return sigma.e.Marshal()
+}
+
+// Unmarshal a byte array into a Signature
+func (sigma *Signature) Unmarshal(msg []byte) error {
+	e := newG1()
+	if _, err := e.Unmarshal(msg); err != nil {
+		return err
+	}
+	sigma.e = e
+	return nil
+}
+
+// apkSigWrap turns a BLS Signature into its modified construction
+func apkSigWrap(pk *PublicKey, signature *UnsafeSignature) (*Signature, error) {
+	// creating tᵢ by hashing PKᵢ
+	t, err := h1(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	sigma := newG1()
+
+	sigma.ScalarMult(signature.e, t)
+
+	return &Signature{e: sigma}, nil
+}
+
+// Verify is the verification step of an aggregated apk signature
+func Verify(apk *Apk, msg []byte, sigma *Signature) error {
+	return verify(apk.gx, msg, sigma.e)
+}
+
+// VerifyBatch is the verification step of a batch of aggregated apk signatures
+// TODO: consider adding the possibility to handle non distinct messages (at batch level after aggregating APK)
+func VerifyBatch(apks []*Apk, msgs [][]byte, sigma *Signature) error {
+	if len(msgs) != len(apks) {
+		return fmt.Errorf(
+			"BLS Verify APK Batch: the nr of Public Keys (%d) and the nr. of messages (%d) do not match",
+			len(apks),
+			len(msgs),
+		)
+	}
+
+	pks := make([]*bn256.G2, len(apks))
+	for i, pk := range apks {
+		pks[i] = pk.gx
+	}
+
+	return verifyBatch(pks, msgs, sigma.e, false)
+}
+
+// UnsafeSign generates an UnsafeSignature being vulnerable to the rogue-key attack and therefore can only be used if the messages are distinct
+func UnsafeSign(key *SecretKey, msg []byte) (*UnsafeSignature, error) {
 	hash, err := h0(msg)
 	if err != nil {
 		return nil, err
 	}
 	p := newG1()
 	p.ScalarMult(hash, key.x)
-	return &Sig{p}, nil
+	return &UnsafeSignature{p}, nil
 }
 
-// Verify checks the given BLS signature bls on the message m using the
+// Compress the signature to the 32 byte form
+func (usig *UnsafeSignature) Compress() []byte {
+	return usig.e.Compress()
+}
+
+// Decompress reconstructs the 64 byte signature from the compressed form
+func (usig *UnsafeSignature) Decompress(x []byte) error {
+	e, err := bn256.Decompress(x)
+	if err != nil {
+		return err
+	}
+	usig.e = e
+	return nil
+}
+
+// Marshal an UnsafeSignature into a byte array
+func (usig *UnsafeSignature) Marshal() []byte {
+	return usig.e.Marshal()
+}
+
+// Unmarshal a byte array into an UnsafeSignature
+func (usig *UnsafeSignature) Unmarshal(msg []byte) error {
+	e := newG1()
+	if _, err := e.Unmarshal(msg); err != nil {
+		return err
+	}
+	usig.e = e
+	return nil
+}
+
+// UnsafeAggregate combines signatures on distinct messages.
+func UnsafeAggregate(one, other *UnsafeSignature) *UnsafeSignature {
+	res := newG1()
+	res.Add(one.e, other.e)
+	return &UnsafeSignature{e: res}
+}
+
+// UnsafeBatch is a utility function to aggregate distinct messages
+// (if not distinct the scheme is vulnerable to chosen-key attack)
+func UnsafeBatch(sigs ...*UnsafeSignature) (*UnsafeSignature, error) {
+	var sum *UnsafeSignature
+	for i, sig := range sigs {
+		if i == 0 {
+			sum = sig
+		} else {
+			sum = UnsafeAggregate(sum, sig)
+		}
+	}
+
+	return sum, nil
+}
+
+// VerifyUnsafeBatch verifies a batch of messages signed with aggregated signature
+// the rogue-key attack is prevented by making all messages distinct
+func VerifyUnsafeBatch(pkeys []*PublicKey, msgList [][]byte, signature *UnsafeSignature) error {
+	g2s := make([]*bn256.G2, len(pkeys))
+	for i, pk := range pkeys {
+		g2s[i] = pk.gx
+	}
+	return verifyBatch(g2s, msgList, signature.e, false)
+}
+
+// VerifyUnsafe checks the given BLS signature bls on the message m using the
 // public key pkey by verifying that the equality e(H(m), X) == e(H(m), x*B2) ==
 // e(x*H(m), B2) == e(S, B2) holds where e is the pairing operation and B2 is the base point from curve G2.
-func Verify(pkey *PublicKey, msg []byte, signature *Sig) error {
+func VerifyUnsafe(pkey *PublicKey, msg []byte, signature *UnsafeSignature) error {
 	return verify(pkey.gx, msg, signature.e)
 }
 
@@ -149,39 +395,6 @@ func verify(pk *bn256.G2, msg []byte, sigma *bn256.G1) error {
 	}
 
 	return nil
-}
-
-// Aggregate combines signatures on distinct messages.
-// TODO: The messages must be distinct, otherwise the scheme is vulnerable to chosen-key attack.
-func Aggregate(one, other *Sig) *Sig {
-	res := newG1()
-	res.Add(one.e, other.e)
-	return &Sig{e: res}
-}
-
-// Batch is a utility function to aggregate distinct messages
-// (if not distinct the scheme is vulnerable to chosen-key attack)
-func Batch(sigs ...*Sig) (*Sig, error) {
-	var sum *Sig
-	for i, sig := range sigs {
-		if i == 0 {
-			sum = sig
-		} else {
-			sum = Aggregate(sum, sig)
-		}
-	}
-
-	return sum, nil
-}
-
-// VerifyBatch verifies a batch of messages signed with aggregated signature
-// the rogue-key attack is prevented by making all messages distinct
-func VerifyBatch(pkeys []*PublicKey, msgList [][]byte, signature *Sig) error {
-	g2s := make([]*bn256.G2, len(pkeys))
-	for i, pk := range pkeys {
-		g2s[i] = pk.gx
-	}
-	return verifyBatch(g2s, msgList, signature.e, false)
 }
 
 func verifyBatch(pkeys []*bn256.G2, msgList [][]byte, sig *bn256.G1, allowDistinct bool) error {
@@ -260,36 +473,6 @@ func (pk *PublicKey) UnmarshalText(data []byte) error {
 	return nil
 }
 
-// Compress the signature to the 32 byte form
-func (sigma *Sig) Compress() []byte {
-	return sigma.e.Compress()
-}
-
-// Decompress reconstructs the 64 byte signature from the compressed form
-func (sigma *Sig) Decompress(x []byte) error {
-	e, err := bn256.Decompress(x)
-	if err != nil {
-		return err
-	}
-	sigma.e = e
-	return nil
-}
-
-// Marshal a Signature into a byte array
-func (sigma *Sig) Marshal() []byte {
-	return sigma.e.Marshal()
-}
-
-// Unmarshal a byte array into a Signature
-func (sigma *Sig) Unmarshal(msg []byte) error {
-	e := newG1()
-	if _, err := e.Unmarshal(msg); err != nil {
-		return err
-	}
-	sigma.e = e
-	return nil
-}
-
 // Marshal returns the binary representation of the G2 point being the public key
 func (pk *PublicKey) Marshal() []byte {
 	return pk.gx.Marshal()
@@ -303,19 +486,6 @@ func (pk *PublicKey) Unmarshal(data []byte) error {
 		return err
 	}
 	return nil
-}
-
-//hashFn is the hash function used to digest a message before mapping it to a point.
-var hashFn = sha3.New256
-
-// TODO: implement the Elligator algorithm for deterministic random-looking hashing to BN256 point. See https://eprint.iacr.org/2014/043.pdf
-func h0(msg []byte) (*bn256.G1, error) {
-	hashed, err := hash.PerformHash(hashFn(), msg)
-	if err != nil {
-		return nil, err
-	}
-	k := new(big.Int).SetBytes(hashed)
-	return newG1().ScalarBaseMult(k), nil
 }
 
 func encodeToText(data []byte) []byte {
