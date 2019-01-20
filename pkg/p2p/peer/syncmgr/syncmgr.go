@@ -123,7 +123,12 @@ func (s *Syncmgr) HeadersFirstMode(p *peermgr.Peer, msg *payload.MsgHeaders) err
 	if len(msg.Headers) == 2*1e3 { // Should be less than 2000, leave it as this for tests
 		log.WithField("prefix", "syncmgr").Debug("Switching to BlocksOnly Mode")
 		s.Mode = 2 // Switch to BlocksOnly. XXX: because HeadersFirst is not in parallel, no race condition here.
-		return s.RequestMoreBlocks()
+		for len(s.headers) > 0 {
+			if err := s.RequestMoreBlocks(); err != nil {
+				log.WithField("prefix", "syncmgr").Error("Failed to request blocks from peer in 'BlocksOnly' mode")
+				return err
+			}
+		}
 	}
 	latestHeader := msg.Headers[len(msg.Headers)-1]
 	_, err := s.pmgr.RequestHeaders(latestHeader.Hash)
@@ -165,6 +170,11 @@ func (s *Syncmgr) RequestAddresses() error {
 	return s.pmgr.RequestAddresses()
 }
 
+// OnInv receives 'inv' msgs from a peer.
+func (s *Syncmgr) OnInv(p *peermgr.Peer, msg *payload.MsgGetData) {
+	//TODO
+}
+
 // OnGetData receives 'getdata' msgs from a peer.
 // This could be a request for a specific Tx or Block and will be read from the chain db.
 // and send to the requesting peer.
@@ -178,29 +188,32 @@ func (s *Syncmgr) OnGetData(p *peermgr.Peer, msg *payload.MsgGetData) {
 			//tx.Hash = vector.Hash
 			//s.chain.GetTx()
 		case payload.InvBlock:
-			block, err := s.chain.GetBlockByHash(vector.Hash)
+			block, err := s.chain.GetBlock(vector.Hash)
 			if err == nil {
-				msg := payload.NewMsgBlock(block)
-				p.Write(msg)
+				blockMsg := payload.NewMsgBlock(block)
+				p.Write(blockMsg)
 			} else {
 				log.WithField("prefix", "syncmgr").Fatalf("Failed to read Block by hash %x", vector.Hash)
 			}
 		default:
-			log.WithField("prefix", "peer").Errorf("Unknown InvType in '%s' msg from %s", commands.Inv, p.RemoteAddr().String())
+			log.WithField("prefix", "syncmgr").Errorf("Unknown InvType in '%s' msg from %s", commands.Inv, p.RemoteAddr().String())
 		}
 	}
 }
 
-// OnBlock receives a block from a peer, then passes it to the blockchain to process.
-// For now we will only use this simple setup, to allow us to test the other parts of the system.
-// See Issue #24
-func (s *Syncmgr) OnBlock(p *peermgr.Peer, msg *payload.MsgBlock) {
+// OnGetBlocks receives 'getblocks' msg from a peer, then passes it to the blockchain to process.
+func (s *Syncmgr) OnGetBlocks(p *peermgr.Peer, msg *payload.MsgGetBlocks) {
+	log.WithField("prefix", "syncmgr").Debugf("Received a '%s' msg from %s", commands.GetBlocks, p.RemoteAddr().String())
 	//TODO
-	//err := s.chain.AcceptBlock() //AddBlock(msg)
-	//if err != nil {
-	//	// Put headers back in front of queue to fetch block for.
-	//	log.WithField("prefix", "syncmgr").Error("Block had an error", err)
-	//}
+}
+
+// OnBlock receives a 'block' msg from a peer, then passes it to the blockchain to process
+func (s *Syncmgr) OnBlock(p *peermgr.Peer, msg *payload.MsgBlock) {
+	err := s.chain.AcceptBlock(msg.Block)
+	if err != nil {
+		// Put headers back in front of queue to fetch block for.
+		log.WithField("prefix", "syncmgr").Error(err)
+	}
 }
 
 // OnGetAddr receives a getaddr msg from a peer, then passes it to the Address Manager to process.
@@ -222,4 +235,8 @@ func (s *Syncmgr) OnMemPool(p *peermgr.Peer, msg *payload.MsgMemPool) {
 	//	// Put headers back in front of queue to fetch block for.
 	//	fmt.Println("Block had an error", err)
 	//}
+}
+
+func (s *Syncmgr) OnReject(p *peermgr.Peer, msg *payload.MsgMemPool) {
+	// TODO
 }

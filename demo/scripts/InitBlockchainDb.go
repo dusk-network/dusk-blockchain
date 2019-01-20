@@ -9,6 +9,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -56,40 +57,55 @@ func createBlocks(env string, totBlocks int, txsPerBlock int) {
 		blocks = append(blocks, block)
 	}
 
-	// AddHeaders
+	// WriteHeaders
 	hdrs := make([]*payload.BlockHeader, len(blocks))
 	for i, block := range blocks {
 		hdrs[i] = block.Header
 	}
-	db.AddHeaders(hdrs)
-	db.AddBlockTransactions(blocks)
+	db.WriteHeaders(hdrs)
+	db.WriteBlockTransactions(blocks)
 }
 
 func createBlockFixture(height int, prevBlock []byte, txTotal int) (*payload.Block, error) {
 	time := time.Now().Unix()
 	// Spoof previous seed, txRoot and certImage
 	seed, _ := crypto.RandEntropy(32)
-	txRoot, _ := crypto.RandEntropy(32)
 	certImage, _ := crypto.RandEntropy(32)
-	h := &payload.BlockHeader{uint64(height), time, prevBlock, seed, txRoot, nil, certImage}
-	h.SetHash()
+	h := &payload.BlockHeader{Height: uint64(height), Timestamp: time, PrevBlock: prevBlock, Seed: seed, Hash: nil, CertImage: certImage}
 
 	// Create txTotal random Txs
 	txs := createRandomTxFixtures(txTotal)
+	b := &payload.Block{h, txs}
 
-	return &payload.Block{h, txs}, nil
+	// Create txRoot
+	if len(b.Txs) > 0 {
+		tree, _ := merkletree.NewTree(b.Txs)
+		b.Header.TxRoot = tree.MerkleRoot
+	} else {
+		b.Header.TxRoot = make([]byte, 32)
+	}
+	h.SetHash()
+
+	return b, nil
 }
 
 func createRandomTxFixtures(total int) []merkletree.Payload {
 	txs := make([]merkletree.Payload, total)
 
+	if len(txs) < 1 {
+		return txs
+	}
+
 	for i := 0; i < total; i++ {
 		keyImage, _ := crypto.RandEntropy(32)
 		txID, _ := crypto.RandEntropy(32)
 		sig, _ := crypto.RandEntropy(2000)
-		in := &transactions.Input{KeyImage: keyImage, TxID: txID, Index: 1, Signature: sig}
+		in := &transactions.Input{KeyImage: keyImage, TxID: txID, Index: uint8(i), Signature: sig}
 		dest, _ := crypto.RandEntropy(32)
-		out := transactions.NewOutput(200, dest, sig)
+
+		amount := rand.Intn(1000) + 1
+		out := transactions.NewOutput(uint64(amount), dest, sig)
+
 		txPubKey, _ := crypto.RandEntropy(32)
 		s := transactions.NewTX()
 		s.AddInput(in)

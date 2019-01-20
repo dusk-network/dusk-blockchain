@@ -262,8 +262,8 @@ func (c *Connmgr) OnConnection(conn net.Conn, addr string) {
 
 	// This is here just to quickly test the system
 	chain, _ := core.GetBcInstance()
-	latestHash, _ := chain.GetLatestHeaderHash()
-	err = p.RequestHeaders(latestHash)
+	latestHdr, _ := chain.GetLatestHeader()
+	err = p.RequestHeaders(latestHdr.Hash)
 	log.Info("For tests, we are only fetching first 2k batch")
 	if err != nil {
 		fmt.Println(err.Error())

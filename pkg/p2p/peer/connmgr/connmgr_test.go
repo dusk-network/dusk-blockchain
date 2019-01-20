@@ -13,8 +13,6 @@ import (
 	"testing"
 )
 
-const tmpUnitTestDir = "/.dusk/unittest"
-
 func init() {
 	log.SetOutput(ioutil.Discard)
 }

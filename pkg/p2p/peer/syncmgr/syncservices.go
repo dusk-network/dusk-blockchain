@@ -24,7 +24,7 @@ func getHeaders(chain core.Blockchain, msg *payload.MsgGetHeaders) (*payload.Msg
 //	locator := msg.Locator
 //	hashStop := msg.HashStop
 //
-//	headers, err := chain.GetHeaders(locator, hashStop)
+//	headers, err := chain.ReadHeaders(locator, hashStop)
 //	if err != nil {
 //		return nil, err
 //	}

@@ -16,14 +16,16 @@ type MsgVersion struct {
 	Timestamp   uint32
 	FromAddress *NetAddress
 	ToAddress   *NetAddress
+	Nonce       uint64
 }
 
 // NewMsgVersion returns a populated MsgVersion struct. The node's
 // I2P address should be passed as an argument.
-func NewMsgVersion(version uint32, from *NetAddress, to *NetAddress) *MsgVersion {
+func NewMsgVersion(version uint32, nonce uint64, from *NetAddress, to *NetAddress) *MsgVersion {
 	return &MsgVersion{
 		Version:     version,
 		Timestamp:   uint32(time.Now().Unix()),
+		Nonce:       nonce,
 		FromAddress: from,
 		ToAddress:   to,
 	}
@@ -37,6 +39,10 @@ func (m *MsgVersion) Encode(w io.Writer) error {
 	}
 
 	if err := encoding.WriteUint32(w, binary.LittleEndian, m.Timestamp); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64(w, binary.LittleEndian, uint64(m.Nonce)); err != nil {
 		return err
 	}
 
@@ -62,8 +68,13 @@ func (m *MsgVersion) Decode(r io.Reader) error {
 		return err
 	}
 
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &m.Nonce); err != nil {
+		return err
+	}
+
 	var from NetAddress
 	var to NetAddress
+
 	if err := from.Decode(r); err != nil {
 		return err
 	}

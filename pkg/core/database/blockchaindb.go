@@ -35,15 +35,14 @@ var (
 func NewBlockchainDB(path string) (*BlockchainDB, error) {
 	db, err := NewDatabase(path)
 	if err != nil {
-		log.WithField("prefix", "database").Debugf("Failed to find db path: %s", path)
 		return nil, err
 	}
 
 	return &BlockchainDB{db, path}, nil
 }
 
-// AddHeaders adds a batch of block headers to the database
-func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
+// WriteHeaders writes a batch of block headers to the database
+func (bdb *BlockchainDB) WriteHeaders(hdrs []*payload.BlockHeader) error {
 	sortedHdrs := util.SortHeadersByHeight(hdrs)
 
 	// batchValues will consist of a header and blockheight record for each header in hdrs, plus one for the latest header
@@ -75,22 +74,21 @@ func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
 	}
 
 	log.WithField("prefix", "database").
-		Infof("Adding block headers (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
-	//	Info("Adding block headers (start height=%d, end height=%d)", uint64(sortedHdrs[0].Height), uint64(sortedHdrs[len(sortedHdrs)-1].Height))
+		Infof("Writing block headers (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
 
 	return nil
 }
 
-// AddBlockTransactions add blocks to the database.
+// WriteBlockTransactions writes blocks to the database.
 // A block transaction is linked to the header by the header hash in the transaction key
-func (bdb *BlockchainDB) AddBlockTransactions(blocks []*payload.Block) error {
+func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*payload.Block) error {
 	// batchValues will consist of a tx and index record for each tx in a block
 	kv := make(batchValues, len(blocks)*2)
 
 	for _, b := range blocks {
 
 		for j, v := range b.Txs {
-			tx := v.(transactions.Stealth)
+			tx := v.(*transactions.Stealth)
 			buf := new(bytes.Buffer)
 			err := tx.Encode(buf)
 			if err != nil {
@@ -128,17 +126,19 @@ func (bdb *BlockchainDB) AddBlockTransactions(blocks []*payload.Block) error {
 func (bdb *BlockchainDB) ReadHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
 	var startHeight, stopHeight = uint64(0), uint64(0)
 
-	startHeight, err := getHeightByBlockHash(bdb, start)
+	hdr, err := bdb.getBlockHeader(start)
 	if err != nil {
 		return nil, err
 	}
 
+	startHeight = hdr.Height
 	if bytes.Equal(stop, make([]byte, 32)) { // Test if stop is a 32 byte hash of zeros
-		hash, err := getLatestBlockHash(bdb)
-		stopHeight, err = getHeightByBlockHash(bdb, hash)
+		hash, err := bdb.getLatestHeaderHash()
+		hdr, err = bdb.getBlockHeader(hash)
 		if err != nil {
 			return nil, err
 		}
+		stopHeight = hdr.Height
 	}
 
 	// Limit to 2000 when requested more
@@ -150,7 +150,7 @@ func (bdb *BlockchainDB) ReadHeaders(start []byte, stop []byte) ([]*payload.Bloc
 	log.WithField("prefix", "database").Debugf("Read headers from db with start height %d and stop height %d", startHeight, stopHeight)
 
 	// Retrieve all block headers from db
-	headerRange, err := getBlockHeaderRange(bdb, startHeight+1, stopHeight)
+	headerRange, err := bdb.getBlockHeaderRange(startHeight+1, stopHeight)
 	if err != nil {
 		return nil, err
 	}

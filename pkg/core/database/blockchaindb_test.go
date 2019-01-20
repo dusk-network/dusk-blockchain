@@ -27,15 +27,19 @@ func TestAddHeader(t *testing.T) {
 	blocks, _ := createBlockFixtures(1, 0)
 	header := blocks[0].Header
 
-	db.AddHeaders([]*payload.BlockHeader{header})
+	db.WriteHeaders([]*payload.BlockHeader{header})
 	assert.NotEqual(t, nil, db)
 
 	heightBytes := database.Uint64ToBytes(header.Height)
+	table := database.NewTable(db, append(database.BLOCKHEIGHT, heightBytes...))
 	heightKey := append(database.BLOCKHEIGHT, heightBytes...)
+
+	table = database.NewTable(db, database.HEADER)
 	dbHeaderHash, _ := db.Get(heightKey)
 
-	headerKey := append(database.HEADER, dbHeaderHash...)
-	dbHeaderBytes, _ := db.Get(headerKey)
+	table = database.NewTable(db, database.HEADER)
+	dbHeaderBytes, _ := table.Get(dbHeaderHash)
+
 	headerBytes, _ := header.Bytes()
 
 	dbLatestHdr, _ := db.Get(database.LATESTHEADER)
@@ -56,7 +60,7 @@ func TestAddHeaders(t *testing.T) {
 		hdrs[i] = block.Header
 	}
 
-	db.AddHeaders(hdrs)
+	db.WriteHeaders(hdrs)
 
 	assert.NotEqual(t, nil, db)
 
@@ -90,12 +94,12 @@ func TestAddBlockTransactions(t *testing.T) {
 		t.FailNow()
 	}
 
-	db.AddBlockTransactions(blocks)
+	db.WriteBlockTransactions(blocks)
 
 	// Run through the txs and assert them
 	for _, b := range blocks {
 		for i, v := range b.Txs {
-			tx := v.(transactions.Stealth)
+			tx := v.(*transactions.Stealth)
 			buf := new(bytes.Buffer)
 			tx.Encode(buf)
 			txBytes := buf.Bytes()
@@ -149,7 +153,7 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		s.AddOutput(out)
 		s.AddTxPubKey(txPubKey)
 		s.SetHash()
-		txs[i] = *s
+		txs[i] = s
 	}
 	return txs
 }
