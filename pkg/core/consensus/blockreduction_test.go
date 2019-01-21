@@ -39,7 +39,7 @@ func TestProcessMsgReduction(t *testing.T) {
 	}
 
 	// Process the message
-	retVotes, _, err := processMsgReduction(ctx, msg)
+	retVotes, err := processMsgReduction(ctx, msg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 // Convenience function to generate a vote for the reduction phase,
 // to emulate a received MsgReduction over the wire
 func newVoteReduction(seed []byte, weight, totalWeight, round uint64, prevHeader *payload.BlockHeader,
-	blockHash []byte) (int, *payload.MsgReduction, error) {
+	blockHash []byte) (uint64, *payload.MsgReduction, error) {
 	if weight < 100 {
 		return 0, nil, errors.New("weight too low, will result in no votes")
 	}

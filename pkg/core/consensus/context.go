@@ -43,13 +43,14 @@ type Context struct {
 	Q          uint64
 
 	// Provisioner values
-	weight    uint64 // Amount this node has staked
-	W         uint64 // Total stake weight of the network
-	Score     []byte // Sortition score of this node
-	votes     int    // Sortition votes of this node
-	VoteLimit uint64 // Votes needed to decide on a block
-	Empty     bool   // Whether or not the block being voted on is empty
-	BlockHash []byte // Block hash currently being voted on by this node
+	weight       uint64 // Amount this node has staked
+	W            uint64 // Total stake weight of the network
+	Score        []byte // Sortition score of this node
+	votes        uint64 // Sortition votes of this node
+	VoteLimit    uint64 // Votes needed to decide on a block
+	Empty        bool   // Whether or not the block being voted on is empty
+	BlockHash    []byte // Block hash currently being voted on by this node
+	SignatureSet []byte // Signature set for signature set reduction phase
 	// q          chan bool               // Channel used to halt BA phase in case of a decision from set agreement
 	// Committee  *Committee              // Provisioner committee
 	// Signatures []*payload.SignatureSet // Result of set agreement phase

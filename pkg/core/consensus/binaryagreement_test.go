@@ -34,7 +34,7 @@ func TestProcessMsgBinary(t *testing.T) {
 	}
 
 	// Process the message
-	retVotes, _, err := processMsgBinary(ctx, msg)
+	retVotes, err := processMsgBinary(ctx, msg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +393,7 @@ func TestCoinFlippedEmpty(t *testing.T) {
 // Convenience function to generate a vote for the binary agreement phase,
 // to emulate a received MsgBinary over the wire. This function emulates an empty block.
 func newVoteBinary(seed []byte, weight, totalWeight, round uint64, prevHeader *payload.BlockHeader,
-	blockHash []byte, empty bool) (int, *payload.MsgBinary, error) {
+	blockHash []byte, empty bool) (uint64, *payload.MsgBinary, error) {
 	if weight < 100 {
 		return 0, nil, errors.New("weight too low, will result in no votes")
 	}

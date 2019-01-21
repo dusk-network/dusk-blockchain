@@ -57,9 +57,11 @@ type Blockchain struct {
 	provisioner bool
 	provPubKey  []byte // Our public key used for provisioning
 
-	reductionChan chan *payload.MsgReduction
-	binaryChan    chan *payload.MsgBinary
-	candidateChan chan *payload.MsgScore
+	reductionChan  chan *payload.MsgReduction
+	binaryChan     chan *payload.MsgBinary
+	candidateChan  chan *payload.MsgScore
+	sigSetChan     chan *payload.MsgSignatureSet
+	sigSetVoteChan chan *payload.MsgSigSetVote
 
 	stakeWeight      uint64 // The amount of DUSK staked by the node
 	totalStakeWeight uint64 // The total amount of DUSK staked
@@ -130,8 +132,10 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain.net = net
 
 	// Consensus set-up
-	chain.reductionChan = make(chan *payload.MsgReduction, 100)
-	chain.binaryChan = make(chan *payload.MsgBinary, 100)
+	chain.reductionChan = make(chan *payload.MsgReduction, 200)
+	chain.binaryChan = make(chan *payload.MsgBinary, 200)
+	chain.sigSetChan = make(chan *payload.MsgSignatureSet, 200)
+	chain.sigSetVoteChan = make(chan *payload.MsgSigSetVote, 200)
 	chain.candidateChan = make(chan *payload.MsgScore, 1)
 	chain.quitChan = make(chan int, 1)
 	chain.roundChan = make(chan int, 1)
@@ -162,7 +166,6 @@ func (b *Blockchain) provisionerLoop() {
 
 			b.ctx.Reset()
 			timer := time.NewTimer(candidateTimer)
-			var candidate []byte
 			var finalHash []byte
 			select {
 			case <-timer.C:
@@ -185,8 +188,13 @@ func (b *Blockchain) provisionerLoop() {
 			}
 
 			if !b.ctx.Empty {
-				// Do set reduction
-				if bytes.Equal(finalHash, candidate) {
+				if err := consensus.SignatureSetReduction(b.ctx, b.sigSetChan, b.sigSetVoteChan); err != nil {
+					// Log
+					b.provisioner = false
+					return
+				}
+
+				if bytes.Equal(finalHash, b.ctx.BlockHash) {
 					// send final block with set of signatures
 					break
 				}

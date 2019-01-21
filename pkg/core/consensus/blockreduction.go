@@ -122,7 +122,7 @@ func committeeVoteReduction(ctx *Context) error {
 }
 
 func countVotesReduction(ctx *Context, c chan *payload.MsgReduction) error {
-	counts := make(map[string]int)
+	counts := make(map[string]uint64)
 	var voters [][]byte
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
@@ -135,8 +135,15 @@ func countVotesReduction(ctx *Context, c chan *payload.MsgReduction) error {
 			ctx.BlockHash = nil
 			return nil
 		case m := <-c:
+			// Check if this node's vote is already recorded
+			for _, voter := range voters {
+				if bytes.Equal(voter, m.PubKeyEd) {
+					break out
+				}
+			}
+
 			// Verify the message score and get back it's contents
-			votes, hash, err := processMsgReduction(ctx, m)
+			votes, err := processMsgReduction(ctx, m)
 			if err != nil {
 				return err
 			}
@@ -147,33 +154,25 @@ func countVotesReduction(ctx *Context, c chan *payload.MsgReduction) error {
 				break
 			}
 
-			// Check if this node's vote is already recorded
-			for _, voter := range voters {
-				if bytes.Equal(voter, m.PubKeyEd) {
-					break out
-				}
-			}
-
 			// Log new information
 			voters = append(voters, m.PubKeyEd)
-			hashStr := hex.EncodeToString(hash)
+			hashStr := hex.EncodeToString(m.BlockHash)
 			counts[hashStr] += votes
 
-			// If a block exceeds the vote threshold, we will return it's hash
-			// and end the loop.
-			if counts[hashStr] > int(ctx.VoteLimit) {
+			// If a block exceeds the vote threshold, we will end the loop.
+			if counts[hashStr] > ctx.VoteLimit {
 				timer.Stop()
-				ctx.BlockHash = hash
+				ctx.BlockHash = m.BlockHash
 				return nil
 			}
 		}
 	}
 }
 
-func processMsgReduction(ctx *Context, msg *payload.MsgReduction) (int, []byte, error) {
+func processMsgReduction(ctx *Context, msg *payload.MsgReduction) (uint64, error) {
 	// Verify message
 	if !verifySignaturesReduction(ctx, msg) {
-		return 0, nil, nil
+		return 0, nil
 	}
 
 	role := &role{
@@ -185,20 +184,23 @@ func processMsgReduction(ctx *Context, msg *payload.MsgReduction) (int, []byte, 
 	// Check if we're on the same chain
 	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
 		// Either an old message or a malformed message
-		return 0, nil, nil
+		return 0, nil
 	}
+
+	// Verify weight
+	// TODO: implement
 
 	// Make sure their score is valid, and calculate their amount of votes.
 	votes, err := verifySortition(ctx, msg.Score, msg.PubKeyBLS, role, msg.Stake)
 	if err != nil {
-		return 0, nil, err
+		return 0, err
 	}
 
 	if votes == 0 {
-		return 0, nil, nil
+		return 0, nil
 	}
 
-	return votes, msg.BlockHash, nil
+	return votes, nil
 }
 
 func verifySignaturesReduction(ctx *Context, msg *payload.MsgReduction) bool {

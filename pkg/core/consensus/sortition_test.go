@@ -109,8 +109,8 @@ func TestVerifySortition(t *testing.T) {
 }*/
 
 // Convenience function to run sortition a number of times
-func runMultipleSortitions(weight, totalWeight, round uint64, times int) ([]int, error) {
-	var voteArray []int
+func runMultipleSortitions(weight, totalWeight, round uint64, times int) ([]uint64, error) {
+	var voteArray []uint64
 	for i := 0; i < times; i++ {
 		// Use random seed each time
 		seed, _ := crypto.RandEntropy(32)
@@ -127,7 +127,7 @@ func runMultipleSortitions(weight, totalWeight, round uint64, times int) ([]int,
 }
 
 // Run sortition function with specified parameters and return context info
-func runSortition(weight, totalWeight, round uint64, seed []byte) (int, []byte, []byte, error) {
+func runSortition(weight, totalWeight, round uint64, seed []byte) (uint64, []byte, []byte, error) {
 	// Create dummy context
 	keys, _ := NewRandKeys()
 	ctx, err := NewProvisionerContext(totalWeight, round, seed, protocol.TestNet, keys)

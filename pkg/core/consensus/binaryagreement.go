@@ -101,14 +101,14 @@ func BinaryAgreement(ctx *Context, c chan *payload.MsgBinary) error {
 func commonCoin(ctx *Context, allMsgs []*payload.MsgBinary) (uint64, error) {
 	var lenHash, _ = new(big.Int).SetString("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0)
 	for i, vote := range allMsgs {
-		votes, h, err := processMsgBinary(ctx, vote)
+		votes, err := processMsgBinary(ctx, vote)
 		if err != nil {
 			return 0, err
 		}
 
-		for j := 1; j < votes; j++ {
-			binary.LittleEndian.PutUint32(h, uint32(i))
-			result, err := hash.Sha3256(h)
+		for j := uint64(1); j < votes; j++ {
+			binary.LittleEndian.PutUint32(vote.BlockHash, uint32(i))
+			result, err := hash.Sha3256(vote.BlockHash)
 			if err != nil {
 				return 0, err
 			}
@@ -177,7 +177,7 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
 }
 
 func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBinary, error) {
-	counts := make(map[string]int)
+	counts := make(map[string]uint64)
 	var voters [][]byte
 	var allMsgs []*payload.MsgBinary
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
@@ -191,8 +191,15 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 			ctx.BlockHash = nil
 			return allMsgs, nil
 		case m := <-c:
+			// Check if this node's vote is already recorded
+			for _, voter := range voters {
+				if bytes.Equal(voter, m.PubKeyEd) {
+					break out
+				}
+			}
+
 			// Verify the message score and get back it's contents
-			votes, hash, err := processMsgBinary(ctx, m)
+			votes, err := processMsgBinary(ctx, m)
 			if err != nil {
 				return nil, err
 			}
@@ -203,37 +210,29 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 				break
 			}
 
-			// Check if this node's vote is already recorded
-			for _, voter := range voters {
-				if bytes.Equal(voter, m.PubKeyEd) {
-					break out
-				}
-			}
-
 			// Log new information
 			voters = append(voters, m.PubKeyEd)
-			hashStr := hex.EncodeToString(hash)
+			hashStr := hex.EncodeToString(m.BlockHash)
 			counts[hashStr] += votes
 
 			// Save vote for common coin
 			allMsgs = append(allMsgs, m)
 
-			// If a block exceeds the vote threshold, we will return it's hash
-			// and end the loop.
-			if counts[hashStr] > int(ctx.VoteLimit) {
+			// If a block exceeds the vote threshold, we will end the loop.
+			if counts[hashStr] > ctx.VoteLimit {
 				timer.Stop()
 				ctx.Empty = m.Empty
-				ctx.BlockHash = hash
+				ctx.BlockHash = m.BlockHash
 				return allMsgs, nil
 			}
 		}
 	}
 }
 
-func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (int, []byte, error) {
+func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (uint64, error) {
 	// Verify message
 	if !verifySignaturesBinary(ctx, msg) {
-		return 0, nil, nil
+		return 0, nil
 	}
 
 	role := &role{
@@ -245,20 +244,23 @@ func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (int, []byte, error)
 	// Check if we're on the same chain
 	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
 		// Either an old message or a malformed message
-		return 0, nil, nil
+		return 0, nil
 	}
+
+	// Verify weight
+	// TODO: implement
 
 	// Make sure their score is valid, and calculate their amount of votes.
 	votes, err := verifySortition(ctx, msg.Score, msg.PubKeyBLS, role, msg.Stake)
 	if err != nil {
-		return 0, nil, err
+		return 0, err
 	}
 
 	if votes == 0 {
-		return 0, nil, nil
+		return 0, nil
 	}
 
-	return votes, msg.BlockHash, nil
+	return votes, nil
 }
 
 func verifySignaturesBinary(ctx *Context, msg *payload.MsgBinary) bool {
