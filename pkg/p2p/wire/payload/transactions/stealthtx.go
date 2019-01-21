@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"io"
 
@@ -12,13 +13,13 @@ import (
 
 // Stealth defines a stealth transaction.
 type Stealth struct {
-	Version uint8  // 1 byte
-	Type    TxType // 1 byte
-	R       []byte // 32 bytes
-	Inputs  []*Input
-	Outputs []*Output
-
-	Hash []byte // 32 bytes
+	Version  uint8  // 1 byte
+	Type     TxType // 1 byte
+	R        []byte // 32 bytes
+	Inputs   []*Input
+	Outputs  []*Output
+	LockTime uint64 // 8 bytes
+	Hash     []byte // 32 bytes
 }
 
 // NewTX will return a standard transaction
@@ -107,6 +108,10 @@ func (s *Stealth) EncodeHashable(w io.Writer) error {
 		}
 	}
 
+	if err := encoding.WriteUint64(w, binary.LittleEndian, s.LockTime); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -163,6 +168,10 @@ func (s *Stealth) Decode(r io.Reader) error {
 		if err := s.Outputs[i].Decode(r); err != nil {
 			return err
 		}
+	}
+
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &s.LockTime); err != nil {
+		return err
 	}
 
 	if err := encoding.Read256(r, &s.Hash); err != nil {

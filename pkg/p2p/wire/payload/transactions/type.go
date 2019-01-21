@@ -9,4 +9,7 @@ const (
 
 	// BidType is the identifier for a blind bid
 	BidType TxType = 0x01
+
+	// StakeType is the identifier for a stake
+	StakeType TxType = 0x02
 )
