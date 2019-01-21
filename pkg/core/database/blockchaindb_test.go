@@ -2,10 +2,11 @@ package database_test
 
 import (
 	"bytes"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 	"io/ioutil"
 	"testing"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -123,11 +124,22 @@ func createBlockFixtures(totalBlocks, totalTxs int) ([]*payload.Block, error) {
 	certImage, _ := crypto.RandEntropy(32)
 
 	for i := 0; i < totalBlocks; i++ {
-		h := &payload.BlockHeader{uint64(i), time, prevBlock, seed, txRoot, nil, certImage}
+		h := &payload.BlockHeader{
+			Height:    uint64(i),
+			Timestamp: time,
+			PrevBlock: prevBlock,
+			Seed:      seed,
+			TxRoot:    txRoot,
+			Hash:      nil,
+			CertImage: certImage,
+		}
 		h.SetHash()
 		// Create random Txs
 		txs := createRandomTxFixtures(totalTxs)
-		blocks[i] = &payload.Block{h, txs}
+		blocks[i] = &payload.Block{
+			Header: h,
+			Txs:    txs,
+		}
 	}
 
 	return blocks, nil
