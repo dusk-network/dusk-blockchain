@@ -5,12 +5,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	cnf "github.com/spf13/viper"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
@@ -23,7 +25,8 @@ var (
 	errBlockValidation   = errors.New("Block failed sanity check")
 	errBlockVerification = errors.New("Block failed to be consistent with the current blockchain")
 
-	candidateTimer = 20 * time.Second
+	candidateTimer = 60 * time.Second
+	maxLockTime    = math.MaxUint16
 )
 
 // Blockchain defines a processor for blocks and transactions which
@@ -44,16 +47,20 @@ type Blockchain struct {
 	lastHeader *payload.BlockHeader // Last validated block on the chain
 	quitChan   chan int             // Channel used to stop consensus loops
 	roundChan  chan int             // Channel used to signify start of a new round
+	ctx        *consensus.Context   // Consensus context object
 
 	// Block generator related fields
 	generator bool
 	bidWeight uint64
 
 	// Provisioner related fields
-	provisioner      bool
-	reductionChan    chan *payload.MsgReduction
-	binaryChan       chan *payload.MsgBinary
-	candidateChan    chan *payload.MsgScore
+	provisioner bool
+	provPubKey  []byte // Our public key used for provisioning
+
+	reductionChan chan *payload.MsgReduction
+	binaryChan    chan *payload.MsgBinary
+	candidateChan chan *payload.MsgScore
+
 	stakeWeight      uint64 // The amount of DUSK staked by the node
 	totalStakeWeight uint64 // The total amount of DUSK staked
 }
@@ -126,8 +133,8 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain.reductionChan = make(chan *payload.MsgReduction, 100)
 	chain.binaryChan = make(chan *payload.MsgBinary, 100)
 	chain.candidateChan = make(chan *payload.MsgScore, 1)
-	chain.quitChan = make(chan int)
-	chain.roundChan = make(chan int)
+	chain.quitChan = make(chan int, 1)
+	chain.roundChan = make(chan int, 1)
 	chain.lastHeader, err = chain.GetLatestHeader()
 	if err != nil {
 		return nil, err
@@ -140,55 +147,59 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	return chain, nil
 }
 
-//// Loop function for provisioner nodes
-//func (b *Blockchain) provisionerLoop() {
-//	b.provisioner = true
-//
-//	for {
-//		select {
-//		case <-b.quitChan:
-//			b.provisioner = false
-//			return
-//		case <-b.roundChan:
-//			// Should add a check here if we're staking, and if not
-//			// then create a staking transaction
-//
-//			timer := time.NewTimer(candidateTimer)
-//			var empty bool
-//			var retHash []byte
-//			var finalHash []byte
-//			var err error
-//			select {
-//			case <-timer.C:
-//				empty, retHash, err = b.blockReduction(nil)
-//			case m := <-b.candidateChan:
-//				timer.Stop()
-//				empty, retHash, err = b.blockReduction(m.CandidateHash)
-//			}
-//
-//			if err != nil {
-//				// Log
-//				b.provisioner = false
-//				return
-//			}
-//
-//			empty, finalHash, err = b.binaryAgreement(retHash, empty)
-//			if !empty {
-//				// Do set reduction
-//				if bytes.Compare(finalHash, retHash) == 0 {
-//					// send final block with set of signatures
-//					break
-//				}
-//
-//				// send tentative block with set of signatures
-//				break
-//			}
-//
-//			// send tentative block without set of signatures
-//			break
-//		}
-//	}
-//}
+// Loop function for provisioner nodes
+func (b *Blockchain) provisionerLoop() {
+	b.provisioner = true
+
+	for {
+		select {
+		case <-b.quitChan:
+			b.provisioner = false
+			return
+		case <-b.roundChan:
+			// Should add a check here if we're staking, and if not
+			// then create a staking transaction
+
+			b.ctx.Reset()
+			timer := time.NewTimer(candidateTimer)
+			var candidate []byte
+			var finalHash []byte
+			select {
+			case <-timer.C:
+				b.ctx.Empty = true
+			case m := <-b.candidateChan:
+				timer.Stop()
+				b.ctx.BlockHash = m.CandidateHash
+			}
+
+			if err := consensus.BlockReduction(b.ctx, b.reductionChan); err != nil {
+				// Log
+				b.provisioner = false
+				return
+			}
+
+			if err := consensus.BinaryAgreement(b.ctx, b.binaryChan); err != nil {
+				// Log
+				b.provisioner = false
+				return
+			}
+
+			if !b.ctx.Empty {
+				// Do set reduction
+				if bytes.Equal(finalHash, candidate) {
+					// send final block with set of signatures
+					break
+				}
+
+				// send tentative block with set of signatures
+				break
+			}
+
+			// send tentative block without set of signatures
+			break
+		}
+	}
+}
 
 // Placeholder at the moment, just to get structure down
 //func (b *Blockchain) generatorLoop() {
@@ -307,6 +318,18 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 		if b.memPool.Exists(tx.Hex()) {
 			b.memPool.RemoveTx(tx)
 		}
+
+		if b.provisioner {
+			// Update provisioners
+			if tx.Type == transactions.StakeType {
+				var amount uint64
+				for _, output := range tx.Outputs {
+					amount += output.Amount
+				}
+
+				b.totalStakeWeight += amount
+			}
+		}
 	}
 
 	// Add to database
@@ -323,12 +346,11 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	b.round = block.Header.Height + 1
 	b.currSeed = block.Header.Seed
 	b.lastHeader = block.Header
-	// Should update total stake weight/generator merkle tree here as well
 
-	// Set off consensus functions if participating
-	if b.provisioner || b.generator {
+	if b.provisioner {
 		b.roundChan <- 1
 	}
+	// Should update generator merkle tree here as well
 
 	// TODO: Relay
 	return nil
@@ -480,7 +502,18 @@ func (b *Blockchain) StartProvisioning() error {
 		return errors.New("already provisioning")
 	}
 
-	//go b.provisionerLoop()
+	keys, err := consensus.NewRandKeys()
+	if err != nil {
+		return err
+	}
+
+	ctx, err := consensus.NewProvisionerContext(b.totalStakeWeight, b.round, b.currSeed, b.net, keys)
+	if err != nil {
+		return err
+	}
+
+	b.ctx = ctx
+	go b.provisionerLoop()
 	return nil
 }
 
