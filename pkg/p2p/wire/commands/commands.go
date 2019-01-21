@@ -29,10 +29,12 @@ const (
 	Certificate    Cmd = "certificate"
 
 	// Consensus commands
-	Score     Cmd = "score"
-	Candidate Cmd = "candidate"
-	Reduction Cmd = "reduction"
-	Binary    Cmd = "binary"
+	Score        Cmd = "score"
+	Candidate    Cmd = "candidate"
+	Reduction    Cmd = "reduction"
+	Binary       Cmd = "binary"
+	SignatureSet Cmd = "signatureset"
+	SigSetVote   Cmd = "sigsetvote"
 
 	// Error commands
 	NotFound Cmd = "notfound"
