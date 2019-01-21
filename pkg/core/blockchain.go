@@ -5,7 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+<<<<<<< HEAD
 	"math"
+=======
+	log "github.com/sirupsen/logrus"
+>>>>>>> 7c061916bb7ed43cbbc1b0dd6d5d1a1bda7bcda2
 	"sort"
 	"time"
 
@@ -37,7 +41,6 @@ var (
 type Blockchain struct {
 	// Basic fields
 	memPool *MemPool
-	db      *database.BlockchainDB
 	net     protocol.Magic
 	height  uint64
 
@@ -67,14 +70,10 @@ type Blockchain struct {
 	totalStakeWeight uint64 // The total amount of DUSK staked
 }
 
-// NewBlockchain will return a new Blockchain instance with an initialized mempool.
+// NewBlockchain returns a new Blockchain instance with an initialized mempool.
 // This Blockchain instance should then be ready to process incoming transactions and blocks.
 func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
-	db, err := database.NewBlockchainDB(cnf.GetString("net.database.dirpath"))
-	if err != nil {
-		log.WithField("prefix", "blockchain").Error(err)
-		return nil, errNoBlockchainDb
-	}
+	db := database.GetInstance()
 
 	marker := []byte("HasBeenInitialisedAlready")
 	init, err := db.Has(marker)
@@ -104,7 +103,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 				return nil, err
 			}
 
-			err = db.AddHeaders([]*payload.BlockHeader{b.Header})
+			err = db.WriteHeaders([]*payload.BlockHeader{b.Header})
 			if err != nil {
 				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header")
 				db.Delete(marker)
@@ -126,6 +125,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain := &Blockchain{}
 
 	// Set up mempool and populate struct fields
+<<<<<<< HEAD
 	chain.memPool = &MemPool{}
 	chain.memPool.Init()
 	chain.db = db
@@ -140,6 +140,18 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain.quitChan = make(chan int, 1)
 	chain.roundChan = make(chan int, 1)
 	chain.lastHeader, err = chain.GetLatestHeader()
+=======
+	//chain.memPool.Init() //TODO: TV commented this line because of no memPool instance (yet)
+	chain.net = net
+
+	// Consensus set-up
+	chain.reductionChan = make(chan *payload.MsgReduction)
+	chain.binaryChan = make(chan *payload.MsgBinary)
+	chain.candidateChan = make(chan *payload.MsgScore)
+	chain.quitChan = make(chan int)
+	chain.roundChan = make(chan int)
+	chain.lastHeader, err = db.GetLatestHeader()
+>>>>>>> 7c061916bb7ed43cbbc1b0dd6d5d1a1bda7bcda2
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +292,8 @@ func (b *Blockchain) VerifyTx(tx *transactions.Stealth) error {
 // to the database.
 func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	// Check if we already have this in the database first
-	exists, err := b.db.Has(block.Header.Hash)
+	db := database.GetInstance()
+	exists, err := db.Has(block.Header.Hash)
 	if err != nil {
 		return err
 	}
@@ -290,29 +303,29 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Check if previous block hash is correct
-	prevHeaderHash, err := b.GetLatestHeaderHash()
+	hdr, err := db.GetBlockHeaderByHeight(block.Header.Height - 1)
 	if err != nil {
 		return err
 	}
-
+	prevHeaderHash := hdr.Hash
 	if bytes.Compare(block.Header.PrevBlock, prevHeaderHash) != 0 {
-		return errors.New("invalid block: previous block hash mismatch")
+		return errors.New("Invalid block: previous block hash mismatch")
 	}
 
 	// Get header from db
-	prevHeader, err := b.GetLatestHeader()
+	prevBlock, err := b.GetBlock(prevHeaderHash)
 	if err != nil {
 		return err
 	}
 
 	// Height check
-	if block.Header.Height != prevHeader.Height+1 {
-		return errors.New("invalid block: heightn incorrect")
+	if block.Header.Height != prevBlock.Header.Height+1 {
+		return errors.New("Invalid block: height incorrect")
 	}
 
 	// Timestamp check
-	if block.Header.Timestamp <= prevHeader.Timestamp {
-		return errors.New("invalid block: timestamp too far in the past")
+	if block.Header.Timestamp < prevBlock.Header.Timestamp {
+		return errors.New("Invalid block: timestamp too far in the past")
 	}
 
 	// Verify block
@@ -321,6 +334,7 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Clear out all matching entries in mempool
+<<<<<<< HEAD
 	for _, v := range block.Txs {
 		tx := v.(*transactions.Stealth)
 		if b.memPool.Exists(tx.Hex()) {
@@ -339,13 +353,21 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 			}
 		}
 	}
+=======
+	//for _, v := range block.Txs {
+	//	tx := v.(*transactions.Stealth)
+	//	if b.memPool.Exists(tx.Hex()) {
+	//		b.memPool.RemoveTx(tx)
+	//	}
+	//}
+>>>>>>> 7c061916bb7ed43cbbc1b0dd6d5d1a1bda7bcda2
 
 	// Add to database
-	if err := b.db.AddHeaders([]*payload.BlockHeader{block.Header}); err != nil {
-		return err
-	}
+	//if err := db.WriteHeaders([]*payload.BlockHeader{block.Header}); err != nil {
+	//	return err
+	//}
 
-	if err := b.db.AddBlockTransactions([]*payload.Block{block}); err != nil {
+	if err := db.WriteBlockTransactions([]*payload.Block{block}); err != nil {
 		return err
 	}
 
@@ -373,7 +395,7 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 	}
 
 	if bytes.Compare(hash, block.Header.Hash) != 0 {
-		return errors.New("invalid block: hash mismatch")
+		return errors.New("Invalid block: hash mismatch")
 	}
 
 	// Check all transactions
@@ -391,17 +413,49 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 	}
 
 	if bytes.Compare(root, block.Header.TxRoot) != 0 {
-		return errors.New("invalid block: merkle root mismatch")
+		return errors.New("Invalid block: merkle root mismatch")
 	}
 
 	return nil
 }
 
-//ValidateHeaders will validate headers that were received through the wire.
-// addHeaders is not safe for concurrent access
+// GetLatestHeader gives the latest block header
+func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
+	db := database.GetInstance()
+
+	return db.GetLatestHeader()
+}
+
+// GetHeaders gives block headers from the database, starting and
+// stopping at the provided locators.
+func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
+	db := database.GetInstance()
+
+	return db.ReadHeaders(start, stop)
+}
+
+// GetBlock will return the block from the received hash
+func (b *Blockchain) GetBlock(hash []byte) (*payload.Block, error) {
+	bd := database.GetInstance()
+
+	return bd.GetBlock(hash)
+}
+
+// AddHeaders will add block headers to the chain.
+func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
+	db := database.GetInstance()
+	if err := db.WriteHeaders(msg.Headers); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ValidateHeaders will validate headers that were received through the wire.
+// TODO: Centralize validation rules
 func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
-	table := database.NewTable(b.db, database.HEADER)
-	latestHash, err := b.db.Get(database.LATESTHEADER)
+	db := database.GetInstance()
+	table := database.NewTable(db, database.HEADER)
+	latestHash, err := db.Get(database.LATESTHEADER)
 	if err != nil {
 		return err
 	}
@@ -453,48 +507,6 @@ func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
 		latestHeader = currentHeader
 	}
 	return nil
-}
-
-// AddHeaders will add block headers to the database.
-func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
-	if err := b.db.AddHeaders(msg.Headers); err != nil {
-		return err
-	}
-	return nil
-}
-
-// GetHeaders will retrieve block headers from the database, starting and
-// stopping at the provided locators.
-func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
-	return b.db.ReadHeaders(start, stop)
-}
-
-// GetLatestHeaderHash gets the block hash of the most recent block.
-func (b *Blockchain) GetLatestHeaderHash() ([]byte, error) {
-	return b.db.Get(database.LATESTHEADER)
-}
-
-// GetLatestHeader will get the most recent block hash and return it as
-// a block header struct.
-func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
-	prevHeaderHash, err := b.GetLatestHeaderHash()
-	if err != nil {
-		return nil, err
-	}
-
-	prevHeaderKey := append(append(database.HEADER, prevHeaderHash...))
-	prevHeaderBytes, err := b.db.Get(prevHeaderKey)
-	if err != nil {
-		return nil, err
-	}
-
-	prevHeaderBuf := bytes.NewReader(prevHeaderBytes)
-	prevHeader := &payload.BlockHeader{}
-	if err := prevHeader.Decode(prevHeaderBuf); err != nil {
-		return nil, err
-	}
-
-	return prevHeader, nil
 }
 
 // StartProvisioning will set the node to provisioner status,

@@ -35,5 +35,5 @@ func (m *MsgBlock) Decode(r io.Reader) error {
 // Command returns the command string associated with the MsgBlock message.
 // Implements the Payload interface.
 func (m *MsgBlock) Command() commands.Cmd {
-	return commands.GetBlocks
+	return commands.Block
 }

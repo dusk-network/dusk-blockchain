@@ -29,7 +29,7 @@ type Connmgr struct {
 	PendingList   map[string]*Request
 	ConnectedList map[string]*Request
 	actionch      chan func()
-	conevtch      chan event.MonEventType
+	conevtch      chan event.ConditionalEvent
 }
 
 // New creates a new connection manager
@@ -38,7 +38,7 @@ func New() *Connmgr {
 		PendingList:   make(map[string]*Request),
 		ConnectedList: make(map[string]*Request),
 		actionch:      make(chan func(), 300),
-		conevtch:      make(chan event.MonEventType),
+		conevtch:      make(chan event.ConditionalEvent),
 	}
 	return cnnmgr
 }
@@ -51,7 +51,7 @@ func (c *Connmgr) NewRequest() {
 	addr, err := c.GetAddress()
 	// When newAddrs is empty an OutOfPeerAddr is triggered
 	if addr == nil || err != nil {
-		c.conevtch <- event.OutOfPeerAddr
+		c.conevtch <- event.GetEvent(event.OutOfPeerAddr)
 		return
 	}
 
@@ -262,8 +262,8 @@ func (c *Connmgr) OnConnection(conn net.Conn, addr string) {
 
 	// This is here just to quickly test the system
 	chain, _ := core.GetBcInstance()
-	latestHash, _ := chain.GetLatestHeaderHash()
-	err = p.RequestHeaders(latestHash)
+	latestHdr, _ := chain.GetLatestHeader()
+	err = p.RequestHeaders(latestHdr.Hash)
 	log.Info("For tests, we are only fetching first 2k batch")
 	if err != nil {
 		fmt.Println(err.Error())

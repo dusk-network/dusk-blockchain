@@ -127,7 +127,7 @@ func (d *Detector) addMessage(cmd commands.Cmd) []commands.Cmd {
 		// We now will expect a Headers Message
 		cmds = append(cmds, commands.Headers)
 	case commands.Addr, commands.GetAddr:
-		// We now will expect a Headers Message
+		// We now will expect a Addr Message
 		cmds = append(cmds, commands.Addr)
 	case commands.GetData:
 		// We will now expect a block/tx message

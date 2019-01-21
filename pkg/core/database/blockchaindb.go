@@ -26,7 +26,7 @@ var (
 	TX = []byte{0x03}
 	// UTXO is the prefix for a utxo key
 	UTXO = []byte{0x04}
-	// LATESTHEADER is the prefix for the latest header key
+	// LATESTHEADER is the prefix for the latest header key (for which there is a block)
 	LATESTHEADER           = []byte{0x05}
 	errAddBlockHeaderDbStr = "Failed to add block header to db."
 	errAddTransactionDbStr = "Failed to add transaction to db."
@@ -42,8 +42,8 @@ func NewBlockchainDB(path string) (*BlockchainDB, error) {
 	return &BlockchainDB{db, path}, nil
 }
 
-// AddHeaders adds a batch of block headers to the database
-func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
+// WriteHeaders writes a batch of block headers to the database
+func (bdb *BlockchainDB) WriteHeaders(hdrs []*payload.BlockHeader) error {
 	sortedHdrs := util.SortHeadersByHeight(hdrs)
 
 	// batchValues will consist of a header and blockheight record for each header in hdrs, plus one for the latest header
@@ -60,8 +60,8 @@ func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
 	// This is the secondary mapping
 	// Key: BLOCKHEIGHT + block height, Value: blockhash
 	for _, h := range sortedHdrs {
-		heightBytes := append(BLOCKHEIGHT, Uint64ToBytes(h.Height)...)
-		kv[string(heightBytes)] = h.Hash
+		heightKey := append(BLOCKHEIGHT, Uint64ToBytes(h.Height)...)
+		kv[string(heightKey)] = h.Hash
 	}
 
 	// This is the third mapping
@@ -75,22 +75,21 @@ func (bdb *BlockchainDB) AddHeaders(hdrs []*payload.BlockHeader) error {
 	}
 
 	log.WithField("prefix", "database").
-		Infof("Adding block headers (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
-	//	Info("Adding block headers (start height=%d, end height=%d)", uint64(sortedHdrs[0].Height), uint64(sortedHdrs[len(sortedHdrs)-1].Height))
+		Infof("Writing block headers (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
 
 	return nil
 }
 
-// AddBlockTransactions add blocks to the database.
+// WriteBlockTransactions writes blocks to the database.
 // A block transaction is linked to the header by the header hash in the transaction key
-func (bdb *BlockchainDB) AddBlockTransactions(blocks []*payload.Block) error {
+func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*payload.Block) error {
 	// batchValues will consist of a tx and index record for each tx in a block
 	kv := make(batchValues, len(blocks)*2)
 
 	for _, b := range blocks {
 
 		for j, v := range b.Txs {
-			tx := v.(transactions.Stealth)
+			tx := v.(*transactions.Stealth)
 			buf := new(bytes.Buffer)
 			err := tx.Encode(buf)
 			if err != nil {
@@ -106,10 +105,10 @@ func (bdb *BlockchainDB) AddBlockTransactions(blocks []*payload.Block) error {
 			// This is the index
 			// Key: [TX] + HEADER HASH + I <- i is the incrementer from the for loop
 			// Value: TXHASH
-			blockhashKey := append(append(TX, b.Header.Hash...))
-			blockhashKey = append(blockhashKey, Uint32ToBytes(uint32(j))...)
+			txHashKey := append(append(TX, b.Header.Hash...))
+			txHashKey = append(txHashKey, Uint32ToBytes(uint32(j))...)
 
-			kv[string(blockhashKey)] = tx.Hash
+			kv[string(txHashKey)] = tx.Hash
 		}
 	}
 
@@ -123,37 +122,39 @@ func (bdb *BlockchainDB) AddBlockTransactions(blocks []*payload.Block) error {
 }
 
 // ReadHeaders reads all block headers from the block chain db between start and stop hashes (start excluded, stop included)
+// Although we do not return the block transactions yet, we must assure that they are there.
+// If a header has no accompanying block, the reading is stopped and previously found headers are sent.
 func (bdb *BlockchainDB) ReadHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
 	var startHeight, stopHeight = uint64(0), uint64(0)
 
-	startHeight, err := getHeightByBlockHash(bdb, start)
+	hdr, err := bdb.getBlockHeader(start)
 	if err != nil {
 		return nil, err
 	}
-	//
-	if bytes.Equal(stop, []byte{}) {
-		hash, err := getLatestBlockHash(bdb)
-		stopHeight, err = getHeightByBlockHash(bdb, hash)
+
+	startHeight = hdr.Height
+	if bytes.Equal(stop, make([]byte, 32)) { // Test if stop is a 32 byte hash of zeros
+		hash, err := bdb.getLatestHeaderHash()
+		hdr, err = bdb.getBlockHeader(hash)
 		if err != nil {
 			return nil, err
 		}
+		stopHeight = hdr.Height
 	}
 
 	// Limit to 2000 when requested more
 	headersLen := stopHeight - startHeight
-	if headersLen > maxRetrievableHeaders {
+	if headersLen > uint64(maxRetrievableHeaders) {
 		headersLen = maxRetrievableHeaders
-		stopHeight = startHeight + 1 + 2000
+		stopHeight = startHeight + 2000
 	}
+	log.WithField("prefix", "database").Debugf("Read headers from db with start height %d and stop height %d", startHeight, stopHeight)
 
 	// Retrieve all block headers from db
-	headers := make([]*payload.BlockHeader, headersLen)
-	headerRange, err := getBlockHeaderRange(bdb, startHeight+1, stopHeight)
+	headerRange, err := bdb.getBlockHeaderRange(startHeight+1, stopHeight)
 	if err != nil {
 		return nil, err
 	}
-	// Add the retrieved range of block headers
-	headers = append(headers, headerRange...)
 
-	return headers, nil
+	return headerRange, nil
 }
