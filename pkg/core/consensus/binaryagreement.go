@@ -13,16 +13,14 @@ import (
 
 // BinaryAgreement is the main function that runs during the binary agreement
 // phase of the consensus.
-func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error {
+func BinaryAgreement(ctx *Context, c chan *payload.MsgBinary) error {
 	// Prepare empty block
 	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		return err
 	}
 
-	for ctx.step = 1; ctx.step < ctx.MaxSteps; ctx.step++ {
-		ctx.AdjustVarsAgreement()
-
+	for ctx.step = 1; ctx.step < maxSteps; ctx.step++ {
 		// Save our currently kept block hash
 		var startHash []byte
 		startHash = append(startHash, ctx.BlockHash...)
@@ -38,20 +36,16 @@ func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error 
 			return err
 		}
 
-		// Increase timer leniency
-		if ctx.step > 1 {
-			ctx.Lambda = ctx.Lambda * 2
-		}
-
 		// Coin-flipped-to-0 step
 		if ctx.BlockHash == nil {
 			ctx.BlockHash = startHash
 		}
 
-		if ctx.empty {
+		if ctx.Empty {
 			ctx.BlockHash = emptyBlock.Header.Hash
 		} else if ctx.step == 1 {
-			ctx.step = ctx.MaxSteps
+			ctx.step = maxSteps
+			// ctx.RaiseVoteLimit()
 			if _, err := committeeVoteBinary(ctx); err != nil {
 				return err
 			}
@@ -60,7 +54,6 @@ func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error 
 		}
 
 		ctx.step++
-		ctx.AdjustVarsAgreement()
 		if _, err := committeeVoteBinary(ctx); err != nil {
 			return err
 		}
@@ -70,15 +63,14 @@ func BinaryAgreement(ctx *Context, empty bool, c chan *payload.MsgBinary) error 
 		// Coin-flipped-to-1 step
 		if ctx.BlockHash == nil {
 			ctx.BlockHash = emptyBlock.Header.Hash
-			empty = true
+			ctx.Empty = true
 		}
 
-		if ctx.empty {
+		if ctx.Empty {
 			return nil
 		}
 
 		ctx.step++
-		ctx.AdjustVarsAgreement()
 		vote, err := committeeVoteBinary(ctx)
 		if err != nil {
 			return err
@@ -159,10 +151,7 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
 		edMsg = append(edMsg, sigBLS...)
 
 		// Sign with ed25519
-		sigEd, err := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
-		if err != nil {
-			return nil, err
-		}
+		sigEd := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
 
 		// Create binary message to gossip
 		blsPubBytes, err := ctx.Keys.BLSPubKey.MarshalBinary()
@@ -170,7 +159,7 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
 			return nil, err
 		}
 
-		msg, err := payload.NewMsgBinary(ctx.Score, ctx.empty, ctx.BlockHash, ctx.LastHeader.Hash, sigEd,
+		msg, err := payload.NewMsgBinary(ctx.Score, ctx.Empty, ctx.BlockHash, ctx.LastHeader.Hash, sigEd,
 			[]byte(*ctx.Keys.EdPubKey), sigBLS, blsPubBytes, ctx.W, ctx.Round, ctx.step)
 		if err != nil {
 			return nil, err
@@ -193,9 +182,10 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 	var allMsgs []*payload.MsgBinary
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
-	timer := time.NewTimer(ctx.Lambda)
+	timer := time.NewTimer(stepTime)
 
 	for {
+	out:
 		select {
 		case <-timer.C:
 			ctx.BlockHash = nil
@@ -215,8 +205,8 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 
 			// Check if this node's vote is already recorded
 			for _, voter := range voters {
-				if bytes.Compare(voter, m.PubKeyEd) == 0 {
-					break
+				if bytes.Equal(voter, m.PubKeyEd) {
+					break out
 				}
 			}
 
@@ -232,7 +222,7 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 			// and end the loop.
 			if counts[hashStr] > int(ctx.VoteLimit) {
 				timer.Stop()
-				ctx.empty = m.Empty
+				ctx.Empty = m.Empty
 				ctx.BlockHash = hash
 				return allMsgs, nil
 			}
@@ -253,7 +243,7 @@ func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (int, []byte, error)
 	}
 
 	// Check if we're on the same chain
-	if bytes.Compare(msg.PrevBlockHash, ctx.LastHeader.Hash) != 0 {
+	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
 		// Either an old message or a malformed message
 		return 0, nil, nil
 	}

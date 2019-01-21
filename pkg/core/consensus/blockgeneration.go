@@ -46,10 +46,7 @@ func GenerateBlock(ctx *Context, k []byte) (*payload.MsgScore, *payload.MsgBlock
 	buf = append(buf, candidateBlock.Header.Hash...)
 	buf = append(buf, ctx.LastHeader.Seed...)
 
-	sig, err := ctx.EDSign(ctx.Keys.EdSecretKey, buf)
-	if err != nil {
-		return nil, nil, err
-	}
+	sig := ctx.EDSign(ctx.Keys.EdSecretKey, buf)
 
 	// Create score msg
 	msgScore, err := payload.NewMsgScore(

@@ -31,7 +31,7 @@ func BlockReduction(ctx *Context, c chan *payload.MsgReduction) error {
 	// If no candidate block was found, then we use the empty block
 	if ctx.BlockHash == nil {
 		ctx.BlockHash = emptyBlock.Header.Hash
-		ctx.empty = true
+		ctx.Empty = true
 	}
 
 	// Vote on passed block
@@ -46,13 +46,12 @@ func BlockReduction(ctx *Context, c chan *payload.MsgReduction) error {
 
 	// Step 2
 	ctx.step++
-	ctx.AdjustVarsReduction()
 
 	// If retHash is nil, no clear winner was found within the time limit.
 	// So we will vote on an empty block instead.
 	if ctx.BlockHash == nil {
 		ctx.BlockHash = emptyBlock.Header.Hash
-		ctx.empty = true
+		ctx.Empty = true
 	}
 
 	if err := committeeVoteReduction(ctx); err != nil {
@@ -67,7 +66,7 @@ func BlockReduction(ctx *Context, c chan *payload.MsgReduction) error {
 	// So we will return an empty block instead.
 	if ctx.BlockHash == nil {
 		ctx.BlockHash = emptyBlock.Header.Hash
-		ctx.empty = true
+		ctx.Empty = true
 	}
 
 	return nil
@@ -100,10 +99,7 @@ func committeeVoteReduction(ctx *Context) error {
 		edMsg = append(edMsg, sigBLS...)
 
 		// Sign with ed25519
-		sigEd, err := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
-		if err != nil {
-			return err
-		}
+		sigEd := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
 
 		// Create reduction message to gossip
 		blsPubBytes, err := ctx.Keys.BLSPubKey.MarshalBinary()
@@ -130,9 +126,10 @@ func countVotesReduction(ctx *Context, c chan *payload.MsgReduction) error {
 	var voters [][]byte
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
-	timer := time.NewTimer(ctx.Lambda)
+	timer := time.NewTimer(stepTime)
 
 	for {
+	out:
 		select {
 		case <-timer.C:
 			ctx.BlockHash = nil
@@ -152,8 +149,8 @@ func countVotesReduction(ctx *Context, c chan *payload.MsgReduction) error {
 
 			// Check if this node's vote is already recorded
 			for _, voter := range voters {
-				if bytes.Compare(voter, m.PubKeyEd) == 0 {
-					break
+				if bytes.Equal(voter, m.PubKeyEd) {
+					break out
 				}
 			}
 
@@ -186,7 +183,7 @@ func processMsgReduction(ctx *Context, msg *payload.MsgReduction) (int, []byte, 
 	}
 
 	// Check if we're on the same chain
-	if bytes.Compare(msg.PrevBlockHash, ctx.LastHeader.Hash) != 0 {
+	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
 		// Either an old message or a malformed message
 		return 0, nil, nil
 	}

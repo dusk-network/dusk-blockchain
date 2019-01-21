@@ -122,7 +122,7 @@ func TestReductionVoteCountIndecisive(t *testing.T) {
 	}
 
 	// Adjust timer to reduce waiting times
-	ctx.Lambda = 1 * time.Second
+	stepTime = 1 * time.Second
 
 	// Let the timer run out
 	c := make(chan *payload.MsgReduction)
@@ -258,7 +258,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				weight := rand.Intn(10000)
+				weight := rand.Intn(1000)
 				weight += 100 // Avoid stakes being too low to participate
 				_, msg, err := newVoteReduction(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader, candidateBlock)
 				if err != nil {
@@ -325,10 +325,7 @@ func newVoteReduction(seed []byte, weight, totalWeight, round uint64, prevHeader
 		edMsg = append(edMsg, sigBLS...)
 
 		// Sign with ed25519
-		sigEd, err := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
-		if err != nil {
-			return 0, nil, err
-		}
+		sigEd := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
 
 		// Create reduction message to gossip
 		blsPubBytes, err := ctx.Keys.BLSPubKey.MarshalBinary()
