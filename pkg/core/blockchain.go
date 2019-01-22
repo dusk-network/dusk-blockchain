@@ -5,16 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
 	"math"
-=======
-	log "github.com/sirupsen/logrus"
->>>>>>> 7c061916bb7ed43cbbc1b0dd6d5d1a1bda7bcda2
 	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	cnf "github.com/spf13/viper"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -43,14 +38,16 @@ type Blockchain struct {
 	memPool *MemPool
 	net     protocol.Magic
 	height  uint64
+	db      *database.BlockchainDB
 
 	// Consensus related
-	currSeed   []byte               // Seed of the current round of consensus
-	round      uint64               // Current round (block height + 1)
-	lastHeader *payload.BlockHeader // Last validated block on the chain
-	quitChan   chan int             // Channel used to stop consensus loops
-	roundChan  chan int             // Channel used to signify start of a new round
-	ctx        *consensus.Context   // Consensus context object
+	currSeed      []byte                     // Seed of the current round of consensus
+	round         uint64                     // Current round (block height + 1)
+	lastHeader    *payload.BlockHeader       // Last validated block on the chain
+	quitChan      chan int                   // Channel used to stop consensus loops
+	roundChan     chan int                   // Channel used to signify start of a new round
+	ctx           *consensus.Context         // Consensus context object
+	consensusChan chan *payload.MsgConsensus // Channel for consensus messages
 
 	// Block generator related fields
 	generator bool
@@ -58,16 +55,10 @@ type Blockchain struct {
 
 	// Provisioner related fields
 	provisioner bool
-	provPubKey  []byte // Our public key used for provisioning
-
-	reductionChan  chan *payload.MsgReduction
-	binaryChan     chan *payload.MsgBinary
-	candidateChan  chan *payload.MsgScore
-	sigSetChan     chan *payload.MsgSignatureSet
-	sigSetVoteChan chan *payload.MsgSigSetVote
 
 	stakeWeight      uint64 // The amount of DUSK staked by the node
 	totalStakeWeight uint64 // The total amount of DUSK staked
+	provisioners     Provisioners
 }
 
 // NewBlockchain returns a new Blockchain instance with an initialized mempool.
@@ -125,33 +116,16 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain := &Blockchain{}
 
 	// Set up mempool and populate struct fields
-<<<<<<< HEAD
 	chain.memPool = &MemPool{}
 	chain.memPool.Init()
 	chain.db = db
 	chain.net = net
 
 	// Consensus set-up
-	chain.reductionChan = make(chan *payload.MsgReduction, 200)
-	chain.binaryChan = make(chan *payload.MsgBinary, 200)
-	chain.sigSetChan = make(chan *payload.MsgSignatureSet, 200)
-	chain.sigSetVoteChan = make(chan *payload.MsgSigSetVote, 200)
-	chain.candidateChan = make(chan *payload.MsgScore, 1)
+	chain.consensusChan = make(chan *payload.MsgConsensus, 500)
 	chain.quitChan = make(chan int, 1)
 	chain.roundChan = make(chan int, 1)
 	chain.lastHeader, err = chain.GetLatestHeader()
-=======
-	//chain.memPool.Init() //TODO: TV commented this line because of no memPool instance (yet)
-	chain.net = net
-
-	// Consensus set-up
-	chain.reductionChan = make(chan *payload.MsgReduction)
-	chain.binaryChan = make(chan *payload.MsgBinary)
-	chain.candidateChan = make(chan *payload.MsgScore)
-	chain.quitChan = make(chan int)
-	chain.roundChan = make(chan int)
-	chain.lastHeader, err = db.GetLatestHeader()
->>>>>>> 7c061916bb7ed43cbbc1b0dd6d5d1a1bda7bcda2
 	if err != nil {
 		return nil, err
 	}
@@ -182,25 +156,26 @@ func (b *Blockchain) provisionerLoop() {
 			select {
 			case <-timer.C:
 				b.ctx.Empty = true
-			case m := <-b.candidateChan:
+			case <-b.consensusChan:
+				// TODO: do checks, maybe put this into it's own function
 				timer.Stop()
-				b.ctx.BlockHash = m.CandidateHash
+				// b.ctx.BlockHash = m.CandidateHash
 			}
 
-			if err := consensus.BlockReduction(b.ctx, b.reductionChan); err != nil {
+			if err := consensus.BlockReduction(b.ctx); err != nil {
 				// Log
 				b.provisioner = false
 				return
 			}
 
-			if err := consensus.BinaryAgreement(b.ctx, b.binaryChan); err != nil {
+			if err := consensus.BinaryAgreement(b.ctx); err != nil {
 				// Log
 				b.provisioner = false
 				return
 			}
 
 			if !b.ctx.Empty {
-				if err := consensus.SignatureSetReduction(b.ctx, b.sigSetChan, b.sigSetVoteChan); err != nil {
+				if err := consensus.SignatureSetReduction(b.ctx); err != nil {
 					// Log
 					b.provisioner = false
 					return
@@ -334,7 +309,6 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Clear out all matching entries in mempool
-<<<<<<< HEAD
 	for _, v := range block.Txs {
 		tx := v.(*transactions.Stealth)
 		if b.memPool.Exists(tx.Hex()) {
@@ -349,18 +323,11 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 					amount += output.Amount
 				}
 
+				b.AddProvisionerInfo(tx, amount)
 				b.totalStakeWeight += amount
 			}
 		}
 	}
-=======
-	//for _, v := range block.Txs {
-	//	tx := v.(*transactions.Stealth)
-	//	if b.memPool.Exists(tx.Hex()) {
-	//		b.memPool.RemoveTx(tx)
-	//	}
-	//}
->>>>>>> 7c061916bb7ed43cbbc1b0dd6d5d1a1bda7bcda2
 
 	// Add to database
 	//if err := db.WriteHeaders([]*payload.BlockHeader{block.Header}); err != nil {
@@ -378,6 +345,7 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	b.lastHeader = block.Header
 
 	if b.provisioner {
+		b.UpdateProvisioners()
 		b.roundChan <- 1
 	}
 	// Should update generator merkle tree here as well
