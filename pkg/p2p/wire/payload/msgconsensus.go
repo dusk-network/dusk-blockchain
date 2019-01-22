@@ -1,7 +1,6 @@
 package payload
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -54,53 +53,36 @@ func NewMsgConsensus(version uint32, round uint64, prevBlockHash, sig, pk []byte
 	}, nil
 }
 
-// Signable returns the fields of MsgConsensus that were signed by the
-// sender as a byte slice for easy verification during consensus.
-func (m *MsgConsensus) Signable() ([]byte, error) {
-	w := new(bytes.Buffer)
+// EncodeSignable returns the fields of MsgConsensus that were signed by the
+// sender encoded to w for easy verification during consensus.
+func (m *MsgConsensus) EncodeSignable(w io.Writer) error {
 	if err := encoding.WriteUint32(w, binary.LittleEndian, m.Version); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := encoding.WriteUint64(w, binary.LittleEndian, m.Round); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := encoding.Write256(w, m.PrevBlockHash); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := encoding.WriteUint8(w, uint8(m.ID)); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := m.Payload.Encode(w); err != nil {
-		return nil, err
+		return err
 	}
 
-	return w.Bytes(), nil
+	return nil
 }
 
 // Encode a MsgConsensus to w
 // Implements Payload interface
 func (m *MsgConsensus) Encode(w io.Writer) error {
-	if err := encoding.WriteUint32(w, binary.LittleEndian, m.Version); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint64(w, binary.LittleEndian, m.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(w, m.PrevBlockHash); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(w, uint8(m.ID)); err != nil {
-		return err
-	}
-
-	if err := m.Payload.Encode(w); err != nil {
+	if err := m.EncodeSignable(w); err != nil {
 		return err
 	}
 
