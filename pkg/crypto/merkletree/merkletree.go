@@ -77,7 +77,7 @@ func NewTree(pl []Payload) (*Tree, error) {
 	}, nil
 }
 
-// Helper to map the Payload array recursively into a Hash tree with a root and a set of leaf nodes
+// create is the helper to map the Payload array recursively into a Hash tree with a root and a set of leaf nodes
 // returns an error if the Payload array is empty
 func create(pl []Payload) (*Node, []*Node, error) {
 	if len(pl) == 0 {
@@ -116,7 +116,7 @@ func create(pl []Payload) (*Node, []*Node, error) {
 	return root, leaves, nil
 }
 
-// Helper function that for a set of leafs nodes, recursively builds the intermediate and root level of a Tree. Returns the resulting root node
+// createIntermediate is the helper function that for a set of leafs nodes, recursively builds the intermediate and root level of a Tree. Returns the resulting root node
 func createIntermediate(nl []*Node) (*Node, error) {
 	var nodes []*Node
 	for i := 0; i < len(nl); i += 2 {
