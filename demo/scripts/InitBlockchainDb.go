@@ -3,18 +3,19 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 const (
@@ -36,7 +37,7 @@ func main() {
 
 func createBlocks(env string, totBlocks int, txsPerBlock int) {
 	var prevBlock = make([]byte, 32)
-	blocks := make([]*payload.Block, 0, totBlocks)
+	blocks := make([]*block.Block, 0, totBlocks)
 
 	marker := []byte("HasBeenInitialisedAlready")
 	path := config.UserHomeDir() + userHomeDuskDir + "/" + strings.ToLower(env) + "/db"
@@ -58,7 +59,7 @@ func createBlocks(env string, totBlocks int, txsPerBlock int) {
 	}
 
 	// WriteHeaders
-	hdrs := make([]*payload.BlockHeader, len(blocks))
+	hdrs := make([]*block.Header, len(blocks))
 	for i, block := range blocks {
 		hdrs[i] = block.Header
 	}
@@ -66,16 +67,16 @@ func createBlocks(env string, totBlocks int, txsPerBlock int) {
 	db.WriteBlockTransactions(blocks)
 }
 
-func createBlockFixture(height int, prevBlock []byte, txTotal int) (*payload.Block, error) {
+func createBlockFixture(height int, prevBlock []byte, txTotal int) (*block.Block, error) {
 	time := time.Now().Unix()
 	// Spoof previous seed, txRoot and certImage
 	seed, _ := crypto.RandEntropy(32)
 	certImage, _ := crypto.RandEntropy(32)
-	h := &payload.BlockHeader{Height: uint64(height), Timestamp: time, PrevBlock: prevBlock, Seed: seed, Hash: nil, CertImage: certImage}
+	h := &block.Header{Height: uint64(height), Timestamp: time, PrevBlock: prevBlock, Seed: seed, Hash: nil, CertImage: certImage}
 
 	// Create txTotal random Txs
 	txs := createRandomTxFixtures(txTotal)
-	b := &payload.Block{h, txs}
+	b := &block.Block{h, txs}
 
 	// Create txRoot
 	if len(b.Txs) > 0 {
@@ -118,7 +119,7 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 }
 
 func createGenesisHeader(t *testing.T) {
-	var b *payload.Block
+	var b *block.Block
 	b, _ = createBlockFixture(0, make([]byte, 32), 0)
 
 	layout := "2006-01-02T15:04:05.000Z"
