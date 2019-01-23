@@ -18,12 +18,8 @@ require (
 	github.com/syndtr/goleveldb v0.0.0-20181128100959-b001fa50d6b2
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
-<<<<<<< HEAD
 	golang.org/x/sys v0.0.0-20181221143128-b4a75ba826a6 // indirect
 	gonum.org/v1/gonum v0.0.0-20190110174637-6efdd52e2d5a
 	gonum.org/v1/netlib v0.0.0-20181224185128-3431cf544c75 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-=======
-	golang.org/x/sys v0.0.0-20181228144115-9a3f9b0469bb // indirect
->>>>>>> c07a7c46d074ac48c822539c9d2535615b8f8937
 )

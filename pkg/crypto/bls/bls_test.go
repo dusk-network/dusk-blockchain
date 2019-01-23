@@ -3,10 +3,7 @@ package bls
 import (
 	"bytes"
 	"crypto/rand"
-<<<<<<< HEAD
-=======
 	"fmt"
->>>>>>> c07a7c46d074ac48c822539c9d2535615b8f8937
 	"io"
 	"math/big"
 	"testing"
@@ -29,7 +26,6 @@ func TestSignVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	sig, err := UnsafeSign(priv, msg)
-<<<<<<< HEAD
 	require.NoError(t, err)
 	require.NoError(t, VerifyUnsafe(pub, msg, sig))
 
@@ -39,17 +35,6 @@ func TestSignVerify(t *testing.T) {
 	// Testing that using a random PK, the signature cannot be verified
 	pub2, _, err := GenKeyPair(rand.Reader)
 	require.NoError(t, err)
-=======
-	require.NoError(t, err)
-	require.NoError(t, VerifyUnsafe(pub, msg, sig))
-
-	// Testing that changing the message, the signature is no longer valid
-	require.NotNil(t, VerifyUnsafe(pub, randomMessage(), sig))
-
-	// Testing that using a random PK, the signature cannot be verified
-	pub2, _, err := GenKeyPair(rand.Reader)
-	require.NoError(t, err)
->>>>>>> c07a7c46d074ac48c822539c9d2535615b8f8937
 	require.NotNil(t, VerifyUnsafe(pub2, msg, sig))
 }
 
@@ -84,7 +69,6 @@ func TestCombine(t *testing.T) {
 	sig3 := UnsafeAggregate(sig1, sig2)
 	pkeys := []*PublicKey{pub1, pub2}
 	require.NoError(t, VerifyUnsafeBatch(pkeys, [][]byte{msg1, msg2}, sig3))
-<<<<<<< HEAD
 }
 
 func TestHashToPoint(t *testing.T) {
@@ -181,104 +165,6 @@ func TestApkVerification(t *testing.T) {
 	require.NoError(t, Verify(apk, msg, signature))
 }
 
-=======
-}
-
-func TestHashToPoint(t *testing.T) {
-	msg := []byte("test data")
-	g1, err := h0(msg)
-	assert.Equal(t, nil, err)
-	assert.NotEqual(t, nil, g1)
-}
-
-func randomInt(r io.Reader) *big.Int {
-	for {
-		k, _ := rand.Int(r, bn256.Order)
-		if k.Sign() > 0 {
-			return k
-		}
-	}
-}
-func TestRogueKey(t *testing.T) {
-	reader := rand.Reader
-	pub, _, err := GenKeyPair(reader)
-	require.NoError(t, err)
-	// α is the pseudo-secret key of the attacker
-	alpha := randomInt(reader)
-	// g₂ᵅ
-	g2Alpha := newG2().ScalarBaseMult(alpha)
-
-	// pk⁻¹
-	rogueGx := newG2()
-	rogueGx.Neg(pub.gx)
-
-	pRogue := newG2()
-	pRogue.Add(g2Alpha, rogueGx)
-
-	sk, pk := &SecretKey{alpha}, &PublicKey{pRogue}
-
-	msg := []byte("test data")
-	rogueSignature, err := UnsafeSign(sk, msg)
-	require.NoError(t, err)
-
-	require.NoError(t, verifyBatch([]*bn256.G2{pub.gx, pk.gx}, [][]byte{msg, msg}, rogueSignature.e, true))
-}
-
-func TestMarshalPk(t *testing.T) {
-	reader := rand.Reader
-	pub, _, err := GenKeyPair(reader)
-	require.NoError(t, err)
-
-	pkByteRepr := pub.Marshal()
-
-	g2 := newG2()
-	g2.Unmarshal(pkByteRepr)
-
-	g2ByteRepr := g2.Marshal()
-	require.Equal(t, pkByteRepr, g2ByteRepr)
-
-	pkInt := new(big.Int).SetBytes(pkByteRepr)
-	g2Int := new(big.Int).SetBytes(g2ByteRepr)
-	require.Equal(t, pkInt, g2Int)
-}
-
-func TestApkVerificationSingleKey(t *testing.T) {
-	reader := rand.Reader
-	msg := []byte("Get Funky Tonight")
-
-	pub1, priv1, err := GenKeyPair(reader)
-	require.NoError(t, err)
-
-	apk := NewApk(pub1)
-
-	signature, err := Sign(priv1, pub1, msg)
-	require.NoError(t, err)
-	require.NoError(t, Verify(apk, msg, signature))
-}
-
-func TestApkVerification(t *testing.T) {
-	reader := rand.Reader
-	msg := []byte("Get Funky Tonight")
-
-	pub1, priv1, err := GenKeyPair(reader)
-	require.NoError(t, err)
-
-	pub2, priv2, err := GenKeyPair(reader)
-	require.NoError(t, err)
-
-	apk := NewApk(pub1)
-	apk.Add(pub2)
-
-	signature, err := Sign(priv1, pub1, msg)
-	require.NoError(t, err)
-	sig2, err := Sign(priv2, pub2, msg)
-	require.NoError(t, err)
-
-	signature.Aggregate(sig2)
-	require.NoError(t, Verify(apk, msg, signature))
-}
-
->>>>>>> c07a7c46d074ac48c822539c9d2535615b8f8937
 func TestApkBatchVerification(t *testing.T) {
 	reader := rand.Reader
 	msg := []byte("Get Funky Tonight")
@@ -319,7 +205,6 @@ func TestApkBatchVerification(t *testing.T) {
 }
 
 func TestSafeCompress(t *testing.T) {
-<<<<<<< HEAD
 	msg := randomMessage()
 	pub, priv, err := GenKeyPair(rand.Reader)
 	require.NoError(t, err)
@@ -328,53 +213,6 @@ func TestSafeCompress(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, Verify(NewApk(pub), msg, sig))
 
-	sigb := sig.Compress()
-	sigTest := &Signature{e: newG1()}
-	require.NoError(t, sigTest.Decompress(sigb))
-
-	require.Equal(t, sig.Marshal(), sigTest.Marshal())
-}
-
-func TestUnsafeCompress(t *testing.T) {
-=======
->>>>>>> c07a7c46d074ac48c822539c9d2535615b8f8937
-	msg := randomMessage()
-	pub, priv, err := GenKeyPair(rand.Reader)
-	require.NoError(t, err)
-
-<<<<<<< HEAD
-	sig, err := UnsafeSign(priv, msg)
-	require.NoError(t, err)
-	require.NoError(t, VerifyUnsafe(pub, msg, sig))
-
-	sigb := sig.Compress()
-	sigTest := &UnsafeSignature{e: newG1()}
-	require.NoError(t, sigTest.Decompress(sigb))
-
-	require.Equal(t, sig.e.Marshal(), sigTest.e.Marshal())
-}
-
-func TestCompressNegativeY(t *testing.T) {
-	sigi, _ := new(big.Int).SetString("4182773077326556947337520923199448906869380994374425209427767883513621864194882999289032108531554108092911166882669083617738348444738725911430569647299733", 10)
-	sigbx := sigi.Bytes()
-	sig := newG1()
-	_, err := sig.Unmarshal(sigbx)
-
-=======
-	sig, err := Sign(priv, pub, msg)
->>>>>>> c07a7c46d074ac48c822539c9d2535615b8f8937
-	require.NoError(t, err)
-	require.NoError(t, Verify(NewApk(pub), msg, sig))
-
-<<<<<<< HEAD
-	// require.NoError(t, Verify(pub, msg, sig))
-
-	sigb := sig.Compress()
-	decompressedG, err := bn256.Decompress(sigb)
-	require.NoError(t, err)
-	decompressed := decompressedG.Marshal()
-	require.Equal(t, sigbx, decompressed)
-=======
 	sigb := sig.Compress()
 	sigTest := &Signature{e: newG1()}
 	require.NoError(t, sigTest.Decompress(sigb))
@@ -482,5 +320,4 @@ func BenchmarkCompressedUnsafeSignature(b *testing.B) {
 		signature.Decompress(sigb)
 		VerifyUnsafe(pk, msg, signature)
 	}
->>>>>>> c07a7c46d074ac48c822539c9d2535615b8f8937
 }
