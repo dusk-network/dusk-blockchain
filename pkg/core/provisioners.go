@@ -75,7 +75,7 @@ func (b *Blockchain) AddProvisionerInfo(tx *transactions.Stealth, amount uint64)
 	// Set information on context object
 	b.ctx.NodeWeights[pk] = b.provisioners[pk].TotalAmount
 	// TODO: Add bls public key
-	// b.ctx.NodeKeys[pk] = hex.EncodeToString(tx.BLS)
+	// b.ctx.NodeKeys[pk] = tx.BLS
 }
 
 // UpdateProvisioners will run through all known nodes and check if they have

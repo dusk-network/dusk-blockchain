@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
@@ -24,8 +24,7 @@ var (
 	errBlockValidation   = errors.New("Block failed sanity check")
 	errBlockVerification = errors.New("Block failed to be consistent with the current blockchain")
 
-	candidateTimer = 60 * time.Second
-	maxLockTime    = math.MaxUint16
+	maxLockTime = math.MaxUint16
 )
 
 // Blockchain defines a processor for blocks and transactions which
@@ -43,7 +42,7 @@ type Blockchain struct {
 	// Consensus related
 	currSeed      []byte                     // Seed of the current round of consensus
 	round         uint64                     // Current round (block height + 1)
-	lastHeader    *payload.BlockHeader       // Last validated block on the chain
+	lastHeader    *block.Header              // Last validated block on the chain
 	quitChan      chan int                   // Channel used to stop consensus loops
 	roundChan     chan int                   // Channel used to signify start of a new round
 	ctx           *consensus.Context         // Consensus context object
@@ -87,14 +86,14 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 			}
 
 			r := bytes.NewReader(genesisBlock)
-			b := payload.NewBlock()
+			b := block.NewBlock()
 			if err := b.Decode(r); err != nil {
 				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header to db")
 				db.Delete(marker)
 				return nil, err
 			}
 
-			err = db.WriteHeaders([]*payload.BlockHeader{b.Header})
+			err = db.WriteHeaders([]*block.Header{b.Header})
 			if err != nil {
 				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header")
 				db.Delete(marker)
@@ -151,15 +150,11 @@ func (b *Blockchain) provisionerLoop() {
 			// then create a staking transaction
 
 			b.ctx.Reset()
-			timer := time.NewTimer(candidateTimer)
 			var finalHash []byte
-			select {
-			case <-timer.C:
-				b.ctx.Empty = true
-			case <-b.consensusChan:
-				// TODO: do checks, maybe put this into it's own function
-				timer.Stop()
-				// b.ctx.BlockHash = m.CandidateHash
+			if err := consensus.BlockCollection(b.ctx); err != nil {
+				// Log
+				b.provisioner = false
+				return
 			}
 
 			if err := consensus.BlockReduction(b.ctx); err != nil {
@@ -265,10 +260,10 @@ func (b *Blockchain) VerifyTx(tx *transactions.Stealth) error {
 // AcceptBlock will attempt to verify a block once it is received from
 // the network. If the verification passes, the block will be added
 // to the database.
-func (b *Blockchain) AcceptBlock(block *payload.Block) error {
+func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 	// Check if we already have this in the database first
 	db := database.GetInstance()
-	exists, err := db.Has(block.Header.Hash)
+	exists, err := db.Has(blk.Header.Hash)
 	if err != nil {
 		return err
 	}
@@ -278,12 +273,12 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Check if previous block hash is correct
-	hdr, err := db.GetBlockHeaderByHeight(block.Header.Height - 1)
+	hdr, err := db.GetBlockHeaderByHeight(blk.Header.Height - 1)
 	if err != nil {
 		return err
 	}
 	prevHeaderHash := hdr.Hash
-	if bytes.Compare(block.Header.PrevBlock, prevHeaderHash) != 0 {
+	if bytes.Compare(blk.Header.PrevBlock, prevHeaderHash) != 0 {
 		return errors.New("Invalid block: previous block hash mismatch")
 	}
 
@@ -294,22 +289,22 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Height check
-	if block.Header.Height != prevBlock.Header.Height+1 {
+	if blk.Header.Height != prevBlock.Header.Height+1 {
 		return errors.New("Invalid block: height incorrect")
 	}
 
 	// Timestamp check
-	if block.Header.Timestamp < prevBlock.Header.Timestamp {
+	if blk.Header.Timestamp < prevBlock.Header.Timestamp {
 		return errors.New("Invalid block: timestamp too far in the past")
 	}
 
 	// Verify block
-	if err := b.VerifyBlock(block); err != nil {
+	if err := b.VerifyBlock(blk); err != nil {
 		return err
 	}
 
 	// Clear out all matching entries in mempool
-	for _, v := range block.Txs {
+	for _, v := range blk.Txs {
 		tx := v.(*transactions.Stealth)
 		if b.memPool.Exists(tx.Hex()) {
 			b.memPool.RemoveTx(tx)
@@ -330,19 +325,19 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Add to database
-	//if err := db.WriteHeaders([]*payload.BlockHeader{block.Header}); err != nil {
+	//if err := db.WriteHeaders([]*block.Header{block.Header}); err != nil {
 	//	return err
 	//}
 
-	if err := db.WriteBlockTransactions([]*payload.Block{block}); err != nil {
+	if err := db.WriteBlockTransactions([]*block.Block{blk}); err != nil {
 		return err
 	}
 
 	// Update variables
-	b.height = block.Header.Height
-	b.round = block.Header.Height + 1
-	b.currSeed = block.Header.Seed
-	b.lastHeader = block.Header
+	b.height = blk.Header.Height
+	b.round = blk.Header.Height + 1
+	b.currSeed = blk.Header.Seed
+	b.lastHeader = blk.Header
 
 	if b.provisioner {
 		b.UpdateProvisioners()
@@ -355,19 +350,19 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 }
 
 // VerifyBlock will perform sanity/consensus checks on a block.
-func (b *Blockchain) VerifyBlock(block *payload.Block) error {
+func (b *Blockchain) VerifyBlock(blk *block.Block) error {
 	// Check hash
-	hash := block.Header.Hash
-	if err := block.SetHash(); err != nil {
+	hash := blk.Header.Hash
+	if err := blk.SetHash(); err != nil {
 		return err
 	}
 
-	if bytes.Compare(hash, block.Header.Hash) != 0 {
+	if bytes.Compare(hash, blk.Header.Hash) != 0 {
 		return errors.New("Invalid block: hash mismatch")
 	}
 
 	// Check all transactions
-	for _, v := range block.Txs {
+	for _, v := range blk.Txs {
 		tx := v.(*transactions.Stealth)
 		if err := b.VerifyTx(tx); err != nil {
 			return err
@@ -375,12 +370,12 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 	}
 
 	// Check merkle root
-	root := block.Header.TxRoot
-	if err := block.SetRoot(); err != nil {
+	root := blk.Header.TxRoot
+	if err := blk.SetRoot(); err != nil {
 		return err
 	}
 
-	if bytes.Compare(root, block.Header.TxRoot) != 0 {
+	if bytes.Compare(root, blk.Header.TxRoot) != 0 {
 		return errors.New("Invalid block: merkle root mismatch")
 	}
 
@@ -388,7 +383,7 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 }
 
 // GetLatestHeader gives the latest block header
-func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
+func (b *Blockchain) GetLatestHeader() (*block.Header, error) {
 	db := database.GetInstance()
 
 	return db.GetLatestHeader()
@@ -396,14 +391,14 @@ func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
 
 // GetHeaders gives block headers from the database, starting and
 // stopping at the provided locators.
-func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
+func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*block.Header, error) {
 	db := database.GetInstance()
 
 	return db.ReadHeaders(start, stop)
 }
 
 // GetBlock will return the block from the received hash
-func (b *Blockchain) GetBlock(hash []byte) (*payload.Block, error) {
+func (b *Blockchain) GetBlock(hash []byte) (*block.Block, error) {
 	bd := database.GetInstance()
 
 	return bd.GetBlock(hash)
@@ -431,7 +426,7 @@ func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
 	key := latestHash
 	headerBytes, err := table.Get(key)
 
-	latestHeader := &payload.BlockHeader{}
+	latestHeader := &block.Header{}
 	err = latestHeader.Decode(bytes.NewReader(headerBytes))
 	if err != nil {
 		return err
