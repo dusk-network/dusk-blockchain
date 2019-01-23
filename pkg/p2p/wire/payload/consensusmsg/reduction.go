@@ -12,7 +12,7 @@ type Reduction struct {
 	Score     []byte // Sortition score of the sender
 	Step      uint8  // Current step
 	BlockHash []byte // Hash of the block being voted on (32 bytes)
-	SigBLS    []byte // BLS signature of the voted block hash
+	SigBLS    []byte // Compressed BLS signature of the voted block hash (33 bytes)
 	PubKeyBLS []byte // Sender BLS public key (32 bytes)
 }
 
@@ -20,7 +20,7 @@ type Reduction struct {
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
 func NewReduction(score []byte, step uint8, hash, sigBLS, pubKeyBLS []byte) (*Reduction, error) {
-	if len(score) != 32 {
+	if len(score) != 33 {
 		return nil, errors.New("wire: supplied score for reduction payload is improper length")
 	}
 
@@ -28,12 +28,8 @@ func NewReduction(score []byte, step uint8, hash, sigBLS, pubKeyBLS []byte) (*Re
 		return nil, errors.New("wire: supplied candidate hash for reduction payload is improper length")
 	}
 
-	if len(sigBLS) != 32 {
-		return nil, errors.New("wire: supplied BLS signature for reduction payload is improper length")
-	}
-
-	if len(pubKeyBLS) != 32 {
-		return nil, errors.New("wire: supplied BLS public key for reduction payload is improper length")
+	if len(sigBLS) != 33 {
+		return nil, errors.New("wire: supplied compressed BLS signature for reduction payload is improper length")
 	}
 
 	return &Reduction{
@@ -48,7 +44,7 @@ func NewReduction(score []byte, step uint8, hash, sigBLS, pubKeyBLS []byte) (*Re
 // Encode a Reduction struct and write to w.
 // Implements Msg interface.
 func (rd *Reduction) Encode(w io.Writer) error {
-	if err := encoding.Write256(w, rd.Score); err != nil {
+	if err := encoding.WriteBLS(w, rd.Score); err != nil {
 		return err
 	}
 
@@ -60,11 +56,11 @@ func (rd *Reduction) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, rd.SigBLS); err != nil {
+	if err := encoding.WriteBLS(w, rd.SigBLS); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(w, rd.PubKeyBLS); err != nil {
+	if err := encoding.WriteVarBytes(w, rd.PubKeyBLS); err != nil {
 		return err
 	}
 
@@ -74,7 +70,7 @@ func (rd *Reduction) Encode(w io.Writer) error {
 // Decode a Reduction from r.
 // Implements Msg interface.
 func (rd *Reduction) Decode(r io.Reader) error {
-	if err := encoding.Read256(r, &rd.Score); err != nil {
+	if err := encoding.ReadBLS(r, &rd.Score); err != nil {
 		return err
 	}
 
@@ -86,11 +82,11 @@ func (rd *Reduction) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &rd.SigBLS); err != nil {
+	if err := encoding.ReadBLS(r, &rd.SigBLS); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &rd.PubKeyBLS); err != nil {
+	if err := encoding.ReadVarBytes(r, &rd.PubKeyBLS); err != nil {
 		return err
 	}
 

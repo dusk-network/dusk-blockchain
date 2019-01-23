@@ -11,7 +11,7 @@ import (
 type SigSetVote struct {
 	Step         uint8  // Current step
 	SignatureSet []byte // Signature set voted on
-	SigBLS       []byte // BLS signature of the signature set
+	SigBLS       []byte // Compressed BLS signature of the signature set
 	PubKeyBLS    []byte // Sender BLS public key
 }
 
@@ -19,12 +19,8 @@ type SigSetVote struct {
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
 func NewSigSetVote(step uint8, sigSet, sigBLS, pubKeyBLS []byte) (*SigSetVote, error) {
-	if len(sigBLS) != 32 {
-		return nil, errors.New("wire: supplied BLS signature for signature set vote payload is improper length")
-	}
-
-	if len(pubKeyBLS) != 32 {
-		return nil, errors.New("wire: supplied BLS public key for signature set vote payload is improper length")
+	if len(sigBLS) != 33 {
+		return nil, errors.New("wire: supplied compressed BLS signature for signature set vote payload is improper length")
 	}
 
 	return &SigSetVote{
@@ -46,11 +42,11 @@ func (s *SigSetVote) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, s.SigBLS); err != nil {
+	if err := encoding.WriteBLS(w, s.SigBLS); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(w, s.PubKeyBLS); err != nil {
+	if err := encoding.WriteVarBytes(w, s.PubKeyBLS); err != nil {
 		return err
 	}
 
@@ -68,11 +64,11 @@ func (s *SigSetVote) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &s.SigBLS); err != nil {
+	if err := encoding.ReadBLS(r, &s.SigBLS); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &s.PubKeyBLS); err != nil {
+	if err := encoding.ReadVarBytes(r, &s.PubKeyBLS); err != nil {
 		return err
 	}
 

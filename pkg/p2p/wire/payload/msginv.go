@@ -6,6 +6,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
@@ -34,7 +35,7 @@ func (m *MsgInv) AddTx(tx *transactions.Stealth) {
 
 // AddBlock will add an InvVect with type InvBlock and the block
 // hash to MsgInv.Vectors.
-func (m *MsgInv) AddBlock(block *Block) {
+func (m *MsgInv) AddBlock(block *block.Block) {
 	vect := &InvVect{
 		Type: InvBlock,
 		Hash: block.Header.Hash,

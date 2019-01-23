@@ -13,15 +13,15 @@ type Agreement struct {
 	Empty     bool   // Whether or not this block is an empty block
 	Step      uint8  // Current step
 	BlockHash []byte // Hash of the block being voted on (32 bytes)
-	SigBLS    []byte // BLS signature of the voted block hash
-	PubKeyBLS []byte // Sender BLS public key (32 bytes)
+	SigBLS    []byte // Compressed BLS signature of the voted block hash (33 bytes)
+	PubKeyBLS []byte // Sender BLS public key
 }
 
 // NewAgreement returns an Agreement struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
 func NewAgreement(score []byte, empty bool, step uint8, hash, sigBLS, pubKeyBLS []byte) (*Agreement, error) {
-	if len(score) != 32 {
+	if len(score) != 33 {
 		return nil, errors.New("wire: supplied score for agreement payload is improper length")
 	}
 
@@ -29,12 +29,8 @@ func NewAgreement(score []byte, empty bool, step uint8, hash, sigBLS, pubKeyBLS 
 		return nil, errors.New("wire: supplied candidate hash for agreement payload is improper length")
 	}
 
-	if len(sigBLS) != 32 {
-		return nil, errors.New("wire: supplied BLS signature for agreement payload is improper length")
-	}
-
-	if len(pubKeyBLS) != 32 {
-		return nil, errors.New("wire: supplied BLS public key for agreement payload is improper length")
+	if len(sigBLS) != 33 {
+		return nil, errors.New("wire: supplied compressed BLS signature for agreement payload is improper length")
 	}
 
 	return &Agreement{
@@ -50,7 +46,7 @@ func NewAgreement(score []byte, empty bool, step uint8, hash, sigBLS, pubKeyBLS 
 // Encode an Agreement struct and write to w.
 // Implements Msg interface.
 func (a *Agreement) Encode(w io.Writer) error {
-	if err := encoding.Write256(w, a.Score); err != nil {
+	if err := encoding.WriteBLS(w, a.Score); err != nil {
 		return err
 	}
 
@@ -66,11 +62,11 @@ func (a *Agreement) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, a.SigBLS); err != nil {
+	if err := encoding.WriteBLS(w, a.SigBLS); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(w, a.PubKeyBLS); err != nil {
+	if err := encoding.WriteVarBytes(w, a.PubKeyBLS); err != nil {
 		return err
 	}
 
@@ -81,7 +77,7 @@ func (a *Agreement) Encode(w io.Writer) error {
 // Implements Msg interface.
 func (a *Agreement) Decode(r io.Reader) error {
 
-	if err := encoding.Read256(r, &a.Score); err != nil {
+	if err := encoding.ReadBLS(r, &a.Score); err != nil {
 		return err
 	}
 
@@ -97,11 +93,11 @@ func (a *Agreement) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &a.SigBLS); err != nil {
+	if err := encoding.ReadBLS(r, &a.SigBLS); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &a.PubKeyBLS); err != nil {
+	if err := encoding.ReadVarBytes(r, &a.PubKeyBLS); err != nil {
 		return err
 	}
 

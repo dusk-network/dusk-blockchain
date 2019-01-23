@@ -1,4 +1,4 @@
-package payload
+package payload_test
 
 import (
 	"bytes"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
@@ -27,7 +29,7 @@ func TestMsgInvEncodeDecodeTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg := NewMsgInv()
+	msg := payload.NewMsgInv()
 	msg.AddTx(s)
 
 	// TODO: test AddBlock function when block structure is decided
@@ -36,7 +38,7 @@ func TestMsgInvEncodeDecodeTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg2 := NewMsgInv()
+	msg2 := payload.NewMsgInv()
 	if err := msg2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +47,7 @@ func TestMsgInvEncodeDecodeTx(t *testing.T) {
 }
 
 func TestMsgInvEncodeDecodeBlock(t *testing.T) {
-	block := NewBlock()
+	b := block.NewBlock()
 
 	// Add 10 transactions
 	for i := 0; i < 10; i++ {
@@ -65,13 +67,13 @@ func TestMsgInvEncodeDecodeBlock(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		block.AddTx(s)
+		b.AddTx(s)
 	}
 
 	// Spoof previous hash and seed
 	h, _ := crypto.RandEntropy(32)
-	block.Header.PrevBlock = h
-	block.Header.Seed = h
+	b.Header.PrevBlock = h
+	b.Header.Seed = h
 
 	// Add cert image
 	rand1, _ := crypto.RandEntropy(32)
@@ -79,9 +81,9 @@ func TestMsgInvEncodeDecodeBlock(t *testing.T) {
 
 	sig, _ := crypto.RandEntropy(32)
 
-	cert := NewCertificate(sig)
+	cert := block.NewCertificate(sig)
 	for i := 1; i < 4; i++ {
-		step := NewStep(uint32(i))
+		step := block.NewStep(uint32(i))
 		step.AddData(rand1, rand2)
 		cert.AddStep(step)
 	}
@@ -90,29 +92,29 @@ func TestMsgInvEncodeDecodeBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := block.AddCertImage(cert); err != nil {
+	if err := b.AddCertImage(cert); err != nil {
 		t.Fatal(err)
 	}
 
 	// Finish off
-	if err := block.SetRoot(); err != nil {
+	if err := b.SetRoot(); err != nil {
 		t.Fatal(err)
 	}
 
-	block.SetTime(time.Now().Unix())
-	if err := block.SetHash(); err != nil {
+	b.SetTime(time.Now().Unix())
+	if err := b.SetHash(); err != nil {
 		t.Fatal(err)
 	}
 
-	msg := NewMsgInv()
-	msg.AddBlock(block)
+	msg := payload.NewMsgInv()
+	msg.AddBlock(b)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2 := NewMsgInv()
+	msg2 := payload.NewMsgInv()
 	if err := msg2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}

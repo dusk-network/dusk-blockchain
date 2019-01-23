@@ -1,4 +1,4 @@
-package payload
+package payload_test
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
@@ -26,14 +27,14 @@ func TestMsgTxEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg := NewMsgTx(s)
+	msg := payload.NewMsgTx(s)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2 := &MsgTx{}
+	msg2 := &payload.MsgTx{}
 	if err := msg2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}

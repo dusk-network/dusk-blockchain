@@ -1,9 +1,14 @@
 package consensusmsg
 
-import "io"
+import (
+	"io"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+)
 
 // Candidate defines a candidate score consensus payload on the Dusk wire protocol.
 type Candidate struct {
+	Block *block.Block
 }
 
 // Encode a Candidate struct to w
