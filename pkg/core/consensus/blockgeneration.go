@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -14,7 +16,7 @@ import (
 
 // GenerateBlock will generate a blockMsg and ScoreMsg
 // if node is eligible.
-func GenerateBlock(ctx *Context, k []byte) (*payload.MsgScore, *payload.MsgBlock, error) {
+func GenerateBlock(ctx *Context, k []byte) (*payload.MsgConsensus, *payload.MsgConsensus, error) {
 
 	err := generateParams(ctx)
 	if err != nil {
@@ -39,29 +41,32 @@ func GenerateBlock(ctx *Context, k []byte) (*payload.MsgScore, *payload.MsgBlock
 		return nil, nil, err
 	}
 
-	// Sign msg score content with Ed25519
-	buf := make([]byte, 0, 40)
-	binary.LittleEndian.PutUint64(buf, ctx.Q)
-	buf = append(buf, zkBytes...)
-	buf = append(buf, candidateBlock.Header.Hash...)
-	buf = append(buf, ctx.LastHeader.Seed...)
-
-	sig := ctx.EDSign(ctx.Keys.EdSecretKey, buf)
-
 	// Create score msg
-	msgScore, err := payload.NewMsgScore(
+	pl, err := consensusmsg.NewCandidateScore(
 		ctx.Q,                      // score
 		zkBytes,                    // zkproof
 		candidateBlock.Header.Hash, // candidateHash
-		sig,                        // sig
-		[]byte(*ctx.Keys.EdPubKey), // pubKey
 		ctx.Seed,                   // seed for this round // XXX(TOG): could we use round number/Block height?
 	)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	// Create block msg
-	msgBlock := payload.NewMsgBlock(candidateBlock)
+	sigEd, err := createSignature(ctx, pl)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return msgScore, msgBlock, nil
+	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create candidate msg - Implement when candidate code is done
+	// msgCandidate := payload.NewMsgBlock(candidateBlock)
+
+	return msgScore, nil, nil
 }
 
 // generate M, X, Y, Z, Q

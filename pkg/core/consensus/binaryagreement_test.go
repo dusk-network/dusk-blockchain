@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"math/rand"
 	"sync"
@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-func TestProcessMsgBinary(t *testing.T) {
+func TestProcessMsgAgreement(t *testing.T) {
 	// Create context
 	ctx, err := provisionerContext()
 	if err != nil {
@@ -27,16 +27,20 @@ func TestProcessMsgBinary(t *testing.T) {
 	}
 
 	// Create a binary agreement phase voting message and get their amount of votes
-	votes, msg, err := newVoteBinary(ctx.Seed, 500, ctx.W, ctx.Round, ctx.LastHeader,
-		emptyBlock.Header.Hash, true)
+	votes, msg, err := newVoteAgreement(ctx, 500, emptyBlock.Header.Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Process the message
-	retVotes, err := processMsgBinary(ctx, msg)
+	valid, retVotes, err := processMsg(ctx, msg)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Should be valid
+	if !valid {
+		t.Fatal("message was not valid")
 	}
 
 	// Votes should be equal
@@ -56,13 +60,12 @@ func TestCommonCoin(t *testing.T) {
 	}
 
 	// Create random amount of MsgBinary
-	var msgs []*payload.MsgBinary
+	var msgs []*payload.MsgConsensus
 	n := rand.Intn(20)
 	for i := 0; i < n; i++ {
 		weight := rand.Intn(2000)
 		weight += 100 // Avoid getting stakes that are too low
-		_, msg, err := newVoteBinary(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader,
-			emptyBlock.Header.Hash, true)
+		_, msg, err := newVoteAgreement(ctx, uint64(weight), emptyBlock.Header.Hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -104,25 +107,23 @@ func TestBinaryVoteCountDecisive(t *testing.T) {
 	}
 
 	// Set up voting phase
-	c := make(chan *payload.MsgBinary)
 	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, msg, err := newVoteBinary(ctx.Seed, 400, ctx.W, ctx.Round, ctx.LastHeader,
-		emptyBlock.Header.Hash, true)
+	_, msg, err := newVoteAgreement(ctx, 400, emptyBlock.Header.Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Start listening for votes
-	var msgs []*payload.MsgBinary
+	var msgs []*payload.MsgConsensus
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		var err error
-		msgs, err = countVotesBinary(ctx, c)
+		msgs, err = countVotesBinary(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +132,7 @@ func TestBinaryVoteCountDecisive(t *testing.T) {
 	}()
 
 	// Send the vote out, and block until the counting function returns
-	c <- msg
+	ctx.msgs <- msg
 	wg.Wait()
 
 	// BlockHash should not be nil after receiving vote
@@ -166,8 +167,7 @@ func TestBinaryVoteCountIndecisive(t *testing.T) {
 	stepTime = 1 * time.Second
 
 	// Let the timer run out
-	c := make(chan *payload.MsgBinary)
-	msgs, err := countVotesBinary(ctx, c)
+	msgs, err := countVotesBinary(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,6 @@ func TestBinaryAgreementDecisive(t *testing.T) {
 	ctx.BlockHash = candidateBlock
 
 	// This should conclude the binary agreement phase fairly quick
-	c := make(chan *payload.MsgBinary)
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
@@ -207,18 +206,17 @@ func TestBinaryAgreementDecisive(t *testing.T) {
 			case <-ticker.C:
 				weight := rand.Intn(10000)
 				weight += 100 // Avoid stakes being too low to participate
-				_, msg, err := newVoteBinary(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader,
-					ctx.BlockHash, ctx.Empty)
+				_, msg, err := newVoteAgreement(ctx, uint64(weight), candidateBlock)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				c <- msg
+				ctx.msgs <- msg
 			}
 		}
 	}()
 
-	if err := BinaryAgreement(ctx, c); err != nil {
+	if err := BinaryAgreement(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -245,7 +243,6 @@ func TestBinaryAgreementOtherBlock(t *testing.T) {
 	otherBlock, _ := crypto.RandEntropy(32)
 
 	// This should conclude the binary agreement phase fairly quick
-	c := make(chan *payload.MsgBinary)
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
@@ -257,18 +254,17 @@ func TestBinaryAgreementOtherBlock(t *testing.T) {
 			case <-ticker.C:
 				weight := rand.Intn(10000)
 				weight += 100 // Avoid stakes being too low to participate
-				_, msg, err := newVoteBinary(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader,
-					otherBlock, ctx.Empty)
+				_, msg, err := newVoteAgreement(ctx, uint64(weight), otherBlock)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				c <- msg
+				ctx.msgs <- msg
 			}
 		}
 	}()
 
-	if err := BinaryAgreement(ctx, c); err != nil {
+	if err := BinaryAgreement(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -296,7 +292,6 @@ func TestCoinFlippedNonEmpty(t *testing.T) {
 	stepTime = 5 * time.Second
 
 	// This should time out the binary agreement voting phase
-	c := make(chan *payload.MsgBinary)
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(5 * time.Second)
 	go func() {
@@ -308,18 +303,17 @@ func TestCoinFlippedNonEmpty(t *testing.T) {
 			case <-ticker.C:
 				weight := rand.Intn(1000)
 				weight += 100 // Avoid stakes being too low to participate
-				_, msg, err := newVoteBinary(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader,
-					ctx.BlockHash, ctx.Empty)
+				_, msg, err := newVoteAgreement(ctx, uint64(weight), candidateBlock)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				c <- msg
+				ctx.msgs <- msg
 			}
 		}
 	}()
 
-	if err := BinaryAgreement(ctx, c); err != nil {
+	if err := BinaryAgreement(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -351,7 +345,6 @@ func TestCoinFlippedEmpty(t *testing.T) {
 	stepTime = 5 * time.Second
 
 	// This should time out the binary agreement voting phase
-	c := make(chan *payload.MsgBinary)
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(5 * time.Second)
 	go func() {
@@ -363,18 +356,17 @@ func TestCoinFlippedEmpty(t *testing.T) {
 			case <-ticker.C:
 				weight := rand.Intn(1000)
 				weight += 100 // Avoid stakes being too low to participate
-				_, msg, err := newVoteBinary(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader,
-					ctx.BlockHash, ctx.Empty)
+				_, msg, err := newVoteAgreement(ctx, uint64(weight), candidateBlock)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				c <- msg
+				ctx.msgs <- msg
 			}
 		}
 	}()
 
-	if err := BinaryAgreement(ctx, c); err != nil {
+	if err := BinaryAgreement(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -392,23 +384,22 @@ func TestCoinFlippedEmpty(t *testing.T) {
 
 // Convenience function to generate a vote for the binary agreement phase,
 // to emulate a received MsgBinary over the wire. This function emulates an empty block.
-func newVoteBinary(seed []byte, weight, totalWeight, round uint64, prevHeader *payload.BlockHeader,
-	blockHash []byte, empty bool) (uint64, *payload.MsgBinary, error) {
+func newVoteAgreement(c *Context, weight uint64, blockHash []byte) (uint64, *payload.MsgConsensus, error) {
 	if weight < 100 {
 		return 0, nil, errors.New("weight too low, will result in no votes")
 	}
 
 	// Create context
 	keys, _ := NewRandKeys()
-	ctx, err := NewProvisionerContext(totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := NewProvisionerContext(c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
 		return 0, nil, err
 	}
 
+	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
 	ctx.weight = weight
-	ctx.LastHeader = prevHeader
+	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
-	ctx.Empty = empty
 
 	role := &role{
 		part:  "committee",
@@ -422,30 +413,26 @@ func newVoteBinary(seed []byte, weight, totalWeight, round uint64, prevHeader *p
 
 	if ctx.votes > 0 {
 		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.BlockHash)
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, blockHash)
 		if err != nil {
 			return 0, nil, err
 		}
 
-		// Create message to sign with ed25519
-		var edMsg []byte
-		edMsg = append(edMsg, ctx.Score...)
-		binary.LittleEndian.PutUint64(edMsg, ctx.Round)
-		edMsg = append(edMsg, byte(ctx.step))
-		edMsg = append(edMsg, ctx.LastHeader.Hash...)
-		edMsg = append(edMsg, sigBLS...)
-
-		// Sign with ed25519
-		sigEd := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
-
-		// Create reduction message to gossip
-		blsPubBytes, err := ctx.Keys.BLSPubKey.MarshalBinary()
+		// Create agreement payload to gossip
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+		pl, err := consensusmsg.NewAgreement(ctx.Score, ctx.Empty, ctx.step, blockHash,
+			sigBLS, blsPubBytes)
 		if err != nil {
 			return 0, nil, err
 		}
 
-		msg, err := payload.NewMsgBinary(ctx.Score, ctx.Empty, ctx.BlockHash, ctx.LastHeader.Hash, sigEd,
-			[]byte(*ctx.Keys.EdPubKey), sigBLS, blsPubBytes, ctx.weight, ctx.Round, ctx.step)
+		sigEd, err := createSignature(ctx, pl)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+			sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return 0, nil, err
 		}

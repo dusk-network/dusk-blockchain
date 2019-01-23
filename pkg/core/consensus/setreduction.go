@@ -2,17 +2,17 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
 // SignatureSetReduction is the signature set reduction phase of the consensus.
-func SignatureSetReduction(ctx *Context, c chan *payload.MsgSignatureSet,
-	v chan *payload.MsgSigSetVote) error {
+func SignatureSetReduction(ctx *Context) error {
 	for ctx.step = 1; ctx.step < maxSteps; ctx.step++ {
 		// Generate our own signature set and propagate
 		if err := signatureSetGeneration(ctx); err != nil {
@@ -20,7 +20,7 @@ func SignatureSetReduction(ctx *Context, c chan *payload.MsgSignatureSet,
 		}
 
 		// Collect signature set with highest score
-		if err := signatureSetCollection(ctx, c); err != nil {
+		if err := signatureSetCollection(ctx); err != nil {
 			return err
 		}
 
@@ -30,7 +30,7 @@ func SignatureSetReduction(ctx *Context, c chan *payload.MsgSignatureSet,
 		}
 
 		// Receive all other votes
-		if err := countVotesSigSet(ctx, v); err != nil {
+		if err := countVotesSigSet(ctx); err != nil {
 			return err
 		}
 
@@ -44,7 +44,7 @@ func SignatureSetReduction(ctx *Context, c chan *payload.MsgSignatureSet,
 			return err
 		}
 
-		if err := countVotesSigSet(ctx, v); err != nil {
+		if err := countVotesSigSet(ctx); err != nil {
 			return err
 		}
 
@@ -57,7 +57,7 @@ func SignatureSetReduction(ctx *Context, c chan *payload.MsgSignatureSet,
 	return nil
 }
 
-func signatureSetCollection(ctx *Context, c chan *payload.MsgSignatureSet) error {
+func signatureSetCollection(ctx *Context) error {
 	var voters [][]byte
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	highest := ctx.weight
@@ -68,7 +68,15 @@ func signatureSetCollection(ctx *Context, c chan *payload.MsgSignatureSet) error
 		select {
 		case <-timer.C:
 			return nil
-		case m := <-c:
+		case m := <-ctx.msgs:
+			// Check first off if this message is the right one, if not
+			// we discard it.
+			if m.ID != consensusmsg.SigSetCandidateID {
+				break
+			}
+
+			pl := m.Payload.(*consensusmsg.SigSetCandidate)
+
 			// Check if this node's signature set is already recorded
 			for _, voter := range voters {
 				if bytes.Equal(voter, m.PubKey) {
@@ -77,14 +85,19 @@ func signatureSetCollection(ctx *Context, c chan *payload.MsgSignatureSet) error
 			}
 
 			// Verify the message
-			if !verifyMsgSignatureSet(ctx, m) {
-				break out
+			valid, stake, err := processMsg(ctx, m)
+			if err != nil {
+				return err
+			}
+
+			if !valid {
+				break
 			}
 
 			// If the stake is higher than our current one, replace
-			if m.Stake > highest {
-				highest = m.Stake
-				ctx.SignatureSet = m.SignatureSet
+			if stake > highest {
+				highest = stake
+				ctx.SignatureSet = pl.SignatureSet
 			}
 		}
 	}
@@ -94,20 +107,18 @@ func signatureSetGeneration(ctx *Context) error {
 	sigs, _ := crypto.RandEntropy(200) // Placeholder
 	ctx.SignatureSet = sigs
 
-	// Construct message
-	var edMsg []byte
-	binary.LittleEndian.PutUint64(edMsg, ctx.weight)
-	binary.LittleEndian.PutUint64(edMsg, ctx.Round)
-	edMsg = append(edMsg, ctx.LastHeader.Hash...)
-	edMsg = append(edMsg, ctx.BlockHash...)
-	edMsg = append(edMsg, sigs...)
+	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SignatureSet)
+	if err != nil {
+		return err
+	}
 
-	// Sign with ed25519
-	edSig := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
+	sigEd, err := createSignature(ctx, pl)
+	if err != nil {
+		return err
+	}
 
-	// Create message to gossip
-	msg, err := payload.NewMsgSignatureSet(ctx.weight, ctx.Round, ctx.LastHeader.Hash, ctx.BlockHash,
-		ctx.SignatureSet, edSig, []byte(*ctx.Keys.EdPubKey))
+	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}
@@ -120,31 +131,6 @@ func signatureSetGeneration(ctx *Context) error {
 	return nil
 }
 
-func verifyMsgSignatureSet(ctx *Context, msg *payload.MsgSignatureSet) bool {
-	if msg.Round != ctx.Round {
-		return false
-	}
-
-	// Check if we're on the same chain
-	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
-		return false
-	}
-
-	// Verify weight
-	// TODO: implement
-
-	// Construct msg to verify
-	var edMsg []byte
-	binary.LittleEndian.PutUint64(edMsg, msg.Stake)
-	binary.LittleEndian.PutUint64(edMsg, msg.Round)
-	edMsg = append(edMsg, msg.PrevBlockHash...)
-	edMsg = append(edMsg, msg.WinningBlockHash...)
-	edMsg = append(edMsg, msg.SignatureSet...)
-
-	// Verify signature
-	return ctx.EDVerify(msg.PubKey, edMsg, msg.Signature)
-}
-
 func committeeVoteSigSet(ctx *Context) error {
 	// Sign signature set with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.SignatureSet)
@@ -152,26 +138,16 @@ func committeeVoteSigSet(ctx *Context) error {
 		return err
 	}
 
-	// Construct message
-	var edMsg []byte
-	binary.LittleEndian.PutUint64(edMsg, ctx.weight)
-	binary.LittleEndian.PutUint64(edMsg, ctx.Round)
-	edMsg = append(edMsg, byte(ctx.step))
-	edMsg = append(edMsg, ctx.LastHeader.Hash...)
-	edMsg = append(edMsg, ctx.SignatureSet...)
-	edMsg = append(edMsg, sigBLS...)
-
-	// Sign with ed25519
-	sigEd := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
-
 	// Create signature set vote message to gossip
-	blsPubBytes, err := ctx.Keys.BLSPubKey.MarshalBinary()
+	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+	pl, err := consensusmsg.NewSigSetVote(ctx.step, ctx.SignatureSet, sigBLS, blsPubBytes)
 	if err != nil {
 		return err
 	}
 
-	msg, err := payload.NewMsgSigSetVote(ctx.weight, ctx.Round, ctx.step, ctx.LastHeader.Hash,
-		ctx.SignatureSet, sigBLS, sigEd, blsPubBytes, []byte(*ctx.Keys.EdSecretKey))
+	sigEd, err := createSignature(ctx, pl)
+	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		sigEd, []byte(*ctx.Keys.EdSecretKey), pl)
 	if err != nil {
 		return err
 	}
@@ -184,7 +160,7 @@ func committeeVoteSigSet(ctx *Context) error {
 	return nil
 }
 
-func countVotesSigSet(ctx *Context, v chan *payload.MsgSigSetVote) error {
+func countVotesSigSet(ctx *Context) error {
 	counts := make(map[string]uint64)
 	var voters [][]byte
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
@@ -197,68 +173,42 @@ func countVotesSigSet(ctx *Context, v chan *payload.MsgSigSetVote) error {
 		case <-timer.C:
 			ctx.SignatureSet = nil
 			return nil
-		case m := <-v:
+		case m := <-ctx.msgs:
+			// Check first off if this message is the right one, if not
+			// we discard it.
+			if m.ID != consensusmsg.SigSetVoteID {
+				break
+			}
+
+			pl := m.Payload.(*consensusmsg.SigSetVote)
+
 			// Check if this node's vote is already recorded
 			for _, voter := range voters {
-				if bytes.Equal(voter, m.PubKeyEd) {
+				if bytes.Equal(voter, m.PubKey) {
 					break out
 				}
 			}
 
 			// Verify the message
-			if !verifyMsgSigSetVote(ctx, m) {
-				break out
+			valid, stake, err := processMsg(ctx, m)
+			if err != nil {
+				return err
 			}
 
-			voters = append(voters, m.PubKeyEd)
-			setStr := hex.EncodeToString(m.SignatureSet)
-			counts[setStr] += m.Stake
+			if !valid {
+				break
+			}
+
+			voters = append(voters, m.PubKey)
+			setStr := hex.EncodeToString(pl.SignatureSet)
+			counts[setStr] += stake
 
 			// If a set exceeds vote threshold, we will end the loop.
 			if counts[setStr] > ctx.VoteLimit {
 				timer.Stop()
-				ctx.SignatureSet = m.SignatureSet
+				ctx.SignatureSet = pl.SignatureSet
 				return nil
 			}
 		}
 	}
-}
-
-func verifyMsgSigSetVote(ctx *Context, msg *payload.MsgSigSetVote) bool {
-	// Synchrony checks
-	if msg.Round != ctx.Round {
-		return false
-	}
-
-	if msg.Step != ctx.step {
-		return false
-	}
-
-	// Check if we're on the same chain
-	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
-		return false
-	}
-
-	// Verify weight
-	// TODO: implement
-
-	// Verify signatures
-
-	// Check BLS
-	if err := ctx.BLSVerify(msg.PubKeyBLS, msg.SignatureSet, msg.SigBLS); err != nil {
-		return false
-	}
-
-	// Check ed25519
-	// Construct message
-	var edMsg []byte
-	binary.LittleEndian.PutUint64(edMsg, msg.Stake)
-	binary.LittleEndian.PutUint64(edMsg, msg.Round)
-	edMsg = append(edMsg, byte(msg.Step))
-	edMsg = append(edMsg, msg.PrevBlockHash...)
-	edMsg = append(edMsg, msg.SignatureSet...)
-	edMsg = append(edMsg, msg.SigBLS...)
-
-	// Verify ed25519
-	return ctx.EDVerify(msg.PubKeyEd, edMsg, msg.SigEd)
 }

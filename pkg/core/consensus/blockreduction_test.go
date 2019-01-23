@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"math/rand"
 	"sync"
@@ -13,8 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
 // TODO: Test vote counter/signature verifier with faulty votes once
@@ -33,15 +32,20 @@ func TestProcessMsgReduction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	votes, msg, err := newVoteReduction(ctx.Seed, 500, ctx.W, ctx.Round, ctx.LastHeader, emptyBlock.Header.Hash)
+	votes, msg, err := newVoteReduction(ctx, 500, emptyBlock.Header.Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Process the message
-	retVotes, err := processMsgReduction(ctx, msg)
+	valid, retVotes, err := processMsg(ctx, msg)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Message should be valid
+	if !valid {
+		t.Fatal("message was not valid")
 	}
 
 	// Votes should be equal
@@ -70,13 +74,12 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 	}
 
 	// Set up voting phase
-	c := make(chan *payload.MsgReduction)
 	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, msg, err := newVoteReduction(ctx.Seed, 400, ctx.W, ctx.Round, ctx.LastHeader, emptyBlock.Header.Hash)
+	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +88,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		if err := countVotesReduction(ctx, c); err != nil {
+		if err := countVotesReduction(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -93,7 +96,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 	}()
 
 	// Send the vote out, and block until the counting function returns
-	c <- msg
+	ctx.msgs <- msg
 	wg.Wait()
 
 	// BlockHash should not be nil after receiving vote
@@ -125,8 +128,7 @@ func TestReductionVoteCountIndecisive(t *testing.T) {
 	stepTime = 1 * time.Second
 
 	// Let the timer run out
-	c := make(chan *payload.MsgReduction)
-	if err := countVotesReduction(ctx, c); err != nil {
+	if err := countVotesReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -151,7 +153,6 @@ func TestBlockReductionDecisive(t *testing.T) {
 	ctx.BlockHash = candidateBlock
 
 	// This should conclude the reduction phase fairly quick
-	c := make(chan *payload.MsgReduction)
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
@@ -163,17 +164,17 @@ func TestBlockReductionDecisive(t *testing.T) {
 			case <-ticker.C:
 				weight := rand.Intn(10000)
 				weight += 100 // Avoid stakes being too low to participate
-				_, msg, err := newVoteReduction(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader, candidateBlock)
+				_, msg, err := newVoteReduction(ctx, uint64(weight), candidateBlock)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				c <- msg
+				ctx.msgs <- msg
 			}
 		}
 	}()
 
-	if err := BlockReduction(ctx, c); err != nil {
+	if err := BlockReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -201,7 +202,6 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	otherBlock, _ := crypto.RandEntropy(32)
 
 	// This should conclude the reduction phase fairly quick
-	c := make(chan *payload.MsgReduction)
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
@@ -213,17 +213,17 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 			case <-ticker.C:
 				weight := rand.Intn(10000)
 				weight += 100 // Avoid stakes being too low to participate
-				_, msg, err := newVoteReduction(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader, otherBlock)
+				_, msg, err := newVoteReduction(ctx, uint64(weight), otherBlock)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				c <- msg
+				ctx.msgs <- msg
 			}
 		}
 	}()
 
-	if err := BlockReduction(ctx, c); err != nil {
+	if err := BlockReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -248,7 +248,6 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	ctx.BlockHash = candidateBlock
 
 	// This should time out and change our context blockhash
-	c := make(chan *payload.MsgReduction)
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(5 * time.Second)
 	go func() {
@@ -260,17 +259,17 @@ func TestBlockReductionIndecisive(t *testing.T) {
 			case <-ticker.C:
 				weight := rand.Intn(1000)
 				weight += 100 // Avoid stakes being too low to participate
-				_, msg, err := newVoteReduction(ctx.Seed, uint64(weight), ctx.W, ctx.Round, ctx.LastHeader, candidateBlock)
+				_, msg, err := newVoteReduction(ctx, uint64(weight), candidateBlock)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				c <- msg
+				ctx.msgs <- msg
 			}
 		}
 	}()
 
-	if err := BlockReduction(ctx, c); err != nil {
+	if err := BlockReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -282,21 +281,21 @@ func TestBlockReductionIndecisive(t *testing.T) {
 
 // Convenience function to generate a vote for the reduction phase,
 // to emulate a received MsgReduction over the wire
-func newVoteReduction(seed []byte, weight, totalWeight, round uint64, prevHeader *payload.BlockHeader,
-	blockHash []byte) (uint64, *payload.MsgReduction, error) {
+func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *payload.MsgConsensus, error) {
 	if weight < 100 {
 		return 0, nil, errors.New("weight too low, will result in no votes")
 	}
 
 	// Create context
 	keys, _ := NewRandKeys()
-	ctx, err := NewProvisionerContext(totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := NewProvisionerContext(c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
 		return 0, nil, err
 	}
 
+	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
 	ctx.weight = weight
-	ctx.LastHeader = prevHeader
+	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
 
 	role := &role{
@@ -311,30 +310,21 @@ func newVoteReduction(seed []byte, weight, totalWeight, round uint64, prevHeader
 
 	if ctx.votes > 0 {
 		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.BlockHash)
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, blockHash)
 		if err != nil {
 			return 0, nil, err
 		}
 
-		// Create message to sign with ed25519
-		var edMsg []byte
-		edMsg = append(edMsg, ctx.Score...)
-		binary.LittleEndian.PutUint64(edMsg, ctx.Round)
-		edMsg = append(edMsg, byte(ctx.step))
-		edMsg = append(edMsg, ctx.LastHeader.Hash...)
-		edMsg = append(edMsg, sigBLS...)
-
-		// Sign with ed25519
-		sigEd := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
-
-		// Create reduction message to gossip
-		blsPubBytes, err := ctx.Keys.BLSPubKey.MarshalBinary()
+		// Create reduction payload to gossip
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.step, blockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return 0, nil, err
 		}
 
-		msg, err := payload.NewMsgReduction(ctx.Score, ctx.BlockHash, ctx.LastHeader.Hash, sigEd,
-			[]byte(*ctx.Keys.EdPubKey), sigBLS, blsPubBytes, ctx.weight, ctx.Round, ctx.step)
+		sigEd, err := createSignature(ctx, pl)
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, sigEd,
+			[]byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return 0, nil, err
 		}

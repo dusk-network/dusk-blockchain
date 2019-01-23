@@ -28,6 +28,7 @@ var (
 //XXX: depending on how we use context, we may want to unexport values and access them in a method via a mutex
 type Context struct {
 	// Common variables
+	Version    uint32
 	Tau        uint64
 	Round      uint64               // Current round
 	step       uint8                // Current step
@@ -36,6 +37,7 @@ type Context struct {
 	k          []byte               // secret
 	Keys       *Keys
 	Magic      protocol.Magic
+	msgs       chan *payload.MsgConsensus
 
 	// Block generator values
 	d          uint64 // bidWeight
@@ -43,16 +45,17 @@ type Context struct {
 	Q          uint64
 
 	// Provisioner values
-	weight       uint64 // Amount this node has staked
-	W            uint64 // Total stake weight of the network
-	Score        []byte // Sortition score of this node
-	votes        uint64 // Sortition votes of this node
-	VoteLimit    uint64 // Votes needed to decide on a block
-	Empty        bool   // Whether or not the block being voted on is empty
-	BlockHash    []byte // Block hash currently being voted on by this node
-	SignatureSet []byte // Signature set for signature set reduction phase
+	weight       uint64            // Amount this node has staked
+	W            uint64            // Total stake weight of the network
+	Score        []byte            // Sortition score of this node
+	votes        uint64            // Sortition votes of this node
+	VoteLimit    uint64            // Votes needed to decide on a block
+	Empty        bool              // Whether or not the block being voted on is empty
+	BlockHash    []byte            // Block hash currently being voted on by this node
+	SignatureSet []byte            // Signature set for signature set reduction phase
+	NodeWeights  map[string]uint64 // Other nodes' stake weights mapped to their Ed25519 public key
+	NodeBLS      map[string]string // Other nodes' Ed25519 public keys mapped to their BLS public keys
 	// q          chan bool               // Channel used to halt BA phase in case of a decision from set agreement
-	// Committee  *Committee              // Provisioner committee
 	// Signatures []*payload.SignatureSet // Result of set agreement phase
 
 	// General functions
@@ -81,6 +84,7 @@ func NewGeneratorContext(Tau uint64, keys *Keys) (*Context, error) {
 	}
 
 	ctx := &Context{
+		Version:     10000, // Placeholder
 		Tau:         Tau,
 		GetAllTXs:   getAllTXs,
 		BLSSign:     bLSSign,
@@ -110,10 +114,12 @@ func NewProvisionerContext(totalWeight, round uint64, seed []byte, magic protoco
 	}
 
 	ctx := &Context{
+		Version:     10000,           // Placeholder
 		Tau:         totalWeight / 5, // Placeholder
 		Round:       round,
 		Seed:        seed,
 		Magic:       magic,
+		msgs:        make(chan *payload.MsgConsensus),
 		W:           totalWeight,
 		GetAllTXs:   getAllTXs,
 		BLSSign:     bLSSign,
@@ -122,8 +128,9 @@ func NewProvisionerContext(totalWeight, round uint64, seed []byte, magic protoco
 		EDVerify:    edVerify,
 		SendMessage: send,
 		Keys:        keys,
+		NodeWeights: make(map[string]uint64),
+		NodeBLS:     make(map[string]string),
 		// q:           make(chan bool),
-		// Committee:   NewCommittee(),
 	}
 
 	ctx.setLastHeader()

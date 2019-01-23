@@ -7,13 +7,15 @@ import (
 	"math/big"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
 // BinaryAgreement is the main function that runs during the binary agreement
 // phase of the consensus.
-func BinaryAgreement(ctx *Context, c chan *payload.MsgBinary) error {
+func BinaryAgreement(ctx *Context) error {
 	// Prepare empty block
 	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
@@ -25,13 +27,13 @@ func BinaryAgreement(ctx *Context, c chan *payload.MsgBinary) error {
 		var startHash []byte
 		startHash = append(startHash, ctx.BlockHash...)
 
-		var msgs []*payload.MsgBinary
+		var msgs []*payload.MsgConsensus
 		var err error
 		if _, err := committeeVoteBinary(ctx); err != nil {
 			return err
 		}
 
-		_, err = countVotesBinary(ctx, c)
+		_, err = countVotesBinary(ctx)
 		if err != nil {
 			return err
 		}
@@ -58,7 +60,7 @@ func BinaryAgreement(ctx *Context, c chan *payload.MsgBinary) error {
 			return err
 		}
 
-		_, err = countVotesBinary(ctx, c)
+		_, err = countVotesBinary(ctx)
 
 		// Coin-flipped-to-1 step
 		if ctx.BlockHash == nil {
@@ -76,7 +78,7 @@ func BinaryAgreement(ctx *Context, c chan *payload.MsgBinary) error {
 			return err
 		}
 
-		msgs, err = countVotesBinary(ctx, c)
+		msgs, err = countVotesBinary(ctx)
 		msgs = append(msgs, vote)
 
 		// CommonCoin step
@@ -98,17 +100,19 @@ func BinaryAgreement(ctx *Context, c chan *payload.MsgBinary) error {
 	return nil
 }
 
-func commonCoin(ctx *Context, allMsgs []*payload.MsgBinary) (uint64, error) {
+func commonCoin(ctx *Context, allVotes []*payload.MsgConsensus) (uint64, error) {
 	var lenHash, _ = new(big.Int).SetString("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0)
-	for i, vote := range allMsgs {
-		votes, err := processMsgBinary(ctx, vote)
+	for i, vote := range allVotes {
+		// Don't check for validity, as it has already been checked during vote count
+		_, votes, err := processMsg(ctx, vote)
 		if err != nil {
 			return 0, err
 		}
 
+		pl := vote.Payload.(*consensusmsg.Agreement)
 		for j := uint64(1); j < votes; j++ {
-			binary.LittleEndian.PutUint32(vote.BlockHash, uint32(i))
-			result, err := hash.Sha3256(vote.BlockHash)
+			binary.LittleEndian.PutUint32(pl.BlockHash, uint32(i))
+			result, err := hash.Sha3256(pl.BlockHash)
 			if err != nil {
 				return 0, err
 			}
@@ -124,7 +128,7 @@ func commonCoin(ctx *Context, allMsgs []*payload.MsgBinary) (uint64, error) {
 	return lenHash.Uint64(), nil
 }
 
-func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
+func committeeVoteBinary(ctx *Context) (*payload.MsgConsensus, error) {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -142,25 +146,21 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
 			return nil, err
 		}
 
-		// Create message to sign with ed25519
-		var edMsg []byte
-		edMsg = append(edMsg, ctx.Score...)
-		binary.LittleEndian.PutUint64(edMsg, ctx.Round)
-		edMsg = append(edMsg, byte(ctx.step))
-		edMsg = append(edMsg, ctx.LastHeader.Hash...)
-		edMsg = append(edMsg, sigBLS...)
-
-		// Sign with ed25519
-		sigEd := ctx.EDSign(ctx.Keys.EdSecretKey, edMsg)
-
-		// Create binary message to gossip
-		blsPubBytes, err := ctx.Keys.BLSPubKey.MarshalBinary()
+		// Create agreement payload to gossip
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+		pl, err := consensusmsg.NewAgreement(ctx.Score, ctx.Empty, ctx.step, ctx.BlockHash,
+			sigBLS, blsPubBytes)
 		if err != nil {
 			return nil, err
 		}
 
-		msg, err := payload.NewMsgBinary(ctx.Score, ctx.Empty, ctx.BlockHash, ctx.LastHeader.Hash, sigEd,
-			[]byte(*ctx.Keys.EdPubKey), sigBLS, blsPubBytes, ctx.W, ctx.Round, ctx.step)
+		sigEd, err := createSignature(ctx, pl)
+		if err != nil {
+			return nil, err
+		}
+
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+			sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return nil, err
 		}
@@ -176,10 +176,10 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgBinary, error) {
 	return nil, nil
 }
 
-func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBinary, error) {
+func countVotesBinary(ctx *Context) ([]*payload.MsgConsensus, error) {
 	counts := make(map[string]uint64)
 	var voters [][]byte
-	var allMsgs []*payload.MsgBinary
+	var allMsgs []*payload.MsgConsensus
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
 	timer := time.NewTimer(stepTime)
@@ -190,18 +190,30 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 		case <-timer.C:
 			ctx.BlockHash = nil
 			return allMsgs, nil
-		case m := <-c:
+		case m := <-ctx.msgs:
+			// Check first off if this message is the right one, if not
+			// we discard it.
+			if m.ID != consensusmsg.AgreementID {
+				break
+			}
+
+			pl := m.Payload.(*consensusmsg.Agreement)
+
 			// Check if this node's vote is already recorded
 			for _, voter := range voters {
-				if bytes.Equal(voter, m.PubKeyEd) {
+				if bytes.Equal(voter, m.PubKey) {
 					break out
 				}
 			}
 
 			// Verify the message score and get back it's contents
-			votes, err := processMsgBinary(ctx, m)
+			valid, votes, err := processMsg(ctx, m)
 			if err != nil {
 				return nil, err
+			}
+
+			if !valid {
+				break
 			}
 
 			// If votes is zero, then the reduction message was most likely
@@ -211,8 +223,8 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 			}
 
 			// Log new information
-			voters = append(voters, m.PubKeyEd)
-			hashStr := hex.EncodeToString(m.BlockHash)
+			voters = append(voters, m.PubKey)
+			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
 
 			// Save vote for common coin
@@ -221,67 +233,10 @@ func countVotesBinary(ctx *Context, c chan *payload.MsgBinary) ([]*payload.MsgBi
 			// If a block exceeds the vote threshold, we will end the loop.
 			if counts[hashStr] > ctx.VoteLimit {
 				timer.Stop()
-				ctx.Empty = m.Empty
-				ctx.BlockHash = m.BlockHash
+				ctx.Empty = pl.Empty
+				ctx.BlockHash = pl.BlockHash
 				return allMsgs, nil
 			}
 		}
 	}
-}
-
-func processMsgBinary(ctx *Context, msg *payload.MsgBinary) (uint64, error) {
-	// Verify message
-	if !verifySignaturesBinary(ctx, msg) {
-		return 0, nil
-	}
-
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.step,
-	}
-
-	// Check if we're on the same chain
-	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
-		// Either an old message or a malformed message
-		return 0, nil
-	}
-
-	// Verify weight
-	// TODO: implement
-
-	// Make sure their score is valid, and calculate their amount of votes.
-	votes, err := verifySortition(ctx, msg.Score, msg.PubKeyBLS, role, msg.Stake)
-	if err != nil {
-		return 0, err
-	}
-
-	if votes == 0 {
-		return 0, nil
-	}
-
-	return votes, nil
-}
-
-func verifySignaturesBinary(ctx *Context, msg *payload.MsgBinary) bool {
-	// Construct message
-	var edMsg []byte
-	edMsg = append(edMsg, msg.Score...)
-	binary.LittleEndian.PutUint64(edMsg, msg.Round)
-	edMsg = append(edMsg, byte(msg.Step))
-	edMsg = append(edMsg, msg.PrevBlockHash...)
-	edMsg = append(edMsg, msg.SigBLS...)
-
-	// Check ed25519
-	if !ctx.EDVerify(msg.PubKeyEd, edMsg, msg.SigEd) {
-		return false
-	}
-
-	// Check BLS
-	if err := ctx.BLSVerify(msg.PubKeyBLS, msg.BlockHash, msg.SigBLS); err != nil {
-		return false
-	}
-
-	// Passed all checks
-	return true
 }
