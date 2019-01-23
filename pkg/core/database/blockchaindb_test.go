@@ -13,7 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
@@ -28,7 +28,7 @@ func TestAddHeader(t *testing.T) {
 	blocks, _ := createBlockFixtures(1, 0)
 	header := blocks[0].Header
 
-	db.WriteHeaders([]*payload.BlockHeader{header})
+	db.WriteHeaders([]*block.Header{header})
 	assert.NotEqual(t, nil, db)
 
 	heightBytes := database.Uint64ToBytes(header.Height)
@@ -56,7 +56,7 @@ func TestAddHeaders(t *testing.T) {
 
 	blocks, _ := createBlockFixtures(5, 0)
 
-	hdrs := make([]*payload.BlockHeader, len(blocks))
+	hdrs := make([]*block.Header, len(blocks))
 	for i, block := range blocks {
 		hdrs[i] = block.Header
 	}
@@ -118,8 +118,8 @@ func TestAddBlockTransactions(t *testing.T) {
 	}
 }
 
-func createBlockFixtures(totalBlocks, totalTxs int) ([]*payload.Block, error) {
-	blocks := make([]*payload.Block, totalBlocks)
+func createBlockFixtures(totalBlocks, totalTxs int) ([]*block.Block, error) {
+	blocks := make([]*block.Block, totalBlocks)
 	time := time.Now().Unix()
 	// Spoof previous hash and seed
 	prevBlock, _ := crypto.RandEntropy(32)
@@ -128,7 +128,7 @@ func createBlockFixtures(totalBlocks, totalTxs int) ([]*payload.Block, error) {
 	certImage, _ := crypto.RandEntropy(32)
 
 	for i := 0; i < totalBlocks; i++ {
-		h := &payload.BlockHeader{
+		h := &block.Header{
 			Height:    uint64(i),
 			Timestamp: time,
 			PrevBlock: prevBlock,
@@ -140,7 +140,7 @@ func createBlockFixtures(totalBlocks, totalTxs int) ([]*payload.Block, error) {
 		h.SetHash()
 		// Create random Txs
 		txs := createRandomTxFixtures(totalTxs)
-		blocks[i] = &payload.Block{
+		blocks[i] = &block.Block{
 			Header: h,
 			Txs:    txs,
 		}

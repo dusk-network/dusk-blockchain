@@ -2,18 +2,19 @@ package database
 
 import (
 	"bytes"
+
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 // getBlockHeaderRange gets a range of block headers in height order.
 // Only returns headers that have an accompanying block.
 // Note that it stops reading at the first header where this is not the case.
-func (bdb *BlockchainDB) getBlockHeaderRange(start uint64, stop uint64) ([]*payload.BlockHeader, error) {
-	var hdrCur *payload.BlockHeader
-	var headers = make([]*payload.BlockHeader, 0, stop-start+1)
+func (bdb *BlockchainDB) getBlockHeaderRange(start uint64, stop uint64) ([]*block.Header, error) {
+	var hdrCur *block.Header
+	var headers = make([]*block.Header, 0, stop-start+1)
 	var err error
 
 	if stop == 0 {
@@ -43,8 +44,8 @@ func (bdb *BlockchainDB) getBlockHeaderRange(start uint64, stop uint64) ([]*payl
 }
 
 // getBlockHeader gives the block header from the hash
-func (bdb *BlockchainDB) getBlockHeader(hash []byte) (*payload.BlockHeader, error) {
-	var header payload.BlockHeader
+func (bdb *BlockchainDB) getBlockHeader(hash []byte) (*block.Header, error) {
+	var header block.Header
 
 	table := NewTable(bdb, HEADER)
 	headerBytes, err := table.Get(hash)
@@ -61,7 +62,7 @@ func (bdb *BlockchainDB) getBlockHeader(hash []byte) (*payload.BlockHeader, erro
 }
 
 // GetBlockHeaderByHeight gives the block header that belongs to the given block height.
-func (bdb *BlockchainDB) GetBlockHeaderByHeight(height uint64) (*payload.BlockHeader, error) {
+func (bdb *BlockchainDB) GetBlockHeaderByHeight(height uint64) (*block.Header, error) {
 	var hash []byte
 	var err error
 
@@ -97,7 +98,7 @@ func (bdb *BlockchainDB) getLatestBlockHeight() (uint64, error) {
 
 // GetLatestHeader returns the most recent header.
 // Note that in this case it does not check the existence of the accompanying block.
-func (bdb *BlockchainDB) GetLatestHeader() (*payload.BlockHeader, error) {
+func (bdb *BlockchainDB) GetLatestHeader() (*block.Header, error) {
 	latestHdrHash, err := bdb.getLatestHeaderHash()
 	if err != nil {
 		return nil, err
@@ -110,7 +111,7 @@ func (bdb *BlockchainDB) GetLatestHeader() (*payload.BlockHeader, error) {
 	}
 
 	latestHdrBuf := bytes.NewReader(latestHdrBytes)
-	latestHdr := &payload.BlockHeader{}
+	latestHdr := &block.Header{}
 	if err = latestHdr.Decode(latestHdrBuf); err != nil {
 		return nil, err
 	}
@@ -119,24 +120,24 @@ func (bdb *BlockchainDB) GetLatestHeader() (*payload.BlockHeader, error) {
 }
 
 // GetBlock will return the block from the received hash
-func (bdb *BlockchainDB) GetBlock(hash []byte) (*payload.Block, error) {
-	var err error = nil
+func (bdb *BlockchainDB) GetBlock(hash []byte) (*block.Block, error) {
+	var err error
 
-	block := &payload.Block{}
+	b := &block.Block{}
 	table := NewTable(bdb, HEADER)
 
 	hdrBytes, err := table.Get(hash)
 	buf := bytes.NewBuffer(hdrBytes)
-	hdr := &payload.BlockHeader{}
+	hdr := &block.Header{}
 	if err = hdr.Decode(buf); err != nil {
 		return nil, err
 	}
-	block.Header = hdr
+	b.Header = hdr
 
 	// If it's the Genesis block just return block without txs
 	// TODO: Can this check be improved. I don't want to check at all !!
-	if block.Header.Height == 0 {
-		return block, nil
+	if b.Header.Height == 0 {
+		return b, nil
 	}
 
 	txHdrHashKey := append(TX, hdr.Hash...)
@@ -157,13 +158,13 @@ func (bdb *BlockchainDB) GetBlock(hash []byte) (*payload.Block, error) {
 	}
 	txIter.Release()
 
-	block.Txs = txs
+	b.Txs = txs
 
-	return block, nil
+	return b, nil
 }
 
 // blockExists checks if received header has an accompanying block
-func (bdb *BlockchainDB) blockExists(hdr *payload.BlockHeader) bool {
+func (bdb *BlockchainDB) blockExists(hdr *block.Header) bool {
 	if hdr.Height == 0 { // Genesis block always exists
 		return true
 	}
