@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
@@ -23,7 +24,7 @@ func BlockReduction(ctx *Context) error {
 	ctx.step = 1
 
 	// Prepare empty block
-	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		return err
 	}
@@ -85,13 +86,13 @@ func committeeVoteReduction(ctx *Context) error {
 
 	if ctx.votes > 0 {
 		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.BlockHash)
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
 		if err != nil {
 			return err
 		}
 
 		// Create reduction payload to gossip
-		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
 		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.step, ctx.BlockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return err

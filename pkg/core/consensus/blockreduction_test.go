@@ -13,11 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
-
-// TODO: Test vote counter/signature verifier with faulty votes once
-// signature libraries are implemented into context.
 
 func TestProcessMsgReduction(t *testing.T) {
 	// Create context
@@ -27,7 +25,7 @@ func TestProcessMsgReduction(t *testing.T) {
 	}
 
 	// Create a reduction phase voting message and get their amount of votes
-	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +72,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 	}
 
 	// Set up voting phase
-	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +132,9 @@ func TestReductionVoteCountIndecisive(t *testing.T) {
 
 	// BlockHash should be nil after hitting time limit
 	assert.Nil(t, ctx.BlockHash)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
 }
 
 // BlockReduction test scenarios
@@ -297,6 +298,7 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
+	ctx.step = c.step
 
 	role := &role{
 		part:  "committee",
@@ -310,13 +312,13 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 
 	if ctx.votes > 0 {
 		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, blockHash)
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, blockHash)
 		if err != nil {
 			return 0, nil, err
 		}
 
 		// Create reduction payload to gossip
-		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
 		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.step, blockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return 0, nil, err

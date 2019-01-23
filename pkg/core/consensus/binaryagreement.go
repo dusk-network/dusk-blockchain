@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
@@ -17,7 +18,7 @@ import (
 // phase of the consensus.
 func BinaryAgreement(ctx *Context) error {
 	// Prepare empty block
-	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		return err
 	}
@@ -141,13 +142,13 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgConsensus, error) {
 
 	if ctx.votes > 0 {
 		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.BlockHash)
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
 		if err != nil {
 			return nil, err
 		}
 
 		// Create agreement payload to gossip
-		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
 		pl, err := consensusmsg.NewAgreement(ctx.Score, ctx.Empty, ctx.step, ctx.BlockHash,
 			sigBLS, blsPubBytes)
 		if err != nil {

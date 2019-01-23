@@ -149,6 +149,6 @@ func runSortition(weight, totalWeight, round uint64, seed []byte) (uint64, []byt
 		return 0, nil, nil, err
 	}
 
-	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
 	return ctx.votes, ctx.Score, blsPubBytes, nil
 }

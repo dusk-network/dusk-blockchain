@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
@@ -21,7 +22,7 @@ func TestProcessMsgAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,12 +55,12 @@ func TestCommonCoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create random amount of MsgBinary
+	// Create random amount of MsgConsensus
 	var msgs []*payload.MsgConsensus
 	n := rand.Intn(20)
 	for i := 0; i < n; i++ {
@@ -107,7 +108,7 @@ func TestBinaryVoteCountDecisive(t *testing.T) {
 	}
 
 	// Set up voting phase
-	emptyBlock, err := payload.NewEmptyBlock(ctx.LastHeader)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,6 +178,9 @@ func TestBinaryVoteCountIndecisive(t *testing.T) {
 
 	// msgs should also be nil
 	assert.Nil(t, msgs)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
 }
 
 // BinaryAgreement test scenarios
@@ -324,6 +328,9 @@ func TestCoinFlippedNonEmpty(t *testing.T) {
 
 	// Step should be maxSteps (coin-flipped-to-0 with a non-empty block sets ctx.step to maxSteps)
 	assert.Equal(t, maxSteps, ctx.step)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
 }
 
 // Test the BinaryAgreement function with little votes coming in, and triggering
@@ -380,6 +387,9 @@ func TestCoinFlippedEmpty(t *testing.T) {
 
 	// ctx.Empty should be true
 	assert.True(t, ctx.Empty)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
 }
 
 // Convenience function to generate a vote for the binary agreement phase,
@@ -400,6 +410,7 @@ func newVoteAgreement(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
+	ctx.step = c.step
 
 	role := &role{
 		part:  "committee",
@@ -413,13 +424,13 @@ func newVoteAgreement(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 
 	if ctx.votes > 0 {
 		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, blockHash)
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, blockHash)
 		if err != nil {
 			return 0, nil, err
 		}
 
 		// Create agreement payload to gossip
-		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
 		pl, err := consensusmsg.NewAgreement(ctx.Score, ctx.Empty, ctx.step, blockHash,
 			sigBLS, blsPubBytes)
 		if err != nil {

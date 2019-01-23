@@ -11,11 +11,13 @@ import (
 func sortition(ctx *Context, role *role) error {
 	// Construct message
 	msg := append(ctx.Seed, []byte(role.part)...)
-	binary.LittleEndian.PutUint64(msg, role.round)
-	binary.LittleEndian.PutUint64(msg, uint64(role.step))
+	round := make([]byte, 8)
+	binary.LittleEndian.PutUint64(round, role.round)
+	msg = append(msg, round...)
+	msg = append(msg, byte(role.step))
 
 	// Generate score and votes
-	score, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, msg)
+	score, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, msg)
 	if err != nil {
 		return err
 	}
@@ -52,8 +54,10 @@ func verifySortition(ctx *Context, score, pk []byte, role *role, stake uint64) (
 func verifyScore(ctx *Context, score, pk []byte, role *role) (bool, error) {
 	// Construct message
 	msg := append(ctx.Seed, []byte(role.part)...)
-	binary.LittleEndian.PutUint64(msg, role.round)
-	binary.LittleEndian.PutUint64(msg, uint64(role.step))
+	round := make([]byte, 8)
+	binary.LittleEndian.PutUint64(round, role.round)
+	msg = append(msg, round...)
+	msg = append(msg, byte(role.step))
 
 	if err := ctx.BLSVerify(pk, msg, score); err != nil {
 		if err.Error() == "bls: Invalid Signature" {
@@ -83,7 +87,7 @@ func calcVotes(threshold, stake, totalStake uint64, score []byte) (uint64, error
 
 	// Calculate score divided by 2^256
 	var lenHash, _ = new(big.Int).SetString("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0)
-	scoreNum := new(big.Int).SetBytes(score)
+	scoreNum := new(big.Int).SetBytes(score[:32])
 	target, _ := new(big.Rat).SetFrac(scoreNum, lenHash).Float64()
 
 	dist := distuv.Normal{

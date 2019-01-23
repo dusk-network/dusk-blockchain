@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
@@ -170,9 +171,9 @@ func generateZ(S, k []byte) ([]byte, error) {
 	return Z, nil
 }
 
-func newCandidateBlock(ctx *Context) (*payload.Block, error) {
+func newCandidateBlock(ctx *Context) (*block.Block, error) {
 
-	candidateBlock := payload.NewBlock()
+	candidateBlock := block.NewBlock()
 
 	err := candidateBlock.SetPrevBlock(ctx.LastHeader)
 	if err != nil {
@@ -180,7 +181,7 @@ func newCandidateBlock(ctx *Context) (*payload.Block, error) {
 	}
 
 	// Seed is the candidate signature of the previous seed
-	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.LastHeader.Seed)
+	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.LastHeader.Seed)
 	if err != nil {
 		return nil, err
 	}

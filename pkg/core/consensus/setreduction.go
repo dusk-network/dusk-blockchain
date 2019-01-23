@@ -133,13 +133,13 @@ func signatureSetGeneration(ctx *Context) error {
 
 func committeeVoteSigSet(ctx *Context) error {
 	// Sign signature set with BLS
-	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.SignatureSet)
+	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SignatureSet)
 	if err != nil {
 		return err
 	}
 
 	// Create signature set vote message to gossip
-	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()[:32] // TODO: figure out why the length is wrong
+	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
 	pl, err := consensusmsg.NewSigSetVote(ctx.step, ctx.SignatureSet, sigBLS, blsPubBytes)
 	if err != nil {
 		return err

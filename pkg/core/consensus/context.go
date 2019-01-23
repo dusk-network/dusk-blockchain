@@ -12,15 +12,17 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 // Global consensus variables
 var (
-	maxMembers       = 200
-	maxSteps   uint8 = 50
-	stepTime         = 20 * time.Second
+	maxMembers          = 200
+	maxSteps      uint8 = 50
+	stepTime            = 20 * time.Second
+	candidateTime       = 60 * time.Second
 )
 
 // Context will hold all the necessary functions and
@@ -30,11 +32,11 @@ type Context struct {
 	// Common variables
 	Version    uint32
 	Tau        uint64
-	Round      uint64               // Current round
-	step       uint8                // Current step
-	Seed       []byte               // Round seed
-	LastHeader *payload.BlockHeader // Previous block
-	k          []byte               // secret
+	Round      uint64        // Current round
+	step       uint8         // Current step
+	Seed       []byte        // Round seed
+	LastHeader *block.Header // Previous block
+	k          []byte        // secret
 	Keys       *Keys
 	Magic      protocol.Magic
 	msgs       chan *payload.MsgConsensus
@@ -45,16 +47,17 @@ type Context struct {
 	Q          uint64
 
 	// Provisioner values
-	weight       uint64            // Amount this node has staked
-	W            uint64            // Total stake weight of the network
-	Score        []byte            // Sortition score of this node
-	votes        uint64            // Sortition votes of this node
-	VoteLimit    uint64            // Votes needed to decide on a block
-	Empty        bool              // Whether or not the block being voted on is empty
-	BlockHash    []byte            // Block hash currently being voted on by this node
-	SignatureSet []byte            // Signature set for signature set reduction phase
-	NodeWeights  map[string]uint64 // Other nodes' stake weights mapped to their Ed25519 public key
-	NodeBLS      map[string]string // Other nodes' Ed25519 public keys mapped to their BLS public keys
+	weight         uint64            // Amount this node has staked
+	W              uint64            // Total stake weight of the network
+	Score          []byte            // Sortition score of this node
+	votes          uint64            // Sortition votes of this node
+	VoteLimit      uint64            // Votes needed to decide on a block
+	Empty          bool              // Whether or not the block being voted on is empty
+	CandidateBlock *block.Block      // Block kept from candidate collection
+	BlockHash      []byte            // Block hash currently being voted on by this node
+	SignatureSet   []byte            // Signature set for signature set reduction phase
+	NodeWeights    map[string]uint64 // Other nodes' stake weights mapped to their Ed25519 public key
+	NodeBLS        map[string][]byte // Other nodes' Ed25519 public keys mapped to their BLS public keys
 	// q          chan bool               // Channel used to halt BA phase in case of a decision from set agreement
 	// Signatures []*payload.SignatureSet // Result of set agreement phase
 
@@ -63,8 +66,8 @@ type Context struct {
 	SendMessage func(magic protocol.Magic, p wire.Payload) error
 
 	// Key functions
-	BLSSign   func(key *bls.SecretKey, msg []byte) ([]byte, error)
-	BLSVerify func(pkey, msg []byte, signature []byte) error
+	BLSSign   func(sk *bls.SecretKey, pk *bls.PublicKey, msg []byte) ([]byte, error)
+	BLSVerify func(pkey, msg, signature []byte) error
 	EDSign    func(privateKey *ed25519.PrivateKey, message []byte) []byte
 	EDVerify  func(publicKey, message, sig []byte) bool
 }
@@ -129,7 +132,7 @@ func NewProvisionerContext(totalWeight, round uint64, seed []byte, magic protoco
 		SendMessage: send,
 		Keys:        keys,
 		NodeWeights: make(map[string]uint64),
-		NodeBLS:     make(map[string]string),
+		NodeBLS:     make(map[string][]byte),
 		// q:           make(chan bool),
 	}
 
@@ -155,6 +158,7 @@ func (c *Context) Reset() {
 	c.BlockHash = nil
 	c.Empty = false
 	c.step = 1
+	c.CandidateBlock = nil
 	// c.Committee.Clear()
 }
 
@@ -177,28 +181,10 @@ func (c *Context) Clear() {
 // 	c.VoteLimit = uint8(float64(len(c.Committee.Members)) * 0.8)
 // }
 
-// SetCommittee will set up the provisioner committee for the current round.
-// The function assumes that the array passed has been pre-sorted according to
-// stake size. It will also set the provisioner vote limit.
-// func (c *Context) SetCommittee(stakers [][]byte) {
-// 	l := maxMembers
-// 	if len(stakers) < maxMembers {
-// 		l = len(stakers)
-// 	}
-
-// 	for i := 0; i < l; i++ {
-// 		// score := DeterministicSortition(staker[i])
-// 		// c.Committee.AddMember(staker[i], score)
-// 	}
-
-// 	// Set votelimit
-// 	c.VoteLimit = uint8(float64(len(c.Committee.Members)) * 0.75)
-// }
-
 // dummy functions
-func (c *Context) setLastHeader() *payload.BlockHeader {
+func (c *Context) setLastHeader() *block.Header {
 	rand, _ := crypto.RandEntropy(32)
-	hdr := &payload.BlockHeader{
+	hdr := &block.Header{
 		Height:    100,
 		Timestamp: 10,
 		PrevBlock: rand,
@@ -232,12 +218,31 @@ func getAllTXs() []*transactions.Stealth {
 	return []*transactions.Stealth{tx}
 }
 
-// Use this until bls is implemented
-func bLSSign(key *bls.SecretKey, msg []byte) ([]byte, error) {
-	return crypto.RandEntropy(32)
+// Sign with BLS and return the compressed signature
+func bLSSign(sk *bls.SecretKey, pk *bls.PublicKey, msg []byte) ([]byte, error) {
+
+	sig, err := bls.Sign(sk, pk, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return sig.Compress(), nil
 }
-func blsVerify(pkey, msg []byte, signature []byte) error {
-	return nil
+
+// Verify a compressed bls signature
+func blsVerify(pkey, msg, signature []byte) error {
+	pk := &bls.PublicKey{}
+	if err := pk.Unmarshal(pkey); err != nil {
+		return err
+	}
+
+	sig := &bls.Signature{}
+	if err := sig.Decompress(signature); err != nil {
+		return err
+	}
+
+	apk := bls.NewApk(pk)
+	return bls.Verify(apk, msg, sig)
 }
 
 func edSign(privateKey *ed25519.PrivateKey, message []byte) []byte {
