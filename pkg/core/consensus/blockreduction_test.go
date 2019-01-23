@@ -17,39 +17,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-func TestProcessMsgReduction(t *testing.T) {
-	// Create context
-	ctx, err := provisionerContext()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a reduction phase voting message and get their amount of votes
-	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	votes, msg, err := newVoteReduction(ctx, 500, emptyBlock.Header.Hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Process the message
-	valid, retVotes, err := processMsg(ctx, msg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Message should be valid
-	if !valid {
-		t.Fatal("message was not valid")
-	}
-
-	// Votes should be equal
-	assert.Equal(t, votes, retVotes)
-}
-
 // Test functionality of vote counting with a clear outcome
 func TestReductionVoteCountDecisive(t *testing.T) {
 	// Create context
