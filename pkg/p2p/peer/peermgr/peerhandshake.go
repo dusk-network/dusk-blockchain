@@ -3,11 +3,12 @@ package peermgr
 import (
 	"errors"
 	"fmt"
+	"net"
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"net"
-	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -97,13 +98,16 @@ func (p *Peer) writeLocalMsgVersion() error {
 	if err != nil {
 		return err
 	}
-	fromAddr := payload.NetAddress{localIP, fromPort}
+	fromAddr := payload.NetAddress{
+		IP:   localIP,
+		Port: fromPort,
+	}
 
 	toIP := p.conn.RemoteAddr().(*net.TCPAddr).IP
 	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := payload.NewNetAddress(toIP.String(), uint16(toPort))
 
-	messageVer := payload.NewMsgVersion(version, p.Nonce, &fromAddr, toAddr)
+	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, p.Nonce)
 
 	return p.Write(messageVer)
 }

@@ -1,16 +1,17 @@
 package peermgr_test
 
 import (
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -294,7 +295,7 @@ func TestHandshakeWrongVersion(t *testing.T) {
 		fromAddr := payload.NewNetAddress("", 20338)
 		toAddr := payload.NewNetAddress("", 20338)
 
-		messageVer := payload.NewMsgVersion(10001, rand.Uint64(), fromAddr, toAddr)
+		messageVer := payload.NewMsgVersion(10001, fromAddr, toAddr, rand.Uint64())
 
 		if err := wire.WriteMessage(conn, protocol.DevNet, messageVer); err != nil {
 			t.Fatal(err)
@@ -414,7 +415,7 @@ func sendAndReadVersion(t *testing.T, conn net.Conn, nonce uint64) (*payload.Msg
 	fromAddr := payload.NewNetAddress("", 20338)
 	toAddr := payload.NewNetAddress("", 20338)
 
-	msgVersion := payload.NewMsgVersion(protocol.ProtocolVersion, nonce, fromAddr, toAddr)
+	msgVersion := payload.NewMsgVersion(protocol.ProtocolVersion, fromAddr, toAddr, nonce)
 	if err := wire.WriteMessage(conn, protocol.DevNet, msgVersion); err != nil {
 		return nil, err
 	}
