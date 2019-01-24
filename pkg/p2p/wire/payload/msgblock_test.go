@@ -15,14 +15,14 @@ import (
 func TestMsgBlockEncodeDecode(t *testing.T) {
 	b := block.NewBlock()
 
-	// Add 10 transactions
+	// Add 10 standard transactions
 	for i := 0; i < 10; i++ {
 		byte32 := []byte{1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4}
 
 		sig, _ := crypto.RandEntropy(2000)
 
 		txPubKey, _ := crypto.RandEntropy(32)
-		s := transactions.NewTX()
+		s := transactions.NewTX(transactions.StandardType, nil)
 		in := transactions.NewInput(txPubKey, txPubKey, 0, sig)
 		s.AddInput(in)
 		s.AddTxPubKey(txPubKey)
