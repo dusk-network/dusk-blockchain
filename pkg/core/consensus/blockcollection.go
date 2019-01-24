@@ -14,7 +14,7 @@ import (
 // be voted on in later phases.
 func BlockCollection(ctx *Context) error {
 	var senders [][]byte
-	var blocks []*block.Block
+	blocks := make([]*block.Block, 0)
 	var highest uint64
 	timer := time.NewTimer(candidateTime)
 
@@ -33,6 +33,14 @@ func BlockCollection(ctx *Context) error {
 			// Type checks
 			if m.ID == consensusmsg.CandidateID {
 				pl := m.Payload.(*consensusmsg.Candidate)
+
+				// See if we already have it
+				for _, block := range blocks {
+					if bytes.Equal(pl.Block.Header.Hash, block.Header.Hash) {
+						break out
+					}
+				}
+
 				blocks = append(blocks, pl.Block)
 			}
 

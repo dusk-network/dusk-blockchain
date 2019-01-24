@@ -396,8 +396,11 @@ func newVoteAgreement(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 			return 0, nil, err
 		}
 
-		// Create agreement payload to gossip
+		// Set BLS on context
 		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
+		c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
+
+		// Create agreement payload to gossip
 		pl, err := consensusmsg.NewAgreement(ctx.Score, ctx.Empty, ctx.step, blockHash,
 			sigBLS, blsPubBytes)
 		if err != nil {

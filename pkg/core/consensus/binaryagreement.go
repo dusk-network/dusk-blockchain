@@ -180,7 +180,7 @@ func committeeVoteBinary(ctx *Context) (*payload.MsgConsensus, error) {
 func countVotesBinary(ctx *Context) ([]*payload.MsgConsensus, error) {
 	counts := make(map[string]uint64)
 	var voters [][]byte
-	var allMsgs []*payload.MsgConsensus
+	allMsgs := make([]*payload.MsgConsensus, 0)
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
 	timer := time.NewTimer(stepTime)

@@ -58,8 +58,6 @@ type Context struct {
 	SignatureSet   []byte            // Signature set for signature set reduction phase
 	NodeWeights    map[string]uint64 // Other nodes' stake weights mapped to their Ed25519 public key
 	NodeBLS        map[string][]byte // Other nodes' Ed25519 public keys mapped to their BLS public keys
-	// q          chan bool               // Channel used to halt BA phase in case of a decision from set agreement
-	// Signatures []*payload.SignatureSet // Result of set agreement phase
 
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
@@ -107,7 +105,6 @@ func NewGeneratorContext(Tau uint64, keys *Keys) (*Context, error) {
 // XXX: Passing funcs as param will lead to big func sig. Put all funcs in a struct and pass struct in
 // Check the func pointers are not nil, return err if so
 func NewProvisionerContext(totalWeight, round uint64, seed []byte, magic protocol.Magic, keys *Keys) (*Context, error) {
-
 	if keys == nil {
 		return nil, errors.New("Key is nil")
 	}
@@ -133,7 +130,6 @@ func NewProvisionerContext(totalWeight, round uint64, seed []byte, magic protoco
 		Keys:        keys,
 		NodeWeights: make(map[string]uint64),
 		NodeBLS:     make(map[string][]byte),
-		// q:           make(chan bool),
 	}
 
 	ctx.setLastHeader()
@@ -173,13 +169,7 @@ func (c *Context) Clear() {
 	c.BLSVerify = nil
 	c.GetAllTXs = nil
 	c.Keys = nil
-	// c.Committee = nil
 }
-
-// RaiseVoteLimit will adjust the provisioner vote limit for the final step.
-// func (c *Context) RaiseVoteLimit() {
-// 	c.VoteLimit = uint8(float64(len(c.Committee.Members)) * 0.8)
-// }
 
 // dummy functions
 func (c *Context) setLastHeader() *block.Header {
@@ -199,7 +189,7 @@ func (c *Context) setLastHeader() *block.Header {
 }
 
 func getAllTXs() []*transactions.Stealth {
-	tx := transactions.NewTX()
+	tx := transactions.NewTX(transactions.StandardType, nil)
 
 	keyImage, _ := crypto.RandEntropy(32)
 	TxID, _ := crypto.RandEntropy(32)
@@ -220,7 +210,6 @@ func getAllTXs() []*transactions.Stealth {
 
 // Sign with BLS and return the compressed signature
 func bLSSign(sk *bls.SecretKey, pk *bls.PublicKey, msg []byte) ([]byte, error) {
-
 	sig, err := bls.Sign(sk, pk, msg)
 	if err != nil {
 		return nil, err

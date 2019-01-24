@@ -284,8 +284,11 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 			return 0, nil, err
 		}
 
-		// Create reduction payload to gossip
+		// Set BLS key on context
 		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
+		c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
+
+		// Create reduction payload to gossip
 		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.step, blockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return 0, nil, err

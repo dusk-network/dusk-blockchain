@@ -31,6 +31,9 @@ func processMsg(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error) {
 	return verifyPayload(ctx, msg)
 }
 
+// More specific payload verification function. This basically acts as a filter,
+// to get a specific payload out of a consensus message and applying the proper
+// verification functions.
 func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error) {
 	stake := ctx.NodeWeights[hex.EncodeToString(msg.PubKey)]
 
@@ -46,7 +49,7 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 			return false, 0, err
 		}
 
-		return true, votes, nil
+		return verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS), votes, nil
 	case consensusmsg.AgreementID:
 		pl := msg.Payload.(*consensusmsg.Agreement)
 		votes, err := verifyAgreement(ctx, pl, stake)
@@ -54,17 +57,26 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 			return false, 0, err
 		}
 
-		return true, votes, nil
+		return verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS), votes, nil
 	// case consensusmsg.SetAgreementID:
 
 	case consensusmsg.SigSetCandidateID:
 		return true, stake, nil
 	case consensusmsg.SigSetVoteID:
 		pl := msg.Payload.(*consensusmsg.SigSetVote)
+		if !verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS) {
+			return false, 0, nil
+		}
+
 		return verifySigSetVote(ctx, pl), stake, nil
 	default:
 		return false, 0, fmt.Errorf("consensus: consensus payload has unrecognized ID %v", msg.Payload.Type())
 	}
+}
+
+func verifyBLSKey(ctx *Context, pubKeyEd, pubKeyBls []byte) bool {
+	pk := hex.EncodeToString(pubKeyEd)
+	return bytes.Equal(ctx.NodeBLS[pk], pubKeyBls)
 }
 
 func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (uint64, error) {

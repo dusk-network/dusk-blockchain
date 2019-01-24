@@ -43,20 +43,15 @@ func TestGenerateX(t *testing.T) {
 
 //XXX: Add fixed test input vectors to outputs
 func TestBlockGeneration(t *testing.T) {
-
 	for i := 0; i < 1000; i++ {
-
 		ctx, err := NewGeneratorContext(200, randtestKeys(t))
 		assert.Equal(t, nil, err)
 
 		k, err := crypto.RandEntropy(32)
 		assert.Equal(t, err, nil)
 
-		msgCan, candidateBlock, err := GenerateBlock(ctx, k)
+		err = GenerateBlock(ctx, k)
 		assert.Equal(t, nil, err)
-		assert.NotEqual(t, nil, msgCan)
-		assert.NotEqual(t, nil, candidateBlock)
-
 	}
 }
 

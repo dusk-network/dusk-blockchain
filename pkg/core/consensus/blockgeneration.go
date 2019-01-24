@@ -17,29 +17,29 @@ import (
 
 // GenerateBlock will generate a blockMsg and ScoreMsg
 // if node is eligible.
-func GenerateBlock(ctx *Context, k []byte) (*payload.MsgConsensus, *payload.MsgConsensus, error) {
+func GenerateBlock(ctx *Context, k []byte) error {
 
 	err := generateParams(ctx)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	// check threshold (eligibility)
 	if ctx.Q <= ctx.Tau {
-		return nil, nil, errors.New("Score is less than tau (threshold)")
+		return errors.New("Score is less than tau (threshold)")
 	}
 
 	// Generate ZkProof and Serialise
 	// XXX: Prove may return error, so chaining like this may not be possible once zk implemented
 	zkBytes, err := zkproof.Prove(ctx.X, ctx.Y, ctx.Z, ctx.M, ctx.k, ctx.Q, ctx.d).Bytes()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	// Generate candidate block
 	candidateBlock, err := newCandidateBlock(ctx)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	// Create score msg
@@ -50,24 +50,28 @@ func GenerateBlock(ctx *Context, k []byte) (*payload.MsgConsensus, *payload.MsgC
 		ctx.Seed,                   // seed for this round // XXX(TOG): could we use round number/Block height?
 	)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	sigEd, err := createSignature(ctx, pl)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 		sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
-		return nil, nil, err
+		return err
+	}
+
+	if err := ctx.SendMessage(ctx.Magic, msgScore); err != nil {
+		return err
 	}
 
 	// Create candidate msg - Implement when candidate code is done
 	// msgCandidate := payload.NewMsgBlock(candidateBlock)
 
-	return msgScore, nil, nil
+	return nil
 }
 
 // generate M, X, Y, Z, Q
