@@ -11,6 +11,13 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+// TypeInfo is an interface for type-specific transaction information.
+type TypeInfo interface {
+	Encode(w io.Writer) error
+	Decode(r io.Reader) error
+	Type() TxType
+}
+
 // Stealth defines a stealth transaction.
 type Stealth struct {
 	Version  uint8  // 1 byte
@@ -18,24 +25,26 @@ type Stealth struct {
 	R        []byte // 32 bytes
 	Inputs   []*Input
 	Outputs  []*Output
+	TypeInfo TypeInfo
 	LockTime uint64 // 8 bytes
 	Hash     []byte // 32 bytes
 }
 
-// NewTX will return a standard transaction
-func NewTX() *Stealth {
+// NewTX will return a transaction with the specified type and type info.
+func NewTX(t TxType, info TypeInfo) *Stealth {
 	return &Stealth{
-		Version: 0x00,
-		Type:    StandardType,
+		Version:  0x00,
+		Type:     t,
+		TypeInfo: info,
 	}
 }
 
-// AddInput will add an input to the transaction's TypeAttributes
+// AddInput will add an input to the transaction
 func (s *Stealth) AddInput(input *Input) {
 	s.Inputs = append(s.Inputs, input)
 }
 
-// AddOutput will add an output to the transaction's TypeAttributes
+// AddOutput will add an output to the transaction
 func (s *Stealth) AddOutput(output *Output) {
 	s.Outputs = append(s.Outputs, output)
 }
@@ -52,6 +61,7 @@ func (s *Stealth) Clear() {
 	s.Inputs = nil
 	s.R = nil
 	s.Outputs = nil
+	s.LockTime = 0
 	s.Hash = nil
 }
 
@@ -104,6 +114,12 @@ func (s *Stealth) EncodeHashable(w io.Writer) error {
 
 	for _, output := range s.Outputs {
 		if err := output.Encode(w); err != nil {
+			return err
+		}
+	}
+
+	if s.TypeInfo != nil {
+		if err := s.TypeInfo.Encode(w); err != nil {
 			return err
 		}
 	}
@@ -168,6 +184,20 @@ func (s *Stealth) Decode(r io.Reader) error {
 		if err := s.Outputs[i].Decode(r); err != nil {
 			return err
 		}
+	}
+
+	switch s.Type {
+	case StandardType:
+		s.TypeInfo = nil
+	case BidType:
+		//
+	case StakeType:
+		typeInfo := &Stake{}
+		if err := typeInfo.Decode(r); err != nil {
+			return err
+		}
+
+		s.TypeInfo = typeInfo
 	}
 
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &s.LockTime); err != nil {
