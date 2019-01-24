@@ -160,7 +160,7 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		dest, _ := crypto.RandEntropy(32)
 		out := transactions.NewOutput(200, dest, sig)
 		txPubKey, _ := crypto.RandEntropy(32)
-		s := transactions.NewTX()
+		s := transactions.NewTX(transactions.StandardType, nil)
 		s.AddInput(in)
 		s.AddOutput(out)
 		s.AddTxPubKey(txPubKey)
