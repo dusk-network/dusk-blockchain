@@ -67,15 +67,14 @@ func (b *Blockchain) SetupProvisioners() error {
 // stake amount.
 func (b *Blockchain) AddProvisionerInfo(tx *transactions.Stealth, amount uint64) {
 	// Set information on blockchain struct
-	pk := hex.EncodeToString(tx.R) // TODO: implement a special stake type that includes an ed25519 public key
-	// TODO: Add bls public key
-	b.provisioners[pk].Stakes = append(b.provisioners[pk].Stakes, tx)
-	b.provisioners[pk].TotalAmount += amount
+	info := tx.TypeInfo.(*transactions.Stake)
+	pkEd := hex.EncodeToString(info.PubKeyEd)
+	b.provisioners[pkEd].Stakes = append(b.provisioners[pkEd].Stakes, tx)
+	b.provisioners[pkEd].TotalAmount += amount
 
 	// Set information on context object
-	b.ctx.NodeWeights[pk] = b.provisioners[pk].TotalAmount
-	// TODO: Add bls public key
-	// b.ctx.NodeKeys[pk] = tx.BLS
+	b.ctx.NodeWeights[pkEd] = b.provisioners[pkEd].TotalAmount
+	b.ctx.NodeBLS[pkEd] = info.PubKeyBLS
 }
 
 // UpdateProvisioners will run through all known nodes and check if they have
@@ -97,9 +96,6 @@ func (b *Blockchain) UpdateProvisioners() {
 
 				// Update context info as well
 				b.ctx.NodeWeights[pk] = node.TotalAmount
-				if node.TotalAmount == 0 {
-					// Remove BLS public key
-				}
 
 				// Finally, cut the tx out of the array
 				node.Stakes = append(node.Stakes[:i], node.Stakes[i+1:]...)

@@ -192,30 +192,38 @@ func (b *Blockchain) provisionerLoop() {
 }
 
 // Placeholder at the moment, just to get structure down
-//func (b *Blockchain) generatorLoop() {
-//	b.generator = true
-//
-//	for {
-//		select {
-//		case <-b.quitChan:
-//			b.generator = false
-//			return
-//		case <-b.roundChan:
-//			if err := b.Generate(nil); err != nil {
-//				// Log
-//				b.generator = false
-//				return
-//			}
-//		}
-//	}
-//}
+func (b *Blockchain) generatorLoop() {
+	b.generator = true
+
+	for {
+		select {
+		case <-b.quitChan:
+			b.generator = false
+			return
+		case <-b.roundChan:
+			if err := consensus.GenerateBlock(ctx, nil); err != nil {
+				// Log
+				b.generator = false
+				return
+			}
+		}
+	}
+}
 
 // AcceptTx attempt to verify a transaction once it is received from
 // the network. If the verification passes, this transaction will
 // be added to the mempool.
 func (b *Blockchain) AcceptTx(tx *transactions.Stealth) error {
 	// Check if we already have this in the database first
-	// Implement when database is added
+	key := append(database.TX, tx.Hash...)
+	exists, err := b.db.Has(key)
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		return nil
+	}
 
 	// Check if this transaction is already in the mempool
 	if b.memPool.Exists(tx.Hex()) {
@@ -227,6 +235,23 @@ func (b *Blockchain) AcceptTx(tx *transactions.Stealth) error {
 	}
 
 	b.memPool.AddTx(tx)
+
+	// Update consensus values
+	if b.provisioner {
+		// Update provisioners
+		if tx.Type == transactions.StakeType {
+			var amount uint64
+			for _, output := range tx.Outputs {
+				amount += output.Amount
+			}
+
+			b.AddProvisionerInfo(tx, amount)
+			b.totalStakeWeight += amount
+		}
+	}
+
+	// if b.generator
+
 	// Relay tx
 	return nil
 }
@@ -262,8 +287,7 @@ func (b *Blockchain) VerifyTx(tx *transactions.Stealth) error {
 // to the database.
 func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 	// Check if we already have this in the database first
-	db := database.GetInstance()
-	exists, err := db.Has(blk.Header.Hash)
+	exists, err := b.db.Has(blk.Header.Hash)
 	if err != nil {
 		return err
 	}
@@ -273,7 +297,7 @@ func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 	}
 
 	// Check if previous block hash is correct
-	hdr, err := db.GetBlockHeaderByHeight(blk.Header.Height - 1)
+	hdr, err := b.db.GetBlockHeaderByHeight(blk.Header.Height - 1)
 	if err != nil {
 		return err
 	}
@@ -309,27 +333,14 @@ func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 		if b.memPool.Exists(tx.Hex()) {
 			b.memPool.RemoveTx(tx)
 		}
-
-		if b.provisioner {
-			// Update provisioners
-			if tx.Type == transactions.StakeType {
-				var amount uint64
-				for _, output := range tx.Outputs {
-					amount += output.Amount
-				}
-
-				b.AddProvisionerInfo(tx, amount)
-				b.totalStakeWeight += amount
-			}
-		}
 	}
 
 	// Add to database
-	//if err := db.WriteHeaders([]*block.Header{block.Header}); err != nil {
+	//if err := b.db.WriteHeaders([]*block.Header{block.Header}); err != nil {
 	//	return err
 	//}
 
-	if err := db.WriteBlockTransactions([]*block.Block{blk}); err != nil {
+	if err := b.db.WriteBlockTransactions([]*block.Block{blk}); err != nil {
 		return err
 	}
 
@@ -496,6 +507,10 @@ func (b *Blockchain) StartProvisioning() error {
 	}
 
 	b.ctx = ctx
+	if err := b.SetupProvisioners(); err != nil {
+		return err
+	}
+
 	go b.provisionerLoop()
 	return nil
 }
