@@ -237,6 +237,7 @@ func (s *Syncmgr) OnMemPool(p *peermgr.Peer, msg *payload.MsgMemPool) {
 	//}
 }
 
-func (s *Syncmgr) OnReject(p *peermgr.Peer, msg *payload.MsgMemPool) {
-	// TODO
+// OnReject (TODO)
+func (s *Syncmgr) OnReject(p *peermgr.Peer, msg *payload.MsgReject) {
+
 }

@@ -55,13 +55,12 @@ func (c *Connmgr) NewRequest() {
 		return
 	}
 
-	// empty request item
+	// Empty request item
 	r := &Request{}
 
 	r.Addr = addr.String()
 	log.WithField("prefix", "connmgr").Infof("Connecting to peer %s", addr)
 
-	// Asynchronous, no error returned.
 	// Will create connection from newAddrs and adds it to the ConnectedList
 	c.Connect(r)
 }
@@ -245,51 +244,52 @@ func (c *Connmgr) loop() {
 
 // OnConnection is called when a successful outbound connection has been made
 func (c *Connmgr) OnConnection(conn net.Conn, addr string) {
-	log.WithField("prefix", "noded").Infof("A connection to node %s was created", addr)
+	log.WithField("prefix", "connmgr").Infof("A connection to node %s was created", addr)
 
 	sm, _ := syncmgr.GetInstance()
 	p := sm.CreatePeer(conn, false)
 	err := p.Run()
 
 	if err != nil {
-		log.WithField("prefix", "noded").Errorf("Failed to run peer: %s", err.Error())
+		log.WithField("prefix", "connmgr").Errorf("Failed to run peer: %s", err.Error())
+		c.OnFail(p.RemoteAddr().String())
+		p.Disconnect()
+		return
 	}
 
-	if err == nil {
-		am := addrmgr.GetInstance()
-		am.ConnectionComplete(conn.RemoteAddr().String(), false)
-	}
+	am := addrmgr.GetInstance()
+	am.ConnectionComplete(conn.RemoteAddr().String(), false)
 
-	// This is here just to quickly test the system
+	log.WithField("prefix", "connmgr").Infof("Connected successfully to peer %s", p.RemoteAddr().String())
+
+	// TODO: Do this by triggering a 'RequestHeaders' event
 	chain, _ := core.GetBcInstance()
 	latestHdr, _ := chain.GetLatestHeader()
-	err = p.RequestHeaders(latestHdr.Hash)
-	log.Info("For tests, we are only fetching first 2k batch")
-	if err != nil {
+	if err = p.RequestHeaders(latestHdr.Hash); err != nil {
 		fmt.Println(err.Error())
+		log.WithField("prefix", "connmgr").Errorf("Failed to request headers from peer %s: %s", addr, err.Error())
 	}
 }
 
 // OnAccept is called when a successful inbound connection has been made
 func (c *Connmgr) OnAccept(conn net.Conn) {
-	log.WithField("prefix", "noded").Infof("Peer %s wants to connect", conn.RemoteAddr().String())
+	log.WithField("prefix", "connmgr").Infof("Peer %s wants to connect", conn.RemoteAddr().String())
 
 	sm, _ := syncmgr.GetInstance()
 	p := sm.CreatePeer(conn, true)
 
 	err := p.Run()
 	if err != nil {
-		log.WithField("prefix", "noded").Errorf("Failed to run peer: %s", err.Error())
+		log.WithField("prefix", "connmgr").Errorf("Failed to run peer: %s", err.Error())
+		c.OnFail(p.RemoteAddr().String())
+		p.Disconnect()
+		return
 	}
 
-	if err == nil {
-		//sm, _ := syncmgr.GetBcInstance()
-		//sm.AddPeer(p)
-		am := addrmgr.GetInstance()
-		am.ConnectionComplete(conn.RemoteAddr().String(), true)
-	}
+	am := addrmgr.GetInstance()
+	am.ConnectionComplete(conn.RemoteAddr().String(), true)
 
-	log.WithField("prefix", "noded").Infof("Start listening for requests from node address %s", conn.RemoteAddr().String())
+	log.WithField("prefix", "connmgr").Infof("Accepted peer %s successfully", p.RemoteAddr().String())
 }
 
 // GetAddress gets a new address from Address Manager
@@ -298,7 +298,7 @@ func (c *Connmgr) GetAddress() (*payload.NetAddress, error) {
 	return am.NewAddr()
 }
 
-// OnFail is called when outbound connection failed
+// OnFail is called when a connection failed
 func (c *Connmgr) OnFail(addr string) {
 	am := addrmgr.GetInstance()
 	am.Failed(addr)
@@ -308,7 +308,7 @@ func (c *Connmgr) OnFail(addr string) {
 func (c *Connmgr) OnMinGetAddr() {
 	sm, _ := syncmgr.GetInstance()
 	if err := sm.RequestAddresses(); err != nil {
-		log.WithField("prefix", "noded").Error("Failed to get addresses from peer after exceeding limit")
+		log.WithField("prefix", "connmgr").Error("Failed to get addresses from peer after exceeding limit")
 	}
 }
 

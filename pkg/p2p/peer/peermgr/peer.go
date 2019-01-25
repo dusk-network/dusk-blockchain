@@ -6,6 +6,7 @@ package peermgr
 
 import (
 	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	cfg "github.com/spf13/viper"
 	"math/rand"
@@ -478,10 +479,12 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	}
 
 	if protocol.ProtocolVersion != msg.Version {
-		log.WithField("prefix", "peer").Infof("Received an invalid '%s' message from %s\n"+
-			"Dusk backwards compatible Version Management not implemented yet", commands.Version, p.addr)
+		error := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
+		log.WithField("prefix", "peer").Infof("TODO: Implement backwards compatible Version Management")
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
-		return p.Write(rejectMsg)
+		p.Write(rejectMsg)
+
+		return errors.New(error)
 	}
 
 	p.versionKnown = true

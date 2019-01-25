@@ -55,9 +55,24 @@ func (p *Peer) inboundHandShake() error {
 	if err = p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
-	if err = p.readRemoteMsgVersion(); err != nil {
+
+	readmsg, err := wire.ReadMessage(p.conn, p.Net())
+	if err != nil {
 		return err
 	}
+
+	switch msg := readmsg.(type) {
+	case *payload.MsgReject:
+		p.Disconnect()
+	case *payload.MsgVersion:
+		if err := p.OnVersion(msg); err != nil {
+			return err
+		}
+	default:
+		log.WithField("prefix", "peer").Warnf("Did not recognise message '%s'", msg.Command())
+		p.Disconnect()
+	}
+
 	verack := payload.NewMsgVerAck()
 	err = p.Write(verack)
 	return p.readVerack()

@@ -309,7 +309,6 @@ func TestHandshakeWrongVersion(t *testing.T) {
 		if !ok {
 			t.Fatal(err)
 		}
-
 		return
 	}
 }

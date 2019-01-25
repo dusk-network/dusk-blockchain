@@ -46,7 +46,7 @@ func (s *Syncmgr) setupPeerResponseHandler() peermgr.ResponseHandler {
 		//OnPing:           s.OnPing,
 		//OnPong:           s.OnPong,
 		//OnReduction:      s.OnReduction,
-		//OnReject:         s.OnReject,
+		OnReject: s.OnReject,
 		//OnScore:          s.OnScore
 		//OnInv:            s.OnInv
 	}
