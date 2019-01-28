@@ -99,7 +99,7 @@ func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*block.Block) error {
 			// This is the main mapping
 			// Key: [TX] + TXHASH
 			txBytes := buf.Bytes()
-			txKey := append(TX, tx.Hash...)
+			txKey := append(TX, tx.R...)
 			kv[string(txKey)] = txBytes
 
 			// This is the index
@@ -108,7 +108,7 @@ func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*block.Block) error {
 			txHashKey := append(append(TX, b.Header.Hash...))
 			txHashKey = append(txHashKey, Uint32ToBytes(uint32(j))...)
 
-			kv[string(txHashKey)] = tx.Hash
+			kv[string(txHashKey)] = tx.R
 		}
 	}
 

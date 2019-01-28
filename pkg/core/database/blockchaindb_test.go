@@ -105,7 +105,7 @@ func TestAddBlockTransactions(t *testing.T) {
 			tx.Encode(buf)
 			txBytes := buf.Bytes()
 
-			txKey := append(database.TX, tx.Hash...)
+			txKey := append(database.TX, tx.R...)
 			dbTxBytes, _ := db.Get(txKey)
 
 			txHashKey := append(database.TX, b.Header.Hash...)
@@ -113,7 +113,7 @@ func TestAddBlockTransactions(t *testing.T) {
 			dbTxHash, _ := db.Get(txHashKey)
 
 			assert.Equal(t, txBytes, dbTxBytes)
-			assert.Equal(t, tx.Hash, dbTxHash)
+			assert.Equal(t, tx.R, dbTxHash)
 		}
 	}
 }
@@ -135,7 +135,7 @@ func createBlockFixtures(totalBlocks, totalTxs int) ([]*block.Block, error) {
 			Seed:      seed,
 			TxRoot:    txRoot,
 			Hash:      nil,
-			CertImage: certImage,
+			CertHash:  certImage,
 		}
 		h.SetHash()
 		// Create random Txs
@@ -159,11 +159,10 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		in := transactions.NewInput(key, txID, 1, sig)
 		dest, _ := crypto.RandEntropy(32)
 		out := transactions.NewOutput(200, dest, sig)
-		txPubKey, _ := crypto.RandEntropy(32)
+		pl := transactions.NewStandard(100)
 		s := transactions.NewTX(transactions.StandardType, nil)
-		s.AddInput(in)
-		s.AddOutput(out)
-		s.AddTxPubKey(txPubKey)
+		pl.AddInput(in)
+		pl.AddOutput(out)
 		s.SetHash()
 		txs[i] = s
 	}
