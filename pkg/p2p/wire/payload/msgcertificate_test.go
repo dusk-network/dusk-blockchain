@@ -19,14 +19,13 @@ func TestMsgCertificateEncodeDecode(t *testing.T) {
 	rand1, _ := crypto.RandEntropy(32)
 	rand2, _ := crypto.RandEntropy(32)
 
-	sig, _ := crypto.RandEntropy(32)
+	sig, _ := crypto.RandEntropy(33)
 
-	cert := block.NewCertificate(sig)
-	for i := 1; i < 4; i++ {
-		step := block.NewStep(uint32(i))
-		step.AddData(rand1, rand2)
-		cert.AddStep(step)
-	}
+	slice := make([][]byte, 0)
+	slice = append(slice, rand1)
+	slice = append(slice, rand2)
+
+	cert := block.NewCertificate(sig, 4, rand1, slice, sig, 2, rand2, slice)
 
 	if err := cert.SetHash(); err != nil {
 		t.Fatal(err)
@@ -58,14 +57,13 @@ func TestMsgCertificateChecks(t *testing.T) {
 	rand1, _ := crypto.RandEntropy(32)
 	rand2, _ := crypto.RandEntropy(32)
 
-	sig, _ := crypto.RandEntropy(32)
+	sig, _ := crypto.RandEntropy(33)
 
-	cert := block.NewCertificate(sig)
-	for i := 1; i < 4; i++ {
-		step := block.NewStep(uint32(i))
-		step.AddData(rand1, rand2)
-		cert.AddStep(step)
-	}
+	slice := make([][]byte, 0)
+	slice = append(slice, rand1)
+	slice = append(slice, rand2)
+
+	cert := block.NewCertificate(sig, 4, rand1, slice, sig, 2, rand2, slice)
 
 	if _, err := payload.NewMsgCertificate(200, wrongHash, cert); err == nil {
 		t.Fatal("check for hash did not work")

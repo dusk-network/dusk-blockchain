@@ -26,7 +26,7 @@ func NewMsgGetData() *MsgGetData {
 func (m *MsgGetData) AddTx(tx *transactions.Stealth) {
 	vect := &InvVect{
 		Type: InvTx,
-		Hash: tx.Hash,
+		Hash: tx.R,
 	}
 
 	m.Vectors = append(m.Vectors, vect)

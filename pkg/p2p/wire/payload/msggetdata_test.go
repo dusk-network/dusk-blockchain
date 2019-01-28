@@ -17,13 +17,14 @@ func TestMsgGetDataEncodeDecodeTx(t *testing.T) {
 	sig, _ := crypto.RandEntropy(2000)
 
 	txPubKey, _ := crypto.RandEntropy(32)
-	s := transactions.NewTX(transactions.StandardType, nil)
+	pl := transactions.NewStandard(100)
+	s := transactions.NewTX(transactions.StandardType, pl)
 	in := transactions.NewInput(txPubKey, txPubKey, 0, sig)
-	s.AddInput(in)
-	s.AddTxPubKey(txPubKey)
+	pl.AddInput(in)
+	s.R = txPubKey
 
 	out := transactions.NewOutput(200, byte32, sig)
-	s.AddOutput(out)
+	pl.AddOutput(out)
 	if err := s.SetHash(); err != nil {
 		t.Fatal(err)
 	}
@@ -54,13 +55,14 @@ func TestMsgGetDataEncodeDecodeBlock(t *testing.T) {
 		sig, _ := crypto.RandEntropy(2000)
 
 		txPubKey, _ := crypto.RandEntropy(32)
-		s := transactions.NewTX(transactions.StandardType, nil)
+		pl := transactions.NewStandard(100)
+		s := transactions.NewTX(transactions.StandardType, pl)
 		in := transactions.NewInput(txPubKey, txPubKey, 0, sig)
-		s.AddInput(in)
-		s.AddTxPubKey(txPubKey)
+		pl.AddInput(in)
+		s.R = txPubKey
 
 		out := transactions.NewOutput(200, byte32, sig)
-		s.AddOutput(out)
+		pl.AddOutput(out)
 		if err := s.SetHash(); err != nil {
 			t.Fatal(err)
 		}
@@ -77,20 +79,19 @@ func TestMsgGetDataEncodeDecodeBlock(t *testing.T) {
 	rand1, _ := crypto.RandEntropy(32)
 	rand2, _ := crypto.RandEntropy(32)
 
-	sig, _ := crypto.RandEntropy(32)
+	sig, _ := crypto.RandEntropy(33)
 
-	cert := block.NewCertificate(sig)
-	for i := 1; i < 4; i++ {
-		step := block.NewStep(uint32(i))
-		step.AddData(rand1, rand2)
-		cert.AddStep(step)
-	}
+	slice := make([][]byte, 0)
+	slice = append(slice, rand1)
+	slice = append(slice, rand2)
+
+	cert := block.NewCertificate(sig, 4, rand1, slice, sig, 2, rand2, slice)
 
 	if err := cert.SetHash(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := b.AddCertImage(cert); err != nil {
+	if err := b.AddCertHash(cert); err != nil {
 		t.Fatal(err)
 	}
 
@@ -99,7 +100,7 @@ func TestMsgGetDataEncodeDecodeBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	b.SetTime(time.Now().Unix())
+	b.Header.Timestamp = time.Now().Unix()
 	if err := b.SetHash(); err != nil {
 		t.Fatal(err)
 	}

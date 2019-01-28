@@ -81,7 +81,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	assert.Equal(t, msg3, msg4)
 
 	// Signature Set Candidate
-	pl3, err := consensusmsg.NewSigSetCandidate(byte32, sigs)
+	pl3, err := consensusmsg.NewSigSetCandidate(byte32, sigs, byte32, sigBLS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	assert.Equal(t, msg5, msg6)
 
 	// Signature Set Vote
-	pl4, err := consensusmsg.NewSigSetVote(1, sigs, sigBLS, byte32)
+	pl4, err := consensusmsg.NewSigSetVote(1, byte32, byte32, sigBLS, byte32, sigBLS)
 	if err != nil {
 		t.Fatal(err)
 	}
