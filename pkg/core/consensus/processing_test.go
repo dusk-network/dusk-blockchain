@@ -32,7 +32,7 @@ func TestProcessMsgReduction(t *testing.T) {
 	}
 
 	// Message should be valid
-	if !valid {
+	if retVotes == 0 || !valid {
 		t.Fatal("message was not valid")
 	}
 
@@ -40,7 +40,7 @@ func TestProcessMsgReduction(t *testing.T) {
 	assert.Equal(t, votes, retVotes)
 }
 
-func TestProcessMsgAgreement(t *testing.T) {
+func TestFaultyMsgRound(t *testing.T) {
 	// Create context
 	ctx, err := provisionerContext()
 	if err != nil {
@@ -52,25 +52,50 @@ func TestProcessMsgAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a binary agreement phase voting message and get their amount of votes
-	votes, msg, err := newVoteAgreement(ctx, 500, emptyBlock.Header.Hash)
+	_, msg, err := newVoteReduction(ctx, 500, emptyBlock.Header.Hash)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Process the message
+	// Change our round and verify the message (should fail)
+	ctx.Round++
 	valid, retVotes, err := processMsg(ctx, msg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Should be valid
-	if !valid {
-		t.Fatal("message was not valid")
+	if retVotes != 0 && valid {
+		t.Fatal("wrong round did not get caught by check")
+	}
+}
+
+func TestFaultyMsgStep(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// Votes should be equal
-	assert.Equal(t, votes, retVotes)
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, msg, err := newVoteReduction(ctx, 500, emptyBlock.Header.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Change our step and verify the message (should fail)
+	ctx.Step++
+	valid, retVotes, err := processMsg(ctx, msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if retVotes != 0 && valid {
+		t.Fatal("wrong step did not get caught by check")
+	}
 }
 
 // TODO: implement missing message types

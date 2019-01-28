@@ -17,7 +17,7 @@ import (
 
 // GenerateBlock will generate a blockMsg and ScoreMsg
 // if node is eligible.
-func GenerateBlock(ctx *Context, k []byte) error {
+func GenerateBlock(ctx *Context) error {
 
 	err := generateParams(ctx)
 	if err != nil {
@@ -179,10 +179,7 @@ func newCandidateBlock(ctx *Context) (*block.Block, error) {
 
 	candidateBlock := block.NewBlock()
 
-	err := candidateBlock.SetPrevBlock(ctx.LastHeader)
-	if err != nil {
-		return nil, err
-	}
+	candidateBlock.SetPrevBlock(ctx.LastHeader)
 
 	// Seed is the candidate signature of the previous seed
 	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.LastHeader.Seed)
@@ -190,12 +187,9 @@ func newCandidateBlock(ctx *Context) (*block.Block, error) {
 		return nil, err
 	}
 
-	err = candidateBlock.SetSeed(seed)
-	if err != nil {
-		return nil, err
-	}
-
-	candidateBlock.SetTime(time.Now().Unix())
+	candidateBlock.Header.Seed = seed
+	candidateBlock.Header.Height = ctx.Round
+	candidateBlock.Header.Timestamp = time.Now().Unix()
 
 	// XXX: Generate coinbase/reward beforehand
 	// Coinbase is still not decided

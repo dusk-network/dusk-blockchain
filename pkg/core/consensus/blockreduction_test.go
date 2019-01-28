@@ -28,7 +28,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	// Set stake weight and vote limit, and generate a score
@@ -61,7 +61,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 	}()
 
 	// Send the vote out, and block until the counting function returns
-	ctx.msgs <- msg
+	ctx.ReductionChan <- msg
 	wg.Wait()
 
 	// BlockHash should not be nil after receiving vote
@@ -79,7 +79,7 @@ func TestReductionVoteCountIndecisive(t *testing.T) {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	// Set stake weight and vote limit, and generate a score
@@ -137,7 +137,7 @@ func TestBlockReductionDecisive(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				ctx.msgs <- msg
+				ctx.ReductionChan <- msg
 			}
 		}
 	}()
@@ -186,7 +186,7 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				ctx.msgs <- msg
+				ctx.ReductionChan <- msg
 			}
 		}
 	}()
@@ -232,7 +232,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				ctx.msgs <- msg
+				ctx.ReductionChan <- msg
 			}
 		}
 	}()
@@ -256,7 +256,7 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 
 	// Create context
 	keys, _ := NewRandKeys()
-	ctx, err := NewProvisionerContext(c.W, c.Round, c.Seed, c.Magic, keys)
+	ctx, err := NewContext(0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -265,12 +265,12 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
-	ctx.step = c.step
+	ctx.Step = c.Step
 
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	if err := sortition(ctx, role); err != nil {
@@ -289,7 +289,7 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 		c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
 
 		// Create reduction payload to gossip
-		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.step, blockHash, sigBLS, blsPubBytes)
+		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.Step, blockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return 0, nil, err
 		}

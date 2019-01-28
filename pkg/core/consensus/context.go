@@ -20,7 +20,7 @@ import (
 // Global consensus variables
 var (
 	maxMembers          = 200
-	maxSteps      uint8 = 50
+	MaxSteps      uint8 = 50
 	stepTime            = 20 * time.Second
 	candidateTime       = 60 * time.Second
 )
@@ -32,14 +32,14 @@ type Context struct {
 	// Common variables
 	Version    uint32
 	Tau        uint64
+	Threshold  uint64
 	Round      uint64        // Current round
-	step       uint8         // Current step
+	Step       uint8         // Current step
 	Seed       []byte        // Round seed
 	LastHeader *block.Header // Previous block
 	k          []byte        // secret
 	Keys       *Keys
 	Magic      protocol.Magic
-	msgs       chan *payload.MsgConsensus
 
 	// Block generator values
 	d          uint64 // bidWeight
@@ -59,6 +59,15 @@ type Context struct {
 	NodeWeights    map[string]uint64 // Other nodes' stake weights mapped to their Ed25519 public key
 	NodeBLS        map[string][]byte // Other nodes' Ed25519 public keys mapped to their BLS public keys
 
+	// Message channels
+	CandidateScoreChan  chan *payload.MsgConsensus
+	CandidateChan       chan *payload.MsgConsensus
+	ReductionChan       chan *payload.MsgConsensus
+	AgreementChan       chan *payload.MsgConsensus
+	SetAgreementChan    chan *payload.MsgConsensus
+	SigSetCandidateChan chan *payload.MsgConsensus
+	SigSetVoteChan      chan *payload.MsgConsensus
+
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
 	SendMessage func(magic protocol.Magic, p wire.Payload) error
@@ -70,66 +79,42 @@ type Context struct {
 	EDVerify  func(publicKey, message, sig []byte) bool
 }
 
-// NewGeneratorContext will create a New context object for block generators
-// with default or user-defined values
+// NewContext will create a New context object with default or user-defined values
 // XXX: Passing funcs as param will lead to big func sig. Put all funcs in a struct and pass struct in
 // Check the func pointers are not nil, return err if so
-func NewGeneratorContext(Tau uint64, keys *Keys) (*Context, error) {
-
+func NewContext(tau, totalWeight, round uint64, seed []byte, magic protocol.Magic, keys *Keys) (*Context, error) {
 	if keys == nil {
-		return nil, errors.New("Key is nil")
+		return nil, errors.New("context: keys is nil")
 	}
 
 	if keys.EdSecretKey == nil || keys.EdPubKey == nil || keys.BLSPubKey == nil || keys.BLSSecretKey == nil {
-		return nil, errors.New("one of the keys to be used during the consensus is nil")
+		return nil, errors.New("context: one of the keys to be used during the consensus is nil")
 	}
 
 	ctx := &Context{
-		Version:     10000, // Placeholder
-		Tau:         Tau,
-		GetAllTXs:   getAllTXs,
-		BLSSign:     bLSSign,
-		BLSVerify:   blsVerify,
-		EDSign:      edSign,
-		EDVerify:    edVerify,
-		SendMessage: send,
-		Keys:        keys,
-	}
-
-	ctx.setLastHeader()
-	return ctx, nil
-}
-
-// NewProvisionerContext will create a New context object for provisioners
-// with default or user-defined values
-// XXX: Passing funcs as param will lead to big func sig. Put all funcs in a struct and pass struct in
-// Check the func pointers are not nil, return err if so
-func NewProvisionerContext(totalWeight, round uint64, seed []byte, magic protocol.Magic, keys *Keys) (*Context, error) {
-	if keys == nil {
-		return nil, errors.New("Key is nil")
-	}
-
-	if keys.EdSecretKey == nil || keys.EdPubKey == nil || keys.BLSPubKey == nil || keys.BLSSecretKey == nil {
-		return nil, errors.New("one of the keys to be used during the consensus is nil")
-	}
-
-	ctx := &Context{
-		Version:     10000,           // Placeholder
-		Tau:         totalWeight / 5, // Placeholder
-		Round:       round,
-		Seed:        seed,
-		Magic:       magic,
-		msgs:        make(chan *payload.MsgConsensus),
-		W:           totalWeight,
-		GetAllTXs:   getAllTXs,
-		BLSSign:     bLSSign,
-		BLSVerify:   blsVerify,
-		EDSign:      edSign,
-		EDVerify:    edVerify,
-		SendMessage: send,
-		Keys:        keys,
-		NodeWeights: make(map[string]uint64),
-		NodeBLS:     make(map[string][]byte),
+		Version:             10000, // Placeholder
+		Tau:                 tau,
+		Threshold:           totalWeight / 5, // Placeholder
+		Round:               round,
+		Seed:                seed,
+		Magic:               magic,
+		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
+		CandidateChan:       make(chan *payload.MsgConsensus, 100),
+		ReductionChan:       make(chan *payload.MsgConsensus, 100),
+		AgreementChan:       make(chan *payload.MsgConsensus, 100),
+		SetAgreementChan:    make(chan *payload.MsgConsensus, 100),
+		SigSetCandidateChan: make(chan *payload.MsgConsensus, 100),
+		SigSetVoteChan:      make(chan *payload.MsgConsensus, 100),
+		W:                   totalWeight,
+		GetAllTXs:           getAllTXs,
+		BLSSign:             bLSSign,
+		BLSVerify:           blsVerify,
+		EDSign:              edSign,
+		EDVerify:            edVerify,
+		SendMessage:         send,
+		Keys:                keys,
+		NodeWeights:         make(map[string]uint64),
+		NodeBLS:             make(map[string][]byte),
 	}
 
 	ctx.setLastHeader()
@@ -153,9 +138,8 @@ func (c *Context) Reset() {
 	c.votes = 0
 	c.BlockHash = nil
 	c.Empty = false
-	c.step = 1
+	c.Step = 1
 	c.CandidateBlock = nil
-	// c.Committee.Clear()
 }
 
 // Clear will remove all values created during consensus
@@ -181,7 +165,7 @@ func (c *Context) setLastHeader() *block.Header {
 		Seed:      rand,
 		TxRoot:    rand,
 		Hash:      rand,
-		CertImage: rand,
+		CertHash:  rand,
 	}
 
 	c.LastHeader = hdr
@@ -189,6 +173,7 @@ func (c *Context) setLastHeader() *block.Header {
 }
 
 func getAllTXs() []*transactions.Stealth {
+	pl := transactions.NewStandard(100)
 	tx := transactions.NewTX(transactions.StandardType, nil)
 
 	keyImage, _ := crypto.RandEntropy(32)
@@ -196,14 +181,14 @@ func getAllTXs() []*transactions.Stealth {
 	sig, _ := crypto.RandEntropy(32)
 
 	input := transactions.NewInput(keyImage, TxID, 0, sig)
-	tx.AddInput(input)
+	pl.AddInput(input)
 
 	dest, _ := crypto.RandEntropy(32)
 	proof, _ := crypto.RandEntropy(32)
 	output := transactions.NewOutput(100, dest, proof)
-	tx.AddOutput(output)
+	pl.AddOutput(output)
 
-	tx.AddTxPubKey(sig)
+	tx.R = sig
 
 	return []*transactions.Stealth{tx}
 }

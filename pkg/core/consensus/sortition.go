@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math/big"
+	"strings"
 
 	"gonum.org/v1/gonum/stat/distuv"
 )
@@ -60,7 +61,7 @@ func verifyScore(ctx *Context, score, pk []byte, role *role) (bool, error) {
 	msg = append(msg, byte(role.step))
 
 	if err := ctx.BLSVerify(pk, msg, score); err != nil {
-		if err.Error() == "bls: Invalid Signature" {
+		if strings.Contains(err.Error(), "Invalid Signature") {
 			return false, nil
 		}
 

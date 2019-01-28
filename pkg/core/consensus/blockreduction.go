@@ -21,7 +21,7 @@ type role struct {
 // that will then be voted on in the binary agreement phase.
 func BlockReduction(ctx *Context) error {
 	// Step 1
-	ctx.step = 1
+	ctx.Step = 1
 
 	// Prepare empty block
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
@@ -46,7 +46,7 @@ func BlockReduction(ctx *Context) error {
 	}
 
 	// Step 2
-	ctx.step++
+	ctx.Step++
 
 	// If retHash is nil, no clear winner was found within the time limit.
 	// So we will vote on an empty block instead.
@@ -77,7 +77,7 @@ func committeeVoteReduction(ctx *Context) error {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	if err := sortition(ctx, role); err != nil {
@@ -93,7 +93,7 @@ func committeeVoteReduction(ctx *Context) error {
 
 		// Create reduction payload to gossip
 		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.step, ctx.BlockHash, sigBLS, blsPubBytes)
+		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.Step, ctx.BlockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return err
 		}
@@ -126,13 +126,7 @@ func countVotesReduction(ctx *Context) error {
 		case <-timer.C:
 			ctx.BlockHash = nil
 			return nil
-		case m := <-ctx.msgs:
-			// Check first off if this message is the right one, if not
-			// we discard it.
-			if m.ID != consensusmsg.ReductionID {
-				break
-			}
-
+		case m := <-ctx.ReductionChan:
 			pl := m.Payload.(*consensusmsg.Reduction)
 
 			// Check if this node's vote is already recorded
@@ -148,13 +142,9 @@ func countVotesReduction(ctx *Context) error {
 				return err
 			}
 
-			if !valid {
-				break
-			}
-
 			// If votes is zero, then the reduction message was most likely
 			// faulty, so we will ignore it.
-			if votes == 0 {
+			if votes == 0 || !valid {
 				break
 			}
 

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -13,7 +15,7 @@ import (
 
 // SignatureSetReduction is the signature set reduction phase of the consensus.
 func SignatureSetReduction(ctx *Context) error {
-	for ctx.step = 1; ctx.step < maxSteps; ctx.step++ {
+	for ; ctx.Step < MaxSteps; ctx.Step++ {
 		// Generate our own signature set and propagate
 		if err := signatureSetGeneration(ctx); err != nil {
 			return err
@@ -39,7 +41,7 @@ func SignatureSetReduction(ctx *Context) error {
 			continue
 		}
 
-		ctx.step++
+		ctx.Step++
 		if err := committeeVoteSigSet(ctx); err != nil {
 			return err
 		}
@@ -68,13 +70,7 @@ func signatureSetCollection(ctx *Context) error {
 		select {
 		case <-timer.C:
 			return nil
-		case m := <-ctx.msgs:
-			// Check first off if this message is the right one, if not
-			// we discard it.
-			if m.ID != consensusmsg.SigSetCandidateID {
-				break
-			}
-
+		case m := <-ctx.SigSetCandidateChan:
 			pl := m.Payload.(*consensusmsg.SigSetCandidate)
 
 			// Check if this node's signature set is already recorded
@@ -107,7 +103,8 @@ func signatureSetGeneration(ctx *Context) error {
 	sigs, _ := crypto.RandEntropy(200) // Placeholder
 	ctx.SignatureSet = sigs
 
-	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SignatureSet)
+	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SignatureSet,
+		ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
 	if err != nil {
 		return err
 	}
@@ -138,9 +135,15 @@ func committeeVoteSigSet(ctx *Context) error {
 		return err
 	}
 
+	// Hash signature set
+	sigSetHash, err := hash.Sha3256(ctx.SignatureSet)
+	if err != nil {
+		return err
+	}
+
 	// Create signature set vote message to gossip
-	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-	pl, err := consensusmsg.NewSigSetVote(ctx.step, ctx.SignatureSet, sigBLS, blsPubBytes)
+	pl, err := consensusmsg.NewSigSetVote(ctx.Step, ctx.BlockHash, sigSetHash, sigBLS,
+		ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
 	if err != nil {
 		return err
 	}
@@ -173,13 +176,7 @@ func countVotesSigSet(ctx *Context) error {
 		case <-timer.C:
 			ctx.SignatureSet = nil
 			return nil
-		case m := <-ctx.msgs:
-			// Check first off if this message is the right one, if not
-			// we discard it.
-			if m.ID != consensusmsg.SigSetVoteID {
-				break
-			}
-
+		case m := <-ctx.SigSetVoteChan:
 			pl := m.Payload.(*consensusmsg.SigSetVote)
 
 			// Check if this node's vote is already recorded
@@ -195,18 +192,18 @@ func countVotesSigSet(ctx *Context) error {
 				return err
 			}
 
-			if !valid {
+			if stake == 0 || !valid {
 				break
 			}
 
 			voters = append(voters, m.PubKey)
-			setStr := hex.EncodeToString(pl.SignatureSet)
+			setStr := hex.EncodeToString(pl.SigSetHash)
 			counts[setStr] += stake
 
 			// If a set exceeds vote threshold, we will end the loop.
 			if counts[setStr] > ctx.VoteLimit {
 				timer.Stop()
-				ctx.SignatureSet = pl.SignatureSet
+				ctx.SignatureSet = pl.SigSetHash
 				return nil
 			}
 		}

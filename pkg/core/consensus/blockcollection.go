@@ -29,46 +29,41 @@ func BlockCollection(ctx *Context) error {
 			}
 
 			return nil
-		case m := <-ctx.msgs:
-			// Type checks
-			if m.ID == consensusmsg.CandidateID {
-				pl := m.Payload.(*consensusmsg.Candidate)
+		case m := <-ctx.CandidateChan:
+			pl := m.Payload.(*consensusmsg.Candidate)
 
-				// See if we already have it
-				for _, block := range blocks {
-					if bytes.Equal(pl.Block.Header.Hash, block.Header.Hash) {
-						break out
-					}
+			// See if we already have it
+			for _, block := range blocks {
+				if bytes.Equal(pl.Block.Header.Hash, block.Header.Hash) {
+					break out
 				}
-
-				blocks = append(blocks, pl.Block)
 			}
 
-			if m.ID == consensusmsg.CandidateScoreID {
-				pl := m.Payload.(*consensusmsg.CandidateScore)
+			blocks = append(blocks, pl.Block)
+		case m := <-ctx.CandidateScoreChan:
+			pl := m.Payload.(*consensusmsg.CandidateScore)
 
-				// Check if this node's candidate was already recorded
-				for _, sender := range senders {
-					if bytes.Equal(sender, m.PubKey) {
-						break out
-					}
+			// Check if this node's candidate was already recorded
+			for _, sender := range senders {
+				if bytes.Equal(sender, m.PubKey) {
+					break out
 				}
+			}
 
-				// Verify the message
-				valid, score, err := processMsg(ctx, m)
-				if err != nil {
-					return err
-				}
+			// Verify the message
+			valid, score, err := processMsg(ctx, m)
+			if err != nil {
+				return err
+			}
 
-				if !valid {
-					break
-				}
+			if !valid {
+				break
+			}
 
-				// If the score is higher than our current one, replace
-				if score > highest {
-					highest = score
-					ctx.BlockHash = pl.CandidateHash
-				}
+			// If the score is higher than our current one, replace
+			if score > highest {
+				highest = score
+				ctx.BlockHash = pl.CandidateHash
 			}
 		}
 	}

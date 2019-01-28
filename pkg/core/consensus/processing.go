@@ -10,7 +10,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-// Message processing function for the consensus.
+// Top-level message processing function for the consensus.
 func processMsg(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error) {
 	// Verify Ed25519 signature
 	edMsg := new(bytes.Buffer)
@@ -22,18 +22,27 @@ func processMsg(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error) {
 		return false, 0, nil
 	}
 
+	// Version check
+	if ctx.Version != msg.Version {
+		return false, 0, nil
+	}
+
 	// Check if we're on the same chain
 	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
 		return false, 0, nil
 	}
 
-	// Return the payload for further processing
+	// Check if we're on the same round
+	if ctx.Round != msg.Round {
+		return false, 0, nil
+	}
+
+	// Proceed to more specific checks
 	return verifyPayload(ctx, msg)
 }
 
-// More specific payload verification function. This basically acts as a filter,
-// to get a specific payload out of a consensus message and applying the proper
-// verification functions.
+// Lower-level message processing function. This function determines the payload type,
+// and applies the proper verification functions.
 func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error) {
 	stake := ctx.NodeWeights[hex.EncodeToString(msg.PubKey)]
 
@@ -41,6 +50,7 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 	case consensusmsg.CandidateScoreID:
 		return true, 0, nil
 	case consensusmsg.CandidateID:
+		// Block was already verified upon reception, so we don't do anything else here.
 		return true, 0, nil
 	case consensusmsg.ReductionID:
 		pl := msg.Payload.(*consensusmsg.Reduction)
@@ -49,7 +59,11 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 			return false, 0, err
 		}
 
-		return verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS), votes, nil
+		if !verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS) {
+			return false, 0, nil
+		}
+
+		return true, votes, nil
 	case consensusmsg.AgreementID:
 		pl := msg.Payload.(*consensusmsg.Agreement)
 		votes, err := verifyAgreement(ctx, pl, stake)
@@ -57,10 +71,19 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 			return false, 0, err
 		}
 
-		return verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS), votes, nil
+		if !verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS) {
+			return false, 0, nil
+		}
+
+		return true, votes, nil
 	// case consensusmsg.SetAgreementID:
 
 	case consensusmsg.SigSetCandidateID:
+		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
+		if !verifySigSetCandidate(ctx, pl, stake) {
+			return false, 0, nil
+		}
+
 		return true, stake, nil
 	case consensusmsg.SigSetVoteID:
 		pl := msg.Payload.(*consensusmsg.SigSetVote)
@@ -68,7 +91,11 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 			return false, 0, nil
 		}
 
-		return verifySigSetVote(ctx, pl), stake, nil
+		if !verifySigSetVote(ctx, pl, stake) {
+			return false, 0, nil
+		}
+
+		return true, stake, nil
 	default:
 		return false, 0, fmt.Errorf("consensus: consensus payload has unrecognized ID %v", msg.Payload.Type())
 	}
@@ -83,7 +110,7 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (ui
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	// Make sure their score is valid, and calculate their amount of votes.
@@ -103,7 +130,7 @@ func verifyAgreement(ctx *Context, pl *consensusmsg.Agreement, stake uint64) (ui
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	// Make sure their score is valid, and calculate their amount of votes.
@@ -119,14 +146,58 @@ func verifyAgreement(ctx *Context, pl *consensusmsg.Agreement, stake uint64) (ui
 	return votes, nil
 }
 
-func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote) bool {
+func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake uint64) bool {
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
+	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
+		return false
+	}
+
+	votes, err := verifySortition(ctx, pl.Score, pl.PubKeyBLS, role, stake)
+	if err != nil {
+		return false
+	}
+
+	if votes == 0 {
+		return false
+	}
+
+	// Verify signature set
+
+	return true
+}
+
+func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote, stake uint64) bool {
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
 	// Synchrony check
-	if pl.Step != ctx.step {
+	if pl.Step != ctx.Step {
+		return false
+	}
+
+	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return false
 	}
 
 	// Check BLS
-	if err := ctx.BLSVerify(pl.PubKeyBLS, pl.SignatureSet, pl.SigBLS); err != nil {
+	if err := ctx.BLSVerify(pl.PubKeyBLS, pl.SigSetHash, pl.SigBLS); err != nil {
+		return false
+	}
+
+	votes, err := verifySortition(ctx, pl.Score, pl.PubKeyBLS, role, stake)
+	if err != nil {
+		return false
+	}
+
+	if votes == 0 {
 		return false
 	}
 

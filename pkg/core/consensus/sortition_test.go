@@ -51,7 +51,7 @@ func TestVerifySortition(t *testing.T) {
 
 	// Create our own context to compare it with
 	keys, _ := NewRandKeys()
-	ctx, err := NewProvisionerContext(totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := NewContext(0, totalWeight, round, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestVerifySortition(t *testing.T) {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	// Now verify sortition
@@ -69,11 +69,15 @@ func TestVerifySortition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if retVotes == 0 {
+		t.Fatal("sortition was not valid")
+	}
+
 	assert.Equal(t, votes, retVotes)
 }
 
 // Implement this once signatures are done
-/*func TestVerifyWrongSortition(t *testing.T) {
+func TestVerifyWrongSortition(t *testing.T) {
 	// Create sortition
 	seed, _ := crypto.RandEntropy(32)
 	totalWeight := uint64(500000)
@@ -86,7 +90,7 @@ func TestVerifySortition(t *testing.T) {
 
 	// Create our own context to compare it with
 	keys, _ := NewRandKeys()
-	ctx, err := NewProvisionerContext(totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := NewContext(0, totalWeight, round, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +99,7 @@ func TestVerifySortition(t *testing.T) {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	// Now verify sortition with a spoofed stake
@@ -106,7 +110,7 @@ func TestVerifySortition(t *testing.T) {
 
 	assert.Equal(t, retVotes, 0)
 	assert.NotEqual(t, retVotes, votes)
-}*/
+}
 
 // Convenience function to run sortition a number of times
 func runMultipleSortitions(weight, totalWeight, round uint64, times int) ([]uint64, error) {
@@ -130,7 +134,7 @@ func runMultipleSortitions(weight, totalWeight, round uint64, times int) ([]uint
 func runSortition(weight, totalWeight, round uint64, seed []byte) (uint64, []byte, []byte, error) {
 	// Create dummy context
 	keys, _ := NewRandKeys()
-	ctx, err := NewProvisionerContext(totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := NewContext(0, totalWeight, round, seed, protocol.TestNet, keys)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -142,7 +146,7 @@ func runSortition(weight, totalWeight, round uint64, seed []byte) (uint64, []byt
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
-		step:  ctx.step,
+		step:  ctx.Step,
 	}
 
 	if err := sortition(ctx, role); err != nil {
