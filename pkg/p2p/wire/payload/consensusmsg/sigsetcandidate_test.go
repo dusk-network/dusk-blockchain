@@ -19,7 +19,12 @@ func TestSigSetCandidateEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewSigSetCandidate(byte32, sigs)
+	sigBLS, err := crypto.RandEntropy(33)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg, err := NewSigSetCandidate(byte32, sigs, sigBLS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,6 +42,11 @@ func TestSigSetCandidateEncodeDecode(t *testing.T) {
 
 // Check to see whether length checks are working.
 func TestSigSetCandidateChecks(t *testing.T) {
+	byte32, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	sigs, err := crypto.RandEntropy(200)
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +57,11 @@ func TestSigSetCandidateChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewSigSetCandidate(wrongByte32, sigs); err == nil {
+	if _, err := NewSigSetCandidate(wrongByte32, sigs, wrongByte32); err == nil {
+		t.Fatal("check for winningblock did not work")
+	}
+
+	if _, err := NewSigSetCandidate(byte32, sigs, byte32); err == nil {
 		t.Fatal("check for winningblock did not work")
 	}
 }

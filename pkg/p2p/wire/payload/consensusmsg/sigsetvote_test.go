@@ -14,17 +14,12 @@ func TestSigSetVoteEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sigs, err := crypto.RandEntropy(200)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	blsSig, err := crypto.RandEntropy(33)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg, err := NewSigSetVote(2, sigs, blsSig, byte32)
+	msg, err := NewSigSetVote(2, byte32, blsSig, byte32, blsSig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,12 +42,20 @@ func TestSigSetVoteChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sigs, err := crypto.RandEntropy(200)
+	blsSig, err := crypto.RandEntropy(33)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := NewSigSetVote(2, sigs, byte32, byte32); err == nil {
+	if _, err := NewSigSetVote(2, blsSig, blsSig, byte32, blsSig); err == nil {
+		t.Fatal("check for sigsethash did not work")
+	}
+
+	if _, err := NewSigSetVote(2, byte32, byte32, byte32, blsSig); err == nil {
 		t.Fatal("check for sigbls did not work")
+	}
+
+	if _, err := NewSigSetVote(2, byte32, blsSig, byte32, byte32); err == nil {
+		t.Fatal("check for score did not work")
 	}
 }
