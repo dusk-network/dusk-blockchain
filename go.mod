@@ -4,7 +4,6 @@ require (
 	bou.ke/monkey v1.0.1
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/bwesterb/go-ristretto v0.0.0-20181208130739-025c49a8861c
-	github.com/cloudflare/bn256 v0.0.0-20180924194519-ae8f6a262a5a
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/mattn/go-colorable v0.0.9 // indirect
 	github.com/mattn/go-isatty v0.0.4 // indirect
@@ -17,6 +16,7 @@ require (
 	github.com/stretchr/testify v1.2.2
 	github.com/syndtr/goleveldb v0.0.0-20181128100959-b001fa50d6b2
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
+	gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0 // indirect
 	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
 	golang.org/x/sys v0.0.0-20181221143128-b4a75ba826a6 // indirect
 	gonum.org/v1/gonum v0.0.0-20190110174637-6efdd52e2d5a
