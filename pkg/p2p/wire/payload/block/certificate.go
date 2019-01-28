@@ -2,7 +2,6 @@ package block
 
 import (
 	"bytes"
-	"encoding/binary"
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -10,53 +9,35 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
-// CertData holds a public address and a proof.
-type CertData struct {
-	PubAddress []byte // 32 bytes
-	Proof      []byte // 32 bytes
-}
-
-// Step defines the certificate information for a step in the consensus.
-type Step struct {
-	StepNum uint32
-	Data    []*CertData
-}
-
 // Certificate defines a block certificate made as a result from the consensus.
 type Certificate struct {
-	Signature []byte // Batched BLS signatures (32 bytes)
-	Steps     []*Step
-	Hash      []byte // Certificate hash (32 bytes)
+	BRBatchedSig      []byte   // Batched BLS signature of the block reduction phase (33 bytes)
+	BRStep            uint8    // Step the block reduction terminated at
+	BRPubKeys         []byte   // Aggregated BLS public keys associated with the signature
+	BRSortitionProofs [][]byte // Public key sortition proofs
+
+	SRBatchedSig      []byte   // Batched BLS signature of the signature set reduction phase (33 bytes)
+	SRStep            uint8    // Step the signature set reduction terminated at
+	SRPubKeys         []byte   // Aggregated BLS public keys associated with the signature
+	SRSortitionProofs [][]byte // Public key sortition proofs
+
+	Hash []byte
 }
 
 // NewCertificate returns a Certificate struct with the provided signature.
-func NewCertificate(sig []byte) *Certificate {
+func NewCertificate(brBatchedSig []byte, brStep uint8, brPubKeys []byte, brProofs [][]byte,
+	srBatchedSig []byte, srStep uint8, srPubKeys []byte, srProofs [][]byte) *Certificate {
 	return &Certificate{
-		Signature: sig,
+		BRBatchedSig:      brBatchedSig,
+		BRStep:            brStep,
+		BRPubKeys:         brPubKeys,
+		BRSortitionProofs: brProofs,
+
+		SRBatchedSig:      srBatchedSig,
+		SRStep:            srStep,
+		SRPubKeys:         srPubKeys,
+		SRSortitionProofs: srProofs,
 	}
-}
-
-// AddStep adds a step to the Certificate struct.
-func (c *Certificate) AddStep(step *Step) {
-	c.Steps = append(c.Steps, step)
-}
-
-// NewStep returns a Step struct with StepNum n.
-func NewStep(n uint32) *Step {
-	return &Step{
-		StepNum: n,
-	}
-}
-
-// AddData will add a combination of a public address and a proof as a CertData
-// struct into Step s.
-func (s *Step) AddData(pubAddr, proof []byte) {
-	data := &CertData{
-		PubAddress: pubAddr,
-		Proof:      proof,
-	}
-
-	s.Data = append(s.Data, data)
 }
 
 // SetHash will set the Certificate hash.
@@ -78,33 +59,47 @@ func (c *Certificate) SetHash() error {
 // EncodeHashable will encode all fields needed from the CertificateStruct to create
 // a certificate hash. Result will be written to w.
 func (c *Certificate) EncodeHashable(w io.Writer) error {
-	if err := encoding.Write256(w, c.Signature); err != nil {
+	if err := encoding.WriteBLS(w, c.BRBatchedSig); err != nil {
 		return err
 	}
 
-	lSteps := uint64(len(c.Steps))
-	if err := encoding.WriteVarInt(w, lSteps); err != nil {
+	if err := encoding.WriteUint8(w, c.BRStep); err != nil {
 		return err
 	}
 
-	for _, step := range c.Steps {
-		if err := encoding.WriteUint32(w, binary.LittleEndian, step.StepNum); err != nil {
+	if err := encoding.WriteVarBytes(w, c.BRPubKeys); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarInt(w, uint64(len(c.BRSortitionProofs))); err != nil {
+		return err
+	}
+
+	for _, brProof := range c.BRSortitionProofs {
+		if err := encoding.WriteVarBytes(w, brProof); err != nil {
 			return err
 		}
+	}
 
-		lData := uint64(len(step.Data))
-		if err := encoding.WriteVarInt(w, lData); err != nil {
+	if err := encoding.WriteBLS(w, c.SRBatchedSig); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(w, c.SRStep); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(w, c.SRPubKeys); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarInt(w, uint64(len(c.SRSortitionProofs))); err != nil {
+		return err
+	}
+
+	for _, srProof := range c.SRSortitionProofs {
+		if err := encoding.WriteVarBytes(w, srProof); err != nil {
 			return err
-		}
-
-		for _, data := range step.Data {
-			if err := encoding.Write256(w, data.PubAddress); err != nil {
-				return err
-			}
-
-			if err := encoding.Write256(w, data.Proof); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -126,37 +121,51 @@ func (c *Certificate) Encode(w io.Writer) error {
 
 // Decode a Certificate struct from r into c.
 func (c *Certificate) Decode(r io.Reader) error {
-	if err := encoding.Read256(r, &c.Signature); err != nil {
+	if err := encoding.ReadBLS(r, &c.BRBatchedSig); err != nil {
 		return err
 	}
 
-	lSteps, err := encoding.ReadVarInt(r)
+	if err := encoding.ReadUint8(r, &c.BRStep); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadVarBytes(r, &c.BRPubKeys); err != nil {
+		return err
+	}
+
+	lBRProofs, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
 	}
 
-	c.Steps = make([]*Step, lSteps)
-	for i := uint64(0); i < lSteps; i++ {
-		c.Steps[i] = &Step{}
-		if err := encoding.ReadUint32(r, binary.LittleEndian, &c.Steps[i].StepNum); err != nil {
+	c.BRSortitionProofs = make([][]byte, lBRProofs)
+	for i := uint64(0); i < lBRProofs; i++ {
+		if err := encoding.ReadVarBytes(r, &c.BRSortitionProofs[i]); err != nil {
 			return err
 		}
+	}
 
-		lData, err := encoding.ReadVarInt(r)
-		if err != nil {
+	if err := encoding.ReadBLS(r, &c.SRBatchedSig); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(r, &c.SRStep); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadVarBytes(r, &c.SRPubKeys); err != nil {
+		return err
+	}
+
+	lSRProofs, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return err
+	}
+
+	c.SRSortitionProofs = make([][]byte, lSRProofs)
+	for i := uint64(0); i < lSRProofs; i++ {
+		if err := encoding.ReadVarBytes(r, &c.SRSortitionProofs[i]); err != nil {
 			return err
-		}
-
-		c.Steps[i].Data = make([]*CertData, lData)
-		for j := uint64(0); j < lData; j++ {
-			c.Steps[i].Data[j] = &CertData{}
-			if err := encoding.Read256(r, &c.Steps[i].Data[j].PubAddress); err != nil {
-				return err
-			}
-
-			if err := encoding.Read256(r, &c.Steps[i].Data[j].Proof); err != nil {
-				return err
-			}
 		}
 	}
 
