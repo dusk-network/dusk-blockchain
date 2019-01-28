@@ -402,9 +402,9 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 		for _, vector := range msg.Vectors {
 			switch vector.Type {
 			case payload.InvTx:
-				tx := transactions.NewTX()
-				tx.Hash = vector.Hash
-				getdata.AddTx(tx)
+				// tx := transactions.NewTX()
+				// tx.R = vector.Hash
+				// getdata.AddTx(tx)
 			case payload.InvBlock:
 				block := block.NewBlock()
 				block.Header.Hash = vector.Hash
