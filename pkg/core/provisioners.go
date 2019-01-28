@@ -47,13 +47,9 @@ func (b *Blockchain) SetupProvisioners() error {
 		for _, v := range block.Txs {
 			tx := v.(*transactions.Stealth)
 			if tx.Type == transactions.StakeType {
-				var amount uint64
-				for _, output := range tx.Outputs {
-					amount += output.Amount
-				}
-
-				b.AddProvisionerInfo(tx, amount)
-				b.totalStakeWeight += amount
+				pl := tx.TypeInfo.(*transactions.Stake)
+				b.AddProvisionerInfo(tx, pl.Output.Amount)
+				b.totalStakeWeight += pl.Output.Amount
 			}
 		}
 
@@ -85,14 +81,10 @@ func (b *Blockchain) UpdateProvisioners() {
 		// Loop through all their stakes
 		for i, tx := range node.Stakes {
 			// Remove if expired
-			if b.height > tx.LockTime {
+			pl := tx.TypeInfo.(*transactions.Stake)
+			if b.height > pl.Timelock {
 				// Get tx amount and deduct it from the total amount
-				var amount uint64
-				for _, output := range tx.Outputs {
-					amount += output.Amount
-				}
-
-				node.TotalAmount -= amount
+				node.TotalAmount -= pl.Output.Amount
 
 				// Update context info as well
 				b.ctx.NodeWeights[pk] = node.TotalAmount

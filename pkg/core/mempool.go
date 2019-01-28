@@ -107,14 +107,14 @@ func (m *MemPool) Clear() {
 }
 
 func (m *MemPool) addTx(tx *transactions.Stealth) {
-	hex := hex.EncodeToString(tx.Hash)
+	hex := hex.EncodeToString(tx.R)
 	m.lock.Lock()
 	m.txs[hex] = tx
 	m.lock.Unlock()
 }
 
 func (m *MemPool) removeTx(tx *transactions.Stealth) {
-	hex := hex.EncodeToString(tx.Hash)
+	hex := hex.EncodeToString(tx.R)
 	m.lock.Lock()
 	m.txs[hex] = nil
 	m.lock.Unlock()
