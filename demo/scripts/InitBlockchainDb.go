@@ -72,7 +72,7 @@ func createBlockFixture(height int, prevBlock []byte, txTotal int) (*block.Block
 	// Spoof previous seed, txRoot and certImage
 	seed, _ := crypto.RandEntropy(32)
 	certImage, _ := crypto.RandEntropy(32)
-	h := &block.Header{Height: uint64(height), Timestamp: time, PrevBlock: prevBlock, Seed: seed, Hash: nil, CertImage: certImage}
+	h := &block.Header{Height: uint64(height), Timestamp: time, PrevBlock: prevBlock, Seed: seed, Hash: nil, CertHash: certImage}
 
 	// Create txTotal random Txs
 	txs := createRandomTxFixtures(txTotal)
@@ -101,17 +101,19 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		keyImage, _ := crypto.RandEntropy(32)
 		txID, _ := crypto.RandEntropy(32)
 		sig, _ := crypto.RandEntropy(2000)
-		in := &transactions.Input{KeyImage: keyImage, TxID: txID, Index: uint8(i), Signature: sig}
 		dest, _ := crypto.RandEntropy(32)
 
 		amount := rand.Intn(1000) + 1
 		out := transactions.NewOutput(uint64(amount), dest, sig)
 
 		txPubKey, _ := crypto.RandEntropy(32)
-		s := transactions.NewTX()
-		s.AddInput(in)
-		s.AddOutput(out)
-		s.AddTxPubKey(txPubKey)
+		pl := transactions.NewStandard(100)
+		s := transactions.NewTX(transactions.StandardType, pl)
+		in := transactions.NewInput(keyImage, txID, 0, sig)
+		pl.AddInput(in)
+		s.R = txPubKey
+
+		pl.AddOutput(out)
 		s.SetHash()
 		txs[i] = s
 	}
