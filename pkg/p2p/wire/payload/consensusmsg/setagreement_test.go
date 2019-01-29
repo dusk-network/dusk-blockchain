@@ -14,12 +14,27 @@ func TestSetAgreementEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	voteSet, err := crypto.RandEntropy(300)
+	pkBLS, err := crypto.RandEntropy(129)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg, err := NewSetAgreement(byte32, voteSet)
+	sigBLS, err := crypto.RandEntropy(33)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var votes []*Vote
+	for i := 0; i < 5; i++ {
+		vote, err := NewVote(byte32, pkBLS, sigBLS)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		votes = append(votes, vote)
+	}
+
+	msg, err := NewSetAgreement(byte32, votes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,17 +51,32 @@ func TestSetAgreementEncodeDecode(t *testing.T) {
 }
 
 func TestSetAgreementChecks(t *testing.T) {
-	wrongByte32, err := crypto.RandEntropy(33)
+	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	voteSet, err := crypto.RandEntropy(300)
+	pkBLS, err := crypto.RandEntropy(129)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := NewSetAgreement(wrongByte32, voteSet); err == nil {
+	sigBLS, err := crypto.RandEntropy(33)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var votes []*Vote
+	for i := 0; i < 5; i++ {
+		vote, err := NewVote(byte32, pkBLS, sigBLS)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		votes = append(votes, vote)
+	}
+
+	if _, err := NewSetAgreement(sigBLS, votes); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 }

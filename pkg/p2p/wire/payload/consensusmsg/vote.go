@@ -1,6 +1,7 @@
 package consensusmsg
 
 import (
+	"errors"
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -15,7 +16,14 @@ type Vote struct {
 
 // NewVote will return a Vote struct populated with the passed parameters.
 func NewVote(hash, pubKey, sig []byte) (*Vote, error) {
-	// TODO: length checks
+	if len(hash) != 32 {
+		return nil, errors.New("supplied hash for vote is improper length")
+	}
+
+	if len(sig) != 33 {
+		return nil, errors.New("supplied sig for vote is improper length")
+	}
+
 	return &Vote{
 		Hash:   hash,
 		PubKey: pubKey,

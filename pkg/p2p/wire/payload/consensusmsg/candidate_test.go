@@ -45,7 +45,7 @@ func TestCandidateEncodeDecode(t *testing.T) {
 	rand1, _ := crypto.RandEntropy(32)
 	rand2, _ := crypto.RandEntropy(32)
 
-	sig, _ := crypto.RandEntropy(32)
+	sig, _ := crypto.RandEntropy(33)
 
 	slice := make([][]byte, 0)
 	slice = append(slice, rand1)
