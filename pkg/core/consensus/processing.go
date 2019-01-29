@@ -132,6 +132,12 @@ func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte) bool
 			return false
 		}
 
+		// A set should only have votes from legitimate provisioners
+		pkBLS := hex.EncodeToString(vote.PubKey)
+		if ctx.NodeBLS[pkBLS] == nil {
+			return false
+		}
+
 		// Signature verification
 		if err := ctx.BLSVerify(vote.PubKey, vote.Hash, vote.Sig); err != nil {
 			return false
