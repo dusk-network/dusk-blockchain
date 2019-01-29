@@ -10,16 +10,15 @@ import (
 // Reduction defines a reduction message on the Dusk wire protocol.
 type Reduction struct {
 	Score     []byte // Sortition score of the sender
-	Step      uint8  // Current step
 	BlockHash []byte // Hash of the block being voted on (32 bytes)
 	SigBLS    []byte // Compressed BLS signature of the voted block hash (33 bytes)
-	PubKeyBLS []byte // Sender BLS public key (32 bytes)
+	PubKeyBLS []byte // Sender BLS public key (129 bytes)
 }
 
 // NewReduction returns a Reduction struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewReduction(score []byte, step uint8, hash, sigBLS, pubKeyBLS []byte) (*Reduction, error) {
+func NewReduction(score, hash, sigBLS, pubKeyBLS []byte) (*Reduction, error) {
 	if len(score) != 33 {
 		return nil, errors.New("wire: supplied score for reduction payload is improper length")
 	}
@@ -34,7 +33,6 @@ func NewReduction(score []byte, step uint8, hash, sigBLS, pubKeyBLS []byte) (*Re
 
 	return &Reduction{
 		Score:     score,
-		Step:      step,
 		BlockHash: hash,
 		SigBLS:    sigBLS,
 		PubKeyBLS: pubKeyBLS,
@@ -45,10 +43,6 @@ func NewReduction(score []byte, step uint8, hash, sigBLS, pubKeyBLS []byte) (*Re
 // Implements Msg interface.
 func (rd *Reduction) Encode(w io.Writer) error {
 	if err := encoding.WriteBLS(w, rd.Score); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(w, rd.Step); err != nil {
 		return err
 	}
 
@@ -71,10 +65,6 @@ func (rd *Reduction) Encode(w io.Writer) error {
 // Implements Msg interface.
 func (rd *Reduction) Decode(r io.Reader) error {
 	if err := encoding.ReadBLS(r, &rd.Score); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &rd.Step); err != nil {
 		return err
 	}
 

@@ -9,7 +9,6 @@ import (
 
 // SigSetVote defines a sigsetvote message on the Dusk wire protocol.
 type SigSetVote struct {
-	Step             uint8  // Current step
 	WinningBlockHash []byte // Hash of the winning block
 	SigSetHash       []byte // Hash of signature set voted on
 	SigBLS           []byte // Compressed BLS signature of the signature set
@@ -20,7 +19,7 @@ type SigSetVote struct {
 // NewSigSetVote returns a SigSetVote struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewSigSetVote(step uint8, winningBlock, sigSetHash, sigBLS, pubKeyBLS, score []byte) (*SigSetVote, error) {
+func NewSigSetVote(winningBlock, sigSetHash, sigBLS, pubKeyBLS, score []byte) (*SigSetVote, error) {
 	if len(winningBlock) != 32 {
 		return nil, errors.New("wire: supplied winning block hash for signature set vote payload is improper length")
 	}
@@ -38,7 +37,6 @@ func NewSigSetVote(step uint8, winningBlock, sigSetHash, sigBLS, pubKeyBLS, scor
 	}
 
 	return &SigSetVote{
-		Step:             step,
 		WinningBlockHash: winningBlock,
 		SigSetHash:       sigSetHash,
 		SigBLS:           sigBLS,
@@ -50,10 +48,6 @@ func NewSigSetVote(step uint8, winningBlock, sigSetHash, sigBLS, pubKeyBLS, scor
 // Encode a SigSetVote struct and write to w.
 // Implements Msg interface.
 func (s *SigSetVote) Encode(w io.Writer) error {
-	if err := encoding.WriteUint8(w, s.Step); err != nil {
-		return err
-	}
-
 	if err := encoding.Write256(w, s.WinningBlockHash); err != nil {
 		return err
 	}
@@ -80,10 +74,6 @@ func (s *SigSetVote) Encode(w io.Writer) error {
 // Decode a SigSetVote from r.
 // Implements Msg interface.
 func (s *SigSetVote) Decode(r io.Reader) error {
-	if err := encoding.ReadUint8(r, &s.Step); err != nil {
-		return err
-	}
-
 	if err := encoding.Read256(r, &s.WinningBlockHash); err != nil {
 		return err
 	}

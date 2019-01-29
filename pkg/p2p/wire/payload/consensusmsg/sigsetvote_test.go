@@ -19,7 +19,7 @@ func TestSigSetVoteEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewSigSetVote(2, byte32, blsSig, byte32, blsSig)
+	msg, err := NewSigSetVote(byte32, byte32, blsSig, byte32, blsSig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,15 +47,19 @@ func TestSigSetVoteChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewSigSetVote(2, blsSig, blsSig, byte32, blsSig); err == nil {
+	if _, err := NewSigSetVote(blsSig, byte32, blsSig, byte32, blsSig); err == nil {
+		t.Fatal("check for winningblock did not work")
+	}
+
+	if _, err := NewSigSetVote(byte32, blsSig, blsSig, byte32, blsSig); err == nil {
 		t.Fatal("check for sigsethash did not work")
 	}
 
-	if _, err := NewSigSetVote(2, byte32, byte32, byte32, blsSig); err == nil {
+	if _, err := NewSigSetVote(byte32, byte32, byte32, byte32, blsSig); err == nil {
 		t.Fatal("check for sigbls did not work")
 	}
 
-	if _, err := NewSigSetVote(2, byte32, blsSig, byte32, byte32); err == nil {
+	if _, err := NewSigSetVote(byte32, byte32, blsSig, byte32, byte32); err == nil {
 		t.Fatal("check for score did not work")
 	}
 }

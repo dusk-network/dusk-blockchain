@@ -10,10 +10,9 @@ var (
 	CandidateScoreID  ID = 0x00
 	CandidateID       ID = 0x01
 	ReductionID       ID = 0x02
-	AgreementID       ID = 0x03
-	SetAgreementID    ID = 0x04
-	SigSetCandidateID ID = 0x05
-	SigSetVoteID      ID = 0x06
+	SetAgreementID    ID = 0x03
+	SigSetCandidateID ID = 0x04
+	SigSetVoteID      ID = 0x05
 )
 
 // Msg is an interface for consensus message payloads.

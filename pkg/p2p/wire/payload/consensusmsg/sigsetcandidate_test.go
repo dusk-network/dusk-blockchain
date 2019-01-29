@@ -24,7 +24,7 @@ func TestSigSetCandidateEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewSigSetCandidate(byte32, sigs, sigBLS)
+	msg, err := NewSigSetCandidate(byte32, sigs, byte32, sigBLS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,11 +57,11 @@ func TestSigSetCandidateChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewSigSetCandidate(wrongByte32, sigs, wrongByte32); err == nil {
+	if _, err := NewSigSetCandidate(wrongByte32, sigs, byte32, wrongByte32); err == nil {
 		t.Fatal("check for winningblock did not work")
 	}
 
-	if _, err := NewSigSetCandidate(byte32, sigs, byte32); err == nil {
+	if _, err := NewSigSetCandidate(byte32, sigs, byte32, byte32); err == nil {
 		t.Fatal("check for winningblock did not work")
 	}
 }
