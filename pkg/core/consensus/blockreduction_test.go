@@ -289,14 +289,14 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 		c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
 
 		// Create reduction payload to gossip
-		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.Step, blockHash, sigBLS, blsPubBytes)
+		pl, err := consensusmsg.NewReduction(ctx.Score, blockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return 0, nil, err
 		}
 
 		sigEd, err := createSignature(ctx, pl)
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, sigEd,
-			[]byte(*ctx.Keys.EdPubKey), pl)
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+			ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return 0, nil, err
 		}

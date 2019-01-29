@@ -53,6 +53,11 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 		// Block was already verified upon reception, so we don't do anything else here.
 		return true, 0, nil
 	case consensusmsg.ReductionID:
+		// Check if we're on the same step
+		if ctx.Step != msg.Step {
+			return false, 0, nil
+		}
+
 		pl := msg.Payload.(*consensusmsg.Reduction)
 		votes, err := verifyReduction(ctx, pl, stake)
 		if err != nil {
@@ -64,20 +69,9 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 		}
 
 		return true, votes, nil
-	case consensusmsg.AgreementID:
-		pl := msg.Payload.(*consensusmsg.Agreement)
-		votes, err := verifyAgreement(ctx, pl, stake)
-		if err != nil {
-			return false, 0, err
-		}
-
-		if !verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS) {
-			return false, 0, nil
-		}
-
-		return true, votes, nil
-	// case consensusmsg.SetAgreementID:
-
+	case consensusmsg.SetAgreementID:
+		pl := msg.Payload.(*consensusmsg.SetAgreement)
+		return verifyVoteSet(ctx, pl.VoteSet, pl.BlockHash), 0, nil
 	case consensusmsg.SigSetCandidateID:
 		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
 		if !verifySigSetCandidate(ctx, pl, stake) {
@@ -102,8 +96,8 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 }
 
 func verifyBLSKey(ctx *Context, pubKeyEd, pubKeyBls []byte) bool {
-	pk := hex.EncodeToString(pubKeyEd)
-	return bytes.Equal(ctx.NodeBLS[pk], pubKeyBls)
+	pk := hex.EncodeToString(pubKeyBls)
+	return bytes.Equal(ctx.NodeBLS[pk], pubKeyEd)
 }
 
 func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (uint64, error) {
@@ -126,24 +120,25 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (ui
 	return votes, nil
 }
 
-func verifyAgreement(ctx *Context, pl *consensusmsg.Agreement, stake uint64) (uint64, error) {
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
+func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte) bool {
+	// A set should be of appropriate length
+	if uint64(len(voteSet)) < ctx.VoteLimit {
+		return false
 	}
 
-	// Make sure their score is valid, and calculate their amount of votes.
-	votes, err := verifySortition(ctx, pl.Score, pl.PubKeyBLS, role, stake)
-	if err != nil {
-		return 0, err
+	for _, vote := range voteSet {
+		// A set should only have votes for the designated hash
+		if !bytes.Equal(hash, vote.Hash) {
+			return false
+		}
+
+		// Signature verification
+		if err := ctx.BLSVerify(vote.PubKey, vote.Hash, vote.Sig); err != nil {
+			return false
+		}
 	}
 
-	if votes == 0 {
-		return 0, nil
-	}
-
-	return votes, nil
+	return true
 }
 
 func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake uint64) bool {
@@ -153,10 +148,12 @@ func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake
 		step:  ctx.Step,
 	}
 
+	// We discard any deviating block hashes after the block reduction phase
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return false
 	}
 
+	// Verify node sortition
 	votes, err := verifySortition(ctx, pl.Score, pl.PubKeyBLS, role, stake)
 	if err != nil {
 		return false
@@ -166,9 +163,7 @@ func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake
 		return false
 	}
 
-	// Verify signature set
-
-	return true
+	return verifyVoteSet(ctx, pl.SignatureSet, pl.WinningBlockHash)
 }
 
 func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote, stake uint64) bool {
@@ -176,11 +171,6 @@ func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote, stake uint64) b
 		part:  "committee",
 		round: ctx.Round,
 		step:  ctx.Step,
-	}
-
-	// Synchrony check
-	if pl.Step != ctx.Step {
-		return false
 	}
 
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
@@ -209,6 +199,7 @@ func createSignature(ctx *Context, pl consensusmsg.Msg) ([]byte, error) {
 	binary.LittleEndian.PutUint32(edMsg[0:], ctx.Version)
 	binary.LittleEndian.PutUint64(edMsg[4:], ctx.Round)
 	edMsg = append(edMsg, ctx.LastHeader.Hash...)
+	edMsg = append(edMsg, byte(ctx.Step))
 	edMsg = append(edMsg, byte(pl.Type()))
 	buf := new(bytes.Buffer)
 	if err := pl.Encode(buf); err != nil {

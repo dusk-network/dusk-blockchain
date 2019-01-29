@@ -13,9 +13,16 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
+
+type role struct {
+	part  string
+	round uint64
+	step  uint8
+}
 
 // Global consensus variables
 var (
@@ -47,23 +54,32 @@ type Context struct {
 	Q          uint64
 
 	// Provisioner values
-	weight         uint64            // Amount this node has staked
-	W              uint64            // Total stake weight of the network
-	Score          []byte            // Sortition score of this node
-	votes          uint64            // Sortition votes of this node
-	VoteLimit      uint64            // Votes needed to decide on a block
-	Empty          bool              // Whether or not the block being voted on is empty
-	CandidateBlock *block.Block      // Block kept from candidate collection
-	BlockHash      []byte            // Block hash currently being voted on by this node
-	SignatureSet   []byte            // Signature set for signature set reduction phase
-	NodeWeights    map[string]uint64 // Other nodes' stake weights mapped to their Ed25519 public key
-	NodeBLS        map[string][]byte // Other nodes' Ed25519 public keys mapped to their BLS public keys
+	// General
+	weight    uint64 // Amount this node has staked
+	W         uint64 // Total stake weight of the network
+	Score     []byte // Sortition score of this node
+	votes     uint64 // Sortition votes of this node
+	VoteLimit uint64 // Votes needed to decide on a block
+	Empty     bool   // Whether or not the block being voted on is empty
+
+	// Block fields
+	CandidateBlock *block.Block         // Block kept from candidate collection
+	BlockHash      []byte               // Block hash currently being voted on by this node
+	BlockVotes     []*consensusmsg.Vote // Vote set for block set agreement phase
+	BlockSetHash   []byte               // Hash of the block vote set being voted on
+
+	// Signature set fields
+	SigSetVotes []*consensusmsg.Vote // Vote set for signature set agreement phase
+	SigSetHash  []byte               // Hash of the signature vote set being voted on
+
+	// Tracking fields
+	NodeWeights map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
+	NodeBLS     map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
 
 	// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
 	CandidateChan       chan *payload.MsgConsensus
 	ReductionChan       chan *payload.MsgConsensus
-	AgreementChan       chan *payload.MsgConsensus
 	SetAgreementChan    chan *payload.MsgConsensus
 	SigSetCandidateChan chan *payload.MsgConsensus
 	SigSetVoteChan      chan *payload.MsgConsensus
@@ -101,7 +117,6 @@ func NewContext(tau, totalWeight, round uint64, seed []byte, magic protocol.Magi
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
 		CandidateChan:       make(chan *payload.MsgConsensus, 100),
 		ReductionChan:       make(chan *payload.MsgConsensus, 100),
-		AgreementChan:       make(chan *payload.MsgConsensus, 100),
 		SetAgreementChan:    make(chan *payload.MsgConsensus, 100),
 		SigSetCandidateChan: make(chan *payload.MsgConsensus, 100),
 		SigSetVoteChan:      make(chan *payload.MsgConsensus, 100),
@@ -140,6 +155,10 @@ func (c *Context) Reset() {
 	c.Empty = false
 	c.Step = 1
 	c.CandidateBlock = nil
+	c.BlockVotes = nil
+	c.BlockSetHash = nil
+	c.SigSetHash = nil
+	c.SigSetVotes = nil
 }
 
 // Clear will remove all values created during consensus

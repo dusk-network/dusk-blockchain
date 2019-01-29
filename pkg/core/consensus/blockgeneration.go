@@ -59,7 +59,7 @@ func GenerateBlock(ctx *Context) error {
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}

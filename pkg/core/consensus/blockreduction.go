@@ -6,34 +6,17 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-type role struct {
-	part  string
-	round uint64
-	step  uint8
-}
-
 // BlockReduction is the main function that runs during block reduction phase.
-// Once the reduction phase is finished, the context object holds a block hash
-// that will then be voted on in the binary agreement phase.
 func BlockReduction(ctx *Context) error {
-	// Step 1
-	ctx.Step = 1
+	// Create fallback value (zero)
+	fallback := make([]byte, 32)
 
-	// Prepare empty block
-	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
-	if err != nil {
-		return err
-	}
-
-	// If no candidate block was found, then we use the empty block
-	if ctx.BlockHash == nil {
-		ctx.BlockHash = emptyBlock.Header.Hash
-		ctx.Empty = true
-	}
+	// Save starting value
+	var startHash []byte
+	copy(startHash, ctx.BlockHash)
 
 	// Vote on passed block
 	if err := committeeVoteReduction(ctx); err != nil {
@@ -45,15 +28,13 @@ func BlockReduction(ctx *Context) error {
 		return err
 	}
 
-	// Step 2
-	ctx.Step++
-
-	// If retHash is nil, no clear winner was found within the time limit.
-	// So we will vote on an empty block instead.
+	// If BlockHash is nil, no clear winner was found within the time limit.
+	// So we will vote again for the first value.
 	if ctx.BlockHash == nil {
-		ctx.BlockHash = emptyBlock.Header.Hash
-		ctx.Empty = true
+		ctx.BlockHash = startHash
 	}
+
+	ctx.Step++
 
 	if err := committeeVoteReduction(ctx); err != nil {
 		return err
@@ -66,14 +47,44 @@ func BlockReduction(ctx *Context) error {
 	// If retHash is nil, no clear winner was found within the time limit.
 	// So we will return an empty block instead.
 	if ctx.BlockHash == nil {
-		ctx.BlockHash = emptyBlock.Header.Hash
-		ctx.Empty = true
+		ctx.BlockHash = fallback
+		ctx.BlockVotes = nil
+		return nil
 	}
+
+	ctx.Step++
+
+	// Send set agreement message
+	pl, err := consensusmsg.NewSetAgreement(ctx.BlockHash, ctx.BlockVotes)
+	if err != nil {
+		return err
+	}
+
+	sigEd, err := createSignature(ctx, pl)
+	if err != nil {
+		return err
+	}
+
+	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
+		return err
+	}
+
+	ctx.SetAgreementChan <- msg
 
 	return nil
 }
 
 func committeeVoteReduction(ctx *Context) error {
+	// First, clear our votes out, so that we get a fresh set for this coming round.
+	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
+
+	// Run sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -93,13 +104,17 @@ func committeeVoteReduction(ctx *Context) error {
 
 		// Create reduction payload to gossip
 		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.Step, ctx.BlockHash, sigBLS, blsPubBytes)
+		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.BlockHash, sigBLS, blsPubBytes)
 		if err != nil {
 			return err
 		}
 
 		sigEd, err := createSignature(ctx, pl)
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, sigEd,
+		if err != nil {
+			return err
+		}
+
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
 			[]byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return err
@@ -152,11 +167,25 @@ func countVotesReduction(ctx *Context) error {
 			voters = append(voters, m.PubKey)
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
+			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS)
+			if err != nil {
+				return err
+			}
+
+			ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
 
 			// If a block exceeds the vote threshold, we will end the loop.
 			if counts[hashStr] > ctx.VoteLimit {
 				timer.Stop()
 				ctx.BlockHash = pl.BlockHash
+
+				// We will also cut all the votes that did not vote for the winning block.
+				for i, vote := range ctx.BlockVotes {
+					if !bytes.Equal(vote.Hash, ctx.BlockHash) {
+						ctx.BlockVotes = append(ctx.BlockVotes[:i], ctx.BlockVotes[i+1:]...)
+					}
+				}
+
 				return nil
 			}
 		}
