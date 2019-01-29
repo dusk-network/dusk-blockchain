@@ -40,6 +40,12 @@ func BlockAgreement(ctx *Context, c chan bool) {
 				// set generation, which should follow after this
 				pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
 				ctx.SigSetVotes = sets[m.Step][pkEd]
+
+				// Set certificate values
+				// TODO: batched sigs
+				ctx.Certificate.BRStep = ctx.Step
+				// TODO: pubkeys
+				// TODO: sortition proofs
 				c <- true
 				return
 			}

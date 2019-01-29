@@ -36,6 +36,11 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 
 			// Check if we have exceeded the limit
 			if uint64(len(sets[m.Step])) >= ctx.VoteLimit {
+				// Set certificate values
+				// TODO: batched sigs
+				ctx.Certificate.BRStep = ctx.Step
+				// TODO: pubkeys
+				// TODO: sortition proofs
 				c <- true
 				return
 			}

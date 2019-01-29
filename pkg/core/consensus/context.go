@@ -55,12 +55,13 @@ type Context struct {
 
 	// Provisioner values
 	// General
-	weight    uint64 // Amount this node has staked
-	W         uint64 // Total stake weight of the network
-	Score     []byte // Sortition score of this node
-	votes     uint64 // Sortition votes of this node
-	VoteLimit uint64 // Votes needed to decide on a block
-	Empty     bool   // Whether or not the block being voted on is empty
+	weight      uint64             // Amount this node has staked
+	W           uint64             // Total stake weight of the network
+	Score       []byte             // Sortition score of this node
+	votes       uint64             // Sortition votes of this node
+	VoteLimit   uint64             // Votes needed to decide on a block
+	Empty       bool               // Whether or not the block being voted on is empty
+	Certificate *block.Certificate // Block certificate to be constructed during consensus
 
 	// Block fields
 	CandidateBlock *block.Block         // Block kept from candidate collection
@@ -154,6 +155,7 @@ func (c *Context) Reset() {
 	c.BlockHash = nil
 	c.Empty = false
 	c.Step = 1
+	c.Certificate = &block.Certificate{}
 	c.CandidateBlock = nil
 	c.BlockVotes = nil
 	c.BlockSetHash = nil
