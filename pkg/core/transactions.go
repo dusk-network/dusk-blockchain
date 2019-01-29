@@ -126,8 +126,8 @@ func (b *Blockchain) checkInputsOutputs(inputs []*transactions.Input, outputs []
 		outAmount += output.Amount
 	}
 
-	if outAmount+fee > inAmount {
-		return errors.New("output amount too high/input amount too low")
+	if outAmount+fee != inAmount {
+		return errors.New("input/output commitments do not match")
 	}
 
 	return nil

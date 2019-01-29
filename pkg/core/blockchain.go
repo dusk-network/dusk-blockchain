@@ -52,8 +52,7 @@ type Blockchain struct {
 	bidWeight uint64
 
 	// Provisioner related fields
-	provisioner bool
-
+	provisioner      bool
 	stakeWeight      uint64 // The amount of DUSK staked by the node
 	totalStakeWeight uint64 // The total amount of DUSK staked
 	provisioners     Provisioners
@@ -136,7 +135,8 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	return chain, nil
 }
 
-// Loop function for consensus
+// Loop function for consensus. All functions are started as goroutines
+// to be able to receive messages while the provisioner function is running.
 func (b *Blockchain) segregatedByzantizeAgreement() {
 	for {
 		select {
@@ -172,45 +172,84 @@ func (b *Blockchain) provision() {
 	// First we reset our context values
 	b.ctx.Reset()
 
+	// Set up a channel that we can get agreement results from
+	c := make(chan bool, 1)
+
 	// Collect a block, and start the loop
 	if err := consensus.BlockCollection(b.ctx); err != nil {
 		// Log
-		b.provisioner = false
+		b.StopProvisioning()
 		return
 	}
 
 	for b.ctx.Step < consensus.MaxSteps {
-		if err := consensus.BlockReduction(b.ctx); err != nil {
-			// Log
-			b.provisioner = false
-			break
-		}
+		// Fire off the parallel block agreement phase
+		go consensus.BlockAgreement(b.ctx, c)
+	out:
+		for {
+			select {
+			case v := <-c:
+				// If it was false, something went wrong and we should quit
+				if !v {
+					// Log
+					b.StopProvisioning()
+					return
+				}
 
-		if !b.ctx.Empty {
-			if err := consensus.SignatureSetReduction(b.ctx); err != nil {
-				// Log
-				b.provisioner = false
-				return
+				// If not, we proceed to the next phase
+				break out
+			default:
+				// Vote on received block. The context object should hold a winning
+				// block hash after this function returns.
+				if err := consensus.BlockReduction(b.ctx); err != nil {
+					// Log
+					b.StopProvisioning()
+					return
+				}
 			}
-
-			// if bytes.Equal(finalHash, b.ctx.BlockHash) {
-			// 	// send final block with set of signatures
-			// 	break
-			// }
-
-			// send tentative block with set of signatures
-			break
 		}
 
-		// send tentative block without set of signatures
-		break
+		for b.ctx.Step < consensus.MaxSteps {
+			// Fire off parallel set agreement phase
+			go consensus.SignatureSetAgreement(b.ctx, c)
+			for {
+				select {
+				case v := <-c:
+					// If it was false, something went wrong and we should quit
+					if !v {
+						// Log
+						b.StopProvisioning()
+						return
+					}
+
+					// If not, we successfully terminate the consensus
+					// send block
+					return
+				default:
+					// Generate our signature set candidate and collect the best one
+					if err := consensus.SignatureSetGeneration(b.ctx); err != nil {
+						// Log
+						b.StopProvisioning()
+						return
+					}
+
+					// Vote on received signature set.
+					if err := consensus.SignatureSetReduction(b.ctx); err != nil {
+						// Log
+						b.StopProvisioning()
+						return
+					}
+				}
+			}
+		}
 	}
 }
 
-// Processor function for all incoming consensus messages
-// We implement this function here to allow access to block verification
-// during candidate collection. Messages will be passed down to the context
-// object afterwards and processed accordingly.
+// Processor function for all incoming consensus messages.
+// This function is implemented here to allow access to block verification
+// during candidate collection, and to allow parallel processing of consensus
+// messages, by splitting them according to their type and passing them
+// to their respective channels.
 func (b *Blockchain) process(m *payload.MsgConsensus) {
 	if b.provisioner || b.generator {
 		switch m.Payload.Type() {
@@ -220,14 +259,13 @@ func (b *Blockchain) process(m *payload.MsgConsensus) {
 			// Verify the block first
 			pl := m.Payload.(*consensusmsg.Candidate)
 			if err := b.VerifyBlock(pl.Block); err != nil {
+				// Log
 				break
 			}
 
 			b.ctx.CandidateChan <- m
 		case consensusmsg.ReductionID:
 			b.ctx.ReductionChan <- m
-		case consensusmsg.AgreementID:
-			b.ctx.AgreementChan <- m
 		case consensusmsg.SetAgreementID:
 			b.ctx.SetAgreementChan <- m
 		case consensusmsg.SigSetCandidateID:
@@ -297,13 +335,8 @@ func (b *Blockchain) StartProvisioning() error {
 }
 
 // StopProvisioning will stop the provisioning process
-func (b *Blockchain) StopProvisioning() error {
-	if !b.provisioner {
-		return errors.New("not provisioning")
-	}
-
+func (b *Blockchain) StopProvisioning() {
 	b.provisioner = false
 	b.ctx.Clear()
 	b.provisioners = nil
-	return nil
 }
