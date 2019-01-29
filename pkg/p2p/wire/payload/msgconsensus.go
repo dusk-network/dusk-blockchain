@@ -18,6 +18,7 @@ type MsgConsensus struct {
 	Version       uint32           // Node version
 	Round         uint64           // The round this consensus message is for
 	PrevBlockHash []byte           // Hash of the previous block header
+	Step          uint8            // Current consensus step
 	ID            consensusmsg.ID  // Payload identifier
 	Payload       consensusmsg.Msg // Consensus payload
 	Signature     []byte           // Ed25519 signature of all above fields
@@ -28,8 +29,8 @@ type MsgConsensus struct {
 // parameters. The payload ID is inferred from the content. The function will
 // do some sanity checks on byte slice lengths and throw an error in event of
 // a mismatch.
-func NewMsgConsensus(version uint32, round uint64, prevBlockHash, sig, pk []byte,
-	pl consensusmsg.Msg) (*MsgConsensus, error) {
+func NewMsgConsensus(version uint32, round uint64, prevBlockHash []byte, step uint8,
+	sig, pk []byte, pl consensusmsg.Msg) (*MsgConsensus, error) {
 	if len(prevBlockHash) != 32 {
 		return nil, errors.New("wire: supplied previous block hash for consensus message is improper length")
 	}
@@ -46,6 +47,7 @@ func NewMsgConsensus(version uint32, round uint64, prevBlockHash, sig, pk []byte
 		Version:       version,
 		Round:         round,
 		PrevBlockHash: prevBlockHash,
+		Step:          step,
 		ID:            pl.Type(),
 		Payload:       pl,
 		Signature:     sig,
@@ -65,6 +67,10 @@ func (m *MsgConsensus) EncodeSignable(w io.Writer) error {
 	}
 
 	if err := encoding.Write256(w, m.PrevBlockHash); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(w, m.Step); err != nil {
 		return err
 	}
 
@@ -112,6 +118,10 @@ func (m *MsgConsensus) Decode(r io.Reader) error {
 		return err
 	}
 
+	if err := encoding.ReadUint8(r, &m.Step); err != nil {
+		return err
+	}
+
 	var ID uint8
 	if err := encoding.ReadUint8(r, &ID); err != nil {
 		return err
@@ -141,20 +151,13 @@ func (m *MsgConsensus) Decode(r io.Reader) error {
 		}
 
 		pl = p
-	case consensusmsg.AgreementID:
-		p := &consensusmsg.Agreement{}
+	case consensusmsg.SetAgreementID:
+		p := &consensusmsg.SetAgreement{}
 		if err := p.Decode(r); err != nil {
 			return err
 		}
 
 		pl = p
-	/*case consensusmsg.SetAgreementID:
-	p := &consensusmsg.SetAgreement{}
-	if err := p.Decode(r); err != nil {
-		return err
-	}
-
-	pl = p*/
 	case consensusmsg.SigSetCandidateID:
 		p := &consensusmsg.SigSetCandidate{}
 		if err := p.Decode(r); err != nil {
