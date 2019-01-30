@@ -6,6 +6,10 @@ func TestSignatureSetGeneration(t *testing.T) {
 
 }
 
-func TestSignatureSetCollection(t *testing.T) {
+func TestSignatureSetCollectionDecisive(t *testing.T) {
+
+}
+
+func TestSignatureSetCollectionIndecisive(t *testing.T) {
 
 }

@@ -32,6 +32,11 @@ func BlockAgreement(ctx *Context, c chan bool) {
 			// Add it to our counter
 			pl := m.Payload.(*consensusmsg.SetAgreement)
 			pkEd := hex.EncodeToString(m.PubKey)
+
+			if sets[m.Step] == nil {
+				sets[m.Step] = make(map[string][]*consensusmsg.Vote)
+			}
+
 			sets[m.Step][pkEd] = pl.VoteSet
 
 			// Check if we have exceeded the limit
@@ -43,7 +48,7 @@ func BlockAgreement(ctx *Context, c chan bool) {
 
 				// Set certificate values
 				// TODO: batched sigs
-				ctx.Certificate.BRStep = ctx.Step
+				// ctx.Certificate.BRStep = ctx.Step
 				// TODO: pubkeys
 				// TODO: sortition proofs
 				c <- true

@@ -1,15 +1,176 @@
 package consensus
 
-import "testing"
+import (
+	"encoding/hex"
+	"errors"
+	"sync"
+	"testing"
+	"time"
 
-func TestSignatureSetVote(t *testing.T) {
+	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
+)
+
+func TestSignatureSetVoteCountDecisive(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
+	// Set stake weight and vote limit, and generate a score
+	ctx.weight = 500
+	ctx.VoteLimit = 20
+	if err := sortition(ctx, role); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up voting phase
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setHash, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.SigSetHash = setHash
+	ctx.BlockHash = emptyBlock.Header.Hash
+	_, msg, err := newVoteSigSet(ctx, 400, emptyBlock.Header.Hash, setHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start counting votes
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := countVotesSigSet(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		wg.Done()
+	}()
+
+	// Send the vote and block until the vote counting function returns
+	ctx.SigSetVoteChan <- msg
+	wg.Wait()
+
+	// Set hash should be the same after receiving vote
+	assert.Equal(t, setHash, ctx.SigSetHash)
+}
+
+func TestSignatureSetVoteCountIndecisive(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
+	// Set stake weight and vote limit, and generate a score
+	ctx.weight = 500
+	ctx.VoteLimit = 20
+	if err := sortition(ctx, role); err != nil {
+		t.Fatal(err)
+	}
+
+	// Adjust timer to reduce waiting times
+	stepTime = 1 * time.Second
+
+	// Let the timer run out
+	if err := countVotesSigSet(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set hash should be the same after receiving vote
+	assert.Nil(t, ctx.SigSetHash)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
+}
+
+func TestSignatureSetReductionDecisive(t *testing.T) {
 
 }
 
-func TestSignatureSetVoteCount(t *testing.T) {
+func TestSignatureSetReductionIndecisive(t *testing.T) {
 
 }
 
-func TestSignatureSetReduction(t *testing.T) {
+func newVoteSigSet(c *Context, weight uint64, winningBlock, setHash []byte) (uint64, *payload.MsgConsensus, error) {
+	if weight < MinimumStake {
+		return 0, nil, errors.New("weight too low, will result in no votes")
+	}
 
+	// Create context
+	keys, _ := NewRandKeys()
+	ctx, err := NewContext(0, c.W, c.Round, c.Seed, c.Magic, keys)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
+	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+	ctx.weight = weight
+	ctx.LastHeader = c.LastHeader
+	ctx.SigSetHash = setHash
+	ctx.BlockHash = winningBlock
+	ctx.Step = c.Step
+
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
+	if err := sortition(ctx, role); err != nil {
+		return 0, nil, err
+	}
+
+	if ctx.votes > 0 {
+		// Sign sig set with BLS
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		// Set BLS key on context
+		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
+		c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
+
+		// Create sigsetvote payload to gossip
+		pl, err := consensusmsg.NewSigSetVote(winningBlock, ctx.SigSetHash, sigBLS, blsPubBytes, ctx.Score)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		sigEd, err := createSignature(ctx, pl)
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+			ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		return ctx.votes, msg, nil
+	}
+
+	return 0, nil, nil
 }

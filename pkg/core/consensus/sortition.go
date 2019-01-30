@@ -23,7 +23,7 @@ func sortition(ctx *Context, role *role) error {
 		return err
 	}
 
-	votes, err := calcVotes(ctx.Tau, ctx.weight, ctx.W, score)
+	votes, err := calcVotes(ctx.Threshold, ctx.weight, ctx.W, score)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func verifySortition(ctx *Context, score, pk []byte, role *role, stake uint64) (
 	}
 
 	if valid {
-		votes, err := calcVotes(ctx.Tau, stake, ctx.W, score)
+		votes, err := calcVotes(ctx.Threshold, stake, ctx.W, score)
 		if err != nil {
 			return 0, err
 		}
@@ -76,7 +76,7 @@ func calcVotes(threshold, stake, totalStake uint64, score []byte) (uint64, error
 		return 0, errors.New("threshold size should not exceed maximum stake weight")
 	}
 
-	if stake < 100 {
+	if stake < MinimumStake {
 		return 0, errors.New("stake not big enough")
 	}
 

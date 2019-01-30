@@ -39,8 +39,12 @@ func SignatureSetReduction(ctx *Context) error {
 			return err
 		}
 
-		// If we got a result, terminate
+		// If we got a result, send message to set agreement and terminate
 		if ctx.SigSetHash != nil {
+			if err := sendSetAgreement(ctx); err != nil {
+				return err
+			}
+
 			return nil
 		}
 	}
@@ -63,14 +67,16 @@ func committeeVoteSigSet(ctx *Context) error {
 		return err
 	}
 
+	ctx.SigSetHash = sigSetHash
+
 	// Sign signature set hash with BLS
-	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, sigSetHash)
+	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
 	if err != nil {
 		return err
 	}
 
 	// Create signature set vote message to gossip
-	pl, err := consensusmsg.NewSigSetVote(ctx.BlockHash, sigSetHash, sigBLS,
+	pl, err := consensusmsg.NewSigSetVote(ctx.BlockHash, ctx.SigSetHash, sigBLS,
 		ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
 	if err != nil {
 		return err
@@ -120,10 +126,12 @@ func countVotesSigSet(ctx *Context) error {
 				return err
 			}
 
+			// Discard if invalid
 			if stake == 0 || !valid {
 				break
 			}
 
+			// Log information
 			voters = append(voters, m.PubKey)
 			setStr := hex.EncodeToString(pl.SigSetHash)
 			counts[setStr] += stake

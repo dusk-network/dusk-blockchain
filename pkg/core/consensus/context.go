@@ -26,10 +26,11 @@ type role struct {
 
 // Global consensus variables
 var (
-	maxMembers          = 200
-	MaxSteps      uint8 = 50
-	stepTime            = 20 * time.Second
-	candidateTime       = 60 * time.Second
+	maxMembers           = 200
+	MaxSteps      uint8  = 50
+	stepTime             = 20 * time.Second
+	candidateTime        = 60 * time.Second
+	MinimumStake  uint64 = 100
 )
 
 // Context will hold all the necessary functions and
@@ -67,7 +68,6 @@ type Context struct {
 	CandidateBlock *block.Block         // Block kept from candidate collection
 	BlockHash      []byte               // Block hash currently being voted on by this node
 	BlockVotes     []*consensusmsg.Vote // Vote set for block set agreement phase
-	BlockSetHash   []byte               // Hash of the block vote set being voted on
 
 	// Signature set fields
 	SigSetVotes []*consensusmsg.Vote // Vote set for signature set agreement phase
@@ -158,7 +158,6 @@ func (c *Context) Reset() {
 	c.Certificate = &block.Certificate{}
 	c.CandidateBlock = nil
 	c.BlockVotes = nil
-	c.BlockSetHash = nil
 	c.SigSetHash = nil
 	c.SigSetVotes = nil
 }

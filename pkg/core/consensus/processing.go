@@ -121,8 +121,8 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (ui
 }
 
 func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte) bool {
-	// A set should be of appropriate length
-	if uint64(len(voteSet)) < ctx.VoteLimit {
+	// A set should be of appropriate length, at least two times the vote limit
+	if uint64(len(voteSet)) < 2*ctx.VoteLimit {
 		return false
 	}
 
@@ -135,6 +135,12 @@ func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte) bool
 		// A set should only have votes from legitimate provisioners
 		pkBLS := hex.EncodeToString(vote.PubKey)
 		if ctx.NodeBLS[pkBLS] == nil {
+			return false
+		}
+
+		// A voter should have at least threshold stake amount
+		pkEd := hex.EncodeToString(ctx.NodeBLS[pkBLS])
+		if ctx.NodeWeights[pkEd] < MinimumStake {
 			return false
 		}
 

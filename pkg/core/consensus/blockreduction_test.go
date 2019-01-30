@@ -250,7 +250,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 // Convenience function to generate a vote for the reduction phase,
 // to emulate a received MsgReduction over the wire
 func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *payload.MsgConsensus, error) {
-	if weight < 100 {
+	if weight < MinimumStake {
 		return 0, nil, errors.New("weight too low, will result in no votes")
 	}
 
@@ -262,6 +262,7 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 	}
 
 	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
+	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
@@ -298,10 +299,6 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 			ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
-			return 0, nil, err
-		}
-
-		if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
 			return 0, nil, err
 		}
 

@@ -11,6 +11,9 @@ import (
 
 // BlockReduction is the main function that runs during block reduction phase.
 func BlockReduction(ctx *Context) error {
+	// First, clear our votes out, so that we get a fresh set for this phase.
+	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
+
 	// Create fallback value (zero)
 	fallback := make([]byte, 32)
 
@@ -28,13 +31,13 @@ func BlockReduction(ctx *Context) error {
 		return err
 	}
 
+	ctx.Step++
+
 	// If BlockHash is nil, no clear winner was found within the time limit.
 	// So we will vote again for the first value.
 	if ctx.BlockHash == nil {
 		ctx.BlockHash = startHash
 	}
-
-	ctx.Step++
 
 	if err := committeeVoteReduction(ctx); err != nil {
 		return err
@@ -44,46 +47,25 @@ func BlockReduction(ctx *Context) error {
 		return err
 	}
 
+	ctx.Step++
+
 	// If retHash is nil, no clear winner was found within the time limit.
-	// So we will return an empty block instead.
+	// So we will return a fallback value instead.
 	if ctx.BlockHash == nil {
 		ctx.BlockHash = fallback
 		ctx.BlockVotes = nil
 		return nil
 	}
 
-	ctx.Step++
-
-	// Send set agreement message
-	pl, err := consensusmsg.NewSetAgreement(ctx.BlockHash, ctx.BlockVotes)
-	if err != nil {
+	// If we did get a result at the end of the phases, send block set agreement message
+	if err := sendSetAgreement(ctx); err != nil {
 		return err
 	}
-
-	sigEd, err := createSignature(ctx, pl)
-	if err != nil {
-		return err
-	}
-
-	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
-	if err != nil {
-		return err
-	}
-
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
-		return err
-	}
-
-	ctx.SetAgreementChan <- msg
 
 	return nil
 }
 
 func committeeVoteReduction(ctx *Context) error {
-	// First, clear our votes out, so that we get a fresh set for this coming round.
-	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
-
 	// Run sortition
 	role := &role{
 		part:  "committee",
@@ -175,7 +157,7 @@ func countVotesReduction(ctx *Context) error {
 			ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
 
 			// If a block exceeds the vote threshold, we will end the loop.
-			if counts[hashStr] > ctx.VoteLimit {
+			if counts[hashStr] >= ctx.VoteLimit {
 				timer.Stop()
 				ctx.BlockHash = pl.BlockHash
 
