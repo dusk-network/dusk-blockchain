@@ -107,7 +107,7 @@ func TestSignatureSetVoteCountIndecisive(t *testing.T) {
 	stepTime = 20 * time.Second
 }
 
-func TestSignatureSetReduction(t *testing.T) {
+func TestSignatureSetReductionDecisive(t *testing.T) {
 	// Create context
 	ctx, err := provisionerContext()
 	if err != nil {
@@ -183,6 +183,57 @@ func TestSignatureSetReduction(t *testing.T) {
 
 	// Function should have returned and we should have the same sigsethash
 	assert.Equal(t, currHash, ctx.SigSetHash)
+}
+
+func TestSignatureSetReductionIndecisive(t *testing.T) {
+	// Adjust timer to reduce waiting times
+	stepTime = 100 * time.Millisecond
+
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.weight = 500
+	ctx.VoteLimit = 100
+	block, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Run sortition
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
+	if err := sortition(ctx, role); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.BlockHash = block
+
+	// Create vote set
+	votes, err := createVoteSet(ctx, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.SigSetVotes = votes
+
+	// The function will loop as long as it doesn't receive a convincing majority
+	// vote. After hitting MaxSteps, the function will return.
+	if err := SignatureSetReduction(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Function should have returned and we should have a nil sigsethash
+	assert.Nil(t, ctx.SigSetHash)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
 }
 
 func newVoteSigSet(c *Context, weight uint64, winningBlock, setHash []byte) (uint64, *payload.MsgConsensus, error) {

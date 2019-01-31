@@ -72,14 +72,20 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 		return true, votes, nil
 	case consensusmsg.SetAgreementID:
 		pl := msg.Payload.(*consensusmsg.SetAgreement)
-		return verifyVoteSet(ctx, pl.VoteSet, pl.BlockHash, msg.Step), 0, nil
-	case consensusmsg.SigSetCandidateID:
-		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
-		if !verifySigSetCandidate(ctx, pl, stake, msg.Step) {
-			return false, 0, nil
+		valid, err := verifyVoteSet(ctx, pl.VoteSet, pl.BlockHash, msg.Step)
+		if err != nil {
+			return false, 0, err
 		}
 
-		return true, stake, nil
+		return valid, 0, nil
+	case consensusmsg.SigSetCandidateID:
+		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
+		valid, err := verifySigSetCandidate(ctx, pl, stake, msg.Step)
+		if err != nil {
+			return false, 0, err
+		}
+
+		return valid, stake, nil
 	case consensusmsg.SigSetVoteID:
 		pl := msg.Payload.(*consensusmsg.SigSetVote)
 		if !verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS) {
@@ -122,46 +128,62 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (ui
 	return votes, nil
 }
 
-func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step uint8) bool {
+func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step uint8) (bool, error) {
 	// A set should be of appropriate length, at least two times the vote limit
 	if uint64(len(voteSet)) < 2*ctx.VoteLimit {
-		return false
+		return false, nil
 	}
 
 	for _, vote := range voteSet {
 		// A set should only have votes for the designated hash
 		if !bytes.Equal(hash, vote.Hash) {
-			return false
+			return false, nil
 		}
 
 		// A set should only have votes from legitimate provisioners
 		pkBLS := hex.EncodeToString(vote.PubKey)
 		if ctx.NodeBLS[pkBLS] == nil {
-			return false
+			return false, nil
 		}
 
 		// A voter should have at least threshold stake amount
 		pkEd := hex.EncodeToString(ctx.NodeBLS[pkBLS])
 		if ctx.NodeWeights[pkEd] < MinimumStake {
-			return false
+			return false, nil
 		}
 
 		// A vote should be from the same step or the step before it
 		if step != ctx.Step && step != ctx.Step-1 {
-			return false
+			return false, nil
+		}
+
+		// A vote's score should be verified
+		role := &role{
+			part:  "committee",
+			round: ctx.Round,
+			step:  ctx.Step,
+		}
+
+		votes, err := verifySortition(ctx, vote.Score, vote.PubKey, role, ctx.NodeWeights[pkEd])
+		if err != nil {
+			return false, err
+		}
+
+		if votes == 0 {
+			return false, nil
 		}
 
 		// Signature verification
 		if err := ctx.BLSVerify(vote.PubKey, vote.Hash, vote.Sig); err != nil {
-			return false
+			return false, nil
 		}
 	}
 
-	return true
+	return true, nil
 }
 
 func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake uint64,
-	step uint8) bool {
+	step uint8) (bool, error) {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -170,17 +192,17 @@ func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake
 
 	// We discard any deviating block hashes after the block reduction phase
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
-		return false
+		return false, nil
 	}
 
 	// Verify node sortition
 	votes, err := verifySortition(ctx, pl.Score, pl.PubKeyBLS, role, stake)
 	if err != nil {
-		return false
+		return false, nil
 	}
 
 	if votes == 0 {
-		return false
+		return false, nil
 	}
 
 	return verifyVoteSet(ctx, pl.SignatureSet, pl.WinningBlockHash, step)

@@ -108,7 +108,7 @@ func TestSendSetAgreement(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		vote, err := consensusmsg.NewVote(hash, keys.BLSPubKey.Marshal(), sig, 1)
+		vote, err := consensusmsg.NewVote(hash, keys.BLSPubKey.Marshal(), sig, sig, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -198,8 +198,25 @@ func createVoteSet(ctx *Context, amount int) ([]*consensusmsg.Vote, error) {
 
 		cSig := sig.Compress()
 
+		// Make dummy context for score creation
+		c, err := NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
+		if err != nil {
+			return nil, err
+		}
+
+		c.weight = 500
+		role := &role{
+			part:  "committee",
+			round: ctx.Round,
+			step:  ctx.Step,
+		}
+
+		if err := sortition(c, role); err != nil {
+			return nil, err
+		}
+
 		vote, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), cSig,
-			ctx.Step)
+			c.Score, ctx.Step)
 		if err != nil {
 			return nil, err
 		}

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -41,8 +43,34 @@ func SignatureSetReduction(ctx *Context) error {
 			return err
 		}
 
-		// If we got a result, send message to set agreement and terminate
+		// If we got a result, populate certificate
 		if ctx.SigSetHash != nil {
+			ctx.Certificate.SRPubKeys = make([][]byte, len(ctx.SigSetVotes))
+			ctx.Certificate.SRSortitionProofs = make([][]byte, len(ctx.SigSetVotes))
+			agSig := &bls.Signature{}
+			if err := agSig.Decompress(ctx.SigSetVotes[0].Sig); err != nil {
+				return err
+			}
+
+			for i, vote := range ctx.SigSetVotes {
+				if i != 0 {
+					sig := &bls.Signature{}
+					if err := sig.Decompress(vote.Sig); err != nil {
+						return err
+					}
+
+					agSig.Aggregate(sig)
+				}
+
+				ctx.Certificate.SRPubKeys[i] = vote.PubKey
+				ctx.Certificate.SRSortitionProofs[i] = vote.Score
+			}
+
+			cSig := agSig.Compress()
+			ctx.Certificate.SRBatchedSig = cSig
+			ctx.Certificate.SRStep = ctx.Step
+
+			// And send message to set agreement and terminate
 			if err := sendSetAgreement(ctx); err != nil {
 				return err
 			}

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
@@ -57,7 +59,34 @@ func BlockReduction(ctx *Context) error {
 		return nil
 	}
 
-	// If we did get a result at the end of the phases, send block set agreement message
+	// If we did get a result at the end of the phases, populate the certificate
+	ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.BlockVotes))
+	ctx.Certificate.BRSortitionProofs = make([][]byte, len(ctx.BlockVotes))
+	agSig := &bls.Signature{}
+	if err := agSig.Decompress(ctx.BlockVotes[0].Sig); err != nil {
+		return err
+	}
+
+	for i, vote := range ctx.BlockVotes {
+		if i != 0 {
+			sig := &bls.Signature{}
+			if err := sig.Decompress(vote.Sig); err != nil {
+				return err
+			}
+
+			agSig.Aggregate(sig)
+		}
+
+		ctx.Certificate.BRPubKeys[i] = vote.PubKey
+		ctx.Certificate.BRSortitionProofs[i] = vote.Score
+
+	}
+
+	cSig := agSig.Compress()
+	ctx.Certificate.BRBatchedSig = cSig
+	ctx.Certificate.BRStep = ctx.Step
+
+	// Send block set agreement message
 	if err := sendSetAgreement(ctx); err != nil {
 		return err
 	}
@@ -149,7 +178,7 @@ func countVotesReduction(ctx *Context) error {
 			voters = append(voters, m.PubKey)
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
-			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, ctx.Step)
+			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, pl.Score, ctx.Step)
 			if err != nil {
 				return err
 			}
