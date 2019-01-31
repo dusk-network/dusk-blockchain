@@ -56,7 +56,16 @@ func TestMsgHeadersEncodeDecode(t *testing.T) {
 		slice = append(slice, rand1)
 		slice = append(slice, rand2)
 
-		cert := block.NewCertificate(sig, 4, rand1, slice, sig, 2, rand2, slice)
+		cert := &block.Certificate{
+			BRBatchedSig:      sig,
+			BRStep:            4,
+			BRPubKeys:         slice,
+			BRSortitionProofs: slice,
+			SRBatchedSig:      sig,
+			SRStep:            2,
+			SRPubKeys:         slice,
+			SRSortitionProofs: slice,
+		}
 
 		if err := cert.SetHash(); err != nil {
 			t.Fatal(err)

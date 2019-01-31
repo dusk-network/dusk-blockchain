@@ -29,18 +29,23 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sigs, err := crypto.RandEntropy(200)
+	// Set Agreement
+	var votes []*consensusmsg.Vote
+	for i := 0; i < 5; i++ {
+		vote, err := consensusmsg.NewVote(byte32, byte32, sigBLS, sigBLS, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		votes = append(votes, vote)
+	}
+
+	pl, err := consensusmsg.NewSetAgreement(byte32, votes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Agreement
-	pl, err := consensusmsg.NewAgreement(sigBLS, false, 1, byte32, sigBLS, byte32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	msg, err := payload.NewMsgConsensus(10000, 29000, byte32, sigEd, byte32, pl)
+	msg, err := payload.NewMsgConsensus(10000, 29000, byte32, 1, sigEd, byte32, pl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,12 +63,12 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	assert.Equal(t, msg, msg2)
 
 	// Reduction
-	pl2, err := consensusmsg.NewReduction(sigBLS, 1, byte32, sigBLS, byte32)
+	pl2, err := consensusmsg.NewReduction(sigBLS, byte32, sigBLS, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg3, err := payload.NewMsgConsensus(10000, 29000, byte32, sigEd, byte32, pl2)
+	msg3, err := payload.NewMsgConsensus(10000, 29000, byte32, 1, sigEd, byte32, pl2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,12 +86,22 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	assert.Equal(t, msg3, msg4)
 
 	// Signature Set Candidate
-	pl3, err := consensusmsg.NewSigSetCandidate(byte32, sigs, byte32, sigBLS)
+	var votes2 []*consensusmsg.Vote
+	for i := 0; i < 5; i++ {
+		vote, err := consensusmsg.NewVote(byte32, byte32, sigBLS, sigBLS, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		votes2 = append(votes2, vote)
+	}
+
+	pl3, err := consensusmsg.NewSigSetCandidate(byte32, votes2, byte32, sigBLS)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg5, err := payload.NewMsgConsensus(10000, 29000, byte32, sigEd, byte32, pl3)
+	msg5, err := payload.NewMsgConsensus(10000, 29000, byte32, 1, sigEd, byte32, pl3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,12 +119,12 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	assert.Equal(t, msg5, msg6)
 
 	// Signature Set Vote
-	pl4, err := consensusmsg.NewSigSetVote(1, byte32, byte32, sigBLS, byte32, sigBLS)
+	pl4, err := consensusmsg.NewSigSetVote(byte32, byte32, sigBLS, byte32, sigBLS)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	msg7, err := payload.NewMsgConsensus(10000, 29000, byte32, sigEd, byte32, pl4)
+	msg7, err := payload.NewMsgConsensus(10000, 29000, byte32, 1, sigEd, byte32, pl4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,8 +140,6 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	}
 
 	assert.Equal(t, msg7, msg8)
-
-	// TODO: implement other payload types when possible
 }
 
 func TestMsgConsensusChecks(t *testing.T) {
@@ -140,15 +153,15 @@ func TestMsgConsensusChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := payload.NewMsgConsensus(10000, 29000, wrongByte32, byte32, byte32, nil); err == nil {
+	if _, err := payload.NewMsgConsensus(10000, 29000, wrongByte32, 1, byte32, byte32, nil); err == nil {
 		t.Fatal("check for prevblockhash did not work")
 	}
 
-	if _, err := payload.NewMsgConsensus(10000, 29000, byte32, wrongByte32, byte32, nil); err == nil {
+	if _, err := payload.NewMsgConsensus(10000, 29000, byte32, 1, wrongByte32, byte32, nil); err == nil {
 		t.Fatal("check for sig did not work")
 	}
 
-	if _, err := payload.NewMsgConsensus(10000, 29000, byte32, byte32, wrongByte32, nil); err == nil {
+	if _, err := payload.NewMsgConsensus(10000, 29000, byte32, 1, byte32, wrongByte32, nil); err == nil {
 		t.Fatal("check for pk did not work")
 	}
 }
