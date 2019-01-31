@@ -13,31 +13,15 @@ import (
 type Certificate struct {
 	BRBatchedSig      []byte   // Batched BLS signature of the block reduction phase (33 bytes)
 	BRStep            uint8    // Step the block reduction terminated at
-	BRPubKeys         []byte   // Aggregated BLS public keys associated with the signature
-	BRSortitionProofs [][]byte // Public key sortition proofs
+	BRPubKeys         [][]byte // BLS public keys associated with the signature
+	BRSortitionProofs [][]byte // Scores of included nodes
 
 	SRBatchedSig      []byte   // Batched BLS signature of the signature set reduction phase (33 bytes)
 	SRStep            uint8    // Step the signature set reduction terminated at
-	SRPubKeys         []byte   // Aggregated BLS public keys associated with the signature
-	SRSortitionProofs [][]byte // Public key sortition proofs
+	SRPubKeys         [][]byte // BLS public keys associated with the signature
+	SRSortitionProofs [][]byte // Scores of included nodes
 
 	Hash []byte
-}
-
-// NewCertificate returns a Certificate struct with the provided signature.
-func NewCertificate(brBatchedSig []byte, brStep uint8, brPubKeys []byte, brProofs [][]byte,
-	srBatchedSig []byte, srStep uint8, srPubKeys []byte, srProofs [][]byte) *Certificate {
-	return &Certificate{
-		BRBatchedSig:      brBatchedSig,
-		BRStep:            brStep,
-		BRPubKeys:         brPubKeys,
-		BRSortitionProofs: brProofs,
-
-		SRBatchedSig:      srBatchedSig,
-		SRStep:            srStep,
-		SRPubKeys:         srPubKeys,
-		SRSortitionProofs: srProofs,
-	}
 }
 
 // SetHash will set the Certificate hash.
@@ -67,8 +51,14 @@ func (c *Certificate) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(w, c.BRPubKeys); err != nil {
+	if err := encoding.WriteVarInt(w, uint64(len(c.BRPubKeys))); err != nil {
 		return err
+	}
+
+	for _, brpk := range c.BRPubKeys {
+		if err := encoding.WriteVarBytes(w, brpk); err != nil {
+			return err
+		}
 	}
 
 	if err := encoding.WriteVarInt(w, uint64(len(c.BRSortitionProofs))); err != nil {
@@ -89,8 +79,14 @@ func (c *Certificate) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(w, c.SRPubKeys); err != nil {
+	if err := encoding.WriteVarInt(w, uint64(len(c.SRPubKeys))); err != nil {
 		return err
+	}
+
+	for _, srpk := range c.SRPubKeys {
+		if err := encoding.WriteVarBytes(w, srpk); err != nil {
+			return err
+		}
 	}
 
 	if err := encoding.WriteVarInt(w, uint64(len(c.SRSortitionProofs))); err != nil {
@@ -129,8 +125,16 @@ func (c *Certificate) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &c.BRPubKeys); err != nil {
+	lBRPubKeys, err := encoding.ReadVarInt(r)
+	if err != nil {
 		return err
+	}
+
+	c.BRPubKeys = make([][]byte, lBRPubKeys)
+	for i := uint64(0); i < lBRPubKeys; i++ {
+		if err := encoding.ReadVarBytes(r, &c.BRPubKeys[i]); err != nil {
+			return err
+		}
 	}
 
 	lBRProofs, err := encoding.ReadVarInt(r)
@@ -153,8 +157,16 @@ func (c *Certificate) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &c.SRPubKeys); err != nil {
+	lSRPubKeys, err := encoding.ReadVarInt(r)
+	if err != nil {
 		return err
+	}
+
+	c.SRPubKeys = make([][]byte, lSRPubKeys)
+	for i := uint64(0); i < lSRPubKeys; i++ {
+		if err := encoding.ReadVarBytes(r, &c.SRPubKeys[i]); err != nil {
+			return err
+		}
 	}
 
 	lSRProofs, err := encoding.ReadVarInt(r)
