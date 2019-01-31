@@ -320,7 +320,8 @@ func (b *Blockchain) StartProvisioning() error {
 		return err
 	}
 
-	ctx, err := consensus.NewContext(b.tau, b.totalStakeWeight, b.round, b.currSeed, b.net, keys)
+	ctx, err := consensus.NewContext(b.tau, b.bidWeight, b.totalStakeWeight, b.round,
+		b.currSeed, b.net, keys)
 	if err != nil {
 		return err
 	}
