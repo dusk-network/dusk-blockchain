@@ -26,7 +26,7 @@ func TestSetAgreementEncodeDecode(t *testing.T) {
 
 	var votes []*Vote
 	for i := 0; i < 5; i++ {
-		vote, err := NewVote(byte32, pkBLS, sigBLS)
+		vote, err := NewVote(byte32, pkBLS, sigBLS, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +68,7 @@ func TestSetAgreementChecks(t *testing.T) {
 
 	var votes []*Vote
 	for i := 0; i < 5; i++ {
-		vote, err := NewVote(byte32, pkBLS, sigBLS)
+		vote, err := NewVote(byte32, pkBLS, sigBLS, 1)
 		if err != nil {
 			t.Fatal(err)
 		}

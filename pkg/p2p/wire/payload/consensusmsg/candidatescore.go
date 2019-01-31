@@ -13,18 +13,18 @@ type CandidateScore struct {
 	Score         uint64
 	Proof         []byte // variable size
 	CandidateHash []byte // Block candidate hash (32 bytes)
-	SeedHash      []byte // Seed hash of the current round
+	Seed          []byte // Seed of the current round
 }
 
 // NewCandidateScore returns a CandidateScore struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewCandidateScore(score uint64, proof, candidateHash, seedHash []byte) (*CandidateScore, error) {
+func NewCandidateScore(score uint64, proof, candidateHash, seed []byte) (*CandidateScore, error) {
 	if len(candidateHash) != 32 {
 		return nil, errors.New("wire: supplied candidate hash for candidate score payload is improper length")
 	}
 
-	if len(seedHash) != 32 {
+	if len(seed) != 33 {
 		return nil, errors.New("wire: supplied seed for candidate score payload is improper length")
 	}
 
@@ -32,7 +32,7 @@ func NewCandidateScore(score uint64, proof, candidateHash, seedHash []byte) (*Ca
 		Score:         score,
 		Proof:         proof,
 		CandidateHash: candidateHash,
-		SeedHash:      seedHash,
+		Seed:          seed,
 	}, nil
 }
 
@@ -51,7 +51,7 @@ func (c *CandidateScore) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, c.SeedHash); err != nil {
+	if err := encoding.WriteBLS(w, c.Seed); err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func (c *CandidateScore) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &c.SeedHash); err != nil {
+	if err := encoding.ReadBLS(r, &c.Seed); err != nil {
 		return err
 	}
 
