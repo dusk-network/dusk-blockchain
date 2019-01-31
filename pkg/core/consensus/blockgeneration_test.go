@@ -4,10 +4,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 func TestGenerateM(t *testing.T) {
@@ -46,7 +45,7 @@ func TestGenerateX(t *testing.T) {
 //XXX: Add fixed test input vectors to outputs
 func TestBlockGeneration(t *testing.T) {
 	for i := 0; i < 1000; i++ {
-		ctx, err := NewContext(200, 0, 150000, nil, protocol.TestNet, randtestKeys(t))
+		ctx, err := NewContext(20, 5000, 0, 150000, nil, protocol.TestNet, randtestKeys(t))
 		assert.Equal(t, nil, err)
 
 		k, err := crypto.RandEntropy(32)

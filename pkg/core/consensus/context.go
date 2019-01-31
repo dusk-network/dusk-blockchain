@@ -99,7 +99,7 @@ type Context struct {
 // NewContext will create a New context object with default or user-defined values
 // XXX: Passing funcs as param will lead to big func sig. Put all funcs in a struct and pass struct in
 // Check the func pointers are not nil, return err if so
-func NewContext(tau, totalWeight, round uint64, seed []byte, magic protocol.Magic, keys *Keys) (*Context, error) {
+func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.Magic, keys *Keys) (*Context, error) {
 	if keys == nil {
 		return nil, errors.New("context: keys is nil")
 	}
@@ -115,6 +115,8 @@ func NewContext(tau, totalWeight, round uint64, seed []byte, magic protocol.Magi
 		Round:               round,
 		Seed:                seed,
 		Magic:               magic,
+		Certificate:         &block.Certificate{},
+		d:                   d,
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
 		CandidateChan:       make(chan *payload.MsgConsensus, 100),
 		ReductionChan:       make(chan *payload.MsgConsensus, 100),

@@ -48,6 +48,7 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateScoreID:
+		// TODO: add actual verification code for score messages
 		return true, 0, nil
 	case consensusmsg.CandidateID:
 		// Block was already verified upon reception, so we don't do anything else here.
@@ -71,10 +72,10 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 		return true, votes, nil
 	case consensusmsg.SetAgreementID:
 		pl := msg.Payload.(*consensusmsg.SetAgreement)
-		return verifyVoteSet(ctx, pl.VoteSet, pl.BlockHash), 0, nil
+		return verifyVoteSet(ctx, pl.VoteSet, pl.BlockHash, msg.Step), 0, nil
 	case consensusmsg.SigSetCandidateID:
 		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
-		if !verifySigSetCandidate(ctx, pl, stake) {
+		if !verifySigSetCandidate(ctx, pl, stake, msg.Step) {
 			return false, 0, nil
 		}
 
@@ -91,7 +92,8 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) (bool, uint64, error
 
 		return true, stake, nil
 	default:
-		return false, 0, fmt.Errorf("consensus: consensus payload has unrecognized ID %v", msg.Payload.Type())
+		return false, 0, fmt.Errorf("consensus: consensus payload has unrecognized ID %v",
+			msg.Payload.Type())
 	}
 }
 
@@ -120,7 +122,7 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (ui
 	return votes, nil
 }
 
-func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte) bool {
+func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step uint8) bool {
 	// A set should be of appropriate length, at least two times the vote limit
 	if uint64(len(voteSet)) < 2*ctx.VoteLimit {
 		return false
@@ -144,6 +146,11 @@ func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte) bool
 			return false
 		}
 
+		// A vote should be from the same step or the step before it
+		if step != ctx.Step && step != ctx.Step-1 {
+			return false
+		}
+
 		// Signature verification
 		if err := ctx.BLSVerify(vote.PubKey, vote.Hash, vote.Sig); err != nil {
 			return false
@@ -153,7 +160,8 @@ func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte) bool
 	return true
 }
 
-func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake uint64) bool {
+func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake uint64,
+	step uint8) bool {
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -175,7 +183,7 @@ func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake
 		return false
 	}
 
-	return verifyVoteSet(ctx, pl.SignatureSet, pl.WinningBlockHash)
+	return verifyVoteSet(ctx, pl.SignatureSet, pl.WinningBlockHash, step)
 }
 
 func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote, stake uint64) bool {

@@ -19,7 +19,7 @@ func BlockReduction(ctx *Context) error {
 
 	// Save starting value
 	var startHash []byte
-	copy(startHash, ctx.BlockHash)
+	startHash = append(startHash, ctx.BlockHash...)
 
 	// Vote on passed block
 	if err := committeeVoteReduction(ctx); err != nil {
@@ -49,7 +49,7 @@ func BlockReduction(ctx *Context) error {
 
 	ctx.Step++
 
-	// If retHash is nil, no clear winner was found within the time limit.
+	// If BlockHash is nil, no clear winner was found within the time limit.
 	// So we will return a fallback value instead.
 	if ctx.BlockHash == nil {
 		ctx.BlockHash = fallback
@@ -149,7 +149,7 @@ func countVotesReduction(ctx *Context) error {
 			voters = append(voters, m.PubKey)
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
-			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS)
+			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, ctx.Step)
 			if err != nil {
 				return err
 			}

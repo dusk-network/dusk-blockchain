@@ -107,12 +107,82 @@ func TestSignatureSetVoteCountIndecisive(t *testing.T) {
 	stepTime = 20 * time.Second
 }
 
-func TestSignatureSetReductionDecisive(t *testing.T) {
+func TestSignatureSetReduction(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-}
+	ctx.weight = 500
+	ctx.VoteLimit = 100
+	block, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-func TestSignatureSetReductionIndecisive(t *testing.T) {
+	// Run sortition
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
 
+	if err := sortition(ctx, role); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.BlockHash = block
+
+	// Create vote set
+	votes, err := createVoteSet(ctx, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.SigSetVotes = votes
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := SignatureSetReduction(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		wg.Done()
+	}()
+
+	// Wait one second..
+	time.Sleep(1 * time.Second)
+
+	// SigSetHash should now be set
+	// Make vote that will win by a large margin
+	_, vote1, err := newVoteSigSet(ctx, 1000, block, ctx.SigSetHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Log current SigSetHash
+	var currHash []byte
+	currHash = append(currHash, ctx.SigSetHash...)
+
+	// Send vote
+	ctx.SigSetVoteChan <- vote1
+
+	// Wait one second..
+	time.Sleep(1 * time.Second)
+
+	// Make new vote, send it, and wait for function to return
+	_, vote2, err := newVoteSigSet(ctx, 1000, block, ctx.SigSetHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.SigSetVoteChan <- vote2
+	wg.Wait()
+
+	// Function should have returned and we should have the same sigsethash
+	assert.Equal(t, currHash, ctx.SigSetHash)
 }
 
 func newVoteSigSet(c *Context, weight uint64, winningBlock, setHash []byte) (uint64, *payload.MsgConsensus, error) {
@@ -122,7 +192,7 @@ func newVoteSigSet(c *Context, weight uint64, winningBlock, setHash []byte) (uin
 
 	// Create context
 	keys, _ := NewRandKeys()
-	ctx, err := NewContext(0, c.W, c.Round, c.Seed, c.Magic, keys)
+	ctx, err := NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
 		return 0, nil, err
 	}

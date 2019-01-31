@@ -51,7 +51,7 @@ func TestVerifySortition(t *testing.T) {
 
 	// Create our own context to compare it with
 	keys, _ := NewRandKeys()
-	ctx, err := NewContext(0, totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := NewContext(0, 0, totalWeight, round, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,42 +76,6 @@ func TestVerifySortition(t *testing.T) {
 	assert.Equal(t, votes, retVotes)
 }
 
-// Implement this once signatures are done
-func TestVerifyWrongSortition(t *testing.T) {
-	// Create sortition
-	seed, _ := crypto.RandEntropy(32)
-	totalWeight := uint64(500000)
-	round := uint64(150000)
-
-	votes, score, pk, err := runSortition(400, totalWeight, round, seed)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create our own context to compare it with
-	keys, _ := NewRandKeys()
-	ctx, err := NewContext(0, totalWeight, round, seed, protocol.TestNet, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create role
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
-	// Now verify sortition with a spoofed stake
-	retVotes, err := verifySortition(ctx, score, pk, role, 200)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, retVotes, 0)
-	assert.NotEqual(t, retVotes, votes)
-}
-
 // Convenience function to run sortition a number of times
 func runMultipleSortitions(weight, totalWeight, round uint64, times int) ([]uint64, error) {
 	var voteArray []uint64
@@ -134,7 +98,7 @@ func runMultipleSortitions(weight, totalWeight, round uint64, times int) ([]uint
 func runSortition(weight, totalWeight, round uint64, seed []byte) (uint64, []byte, []byte, error) {
 	// Create dummy context
 	keys, _ := NewRandKeys()
-	ctx, err := NewContext(0, totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := NewContext(0, 0, totalWeight, round, seed, protocol.TestNet, keys)
 	if err != nil {
 		return 0, nil, nil, err
 	}

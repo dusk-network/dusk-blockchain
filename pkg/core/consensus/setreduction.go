@@ -14,7 +14,7 @@ import (
 
 // SignatureSetReduction is the signature set reduction phase of the consensus.
 func SignatureSetReduction(ctx *Context) error {
-	for ; ctx.Step < MaxSteps; ctx.Step++ {
+	for ctx.Step = 1; ctx.Step < MaxSteps; ctx.Step++ {
 		// Vote on collected signature set
 		if err := committeeVoteSigSet(ctx); err != nil {
 			return err
@@ -25,12 +25,14 @@ func SignatureSetReduction(ctx *Context) error {
 			return err
 		}
 
+		ctx.Step++
+
 		// If we timed out, go back to the beginning of the loop
 		if ctx.SigSetHash == nil {
+			// TODO: this should probably change to some fallback protocol
 			continue
 		}
 
-		ctx.Step++
 		if err := committeeVoteSigSet(ctx); err != nil {
 			return err
 		}
@@ -83,8 +85,12 @@ func committeeVoteSigSet(ctx *Context) error {
 	}
 
 	sigEd, err := createSignature(ctx, pl)
+	if err != nil {
+		return err
+	}
+
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step,
-		sigEd, []byte(*ctx.Keys.EdSecretKey), pl)
+		sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}

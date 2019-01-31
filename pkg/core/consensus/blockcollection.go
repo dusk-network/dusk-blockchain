@@ -39,6 +39,16 @@ func BlockCollection(ctx *Context) error {
 				}
 			}
 
+			// Verify the message
+			valid, _, err := processMsg(ctx, m)
+			if err != nil {
+				return err
+			}
+
+			if !valid {
+				break
+			}
+
 			blocks = append(blocks, pl.Block)
 		case m := <-ctx.CandidateScoreChan:
 			pl := m.Payload.(*consensusmsg.CandidateScore)
@@ -51,7 +61,7 @@ func BlockCollection(ctx *Context) error {
 			}
 
 			// Verify the message
-			valid, score, err := processMsg(ctx, m)
+			valid, _, err := processMsg(ctx, m)
 			if err != nil {
 				return err
 			}
@@ -61,8 +71,8 @@ func BlockCollection(ctx *Context) error {
 			}
 
 			// If the score is higher than our current one, replace
-			if score > highest {
-				highest = score
+			if pl.Score > highest {
+				highest = pl.Score
 				ctx.BlockHash = pl.CandidateHash
 			}
 		}

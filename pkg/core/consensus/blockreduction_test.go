@@ -104,6 +104,66 @@ func TestReductionVoteCountIndecisive(t *testing.T) {
 	stepTime = 20 * time.Second
 }
 
+// Test if a repeated vote does not add to the counter
+func TestReductionVoteCountDuplicates(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
+	// Set stake weight and vote limit, and generate a score
+	ctx.weight = 500
+	ctx.VoteLimit = 2000
+	if err := sortition(ctx, role); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up voting phase
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Adjust timer to reduce waiting times
+	stepTime = 3 * time.Second
+
+	// Start listening for votes
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := countVotesReduction(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		wg.Done()
+	}()
+
+	// Send the vote out ten times, and block until the counting function returns
+	for i := 0; i < 10; i++ {
+		ctx.ReductionChan <- msg
+	}
+
+	wg.Wait()
+
+	// BlockHash should be nil after not receiving enough votes
+	assert.Nil(t, ctx.BlockHash)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
+}
+
 // BlockReduction test scenarios
 
 // Test the BlockReduction function with many votes coming in.
@@ -215,6 +275,9 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
+	// Adjust timer to reduce waiting times
+	stepTime = 1 * time.Second
+
 	// This should time out and change our context blockhash
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(5 * time.Second)
@@ -245,6 +308,9 @@ func TestBlockReductionIndecisive(t *testing.T) {
 
 	// Empty block hash should have come out
 	assert.NotEqual(t, candidateBlock, ctx.BlockHash)
+
+	// Reset step timer
+	stepTime = 20 * time.Second
 }
 
 // Convenience function to generate a vote for the reduction phase,
@@ -256,7 +322,7 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 
 	// Create context
 	keys, _ := NewRandKeys()
-	ctx, err := NewContext(0, c.W, c.Round, c.Seed, c.Magic, keys)
+	ctx, err := NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -285,9 +351,7 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 			return 0, nil, err
 		}
 
-		// Set BLS key on context
 		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-		c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
 
 		// Create reduction payload to gossip
 		pl, err := consensusmsg.NewReduction(ctx.Score, blockHash, sigBLS, blsPubBytes)

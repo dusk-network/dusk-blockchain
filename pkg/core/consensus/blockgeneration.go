@@ -36,6 +36,14 @@ func GenerateBlock(ctx *Context) error {
 		return err
 	}
 
+	// Seed is the candidate signature of the previous seed
+	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.LastHeader.Seed)
+	if err != nil {
+		return err
+	}
+
+	ctx.Seed = seed
+
 	// Generate candidate block
 	candidateBlock, err := newCandidateBlock(ctx)
 	if err != nil {
@@ -68,8 +76,17 @@ func GenerateBlock(ctx *Context) error {
 		return err
 	}
 
-	// Create candidate msg - Implement when candidate code is done
-	// msgCandidate := payload.NewMsgBlock(candidateBlock)
+	// Create candidate msg
+	pl2 := consensusmsg.NewCandidate(candidateBlock)
+	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl2)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.SendMessage(ctx.Magic, msgCandidate); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -181,13 +198,7 @@ func newCandidateBlock(ctx *Context) (*block.Block, error) {
 
 	candidateBlock.SetPrevBlock(ctx.LastHeader)
 
-	// Seed is the candidate signature of the previous seed
-	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.LastHeader.Seed)
-	if err != nil {
-		return nil, err
-	}
-
-	candidateBlock.Header.Seed = seed
+	candidateBlock.Header.Seed = ctx.Seed
 	candidateBlock.Header.Height = ctx.Round
 	candidateBlock.Header.Timestamp = time.Now().Unix()
 
@@ -197,7 +208,7 @@ func newCandidateBlock(ctx *Context) (*block.Block, error) {
 	for _, tx := range txs {
 		candidateBlock.AddTx(tx)
 	}
-	err = candidateBlock.SetRoot()
+	err := candidateBlock.SetRoot()
 	if err != nil {
 		return nil, err
 	}

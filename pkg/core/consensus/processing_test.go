@@ -40,6 +40,8 @@ func TestProcessMsgReduction(t *testing.T) {
 	assert.Equal(t, votes, retVotes)
 }
 
+// TODO: implement missing message types
+
 func TestFaultyMsgRound(t *testing.T) {
 	// Create context
 	ctx, err := provisionerContext()
@@ -98,4 +100,89 @@ func TestFaultyMsgStep(t *testing.T) {
 	}
 }
 
-// TODO: implement missing message types
+func TestFaultyMsgLastHeader(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, msg, err := newVoteReduction(ctx, 500, emptyBlock.Header.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Change our header hash and verify the message (should fail)
+	ctx.LastHeader.Hash = make([]byte, 32)
+	valid, retVotes, err := processMsg(ctx, msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if retVotes != 0 && valid {
+		t.Fatal("wrong version did not get caught by check")
+	}
+}
+
+func TestFaultyMsgVersion(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, msg, err := newVoteReduction(ctx, 500, emptyBlock.Header.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Change our version and verify the message (should fail)
+	ctx.Version = 20000
+	valid, retVotes, err := processMsg(ctx, msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if retVotes != 0 && valid {
+		t.Fatal("wrong version did not get caught by check")
+	}
+}
+
+func TestFaultyMsgSig(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, msg, err := newVoteReduction(ctx, 500, emptyBlock.Header.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Change their Ed25519 public key and verify the message (should fail)
+	msg.PubKey = make([]byte, 32)
+	valid, retVotes, err := processMsg(ctx, msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if retVotes != 0 && valid {
+		t.Fatal("wrong version did not get caught by check")
+	}
+}
