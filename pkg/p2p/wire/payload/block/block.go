@@ -52,6 +52,9 @@ func NewEmptyBlock(prevHeader *Header) (*Block, error) {
 		return nil, err
 	}
 
+	// Add one empty byte for encoding purposes
+	seedHash = append(seedHash, byte(0))
+
 	block.Header.Seed = seedHash
 	block.Header.Timestamp = (time.Now().Unix())
 	if err := block.SetHash(); err != nil {

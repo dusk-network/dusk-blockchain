@@ -59,7 +59,7 @@ func (b *Header) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, b.Seed); err != nil {
+	if err := encoding.WriteBLS(w, b.Seed); err != nil {
 		return err
 	}
 
@@ -107,7 +107,7 @@ func (b *Header) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &b.Seed); err != nil {
+	if err := encoding.ReadBLS(r, &b.Seed); err != nil {
 		return err
 	}
 
