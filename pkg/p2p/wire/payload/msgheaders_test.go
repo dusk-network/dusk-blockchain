@@ -44,7 +44,9 @@ func TestMsgHeadersEncodeDecode(t *testing.T) {
 		// Spoof previous hash and seed
 		h, _ := crypto.RandEntropy(32)
 		b.Header.PrevBlock = h
-		b.Header.Seed = h
+
+		s, _ := crypto.RandEntropy(33)
+		b.Header.Seed = s
 
 		// Add cert image
 		rand1, _ := crypto.RandEntropy(32)
