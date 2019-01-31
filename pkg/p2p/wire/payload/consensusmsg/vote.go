@@ -12,11 +12,12 @@ type Vote struct {
 	Hash   []byte // The block hash or signature set hash voted on
 	PubKey []byte // BLS public key of the voter
 	Sig    []byte // Compressed BLS signature of the hash
+	Score  []byte // Node sortition score
 	Step   uint8  // Step this vote occurred at
 }
 
 // NewVote will return a Vote struct populated with the passed parameters.
-func NewVote(hash, pubKey, sig []byte, step uint8) (*Vote, error) {
+func NewVote(hash, pubKey, sig, score []byte, step uint8) (*Vote, error) {
 	if len(hash) != 32 {
 		return nil, errors.New("supplied hash for vote is improper length")
 	}
@@ -25,10 +26,15 @@ func NewVote(hash, pubKey, sig []byte, step uint8) (*Vote, error) {
 		return nil, errors.New("supplied sig for vote is improper length")
 	}
 
+	if len(score) != 33 {
+		return nil, errors.New("supplied score for vote is improper length")
+	}
+
 	return &Vote{
 		Hash:   hash,
 		PubKey: pubKey,
 		Sig:    sig,
+		Score:  score,
 		Step:   step,
 	}, nil
 }
@@ -44,6 +50,10 @@ func (v *Vote) Encode(w io.Writer) error {
 	}
 
 	if err := encoding.WriteBLS(w, v.Sig); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteBLS(w, v.Score); err != nil {
 		return err
 	}
 
@@ -65,6 +75,10 @@ func (v *Vote) Decode(r io.Reader) error {
 	}
 
 	if err := encoding.ReadBLS(r, &v.Sig); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadBLS(r, &v.Score); err != nil {
 		return err
 	}
 
