@@ -25,6 +25,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Make role for sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -44,6 +45,7 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Make a block reduction messages
 	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +78,7 @@ func TestReductionVoteCountIndecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Make role for sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -112,6 +115,7 @@ func TestReductionVoteCountDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Make role for sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -131,6 +135,7 @@ func TestReductionVoteCountDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Make block reduction message
 	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
 	if err != nil {
 		t.Fatal(err)
@@ -174,12 +179,14 @@ func TestBlockReductionDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	ctx.VoteLimit = 10000
 	ctx.weight = 500
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
+	// Continually send reduction messages from a goroutine.
 	// This should conclude the reduction phase fairly quick
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -221,14 +228,17 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	ctx.VoteLimit = 10000
 	ctx.weight = 500
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
+	// Make another block hash that voters will vote on
 	otherBlock, _ := crypto.RandEntropy(32)
 
+	// Continually send reduction messages from a goroutine.
 	// This should conclude the reduction phase fairly quick
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -269,6 +279,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	ctx.VoteLimit = 10000
 	ctx.weight = 500
 
@@ -327,13 +338,17 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 		return 0, nil, err
 	}
 
+	// Populate mappings on passed context
 	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
 	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+
+	// Populate new context fields
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
 	ctx.Step = c.Step
 
+	// Run sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -351,10 +366,8 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 			return 0, nil, err
 		}
 
-		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-
 		// Create reduction payload to gossip
-		pl, err := consensusmsg.NewReduction(ctx.Score, blockHash, sigBLS, blsPubBytes)
+		pl, err := consensusmsg.NewReduction(ctx.Score, blockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
 		if err != nil {
 			return 0, nil, err
 		}

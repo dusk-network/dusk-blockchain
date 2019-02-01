@@ -28,9 +28,9 @@ func sortition(ctx *Context, role *role) error {
 		return err
 	}
 
+	// Set them on passed context
 	ctx.votes = votes
 	ctx.Score = score
-
 	return nil
 }
 
@@ -60,6 +60,7 @@ func verifyScore(ctx *Context, score, pk []byte, role *role) (bool, error) {
 	msg = append(msg, round...)
 	msg = append(msg, byte(role.step))
 
+	// And verify
 	if err := ctx.BLSVerify(pk, msg, score); err != nil {
 		if strings.Contains(err.Error(), "Invalid Signature") {
 			return false, nil
@@ -72,6 +73,7 @@ func verifyScore(ctx *Context, score, pk []byte, role *role) (bool, error) {
 }
 
 func calcVotes(threshold, stake, totalStake uint64, score []byte) (uint64, error) {
+	// Sanity checks
 	if threshold > totalStake {
 		return 0, errors.New("threshold size should not exceed maximum stake weight")
 	}
@@ -91,11 +93,13 @@ func calcVotes(threshold, stake, totalStake uint64, score []byte) (uint64, error
 	scoreNum := new(big.Int).SetBytes(score[:32])
 	target, _ := new(big.Rat).SetFrac(scoreNum, lenHash).Float64()
 
+	// Set up the distribution
 	dist := distuv.Normal{
 		Mu:    float64(stake / 100),
 		Sigma: p,
 	}
 
+	// Calculate votes
 	pos := float64(0.0)
 	votes := uint64(0)
 	for {

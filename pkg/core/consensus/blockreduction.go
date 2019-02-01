@@ -85,23 +85,25 @@ func committeeVoteReduction(ctx *Context) error {
 		}
 
 		// Create reduction payload to gossip
-		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.BlockHash, sigBLS, blsPubBytes)
+		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
 		if err != nil {
 			return err
 		}
 
+		// Sign the payload
 		sigEd, err := createSignature(ctx, pl)
 		if err != nil {
 			return err
 		}
 
+		// Create message
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
 			[]byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return err
 		}
 
+		// Gossip message
 		if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
 			return err
 		}
@@ -111,10 +113,17 @@ func committeeVoteReduction(ctx *Context) error {
 }
 
 func countVotesReduction(ctx *Context) error {
+	// Keep a counter of how many votes have been cast for a specific block
 	counts := make(map[string]uint64)
+
+	// Keep track of all nodes who have voted
 	var voters [][]byte
+
+	// Add our own information beforehand
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
+
+	// Start the timer
 	timer := time.NewTimer(stepTime)
 
 	for {

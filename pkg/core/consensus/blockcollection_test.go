@@ -82,7 +82,7 @@ func TestBlockCollection(t *testing.T) {
 	ctx.CandidateScoreChan <- msgScore
 	ctx.CandidateChan <- msgCandidate
 
-	// Block until function returns
+	// Block until block collection returns
 	wg.Wait()
 
 	// CandidateBlock and BlockHash should not be nil after receiving at least
@@ -104,6 +104,7 @@ func TestBlockCollectionNoBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Run block collection and let it time out
 	if err := BlockCollection(ctx); err != nil {
 		t.Fatal(err)
 	}

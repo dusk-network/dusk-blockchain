@@ -8,7 +8,8 @@ import (
 )
 
 // BlockAgreement is the function that runs during the block reduction phase, used
-// to collect vote sets and find a winning block.
+// to collect vote sets and find a winning block. BlockAgreement will run indefinitely
+// until a decision is reached.
 func BlockAgreement(ctx *Context, c chan bool) {
 	// Make a mapping of steps, pointing to a mapping of an Ed25519 public keys and
 	// vote sets.
@@ -30,7 +31,7 @@ func BlockAgreement(ctx *Context, c chan bool) {
 				break
 			}
 
-			// Add it to our counter
+			// Add it to our collection
 			pl := m.Payload.(*consensusmsg.SetAgreement)
 			pkEd := hex.EncodeToString(m.PubKey)
 
@@ -57,6 +58,7 @@ func BlockAgreement(ctx *Context, c chan bool) {
 					return
 				}
 
+				// Batch all the signatures together
 				for i, vote := range ctx.BlockVotes {
 					if i != 0 {
 						sig := &bls.Signature{}

@@ -13,6 +13,7 @@ func TestFaultyMsgRound(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create a dummy block and message
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
@@ -42,6 +43,7 @@ func TestFaultyMsgStep(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create a dummy block and message
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
@@ -71,6 +73,7 @@ func TestFaultyMsgLastHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create a dummy block and message
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
@@ -100,6 +103,7 @@ func TestFaultyMsgVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create a dummy block and message
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
@@ -129,6 +133,7 @@ func TestFaultyMsgSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create a dummy block and message
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)

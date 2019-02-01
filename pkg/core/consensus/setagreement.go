@@ -53,6 +53,7 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 					return
 				}
 
+				// Batch all the signatures together
 				for i, vote := range ctx.SigSetVotes {
 					if i != 0 {
 						sig := &bls.Signature{}
@@ -80,6 +81,7 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 }
 
 func sendSetAgreement(ctx *Context, votes []*consensusmsg.Vote) error {
+	// Create payload, signature and message
 	pl, err := consensusmsg.NewSetAgreement(ctx.BlockHash, votes)
 	if err != nil {
 		return err
@@ -96,10 +98,12 @@ func sendSetAgreement(ctx *Context, votes []*consensusmsg.Vote) error {
 		return err
 	}
 
+	// Gossip message
 	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
 		return err
 	}
 
+	// Send it to our own agreement channel
 	ctx.SetAgreementChan <- msg
 	return nil
 }

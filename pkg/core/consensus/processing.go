@@ -184,18 +184,18 @@ func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step
 
 func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake uint64,
 	step uint8) (bool, error) {
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
 	// We discard any deviating block hashes after the block reduction phase
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return false, nil
 	}
 
 	// Verify node sortition
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
+	}
+
 	votes, err := verifySortition(ctx, pl.Score, pl.PubKeyBLS, role, stake)
 	if err != nil {
 		return false, nil
@@ -209,12 +209,7 @@ func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, stake
 }
 
 func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote, stake uint64) bool {
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
+	// We discard any deviating block hashes after the block reduction phase
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return false
 	}
@@ -222,6 +217,13 @@ func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote, stake uint64) b
 	// Check BLS
 	if err := ctx.BLSVerify(pl.PubKeyBLS, pl.SigSetHash, pl.SigBLS); err != nil {
 		return false
+	}
+
+	// Verify node sortition
+	role := &role{
+		part:  "committee",
+		round: ctx.Round,
+		step:  ctx.Step,
 	}
 
 	votes, err := verifySortition(ctx, pl.Score, pl.PubKeyBLS, role, stake)

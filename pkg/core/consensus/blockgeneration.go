@@ -18,7 +18,6 @@ import (
 // GenerateBlock will generate a blockMsg and ScoreMsg
 // if node is eligible.
 func GenerateBlock(ctx *Context) error {
-
 	err := generateParams(ctx)
 	if err != nil {
 		return err

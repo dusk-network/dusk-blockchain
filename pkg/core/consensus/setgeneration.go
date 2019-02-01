@@ -12,8 +12,7 @@ import (
 // then collect all other messages, then retaining the most voted set for the
 // signature set reduction phase.
 func SignatureSetGeneration(ctx *Context) error {
-	// TODO: add sortition for sigsetgen
-
+	// Create our own signature set candidate message
 	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes,
 		ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
 	if err != nil {
@@ -64,6 +63,7 @@ func SignatureSetGeneration(ctx *Context) error {
 				return err
 			}
 
+			// Discard if it's invalid
 			if !valid {
 				break
 			}

@@ -25,6 +25,7 @@ func TestSignatureSetGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -39,13 +40,14 @@ func TestSignatureSetGeneration(t *testing.T) {
 	ctx.SigSetVotes = votes
 	ctx.weight = 500
 	ctx.VoteLimit = 20
+
+	// Run sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
 		step:  ctx.Step,
 	}
 
-	// Run sortition
 	if err := sortition(ctx, role); err != nil {
 		t.Fatal(err)
 	}
@@ -68,6 +70,7 @@ func TestSignatureSetGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Run signature set generation function
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -105,12 +108,17 @@ func newSigSetCandidate(c *Context, weight uint64) ([]*consensusmsg.Vote,
 		return nil, nil, err
 	}
 
+	// Populate mappings on passed context
 	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
 	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+
+	// Populate new context fields
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = c.BlockHash
 	ctx.Step = c.Step
+
+	// Create a vote set
 	votes, err := createVoteSet(c, 50)
 	if err != nil {
 		return nil, nil, err
@@ -118,6 +126,7 @@ func newSigSetCandidate(c *Context, weight uint64) ([]*consensusmsg.Vote,
 
 	ctx.SigSetVotes = votes
 
+	// Run sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -129,6 +138,7 @@ func newSigSetCandidate(c *Context, weight uint64) ([]*consensusmsg.Vote,
 	}
 
 	if ctx.votes > 0 {
+		// Create payload, signature and message
 		pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes,
 			ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
 		if err != nil {

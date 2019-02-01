@@ -25,6 +25,7 @@ func TestSetAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	ctx.weight = 500
 	ctx.VoteLimit = 20
 
@@ -37,7 +38,7 @@ func TestSetAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockVotes = votes
+	ctx.SigSetVotes = votes
 
 	// This should conclude the signature set agreement phase fairly quick
 	q := make(chan bool, 1)
@@ -83,6 +84,7 @@ func TestSendSetAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -96,6 +98,7 @@ func TestSendSetAgreement(t *testing.T) {
 	ctx.LastHeader.Hash = prevHash
 	ctx.BlockHash = hash
 
+	// Create a dummy vote set
 	var votes []*consensusmsg.Vote
 	for i := 0; i < 5; i++ {
 		keys, err := NewRandKeys()
@@ -117,13 +120,14 @@ func TestSendSetAgreement(t *testing.T) {
 	}
 
 	ctx.BlockVotes = votes
+
+	// Send the set agreement message with the vote set we juust created
 	if err := sendSetAgreement(ctx, ctx.BlockVotes); err != nil {
 		t.Fatal(err)
 	}
 
 	// Should have gotten the message into our setagreement channel
 	msg := <-ctx.SetAgreementChan
-
 	assert.NotNil(t, msg)
 }
 
@@ -140,13 +144,17 @@ func newVoteSetAgreement(c *Context, weight uint64, blockHash []byte,
 		return 0, nil, err
 	}
 
+	// Populate mappings on passed context
 	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
 	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+
+	// Populate new context fields
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
 	ctx.Step = c.Step
 
+	// Run sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -177,6 +185,8 @@ func newVoteSetAgreement(c *Context, weight uint64, blockHash []byte,
 	return 0, nil, nil
 }
 
+// Convenience function to make a vote set. It should pass verifications done
+// by the passed context object after the function returns.
 func createVoteSet(ctx *Context, amount int) ([]*consensusmsg.Vote, error) {
 	var votes []*consensusmsg.Vote
 	for i := 0; i < amount; i++ {
@@ -191,6 +201,7 @@ func createVoteSet(ctx *Context, amount int) ([]*consensusmsg.Vote, error) {
 		ctx.NodeWeights[pkEd] = 500
 		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
 
+		// Create vote signature
 		sig, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
 		if err != nil {
 			return nil, err
@@ -205,6 +216,8 @@ func createVoteSet(ctx *Context, amount int) ([]*consensusmsg.Vote, error) {
 		}
 
 		c.weight = 500
+
+		// Run sortition
 		role := &role{
 			part:  "committee",
 			round: ctx.Round,
@@ -215,6 +228,7 @@ func createVoteSet(ctx *Context, amount int) ([]*consensusmsg.Vote, error) {
 			return nil, err
 		}
 
+		// Create a vote and add it to the array
 		vote, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), cSig,
 			c.Score, ctx.Step)
 		if err != nil {

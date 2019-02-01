@@ -63,7 +63,7 @@ func committeeVoteSigSet(ctx *Context) error {
 		}
 	}
 
-	// Hash bytes
+	// Hash bytes and set it on context
 	sigSetHash, err := hash.Sha3256(buf.Bytes())
 	if err != nil {
 		return err
@@ -104,10 +104,17 @@ func committeeVoteSigSet(ctx *Context) error {
 }
 
 func countVotesSigSet(ctx *Context) error {
+	// Keep a counter of how many votes have been cast for a specific block
 	counts := make(map[string]uint64)
+
+	// Keep track of all nodes who have voted
 	var voters [][]byte
+
+	// Add our own information beforehand
 	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
 	counts[hex.EncodeToString(ctx.SigSetHash)] += ctx.weight
+
+	// Start the timer
 	timer := time.NewTimer(stepTime)
 
 	for {

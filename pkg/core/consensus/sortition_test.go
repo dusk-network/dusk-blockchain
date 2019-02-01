@@ -39,7 +39,7 @@ func TestSortition(t *testing.T) {
 }
 
 func TestVerifySortition(t *testing.T) {
-	// Create sortition
+	// Create score
 	seed, _ := crypto.RandEntropy(32)
 	totalWeight := uint64(500000)
 	round := uint64(150000)

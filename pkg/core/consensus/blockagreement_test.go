@@ -18,6 +18,7 @@ func TestBlockAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic parameters
 	ctx.weight = 500
 	ctx.VoteLimit = 20
 

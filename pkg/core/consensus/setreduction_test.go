@@ -22,6 +22,7 @@ func TestSignatureSetVoteCountDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create role for sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -35,7 +36,7 @@ func TestSignatureSetVoteCountDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Set up voting phase
+	// Create dummy values
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
@@ -79,6 +80,7 @@ func TestSignatureSetVoteCountIndecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create role for sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,
@@ -114,12 +116,15 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	ctx.weight = 500
 	ctx.VoteLimit = 100
 	block, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	ctx.BlockHash = block
 
 	// Run sortition
 	role := &role{
@@ -132,8 +137,6 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = block
-
 	// Create vote set
 	votes, err := createVoteSet(ctx, 50)
 	if err != nil {
@@ -142,6 +145,7 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 
 	ctx.SigSetVotes = votes
 
+	// Run signature set reduction function
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -195,12 +199,15 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Set basic fields on context
 	ctx.weight = 500
 	ctx.VoteLimit = 100
 	block, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	ctx.BlockHash = block
 
 	// Run sortition
 	role := &role{
@@ -212,8 +219,6 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 	if err := sortition(ctx, role); err != nil {
 		t.Fatal(err)
 	}
-
-	ctx.BlockHash = block
 
 	// Create vote set
 	votes, err := createVoteSet(ctx, 50)
@@ -248,14 +253,18 @@ func newVoteSigSet(c *Context, weight uint64, winningBlock, setHash []byte) (uin
 		return 0, nil, err
 	}
 
+	// Populate mappings on passed context
 	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
 	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+
+	// Populate new context fields
 	ctx.weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.SigSetHash = setHash
 	ctx.BlockHash = winningBlock
 	ctx.Step = c.Step
 
+	// Run sortition
 	role := &role{
 		part:  "committee",
 		round: ctx.Round,

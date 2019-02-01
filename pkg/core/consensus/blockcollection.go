@@ -22,6 +22,7 @@ func BlockCollection(ctx *Context) error {
 	out:
 		select {
 		case <-timer.C:
+			// Set CandidateBlock on context, if we received it
 			for _, block := range blocks {
 				if bytes.Equal(block.Header.Hash, ctx.BlockHash) {
 					ctx.CandidateBlock = block
@@ -45,6 +46,7 @@ func BlockCollection(ctx *Context) error {
 				return err
 			}
 
+			// Discard if invalid
 			if !valid {
 				break
 			}
@@ -66,6 +68,7 @@ func BlockCollection(ctx *Context) error {
 				return err
 			}
 
+			// Discard if invalid
 			if !valid {
 				break
 			}
