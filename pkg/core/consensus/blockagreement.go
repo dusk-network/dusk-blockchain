@@ -42,7 +42,8 @@ func BlockAgreement(ctx *Context, c chan bool) {
 			sets[m.Step][pkEd] = pl.VoteSet
 
 			// Check if we have exceeded the limit
-			if uint64(len(sets[m.Step])) >= ctx.VoteLimit {
+			limit := float64(len(ctx.NodeWeights)) * 0.75
+			if len(sets[m.Step]) >= int(limit) {
 				// Set our own vote set as the signature set for signature
 				// set generation, which should follow after this
 				pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))

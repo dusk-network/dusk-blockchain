@@ -140,13 +140,13 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 	}
 
 	// Create vote set
-	votes, err := createVoteSet(ctx, 50)
+	votes, _, err := createVotesAndMsgs(ctx, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ctx.SigSetVotes = votes
-	sigSetHash, err := hashSigSetVotes(ctx)
+	sigSetHash, err := hashSigSetVotes(ctx.SigSetVotes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 	}
 
 	// Create vote set
-	votes, err := createVoteSet(ctx, 50)
+	votes, _, err := createVotesAndMsgs(ctx, 50)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"sync"
@@ -32,13 +33,13 @@ func TestSignatureSetGeneration(t *testing.T) {
 	}
 
 	ctx.BlockHash = hash
-	votes, err := createVoteSet(ctx, 50)
+	votes, _, err := createVotesAndMsgs(ctx, 15)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ctx.SigSetVotes = votes
-	ctx.weight = 500
+	ctx.weight = 200
 	ctx.VoteLimit = 20
 
 	// Run sortition
@@ -52,23 +53,28 @@ func TestSignatureSetGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Shuffle vote set
+	var otherVotes []*consensusmsg.Vote
+	otherVotes = append(otherVotes, votes...)
+	otherVotes[0] = otherVotes[1]
+
 	// Create votes
-	_, vote1, err := newSigSetCandidate(ctx, 500)
+	vote1, err := newSigSetCandidate(ctx, 500, otherVotes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, vote2, err := newSigSetCandidate(ctx, 800)
+	vote2, err := newSigSetCandidate(ctx, 800, otherVotes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// We should end up with the vote set of the node with the highest stake.
-	// So, we save it here.
-	otherVotes, vote3, err := newSigSetCandidate(ctx, 1500)
+	vote3, err := newSigSetCandidate(ctx, 1500, otherVotes)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	allVotes := []*payload.MsgConsensus{vote1, vote2, vote3}
 
 	// Run signature set generation function
 	wg := sync.WaitGroup{}
@@ -83,29 +89,39 @@ func TestSignatureSetGeneration(t *testing.T) {
 
 	// Send votes, and then block until function returns
 	// The order should not matter, as the highest stake will win
-	ctx.SigSetCandidateChan <- vote1
-	ctx.SigSetCandidateChan <- vote3
-	ctx.SigSetCandidateChan <- vote2
+	for _, vote := range allVotes {
+		// Do this to avoid pointer issues during verification
+		buf := new(bytes.Buffer)
+		if err := vote.Encode(buf); err != nil {
+			t.Fatal(err)
+		}
+
+		msg := &payload.MsgConsensus{}
+		if err := msg.Decode(buf); err != nil {
+			t.Fatal(err)
+		}
+
+		ctx.SigSetCandidateChan <- msg
+	}
 	wg.Wait()
 
-	// We should now have vote3's vote set
+	// We should now have otherVotes
 	assert.Equal(t, otherVotes, ctx.SigSetVotes)
 
 	// Reset step timer
 	stepTime = 20 * time.Second
 }
 
-func newSigSetCandidate(c *Context, weight uint64) ([]*consensusmsg.Vote,
-	*payload.MsgConsensus, error) {
+func newSigSetCandidate(c *Context, weight uint64, votes []*consensusmsg.Vote) (*payload.MsgConsensus, error) {
 	if weight < MinimumStake {
-		return nil, nil, errors.New("weight too low, will result in no votes")
+		return nil, errors.New("weight too low, will result in no votes")
 	}
 
 	// Create context
 	keys, _ := NewRandKeys()
 	ctx, err := NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Populate mappings on passed context
@@ -117,13 +133,6 @@ func newSigSetCandidate(c *Context, weight uint64) ([]*consensusmsg.Vote,
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = c.BlockHash
 	ctx.Step = c.Step
-
-	// Create a vote set
-	votes, err := createVoteSet(c, 50)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	ctx.SigSetVotes = votes
 
 	// Run sortition
@@ -134,7 +143,7 @@ func newSigSetCandidate(c *Context, weight uint64) ([]*consensusmsg.Vote,
 	}
 
 	if err := sortition(ctx, role); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if ctx.votes > 0 {
@@ -142,18 +151,18 @@ func newSigSetCandidate(c *Context, weight uint64) ([]*consensusmsg.Vote,
 		pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes,
 			ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		sigEd, err := createSignature(ctx, pl)
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 			ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		return votes, msg, nil
+		return msg, nil
 	}
 
-	return nil, nil, nil
+	return nil, nil
 }

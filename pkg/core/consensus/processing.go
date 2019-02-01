@@ -135,8 +135,9 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (ui
 }
 
 func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step uint8) (bool, error) {
-	// A set should be of appropriate length, at least two times the vote limit
-	if uint64(len(voteSet)) < 2*ctx.VoteLimit {
+	// A set should be of appropriate length, at least 2*0.75*len(provisioners)
+	limit := 2.0 * 0.75 * float64(len(ctx.NodeWeights))
+	if len(voteSet) < int(limit) {
 		return false, nil
 	}
 

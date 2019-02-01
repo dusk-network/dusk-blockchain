@@ -51,7 +51,7 @@ func SignatureSetReduction(ctx *Context) error {
 }
 
 func committeeVoteSigSet(ctx *Context) error {
-	sigSetHash, err := hashSigSetVotes(ctx)
+	sigSetHash, err := hashSigSetVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}

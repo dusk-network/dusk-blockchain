@@ -387,6 +387,10 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 		}
 
 		sigEd, err := createSignature(ctx, pl)
+		if err != nil {
+			return 0, nil, err
+		}
+
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 			ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {

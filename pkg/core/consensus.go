@@ -46,6 +46,17 @@ func (b *Blockchain) provision() {
 	// First we reset our context values
 	b.ctx.Reset()
 
+	// Then, set the vote limit
+	// Votes are currently quite similar to stake size (often a little bit less due
+	// to the pseudo-random parts of sortition) so we will count with that for now
+	var allVotes uint64
+	for _, vote := range b.ctx.NodeWeights {
+		allVotes += vote
+	}
+
+	// Should come out to around 75% of voting power
+	b.ctx.VoteLimit = uint64(float64(allVotes) * 0.75)
+
 	// Set up a channel that we can get agreement results from
 	c := make(chan bool, 1)
 

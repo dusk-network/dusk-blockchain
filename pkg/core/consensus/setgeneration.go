@@ -49,7 +49,7 @@ func SignatureSetGeneration(ctx *Context) error {
 
 	// Initialize container for all vote sets, and add our own
 	ctx.AllVotes = make(map[string][]*consensusmsg.Vote)
-	sigSetHash, err := hashSigSetVotes(ctx)
+	sigSetHash, err := hashSigSetVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}
@@ -87,6 +87,12 @@ func SignatureSetGeneration(ctx *Context) error {
 
 			// Log information
 			voters[pkEd] = true
+			setHash, err := hashSigSetVotes(pl.SignatureSet)
+			if err != nil {
+				return err
+			}
+
+			ctx.AllVotes[hex.EncodeToString(setHash)] = pl.SignatureSet
 
 			// If the stake is higher than our current one, replace
 			if stake > highest {
@@ -98,10 +104,10 @@ func SignatureSetGeneration(ctx *Context) error {
 }
 
 // Returns the hash of ctx.SigSetVotes
-func hashSigSetVotes(ctx *Context) ([]byte, error) {
+func hashSigSetVotes(votes []*consensusmsg.Vote) ([]byte, error) {
 	// Encode signature set
 	buf := new(bytes.Buffer)
-	for _, vote := range ctx.SigSetVotes {
+	for _, vote := range votes {
 		if err := vote.Encode(buf); err != nil {
 			return nil, err
 		}

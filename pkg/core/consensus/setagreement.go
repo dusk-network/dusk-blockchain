@@ -18,6 +18,8 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 	for {
 		select {
 		case m := <-ctx.SetAgreementChan:
+			pl := m.Payload.(*consensusmsg.SetAgreement)
+
 			// Process received message
 			valid, _, err := processMsg(ctx, m)
 			if err != nil {
@@ -32,7 +34,6 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 			}
 
 			// Add it to our counter
-			pl := m.Payload.(*consensusmsg.SetAgreement)
 			pkEd := hex.EncodeToString(m.PubKey)
 
 			if sets[m.Step] == nil {
@@ -42,7 +43,8 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 			sets[m.Step][pkEd] = pl.VoteSet
 
 			// Check if we have exceeded the limit
-			if uint64(len(sets[m.Step])) >= ctx.VoteLimit {
+			limit := float64(len(ctx.NodeWeights)) * 0.75
+			if len(sets[m.Step]) >= int(limit) {
 				// Populate certificate
 				ctx.Certificate.SRPubKeys = make([][]byte, len(ctx.SigSetVotes))
 				ctx.Certificate.SRSortitionProofs = make([][]byte, len(ctx.SigSetVotes))

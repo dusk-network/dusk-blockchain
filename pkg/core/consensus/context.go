@@ -157,6 +157,7 @@ func (c *Context) Reset() {
 	// Provisioner
 	c.Score = nil
 	c.votes = 0
+	c.VoteLimit = 0
 	c.BlockHash = nil
 	c.Empty = false
 	c.Step = 1

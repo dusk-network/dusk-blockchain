@@ -1,12 +1,13 @@
 package consensus
 
 import (
-	"math/rand"
+	"bytes"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
 // Block agreement runs until a decision is made. Thus, we will only test for
@@ -25,33 +26,32 @@ func TestBlockAgreement(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
-	// Make vote set with at least 2*VoteLimit amount of votes
-	votes, err := createVoteSet(ctx, 50)
+	// Make vote set and vote messages
+	votes, msgs, err := createVotesAndMsgs(ctx, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ctx.BlockVotes = votes
 
-	// This should conclude the signature set agreement phase fairly quick
+	// Send msgs
 	q := make(chan bool, 1)
 	ticker := time.NewTicker(300 * time.Millisecond)
 	go func() {
-		for {
+		for i := 0; i < len(msgs); i++ {
 			select {
 			case <-q:
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				weight := rand.Intn(10000)
-				weight += 100 // Avoid stakes being too low to participate
-				newVotes, err := createVoteSet(ctx, 50)
-				if err != nil {
+				// First encode and decode to avoid pointer issues
+				buf := new(bytes.Buffer)
+				if err := msgs[i].Encode(buf); err != nil {
 					t.Fatal(err)
 				}
 
-				_, msg, err := newVoteSetAgreement(ctx, uint64(weight), candidateBlock, newVotes)
-				if err != nil {
+				msg := &payload.MsgConsensus{}
+				if err := msg.Decode(buf); err != nil {
 					t.Fatal(err)
 				}
 
