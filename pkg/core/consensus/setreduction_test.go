@@ -48,6 +48,8 @@ func TestSignatureSetVoteCountDecisive(t *testing.T) {
 	}
 
 	ctx.SigSetHash = setHash
+	setStr := hex.EncodeToString(setHash)
+	ctx.AllVotes[setStr] = make([]*consensusmsg.Vote, 1)
 	ctx.BlockHash = emptyBlock.Header.Hash
 	_, msg, err := newVoteSigSet(ctx, 400, emptyBlock.Header.Hash, setHash)
 	if err != nil {
@@ -144,6 +146,13 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 	}
 
 	ctx.SigSetVotes = votes
+	sigSetHash, err := hashSigSetVotes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setStr := hex.EncodeToString(sigSetHash)
+	ctx.AllVotes[setStr] = votes
 
 	// Run signature set reduction function
 	wg := &sync.WaitGroup{}
@@ -191,7 +200,7 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 
 func TestSignatureSetReductionIndecisive(t *testing.T) {
 	// Adjust timer to reduce waiting times
-	stepTime = 100 * time.Millisecond
+	stepTime = 1 * time.Second
 
 	// Create context
 	ctx, err := provisionerContext()
@@ -228,8 +237,7 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 
 	ctx.SigSetVotes = votes
 
-	// The function will loop as long as it doesn't receive a convincing majority
-	// vote. After hitting MaxSteps, the function will return.
+	// The function will return as soon as it doesn't get a decisive outcome.
 	if err := SignatureSetReduction(ctx); err != nil {
 		t.Fatal(err)
 	}

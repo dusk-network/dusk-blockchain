@@ -88,7 +88,7 @@ func TestBlockCollection(t *testing.T) {
 	// CandidateBlock and BlockHash should not be nil after receiving at least
 	// one candidate and score message
 	assert.NotNil(t, ctx.BlockHash)
-	assert.NotNil(t, ctx.CandidateBlock)
+	assert.NotNil(t, ctx.CandidateBlocks)
 
 	// Reset candidate timer
 	candidateTime = 60 * time.Second
@@ -111,7 +111,7 @@ func TestBlockCollectionNoBlock(t *testing.T) {
 
 	// BlockHash and CandidateBlock should be nil
 	assert.Nil(t, ctx.BlockHash)
-	assert.Nil(t, ctx.CandidateBlock)
+	assert.Empty(t, ctx.CandidateBlocks)
 
 	// Reset candidate timer
 	candidateTime = 60 * time.Second

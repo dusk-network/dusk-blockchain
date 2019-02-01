@@ -45,6 +45,9 @@ func TestReductionVoteCountDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
+	ctx.CandidateBlocks[hashStr] = &block.Block{}
+
 	// Make a block reduction messages
 	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
 	if err != nil {
@@ -186,6 +189,9 @@ func TestBlockReductionDecisive(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
+	hashStr := hex.EncodeToString(candidateBlock)
+	ctx.CandidateBlocks[hashStr] = &block.Block{}
+
 	// Continually send reduction messages from a goroutine.
 	// This should conclude the reduction phase fairly quick
 	q := make(chan bool, 1)
@@ -235,8 +241,13 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
+	candidateHashStr := hex.EncodeToString(candidateBlock)
+	ctx.CandidateBlocks[candidateHashStr] = &block.Block{}
+
 	// Make another block hash that voters will vote on
 	otherBlock, _ := crypto.RandEntropy(32)
+	otherHashStr := hex.EncodeToString(otherBlock)
+	ctx.CandidateBlocks[otherHashStr] = &block.Block{}
 
 	// Continually send reduction messages from a goroutine.
 	// This should conclude the reduction phase fairly quick
@@ -285,6 +296,9 @@ func TestBlockReductionIndecisive(t *testing.T) {
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
+
+	hashStr := hex.EncodeToString(candidateBlock)
+	ctx.CandidateBlocks[hashStr] = &block.Block{}
 
 	// Adjust timer to reduce waiting times
 	stepTime = 1 * time.Second

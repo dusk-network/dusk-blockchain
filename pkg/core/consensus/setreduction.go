@@ -1,11 +1,8 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/hex"
 	"time"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
@@ -14,57 +11,47 @@ import (
 
 // SignatureSetReduction is the signature set reduction phase of the consensus.
 func SignatureSetReduction(ctx *Context) error {
-	for ctx.Step = 1; ctx.Step < MaxSteps; ctx.Step++ {
-		// Vote on collected signature set
-		if err := committeeVoteSigSet(ctx); err != nil {
-			return err
-		}
+	// Vote on collected signature set
+	if err := committeeVoteSigSet(ctx); err != nil {
+		return err
+	}
 
-		// Receive all other votes
-		if err := countVotesSigSet(ctx); err != nil {
-			return err
-		}
+	// Receive all other votes
+	if err := countVotesSigSet(ctx); err != nil {
+		return err
+	}
 
-		ctx.Step++
+	ctx.Step++
 
-		// If we timed out, go back to the beginning of the loop
-		if ctx.SigSetHash == nil {
-			continue
-		}
+	// If we timed out, exit the loop and go back to signature set generation
+	if ctx.SigSetHash == nil {
+		return nil
+	}
 
-		if err := committeeVoteSigSet(ctx); err != nil {
-			return err
-		}
+	if err := committeeVoteSigSet(ctx); err != nil {
+		return err
+	}
 
-		if err := countVotesSigSet(ctx); err != nil {
-			return err
-		}
+	if err := countVotesSigSet(ctx); err != nil {
+		return err
+	}
 
-		// If we got a result, populate certificate
-		if ctx.SigSetHash != nil {
-			// And send message to set agreement and terminate
-			if err := sendSetAgreement(ctx, ctx.SigSetVotes); err != nil {
-				return err
-			}
+	// If we timed out, exit the loop and go back to signature set generation
+	if ctx.SigSetHash == nil {
+		return nil
+	}
 
-			return nil
-		}
+	// If we got a result, populate certificate, send message to
+	// set agreement and terminate
+	if err := sendSetAgreement(ctx, ctx.SigSetVotes); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func committeeVoteSigSet(ctx *Context) error {
-	// Encode signature set
-	buf := new(bytes.Buffer)
-	for _, vote := range ctx.SigSetVotes {
-		if err := vote.Encode(buf); err != nil {
-			return err
-		}
-	}
-
-	// Hash bytes and set it on context
-	sigSetHash, err := hash.Sha3256(buf.Bytes())
+	sigSetHash, err := hashSigSetVotes(ctx)
 	if err != nil {
 		return err
 	}
@@ -108,10 +95,10 @@ func countVotesSigSet(ctx *Context) error {
 	counts := make(map[string]uint64)
 
 	// Keep track of all nodes who have voted
-	var voters [][]byte
+	voters := make(map[string]bool)
 
 	// Add our own information beforehand
-	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
+	voters[hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))] = true
 	counts[hex.EncodeToString(ctx.SigSetHash)] += ctx.weight
 
 	// Start the timer
@@ -125,12 +112,11 @@ func countVotesSigSet(ctx *Context) error {
 			return nil
 		case m := <-ctx.SigSetVoteChan:
 			pl := m.Payload.(*consensusmsg.SigSetVote)
+			pkEd := hex.EncodeToString(m.PubKey)
 
 			// Check if this node's vote is already recorded
-			for _, voter := range voters {
-				if bytes.Equal(voter, m.PubKey) {
-					break out
-				}
+			if voters[pkEd] {
+				break out
 			}
 
 			// Verify the message
@@ -145,14 +131,19 @@ func countVotesSigSet(ctx *Context) error {
 			}
 
 			// Log information
-			voters = append(voters, m.PubKey)
+			voters[pkEd] = true
 			setStr := hex.EncodeToString(pl.SigSetHash)
 			counts[setStr] += stake
 
 			// If a set exceeds vote threshold, we will end the loop.
 			if counts[setStr] > ctx.VoteLimit {
 				timer.Stop()
+
+				// Set signature set hash
 				ctx.SigSetHash = pl.SigSetHash
+
+				// Set vote set to winning hash
+				ctx.SigSetVotes = ctx.AllVotes[setStr]
 				return nil
 			}
 		}

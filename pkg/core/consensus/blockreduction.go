@@ -14,13 +14,6 @@ func BlockReduction(ctx *Context) error {
 	// First, clear our votes out, so that we get a fresh set for this phase.
 	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
 
-	// Create fallback value (zero)
-	fallback := make([]byte, 32)
-
-	// Save starting value
-	var startHash []byte
-	startHash = append(startHash, ctx.BlockHash...)
-
 	// Vote on passed block
 	if err := committeeVoteReduction(ctx); err != nil {
 		return err
@@ -34,9 +27,9 @@ func BlockReduction(ctx *Context) error {
 	ctx.Step++
 
 	// If BlockHash is nil, no clear winner was found within the time limit.
-	// So we will vote again for the first value.
+	// So we will exit and restart the consensus.
 	if ctx.BlockHash == nil {
-		ctx.BlockHash = startHash
+		return nil
 	}
 
 	if err := committeeVoteReduction(ctx); err != nil {
@@ -50,10 +43,8 @@ func BlockReduction(ctx *Context) error {
 	ctx.Step++
 
 	// If BlockHash is nil, no clear winner was found within the time limit.
-	// So we will return a fallback value instead.
+	// So we will exit and restart the consensus.
 	if ctx.BlockHash == nil {
-		ctx.BlockHash = fallback
-		ctx.BlockVotes = nil
 		return nil
 	}
 
@@ -117,10 +108,10 @@ func countVotesReduction(ctx *Context) error {
 	counts := make(map[string]uint64)
 
 	// Keep track of all nodes who have voted
-	var voters [][]byte
+	voters := make(map[string]bool)
 
 	// Add our own information beforehand
-	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
+	voters[hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))] = true
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
 
 	// Start the timer
@@ -134,12 +125,11 @@ func countVotesReduction(ctx *Context) error {
 			return nil
 		case m := <-ctx.ReductionChan:
 			pl := m.Payload.(*consensusmsg.Reduction)
+			pkEd := hex.EncodeToString(m.PubKey)
 
 			// Check if this node's vote is already recorded
-			for _, voter := range voters {
-				if bytes.Equal(voter, m.PubKey) {
-					break out
-				}
+			if voters[pkEd] {
+				break out
 			}
 
 			// Verify the message score and get back it's contents
@@ -155,7 +145,7 @@ func countVotesReduction(ctx *Context) error {
 			}
 
 			// Log new information
-			voters = append(voters, m.PubKey)
+			voters[pkEd] = true
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
 			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, pl.Score, ctx.Step)

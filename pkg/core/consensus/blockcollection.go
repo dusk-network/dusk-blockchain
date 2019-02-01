@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"bytes"
+	"encoding/hex"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
@@ -13,31 +13,30 @@ import (
 // came with the highest score it found during message processing, which should then
 // be voted on in later phases.
 func BlockCollection(ctx *Context) error {
-	var senders [][]byte
-	blocks := make([]*block.Block, 0)
+	// Keep track of those who have already propagated their messages
+	senders := make(map[string]bool)
+
+	// Keep track of the highest bid score seen
 	var highest uint64
+
+	// Empty out our CandidateBlocks map
+	ctx.CandidateBlocks = make(map[string]*block.Block)
+
+	// Start the timer
 	timer := time.NewTimer(candidateTime)
 
 	for {
 	out:
 		select {
 		case <-timer.C:
-			// Set CandidateBlock on context, if we received it
-			for _, block := range blocks {
-				if bytes.Equal(block.Header.Hash, ctx.BlockHash) {
-					ctx.CandidateBlock = block
-				}
-			}
-
 			return nil
 		case m := <-ctx.CandidateChan:
 			pl := m.Payload.(*consensusmsg.Candidate)
+			blockHash := hex.EncodeToString(pl.Block.Header.Hash)
 
 			// See if we already have it
-			for _, block := range blocks {
-				if bytes.Equal(pl.Block.Header.Hash, block.Header.Hash) {
-					break out
-				}
+			if ctx.CandidateBlocks[blockHash] != nil {
+				break out
 			}
 
 			// Verify the message
@@ -51,15 +50,15 @@ func BlockCollection(ctx *Context) error {
 				break
 			}
 
-			blocks = append(blocks, pl.Block)
+			// Add to the mapping
+			ctx.CandidateBlocks[blockHash] = pl.Block
 		case m := <-ctx.CandidateScoreChan:
 			pl := m.Payload.(*consensusmsg.CandidateScore)
+			pkEd := hex.EncodeToString(m.PubKey)
 
 			// Check if this node's candidate was already recorded
-			for _, sender := range senders {
-				if bytes.Equal(sender, m.PubKey) {
-					break out
-				}
+			if senders[pkEd] {
+				break out
 			}
 
 			// Verify the message
@@ -72,6 +71,9 @@ func BlockCollection(ctx *Context) error {
 			if !valid {
 				break
 			}
+
+			// Log information
+			senders[pkEd] = true
 
 			// If the score is higher than our current one, replace
 			if pl.Score > highest {

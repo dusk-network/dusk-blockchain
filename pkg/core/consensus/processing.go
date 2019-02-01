@@ -125,6 +125,12 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction, stake uint64) (ui
 		return 0, nil
 	}
 
+	// Make sure they voted on an existing block
+	blockHash := hex.EncodeToString(pl.BlockHash)
+	if ctx.CandidateBlocks[blockHash] == nil {
+		return 0, nil
+	}
+
 	return votes, nil
 }
 
@@ -232,6 +238,12 @@ func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote, stake uint64) b
 	}
 
 	if votes == 0 {
+		return false
+	}
+
+	// Vote must be for an existing vote set
+	setStr := hex.EncodeToString(pl.SigSetHash)
+	if ctx.AllVotes[setStr] == nil {
 		return false
 	}
 

@@ -2,8 +2,10 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
@@ -37,9 +39,25 @@ func SignatureSetGeneration(ctx *Context) error {
 
 	// Collect signature set with highest score, and set our context value
 	// to the winner.
-	var voters [][]byte
-	voters = append(voters, []byte(*ctx.Keys.EdPubKey))
+
+	// Keep track of those who have voted
+	voters := make(map[string]bool)
+	pk := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+
+	// Log our own key
+	voters[pk] = true
+
+	// Initialize container for all vote sets, and add our own
+	ctx.AllVotes = make(map[string][]*consensusmsg.Vote)
+	sigSetHash, err := hashSigSetVotes(ctx)
+	if err != nil {
+		return err
+	}
+
+	ctx.AllVotes[hex.EncodeToString(sigSetHash)] = ctx.SigSetVotes
 	highest := ctx.weight
+
+	// Start timer
 	timer := time.NewTimer(stepTime)
 
 	for {
@@ -49,12 +67,11 @@ func SignatureSetGeneration(ctx *Context) error {
 			return nil
 		case m := <-ctx.SigSetCandidateChan:
 			pl := m.Payload.(*consensusmsg.SigSetCandidate)
+			pkEd := hex.EncodeToString(m.PubKey)
 
 			// Check if this node's signature set is already recorded
-			for _, voter := range voters {
-				if bytes.Equal(voter, m.PubKey) {
-					break out
-				}
+			if voters[pkEd] {
+				break out
 			}
 
 			// Verify the message
@@ -68,6 +85,9 @@ func SignatureSetGeneration(ctx *Context) error {
 				break
 			}
 
+			// Log information
+			voters[pkEd] = true
+
 			// If the stake is higher than our current one, replace
 			if stake > highest {
 				highest = stake
@@ -75,4 +95,23 @@ func SignatureSetGeneration(ctx *Context) error {
 			}
 		}
 	}
+}
+
+// Returns the hash of ctx.SigSetVotes
+func hashSigSetVotes(ctx *Context) ([]byte, error) {
+	// Encode signature set
+	buf := new(bytes.Buffer)
+	for _, vote := range ctx.SigSetVotes {
+		if err := vote.Encode(buf); err != nil {
+			return nil, err
+		}
+	}
+
+	// Hash bytes and set it on context
+	sigSetHash, err := hash.Sha3256(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return sigSetHash, nil
 }
