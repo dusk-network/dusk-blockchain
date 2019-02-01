@@ -117,7 +117,7 @@ func TestSendSetAgreement(t *testing.T) {
 	}
 
 	ctx.BlockVotes = votes
-	if err := sendSetAgreement(ctx); err != nil {
+	if err := sendSetAgreement(ctx, ctx.BlockVotes); err != nil {
 		t.Fatal(err)
 	}
 

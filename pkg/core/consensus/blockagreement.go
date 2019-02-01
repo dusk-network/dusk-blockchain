@@ -3,6 +3,7 @@ package consensus
 import (
 	"encoding/hex"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
@@ -46,11 +47,36 @@ func BlockAgreement(ctx *Context, c chan bool) {
 				pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
 				ctx.SigSetVotes = sets[m.Step][pkEd]
 
-				// Set certificate values
-				// TODO: batched sigs
-				// ctx.Certificate.BRStep = ctx.Step
-				// TODO: pubkeys
-				// TODO: sortition proofs
+				// Populate certificate
+				ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.BlockVotes))
+				ctx.Certificate.BRSortitionProofs = make([][]byte, len(ctx.BlockVotes))
+				agSig := &bls.Signature{}
+				if err := agSig.Decompress(ctx.BlockVotes[0].Sig); err != nil {
+					// Log
+					c <- false
+					return
+				}
+
+				for i, vote := range ctx.BlockVotes {
+					if i != 0 {
+						sig := &bls.Signature{}
+						if err := sig.Decompress(vote.Sig); err != nil {
+							// Log
+							c <- false
+							return
+						}
+
+						agSig.Aggregate(sig)
+					}
+
+					ctx.Certificate.BRPubKeys[i] = vote.PubKey
+					ctx.Certificate.BRSortitionProofs[i] = vote.Score
+
+				}
+
+				cSig := agSig.Compress()
+				ctx.Certificate.BRBatchedSig = cSig
+				ctx.Certificate.BRStep = m.Step
 				c <- true
 				return
 			}
