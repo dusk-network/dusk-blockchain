@@ -33,7 +33,6 @@ func TestMsgInvEncodeDecodeTx(t *testing.T) {
 	msg := payload.NewMsgInv()
 	msg.AddTx(s)
 
-	// TODO: test AddBlock function when block structure is decided
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		t.Fatal(err)
