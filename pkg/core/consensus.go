@@ -62,7 +62,6 @@ func (b *Blockchain) provision() {
 
 	// Fire off the parallel block agreement phase
 	go consensus.BlockAgreement(b.ctx, c)
-out:
 	for b.ctx.Step < consensus.MaxSteps {
 		select {
 		case v := <-c:
@@ -73,8 +72,9 @@ out:
 				return
 			}
 
-			// If not, we proceed to the next phase
-			break out
+			// If not, we proceed to the next phase by maxing out the
+			// step counter.
+			b.ctx.Step = consensus.MaxSteps
 		default:
 			// If this is the first step, or if we returned without a decisive vote,
 			// collect blocks
