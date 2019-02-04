@@ -89,7 +89,10 @@ func calcVotes(threshold, stake, totalStake uint64, score []byte) (uint64, error
 	}
 
 	// Calculate score divided by 2^256
-	var lenHash, _ = new(big.Int).SetString("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 0)
+
+	i := big.NewInt(2)
+	e := big.NewInt(256)
+	lenHash := i.Exp(i, e, nil)
 	scoreNum := new(big.Int).SetBytes(score[:32])
 	target, _ := new(big.Rat).SetFrac(scoreNum, lenHash).Float64()
 
