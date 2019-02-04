@@ -1,9 +1,3 @@
-# RPC/CLI
-
-The setup for the node RPC server and the CLI are based on the Bitcoin daemon/CLI setup, with all the software contained within one executable, shipped with a second executable that communicates with the daemon over RPC calls. As an addition, the CLI for dusk will open up a shell-like interface in the terminal if no commands are passed on startup. This configuration is open for change, as porting the code will not be a huge problem. For the type of network we are building however, I believe a setup like this one is favorable over a CryptoNote inspired setup (with the wallet manager seperated from the node). Depending on how the node gets built from here on, having wallet code contained in the node will be much more simple, as it allows for the process to simply start up and begin working as a generator or provisioner (if specified in .conf or some other way) without having to start up a wallet-cli process as well and manually committing coins each time.
-
-#
-
 ### RPC server
 
 The RPC server is loosely based on the RPC server used by the Bitcoin client. On startup, the server will listen on a specified port on localhost, and accept method calls through a JSON format. The server will respond with a JSON response including the result of the function called, and an error message if one was encountered during function execution. In case of an unauthenticated user calling an admin level command, the server will send back a 401 Unauthorized response, along with an error message specifying which command was called.
