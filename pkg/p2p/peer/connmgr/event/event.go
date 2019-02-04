@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-// ConditionalEvent is an interface that can be use
+// ConditionalEvent is an interface that can be used for events
+// that canbe triggered under certain conditions
 type ConditionalEvent interface {
 	GetType() Type
 	IsExecutable() bool

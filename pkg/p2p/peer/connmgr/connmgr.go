@@ -158,7 +158,7 @@ func (c *Connmgr) failed(r *Request) {
 			// if not then we should check if this request has had maxRetries
 		} else if r.Retries > maxRetries {
 			delete(c.PendingList, r.Addr)
-			go c.monitorThresholds()
+			//go c.monitorThresholds()
 			log.WithField("prefix", "connmgr").
 				Warnf("%s has been tried the maximum amount of times", r.Addr)
 			// As a NewRequest (monitor fills the ConnectedList) is asynchronous it could be faster than OnFail.
@@ -229,7 +229,7 @@ func (c *Connmgr) connected(r *Request) error {
 			c.config.OnConnection(r.Conn, r.Addr)
 		}
 
-		go c.monitorThresholds()
+		//go c.monitorThresholds()
 
 		if err != nil {
 			log.Error("Error connected", err)
