@@ -61,7 +61,6 @@ func SignatureSetGeneration(ctx *Context) error {
 	timer := time.NewTimer(stepTime)
 
 	for {
-	out:
 		select {
 		case <-timer.C:
 			return nil
@@ -71,7 +70,7 @@ func SignatureSetGeneration(ctx *Context) error {
 
 			// Check if this node's signature set is already recorded
 			if voters[pkEd] {
-				break out
+				break
 			}
 
 			// Verify the message

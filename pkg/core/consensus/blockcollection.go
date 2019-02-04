@@ -26,7 +26,6 @@ func BlockCollection(ctx *Context) error {
 	timer := time.NewTimer(candidateTime)
 
 	for {
-	out:
 		select {
 		case <-timer.C:
 			return nil
@@ -36,7 +35,7 @@ func BlockCollection(ctx *Context) error {
 
 			// See if we already have it
 			if ctx.CandidateBlocks[blockHash] != nil {
-				break out
+				break
 			}
 
 			// Verify the message
@@ -58,7 +57,7 @@ func BlockCollection(ctx *Context) error {
 
 			// Check if this node's candidate was already recorded
 			if senders[pkEd] {
-				break out
+				break
 			}
 
 			// Verify the message

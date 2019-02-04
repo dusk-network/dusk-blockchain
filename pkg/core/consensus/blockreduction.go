@@ -11,7 +11,12 @@ import (
 
 // BlockReduction is the main function that runs during block reduction phase.
 func BlockReduction(ctx *Context) error {
-	// First, clear our votes out, so that we get a fresh set for this phase.
+	// First, make sure we got a result from block collection.
+	if ctx.BlockHash == nil {
+		return nil
+	}
+
+	// Clear our votes out, so that we get a fresh set for this phase.
 	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
 
 	// Vote on passed block
@@ -118,7 +123,6 @@ func countVotesReduction(ctx *Context) error {
 	timer := time.NewTimer(stepTime)
 
 	for {
-	out:
 		select {
 		case <-timer.C:
 			ctx.BlockHash = nil
@@ -129,7 +133,7 @@ func countVotesReduction(ctx *Context) error {
 
 			// Check if this node's vote is already recorded
 			if voters[pkEd] {
-				break out
+				break
 			}
 
 			// Verify the message score and get back it's contents

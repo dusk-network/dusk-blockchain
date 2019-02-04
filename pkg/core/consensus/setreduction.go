@@ -105,7 +105,6 @@ func countVotesSigSet(ctx *Context) error {
 	timer := time.NewTimer(stepTime)
 
 	for {
-	out:
 		select {
 		case <-timer.C:
 			ctx.SigSetHash = nil
@@ -116,7 +115,7 @@ func countVotesSigSet(ctx *Context) error {
 
 			// Check if this node's vote is already recorded
 			if voters[pkEd] {
-				break out
+				break
 			}
 
 			// Verify the message
