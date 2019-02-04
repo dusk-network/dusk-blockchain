@@ -149,7 +149,7 @@ func TestAttemptedMoveFromGoodToBad(t *testing.T) {
 	assert.Equal(t, 1, len(addrmgr.Bad()))
 }
 
-func TestGetAddress(t *testing.T) {
+func TestUnconnected(t *testing.T) {
 
 	addrmgr := addrmgr.New()
 
@@ -164,12 +164,34 @@ func TestGetAddress(t *testing.T) {
 
 	addrmgr.AddAddrs(addrs)
 
-	fetchAddr, err := addrmgr.NewAddr()
+	unas := addrmgr.Unconnected()
+
+	ipports := []payload.NetAddress{*addr, *addr2, *addr3}
+
+	assert.ElementsMatch(t, ipports, unas)
+}
+
+func TestNewAddres(t *testing.T) {
+
+	addrmgr := addrmgr.New()
+
+	ip := "1000:0000:0000:0000:0000:0000:0000:0000" // different
+	addr := payload.NewNetAddress(ip, 10333)
+	ip2 := "1000:0000:0000:0000:0000:0000:0000:0000" // different
+	addr2 := payload.NewNetAddress(ip2, 10334)
+	ip3 := "1000:0000:0000:0000:0000:0000:0000:0000" // different
+	addr3 := payload.NewNetAddress(ip3, 10335)
+
+	addrs := []*payload.NetAddress{addr, addr2, addr3}
+
+	addrmgr.AddAddrs(addrs)
+
+	fetchAddr, err := addrmgr.NewAddres()
 	assert.Equal(t, nil, err)
 
 	ipports := []string{addr.String(), addr2.String(), addr3.String()}
 
-	assert.Contains(t, ipports, fetchAddr.String())
+	assert.Contains(t, ipports, fetchAddr)
 }
 
 // ipV6Address returns a valid IPv6 address as net.IP

@@ -120,7 +120,7 @@ func (bdb *BlockchainDB) GetLatestHeader() (*payload.BlockHeader, error) {
 
 // GetBlock will return the block from the received hash
 func (bdb *BlockchainDB) GetBlock(hash []byte) (*payload.Block, error) {
-	var err error = nil
+	var err error
 
 	block := &payload.Block{}
 	table := NewTable(bdb, HEADER)

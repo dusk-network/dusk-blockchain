@@ -30,6 +30,9 @@ var (
 // transactions. Properly verified transactions and blocks will be
 // added to the memory pool and the database respectively.
 type Blockchain struct {
+	// Database
+	db *database.BlockchainDB
+
 	// Basic fields
 	memPool *MemPool
 	net     protocol.Magic
@@ -57,8 +60,14 @@ type Blockchain struct {
 
 // NewBlockchain returns a new Blockchain instance with an initialized mempool.
 // This Blockchain instance should then be ready to process incoming transactions and blocks.
-func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
-	db := database.GetInstance()
+func NewBlockchain(db *database.BlockchainDB, net protocol.Magic) (*Blockchain, error) {
+	//path := config.EnvNetCfg.DatabaseDirPath
+	//db, err := database.NewBlockchainDB(path)
+	//log.WithField("prefix", "database").Debugf("Path to database: %s", path)
+	//if err != nil {
+	//	log.WithField("prefix", "database").Fatalf("Failed to find db path: %s", path)
+	//	return nil, err
+	//}
 
 	marker := []byte("HasBeenInitialisedAlready")
 	init, err := db.Has(marker)
@@ -107,7 +116,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 		}
 	}
 
-	chain := &Blockchain{}
+	chain := &Blockchain{db: db}
 
 	// Set up mempool and populate struct fields
 	//chain.memPool.Init() //TODO: TV commented this line because of no memPool instance (yet)
@@ -252,8 +261,7 @@ func (b *Blockchain) VerifyTx(tx *transactions.Stealth) error {
 // to the database.
 func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	// Check if we already have this in the database first
-	db := database.GetInstance()
-	exists, err := db.Has(block.Header.Hash)
+	exists, err := b.db.Has(block.Header.Hash)
 	if err != nil {
 		return err
 	}
@@ -263,7 +271,7 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Check if previous block hash is correct
-	hdr, err := db.GetBlockHeaderByHeight(block.Header.Height - 1)
+	hdr, err := b.db.GetBlockHeaderByHeight(block.Header.Height - 1)
 	if err != nil {
 		return err
 	}
@@ -306,7 +314,7 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	//	return err
 	//}
 
-	if err := db.WriteBlockTransactions([]*payload.Block{block}); err != nil {
+	if err := b.db.WriteBlockTransactions([]*payload.Block{block}); err != nil {
 		return err
 	}
 
@@ -361,41 +369,33 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 
 // GetLatestHeader gives the latest block header
 func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
-	db := database.GetInstance()
-
-	return db.GetLatestHeader()
+	return b.db.GetLatestHeader()
 }
 
 // GetHeaders gives block headers from the database, starting and
 // stopping at the provided locators.
 func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
-	db := database.GetInstance()
-
-	return db.ReadHeaders(start, stop)
+	return b.db.ReadHeaders(start, stop)
 }
 
 // GetBlock will return the block from the received hash
 func (b *Blockchain) GetBlock(hash []byte) (*payload.Block, error) {
-	bd := database.GetInstance()
-
-	return bd.GetBlock(hash)
+	return b.db.GetBlock(hash)
 }
 
-// AddHeaders will add block headers to the chain.
+// AddHeaders will add block headers to the chain
 func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
-	db := database.GetInstance()
-	if err := db.WriteHeaders(msg.Headers); err != nil {
+	if err := b.db.WriteHeaders(msg.Headers); err != nil {
 		return err
 	}
 	return nil
 }
 
-// ValidateHeaders will validate headers that were received through the wire.
+// ValidateHeaders will validate headers that were received through the wire
 // TODO: Centralize validation rules
 func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
-	db := database.GetInstance()
-	table := database.NewTable(db, database.HEADER)
-	latestHash, err := db.Get(database.LATESTHEADER)
+	table := database.NewTable(b.db, database.HEADER)
+	latestHash, err := b.db.Get(database.LATESTHEADER)
 	if err != nil {
 		return err
 	}

@@ -1,9 +1,9 @@
-package config
+package logging
 
 import (
-	"github.com/sirupsen/logrus"
-	cfg "github.com/spf13/viper"
+	log "github.com/sirupsen/logrus"
 	"github.com/x-cray/logrus-prefixed-formatter"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
@@ -16,11 +16,11 @@ const (
 )
 
 // ConfigureLogging configurates the logging
-func configureLogging() error {
+func ConfigureLogging() error {
 
 	// Get the logging config.
-	logFilepath := cfg.GetString("net.logging.filepath")
-	level := cfg.GetString("net.logging.level")
+	logFilepath := config.EnvNetCfg.Log.FilePath
+	level := config.EnvNetCfg.Log.Level
 
 	// Create a log file if not yet exist
 	logFilepath = createLogFile(logFilepath, "net")
@@ -33,20 +33,20 @@ func configureLogging() error {
 	logger := createRollingFileLogger(logfile)
 
 	mw := io.MultiWriter(os.Stdout, &logger)
-	logrus.SetOutput(mw)
+	log.SetOutput(mw)
 
-	logLevel, err := logrus.ParseLevel(strings.ToUpper(level))
+	logLevel, err := log.ParseLevel(strings.ToUpper(level))
 	if err != nil {
 		return err
 	}
-	logrus.SetLevel(logLevel)
+	log.SetLevel(logLevel)
 
 	// Use a custom formatter TODO: ext. configuration
-	logrus.SetFormatter(&prefixed.TextFormatter{
-		TimestampFormat: cfg.GetString("net.logging.timestampformat"),
+	log.SetFormatter(&prefixed.TextFormatter{
+		TimestampFormat: config.EnvNetCfg.Log.TimestampFormat,
 		FullTimestamp:   true,
 		ForceFormatting: true,
-		ForceColors:     cfg.GetBool("net.logging.tty"),
+		ForceColors:     config.EnvNetCfg.Log.Tty,
 	})
 
 	return nil

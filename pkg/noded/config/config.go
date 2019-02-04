@@ -1,64 +1,69 @@
 package config
 
 import (
-	cfg "github.com/spf13/viper"
-	"log"
-	"strings"
+	"encoding/json"
+	log "github.com/sirupsen/logrus"
+	"os"
 )
 
-const (
-	errConfigRead = "Error when reading config:\n%s"
-)
+// EnvNetCfg is a var to be able to read configuration globally
+var EnvNetCfg EnvNetConfig
 
-// LoadConfig loads all the noded configuration from the noded.toml file.
-// It's also aware of some default configuration settings.
-func LoadConfig() error {
-
-	cfg.SetConfigName("noded")            // Name of config file without file extension
-	cfg.AddConfigPath("cmd/noded/config") // Path of config file
-	cfg.AutomaticEnv()
-
-	err := cfg.ReadInConfig()
-	if err != nil {
-		log.Fatalf(errConfigRead, err)
-	}
-	cfg.BindEnv("Env.Net", "DUSK.ENV.NET")
-
-	envNet := cfg.GetString("Env.Net")
-	if envNet == "" {
-		log.Fatalf(errConfigRead,
-			"Please set at least:\n"+
-				" - config var 'env.net' or\n"+
-				" - env var 'DUSK.ENV.NET' or\n"+
-				" - cmdline arg 'env.net'.",
-		)
-	}
-
-	cfg.RegisterAlias(envNet, "net")
-
-	setDefaults(envNet)
-
-	err = configureLogging()
-
-	// TODO: Any other initialisation of external config
-
-	return err
+// EnvNetConfig holds the configuration for an network environment like TestNet, MainNet etc.
+// Values can be set by the user in cmd/config/config.json.
+type EnvNetConfig struct {
+	Magic    uint32
+	Log      Log
+	Peer     Peer
+	Monitor  Monitor
+	Database Database
 }
 
-func setDefaults(envNet string) {
-	// Logging
-	cfg.SetDefault("net.logging.filepath", UserHomeDir()+userHomeDuskDir+"/"+strings.ToLower(envNet)+"/noded/noded.log")
-	cfg.SetDefault("net.logging.level", "info")
-	cfg.SetDefault("net.logging.timestampformat", "2006-01-02 15:04:05")
-	cfg.SetDefault("net.logging.tty", false)
-	// Peer
-	cfg.SetDefault("net.peer.port", "10333") //TODO: To be decided
-	cfg.SetDefault("net.peer.dialtimeout", 0)
+// Log holds all configuration related to logging
+type Log struct {
+	FilePath string
+	// Log level (log levels: trace, debug, info, warning, error, fatal and panic)
+	Level string
+	// See: https://golang.org/src/time/format.go
+	TimestampFormat string
+	// Write log file for a TTY device (to see coloured log text)
+	Tty bool
+}
 
-	// Database
-	cfg.SetDefault("net.database.dirpath", UserHomeDir()+userHomeDuskDir+"/"+strings.ToLower(envNet)+"/db")
+// Peer holds all configuration related to the local peer
+type Peer struct {
+	Port        uint16
+	DialTimeout uint16
+	Seeds       []string
+	// Minimum peers before logging error messaages (or any other future notification system)
+	Min uint16
+	// Maximum peers before disabling peers
+	Max uint16
+	// Minimum peers before sending 'getaddr' messages to find more peers
+	MinGetAddr uint16
+}
 
-	// Monitoring Events
-	cfg.SetDefault("net.monitoring.evtDisableDuration", "1m")
+// Monitor holds all configuration related to monitoring peer synchronisation thresholds
+type Monitor struct {
+	// Disable events for a certain time to be triggered again.
+	EvtDisableDuration string
+}
 
+// Database holds all configuration related to the blockchain database
+type Database struct {
+	DirPath string
+}
+
+// LoadConfig reads and loads the configuration from cmd/config/config.json
+func LoadConfig(file string) {
+	var config EnvNetConfig
+	configFile, err := os.Open(file)
+	defer configFile.Close()
+	jsonParser := json.NewDecoder(configFile)
+	err = jsonParser.Decode(&config)
+	if err != nil {
+		log.Fatalf("Could not read configuration: %s", err.Error())
+	}
+
+	EnvNetCfg = config
 }

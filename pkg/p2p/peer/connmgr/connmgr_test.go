@@ -1,15 +1,11 @@
 package connmgr_test
 
 import (
-	"bou.ke/monkey"
 	log "github.com/sirupsen/logrus"
-	cfg "github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"io/ioutil"
 	"net"
-	"reflect"
 	"testing"
 )
 
@@ -18,13 +14,14 @@ func init() {
 }
 
 func TestConnect(t *testing.T) {
-	cm := connmgr.GetInstance()
-	cm.Run()
+	cfg := connmgr.Config{
+		GetAddress:   nil,
+		OnConnection: nil,
+		OnAccept:     nil,
+	}
 
-	var c *connmgr.Connmgr
-	monkey.PatchInstanceMethod(reflect.TypeOf(c), "OnConnection", func(_ *connmgr.Connmgr, _ net.Conn, _ string) {
-		return
-	})
+	cm := connmgr.New(cfg)
+	cm.Run()
 
 	ipport := "google.com:80"
 
@@ -36,20 +33,22 @@ func TestConnect(t *testing.T) {
 }
 
 func TestNewRequest(t *testing.T) {
+	address := "google.com:80"
 
-	address := payload.NewNetAddress("216.58.212.174", 80)
-	cfg.Set("net.peer.seeds", address.String())
+	var getAddr = func() (string, error) {
+		return address, nil
+	}
 
-	var c *connmgr.Connmgr
-	monkey.PatchInstanceMethod(reflect.TypeOf(c), "OnConnection", func(_ *connmgr.Connmgr, _ net.Conn, _ string) {
-		return
-	})
+	cfg := connmgr.Config{
+		GetAddress: getAddr,
+	}
 
-	cm := connmgr.New()
+	cm := connmgr.New(cfg)
+
 	cm.Run()
 	cm.NewRequest()
 
-	if _, ok := cm.ConnectedList[address.String()]; ok {
+	if _, ok := cm.ConnectedList[address]; ok {
 		assert.Equal(t, true, ok)
 		assert.Equal(t, 1, len(cm.ConnectedList))
 		return
@@ -59,13 +58,25 @@ func TestNewRequest(t *testing.T) {
 }
 
 func TestDisconnect(t *testing.T) {
-	address := payload.NewNetAddress("216.58.212.174", 80)
-	cm := connmgr.New()
+	address := "google.com:80"
+
+	var getAddr = func() (string, error) {
+		return address, nil
+	}
+
+	cfg := connmgr.Config{
+		GetAddress:   getAddr,
+		OnConnection: nil,
+		OnAccept:     nil,
+	}
+
+	cm := connmgr.New(cfg)
+
 	_, conn := net.Pipe()
-	cm.ConnectedList[address.String()] = &connmgr.Request{Conn: conn, Addr: address.String()}
+	cm.ConnectedList[address] = &connmgr.Request{Conn: conn, Addr: address}
 	cm.Run()
 	cm.NewRequest()
-	cm.Disconnect(address.String())
+	cm.Disconnect(address)
 
 	assert.Equal(t, 0, len(cm.ConnectedList))
 }

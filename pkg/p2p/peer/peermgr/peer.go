@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	cfg "github.com/spf13/viper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"math/rand"
 	"net"
 	"strconv"
@@ -124,7 +124,7 @@ func NewPeer(conn net.Conn, inbound bool, respHndlr ResponseHandler) *Peer {
 	p.addr = conn.RemoteAddr().String()
 
 	// TODO: Shouldn't this be sent by remote peer
-	p.net = protocol.Magic(uint32(cfg.GetInt("net.magic")))
+	p.net = protocol.Magic(uint32(config.EnvNetCfg.Magic))
 
 	p.conn = conn
 	p.createdAt = time.Now()
@@ -460,7 +460,7 @@ func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
 
 // OnBlock Listener. Is called after receiving a 'blocks' msg
 func (p *Peer) OnBlock(msg *payload.MsgBlock) {
-	log.WithField("prefix", "peer").Infof("Received a '%s' message (Height=%d) from %s", commands.Block, msg.Block.Header.Height, p.addr)
+	log.WithField("prefix", "peer").Debugf("Received a '%s' message (Height=%d) from %s", commands.Block, msg.Block.Header.Height, p.addr)
 	p.inch <- func() {
 		if p.hndlr.OnBlock != nil {
 			p.hndlr.OnBlock(p, msg)
@@ -664,7 +664,7 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 // It will put a function on the outgoing peer queue to send a 'getdata' msg to an other peer.
 // The same possible function error will be returned from this method.
 func (p *Peer) RequestBlocks(hashes [][]byte) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
+	log.WithField("prefix", "peer").Debugf("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
 	blocks := make([]*payload.Block, 0, len(hashes))

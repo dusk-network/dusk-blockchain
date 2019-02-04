@@ -2,7 +2,7 @@ package peermgr_test
 
 import (
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -56,7 +56,7 @@ func TestResponseHandler(t *testing.T) {
 
 func TestInboundHandshake(t *testing.T) {
 	address := ":20338"
-	viper.Set("net.magic", 0x74736E40)
+	config.EnvNetCfg.Magic = 0x74736E40
 
 	go func() {
 		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
@@ -122,7 +122,7 @@ func TestInboundHandshake(t *testing.T) {
 
 func TestOutboundHandshake(t *testing.T) {
 	address := ":20338"
-	viper.Set("net.magic", 0x74736E40)
+	config.EnvNetCfg.Magic = 0x74736E40
 
 	go func() {
 		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
@@ -185,7 +185,7 @@ func TestOutboundHandshake(t *testing.T) {
 // TestHandshakeCancelled tests the response message after sending a 'version'
 func TestHandshakeCancelled(t *testing.T) {
 	address := ":20338"
-	viper.Set("net.magic", 0x74736E40)
+	config.EnvNetCfg.Magic = 0x74736E40
 
 	go func() {
 		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
@@ -245,7 +245,7 @@ func TestHandshakeCancelled(t *testing.T) {
 func TestHandshakeWrongVersion(t *testing.T) {
 	// Make sure peer is disconnected.
 	address := ":20338"
-	viper.Set("net.magic", 0x74736E40)
+	config.EnvNetCfg.Magic = 0x74736E40
 
 	go func() {
 		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
@@ -316,7 +316,7 @@ func TestHandshakeWrongVersion(t *testing.T) {
 // TestHandshakeNoVerack tests a peer returning no verack as last message.
 func TestHandshakeNoVerack(t *testing.T) {
 	address := ":20338"
-	viper.Set("net.magic", 0x74736E40)
+	config.EnvNetCfg.Magic = 0x74736E40
 
 	go func() {
 		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
@@ -325,7 +325,7 @@ func TestHandshakeNoVerack(t *testing.T) {
 		}
 		rspHndlr := createResponseHandler()
 		p := peermgr.NewPeer(conn, false, rspHndlr)
-		err = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 		err = p.Run()
 		if err != nil {
 			assert.NotEqual(t, nil, err)
@@ -368,7 +368,7 @@ func TestHandshakeNoVerack(t *testing.T) {
 // TestHandshakeSelfConnect tests a peer receiving a msg from itself.
 func TestHandshakeSelfConnect(t *testing.T) {
 	address := ":20338"
-	viper.Set("net.magic", 0x74736E40)
+	config.EnvNetCfg.Magic = 0x74736E40
 	nonce := rand.Uint64()
 
 	go func() {

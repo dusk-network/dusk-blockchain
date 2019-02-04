@@ -1,7 +1,7 @@
 package event
 
 import (
-	"github.com/spf13/viper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"sync"
 	"time"
 )
@@ -35,7 +35,7 @@ const (
 var events map[Type]ConditionalEvent
 var once sync.Once
 
-// GetEvent gets the syncEvent instance of a specific type as a Singleton
+// GetEvent gets the syncEvent instance of a specific type
 func GetEvent(evtType Type) ConditionalEvent {
 	if events == nil {
 		once.Do(func() {
@@ -69,7 +69,7 @@ func (m *syncEvent) Execute() ConditionalEvent {
 
 func (m *syncEvent) setExecutableFlag() {
 	elapsedTime := time.Now().Sub(m.timeDisabled)
-	duration, _ := time.ParseDuration(viper.GetString("net.monitoring.evtDisableDuration"))
+	duration, _ := time.ParseDuration(config.EnvNetCfg.Monitor.EvtDisableDuration)
 
 	if elapsedTime > duration {
 		m.executableFlag = true
