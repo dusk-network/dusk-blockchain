@@ -36,6 +36,7 @@ var events map[Type]ConditionalEvent
 var once sync.Once
 
 // GetEvent gets the syncEvent instance of a specific type
+// TODO: This Singleton will be removed when eventing is improved
 func GetEvent(evtType Type) ConditionalEvent {
 	if events == nil {
 		once.Do(func() {
