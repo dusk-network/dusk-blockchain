@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -203,14 +201,18 @@ func TestBlockReductionDuplicates(t *testing.T) {
 	// Set stake weight and vote limit, and generate a score
 	ctx.Weight = 500
 	ctx.VoteLimit = 2000
-	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
-		role, ctx.Threshold, ctx.Weight, ctx.W)
-	if prErr != nil && prErr.Priority == prerror.High {
-		t.Fatal(prErr)
+	score, err := sortition.CalcScore(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, role)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.Score = score
+	votes, err := sortition.Prove(ctx.Score, ctx.Threshold, ctx.Weight, ctx.W)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	ctx.Votes = votes
-	ctx.Score = score
 
 	// Set up voting phase
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
@@ -286,16 +288,20 @@ func newVoteReduction(c *consensus.Context, weight uint64, blockHash []byte) (ui
 		Step:  ctx.Step,
 	}
 
-	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
-		role, ctx.Threshold, ctx.Weight, ctx.W)
-	if prErr != nil {
-		return 0, nil, prErr.Err
+	score, err := sortition.CalcScore(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, role)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	ctx.Score = score
+	votes, err := sortition.Prove(ctx.Score, ctx.Threshold, ctx.Weight, ctx.W)
+	if err != nil {
+		return 0, nil, err
 	}
 
 	ctx.Votes = votes
-	ctx.Score = score
 	if ctx.Votes == 0 {
-		return 0, nil, nil
+		return 0, nil, errors.New("no votes")
 	}
 
 	// Sign block hash with BLS

@@ -166,14 +166,18 @@ func createVotesAndMsgs(ctx *consensus.Context, amount int) ([]*consensusmsg.Vot
 			Step:  ctx.Step,
 		}
 
-		votes, score, prErr := sortition.Prove(c.Seed, c.Keys.BLSSecretKey, c.Keys.BLSPubKey, role,
-			c.Threshold, c.Weight, c.W)
+		score, err := sortition.CalcScore(c.Seed, c.Keys.BLSSecretKey, c.Keys.BLSPubKey, role)
 		if err != nil {
-			return nil, nil, prErr
+			return nil, nil, err
+		}
+
+		c.Score = score
+		votes, err := sortition.Prove(c.Score, c.Threshold, c.Weight, c.W)
+		if err != nil {
+			return nil, nil, err
 		}
 
 		c.Votes = votes
-		c.Score = score
 
 		// Create vote signatures
 		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)

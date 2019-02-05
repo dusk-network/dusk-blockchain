@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
@@ -72,18 +73,22 @@ func committeeVoteReduction(ctx *Context) error {
 		Step:  ctx.Step,
 	}
 
-	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
-		role, ctx.Threshold, ctx.Weight, ctx.W)
-	if prErr != nil {
-		return prErr.Err
+	score, err := sortition.CalcScore(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, role)
+	if err != nil {
+		return err
+	}
+
+	ctx.Score = score
+	votes, err := sortition.Prove(ctx.Score, ctx.Threshold, ctx.Weight, ctx.W)
+	if err != nil {
+		return err
 	}
 
 	ctx.Votes = votes
-	ctx.Score = score
 
-	// Return if we didn't get any votes from sortition
+	// Return with an error if we didn't get any votes from sortition
 	if ctx.Votes == 0 {
-		return nil
+		return errors.New("sortition did not result in any votes")
 	}
 
 	// Sign block hash with BLS
