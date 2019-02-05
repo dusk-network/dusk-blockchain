@@ -29,9 +29,8 @@ var (
 	MinimumStake uint64 = 100
 )
 
-// Prove will run the sortition function for the passed context and role.
-func Prove(seed []byte, sk *bls.SecretKey, pk *bls.PublicKey, role *Role,
-	threshold, weight, totalWeight uint64) (uint64, []byte, *prerror.PrError) {
+// CalcScore will calculate the node's sortition score.
+func CalcScore(seed []byte, sk *bls.SecretKey, pk *bls.PublicKey, role *Role) ([]byte, error) {
 	// Construct message
 	msg := append(seed, []byte(role.Part)...)
 	round := make([]byte, 8)
@@ -42,19 +41,23 @@ func Prove(seed []byte, sk *bls.SecretKey, pk *bls.PublicKey, role *Role,
 	// Generate score
 	sig, err := bls.Sign(sk, pk, msg)
 	if err != nil {
-		return 0, nil, prerror.New(prerror.High, err)
+		return nil, err
 	}
 
 	// Compress score
 	score := sig.Compress()
+	return score, nil
+}
 
+// Prove will run the sortition function for the passed context and role.
+func Prove(score []byte, threshold, weight, totalWeight uint64) (uint64, error) {
 	// Generate votes
 	votes, err := calcVotes(threshold, weight, totalWeight, score)
 	if err != nil {
-		return 0, nil, prerror.New(prerror.Low, err)
+		return 0, err
 	}
 
-	return votes, score, nil
+	return votes, nil
 }
 
 // Verify will run the sortition function for another node's information.

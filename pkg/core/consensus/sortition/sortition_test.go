@@ -8,7 +8,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
@@ -116,14 +115,18 @@ func runSortition(weight, totalWeight, round uint64, seed []byte) (uint64, []byt
 		Step:  ctx.Step,
 	}
 
-	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
-		role, ctx.Threshold, ctx.Weight, ctx.W)
-	if prErr != nil && prErr.Priority == prerror.High {
-		return 0, nil, nil, prErr
+	score, err := sortition.CalcScore(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, role)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	ctx.Score = score
+	votes, err := sortition.Prove(ctx.Score, ctx.Threshold, ctx.Weight, ctx.W)
+	if err != nil {
+		return 0, nil, nil, err
 	}
 
 	ctx.Votes = votes
-	ctx.Score = score
 	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
 	return ctx.Votes, ctx.Score, blsPubBytes, nil
 }
