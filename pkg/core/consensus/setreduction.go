@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -36,6 +38,8 @@ func SignatureSetReduction(ctx *Context) error {
 		return err
 	}
 
+	ctx.Step++
+
 	// If we timed out, exit the loop and go back to signature set generation
 	if ctx.SigSetHash == nil {
 		return nil
@@ -43,7 +47,7 @@ func SignatureSetReduction(ctx *Context) error {
 
 	// If we got a result, populate certificate, send message to
 	// set agreement and terminate
-	if err := sendSetAgreement(ctx, ctx.SigSetVotes); err != nil {
+	if err := SendSetAgreement(ctx, ctx.SigSetVotes); err != nil {
 		return err
 	}
 
@@ -57,6 +61,8 @@ func committeeVoteSigSet(ctx *Context) error {
 	}
 
 	ctx.SigSetHash = sigSetHash
+	setStr := hex.EncodeToString(sigSetHash)
+	ctx.AllVotes[setStr] = ctx.SigSetVotes
 
 	// Sign signature set hash with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
@@ -71,7 +77,7 @@ func committeeVoteSigSet(ctx *Context) error {
 		return err
 	}
 
-	sigEd, err := createSignature(ctx, pl)
+	sigEd, err := CreateSignature(ctx, pl)
 	if err != nil {
 		return err
 	}
@@ -99,10 +105,10 @@ func countVotesSigSet(ctx *Context) error {
 
 	// Add our own information beforehand
 	voters[hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))] = true
-	counts[hex.EncodeToString(ctx.SigSetHash)] += ctx.weight
+	counts[hex.EncodeToString(ctx.SigSetHash)] += ctx.Weight
 
 	// Start the timer
-	timer := time.NewTimer(stepTime)
+	timer := time.NewTimer(StepTime)
 
 	for {
 		select {
@@ -119,13 +125,18 @@ func countVotesSigSet(ctx *Context) error {
 			}
 
 			// Verify the message
-			valid, stake, err := processMsg(ctx, m)
+			stake, err := ProcessMsg(ctx, m)
 			if err != nil {
-				return err
+				if err.Priority == prerror.High {
+					return err.Err
+				}
+
+				// Discard if invalid
+				break
 			}
 
-			// Discard if invalid
-			if stake == 0 || !valid {
+			// If sender hasn't staked, discard
+			if stake == 0 {
 				break
 			}
 
@@ -135,16 +146,18 @@ func countVotesSigSet(ctx *Context) error {
 			counts[setStr] += stake
 
 			// If a set exceeds vote threshold, we will end the loop.
-			if counts[setStr] > ctx.VoteLimit {
-				timer.Stop()
-
-				// Set signature set hash
-				ctx.SigSetHash = pl.SigSetHash
-
-				// Set vote set to winning hash
-				ctx.SigSetVotes = ctx.AllVotes[setStr]
-				return nil
+			if counts[setStr] < ctx.VoteLimit {
+				break
 			}
+
+			timer.Stop()
+
+			// Set signature set hash
+			ctx.SigSetHash = pl.SigSetHash
+
+			// Set vote set to winning hash
+			ctx.SigSetVotes = ctx.AllVotes[setStr]
+			return nil
 		}
 	}
 }

@@ -1,4 +1,4 @@
-package consensus
+package consensus_test
 
 import (
 	"encoding/hex"
@@ -8,6 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
 	"github.com/stretchr/testify/assert"
@@ -16,163 +20,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
-
-// Test functionality of vote counting with a clear outcome
-func TestReductionVoteCountDecisive(t *testing.T) {
-	// Create context
-	ctx, err := provisionerContext()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Make role for sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
-	// Set stake weight and vote limit, and generate a score
-	ctx.weight = 500
-	ctx.VoteLimit = 20
-	if err := sortition(ctx, role); err != nil {
-		t.Fatal(err)
-	}
-
-	// Set up voting phase
-	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = &block.Block{}
-
-	// Make a block reduction messages
-	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Start listening for votes
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		if err := countVotesReduction(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		wg.Done()
-	}()
-
-	// Send the vote out, and block until the counting function returns
-	ctx.ReductionChan <- msg
-	wg.Wait()
-
-	// BlockHash should not be nil after receiving vote
-	assert.NotNil(t, ctx.BlockHash)
-}
-
-// Test functionality of vote counting when no clear outcome is reached
-func TestReductionVoteCountIndecisive(t *testing.T) {
-	// Create context
-	ctx, err := provisionerContext()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Make role for sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
-	// Set stake weight and vote limit, and generate a score
-	ctx.weight = 500
-	ctx.VoteLimit = 20
-	if err := sortition(ctx, role); err != nil {
-		t.Fatal(err)
-	}
-
-	// Adjust timer to reduce waiting times
-	stepTime = 1 * time.Second
-
-	// Let the timer run out
-	if err := countVotesReduction(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// BlockHash should be nil after hitting time limit
-	assert.Nil(t, ctx.BlockHash)
-
-	// Reset step timer
-	stepTime = 20 * time.Second
-}
-
-// Test if a repeated vote does not add to the counter
-func TestReductionVoteCountDuplicates(t *testing.T) {
-	// Create context
-	ctx, err := provisionerContext()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Make role for sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
-	// Set stake weight and vote limit, and generate a score
-	ctx.weight = 500
-	ctx.VoteLimit = 2000
-	if err := sortition(ctx, role); err != nil {
-		t.Fatal(err)
-	}
-
-	// Set up voting phase
-	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Make block reduction message
-	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Adjust timer to reduce waiting times
-	stepTime = 3 * time.Second
-
-	// Start listening for votes
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		if err := countVotesReduction(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		wg.Done()
-	}()
-
-	// Send the vote out ten times, and block until the counting function returns
-	for i := 0; i < 10; i++ {
-		ctx.ReductionChan <- msg
-	}
-
-	wg.Wait()
-
-	// BlockHash should be nil after not receiving enough votes
-	assert.Nil(t, ctx.BlockHash)
-
-	// Reset step timer
-	stepTime = 20 * time.Second
-}
-
-// BlockReduction test scenarios
 
 // Test the BlockReduction function with many votes coming in.
 func TestBlockReductionDecisive(t *testing.T) {
@@ -184,7 +31,7 @@ func TestBlockReductionDecisive(t *testing.T) {
 
 	// Set basic fields on context
 	ctx.VoteLimit = 10000
-	ctx.weight = 500
+	ctx.Weight = 500
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
@@ -215,7 +62,7 @@ func TestBlockReductionDecisive(t *testing.T) {
 		}
 	}()
 
-	if err := BlockReduction(ctx); err != nil {
+	if err := consensus.BlockReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -236,7 +83,7 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 
 	// Set basic fields on context
 	ctx.VoteLimit = 10000
-	ctx.weight = 500
+	ctx.Weight = 500
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
@@ -272,7 +119,7 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 		}
 	}()
 
-	if err := BlockReduction(ctx); err != nil {
+	if err := consensus.BlockReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -292,7 +139,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 
 	// Set basic fields on context
 	ctx.VoteLimit = 10000
-	ctx.weight = 500
+	ctx.Weight = 500
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
@@ -301,7 +148,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	ctx.CandidateBlocks[hashStr] = &block.Block{}
 
 	// Adjust timer to reduce waiting times
-	stepTime = 1 * time.Second
+	consensus.StepTime = 1 * time.Second
 
 	// This should time out and change our context blockhash
 	q := make(chan bool, 1)
@@ -325,7 +172,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 		}
 	}()
 
-	if err := BlockReduction(ctx); err != nil {
+	if err := consensus.BlockReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -335,19 +182,89 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	assert.NotEqual(t, candidateBlock, ctx.BlockHash)
 
 	// Reset step timer
-	stepTime = 20 * time.Second
+	consensus.StepTime = 20 * time.Second
+}
+
+// Test if a repeated vote does not add to the counter
+func TestBlockReductionDuplicates(t *testing.T) {
+	// Create context
+	ctx, err := provisionerContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make role for sortition
+	role := &sortition.Role{
+		Part:  "committee",
+		Round: ctx.Round,
+		Step:  ctx.Step,
+	}
+
+	// Set stake weight and vote limit, and generate a score
+	ctx.Weight = 500
+	ctx.VoteLimit = 2000
+	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
+		role, ctx.Threshold, ctx.Weight, ctx.W)
+	if prErr != nil && prErr.Priority == prerror.High {
+		t.Fatal(prErr)
+	}
+
+	ctx.Votes = votes
+	ctx.Score = score
+
+	// Set up voting phase
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
+	ctx.CandidateBlocks[hashStr] = &block.Block{}
+
+	// Make block reduction message
+	_, msg, err := newVoteReduction(ctx, 400, emptyBlock.Header.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Adjust timer to reduce waiting times
+	consensus.StepTime = 3 * time.Second
+
+	// Start listening for votes
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := consensus.BlockReduction(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		wg.Done()
+	}()
+
+	// Send the vote out ten times, and block until the counting function returns
+	for i := 0; i < 10; i++ {
+		ctx.ReductionChan <- msg
+	}
+
+	wg.Wait()
+
+	// BlockHash should be nil after not receiving enough votes
+	assert.Nil(t, ctx.BlockHash)
+
+	// Reset step timer
+	consensus.StepTime = 20 * time.Second
 }
 
 // Convenience function to generate a vote for the reduction phase,
 // to emulate a received MsgReduction over the wire
-func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *payload.MsgConsensus, error) {
-	if weight < MinimumStake {
+func newVoteReduction(c *consensus.Context, weight uint64, blockHash []byte) (uint64, *payload.MsgConsensus, error) {
+	if weight < sortition.MinimumStake {
 		return 0, nil, errors.New("weight too low, will result in no votes")
 	}
 
 	// Create context
-	keys, _ := NewRandKeys()
-	ctx, err := NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
+	keys, _ := consensus.NewRandKeys()
+	ctx, err := consensus.NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -357,48 +274,52 @@ func newVoteReduction(c *Context, weight uint64, blockHash []byte) (uint64, *pay
 	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
 
 	// Populate new context fields
-	ctx.weight = weight
+	ctx.Weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
 	ctx.Step = c.Step
 
 	// Run sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
+	role := &sortition.Role{
+		Part:  "committee",
+		Round: ctx.Round,
+		Step:  ctx.Step,
 	}
 
-	if err := sortition(ctx, role); err != nil {
+	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
+		role, ctx.Threshold, ctx.Weight, ctx.W)
+	if prErr != nil {
+		return 0, nil, prErr.Err
+	}
+
+	ctx.Votes = votes
+	ctx.Score = score
+	if ctx.Votes == 0 {
+		return 0, nil, nil
+	}
+
+	// Sign block hash with BLS
+	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, blockHash)
+	if err != nil {
 		return 0, nil, err
 	}
 
-	if ctx.votes > 0 {
-		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, blockHash)
-		if err != nil {
-			return 0, nil, err
-		}
-
-		// Create reduction payload to gossip
-		pl, err := consensusmsg.NewReduction(ctx.Score, blockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
-		if err != nil {
-			return 0, nil, err
-		}
-
-		sigEd, err := createSignature(ctx, pl)
-		if err != nil {
-			return 0, nil, err
-		}
-
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-			ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
-		if err != nil {
-			return 0, nil, err
-		}
-
-		return ctx.votes, msg, nil
+	// Create reduction payload to gossip
+	pl, err := consensusmsg.NewReduction(score, blockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+	if err != nil {
+		return 0, nil, err
 	}
 
-	return 0, nil, nil
+	sigEd, err := consensus.CreateSignature(ctx, pl)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return votes, msg, nil
 }

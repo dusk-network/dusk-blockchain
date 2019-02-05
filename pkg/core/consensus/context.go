@@ -18,19 +18,12 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-type role struct {
-	part  string
-	round uint64
-	step  uint8
-}
-
 // Global consensus variables
 var (
-	maxMembers           = 200
-	MaxSteps      uint8  = 50
-	stepTime             = 20 * time.Second
-	candidateTime        = 60 * time.Second
-	MinimumStake  uint64 = 100
+	maxMembers          = 200
+	MaxSteps      uint8 = 50
+	StepTime            = 20 * time.Second
+	CandidateTime       = 60 * time.Second
 )
 
 // Context will hold all the necessary functions and
@@ -45,21 +38,21 @@ type Context struct {
 	Step       uint8         // Current step
 	Seed       []byte        // Round seed
 	LastHeader *block.Header // Previous block
-	k          []byte        // secret
+	K          []byte        // secret
 	Keys       *Keys
 	Magic      protocol.Magic
 
 	// Block generator values
-	d          uint64 // bidWeight
+	D          uint64 // bidWeight
 	X, Y, Z, M []byte
 	Q          uint64
 
 	// Provisioner values
 	// General
-	weight      uint64             // Amount this node has staked
+	Weight      uint64             // Amount this node has staked
 	W           uint64             // Total stake weight of the network
 	Score       []byte             // Sortition score of this node
-	votes       uint64             // Sortition votes of this node
+	Votes       uint64             // Sortition votes of this node
 	VoteLimit   uint64             // Votes needed to decide on a block
 	Empty       bool               // Whether or not the block being voted on is empty
 	Certificate *block.Certificate // Block certificate to be constructed during consensus
@@ -117,7 +110,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Seed:                seed,
 		Magic:               magic,
 		Certificate:         &block.Certificate{},
-		d:                   d,
+		D:                   d,
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
 		CandidateChan:       make(chan *payload.MsgConsensus, 100),
 		ReductionChan:       make(chan *payload.MsgConsensus, 100),
@@ -145,18 +138,17 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 // Reset removes all information that was generated during the consensus
 func (c *Context) Reset() {
 	// Block generator
-	c.k = nil
-	c.d = 0
+	c.K = nil
+	c.D = 0
 	c.X = nil
 	c.Y = nil
 	c.Z = nil
 	c.M = nil
-	c.k = nil
 	c.Q = 0
 
 	// Provisioner
 	c.Score = nil
-	c.votes = 0
+	c.Votes = 0
 	c.VoteLimit = 0
 	c.BlockHash = nil
 	c.Empty = false
@@ -243,7 +235,11 @@ func blsVerify(pkey, msg, signature []byte) error {
 	}
 
 	apk := bls.NewApk(pk)
-	return bls.Verify(apk, msg, sig)
+	if err := bls.Verify(apk, msg, sig); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func edSign(privateKey *ed25519.PrivateKey, message []byte) []byte {

@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
@@ -23,7 +25,7 @@ func BlockCollection(ctx *Context) error {
 	ctx.CandidateBlocks = make(map[string]*block.Block)
 
 	// Start the timer
-	timer := time.NewTimer(candidateTime)
+	timer := time.NewTimer(CandidateTime)
 
 	for {
 		select {
@@ -39,13 +41,13 @@ func BlockCollection(ctx *Context) error {
 			}
 
 			// Verify the message
-			valid, _, err := processMsg(ctx, m)
+			_, err := ProcessMsg(ctx, m)
 			if err != nil {
-				return err
-			}
+				if err.Priority == prerror.High {
+					return err
+				}
 
-			// Discard if invalid
-			if !valid {
+				// Discard if invalid
 				break
 			}
 
@@ -61,13 +63,13 @@ func BlockCollection(ctx *Context) error {
 			}
 
 			// Verify the message
-			valid, _, err := processMsg(ctx, m)
+			_, err := ProcessMsg(ctx, m)
 			if err != nil {
-				return err
-			}
+				if err.Priority == prerror.High {
+					return err
+				}
 
-			// Discard if invalid
-			if !valid {
+				// Discard if invalid
 				break
 			}
 

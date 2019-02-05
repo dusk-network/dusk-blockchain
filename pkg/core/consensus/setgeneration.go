@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -21,7 +23,7 @@ func SignatureSetGeneration(ctx *Context) error {
 		return err
 	}
 
-	sigEd, err := createSignature(ctx, pl)
+	sigEd, err := CreateSignature(ctx, pl)
 	if err != nil {
 		return err
 	}
@@ -55,10 +57,10 @@ func SignatureSetGeneration(ctx *Context) error {
 	}
 
 	ctx.AllVotes[hex.EncodeToString(sigSetHash)] = ctx.SigSetVotes
-	highest := ctx.weight
+	highest := ctx.Weight
 
 	// Start timer
-	timer := time.NewTimer(stepTime)
+	timer := time.NewTimer(StepTime)
 
 	for {
 		select {
@@ -74,13 +76,13 @@ func SignatureSetGeneration(ctx *Context) error {
 			}
 
 			// Verify the message
-			valid, stake, err := processMsg(ctx, m)
-			if err != nil {
-				return err
-			}
+			stake, prErr := ProcessMsg(ctx, m)
+			if prErr != nil {
+				if prErr.Priority == prerror.High {
+					return prErr.Err
+				}
 
-			// Discard if it's invalid
-			if !valid {
+				// Discard if it's invalid
 				break
 			}
 

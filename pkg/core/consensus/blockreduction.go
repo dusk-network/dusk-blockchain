@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
@@ -54,7 +57,7 @@ func BlockReduction(ctx *Context) error {
 	}
 
 	// If we did get a result, send block set agreement message
-	if err := sendSetAgreement(ctx, ctx.BlockVotes); err != nil {
+	if err := SendSetAgreement(ctx, ctx.BlockVotes); err != nil {
 		return err
 	}
 
@@ -63,46 +66,54 @@ func BlockReduction(ctx *Context) error {
 
 func committeeVoteReduction(ctx *Context) error {
 	// Run sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
+	role := &sortition.Role{
+		Part:  "committee",
+		Round: ctx.Round,
+		Step:  ctx.Step,
 	}
 
-	if err := sortition(ctx, role); err != nil {
+	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
+		role, ctx.Threshold, ctx.Weight, ctx.W)
+	if prErr != nil {
+		return prErr.Err
+	}
+
+	ctx.Votes = votes
+	ctx.Score = score
+
+	// Return if we didn't get any votes from sortition
+	if ctx.Votes == 0 {
+		return nil
+	}
+
+	// Sign block hash with BLS
+	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
+	if err != nil {
 		return err
 	}
 
-	if ctx.votes > 0 {
-		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
-		if err != nil {
-			return err
-		}
+	// Create reduction payload to gossip
+	pl, err := consensusmsg.NewReduction(score, ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+	if err != nil {
+		return err
+	}
 
-		// Create reduction payload to gossip
-		pl, err := consensusmsg.NewReduction(ctx.Score, ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
-		if err != nil {
-			return err
-		}
+	// Sign the payload
+	sigEd, err := CreateSignature(ctx, pl)
+	if err != nil {
+		return err
+	}
 
-		// Sign the payload
-		sigEd, err := createSignature(ctx, pl)
-		if err != nil {
-			return err
-		}
+	// Create message
+	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
+		[]byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return err
+	}
 
-		// Create message
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
-			[]byte(*ctx.Keys.EdPubKey), pl)
-		if err != nil {
-			return err
-		}
-
-		// Gossip message
-		if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
-			return err
-		}
+	// Gossip message
+	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
+		return err
 	}
 
 	return nil
@@ -117,10 +128,10 @@ func countVotesReduction(ctx *Context) error {
 
 	// Add our own information beforehand
 	voters[hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))] = true
-	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.votes
+	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.Votes
 
 	// Start the timer
-	timer := time.NewTimer(stepTime)
+	timer := time.NewTimer(StepTime)
 
 	for {
 		select {
@@ -137,14 +148,19 @@ func countVotesReduction(ctx *Context) error {
 			}
 
 			// Verify the message score and get back it's contents
-			valid, votes, err := processMsg(ctx, m)
+			votes, err := ProcessMsg(ctx, m)
 			if err != nil {
-				return err
+				if err.Priority == prerror.High {
+					return err.Err
+				}
+
+				// Discard if invalid
+				break
 			}
 
 			// If votes is zero, then the reduction message was most likely
 			// faulty, so we will ignore it.
-			if votes == 0 || !valid {
+			if votes == 0 {
 				break
 			}
 
@@ -152,27 +168,29 @@ func countVotesReduction(ctx *Context) error {
 			voters[pkEd] = true
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
-			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, pl.Score, ctx.Step)
-			if err != nil {
-				return err
+			blockVote, err2 := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, pl.Score, ctx.Step)
+			if err2 != nil {
+				return err2
 			}
 
 			ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
 
-			// If a block exceeds the vote threshold, we will end the loop.
-			if counts[hashStr] >= ctx.VoteLimit {
-				timer.Stop()
-				ctx.BlockHash = pl.BlockHash
-
-				// We will also cut all the votes that did not vote for the winning block.
-				for i, vote := range ctx.BlockVotes {
-					if !bytes.Equal(vote.Hash, ctx.BlockHash) {
-						ctx.BlockVotes = append(ctx.BlockVotes[:i], ctx.BlockVotes[i+1:]...)
-					}
-				}
-
-				return nil
+			// If a block doesnt exceedd the vote threshold, we keep going.
+			if counts[hashStr] < ctx.VoteLimit {
+				break
 			}
+
+			timer.Stop()
+			ctx.BlockHash = pl.BlockHash
+
+			// We will also cut all the votes that did not vote for the winning block.
+			for i, vote := range ctx.BlockVotes {
+				if !bytes.Equal(vote.Hash, ctx.BlockHash) {
+					ctx.BlockVotes = append(ctx.BlockVotes[:i], ctx.BlockVotes[i+1:]...)
+				}
+			}
+
+			return nil
 		}
 	}
 }

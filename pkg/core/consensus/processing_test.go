@@ -1,7 +1,10 @@
-package consensus
+package consensus_test
 
 import (
 	"testing"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
@@ -26,12 +29,12 @@ func TestFaultyMsgRound(t *testing.T) {
 
 	// Change our round and verify the message (should fail)
 	ctx.Round++
-	valid, retVotes, err := processMsg(ctx, msg)
-	if err != nil {
-		t.Fatal(err)
+	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	if err2.Priority == prerror.High {
+		t.Fatal(err2)
 	}
 
-	if retVotes != 0 && valid {
+	if retVotes != 0 && err2.Priority == prerror.Low {
 		t.Fatal("wrong round did not get caught by check")
 	}
 }
@@ -56,12 +59,12 @@ func TestFaultyMsgStep(t *testing.T) {
 
 	// Change our step and verify the message (should fail)
 	ctx.Step++
-	valid, retVotes, err := processMsg(ctx, msg)
-	if err != nil {
-		t.Fatal(err)
+	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	if err2.Priority == prerror.High {
+		t.Fatal(err2)
 	}
 
-	if retVotes != 0 && valid {
+	if retVotes != 0 && err2.Priority == prerror.Low {
 		t.Fatal("wrong step did not get caught by check")
 	}
 }
@@ -86,12 +89,12 @@ func TestFaultyMsgLastHeader(t *testing.T) {
 
 	// Change our header hash and verify the message (should fail)
 	ctx.LastHeader.Hash = make([]byte, 32)
-	valid, retVotes, err := processMsg(ctx, msg)
-	if err != nil {
-		t.Fatal(err)
+	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	if err2.Priority == prerror.High {
+		t.Fatal(err2)
 	}
 
-	if retVotes != 0 && valid {
+	if retVotes != 0 && err2.Priority == prerror.Low {
 		t.Fatal("wrong version did not get caught by check")
 	}
 }
@@ -116,12 +119,12 @@ func TestFaultyMsgVersion(t *testing.T) {
 
 	// Change our version and verify the message (should fail)
 	ctx.Version = 20000
-	valid, retVotes, err := processMsg(ctx, msg)
-	if err != nil {
-		t.Fatal(err)
+	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	if err2.Priority == prerror.High {
+		t.Fatal(err2)
 	}
 
-	if retVotes != 0 && valid {
+	if retVotes != 0 && err2.Priority == prerror.Low {
 		t.Fatal("wrong version did not get caught by check")
 	}
 }
@@ -146,12 +149,12 @@ func TestFaultyMsgSig(t *testing.T) {
 
 	// Change their Ed25519 public key and verify the message (should fail)
 	msg.PubKey = make([]byte, 32)
-	valid, retVotes, err := processMsg(ctx, msg)
-	if err != nil {
-		t.Fatal(err)
+	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	if err2.Priority == prerror.High {
+		t.Fatal(err2)
 	}
 
-	if retVotes != 0 && valid {
+	if retVotes != 0 && err2.Priority == prerror.Low {
 		t.Fatal("wrong version did not get caught by check")
 	}
 }

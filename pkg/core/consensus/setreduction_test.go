@@ -1,4 +1,4 @@
-package consensus
+package consensus_test
 
 import (
 	"encoding/hex"
@@ -8,108 +8,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
-
-func TestSignatureSetVoteCountDecisive(t *testing.T) {
-	// Create context
-	ctx, err := provisionerContext()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create role for sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
-	// Set stake weight and vote limit, and generate a score
-	ctx.weight = 500
-	ctx.VoteLimit = 20
-	if err := sortition(ctx, role); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create dummy values
-	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	setHash, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx.SigSetHash = setHash
-	setStr := hex.EncodeToString(setHash)
-	ctx.AllVotes[setStr] = make([]*consensusmsg.Vote, 1)
-	ctx.BlockHash = emptyBlock.Header.Hash
-	_, msg, err := newVoteSigSet(ctx, 400, emptyBlock.Header.Hash, setHash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Start counting votes
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		if err := countVotesSigSet(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		wg.Done()
-	}()
-
-	// Send the vote and block until the vote counting function returns
-	ctx.SigSetVoteChan <- msg
-	wg.Wait()
-
-	// Set hash should be the same after receiving vote
-	assert.Equal(t, setHash, ctx.SigSetHash)
-}
-
-func TestSignatureSetVoteCountIndecisive(t *testing.T) {
-	// Create context
-	ctx, err := provisionerContext()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create role for sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
-	}
-
-	// Set stake weight and vote limit, and generate a score
-	ctx.weight = 500
-	ctx.VoteLimit = 20
-	if err := sortition(ctx, role); err != nil {
-		t.Fatal(err)
-	}
-
-	// Adjust timer to reduce waiting times
-	stepTime = 1 * time.Second
-
-	// Let the timer run out
-	if err := countVotesSigSet(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	// Set hash should be the same after receiving vote
-	assert.Nil(t, ctx.SigSetHash)
-
-	// Reset step timer
-	stepTime = 20 * time.Second
-}
 
 func TestSignatureSetReductionDecisive(t *testing.T) {
 	// Create context
@@ -119,7 +25,7 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 	}
 
 	// Set basic fields on context
-	ctx.weight = 500
+	ctx.Weight = 500
 	ctx.VoteLimit = 100
 	block, err := crypto.RandEntropy(32)
 	if err != nil {
@@ -129,36 +35,34 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 	ctx.BlockHash = block
 
 	// Run sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
+	role := &sortition.Role{
+		Part:  "committee",
+		Round: ctx.Round,
+		Step:  ctx.Step,
 	}
 
-	if err := sortition(ctx, role); err != nil {
-		t.Fatal(err)
+	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
+		role, ctx.Threshold, ctx.Weight, ctx.W)
+	if prErr != nil && prErr.Priority == prerror.High {
+		t.Fatal(prErr)
 	}
+
+	ctx.Votes = votes
+	ctx.Score = score
 
 	// Create vote set
-	votes, _, err := createVotesAndMsgs(ctx, 50)
+	voteSet, _, err := createVotesAndMsgs(ctx, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx.SigSetVotes = votes
-	sigSetHash, err := hashSigSetVotes(ctx.SigSetVotes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	setStr := hex.EncodeToString(sigSetHash)
-	ctx.AllVotes[setStr] = votes
+	ctx.SigSetVotes = voteSet
 
 	// Run signature set reduction function
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		if err := SignatureSetReduction(ctx); err != nil {
+		if err := consensus.SignatureSetReduction(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -200,7 +104,7 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 
 func TestSignatureSetReductionIndecisive(t *testing.T) {
 	// Adjust timer to reduce waiting times
-	stepTime = 1 * time.Second
+	consensus.StepTime = 1 * time.Second
 
 	// Create context
 	ctx, err := provisionerContext()
@@ -209,7 +113,7 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 	}
 
 	// Set basic fields on context
-	ctx.weight = 500
+	ctx.Weight = 500
 	ctx.VoteLimit = 100
 	block, err := crypto.RandEntropy(32)
 	if err != nil {
@@ -219,26 +123,31 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 	ctx.BlockHash = block
 
 	// Run sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
+	role := &sortition.Role{
+		Part:  "committee",
+		Round: ctx.Round,
+		Step:  ctx.Step,
 	}
 
-	if err := sortition(ctx, role); err != nil {
-		t.Fatal(err)
+	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
+		role, ctx.Threshold, ctx.Weight, ctx.W)
+	if prErr != nil && prErr.Priority == prerror.High {
+		t.Fatal(prErr)
 	}
+
+	ctx.Votes = votes
+	ctx.Score = score
 
 	// Create vote set
-	votes, _, err := createVotesAndMsgs(ctx, 50)
+	voteSet, _, err := createVotesAndMsgs(ctx, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx.SigSetVotes = votes
+	ctx.SigSetVotes = voteSet
 
 	// The function will return as soon as it doesn't get a decisive outcome.
-	if err := SignatureSetReduction(ctx); err != nil {
+	if err := consensus.SignatureSetReduction(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -246,17 +155,17 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 	assert.Nil(t, ctx.SigSetHash)
 
 	// Reset step timer
-	stepTime = 20 * time.Second
+	consensus.StepTime = 20 * time.Second
 }
 
-func newVoteSigSet(c *Context, weight uint64, winningBlock, setHash []byte) (uint64, *payload.MsgConsensus, error) {
-	if weight < MinimumStake {
+func newVoteSigSet(c *consensus.Context, weight uint64, winningBlock, setHash []byte) (uint64, *payload.MsgConsensus, error) {
+	if weight < sortition.MinimumStake {
 		return 0, nil, errors.New("weight too low, will result in no votes")
 	}
 
 	// Create context
-	keys, _ := NewRandKeys()
-	ctx, err := NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
+	keys, _ := consensus.NewRandKeys()
+	ctx, err := consensus.NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -266,49 +175,57 @@ func newVoteSigSet(c *Context, weight uint64, winningBlock, setHash []byte) (uin
 	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
 
 	// Populate new context fields
-	ctx.weight = weight
+	ctx.Weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.SigSetHash = setHash
 	ctx.BlockHash = winningBlock
 	ctx.Step = c.Step
 
 	// Run sortition
-	role := &role{
-		part:  "committee",
-		round: ctx.Round,
-		step:  ctx.Step,
+	role := &sortition.Role{
+		Part:  "committee",
+		Round: ctx.Round,
+		Step:  ctx.Step,
 	}
 
-	if err := sortition(ctx, role); err != nil {
+	votes, score, prErr := sortition.Prove(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey,
+		role, ctx.Threshold, ctx.Weight, ctx.W)
+	if prErr != nil {
+		return 0, nil, prErr.Err
+	}
+
+	ctx.Votes = votes
+	ctx.Score = score
+	if ctx.Votes == 0 {
+		return 0, nil, nil
+	}
+
+	// Sign sig set with BLS
+	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
+	if err != nil {
 		return 0, nil, err
 	}
 
-	if ctx.votes > 0 {
-		// Sign sig set with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
-		if err != nil {
-			return 0, nil, err
-		}
+	// Set BLS key on context
+	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
+	c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
 
-		// Set BLS key on context
-		blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-		c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
-
-		// Create sigsetvote payload to gossip
-		pl, err := consensusmsg.NewSigSetVote(winningBlock, ctx.SigSetHash, sigBLS, blsPubBytes, ctx.Score)
-		if err != nil {
-			return 0, nil, err
-		}
-
-		sigEd, err := createSignature(ctx, pl)
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-			ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
-		if err != nil {
-			return 0, nil, err
-		}
-
-		return ctx.votes, msg, nil
+	// Create sigsetvote payload to gossip
+	pl, err := consensusmsg.NewSigSetVote(winningBlock, ctx.SigSetHash, sigBLS, blsPubBytes, ctx.Score)
+	if err != nil {
+		return 0, nil, err
 	}
 
-	return 0, nil, nil
+	sigEd, err := consensus.CreateSignature(ctx, pl)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return ctx.Votes, msg, nil
 }

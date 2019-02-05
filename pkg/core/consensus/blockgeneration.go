@@ -30,7 +30,7 @@ func GenerateBlock(ctx *Context) error {
 
 	// Generate ZkProof and Serialise
 	// XXX: Prove may return error, so chaining like this may not be possible once zk implemented
-	zkBytes, err := zkproof.Prove(ctx.X, ctx.Y, ctx.Z, ctx.M, ctx.k, ctx.Q, ctx.d).Bytes()
+	zkBytes, err := zkproof.Prove(ctx.X, ctx.Y, ctx.Z, ctx.M, ctx.K, ctx.Q, ctx.D).Bytes()
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func GenerateBlock(ctx *Context) error {
 		return err
 	}
 
-	sigEd, err := createSignature(ctx, pl)
+	sigEd, err := CreateSignature(ctx, pl)
 	if err != nil {
 		return err
 	}
@@ -94,23 +94,23 @@ func GenerateBlock(ctx *Context) error {
 func generateParams(ctx *Context) error {
 	// XXX: generating X, Y, Z in this way is in-efficient. Passing the parameters in directly from previous computation is better.
 	// Wait until, specs for this has been semi-finalised
-	M, err := generateM(ctx.k)
+	M, err := GenerateM(ctx.K)
 	if err != nil {
 		return err
 	}
-	X, err := generateX(ctx.d, ctx.k)
+	X, err := GenerateX(ctx.D, ctx.K)
 	if err != nil {
 		return err
 	}
-	Y, err := generateY(ctx.d, ctx.LastHeader.Seed, ctx.k)
+	Y, err := GenerateY(ctx.D, ctx.LastHeader.Seed, ctx.K)
 	if err != nil {
 		return err
 	}
-	Z, err := generateZ(ctx.LastHeader.Seed, ctx.k)
+	Z, err := generateZ(ctx.LastHeader.Seed, ctx.K)
 	if err != nil {
 		return err
 	}
-	Q, err := GenerateScore(ctx.d, Y)
+	Q, err := GenerateScore(ctx.D, Y)
 	if err != nil {
 		return err
 	}
@@ -125,8 +125,8 @@ func generateParams(ctx *Context) error {
 
 }
 
-// M = H(k)
-func generateM(k []byte) ([]byte, error) {
+// GenerateM will return M so that M = H(k)
+func GenerateM(k []byte) ([]byte, error) {
 	M, err := hash.Sha3256(k)
 	if err != nil {
 		return nil, err
@@ -135,10 +135,10 @@ func generateM(k []byte) ([]byte, error) {
 	return M, nil
 }
 
-// X = H(d, M)
-func generateX(d uint64, k []byte) ([]byte, error) {
+// GenerateX will return X so that X = H(d, M)
+func GenerateX(d uint64, k []byte) ([]byte, error) {
 
-	M, err := generateM(k)
+	M, err := GenerateM(k)
 
 	dM := make([]byte, 8, 40)
 
@@ -154,10 +154,10 @@ func generateX(d uint64, k []byte) ([]byte, error) {
 	return X, nil
 }
 
-// Y = H(S, X)
-func generateY(d uint64, S, k []byte) ([]byte, error) {
+// GenerateY will return Y so that Y = H(S, X)
+func GenerateY(d uint64, S, k []byte) ([]byte, error) {
 
-	X, err := generateX(d, k)
+	X, err := GenerateX(d, k)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func generateY(d uint64, S, k []byte) ([]byte, error) {
 // Z = H(S, M)
 func generateZ(S, k []byte) ([]byte, error) {
 
-	M, err := generateM(k)
+	M, err := GenerateM(k)
 
 	SM := make([]byte, 0, 64) // M = 32 , prevSeed = 32
 	SM = append(SM, S...)

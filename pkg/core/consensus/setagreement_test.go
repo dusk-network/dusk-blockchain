@@ -1,4 +1,4 @@
-package consensus
+package consensus_test
 
 import (
 	"bytes"
@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +25,7 @@ func TestSetAgreement(t *testing.T) {
 	}
 
 	// Set basic fields on context
-	ctx.weight = 500
+	ctx.Weight = 500
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
@@ -63,7 +65,7 @@ func TestSetAgreement(t *testing.T) {
 	}()
 
 	c := make(chan bool, 1)
-	SignatureSetAgreement(ctx, c)
+	consensus.SignatureSetAgreement(ctx, c)
 
 	q <- true
 
@@ -96,7 +98,7 @@ func TestSendSetAgreement(t *testing.T) {
 	// Create a dummy vote set
 	var votes []*consensusmsg.Vote
 	for i := 0; i < 5; i++ {
-		keys, err := NewRandKeys()
+		keys, err := consensus.NewRandKeys()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,7 +119,7 @@ func TestSendSetAgreement(t *testing.T) {
 	ctx.BlockVotes = votes
 
 	// Send the set agreement message with the vote set we just created
-	if err := sendSetAgreement(ctx, ctx.BlockVotes); err != nil {
+	if err := consensus.SendSetAgreement(ctx, ctx.BlockVotes); err != nil {
 		t.Fatal(err)
 	}
 
@@ -129,14 +131,14 @@ func TestSendSetAgreement(t *testing.T) {
 // Convenience function to make a vote set and messages from all voters.
 // It should pass verifications done by the passed context object after the function returns,
 // and all the messages should exceed the vote limit.
-func createVotesAndMsgs(ctx *Context, amount int) ([]*consensusmsg.Vote,
+func createVotesAndMsgs(ctx *consensus.Context, amount int) ([]*consensusmsg.Vote,
 	[]*payload.MsgConsensus, error) {
-	var votes []*consensusmsg.Vote
-	var ctxs []*Context
+	var voteSet []*consensusmsg.Vote
+	var ctxs []*consensus.Context
 
 	// Make two votes per node
 	for i := 0; i < amount; i++ {
-		keys, err := NewRandKeys()
+		keys, err := consensus.NewRandKeys()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -148,25 +150,30 @@ func createVotesAndMsgs(ctx *Context, amount int) ([]*consensusmsg.Vote,
 		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
 
 		// Make dummy context for score creation
-		c, err := NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
+		c, err := consensus.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		c.LastHeader = ctx.LastHeader
-		c.weight = 500
+		c.Weight = 500
 		c.BlockHash = ctx.BlockHash
 
 		// Run sortition
-		role := &role{
-			part:  "committee",
-			round: ctx.Round,
-			step:  ctx.Step,
+		role := &sortition.Role{
+			Part:  "committee",
+			Round: ctx.Round,
+			Step:  ctx.Step,
 		}
 
-		if err := sortition(c, role); err != nil {
-			return nil, nil, err
+		votes, score, prErr := sortition.Prove(c.Seed, c.Keys.BLSSecretKey, c.Keys.BLSPubKey, role,
+			c.Threshold, c.Weight, c.W)
+		if err != nil {
+			return nil, nil, prErr
 		}
+
+		c.Votes = votes
+		c.Score = score
 
 		// Create vote signatures
 		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
@@ -192,8 +199,8 @@ func createVotesAndMsgs(ctx *Context, amount int) ([]*consensusmsg.Vote,
 			return nil, nil, err
 		}
 
-		votes = append(votes, vote1)
-		votes = append(votes, vote2)
+		voteSet = append(voteSet, vote1)
+		voteSet = append(voteSet, vote2)
 		ctxs = append(ctxs, c)
 	}
 
@@ -201,14 +208,14 @@ func createVotesAndMsgs(ctx *Context, amount int) ([]*consensusmsg.Vote,
 	for _, c := range ctxs {
 		// Do this to avoid pointer issues during processing
 		newVotes := make([]*consensusmsg.Vote, 0)
-		newVotes = append(newVotes, votes...)
+		newVotes = append(newVotes, voteSet...)
 
 		pl, err := consensusmsg.NewSetAgreement(c.BlockHash, newVotes)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		sigEd, err := createSignature(c, pl)
+		sigEd, err := consensus.CreateSignature(c, pl)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -222,5 +229,5 @@ func createVotesAndMsgs(ctx *Context, amount int) ([]*consensusmsg.Vote,
 		msgs = append(msgs, msg)
 	}
 
-	return votes, msgs, nil
+	return voteSet, msgs, nil
 }

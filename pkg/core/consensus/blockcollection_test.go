@@ -1,10 +1,11 @@
-package consensus
+package consensus_test
 
 import (
 	"sync"
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -17,7 +18,7 @@ import (
 
 func TestBlockCollection(t *testing.T) {
 	// Lower candidate timer to prevent waiting times
-	candidateTime = 5 * time.Second
+	consensus.CandidateTime = 5 * time.Second
 
 	// Create a dummy context
 	ctx, err := provisionerContext()
@@ -37,7 +38,7 @@ func TestBlockCollection(t *testing.T) {
 
 	// Make candidate payload and message
 	pl := consensusmsg.NewCandidate(blk)
-	sigEd, err := createSignature(ctx, pl)
+	sigEd, err := consensus.CreateSignature(ctx, pl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +61,7 @@ func TestBlockCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sigEd2, err := createSignature(ctx, pl2)
+	sigEd2, err := consensus.CreateSignature(ctx, pl2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +72,7 @@ func TestBlockCollection(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		if err := BlockCollection(ctx); err != nil {
+		if err := consensus.BlockCollection(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -91,12 +92,12 @@ func TestBlockCollection(t *testing.T) {
 	assert.NotNil(t, ctx.CandidateBlocks)
 
 	// Reset candidate timer
-	candidateTime = 60 * time.Second
+	consensus.CandidateTime = 60 * time.Second
 }
 
 func TestBlockCollectionNoBlock(t *testing.T) {
 	// Lower candidate timer to prevent waiting times
-	candidateTime = 1 * time.Second
+	consensus.CandidateTime = 1 * time.Second
 
 	// Create a dummy context
 	ctx, err := provisionerContext()
@@ -105,7 +106,7 @@ func TestBlockCollectionNoBlock(t *testing.T) {
 	}
 
 	// Run block collection and let it time out
-	if err := BlockCollection(ctx); err != nil {
+	if err := consensus.BlockCollection(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,5 +115,5 @@ func TestBlockCollectionNoBlock(t *testing.T) {
 	assert.Empty(t, ctx.CandidateBlocks)
 
 	// Reset candidate timer
-	candidateTime = 60 * time.Second
+	consensus.CandidateTime = 60 * time.Second
 }

@@ -1,4 +1,4 @@
-package consensus
+package consensus_test
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
@@ -20,7 +21,7 @@ func TestBlockAgreement(t *testing.T) {
 	}
 
 	// Set basic parameters
-	ctx.weight = 500
+	ctx.Weight = 500
 	ctx.VoteLimit = 20
 
 	candidateBlock, _ := crypto.RandEntropy(32)
@@ -61,7 +62,7 @@ func TestBlockAgreement(t *testing.T) {
 	}()
 
 	c := make(chan bool, 1)
-	BlockAgreement(ctx, c)
+	consensus.BlockAgreement(ctx, c)
 
 	q <- true
 
