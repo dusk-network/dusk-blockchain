@@ -1,7 +1,11 @@
 package peermgr
 
 import (
+	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"net"
 	"time"
 
@@ -29,7 +33,7 @@ func (p *Peer) Handshake() error {
 	select {
 	case err := <-handshakeErr:
 		if err != nil {
-			return err
+			return fmt.Errorf(errHandShakeFromStr, err)
 		}
 	case <-time.After(handshakeTimeout):
 		return errHandShakeTimeout
@@ -51,9 +55,24 @@ func (p *Peer) inboundHandShake() error {
 	if err = p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
-	if err = p.readRemoteMsgVersion(); err != nil {
+
+	readmsg, err := wire.ReadMessage(p.conn, p.Net())
+	if err != nil {
 		return err
 	}
+
+	switch msg := readmsg.(type) {
+	case *payload.MsgReject:
+		p.Disconnect()
+	case *payload.MsgVersion:
+		if err := p.OnVersion(msg); err != nil {
+			return err
+		}
+	default:
+		log.WithField("prefix", "peer").Warnf("Did not recognise message '%s'", msg.Command())
+		p.Disconnect()
+	}
+
 	verack := payload.NewMsgVerAck()
 	err = p.Write(verack)
 	return p.readVerack()
@@ -83,13 +102,12 @@ func (p *Peer) outboundHandShake() error {
 }
 
 func (p *Peer) writeLocalMsgVersion() error {
-	//nonce := p.config.Nonce
 	//relay := p.config.Relay
 	fromPort := uint16(p.Port())
 	//ua := p.config.UserAgent
 	//sh := p.config.StartHeight()
 	//services := p.config.Services
-	version := p.ProtocolVersion()
+	version := protocol.ProtocolVersion
 	localIP, err := util.GetOutboundIP()
 	if err != nil {
 		return err
@@ -100,7 +118,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := payload.NewNetAddress(toIP.String(), uint16(toPort))
 
-	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr)
+	messageVer := payload.NewMsgVersion(version, p.Nonce, &fromAddr, toAddr)
 
 	return p.Write(messageVer)
 }
@@ -113,8 +131,10 @@ func (p *Peer) readRemoteMsgVersion() error {
 
 	version, ok := readmsg.(*payload.MsgVersion)
 	if !ok {
-		return err
+		error := fmt.Sprintf("Did not receive the expected '%s' message", commands.Version)
+		return errors.New(error)
 	}
+
 	return p.OnVersion(version)
 }
 

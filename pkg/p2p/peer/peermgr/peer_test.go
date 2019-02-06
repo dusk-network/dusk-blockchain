@@ -2,11 +2,12 @@ package peermgr_test
 
 import (
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"testing"
 	"time"
@@ -20,37 +21,44 @@ func init() {
 }
 
 func createResponseHandler() peermgr.ResponseHandler {
-
-	//DefaultHeight := func() uint64 {
-	//	return 10
-	//}
-
 	OnAddr := func(p *peermgr.Peer, msg *payload.MsgAddr) {}
 	OnHeaders := func(p *peermgr.Peer, msg *payload.MsgHeaders) {}
 	OnGetHeaders := func(p *peermgr.Peer, msg *payload.MsgGetHeaders) {}
-	//OnInv := func(p *peermgr.Peer, msg *payload.MsgInv) {}
+	OnInv := func(p *peermgr.Peer, msg *payload.MsgInv) {}
 	OnGetData := func(p *peermgr.Peer, msg *payload.MsgGetData) {}
-	//OnBlock := func(p *peermgr.Peer, msg *payload.MsgBlock) {}
+	OnBlock := func(p *peermgr.Peer, msg *payload.MsgBlock) {}
 	OnGetBlocks := func(p *peermgr.Peer, msg *payload.MsgGetBlocks) {}
 
 	return peermgr.ResponseHandler{
 		OnHeaders:    OnHeaders,
 		OnAddr:       OnAddr,
 		OnGetHeaders: OnGetHeaders,
-		//OnInv:        OnInv,
-		OnGetData: OnGetData,
-		//OnBlock:      OnBlock,
-		OnGetBlocks: OnGetBlocks,
+		OnInv:        OnInv,
+		OnGetData:    OnGetData,
+		OnBlock:      OnBlock,
+		OnGetBlocks:  OnGetBlocks,
 	}
 }
 
-// TODO: Test is an integration test, not unit test.
-// Let's find an integration test lib or mocking.
-func TestHandshake(t *testing.T) {
-	address := ":20338"
-	viper.Set("net.magic", "1953721920")
-	go func() {
+func TestResponseHandler(t *testing.T) {
+	_, conn := net.Pipe()
+	inbound := true
+	rspHndlr := createResponseHandler()
 
+	p := peermgr.NewPeer(conn, inbound, rspHndlr)
+
+	// test inbound
+	assert.Equal(t, inbound, p.Inbound())
+	// handshake not done, should be false
+	assert.Equal(t, false, p.IsVerackReceived())
+	assert.WithinDuration(t, time.Now(), p.CreatedAt(), 1*time.Second)
+}
+
+func TestInboundHandshake(t *testing.T) {
+	address := ":20338"
+	config.EnvNetCfg.Magic = 0x74736E40
+
+	go func() {
 		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
 		if err != nil {
 			t.Fatal(err)
@@ -58,15 +66,270 @@ func TestHandshake(t *testing.T) {
 		rspHndlr := createResponseHandler()
 		p := peermgr.NewPeer(conn, true, rspHndlr)
 		err = p.Run()
-		verack := payload.NewMsgVerAck()
+
+		assert.Equal(t, true, p.IsVerackReceived())
+	}()
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		listener.Close()
+	}()
+
+	for {
+		conn, err := listener.Accept()
 		if err != nil {
-			t.Fail()
-		}
-		if err := p.Write(verack); err != nil {
 			t.Fatal(err)
 		}
 
-		assert.Equal(t, true, p.IsVerackReceived())
+		version, err := sendAndReadVersion(t, conn, rand.Uint64())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, nil, version)
+
+		msgVerack := payload.NewMsgVerAck()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, nil, msgVerack)
+
+		if err := wire.WriteMessage(conn, protocol.DevNet, msgVerack); err != nil {
+			t.Fatal(err)
+		}
+
+		readmsg, err := wire.ReadMessage(conn, protocol.DevNet)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, nil, readmsg)
+
+		verack, ok := readmsg.(*payload.MsgVerAck)
+		if !ok {
+			t.Fatal(err)
+		}
+		assert.NotEqual(t, nil, verack)
+		return
+	}
+}
+
+func TestOutboundHandshake(t *testing.T) {
+	address := ":20338"
+	config.EnvNetCfg.Magic = 0x74736E40
+
+	go func() {
+		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rspHndlr := createResponseHandler()
+		p := peermgr.NewPeer(conn, false, rspHndlr)
+		err = p.Run()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		listener.Close()
+	}()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		version, err := sendAndReadVersion(t, conn, rand.Uint64())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, nil, version)
+
+		messageVer := payload.NewMsgVerAck()
+		if err := wire.WriteMessage(conn, protocol.DevNet, messageVer); err != nil {
+			t.Fatal(err)
+			return
+		}
+
+		readmsg, err := wire.ReadMessage(conn, protocol.DevNet)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, nil, readmsg)
+
+		verack, ok := readmsg.(*payload.MsgVerAck)
+		if !ok {
+			t.Fatal(err)
+		}
+		assert.NotEqual(t, nil, verack)
+		return
+	}
+}
+
+// TestHandshakeCancelled tests the response message after sending a 'version'
+func TestHandshakeCancelled(t *testing.T) {
+	address := ":20338"
+	config.EnvNetCfg.Magic = 0x74736E40
+
+	go func() {
+		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rspHndlr := createResponseHandler()
+		p := peermgr.NewPeer(conn, true, rspHndlr)
+		err = p.Run()
+		if err != nil {
+			assert.NotEqual(t, nil, err)
+		}
+	}()
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		listener.Close()
+	}()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		readmsg, err := wire.ReadMessage(conn, protocol.DevNet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		version, ok := readmsg.(*payload.MsgVersion)
+		if !ok {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, nil, version)
+
+		// A 'version' came in, let's send a wrong msg response
+		messageVer := payload.NewMsgVerAck()
+		if err := wire.WriteMessage(conn, protocol.DevNet, messageVer); err != nil {
+			t.Fatal(err)
+			return
+		}
+		return
+	}
+}
+
+// TestHandshakeWrongVersion tests a peer returning a wrong version.
+func TestHandshakeWrongVersion(t *testing.T) {
+	// Make sure peer is disconnected.
+	address := ":20338"
+	config.EnvNetCfg.Magic = 0x74736E40
+
+	go func() {
+		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rspHndlr := createResponseHandler()
+		p := peermgr.NewPeer(conn, true, rspHndlr)
+		err = p.Run()
+		if err != nil {
+			assert.NotEqual(t, nil, err)
+		}
+	}()
+
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+
+	defer func() {
+		listener.Close()
+	}()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		readmsg, err := wire.ReadMessage(conn, protocol.DevNet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		version, ok := readmsg.(*payload.MsgVersion)
+		if !ok {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, nil, version)
+
+		fromAddr := payload.NewNetAddress("", 20338)
+		toAddr := payload.NewNetAddress("", 20338)
+
+		messageVer := payload.NewMsgVersion(10001, rand.Uint64(), fromAddr, toAddr)
+
+		if err := wire.WriteMessage(conn, protocol.DevNet, messageVer); err != nil {
+			t.Fatal(err)
+			return
+		}
+
+		readmsg, err = wire.ReadMessage(conn, protocol.DevNet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, ok = readmsg.(*payload.MsgReject)
+		if !ok {
+			t.Fatal(err)
+		}
+		return
+	}
+}
+
+// TestHandshakeNoVerack tests a peer returning no verack as last message.
+func TestHandshakeNoVerack(t *testing.T) {
+	address := ":20338"
+	config.EnvNetCfg.Magic = 0x74736E40
+
+	go func() {
+		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rspHndlr := createResponseHandler()
+		p := peermgr.NewPeer(conn, false, rspHndlr)
+		conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		err = p.Run()
+		if err != nil {
+			assert.NotEqual(t, nil, err)
+		}
 
 	}()
 
@@ -81,93 +344,92 @@ func TestHandshake(t *testing.T) {
 	}()
 
 	for {
-
 		conn, err := listener.Accept()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		fromAddr := payload.NewNetAddress("82.2.97.142", 20338)
-		toAddr := payload.NewNetAddress("127.0.0.1", 20338)
-
-		messageVer := payload.NewMsgVersion(protocol.ProtocolVersion, fromAddr, toAddr)
-
+		version, err := sendAndReadVersion(t, conn, rand.Uint64())
 		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := wire.WriteMessage(conn, protocol.DevNet, messageVer); err != nil {
 			t.Fatal(err)
 			return
 		}
 
-		readmsg, err := wire.ReadMessage(conn, protocol.DevNet)
-		if err != nil {
-			t.Fatal(err)
-		}
-		version, ok := readmsg.(*payload.MsgVersion)
-		if !ok {
-			t.Fatal(err)
-		}
-
 		assert.NotEqual(t, nil, version)
 
-		messageVrck := payload.NewMsgVerAck()
+		_, err = wire.ReadMessage(conn, protocol.DevNet)
+		if err != nil {
+			assert.NotEqual(t, nil, err)
+		}
+		return
+	}
+}
+
+// TestHandshakeSelfConnect tests a peer receiving a msg from itself.
+func TestHandshakeSelfConnect(t *testing.T) {
+	address := ":20338"
+	config.EnvNetCfg.Magic = 0x74736E40
+	nonce := rand.Uint64()
+
+	go func() {
+		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		assert.NotEqual(t, nil, messageVrck)
-
-		if err := wire.WriteMessage(conn, protocol.DevNet, messageVrck); err != nil {
-			t.Fatal(err)
-		}
-
-		readmsg, err = wire.ReadMessage(conn, protocol.DevNet)
+		rspHndlr := createResponseHandler()
+		p := peermgr.NewPeer(conn, false, rspHndlr)
+		p.Nonce = nonce
+		err = p.Run()
 		if err != nil {
-			t.Fatal(err)
+			assert.NotEqual(t, nil, err)
 		}
+	}()
 
-		assert.NotEqual(t, nil, readmsg)
-
-		verk, ok := readmsg.(*payload.MsgVerAck)
-		if !ok {
-			t.Fatal(err)
-		}
-		assert.NotEqual(t, nil, verk)
-
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatal(err)
 		return
 	}
 
+	defer func() {
+		listener.Close()
+	}()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := sendAndReadVersion(t, conn, nonce); err != nil {
+			assert.NotEqual(t, nil, err)
+		}
+
+		return
+	}
 }
 
-func TestResponseHandler(t *testing.T) {
-	_, conn := net.Pipe()
+func sendAndReadVersion(t *testing.T, conn net.Conn, nonce uint64) (*payload.MsgVersion, error) {
+	fromAddr := payload.NewNetAddress("", 20338)
+	toAddr := payload.NewNetAddress("", 20338)
 
-	inbound := true
+	msgVersion := payload.NewMsgVersion(protocol.ProtocolVersion, nonce, fromAddr, toAddr)
+	if err := wire.WriteMessage(conn, protocol.DevNet, msgVersion); err != nil {
+		return nil, err
+	}
 
-	rspHndlr := createResponseHandler()
+	_, err := wire.ReadMessage(conn, protocol.DevNet)
+	if err != nil {
+		return nil, err
+	}
 
-	p := peermgr.NewPeer(conn, inbound, rspHndlr)
-
-	// test inbound
-	assert.Equal(t, inbound, p.Inbound())
-
-	// handshake not done, should be false
-	assert.Equal(t, false, p.IsVerackReceived())
-
-	assert.WithinDuration(t, time.Now(), p.CreatedAt(), 1*time.Second)
+	return msgVersion, nil
 }
 
-func TestHandshakeCancelled(t *testing.T) {
-	// These are the conditions which should invalidate the handshake.
-	// Make sure peer is disconnected.
-}
-
+// TestPeerDisconnect
+// Make sure everything is shutdown
+// Make sure timer is shutdown in stall detector too. Should maybe put this part of test into stall detector.
 func TestPeerDisconnect(t *testing.T) {
-	// Make sure everything is shutdown
-	// Make sure timer is shutdown in stall detector too. Should maybe put this part of test into stall detector.
-
 	_, conn := net.Pipe()
 	inbound := true
 	rspHndlr := createResponseHandler()
@@ -182,11 +444,9 @@ func TestPeerDisconnect(t *testing.T) {
 	// Check if Stall detector is still running
 	_, ok := <-p.Detector.Quitch
 	assert.Equal(t, ok, false)
-
 }
 
 func TestNotifyDisconnect(t *testing.T) {
-
 	_, conn := net.Pipe()
 	inbound := true
 	rspHndlr := createResponseHandler()

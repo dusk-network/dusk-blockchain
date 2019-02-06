@@ -2,6 +2,7 @@ package payload
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ func TestMsgVersionEncodeDecode(t *testing.T) {
 	addr1 := NewNetAddress("202.108.250.180", 9999)
 	addr2 := NewNetAddress("224.164.2.18", 9999)
 
-	msg := NewMsgVersion(pver, addr1, addr2)
+	msg := NewMsgVersion(pver, rand.Uint64(), addr1, addr2)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {

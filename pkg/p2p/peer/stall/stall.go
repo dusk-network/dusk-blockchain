@@ -49,14 +49,16 @@ loop:
 		select {
 		case <-ticker.C:
 			now := time.Now()
+			d.lock.Lock()
 			for _, deadline := range d.responses {
 				if now.After(deadline) {
 					log.WithField("prefix", "stall").Info("Deadline passed")
 					ticker.Stop()
+					d.lock.Unlock()
 					break loop
 				}
 			}
-
+			d.lock.Unlock()
 		}
 	}
 	d.Quit()
@@ -70,7 +72,6 @@ func (d *Detector) Quit() {
 	if atomic.LoadInt32(&d.disconnected) != 0 {
 		return
 	}
-
 	atomic.AddInt32(&d.disconnected, 1)
 	close(d.Quitch)
 }
@@ -127,7 +128,7 @@ func (d *Detector) addMessage(cmd commands.Cmd) []commands.Cmd {
 		// We now will expect a Headers Message
 		cmds = append(cmds, commands.Headers)
 	case commands.Addr, commands.GetAddr:
-		// We now will expect a Headers Message
+		// We now will expect a Addr Message
 		cmds = append(cmds, commands.Addr)
 	case commands.GetData:
 		// We will now expect a block/tx message

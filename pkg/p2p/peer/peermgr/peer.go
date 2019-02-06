@@ -6,9 +6,13 @@ package peermgr
 
 import (
 	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
-	cfg "github.com/spf13/viper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
+	"math/rand"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,6 +52,7 @@ const (
 
 var (
 	errHandShakeTimeout    = errors.New("Handshake timed out, peers have " + handshakeTimeout.String() + " to complete the handshake")
+	errHandShakeFromStr    = "Handshake failed: %s"
 	receivedMessageFromStr = "Received a '%s' message from %s"
 )
 
@@ -71,7 +76,7 @@ type ResponseHandler struct {
 	OnReduction      func(*Peer, *payload.MsgReduction)
 	OnReject         func(*Peer, *payload.MsgReject)
 	OnScore          func(*Peer, *payload.MsgScore)
-	OnInv            func(*Peer, *payload.MsgScore)
+	OnInv            func(*Peer, *payload.MsgInv)
 }
 
 // Peer holds all configuration and state to be able to communicate with other peers.
@@ -80,12 +85,12 @@ type Peer struct {
 	// Unchangeable state: concurrent safe
 	addr      string
 	protoVer  uint32
-	port      uint16
 	inbound   bool
 	userAgent string
 	services  protocol.ServiceFlag
 	createdAt time.Time
 	relay     bool
+	Nonce     uint64
 
 	net  protocol.Magic
 	conn net.Conn
@@ -107,22 +112,25 @@ type Peer struct {
 }
 
 // NewPeer is called after a connection to a peer was successful.
-func NewPeer(con net.Conn, inbound bool, respHndlr ResponseHandler) *Peer {
+// Inbound as well as Outbound.
+func NewPeer(conn net.Conn, inbound bool, respHndlr ResponseHandler) *Peer {
 	p := Peer{}
+	p.Nonce = rand.Uint64()
 	p.hndlr = respHndlr
 	p.inch = make(chan func(), inputBufferSize)
 	p.outch = make(chan func(), outputBufferSize)
 	p.quitch = make(chan struct{}, 1)
 	p.inbound = inbound
-	p.port = uint16(cfg.GetInt("net.port"))
-	p.net = protocol.Magic(uint32(cfg.GetInt("net.magic")))
-	p.conn = con
+	p.addr = conn.RemoteAddr().String()
+
+	// TODO: Shouldn't this be sent by remote peer
+	p.net = protocol.Magic(uint32(config.EnvNetCfg.Magic))
+
+	p.conn = conn
 	p.createdAt = time.Now()
-	p.addr = p.conn.RemoteAddr().String()
 
 	p.Detector = stall.NewDetector(responseTime, tickerInterval)
 
-	// TODO: set the unchangeable states
 	return &p
 }
 
@@ -165,7 +173,9 @@ func (p *Peer) Net() protocol.Magic {
 
 // Port returns the port
 func (p *Peer) Port() uint16 {
-	return p.port
+	s := strings.Split(p.RemoteAddr().String(), ":")
+	port, _ := strconv.ParseUint(s[1], 10, 16)
+	return uint16(port)
 }
 
 // CreatedAt returns the created at time
@@ -324,20 +334,20 @@ loop:
 		//	p.OnCertificateReq(msg)
 		//case *payload.MsgMemPool:
 		//	p.OnMemPool(msg)
-		//case *payload.MsgNotFound:
-		//	p.OnNotFound(msg)
+		case *payload.MsgNotFound:
+			p.OnNotFound(msg)
 		//case *payload.MsgPing:
 		//	p.OnPing(msg)
 		//case *payload.MsgPong:
 		//	p.OnPong(msg)
 		//case *payload.MsgReduction:
 		//	p.OnReduction(msg)
-		//case *payload.MsgReject:
-		//	p.OnReject(msg)
+		case *payload.MsgReject:
+			p.OnReject(msg)
 		//case *payload.MsgScore:
 		//	p.OnScore(msg)
 		default:
-			log.WithField("prefix", "peer").Warn("Did not recognise message", msg.Command()) //Do not disconnect peer, just log message
+			log.WithField("prefix", "peer").Warnf("Did not recognise message '%s'", msg.Command()) //Do not disconnect peer, just log message
 		}
 	}
 
@@ -450,7 +460,7 @@ func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
 
 // OnBlock Listener. Is called after receiving a 'blocks' msg
 func (p *Peer) OnBlock(msg *payload.MsgBlock) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Block, p.addr)
+	log.WithField("prefix", "peer").Debugf("Received a '%s' message (Height=%d) from %s", commands.Block, msg.Block.Header.Height, p.addr)
 	p.inch <- func() {
 		if p.hndlr.OnBlock != nil {
 			p.hndlr.OnBlock(p, msg)
@@ -461,16 +471,35 @@ func (p *Peer) OnBlock(msg *payload.MsgBlock) {
 // OnVersion Listener will be called during the handshake, any error checking should be done here for 'version' msg.
 // This should only ever be called during the handshake. Any other place and the peer will disconnect.
 func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
-	//if msg.Nonce == p.config.Nonce {
-	//	p.conn.Close()
-	//	return errors.New("Self connection, disconnecting Peer")
-	//}
-	//p.versionKnown = true
-	//p.port = msg.Port
+	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Version, p.addr)
+	if msg.Nonce == p.Nonce {
+		log.WithField("prefix", "peer").Infof("Received '%s' message from yourself", commands.Version)
+		p.conn.Close()
+		return errors.New("Self connection, disconnecting Peer")
+	}
+
+	if protocol.ProtocolVersion != msg.Version {
+		error := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
+		log.WithField("prefix", "peer").Infof("TODO: Implement backwards compatible Version Management")
+		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
+		p.Write(rejectMsg)
+
+		return errors.New(error)
+	}
+
+	p.versionKnown = true
+	p.protoVer = msg.Version
 	//p.services = msg.Services
 	//p.userAgent = string(msg.UserAgent)
-	//p.createdAt = time.Now()
 	//p.relay = msg.Relay
+	p.createdAt = time.Now()
+	return nil
+}
+
+// OnVerack Listener will be called during the handshake.
+// This should only ever be called during the handshake. Any other place and the peer will disconnect.
+func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
+	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.VerAck, p.addr)
 	return nil
 }
 
@@ -632,10 +661,10 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 }
 
 // RequestBlocks will ask a peer for blocks.
-// It will put a function on the outgoing peer queue to send a 'getblocks' msg to an other peer.
+// It will put a function on the outgoing peer queue to send a 'getdata' msg to an other peer.
 // The same possible function error will be returned from this method.
 func (p *Peer) RequestBlocks(hashes [][]byte) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
+	log.WithField("prefix", "peer").Debugf("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
 	blocks := make([]*payload.Block, 0, len(hashes))

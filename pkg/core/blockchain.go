@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	cfg "github.com/spf13/viper"
 	"sort"
 	"time"
 
@@ -31,9 +30,11 @@ var (
 // transactions. Properly verified transactions and blocks will be
 // added to the memory pool and the database respectively.
 type Blockchain struct {
+	// Database
+	db *database.BlockchainDB
+
 	// Basic fields
 	memPool *MemPool
-	db      *database.BlockchainDB
 	net     protocol.Magic
 	height  uint64
 
@@ -57,16 +58,16 @@ type Blockchain struct {
 	totalStakeWeight uint64 // The total amount of DUSK staked
 }
 
-// NewBlockchain will return a new Blockchain instance with an initialized mempool.
+// NewBlockchain returns a new Blockchain instance with an initialized mempool.
 // This Blockchain instance should then be ready to process incoming transactions and blocks.
-func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
-	dbPath := cfg.GetString("net.database.dirpath")
-	log.WithField("prefix", "blockchain").Debugf("Path to database: %s", dbPath)
-	db, err := database.NewBlockchainDB(dbPath)
-	if err != nil {
-		log.WithField("prefix", "blockchain").Error(err)
-		return nil, errNoBlockchainDb
-	}
+func NewBlockchain(db *database.BlockchainDB, net protocol.Magic) (*Blockchain, error) {
+	//path := config.EnvNetCfg.DatabaseDirPath
+	//db, err := database.NewBlockchainDB(path)
+	//log.WithField("prefix", "database").Debugf("Path to database: %s", path)
+	//if err != nil {
+	//	log.WithField("prefix", "database").Fatalf("Failed to find db path: %s", path)
+	//	return nil, err
+	//}
 
 	marker := []byte("HasBeenInitialisedAlready")
 	init, err := db.Has(marker)
@@ -96,7 +97,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 				return nil, err
 			}
 
-			err = db.AddHeaders([]*payload.BlockHeader{b.Header})
+			err = db.WriteHeaders([]*payload.BlockHeader{b.Header})
 			if err != nil {
 				log.WithField("prefix", "blockchain").Error("Failed to add genesis block header")
 				db.Delete(marker)
@@ -115,11 +116,10 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 		}
 	}
 
-	chain := &Blockchain{}
+	chain := &Blockchain{db: db}
 
 	// Set up mempool and populate struct fields
 	//chain.memPool.Init() //TODO: TV commented this line because of no memPool instance (yet)
-	chain.db = db
 	chain.net = net
 
 	// Consensus set-up
@@ -128,7 +128,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 	chain.candidateChan = make(chan *payload.MsgScore)
 	chain.quitChan = make(chan int)
 	chain.roundChan = make(chan int)
-	chain.lastHeader, err = chain.GetLatestHeader()
+	chain.lastHeader, err = db.GetLatestHeader()
 	if err != nil {
 		return nil, err
 	}
@@ -271,29 +271,29 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Check if previous block hash is correct
-	prevHeaderHash, err := b.GetLatestHeaderHash()
+	hdr, err := b.db.GetBlockHeaderByHeight(block.Header.Height - 1)
 	if err != nil {
 		return err
 	}
-
+	prevHeaderHash := hdr.Hash
 	if bytes.Compare(block.Header.PrevBlock, prevHeaderHash) != 0 {
-		return errors.New("invalid block: previous block hash mismatch")
+		return errors.New("Invalid block: previous block hash mismatch")
 	}
 
 	// Get header from db
-	prevHeader, err := b.GetLatestHeader()
+	prevBlock, err := b.GetBlock(prevHeaderHash)
 	if err != nil {
 		return err
 	}
 
 	// Height check
-	if block.Header.Height != prevHeader.Height+1 {
-		return errors.New("invalid block: heightn incorrect")
+	if block.Header.Height != prevBlock.Header.Height+1 {
+		return errors.New("Invalid block: height incorrect")
 	}
 
 	// Timestamp check
-	if block.Header.Timestamp <= prevHeader.Timestamp {
-		return errors.New("invalid block: timestamp too far in the past")
+	if block.Header.Timestamp < prevBlock.Header.Timestamp {
+		return errors.New("Invalid block: timestamp too far in the past")
 	}
 
 	// Verify block
@@ -302,19 +302,19 @@ func (b *Blockchain) AcceptBlock(block *payload.Block) error {
 	}
 
 	// Clear out all matching entries in mempool
-	for _, v := range block.Txs {
-		tx := v.(*transactions.Stealth)
-		if b.memPool.Exists(tx.Hex()) {
-			b.memPool.RemoveTx(tx)
-		}
-	}
+	//for _, v := range block.Txs {
+	//	tx := v.(*transactions.Stealth)
+	//	if b.memPool.Exists(tx.Hex()) {
+	//		b.memPool.RemoveTx(tx)
+	//	}
+	//}
 
 	// Add to database
-	if err := b.db.AddHeaders([]*payload.BlockHeader{block.Header}); err != nil {
-		return err
-	}
+	//if err := db.WriteHeaders([]*payload.BlockHeader{block.Header}); err != nil {
+	//	return err
+	//}
 
-	if err := b.db.AddBlockTransactions([]*payload.Block{block}); err != nil {
+	if err := b.db.WriteBlockTransactions([]*payload.Block{block}); err != nil {
 		return err
 	}
 
@@ -343,7 +343,7 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 	}
 
 	if bytes.Compare(hash, block.Header.Hash) != 0 {
-		return errors.New("invalid block: hash mismatch")
+		return errors.New("Invalid block: hash mismatch")
 	}
 
 	// Check all transactions
@@ -361,14 +361,38 @@ func (b *Blockchain) VerifyBlock(block *payload.Block) error {
 	}
 
 	if bytes.Compare(root, block.Header.TxRoot) != 0 {
-		return errors.New("invalid block: merkle root mismatch")
+		return errors.New("Invalid block: merkle root mismatch")
 	}
 
 	return nil
 }
 
-//ValidateHeaders will validate headers that were received through the wire.
-// addHeaders is not safe for concurrent access
+// GetLatestHeader gives the latest block header
+func (b *Blockchain) GetLatestHeader() (*payload.BlockHeader, error) {
+	return b.db.GetLatestHeader()
+}
+
+// GetHeaders gives block headers from the database, starting and
+// stopping at the provided locators.
+func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
+	return b.db.ReadHeaders(start, stop)
+}
+
+// GetBlock will return the block from the received hash
+func (b *Blockchain) GetBlock(hash []byte) (*payload.Block, error) {
+	return b.db.GetBlock(hash)
+}
+
+// AddHeaders will add block headers to the chain
+func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
+	if err := b.db.WriteHeaders(msg.Headers); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ValidateHeaders will validate headers that were received through the wire
+// TODO: Centralize validation rules
 func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
 	table := database.NewTable(b.db, database.HEADER)
 	latestHash, err := b.db.Get(database.LATESTHEADER)
