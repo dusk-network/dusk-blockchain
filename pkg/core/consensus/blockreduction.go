@@ -15,13 +15,13 @@ import (
 
 // BlockReduction is the main function that runs during block reduction phase.
 func BlockReduction(ctx *Context) error {
-	// First, make sure we got a result from block collection.
-	if ctx.BlockHash == nil {
-		return nil
-	}
-
 	// Set up a fallback value
 	fallback := make([]byte, 32)
+
+	// If we made it here without getting a block, set blockhash to fallback value.
+	if ctx.BlockHash == nil {
+		ctx.BlockHash = fallback
+	}
 
 	// Clear our votes out, so that we get a fresh set for this phase.
 	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
@@ -190,7 +190,7 @@ func countVotesReduction(ctx *Context) error {
 
 			ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
 
-			// If a block doesnt exceedd the vote threshold, we keep going.
+			// If a block doesnt exceed the vote threshold, we keep going.
 			if counts[hashStr] < ctx.VoteLimit {
 				break
 			}
