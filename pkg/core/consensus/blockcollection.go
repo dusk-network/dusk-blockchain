@@ -25,7 +25,7 @@ func BlockCollection(ctx *Context) error {
 	ctx.CandidateBlocks = make(map[string]*block.Block)
 
 	// Start the timer
-	timer := time.NewTimer(CandidateTime)
+	timer := time.NewTimer(CandidateTime * (time.Duration(ctx.Multiplier) * time.Second))
 
 	for {
 		select {

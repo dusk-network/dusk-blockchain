@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"bytes"
 	"encoding/hex"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 
 // SignatureSetReduction is the signature set reduction phase of the consensus.
 func SignatureSetReduction(ctx *Context) error {
+	// Set up a fallback value
+	fallback := make([]byte, 32)
+
 	// Vote on collected signature set
 	if err := committeeVoteSigSet(ctx); err != nil {
 		return err
@@ -27,7 +31,7 @@ func SignatureSetReduction(ctx *Context) error {
 
 	// If we timed out, exit the loop and go back to signature set generation
 	if ctx.SigSetHash == nil {
-		return nil
+		ctx.SigSetHash = fallback
 	}
 
 	if err := committeeVoteSigSet(ctx); err != nil {
@@ -42,6 +46,13 @@ func SignatureSetReduction(ctx *Context) error {
 
 	// If we timed out, exit the loop and go back to signature set generation
 	if ctx.SigSetHash == nil {
+		return nil
+	}
+
+	// If SigSetHash is fallback, the committee has agreed to exit and restart
+	// consensus.
+	if bytes.Equal(ctx.SigSetHash, fallback) {
+		ctx.SigSetHash = nil
 		return nil
 	}
 
@@ -108,7 +119,7 @@ func countVotesSigSet(ctx *Context) error {
 	counts[hex.EncodeToString(ctx.SigSetHash)] += ctx.Weight
 
 	// Start the timer
-	timer := time.NewTimer(StepTime)
+	timer := time.NewTimer(StepTime * (time.Duration(ctx.Multiplier) * time.Second))
 
 	for {
 		select {

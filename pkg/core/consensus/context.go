@@ -41,6 +41,7 @@ type Context struct {
 	K          []byte        // secret
 	Keys       *Keys
 	Magic      protocol.Magic
+	Multiplier uint8 // Time multiplier
 
 	// Block generator values
 	D          uint64 // bidWeight
@@ -109,6 +110,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Round:               round,
 		Seed:                seed,
 		Magic:               magic,
+		Multiplier:          1,
 		Certificate:         &block.Certificate{},
 		D:                   d,
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
@@ -159,6 +161,7 @@ func (c *Context) Reset() {
 	c.BlockVotes = nil
 	c.SigSetHash = nil
 	c.SigSetVotes = nil
+	c.Multiplier = 1
 }
 
 // Clear will remove all values created during consensus

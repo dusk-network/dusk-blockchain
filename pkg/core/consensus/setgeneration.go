@@ -60,7 +60,7 @@ func SignatureSetGeneration(ctx *Context) error {
 	highest := ctx.Weight
 
 	// Start timer
-	timer := time.NewTimer(StepTime)
+	timer := time.NewTimer(StepTime * (time.Duration(ctx.Multiplier) * time.Second))
 
 	for {
 		select {

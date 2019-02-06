@@ -20,6 +20,9 @@ func BlockReduction(ctx *Context) error {
 		return nil
 	}
 
+	// Set up a fallback value
+	fallback := make([]byte, 32)
+
 	// Clear our votes out, so that we get a fresh set for this phase.
 	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
 
@@ -36,9 +39,9 @@ func BlockReduction(ctx *Context) error {
 	ctx.Step++
 
 	// If BlockHash is nil, no clear winner was found within the time limit.
-	// So we will exit and restart the consensus.
+	// We will vote on the fallback value.
 	if ctx.BlockHash == nil {
-		return nil
+		ctx.BlockHash = fallback
 	}
 
 	if err := committeeVoteReduction(ctx); err != nil {
@@ -54,6 +57,13 @@ func BlockReduction(ctx *Context) error {
 	// If BlockHash is nil, no clear winner was found within the time limit.
 	// So we will exit and restart the consensus.
 	if ctx.BlockHash == nil {
+		return nil
+	}
+
+	// If BlockHash is fallback, the committee has agreed to exit and restart
+	// consensus.
+	if bytes.Equal(ctx.BlockHash, fallback) {
+		ctx.BlockHash = nil
 		return nil
 	}
 
@@ -136,7 +146,7 @@ func countVotesReduction(ctx *Context) error {
 	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.Votes
 
 	// Start the timer
-	timer := time.NewTimer(StepTime)
+	timer := time.NewTimer(StepTime * (time.Duration(ctx.Multiplier) * time.Second))
 
 	for {
 		select {

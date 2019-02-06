@@ -93,6 +93,11 @@ func (b *Blockchain) provision() {
 				b.StopProvisioning()
 				return
 			}
+
+			// Increase multiplier
+			if b.ctx.Multiplier < 10 {
+				b.ctx.Multiplier = b.ctx.Multiplier * 2
+			}
 		}
 	}
 
@@ -136,6 +141,11 @@ func (b *Blockchain) provision() {
 				// Log
 				b.StopProvisioning()
 				return
+			}
+
+			// Increase multiplier
+			if b.ctx.Multiplier < 10 {
+				b.ctx.Multiplier = b.ctx.Multiplier * 2
 			}
 		}
 	}
