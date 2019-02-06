@@ -106,7 +106,8 @@ func (b *Blockchain) UpdateProvisioners() {
 			}
 
 			for i, pkBytes := range b.ctx.Committee {
-				if bytes.Equal(pk, pkBytes) {
+				pkStr := hex.EncodeToString(pkBytes)
+				if pk == pkStr {
 					b.ctx.Committee = append(b.ctx.Committee[:i], b.ctx.Committee[i+1:]...)
 				}
 			}
