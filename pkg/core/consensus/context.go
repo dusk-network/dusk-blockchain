@@ -24,6 +24,7 @@ var (
 	MaxSteps      uint8 = 50
 	StepTime            = 20 * time.Second
 	CandidateTime       = 60 * time.Second
+	committeeSize uint8 = 50
 )
 
 // Context will hold all the necessary functions and
@@ -69,8 +70,10 @@ type Context struct {
 	SigSetHash  []byte                          // Hash of the signature vote set being voted on
 
 	// Tracking fields
-	NodeWeights map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
-	NodeBLS     map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
+	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
+	CurrentCommittee [][]byte          // Set of public keys of committee members for a current step
+	NodeWeights      map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
+	NodeBLS          map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
 
 	// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
