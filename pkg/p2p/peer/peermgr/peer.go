@@ -297,28 +297,22 @@ loop:
 			p.OnGetData(msg)
 		case *payload.MsgTx:
 			p.OnTx(msg)
-		//case *payload.MsgBinary:
-		//	p.OnBinary(msg)
-		//case *payload.MsgCandidate:
-		//	p.OnCandidate(msg)
-		//case *payload.MsgCertificate:
-		//	p.OnCertificate(msg)
-		//case *payload.MsgCertificateReq:
-		//	p.OnCertificateReq(msg)
-		//case *payload.MsgMemPool:
-		//	p.OnMemPool(msg)
+		case *payload.MsgConsensus:
+			p.OnConsensusMsg(msg)
+		case *payload.MsgCertificate:
+			p.OnCertificate(msg)
+		case *payload.MsgCertificateReq:
+			p.OnCertificateReq(msg)
+		case *payload.MsgMemPool:
+			p.OnMemPool(msg)
 		case *payload.MsgNotFound:
 			p.OnNotFound(msg)
-		//case *payload.MsgPing:
-		//	p.OnPing(msg)
-		//case *payload.MsgPong:
-		//	p.OnPong(msg)
-		//case *payload.MsgReduction:
-		//	p.OnReduction(msg)
+		case *payload.MsgPing:
+			p.OnPing(msg)
+		case *payload.MsgPong:
+			p.OnPong(msg)
 		case *payload.MsgReject:
 			p.OnReject(msg)
-		//case *payload.MsgScore:
-		//	p.OnScore(msg)
 		default:
 			log.WithField("prefix", "peer").Warnf("Did not recognise message '%s'", msg.Command()) //Do not disconnect peer, just log message
 		}
@@ -448,12 +442,12 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	if msg.Nonce == p.Nonce {
 		log.WithField("prefix", "peer").Infof("Received '%s' message from yourself", commands.Version)
 		p.conn.Close()
-		return errors.New("Self connection, disconnecting Peer")
+		return errors.New("self connection, peer disconnected")
 	}
 
 	if protocol.ProtocolVersion != msg.Version {
 		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
-		log.WithField("prefix", "peer").Infof("TODO: Implement backwards compatible Version Management")
+		log.WithField("prefix", "peer").Infof("Incompatible protocol version")
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
 		p.Write(rejectMsg)
 
@@ -462,9 +456,6 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 
 	p.versionKnown = true
 	p.protoVer = msg.Version
-	//p.services = msg.Services
-	//p.userAgent = string(msg.UserAgent)
-	//p.relay = msg.Relay
 	p.createdAt = time.Now()
 	return nil
 }
@@ -472,7 +463,17 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 // OnVerack Listener will be called during the handshake.
 // This should only ever be called during the handshake. Any other place and the peer will disconnect.
 func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.VerAck, p.addr)
+	return nil
+}
+
+// OnConsensusMsg is called when the node receives a consensus message
+func (p *Peer) OnConsensusMsg(msg *payload.MsgConsensus) error {
+	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Consensus, p.addr)
+	p.inch <- func() {
+		if p.cfg.Handler.OnConsensus != nil {
+			p.cfg.Handler.OnConsensus(p, msg)
+		}
+	}
 	return nil
 }
 
