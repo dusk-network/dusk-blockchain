@@ -463,7 +463,6 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 // OnVerack Listener will be called during the handshake.
 // This should only ever be called during the handshake. Any other place and the peer will disconnect.
 func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.VerAck, p.addr)
 	return nil
 }
 
