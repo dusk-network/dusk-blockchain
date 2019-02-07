@@ -442,7 +442,7 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	if msg.Nonce == p.Nonce {
 		log.WithField("prefix", "peer").Infof("Received '%s' message from yourself", commands.Version)
 		p.conn.Close()
-		return errors.New("Self connection, peer disconnected")
+		return errors.New("self connection, peer disconnected")
 	}
 
 	if protocol.ProtocolVersion != msg.Version {
