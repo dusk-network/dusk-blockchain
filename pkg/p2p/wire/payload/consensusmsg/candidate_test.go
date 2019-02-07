@@ -54,14 +54,12 @@ func TestCandidateEncodeDecode(t *testing.T) {
 	slice = append(slice, rand2)
 
 	cert := &block.Certificate{
-		BRBatchedSig:      sig,
-		BRStep:            4,
-		BRPubKeys:         slice,
-		BRSortitionProofs: slice,
-		SRBatchedSig:      sig,
-		SRStep:            2,
-		SRPubKeys:         slice,
-		SRSortitionProofs: slice,
+		BRBatchedSig: sig,
+		BRStep:       4,
+		BRPubKeys:    slice,
+		SRBatchedSig: sig,
+		SRStep:       2,
+		SRPubKeys:    slice,
 	}
 
 	if err := cert.SetHash(); err != nil {
