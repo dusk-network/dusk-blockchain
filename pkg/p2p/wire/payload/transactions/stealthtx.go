@@ -10,48 +10,28 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+// TypeInfo is an interface for type-specific transaction information.
+type TypeInfo interface {
+	Encode(w io.Writer) error
+	Decode(r io.Reader) error
+	Type() TxType
+}
+
 // Stealth defines a stealth transaction.
 type Stealth struct {
-	Version uint8  // 1 byte
-	Type    TxType // 1 byte
-	R       []byte // 32 bytes
-	Inputs  []*Input
-	Outputs []*Output
-
-	Hash []byte // 32 bytes
+	Version  uint8  // 1 byte
+	Type     TxType // 1 byte
+	TypeInfo TypeInfo
+	R        []byte // TxID (32 bytes)
 }
 
-// NewTX will return a standard transaction
-func NewTX() *Stealth {
+// NewTX will return a transaction with the specified type and type info.
+func NewTX(t TxType, info TypeInfo) *Stealth {
 	return &Stealth{
-		Version: 0x00,
-		Type:    StandardType,
+		Version:  0x00,
+		Type:     t,
+		TypeInfo: info,
 	}
-}
-
-// AddInput will add an input to the transaction's TypeAttributes
-func (s *Stealth) AddInput(input *Input) {
-	s.Inputs = append(s.Inputs, input)
-}
-
-// AddOutput will add an output to the transaction's TypeAttributes
-func (s *Stealth) AddOutput(output *Output) {
-	s.Outputs = append(s.Outputs, output)
-}
-
-// AddTxPubKey will add a transaction public key to the transaction object
-func (s *Stealth) AddTxPubKey(pk []byte) {
-	// This should be adjusted in the future to work as described in
-	// the documentation - this is merely a placeholder
-	s.R = pk
-}
-
-// Clear all transaction fields
-func (s *Stealth) Clear() {
-	s.Inputs = nil
-	s.R = nil
-	s.Outputs = nil
-	s.Hash = nil
 }
 
 // SetHash will set the transaction hash
@@ -66,7 +46,7 @@ func (s *Stealth) SetHash() error {
 		return err
 	}
 
-	s.Hash = h
+	s.R = h
 	return nil
 }
 
@@ -81,28 +61,8 @@ func (s *Stealth) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, s.R); err != nil {
-		return err
-	}
-
-	lIn := uint64(len(s.Inputs))
-	if err := encoding.WriteVarInt(w, lIn); err != nil {
-		return err
-	}
-
-	for _, input := range s.Inputs {
-		if err := input.Encode(w); err != nil {
-			return err
-		}
-	}
-
-	lOut := uint64(len(s.Outputs))
-	if err := encoding.WriteVarInt(w, lOut); err != nil {
-		return err
-	}
-
-	for _, output := range s.Outputs {
-		if err := output.Encode(w); err != nil {
+	if s.TypeInfo != nil {
+		if err := s.TypeInfo.Encode(w); err != nil {
 			return err
 		}
 	}
@@ -116,7 +76,7 @@ func (s *Stealth) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, s.Hash); err != nil {
+	if err := encoding.Write256(w, s.R); err != nil {
 		return err
 	}
 
@@ -134,38 +94,54 @@ func (s *Stealth) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &s.R); err != nil {
-		return err
-	}
-
 	s.Type = TxType(t)
-	lIn, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
-	}
 
-	s.Inputs = make([]*Input, lIn)
-	for i := uint64(0); i < lIn; i++ {
-		s.Inputs[i] = &Input{}
-		if err := s.Inputs[i].Decode(r); err != nil {
+	switch s.Type {
+	case CoinbaseType:
+		typeInfo := &Coinbase{}
+		if err := typeInfo.Decode(r); err != nil {
 			return err
 		}
-	}
 
-	lOut, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
-	}
-
-	s.Outputs = make([]*Output, lOut)
-	for i := uint64(0); i < lOut; i++ {
-		s.Outputs[i] = &Output{}
-		if err := s.Outputs[i].Decode(r); err != nil {
+		s.TypeInfo = typeInfo
+	case BidType:
+		typeInfo := &Bid{}
+		if err := typeInfo.Decode(r); err != nil {
 			return err
 		}
+
+		s.TypeInfo = typeInfo
+	case StakeType:
+		typeInfo := &Stake{}
+		if err := typeInfo.Decode(r); err != nil {
+			return err
+		}
+
+		s.TypeInfo = typeInfo
+	case StandardType:
+		typeInfo := &Standard{}
+		if err := typeInfo.Decode(r); err != nil {
+			return err
+		}
+
+		s.TypeInfo = typeInfo
+	case TimelockType:
+		typeInfo := &Timelock{}
+		if err := typeInfo.Decode(r); err != nil {
+			return err
+		}
+
+		s.TypeInfo = typeInfo
+	case ContractType:
+		typeInfo := &Contract{}
+		if err := typeInfo.Decode(r); err != nil {
+			return err
+		}
+
+		s.TypeInfo = typeInfo
 	}
 
-	if err := encoding.Read256(r, &s.Hash); err != nil {
+	if err := encoding.Read256(r, &s.R); err != nil {
 		return err
 	}
 
@@ -174,7 +150,7 @@ func (s *Stealth) Decode(r io.Reader) error {
 
 // Hex returns the tx hash as a hexadecimal string
 func (s *Stealth) Hex() string {
-	return hex.EncodeToString(s.Hash)
+	return hex.EncodeToString(s.R)
 }
 
 // CalculateHash implements merkletree.Payload

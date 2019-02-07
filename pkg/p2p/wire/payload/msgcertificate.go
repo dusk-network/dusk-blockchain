@@ -7,19 +7,20 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
 
 // MsgCertificate defines a certificate message on the Dusk wire protocol.
 type MsgCertificate struct {
-	BlockHeight uint64       // Block height of the requested certificate
-	BlockHash   []byte       // Block hash of the requested certificate (32 bytes)
-	BlockCert   *Certificate // Block certificate (variable size)
+	BlockHeight uint64             // Block height of the requested certificate
+	BlockHash   []byte             // Block hash of the requested certificate (32 bytes)
+	BlockCert   *block.Certificate // Block certificate (variable size)
 }
 
 // NewMsgCertificate returns a MsgCertificate struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewMsgCertificate(height uint64, hash []byte, cert *Certificate) (*MsgCertificate, error) {
+func NewMsgCertificate(height uint64, hash []byte, cert *block.Certificate) (*MsgCertificate, error) {
 	if len(hash) != 32 {
 		return nil, errors.New("wire: supplied block hash for certificate message is improper length")
 	}
@@ -60,7 +61,7 @@ func (m *MsgCertificate) Decode(r io.Reader) error {
 		return err
 	}
 
-	m.BlockCert = &Certificate{}
+	m.BlockCert = &block.Certificate{}
 	if err := m.BlockCert.Decode(r); err != nil {
 		return err
 	}

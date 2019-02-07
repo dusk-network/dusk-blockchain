@@ -4,13 +4,14 @@ import (
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
 // MsgHeaders defines a headers message on the Dusk wire protocol.
 type MsgHeaders struct {
-	Headers []*BlockHeader
+	Headers []*block.Header
 }
 
 // NewMsgHeaders will return an empty MsgHeaders struct.
@@ -19,7 +20,7 @@ func NewMsgHeaders() *MsgHeaders {
 }
 
 // AddHeader will add a block header to the MsgHeaders struct.
-func (m *MsgHeaders) AddHeader(header *BlockHeader) {
+func (m *MsgHeaders) AddHeader(header *block.Header) {
 	m.Headers = append(m.Headers, header)
 }
 
@@ -51,9 +52,9 @@ func (m *MsgHeaders) Decode(r io.Reader) error {
 		return err
 	}
 
-	m.Headers = make([]*BlockHeader, lHeaders)
+	m.Headers = make([]*block.Header, lHeaders)
 	for i := uint64(0); i < lHeaders; i++ {
-		m.Headers[i] = &BlockHeader{}
+		m.Headers[i] = &block.Header{}
 		if err := m.Headers[i].Decode(r); err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-package payload
+package payload_test
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
 func TestMsgCertificateReqEncodeDecode(t *testing.T) {
@@ -14,7 +15,7 @@ func TestMsgCertificateReqEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewMsgCertificateReq(1500, hash)
+	msg, err := payload.NewMsgCertificateReq(1500, hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +25,7 @@ func TestMsgCertificateReqEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg2 := &MsgCertificateReq{}
+	msg2 := &payload.MsgCertificateReq{}
 	msg2.Decode(buf)
 
 	assert.Equal(t, msg, msg2)
@@ -37,7 +38,7 @@ func TestMsgCertificateReqChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewMsgCertificateReq(200, wrongHash); err == nil {
+	if _, err := payload.NewMsgCertificateReq(200, wrongHash); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 }

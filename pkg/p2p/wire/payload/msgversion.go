@@ -21,13 +21,13 @@ type MsgVersion struct {
 
 // NewMsgVersion returns a populated MsgVersion struct. The node's
 // I2P address should be passed as an argument.
-func NewMsgVersion(version uint32, nonce uint64, from *NetAddress, to *NetAddress) *MsgVersion {
+func NewMsgVersion(version uint32, from, to *NetAddress, nonce uint64) *MsgVersion {
 	return &MsgVersion{
 		Version:     version,
 		Timestamp:   uint32(time.Now().Unix()),
-		Nonce:       nonce,
 		FromAddress: from,
 		ToAddress:   to,
+		Nonce:       nonce,
 	}
 }
 
@@ -42,15 +42,15 @@ func (m *MsgVersion) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteUint64(w, binary.LittleEndian, uint64(m.Nonce)); err != nil {
-		return err
-	}
-
 	if err := m.FromAddress.Encode(w); err != nil {
 		return err
 	}
 
 	if err := m.ToAddress.Encode(w); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64(w, binary.LittleEndian, uint64(m.Nonce)); err != nil {
 		return err
 	}
 
@@ -68,10 +68,6 @@ func (m *MsgVersion) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &m.Nonce); err != nil {
-		return err
-	}
-
 	var from NetAddress
 	var to NetAddress
 
@@ -85,6 +81,11 @@ func (m *MsgVersion) Decode(r io.Reader) error {
 
 	m.FromAddress = &from
 	m.ToAddress = &to
+
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &m.Nonce); err != nil {
+		return err
+	}
+
 	return nil
 }
 

@@ -7,8 +7,6 @@ package peermgr
 import (
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"math/rand"
 	"net"
 	"strconv"
@@ -17,10 +15,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
@@ -67,15 +69,13 @@ type ResponseHandler struct {
 	OnGetAddr        func(*Peer, *payload.MsgGetAddr)
 	OnGetBlocks      func(*Peer, *payload.MsgGetBlocks)
 	OnBlock          func(*Peer, *payload.MsgBlock)
-	OnBinary         func(*Peer, *payload.MsgBinary)
+	OnConsensus      func(*Peer, *payload.MsgConsensus)
 	OnCertificate    func(*Peer, *payload.MsgCertificate)
 	OnCertificateReq func(*Peer, *payload.MsgCertificateReq)
 	OnMemPool        func(*Peer, *payload.MsgMemPool)
 	OnPing           func(*Peer, *payload.MsgPing)
 	OnPong           func(*Peer, *payload.MsgPong)
-	OnReduction      func(*Peer, *payload.MsgReduction)
 	OnReject         func(*Peer, *payload.MsgReject)
-	OnScore          func(*Peer, *payload.MsgScore)
 	OnInv            func(*Peer, *payload.MsgInv)
 }
 
@@ -403,11 +403,11 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 		for _, vector := range msg.Vectors {
 			switch vector.Type {
 			case payload.InvTx:
-				tx := transactions.NewTX()
-				tx.Hash = vector.Hash
-				getdata.AddTx(tx)
+				// tx := transactions.NewTX()
+				// tx.R = vector.Hash
+				// getdata.AddTx(tx)
 			case payload.InvBlock:
-				block := payload.NewBlock()
+				block := block.NewBlock()
 				block.Header.Hash = vector.Hash
 				getdata.AddBlock(block)
 			default:
@@ -513,12 +513,12 @@ func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
 	}
 }
 
-// OnBinary Listener. Is called after receiving a 'binary' msg
-func (p *Peer) OnBinary(msg *payload.MsgBinary) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Binary, p.addr)
+// OnConsensus Listener. Is called after receiving a 'consensus' msg
+func (p *Peer) OnConsensus(msg *payload.MsgConsensus) {
+	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Consensus, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnBinary != nil {
-			p.hndlr.OnBinary(p, msg)
+		if p.hndlr.OnConsensus != nil {
+			p.hndlr.OnConsensus(p, msg)
 		}
 	}
 }
@@ -593,32 +593,12 @@ func (p *Peer) OnPong(msg *payload.MsgPong) {
 	}
 }
 
-// OnReduction Listener. Is called after receiving a 'reduction' msg
-func (p *Peer) OnReduction(msg *payload.MsgReduction) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Reduction, p.addr)
-	p.inch <- func() {
-		if p.hndlr.OnReduction != nil {
-			p.hndlr.OnReduction(p, msg)
-		}
-	}
-}
-
 // OnReject Listener. Is called after receiving a 'reject' msg
 func (p *Peer) OnReject(msg *payload.MsgReject) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Reject, p.addr)
 	p.inch <- func() {
 		if p.hndlr.OnReject != nil {
 			p.hndlr.OnReject(p, msg)
-		}
-	}
-}
-
-// OnScore Listener. Is called after receiving a 'score' msg
-func (p *Peer) OnScore(msg *payload.MsgScore) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Score, p.addr)
-	p.inch <- func() {
-		if p.hndlr.OnScore != nil {
-			p.hndlr.OnScore(p, msg)
 		}
 	}
 }
@@ -667,12 +647,12 @@ func (p *Peer) RequestBlocks(hashes [][]byte) error {
 	log.WithField("prefix", "peer").Debugf("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
-	blocks := make([]*payload.Block, 0, len(hashes))
+	blocks := make([]*block.Block, 0, len(hashes))
 	for _, hash := range hashes {
 		// Create a block from requested hash
-		block := payload.NewBlock()
-		block.Header.Hash = hash
-		blocks = append(blocks, block)
+		b := block.NewBlock()
+		b.Header.Hash = hash
+		blocks = append(blocks, b)
 	}
 
 	p.outch <- func() {

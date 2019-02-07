@@ -27,12 +27,7 @@ const (
 	Inv            Cmd = "inv"
 	CertificateReq Cmd = "certificatereq"
 	Certificate    Cmd = "certificate"
-
-	// Consensus commands
-	Score     Cmd = "score"
-	Candidate Cmd = "candidate"
-	Reduction Cmd = "reduction"
-	Binary    Cmd = "binary"
+	Consensus      Cmd = "consensus"
 
 	// Error commands
 	NotFound Cmd = "notfound"

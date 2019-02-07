@@ -1,4 +1,4 @@
-package payload
+package payload_test
 
 import (
 	"bytes"
@@ -7,15 +7,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 func TestMsgHeadersEncodeDecode(t *testing.T) {
-	msg := NewMsgHeaders()
+	msg := payload.NewMsgHeaders()
 
 	// Add 10 block headers
 	for i := 0; i < 10; i++ {
-		block := NewBlock()
+		b := block.NewBlock()
 
 		// Add 10 transactions
 		for i := 0; i < 10; i++ {
@@ -24,57 +26,68 @@ func TestMsgHeadersEncodeDecode(t *testing.T) {
 			sig, _ := crypto.RandEntropy(2000)
 
 			txPubKey, _ := crypto.RandEntropy(32)
-			s := transactions.NewTX()
+			pl := transactions.NewStandard(100)
+			s := transactions.NewTX(transactions.StandardType, pl)
 			in := transactions.NewInput(txPubKey, txPubKey, 0, sig)
-			s.AddInput(in)
-			s.AddTxPubKey(txPubKey)
+			pl.AddInput(in)
+			s.R = txPubKey
 
 			out := transactions.NewOutput(200, byte32, sig)
-			s.AddOutput(out)
+			pl.AddOutput(out)
 			if err := s.SetHash(); err != nil {
 				t.Fatal(err)
 			}
 
-			block.AddTx(s)
+			b.AddTx(s)
 		}
 
 		// Spoof previous hash and seed
 		h, _ := crypto.RandEntropy(32)
-		block.Header.PrevBlock = h
-		block.Header.Seed = h
+		b.Header.PrevBlock = h
+
+		s, _ := crypto.RandEntropy(33)
+		b.Header.Seed = s
 
 		// Add cert image
 		rand1, _ := crypto.RandEntropy(32)
 		rand2, _ := crypto.RandEntropy(32)
 
-		sig, _ := crypto.RandEntropy(32)
+		sig, _ := crypto.RandEntropy(33)
 
-		cert := NewCertificate(sig)
-		for i := 1; i < 4; i++ {
-			step := NewStep(uint32(i))
-			step.AddData(rand1, rand2)
-			cert.AddStep(step)
+		slice := make([][]byte, 0)
+		slice = append(slice, rand1)
+		slice = append(slice, rand2)
+
+		cert := &block.Certificate{
+			BRBatchedSig:      sig,
+			BRStep:            4,
+			BRPubKeys:         slice,
+			BRSortitionProofs: slice,
+			SRBatchedSig:      sig,
+			SRStep:            2,
+			SRPubKeys:         slice,
+			SRSortitionProofs: slice,
 		}
 
 		if err := cert.SetHash(); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := block.AddCertImage(cert); err != nil {
+		if err := b.AddCertHash(cert); err != nil {
 			t.Fatal(err)
 		}
 
 		// Finish off
-		if err := block.SetRoot(); err != nil {
+		if err := b.SetRoot(); err != nil {
 			t.Fatal(err)
 		}
 
-		block.SetTime(time.Now().Unix())
-		if err := block.SetHash(); err != nil {
+		b.Header.Timestamp = time.Now().Unix()
+		if err := b.SetHash(); err != nil {
 			t.Fatal(err)
 		}
 
-		msg.AddHeader(block.Header)
+		msg.AddHeader(b.Header)
 	}
 
 	buf := new(bytes.Buffer)
@@ -82,7 +95,7 @@ func TestMsgHeadersEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg2 := NewMsgHeaders()
+	msg2 := payload.NewMsgHeaders()
 	if err := msg2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}

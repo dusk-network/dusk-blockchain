@@ -4,16 +4,17 @@ import (
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
 
 // MsgBlock defines a block message on the Dusk wire protocol.
 type MsgBlock struct {
-	Block *Block
+	Block *block.Block
 }
 
 // NewMsgBlock will return a MsgBlock with the specified block
 // as it's contents.
-func NewMsgBlock(b *Block) *MsgBlock {
+func NewMsgBlock(b *block.Block) *MsgBlock {
 	return &MsgBlock{
 		Block: b,
 	}
@@ -28,7 +29,7 @@ func (m *MsgBlock) Encode(w io.Writer) error {
 // Decode a MsgBlock from r.
 // Implements payload interface.
 func (m *MsgBlock) Decode(r io.Reader) error {
-	m.Block = &Block{}
+	m.Block = &block.Block{}
 	return m.Block.Decode(r)
 }
 
