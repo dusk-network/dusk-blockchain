@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
@@ -76,29 +75,18 @@ func BlockReduction(ctx *Context) error {
 }
 
 func committeeVoteReduction(ctx *Context) error {
-	// Run sortition
-	role := &sortition.Role{
-		Part:  "committee",
-		Round: ctx.Round,
-		Step:  ctx.Step,
-	}
-
-	score, err := sortition.CalcScore(ctx.Seed, ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, role)
+	// Set committee first
+	currentCommittee, err := sortition.Deterministic(ctx.Round, ctx.W, ctx.Step, CommitteeSize,
+		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return err
 	}
 
-	ctx.Score = score
-	votes, err := sortition.Prove(ctx.Score, ctx.Threshold, ctx.Weight, ctx.W)
-	if err != nil {
-		return err
-	}
+	ctx.CurrentCommittee = currentCommittee
 
-	ctx.Votes = votes
-
-	// Return with an error if we didn't get any votes from sortition
-	if ctx.Votes == 0 {
-		return errors.New("sortition did not result in any votes")
+	// If we are not in the committee, then don't vote
+	if votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey)); votes == 0 {
+		return nil
 	}
 
 	// Sign block hash with BLS
@@ -108,7 +96,7 @@ func committeeVoteReduction(ctx *Context) error {
 	}
 
 	// Create reduction payload to gossip
-	pl, err := consensusmsg.NewReduction(score, ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+	pl, err := consensusmsg.NewReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
 		return err
 	}
@@ -131,19 +119,19 @@ func committeeVoteReduction(ctx *Context) error {
 		return err
 	}
 
+	ctx.ReductionChan <- msg
 	return nil
 }
 
 func countVotesReduction(ctx *Context) error {
+	// Set vote limit
+	voteLimit := uint8(len(ctx.CurrentCommittee))
+
 	// Keep a counter of how many votes have been cast for a specific block
-	counts := make(map[string]uint64)
+	counts := make(map[string]uint8)
 
 	// Keep track of all nodes who have voted
 	voters := make(map[string]bool)
-
-	// Add our own information beforehand
-	voters[hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))] = true
-	counts[hex.EncodeToString(ctx.BlockHash)] += ctx.Votes
 
 	// Start the timer
 	timer := time.NewTimer(StepTime * (time.Duration(ctx.Multiplier) * time.Second))
@@ -183,7 +171,7 @@ func countVotesReduction(ctx *Context) error {
 			voters[pkEd] = true
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
-			blockVote, err2 := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, pl.Score, ctx.Step)
+			blockVote, err2 := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, ctx.Step)
 			if err2 != nil {
 				return err2
 			}
@@ -191,7 +179,7 @@ func countVotesReduction(ctx *Context) error {
 			ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
 
 			// If a block doesnt exceed the vote threshold, we keep going.
-			if counts[hashStr] < ctx.VoteLimit {
+			if counts[hashStr] < voteLimit {
 				break
 			}
 

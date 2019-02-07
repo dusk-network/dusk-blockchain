@@ -52,7 +52,6 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 
 			// Populate certificate
 			ctx.Certificate.SRPubKeys = make([][]byte, len(ctx.SigSetVotes))
-			ctx.Certificate.SRSortitionProofs = make([][]byte, len(ctx.SigSetVotes))
 			agSig := &bls.Signature{}
 			if err := agSig.Decompress(ctx.SigSetVotes[0].Sig); err != nil {
 				// Log
@@ -75,7 +74,6 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 
 				agSig.Aggregate(sig)
 				ctx.Certificate.SRPubKeys[i] = vote.PubKey
-				ctx.Certificate.SRSortitionProofs[i] = vote.Score
 			}
 
 			cSig := agSig.Compress()

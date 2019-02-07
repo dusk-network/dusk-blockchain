@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -66,6 +67,21 @@ func SignatureSetReduction(ctx *Context) error {
 }
 
 func committeeVoteSigSet(ctx *Context) error {
+	// Set committee first
+	currentCommittee, err := sortition.Deterministic(ctx.Round, ctx.W, ctx.Step, CommitteeSize,
+		ctx.Committee, ctx.NodeWeights)
+	if err != nil {
+		return err
+	}
+
+	ctx.CurrentCommittee = currentCommittee
+
+	// If we are not in the committee, then don't vote
+	if votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey)); votes == 0 {
+		return nil
+	}
+
+	// Hash our vote set
 	sigSetHash, err := hashSigSetVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
@@ -83,7 +99,7 @@ func committeeVoteSigSet(ctx *Context) error {
 
 	// Create signature set vote message to gossip
 	pl, err := consensusmsg.NewSigSetVote(ctx.BlockHash, ctx.SigSetHash, sigBLS,
-		ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
+		ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
 		return err
 	}
@@ -104,19 +120,19 @@ func committeeVoteSigSet(ctx *Context) error {
 		return err
 	}
 
+	ctx.SigSetVoteChan <- msg
 	return nil
 }
 
 func countVotesSigSet(ctx *Context) error {
+	// Set vote limit
+	voteLimit := uint8(len(ctx.CurrentCommittee))
+
 	// Keep a counter of how many votes have been cast for a specific block
-	counts := make(map[string]uint64)
+	counts := make(map[string]uint8)
 
 	// Keep track of all nodes who have voted
 	voters := make(map[string]bool)
-
-	// Add our own information beforehand
-	voters[hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))] = true
-	counts[hex.EncodeToString(ctx.SigSetHash)] += ctx.Weight
 
 	// Start the timer
 	timer := time.NewTimer(StepTime * (time.Duration(ctx.Multiplier) * time.Second))
@@ -136,7 +152,7 @@ func countVotesSigSet(ctx *Context) error {
 			}
 
 			// Verify the message
-			stake, err := ProcessMsg(ctx, m)
+			votes, err := ProcessMsg(ctx, m)
 			if err != nil {
 				if err.Priority == prerror.High {
 					return err.Err
@@ -146,18 +162,13 @@ func countVotesSigSet(ctx *Context) error {
 				break
 			}
 
-			// If sender hasn't staked, discard
-			if stake == 0 {
-				break
-			}
-
 			// Log information
 			voters[pkEd] = true
 			setStr := hex.EncodeToString(pl.SigSetHash)
-			counts[setStr] += stake
+			counts[setStr] += votes
 
 			// If a set exceeds vote threshold, we will end the loop.
-			if counts[setStr] < ctx.VoteLimit {
+			if counts[setStr] < voteLimit {
 				break
 			}
 

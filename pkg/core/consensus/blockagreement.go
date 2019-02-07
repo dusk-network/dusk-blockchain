@@ -55,7 +55,6 @@ func BlockAgreement(ctx *Context, c chan bool) {
 
 			// Populate certificate
 			ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.BlockVotes))
-			ctx.Certificate.BRSortitionProofs = make([][]byte, len(ctx.BlockVotes))
 			agSig := &bls.Signature{}
 			if err := agSig.Decompress(ctx.BlockVotes[0].Sig); err != nil {
 				// Log
@@ -79,7 +78,6 @@ func BlockAgreement(ctx *Context, c chan bool) {
 
 				agSig.Aggregate(sig)
 				ctx.Certificate.BRPubKeys[i] = vote.PubKey
-				ctx.Certificate.BRSortitionProofs[i] = vote.Score
 			}
 
 			cSig := agSig.Compress()

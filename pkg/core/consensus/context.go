@@ -24,7 +24,7 @@ var (
 	MaxSteps      uint8 = 50
 	StepTime            = 20 * time.Second
 	CandidateTime       = 60 * time.Second
-	committeeSize uint8 = 50
+	CommitteeSize uint8 = 50
 )
 
 // Context will hold all the necessary functions and
@@ -53,9 +53,6 @@ type Context struct {
 	// General
 	Weight      uint64             // Amount this node has staked
 	W           uint64             // Total stake weight of the network
-	Score       []byte             // Sortition score of this node
-	Votes       uint64             // Sortition votes of this node
-	VoteLimit   uint64             // Votes needed to decide on a block
 	Empty       bool               // Whether or not the block being voted on is empty
 	Certificate *block.Certificate // Block certificate to be constructed during consensus
 
@@ -152,9 +149,6 @@ func (c *Context) Reset() {
 	c.Q = 0
 
 	// Provisioner
-	c.Score = nil
-	c.Votes = 0
-	c.VoteLimit = 0
 	c.BlockHash = nil
 	c.Empty = false
 	c.Step = 1

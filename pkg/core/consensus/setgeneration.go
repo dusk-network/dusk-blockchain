@@ -18,7 +18,7 @@ import (
 func SignatureSetGeneration(ctx *Context) error {
 	// Create our own signature set candidate message
 	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes,
-		ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
+		ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
 		return err
 	}
@@ -76,8 +76,7 @@ func SignatureSetGeneration(ctx *Context) error {
 			}
 
 			// Verify the message
-			stake, prErr := ProcessMsg(ctx, m)
-			if prErr != nil {
+			if _, prErr := ProcessMsg(ctx, m); prErr != nil {
 				if prErr.Priority == prerror.High {
 					return prErr.Err
 				}
@@ -94,6 +93,7 @@ func SignatureSetGeneration(ctx *Context) error {
 			}
 
 			ctx.AllVotes[hex.EncodeToString(setHash)] = pl.SignatureSet
+			stake := ctx.NodeWeights[pkEd]
 
 			// If the stake is higher than our current one, replace
 			if stake > highest {

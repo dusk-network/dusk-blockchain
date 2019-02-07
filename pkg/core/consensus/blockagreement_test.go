@@ -22,7 +22,6 @@ func TestBlockAgreement(t *testing.T) {
 
 	// Set basic parameters
 	ctx.Weight = 500
-	ctx.VoteLimit = 20
 
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
