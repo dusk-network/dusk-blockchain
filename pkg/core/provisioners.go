@@ -75,6 +75,9 @@ func (b *Blockchain) AddProvisionerInfo(tx *transactions.Stealth, amount uint64)
 	pkBLS := hex.EncodeToString(info.PubKeyBLS)
 	b.ctx.NodeBLS[pkBLS] = info.PubKeyEd
 	b.ctx.Committee = append(b.ctx.Committee, info.PubKeyEd)
+
+	// Sort committee list
+	b.SortProvisioners()
 }
 
 // UpdateProvisioners will run through all known nodes and check if they have
@@ -115,6 +118,12 @@ func (b *Blockchain) UpdateProvisioners() {
 	}
 
 	// Sort committee list
+	b.SortProvisioners()
+}
+
+// SortProvisioners will sort the Committee slice on the context object
+// lexicographically.
+func (b *Blockchain) SortProvisioners() {
 	sort.SliceStable(b.ctx.Committee, func(i, j int) bool {
 		return bytes.Compare(b.ctx.Committee[i], b.ctx.Committee[j]) < bytes.Compare(b.ctx.Committee[j], b.ctx.Committee[i])
 	})

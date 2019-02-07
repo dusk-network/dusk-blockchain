@@ -43,18 +43,6 @@ func (b *Blockchain) AcceptTx(tx *transactions.Stealth) error {
 
 	b.memPool.AddTx(tx)
 
-	// Update consensus values
-	if b.provisioner {
-		// Update provisioners
-		if tx.Type == transactions.StakeType {
-			pl := tx.TypeInfo.(*transactions.Stake)
-			b.AddProvisionerInfo(tx, pl.Output.Amount)
-			b.totalStakeWeight += pl.Output.Amount
-		}
-	}
-
-	// if b.generator
-
 	// Relay tx
 	return nil
 }
@@ -160,11 +148,18 @@ func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 		return err
 	}
 
-	// Clear out all matching entries in mempool
 	for _, v := range blk.Txs {
+		// Clear out all matching entries in mempool
 		tx := v.(*transactions.Stealth)
 		if b.memPool.Exists(tx.Hex()) {
 			b.memPool.RemoveTx(tx)
+		}
+
+		// Update provisioners
+		if b.provisioner && tx.Type == transactions.StakeType {
+			pl := tx.TypeInfo.(*transactions.Stake)
+			b.AddProvisionerInfo(tx, pl.Output.Amount)
+			b.totalStakeWeight += pl.Output.Amount
 		}
 	}
 
