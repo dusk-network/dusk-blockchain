@@ -452,12 +452,12 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	}
 
 	if protocol.ProtocolVersion != msg.Version {
-		error := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
+		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
 		log.WithField("prefix", "peer").Infof("TODO: Implement backwards compatible Version Management")
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
 		p.Write(rejectMsg)
 
-		return errors.New(error)
+		return errors.New(err)
 	}
 
 	p.versionKnown = true
