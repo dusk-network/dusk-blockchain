@@ -1,9 +1,8 @@
-package consensus_test
+package msg_test
 
 import (
 	"testing"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
@@ -29,7 +28,7 @@ func TestFaultyMsgRound(t *testing.T) {
 
 	// Change our round and verify the message (should fail)
 	ctx.Round++
-	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	retVotes, err2 := msg.Process(ctx, msg)
 	if err2.Priority == prerror.High {
 		t.Fatal(err2)
 	}
@@ -59,7 +58,7 @@ func TestFaultyMsgStep(t *testing.T) {
 
 	// Change our step and verify the message (should fail)
 	ctx.Step++
-	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	retVotes, err2 := msg.Process(ctx, msg)
 	if err2.Priority == prerror.High {
 		t.Fatal(err2)
 	}
@@ -89,7 +88,7 @@ func TestFaultyMsgLastHeader(t *testing.T) {
 
 	// Change our header hash and verify the message (should fail)
 	ctx.LastHeader.Hash = make([]byte, 32)
-	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	retVotes, err2 := msg.Process(ctx, msg)
 	if err2.Priority == prerror.High {
 		t.Fatal(err2)
 	}
@@ -119,7 +118,7 @@ func TestFaultyMsgVersion(t *testing.T) {
 
 	// Change our version and verify the message (should fail)
 	ctx.Version = 20000
-	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	retVotes, err2 := msg.Process(ctx, msg)
 	if err2.Priority == prerror.High {
 		t.Fatal(err2)
 	}
@@ -149,7 +148,7 @@ func TestFaultyMsgSig(t *testing.T) {
 
 	// Change their Ed25519 public key and verify the message (should fail)
 	msg.PubKey = make([]byte, 32)
-	retVotes, err2 := consensus.ProcessMsg(ctx, msg)
+	retVotes, err2 := msg.Process(ctx, msg)
 	if err2.Priority == prerror.High {
 		t.Fatal(err2)
 	}

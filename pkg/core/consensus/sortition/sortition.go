@@ -9,9 +9,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
-// Deterministic will run the deterministic sortition function, which determines
+// CreateCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step.
-func Deterministic(round, totalWeight uint64, step, size uint8,
+func CreateCommittee(round, totalWeight uint64, step, size uint8,
 	committee [][]byte, stakes map[string]uint64) ([][]byte, error) {
 	var currentCommittee [][]byte
 	W := new(big.Int).SetUint64(totalWeight)
@@ -45,7 +45,7 @@ func Deterministic(round, totalWeight uint64, step, size uint8,
 		}
 	}
 
-	return nil, nil
+	return currentCommittee, nil
 }
 
 // Verify will check if a public key is included in a passed committee, and return

@@ -1,20 +1,22 @@
-package consensus
+package collection
 
 import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-// BlockCollection is the function that is ran by provisioners during block generation.
+// Block is the function that is ran by provisioners and generators during block generation.
 // After the function terminates, the context object should hold a block hash that
 // came with the highest score it found during message processing, which should then
 // be voted on in later phases.
-func BlockCollection(ctx *Context) error {
+func Block(ctx *user.Context) error {
 	// Keep track of those who have already propagated their messages
 	senders := make(map[string]bool)
 
@@ -25,7 +27,7 @@ func BlockCollection(ctx *Context) error {
 	ctx.CandidateBlocks = make(map[string]*block.Block)
 
 	// Start the timer
-	timer := time.NewTimer(CandidateTime * (time.Duration(ctx.Multiplier) * time.Second))
+	timer := time.NewTimer(user.CandidateTime * (time.Duration(ctx.Multiplier) * time.Second))
 
 	for {
 		select {
@@ -41,7 +43,7 @@ func BlockCollection(ctx *Context) error {
 			}
 
 			// Verify the message
-			_, err := ProcessMsg(ctx, m)
+			_, err := msg.Process(ctx, m)
 			if err != nil {
 				if err.Priority == prerror.High {
 					return err
@@ -63,7 +65,7 @@ func BlockCollection(ctx *Context) error {
 			}
 
 			// Verify the message
-			_, err := ProcessMsg(ctx, m)
+			_, err := msg.Process(ctx, m)
 			if err != nil {
 				if err.Priority == prerror.High {
 					return err

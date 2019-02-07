@@ -1,4 +1,4 @@
-package consensus_test
+package reduction_test
 
 import (
 	"encoding/hex"

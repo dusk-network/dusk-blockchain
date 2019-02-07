@@ -1,17 +1,19 @@
-package consensus
+package agreement
 
 import (
 	"encoding/hex"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
-// BlockAgreement is the function that runs during the block reduction phase, used
-// to collect vote sets and find a winning block. BlockAgreement will run indefinitely
+// Block is the function that runs during the block reduction phase, used
+// to collect vote sets and find a winning block. Block will run indefinitely
 // until a decision is reached.
-func BlockAgreement(ctx *Context, c chan bool) {
+func Block(ctx *user.Context, c chan bool) {
 	// Make a mapping of steps, pointing to a mapping of an Ed25519 public keys and
 	// vote sets.
 	sets := make(map[uint8]map[string][]*consensusmsg.Vote)
@@ -20,7 +22,7 @@ func BlockAgreement(ctx *Context, c chan bool) {
 		select {
 		case m := <-ctx.SetAgreementChan:
 			// Process received message
-			_, err := ProcessMsg(ctx, m)
+			_, err := msg.Process(ctx, m)
 			if err != nil {
 				if err.Priority == prerror.High {
 					// Log

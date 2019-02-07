@@ -1,4 +1,4 @@
-package consensus_test
+package agreement_test
 
 import (
 	"bytes"
@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -19,14 +21,15 @@ import (
 // completion in this phase. As of right now, the phase is not timed.
 func TestSetAgreement(t *testing.T) {
 	// Create context
-	ctx, err := provisionerContext()
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := user.NewRandKeys()
+	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set basic fields on context
 	ctx.Weight = 500
-
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
@@ -65,7 +68,7 @@ func TestSetAgreement(t *testing.T) {
 	}()
 
 	c := make(chan bool, 1)
-	consensus.SignatureSetAgreement(ctx, c)
+	agreement.SignatureSet(ctx, c)
 
 	q <- true
 
@@ -76,7 +79,10 @@ func TestSetAgreement(t *testing.T) {
 
 // Test for set agreement convenience function
 func TestSendSetAgreement(t *testing.T) {
-	ctx, err := provisionerContext()
+	// Create context
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := user.NewRandKeys()
+	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +104,7 @@ func TestSendSetAgreement(t *testing.T) {
 	// Create a dummy vote set
 	var votes []*consensusmsg.Vote
 	for i := 0; i < 5; i++ {
-		keys, err := consensus.NewRandKeys()
+		keys, err := user.NewRandKeys()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +114,7 @@ func TestSendSetAgreement(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		vote, err := consensusmsg.NewVote(hash, keys.BLSPubKey.Marshal(), sig, sig, 1)
+		vote, err := consensusmsg.NewVote(hash, keys.BLSPubKey.Marshal(), sig, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,7 +125,7 @@ func TestSendSetAgreement(t *testing.T) {
 	ctx.BlockVotes = votes
 
 	// Send the set agreement message with the vote set we just created
-	if err := consensus.SendSetAgreement(ctx, ctx.BlockVotes); err != nil {
+	if err := agreement.SendSet(ctx, ctx.BlockVotes); err != nil {
 		t.Fatal(err)
 	}
 
@@ -131,14 +137,14 @@ func TestSendSetAgreement(t *testing.T) {
 // Convenience function to make a vote set and messages from all voters.
 // It should pass verifications done by the passed context object after the function returns,
 // and all the messages should exceed the vote limit.
-func createVotesAndMsgs(ctx *consensus.Context, amount int) ([]*consensusmsg.Vote,
+func createVotesAndMsgs(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 	[]*payload.MsgConsensus, error) {
 	var voteSet []*consensusmsg.Vote
-	var ctxs []*consensus.Context
+	var ctxs []*user.Context
 
 	// Make two votes per node
 	for i := 0; i < amount; i++ {
-		keys, err := consensus.NewRandKeys()
+		keys, err := user.NewRandKeys()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -150,7 +156,7 @@ func createVotesAndMsgs(ctx *consensus.Context, amount int) ([]*consensusmsg.Vot
 		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
 
 		// Make dummy context for score creation
-		c, err := consensus.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
+		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -158,26 +164,6 @@ func createVotesAndMsgs(ctx *consensus.Context, amount int) ([]*consensusmsg.Vot
 		c.LastHeader = ctx.LastHeader
 		c.Weight = 500
 		c.BlockHash = ctx.BlockHash
-
-		// Run sortition
-		role := &sortition.Role{
-			Part:  "committee",
-			Round: ctx.Round,
-			Step:  ctx.Step,
-		}
-
-		score, err := sortition.CalcScore(c.Seed, c.Keys.BLSSecretKey, c.Keys.BLSPubKey, role)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		c.Score = score
-		votes, err := sortition.Prove(c.Score, c.Threshold, c.Weight, c.W)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		c.Votes = votes
 
 		// Create vote signatures
 		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
@@ -192,13 +178,13 @@ func createVotesAndMsgs(ctx *consensus.Context, amount int) ([]*consensusmsg.Vot
 
 		// Create two votes and add them to the array
 		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
-			c.Score, ctx.Step)
+			ctx.Step)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
-			c.Score, ctx.Step-1)
+			ctx.Step-1)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -219,7 +205,7 @@ func createVotesAndMsgs(ctx *consensus.Context, amount int) ([]*consensusmsg.Vot
 			return nil, nil, err
 		}
 
-		sigEd, err := consensus.CreateSignature(c, pl)
+		sigEd, err := msg.CreateSignature(c, pl)
 		if err != nil {
 			return nil, nil, err
 		}

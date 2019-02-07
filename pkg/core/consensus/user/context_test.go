@@ -1,11 +1,11 @@
-package consensus_test
+package user_test
 
 import (
 	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
@@ -14,10 +14,10 @@ func TestNewGeneratorContext(t *testing.T) {
 
 	tau := rand.Uint64()
 
-	keys, err := consensus.NewRandKeys()
+	keys, err := user.NewRandKeys()
 	assert.Equal(t, err, nil)
 
-	ctx, err := consensus.NewContext(tau, 0, 0, 150000, nil, protocol.TestNet, keys)
+	ctx, err := user.NewContext(tau, 0, 0, 150000, nil, protocol.TestNet, keys)
 	assert.NotEqual(t, ctx, nil)
 	assert.Equal(t, err, nil)
 
@@ -28,10 +28,10 @@ func TestReset(t *testing.T) {
 
 	tau := rand.Uint64()
 
-	keys, err := consensus.NewRandKeys()
+	keys, err := user.NewRandKeys()
 	assert.Equal(t, err, nil)
 
-	ctx, err := consensus.NewContext(tau, 0, 0, 150000, nil, protocol.TestNet, keys)
+	ctx, err := user.NewContext(tau, 0, 0, 150000, nil, protocol.TestNet, keys)
 
 	// check consensus values were resetted
 	assert.Nil(t, ctx.X, nil, nil)
@@ -44,12 +44,12 @@ func TestReset(t *testing.T) {
 }
 
 // Convenience function for provisioner tests
-func provisionerContext() (*consensus.Context, error) {
+func provisionerContext() (*user.Context, error) {
 	seed, _ := crypto.RandEntropy(32)
-	keys, _ := consensus.NewRandKeys()
+	keys, _ := user.NewRandKeys()
 	totalWeight := uint64(500000)
 	round := uint64(150000)
-	ctx, err := consensus.NewContext(0, 0, totalWeight, round, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, totalWeight, round, seed, protocol.TestNet, keys)
 	if err != nil {
 		return nil, err
 	}

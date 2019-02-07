@@ -1,8 +1,10 @@
-package consensus
+package agreement
 
 import (
 	"encoding/hex"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -10,9 +12,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-// SignatureSetAgreement is the function that runs during the signature set reduction
-// phase, usednto collect vote sets and find a winning signature set.
-func SignatureSetAgreement(ctx *Context, c chan bool) {
+// SignatureSet is the function that runs during the signature set reduction
+// phase, used to collect vote sets and find a winning signature set.
+func SignatureSet(ctx *user.Context, c chan bool) {
 	// Make a mapping of steps, pointing to a mapping of an Ed25519 public keys and
 	// vote sets.
 	sets := make(map[uint8]map[string][]*consensusmsg.Vote)
@@ -23,7 +25,7 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 			pl := m.Payload.(*consensusmsg.SetAgreement)
 
 			// Process received message
-			_, err := ProcessMsg(ctx, m)
+			_, err := msg.Process(ctx, m)
 			if err != nil {
 				if err.Priority == prerror.High {
 					// Log
@@ -85,15 +87,15 @@ func SignatureSetAgreement(ctx *Context, c chan bool) {
 	}
 }
 
-// SendSetAgreement will send out a set agreement message with the passed vote set.
-func SendSetAgreement(ctx *Context, votes []*consensusmsg.Vote) error {
+// SendSet will send out a set agreement message with the passed vote set.
+func SendSet(ctx *user.Context, votes []*consensusmsg.Vote) error {
 	// Create payload, signature and message
 	pl, err := consensusmsg.NewSetAgreement(ctx.BlockHash, votes)
 	if err != nil {
 		return err
 	}
 
-	sigEd, err := CreateSignature(ctx, pl)
+	sigEd, err := msg.CreateSignature(ctx, pl)
 	if err != nil {
 		return err
 	}

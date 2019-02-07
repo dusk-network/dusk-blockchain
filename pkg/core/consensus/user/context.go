@@ -1,4 +1,4 @@
-package consensus
+package user
 
 import (
 	"errors"
@@ -50,29 +50,28 @@ type Context struct {
 	Q          uint64
 
 	// Provisioner values
-	// General
+	/// General
 	Weight      uint64             // Amount this node has staked
 	W           uint64             // Total stake weight of the network
-	Empty       bool               // Whether or not the block being voted on is empty
 	Certificate *block.Certificate // Block certificate to be constructed during consensus
 
-	// Block fields
+	/// Block fields
 	CandidateBlocks map[string]*block.Block // Blocks kept from candidate collection, mapped to their hashes
 	BlockHash       []byte                  // Block hash currently being voted on by this node
 	BlockVotes      []*consensusmsg.Vote    // Vote set for block set agreement phase
 
-	// Signature set fields
+	/// Signature set fields
 	AllVotes    map[string][]*consensusmsg.Vote // Mapping of hashes to vote sets received during signature set generation
 	SigSetVotes []*consensusmsg.Vote            // Vote set for signature set agreement phase
 	SigSetHash  []byte                          // Hash of the signature vote set being voted on
 
-	// Tracking fields
+	/// Tracking fields
 	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
 	CurrentCommittee [][]byte          // Set of public keys of committee members for a current step
 	NodeWeights      map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
 	NodeBLS          map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
 
-	// Message channels
+	/// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
 	CandidateChan       chan *payload.MsgConsensus
 	ReductionChan       chan *payload.MsgConsensus
@@ -150,7 +149,6 @@ func (c *Context) Reset() {
 
 	// Provisioner
 	c.BlockHash = nil
-	c.Empty = false
 	c.Step = 1
 	c.Certificate = &block.Certificate{}
 	c.CandidateBlocks = make(map[string]*block.Block)
@@ -158,7 +156,6 @@ func (c *Context) Reset() {
 	c.BlockVotes = nil
 	c.SigSetHash = nil
 	c.SigSetVotes = nil
-	c.Multiplier = 1
 }
 
 // Clear will remove all values created during consensus

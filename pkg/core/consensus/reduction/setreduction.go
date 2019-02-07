@@ -1,11 +1,15 @@
-package consensus
+package reduction
 
 import (
 	"bytes"
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -13,8 +17,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
-// SignatureSetReduction is the signature set reduction phase of the consensus.
-func SignatureSetReduction(ctx *Context) error {
+// SignatureSet is the signature set reduction phase of the consensus.
+func SignatureSet(ctx *user.Context) error {
 	// Set up a fallback value
 	fallback := make([]byte, 32)
 
@@ -59,16 +63,16 @@ func SignatureSetReduction(ctx *Context) error {
 
 	// If we got a result, populate certificate, send message to
 	// set agreement and terminate
-	if err := SendSetAgreement(ctx, ctx.SigSetVotes); err != nil {
+	if err := agreement.SendSet(ctx, ctx.SigSetVotes); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func committeeVoteSigSet(ctx *Context) error {
+func committeeVoteSigSet(ctx *user.Context) error {
 	// Set committee first
-	currentCommittee, err := sortition.Deterministic(ctx.Round, ctx.W, ctx.Step, CommitteeSize,
+	currentCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, user.CommitteeSize,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return err
@@ -82,7 +86,7 @@ func committeeVoteSigSet(ctx *Context) error {
 	}
 
 	// Hash our vote set
-	sigSetHash, err := hashSigSetVotes(ctx.SigSetVotes)
+	sigSetHash, err := msg.HashVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}
@@ -104,7 +108,7 @@ func committeeVoteSigSet(ctx *Context) error {
 		return err
 	}
 
-	sigEd, err := CreateSignature(ctx, pl)
+	sigEd, err := msg.CreateSignature(ctx, pl)
 	if err != nil {
 		return err
 	}
@@ -124,7 +128,7 @@ func committeeVoteSigSet(ctx *Context) error {
 	return nil
 }
 
-func countVotesSigSet(ctx *Context) error {
+func countVotesSigSet(ctx *user.Context) error {
 	// Set vote limit
 	voteLimit := uint8(len(ctx.CurrentCommittee))
 
@@ -135,7 +139,7 @@ func countVotesSigSet(ctx *Context) error {
 	voters := make(map[string]bool)
 
 	// Start the timer
-	timer := time.NewTimer(StepTime * (time.Duration(ctx.Multiplier) * time.Second))
+	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier) * time.Second))
 
 	for {
 		select {
@@ -152,7 +156,7 @@ func countVotesSigSet(ctx *Context) error {
 			}
 
 			// Verify the message
-			votes, err := ProcessMsg(ctx, m)
+			votes, err := msg.Process(ctx, m)
 			if err != nil {
 				if err.Priority == prerror.High {
 					return err.Err

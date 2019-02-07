@@ -1,4 +1,4 @@
-package consensus
+package msg
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
@@ -15,8 +17,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-// ProcessMsg is a top-level message processing function for the consensus.
-func ProcessMsg(ctx *Context, msg *payload.MsgConsensus) (uint8, *prerror.PrError) {
+// Process is a top-level message processing function for the consensus.
+func Process(ctx *user.Context, msg *payload.MsgConsensus) (uint8, *prerror.PrError) {
 	// Verify Ed25519 signature
 	edMsg := new(bytes.Buffer)
 	if err := msg.EncodeSignable(edMsg); err != nil {
@@ -54,7 +56,7 @@ func ProcessMsg(ctx *Context, msg *payload.MsgConsensus) (uint8, *prerror.PrErro
 
 // Lower-level message processing function. This function determines the payload type,
 // and applies the proper verification functions.
-func verifyPayload(ctx *Context, msg *payload.MsgConsensus) *prerror.PrError {
+func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateScoreID:
 		// TODO: add actual verification code for score messages
@@ -109,12 +111,12 @@ func verifyPayload(ctx *Context, msg *payload.MsgConsensus) *prerror.PrError {
 	}
 }
 
-func verifyBLSKey(ctx *Context, pubKeyEd, pubKeyBls []byte) bool {
+func verifyBLSKey(ctx *user.Context, pubKeyEd, pubKeyBls []byte) bool {
 	pk := hex.EncodeToString(pubKeyBls)
 	return bytes.Equal(ctx.NodeBLS[pk], pubKeyEd)
 }
 
-func verifyReduction(ctx *Context, pl *consensusmsg.Reduction) *prerror.PrError {
+func verifyReduction(ctx *user.Context, pl *consensusmsg.Reduction) *prerror.PrError {
 	// Make sure they voted on an existing block
 	blockHash := hex.EncodeToString(pl.BlockHash)
 	if ctx.CandidateBlocks[blockHash] == nil {
@@ -124,7 +126,7 @@ func verifyReduction(ctx *Context, pl *consensusmsg.Reduction) *prerror.PrError 
 	return nil
 }
 
-func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step uint8) *prerror.PrError {
+func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte, step uint8) *prerror.PrError {
 	// A set should be of appropriate length, at least 2*0.75*len(committee)
 	limit := 2.0 * 0.75 * float64(len(ctx.CurrentCommittee))
 	if len(voteSet) < int(limit) {
@@ -132,7 +134,7 @@ func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step
 	}
 
 	// Create committee from previous step
-	prevCommittee, err := sortition.Deterministic(ctx.Round, ctx.W, ctx.Step-1, uint8(len(ctx.CurrentCommittee)),
+	prevCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step-1, uint8(len(ctx.CurrentCommittee)),
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return prerror.New(prerror.High, err)
@@ -171,7 +173,7 @@ func verifyVoteSet(ctx *Context, voteSet []*consensusmsg.Vote, hash []byte, step
 	return nil
 }
 
-func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, step uint8) *prerror.PrError {
+func verifySigSetCandidate(ctx *user.Context, pl *consensusmsg.SigSetCandidate, step uint8) *prerror.PrError {
 	// We discard any deviating block hashes after the block reduction phase
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return prerror.New(prerror.Low, errors.New("wrong block hash"))
@@ -180,7 +182,7 @@ func verifySigSetCandidate(ctx *Context, pl *consensusmsg.SigSetCandidate, step 
 	return verifyVoteSet(ctx, pl.SignatureSet, pl.WinningBlockHash, step)
 }
 
-func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote) *prerror.PrError {
+func verifySigSetVote(ctx *user.Context, pl *consensusmsg.SigSetVote) *prerror.PrError {
 	// We discard any deviating block hashes after the block reduction phase
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return prerror.New(prerror.Low, errors.New("wrong block hash"))
@@ -202,7 +204,7 @@ func verifySigSetVote(ctx *Context, pl *consensusmsg.SigSetVote) *prerror.PrErro
 
 // CreateSignature will return the byte representation of a consensus message that
 // is signed with Ed25519.
-func CreateSignature(ctx *Context, pl consensusmsg.Msg) ([]byte, error) {
+func CreateSignature(ctx *user.Context, pl consensusmsg.Msg) ([]byte, error) {
 	edMsg := make([]byte, 12)
 	binary.LittleEndian.PutUint32(edMsg[0:], ctx.Version)
 	binary.LittleEndian.PutUint64(edMsg[4:], ctx.Round)
@@ -216,4 +218,23 @@ func CreateSignature(ctx *Context, pl consensusmsg.Msg) ([]byte, error) {
 
 	edMsg = append(edMsg, buf.Bytes()...)
 	return ctx.EDSign(ctx.Keys.EdSecretKey, edMsg), nil
+}
+
+// HashVotes returns the hash of the passed vote set
+func HashVotes(votes []*consensusmsg.Vote) ([]byte, error) {
+	// Encode signature set
+	buf := new(bytes.Buffer)
+	for _, vote := range votes {
+		if err := vote.Encode(buf); err != nil {
+			return nil, err
+		}
+	}
+
+	// Hash bytes and set it on context
+	sigSetHash, err := hash.Sha3256(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return sigSetHash, nil
 }

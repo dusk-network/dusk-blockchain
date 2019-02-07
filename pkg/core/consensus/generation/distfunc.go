@@ -1,4 +1,4 @@
-package consensus
+package generation
 
 import (
 	"errors"
@@ -9,8 +9,8 @@ import (
 
 // distfunc is the function used to generate the score using sigma distribution
 
-// GenerateScore generates the score Q, for the block generation hase
-func GenerateScore(d uint64, Y []byte) (uint64, error) {
+// Score generates the score Q, for the block generation hase
+func Score(d uint64, Y []byte) (uint64, error) {
 
 	if len(Y) != 32 {
 		return 0, errors.New("Y is not 256 bits (32 bytes) in length")

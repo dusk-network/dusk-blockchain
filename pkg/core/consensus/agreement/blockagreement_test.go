@@ -1,12 +1,16 @@
-package consensus_test
+package agreement_test
 
 import (
 	"bytes"
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
@@ -15,14 +19,15 @@ import (
 // completion in this phase. As of right now, the phase is not timed.
 func TestBlockAgreement(t *testing.T) {
 	// Create context
-	ctx, err := provisionerContext()
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := user.NewRandKeys()
+	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set basic parameters
 	ctx.Weight = 500
-
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
@@ -61,7 +66,7 @@ func TestBlockAgreement(t *testing.T) {
 	}()
 
 	c := make(chan bool, 1)
-	consensus.BlockAgreement(ctx, c)
+	agreement.Block(ctx, c)
 
 	q <- true
 
