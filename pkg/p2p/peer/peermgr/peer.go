@@ -448,12 +448,12 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	if msg.Nonce == p.Nonce {
 		log.WithField("prefix", "peer").Infof("Received '%s' message from yourself", commands.Version)
 		p.conn.Close()
-		return errors.New("Self connection, disconnecting Peer")
+		return errors.New("Self connection, peer disconnected")
 	}
 
 	if protocol.ProtocolVersion != msg.Version {
 		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
-		log.WithField("prefix", "peer").Infof("TODO: Implement backwards compatible Version Management")
+		log.WithField("prefix", "peer").Infof("Incompatible protocol version")
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
 		p.Write(rejectMsg)
 
