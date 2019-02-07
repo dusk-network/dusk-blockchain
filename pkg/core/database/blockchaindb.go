@@ -2,8 +2,9 @@ package database
 
 import (
 	"bytes"
+
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
@@ -42,7 +43,7 @@ func NewBlockchainDB(path string) (*BlockchainDB, error) {
 }
 
 // WriteHeaders writes a batch of block headers to the database
-func (bdb *BlockchainDB) WriteHeaders(hdrs []*payload.BlockHeader) error {
+func (bdb *BlockchainDB) WriteHeaders(hdrs []*block.Header) error {
 	sortedHdrs := util.SortHeadersByHeight(hdrs)
 
 	// batchValues will consist of a header and blockheight record for each header in hdrs, plus one for the latest header
@@ -81,7 +82,7 @@ func (bdb *BlockchainDB) WriteHeaders(hdrs []*payload.BlockHeader) error {
 
 // WriteBlockTransactions writes blocks to the database.
 // A block transaction is linked to the header by the header hash in the transaction key
-func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*payload.Block) error {
+func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*block.Block) error {
 	// batchValues will consist of a tx and index record for each tx in a block
 	kv := make(batchValues, len(blocks)*2)
 
@@ -98,7 +99,7 @@ func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*payload.Block) error {
 			// This is the main mapping
 			// Key: [TX] + TXHASH
 			txBytes := buf.Bytes()
-			txKey := append(TX, tx.Hash...)
+			txKey := append(TX, tx.R...)
 			kv[string(txKey)] = txBytes
 
 			// This is the index
@@ -107,7 +108,7 @@ func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*payload.Block) error {
 			txHashKey := append(append(TX, b.Header.Hash...))
 			txHashKey = append(txHashKey, Uint32ToBytes(uint32(j))...)
 
-			kv[string(txHashKey)] = tx.Hash
+			kv[string(txHashKey)] = tx.R
 		}
 	}
 
@@ -124,7 +125,7 @@ func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*payload.Block) error {
 // ReadHeaders reads all block headers from the block chain db between start and stop hashes (start excluded, stop included)
 // Although we do not return the block transactions yet, we must assure that they are there.
 // If a header has no accompanying block, the reading is stopped and previously found headers are sent.
-func (bdb *BlockchainDB) ReadHeaders(start []byte, stop []byte) ([]*payload.BlockHeader, error) {
+func (bdb *BlockchainDB) ReadHeaders(start []byte, stop []byte) ([]*block.Header, error) {
 	var startHeight, stopHeight = uint64(0), uint64(0)
 
 	hdr, err := bdb.getBlockHeader(start)

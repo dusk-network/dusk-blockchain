@@ -14,7 +14,7 @@ func TestWriteReadMessage(t *testing.T) {
 	addr1 := payload.NewNetAddress("202.108.250.180", 9999)
 	addr2 := payload.NewNetAddress("224.164.2.18", 9999)
 
-	msg := payload.NewMsgVersion(protocol.ProtocolVersion, rand.Uint64(), addr1, addr2)
+	msg := payload.NewMsgVersion(protocol.ProtocolVersion, addr1, addr2, rand.Uint64())
 	buf := new(bytes.Buffer)
 	if err := WriteMessage(buf, protocol.MainNet, msg); err != nil {
 		t.Fatal(err)

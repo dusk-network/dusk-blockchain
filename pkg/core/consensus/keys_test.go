@@ -1,15 +1,16 @@
-package consensus
+package consensus_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 )
 
 func TestNewKeys(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
-		keys, err := NewRandKeys()
+		keys, err := consensus.NewRandKeys()
 		assert.Equal(t, nil, err)
 		assert.NotEqual(t, nil, keys)
 		assert.NotEqual(t, nil, keys.BLSPubKey)
@@ -21,7 +22,7 @@ func TestNewKeys(t *testing.T) {
 }
 func TestClear(t *testing.T) {
 
-	keys, err := NewRandKeys()
+	keys, err := consensus.NewRandKeys()
 	assert.Equal(t, nil, err)
 	assert.NotEqual(t, nil, keys)
 	assert.NotEqual(t, nil, keys.BLSPubKey)

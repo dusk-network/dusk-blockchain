@@ -1,4 +1,4 @@
-package payload
+package payload_test
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
 func TestMsgGetHeadersEncodeDecode(t *testing.T) {
@@ -19,13 +20,13 @@ func TestMsgGetHeadersEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg := NewMsgGetHeaders(locator, stop)
+	msg := payload.NewMsgGetHeaders(locator, stop)
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2 := &MsgGetHeaders{}
+	msg2 := &payload.MsgGetHeaders{}
 	if err := msg2.Decode(buf); err != nil {
 		t.Fatal(err)
 	}

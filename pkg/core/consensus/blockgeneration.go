@@ -5,6 +5,9 @@ import (
 	"errors"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -14,80 +17,100 @@ import (
 
 // GenerateBlock will generate a blockMsg and ScoreMsg
 // if node is eligible.
-func GenerateBlock(ctx *Context, k []byte) (*payload.MsgScore, *payload.MsgBlock, error) {
-
+func GenerateBlock(ctx *Context) error {
 	err := generateParams(ctx)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	// check threshold (eligibility)
 	if ctx.Q <= ctx.Tau {
-		return nil, nil, errors.New("Score is less than tau (threshold)")
+		return errors.New("Score is less than tau (threshold)")
 	}
 
 	// Generate ZkProof and Serialise
 	// XXX: Prove may return error, so chaining like this may not be possible once zk implemented
-	zkBytes, err := zkproof.Prove(ctx.X, ctx.Y, ctx.Z, ctx.M, ctx.k, ctx.Q, ctx.d).Bytes()
+	zkBytes, err := zkproof.Prove(ctx.X, ctx.Y, ctx.Z, ctx.M, ctx.K, ctx.Q, ctx.D).Bytes()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
+
+	// Seed is the candidate signature of the previous seed
+	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.LastHeader.Seed)
+	if err != nil {
+		return err
+	}
+
+	ctx.Seed = seed
 
 	// Generate candidate block
 	candidateBlock, err := newCandidateBlock(ctx)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	// Sign msg score content with Ed25519
-	buf := make([]byte, 0, 40)
-	binary.LittleEndian.PutUint64(buf, ctx.Q)
-	buf = append(buf, zkBytes...)
-	buf = append(buf, candidateBlock.Header.Hash...)
-	buf = append(buf, ctx.GetLastHeader().Seed...)
-
-	sig, err := ctx.EDSign(ctx.Keys.EdSecretKey, buf)
-	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	// Create score msg
-	msgScore, err := payload.NewMsgScore(
+	pl, err := consensusmsg.NewCandidateScore(
 		ctx.Q,                      // score
 		zkBytes,                    // zkproof
 		candidateBlock.Header.Hash, // candidateHash
-		sig,                        // sig
-		[]byte(*ctx.Keys.EdPubKey), // pubKey
 		ctx.Seed,                   // seed for this round // XXX(TOG): could we use round number/Block height?
 	)
+	if err != nil {
+		return err
+	}
 
-	// Create block msg
-	msgBlock := payload.NewMsgBlock(candidateBlock)
+	sigEd, err := CreateSignature(ctx, pl)
+	if err != nil {
+		return err
+	}
 
-	return msgScore, msgBlock, nil
+	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.SendMessage(ctx.Magic, msgScore); err != nil {
+		return err
+	}
+
+	// Create candidate msg
+	pl2 := consensusmsg.NewCandidate(candidateBlock)
+	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl2)
+	if err != nil {
+		return err
+	}
+
+	if err := ctx.SendMessage(ctx.Magic, msgCandidate); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // generate M, X, Y, Z, Q
 func generateParams(ctx *Context) error {
 	// XXX: generating X, Y, Z in this way is in-efficient. Passing the parameters in directly from previous computation is better.
 	// Wait until, specs for this has been semi-finalised
-	M, err := generateM(ctx.k)
+	M, err := GenerateM(ctx.K)
 	if err != nil {
 		return err
 	}
-	X, err := generateX(ctx.d, ctx.k)
+	X, err := GenerateX(ctx.D, ctx.K)
 	if err != nil {
 		return err
 	}
-	Y, err := generateY(ctx.d, ctx.GetLastHeader().Seed, ctx.k)
+	Y, err := GenerateY(ctx.D, ctx.LastHeader.Seed, ctx.K)
 	if err != nil {
 		return err
 	}
-	Z, err := generateZ(ctx.GetLastHeader().Seed, ctx.k)
+	Z, err := generateZ(ctx.LastHeader.Seed, ctx.K)
 	if err != nil {
 		return err
 	}
-	Q, err := GenerateScore(ctx.d, Y)
+	Q, err := GenerateScore(ctx.D, Y)
 	if err != nil {
 		return err
 	}
@@ -102,8 +125,8 @@ func generateParams(ctx *Context) error {
 
 }
 
-// M = H(k)
-func generateM(k []byte) ([]byte, error) {
+// GenerateM will return M so that M = H(k)
+func GenerateM(k []byte) ([]byte, error) {
 	M, err := hash.Sha3256(k)
 	if err != nil {
 		return nil, err
@@ -112,10 +135,10 @@ func generateM(k []byte) ([]byte, error) {
 	return M, nil
 }
 
-// X = H(d, M)
-func generateX(d uint64, k []byte) ([]byte, error) {
+// GenerateX will return X so that X = H(d, M)
+func GenerateX(d uint64, k []byte) ([]byte, error) {
 
-	M, err := generateM(k)
+	M, err := GenerateM(k)
 
 	dM := make([]byte, 8, 40)
 
@@ -131,10 +154,10 @@ func generateX(d uint64, k []byte) ([]byte, error) {
 	return X, nil
 }
 
-// Y = H(S, X)
-func generateY(d uint64, S, k []byte) ([]byte, error) {
+// GenerateY will return Y so that Y = H(S, X)
+func GenerateY(d uint64, S, k []byte) ([]byte, error) {
 
-	X, err := generateX(d, k)
+	X, err := GenerateX(d, k)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +177,7 @@ func generateY(d uint64, S, k []byte) ([]byte, error) {
 // Z = H(S, M)
 func generateZ(S, k []byte) ([]byte, error) {
 
-	M, err := generateM(k)
+	M, err := GenerateM(k)
 
 	SM := make([]byte, 0, 64) // M = 32 , prevSeed = 32
 	SM = append(SM, S...)
@@ -168,27 +191,15 @@ func generateZ(S, k []byte) ([]byte, error) {
 	return Z, nil
 }
 
-func newCandidateBlock(ctx *Context) (*payload.Block, error) {
+func newCandidateBlock(ctx *Context) (*block.Block, error) {
 
-	candidateBlock := payload.NewBlock()
+	candidateBlock := block.NewBlock()
 
-	err := candidateBlock.SetPrevBlock(ctx.GetLastHeader())
-	if err != nil {
-		return nil, err
-	}
+	candidateBlock.SetPrevBlock(ctx.LastHeader)
 
-	// Seed is the candidate signature of the previous seed
-	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.GetLastHeader().Seed)
-	if err != nil {
-		return nil, err
-	}
-
-	err = candidateBlock.SetSeed(seed)
-	if err != nil {
-		return nil, err
-	}
-
-	candidateBlock.SetTime(time.Now().Unix())
+	candidateBlock.Header.Seed = ctx.Seed
+	candidateBlock.Header.Height = ctx.Round
+	candidateBlock.Header.Timestamp = time.Now().Unix()
 
 	// XXX: Generate coinbase/reward beforehand
 	// Coinbase is still not decided
@@ -196,7 +207,7 @@ func newCandidateBlock(ctx *Context) (*payload.Block, error) {
 	for _, tx := range txs {
 		candidateBlock.AddTx(tx)
 	}
-	err = candidateBlock.SetRoot()
+	err := candidateBlock.SetRoot()
 	if err != nil {
 		return nil, err
 	}

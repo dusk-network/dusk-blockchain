@@ -2,17 +2,18 @@ package database_test
 
 import (
 	"bytes"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 	"io/ioutil"
 	"testing"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
@@ -27,7 +28,7 @@ func TestAddHeader(t *testing.T) {
 	blocks, _ := createBlockFixtures(1, 0)
 	header := blocks[0].Header
 
-	db.WriteHeaders([]*payload.BlockHeader{header})
+	db.WriteHeaders([]*block.Header{header})
 	assert.NotEqual(t, nil, db)
 
 	heightBytes := database.Uint64ToBytes(header.Height)
@@ -55,7 +56,7 @@ func TestAddHeaders(t *testing.T) {
 
 	blocks, _ := createBlockFixtures(5, 0)
 
-	hdrs := make([]*payload.BlockHeader, len(blocks))
+	hdrs := make([]*block.Header, len(blocks))
 	for i, block := range blocks {
 		hdrs[i] = block.Header
 	}
@@ -104,7 +105,7 @@ func TestAddBlockTransactions(t *testing.T) {
 			tx.Encode(buf)
 			txBytes := buf.Bytes()
 
-			txKey := append(database.TX, tx.Hash...)
+			txKey := append(database.TX, tx.R...)
 			dbTxBytes, _ := db.Get(txKey)
 
 			txHashKey := append(database.TX, b.Header.Hash...)
@@ -112,13 +113,13 @@ func TestAddBlockTransactions(t *testing.T) {
 			dbTxHash, _ := db.Get(txHashKey)
 
 			assert.Equal(t, txBytes, dbTxBytes)
-			assert.Equal(t, tx.Hash, dbTxHash)
+			assert.Equal(t, tx.R, dbTxHash)
 		}
 	}
 }
 
-func createBlockFixtures(totalBlocks, totalTxs int) ([]*payload.Block, error) {
-	blocks := make([]*payload.Block, totalBlocks)
+func createBlockFixtures(totalBlocks, totalTxs int) ([]*block.Block, error) {
+	blocks := make([]*block.Block, totalBlocks)
 	time := time.Now().Unix()
 	// Spoof previous hash and seed
 	prevBlock, _ := crypto.RandEntropy(32)
@@ -127,11 +128,22 @@ func createBlockFixtures(totalBlocks, totalTxs int) ([]*payload.Block, error) {
 	certImage, _ := crypto.RandEntropy(32)
 
 	for i := 0; i < totalBlocks; i++ {
-		h := &payload.BlockHeader{uint64(i), time, prevBlock, seed, txRoot, nil, certImage}
+		h := &block.Header{
+			Height:    uint64(i),
+			Timestamp: time,
+			PrevBlock: prevBlock,
+			Seed:      seed,
+			TxRoot:    txRoot,
+			Hash:      nil,
+			CertHash:  certImage,
+		}
 		h.SetHash()
 		// Create random Txs
 		txs := createRandomTxFixtures(totalTxs)
-		blocks[i] = &payload.Block{h, txs}
+		blocks[i] = &block.Block{
+			Header: h,
+			Txs:    txs,
+		}
 	}
 
 	return blocks, nil
@@ -147,11 +159,10 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		in := transactions.NewInput(key, txID, 1, sig)
 		dest, _ := crypto.RandEntropy(32)
 		out := transactions.NewOutput(200, dest, sig)
-		txPubKey, _ := crypto.RandEntropy(32)
-		s := transactions.NewTX()
-		s.AddInput(in)
-		s.AddOutput(out)
-		s.AddTxPubKey(txPubKey)
+		pl := transactions.NewStandard(100)
+		s := transactions.NewTX(transactions.StandardType, nil)
+		pl.AddInput(in)
+		pl.AddOutput(out)
 		s.SetHash()
 		txs[i] = s
 	}

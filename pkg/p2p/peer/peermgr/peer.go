@@ -7,9 +7,6 @@ package peermgr
 import (
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -17,10 +14,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
@@ -56,29 +56,6 @@ var (
 	receivedMessageFromStr = "Received a '%s' message from %s"
 )
 
-// ResponseHandler holds all response handlers related to response meesages from an external peer
-type ResponseHandler struct {
-	OnHeaders        func(*Peer, *payload.MsgHeaders)
-	OnNotFound       func(*Peer, *payload.MsgNotFound)
-	OnGetData        func(*Peer, *payload.MsgGetData)
-	OnTx             func(*Peer, *payload.MsgTx)
-	OnGetHeaders     func(*Peer, *payload.MsgGetHeaders)
-	OnAddr           func(*Peer, *payload.MsgAddr)
-	OnGetAddr        func(*Peer, *payload.MsgGetAddr)
-	OnGetBlocks      func(*Peer, *payload.MsgGetBlocks)
-	OnBlock          func(*Peer, *payload.MsgBlock)
-	OnBinary         func(*Peer, *payload.MsgBinary)
-	OnCertificate    func(*Peer, *payload.MsgCertificate)
-	OnCertificateReq func(*Peer, *payload.MsgCertificateReq)
-	OnMemPool        func(*Peer, *payload.MsgMemPool)
-	OnPing           func(*Peer, *payload.MsgPing)
-	OnPong           func(*Peer, *payload.MsgPong)
-	OnReduction      func(*Peer, *payload.MsgReduction)
-	OnReject         func(*Peer, *payload.MsgReject)
-	OnScore          func(*Peer, *payload.MsgScore)
-	OnInv            func(*Peer, *payload.MsgInv)
-}
-
 // Peer holds all configuration and state to be able to communicate with other peers.
 // Every Peer has a Detector that keeps track of pending messages that require a synchronous response.
 type Peer struct {
@@ -95,7 +72,7 @@ type Peer struct {
 	net  protocol.Magic
 	conn net.Conn
 
-	hndlr ResponseHandler
+	cfg *Config
 
 	// Atomic vals
 	disconnected int32
@@ -113,25 +90,21 @@ type Peer struct {
 
 // NewPeer is called after a connection to a peer was successful.
 // Inbound as well as Outbound.
-func NewPeer(conn net.Conn, inbound bool, respHndlr ResponseHandler) *Peer {
-	p := Peer{}
-	p.Nonce = rand.Uint64()
-	p.hndlr = respHndlr
-	p.inch = make(chan func(), inputBufferSize)
-	p.outch = make(chan func(), outputBufferSize)
-	p.quitch = make(chan struct{}, 1)
-	p.inbound = inbound
-	p.addr = conn.RemoteAddr().String()
+func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
+	p := &Peer{
+		Nonce:     cfg.Nonce,
+		inch:      make(chan func(), inputBufferSize),
+		outch:     make(chan func(), outputBufferSize),
+		quitch:    make(chan struct{}, 1),
+		inbound:   inbound,
+		conn:      conn,
+		addr:      conn.RemoteAddr().String(),
+		net:       cfg.Magic,
+		createdAt: time.Now(),
+		Detector:  stall.NewDetector(responseTime, tickerInterval),
+	}
 
-	// TODO: Shouldn't this be sent by remote peer
-	p.net = protocol.Magic(uint32(config.EnvNetCfg.Magic))
-
-	p.conn = conn
-	p.createdAt = time.Now()
-
-	p.Detector = stall.NewDetector(responseTime, tickerInterval)
-
-	return &p
+	return p
 }
 
 // Write to a peer
@@ -375,8 +348,8 @@ func (p *Peer) WriteLoop() {
 func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetData, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetData != nil {
-			p.hndlr.OnGetData(p, msg)
+		if p.cfg.Handler.OnGetData != nil {
+			p.cfg.Handler.OnGetData(p, msg)
 		}
 	}
 }
@@ -385,8 +358,8 @@ func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 func (p *Peer) OnTx(msg *payload.MsgTx) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Tx, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnTx != nil {
-			p.hndlr.OnTx(p, msg)
+		if p.cfg.Handler.OnTx != nil {
+			p.cfg.Handler.OnTx(p, msg)
 		}
 	}
 }
@@ -403,11 +376,11 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 		for _, vector := range msg.Vectors {
 			switch vector.Type {
 			case payload.InvTx:
-				tx := transactions.NewTX()
-				tx.Hash = vector.Hash
-				getdata.AddTx(tx)
+				// tx := transactions.NewTX()
+				// tx.R = vector.Hash
+				// getdata.AddTx(tx)
 			case payload.InvBlock:
-				block := payload.NewBlock()
+				block := block.NewBlock()
 				block.Header.Hash = vector.Hash
 				getdata.AddBlock(block)
 			default:
@@ -422,8 +395,8 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetHeaders, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetHeaders != nil {
-			p.hndlr.OnGetHeaders(p, msg)
+		if p.cfg.Handler.OnGetHeaders != nil {
+			p.cfg.Handler.OnGetHeaders(p, msg)
 		}
 	}
 }
@@ -432,8 +405,8 @@ func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
 func (p *Peer) OnAddr(msg *payload.MsgAddr) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Addr, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnAddr != nil {
-			p.hndlr.OnAddr(p, msg)
+		if p.cfg.Handler.OnAddr != nil {
+			p.cfg.Handler.OnAddr(p, msg)
 		}
 	}
 }
@@ -442,8 +415,8 @@ func (p *Peer) OnAddr(msg *payload.MsgAddr) {
 func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetAddr, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetAddr != nil {
-			p.hndlr.OnGetAddr(p, msg)
+		if p.cfg.Handler.OnGetAddr != nil {
+			p.cfg.Handler.OnGetAddr(p, msg)
 		}
 	}
 }
@@ -452,8 +425,8 @@ func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
 func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetBlocks, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetBlocks != nil {
-			p.hndlr.OnGetBlocks(p, msg)
+		if p.cfg.Handler.OnGetBlocks != nil {
+			p.cfg.Handler.OnGetBlocks(p, msg)
 		}
 	}
 }
@@ -462,8 +435,8 @@ func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
 func (p *Peer) OnBlock(msg *payload.MsgBlock) {
 	log.WithField("prefix", "peer").Debugf("Received a '%s' message (Height=%d) from %s", commands.Block, msg.Block.Header.Height, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnBlock != nil {
-			p.hndlr.OnBlock(p, msg)
+		if p.cfg.Handler.OnBlock != nil {
+			p.cfg.Handler.OnBlock(p, msg)
 		}
 	}
 }
@@ -507,18 +480,18 @@ func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
 func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Headers, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnHeaders != nil {
-			p.hndlr.OnHeaders(p, msg)
+		if p.cfg.Handler.OnHeaders != nil {
+			p.cfg.Handler.OnHeaders(p, msg)
 		}
 	}
 }
 
-// OnBinary Listener. Is called after receiving a 'binary' msg
-func (p *Peer) OnBinary(msg *payload.MsgBinary) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Binary, p.addr)
+// OnConsensus Listener. Is called after receiving a 'consensus' msg
+func (p *Peer) OnConsensus(msg *payload.MsgConsensus) {
+	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Consensus, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnBinary != nil {
-			p.hndlr.OnBinary(p, msg)
+		if p.cfg.Handler.OnConsensus != nil {
+			p.cfg.Handler.OnConsensus(p, msg)
 		}
 	}
 }
@@ -527,8 +500,8 @@ func (p *Peer) OnBinary(msg *payload.MsgBinary) {
 func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Certificate, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnCertificate != nil {
-			p.hndlr.OnCertificate(p, msg)
+		if p.cfg.Handler.OnCertificate != nil {
+			p.cfg.Handler.OnCertificate(p, msg)
 		}
 	}
 }
@@ -537,8 +510,8 @@ func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
 func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.CertificateReq, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnCertificateReq != nil {
-			p.hndlr.OnCertificateReq(p, msg)
+		if p.cfg.Handler.OnCertificateReq != nil {
+			p.cfg.Handler.OnCertificateReq(p, msg)
 		}
 	}
 }
@@ -547,8 +520,8 @@ func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
 func (p *Peer) OnMemPool(msg *payload.MsgMemPool) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.MemPool, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnMemPool != nil {
-			p.hndlr.OnMemPool(p, msg)
+		if p.cfg.Handler.OnMemPool != nil {
+			p.cfg.Handler.OnMemPool(p, msg)
 		}
 	}
 }
@@ -567,8 +540,8 @@ func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
 		}
 	}
 	p.inch <- func() {
-		if p.hndlr.OnNotFound != nil {
-			p.hndlr.OnNotFound(p, msg)
+		if p.cfg.Handler.OnNotFound != nil {
+			p.cfg.Handler.OnNotFound(p, msg)
 		}
 	}
 }
@@ -577,8 +550,8 @@ func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
 func (p *Peer) OnPing(msg *payload.MsgPing) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Ping, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnPing != nil {
-			p.hndlr.OnPing(p, msg)
+		if p.cfg.Handler.OnPing != nil {
+			p.cfg.Handler.OnPing(p, msg)
 		}
 	}
 }
@@ -587,18 +560,8 @@ func (p *Peer) OnPing(msg *payload.MsgPing) {
 func (p *Peer) OnPong(msg *payload.MsgPong) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Pong, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnPong != nil {
-			p.hndlr.OnPong(p, msg)
-		}
-	}
-}
-
-// OnReduction Listener. Is called after receiving a 'reduction' msg
-func (p *Peer) OnReduction(msg *payload.MsgReduction) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Reduction, p.addr)
-	p.inch <- func() {
-		if p.hndlr.OnReduction != nil {
-			p.hndlr.OnReduction(p, msg)
+		if p.cfg.Handler.OnPong != nil {
+			p.cfg.Handler.OnPong(p, msg)
 		}
 	}
 }
@@ -607,18 +570,8 @@ func (p *Peer) OnReduction(msg *payload.MsgReduction) {
 func (p *Peer) OnReject(msg *payload.MsgReject) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Reject, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnReject != nil {
-			p.hndlr.OnReject(p, msg)
-		}
-	}
-}
-
-// OnScore Listener. Is called after receiving a 'score' msg
-func (p *Peer) OnScore(msg *payload.MsgScore) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Score, p.addr)
-	p.inch <- func() {
-		if p.hndlr.OnScore != nil {
-			p.hndlr.OnScore(p, msg)
+		if p.cfg.Handler.OnReject != nil {
+			p.cfg.Handler.OnReject(p, msg)
 		}
 	}
 }
@@ -667,12 +620,12 @@ func (p *Peer) RequestBlocks(hashes [][]byte) error {
 	log.WithField("prefix", "peer").Debugf("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
-	blocks := make([]*payload.Block, 0, len(hashes))
+	blocks := make([]*block.Block, 0, len(hashes))
 	for _, hash := range hashes {
 		// Create a block from requested hash
-		block := payload.NewBlock()
-		block.Header.Hash = hash
-		blocks = append(blocks, block)
+		b := block.NewBlock()
+		b.Header.Hash = hash
+		blocks = append(blocks, b)
 	}
 
 	p.outch <- func() {

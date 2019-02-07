@@ -1,20 +1,22 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/logging"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/logging"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 const (
@@ -55,8 +57,8 @@ func main() {
 }
 
 func createBlocks(env string, totBlocks int, txsPerBlock int) {
-	var prevHash = make([]byte, 32)
-	blocks := make([]*payload.Block, 0, totBlocks)
+	var prevBlock = make([]byte, 32)
+	blocks := make([]*block.Block, 0, totBlocks)
 
 	path := logging.UserHomeDir() + userHomeDuskDir + "/" + strings.ToLower(env) + "/db"
 	db, _ := database.NewBlockchainDB(path)
@@ -114,7 +116,7 @@ func addBlocks(env string, totBlocks int, txsPerBlock int) {
 	}
 
 	// WriteHeaders
-	hdrs := make([]*payload.BlockHeader, len(blocks))
+	hdrs := make([]*block.Header, len(blocks))
 	for i, block := range blocks {
 		hdrs[i] = block.Header
 	}
@@ -122,16 +124,16 @@ func addBlocks(env string, totBlocks int, txsPerBlock int) {
 	db.WriteBlockTransactions(blocks)
 }
 
-func createBlockFixture(height uint64, prevBlock []byte, txTotal int) (*payload.Block, error) {
-	t := time.Now().Unix()
+func createBlockFixture(height int, prevBlock []byte, txTotal int) (*block.Block, error) {
+	time := time.Now().Unix()
 	// Spoof previous seed, txRoot and certImage
 	seed, _ := crypto.RandEntropy(32)
 	certImage, _ := crypto.RandEntropy(32)
-	h := &payload.BlockHeader{Height: uint64(height), Timestamp: t, PrevBlock: prevBlock, Seed: seed, Hash: nil, CertImage: certImage}
+	h := &block.Header{Height: uint64(height), Timestamp: time, PrevBlock: prevBlock, Seed: seed, Hash: nil, CertHash: certImage}
 
 	// Create txTotal random Txs
 	txs := createRandomTxFixtures(txTotal)
-	b := &payload.Block{h, txs}
+	b := &block.Block{h, txs}
 
 	// Create txRoot
 	if len(b.Txs) > 0 {
@@ -156,19 +158,38 @@ func createRandomTxFixtures(total int) []merkletree.Payload {
 		keyImage, _ := crypto.RandEntropy(32)
 		txID, _ := crypto.RandEntropy(32)
 		sig, _ := crypto.RandEntropy(2000)
-		in := &transactions.Input{KeyImage: keyImage, TxID: txID, Index: uint8(i), Signature: sig}
 		dest, _ := crypto.RandEntropy(32)
 
 		amount := rand.Intn(1000) + 1
 		out := transactions.NewOutput(uint64(amount), dest, sig)
 
 		txPubKey, _ := crypto.RandEntropy(32)
-		s := transactions.NewTX()
-		s.AddInput(in)
-		s.AddOutput(out)
-		s.AddTxPubKey(txPubKey)
+		pl := transactions.NewStandard(100)
+		s := transactions.NewTX(transactions.StandardType, pl)
+		in := transactions.NewInput(keyImage, txID, 0, sig)
+		pl.AddInput(in)
+		s.R = txPubKey
+
+		pl.AddOutput(out)
 		s.SetHash()
 		txs[i] = s
 	}
 	return txs
+}
+
+func createGenesisHeader(t *testing.T) {
+	var b *block.Block
+	b, _ = createBlockFixture(0, make([]byte, 32), 0)
+
+	layout := "2006-01-02T15:04:05.000Z"
+	str := "2019-01-01T00:00:00.000Z"
+	genTime, _ := time.Parse(layout, str)
+
+	b.Header.Timestamp = genTime.Unix()
+	b.SetHash()
+
+	buf := new(bytes.Buffer)
+	if err := b.Encode(buf); err != nil {
+		t.Fatal(err)
+	}
 }

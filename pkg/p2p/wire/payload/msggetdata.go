@@ -6,6 +6,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
@@ -25,14 +26,14 @@ func NewMsgGetData() *MsgGetData {
 func (m *MsgGetData) AddTx(tx *transactions.Stealth) {
 	vect := &InvVect{
 		Type: InvTx,
-		Hash: tx.Hash,
+		Hash: tx.R,
 	}
 
 	m.Vectors = append(m.Vectors, vect)
 }
 
 // AddBlock will add a block inventory vector to MsgGetData.
-func (m *MsgGetData) AddBlock(block *Block) {
+func (m *MsgGetData) AddBlock(block *block.Block) {
 	vect := &InvVect{
 		Type: InvBlock,
 		Hash: block.Header.Hash,
@@ -42,7 +43,7 @@ func (m *MsgGetData) AddBlock(block *Block) {
 }
 
 // AddBlocks will add blocks inventory vector to MsgGetData.
-func (m *MsgGetData) AddBlocks(blocks []*Block) {
+func (m *MsgGetData) AddBlocks(blocks []*block.Block) {
 	for _, block := range blocks {
 		m.AddBlock(block)
 	}
