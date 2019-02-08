@@ -96,7 +96,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 		votes2 = append(votes2, vote)
 	}
 
-	pl3, err := consensusmsg.NewSigSetCandidate(byte32, votes2, byte32)
+	pl3, err := consensusmsg.NewSigSetCandidate(byte32, votes2)
 	if err != nil {
 		t.Fatal(err)
 	}
