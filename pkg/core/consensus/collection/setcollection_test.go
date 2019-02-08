@@ -18,8 +18,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
-// This test will test both signature set generation and signature set collection.
-func TestSignatureSetGeneration(t *testing.T) {
+// This test will test signature set collection.
+func TestSignatureSetCollection(t *testing.T) {
 	// Put step timer down to avoid long waiting times
 	user.StepTime = 3 * time.Second
 
