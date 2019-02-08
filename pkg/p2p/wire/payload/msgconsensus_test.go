@@ -32,7 +32,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	// Set Agreement
 	var votes []*consensusmsg.Vote
 	for i := 0; i < 5; i++ {
-		vote, err := consensusmsg.NewVote(byte32, byte32, sigBLS, sigBLS, 1)
+		vote, err := consensusmsg.NewVote(byte32, byte32, sigBLS, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,7 +63,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	assert.Equal(t, msg, msg2)
 
 	// Reduction
-	pl2, err := consensusmsg.NewReduction(sigBLS, byte32, sigBLS, byte32)
+	pl2, err := consensusmsg.NewReduction(sigBLS, byte32, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	// Signature Set Candidate
 	var votes2 []*consensusmsg.Vote
 	for i := 0; i < 5; i++ {
-		vote, err := consensusmsg.NewVote(byte32, byte32, sigBLS, sigBLS, 1)
+		vote, err := consensusmsg.NewVote(byte32, byte32, sigBLS, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +96,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 		votes2 = append(votes2, vote)
 	}
 
-	pl3, err := consensusmsg.NewSigSetCandidate(byte32, votes2, byte32, sigBLS)
+	pl3, err := consensusmsg.NewSigSetCandidate(byte32, votes2, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestMsgConsensusEncodeDecode(t *testing.T) {
 	assert.Equal(t, msg5, msg6)
 
 	// Signature Set Vote
-	pl4, err := consensusmsg.NewSigSetVote(byte32, byte32, sigBLS, byte32, sigBLS)
+	pl4, err := consensusmsg.NewSigSetVote(byte32, byte32, sigBLS, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
