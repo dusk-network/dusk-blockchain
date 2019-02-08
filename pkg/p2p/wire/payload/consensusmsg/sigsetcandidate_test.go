@@ -34,7 +34,7 @@ func TestSigSetCandidateEncodeDecode(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	msg, err := NewSigSetCandidate(byte32, votes, byte32)
+	msg, err := NewSigSetCandidate(byte32, votes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestSigSetCandidateChecks(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	if _, err := NewSigSetCandidate(wrongByte32, votes, byte32); err == nil {
+	if _, err := NewSigSetCandidate(wrongByte32, votes); err == nil {
 		t.Fatal("check for winningblock did not work")
 	}
 }
