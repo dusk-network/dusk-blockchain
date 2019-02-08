@@ -166,6 +166,51 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	assert.Equal(t, otherBlock, ctx.BlockHash)
 }
 
+// Test the Block function with the fallback value.
+func TestBlockReductionFallback(t *testing.T) {
+	// Create context
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := user.NewRandKeys()
+	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set basic fields on context
+	ctx.Weight = 500
+
+	// Set ourselves as committee member
+	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	ctx.NodeWeights[pkEd] = 500
+	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+
+	// Make 50 fallback votes and send them to the channel beforehand
+	for i := 0; i < 50; i++ {
+		msg, err := newVoteReduction(ctx, make([]byte, 32))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ctx.ReductionChan <- msg
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := reduction.Block(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		wg.Done()
+	}()
+
+	// Wait until done
+	wg.Wait()
+
+	// Block hash should be nil
+	assert.Nil(t, ctx.BlockHash)
+}
+
 // Test Block function with a low amount of votes coming in.
 func TestBlockReductionIndecisive(t *testing.T) {
 	// Create context
