@@ -163,6 +163,7 @@ func createVotesAndMsgs(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 		c.LastHeader = ctx.LastHeader
 		c.Weight = 500
 		c.BlockHash = ctx.BlockHash
+		ctx.CurrentCommittee = append(ctx.CurrentCommittee, []byte(*c.Keys.EdPubKey))
 
 		// Create vote signatures
 		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
