@@ -11,8 +11,7 @@ import (
 // signature set reduction phase.
 func SignatureSet(ctx *user.Context) error {
 	// Create our own signature set candidate message
-	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes,
-		ctx.Keys.BLSPubKey.Marshal())
+	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}
@@ -23,7 +22,7 @@ func SignatureSet(ctx *user.Context) error {
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.Certificate.BRStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}
