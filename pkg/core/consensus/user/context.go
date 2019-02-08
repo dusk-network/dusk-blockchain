@@ -111,6 +111,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Tau:                 tau,
 		Threshold:           totalWeight / 5, // Placeholder
 		Round:               round,
+		Step:                1,
 		Seed:                seed,
 		Magic:               magic,
 		Multiplier:          1,
