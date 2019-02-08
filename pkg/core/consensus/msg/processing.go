@@ -38,14 +38,14 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 		return prerror.New(prerror.Low, errors.New("version mismatch"))
 	}
 
-	// Check if we're on the same chain
-	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
-		return prerror.New(prerror.Low, errors.New("voter is on a different chain"))
-	}
-
 	// Check if we're on the same round
 	if ctx.Round != msg.Round {
 		return prerror.New(prerror.Low, errors.New("round mismatch"))
+	}
+
+	// Check if we're on the same chain
+	if !bytes.Equal(msg.PrevBlockHash, ctx.LastHeader.Hash) {
+		return prerror.New(prerror.Low, errors.New("voter is on a different chain"))
 	}
 
 	// Proceed to more specific checks
@@ -77,12 +77,12 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		}
 
 		pl := msg.Payload.(*consensusmsg.Reduction)
-		if err := verifyReduction(ctx, pl); err != nil {
-			return err
-		}
-
 		if !verifyBLSKey(ctx, msg.PubKey, pl.PubKeyBLS) {
 			return prerror.New(prerror.Low, errors.New("BLS key mismatch"))
+		}
+
+		if err := verifyReduction(ctx, pl); err != nil {
+			return err
 		}
 
 		ctx.ReductionChan <- msg
@@ -118,6 +118,11 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		ctx.SigSetCandidateChan <- msg
 		return nil
 	case consensusmsg.SigSetVoteID:
+		// Check if we're on the same step
+		if ctx.Step != msg.Step {
+			return prerror.New(prerror.Low, errors.New("step mismatch"))
+		}
+
 		// Check if this node is eligible to vote
 		votes := sortition.Verify(ctx.CurrentCommittee, msg.PubKey)
 		if votes == 0 {
@@ -147,6 +152,11 @@ func verifyBLSKey(ctx *user.Context, pubKeyEd, pubKeyBls []byte) bool {
 }
 
 func verifyReduction(ctx *user.Context, pl *consensusmsg.Reduction) *prerror.PrError {
+	// Check BLS
+	if err := ctx.BLSVerify(pl.PubKeyBLS, pl.BlockHash, pl.SigBLS); err != nil {
+		return prerror.New(prerror.Low, errors.New("BLS verification failed"))
+	}
+
 	// Make sure they voted on an existing block
 	blockHash := hex.EncodeToString(pl.BlockHash)
 	if ctx.CandidateBlocks[blockHash] == nil {
@@ -163,8 +173,14 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 		return prerror.New(prerror.Low, errors.New("vote set is too small"))
 	}
 
-	// Create committee from previous step
-	prevCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step-1,
+	// Create committees
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, step,
+		uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
+	if err != nil {
+		return prerror.New(prerror.High, err)
+	}
+
+	prevCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, step-1,
 		uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return prerror.New(prerror.High, err)
@@ -178,17 +194,18 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 
 		// A set should only have votes from legitimate provisioners
 		pkBLS := hex.EncodeToString(vote.PubKey)
-		if ctx.NodeBLS[pkBLS] == nil {
+		pkEd := hex.EncodeToString(ctx.NodeBLS[pkBLS])
+		if ctx.NodeBLS[pkBLS] == nil || ctx.NodeWeights[pkEd] == 0 {
 			return prerror.New(prerror.Low, errors.New("vote is from non-provisioner node"))
 		}
 
 		// A vote should be from the same step or the step before it
-		if step != ctx.Step && step != ctx.Step-1 {
+		if step != vote.Step && step != vote.Step+1 {
 			return prerror.New(prerror.Low, errors.New("vote is from another phase"))
 		}
 
 		// A voting node should have been part of this or the previous committee
-		if votes := sortition.Verify(ctx.CurrentCommittee, ctx.NodeBLS[pkBLS]); votes == 0 {
+		if votes := sortition.Verify(committee, ctx.NodeBLS[pkBLS]); votes == 0 {
 			if votes = sortition.Verify(prevCommittee, ctx.NodeBLS[pkBLS]); votes == 0 {
 				return prerror.New(prerror.Low, errors.New("vote is not from committee"))
 			}
