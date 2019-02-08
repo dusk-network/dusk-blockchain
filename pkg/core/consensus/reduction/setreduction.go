@@ -6,11 +6,9 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
@@ -23,12 +21,12 @@ func SignatureSet(ctx *user.Context) error {
 	fallback := make([]byte, 32)
 
 	// Vote on collected signature set
-	if err := committeeVoteSigSet(ctx); err != nil {
+	if err := sigSetVote(ctx); err != nil {
 		return err
 	}
 
 	// Receive all other votes
-	if err := countVotesSigSet(ctx); err != nil {
+	if err := countSigSetVotes(ctx); err != nil {
 		return err
 	}
 
@@ -39,11 +37,13 @@ func SignatureSet(ctx *user.Context) error {
 		ctx.SigSetHash = fallback
 	}
 
-	if err := committeeVoteSigSet(ctx); err != nil {
+	// Vote on collected signature set
+	if err := sigSetVote(ctx); err != nil {
 		return err
 	}
 
-	if err := countVotesSigSet(ctx); err != nil {
+	// Receive all other votes
+	if err := countSigSetVotes(ctx); err != nil {
 		return err
 	}
 
@@ -70,9 +70,14 @@ func SignatureSet(ctx *user.Context) error {
 	return nil
 }
 
-func committeeVoteSigSet(ctx *user.Context) error {
+func sigSetVote(ctx *user.Context) error {
 	// Set committee first
-	currentCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, user.CommitteeSize,
+	size := user.CommitteeSize
+	if len(ctx.Committee) < int(user.CommitteeSize) {
+		size = uint8(len(ctx.Committee))
+	}
+
+	currentCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, size,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return err
@@ -86,7 +91,7 @@ func committeeVoteSigSet(ctx *user.Context) error {
 	}
 
 	// Hash our vote set
-	sigSetHash, err := msg.HashVotes(ctx.SigSetVotes)
+	sigSetHash, err := ctx.HashVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}
@@ -108,7 +113,7 @@ func committeeVoteSigSet(ctx *user.Context) error {
 		return err
 	}
 
-	sigEd, err := msg.CreateSignature(ctx, pl)
+	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
 		return err
 	}
@@ -128,7 +133,7 @@ func committeeVoteSigSet(ctx *user.Context) error {
 	return nil
 }
 
-func countVotesSigSet(ctx *user.Context) error {
+func countSigSetVotes(ctx *user.Context) error {
 	// Set vote limit
 	voteLimit := uint8(len(ctx.CurrentCommittee))
 
@@ -139,7 +144,7 @@ func countVotesSigSet(ctx *user.Context) error {
 	voters := make(map[string]bool)
 
 	// Start the timer
-	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier) * time.Second))
+	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
 
 	for {
 		select {
@@ -155,16 +160,8 @@ func countVotesSigSet(ctx *user.Context) error {
 				break
 			}
 
-			// Verify the message
-			votes, err := msg.Process(ctx, m)
-			if err != nil {
-				if err.Priority == prerror.High {
-					return err.Err
-				}
-
-				// Discard if invalid
-				break
-			}
+			// Get amount of votes
+			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
 
 			// Log information
 			voters[pkEd] = true

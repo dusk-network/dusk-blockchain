@@ -1,7 +1,6 @@
 package generation
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -18,7 +17,7 @@ func SignatureSet(ctx *user.Context) error {
 		return err
 	}
 
-	sigEd, err := msg.CreateSignature(ctx, pl)
+	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
 		return err
 	}

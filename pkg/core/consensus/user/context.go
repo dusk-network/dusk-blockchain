@@ -1,6 +1,8 @@
 package user
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -81,6 +84,7 @@ type Context struct {
 
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
+	HashVotes   func([]*consensusmsg.Vote) ([]byte, error)
 	SendMessage func(magic protocol.Magic, p wire.Payload) error
 
 	// Key functions
@@ -122,6 +126,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		CandidateBlocks:     make(map[string]*block.Block),
 		AllVotes:            make(map[string][]*consensusmsg.Vote),
 		GetAllTXs:           getAllTXs,
+		HashVotes:           hashVotes,
 		BLSSign:             bLSSign,
 		BLSVerify:           blsVerify,
 		EDSign:              edSign,
@@ -171,6 +176,24 @@ func (c *Context) Clear() {
 	c.Keys = nil
 }
 
+// CreateSignature will return the byte representation of a consensus message that
+// is signed with Ed25519.
+func (c *Context) CreateSignature(pl consensusmsg.Msg) ([]byte, error) {
+	edMsg := make([]byte, 12)
+	binary.LittleEndian.PutUint32(edMsg[0:], c.Version)
+	binary.LittleEndian.PutUint64(edMsg[4:], c.Round)
+	edMsg = append(edMsg, c.LastHeader.Hash...)
+	edMsg = append(edMsg, byte(c.Step))
+	edMsg = append(edMsg, byte(pl.Type()))
+	buf := new(bytes.Buffer)
+	if err := pl.Encode(buf); err != nil {
+		return nil, err
+	}
+
+	edMsg = append(edMsg, buf.Bytes()...)
+	return c.EDSign(c.Keys.EdSecretKey, edMsg), nil
+}
+
 // dummy functions
 func (c *Context) setLastHeader() *block.Header {
 	rand, _ := crypto.RandEntropy(32)
@@ -207,6 +230,25 @@ func getAllTXs() []*transactions.Stealth {
 	tx.R = sig
 
 	return []*transactions.Stealth{tx}
+}
+
+// HashVotes returns the hash of the passed vote set
+func hashVotes(votes []*consensusmsg.Vote) ([]byte, error) {
+	// Encode signature set
+	buf := new(bytes.Buffer)
+	for _, vote := range votes {
+		if err := vote.Encode(buf); err != nil {
+			return nil, err
+		}
+	}
+
+	// Hash bytes and set it on context
+	sigSetHash, err := hash.Sha3256(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return sigSetHash, nil
 }
 
 // Sign with BLS and return the compressed signature

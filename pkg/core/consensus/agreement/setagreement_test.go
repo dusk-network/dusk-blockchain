@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -205,7 +204,7 @@ func createVotesAndMsgs(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 			return nil, nil, err
 		}
 
-		sigEd, err := msg.CreateSignature(c, pl)
+		sigEd, err := c.CreateSignature(pl)
 		if err != nil {
 			return nil, nil, err
 		}

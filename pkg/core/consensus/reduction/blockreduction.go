@@ -6,11 +6,9 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -30,12 +28,12 @@ func Block(ctx *user.Context) error {
 	ctx.BlockVotes = make([]*consensusmsg.Vote, 0)
 
 	// Vote on passed block
-	if err := committeeVoteReduction(ctx); err != nil {
+	if err := blockVote(ctx); err != nil {
 		return err
 	}
 
 	// Receive all other votes
-	if err := countVotesReduction(ctx); err != nil {
+	if err := countBlockVotes(ctx); err != nil {
 		return err
 	}
 
@@ -47,11 +45,13 @@ func Block(ctx *user.Context) error {
 		ctx.BlockHash = fallback
 	}
 
-	if err := committeeVoteReduction(ctx); err != nil {
+	// Vote on passed block
+	if err := blockVote(ctx); err != nil {
 		return err
 	}
 
-	if err := countVotesReduction(ctx); err != nil {
+	// Receive all other votes
+	if err := countBlockVotes(ctx); err != nil {
 		return err
 	}
 
@@ -78,9 +78,14 @@ func Block(ctx *user.Context) error {
 	return nil
 }
 
-func committeeVoteReduction(ctx *user.Context) error {
+func blockVote(ctx *user.Context) error {
 	// Set committee first
-	currentCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, user.CommitteeSize,
+	size := user.CommitteeSize
+	if len(ctx.Committee) < int(user.CommitteeSize) {
+		size = uint8(len(ctx.Committee))
+	}
+
+	currentCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, size,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return err
@@ -106,7 +111,7 @@ func committeeVoteReduction(ctx *user.Context) error {
 	}
 
 	// Sign the payload
-	sigEd, err := msg.CreateSignature(ctx, pl)
+	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
 		return err
 	}
@@ -127,7 +132,7 @@ func committeeVoteReduction(ctx *user.Context) error {
 	return nil
 }
 
-func countVotesReduction(ctx *user.Context) error {
+func countBlockVotes(ctx *user.Context) error {
 	// Set vote limit
 	voteLimit := uint8(len(ctx.CurrentCommittee))
 
@@ -138,7 +143,7 @@ func countVotesReduction(ctx *user.Context) error {
 	voters := make(map[string]bool)
 
 	// Start the timer
-	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier) * time.Second))
+	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
 
 	for {
 		select {
@@ -154,22 +159,8 @@ func countVotesReduction(ctx *user.Context) error {
 				break
 			}
 
-			// Verify the message score and get back it's contents
-			votes, err := msg.Process(ctx, m)
-			if err != nil {
-				if err.Priority == prerror.High {
-					return err.Err
-				}
-
-				// Discard if invalid
-				break
-			}
-
-			// If votes is zero, then the reduction message was most likely
-			// faulty, so we will ignore it.
-			if votes == 0 {
-				break
-			}
+			// Get amount of votes
+			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
 
 			// Log new information
 			voters[pkEd] = true
@@ -180,7 +171,9 @@ func countVotesReduction(ctx *user.Context) error {
 				return err2
 			}
 
-			ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
+			for i := uint8(0); i < votes; i++ {
+				ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
+			}
 
 			// If a block doesnt exceed the vote threshold, we keep going.
 			if counts[hashStr] < voteLimit {

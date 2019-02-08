@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
@@ -43,7 +42,7 @@ func TestBlockCollection(t *testing.T) {
 
 	// Make candidate payload and message
 	pl := consensusmsg.NewCandidate(blk)
-	sigEd, err := msg.CreateSignature(ctx, pl)
+	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +65,7 @@ func TestBlockCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sigEd2, err := msg.CreateSignature(ctx, pl2)
+	sigEd2, err := ctx.CreateSignature(pl2)
 	if err != nil {
 		t.Fatal(err)
 	}

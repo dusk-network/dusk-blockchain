@@ -4,9 +4,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -27,7 +25,7 @@ func Block(ctx *user.Context) error {
 	ctx.CandidateBlocks = make(map[string]*block.Block)
 
 	// Start the timer
-	timer := time.NewTimer(user.CandidateTime * (time.Duration(ctx.Multiplier) * time.Second))
+	timer := time.NewTimer(user.CandidateTime * (time.Duration(ctx.Multiplier)))
 
 	for {
 		select {
@@ -42,17 +40,6 @@ func Block(ctx *user.Context) error {
 				break
 			}
 
-			// Verify the message
-			_, err := msg.Process(ctx, m)
-			if err != nil {
-				if err.Priority == prerror.High {
-					return err
-				}
-
-				// Discard if invalid
-				break
-			}
-
 			// Add to the mapping
 			ctx.CandidateBlocks[blockHash] = pl.Block
 		case m := <-ctx.CandidateScoreChan:
@@ -61,17 +48,6 @@ func Block(ctx *user.Context) error {
 
 			// Check if this node's candidate was already recorded
 			if senders[pkEd] {
-				break
-			}
-
-			// Verify the message
-			_, err := msg.Process(ctx, m)
-			if err != nil {
-				if err.Priority == prerror.High {
-					return err
-				}
-
-				// Discard if invalid
 				break
 			}
 

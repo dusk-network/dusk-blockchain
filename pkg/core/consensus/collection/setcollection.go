@@ -4,15 +4,13 @@ import (
 	"encoding/hex"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
-// SigSet will collect the signature set with highest score, and set our context value
+// SignatureSet will collect the signature set with highest score, and set our context value
 // to the winner.
-func SigSet(ctx *user.Context) error {
+func SignatureSet(ctx *user.Context) error {
 	// Keep track of those who have voted
 	voters := make(map[string]bool)
 	pk := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
@@ -22,7 +20,7 @@ func SigSet(ctx *user.Context) error {
 
 	// Initialize container for all vote sets, and add our own
 	ctx.AllVotes = make(map[string][]*consensusmsg.Vote)
-	sigSetHash, err := msg.HashVotes(ctx.SigSetVotes)
+	sigSetHash, err := ctx.HashVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}
@@ -31,7 +29,7 @@ func SigSet(ctx *user.Context) error {
 	highest := ctx.Weight
 
 	// Start timer
-	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier) * time.Second))
+	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
 
 	for {
 		select {
@@ -46,19 +44,9 @@ func SigSet(ctx *user.Context) error {
 				break
 			}
 
-			// Verify the message
-			if _, prErr := msg.Process(ctx, m); prErr != nil {
-				if prErr.Priority == prerror.High {
-					return prErr.Err
-				}
-
-				// Discard if it's invalid
-				break
-			}
-
 			// Log information
 			voters[pkEd] = true
-			setHash, err := msg.HashVotes(pl.SignatureSet)
+			setHash, err := ctx.HashVotes(pl.SignatureSet)
 			if err != nil {
 				return err
 			}
