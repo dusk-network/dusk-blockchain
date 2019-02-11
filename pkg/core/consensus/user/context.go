@@ -83,6 +83,9 @@ type Context struct {
 	SigSetReductionChan chan *payload.MsgConsensus
 	SigSetAgreementChan chan *payload.MsgConsensus
 
+	// Message queue
+	Queue map[uint64]map[uint8][]*payload.MsgConsensus
+
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
 	HashVotes   func([]*consensusmsg.Vote) ([]byte, error)
@@ -125,6 +128,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		SigSetCandidateChan: make(chan *payload.MsgConsensus, 100),
 		SigSetReductionChan: make(chan *payload.MsgConsensus, 100),
 		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
+		Queue:               make(map[uint64]map[uint8][]*payload.MsgConsensus),
 		W:                   totalWeight,
 		CandidateBlocks:     make(map[string]*block.Block),
 		AllVotes:            make(map[string][]*consensusmsg.Vote),
