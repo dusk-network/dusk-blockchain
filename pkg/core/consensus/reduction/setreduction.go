@@ -63,7 +63,7 @@ func SignatureSet(ctx *user.Context) error {
 
 	// If we got a result, populate certificate, send message to
 	// set agreement and terminate
-	if err := agreement.SendSet(ctx, ctx.SigSetVotes); err != nil {
+	if err := agreement.SendSigSet(ctx, ctx.SigSetVotes); err != nil {
 		return err
 	}
 
@@ -107,7 +107,7 @@ func sigSetVote(ctx *user.Context) error {
 	}
 
 	// Create signature set vote message to gossip
-	pl, err := consensusmsg.NewSigSetVote(ctx.BlockHash, ctx.SigSetHash, sigBLS,
+	pl, err := consensusmsg.NewSigSetReduction(ctx.BlockHash, ctx.SigSetHash, sigBLS,
 		ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func sigSetVote(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.SigSetVoteChan <- msg
+	ctx.SigSetReductionChan <- msg
 	return nil
 }
 
@@ -151,8 +151,8 @@ func countSigSetVotes(ctx *user.Context) error {
 		case <-timer.C:
 			ctx.SigSetHash = nil
 			return nil
-		case m := <-ctx.SigSetVoteChan:
-			pl := m.Payload.(*consensusmsg.SigSetVote)
+		case m := <-ctx.SigSetReductionChan:
+			pl := m.Payload.(*consensusmsg.SigSetReduction)
 			pkEd := hex.EncodeToString(m.PubKey)
 
 			// Check if this node's vote is already recorded

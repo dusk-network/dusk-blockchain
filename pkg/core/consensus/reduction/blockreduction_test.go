@@ -89,7 +89,7 @@ func TestBlockReductionDecisive(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx.ReductionChan <- msg
+		ctx.BlockReductionChan <- msg
 	}
 
 	wg := sync.WaitGroup{}
@@ -146,7 +146,7 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx.ReductionChan <- msg
+		ctx.BlockReductionChan <- msg
 	}
 
 	wg := sync.WaitGroup{}
@@ -191,7 +191,7 @@ func TestBlockReductionFallback(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx.ReductionChan <- msg
+		ctx.BlockReductionChan <- msg
 	}
 
 	wg := sync.WaitGroup{}
@@ -300,7 +300,7 @@ func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus,
 	}
 
 	// Create reduction payload to gossip
-	pl, err := consensusmsg.NewReduction(blockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+	pl, err := consensusmsg.NewBlockReduction(blockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
 		return nil, err
 	}
