@@ -7,17 +7,17 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-// Reduction defines a reduction message on the Dusk wire protocol.
-type Reduction struct {
+// BlockReduction defines a blockreduction message on the Dusk wire protocol.
+type BlockReduction struct {
 	BlockHash []byte // Hash of the block being voted on (32 bytes)
 	SigBLS    []byte // Compressed BLS signature of the voted block hash (33 bytes)
 	PubKeyBLS []byte // Sender BLS public key (129 bytes)
 }
 
-// NewReduction returns a Reduction struct populated with the specified information.
+// NewBlockReduction returns a BlockReduction struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewReduction(hash, sigBLS, pubKeyBLS []byte) (*Reduction, error) {
+func NewBlockReduction(hash, sigBLS, pubKeyBLS []byte) (*BlockReduction, error) {
 	if len(hash) != 32 {
 		return nil, errors.New("wire: supplied candidate hash for reduction payload is improper length")
 	}
@@ -26,16 +26,16 @@ func NewReduction(hash, sigBLS, pubKeyBLS []byte) (*Reduction, error) {
 		return nil, errors.New("wire: supplied compressed BLS signature for reduction payload is improper length")
 	}
 
-	return &Reduction{
+	return &BlockReduction{
 		BlockHash: hash,
 		SigBLS:    sigBLS,
 		PubKeyBLS: pubKeyBLS,
 	}, nil
 }
 
-// Encode a Reduction struct and write to w.
+// Encode a BlockReduction struct and write to w.
 // Implements Msg interface.
-func (rd *Reduction) Encode(w io.Writer) error {
+func (rd *BlockReduction) Encode(w io.Writer) error {
 	if err := encoding.Write256(w, rd.BlockHash); err != nil {
 		return err
 	}
@@ -51,9 +51,9 @@ func (rd *Reduction) Encode(w io.Writer) error {
 	return nil
 }
 
-// Decode a Reduction from r.
+// Decode a BlockReduction from r.
 // Implements Msg interface.
-func (rd *Reduction) Decode(r io.Reader) error {
+func (rd *BlockReduction) Decode(r io.Reader) error {
 	if err := encoding.Read256(r, &rd.BlockHash); err != nil {
 		return err
 	}
@@ -71,6 +71,6 @@ func (rd *Reduction) Decode(r io.Reader) error {
 
 // Type returns the consensus payload identifier.
 // Implements Msg interface.
-func (rd *Reduction) Type() ID {
-	return ReductionID
+func (rd *BlockReduction) Type() ID {
+	return BlockReductionID
 }

@@ -9,10 +9,11 @@ type ID uint8
 var (
 	CandidateScoreID  ID = 0x00
 	CandidateID       ID = 0x01
-	ReductionID       ID = 0x02
-	SetAgreementID    ID = 0x03
+	BlockReductionID  ID = 0x02
+	BlockAgreementID  ID = 0x03
 	SigSetCandidateID ID = 0x04
-	SigSetVoteID      ID = 0x05
+	SigSetReductionID ID = 0x05
+	SigSetAgreementID ID = 0x06
 )
 
 // Msg is an interface for consensus message payloads.

@@ -8,7 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
-func TestSigSetVoteEncodeDecode(t *testing.T) {
+func TestSigSetReductionEncodeDecode(t *testing.T) {
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -19,7 +19,7 @@ func TestSigSetVoteEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewSigSetVote(byte32, byte32, blsSig, byte32)
+	msg, err := NewSigSetReduction(byte32, byte32, blsSig, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,14 +29,14 @@ func TestSigSetVoteEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg2 := &SigSetVote{}
+	msg2 := &SigSetReduction{}
 	msg2.Decode(buf)
 
 	assert.Equal(t, msg, msg2)
 }
 
 // Check to see whether length checks are working.
-func TestSigSetVoteChecks(t *testing.T) {
+func TestSigSetReductionChecks(t *testing.T) {
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -47,15 +47,15 @@ func TestSigSetVoteChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewSigSetVote(blsSig, byte32, blsSig, byte32); err == nil {
+	if _, err := NewSigSetReduction(blsSig, byte32, blsSig, byte32); err == nil {
 		t.Fatal("check for winningblock did not work")
 	}
 
-	if _, err := NewSigSetVote(byte32, blsSig, blsSig, byte32); err == nil {
+	if _, err := NewSigSetReduction(byte32, blsSig, blsSig, byte32); err == nil {
 		t.Fatal("check for sigsethash did not work")
 	}
 
-	if _, err := NewSigSetVote(byte32, byte32, byte32, byte32); err == nil {
+	if _, err := NewSigSetReduction(byte32, byte32, byte32, byte32); err == nil {
 		t.Fatal("check for sigbls did not work")
 	}
 }
