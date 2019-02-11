@@ -13,7 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-func TestVerifyReduction(t *testing.T) {
+func TestVerifyBlockReduction(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -47,7 +47,7 @@ func TestVerifyReduction(t *testing.T) {
 	}
 }
 
-func TestReductionUnknownBlock(t *testing.T) {
+func TestBlockReductionUnknownBlock(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -81,7 +81,7 @@ func TestReductionUnknownBlock(t *testing.T) {
 	}
 }
 
-func TestReductionWrongStep(t *testing.T) {
+func TestBlockReductionWrongStep(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -120,7 +120,7 @@ func TestReductionWrongStep(t *testing.T) {
 	}
 }
 
-func TestReductionNotInCommittee(t *testing.T) {
+func TestBlockReductionNotInCommittee(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -155,7 +155,7 @@ func TestReductionNotInCommittee(t *testing.T) {
 	}
 }
 
-func TestReductionWrongBLSKey(t *testing.T) {
+func TestBlockReductionWrongBLSKey(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -196,7 +196,7 @@ func TestReductionWrongBLSKey(t *testing.T) {
 	}
 }
 
-func TestReductionWrongBLSSig(t *testing.T) {
+func TestBlockReductionWrongBLSSig(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
