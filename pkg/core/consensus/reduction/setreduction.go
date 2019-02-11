@@ -61,8 +61,7 @@ func SignatureSet(ctx *user.Context) error {
 		return nil
 	}
 
-	// If we got a result, populate certificate, send message to
-	// set agreement and terminate
+	// If we got a result, send set agreement message
 	if err := agreement.SendSigSet(ctx, ctx.SigSetVotes); err != nil {
 		return err
 	}
