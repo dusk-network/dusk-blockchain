@@ -19,8 +19,8 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 
 	for {
 		select {
-		case m := <-ctx.SetAgreementChan:
-			pl := m.Payload.(*consensusmsg.SetAgreement)
+		case m := <-ctx.SigSetAgreementChan:
+			pl := m.Payload.(*consensusmsg.SigSetAgreement)
 
 			// Get amount of votes
 			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
@@ -80,10 +80,15 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 	}
 }
 
-// SendSet will send out a set agreement message with the passed vote set.
-func SendSet(ctx *user.Context, votes []*consensusmsg.Vote) error {
+// SendSigSet will send out a signature set agreement message with the passed vote set.
+func SendSigSet(ctx *user.Context, votes []*consensusmsg.Vote) error {
 	// Create payload, signature and message
-	pl, err := consensusmsg.NewSetAgreement(ctx.BlockHash, votes)
+	hash, err := ctx.HashVotes(votes)
+	if err != nil {
+		return err
+	}
+
+	pl, err := consensusmsg.NewSigSetAgreement(ctx.BlockHash, hash, votes)
 	if err != nil {
 		return err
 	}
@@ -105,6 +110,6 @@ func SendSet(ctx *user.Context, votes []*consensusmsg.Vote) error {
 	}
 
 	// Send it to our own agreement channel
-	ctx.SetAgreementChan <- msg
+	ctx.SigSetAgreementChan <- msg
 	return nil
 }

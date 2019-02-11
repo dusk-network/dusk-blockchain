@@ -6,6 +6,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
@@ -18,8 +19,8 @@ func Block(ctx *user.Context, c chan bool) {
 
 	for {
 		select {
-		case m := <-ctx.SetAgreementChan:
-			pl := m.Payload.(*consensusmsg.SetAgreement)
+		case m := <-ctx.BlockAgreementChan:
+			pl := m.Payload.(*consensusmsg.BlockAgreement)
 
 			// Get amount of votes
 			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
@@ -82,4 +83,32 @@ func Block(ctx *user.Context, c chan bool) {
 			return
 		}
 	}
+}
+
+// SendBlock will send out a block agreement message with the passed vote set.
+func SendBlock(ctx *user.Context, votes []*consensusmsg.Vote) error {
+	pl, err := consensusmsg.NewBlockAgreement(ctx.BlockHash, votes)
+	if err != nil {
+		return err
+	}
+
+	sigEd, err := ctx.CreateSignature(pl)
+	if err != nil {
+		return err
+	}
+
+	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return err
+	}
+
+	// Gossip message
+	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
+		return err
+	}
+
+	// Send it to our own agreement channel
+	ctx.SigSetAgreementChan <- msg
+	return nil
 }
