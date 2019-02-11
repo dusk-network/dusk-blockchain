@@ -77,10 +77,11 @@ type Context struct {
 	/// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
 	CandidateChan       chan *payload.MsgConsensus
-	ReductionChan       chan *payload.MsgConsensus
-	SetAgreementChan    chan *payload.MsgConsensus
+	BlockReductionChan  chan *payload.MsgConsensus
+	BlockAgreementChan  chan *payload.MsgConsensus
 	SigSetCandidateChan chan *payload.MsgConsensus
-	SigSetVoteChan      chan *payload.MsgConsensus
+	SigSetReductionChan chan *payload.MsgConsensus
+	SigSetAgreementChan chan *payload.MsgConsensus
 
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
@@ -119,10 +120,11 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		D:                   d,
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
 		CandidateChan:       make(chan *payload.MsgConsensus, 100),
-		ReductionChan:       make(chan *payload.MsgConsensus, 100),
-		SetAgreementChan:    make(chan *payload.MsgConsensus, 100),
+		BlockReductionChan:  make(chan *payload.MsgConsensus, 100),
+		BlockAgreementChan:  make(chan *payload.MsgConsensus, 100),
 		SigSetCandidateChan: make(chan *payload.MsgConsensus, 100),
-		SigSetVoteChan:      make(chan *payload.MsgConsensus, 100),
+		SigSetReductionChan: make(chan *payload.MsgConsensus, 100),
+		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
 		W:                   totalWeight,
 		CandidateBlocks:     make(map[string]*block.Block),
 		AllVotes:            make(map[string][]*consensusmsg.Vote),
