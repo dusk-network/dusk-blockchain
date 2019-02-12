@@ -365,23 +365,9 @@ func (p *Peer) OnTx(msg *payload.MsgTx) {
 func (p *Peer) OnInv(msg *payload.MsgInv) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Inv, p.addr)
 	p.inch <- func() {
-		// TODO: Check if we are interested or always get the data?
-		getdata := payload.NewMsgGetData()
-		for _, vector := range msg.Vectors {
-			switch vector.Type {
-			case payload.InvTx:
-				// tx := transactions.NewTX()
-				// tx.R = vector.Hash
-				// getdata.AddTx(tx)
-			case payload.InvBlock:
-				block := block.NewBlock()
-				block.Header.Hash = vector.Hash
-				getdata.AddBlock(block)
-			default:
-				log.WithField("prefix", "peer").Errorf("Unknown InvType in '%s' msg from %s", commands.Inv, p.addr)
-			}
+		if p.cfg.Handler.OnInv != nil {
+			p.cfg.Handler.OnInv(p, msg)
 		}
-		p.Write(getdata)
 	}
 }
 
@@ -606,7 +592,7 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetData)
 		getdata := payload.NewMsgGetData()
-		getdata.AddTx(&tx)
+		getdata.AddTx(tx.R)
 		err := p.Write(getdata)
 		c <- err
 	}
