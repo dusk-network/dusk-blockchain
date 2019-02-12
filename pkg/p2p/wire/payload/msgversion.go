@@ -39,7 +39,7 @@ func NewMsgVersion(version *protocol.Version, from, to *NetAddress, services pro
 // Encode a MsgVersion struct and write to w.
 // Implements Payload interface.
 func (m *MsgVersion) Encode(w io.Writer) error {
-	if err := m.Encode(w); err != nil {
+	if err := m.Version.Encode(w); err != nil {
 		return err
 	}
 
@@ -70,7 +70,7 @@ func (m *MsgVersion) Encode(w io.Writer) error {
 // Implements Payload interface.
 func (m *MsgVersion) Decode(r io.Reader) error {
 	m.Version = &protocol.Version{}
-	if err := m.Decode(r); err != nil {
+	if err := m.Version.Decode(r); err != nil {
 		return err
 	}
 
