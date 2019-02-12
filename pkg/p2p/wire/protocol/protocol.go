@@ -10,11 +10,11 @@ const (
 	// UserAgent is a basic user agent token in the following format: /Name:Version/Name:Version/.../
 	UserAgent = "/Dusk:1.0/GO:1.11/" //TODO: Think of a better token name
 
-	// NodePeerService indicates the Node's type
-	NodePeerService ServiceFlag = 1
-	// BloomFilerService ServiceFlag = 2 // Not implemented
-	// PrunedNode        ServiceFlag = 3 // Not implemented
-	// LightNode         ServiceFlag = 4 // Not implemented
+	// FullNode indicates that a user is running the full node implementation of Dusk
+	FullNode ServiceFlag = 1
+
+	// LightNode indicates that a user is running a Dusk light node
+	// LightNode ServiceFlag = 2 // Not implemented
 )
 
 // Magic is the network that Dusk is running on

@@ -456,6 +456,7 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 
 	p.versionKnown = true
 	p.protoVer = msg.Version
+	p.services = msg.Services
 	p.createdAt = time.Now()
 	return nil
 }
