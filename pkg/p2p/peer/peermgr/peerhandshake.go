@@ -108,7 +108,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 	//ua := p.config.UserAgent
 	//sh := p.config.StartHeight()
 	//services := p.config.Services
-	version := protocol.ProtocolVersion
+	version := protocol.NodeVer
 	localIP, err := util.GetOutboundIP()
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := payload.NewNetAddress(toIP.String(), uint16(toPort))
 
-	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, p.Nonce)
+	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, protocol.FullNode, p.Nonce)
 
 	return p.Write(messageVer)
 }
