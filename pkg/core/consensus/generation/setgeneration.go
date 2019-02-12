@@ -6,9 +6,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
 
-// SignatureSet will generate a signature set message, gossip it, and
-// then collect all other messages, then retaining the most voted set for the
-// signature set reduction phase.
+// SignatureSet will generate a signature set message and gossip it.
 func SignatureSet(ctx *user.Context) error {
 	// Create our own signature set candidate message
 	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes)
