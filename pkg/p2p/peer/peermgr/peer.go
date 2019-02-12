@@ -92,16 +92,15 @@ type Peer struct {
 // Inbound as well as Outbound.
 func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
 	p := &Peer{
-		Nonce:     cfg.Nonce,
-		inch:      make(chan func(), inputBufferSize),
-		outch:     make(chan func(), outputBufferSize),
-		quitch:    make(chan struct{}, 1),
-		inbound:   inbound,
-		conn:      conn,
-		addr:      conn.RemoteAddr().String(),
-		net:       cfg.Magic,
-		createdAt: time.Now(),
-		Detector:  stall.NewDetector(responseTime, tickerInterval),
+		Nonce:    cfg.Nonce,
+		inch:     make(chan func(), inputBufferSize),
+		outch:    make(chan func(), outputBufferSize),
+		quitch:   make(chan struct{}, 1),
+		inbound:  inbound,
+		conn:     conn,
+		addr:     conn.RemoteAddr().String(),
+		net:      cfg.Magic,
+		Detector: stall.NewDetector(responseTime, tickerInterval),
 	}
 
 	return p
