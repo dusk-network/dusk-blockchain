@@ -6,7 +6,7 @@ package peermgr
 
 import (
 	"errors"
-	"math/rand"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -15,7 +15,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	cfg "github.com/spf13/viper"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -57,33 +56,12 @@ var (
 	receivedMessageFromStr = "Received a '%s' message from %s"
 )
 
-// ResponseHandler holds all response handlers related to response meesages from an external peer
-type ResponseHandler struct {
-	OnHeaders        func(*Peer, *payload.MsgHeaders)
-	OnNotFound       func(*Peer, *payload.MsgNotFound)
-	OnGetData        func(*Peer, *payload.MsgGetData)
-	OnTx             func(*Peer, *payload.MsgTx)
-	OnGetHeaders     func(*Peer, *payload.MsgGetHeaders)
-	OnAddr           func(*Peer, *payload.MsgAddr)
-	OnGetAddr        func(*Peer, *payload.MsgGetAddr)
-	OnGetBlocks      func(*Peer, *payload.MsgGetBlocks)
-	OnBlock          func(*Peer, *payload.MsgBlock)
-	OnConsensus      func(*Peer, *payload.MsgConsensus)
-	OnCertificate    func(*Peer, *payload.MsgCertificate)
-	OnCertificateReq func(*Peer, *payload.MsgCertificateReq)
-	OnMemPool        func(*Peer, *payload.MsgMemPool)
-	OnPing           func(*Peer, *payload.MsgPing)
-	OnPong           func(*Peer, *payload.MsgPong)
-	OnReject         func(*Peer, *payload.MsgReject)
-	OnInv            func(*Peer, *payload.MsgInv)
-}
-
 // Peer holds all configuration and state to be able to communicate with other peers.
 // Every Peer has a Detector that keeps track of pending messages that require a synchronous response.
 type Peer struct {
 	// Unchangeable state: concurrent safe
 	addr      string
-	protoVer  uint32
+	protoVer  *protocol.Version
 	inbound   bool
 	userAgent string
 	services  protocol.ServiceFlag
@@ -94,7 +72,7 @@ type Peer struct {
 	net  protocol.Magic
 	conn net.Conn
 
-	hndlr ResponseHandler
+	cfg *Config
 
 	// Atomic vals
 	disconnected int32
@@ -112,25 +90,20 @@ type Peer struct {
 
 // NewPeer is called after a connection to a peer was successful.
 // Inbound as well as Outbound.
-func NewPeer(conn net.Conn, inbound bool, respHndlr ResponseHandler) *Peer {
-	p := Peer{}
-	p.Nonce = rand.Uint64()
-	p.hndlr = respHndlr
-	p.inch = make(chan func(), inputBufferSize)
-	p.outch = make(chan func(), outputBufferSize)
-	p.quitch = make(chan struct{}, 1)
-	p.inbound = inbound
-	p.addr = conn.RemoteAddr().String()
+func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
+	p := &Peer{
+		Nonce:    cfg.Nonce,
+		inch:     make(chan func(), inputBufferSize),
+		outch:    make(chan func(), outputBufferSize),
+		quitch:   make(chan struct{}, 1),
+		inbound:  inbound,
+		conn:     conn,
+		addr:     conn.RemoteAddr().String(),
+		net:      cfg.Magic,
+		Detector: stall.NewDetector(responseTime, tickerInterval),
+	}
 
-	// TODO: Shouldn't this be sent by remote peer
-	p.net = protocol.Magic(uint32(cfg.GetInt("net.magic")))
-
-	p.conn = conn
-	p.createdAt = time.Now()
-
-	p.Detector = stall.NewDetector(responseTime, tickerInterval)
-
-	return &p
+	return p
 }
 
 // Write to a peer
@@ -161,7 +134,7 @@ func (p *Peer) Disconnect() {
 }
 
 // ProtocolVersion returns the protocol version
-func (p *Peer) ProtocolVersion() uint32 {
+func (p *Peer) ProtocolVersion() *protocol.Version {
 	return p.protoVer
 }
 
@@ -323,28 +296,22 @@ loop:
 			p.OnGetData(msg)
 		case *payload.MsgTx:
 			p.OnTx(msg)
-		//case *payload.MsgBinary:
-		//	p.OnBinary(msg)
-		//case *payload.MsgCandidate:
-		//	p.OnCandidate(msg)
-		//case *payload.MsgCertificate:
-		//	p.OnCertificate(msg)
-		//case *payload.MsgCertificateReq:
-		//	p.OnCertificateReq(msg)
-		//case *payload.MsgMemPool:
-		//	p.OnMemPool(msg)
+		case *payload.MsgConsensus:
+			p.OnConsensusMsg(msg)
+		case *payload.MsgCertificate:
+			p.OnCertificate(msg)
+		case *payload.MsgCertificateReq:
+			p.OnCertificateReq(msg)
+		case *payload.MsgMemPool:
+			p.OnMemPool(msg)
 		case *payload.MsgNotFound:
 			p.OnNotFound(msg)
-		//case *payload.MsgPing:
-		//	p.OnPing(msg)
-		//case *payload.MsgPong:
-		//	p.OnPong(msg)
-		//case *payload.MsgReduction:
-		//	p.OnReduction(msg)
+		case *payload.MsgPing:
+			p.OnPing(msg)
+		case *payload.MsgPong:
+			p.OnPong(msg)
 		case *payload.MsgReject:
 			p.OnReject(msg)
-		//case *payload.MsgScore:
-		//	p.OnScore(msg)
 		default:
 			log.WithField("prefix", "peer").Warnf("Did not recognise message '%s'", msg.Command()) //Do not disconnect peer, just log message
 		}
@@ -374,8 +341,8 @@ func (p *Peer) WriteLoop() {
 func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetData, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetData != nil {
-			p.hndlr.OnGetData(p, msg)
+		if p.cfg.Handler.OnGetData != nil {
+			p.cfg.Handler.OnGetData(p, msg)
 		}
 	}
 }
@@ -384,8 +351,8 @@ func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 func (p *Peer) OnTx(msg *payload.MsgTx) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Tx, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnTx != nil {
-			p.hndlr.OnTx(p, msg)
+		if p.cfg.Handler.OnTx != nil {
+			p.cfg.Handler.OnTx(p, msg)
 		}
 	}
 }
@@ -397,23 +364,9 @@ func (p *Peer) OnTx(msg *payload.MsgTx) {
 func (p *Peer) OnInv(msg *payload.MsgInv) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Inv, p.addr)
 	p.inch <- func() {
-		// TODO: Check if we are interested or always get the data?
-		getdata := payload.NewMsgGetData()
-		for _, vector := range msg.Vectors {
-			switch vector.Type {
-			case payload.InvTx:
-				// tx := transactions.NewTX()
-				// tx.R = vector.Hash
-				// getdata.AddTx(tx)
-			case payload.InvBlock:
-				block := block.NewBlock()
-				block.Header.Hash = vector.Hash
-				getdata.AddBlock(block)
-			default:
-				log.WithField("prefix", "peer").Errorf("Unknown InvType in '%s' msg from %s", commands.Inv, p.addr)
-			}
+		if p.cfg.Handler.OnInv != nil {
+			p.cfg.Handler.OnInv(p, msg)
 		}
-		p.Write(getdata)
 	}
 }
 
@@ -421,8 +374,8 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetHeaders, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetHeaders != nil {
-			p.hndlr.OnGetHeaders(p, msg)
+		if p.cfg.Handler.OnGetHeaders != nil {
+			p.cfg.Handler.OnGetHeaders(p, msg)
 		}
 	}
 }
@@ -431,8 +384,8 @@ func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
 func (p *Peer) OnAddr(msg *payload.MsgAddr) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Addr, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnAddr != nil {
-			p.hndlr.OnAddr(p, msg)
+		if p.cfg.Handler.OnAddr != nil {
+			p.cfg.Handler.OnAddr(p, msg)
 		}
 	}
 }
@@ -441,8 +394,8 @@ func (p *Peer) OnAddr(msg *payload.MsgAddr) {
 func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetAddr, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetAddr != nil {
-			p.hndlr.OnGetAddr(p, msg)
+		if p.cfg.Handler.OnGetAddr != nil {
+			p.cfg.Handler.OnGetAddr(p, msg)
 		}
 	}
 }
@@ -451,18 +404,18 @@ func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
 func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetBlocks, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnGetBlocks != nil {
-			p.hndlr.OnGetBlocks(p, msg)
+		if p.cfg.Handler.OnGetBlocks != nil {
+			p.cfg.Handler.OnGetBlocks(p, msg)
 		}
 	}
 }
 
 // OnBlock Listener. Is called after receiving a 'blocks' msg
 func (p *Peer) OnBlock(msg *payload.MsgBlock) {
-	log.WithField("prefix", "peer").Infof("Received a '%s' message (Height=%d) from %s", commands.Block, msg.Block.Header.Height, p.addr)
+	log.WithField("prefix", "peer").Debugf("Received a '%s' message (Height=%d) from %s", commands.Block, msg.Block.Header.Height, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnBlock != nil {
-			p.hndlr.OnBlock(p, msg)
+		if p.cfg.Handler.OnBlock != nil {
+			p.cfg.Handler.OnBlock(p, msg)
 		}
 	}
 }
@@ -474,21 +427,21 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	if msg.Nonce == p.Nonce {
 		log.WithField("prefix", "peer").Infof("Received '%s' message from yourself", commands.Version)
 		p.conn.Close()
-		return errors.New("Self connection, disconnecting Peer")
+		return errors.New("self connection, peer disconnected")
 	}
 
-	if protocol.ProtocolVersion != msg.Version {
-		log.WithField("prefix", "peer").Infof("Received an invalid '%s' message from %s\n"+
-			"Dusk backwards compatible Version Management not implemented yet", commands.Version, p.addr)
+	if protocol.NodeVer.Major != msg.Version.Major {
+		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
+		log.WithField("prefix", "peer").Infof("Incompatible protocol version")
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
-		return p.Write(rejectMsg)
+		p.Write(rejectMsg)
+
+		return errors.New(err)
 	}
 
 	p.versionKnown = true
 	p.protoVer = msg.Version
-	//p.services = msg.Services
-	//p.userAgent = string(msg.UserAgent)
-	//p.relay = msg.Relay
+	p.services = msg.Services
 	p.createdAt = time.Now()
 	return nil
 }
@@ -496,7 +449,17 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 // OnVerack Listener will be called during the handshake.
 // This should only ever be called during the handshake. Any other place and the peer will disconnect.
 func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.VerAck, p.addr)
+	return nil
+}
+
+// OnConsensusMsg is called when the node receives a consensus message
+func (p *Peer) OnConsensusMsg(msg *payload.MsgConsensus) error {
+	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Consensus, p.addr)
+	p.inch <- func() {
+		if p.cfg.Handler.OnConsensus != nil {
+			p.cfg.Handler.OnConsensus(p, msg)
+		}
+	}
 	return nil
 }
 
@@ -504,8 +467,8 @@ func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
 func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Headers, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnHeaders != nil {
-			p.hndlr.OnHeaders(p, msg)
+		if p.cfg.Handler.OnHeaders != nil {
+			p.cfg.Handler.OnHeaders(p, msg)
 		}
 	}
 }
@@ -514,8 +477,8 @@ func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
 func (p *Peer) OnConsensus(msg *payload.MsgConsensus) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Consensus, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnConsensus != nil {
-			p.hndlr.OnConsensus(p, msg)
+		if p.cfg.Handler.OnConsensus != nil {
+			p.cfg.Handler.OnConsensus(p, msg)
 		}
 	}
 }
@@ -524,8 +487,8 @@ func (p *Peer) OnConsensus(msg *payload.MsgConsensus) {
 func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Certificate, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnCertificate != nil {
-			p.hndlr.OnCertificate(p, msg)
+		if p.cfg.Handler.OnCertificate != nil {
+			p.cfg.Handler.OnCertificate(p, msg)
 		}
 	}
 }
@@ -534,8 +497,8 @@ func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
 func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.CertificateReq, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnCertificateReq != nil {
-			p.hndlr.OnCertificateReq(p, msg)
+		if p.cfg.Handler.OnCertificateReq != nil {
+			p.cfg.Handler.OnCertificateReq(p, msg)
 		}
 	}
 }
@@ -544,8 +507,8 @@ func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
 func (p *Peer) OnMemPool(msg *payload.MsgMemPool) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.MemPool, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnMemPool != nil {
-			p.hndlr.OnMemPool(p, msg)
+		if p.cfg.Handler.OnMemPool != nil {
+			p.cfg.Handler.OnMemPool(p, msg)
 		}
 	}
 }
@@ -564,8 +527,8 @@ func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
 		}
 	}
 	p.inch <- func() {
-		if p.hndlr.OnNotFound != nil {
-			p.hndlr.OnNotFound(p, msg)
+		if p.cfg.Handler.OnNotFound != nil {
+			p.cfg.Handler.OnNotFound(p, msg)
 		}
 	}
 }
@@ -574,8 +537,8 @@ func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
 func (p *Peer) OnPing(msg *payload.MsgPing) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Ping, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnPing != nil {
-			p.hndlr.OnPing(p, msg)
+		if p.cfg.Handler.OnPing != nil {
+			p.cfg.Handler.OnPing(p, msg)
 		}
 	}
 }
@@ -584,8 +547,8 @@ func (p *Peer) OnPing(msg *payload.MsgPing) {
 func (p *Peer) OnPong(msg *payload.MsgPong) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Pong, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnPong != nil {
-			p.hndlr.OnPong(p, msg)
+		if p.cfg.Handler.OnPong != nil {
+			p.cfg.Handler.OnPong(p, msg)
 		}
 	}
 }
@@ -594,8 +557,8 @@ func (p *Peer) OnPong(msg *payload.MsgPong) {
 func (p *Peer) OnReject(msg *payload.MsgReject) {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Reject, p.addr)
 	p.inch <- func() {
-		if p.hndlr.OnReject != nil {
-			p.hndlr.OnReject(p, msg)
+		if p.cfg.Handler.OnReject != nil {
+			p.cfg.Handler.OnReject(p, msg)
 		}
 	}
 }
@@ -629,7 +592,7 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetData)
 		getdata := payload.NewMsgGetData()
-		getdata.AddTx(&tx)
+		getdata.AddTx(tx.R)
 		err := p.Write(getdata)
 		c <- err
 	}
@@ -641,7 +604,7 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 // It will put a function on the outgoing peer queue to send a 'getdata' msg to an other peer.
 // The same possible function error will be returned from this method.
 func (p *Peer) RequestBlocks(hashes [][]byte) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
+	log.WithField("prefix", "peer").Debugf("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
 	blocks := make([]*block.Block, 0, len(hashes))

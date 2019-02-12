@@ -75,7 +75,7 @@ func (bdb *BlockchainDB) WriteHeaders(hdrs []*block.Header) error {
 	}
 
 	log.WithField("prefix", "database").
-		Infof("Writing block headers (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
+		Debugf("Writing block headers (start height=%d, end height=%d)", sortedHdrs[0].Height, sortedHdrs[len(sortedHdrs)-1].Height)
 
 	return nil
 }
@@ -117,6 +117,7 @@ func (bdb *BlockchainDB) WriteBlockTransactions(blocks []*block.Block) error {
 		log.WithField("prefix", "database").Error(errAddTransactionDbStr)
 		return err
 	}
+	log.WithField("prefix", "database").Debugf("Writing block (start height=%d, end height=%d)", blocks[0].Header.Height, blocks[len(blocks)-1].Header.Height)
 
 	return nil
 }
@@ -146,7 +147,7 @@ func (bdb *BlockchainDB) ReadHeaders(start []byte, stop []byte) ([]*block.Header
 	headersLen := stopHeight - startHeight
 	if headersLen > uint64(maxRetrievableHeaders) {
 		headersLen = maxRetrievableHeaders
-		stopHeight = startHeight + 2000
+		stopHeight = startHeight + maxRetrievableHeaders
 	}
 	log.WithField("prefix", "database").Debugf("Read headers from db with start height %d and stop height %d", startHeight, stopHeight)
 

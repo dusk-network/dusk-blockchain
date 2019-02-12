@@ -56,9 +56,24 @@ func (p *Peer) inboundHandShake() error {
 	if err = p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
-	if err = p.readRemoteMsgVersion(); err != nil {
+
+	readmsg, err := wire.ReadMessage(p.conn, p.Net())
+	if err != nil {
 		return err
 	}
+
+	switch msg := readmsg.(type) {
+	case *payload.MsgReject:
+		p.Disconnect()
+	case *payload.MsgVersion:
+		if err := p.OnVersion(msg); err != nil {
+			return err
+		}
+	default:
+		log.WithField("prefix", "peer").Warnf("Did not recognise message '%s'", msg.Command())
+		p.Disconnect()
+	}
+
 	verack := payload.NewMsgVerAck()
 	err = p.Write(verack)
 	return p.readVerack()
@@ -93,7 +108,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 	//ua := p.config.UserAgent
 	//sh := p.config.StartHeight()
 	//services := p.config.Services
-	version := protocol.ProtocolVersion
+	version := protocol.NodeVer
 	localIP, err := util.GetOutboundIP()
 	if err != nil {
 		return err
@@ -107,7 +122,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := payload.NewNetAddress(toIP.String(), uint16(toPort))
 
-	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, p.Nonce)
+	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, protocol.FullNode, p.Nonce)
 
 	return p.Write(messageVer)
 }
@@ -120,8 +135,8 @@ func (p *Peer) readRemoteMsgVersion() error {
 
 	version, ok := readmsg.(*payload.MsgVersion)
 	if !ok {
-		error := fmt.Sprintf("Did not receive the expected '%s' message", commands.Version)
-		return errors.New(error)
+		err := fmt.Sprintf("Did not receive the expected '%s' message", commands.Version)
+		return errors.New(err)
 	}
 
 	return p.OnVersion(version)

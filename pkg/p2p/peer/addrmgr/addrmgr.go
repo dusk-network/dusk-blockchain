@@ -3,11 +3,13 @@ package addrmgr
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"math/rand"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
@@ -43,13 +45,28 @@ type Addrmgr struct {
 
 // New creates a new address manager
 func New() *Addrmgr {
-	return &Addrmgr{
+	am := &Addrmgr{
 		sync.RWMutex{},
 		make(map[*payload.NetAddress]addrStats, 100),
 		make(map[*payload.NetAddress]struct{}, 100),
 		make(map[*payload.NetAddress]addrStats, 100),
 		make(map[string]*payload.NetAddress, 100),
 	}
+
+	am.AddAddrs(am.getPermanentAddresses())
+	return am
+}
+
+func (a *Addrmgr) getPermanentAddresses() []*payload.NetAddress {
+	// Add the (permanent) seed addresses to the Address Manager
+	var netAddrs []*payload.NetAddress
+	addrs := config.EnvNetCfg.Peer.Seeds
+	for _, addr := range addrs {
+		s := strings.Split(addr, ":")
+		port, _ := strconv.ParseUint(s[1], 10, 16)
+		netAddrs = append(netAddrs, payload.NewNetAddress(s[0], uint16(port)))
+	}
+	return netAddrs
 }
 
 // AddAddrs will add new addresses into the newaddr list
@@ -226,38 +243,27 @@ func (a *Addrmgr) Failed(addr string) {
 
 }
 
-// OnAddr is the responder for the Config file when a OnAddr is received by a peer
-func (a *Addrmgr) OnAddr(p *peermgr.Peer, msg *payload.MsgAddr) {
-	a.AddAddrs(msg.Addresses)
-}
-
-// OnGetAddr is called when a peer sends a request for the addressList.
-// We will give them the best addresses we have from good.
-func (a *Addrmgr) OnGetAddr(p *peermgr.Peer, msg *payload.MsgGetAddr) {
+// GetGoodAddresses give the best addresses we have from good.
+// TODO: Remove, is duplicate of Good()
+func (a *Addrmgr) GetGoodAddresses() []payload.NetAddress {
 	a.addrmtx.RLock()
 	defer a.addrmtx.RUnlock()
-	// Push most recent peers to peer
-	addrMsg := payload.NewMsgAddr()
-	for _, add := range a.Good() {
-		addrMsg.AddAddr(&add)
-	}
-
-	p.Write(addrMsg)
+	return a.Good()
 }
 
-// NewAddr will return an address for the external caller to connect to.
+// NewAddres will return an address for the caller to connect to.
 // In our case, it will be the connection manager.
-func (a *Addrmgr) NewAddr() (*payload.NetAddress, error) {
+func (a *Addrmgr) NewAddres() (string, error) {
 	// For now it just returns a random value from unconnected
 	// TODO: When an address is tried, the address manager is notified.
 	// When asked for a new address, this should be taken into account
 	// when choosing a new one, also the number of retries.
 	unconnected := a.Unconnected()
 	if len(unconnected) == 0 {
-		return nil, fmt.Errorf("Failed to issue a new peer address to connect to")
+		return "", fmt.Errorf("Failed to issue a new peer address to connect to")
 	}
-	randInt := rand.Intn(len(unconnected))
-	return &unconnected[randInt], nil
+	rand := rand.Intn(len(unconnected))
+	return unconnected[rand].String(), nil
 }
 
 // https://www.dotnetperls.com/duplicates-go
