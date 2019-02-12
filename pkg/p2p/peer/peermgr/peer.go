@@ -61,7 +61,7 @@ var (
 type Peer struct {
 	// Unchangeable state: concurrent safe
 	addr      string
-	protoVer  uint32
+	protoVer  *protocol.Version
 	inbound   bool
 	userAgent string
 	services  protocol.ServiceFlag
@@ -134,7 +134,7 @@ func (p *Peer) Disconnect() {
 }
 
 // ProtocolVersion returns the protocol version
-func (p *Peer) ProtocolVersion() uint32 {
+func (p *Peer) ProtocolVersion() *protocol.Version {
 	return p.protoVer
 }
 
@@ -444,7 +444,7 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 		return errors.New("self connection, peer disconnected")
 	}
 
-	if protocol.ProtocolVersion != msg.Version {
+	if protocol.NodeVer.Major != msg.Version.Major {
 		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
 		log.WithField("prefix", "peer").Infof("Incompatible protocol version")
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")

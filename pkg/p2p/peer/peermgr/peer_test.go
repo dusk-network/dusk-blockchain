@@ -297,7 +297,13 @@ func TestHandshakeWrongVersion(t *testing.T) {
 		fromAddr := payload.NewNetAddress("", 20338)
 		toAddr := payload.NewNetAddress("", 20338)
 
-		messageVer := payload.NewMsgVersion(10001, fromAddr, toAddr, rand.Uint64())
+		pver := &protocol.Version{
+			Major: 1,
+			Minor: 0,
+			Patch: 0,
+		}
+
+		messageVer := payload.NewMsgVersion(pver, fromAddr, toAddr, protocol.FullNode, rand.Uint64())
 
 		if err := wire.WriteMessage(conn, protocol.DevNet, messageVer); err != nil {
 			t.Fatal(err)
@@ -412,7 +418,7 @@ func sendAndReadVersion(t *testing.T, conn net.Conn, nonce uint64) (*payload.Msg
 	fromAddr := payload.NewNetAddress("", 20338)
 	toAddr := payload.NewNetAddress("", 20338)
 
-	msgVersion := payload.NewMsgVersion(protocol.ProtocolVersion, fromAddr, toAddr, nonce)
+	msgVersion := payload.NewMsgVersion(protocol.NodeVer, fromAddr, toAddr, protocol.FullNode, nonce)
 	if err := wire.WriteMessage(conn, protocol.DevNet, msgVersion); err != nil {
 		return nil, err
 	}
