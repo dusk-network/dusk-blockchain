@@ -67,7 +67,6 @@ type Peer struct {
 	services  protocol.ServiceFlag
 	createdAt time.Time
 	relay     bool
-	Nonce     uint64
 
 	net  protocol.Magic
 	conn net.Conn
@@ -92,7 +91,6 @@ type Peer struct {
 // Inbound as well as Outbound.
 func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
 	p := &Peer{
-		Nonce:    cfg.Nonce,
 		inch:     make(chan func(), inputBufferSize),
 		outch:    make(chan func(), outputBufferSize),
 		quitch:   make(chan struct{}, 1),
@@ -101,6 +99,7 @@ func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
 		addr:     conn.RemoteAddr().String(),
 		net:      cfg.Magic,
 		Detector: stall.NewDetector(responseTime, tickerInterval),
+		cfg:      cfg,
 	}
 
 	return p
@@ -424,7 +423,7 @@ func (p *Peer) OnBlock(msg *payload.MsgBlock) {
 // This should only ever be called during the handshake. Any other place and the peer will disconnect.
 func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Version, p.addr)
-	if msg.Nonce == p.Nonce {
+	if msg.Nonce == p.cfg.Nonce {
 		log.WithField("prefix", "peer").Infof("Received '%s' message from yourself", commands.Version)
 		p.conn.Close()
 		return errors.New("self connection, peer disconnected")

@@ -122,7 +122,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := payload.NewNetAddress(toIP.String(), uint16(toPort))
 
-	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, protocol.FullNode, p.Nonce)
+	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, protocol.FullNode, p.cfg.Nonce)
 
 	return p.Write(messageVer)
 }
