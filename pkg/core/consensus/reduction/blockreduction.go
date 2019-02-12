@@ -71,9 +71,14 @@ func Block(ctx *user.Context) error {
 	}
 
 	// If we did get a result, send block set agreement message
-	if err := agreement.SendBlock(ctx, ctx.BlockVotes); err != nil {
+	if err := agreement.SendBlock(ctx); err != nil {
 		return err
 	}
+
+	// Copy BlockVotes into SigSetVotes, in case we terminate a bit later
+	// and BlockVotes will have been emptied.
+	ctx.SigSetVotes = nil
+	ctx.SigSetVotes = append(ctx.SigSetVotes, ctx.BlockVotes...)
 
 	return nil
 }

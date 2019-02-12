@@ -62,7 +62,7 @@ func SignatureSet(ctx *user.Context) error {
 	}
 
 	// If we got a result, send set agreement message
-	if err := agreement.SendSigSet(ctx, ctx.SigSetVotes); err != nil {
+	if err := agreement.SendSigSet(ctx); err != nil {
 		return err
 	}
 
