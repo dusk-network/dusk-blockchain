@@ -1,4 +1,4 @@
-package consensus
+package user
 
 import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"

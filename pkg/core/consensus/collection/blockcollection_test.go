@@ -1,15 +1,17 @@
-package consensus_test
+package collection_test
 
 import (
 	"sync"
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 
@@ -18,10 +20,12 @@ import (
 
 func TestBlockCollection(t *testing.T) {
 	// Lower candidate timer to prevent waiting times
-	consensus.CandidateTime = 5 * time.Second
+	user.CandidateTime = 5 * time.Second
 
-	// Create a dummy context
-	ctx, err := provisionerContext()
+	// Create context
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := user.NewRandKeys()
+	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +42,7 @@ func TestBlockCollection(t *testing.T) {
 
 	// Make candidate payload and message
 	pl := consensusmsg.NewCandidate(blk)
-	sigEd, err := consensus.CreateSignature(ctx, pl)
+	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +65,7 @@ func TestBlockCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sigEd2, err := consensus.CreateSignature(ctx, pl2)
+	sigEd2, err := ctx.CreateSignature(pl2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +76,7 @@ func TestBlockCollection(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		if err := consensus.BlockCollection(ctx); err != nil {
+		if err := collection.Block(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -92,21 +96,23 @@ func TestBlockCollection(t *testing.T) {
 	assert.NotNil(t, ctx.CandidateBlocks)
 
 	// Reset candidate timer
-	consensus.CandidateTime = 60 * time.Second
+	user.CandidateTime = 60 * time.Second
 }
 
 func TestBlockCollectionNoBlock(t *testing.T) {
 	// Lower candidate timer to prevent waiting times
-	consensus.CandidateTime = 1 * time.Second
+	user.CandidateTime = 1 * time.Second
 
-	// Create a dummy context
-	ctx, err := provisionerContext()
+	// Create context
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := user.NewRandKeys()
+	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Run block collection and let it time out
-	if err := consensus.BlockCollection(ctx); err != nil {
+	if err := collection.Block(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,5 +121,5 @@ func TestBlockCollectionNoBlock(t *testing.T) {
 	assert.Empty(t, ctx.CandidateBlocks)
 
 	// Reset candidate timer
-	consensus.CandidateTime = 60 * time.Second
+	user.CandidateTime = 60 * time.Second
 }

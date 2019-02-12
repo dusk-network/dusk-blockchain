@@ -1,6 +1,8 @@
-package consensus
+package user
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -24,6 +27,7 @@ var (
 	MaxSteps      uint8 = 50
 	StepTime            = 20 * time.Second
 	CandidateTime       = 60 * time.Second
+	CommitteeSize uint8 = 50
 )
 
 // Context will hold all the necessary functions and
@@ -41,6 +45,7 @@ type Context struct {
 	K          []byte        // secret
 	Keys       *Keys
 	Magic      protocol.Magic
+	Multiplier uint8 // Time multiplier
 
 	// Block generator values
 	D          uint64 // bidWeight
@@ -48,30 +53,28 @@ type Context struct {
 	Q          uint64
 
 	// Provisioner values
-	// General
+	/// General
 	Weight      uint64             // Amount this node has staked
 	W           uint64             // Total stake weight of the network
-	Score       []byte             // Sortition score of this node
-	Votes       uint64             // Sortition votes of this node
-	VoteLimit   uint64             // Votes needed to decide on a block
-	Empty       bool               // Whether or not the block being voted on is empty
 	Certificate *block.Certificate // Block certificate to be constructed during consensus
 
-	// Block fields
+	/// Block fields
 	CandidateBlocks map[string]*block.Block // Blocks kept from candidate collection, mapped to their hashes
 	BlockHash       []byte                  // Block hash currently being voted on by this node
 	BlockVotes      []*consensusmsg.Vote    // Vote set for block set agreement phase
 
-	// Signature set fields
+	/// Signature set fields
 	AllVotes    map[string][]*consensusmsg.Vote // Mapping of hashes to vote sets received during signature set generation
 	SigSetVotes []*consensusmsg.Vote            // Vote set for signature set agreement phase
 	SigSetHash  []byte                          // Hash of the signature vote set being voted on
 
-	// Tracking fields
-	NodeWeights map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
-	NodeBLS     map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
+	/// Tracking fields
+	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
+	CurrentCommittee [][]byte          // Set of public keys of committee members for a current step
+	NodeWeights      map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
+	NodeBLS          map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
 
-	// Message channels
+	/// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
 	CandidateChan       chan *payload.MsgConsensus
 	ReductionChan       chan *payload.MsgConsensus
@@ -81,6 +84,7 @@ type Context struct {
 
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
+	HashVotes   func([]*consensusmsg.Vote) ([]byte, error)
 	SendMessage func(magic protocol.Magic, p wire.Payload) error
 
 	// Key functions
@@ -109,6 +113,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Round:               round,
 		Seed:                seed,
 		Magic:               magic,
+		Multiplier:          1,
 		Certificate:         &block.Certificate{},
 		D:                   d,
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
@@ -121,6 +126,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		CandidateBlocks:     make(map[string]*block.Block),
 		AllVotes:            make(map[string][]*consensusmsg.Vote),
 		GetAllTXs:           getAllTXs,
+		HashVotes:           hashVotes,
 		BLSSign:             bLSSign,
 		BLSVerify:           blsVerify,
 		EDSign:              edSign,
@@ -147,11 +153,7 @@ func (c *Context) Reset() {
 	c.Q = 0
 
 	// Provisioner
-	c.Score = nil
-	c.Votes = 0
-	c.VoteLimit = 0
 	c.BlockHash = nil
-	c.Empty = false
 	c.Step = 1
 	c.Certificate = &block.Certificate{}
 	c.CandidateBlocks = make(map[string]*block.Block)
@@ -172,6 +174,24 @@ func (c *Context) Clear() {
 	c.BLSVerify = nil
 	c.GetAllTXs = nil
 	c.Keys = nil
+}
+
+// CreateSignature will return the byte representation of a consensus message that
+// is signed with Ed25519.
+func (c *Context) CreateSignature(pl consensusmsg.Msg) ([]byte, error) {
+	edMsg := make([]byte, 12)
+	binary.LittleEndian.PutUint32(edMsg[0:], c.Version)
+	binary.LittleEndian.PutUint64(edMsg[4:], c.Round)
+	edMsg = append(edMsg, c.LastHeader.Hash...)
+	edMsg = append(edMsg, byte(c.Step))
+	edMsg = append(edMsg, byte(pl.Type()))
+	buf := new(bytes.Buffer)
+	if err := pl.Encode(buf); err != nil {
+		return nil, err
+	}
+
+	edMsg = append(edMsg, buf.Bytes()...)
+	return c.EDSign(c.Keys.EdSecretKey, edMsg), nil
 }
 
 // dummy functions
@@ -210,6 +230,25 @@ func getAllTXs() []*transactions.Stealth {
 	tx.R = sig
 
 	return []*transactions.Stealth{tx}
+}
+
+// HashVotes returns the hash of the passed vote set
+func hashVotes(votes []*consensusmsg.Vote) ([]byte, error) {
+	// Encode signature set
+	buf := new(bytes.Buffer)
+	for _, vote := range votes {
+		if err := vote.Encode(buf); err != nil {
+			return nil, err
+		}
+	}
+
+	// Hash bytes and set it on context
+	sigSetHash, err := hash.Sha3256(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return sigSetHash, nil
 }
 
 // Sign with BLS and return the compressed signature

@@ -24,7 +24,7 @@ func TestVoteEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vote, err := NewVote(byte32, pkBLS, sigBLS, sigBLS, 1)
+	vote, err := NewVote(byte32, pkBLS, sigBLS, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,15 +58,11 @@ func TestVoteChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewVote(sigBLS, pkBLS, sigBLS, sigBLS, 1); err == nil {
+	if _, err := NewVote(sigBLS, pkBLS, sigBLS, 1); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewVote(byte32, pkBLS, byte32, sigBLS, 1); err == nil {
+	if _, err := NewVote(byte32, pkBLS, byte32, 1); err == nil {
 		t.Fatal("check for sig did not work")
-	}
-
-	if _, err := NewVote(byte32, pkBLS, sigBLS, byte32, 1); err == nil {
-		t.Fatal("check for score did not work")
 	}
 }
