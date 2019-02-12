@@ -121,10 +121,10 @@ func TestSendSigSetAgreement(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	ctx.BlockVotes = votes
+	ctx.SigSetVotes = votes
 
 	// Send the set agreement message with the vote set we just created
-	if err := agreement.SendSigSet(ctx, ctx.BlockVotes); err != nil {
+	if err := agreement.SendSigSet(ctx); err != nil {
 		t.Fatal(err)
 	}
 

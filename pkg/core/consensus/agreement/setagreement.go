@@ -80,15 +80,15 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 	}
 }
 
-// SendSigSet will send out a signature set agreement message with the passed vote set.
-func SendSigSet(ctx *user.Context, votes []*consensusmsg.Vote) error {
+// SendSigSet will send out a signature set agreement message.
+func SendSigSet(ctx *user.Context) error {
 	// Create payload, signature and message
-	hash, err := ctx.HashVotes(votes)
+	hash, err := ctx.HashVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}
 
-	pl, err := consensusmsg.NewSigSetAgreement(ctx.BlockHash, hash, votes)
+	pl, err := consensusmsg.NewSigSetAgreement(ctx.BlockHash, hash, ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}

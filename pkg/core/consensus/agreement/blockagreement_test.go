@@ -128,7 +128,7 @@ func TestSendBlockAgreement(t *testing.T) {
 	ctx.BlockVotes = votes
 
 	// Send the set agreement message with the vote set we just created
-	if err := agreement.SendBlock(ctx, ctx.BlockVotes); err != nil {
+	if err := agreement.SendBlock(ctx); err != nil {
 		t.Fatal(err)
 	}
 

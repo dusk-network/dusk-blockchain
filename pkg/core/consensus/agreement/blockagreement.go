@@ -40,10 +40,6 @@ func Block(ctx *user.Context, c chan bool) {
 				break
 			}
 
-			// Set our own vote set as the signature set for signature
-			// set generation, which should follow after this
-			ctx.SigSetVotes = ctx.BlockVotes
-
 			// Populate certificate
 			ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.BlockVotes))
 			for i := 0; i < len(ctx.BlockVotes); i++ {
@@ -85,9 +81,10 @@ func Block(ctx *user.Context, c chan bool) {
 	}
 }
 
-// SendBlock will send out a block agreement message with the passed vote set.
-func SendBlock(ctx *user.Context, votes []*consensusmsg.Vote) error {
-	pl, err := consensusmsg.NewBlockAgreement(ctx.BlockHash, votes)
+// SendBlock will send out a block agreement message.
+func SendBlock(ctx *user.Context) error {
+	// Create payload and message
+	pl, err := consensusmsg.NewBlockAgreement(ctx.BlockHash, ctx.BlockVotes)
 	if err != nil {
 		return err
 	}
