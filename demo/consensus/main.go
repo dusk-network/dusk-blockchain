@@ -7,7 +7,7 @@ import (
 
 func main() {
 
-	if len(os.Args) < 3 { // [programName, port, peers...]
+	if len(os.Args) < 2 { // [programName, port,...]
 		fmt.Println("Please enter more arguments")
 		os.Exit(1)
 	}
@@ -15,9 +15,15 @@ func main() {
 	args := os.Args[1:] // [port, peers...]
 
 	port := args[0]
-	peers := args[1:]
+
+	var peers []string
+	if len(args) > 1 {
+		peers = args[1:]
+	}
 
 	fmt.Println(port, peers)
+
+	// connect to the peers in the list
 	for {
 	}
 }
