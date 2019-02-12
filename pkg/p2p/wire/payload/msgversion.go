@@ -14,7 +14,7 @@ import (
 // MsgVersion declares a version message on the Dusk wire protocol.
 // This is used by a node to advertise itself to peers on the network.
 type MsgVersion struct {
-	Version     uint32
+	Version     *protocol.Version
 	Timestamp   uint32
 	FromAddress *NetAddress
 	ToAddress   *NetAddress
@@ -24,7 +24,7 @@ type MsgVersion struct {
 
 // NewMsgVersion returns a populated MsgVersion struct. The node's
 // I2P address should be passed as an argument.
-func NewMsgVersion(version uint32, from, to *NetAddress, services protocol.ServiceFlag,
+func NewMsgVersion(version *protocol.Version, from, to *NetAddress, services protocol.ServiceFlag,
 	nonce uint64) *MsgVersion {
 	return &MsgVersion{
 		Version:     version,
@@ -39,7 +39,7 @@ func NewMsgVersion(version uint32, from, to *NetAddress, services protocol.Servi
 // Encode a MsgVersion struct and write to w.
 // Implements Payload interface.
 func (m *MsgVersion) Encode(w io.Writer) error {
-	if err := encoding.WriteUint32(w, binary.LittleEndian, uint32(m.Version)); err != nil {
+	if err := m.Encode(w); err != nil {
 		return err
 	}
 
@@ -69,7 +69,8 @@ func (m *MsgVersion) Encode(w io.Writer) error {
 // Decode a MsgVersion from r.
 // Implements Payload interface.
 func (m *MsgVersion) Decode(r io.Reader) error {
-	if err := encoding.ReadUint32(r, binary.LittleEndian, &m.Version); err != nil {
+	m.Version = &protocol.Version{}
+	if err := m.Decode(r); err != nil {
 		return err
 	}
 
