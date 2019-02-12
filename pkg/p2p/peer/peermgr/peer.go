@@ -68,7 +68,6 @@ type Peer struct {
 	createdAt time.Time
 	relay     bool
 
-	net  protocol.Magic
 	conn net.Conn
 
 	cfg *Config
@@ -97,7 +96,6 @@ func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
 		inbound:  inbound,
 		conn:     conn,
 		addr:     conn.RemoteAddr().String(),
-		net:      cfg.Magic,
 		Detector: stall.NewDetector(responseTime, tickerInterval),
 		cfg:      cfg,
 	}
@@ -107,12 +105,12 @@ func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
 
 // Write to a peer
 func (p *Peer) Write(msg wire.Payload) error {
-	return wire.WriteMessage(p.conn, p.net, msg)
+	return wire.WriteMessage(p.conn, p.cfg.Magic, msg)
 }
 
 // Read from a peer
 func (p *Peer) Read() (wire.Payload, error) {
-	return wire.ReadMessage(p.conn, p.net)
+	return wire.ReadMessage(p.conn, p.cfg.Magic)
 }
 
 // Disconnect disconnects from a peer
@@ -139,7 +137,7 @@ func (p *Peer) ProtocolVersion() *protocol.Version {
 
 // Net returns the protocol magic
 func (p *Peer) Net() protocol.Magic {
-	return p.net
+	return p.cfg.Magic
 }
 
 // Port returns the port
