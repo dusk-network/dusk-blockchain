@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
 )
 
 func main() {
@@ -39,15 +38,6 @@ func main() {
 	// connect to the peers in the list
 	for {
 	}
-}
-
-func Dial(addr string) (net.Conn, error) {
-	dialTimeout := 1 * time.Second
-	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
 }
 
 func OnAccept(conn net.Conn) {
