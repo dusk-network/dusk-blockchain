@@ -4,9 +4,6 @@ package protocol
 type ServiceFlag uint64
 
 const (
-	// ProtocolVersion is the current protocol version
-	ProtocolVersion uint32 = 10000
-
 	// UserAgent is a basic user agent token in the following format: /Name:Version/Name:Version/.../
 	UserAgent = "/Dusk:1.0/GO:1.11/" //TODO: Think of a better token name
 
@@ -16,6 +13,13 @@ const (
 	// LightNode indicates that a user is running a Dusk light node
 	// LightNode ServiceFlag = 2 // Not implemented
 )
+
+// NodeVer is the current node version.
+var NodeVer = &Version{
+	Major: 0,
+	Minor: 1,
+	Patch: 0,
+}
 
 // Magic is the network that Dusk is running on
 type Magic uint32
