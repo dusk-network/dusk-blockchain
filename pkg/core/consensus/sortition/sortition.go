@@ -1,143 +1,63 @@
 package sortition
 
 import (
+	"bytes"
 	"encoding/binary"
-	"errors"
+	"encoding/hex"
 	"math/big"
-	"strings"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
-
-	"gonum.org/v1/gonum/stat/distuv"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
-// Role contains information about a node performing consensus.
-type Role struct {
-	Part  string
-	Round uint64
-	Step  uint8
-}
+// CreateCommittee will run the deterministic sortition function, which determines
+// who will be in the committee for a given step.
+func CreateCommittee(round, totalWeight uint64, step, size uint8,
+	committee [][]byte, stakes map[string]uint64) ([][]byte, error) {
+	var currentCommittee [][]byte
+	W := new(big.Int).SetUint64(totalWeight)
+	for i := uint8(0); i < size; i++ {
+		// Create message to hash
+		msg := make([]byte, 10)
+		binary.LittleEndian.PutUint64(msg[:8], round)
+		msg = append(msg, byte(step))
+		msg = append(msg, byte(i))
 
-var (
-	i       = big.NewInt(2)
-	e       = big.NewInt(256)
-	lenHash = i.Exp(i, e, nil)
-
-	// MinimumStake is the minimum stake needed to be eligible for sortition
-	MinimumStake uint64 = 100
-)
-
-// Prove will run the sortition function for the passed context and role.
-func Prove(seed []byte, sk *bls.SecretKey, pk *bls.PublicKey, role *Role,
-	threshold, weight, totalWeight uint64) (uint64, []byte, *prerror.PrError) {
-	// Construct message
-	msg := append(seed, []byte(role.Part)...)
-	round := make([]byte, 8)
-	binary.LittleEndian.PutUint64(round, role.Round)
-	msg = append(msg, round...)
-	msg = append(msg, byte(role.Step))
-
-	// Generate score
-	sig, err := bls.Sign(sk, pk, msg)
-	if err != nil {
-		return 0, nil, prerror.New(prerror.High, err)
-	}
-
-	// Compress score
-	score := sig.Compress()
-
-	// Generate votes
-	votes, err := calcVotes(threshold, weight, totalWeight, score)
-	if err != nil {
-		return 0, nil, prerror.New(prerror.Low, err)
-	}
-
-	return votes, score, nil
-}
-
-// Verify will run the sortition function for another node's information.
-func Verify(seed, score, pk []byte, role *Role, threshold, stake,
-	totalWeight uint64) (uint64, *prerror.PrError) {
-	if scoreErr := verifyScore(seed, score, pk, role); scoreErr != nil {
-		return 0, scoreErr
-	}
-
-	votes, err := calcVotes(threshold, stake, totalWeight, score)
-	if err != nil {
-		return 0, prerror.New(prerror.Low, err)
-	}
-
-	return votes, nil
-}
-
-func verifyScore(seed, score, pkBytes []byte, role *Role) *prerror.PrError {
-	// Construct message
-	msg := append(seed, []byte(role.Part)...)
-	round := make([]byte, 8)
-	binary.LittleEndian.PutUint64(round, role.Round)
-	msg = append(msg, round...)
-	msg = append(msg, byte(role.Step))
-
-	// And verify
-	pk := &bls.PublicKey{}
-	pk.Unmarshal(pkBytes)
-	apk := bls.NewApk(pk)
-
-	sig := &bls.Signature{}
-	sig.Decompress(score)
-
-	if err := bls.Verify(apk, msg, sig); err != nil {
-		if strings.Contains(err.Error(), "Invalid Signature") {
-			return prerror.New(prerror.Low, err)
+		// Hash message
+		hash, err := hash.Sha3256(msg)
+		if err != nil {
+			return nil, err
 		}
 
-		return prerror.New(prerror.High, err)
+		// Generate score
+		hashNum := new(big.Int).SetBytes(hash)
+		scoreNum := new(big.Int).Mod(hashNum, W)
+		score := scoreNum.Uint64()
+
+		// Walk through the committee set and keep deducting until we reach zero
+		for _, pk := range committee {
+			pkStr := hex.EncodeToString(pk)
+			if stakes[pkStr] >= score {
+				currentCommittee = append(currentCommittee, pk)
+				break
+			}
+
+			score -= stakes[pkStr]
+		}
 	}
 
-	return nil
+	return currentCommittee, nil
 }
 
-func calcVotes(threshold, stake, totalStake uint64, score []byte) (uint64, error) {
-	// Sanity checks
-	if threshold > totalStake {
-		return 0, errors.New("threshold size should not exceed maximum stake weight")
-	}
-
-	if stake < MinimumStake {
-		return 0, errors.New("stake not big enough")
-	}
-
-	// Calculate probability (sigma)
-	p := float64(threshold) / float64(totalStake)
-	if p > 1 || p < 0 {
-		return 0, errors.New("p should be between 0 and 1")
-	}
-
-	// Calculate score divided by 2^256
-	scoreNum := new(big.Int).SetBytes(score[:32])
-	target, _ := new(big.Rat).SetFrac(scoreNum, lenHash).Float64()
-
-	// Set up the distribution
-	dist := distuv.Normal{
-		Mu:    float64(stake / 100),
-		Sigma: p,
-	}
-
-	// Calculate votes
-	pos := float64(0.0)
-	votes := uint64(0)
-	for {
-		p1 := dist.Prob(pos)
-		p2 := dist.Prob(pos + 0.01)
-		if target >= p1 && target <= p2 {
-			break
+// Verify will check if a public key is included in a passed committee, and return
+// how many times they appear.
+func Verify(committee [][]byte, pk []byte) uint8 {
+	// Check if this node is eligible, and how many votes they get
+	votes := uint8(0)
+	for _, pkB := range committee {
+		if bytes.Equal(pkB, pk) {
+			votes++
 		}
-
-		pos += 0.01
-		votes++
 	}
 
-	return votes, nil
+	return votes
 }

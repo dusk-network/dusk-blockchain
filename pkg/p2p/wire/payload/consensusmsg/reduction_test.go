@@ -19,7 +19,7 @@ func TestReductionEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewReduction(blsSig, byte32, blsSig, byte32)
+	msg, err := NewReduction(byte32, blsSig, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,15 +47,11 @@ func TestReductionChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewReduction(byte32, byte32, wrongByte32, byte32); err == nil {
-		t.Fatal("check for score did not work")
-	}
-
-	if _, err := NewReduction(wrongByte32, wrongByte32, wrongByte32, byte32); err == nil {
+	if _, err := NewReduction(wrongByte32, wrongByte32, byte32); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewReduction(wrongByte32, byte32, byte32, byte32); err == nil {
+	if _, err := NewReduction(byte32, byte32, byte32); err == nil {
 		t.Fatal("check for sigbls did not work")
 	}
 }

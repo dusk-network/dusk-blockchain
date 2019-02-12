@@ -1,61 +1,55 @@
-package consensus
+package agreement
 
 import (
 	"encoding/hex"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
-// BlockAgreement is the function that runs during the block reduction phase, used
-// to collect vote sets and find a winning block. BlockAgreement will run indefinitely
+// Block is the function that runs during the block reduction phase, used
+// to collect vote sets and find a winning block. Block will run indefinitely
 // until a decision is reached.
-func BlockAgreement(ctx *Context, c chan bool) {
-	// Make a mapping of steps, pointing to a mapping of an Ed25519 public keys and
-	// vote sets.
-	sets := make(map[uint8]map[string][]*consensusmsg.Vote)
+func Block(ctx *user.Context, c chan bool) {
+	// Make a mapping of steps, pointing to a slice of vote sets.
+	sets := make(map[uint8][][]*consensusmsg.Vote)
 
 	for {
 		select {
 		case m := <-ctx.SetAgreementChan:
-			// Process received message
-			_, err := ProcessMsg(ctx, m)
-			if err != nil {
-				if err.Priority == prerror.High {
-					// Log
-					c <- false
-					return
-				}
-
-				// Discard if invalid
-				break
-			}
-
-			// Add it to our collection
 			pl := m.Payload.(*consensusmsg.SetAgreement)
-			pkEd := hex.EncodeToString(m.PubKey)
 
+			// Get amount of votes
+			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
+
+			// Add it to our set
 			if sets[m.Step] == nil {
-				sets[m.Step] = make(map[string][]*consensusmsg.Vote)
+				sets[m.Step] = make([][]*consensusmsg.Vote, 0)
 			}
 
-			sets[m.Step][pkEd] = pl.VoteSet
+			for i := uint8(0); i < votes; i++ {
+				sets[m.Step] = append(sets[m.Step], pl.VoteSet)
+			}
 
 			// Check if we have exceeded the limit.
-			limit := float64(len(ctx.NodeWeights)) * 0.75
+			limit := float64(len(ctx.CurrentCommittee)) * 0.75
 			if len(sets[m.Step]) < int(limit) {
 				break
 			}
 
 			// Set our own vote set as the signature set for signature
 			// set generation, which should follow after this
-			ctxPkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
-			ctx.SigSetVotes = sets[m.Step][ctxPkEd]
+			ctx.SigSetVotes = ctx.BlockVotes
 
 			// Populate certificate
 			ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.BlockVotes))
-			ctx.Certificate.BRSortitionProofs = make([][]byte, len(ctx.BlockVotes))
+			for i := 0; i < len(ctx.BlockVotes); i++ {
+				pkBLS := hex.EncodeToString(ctx.BlockVotes[i].PubKey)
+				ctx.Certificate.BRPubKeys = append(ctx.Certificate.BRPubKeys, ctx.NodeBLS[pkBLS])
+			}
+
 			agSig := &bls.Signature{}
 			if err := agSig.Decompress(ctx.BlockVotes[0].Sig); err != nil {
 				// Log
@@ -79,7 +73,6 @@ func BlockAgreement(ctx *Context, c chan bool) {
 
 				agSig.Aggregate(sig)
 				ctx.Certificate.BRPubKeys[i] = vote.PubKey
-				ctx.Certificate.BRSortitionProofs[i] = vote.Score
 			}
 
 			cSig := agSig.Compress()

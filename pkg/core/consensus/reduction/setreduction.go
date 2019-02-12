@@ -1,25 +1,49 @@
-package consensus
+package reduction
 
 import (
+	"bytes"
 	"encoding/hex"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
-// SignatureSetReduction is the signature set reduction phase of the consensus.
-func SignatureSetReduction(ctx *Context) error {
+// SignatureSet is the signature set reduction phase of the consensus.
+func SignatureSet(ctx *user.Context) error {
+	// Set up a fallback value
+	fallback := make([]byte, 32)
+
 	// Vote on collected signature set
-	if err := committeeVoteSigSet(ctx); err != nil {
+	if err := sigSetVote(ctx); err != nil {
 		return err
 	}
 
 	// Receive all other votes
-	if err := countVotesSigSet(ctx); err != nil {
+	if err := countSigSetVotes(ctx); err != nil {
+		return err
+	}
+
+	ctx.Step++
+
+	// If we timed out, exit the loop and go back to signature set generation
+	if ctx.SigSetHash == nil {
+		ctx.SigSetHash = fallback
+	}
+
+	// Vote on collected signature set
+	if err := sigSetVote(ctx); err != nil {
+		return err
+	}
+
+	// Receive all other votes
+	if err := countSigSetVotes(ctx); err != nil {
 		return err
 	}
 
@@ -30,32 +54,44 @@ func SignatureSetReduction(ctx *Context) error {
 		return nil
 	}
 
-	if err := committeeVoteSigSet(ctx); err != nil {
-		return err
-	}
-
-	if err := countVotesSigSet(ctx); err != nil {
-		return err
-	}
-
-	ctx.Step++
-
-	// If we timed out, exit the loop and go back to signature set generation
-	if ctx.SigSetHash == nil {
+	// If SigSetHash is fallback, the committee has agreed to exit and restart
+	// consensus.
+	if bytes.Equal(ctx.SigSetHash, fallback) {
+		ctx.SigSetHash = nil
 		return nil
 	}
 
 	// If we got a result, populate certificate, send message to
 	// set agreement and terminate
-	if err := SendSetAgreement(ctx, ctx.SigSetVotes); err != nil {
+	if err := agreement.SendSet(ctx, ctx.SigSetVotes); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func committeeVoteSigSet(ctx *Context) error {
-	sigSetHash, err := hashSigSetVotes(ctx.SigSetVotes)
+func sigSetVote(ctx *user.Context) error {
+	// Set committee first
+	size := user.CommitteeSize
+	if len(ctx.Committee) < int(user.CommitteeSize) {
+		size = uint8(len(ctx.Committee))
+	}
+
+	currentCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, size,
+		ctx.Committee, ctx.NodeWeights)
+	if err != nil {
+		return err
+	}
+
+	ctx.CurrentCommittee = currentCommittee
+
+	// If we are not in the committee, then don't vote
+	if votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey)); votes == 0 {
+		return nil
+	}
+
+	// Hash our vote set
+	sigSetHash, err := ctx.HashVotes(ctx.SigSetVotes)
 	if err != nil {
 		return err
 	}
@@ -72,12 +108,12 @@ func committeeVoteSigSet(ctx *Context) error {
 
 	// Create signature set vote message to gossip
 	pl, err := consensusmsg.NewSigSetVote(ctx.BlockHash, ctx.SigSetHash, sigBLS,
-		ctx.Keys.BLSPubKey.Marshal(), ctx.Score)
+		ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
 		return err
 	}
 
-	sigEd, err := CreateSignature(ctx, pl)
+	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
 		return err
 	}
@@ -93,22 +129,22 @@ func committeeVoteSigSet(ctx *Context) error {
 		return err
 	}
 
+	ctx.SigSetVoteChan <- msg
 	return nil
 }
 
-func countVotesSigSet(ctx *Context) error {
+func countSigSetVotes(ctx *user.Context) error {
+	// Set vote limit
+	voteLimit := uint8(len(ctx.CurrentCommittee))
+
 	// Keep a counter of how many votes have been cast for a specific block
-	counts := make(map[string]uint64)
+	counts := make(map[string]uint8)
 
 	// Keep track of all nodes who have voted
 	voters := make(map[string]bool)
 
-	// Add our own information beforehand
-	voters[hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))] = true
-	counts[hex.EncodeToString(ctx.SigSetHash)] += ctx.Weight
-
 	// Start the timer
-	timer := time.NewTimer(StepTime)
+	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
 
 	for {
 		select {
@@ -124,29 +160,16 @@ func countVotesSigSet(ctx *Context) error {
 				break
 			}
 
-			// Verify the message
-			stake, err := ProcessMsg(ctx, m)
-			if err != nil {
-				if err.Priority == prerror.High {
-					return err.Err
-				}
-
-				// Discard if invalid
-				break
-			}
-
-			// If sender hasn't staked, discard
-			if stake == 0 {
-				break
-			}
+			// Get amount of votes
+			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
 
 			// Log information
 			voters[pkEd] = true
 			setStr := hex.EncodeToString(pl.SigSetHash)
-			counts[setStr] += stake
+			counts[setStr] += votes
 
 			// If a set exceeds vote threshold, we will end the loop.
-			if counts[setStr] < ctx.VoteLimit {
+			if counts[setStr] < voteLimit {
 				break
 			}
 

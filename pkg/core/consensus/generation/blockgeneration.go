@@ -1,4 +1,4 @@
-package consensus
+package generation
 
 import (
 	"encoding/binary"
@@ -8,6 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -15,9 +16,8 @@ import (
 
 // Refactor of code made by jules
 
-// GenerateBlock will generate a blockMsg and ScoreMsg
-// if node is eligible.
-func GenerateBlock(ctx *Context) error {
+// Block will generate a blockMsg and ScoreMsg if node is eligible.
+func Block(ctx *user.Context) error {
 	err := generateParams(ctx)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func GenerateBlock(ctx *Context) error {
 		return err
 	}
 
-	sigEd, err := CreateSignature(ctx, pl)
+	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func GenerateBlock(ctx *Context) error {
 }
 
 // generate M, X, Y, Z, Q
-func generateParams(ctx *Context) error {
+func generateParams(ctx *user.Context) error {
 	// XXX: generating X, Y, Z in this way is in-efficient. Passing the parameters in directly from previous computation is better.
 	// Wait until, specs for this has been semi-finalised
 	M, err := GenerateM(ctx.K)
@@ -110,7 +110,7 @@ func generateParams(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	Q, err := GenerateScore(ctx.D, Y)
+	Q, err := Score(ctx.D, Y)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func generateZ(S, k []byte) ([]byte, error) {
 	return Z, nil
 }
 
-func newCandidateBlock(ctx *Context) (*block.Block, error) {
+func newCandidateBlock(ctx *user.Context) (*block.Block, error) {
 
 	candidateBlock := block.NewBlock()
 
