@@ -120,24 +120,18 @@ func NewBlockchain(db *database.BlockchainDB, net protocol.Magic) (*Blockchain, 
 
 // GetLatestHeader gives the latest block header
 func (b *Blockchain) GetLatestHeader() (*block.Header, error) {
-	db := database.GetInstance()
-
-	return db.GetLatestHeader()
+	return nil, nil
 }
 
 // GetHeaders gives block headers from the database, starting and
 // stopping at the provided locators.
 func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*block.Header, error) {
-	db := database.GetInstance()
-
-	return db.ReadHeaders(start, stop)
+	return nil, nil
 }
 
 // GetBlock will return the block from the received hash
 func (b *Blockchain) GetBlock(hash []byte) (*block.Block, error) {
-	bd := database.GetInstance()
-
-	return bd.GetBlock(hash)
+	return nil, nil
 }
 
 // AddHeaders will add block headers to the chain
