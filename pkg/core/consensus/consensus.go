@@ -293,6 +293,6 @@ func (c *Consensus) process(m *payload.MsgConsensus) {
 	}
 }
 
-func (c *Consensus) ProvisionerListUpdate(blk *block.Block) error {
+func (c *Consensus) UpdateProvisioners(blk *block.Block) error {
 	return nil
 }
