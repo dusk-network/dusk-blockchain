@@ -230,6 +230,39 @@ func (c *Consensus) consensus() {
 	c.ctx.Multiplier = 1
 }
 
+func (c *Consensus) StartGenerating() error {
+	if c.generator {
+		return errors.New("already generating")
+	}
+
+	keys, err := user.NewRandKeys()
+	if err != nil {
+		return err
+	}
+
+	height := c.GetLatestHeight()
+
+	ctx, err := user.NewContext(c.tau, c.bidWeight, c.totalStakeWeight, height+1,
+		c.lastHeader.Seed, c.net, keys)
+	if err != nil {
+		return err
+	}
+
+	c.ctx = ctx
+	if err := c.SetupProvisioners(); err != nil {
+		return err
+	}
+
+	c.generator = true
+	return nil
+}
+
+func (c *Consensus) StopGenerating() {
+	c.generator = false
+	c.ctx.Clear()
+	c.provisioners = nil
+}
+
 // StartProvisioning will set the node to provisioner status,
 // and will start participating in block reduction and binary agreement
 // phases of the protocol.
@@ -245,7 +278,7 @@ func (c *Consensus) StartProvisioning() error {
 
 	height := c.GetLatestHeight()
 
-	ctx, err := user.NewContext(0, c.bidWeight, c.totalStakeWeight, height+1,
+	ctx, err := user.NewContext(c.tau, c.bidWeight, c.totalStakeWeight, height+1,
 		c.lastHeader.Seed, c.net, keys)
 	if err != nil {
 		return err
