@@ -24,7 +24,7 @@ type Config struct {
 	round         uint64                     // Current round (block height + 1)
 	tau           uint64                     // Current generator threshold
 	lastHeader    *block.Header              // Last validated block on the chain
-	roundChan     chan int                   // Channel used to signify start of a new round
+	RoundChan     chan int                   // Channel used to signify start of a new round
 	ctx           *user.Context              // Consensus context object
 	ConsensusChan chan *payload.MsgConsensus // Channel for consensus messages
 
@@ -64,7 +64,7 @@ func New(cfg *Config) (*Consensus, error) {
 	}
 
 	cfg.ConsensusChan = make(chan *payload.MsgConsensus, 500)
-	cfg.roundChan = make(chan int, 1)
+	cfg.RoundChan = make(chan int, 1)
 
 	latestHeight := cfg.GetLatestHeight()
 	latestHeader, err := cfg.GetBlockHeaderByHeight(latestHeight)
@@ -87,7 +87,7 @@ func New(cfg *Config) (*Consensus, error) {
 func (c *Consensus) segregatedByzantizeAgreement() {
 	for {
 		select {
-		case <-c.roundChan:
+		case <-c.RoundChan:
 			go c.consensus()
 		case m := <-c.ConsensusChan:
 			go c.process(m)
@@ -160,7 +160,7 @@ func (c *Consensus) consensus() {
 
 	// If we did not get a result, restart the consensus from block generation.
 	if c.ctx.BlockHash == nil {
-		c.roundChan <- 1
+		c.RoundChan <- 1
 		return
 	}
 
