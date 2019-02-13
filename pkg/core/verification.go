@@ -154,14 +154,10 @@ func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 		if b.memPool.Exists(tx.Hex()) {
 			b.memPool.RemoveTx(tx)
 		}
-
-		// Update provisioners
-		if b.provisioner && tx.Type == transactions.StakeType {
-			pl := tx.TypeInfo.(*transactions.Stake)
-			b.AddProvisionerInfo(tx, pl.Output.Amount)
-			b.totalStakeWeight += pl.Output.Amount
-		}
 	}
+
+	// Update Provisioners
+	b.cfg.UpdateProvisioners(blk)
 
 	// Add to database
 	//if err := b.db.WriteHeaders([]*block.Header{block.Header}); err != nil {
@@ -174,14 +170,8 @@ func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 
 	// Update variables
 	b.height = blk.Header.Height
-	b.round = blk.Header.Height + 1
-	b.currSeed = blk.Header.Seed
 	b.lastHeader = blk.Header
 
-	if b.provisioner {
-		b.UpdateProvisioners()
-		b.roundChan <- 1
-	}
 	// Should update generator merkle tree here as well
 
 	// TODO: Relay
