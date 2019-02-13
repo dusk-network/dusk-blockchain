@@ -11,12 +11,14 @@ import (
 )
 
 func TestMsgVersionEncodeDecode(t *testing.T) {
-	pver := protocol.ProtocolVersion
+	pver := protocol.NodeVer
 
 	addr1 := payload.NewNetAddress("202.108.250.180", 9999)
 	addr2 := payload.NewNetAddress("224.164.2.18", 9999)
 
-	msg := payload.NewMsgVersion(pver, addr1, addr2, rand.Uint64())
+	services := protocol.FullNode
+
+	msg := payload.NewMsgVersion(pver, addr1, addr2, services, rand.Uint64())
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {

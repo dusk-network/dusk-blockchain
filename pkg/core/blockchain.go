@@ -31,6 +31,9 @@ const maxLockTime = math.MaxUint16
 // transactions. Properly verified transactions and blocks will be
 // added to the memory pool and the database respectively.
 type Blockchain struct {
+	// Database
+	db *database.BlockchainDB
+
 	// Basic fields
 	memPool *MemPool
 	net     protocol.Magic
@@ -59,8 +62,14 @@ type Blockchain struct {
 
 // NewBlockchain returns a new Blockchain instance with an initialized mempool.
 // This Blockchain instance should then be ready to process incoming transactions and blocks.
-func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
-	db := database.GetInstance()
+func NewBlockchain(db *database.BlockchainDB, net protocol.Magic) (*Blockchain, error) {
+	//path := config.EnvNetCfg.DatabaseDirPath
+	//db, err := database.NewBlockchainDB(path)
+	//log.WithField("prefix", "database").Debugf("Path to database: %s", path)
+	//if err != nil {
+	//	log.WithField("prefix", "database").Fatalf("Failed to find db path: %s", path)
+	//	return nil, err
+	//}
 
 	marker := []byte("HasBeenInitialisedAlready")
 	init, err := db.Has(marker)
@@ -109,7 +118,7 @@ func NewBlockchain(net protocol.Magic) (*Blockchain, error) {
 		}
 	}
 
-	chain := &Blockchain{}
+	chain := &Blockchain{db: db}
 
 	// Set up mempool and populate struct fields
 	chain.memPool = &MemPool{}
@@ -156,10 +165,9 @@ func (b *Blockchain) GetBlock(hash []byte) (*block.Block, error) {
 	return bd.GetBlock(hash)
 }
 
-// AddHeaders will add block headers to the chain.
+// AddHeaders will add block headers to the chain
 func (b *Blockchain) AddHeaders(msg *payload.MsgHeaders) error {
-	db := database.GetInstance()
-	if err := db.WriteHeaders(msg.Headers); err != nil {
+	if err := b.db.WriteHeaders(msg.Headers); err != nil {
 		return err
 	}
 	return nil

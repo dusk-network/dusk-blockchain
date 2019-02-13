@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"os"
 	"strconv"
@@ -13,7 +14,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/logging"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
@@ -22,39 +23,95 @@ const (
 	userHomeDuskDir = "/.dusk"
 )
 
+var marker = []byte("HasBeenInitialisedAlready")
+
 /**
  * This script creates a LevelDB blockchain database and fills it with block headers and blocks.
- * Parameters: env, nrofblocks, txperblock
- * Warning: It overwrites a possible existing default db directory (<user home>/.dusk/<env.net>/db).
+ * Parameters: action. env, nrofblocks, txperblock
+ * Examples:
+ * Initialize a blockchain db with 1000 blocks with each 3 transactions:
+ * 		go run AddToBlockchainDb.go init devnet 1000 3
+ * Add 2000 blocks to an existing blockchain db with each 2 transactions:
+ * 		go run AddToBlockchainDb.go add devnet 2000 2
+ * Warning: Action 'init' overwrites an existing db directory (<user home>/.dusk/<env>/db).
  */
+
+func init() {
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.TextFormatter{DisableColors: true})
+}
+
 func main() {
 	args := os.Args[1:]
-	env := args[0]
-	totBlocks, _ := strconv.ParseUint(args[1], 10, 32)
-	txsPerBlock, _ := strconv.ParseUint(args[2], 10, 32)
-	createBlocks(env, int(totBlocks), int(txsPerBlock))
+	action := args[0]
+	env := args[1]
+	totBlocks, _ := strconv.ParseUint(args[2], 10, 32)
+	txsPerBlock, _ := strconv.ParseUint(args[3], 10, 32)
+	if action == "init" {
+		createBlocks(env, int(totBlocks), int(txsPerBlock))
+	}
+	if action == "add" {
+		addBlocks(env, int(totBlocks), int(txsPerBlock))
+	}
 }
 
 func createBlocks(env string, totBlocks int, txsPerBlock int) {
 	var prevBlock = make([]byte, 32)
 	blocks := make([]*block.Block, 0, totBlocks)
 
-	marker := []byte("HasBeenInitialisedAlready")
-	path := config.UserHomeDir() + userHomeDuskDir + "/" + strings.ToLower(env) + "/db"
+	path := logging.UserHomeDir() + userHomeDuskDir + "/" + strings.ToLower(env) + "/db"
 	db, _ := database.NewBlockchainDB(path)
 	db.Put(marker, []byte{})
 
 	// First create the Genesis block
-	genHdr, _ := createBlockFixture(0, prevBlock, 0)
+	genBlk, _ := createBlockFixture(0, prevHash, 0)
 	genesisHash, _ := hex.DecodeString("1ec2824a95be6188a6ffa51b3cfcfaacdcf09d07cdd46d1377e209318ba09bd5") // <= This is the genesis hash
-	genHdr.Header.Hash = genesisHash
+	genBlk.Header.Hash = genesisHash
 
-	blocks = append(blocks, genHdr)
-	prevBlock = genHdr.Header.Hash
+	blocks = append(blocks, genBlk)
+	prevHash = genBlk.Header.Hash
 
 	for i := 1; i <= totBlocks; i++ {
-		block, _ := createBlockFixture(i, prevBlock, txsPerBlock)
-		prevBlock = block.Header.Hash
+		block, _ := createBlockFixture(uint64(i), prevHash, txsPerBlock)
+		prevHash = block.Header.Hash
+		blocks = append(blocks, block)
+	}
+
+	// WriteHeaders
+	hdrs := make([]*payload.BlockHeader, len(blocks))
+	for i, block := range blocks {
+		hdrs[i] = block.Header
+	}
+	db.WriteHeaders(hdrs)
+	db.WriteBlockTransactions(blocks)
+}
+
+func addBlocks(env string, totBlocks int, txsPerBlock int) {
+	blocks := make([]*payload.Block, 0, totBlocks)
+	// Read last header
+	path := logging.UserHomeDir() + userHomeDuskDir + "/" + strings.ToLower(env) + "/db"
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		fmt.Println("Action 'add' can only be used with an existing blockchain db.")
+		return
+	}
+	db, _ := database.NewBlockchainDB(path)
+
+	// Check if existing db
+	init, _ := db.Has(marker)
+	if !init {
+		fmt.Println("Action 'add' can only be used with an initialized blockchain db.")
+		fmt.Println("Use Action 'init' first to initialize a blockchain db.")
+
+	}
+
+	latestHdr, _ := db.GetLatestHeader()
+	prevHash := latestHdr.Hash
+
+	for i := 1; i <= totBlocks; i++ {
+		block, _ := createBlockFixture(latestHdr.Height+uint64(i), prevHash, txsPerBlock)
+		prevHash = block.Header.Hash
 		blocks = append(blocks, block)
 	}
 
