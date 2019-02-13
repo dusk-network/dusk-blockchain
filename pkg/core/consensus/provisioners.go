@@ -1,14 +1,17 @@
-package core
+package consensus
 
 import (
 	"bytes"
 	"encoding/hex"
+	"math"
 	"sort"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
+
+const maxLockTime = math.MaxUint16
 
 // Provisioners is a mapping that links an ed25519 public key to a node's
 // staking info.
@@ -24,23 +27,24 @@ type Provisioner struct {
 // SetupProvisioners will clear out all related entries and scan the blockchain
 // for all staking transactions, logging the total weight and the information
 // for each node.
-func (b *Blockchain) SetupProvisioners() error {
-	b.totalStakeWeight = b.stakeWeight             // Reset total weight
-	b.provisioners = make(map[string]*Provisioner) // Reset provisioners
+func (c *Consensus) SetupProvisioners() error {
+	c.totalStakeWeight = c.stakeWeight             // Reset total weight
+	c.provisioners = make(map[string]*Provisioner) // Reset provisioners
+
+	height := c.GetLatestHeight()
 
 	l := maxLockTime
-	if b.height < uint64(maxLockTime) {
-		l = int(b.height)
+	if height < uint64(maxLockTime) {
+		l = int(height)
 	}
 
-	currHeight := b.height
 	for i := 0; i < l; i++ {
-		hdr, err := b.db.GetBlockHeaderByHeight(currHeight)
+		hdr, err := c.GetBlockHeaderByHeight(height)
 		if err != nil {
 			return err
 		}
 
-		block, err := b.db.GetBlock(hdr.Hash)
+		block, err := c.GetBlock(hdr.Hash)
 		if err != nil {
 			return err
 		}
@@ -49,48 +53,48 @@ func (b *Blockchain) SetupProvisioners() error {
 			tx := v.(*transactions.Stealth)
 			if tx.Type == transactions.StakeType {
 				pl := tx.TypeInfo.(*transactions.Stake)
-				b.AddProvisionerInfo(tx, pl.Output.Amount)
-				b.totalStakeWeight += pl.Output.Amount
+				c.AddProvisionerInfo(tx, pl.Output.Amount)
+				c.totalStakeWeight += pl.Output.Amount
 			}
 		}
 
-		currHeight--
+		height--
 	}
 
-	b.UpdateProvisioners()
+	c.UpdateProvisioners()
 	return nil
 }
 
 // AddProvisionerInfo will add the tx info to a provisioner, and update their total
 // stake amount.
-func (b *Blockchain) AddProvisionerInfo(tx *transactions.Stealth, amount uint64) {
+func (c *Consensus) AddProvisionerInfo(tx *transactions.Stealth, amount uint64) {
 	// Set information on blockchain struct
 	info := tx.TypeInfo.(*transactions.Stake)
 	pkEd := hex.EncodeToString(info.PubKeyEd)
-	b.provisioners[pkEd].Stakes = append(b.provisioners[pkEd].Stakes, tx)
-	b.provisioners[pkEd].TotalAmount += amount
+	c.provisioners[pkEd].Stakes = append(c.provisioners[pkEd].Stakes, tx)
+	c.provisioners[pkEd].TotalAmount += amount
 
 	// Set information on context object
-	b.ctx.NodeWeights[pkEd] = b.provisioners[pkEd].TotalAmount
+	c.ctx.NodeWeights[pkEd] = c.provisioners[pkEd].TotalAmount
 	pkBLS := hex.EncodeToString(info.PubKeyBLS)
-	b.ctx.NodeBLS[pkBLS] = info.PubKeyEd
-	b.ctx.Committee = append(b.ctx.Committee, info.PubKeyEd)
+	c.ctx.NodeBLS[pkBLS] = info.PubKeyEd
+	c.ctx.Committee = append(c.ctx.Committee, info.PubKeyEd)
 
 	// Sort committee list
-	b.SortProvisioners()
+	c.SortProvisioners()
 }
 
 // UpdateProvisioners will run through all known nodes and check if they have
 // expired stakes, and removing them if they do. It will also keep the context
 // committee sorted and up to date.
-func (b *Blockchain) UpdateProvisioners() {
+func (c *Consensus) UpdateProvisioners() {
 	// Loop through all nodes
-	for pk, node := range b.provisioners {
+	for pk, node := range c.provisioners {
 		// Loop through all their stakes
 		for i, tx := range node.Stakes {
 			// Remove if expired
 			pl := tx.TypeInfo.(*transactions.Stake)
-			if b.height <= pl.Timelock {
+			if c.GetLatestHeight() <= pl.Timelock {
 				continue
 			}
 
@@ -98,7 +102,7 @@ func (b *Blockchain) UpdateProvisioners() {
 			node.TotalAmount -= pl.Output.Amount
 
 			// Update context info as well
-			b.ctx.NodeWeights[pk] = node.TotalAmount
+			c.ctx.NodeWeights[pk] = node.TotalAmount
 
 			// Finally, cut the tx out of the array
 			node.Stakes = append(node.Stakes[:i], node.Stakes[i+1:]...)
@@ -108,23 +112,23 @@ func (b *Blockchain) UpdateProvisioners() {
 				continue
 			}
 
-			for i, pkBytes := range b.ctx.Committee {
+			for i, pkBytes := range c.ctx.Committee {
 				pkStr := hex.EncodeToString(pkBytes)
 				if pk == pkStr {
-					b.ctx.Committee = append(b.ctx.Committee[:i], b.ctx.Committee[i+1:]...)
+					c.ctx.Committee = append(c.ctx.Committee[:i], c.ctx.Committee[i+1:]...)
 				}
 			}
 		}
 	}
 
 	// Sort committee list
-	b.SortProvisioners()
+	c.SortProvisioners()
 }
 
 // SortProvisioners will sort the Committee slice on the context object
 // lexicographically.
-func (b *Blockchain) SortProvisioners() {
-	sort.SliceStable(b.ctx.Committee, func(i, j int) bool {
-		return bytes.Compare(b.ctx.Committee[i], b.ctx.Committee[j]) < bytes.Compare(b.ctx.Committee[j], b.ctx.Committee[i])
+func (c *Consensus) SortProvisioners() {
+	sort.SliceStable(c.ctx.Committee, func(i, j int) bool {
+		return bytes.Compare(c.ctx.Committee[i], c.ctx.Committee[j]) < bytes.Compare(c.ctx.Committee[j], c.ctx.Committee[i])
 	})
 }
