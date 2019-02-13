@@ -3,10 +3,8 @@ package msg_test
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"testing"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -14,11 +12,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-func TestVerifySetAgreement(t *testing.T) {
+func TestVerifySigSetAgreement(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -37,7 +34,7 @@ func TestVerifySetAgreement(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +55,7 @@ func TestVerifySetAgreement(t *testing.T) {
 	}
 }
 
-func TestSetAgreementNotInCommittee(t *testing.T) {
+func TestSigSetAgreementNotInCommittee(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -77,7 +74,7 @@ func TestSetAgreementNotInCommittee(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +112,56 @@ func TestSetAgreementNotInCommittee(t *testing.T) {
 	}
 }
 
-func TestSetAgreementSmallVoteSet(t *testing.T) {
+func TestSigSetAgreementWrongBlock(t *testing.T) {
+	// Create context
+	seed, _ := crypto.RandEntropy(32)
+	keys, _ := user.NewRandKeys()
+	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a dummy block and message
+	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.BlockHash = emptyBlock.Header.Hash
+
+	// Create vote set with a different hash
+	hash, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.Step++
+	m, err := createVoteSetAndMsg(ctx, hash, 10, 0x06, false, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up committee
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+		ctx.Committee, ctx.NodeWeights)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.CurrentCommittee = committee
+
+	// Verify the message
+	err2 := msg.Process(ctx, m)
+	if err2 == nil {
+		t.Fatal("block hash check did not work")
+	}
+
+	if err2.Priority == prerror.High {
+		t.Fatal(err2)
+	}
+}
+
+func TestSigSetAgreementSmallVoteSet(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -134,7 +180,7 @@ func TestSetAgreementSmallVoteSet(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +205,7 @@ func TestSetAgreementSmallVoteSet(t *testing.T) {
 	}
 }
 
-func TestSetAgreementVoterStakeCheck(t *testing.T) {
+func TestSigSetAgreementVoterStakeCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -178,7 +224,7 @@ func TestSetAgreementVoterStakeCheck(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +259,7 @@ func TestSetAgreementVoterStakeCheck(t *testing.T) {
 	}
 }
 
-func TestSetAgreementVoterBLSCheck(t *testing.T) {
+func TestSigSetAgreementVoterBLSCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -232,7 +278,7 @@ func TestSetAgreementVoterBLSCheck(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +312,7 @@ func TestSetAgreementVoterBLSCheck(t *testing.T) {
 	}
 }
 
-func TestSetAgreementVoterCommitteeCheck(t *testing.T) {
+func TestSigSetAgreementVoterCommitteeCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -285,7 +331,7 @@ func TestSetAgreementVoterCommitteeCheck(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +367,7 @@ func TestSetAgreementVoterCommitteeCheck(t *testing.T) {
 	}
 }
 
-func TestSetAgreementVoterSigCheck(t *testing.T) {
+func TestSigSetAgreementVoterSigCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -340,7 +386,7 @@ func TestSetAgreementVoterSigCheck(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, true, false, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, true, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +411,7 @@ func TestSetAgreementVoterSigCheck(t *testing.T) {
 	}
 }
 
-func TestSetAgreementVoterStepCheck(t *testing.T) {
+func TestSigSetAgreementVoterStepCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -384,7 +430,7 @@ func TestSetAgreementVoterStepCheck(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, true, false)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +455,7 @@ func TestSetAgreementVoterStepCheck(t *testing.T) {
 	}
 }
 
-func TestSetAgreementVoterHashCheck(t *testing.T) {
+func TestSigSetAgreementVoterHashCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -428,7 +474,7 @@ func TestSetAgreementVoterHashCheck(t *testing.T) {
 
 	// Create vote set
 	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, true)
+	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,146 +497,4 @@ func TestSetAgreementVoterHashCheck(t *testing.T) {
 	if err2.Priority == prerror.High {
 		t.Fatal(err2)
 	}
-}
-
-// Convenience function to create a vote set that can be verified reliably,
-// or can be altered to have specific checks fail.
-func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
-	id uint8, spoofSig, spoofStep, spoofHash bool) (*payload.MsgConsensus, error) {
-	var ctxs []*user.Context
-	for i := 0; i < amount; i++ {
-		keys, err := user.NewRandKeys()
-		if err != nil {
-			return nil, err
-		}
-
-		// Set these keys in our context values to pass processing
-		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
-		pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
-		ctx.NodeWeights[pkEd] = 500
-		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
-		ctx.Committee = append(ctx.Committee, []byte(*keys.EdPubKey))
-
-		// Make dummy context for score creation
-		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
-		if err != nil {
-			return nil, err
-		}
-
-		c.LastHeader = ctx.LastHeader
-		c.Weight = 500
-		c.BlockHash = blockHash
-
-		ctxs = append(ctxs, c)
-	}
-
-	committee1, err := sortition.CreateCommittee(ctx.Round, ctx.W, 1, uint8(amount), ctx.Committee,
-		ctx.NodeWeights)
-	if err != nil {
-		return nil, err
-	}
-
-	committee2, err := sortition.CreateCommittee(ctx.Round, ctx.W, 2, uint8(amount), ctx.Committee,
-		ctx.NodeWeights)
-	if err != nil {
-		return nil, err
-	}
-
-	var voteSet []*consensusmsg.Vote
-
-	for _, pk := range committee1 {
-		for _, user := range ctxs {
-			if !bytes.Equal(pk, []byte(*user.Keys.EdPubKey)) {
-				continue
-			}
-
-			sig, err := user.BLSSign(user.Keys.BLSSecretKey, user.Keys.BLSPubKey, blockHash)
-			if err != nil {
-				return nil, err
-			}
-
-			if spoofSig {
-				sig = make([]byte, 33)
-			}
-
-			vote, err := consensusmsg.NewVote(blockHash, user.Keys.BLSPubKey.Marshal(), sig, 1)
-			if err != nil {
-				return nil, err
-			}
-
-			if spoofStep {
-				vote.Step += 2
-			}
-
-			if spoofHash {
-				vote.Hash = make([]byte, 32)
-			}
-
-			voteSet = append(voteSet, vote)
-		}
-	}
-
-	for _, pk := range committee2 {
-		for _, user := range ctxs {
-			if !bytes.Equal(pk, []byte(*user.Keys.EdPubKey)) {
-				continue
-			}
-
-			sig, err := user.BLSSign(user.Keys.BLSSecretKey, user.Keys.BLSPubKey, blockHash)
-			if err != nil {
-				return nil, err
-			}
-
-			if spoofSig {
-				sig = make([]byte, 33)
-			}
-
-			vote, err := consensusmsg.NewVote(blockHash, user.Keys.BLSPubKey.Marshal(), sig, 2)
-			if err != nil {
-				return nil, err
-			}
-
-			if spoofStep {
-				vote.Step += 2
-			}
-
-			if spoofHash {
-				vote.Hash = make([]byte, 32)
-			}
-
-			voteSet = append(voteSet, vote)
-		}
-	}
-
-	// Make message from one of the context objects we just created
-	var pl consensusmsg.Msg
-	c := ctxs[0]
-	switch consensusmsg.ID(id) {
-	case consensusmsg.SetAgreementID:
-		pl, err = consensusmsg.NewSetAgreement(blockHash, voteSet)
-		if err != nil {
-			return nil, err
-		}
-	case consensusmsg.SigSetCandidateID:
-		pl, err = consensusmsg.NewSigSetCandidate(blockHash, voteSet)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("wrong id for vote set and message creation")
-	}
-
-	c.Step = ctx.Step
-	sigEd, err := c.CreateSignature(pl)
-	if err != nil {
-		return nil, err
-	}
-
-	m, err := payload.NewMsgConsensus(c.Version, c.Round, c.LastHeader.Hash, c.Step,
-		sigEd, []byte(*c.Keys.EdPubKey), pl)
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
 }

@@ -8,7 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
-func TestReductionEncodeDecode(t *testing.T) {
+func TestBlockReductionEncodeDecode(t *testing.T) {
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -19,7 +19,7 @@ func TestReductionEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewReduction(byte32, blsSig, byte32)
+	msg, err := NewBlockReduction(byte32, blsSig, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,14 +29,14 @@ func TestReductionEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg2 := &Reduction{}
+	msg2 := &BlockReduction{}
 	msg2.Decode(buf)
 
 	assert.Equal(t, msg, msg2)
 }
 
 // Check to see whether length checks are working.
-func TestReductionChecks(t *testing.T) {
+func TestBlockReductionChecks(t *testing.T) {
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -47,11 +47,11 @@ func TestReductionChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewReduction(wrongByte32, wrongByte32, byte32); err == nil {
+	if _, err := NewBlockReduction(wrongByte32, wrongByte32, byte32); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 
-	if _, err := NewReduction(byte32, byte32, byte32); err == nil {
+	if _, err := NewBlockReduction(byte32, byte32, byte32); err == nil {
 		t.Fatal("check for sigbls did not work")
 	}
 }

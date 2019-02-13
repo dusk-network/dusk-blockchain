@@ -144,15 +144,15 @@ func (m *MsgConsensus) Decode(r io.Reader) error {
 		}
 
 		pl = p
-	case consensusmsg.ReductionID:
-		p := &consensusmsg.Reduction{}
+	case consensusmsg.BlockReductionID:
+		p := &consensusmsg.BlockReduction{}
 		if err := p.Decode(r); err != nil {
 			return err
 		}
 
 		pl = p
-	case consensusmsg.SetAgreementID:
-		p := &consensusmsg.SetAgreement{}
+	case consensusmsg.BlockAgreementID:
+		p := &consensusmsg.BlockAgreement{}
 		if err := p.Decode(r); err != nil {
 			return err
 		}
@@ -165,8 +165,15 @@ func (m *MsgConsensus) Decode(r io.Reader) error {
 		}
 
 		pl = p
-	case consensusmsg.SigSetVoteID:
-		p := &consensusmsg.SigSetVote{}
+	case consensusmsg.SigSetReductionID:
+		p := &consensusmsg.SigSetReduction{}
+		if err := p.Decode(r); err != nil {
+			return err
+		}
+
+		pl = p
+	case consensusmsg.SigSetAgreementID:
+		p := &consensusmsg.SigSetAgreement{}
 		if err := p.Decode(r); err != nil {
 			return err
 		}

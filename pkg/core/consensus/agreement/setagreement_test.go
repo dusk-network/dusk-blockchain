@@ -33,7 +33,7 @@ func TestSetAgreement(t *testing.T) {
 	ctx.BlockHash = candidateBlock
 
 	// Make vote set and vote messages
-	votes, msgs, err := createVotesAndMsgs(ctx, 10)
+	votes, msgs, err := createVotesSigSet(ctx, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestSetAgreement(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				ctx.SetAgreementChan <- msg
+				ctx.SigSetAgreementChan <- msg
 			}
 		}
 	}()
@@ -76,8 +76,8 @@ func TestSetAgreement(t *testing.T) {
 	assert.True(t, result)
 }
 
-// Test for set agreement convenience function
-func TestSendSetAgreement(t *testing.T) {
+// Test for signature set agreement convenience function
+func TestSendSigSetAgreement(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -121,22 +121,22 @@ func TestSendSetAgreement(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	ctx.BlockVotes = votes
+	ctx.SigSetVotes = votes
 
 	// Send the set agreement message with the vote set we just created
-	if err := agreement.SendSet(ctx, ctx.BlockVotes); err != nil {
+	if err := agreement.SendSigSet(ctx); err != nil {
 		t.Fatal(err)
 	}
 
 	// Should have gotten the message into our setagreement channel
-	msg := <-ctx.SetAgreementChan
+	msg := <-ctx.SigSetAgreementChan
 	assert.NotNil(t, msg)
 }
 
-// Convenience function to make a vote set and messages from all voters.
+// Convenience function to make a vote set and messages from all voters for signature set agreement.
 // It should pass verifications done by the passed context object after the function returns,
 // and all the messages should exceed the vote limit.
-func createVotesAndMsgs(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
+func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 	[]*payload.MsgConsensus, error) {
 	var voteSet []*consensusmsg.Vote
 	var ctxs []*user.Context
@@ -200,7 +200,12 @@ func createVotesAndMsgs(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 		newVotes := make([]*consensusmsg.Vote, 0)
 		newVotes = append(newVotes, voteSet...)
 
-		pl, err := consensusmsg.NewSetAgreement(c.BlockHash, newVotes)
+		hash, err := c.HashVotes(newVotes)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		pl, err := consensusmsg.NewSigSetAgreement(c.BlockHash, hash, newVotes)
 		if err != nil {
 			return nil, nil, err
 		}

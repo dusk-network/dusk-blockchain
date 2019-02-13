@@ -71,9 +71,14 @@ func Block(ctx *user.Context) error {
 	}
 
 	// If we did get a result, send block set agreement message
-	if err := agreement.SendSet(ctx, ctx.BlockVotes); err != nil {
+	if err := agreement.SendBlock(ctx); err != nil {
 		return err
 	}
+
+	// Copy BlockVotes into SigSetVotes, in case we terminate a bit later
+	// and BlockVotes will have been emptied.
+	ctx.SigSetVotes = nil
+	ctx.SigSetVotes = append(ctx.SigSetVotes, ctx.BlockVotes...)
 
 	return nil
 }
@@ -105,7 +110,7 @@ func blockVote(ctx *user.Context) error {
 	}
 
 	// Create reduction payload to gossip
-	pl, err := consensusmsg.NewReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+	pl, err := consensusmsg.NewBlockReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
 		return err
 	}
@@ -128,7 +133,7 @@ func blockVote(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.ReductionChan <- msg
+	ctx.BlockReductionChan <- msg
 	return nil
 }
 
@@ -150,8 +155,8 @@ func countBlockVotes(ctx *user.Context) error {
 		case <-timer.C:
 			ctx.BlockHash = nil
 			return nil
-		case m := <-ctx.ReductionChan:
-			pl := m.Payload.(*consensusmsg.Reduction)
+		case m := <-ctx.BlockReductionChan:
+			pl := m.Payload.(*consensusmsg.BlockReduction)
 			pkEd := hex.EncodeToString(m.PubKey)
 
 			// Check if this node's vote is already recorded

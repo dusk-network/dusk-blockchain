@@ -8,7 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
-func TestSetAgreementEncodeDecode(t *testing.T) {
+func TestBlockAgreementEncodeDecode(t *testing.T) {
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestSetAgreementEncodeDecode(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	msg, err := NewSetAgreement(byte32, votes)
+	msg, err := NewBlockAgreement(byte32, votes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,13 +44,13 @@ func TestSetAgreementEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg2 := &SetAgreement{}
+	msg2 := &BlockAgreement{}
 	msg2.Decode(buf)
 
 	assert.Equal(t, msg, msg2)
 }
 
-func TestSetAgreementChecks(t *testing.T) {
+func TestBlockAgreementChecks(t *testing.T) {
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestSetAgreementChecks(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	if _, err := NewSetAgreement(sigBLS, votes); err == nil {
+	if _, err := NewBlockAgreement(sigBLS, votes); err == nil {
 		t.Fatal("check for hash did not work")
 	}
 }

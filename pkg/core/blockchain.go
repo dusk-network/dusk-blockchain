@@ -9,7 +9,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
@@ -38,26 +37,9 @@ type Blockchain struct {
 	memPool *MemPool
 	net     protocol.Magic
 	height  uint64
-	db      *database.BlockchainDB
 
-	// Consensus related
-	currSeed      []byte                     // Seed of the current round of consensus
-	round         uint64                     // Current round (block height + 1)
-	tau           uint64                     // Current generator threshold
-	lastHeader    *block.Header              // Last validated block on the chain
-	roundChan     chan int                   // Channel used to signify start of a new round
-	ctx           *consensus.Context         // Consensus context object
-	consensusChan chan *payload.MsgConsensus // Channel for consensus messages
+	lastHeader *block.Header // Last validated block on the chain
 
-	// Block generator related fields
-	generator bool
-	bidWeight uint64
-
-	// Provisioner related fields
-	provisioner      bool
-	stakeWeight      uint64 // The amount of DUSK staked by the node
-	totalStakeWeight uint64 // The total amount of DUSK staked
-	provisioners     Provisioners
 }
 
 // NewBlockchain returns a new Blockchain instance with an initialized mempool.
@@ -126,43 +108,30 @@ func NewBlockchain(db *database.BlockchainDB, net protocol.Magic) (*Blockchain, 
 	chain.db = db
 	chain.net = net
 
-	// Consensus set-up
-	chain.consensusChan = make(chan *payload.MsgConsensus, 500)
-	chain.roundChan = make(chan int, 1)
 	chain.lastHeader, err = chain.GetLatestHeader()
 	if err != nil {
 		return nil, err
 	}
 
 	chain.height = chain.lastHeader.Height
-	chain.round = chain.height + 1
-	chain.currSeed = chain.lastHeader.Seed
 
-	// Start consensus loop
-	go chain.segregatedByzantizeAgreement()
 	return chain, nil
 }
 
 // GetLatestHeader gives the latest block header
 func (b *Blockchain) GetLatestHeader() (*block.Header, error) {
-	db := database.GetInstance()
-
-	return db.GetLatestHeader()
+	return nil, nil
 }
 
 // GetHeaders gives block headers from the database, starting and
 // stopping at the provided locators.
 func (b *Blockchain) GetHeaders(start []byte, stop []byte) ([]*block.Header, error) {
-	db := database.GetInstance()
-
-	return db.ReadHeaders(start, stop)
+	return nil, nil
 }
 
 // GetBlock will return the block from the received hash
 func (b *Blockchain) GetBlock(hash []byte) (*block.Block, error) {
-	bd := database.GetInstance()
-
-	return bd.GetBlock(hash)
+	return nil, nil
 }
 
 // AddHeaders will add block headers to the chain

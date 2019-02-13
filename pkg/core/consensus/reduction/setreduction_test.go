@@ -126,7 +126,7 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 	currHash = append(currHash, ctx.SigSetHash...)
 
 	// Send vote
-	ctx.SigSetVoteChan <- vote1
+	ctx.SigSetReductionChan <- vote1
 
 	// Wait one second..
 	time.Sleep(1 * time.Second)
@@ -137,7 +137,7 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.SigSetVoteChan <- vote2
+	ctx.SigSetReductionChan <- vote2
 	wg.Wait()
 
 	// Function should have returned and we should have the same sigsethash
@@ -225,7 +225,7 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
 
 	// Create sigsetvote payload to gossip
-	pl, err := consensusmsg.NewSigSetVote(winningBlock, ctx.SigSetHash, sigBLS, blsPubBytes)
+	pl, err := consensusmsg.NewSigSetReduction(winningBlock, ctx.SigSetHash, sigBLS, blsPubBytes)
 	if err != nil {
 		return nil, err
 	}
