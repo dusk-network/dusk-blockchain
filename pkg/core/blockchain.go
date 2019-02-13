@@ -23,7 +23,7 @@ var (
 )
 
 type Config struct {
-	UpdateProvisioners func(*block.Block)
+	UpdateProvisioners func(*block.Block) error
 }
 
 const maxLockTime = math.MaxUint16
@@ -51,13 +51,6 @@ type Blockchain struct {
 // NewBlockchain returns a new Blockchain instance with an initialized mempool.
 // This Blockchain instance should then be ready to process incoming transactions and blocks.
 func NewBlockchain(db *database.BlockchainDB, net protocol.Magic, cfg *Config) (*Blockchain, error) {
-	//path := config.EnvNetCfg.DatabaseDirPath
-	//db, err := database.NewBlockchainDB(path)
-	//log.WithField("prefix", "database").Debugf("Path to database: %s", path)
-	//if err != nil {
-	//	log.WithField("prefix", "database").Fatalf("Failed to find db path: %s", path)
-	//	return nil, err
-	//}
 
 	marker := []byte("HasBeenInitialisedAlready")
 	init, err := db.Has(marker)
