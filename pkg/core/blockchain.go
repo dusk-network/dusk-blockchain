@@ -22,6 +22,10 @@ var (
 	errBlockVerification = errors.New("Block failed to be consistent with the current blockchain")
 )
 
+type Config struct {
+	UpdateProvisioners func(*block.Block) error
+}
+
 const maxLockTime = math.MaxUint16
 
 // Blockchain defines a processor for blocks and transactions which
@@ -32,6 +36,8 @@ const maxLockTime = math.MaxUint16
 type Blockchain struct {
 	// Database
 	db *database.BlockchainDB
+
+	cfg *Config
 
 	// Basic fields
 	memPool *MemPool
@@ -44,14 +50,7 @@ type Blockchain struct {
 
 // NewBlockchain returns a new Blockchain instance with an initialized mempool.
 // This Blockchain instance should then be ready to process incoming transactions and blocks.
-func NewBlockchain(db *database.BlockchainDB, net protocol.Magic) (*Blockchain, error) {
-	//path := config.EnvNetCfg.DatabaseDirPath
-	//db, err := database.NewBlockchainDB(path)
-	//log.WithField("prefix", "database").Debugf("Path to database: %s", path)
-	//if err != nil {
-	//	log.WithField("prefix", "database").Fatalf("Failed to find db path: %s", path)
-	//	return nil, err
-	//}
+func NewBlockchain(db *database.BlockchainDB, net protocol.Magic, cfg *Config) (*Blockchain, error) {
 
 	marker := []byte("HasBeenInitialisedAlready")
 	init, err := db.Has(marker)
@@ -101,6 +100,8 @@ func NewBlockchain(db *database.BlockchainDB, net protocol.Magic) (*Blockchain, 
 	}
 
 	chain := &Blockchain{db: db}
+
+	chain.cfg = cfg
 
 	// Set up mempool and populate struct fields
 	chain.memPool = &MemPool{}

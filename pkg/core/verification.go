@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -154,14 +153,10 @@ func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 		if b.memPool.Exists(tx.Hex()) {
 			b.memPool.RemoveTx(tx)
 		}
-
-		// Update provisioners
-		if b.provisioner && tx.Type == transactions.StakeType {
-			pl := tx.TypeInfo.(*transactions.Stake)
-			b.AddProvisionerInfo(tx, pl.Output.Amount)
-			b.totalStakeWeight += pl.Output.Amount
-		}
 	}
+
+	// Update Provisioners
+	b.cfg.UpdateProvisioners(blk)
 
 	// Add to database
 	//if err := b.db.WriteHeaders([]*block.Header{block.Header}); err != nil {
@@ -174,14 +169,8 @@ func (b *Blockchain) AcceptBlock(blk *block.Block) error {
 
 	// Update variables
 	b.height = blk.Header.Height
-	b.round = blk.Header.Height + 1
-	b.currSeed = blk.Header.Seed
 	b.lastHeader = blk.Header
 
-	if b.provisioner {
-		b.UpdateProvisioners()
-		b.roundChan <- 1
-	}
 	// Should update generator merkle tree here as well
 
 	// TODO: Relay
@@ -239,58 +228,5 @@ func (b *Blockchain) VerifyBlock(blk *block.Block) error {
 // ValidateHeaders will validate headers that were received through the wire.
 // TODO: Centralize validation rules
 func (b *Blockchain) ValidateHeaders(msg *payload.MsgHeaders) error {
-	db := database.GetInstance()
-	table := database.NewTable(db, database.HEADER)
-	latestHash, err := db.Get(database.LATESTHEADER)
-	if err != nil {
-		return err
-	}
-
-	key := latestHash
-	headerBytes, err := table.Get(key)
-
-	latestHeader := &block.Header{}
-	err = latestHeader.Decode(bytes.NewReader(headerBytes))
-	if err != nil {
-		return err
-	}
-
-	// Sort the headers
-	sortedHeaders := msg.Headers
-	sort.Slice(sortedHeaders,
-		func(i, j int) bool {
-			return sortedHeaders[i].Height < sortedHeaders[j].Height
-		})
-
-	// Do checks on headers
-	for _, currentHeader := range sortedHeaders {
-
-		if latestHeader == nil {
-			// This should not happen as genesis header is added if new
-			// database, however we check nonetheless
-			return errors.New("Previous header is nil")
-		}
-
-		// Check current hash links with previous
-		if !bytes.Equal(currentHeader.PrevBlock, latestHeader.Hash) {
-			return errors.New("Last header hash != current header previous hash")
-		}
-
-		// Check current Index is one more than the previous Index
-		if currentHeader.Height != latestHeader.Height+1 {
-			return errors.New("Last header height != current header height")
-		}
-
-		// Check current timestamp is later than the previous header's timestamp
-		// TODO: This check implies that we use one central time on all nodes in whatever timezone.
-		//  But even then, because of communication delays this will lead to problems.
-		//  Let's not do this check!!
-		//if latestHeader.Timestamp > currentHeader.Timestamp {
-		//	return errors.New("Timestamp of Previous Header is later than Timestamp of current Header")
-		//}
-
-		// NOTE: These are the only non-contextual checks we can do without the blockchain state
-		latestHeader = currentHeader
-	}
 	return nil
 }

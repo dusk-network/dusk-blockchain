@@ -61,7 +61,7 @@ func (c *Consensus) SetupProvisioners() error {
 		height--
 	}
 
-	c.UpdateProvisioners()
+	c.RemoveOldProvisioners()
 	return nil
 }
 
@@ -84,10 +84,10 @@ func (c *Consensus) AddProvisionerInfo(tx *transactions.Stealth, amount uint64) 
 	c.SortProvisioners()
 }
 
-// UpdateProvisioners will run through all known nodes and check if they have
+// RemoveOldProvisioners will run through all known nodes and check if they have
 // expired stakes, and removing them if they do. It will also keep the context
 // committee sorted and up to date.
-func (c *Consensus) UpdateProvisioners() {
+func (c *Consensus) RemoveOldProvisioners() {
 	// Loop through all nodes
 	for pk, node := range c.provisioners {
 		// Loop through all their stakes
