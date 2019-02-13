@@ -4,15 +4,19 @@ import (
 	"fmt"
 	"net"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 type Server struct {
-	nonce uint64
-	peers []*peermgr.Peer
-	cfg   *peermgr.Config
+	nonce     uint64
+	peers     []*peermgr.Peer
+	cfg       *peermgr.Config
+	consensus *consensus.Consensus
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
@@ -67,4 +71,15 @@ func setupPeerConfig(nonce uint64) *peermgr.Config {
 		Nonce:   nonce,
 		Handler: handler,
 	}
+}
+
+func (s *Server) sendMessage(magic protocol.Magic, p wire.Payload) error {
+	for _, peer := range s.peers {
+		fmt.Printf("writing a %s message to peer %s\n", p.Command(), peer.RemoteAddr().String())
+		if err := peer.Write(p); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -6,7 +6,11 @@ import (
 	"os"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 )
 
@@ -49,12 +53,25 @@ func main() {
 
 	}
 
-	consensus, err := consensus.New(setupConsensusConfig())
+	// Create a context object to use
+	keys, err := user.NewRandKeys()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	ctx, err := user.NewContext(0, 500, 0, 1, make([]byte, 32), protocol.TestNet, keys)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Substitute SendMessage with our own function
+	ctx.SendMessage = s.sendMessage
+
+	// Trigger block generation every 5 seconds
 	for {
+		time.Sleep(5 * time.Second)
+		generation.Block(ctx)
 	}
 }
