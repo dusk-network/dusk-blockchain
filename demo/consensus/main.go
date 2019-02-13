@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 )
 
@@ -46,6 +47,12 @@ func main() {
 			fmt.Println(err)
 		}
 
+	}
+
+	consensus, err := consensus.New(setupConsensusConfig())
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 	for {

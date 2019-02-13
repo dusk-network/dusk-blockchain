@@ -3,12 +3,9 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
@@ -36,9 +33,9 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	s.peers = append(s.peers, peer)
 
 	// Send a mock message upon connection
-	msg := mockConsensusMsg()
-	err := peer.Write(msg)
-	fmt.Println(err)
+	// msg := mockConsensusMsg()
+	// err := peer.Write(msg)
+	// fmt.Println(err)
 }
 
 func OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
@@ -70,29 +67,4 @@ func setupPeerConfig(nonce uint64) *peermgr.Config {
 		Nonce:   nonce,
 		Handler: handler,
 	}
-}
-
-func mockConsensusMsg() *payload.MsgConsensus {
-	byte32, err := crypto.RandEntropy(32)
-	byte33, err := crypto.RandEntropy(33)
-	if err != nil {
-		fmt.Println("Could not create a Mock Consensus message")
-		os.Exit(1)
-	}
-	byte64, err := crypto.RandEntropy(64)
-	if err != nil {
-		fmt.Println("Could not create a Mock Consensus message")
-		os.Exit(1)
-	}
-	reductionPayload, err := consensusmsg.NewReduction(byte32, byte33, byte32)
-	if err != nil {
-		fmt.Println("Could not create a Mock Consensus message")
-		os.Exit(1)
-	}
-	msg, err := payload.NewMsgConsensus(10, 10, byte32, 10, byte64, byte32, reductionPayload)
-	if err != nil {
-		fmt.Println("Could not create a Mock Consensus message")
-		os.Exit(1)
-	}
-	return msg
 }
