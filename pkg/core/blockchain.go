@@ -106,7 +106,6 @@ func NewBlockchain(db *database.BlockchainDB, net protocol.Magic, cfg *Config) (
 	// Set up mempool and populate struct fields
 	chain.memPool = &MemPool{}
 	chain.memPool.Init()
-	chain.db = db
 	chain.net = net
 
 	chain.lastHeader, err = chain.GetLatestHeader()
