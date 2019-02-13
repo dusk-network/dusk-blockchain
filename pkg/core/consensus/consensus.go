@@ -26,7 +26,7 @@ type Config struct {
 	lastHeader    *block.Header              // Last validated block on the chain
 	roundChan     chan int                   // Channel used to signify start of a new round
 	ctx           *user.Context              // Consensus context object
-	consensusChan chan *payload.MsgConsensus // Channel for consensus messages
+	ConsensusChan chan *payload.MsgConsensus // Channel for consensus messages
 
 	// Block generator related fields
 	generator bool
@@ -63,7 +63,7 @@ func New(cfg *Config) (*Consensus, error) {
 		return nil, errors.New("pointer to VerifyBlock function is nil ")
 	}
 
-	cfg.consensusChan = make(chan *payload.MsgConsensus, 500)
+	cfg.ConsensusChan = make(chan *payload.MsgConsensus, 500)
 	cfg.roundChan = make(chan int, 1)
 
 	latestHeight := cfg.GetLatestHeight()
@@ -89,7 +89,7 @@ func (c *Consensus) segregatedByzantizeAgreement() {
 		select {
 		case <-c.roundChan:
 			go c.consensus()
-		case m := <-c.consensusChan:
+		case m := <-c.ConsensusChan:
 			go c.process(m)
 		}
 	}
@@ -291,4 +291,8 @@ func (c *Consensus) process(m *payload.MsgConsensus) {
 			}
 		}
 	}
+}
+
+func (c *Consensus) UpdateProvisioners(blk *block.Block) error {
+	return nil
 }
