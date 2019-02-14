@@ -31,7 +31,7 @@ type Server struct {
 
 // OnAccept is the function that runs when a node tries to connect with us
 func (s *Server) OnAccept(conn net.Conn) {
-	fmt.Printf("someone has tried to connect to us, with the address %s \n", conn.RemoteAddr().String())
+	fmt.Printf("someone has tried to connect to us, with the address %s\n", conn.RemoteAddr().String())
 
 	// Add peer to server's list of peers
 	peer := peermgr.NewPeer(conn, true, s.cfg)
@@ -51,7 +51,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 
 // OnConnection is the function that runs when we connect to another node
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	fmt.Printf("we have connected to the node with the address %s \n", conn.RemoteAddr().String())
+	fmt.Printf("we have connected to the node with the address %s\n", conn.RemoteAddr().String())
 
 	// Add peer to server's list of peers
 	peer := peermgr.NewPeer(conn, false, s.cfg)
@@ -72,15 +72,15 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateID:
 		candMsg := msg.Payload.(*consensusmsg.Candidate)
-		fmt.Printf("[CONSENSUS] Candidate block message\n Block hash: %s\n", hex.EncodeToString(candMsg.Block.Header.Hash))
+		fmt.Printf("[CONSENSUS] Candidate block message\n\tBlock hash: %s\n", hex.EncodeToString(candMsg.Block.Header.Hash))
 		s.ctx.CandidateChan <- msg
 	case consensusmsg.CandidateScoreID:
 		candScore := msg.Payload.(*consensusmsg.CandidateScore)
-		fmt.Printf("[CONSENSUS] Candidate Score msg\n candidate score: %d\n Block hash :%s\n", candScore.Score, hex.EncodeToString(candScore.CandidateHash))
+		fmt.Printf("[CONSENSUS] Candidate Score msg\n\tcandidate score: %d\n\tBlock hash :%s\n", candScore.Score, hex.EncodeToString(candScore.CandidateHash))
 		s.ctx.CandidateScoreChan <- msg
 	case consensusmsg.BlockReductionID:
 		blockReduction := msg.Payload.(*consensusmsg.BlockReduction)
-		fmt.Printf("[CONSENSUS] Block Reduction msg\n Block hash :%s\n", hex.EncodeToString(blockReduction.BlockHash))
+		fmt.Printf("[CONSENSUS] Block Reduction msg\n\tBlock hash :%s\n", hex.EncodeToString(blockReduction.BlockHash))
 		if err := s.process(msg); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -104,6 +104,8 @@ func (s *Server) OnTx(peer *peermgr.Peer, msg *payload.MsgTx) {
 
 	// Put information into our context object
 	pl := msg.Tx.TypeInfo.(*transactions.Stake)
+	s.ctx.Committee = append(s.ctx.Committee, pl.PubKeyEd)
+	s.ctx.W += pl.Output.Amount
 	pkEd := hex.EncodeToString(pl.PubKeyEd)
 	s.ctx.NodeWeights[pkEd] = pl.Output.Amount
 	pkBLS := hex.EncodeToString(pl.PubKeyBLS)
@@ -115,7 +117,7 @@ func setupPeerConfig(s *Server, nonce uint64) *peermgr.Config {
 		OnHeaders:        nil,
 		OnNotFound:       nil,
 		OnGetData:        nil,
-		OnTx:             nil,
+		OnTx:             s.OnTx,
 		OnGetHeaders:     nil,
 		OnAddr:           nil,
 		OnGetAddr:        nil,

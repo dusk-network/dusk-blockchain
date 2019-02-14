@@ -137,6 +137,7 @@ func setupContext(s *Server) *user.Context {
 	}
 
 	// Set values for provisioning
+	ctx.Committee = append(ctx.Committee, []byte(*keys.EdPubKey))
 	ctx.Weight = uint64(weight)
 	pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
 	pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
@@ -152,6 +153,11 @@ func setupContext(s *Server) *user.Context {
 	stake.AddInput(in)
 	stake.AddOutput(out)
 	tx := transactions.NewTX(transactions.StakeType, stake)
+	if err := tx.SetHash(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
 	s.txs = append(s.txs, tx)
 
 	// Substitute SendMessage with our own function
