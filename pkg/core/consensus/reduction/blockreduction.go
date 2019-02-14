@@ -171,13 +171,18 @@ func countBlockVotes(ctx *user.Context) error {
 			voters[pkEd] = true
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
-			blockVote, err2 := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, ctx.Step)
-			if err2 != nil {
-				return err2
+			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, ctx.Step)
+			if err != nil {
+				return err
 			}
 
 			for i := uint8(0); i < votes; i++ {
 				ctx.BlockVotes = append(ctx.BlockVotes, blockVote)
+			}
+
+			// Gossip the message
+			if err := ctx.SendMessage(ctx.Magic, m); err != nil {
+				return err
 			}
 
 			// If a block doesnt exceed the vote threshold, we keep going.
