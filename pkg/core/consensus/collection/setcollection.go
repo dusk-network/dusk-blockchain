@@ -58,6 +58,9 @@ func SignatureSet(ctx *user.Context) error {
 			if stake > highest {
 				highest = stake
 				ctx.SigSetVotes = pl.SignatureSet
+
+				// Gossip it to the rest of the network
+				ctx.SendMessage(ctx.Magic, m)
 			}
 		}
 	}
