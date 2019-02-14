@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"os"
@@ -8,6 +9,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 
@@ -33,10 +35,12 @@ func main() {
 	}
 
 	// Setup server
-	s := Server{
-		peers: make([]*peermgr.Peer, 0, 10),
-		cfg:   setupPeerConfig(rand.Uint64()),
+	s := &Server{
+		peers:       make([]*peermgr.Peer, 0, 10),
+		connectChan: make(chan bool, 1),
 	}
+
+	s.cfg = setupPeerConfig(s, rand.Uint64())
 
 	// setup connmgr
 	cfg := CmgrConfig{
@@ -53,6 +57,9 @@ func main() {
 
 	}
 
+	// Generate a random number between 100 and 1000 for the bid weight
+	bidWeight := 100 + rand.Intn(900)
+
 	// Create a context object to use
 	keys, err := user.NewRandKeys()
 	if err != nil {
@@ -60,18 +67,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx, err := user.NewContext(0, 500, 0, 1, make([]byte, 32), protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, uint64(bidWeight), 0, 1, make([]byte, 32), protocol.TestNet, keys)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	s.ctx = ctx
+
 	// Substitute SendMessage with our own function
 	ctx.SendMessage = s.sendMessage
 
-	// Trigger block generation every 5 seconds
+	// wait for a connection, so we can start off simultaneously
+	<-s.connectChan
+
+	// Trigger block generation and block collection loop
 	for {
-		time.Sleep(5 * time.Second)
 		generation.Block(ctx)
+		fmt.Printf("our generated block is %s\n", hex.EncodeToString(ctx.BlockHash))
+		collection.Block(ctx)
+		fmt.Printf("our best block is %s\n", hex.EncodeToString(ctx.BlockHash))
 	}
 }

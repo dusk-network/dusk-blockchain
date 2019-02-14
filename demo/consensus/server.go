@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
@@ -13,10 +14,11 @@ import (
 )
 
 type Server struct {
-	nonce     uint64
-	peers     []*peermgr.Peer
-	cfg       *peermgr.Config
-	consensus *consensus.Consensus
+	nonce       uint64
+	peers       []*peermgr.Peer
+	cfg         *peermgr.Config
+	ctx         *user.Context
+	connectChan chan bool
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
@@ -26,6 +28,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	peer := peermgr.NewPeer(conn, true, s.cfg)
 	peer.Run()
 	s.peers = append(s.peers, peer)
+	s.connectChan <- true
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
@@ -35,6 +38,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peer := peermgr.NewPeer(conn, false, s.cfg)
 	peer.Run()
 	s.peers = append(s.peers, peer)
+	s.connectChan <- true
 
 	// Send a mock message upon connection
 	// msg := mockConsensusMsg()
@@ -42,11 +46,17 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	// fmt.Println(err)
 }
 
-func OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
+func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 	fmt.Printf("we have received a consensus message from peer %s , message type %d\n", peer.RemoteAddr().String(), msg.Payload.Type())
+	switch msg.Payload.Type() {
+	case consensusmsg.CandidateID:
+		s.ctx.CandidateChan <- msg
+	case consensusmsg.CandidateScoreID:
+		s.ctx.CandidateScoreChan <- msg
+	}
 }
 
-func setupPeerConfig(nonce uint64) *peermgr.Config {
+func setupPeerConfig(s *Server, nonce uint64) *peermgr.Config {
 	handler := peermgr.ResponseHandler{
 		OnHeaders:        nil,
 		OnNotFound:       nil,
@@ -57,7 +67,7 @@ func setupPeerConfig(nonce uint64) *peermgr.Config {
 		OnGetAddr:        nil,
 		OnGetBlocks:      nil,
 		OnBlock:          nil,
-		OnConsensus:      OnConsensus,
+		OnConsensus:      s.OnConsensus,
 		OnCertificate:    nil,
 		OnCertificateReq: nil,
 		OnMemPool:        nil,
