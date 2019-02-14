@@ -2,6 +2,7 @@ package generation
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -86,6 +87,11 @@ func Block(ctx *user.Context) error {
 	if err := ctx.SendMessage(ctx.Magic, msgCandidate); err != nil {
 		return err
 	}
+
+	// Set values on our context
+	ctx.BlockHash = candidateBlock.Header.Hash
+	hashStr := hex.EncodeToString(ctx.BlockHash)
+	ctx.CandidateBlocks[hashStr] = candidateBlock
 
 	return nil
 }
