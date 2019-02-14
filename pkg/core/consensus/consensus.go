@@ -24,9 +24,9 @@ type Config struct {
 	round         uint64                     // Current round (block height + 1)
 	tau           uint64                     // Current generator threshold
 	lastHeader    *block.Header              // Last validated block on the chain
-	roundChan     chan int                   // Channel used to signify start of a new round
+	RoundChan     chan int                   // Channel used to signify start of a new round
 	ctx           *user.Context              // Consensus context object
-	consensusChan chan *payload.MsgConsensus // Channel for consensus messages
+	ConsensusChan chan *payload.MsgConsensus // Channel for consensus messages
 
 	// Block generator related fields
 	generator bool
@@ -63,8 +63,8 @@ func New(cfg *Config) (*Consensus, error) {
 		return nil, errors.New("pointer to VerifyBlock function is nil ")
 	}
 
-	cfg.consensusChan = make(chan *payload.MsgConsensus, 500)
-	cfg.roundChan = make(chan int, 1)
+	cfg.ConsensusChan = make(chan *payload.MsgConsensus, 500)
+	cfg.RoundChan = make(chan int, 1)
 
 	latestHeight := cfg.GetLatestHeight()
 	latestHeader, err := cfg.GetBlockHeaderByHeight(latestHeight)
@@ -87,9 +87,9 @@ func New(cfg *Config) (*Consensus, error) {
 func (c *Consensus) segregatedByzantizeAgreement() {
 	for {
 		select {
-		case <-c.roundChan:
+		case <-c.RoundChan:
 			go c.consensus()
-		case m := <-c.consensusChan:
+		case m := <-c.ConsensusChan:
 			go c.process(m)
 		}
 	}
@@ -160,7 +160,7 @@ func (c *Consensus) consensus() {
 
 	// If we did not get a result, restart the consensus from block generation.
 	if c.ctx.BlockHash == nil {
-		c.roundChan <- 1
+		c.RoundChan <- 1
 		return
 	}
 
@@ -230,6 +230,39 @@ func (c *Consensus) consensus() {
 	c.ctx.Multiplier = 1
 }
 
+func (c *Consensus) StartGenerating() error {
+	if c.generator {
+		return errors.New("already generating")
+	}
+
+	keys, err := user.NewRandKeys()
+	if err != nil {
+		return err
+	}
+
+	height := c.GetLatestHeight()
+
+	ctx, err := user.NewContext(c.tau, c.bidWeight, c.totalStakeWeight, height+1,
+		c.lastHeader.Seed, c.net, keys)
+	if err != nil {
+		return err
+	}
+
+	c.ctx = ctx
+	if err := c.SetupProvisioners(); err != nil {
+		return err
+	}
+
+	c.generator = true
+	return nil
+}
+
+func (c *Consensus) StopGenerating() {
+	c.generator = false
+	c.ctx.Clear()
+	c.provisioners = nil
+}
+
 // StartProvisioning will set the node to provisioner status,
 // and will start participating in block reduction and binary agreement
 // phases of the protocol.
@@ -245,7 +278,7 @@ func (c *Consensus) StartProvisioning() error {
 
 	height := c.GetLatestHeight()
 
-	ctx, err := user.NewContext(0, c.bidWeight, c.totalStakeWeight, height+1,
+	ctx, err := user.NewContext(c.tau, c.bidWeight, c.totalStakeWeight, height+1,
 		c.lastHeader.Seed, c.net, keys)
 	if err != nil {
 		return err
@@ -291,4 +324,8 @@ func (c *Consensus) process(m *payload.MsgConsensus) {
 			}
 		}
 	}
+}
+
+func (c *Consensus) UpdateProvisioners(blk *block.Block) error {
+	return nil
 }

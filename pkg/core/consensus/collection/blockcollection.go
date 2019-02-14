@@ -40,6 +40,8 @@ func Block(ctx *user.Context) error {
 			}
 			ctx.CandidateBlocks[blockHash] = pl.Block
 
+			// Gossip it to the rest of the network
+			ctx.SendMessage(ctx.Magic, m)
 		case m := <-ctx.CandidateScoreChan:
 			pl := m.Payload.(*consensusmsg.CandidateScore)
 			pkEd := hex.EncodeToString(m.PubKey)
@@ -55,6 +57,9 @@ func Block(ctx *user.Context) error {
 			if pl.Score > highest {
 				highest = pl.Score
 				ctx.BlockHash = pl.CandidateHash
+
+				// Gossip it to the rest of the network
+				ctx.SendMessage(ctx.Magic, m)
 			}
 
 		}

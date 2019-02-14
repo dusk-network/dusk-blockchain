@@ -235,6 +235,7 @@ func getAllTXs() []*transactions.Stealth {
 	pl.AddOutput(output)
 
 	tx.R = sig
+	tx.TypeInfo = pl
 
 	return []*transactions.Stealth{tx}
 }

@@ -9,9 +9,9 @@ import (
 
 func TestCompactSize(t *testing.T) {
 	a := uint64(1)
-	b := uint64(2 ^ 8)
-	c := uint64(2 ^ 16)
-	d := uint64(2 ^ 32)
+	b := uint64(1<<16 - 1)
+	c := uint64(1<<32 - 1)
+	d := uint64(1<<64 - 1)
 
 	// Serialize
 	buf := new(bytes.Buffer)

@@ -30,7 +30,7 @@ func TestMsgGetDataEncodeDecodeTx(t *testing.T) {
 	}
 
 	msg := payload.NewMsgGetData()
-	msg.AddTx(s)
+	msg.AddTx(s.R)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
@@ -115,7 +115,7 @@ func TestMsgGetDataEncodeDecodeBlock(t *testing.T) {
 	}
 
 	msg := payload.NewMsgGetData()
-	msg.AddBlock(b)
+	msg.AddBlock(b.Header.Hash)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
