@@ -4,17 +4,16 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
-func TestVerifySigSetVote(t *testing.T) {
+func TestVerifyBlockReduction(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -29,13 +28,11 @@ func TestVerifySigSetVote(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	// Add the block to our collection
+	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
+	ctx.CandidateBlocks[hashStr] = emptyBlock
 
-	// Add the vote set to our collection
-	setStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.AllVotes[setStr] = make([]*consensusmsg.Vote, 0)
-
-	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, false)
+	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x02, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +47,7 @@ func TestVerifySigSetVote(t *testing.T) {
 	}
 }
 
-func TestSigSetVoteDeviatingBlock(t *testing.T) {
+func TestBlockReductionWrongStep(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -65,49 +62,7 @@ func TestSigSetVoteDeviatingBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
-
-	// Change our block hash
-	otherBlock, err := crypto.RandEntropy(32)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx.BlockHash = otherBlock
-
-	// Verify the message (should fail with low priority error)
-	err2 := msg.Process(ctx, m)
-	if err2 == nil {
-		t.Fatal("unknown block check did not work")
-	}
-
-	if err2.Priority == prerror.High {
-		t.Fatal(err2)
-	}
-}
-
-func TestSigSetVoteWrongStep(t *testing.T) {
-	// Create context
-	seed, _ := crypto.RandEntropy(32)
-	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a dummy block and message
-	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, false)
+	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x02, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +86,7 @@ func TestSigSetVoteWrongStep(t *testing.T) {
 	}
 }
 
-func TestSigSetVoteNotInCommittee(t *testing.T) {
+func TestBlockReductionNotInCommittee(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -146,7 +101,7 @@ func TestSigSetVoteNotInCommittee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, false)
+	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x02, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +121,7 @@ func TestSigSetVoteNotInCommittee(t *testing.T) {
 	}
 }
 
-func TestSigSetVoteUnknownVoteSet(t *testing.T) {
+func TestBlockReductionWrongBLSKey(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -181,43 +136,7 @@ func TestSigSetVoteUnknownVoteSet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
-	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
-
-	// Verify the message
-	err2 := msg.Process(ctx, m)
-	if err2 == nil {
-		t.Fatal("vote set check did not work")
-	}
-
-	if err2.Priority == prerror.High {
-		t.Fatal(err2)
-	}
-}
-
-func TestSigSetVoteWrongBLSKey(t *testing.T) {
-	// Create context
-	seed, _ := crypto.RandEntropy(32)
-	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create a dummy block and message
-	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx.BlockHash = emptyBlock.Header.Hash
-	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, false)
+	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x02, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +162,7 @@ func TestSigSetVoteWrongBLSKey(t *testing.T) {
 	}
 }
 
-func TestSigSetVoteWrongBLSSig(t *testing.T) {
+func TestBlockReductionWrongBLSSig(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -252,14 +171,13 @@ func TestSigSetVoteWrongBLSSig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a dummy block and message with wrong signature
+	// Create a dummy block and message
 	emptyBlock, err := block.NewEmptyBlock(ctx.LastHeader)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
-	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, true)
+	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x02, nil, true)
 	if err != nil {
 		t.Fatal(err)
 	}
