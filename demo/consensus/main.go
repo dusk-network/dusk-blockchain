@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -144,6 +146,11 @@ func setupContext(s *Server) *user.Context {
 	// Make a staking transaction which mirrors this to other nodes
 	stake := transactions.NewStake(1000, 100, []byte(*keys.EdPubKey),
 		keys.BLSPubKey.Marshal())
+	byte32, _ := crypto.RandEntropy(32)
+	in := transactions.NewInput(byte32, byte32, 0, byte32)
+	out := transactions.NewOutput(uint64(weight), byte32, byte32)
+	stake.AddInput(in)
+	stake.AddOutput(out)
 	tx := transactions.NewTX(transactions.StakeType, stake)
 	s.txs = append(s.txs, tx)
 
