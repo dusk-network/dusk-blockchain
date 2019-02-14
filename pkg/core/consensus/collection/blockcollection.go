@@ -15,8 +15,6 @@ import (
 // came with the highest score found during message processing, which should then
 // be voted on in later phases, if the corresponding block was also received for it.
 func Block(ctx *user.Context) error {
-	// Keeps track of those who have already propagated their score messages
-	senders := make(map[string]bool)
 
 	// Keep track of the highest bid score seen
 	var highest uint64
@@ -44,13 +42,6 @@ func Block(ctx *user.Context) error {
 			ctx.SendMessage(ctx.Magic, m)
 		case m := <-ctx.CandidateScoreChan:
 			pl := m.Payload.(*consensusmsg.CandidateScore)
-			pkEd := hex.EncodeToString(m.PubKey)
-
-			// Add candidate score to map of known candidate scores, if unknown
-			if senders[pkEd] {
-				break
-			}
-			senders[pkEd] = true
 
 			// If the received score is higher than our current one, replace
 			// the current blockhash and score with the received block hash and score.
