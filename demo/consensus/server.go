@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net"
 
@@ -39,19 +40,17 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peer.Run()
 	s.peers = append(s.peers, peer)
 	s.connectChan <- true
-
-	// Send a mock message upon connection
-	// msg := mockConsensusMsg()
-	// err := peer.Write(msg)
-	// fmt.Println(err)
 }
 
 func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
-	fmt.Printf("we have received a consensus message from peer %s , message type %d\n", peer.RemoteAddr().String(), msg.Payload.Type())
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateID:
+		candMsg := msg.Payload.(*consensusmsg.Candidate)
+		fmt.Printf("[CONSENSUS] Candidate block message\n Block hash: %s\n", hex.EncodeToString(candMsg.Block.Header.Hash))
 		s.ctx.CandidateChan <- msg
 	case consensusmsg.CandidateScoreID:
+		candScore := msg.Payload.(*consensusmsg.CandidateScore)
+		fmt.Printf("[CONSENSUS] Candidate Score msg\n candidate score: %d\n Block hash :%s\n", candScore.Score, hex.EncodeToString(candScore.CandidateHash))
 		s.ctx.CandidateScoreChan <- msg
 	}
 }
@@ -85,7 +84,7 @@ func setupPeerConfig(s *Server, nonce uint64) *peermgr.Config {
 
 func (s *Server) sendMessage(magic protocol.Magic, p wire.Payload) error {
 	for _, peer := range s.peers {
-		fmt.Printf("writing a %s message to peer %s\n", p.Command(), peer.RemoteAddr().String())
+		fmt.Printf("[CONSENSUS] writing message to peer %s\n", peer.RemoteAddr().String())
 		if err := peer.Write(p); err != nil {
 			return err
 		}
