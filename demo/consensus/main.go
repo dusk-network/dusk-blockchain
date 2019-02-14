@@ -9,6 +9,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -134,6 +135,18 @@ func setupContext(s *Server) *user.Context {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	// Set context last header to a common value to avoid processing errors
+	ctx.LastHeader = &block.Header{
+		Version:   0,
+		Timestamp: 150000000,
+		Height:    0,
+		PrevBlock: make([]byte, 32),
+		Seed:      make([]byte, 32),
+		TxRoot:    make([]byte, 32),
+		CertHash:  make([]byte, 32),
+		Hash:      make([]byte, 32),
 	}
 
 	// Set values for provisioning

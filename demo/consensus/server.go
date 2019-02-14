@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
@@ -72,15 +73,18 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateID:
 		candMsg := msg.Payload.(*consensusmsg.Candidate)
-		fmt.Printf("[CONSENSUS] Candidate block message\n\tBlock hash: %s\n", hex.EncodeToString(candMsg.Block.Header.Hash))
+		fmt.Printf("[CONSENSUS] Candidate block message\n\tBlock hash: %s\n",
+			hex.EncodeToString(candMsg.Block.Header.Hash))
 		s.ctx.CandidateChan <- msg
 	case consensusmsg.CandidateScoreID:
 		candScore := msg.Payload.(*consensusmsg.CandidateScore)
-		fmt.Printf("[CONSENSUS] Candidate Score msg\n\tcandidate score: %d\n\tBlock hash :%s\n", candScore.Score, hex.EncodeToString(candScore.CandidateHash))
+		fmt.Printf("[CONSENSUS] Candidate Score msg\n\tcandidate score: %d\n\tBlock hash: %s\n",
+			candScore.Score, hex.EncodeToString(candScore.CandidateHash))
 		s.ctx.CandidateScoreChan <- msg
 	case consensusmsg.BlockReductionID:
 		blockReduction := msg.Payload.(*consensusmsg.BlockReduction)
-		fmt.Printf("[CONSENSUS] Block Reduction msg\n\tBlock hash :%s\n", hex.EncodeToString(blockReduction.BlockHash))
+		fmt.Printf("[CONSENSUS] Block Reduction msg\n\tBlock hash: %s\n",
+			hex.EncodeToString(blockReduction.BlockHash))
 		if err := s.process(msg); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -110,6 +114,11 @@ func (s *Server) OnTx(peer *peermgr.Peer, msg *payload.MsgTx) {
 	s.ctx.NodeWeights[pkEd] = pl.Output.Amount
 	pkBLS := hex.EncodeToString(pl.PubKeyBLS)
 	s.ctx.NodeBLS[pkBLS] = pl.PubKeyEd
+
+	// Sort committee
+	sort.SliceStable(s.ctx.Committee, func(i int, j int) bool {
+		return hex.EncodeToString(s.ctx.Committee[i]) < hex.EncodeToString(s.ctx.Committee[j])
+	})
 }
 
 func setupPeerConfig(s *Server, nonce uint64) *peermgr.Config {
