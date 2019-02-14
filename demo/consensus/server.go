@@ -14,6 +14,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
+// Server is the node server
 type Server struct {
 	nonce       uint64
 	peers       []*peermgr.Peer
@@ -22,6 +23,7 @@ type Server struct {
 	connectChan chan bool
 }
 
+// OnAccept is the function that runs when a node tries to connect with us
 func (s *Server) OnAccept(conn net.Conn) {
 	fmt.Printf("someone has tried to connect to us, with the address %s \n", conn.RemoteAddr().String())
 
@@ -32,6 +34,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	s.connectChan <- true
 }
 
+// OnConnection is the function that runs when we connect to another node
 func (s *Server) OnConnection(conn net.Conn, addr string) {
 	fmt.Printf("we have connected to the node with the address %s \n", conn.RemoteAddr().String())
 
@@ -42,6 +45,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	s.connectChan <- true
 }
 
+// OnConsensus is the function that runs when we receive a consensus message from another node
 func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateID:

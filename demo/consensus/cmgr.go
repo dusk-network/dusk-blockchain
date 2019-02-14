@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// CmgrConfig is the config file for the node connection manager
 type CmgrConfig struct {
 	Port     string
 	OnAccept func(net.Conn)
