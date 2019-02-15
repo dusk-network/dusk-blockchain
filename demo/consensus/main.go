@@ -7,6 +7,13 @@ import (
 	"os"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
@@ -38,12 +45,32 @@ func main() {
 	// wait for a connection, so we can start off simultaneously
 	<-s.connectChan
 
-	// Trigger block generation and block collection loop
+	// Trigger consensus loop
 	for {
-		generation.Block(s.ctx)
+		// Block generation
+		if err := generation.Block(s.ctx); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
 		fmt.Printf("our generated block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
-		collection.Block(s.ctx)
+
+		// Block collection
+		if err := collection.Block(s.ctx); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
 		fmt.Printf("our best block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
+
+		// Block reduction
+		if err := reduction.Block(s.ctx); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("resulting hash from block reduction is %s\n",
+			hex.EncodeToString(s.ctx.BlockHash))
 	}
 }
 
@@ -93,8 +120,8 @@ func setupConnMgr(port string, peers []string, s *Server) *connmgr {
 }
 
 func setupContext(s *Server) *user.Context {
-	// Generate a random number between 100 and 1000 for the bid weight
-	bidWeight := 100 + rand.Intn(900)
+	// Generate a random number between 100 and 1000 for the bid/stake weight
+	weight := 100 + rand.Intn(900)
 
 	// Create a context object to use
 	keys, err := user.NewRandKeys()
@@ -103,11 +130,48 @@ func setupContext(s *Server) *user.Context {
 		os.Exit(1)
 	}
 
-	ctx, err := user.NewContext(0, uint64(bidWeight), 0, 1, make([]byte, 32), protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, uint64(weight), uint64(weight), 1,
+		make([]byte, 32), protocol.TestNet, keys)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// Set context last header to a common value to avoid processing errors
+	ctx.LastHeader = &block.Header{
+		Version:   0,
+		Timestamp: 150000000,
+		Height:    0,
+		PrevBlock: make([]byte, 32),
+		Seed:      make([]byte, 32),
+		TxRoot:    make([]byte, 32),
+		CertHash:  make([]byte, 32),
+		Hash:      make([]byte, 32),
+	}
+
+	// Set values for provisioning
+	ctx.Committee = append(ctx.Committee, []byte(*keys.EdPubKey))
+	ctx.Weight = uint64(weight)
+	pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+	pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
+	ctx.NodeBLS[pkBLS] = *keys.EdPubKey
+	ctx.NodeWeights[pkEd] = uint64(weight)
+
+	// Make a staking transaction which mirrors this to other nodes
+	stake := transactions.NewStake(1000, 100, []byte(*keys.EdPubKey),
+		keys.BLSPubKey.Marshal())
+	byte32, _ := crypto.RandEntropy(32)
+	in := transactions.NewInput(byte32, byte32, 0, byte32)
+	out := transactions.NewOutput(uint64(weight), byte32, byte32)
+	stake.AddInput(in)
+	stake.AddOutput(out)
+	tx := transactions.NewTX(transactions.StakeType, stake)
+	if err := tx.SetHash(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	s.txs = append(s.txs, tx)
 
 	// Substitute SendMessage with our own function
 	ctx.SendMessage = s.sendMessage
