@@ -38,6 +38,7 @@ before_script:
   - chmod 700 ~/.ssh
   - git config --global user.email "git@gitlab.dusk.network"
   - git config --global user.name "Gitlab Runner"
+  - git config --global url."git@gitlab.dusk.network:".insteadOf "https://gitlab.dusk.network/"
    
   - mkdir -p /go/src/gitlab.dusk.network/dusk-core/dusk-go /go/src/_/builds
   - cp -r $CI_PROJECT_DIR /go/src/gitlab.dusk.network/dusk-core/dusk-go
