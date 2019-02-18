@@ -22,7 +22,9 @@ before_script:
   ## Run ssh-agent (inside the build environment)
   ##
   - eval $(ssh-agent -s)
-
+  - echo "debug"
+  - echo "$SSH_PRIVATE_KEY" # all is ok here, it'll be printed
+  - echo "debug"
   ##
   ## Add the SSH key stored in SSH_PRIVATE_KEY variable to the agent store
   ## We're using tr to fix line endings which makes ed25519 keys work
@@ -36,6 +38,7 @@ before_script:
   ##
   - mkdir -p ~/.ssh
   - chmod 700 ~/.ssh
+  - ls -la ~./ssh
   - git config --global user.email "git@gitlab.dusk.network"
   - git config --global user.name "Gitlab Runner"
   - git config --global url."git@gitlab.dusk.network:".insteadOf "https://gitlab.dusk.network/"
