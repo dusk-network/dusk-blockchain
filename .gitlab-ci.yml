@@ -14,6 +14,10 @@ stages:
 
 before_script:
   ##
+  ## Clean up /go folder - required by Shell Executor runners
+  ##
+  - 'find /go -mindepth 1 -maxdepth 1 | xargs rm -rf'
+  ##
   ## Install ssh-agent if not already installed, it is required by Docker.
   ##
   - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
