@@ -11,12 +11,13 @@ import (
 type SigSetCandidate struct {
 	WinningBlockHash []byte  // Winning block hash
 	SignatureSet     []*Vote // Generated signature set
+	Step             uint8   // Step at which this vote set was created
 }
 
 // NewSigSetCandidate returns a SigSetCandidate struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewSigSetCandidate(winningBlock []byte, sigSet []*Vote) (*SigSetCandidate, error) {
+func NewSigSetCandidate(winningBlock []byte, sigSet []*Vote, step uint8) (*SigSetCandidate, error) {
 	if len(winningBlock) != 32 {
 		return nil, errors.New("wire: supplied winning block hash for signature set candidate payload is improper length")
 	}
@@ -24,6 +25,7 @@ func NewSigSetCandidate(winningBlock []byte, sigSet []*Vote) (*SigSetCandidate, 
 	return &SigSetCandidate{
 		WinningBlockHash: winningBlock,
 		SignatureSet:     sigSet,
+		Step:             step,
 	}, nil
 }
 
@@ -42,6 +44,10 @@ func (s *SigSetCandidate) Encode(w io.Writer) error {
 		if err := vote.Encode(w); err != nil {
 			return err
 		}
+	}
+
+	if err := encoding.WriteUint8(w, s.Step); err != nil {
+		return err
 	}
 
 	return nil
@@ -65,6 +71,10 @@ func (s *SigSetCandidate) Decode(r io.Reader) error {
 		if err := s.SignatureSet[i].Decode(r); err != nil {
 			return err
 		}
+	}
+
+	if err := encoding.ReadUint8(r, &s.Step); err != nil {
+		return err
 	}
 
 	return nil
