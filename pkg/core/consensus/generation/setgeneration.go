@@ -9,7 +9,8 @@ import (
 // SignatureSet will generate a signature set message and gossip it.
 func SignatureSet(ctx *user.Context) error {
 	// Create our own signature set candidate message
-	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes)
+	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes,
+		ctx.Certificate.BRStep)
 	if err != nil {
 		return err
 	}
@@ -20,15 +21,13 @@ func SignatureSet(ctx *user.Context) error {
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Certificate.BRStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}
 
 	// Gossip msg
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
-		return err
-	}
+	ctx.SigSetCandidateChan <- msg
 
 	return nil
 }

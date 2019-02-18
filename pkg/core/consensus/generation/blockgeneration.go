@@ -71,9 +71,7 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	if err := ctx.SendMessage(ctx.Magic, msgScore); err != nil {
-		return err
-	}
+	ctx.CandidateScoreChan <- msgScore
 
 	// Create candidate msg
 	pl2 := consensusmsg.NewCandidate(candidateBlock)
@@ -87,7 +85,7 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	// Set values on our context
+	// Set value on our context
 	ctx.BlockHash = candidateBlock.Header.Hash
 	ctx.CandidateBlock = candidateBlock
 
