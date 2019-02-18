@@ -64,9 +64,8 @@ type Context struct {
 	BlockVotes     []*consensusmsg.Vote // Vote set for block set agreement phase
 
 	/// Signature set fields
-	AllVotes    map[string][]*consensusmsg.Vote // Mapping of hashes to vote sets received during signature set generation
-	SigSetVotes []*consensusmsg.Vote            // Vote set for signature set agreement phase
-	SigSetHash  []byte                          // Hash of the signature vote set being voted on
+	SigSetVotes []*consensusmsg.Vote // Vote set for signature set agreement phase
+	SigSetHash  []byte               // Hash of the signature vote set being voted on
 
 	/// Tracking fields
 	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
@@ -130,7 +129,6 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
 		Queue:               make(map[uint64]map[uint8][]*payload.MsgConsensus),
 		W:                   totalWeight,
-		AllVotes:            make(map[string][]*consensusmsg.Vote),
 		GetAllTXs:           getAllTXs,
 		HashVotes:           hashVotes,
 		BLSSign:             bLSSign,
@@ -161,7 +159,6 @@ func (c *Context) Reset() {
 	c.BlockHash = nil
 	c.Step = 1
 	c.Certificate = &block.Certificate{}
-	c.AllVotes = make(map[string][]*consensusmsg.Vote)
 	c.BlockVotes = nil
 	c.SigSetHash = nil
 	c.SigSetVotes = nil

@@ -12,12 +12,13 @@ type SigSetAgreement struct {
 	BlockHash []byte
 	SetHash   []byte
 	VoteSet   []*Vote
+	Step      uint8
 }
 
 // NewSigSetAgreement returns a SigSetAgreement struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewSigSetAgreement(blockHash, setHash []byte, voteSet []*Vote) (*SigSetAgreement, error) {
+func NewSigSetAgreement(blockHash, setHash []byte, voteSet []*Vote, step uint8) (*SigSetAgreement, error) {
 	if len(blockHash) != 32 {
 		return nil, errors.New("wire: supplied block hash for signature set agreement payload is improper length")
 	}
@@ -30,6 +31,7 @@ func NewSigSetAgreement(blockHash, setHash []byte, voteSet []*Vote) (*SigSetAgre
 		BlockHash: blockHash,
 		SetHash:   setHash,
 		VoteSet:   voteSet,
+		Step:      step,
 	}, nil
 }
 
@@ -52,6 +54,10 @@ func (s *SigSetAgreement) Encode(w io.Writer) error {
 		if err := vote.Encode(w); err != nil {
 			return err
 		}
+	}
+
+	if err := encoding.WriteUint8(w, s.Step); err != nil {
+		return err
 	}
 
 	return nil
@@ -79,6 +85,10 @@ func (s *SigSetAgreement) Decode(r io.Reader) error {
 		if err := s.VoteSet[i].Decode(r); err != nil {
 			return err
 		}
+	}
+
+	if err := encoding.ReadUint8(r, &s.Step); err != nil {
+		return err
 	}
 
 	return nil

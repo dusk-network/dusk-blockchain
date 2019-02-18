@@ -34,7 +34,7 @@ func TestSigSetAgreementEncodeDecode(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	msg, err := NewSigSetAgreement(byte32, byte32, votes)
+	msg, err := NewSigSetAgreement(byte32, byte32, votes, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +76,11 @@ func TestSigSetAgreementChecks(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	if _, err := NewSigSetAgreement(sigBLS, byte32, votes); err == nil {
+	if _, err := NewSigSetAgreement(sigBLS, byte32, votes, 1); err == nil {
 		t.Fatal("check for blockhash did not work")
 	}
 
-	if _, err := NewSigSetAgreement(byte32, sigBLS, votes); err == nil {
+	if _, err := NewSigSetAgreement(byte32, sigBLS, votes, 1); err == nil {
 		t.Fatal("check for sethash did not work")
 	}
 }
