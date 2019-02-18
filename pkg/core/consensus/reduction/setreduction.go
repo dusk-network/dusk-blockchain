@@ -32,7 +32,7 @@ func SignatureSet(ctx *user.Context) error {
 
 	ctx.Step++
 
-	// If we timed out, exit the loop and go back to signature set generation
+	// If we timed out, vote for fallback value
 	if ctx.SigSetHash == nil {
 		ctx.SigSetHash = fallback
 	}
@@ -46,8 +46,6 @@ func SignatureSet(ctx *user.Context) error {
 	if err := countSigSetVotes(ctx); err != nil {
 		return err
 	}
-
-	ctx.Step++
 
 	// If we timed out, exit the loop and go back to signature set generation
 	if ctx.SigSetHash == nil {
@@ -65,6 +63,8 @@ func SignatureSet(ctx *user.Context) error {
 	if err := agreement.SendSigSet(ctx); err != nil {
 		return err
 	}
+
+	ctx.Step++
 
 	return nil
 }
@@ -88,16 +88,6 @@ func sigSetVote(ctx *user.Context) error {
 	if votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey)); votes == 0 {
 		return nil
 	}
-
-	// Hash our vote set
-	sigSetHash, err := ctx.HashVotes(ctx.SigSetVotes)
-	if err != nil {
-		return err
-	}
-
-	ctx.SigSetHash = sigSetHash
-	setStr := hex.EncodeToString(sigSetHash)
-	ctx.AllVotes[setStr] = ctx.SigSetVotes
 
 	// Sign signature set hash with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
@@ -123,11 +113,6 @@ func sigSetVote(ctx *user.Context) error {
 		return err
 	}
 
-	// Gossip message
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
-		return err
-	}
-
 	ctx.SigSetReductionChan <- msg
 	return nil
 }
@@ -136,7 +121,7 @@ func countSigSetVotes(ctx *user.Context) error {
 	// Set vote limit
 	voteLimit := uint8(len(ctx.CurrentCommittee))
 
-	// Keep a counter of how many votes have been cast for a specific block
+	// Keep a counter of how many votes have been cast for a specific set
 	counts := make(map[string]uint8)
 
 	// Keep track of all nodes who have voted
@@ -167,6 +152,11 @@ func countSigSetVotes(ctx *user.Context) error {
 			setStr := hex.EncodeToString(pl.SigSetHash)
 			counts[setStr] += votes
 
+			// Gossip the message
+			if err := ctx.SendMessage(ctx.Magic, m); err != nil {
+				return err
+			}
+
 			// If a set exceeds vote threshold, we will end the loop.
 			if counts[setStr] < voteLimit {
 				break
@@ -176,9 +166,6 @@ func countSigSetVotes(ctx *user.Context) error {
 
 			// Set signature set hash
 			ctx.SigSetHash = pl.SigSetHash
-
-			// Set vote set to winning hash
-			ctx.SigSetVotes = ctx.AllVotes[setStr]
 			return nil
 		}
 	}
