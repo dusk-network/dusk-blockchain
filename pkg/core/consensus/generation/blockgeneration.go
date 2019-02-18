@@ -2,7 +2,6 @@ package generation
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"time"
 
@@ -90,8 +89,7 @@ func Block(ctx *user.Context) error {
 
 	// Set values on our context
 	ctx.BlockHash = candidateBlock.Header.Hash
-	hashStr := hex.EncodeToString(ctx.BlockHash)
-	ctx.CandidateBlocks[hashStr] = candidateBlock
+	ctx.CandidateBlock = candidateBlock
 
 	return nil
 }
