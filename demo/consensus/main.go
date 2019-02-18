@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
@@ -47,6 +49,9 @@ func main() {
 
 	// Trigger consensus loop
 	for {
+		// Reset context
+		s.ctx.Reset()
+
 		// Block generation
 		if err := generation.Block(s.ctx); err != nil {
 			fmt.Println(err)
@@ -63,13 +68,44 @@ func main() {
 
 		fmt.Printf("our best block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
 
-		// Block reduction
-		if err := reduction.Block(s.ctx); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+		// Start block agreement concurrently
+		c := make(chan bool, 1)
+		go agreement.Block(s.ctx, c)
+
+		for s.ctx.Step < user.MaxSteps {
+			select {
+			case v := <-c:
+				// If it was false, something went wrong and we should quit
+				if !v {
+					fmt.Println("error encountered during block agreement")
+					os.Exit(1)
+				}
+
+				// If not, we proceed to the next phase by maxing out the
+				// step counter.
+				s.ctx.Step = user.MaxSteps
+			default:
+				// Vote on received block. The context object should hold a winning
+				// block hash after this function returns.
+				if err := reduction.Block(s.ctx); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+
+				if s.ctx.BlockHash != nil {
+					continue
+				}
+
+				// If we did not get a result, increase the multiplier and
+				// exit the loop.
+				s.ctx.Step = user.MaxSteps
+				if s.ctx.Multiplier < 10 {
+					s.ctx.Multiplier = s.ctx.Multiplier * 2
+				}
+			}
 		}
 
-		fmt.Printf("resulting hash from block reduction is %s\n",
+		fmt.Printf("resulting hash from block agreement is %s\n",
 			hex.EncodeToString(s.ctx.BlockHash))
 	}
 }
