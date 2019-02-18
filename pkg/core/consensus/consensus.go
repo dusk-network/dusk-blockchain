@@ -186,11 +186,15 @@ func (c *Consensus) consensus() {
 				return
 			}
 
-			// If not, we successfully terminate the consensus
-			// Propagate the decided block if we have it
-			for _, block := range c.ctx.CandidateBlocks {
-				if bytes.Equal(block.Header.Hash, c.ctx.BlockHash) {
-					// send block
+			// Propagate block
+			// TODO: set signature
+			if bytes.Equal(c.ctx.BlockHash, c.ctx.CandidateBlock.Header.Hash) {
+				m := payload.NewMsgInv()
+				m.AddBlock(c.ctx.CandidateBlock)
+				if err := c.ctx.SendMessage(c.ctx.Magic, m); err != nil {
+					// Log
+					c.StopProvisioning()
+					return
 				}
 			}
 

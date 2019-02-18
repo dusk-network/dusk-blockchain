@@ -151,7 +151,6 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 func (c *Context) Reset() {
 	// Block generator
 	c.K = nil
-	c.D = 0
 	c.X = nil
 	c.Y = nil
 	c.Z = nil

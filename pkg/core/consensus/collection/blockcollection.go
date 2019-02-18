@@ -31,7 +31,7 @@ func Block(ctx *user.Context) error {
 			}
 
 			// If we already received the block before, we avoid gossiping it again.
-			if ctx.CandidateBlock == pl.Block {
+			if bytes.Equal(ctx.CandidateBlock.Header.Hash, pl.Block.Header.Hash) {
 				break
 			}
 
