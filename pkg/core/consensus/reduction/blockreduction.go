@@ -128,11 +128,6 @@ func blockVote(ctx *user.Context) error {
 		return err
 	}
 
-	// Gossip message
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
-		return err
-	}
-
 	ctx.BlockReductionChan <- msg
 	return nil
 }
