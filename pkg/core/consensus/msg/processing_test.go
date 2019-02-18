@@ -357,7 +357,7 @@ func newMessage(c *user.Context, blockHash []byte, id uint8,
 			return nil, err
 		}
 	case consensusmsg.SigSetCandidateID:
-		pl, err = consensusmsg.NewSigSetCandidate(blockHash, voteSet)
+		pl, err = consensusmsg.NewSigSetCandidate(blockHash, voteSet, 2)
 		if err != nil {
 			return nil, err
 		}

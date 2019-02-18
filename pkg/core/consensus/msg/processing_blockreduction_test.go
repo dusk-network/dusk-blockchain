@@ -1,7 +1,6 @@
 package msg_test
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -27,10 +26,6 @@ func TestVerifyBlockReduction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
 
 	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x02, nil, false)
 	if err != nil {
@@ -67,10 +62,6 @@ func TestBlockReductionWrongStep(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
-
 	// Add them to our committee
 	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
 
@@ -106,10 +97,6 @@ func TestBlockReductionNotInCommittee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
-
 	// Verify the message (should fail with low priority error)
 	err2 := msg.Process(ctx, m)
 	if err2 == nil {
@@ -140,10 +127,6 @@ func TestBlockReductionWrongBLSKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
 
 	// Add them to our committee
 	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
@@ -181,10 +164,6 @@ func TestBlockReductionWrongBLSSig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
 
 	// Add them to our committee
 	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)

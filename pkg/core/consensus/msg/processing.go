@@ -117,7 +117,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return nil
 	case consensusmsg.SigSetCandidateID:
 		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
-		if err := verifySigSetCandidate(ctx, pl, msg.Step); err != nil {
+		if err := verifySigSetCandidate(ctx, pl, pl.Step); err != nil {
 			return err
 		}
 
@@ -159,7 +159,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 			return prerror.New(prerror.Low, errors.New("wrong block hash"))
 		}
 
-		if err := verifyVoteSet(ctx, pl.VoteSet, pl.SetHash, msg.Step); err != nil {
+		if err := verifyVoteSet(ctx, pl.VoteSet, pl.BlockHash, pl.Step); err != nil {
 			return err
 		}
 
@@ -194,7 +194,8 @@ func verifySortition(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrEr
 	return nil
 }
 
-func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte, step uint8) *prerror.PrError {
+func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
+	step uint8) *prerror.PrError {
 	// A set should be of appropriate length, at least 2*0.75*len(committee)
 	limit := 2.0 * 0.75 * float64(len(ctx.CurrentCommittee))
 	if len(voteSet) < int(limit) {
@@ -240,7 +241,9 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 		}
 
 		// Signature verification
-		if err := ctx.BLSVerify(vote.PubKey, vote.Hash, vote.Sig); err != nil {
+		sigCopy := make([]byte, len(vote.Sig))
+		copy(sigCopy, vote.Sig)
+		if err := ctx.BLSVerify(vote.PubKey, vote.Hash, sigCopy); err != nil {
 			return prerror.New(prerror.Low, errors.New("BLS signature verification failed"))
 		}
 	}
@@ -248,7 +251,8 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 	return nil
 }
 
-func verifySigSetCandidate(ctx *user.Context, pl *consensusmsg.SigSetCandidate, step uint8) *prerror.PrError {
+func verifySigSetCandidate(ctx *user.Context, pl *consensusmsg.SigSetCandidate,
+	step uint8) *prerror.PrError {
 	// We discard any deviating block hashes after the block reduction phase
 	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return prerror.New(prerror.Low, errors.New("wrong block hash"))
