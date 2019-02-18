@@ -89,6 +89,44 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+	case consensusmsg.BlockAgreementID:
+		blockAgreement := msg.Payload.(*consensusmsg.BlockAgreement)
+		fmt.Printf("[CONSENSUS] Block Agreement msg\n\tBlock hash: %s\n",
+			hex.EncodeToString(blockAgreement.BlockHash))
+		if err := s.process(msg); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	case consensusmsg.SigSetCandidateID:
+		candSet := msg.Payload.(*consensusmsg.SigSetCandidate)
+		candHash, err := s.ctx.HashVotes(candSet.SignatureSet)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("[CONSENSUS] Signature Set Candidate msg\n\tSet hash: %s\n\tBlock hash: %s\n",
+			hex.EncodeToString(candHash), hex.EncodeToString(candSet.WinningBlockHash))
+		if err := s.process(msg); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	case consensusmsg.SigSetReductionID:
+		sigSetReduction := msg.Payload.(*consensusmsg.SigSetReduction)
+		fmt.Printf("[CONSENSUS] Signature Set Reduction msg\n\tSet hash: %s\n\tBlock hash: %s\n",
+			hex.EncodeToString(sigSetReduction.SigSetHash), hex.EncodeToString(sigSetReduction.WinningBlockHash))
+		if err := s.process(msg); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+	case consensusmsg.SigSetAgreementID:
+		sigSetAgreement := msg.Payload.(*consensusmsg.SigSetAgreement)
+		fmt.Printf("[CONSENSUS] Signature Set Agreement msg\n\tBlock hash: %s\n\tSetHash: %s\n",
+			hex.EncodeToString(sigSetAgreement.BlockHash), hex.EncodeToString(sigSetAgreement.SetHash))
+		if err := s.process(msg); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -164,6 +202,8 @@ func (s *Server) process(m *payload.MsgConsensus) error {
 	if err != nil && err.Priority == prerror.High {
 		return err.Err
 	}
+
+	fmt.Println(err)
 
 	return nil
 }

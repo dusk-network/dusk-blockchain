@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -11,6 +12,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
@@ -52,6 +54,8 @@ func main() {
 		// Reset context
 		s.ctx.Reset()
 
+		// Block phase
+
 		// Block generation
 		if err := generation.Block(s.ctx); err != nil {
 			fmt.Println(err)
@@ -92,6 +96,9 @@ func main() {
 					os.Exit(1)
 				}
 
+				fmt.Printf("resulting hash from block reduction is %s\n",
+					hex.EncodeToString(s.ctx.BlockHash))
+
 				if s.ctx.BlockHash != nil {
 					continue
 				}
@@ -105,8 +112,81 @@ func main() {
 			}
 		}
 
+		if s.ctx.BlockHash == nil {
+			fmt.Println("exited without a block hash")
+			os.Exit(1)
+		}
+
 		fmt.Printf("resulting hash from block agreement is %s\n",
 			hex.EncodeToString(s.ctx.BlockHash))
+
+		// Signature set phase
+
+		// Reset step counter
+		s.ctx.Step = 1
+
+		// Fire off parallel set agreement phase
+		go agreement.SignatureSet(s.ctx, c)
+
+		for s.ctx.Step < user.MaxSteps {
+			select {
+			case v := <-c:
+				// If it was false, something went wrong and we should quit
+				if !v {
+					fmt.Println("error encountered during signature set agreement")
+					os.Exit(1)
+				}
+
+				// Propagate block
+				// TODO: set signature
+				if bytes.Equal(s.ctx.BlockHash, s.ctx.CandidateBlock.Header.Hash) {
+					m := payload.NewMsgInv()
+					m.AddBlock(s.ctx.CandidateBlock)
+					if err := s.ctx.SendMessage(s.ctx.Magic, m); err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
+				}
+
+				s.ctx.Step = user.MaxSteps
+			default:
+				if s.ctx.SigSetHash == nil {
+					if err := generation.SignatureSet(s.ctx); err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
+
+					if err := collection.SignatureSet(s.ctx); err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
+
+					fmt.Printf("collected signature set hash is %s\n",
+						hex.EncodeToString(s.ctx.SigSetHash))
+				}
+
+				// Vote on received signature set
+				if err := reduction.SignatureSet(s.ctx); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+
+				fmt.Printf("resulting hash from signature set reduction is %s\n",
+					hex.EncodeToString(s.ctx.SigSetHash))
+
+				if s.ctx.SigSetHash != nil {
+					continue
+				}
+
+				// Increase multiplier
+				if s.ctx.Multiplier < 10 {
+					s.ctx.Multiplier = s.ctx.Multiplier * 2
+				}
+			}
+		}
+
+		fmt.Printf("final results:\n\tblock hash: %s\n\tsignature set hash: %s\n",
+			hex.EncodeToString(s.ctx.BlockHash), hex.EncodeToString(s.ctx.SigSetHash))
 	}
 }
 
