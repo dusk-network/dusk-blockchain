@@ -511,7 +511,7 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 			return nil, err
 		}
 	case consensusmsg.SigSetCandidateID:
-		pl, err = consensusmsg.NewSigSetCandidate(blockHash, voteSet)
+		pl, err = consensusmsg.NewSigSetCandidate(blockHash, voteSet, 2)
 		if err != nil {
 			return nil, err
 		}
@@ -522,12 +522,12 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 		}
 
 		// Adjust votes to vote for the hash instead
-		voteSet, err := createVotes(committee1, committee2, ctxs, hash, spoofSig, spoofStep, spoofHash)
+		voteSet, err := createVotes(committee1, committee2, ctxs, blockHash, spoofSig, spoofStep, spoofHash)
 		if err != nil {
 			return nil, err
 		}
 
-		pl, err = consensusmsg.NewSigSetAgreement(blockHash, hash, voteSet)
+		pl, err = consensusmsg.NewSigSetAgreement(blockHash, hash, voteSet, 2)
 		if err != nil {
 			return nil, err
 		}

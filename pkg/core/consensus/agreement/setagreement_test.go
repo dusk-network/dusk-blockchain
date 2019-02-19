@@ -205,7 +205,7 @@ func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 			return nil, nil, err
 		}
 
-		pl, err := consensusmsg.NewSigSetAgreement(c.BlockHash, hash, newVotes)
+		pl, err := consensusmsg.NewSigSetAgreement(c.BlockHash, hash, newVotes, 1)
 		if err != nil {
 			return nil, nil, err
 		}

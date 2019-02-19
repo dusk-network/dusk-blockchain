@@ -39,8 +39,7 @@ func TestBlockReductionVote(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
-	hashStr := hex.EncodeToString(candidateBlock)
-	ctx.CandidateBlocks[hashStr] = &block.Block{}
+	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
@@ -72,8 +71,7 @@ func TestBlockReductionDecisive(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
-	hashStr := hex.EncodeToString(candidateBlock)
-	ctx.CandidateBlocks[hashStr] = &block.Block{}
+	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
@@ -126,8 +124,7 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
-	candidateHashStr := hex.EncodeToString(candidateBlock)
-	ctx.CandidateBlocks[candidateHashStr] = &block.Block{}
+	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
@@ -136,8 +133,6 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 
 	// Make another block hash that voters will vote on
 	otherBlock, _ := crypto.RandEntropy(32)
-	otherHashStr := hex.EncodeToString(otherBlock)
-	ctx.CandidateBlocks[otherHashStr] = &block.Block{}
 
 	// Make 50 votes and send them to the channel beforehand
 	for i := 0; i < 50; i++ {
@@ -227,8 +222,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
-	hashStr := hex.EncodeToString(candidateBlock)
-	ctx.CandidateBlocks[hashStr] = &block.Block{}
+	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))

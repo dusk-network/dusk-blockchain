@@ -37,8 +37,7 @@ func TestSignatureSetReductionVote(t *testing.T) {
 	candidateBlock, _ := crypto.RandEntropy(32)
 	ctx.BlockHash = candidateBlock
 
-	hashStr := hex.EncodeToString(candidateBlock)
-	ctx.CandidateBlocks[hashStr] = &block.Block{}
+	ctx.CandidateBlock = &block.Block{}
 
 	// Create vote set
 	voteSet, err := createVotes(ctx, 50)

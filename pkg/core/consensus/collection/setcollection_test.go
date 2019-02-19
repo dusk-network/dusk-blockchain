@@ -129,7 +129,7 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	c.CurrentCommittee = append(c.CurrentCommittee, []byte(*keys.EdPubKey))
 
 	// Create payload, signature and message
-	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes)
+	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes, 1)
 	if err != nil {
 		return nil, err
 	}

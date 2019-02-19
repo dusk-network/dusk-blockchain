@@ -55,8 +55,6 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.Step++
-
 	// If BlockHash is nil, no clear winner was found within the time limit.
 	// So we will exit and restart the consensus.
 	if ctx.BlockHash == nil {
@@ -75,10 +73,7 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	// Copy BlockVotes into SigSetVotes, in case we terminate a bit later
-	// and BlockVotes will have been emptied.
-	ctx.SigSetVotes = nil
-	ctx.SigSetVotes = append(ctx.SigSetVotes, ctx.BlockVotes...)
+	ctx.Step++
 
 	return nil
 }
@@ -125,11 +120,6 @@ func blockVote(ctx *user.Context) error {
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
 		[]byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
-		return err
-	}
-
-	// Gossip message
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
 		return err
 	}
 

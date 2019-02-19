@@ -1,10 +1,7 @@
 package msg_test
 
 import (
-	"encoding/hex"
 	"testing"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -30,10 +27,6 @@ func TestVerifySigSetVote(t *testing.T) {
 	}
 
 	ctx.BlockHash = emptyBlock.Header.Hash
-
-	// Add the vote set to our collection
-	setStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.AllVotes[setStr] = make([]*consensusmsg.Vote, 0)
 
 	m, err := newMessage(ctx, emptyBlock.Header.Hash, 0x05, nil, false)
 	if err != nil {
@@ -112,10 +105,6 @@ func TestSigSetVoteWrongStep(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
-
 	// Add them to our committee
 	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
 
@@ -151,10 +140,6 @@ func TestSigSetVoteNotInCommittee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
-
 	// Verify the message (should fail with low priority error)
 	err2 := msg.Process(ctx, m)
 	if err2 == nil {
@@ -186,10 +171,6 @@ func TestSigSetVoteWrongBLSKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
 
 	// Add them to our committee
 	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
@@ -228,10 +209,6 @@ func TestSigSetVoteWrongBLSSig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Add the block to our collection
-	hashStr := hex.EncodeToString(emptyBlock.Header.Hash)
-	ctx.CandidateBlocks[hashStr] = emptyBlock
 
 	// Add them to our committee
 	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
