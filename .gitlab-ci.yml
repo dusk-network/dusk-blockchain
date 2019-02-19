@@ -13,6 +13,7 @@ stages:
   # - build
 
 before_script:
+  - env
   ##
   ## Clean up /go folder - required by Shell Executor runners
   ##
