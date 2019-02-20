@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -59,7 +61,6 @@ func SignatureSet(ctx *user.Context) error {
 		return nil
 	}
 
-	// If we got a result, send set agreement message
 	if err := agreement.SendSigSet(ctx); err != nil {
 		return err
 	}
@@ -71,21 +72,13 @@ func SignatureSet(ctx *user.Context) error {
 
 func sigSetVote(ctx *user.Context) error {
 	// Set committee first
-	size := user.CommitteeSize
-	if len(ctx.Committee) < int(user.CommitteeSize) {
-		size = uint8(len(ctx.Committee))
-	}
-
-	currentCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, size,
-		ctx.Committee, ctx.NodeWeights)
-	if err != nil {
+	if err := ctx.SetCommittee(); err != nil {
 		return err
 	}
 
-	ctx.CurrentCommittee = currentCommittee
-
 	// If we are not in the committee, then don't vote
-	if votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey)); votes == 0 {
+	votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
+	if votes == 0 {
 		return nil
 	}
 
@@ -129,6 +122,12 @@ func countSigSetVotes(ctx *user.Context) error {
 
 	// Start the timer
 	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
+
+	// Empty queue
+	prErr := msg.ProcessQueue(ctx)
+	if prErr != nil && prErr.Priority == prerror.High {
+		return prErr.Err
+	}
 
 	for {
 		select {

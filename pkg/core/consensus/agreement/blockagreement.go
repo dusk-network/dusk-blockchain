@@ -73,6 +73,7 @@ func Block(ctx *user.Context, c chan bool) {
 
 			// Set SigSetVotes for signature set phase
 			ctx.SigSetVotes = sets[m.Step]
+			ctx.WinningBlockHash = pl.BlockHash
 
 			// // Populate certificate
 			// ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.SigSetVotes))
@@ -134,11 +135,6 @@ func SendBlock(ctx *user.Context) error {
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
-		return err
-	}
-
-	// Gossip message
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
 		return err
 	}
 

@@ -1,6 +1,7 @@
 package agreement
 
 import (
+	"bytes"
 	"encoding/hex"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
@@ -13,11 +14,14 @@ import (
 // SignatureSet is the function that runs during the signature set reduction
 // phase, used to collect vote sets and find a winning signature set.
 func SignatureSet(ctx *user.Context, c chan bool) {
-	// Keep track of all nodes who have voted
-	voters := make(map[string]bool)
+	// Store our sets on every step for certificate generation
+	sets := make(map[uint8][]*consensusmsg.Vote)
 
-	// Make a mapping of steps, pointing to a slice of vote sets.
-	sets := make(map[uint8][][]*consensusmsg.Vote)
+	// Make a counter to keep track of how many votes have been cast in a step
+	counter := make(map[uint8]int)
+
+	// Make a map to keep track if a node has voted in a certain step
+	voted := make(map[uint8]map[string]bool)
 
 	for {
 		select {
@@ -25,24 +29,34 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 			pl := m.Payload.(*consensusmsg.SigSetAgreement)
 			pkEd := hex.EncodeToString(m.PubKey)
 
-			// Check if this node's vote is already recorded
-			if voters[pkEd] {
+			// Check if node has already voted
+			if voted[m.Step] == nil {
+				voted[m.Step] = make(map[string]bool)
+			}
+
+			if voted[m.Step][pkEd] {
 				break
 			}
 
-			voters[pkEd] = true
+			// Log vote
+			voted[m.Step][pkEd] = true
+
+			// Store set if it's ours
+			if bytes.Equal(m.PubKey, []byte(*ctx.Keys.EdPubKey)) {
+				sets[m.Step] = pl.VoteSet
+			}
 
 			// Get amount of votes
-			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
-
-			// Add it to our set
-			if sets[m.Step] == nil {
-				sets[m.Step] = make([][]*consensusmsg.Vote, 0)
+			committee, err := sortition.CreateCommittee(m.Round, ctx.W, m.Step,
+				uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
+			if err != nil {
+				// Log
+				c <- false
+				return
 			}
 
-			for i := uint8(0); i < votes; i++ {
-				sets[m.Step] = append(sets[m.Step], pl.VoteSet)
-			}
+			votes := sortition.Verify(committee, m.PubKey)
+			counter[m.Step] += int(votes)
 
 			// Gossip the message
 			if err := ctx.SendMessage(ctx.Magic, m); err != nil {
@@ -53,7 +67,7 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 
 			// Check if we have exceeded the limit
 			limit := float64(len(ctx.CurrentCommittee)) * 0.75
-			if len(sets[m.Step]) < int(limit) {
+			if counter[m.Step] < int(limit) {
 				break
 			}
 
@@ -119,11 +133,6 @@ func SendSigSet(ctx *user.Context) error {
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
-		return err
-	}
-
-	// Gossip message
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
 		return err
 	}
 

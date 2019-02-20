@@ -2,9 +2,9 @@ package generation
 
 import (
 	"encoding/binary"
-	"errors"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
@@ -23,9 +23,16 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
+	k, err := crypto.RandEntropy(32)
+	if err != nil {
+		return err
+	}
+
+	ctx.K = k
+
 	// check threshold (eligibility)
 	if ctx.Q <= ctx.Tau {
-		return errors.New("Score is less than tau (threshold)")
+		return nil
 	}
 
 	// Generate ZkProof and Serialise
