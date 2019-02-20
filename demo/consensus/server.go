@@ -121,7 +121,7 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 		}
 	case consensusmsg.SigSetAgreementID:
 		sigSetAgreement := msg.Payload.(*consensusmsg.SigSetAgreement)
-		fmt.Printf("[CONSENSUS] Signature Set Agreement msg\n\tBlock hash: %s\n\tSetHash: %s\n",
+		fmt.Printf("[CONSENSUS] Signature Set Agreement msg\n\tSet hash: %s\n\tBlock hash: %s\n",
 			hex.EncodeToString(sigSetAgreement.BlockHash), hex.EncodeToString(sigSetAgreement.SetHash))
 		if err := s.process(msg); err != nil {
 			fmt.Println(err)
@@ -203,7 +203,9 @@ func (s *Server) process(m *payload.MsgConsensus) error {
 		return err.Err
 	}
 
-	fmt.Println(err)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	return nil
 }
