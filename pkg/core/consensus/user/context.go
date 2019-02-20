@@ -118,6 +118,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Seed:                seed,
 		Magic:               magic,
 		Multiplier:          1,
+		CandidateBlock:      &block.Block{},
 		Certificate:         &block.Certificate{},
 		D:                   d,
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
