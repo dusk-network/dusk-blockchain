@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
@@ -59,9 +60,10 @@ type Context struct {
 	Certificate *block.Certificate // Block certificate to be constructed during consensus
 
 	/// Block fields
-	CandidateBlock *block.Block         // Winning block from candidate collection
-	BlockHash      []byte               // Block hash currently being voted on by this node
-	BlockVotes     []*consensusmsg.Vote // Vote set for block set agreement phase
+	CandidateBlock   *block.Block         // Winning block from candidate collection
+	BlockHash        []byte               // Block hash currently being voted on by this node
+	WinningBlockHash []byte               // Block hash that won the block phase
+	BlockVotes       []*consensusmsg.Vote // Vote set for block set agreement phase
 
 	/// Signature set fields
 	SigSetVotes []*consensusmsg.Vote // Vote set for signature set agreement phase
@@ -148,6 +150,9 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 
 // Reset removes all information that was generated during the consensus
 func (c *Context) Reset() {
+	c.Queue = make(map[uint64]map[uint8][]*payload.MsgConsensus)
+	c.Multiplier = 1
+
 	// Block generator
 	c.K = nil
 	c.X = nil
@@ -158,6 +163,10 @@ func (c *Context) Reset() {
 
 	// Provisioner
 	c.BlockHash = nil
+	c.BlockVotes = nil
+	c.SigSetHash = nil
+	c.SigSetVotes = nil
+	c.CandidateBlock = &block.Block{}
 	c.Step = 1
 	c.Certificate = &block.Certificate{}
 	c.BlockVotes = nil
@@ -194,6 +203,23 @@ func (c *Context) CreateSignature(pl consensusmsg.Msg) ([]byte, error) {
 
 	edMsg = append(edMsg, buf.Bytes()...)
 	return c.EDSign(c.Keys.EdSecretKey, edMsg), nil
+}
+
+// SetCommittee will set the committee for the current step
+func (c *Context) SetCommittee() error {
+	size := CommitteeSize
+	if len(c.Committee) < int(CommitteeSize) {
+		size = uint8(len(c.Committee))
+	}
+
+	currentCommittee, err := sortition.CreateCommittee(c.Round, c.W, c.Step, size,
+		c.Committee, c.NodeWeights)
+	if err != nil {
+		return err
+	}
+
+	c.CurrentCommittee = currentCommittee
+	return nil
 }
 
 // dummy functions
