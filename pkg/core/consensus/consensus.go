@@ -101,7 +101,7 @@ func (c *Consensus) consensus() {
 
 	if c.generator {
 		// Generate block and score, and propagate
-		if err := generation.Block(c.ctx); err != nil {
+		if prErr := generation.Block(c.ctx); prErr != nil && prErr.Priority == prerror.High {
 			// Log
 			c.generator = false
 			return
