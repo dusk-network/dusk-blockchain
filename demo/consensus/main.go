@@ -47,7 +47,7 @@ func main() {
 		}
 	}
 
-	// wait for a connection, so we can start off simultaneously
+	// wait for a connection, so we can start off simultaneously with another node
 	<-s.connectChan
 
 	// Trigger consensus loop
@@ -215,7 +215,11 @@ func main() {
 			hex.EncodeToString(s.ctx.BlockHash), hex.EncodeToString(s.ctx.SigSetHash))
 
 		s.ctx.Queue[s.ctx.Round] = make(map[uint8][]*payload.MsgConsensus)
+		s.ctx.LastHeader.Height = s.ctx.Round
 		s.ctx.Round++
+		s.ctx.LastHeader.Hash = s.ctx.WinningBlockHash
+		s.ctx.Seed = s.ctx.CandidateBlock.Header.Seed
+		s.ctx.LastHeader.Seed = s.ctx.CandidateBlock.Header.Seed
 	}
 }
 
