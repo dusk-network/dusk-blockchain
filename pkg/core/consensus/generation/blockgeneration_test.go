@@ -54,8 +54,8 @@ func TestBlockGeneration(t *testing.T) {
 		assert.Equal(t, err, nil)
 
 		ctx.K = k
-		err = generation.Block(ctx)
-		assert.Equal(t, nil, err)
+		prErr := generation.Block(ctx)
+		assert.Empty(t, prErr)
 	}
 }
 

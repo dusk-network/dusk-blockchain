@@ -22,7 +22,7 @@ func TestSetAgreement(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 5500, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,6 +163,7 @@ func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 		c.LastHeader = ctx.LastHeader
 		c.Weight = 500
 		c.BlockHash = ctx.BlockHash
+		ctx.Committee = append(ctx.Committee, []byte(*c.Keys.EdPubKey))
 		ctx.CurrentCommittee = append(ctx.CurrentCommittee, []byte(*c.Keys.EdPubKey))
 
 		// Create vote signatures
