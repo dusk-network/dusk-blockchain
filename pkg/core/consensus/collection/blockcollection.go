@@ -22,6 +22,18 @@ func Block(ctx *user.Context) error {
 		select {
 		case <-timer.C:
 			return nil
+		case m := <-ctx.CandidateScoreChan:
+			pl := m.Payload.(*consensusmsg.CandidateScore)
+
+			// If the received score is higher than our current one, replace
+			// the current score with the received score, and store the block hash.
+			if pl.Score > highest {
+				highest = pl.Score
+				ctx.BlockHash = pl.CandidateHash
+
+				// Gossip it to the rest of the network
+				ctx.SendMessage(ctx.Magic, m)
+			}
 		case m := <-ctx.CandidateChan:
 			pl := m.Payload.(*consensusmsg.Candidate)
 
@@ -40,18 +52,6 @@ func Block(ctx *user.Context) error {
 
 			// Gossip it to the rest of the network
 			ctx.SendMessage(ctx.Magic, m)
-		case m := <-ctx.CandidateScoreChan:
-			pl := m.Payload.(*consensusmsg.CandidateScore)
-
-			// If the received score is higher than our current one, replace
-			// the current score with the received score, and store the block hash.
-			if pl.Score > highest {
-				highest = pl.Score
-				ctx.BlockHash = pl.CandidateHash
-
-				// Gossip it to the rest of the network
-				ctx.SendMessage(ctx.Magic, m)
-			}
 		}
 	}
 }

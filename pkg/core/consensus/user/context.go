@@ -163,6 +163,7 @@ func (c *Context) Reset() {
 
 	// Provisioner
 	c.BlockHash = nil
+	c.WinningBlockHash = nil
 	c.BlockVotes = nil
 	c.SigSetHash = nil
 	c.SigSetVotes = nil
@@ -172,6 +173,13 @@ func (c *Context) Reset() {
 	c.BlockVotes = nil
 	c.SigSetHash = nil
 	c.SigSetVotes = nil
+	c.BlockReductionChan = make(chan *payload.MsgConsensus, 100)
+	c.CandidateChan = make(chan *payload.MsgConsensus, 100)
+	c.CandidateScoreChan = make(chan *payload.MsgConsensus, 100)
+	c.BlockAgreementChan = make(chan *payload.MsgConsensus, 100)
+	c.SigSetAgreementChan = make(chan *payload.MsgConsensus, 100)
+	c.SigSetCandidateChan = make(chan *payload.MsgConsensus, 100)
+	c.SigSetReductionChan = make(chan *payload.MsgConsensus, 100)
 }
 
 // Clear will remove all values created during consensus
