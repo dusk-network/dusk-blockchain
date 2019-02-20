@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -57,8 +59,9 @@ func main() {
 		// Block phase
 
 		// Block generation
-		if err := generation.Block(s.ctx); err != nil {
-			fmt.Println(err)
+		prErr := generation.Block(s.ctx)
+		if prErr != nil && prErr.Priority == prerror.High {
+			fmt.Println(prErr.Err)
 			os.Exit(1)
 		}
 
