@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
@@ -17,28 +19,28 @@ import (
 // Refactor of code made by jules
 
 // Block will generate a blockMsg and ScoreMsg if node is eligible.
-func Block(ctx *user.Context) error {
+func Block(ctx *user.Context) *prerror.PrError {
 	err := generateParams(ctx)
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	// check threshold (eligibility)
 	if ctx.Q <= ctx.Tau {
-		return errors.New("Score is less than tau (threshold)")
+		return prerror.New(prerror.Low, errors.New("Score is less than tau (threshold)"))
 	}
 
 	// Generate ZkProof and Serialise
 	// XXX: Prove may return error, so chaining like this may not be possible once zk implemented
 	zkBytes, err := zkproof.Prove(ctx.X, ctx.Y, ctx.Z, ctx.M, ctx.K, ctx.Q, ctx.D).Bytes()
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	// Seed is the candidate signature of the previous seed
 	seed, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.LastHeader.Seed)
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	ctx.Seed = seed
@@ -46,7 +48,7 @@ func Block(ctx *user.Context) error {
 	// Generate candidate block
 	candidateBlock, err := newCandidateBlock(ctx)
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	// Create score msg
@@ -57,18 +59,18 @@ func Block(ctx *user.Context) error {
 		ctx.Seed,                   // seed for this round // XXX(TOG): could we use round number/Block height?
 	)
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	sigEd, err := ctx.CreateSignature(pl)
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	ctx.CandidateScoreChan <- msgScore
@@ -78,11 +80,11 @@ func Block(ctx *user.Context) error {
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl2)
 	if err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	if err := ctx.SendMessage(ctx.Magic, msgCandidate); err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	// Set value on our context
