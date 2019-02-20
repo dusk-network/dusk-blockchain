@@ -51,19 +51,22 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 		return prerror.New(prerror.Low, errors.New("voter is on a different chain"))
 	}
 
-	// Recursively process the contents of ctx.todo here, before moving on.
+	// Proceed to more specific checks
+	return verifyPayload(ctx, msg)
+}
+
+// ProcessQueue will process messages in the queue
+func ProcessQueue(ctx *user.Context) *prerror.PrError {
 	if len(ctx.Queue[ctx.Round][ctx.Step]) > 0 {
-		// Remove element from queue, to prevent infinite loops
-		var m *payload.MsgConsensus
-		m = ctx.Queue[ctx.Round][ctx.Step][0]
-		ctx.Queue[ctx.Round][ctx.Step] = ctx.Queue[ctx.Round][ctx.Step][1:]
-		if err := Process(ctx, m); err != nil {
-			return err
+		for _, m := range ctx.Queue[ctx.Round][ctx.Step] {
+			err := Process(ctx, m)
+			if err != nil && err.Priority == prerror.High {
+				return err
+			}
 		}
 	}
 
-	// Proceed to more specific checks
-	return verifyPayload(ctx, msg)
+	return nil
 }
 
 // Lower-level message processing function. This function determines the payload type,
@@ -85,9 +88,8 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		}
 
 		// Verify sortition
-		votes := sortition.Verify(ctx.CurrentCommittee, msg.PubKey)
-		if votes == 0 {
-			return prerror.New(prerror.Low, errors.New("node is not included in committee"))
+		if err := verifySortition(ctx, msg); err != nil {
+			return err
 		}
 
 		pl := msg.Payload.(*consensusmsg.BlockReduction)
@@ -130,9 +132,8 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		}
 
 		// Verify sortition
-		votes := sortition.Verify(ctx.CurrentCommittee, msg.PubKey)
-		if votes == 0 {
-			return prerror.New(prerror.Low, errors.New("node is not included in committee"))
+		if err := verifySortition(ctx, msg); err != nil {
+			return err
 		}
 
 		pl := msg.Payload.(*consensusmsg.SigSetReduction)
@@ -163,7 +164,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 			return err
 		}
 
-		ctx.BlockAgreementChan <- msg
+		ctx.SigSetAgreementChan <- msg
 		return nil
 	default:
 		return prerror.New(prerror.Low, fmt.Errorf("consensus: consensus payload has unrecognized ID %v",
@@ -254,7 +255,7 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 func verifySigSetCandidate(ctx *user.Context, pl *consensusmsg.SigSetCandidate,
 	step uint8) *prerror.PrError {
 	// We discard any deviating block hashes after the block reduction phase
-	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
+	if !bytes.Equal(pl.WinningBlockHash, ctx.WinningBlockHash) {
 		return prerror.New(prerror.Low, errors.New("wrong block hash"))
 	}
 
@@ -263,7 +264,7 @@ func verifySigSetCandidate(ctx *user.Context, pl *consensusmsg.SigSetCandidate,
 
 func verifySigSetReduction(ctx *user.Context, pl *consensusmsg.SigSetReduction) *prerror.PrError {
 	// We discard any deviating block hashes after the block reduction phase
-	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
+	if !bytes.Equal(pl.WinningBlockHash, ctx.WinningBlockHash) {
 		return prerror.New(prerror.Low, errors.New("wrong block hash"))
 	}
 
