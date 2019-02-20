@@ -9,7 +9,7 @@ import (
 // SignatureSet will generate a signature set message and gossip it.
 func SignatureSet(ctx *user.Context) error {
 	// Create our own signature set candidate message
-	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes,
+	pl, err := consensusmsg.NewSigSetCandidate(ctx.WinningBlockHash, ctx.SigSetVotes,
 		ctx.Certificate.BRStep)
 	if err != nil {
 		return err

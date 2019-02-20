@@ -55,7 +55,6 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 				return
 			}
 
-			// Get amount of votes
 			votes := sortition.Verify(committee, m.PubKey)
 			counter[m.Step] += int(votes)
 
@@ -134,11 +133,6 @@ func SendSigSet(ctx *user.Context) error {
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
 		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
-		return err
-	}
-
-	// Gossip message
-	if err := ctx.SendMessage(ctx.Magic, msg); err != nil {
 		return err
 	}
 
