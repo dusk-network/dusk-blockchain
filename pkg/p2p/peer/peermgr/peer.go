@@ -31,7 +31,7 @@ const (
 	idleTimeout            = 5 * time.Minute // If no message received after idleTimeout, then peer disconnects
 
 	// nodes will have `responseTime` seconds to reply with a response
-	responseTime = 120 * time.Second
+	responseTime = 300 * time.Second
 
 	// the stall detector will check every `tickerInterval` to see if messages
 	// are overdue. Should be less than `responseTime`
