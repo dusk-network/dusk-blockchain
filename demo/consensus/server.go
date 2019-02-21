@@ -86,18 +86,22 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 		blockReduction := msg.Payload.(*consensusmsg.BlockReduction)
 		fmt.Printf("[CONSENSUS] Block Reduction msg\n\tBlock hash: %s\n",
 			hex.EncodeToString(blockReduction.BlockHash))
-		if err := s.process(msg); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		go func() {
+			if err := s.process(msg); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		}()
 	case consensusmsg.BlockAgreementID:
 		blockAgreement := msg.Payload.(*consensusmsg.BlockAgreement)
 		fmt.Printf("[CONSENSUS] Block Agreement msg\n\tBlock hash: %s\n",
 			hex.EncodeToString(blockAgreement.BlockHash))
-		if err := s.process(msg); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		go func() {
+			if err := s.process(msg); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		}()
 	case consensusmsg.SigSetCandidateID:
 		candSet := msg.Payload.(*consensusmsg.SigSetCandidate)
 		candHash, err := s.ctx.HashVotes(candSet.SignatureSet)
@@ -108,26 +112,32 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 
 		fmt.Printf("[CONSENSUS] Signature Set Candidate msg\n\tSet hash: %s\n\tBlock hash: %s\n",
 			hex.EncodeToString(candHash), hex.EncodeToString(candSet.WinningBlockHash))
-		if err := s.process(msg); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		go func() {
+			if err := s.process(msg); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		}()
 	case consensusmsg.SigSetReductionID:
 		sigSetReduction := msg.Payload.(*consensusmsg.SigSetReduction)
 		fmt.Printf("[CONSENSUS] Signature Set Reduction msg\n\tSet hash: %s\n\tBlock hash: %s\n",
 			hex.EncodeToString(sigSetReduction.SigSetHash), hex.EncodeToString(sigSetReduction.WinningBlockHash))
-		if err := s.process(msg); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		go func() {
+			if err := s.process(msg); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		}()
 	case consensusmsg.SigSetAgreementID:
 		sigSetAgreement := msg.Payload.(*consensusmsg.SigSetAgreement)
 		fmt.Printf("[CONSENSUS] Signature Set Agreement msg\n\tSet hash: %s\n\tBlock hash: %s\n",
-			hex.EncodeToString(sigSetAgreement.BlockHash), hex.EncodeToString(sigSetAgreement.SetHash))
-		if err := s.process(msg); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+			hex.EncodeToString(sigSetAgreement.SetHash), hex.EncodeToString(sigSetAgreement.BlockHash))
+		go func() {
+			if err := s.process(msg); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		}()
 	}
 }
 
