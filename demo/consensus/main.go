@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
@@ -32,9 +33,15 @@ func main() {
 
 	randWait := rand.Float64() * 2.0
 
-	port, peers := getPortPeers()
+	numNodes, port, peers := getPortPeers()
 
-	s := setupServer()
+	nodes, err := strconv.Atoi(numNodes)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	s := setupServer(nodes)
 
 	s.ctx = setupContext(s)
 
@@ -48,7 +55,7 @@ func main() {
 	}
 
 	// wait for a connection, so we can start off simultaneously with another node
-	<-s.connectChan
+	s.wg.Wait()
 
 	// Trigger consensus loop
 	for {
@@ -77,6 +84,8 @@ func main() {
 		}
 
 		fmt.Printf("our best block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
+
+		return
 
 		// Start block agreement concurrently
 		c := make(chan bool, 1)
@@ -225,32 +234,34 @@ func main() {
 
 // gets the port and peers to connect to
 // from the command line arguments
-func getPortPeers() (string, []string) {
-	if len(os.Args) < 2 { // [programName, port,...]
+func getPortPeers() (string, string, []string) {
+	if len(os.Args) < 3 { // [programName, nodes,port,...]
 		fmt.Println("Please enter more arguments")
 		os.Exit(1)
 	}
 
-	args := os.Args[1:] // [port, peers...]
+	args := os.Args[1:] // Remove program name leaving [nodes, port, peers...]
 
-	port := args[0]
+	nodes := args[0]
+	port := args[1]
 
 	var peers []string
-	if len(args) > 1 {
-		peers = args[1:]
+	if len(args) > 2 {
+		peers = args[2:]
 	}
 
-	return port, peers
+	return nodes, port, peers
 }
 
 // setupServer creates the server struct
 // populating it with the configurations for peer
-func setupServer() *Server {
+func setupServer(nodes int) *Server {
 	// Setup server
 	s := &Server{
-		peers:       make([]*peermgr.Peer, 0, 10),
-		connectChan: make(chan bool, 1),
+		peers: make([]*peermgr.Peer, 0, 10),
 	}
+
+	s.wg.Add(nodes)
 
 	s.cfg = setupPeerConfig(s, rand.Uint64())
 	return s
