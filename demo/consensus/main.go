@@ -109,8 +109,6 @@ func main() {
 					os.Exit(1)
 				}
 			default:
-				time.Sleep(time.Duration(randWait) * time.Second)
-
 				// Vote on received block. The context object should hold a winning
 				// block hash after this function returns.
 				if err := reduction.Block(s.ctx); err != nil {
@@ -197,8 +195,6 @@ func main() {
 					fmt.Printf("collected signature set hash is %s\n",
 						hex.EncodeToString(s.ctx.SigSetHash))
 				}
-
-				time.Sleep(time.Duration(randWait) * time.Second)
 
 				// Vote on received signature set
 				if err := reduction.SignatureSet(s.ctx); err != nil {
