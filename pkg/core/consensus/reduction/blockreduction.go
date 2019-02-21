@@ -81,44 +81,51 @@ func Block(ctx *user.Context) error {
 }
 
 func blockVote(ctx *user.Context) error {
-	// Set committee first
-	if err := ctx.SetCommittee(); err != nil {
-		return err
-	}
+	select {
+	case <-ctx.QuitChan:
+		// Send another value to get through the phase
+		ctx.QuitChan <- true
+		return nil
+	default:
+		// Set committee first
+		if err := ctx.SetCommittee(); err != nil {
+			return err
+		}
 
-	// If we are not in the committee, then don't vote
-	votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
-	if votes == 0 {
+		// If we are not in the committee, then don't vote
+		votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
+		if votes == 0 {
+			return nil
+		}
+
+		// Sign block hash with BLS
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
+		if err != nil {
+			return err
+		}
+
+		// Create reduction payload to gossip
+		pl, err := consensusmsg.NewBlockReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+		if err != nil {
+			return err
+		}
+
+		// Sign the payload
+		sigEd, err := ctx.CreateSignature(pl)
+		if err != nil {
+			return err
+		}
+
+		// Create message
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
+			[]byte(*ctx.Keys.EdPubKey), pl)
+		if err != nil {
+			return err
+		}
+
+		ctx.BlockReductionChan <- msg
 		return nil
 	}
-
-	// Sign block hash with BLS
-	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
-	if err != nil {
-		return err
-	}
-
-	// Create reduction payload to gossip
-	pl, err := consensusmsg.NewBlockReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
-	if err != nil {
-		return err
-	}
-
-	// Sign the payload
-	sigEd, err := ctx.CreateSignature(pl)
-	if err != nil {
-		return err
-	}
-
-	// Create message
-	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
-		[]byte(*ctx.Keys.EdPubKey), pl)
-	if err != nil {
-		return err
-	}
-
-	ctx.BlockReductionChan <- msg
-	return nil
 }
 
 func countBlockVotes(ctx *user.Context) error {
@@ -142,10 +149,18 @@ func countBlockVotes(ctx *user.Context) error {
 
 	for {
 		select {
+		case <-ctx.QuitChan:
+			// Send another value to get through the phase
+			ctx.QuitChan <- true
+			return nil
 		case <-timer.C:
 			ctx.BlockHash = nil
 			return nil
 		case m := <-ctx.BlockReductionChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.BlockReduction)
 			pkEd := hex.EncodeToString(m.PubKey)
 
