@@ -105,6 +105,7 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 			// cSig := agSig.Compress()
 			// ctx.Certificate.SRBatchedSig = cSig
 			// ctx.Certificate.SRStep = ctx.Step
+			ctx.WinningSigSetHash = pl.SetHash
 			c <- true
 			return
 		}

@@ -66,8 +66,9 @@ type Context struct {
 	BlockVotes       []*consensusmsg.Vote // Vote set for block set agreement phase
 
 	/// Signature set fields
-	SigSetVotes []*consensusmsg.Vote // Vote set for signature set agreement phase
-	SigSetHash  []byte               // Hash of the signature vote set being voted on
+	SigSetVotes       []*consensusmsg.Vote // Vote set for signature set agreement phase
+	SigSetHash        []byte               // Hash of the signature vote set being voted on
+	WinningSigSetHash []byte               // Winning signature set hash
 
 	/// Tracking fields
 	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
@@ -150,8 +151,14 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 
 // Reset removes all information that was generated during the consensus
 func (c *Context) Reset() {
-	c.Queue = make(map[uint64]map[uint8][]*payload.MsgConsensus)
 	c.Multiplier = 1
+	c.BlockReductionChan = make(chan *payload.MsgConsensus, 100)
+	c.CandidateChan = make(chan *payload.MsgConsensus, 100)
+	c.CandidateScoreChan = make(chan *payload.MsgConsensus, 100)
+	c.BlockAgreementChan = make(chan *payload.MsgConsensus, 100)
+	c.SigSetAgreementChan = make(chan *payload.MsgConsensus, 100)
+	c.SigSetCandidateChan = make(chan *payload.MsgConsensus, 100)
+	c.SigSetReductionChan = make(chan *payload.MsgConsensus, 100)
 
 	// Block generator
 	c.K = nil
@@ -166,6 +173,7 @@ func (c *Context) Reset() {
 	c.WinningBlockHash = nil
 	c.BlockVotes = nil
 	c.SigSetHash = nil
+	c.WinningSigSetHash = nil
 	c.SigSetVotes = nil
 	c.CandidateBlock = &block.Block{}
 	c.Step = 1
@@ -173,13 +181,6 @@ func (c *Context) Reset() {
 	c.BlockVotes = nil
 	c.SigSetHash = nil
 	c.SigSetVotes = nil
-	c.BlockReductionChan = make(chan *payload.MsgConsensus, 100)
-	c.CandidateChan = make(chan *payload.MsgConsensus, 100)
-	c.CandidateScoreChan = make(chan *payload.MsgConsensus, 100)
-	c.BlockAgreementChan = make(chan *payload.MsgConsensus, 100)
-	c.SigSetAgreementChan = make(chan *payload.MsgConsensus, 100)
-	c.SigSetCandidateChan = make(chan *payload.MsgConsensus, 100)
-	c.SigSetReductionChan = make(chan *payload.MsgConsensus, 100)
 }
 
 // Clear will remove all values created during consensus
