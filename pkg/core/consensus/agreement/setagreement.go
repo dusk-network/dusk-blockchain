@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -24,6 +26,14 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 	voted := make(map[uint8]map[string]bool)
 
 	for {
+		// Empty queue
+		prErr := msg.ProcessQueue(ctx)
+		if prErr != nil && prErr.Priority == prerror.High {
+			// Log
+			c <- false
+			return
+		}
+
 		select {
 		case m := <-ctx.SigSetAgreementChan:
 			if m.Round != ctx.Round {
