@@ -90,10 +90,7 @@ func main() {
 
 		// Start block agreement concurrently
 		c := make(chan bool, 1)
-		go func() {
-			agreement.Block(s.ctx, c)
-			fmt.Println("block agreement done")
-		}()
+		go agreement.Block(s.ctx, c)
 
 		for s.ctx.Step < user.MaxSteps {
 			select {
@@ -156,10 +153,7 @@ func main() {
 		}
 
 		// Fire off parallel set agreement phase
-		go func() {
-			agreement.SignatureSet(s.ctx, c)
-			fmt.Println("sigset agreement done")
-		}()
+		go agreement.SignatureSet(s.ctx, c)
 
 		for s.ctx.Step < user.MaxSteps {
 			select {
