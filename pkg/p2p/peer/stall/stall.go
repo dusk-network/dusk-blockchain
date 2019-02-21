@@ -1,10 +1,11 @@
 package stall
 
 import (
-	log "github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
@@ -93,7 +94,7 @@ func (d *Detector) AddMessage(cmd commands.Cmd) {
 // This will remove the pendingresponse message from the map.
 // The command passed through is the command we received.
 func (d *Detector) RemoveMessage(cmd commands.Cmd) {
-	cmds := d.addMessage(cmd)
+	cmds := d.removeMessage(cmd)
 	d.lock.Lock()
 	for _, cmd := range cmds {
 		delete(d.responses, cmd)

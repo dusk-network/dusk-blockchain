@@ -146,7 +146,7 @@ func countSigSetVotes(ctx *user.Context) error {
 			ctx.SigSetHash = nil
 			return nil
 		case m := <-ctx.SigSetReductionChan:
-			if m.Round != ctx.Round {
+			if m.Round != ctx.Round || m.Step != ctx.Step {
 				break
 			}
 
