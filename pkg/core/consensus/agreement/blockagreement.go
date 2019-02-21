@@ -86,7 +86,11 @@ func Block(ctx *user.Context, c chan bool) {
 			}
 
 			// Set SigSetVotes for signature set phase
-			ctx.SigSetVotes = sets[m.Step]
+			ctx.SigSetVotes = pl.VoteSet
+			if sets[m.Step] != nil {
+				ctx.SigSetVotes = sets[m.Step]
+			}
+
 			ctx.WinningBlockHash = pl.BlockHash
 
 			// // Populate certificate
