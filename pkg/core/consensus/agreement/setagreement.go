@@ -26,6 +26,10 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 	for {
 		select {
 		case m := <-ctx.SigSetAgreementChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.SigSetAgreement)
 			pkEd := hex.EncodeToString(m.PubKey)
 
@@ -107,6 +111,7 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 			// ctx.Certificate.SRStep = ctx.Step
 			ctx.WinningSigSetHash = pl.SetHash
 			c <- true
+			ctx.QuitChan <- true
 			return
 		}
 	}

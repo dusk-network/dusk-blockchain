@@ -26,6 +26,10 @@ func Block(ctx *user.Context, c chan bool) {
 	for {
 		select {
 		case m := <-ctx.BlockAgreementChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.BlockAgreement)
 			pkEd := hex.EncodeToString(m.PubKey)
 
@@ -114,6 +118,7 @@ func Block(ctx *user.Context, c chan bool) {
 			ctx.Certificate.BRStep = m.Step
 
 			c <- true
+			ctx.QuitChan <- true
 			return
 		}
 	}

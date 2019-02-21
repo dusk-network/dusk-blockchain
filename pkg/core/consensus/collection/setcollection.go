@@ -28,6 +28,10 @@ func SignatureSet(ctx *user.Context) error {
 		case <-timer.C:
 			return nil
 		case m := <-ctx.SigSetCandidateChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.SigSetCandidate)
 			pkEd := hex.EncodeToString(m.PubKey)
 			stake := ctx.NodeWeights[pkEd]

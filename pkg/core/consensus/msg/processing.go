@@ -156,7 +156,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		pl := msg.Payload.(*consensusmsg.SigSetAgreement)
 
 		// We discard any deviating block hashes after the block reduction phase
-		if !bytes.Equal(pl.BlockHash, ctx.BlockHash) {
+		if !bytes.Equal(pl.BlockHash, ctx.WinningBlockHash) {
 			return prerror.New(prerror.Low, errors.New("wrong block hash"))
 		}
 
@@ -255,7 +255,7 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 func verifySigSetCandidate(ctx *user.Context, pl *consensusmsg.SigSetCandidate,
 	step uint8) *prerror.PrError {
 	// We discard any deviating block hashes after the block reduction phase
-	if !bytes.Equal(pl.WinningBlockHash, ctx.WinningBlockHash) {
+	if !bytes.Equal(pl.WinningBlockHash, ctx.BlockHash) {
 		return prerror.New(prerror.Low, errors.New("wrong block hash"))
 	}
 
