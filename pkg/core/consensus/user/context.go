@@ -26,8 +26,8 @@ import (
 var (
 	maxMembers          = 200
 	MaxSteps      uint8 = 50
-	StepTime            = 20 * time.Second
-	CandidateTime       = 60 * time.Second
+	StepTime            = 10 * time.Second
+	CandidateTime       = 20 * time.Second
 	CommitteeSize uint8 = 50
 )
 
@@ -84,6 +84,7 @@ type Context struct {
 	SigSetCandidateChan chan *payload.MsgConsensus
 	SigSetReductionChan chan *payload.MsgConsensus
 	SigSetAgreementChan chan *payload.MsgConsensus
+	QuitChan            chan bool
 
 	// Message queue
 	Queue map[uint64]map[uint8][]*payload.MsgConsensus
@@ -131,6 +132,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		SigSetCandidateChan: make(chan *payload.MsgConsensus, 100),
 		SigSetReductionChan: make(chan *payload.MsgConsensus, 100),
 		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
+		QuitChan:            make(chan bool, 1),
 		Queue:               make(map[uint64]map[uint8][]*payload.MsgConsensus),
 		W:                   totalWeight,
 		GetAllTXs:           getAllTXs,
@@ -152,13 +154,6 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 // Reset removes all information that was generated during the consensus
 func (c *Context) Reset() {
 	c.Multiplier = 1
-	c.BlockReductionChan = make(chan *payload.MsgConsensus, 100)
-	c.CandidateChan = make(chan *payload.MsgConsensus, 100)
-	c.CandidateScoreChan = make(chan *payload.MsgConsensus, 100)
-	c.BlockAgreementChan = make(chan *payload.MsgConsensus, 100)
-	c.SigSetAgreementChan = make(chan *payload.MsgConsensus, 100)
-	c.SigSetCandidateChan = make(chan *payload.MsgConsensus, 100)
-	c.SigSetReductionChan = make(chan *payload.MsgConsensus, 100)
 
 	// Block generator
 	c.K = nil
@@ -178,9 +173,6 @@ func (c *Context) Reset() {
 	c.CandidateBlock = &block.Block{}
 	c.Step = 1
 	c.Certificate = &block.Certificate{}
-	c.BlockVotes = nil
-	c.SigSetHash = nil
-	c.SigSetVotes = nil
 }
 
 // Clear will remove all values created during consensus

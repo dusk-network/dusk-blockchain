@@ -29,6 +29,10 @@ func Block(ctx *user.Context) error {
 		case <-timer.C:
 			return nil
 		case m := <-ctx.CandidateScoreChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.CandidateScore)
 
 			// If the received score is higher than our current one, replace
@@ -41,6 +45,10 @@ func Block(ctx *user.Context) error {
 				ctx.SendMessage(ctx.Magic, m)
 			}
 		case m := <-ctx.CandidateChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.Candidate)
 
 			// Add candidate block to map of known candidate blocks, if unknown

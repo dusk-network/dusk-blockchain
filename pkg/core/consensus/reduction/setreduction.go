@@ -71,43 +71,50 @@ func SignatureSet(ctx *user.Context) error {
 }
 
 func sigSetVote(ctx *user.Context) error {
-	// Set committee first
-	if err := ctx.SetCommittee(); err != nil {
-		return err
-	}
+	select {
+	case <-ctx.QuitChan:
+		// Send another value to get through the phase
+		ctx.QuitChan <- true
+		return nil
+	default:
+		// Set committee first
+		if err := ctx.SetCommittee(); err != nil {
+			return err
+		}
 
-	// If we are not in the committee, then don't vote
-	votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
-	if votes == 0 {
+		// If we are not in the committee, then don't vote
+		votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
+		if votes == 0 {
+			return nil
+		}
+
+		// Sign signature set hash with BLS
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
+		if err != nil {
+			return err
+		}
+
+		// Create signature set vote message to gossip
+		pl, err := consensusmsg.NewSigSetReduction(ctx.BlockHash, ctx.SigSetHash, sigBLS,
+			ctx.Keys.BLSPubKey.Marshal())
+		if err != nil {
+			return err
+		}
+
+		sigEd, err := ctx.CreateSignature(pl)
+		if err != nil {
+			return err
+		}
+
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step,
+			sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		if err != nil {
+			return err
+		}
+
+		ctx.SigSetReductionChan <- msg
 		return nil
 	}
-
-	// Sign signature set hash with BLS
-	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
-	if err != nil {
-		return err
-	}
-
-	// Create signature set vote message to gossip
-	pl, err := consensusmsg.NewSigSetReduction(ctx.BlockHash, ctx.SigSetHash, sigBLS,
-		ctx.Keys.BLSPubKey.Marshal())
-	if err != nil {
-		return err
-	}
-
-	sigEd, err := ctx.CreateSignature(pl)
-	if err != nil {
-		return err
-	}
-
-	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step,
-		sigEd, []byte(*ctx.Keys.EdPubKey), pl)
-	if err != nil {
-		return err
-	}
-
-	ctx.SigSetReductionChan <- msg
-	return nil
 }
 
 func countSigSetVotes(ctx *user.Context) error {
@@ -131,10 +138,18 @@ func countSigSetVotes(ctx *user.Context) error {
 
 	for {
 		select {
+		case <-ctx.QuitChan:
+			// Send another value to get through the phase
+			ctx.QuitChan <- true
+			return nil
 		case <-timer.C:
 			ctx.SigSetHash = nil
 			return nil
 		case m := <-ctx.SigSetReductionChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.SigSetReduction)
 			pkEd := hex.EncodeToString(m.PubKey)
 

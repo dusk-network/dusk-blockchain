@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -57,6 +58,9 @@ func main() {
 	// wait for a connection, so we can start off simultaneously with another node
 	s.wg.Wait()
 
+	// Set up a random amount of latency to start off with
+	time.Sleep(time.Duration(randWait) * time.Second)
+
 	// Trigger consensus loop
 	for {
 		// Reset context
@@ -65,7 +69,6 @@ func main() {
 		// Block phase
 
 		// Block generation
-		time.Sleep(time.Duration(randWait) * time.Second)
 		if err := generation.Block(s.ctx); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -84,8 +87,6 @@ func main() {
 		}
 
 		fmt.Printf("our best block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
-
-		return
 
 		// Start block agreement concurrently
 		c := make(chan bool, 1)
@@ -108,8 +109,6 @@ func main() {
 					os.Exit(1)
 				}
 			default:
-				time.Sleep(time.Duration(randWait) * time.Second)
-
 				// Vote on received block. The context object should hold a winning
 				// block hash after this function returns.
 				if err := reduction.Block(s.ctx); err != nil {
@@ -133,7 +132,11 @@ func main() {
 			}
 		}
 
-		if s.ctx.WinningBlockHash == nil {
+		// Empty QuitChan
+		s.ctx.QuitChan = make(chan bool, 1)
+
+		if bytes.Equal(s.ctx.WinningBlockHash, make([]byte, 32)) {
+			fmt.Println("no winning block hash")
 			continue
 		}
 
@@ -193,8 +196,6 @@ func main() {
 						hex.EncodeToString(s.ctx.SigSetHash))
 				}
 
-				time.Sleep(time.Duration(randWait) * time.Second)
-
 				// Vote on received signature set
 				if err := reduction.SignatureSet(s.ctx); err != nil {
 					fmt.Println(err)
@@ -215,20 +216,24 @@ func main() {
 			}
 		}
 
-		if s.ctx.WinningSigSetHash == nil {
-			fmt.Println("exited without a sigset hash")
-			os.Exit(1)
+		// Empty QuitChan
+		s.ctx.QuitChan = make(chan bool, 1)
+
+		if bytes.Equal(s.ctx.WinningSigSetHash, make([]byte, 32)) {
+			fmt.Println("no winning signature set hash")
+			continue
 		}
 
 		fmt.Printf("[FINAL RESULTS]\n\tblock hash: %s\n\tsignature set hash: %s\n",
 			hex.EncodeToString(s.ctx.WinningBlockHash), hex.EncodeToString(s.ctx.WinningSigSetHash))
 
-		s.ctx.Queue[s.ctx.Round] = make(map[uint8][]*payload.MsgConsensus)
 		s.ctx.LastHeader.Height = s.ctx.Round
-		s.ctx.Round++
 		s.ctx.LastHeader.Hash = s.ctx.WinningBlockHash
 		s.ctx.Seed = s.ctx.CandidateBlock.Header.Seed
 		s.ctx.LastHeader.Seed = s.ctx.CandidateBlock.Header.Seed
+		s.ctx.Queue[s.ctx.Round] = make(map[uint8][]*payload.MsgConsensus)
+
+		s.ctx.Round++
 	}
 }
 

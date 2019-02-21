@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"bytes"
 	"encoding/hex"
 	"time"
 
@@ -28,7 +29,17 @@ func SignatureSet(ctx *user.Context) error {
 		case <-timer.C:
 			return nil
 		case m := <-ctx.SigSetCandidateChan:
+			if m.Round != ctx.Round {
+				break
+			}
+
 			pl := m.Payload.(*consensusmsg.SigSetCandidate)
+
+			// We discard any deviating block hashes after the block reduction phase
+			if !bytes.Equal(pl.WinningBlockHash, ctx.WinningBlockHash) {
+				break
+			}
+
 			pkEd := hex.EncodeToString(m.PubKey)
 			stake := ctx.NodeWeights[pkEd]
 
