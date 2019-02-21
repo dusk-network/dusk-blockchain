@@ -124,12 +124,12 @@ func main() {
 			}
 		}
 
-		if s.ctx.BlockHash == nil {
+		if s.ctx.WinningBlockHash == nil {
 			continue
 		}
 
 		fmt.Printf("resulting hash from block agreement is %s\n",
-			hex.EncodeToString(s.ctx.BlockHash))
+			hex.EncodeToString(s.ctx.WinningBlockHash))
 
 		// Signature set phase
 
@@ -206,13 +206,13 @@ func main() {
 			}
 		}
 
-		if s.ctx.SigSetHash == nil {
+		if s.ctx.WinningSigSetHash == nil {
 			fmt.Println("exited without a sigset hash")
 			os.Exit(1)
 		}
 
-		fmt.Printf("final results:\n\tblock hash: %s\n\tsignature set hash: %s\n",
-			hex.EncodeToString(s.ctx.BlockHash), hex.EncodeToString(s.ctx.SigSetHash))
+		fmt.Printf("[FINAL RESULTS]\n\tblock hash: %s\n\tsignature set hash: %s\n",
+			hex.EncodeToString(s.ctx.WinningBlockHash), hex.EncodeToString(s.ctx.WinningSigSetHash))
 
 		s.ctx.Queue[s.ctx.Round] = make(map[uint8][]*payload.MsgConsensus)
 		s.ctx.LastHeader.Height = s.ctx.Round
