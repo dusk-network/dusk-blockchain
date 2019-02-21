@@ -157,7 +157,7 @@ func countBlockVotes(ctx *user.Context) error {
 			ctx.BlockHash = nil
 			return nil
 		case m := <-ctx.BlockReductionChan:
-			if m.Round != ctx.Round {
+			if m.Round != ctx.Round || m.Step != ctx.Step {
 				break
 			}
 
