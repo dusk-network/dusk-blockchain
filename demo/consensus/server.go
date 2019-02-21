@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
@@ -22,12 +23,12 @@ import (
 
 // Server is the node server
 type Server struct {
-	nonce       uint64
-	peers       []*peermgr.Peer
-	txs         []*transactions.Stealth
-	cfg         *peermgr.Config
-	ctx         *user.Context
-	connectChan chan bool
+	nonce uint64
+	peers []*peermgr.Peer
+	txs   []*transactions.Stealth
+	cfg   *peermgr.Config
+	ctx   *user.Context
+	wg    sync.WaitGroup
 }
 
 // OnAccept is the function that runs when a node tries to connect with us
@@ -47,7 +48,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 		}
 	}
 
-	s.connectChan <- true
+	s.wg.Done()
 }
 
 // OnConnection is the function that runs when we connect to another node
@@ -65,7 +66,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		os.Exit(1)
 	}
 
-	s.connectChan <- true
+	s.wg.Done()
 }
 
 // OnConsensus is the function that runs when we receive a consensus message from another node
