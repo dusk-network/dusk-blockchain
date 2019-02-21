@@ -145,6 +145,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Keys:                keys,
 		NodeWeights:         make(map[string]uint64),
 		NodeBLS:             make(map[string][]byte),
+		WinningBlockHash:    make([]byte, 32),
 	}
 
 	ctx.setLastHeader()
@@ -165,7 +166,7 @@ func (c *Context) Reset() {
 
 	// Provisioner
 	c.BlockHash = nil
-	c.WinningBlockHash = nil
+	c.WinningBlockHash = make([]byte, 32)
 	c.BlockVotes = nil
 	c.SigSetHash = nil
 	c.WinningSigSetHash = nil
