@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 )
@@ -15,6 +17,11 @@ func SignatureSet(ctx *user.Context) error {
 
 	// Start timer
 	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
+
+	// Process queue
+	if err := msg.ProcessQueue(ctx); err != nil {
+		return err
+	}
 
 	for {
 		select {

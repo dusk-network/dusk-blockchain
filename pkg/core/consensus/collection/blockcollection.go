@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -17,6 +18,11 @@ func Block(ctx *user.Context) error {
 	// Keep track of the highest bid score seen
 	var highest uint64
 	timer := time.NewTimer(user.CandidateTime * (time.Duration(ctx.Multiplier)))
+
+	// Process queue
+	if err := msg.ProcessQueue(ctx); err != nil {
+		return err
+	}
 
 	for {
 		select {
