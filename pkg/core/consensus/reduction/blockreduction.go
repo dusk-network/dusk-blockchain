@@ -3,6 +3,8 @@ package reduction
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
+	"math/rand"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -67,6 +69,7 @@ func Block(ctx *user.Context) error {
 	// If BlockHash is fallback, the committee has agreed to exit and restart
 	// consensus.
 	if bytes.Equal(ctx.BlockHash, fallback) {
+		fmt.Printf("voting for %s\n", hex.EncodeToString(ctx.BlockHash))
 		ctx.BlockHash = nil
 		return nil
 	}
@@ -98,32 +101,38 @@ func blockVote(ctx *user.Context) error {
 			return nil
 		}
 
-		// Sign block hash with BLS
-		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
-		if err != nil {
-			return err
+		r := rand.Intn(200)
+		if r > 2 {
+			// Sign block hash with BLS
+			sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
+			if err != nil {
+				return err
+			}
+
+			// Create reduction payload to gossip
+			pl, err := consensusmsg.NewBlockReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+			if err != nil {
+				return err
+			}
+
+			// Sign the payload
+			sigEd, err := ctx.CreateSignature(pl)
+			if err != nil {
+				return err
+			}
+
+			// Create message
+			msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
+				[]byte(*ctx.Keys.EdPubKey), pl)
+			if err != nil {
+				return err
+			}
+
+			ctx.BlockReductionChan <- msg
+			return nil
 		}
 
-		// Create reduction payload to gossip
-		pl, err := consensusmsg.NewBlockReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
-		if err != nil {
-			return err
-		}
-
-		// Sign the payload
-		sigEd, err := ctx.CreateSignature(pl)
-		if err != nil {
-			return err
-		}
-
-		// Create message
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
-			[]byte(*ctx.Keys.EdPubKey), pl)
-		if err != nil {
-			return err
-		}
-
-		ctx.BlockReductionChan <- msg
+		fmt.Println("resulting: skipping")
 		return nil
 	}
 }
