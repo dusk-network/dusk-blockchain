@@ -31,7 +31,7 @@ func main() {
 
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	randWait := rand.Float64() * 2.0
+	// randWait := rand.Float64() * 2.0
 
 	numNodes, port, peers := getPortPeers()
 
@@ -58,7 +58,7 @@ func main() {
 	s.wg.Wait()
 
 	// Set up a random amount of latency to start off with
-	time.Sleep(time.Duration(randWait) * time.Second)
+	// time.Sleep(time.Duration(randWait) * time.Second)
 
 	// Trigger consensus loop
 	for {
@@ -329,13 +329,11 @@ func setupContext(s *Server) *user.Context {
 	out := transactions.NewOutput(uint64(weight), byte32, byte32)
 	stake.AddInput(in)
 	stake.AddOutput(out)
-	tx := transactions.NewTX(transactions.StakeType, stake)
-	if err := tx.SetHash(); err != nil {
+	s.tx = transactions.NewTX(transactions.StakeType, stake)
+	if err := s.tx.SetHash(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	s.txs = append(s.txs, tx)
 
 	// Substitute SendMessage with our own function
 	ctx.SendMessage = s.sendMessage
