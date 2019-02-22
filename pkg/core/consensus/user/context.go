@@ -27,8 +27,8 @@ import (
 var (
 	maxMembers          = 200
 	MaxSteps      uint8 = 50
-	StepTime            = 3 * time.Second
-	CandidateTime       = 3 * time.Second
+	StepTime            = 1 * time.Second
+	CandidateTime       = 1 * time.Second
 	CommitteeSize uint8 = 50
 )
 
@@ -86,6 +86,7 @@ type Context struct {
 	SigSetReductionChan chan *payload.MsgConsensus
 	SigSetAgreementChan chan *payload.MsgConsensus
 	QuitChan            chan bool
+	StopChan            chan bool
 
 	// Message queue
 	*Queue
@@ -137,6 +138,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		SigSetReductionChan: make(chan *payload.MsgConsensus, 100),
 		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
 		QuitChan:            make(chan bool, 1),
+		StopChan:            make(chan bool, 1),
 		Queue:               queue,
 		W:                   totalWeight,
 		GetAllTXs:           getAllTXs,
