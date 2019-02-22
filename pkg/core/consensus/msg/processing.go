@@ -38,11 +38,7 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 	}
 
 	if ctx.Round < msg.Round || ctx.Step < msg.Step {
-		if ctx.Queue[msg.Round] == nil {
-			ctx.Queue[msg.Round] = make(map[uint8][]*payload.MsgConsensus)
-		}
-
-		ctx.Queue[msg.Round][msg.Step] = append(ctx.Queue[msg.Round][msg.Step], msg)
+		ctx.Queue.Put(msg.Round, msg.Step, msg)
 		return nil
 	}
 
@@ -57,12 +53,15 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 
 // ProcessQueue will process messages in the queue
 func ProcessQueue(ctx *user.Context) *prerror.PrError {
-	if len(ctx.Queue[ctx.Round][ctx.Step]) > 0 {
-		for _, m := range ctx.Queue[ctx.Round][ctx.Step] {
-			err := Process(ctx, m)
-			if err != nil && err.Priority == prerror.High {
-				return err
-			}
+	msgs := ctx.Queue.Get(ctx.Round, ctx.Step)
+	if msgs == nil {
+		return nil
+	}
+
+	for _, m := range msgs {
+		err := Process(ctx, m)
+		if err != nil && err.Priority == prerror.High {
+			return err
 		}
 	}
 
