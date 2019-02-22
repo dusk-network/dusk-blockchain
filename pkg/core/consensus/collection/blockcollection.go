@@ -27,6 +27,7 @@ func Block(ctx *user.Context) error {
 	for {
 		select {
 		case <-timer.C:
+			ctx.Step++
 			return nil
 		case m := <-ctx.CandidateScoreChan:
 			if m.Round != ctx.Round {

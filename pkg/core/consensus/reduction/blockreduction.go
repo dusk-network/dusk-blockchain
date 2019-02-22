@@ -44,12 +44,6 @@ func Block(ctx *user.Context) error {
 
 	ctx.Step++
 
-	// If BlockHash is nil, no clear winner was found within the time limit.
-	// We will vote on the fallback value.
-	if ctx.BlockHash == nil {
-		ctx.BlockHash = fallback
-	}
-
 	// Vote on passed block
 	if err := blockVote(ctx); err != nil {
 		return err
@@ -60,17 +54,9 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	// If BlockHash is nil, no clear winner was found within the time limit.
-	// So we will exit and restart the consensus.
-	if ctx.BlockHash == nil {
-		return nil
-	}
-
 	// If BlockHash is fallback, the committee has agreed to exit and restart
 	// consensus.
 	if bytes.Equal(ctx.BlockHash, fallback) {
-		fmt.Printf("voting for %s\n", hex.EncodeToString(ctx.BlockHash))
-		ctx.BlockHash = nil
 		return nil
 	}
 
@@ -163,7 +149,8 @@ func countBlockVotes(ctx *user.Context) error {
 			ctx.QuitChan <- true
 			return nil
 		case <-timer.C:
-			ctx.BlockHash = nil
+			fmt.Println("timed out")
+			ctx.BlockHash = make([]byte, 32)
 			return nil
 		case m := <-ctx.BlockReductionChan:
 			if m.Round != ctx.Round || m.Step != ctx.Step {
@@ -172,7 +159,7 @@ func countBlockVotes(ctx *user.Context) error {
 
 			pl := m.Payload.(*consensusmsg.BlockReduction)
 			pkEd := hex.EncodeToString(m.PubKey)
-
+			fmt.Printf("voting received %s\n", hex.EncodeToString(pl.BlockHash))
 			// Check if this node's vote is already recorded
 			if voters[pkEd] {
 				break

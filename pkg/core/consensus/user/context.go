@@ -27,8 +27,8 @@ import (
 var (
 	maxMembers          = 200
 	MaxSteps      uint8 = 50
-	StepTime            = 1 * time.Second
-	CandidateTime       = 1 * time.Second
+	StepTime            = 500 * time.Millisecond
+	CandidateTime       = 500 * time.Millisecond
 	CommitteeSize uint8 = 50
 )
 
@@ -160,8 +160,6 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 
 // Reset removes all information that was generated during the consensus
 func (c *Context) Reset() {
-	c.Multiplier = 1
-
 	// Block generator
 	c.K = nil
 	c.X = nil

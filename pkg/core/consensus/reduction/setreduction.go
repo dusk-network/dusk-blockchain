@@ -34,11 +34,6 @@ func SignatureSet(ctx *user.Context) error {
 
 	ctx.Step++
 
-	// If we timed out, vote for fallback value
-	if ctx.SigSetHash == nil {
-		ctx.SigSetHash = fallback
-	}
-
 	// Vote on collected signature set
 	if err := sigSetVote(ctx); err != nil {
 		return err
@@ -49,15 +44,9 @@ func SignatureSet(ctx *user.Context) error {
 		return err
 	}
 
-	// If we timed out, exit the loop and go back to signature set generation
-	if ctx.SigSetHash == nil {
-		return nil
-	}
-
 	// If SigSetHash is fallback, the committee has agreed to exit and restart
 	// consensus.
 	if bytes.Equal(ctx.SigSetHash, fallback) {
-		ctx.SigSetHash = nil
 		return nil
 	}
 
@@ -143,7 +132,7 @@ func countSigSetVotes(ctx *user.Context) error {
 			ctx.QuitChan <- true
 			return nil
 		case <-timer.C:
-			ctx.SigSetHash = nil
+			ctx.SigSetHash = make([]byte, 32)
 			return nil
 		case m := <-ctx.SigSetReductionChan:
 			if m.Round != ctx.Round || m.Step != ctx.Step {
