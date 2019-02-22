@@ -27,6 +27,7 @@ func SignatureSet(ctx *user.Context) error {
 	for {
 		select {
 		case <-timer.C:
+			ctx.Step++
 			return nil
 		case m := <-ctx.SigSetCandidateChan:
 			if m.Round != ctx.Round {
