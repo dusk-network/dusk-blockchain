@@ -85,7 +85,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		fmt.Printf("our best block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
+		fmt.Printf("our resulting block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
 
 		// Start block agreement concurrently
 		c := make(chan bool, 1)
@@ -136,6 +136,7 @@ func main() {
 
 		if bytes.Equal(s.ctx.WinningBlockHash, make([]byte, 32)) {
 			fmt.Println("no winning block hash")
+			s.ctx.StopChan <- true
 			continue
 		}
 
@@ -220,6 +221,7 @@ func main() {
 
 		if bytes.Equal(s.ctx.WinningSigSetHash, make([]byte, 32)) {
 			fmt.Println("no winning signature set hash")
+			s.ctx.StopChan <- true
 			continue
 		}
 
