@@ -82,8 +82,13 @@ func Block(ctx *user.Context) error {
 
 	// Create candidate msg
 	pl2 := consensusmsg.NewCandidate(candidateBlock)
+	sigEd2, err := ctx.CreateSignature(pl2)
+	if err != nil {
+		return err
+	}
+
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl2)
+		ctx.Step, sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
 	if err != nil {
 		return err
 	}
