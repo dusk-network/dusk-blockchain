@@ -28,7 +28,7 @@ import (
 const (
 	maxOutboundConnections = 100
 	handshakeTimeout       = 30 * time.Second
-	idleTimeout            = 5 * time.Minute // If no message received after idleTimeout, then peer disconnects
+	idleTimeout            = 2 * time.Minute // If no message received after idleTimeout, then peer disconnects
 
 	// nodes will have `responseTime` seconds to reply with a response
 	responseTime = 300 * time.Second
@@ -638,4 +638,11 @@ func (p *Peer) RequestAddresses() error {
 	}
 
 	return <-c
+}
+
+func (p *Peer) WriteConsensus(msg wire.Payload) error {
+	p.outch <- func() {
+		p.Write(msg)
+	}
+	return nil
 }

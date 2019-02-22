@@ -190,7 +190,7 @@ func setupPeerConfig(s *Server, nonce uint64) *peermgr.Config {
 func (s *Server) sendMessage(magic protocol.Magic, p wire.Payload) error {
 	for _, peer := range s.peers {
 		fmt.Printf("[CONSENSUS] writing message to peer %s\n", peer.RemoteAddr().String())
-		if err := peer.Write(p); err != nil {
+		if err := peer.WriteConsensus(p); err != nil {
 			return err
 		}
 	}
