@@ -35,6 +35,8 @@ func Block(ctx *user.Context, c chan bool) {
 		}
 
 		select {
+		case <-ctx.StopChan:
+			return
 		case m := <-ctx.BlockAgreementChan:
 			if m.Round != ctx.Round {
 				break
