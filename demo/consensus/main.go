@@ -13,7 +13,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
@@ -231,7 +230,7 @@ func main() {
 		s.ctx.LastHeader.Hash = s.ctx.WinningBlockHash
 		s.ctx.Seed = s.ctx.CandidateBlock.Header.Seed
 		s.ctx.LastHeader.Seed = s.ctx.CandidateBlock.Header.Seed
-		s.ctx.Queue[s.ctx.Round] = make(map[uint8][]*payload.MsgConsensus)
+		s.ctx.Queue.Map.Delete(s.ctx.Round)
 
 		s.ctx.Round++
 	}
