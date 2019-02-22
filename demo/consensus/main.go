@@ -13,6 +13,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
@@ -64,6 +65,10 @@ func main() {
 	for {
 		// Reset context
 		s.ctx.Reset()
+		s.ctx.BlockReductionChan = make(chan *payload.MsgConsensus, 100)
+		s.ctx.SigSetReductionChan = make(chan *payload.MsgConsensus, 100)
+		s.ctx.BlockAgreementChan = make(chan *payload.MsgConsensus, 100)
+		s.ctx.SigSetAgreementChan = make(chan *payload.MsgConsensus, 100)
 
 		// Block phase
 
@@ -118,7 +123,7 @@ func main() {
 				fmt.Printf("resulting hash from block reduction is %s\n",
 					hex.EncodeToString(s.ctx.BlockHash))
 
-				if s.ctx.BlockHash != nil {
+				if !bytes.Equal(s.ctx.BlockHash, make([]byte, 32)) {
 					continue
 				}
 
@@ -137,6 +142,7 @@ func main() {
 		if bytes.Equal(s.ctx.WinningBlockHash, make([]byte, 32)) {
 			fmt.Println("no winning block hash")
 			s.ctx.StopChan <- true
+			s.ctx.Queue.Map.Delete(s.ctx.Round)
 			continue
 		}
 
@@ -205,7 +211,7 @@ func main() {
 				fmt.Printf("resulting hash from signature set reduction is %s\n",
 					hex.EncodeToString(s.ctx.SigSetHash))
 
-				if s.ctx.SigSetHash != nil {
+				if !bytes.Equal(s.ctx.SigSetHash, make([]byte, 32)) {
 					continue
 				}
 
@@ -222,6 +228,7 @@ func main() {
 		if bytes.Equal(s.ctx.WinningSigSetHash, make([]byte, 32)) {
 			fmt.Println("no winning signature set hash")
 			s.ctx.StopChan <- true
+			s.ctx.Queue.Map.Delete(s.ctx.Round)
 			continue
 		}
 
@@ -233,6 +240,7 @@ func main() {
 		s.ctx.Seed = s.ctx.CandidateBlock.Header.Seed
 		s.ctx.LastHeader.Seed = s.ctx.CandidateBlock.Header.Seed
 		s.ctx.Queue.Map.Delete(s.ctx.Round)
+		s.ctx.Multiplier = 1
 
 		s.ctx.Round++
 	}
