@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ed25519"
@@ -26,8 +27,8 @@ import (
 var (
 	maxMembers          = 200
 	MaxSteps      uint8 = 50
-	StepTime            = 10 * time.Second
-	CandidateTime       = 20 * time.Second
+	StepTime            = 3 * time.Second
+	CandidateTime       = 3 * time.Second
 	CommitteeSize uint8 = 50
 )
 
@@ -87,7 +88,7 @@ type Context struct {
 	QuitChan            chan bool
 
 	// Message queue
-	Queue map[uint64]map[uint8][]*payload.MsgConsensus
+	*Queue
 
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
@@ -113,6 +114,9 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		return nil, errors.New("context: one of the keys to be used during the consensus is nil")
 	}
 
+	queue := &Queue{
+		Map: new(sync.Map),
+	}
 	ctx := &Context{
 		Version:             10000, // Placeholder
 		Tau:                 tau,
@@ -133,7 +137,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		SigSetReductionChan: make(chan *payload.MsgConsensus, 100),
 		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
 		QuitChan:            make(chan bool, 1),
-		Queue:               make(map[uint64]map[uint8][]*payload.MsgConsensus),
+		Queue:               queue,
 		W:                   totalWeight,
 		GetAllTXs:           getAllTXs,
 		HashVotes:           hashVotes,
