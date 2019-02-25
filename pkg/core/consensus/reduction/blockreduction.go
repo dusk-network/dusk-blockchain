@@ -123,7 +123,10 @@ func blockVote(ctx *user.Context) error {
 
 func countBlockVotes(ctx *user.Context) error {
 	// Set vote limit
-	voteLimit := uint8(len(ctx.CurrentCommittee))
+	voteLimit := uint8(len(ctx.Committee))
+	if voteLimit > 50 {
+		voteLimit = 50
+	}
 
 	// Keep a counter of how many votes have been cast for a specific block
 	counts := make(map[string]uint8)
@@ -147,6 +150,11 @@ func countBlockVotes(ctx *user.Context) error {
 			ctx.QuitChan <- true
 			return nil
 		case <-timer.C:
+			// Increase multiplier
+			if ctx.Multiplier < 10 {
+				ctx.Multiplier = ctx.Multiplier * 2
+			}
+
 			ctx.BlockHash = make([]byte, 32)
 			return nil
 		case m := <-ctx.BlockReductionChan:
