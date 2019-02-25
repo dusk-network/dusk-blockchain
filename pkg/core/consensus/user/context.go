@@ -27,8 +27,8 @@ import (
 var (
 	maxMembers          = 200
 	MaxSteps      uint8 = 50
-	StepTime            = 100 * time.Millisecond
-	CandidateTime       = 100 * time.Millisecond
+	StepTime            = 50 * time.Millisecond
+	CandidateTime       = 50 * time.Millisecond
 	CommitteeSize uint8 = 50
 )
 
