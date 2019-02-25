@@ -13,7 +13,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
@@ -65,10 +64,6 @@ func main() {
 	for {
 		// Reset context
 		s.ctx.Reset()
-		s.ctx.BlockReductionChan = make(chan *payload.MsgConsensus, 100)
-		s.ctx.SigSetReductionChan = make(chan *payload.MsgConsensus, 100)
-		s.ctx.BlockAgreementChan = make(chan *payload.MsgConsensus, 100)
-		s.ctx.SigSetAgreementChan = make(chan *payload.MsgConsensus, 100)
 
 		// Block phase
 
@@ -79,7 +74,7 @@ func main() {
 		}
 
 		fmt.Printf("our generated block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
-		if err := s.ctx.SetCommittee(); err != nil {
+		if err := s.ctx.SetCommittee(s.ctx.BlockStep); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -96,7 +91,8 @@ func main() {
 		c := make(chan bool, 1)
 		go agreement.Block(s.ctx, c)
 
-		for s.ctx.Step < user.MaxSteps {
+	block:
+		for s.ctx.BlockStep < user.MaxSteps {
 			select {
 			case v := <-c:
 				// If it was false, something went wrong and we should quit
@@ -105,13 +101,8 @@ func main() {
 					os.Exit(1)
 				}
 
-				// If not, we proceed to the next phase by maxing out the
-				// step counter.
-				s.ctx.Step = user.MaxSteps
-				if err := s.ctx.SetCommittee(); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
+				// If not, we proceed to the next phase
+				break block
 			default:
 				// Vote on received block. The context object should hold a winning
 				// block hash after this function returns.
@@ -129,10 +120,11 @@ func main() {
 
 				// If we did not get a result, increase the multiplier and
 				// exit the loop.
-				s.ctx.Step = user.MaxSteps
 				if s.ctx.Multiplier < 10 {
 					s.ctx.Multiplier = s.ctx.Multiplier * 2
 				}
+
+				break block
 			}
 		}
 
@@ -142,7 +134,6 @@ func main() {
 		if bytes.Equal(s.ctx.WinningBlockHash, make([]byte, 32)) {
 			fmt.Println("no winning block hash")
 			s.ctx.StopChan <- true
-			s.ctx.Queue.Map.Delete(s.ctx.Round)
 			continue
 		}
 
@@ -151,9 +142,7 @@ func main() {
 
 		// Signature set phase
 
-		// Reset step counter and committee
-		s.ctx.Step = 1
-		if err := s.ctx.SetCommittee(); err != nil {
+		if err := s.ctx.SetCommittee(s.ctx.SigSetStep); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -161,7 +150,8 @@ func main() {
 		// Fire off parallel set agreement phase
 		go agreement.SignatureSet(s.ctx, c)
 
-		for s.ctx.Step < user.MaxSteps {
+	sigset:
+		for s.ctx.SigSetStep < user.MaxSteps {
 			select {
 			case v := <-c:
 				// If it was false, something went wrong and we should quit
@@ -181,11 +171,7 @@ func main() {
 				// 	}
 				// }
 
-				s.ctx.Step = user.MaxSteps
-				if err := s.ctx.SetCommittee(); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
+				break sigset
 			default:
 				if s.ctx.SigSetHash == nil {
 					if err := generation.SignatureSet(s.ctx); err != nil {
@@ -228,7 +214,6 @@ func main() {
 		if bytes.Equal(s.ctx.WinningSigSetHash, make([]byte, 32)) {
 			fmt.Println("no winning signature set hash")
 			s.ctx.StopChan <- true
-			s.ctx.Queue.Map.Delete(s.ctx.Round)
 			continue
 		}
 
@@ -239,8 +224,11 @@ func main() {
 		s.ctx.LastHeader.Hash = s.ctx.WinningBlockHash
 		s.ctx.Seed = s.ctx.CandidateBlock.Header.Seed
 		s.ctx.LastHeader.Seed = s.ctx.CandidateBlock.Header.Seed
-		s.ctx.Queue.Map.Delete(s.ctx.Round)
+		s.ctx.BlockQueue.Map.Delete(s.ctx.Round)
+		s.ctx.SigSetQueue.Map.Delete(s.ctx.Round)
 		s.ctx.Multiplier = 1
+		s.ctx.BlockStep = 1
+		s.ctx.SigSetStep = 1
 
 		s.ctx.Round++
 	}
