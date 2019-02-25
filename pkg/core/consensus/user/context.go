@@ -27,8 +27,8 @@ import (
 var (
 	maxMembers          = 200
 	MaxSteps      uint8 = 50
-	StepTime            = 50 * time.Millisecond
-	CandidateTime       = 50 * time.Millisecond
+	StepTime            = 10 * time.Millisecond
+	CandidateTime       = 10 * time.Millisecond
 	CommitteeSize uint8 = 50
 )
 
@@ -62,10 +62,11 @@ type Context struct {
 	Certificate *block.Certificate // Block certificate to be constructed during consensus
 
 	/// Block fields
-	CandidateBlock   *block.Block         // Winning block from candidate collection
-	BlockHash        []byte               // Block hash currently being voted on by this node
-	WinningBlockHash []byte               // Block hash that won the block phase
-	BlockVotes       []*consensusmsg.Vote // Vote set for block set agreement phase
+	CandidateBlock    *block.Block         // Winning block from candidate collection
+	BlockHash         []byte               // Block hash currently being voted on by this node
+	WinningBlockHash  []byte               // Block hash that won the block phase
+	BlockVotes        []*consensusmsg.Vote // Vote set for block set agreement phase
+	WinningBlockVotes []*consensusmsg.Vote // Winning vote set for block set agreement phase
 
 	/// Signature set fields
 	SigSetVotes       []*consensusmsg.Vote // Vote set for signature set agreement phase
@@ -222,12 +223,7 @@ func (c *Context) CreateSignature(pl consensusmsg.Msg, step uint8) ([]byte, erro
 
 // SetCommittee will set the committee for the given step
 func (c *Context) SetCommittee(step uint8) error {
-	size := CommitteeSize
-	if len(c.Committee) < int(CommitteeSize) {
-		size = uint8(len(c.Committee))
-	}
-
-	currentCommittee, err := sortition.CreateCommittee(c.Round, c.W, step, size,
+	currentCommittee, err := sortition.CreateCommittee(c.Round, c.W, step,
 		c.Committee, c.NodeWeights)
 	if err != nil {
 		return err
