@@ -84,7 +84,7 @@ func sigSetVote(ctx *user.Context) error {
 		}
 
 		// Create signature set vote message to gossip
-		pl, err := consensusmsg.NewSigSetReduction(ctx.BlockHash, ctx.SigSetHash, sigBLS,
+		pl, err := consensusmsg.NewSigSetReduction(ctx.WinningBlockHash, ctx.SigSetHash, sigBLS,
 			ctx.Keys.BLSPubKey.Marshal())
 		if err != nil {
 			return err
