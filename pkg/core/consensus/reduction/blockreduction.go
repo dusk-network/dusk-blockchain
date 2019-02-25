@@ -3,11 +3,8 @@ package reduction
 import (
 	"bytes"
 	"encoding/hex"
-<<<<<<< HEAD
 	"fmt"
 	"math/rand"
-=======
->>>>>>> b5763e615339514912bd243f4b308dd48c3149a5
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -104,17 +101,21 @@ func blockVote(ctx *user.Context) error {
 				return err
 			}
 
-		// Sign the payload
-		sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
-		if err != nil {
-			return err
-		}
+			// Sign the payload
+			sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
+			if err != nil {
+				return err
+			}
 
-		// Create message
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.BlockStep, sigEd,
-			[]byte(*ctx.Keys.EdPubKey), pl)
-		if err != nil {
-			return err
+			// Create message
+			msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.BlockStep, sigEd,
+				[]byte(*ctx.Keys.EdPubKey), pl)
+			if err != nil {
+				return err
+			}
+
+			ctx.BlockReductionChan <- msg
+			return nil
 		}
 
 		fmt.Println("resulting: skipping")
