@@ -67,13 +67,13 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl)
+	sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
 	if err != nil {
 		return err
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.BlockStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}
@@ -82,13 +82,13 @@ func Block(ctx *user.Context) error {
 
 	// Create candidate msg
 	pl2 := consensusmsg.NewCandidate(candidateBlock)
-	sigEd2, err := ctx.CreateSignature(pl2)
+	sigEd2, err := ctx.CreateSignature(pl2, ctx.BlockStep)
 	if err != nil {
 		return err
 	}
 
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
+		ctx.BlockStep, sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
 	if err != nil {
 		return err
 	}
