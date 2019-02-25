@@ -54,7 +54,7 @@ func Block(ctx *user.Context, c chan bool) {
 
 			// Get amount of votes
 			committee, err := sortition.CreateCommittee(m.Round, ctx.W, m.Step,
-				uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
+				ctx.Committee, ctx.NodeWeights)
 			if err != nil {
 				// Log
 				c <- false
@@ -78,9 +78,9 @@ func Block(ctx *user.Context, c chan bool) {
 			}
 
 			// Set SigSetVotes for signature set phase
-			ctx.SigSetVotes = pl.VoteSet
+			ctx.WinningBlockVotes = pl.VoteSet
 			if sets[m.Step] != nil {
-				ctx.SigSetVotes = sets[m.Step]
+				ctx.WinningBlockVotes = sets[m.Step]
 			}
 
 			ctx.WinningBlockHash = pl.BlockHash

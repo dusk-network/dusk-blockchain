@@ -54,7 +54,7 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 
 			// Get amount of votes
 			committee, err := sortition.CreateCommittee(m.Round, ctx.W, m.Step,
-				uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
+				ctx.Committee, ctx.NodeWeights)
 			if err != nil {
 				// Log
 				c <- false
@@ -122,13 +122,8 @@ func SignatureSet(ctx *user.Context, c chan bool) {
 // SendSigSet will send out a signature set agreement message.
 func SendSigSet(ctx *user.Context) error {
 	// Create payload, signature and message
-	hash, err := ctx.HashVotes(ctx.SigSetVotes)
-	if err != nil {
-		return err
-	}
-
-	pl, err := consensusmsg.NewSigSetAgreement(ctx.WinningBlockHash, hash, ctx.SigSetVotes,
-		ctx.Certificate.BRStep)
+	pl, err := consensusmsg.NewSigSetAgreement(ctx.WinningBlockHash, ctx.SigSetHash, ctx.SigSetVotes,
+		ctx.SigSetStep)
 	if err != nil {
 		return err
 	}
