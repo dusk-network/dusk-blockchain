@@ -115,12 +115,6 @@ func main() {
 					break
 				}
 
-				// If we did not get a result, increase the multiplier and
-				// exit the loop.
-				if s.ctx.Multiplier < 100 {
-					s.ctx.Multiplier = s.ctx.Multiplier * 2
-				}
-
 				break block
 			}
 		}
@@ -189,11 +183,6 @@ func main() {
 
 				if !bytes.Equal(s.ctx.SigSetHash, make([]byte, 32)) {
 					break
-				}
-
-				// Increase multiplier
-				if s.ctx.Multiplier < 100 {
-					s.ctx.Multiplier = s.ctx.Multiplier * 2
 				}
 
 				fmt.Println("no winning signature set hash")
