@@ -66,26 +66,27 @@ func main() {
 		s.ctx.Reset()
 
 		// Block phase
+		fmt.Println("resulting: block phase")
 
 		// Block generation
 		if err := generation.Block(s.ctx); err != nil {
-			fmt.Println(err)
+			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
 
 		fmt.Printf("our generated block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
 		if err := s.ctx.SetCommittee(s.ctx.BlockStep); err != nil {
-			fmt.Println(err)
+			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
 
 		// Block collection
 		if err := collection.Block(s.ctx); err != nil {
-			fmt.Println(err)
+			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Printf("our resulting block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
+		fmt.Printf("resulting block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
 
 		// Start block agreement concurrently
 		c := make(chan bool, 1)
@@ -107,7 +108,7 @@ func main() {
 				// Vote on received block. The context object should hold a winning
 				// block hash after this function returns.
 				if err := reduction.Block(s.ctx); err != nil {
-					fmt.Println(err)
+					fmt.Printf("error: %v\n", err)
 					os.Exit(1)
 				}
 
@@ -115,7 +116,7 @@ func main() {
 					hex.EncodeToString(s.ctx.BlockHash))
 
 				if !bytes.Equal(s.ctx.BlockHash, make([]byte, 32)) {
-					continue
+					break
 				}
 
 				// If we did not get a result, increase the multiplier and
@@ -141,13 +142,15 @@ func main() {
 			hex.EncodeToString(s.ctx.WinningBlockHash))
 
 		// Signature set phase
+		fmt.Println("resulting: signature set phase")
 
 		if err := s.ctx.SetCommittee(s.ctx.SigSetStep); err != nil {
-			fmt.Println(err)
+			fmt.Printf("error: %v\n", err)
 			os.Exit(1)
 		}
 
 		// Fire off parallel set agreement phase
+		c = make(chan bool, 1)
 		go agreement.SignatureSet(s.ctx, c)
 
 	sigset:
@@ -173,32 +176,32 @@ func main() {
 
 				break sigset
 			default:
-				if s.ctx.SigSetHash == nil {
+				if bytes.Equal(s.ctx.SigSetHash, make([]byte, 32)) {
 					if err := generation.SignatureSet(s.ctx); err != nil {
-						fmt.Println(err)
+						fmt.Printf("error: %v\n", err)
 						os.Exit(1)
 					}
 
 					if err := collection.SignatureSet(s.ctx); err != nil {
-						fmt.Println(err)
+						fmt.Printf("error: %v\n", err)
 						os.Exit(1)
 					}
 
-					fmt.Printf("collected signature set hash is %s\n",
+					fmt.Printf("resulting: signature set hash is %s\n",
 						hex.EncodeToString(s.ctx.SigSetHash))
 				}
 
 				// Vote on received signature set
 				if err := reduction.SignatureSet(s.ctx); err != nil {
-					fmt.Println(err)
+					fmt.Printf("error: %v\n", err)
 					os.Exit(1)
 				}
 
-				fmt.Printf("resulting hash from signature set reduction is %s\n",
+				fmt.Printf("resulting: hash from signature set reduction is %s\n",
 					hex.EncodeToString(s.ctx.SigSetHash))
 
 				if !bytes.Equal(s.ctx.SigSetHash, make([]byte, 32)) {
-					continue
+					break
 				}
 
 				// Increase multiplier
@@ -217,8 +220,8 @@ func main() {
 			continue
 		}
 
-		fmt.Printf("[FINAL RESULTS]\n\tblock hash: %s\n\tsignature set hash: %s\n",
-			hex.EncodeToString(s.ctx.WinningBlockHash), hex.EncodeToString(s.ctx.WinningSigSetHash))
+		fmt.Printf("[FINAL RESULTS ROUND %v]\n\tblock hash: %s\n\tsignature set hash: %s\n",
+			s.ctx.Round, hex.EncodeToString(s.ctx.WinningBlockHash), hex.EncodeToString(s.ctx.WinningSigSetHash))
 
 		s.ctx.LastHeader.Height = s.ctx.Round
 		s.ctx.LastHeader.Hash = s.ctx.WinningBlockHash
