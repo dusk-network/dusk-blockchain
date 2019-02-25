@@ -22,6 +22,9 @@ func SignatureSet(ctx *user.Context) error {
 	// Set up a fallback value
 	fallback := make([]byte, 32)
 
+	// Clear our votes out, so that we get a fresh set for this phase
+	ctx.SigSetVotes = make([]*consensusmsg.Vote, 0)
+
 	// Vote on collected signature set
 	if err := sigSetVote(ctx); err != nil {
 		return err
@@ -50,8 +53,14 @@ func SignatureSet(ctx *user.Context) error {
 		return nil
 	}
 
-	if err := agreement.SendSigSet(ctx); err != nil {
-		return err
+	select {
+	case <-ctx.QuitChan:
+		ctx.QuitChan <- true
+		break
+	default:
+		if err := agreement.SendSigSet(ctx); err != nil {
+			return err
+		}
 	}
 
 	ctx.SigSetStep++
@@ -154,6 +163,15 @@ func countSigSetVotes(ctx *user.Context) error {
 			voters[pkEd] = true
 			setStr := hex.EncodeToString(pl.SigSetHash)
 			counts[setStr] += votes
+			sigSetVote, err := consensusmsg.NewVote(pl.SigSetHash, pl.PubKeyBLS,
+				pl.SigBLS, ctx.SigSetStep)
+			if err != nil {
+				return err
+			}
+
+			for i := uint8(0); i < votes; i++ {
+				ctx.SigSetVotes = append(ctx.SigSetVotes, sigSetVote)
+			}
 
 			// Gossip the message
 			if err := ctx.SendMessage(ctx.Magic, m); err != nil {
@@ -169,6 +187,14 @@ func countSigSetVotes(ctx *user.Context) error {
 
 			// Set signature set hash
 			ctx.SigSetHash = pl.SigSetHash
+
+			// We will also cut all the votes that did not vote for the winning block.
+			for i, vote := range ctx.SigSetVotes {
+				if !bytes.Equal(vote.Hash, ctx.SigSetHash) {
+					ctx.SigSetVotes = append(ctx.SigSetVotes[:i], ctx.SigSetVotes[i+1:]...)
+				}
+			}
+
 			return nil
 		}
 	}

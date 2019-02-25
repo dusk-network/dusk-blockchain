@@ -58,8 +58,14 @@ func Block(ctx *user.Context) error {
 		return nil
 	}
 
-	if err := agreement.SendBlock(ctx); err != nil {
-		return err
+	select {
+	case <-ctx.QuitChan:
+		ctx.QuitChan <- true
+		break
+	default:
+		if err := agreement.SendBlock(ctx); err != nil {
+			return err
+		}
 	}
 
 	ctx.BlockStep++
