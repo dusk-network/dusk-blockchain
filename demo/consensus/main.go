@@ -66,7 +66,6 @@ func main() {
 		s.ctx.Reset()
 
 		// Block phase
-		fmt.Println("resulting: block phase")
 
 		// Block generation
 		if err := generation.Block(s.ctx); err != nil {
@@ -112,16 +111,13 @@ func main() {
 					os.Exit(1)
 				}
 
-				fmt.Printf("resulting hash from block reduction is %s\n",
-					hex.EncodeToString(s.ctx.BlockHash))
-
 				if !bytes.Equal(s.ctx.BlockHash, make([]byte, 32)) {
 					break
 				}
 
 				// If we did not get a result, increase the multiplier and
 				// exit the loop.
-				if s.ctx.Multiplier < 10 {
+				if s.ctx.Multiplier < 100 {
 					s.ctx.Multiplier = s.ctx.Multiplier * 2
 				}
 
@@ -138,11 +134,8 @@ func main() {
 			continue
 		}
 
-		fmt.Printf("resulting hash from block agreement is %s\n",
-			hex.EncodeToString(s.ctx.WinningBlockHash))
-
 		// Signature set phase
-		fmt.Println("resulting: signature set phase")
+		s.ctx.Multiplier = 1
 
 		if err := s.ctx.SetCommittee(s.ctx.SigSetStep); err != nil {
 			fmt.Printf("error: %v\n", err)
@@ -186,9 +179,6 @@ func main() {
 						fmt.Printf("error: %v\n", err)
 						os.Exit(1)
 					}
-
-					fmt.Printf("resulting: signature set hash is %s\n",
-						hex.EncodeToString(s.ctx.SigSetHash))
 				}
 
 				// Vote on received signature set
@@ -197,15 +187,12 @@ func main() {
 					os.Exit(1)
 				}
 
-				fmt.Printf("resulting: hash from signature set reduction is %s\n",
-					hex.EncodeToString(s.ctx.SigSetHash))
-
 				if !bytes.Equal(s.ctx.SigSetHash, make([]byte, 32)) {
 					break
 				}
 
 				// Increase multiplier
-				if s.ctx.Multiplier < 10 {
+				if s.ctx.Multiplier < 100 {
 					s.ctx.Multiplier = s.ctx.Multiplier * 2
 				}
 			}
