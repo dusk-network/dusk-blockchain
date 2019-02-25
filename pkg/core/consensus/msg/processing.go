@@ -37,9 +37,19 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 		return prerror.New(prerror.Low, errors.New("round mismatch"))
 	}
 
-	if ctx.Round < msg.Round || ctx.Step < msg.Step {
-		ctx.Queue.Put(msg.Round, msg.Step, msg)
-		return nil
+	switch msg.ID {
+	case consensusmsg.BlockAgreementID, consensusmsg.BlockReductionID,
+		consensusmsg.CandidateID, consensusmsg.CandidateScoreID:
+		if ctx.Round < msg.Round || ctx.BlockStep < msg.Step {
+			ctx.BlockQueue.Put(msg.Round, msg.Step, msg)
+			return nil
+		}
+	case consensusmsg.SigSetAgreementID, consensusmsg.SigSetCandidateID,
+		consensusmsg.SigSetReductionID:
+		if ctx.Round < msg.Round || ctx.SigSetStep < msg.Step {
+			ctx.SigSetQueue.Put(msg.Round, msg.Step, msg)
+			return nil
+		}
 	}
 
 	// Check if we're on the same chain
@@ -51,9 +61,26 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 	return verifyPayload(ctx, msg)
 }
 
-// ProcessQueue will process messages in the queue
-func ProcessQueue(ctx *user.Context) *prerror.PrError {
-	msgs := ctx.Queue.Get(ctx.Round, ctx.Step)
+// ProcessBlockQueue will process messages in the queue
+func ProcessBlockQueue(ctx *user.Context) *prerror.PrError {
+	msgs := ctx.BlockQueue.Get(ctx.Round, ctx.BlockStep)
+	if msgs == nil {
+		return nil
+	}
+
+	for _, m := range msgs {
+		err := Process(ctx, m)
+		if err != nil && err.Priority == prerror.High {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ProcessSigSetQueue will process messages in the queue
+func ProcessSigSetQueue(ctx *user.Context) *prerror.PrError {
+	msgs := ctx.SigSetQueue.Get(ctx.Round, ctx.SigSetStep)
 	if msgs == nil {
 		return nil
 	}
@@ -82,7 +109,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return nil
 	case consensusmsg.BlockReductionID:
 		// Check if we're on the same step
-		if ctx.Step > msg.Step {
+		if ctx.BlockStep > msg.Step {
 			return prerror.New(prerror.Low, errors.New("step mismatch"))
 		}
 
@@ -126,7 +153,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return nil
 	case consensusmsg.SigSetReductionID:
 		// Check if we're on the same step
-		if ctx.Step > msg.Step {
+		if ctx.SigSetStep > msg.Step {
 			return prerror.New(prerror.Low, errors.New("step mismatch"))
 		}
 
