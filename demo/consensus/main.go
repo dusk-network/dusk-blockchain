@@ -195,6 +195,8 @@ func main() {
 				if s.ctx.Multiplier < 100 {
 					s.ctx.Multiplier = s.ctx.Multiplier * 2
 				}
+
+				fmt.Println("no winning signature set hash")
 			}
 		}
 
@@ -202,7 +204,6 @@ func main() {
 		s.ctx.QuitChan = make(chan bool, 1)
 
 		if bytes.Equal(s.ctx.WinningSigSetHash, make([]byte, 32)) {
-			fmt.Println("no winning signature set hash")
 			s.ctx.StopChan <- true
 			continue
 		}
