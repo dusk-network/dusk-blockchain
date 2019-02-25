@@ -186,7 +186,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 			return prerror.New(prerror.Low, errors.New("wrong block hash"))
 		}
 
-		if err := verifyVoteSet(ctx, pl.VoteSet, pl.BlockHash, pl.Step); err != nil {
+		if err := verifyVoteSet(ctx, pl.VoteSet, pl.SetHash, pl.Step); err != nil {
 			return err
 		}
 
@@ -207,7 +207,7 @@ func verifySortition(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrEr
 	// Check what step this message is from, and reconstruct the committee
 	// for that step.
 	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, msg.Step,
-		uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
+		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return prerror.New(prerror.High, err)
 	}
@@ -231,13 +231,13 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 
 	// Create committees
 	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, step,
-		uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
+		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return prerror.New(prerror.High, err)
 	}
 
 	prevCommittee, err := sortition.CreateCommittee(ctx.Round, ctx.W, step-1,
-		uint8(len(ctx.CurrentCommittee)), ctx.Committee, ctx.NodeWeights)
+		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		return prerror.New(prerror.High, err)
 	}
