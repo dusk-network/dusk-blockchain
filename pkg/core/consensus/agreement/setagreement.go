@@ -127,7 +127,7 @@ func SendSigSet(ctx *user.Context) error {
 		return err
 	}
 
-	pl, err := consensusmsg.NewSigSetAgreement(ctx.BlockHash, hash, ctx.SigSetVotes,
+	pl, err := consensusmsg.NewSigSetAgreement(ctx.WinningBlockHash, hash, ctx.SigSetVotes,
 		ctx.Certificate.BRStep)
 	if err != nil {
 		return err
