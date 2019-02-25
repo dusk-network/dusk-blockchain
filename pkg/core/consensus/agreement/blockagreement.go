@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
 // Block is the function that runs during the block reduction phase, used
@@ -26,14 +24,6 @@ func Block(ctx *user.Context, c chan bool) {
 	voted := make(map[uint8]map[string]bool)
 
 	for {
-		// Empty queue
-		prErr := msg.ProcessBlockQueue(ctx)
-		if prErr != nil && prErr.Priority == prerror.High {
-			// Log
-			c <- false
-			return
-		}
-
 		select {
 		case <-ctx.StopChan:
 			return

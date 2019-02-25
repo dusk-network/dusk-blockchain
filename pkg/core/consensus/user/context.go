@@ -27,8 +27,8 @@ import (
 var (
 	maxMembers          = 200
 	MaxSteps      uint8 = 50
-	StepTime            = 500 * time.Millisecond
-	CandidateTime       = 500 * time.Millisecond
+	StepTime            = 100 * time.Millisecond
+	CandidateTime       = 100 * time.Millisecond
 	CommitteeSize uint8 = 50
 )
 
@@ -161,6 +161,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		NodeWeights:         make(map[string]uint64),
 		NodeBLS:             make(map[string][]byte),
 		WinningBlockHash:    make([]byte, 32),
+		SigSetHash:          make([]byte, 32),
 	}
 
 	ctx.setLastHeader()
@@ -181,7 +182,7 @@ func (c *Context) Reset() {
 	c.BlockHash = nil
 	c.WinningBlockHash = make([]byte, 32)
 	c.BlockVotes = nil
-	c.SigSetHash = nil
+	c.SigSetHash = make([]byte, 32)
 	c.WinningSigSetHash = nil
 	c.SigSetVotes = nil
 	c.CandidateBlock = &block.Block{}
