@@ -32,7 +32,7 @@ func SignatureSet(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.Step++
+	ctx.SigSetStep++
 
 	// Vote on collected signature set
 	if err := sigSetVote(ctx); err != nil {
@@ -54,7 +54,7 @@ func SignatureSet(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.Step++
+	ctx.SigSetStep++
 
 	return nil
 }
@@ -67,7 +67,7 @@ func sigSetVote(ctx *user.Context) error {
 		return nil
 	default:
 		// Set committee first
-		if err := ctx.SetCommittee(); err != nil {
+		if err := ctx.SetCommittee(ctx.SigSetStep); err != nil {
 			return err
 		}
 
@@ -90,13 +90,13 @@ func sigSetVote(ctx *user.Context) error {
 			return err
 		}
 
-		sigEd, err := ctx.CreateSignature(pl)
+		sigEd, err := ctx.CreateSignature(pl, ctx.SigSetStep)
 		if err != nil {
 			return err
 		}
 
-		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step,
-			sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+			ctx.SigSetStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func countSigSetVotes(ctx *user.Context) error {
 	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
 
 	// Empty queue
-	prErr := msg.ProcessQueue(ctx)
+	prErr := msg.ProcessSigSetQueue(ctx)
 	if prErr != nil && prErr.Priority == prerror.High {
 		return prErr.Err
 	}
@@ -135,7 +135,7 @@ func countSigSetVotes(ctx *user.Context) error {
 			ctx.SigSetHash = make([]byte, 32)
 			return nil
 		case m := <-ctx.SigSetReductionChan:
-			if m.Round != ctx.Round || m.Step != ctx.Step {
+			if m.Round != ctx.Round || m.Step != ctx.SigSetStep {
 				break
 			}
 

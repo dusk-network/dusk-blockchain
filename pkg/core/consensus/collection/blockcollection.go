@@ -20,14 +20,14 @@ func Block(ctx *user.Context) error {
 	timer := time.NewTimer(user.CandidateTime * (time.Duration(ctx.Multiplier)))
 
 	// Process queue
-	if err := msg.ProcessQueue(ctx); err != nil {
+	if err := msg.ProcessBlockQueue(ctx); err != nil {
 		return err
 	}
 
 	for {
 		select {
 		case <-timer.C:
-			ctx.Step++
+			ctx.BlockStep++
 			return nil
 		case m := <-ctx.CandidateScoreChan:
 			if m.Round != ctx.Round {

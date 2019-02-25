@@ -123,7 +123,7 @@ func (c *Consensus) consensus() {
 	}
 
 	// Block inner loop
-	for c.ctx.Step < user.MaxSteps {
+	for c.ctx.BlockStep < user.MaxSteps {
 		select {
 		case v := <-ch:
 			// If it was false, something went wrong and we should quit
@@ -135,7 +135,7 @@ func (c *Consensus) consensus() {
 
 			// If not, we proceed to the next phase by maxing out the
 			// step counter.
-			c.ctx.Step = user.MaxSteps
+			c.ctx.BlockStep = user.MaxSteps
 		default:
 			// Vote on received block. The context object should hold a winning
 			// block hash after this function returns.
@@ -151,7 +151,7 @@ func (c *Consensus) consensus() {
 
 			// If we did not get a result, increase the multiplier and
 			// exit the loop.
-			c.ctx.Step = user.MaxSteps
+			c.ctx.BlockStep = user.MaxSteps
 			if c.ctx.Multiplier < 10 {
 				c.ctx.Multiplier = c.ctx.Multiplier * 2
 			}
@@ -169,14 +169,11 @@ func (c *Consensus) consensus() {
 		return
 	}
 
-	// Reset step counter
-	c.ctx.Step = 1
-
 	// Fire off parallel set agreement phase
 	go agreement.SignatureSet(c.ctx, ch)
 
 	// Signature set inner loop
-	for c.ctx.Step < user.MaxSteps {
+	for c.ctx.SigSetStep < user.MaxSteps {
 		select {
 		case v := <-ch:
 			// If it was false, something went wrong and we should quit

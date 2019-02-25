@@ -40,8 +40,9 @@ type Context struct {
 	Version    uint32
 	Tau        uint64
 	Threshold  uint64
-	Round      uint64        // Current round
-	Step       uint8         // Current step
+	Round      uint64 // Current round
+	BlockStep  uint8  // Current step
+	SigSetStep uint8
 	Seed       []byte        // Round seed
 	LastHeader *block.Header // Previous block
 	K          []byte        // secret
@@ -89,7 +90,8 @@ type Context struct {
 	StopChan            chan bool
 
 	// Message queue
-	*Queue
+	BlockQueue  *Queue
+	SigSetQueue *Queue
 
 	// General functions
 	GetAllTXs   func() []*transactions.Stealth
@@ -115,15 +117,21 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		return nil, errors.New("context: one of the keys to be used during the consensus is nil")
 	}
 
-	queue := &Queue{
+	blockQueue := &Queue{
 		Map: new(sync.Map),
 	}
+
+	sigSetQueue := &Queue{
+		Map: new(sync.Map),
+	}
+
 	ctx := &Context{
 		Version:             10000, // Placeholder
 		Tau:                 tau,
 		Threshold:           totalWeight / 5, // Placeholder
 		Round:               round,
-		Step:                1,
+		BlockStep:           1,
+		SigSetStep:          1,
 		Seed:                seed,
 		Magic:               magic,
 		Multiplier:          1,
@@ -139,7 +147,8 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
 		QuitChan:            make(chan bool, 1),
 		StopChan:            make(chan bool, 1),
-		Queue:               queue,
+		BlockQueue:          blockQueue,
+		SigSetQueue:         sigSetQueue,
 		W:                   totalWeight,
 		GetAllTXs:           getAllTXs,
 		HashVotes:           hashVotes,
@@ -176,7 +185,6 @@ func (c *Context) Reset() {
 	c.WinningSigSetHash = nil
 	c.SigSetVotes = nil
 	c.CandidateBlock = &block.Block{}
-	c.Step = 1
 	c.Certificate = &block.Certificate{}
 }
 
@@ -195,12 +203,12 @@ func (c *Context) Clear() {
 
 // CreateSignature will return the byte representation of a consensus message that
 // is signed with Ed25519.
-func (c *Context) CreateSignature(pl consensusmsg.Msg) ([]byte, error) {
+func (c *Context) CreateSignature(pl consensusmsg.Msg, step uint8) ([]byte, error) {
 	edMsg := make([]byte, 12)
 	binary.LittleEndian.PutUint32(edMsg[0:], c.Version)
 	binary.LittleEndian.PutUint64(edMsg[4:], c.Round)
 	edMsg = append(edMsg, c.LastHeader.Hash...)
-	edMsg = append(edMsg, byte(c.Step))
+	edMsg = append(edMsg, byte(step))
 	edMsg = append(edMsg, byte(pl.Type()))
 	buf := new(bytes.Buffer)
 	if err := pl.Encode(buf); err != nil {
@@ -211,14 +219,14 @@ func (c *Context) CreateSignature(pl consensusmsg.Msg) ([]byte, error) {
 	return c.EDSign(c.Keys.EdSecretKey, edMsg), nil
 }
 
-// SetCommittee will set the committee for the current step
-func (c *Context) SetCommittee() error {
+// SetCommittee will set the committee for the given step
+func (c *Context) SetCommittee(step uint8) error {
 	size := CommitteeSize
 	if len(c.Committee) < int(CommitteeSize) {
 		size = uint8(len(c.Committee))
 	}
 
-	currentCommittee, err := sortition.CreateCommittee(c.Round, c.W, c.Step, size,
+	currentCommittee, err := sortition.CreateCommittee(c.Round, c.W, step, size,
 		c.Committee, c.NodeWeights)
 	if err != nil {
 		return err

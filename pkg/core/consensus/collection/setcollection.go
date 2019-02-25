@@ -20,14 +20,14 @@ func SignatureSet(ctx *user.Context) error {
 	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
 
 	// Process queue
-	if err := msg.ProcessQueue(ctx); err != nil {
+	if err := msg.ProcessSigSetQueue(ctx); err != nil {
 		return err
 	}
 
 	for {
 		select {
 		case <-timer.C:
-			ctx.Step++
+			ctx.SigSetStep++
 			return nil
 		case m := <-ctx.SigSetCandidateChan:
 			if m.Round != ctx.Round {

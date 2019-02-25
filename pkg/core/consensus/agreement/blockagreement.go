@@ -27,7 +27,7 @@ func Block(ctx *user.Context, c chan bool) {
 
 	for {
 		// Empty queue
-		prErr := msg.ProcessQueue(ctx)
+		prErr := msg.ProcessBlockQueue(ctx)
 		if prErr != nil && prErr.Priority == prerror.High {
 			// Log
 			c <- false
@@ -148,13 +148,13 @@ func SendBlock(ctx *user.Context) error {
 		return err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl)
+	sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
 	if err != nil {
 		return err
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.BlockStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}

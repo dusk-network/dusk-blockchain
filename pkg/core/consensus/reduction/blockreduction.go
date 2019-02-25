@@ -3,8 +3,11 @@ package reduction
 import (
 	"bytes"
 	"encoding/hex"
+<<<<<<< HEAD
 	"fmt"
 	"math/rand"
+=======
+>>>>>>> b5763e615339514912bd243f4b308dd48c3149a5
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -42,7 +45,7 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.Step++
+	ctx.BlockStep++
 
 	// Vote on passed block
 	if err := blockVote(ctx); err != nil {
@@ -64,7 +67,7 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.Step++
+	ctx.BlockStep++
 
 	return nil
 }
@@ -77,7 +80,7 @@ func blockVote(ctx *user.Context) error {
 		return nil
 	default:
 		// Set committee first
-		if err := ctx.SetCommittee(); err != nil {
+		if err := ctx.SetCommittee(ctx.BlockStep); err != nil {
 			return err
 		}
 
@@ -101,21 +104,17 @@ func blockVote(ctx *user.Context) error {
 				return err
 			}
 
-			// Sign the payload
-			sigEd, err := ctx.CreateSignature(pl)
-			if err != nil {
-				return err
-			}
+		// Sign the payload
+		sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
+		if err != nil {
+			return err
+		}
 
-			// Create message
-			msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.Step, sigEd,
-				[]byte(*ctx.Keys.EdPubKey), pl)
-			if err != nil {
-				return err
-			}
-
-			ctx.BlockReductionChan <- msg
-			return nil
+		// Create message
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.BlockStep, sigEd,
+			[]byte(*ctx.Keys.EdPubKey), pl)
+		if err != nil {
+			return err
 		}
 
 		fmt.Println("resulting: skipping")
@@ -137,7 +136,7 @@ func countBlockVotes(ctx *user.Context) error {
 	timer := time.NewTimer(user.StepTime * (time.Duration(ctx.Multiplier)))
 
 	// Empty queue
-	prErr := msg.ProcessQueue(ctx)
+	prErr := msg.ProcessBlockQueue(ctx)
 	if prErr != nil && prErr.Priority == prerror.High {
 		return prErr.Err
 	}
@@ -149,17 +148,16 @@ func countBlockVotes(ctx *user.Context) error {
 			ctx.QuitChan <- true
 			return nil
 		case <-timer.C:
-			fmt.Println("timed out")
 			ctx.BlockHash = make([]byte, 32)
 			return nil
 		case m := <-ctx.BlockReductionChan:
-			if m.Round != ctx.Round || m.Step != ctx.Step {
+			if m.Round != ctx.Round || m.Step != ctx.BlockStep {
 				break
 			}
 
 			pl := m.Payload.(*consensusmsg.BlockReduction)
 			pkEd := hex.EncodeToString(m.PubKey)
-			fmt.Printf("voting received %s\n", hex.EncodeToString(pl.BlockHash))
+
 			// Check if this node's vote is already recorded
 			if voters[pkEd] {
 				break
@@ -172,7 +170,8 @@ func countBlockVotes(ctx *user.Context) error {
 			voters[pkEd] = true
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
-			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS, pl.SigBLS, ctx.Step)
+			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS,
+				pl.SigBLS, ctx.BlockStep)
 			if err != nil {
 				return err
 			}
