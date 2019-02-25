@@ -72,7 +72,12 @@ func Block(ctx *user.Context, c chan bool) {
 			}
 
 			// Check if we have exceeded the limit.
-			limit := float64(len(ctx.CurrentCommittee)) * 0.75
+			size := len(ctx.Committee)
+			if size > 50 {
+				size = 50
+			}
+
+			limit := float64(size) * 0.75
 			if counter[m.Step] < int(limit) {
 				break
 			}
