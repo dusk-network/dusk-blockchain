@@ -39,10 +39,9 @@ type Context struct {
 	// Common variables
 	Version    uint32
 	Tau        uint64
-	Threshold  uint64
-	Round      uint64 // Current round
-	BlockStep  uint8  // Current step
-	SigSetStep uint8
+	Round      uint64        // Current round
+	BlockStep  uint32        // Current step of block phase
+	SigSetStep uint32        // Current step of signature set phase
 	Seed       []byte        // Round seed
 	LastHeader *block.Header // Previous block
 	K          []byte        // secret
@@ -53,7 +52,7 @@ type Context struct {
 	// Block generator values
 	D          uint64 // bidWeight
 	X, Y, Z, M []byte
-	Q          uint64
+	Q          []byte
 
 	// Provisioner values
 	/// General
@@ -78,6 +77,8 @@ type Context struct {
 	CurrentCommittee [][]byte          // Set of public keys of committee members for a current step
 	NodeWeights      map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
 	NodeBLS          map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
+	SortedPubList    [][]byte          // Bidder public list which lexicographically sorts all values
+	PubList          []byte
 
 	/// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
@@ -126,10 +127,14 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Map: new(sync.Map),
 	}
 
+	k, err := crypto.RandEntropy(32)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx := &Context{
 		Version:             10000, // Placeholder
 		Tau:                 tau,
-		Threshold:           totalWeight / 5, // Placeholder
 		Round:               round,
 		BlockStep:           1,
 		SigSetStep:          1,
@@ -139,6 +144,10 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		CandidateBlock:      &block.Block{},
 		Certificate:         &block.Certificate{},
 		D:                   d,
+		K:                   k,
+		X:                   make([]byte, 32),
+		Y:                   make([]byte, 32),
+		Q:                   make([]byte, 32),
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
 		CandidateChan:       make(chan *payload.MsgConsensus, 100),
 		BlockReductionChan:  make(chan *payload.MsgConsensus, 100),
@@ -172,12 +181,11 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 // Reset removes all information that was generated during the consensus
 func (c *Context) Reset() {
 	// Block generator
-	c.K = nil
-	c.X = nil
-	c.Y = nil
+	c.X = make([]byte, 32)
+	c.Y = make([]byte, 32)
 	c.Z = nil
 	c.M = nil
-	c.Q = 0
+	c.Q = make([]byte, 32)
 
 	// Provisioner
 	c.BlockHash = nil
