@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -100,7 +103,16 @@ func ProcessSigSetQueue(ctx *user.Context) *prerror.PrError {
 func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateScoreID:
-		// TODO: add actual verification code for score messages
+		pl := msg.Payload.(*consensusmsg.CandidateScore)
+		if !zkproof.Verify(ctx, pl.Proof, pl.Seed, pl.Score, pl.ZImg) {
+			return prerror.New(prerror.Low, errors.New("proof verification failed"))
+		}
+
+		score := big.NewInt(0).SetBytes(pl.Score).Uint64()
+		if score < ctx.Tau {
+			return prerror.New(prerror.Low, errors.New("candidate score below threshold"))
+		}
+
 		ctx.CandidateScoreChan <- msg
 		return nil
 	case consensusmsg.CandidateID:
