@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"sync/atomic"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
@@ -99,21 +100,6 @@ func (c *Consensus) consensus() {
 	// First we reset our context values
 	c.ctx.Reset()
 
-	if c.generator {
-		// Generate block and score, and propagate
-		if err := generation.Block(c.ctx); err != nil {
-			// Log
-			c.generator = false
-			return
-		}
-	}
-
-	if err := collection.Block(c.ctx); err != nil {
-		// Log
-		c.StopProvisioning()
-		return
-	}
-
 	// Set up a channel that we can get agreement results from
 	ch := make(chan bool, 1)
 
@@ -123,7 +109,8 @@ func (c *Consensus) consensus() {
 	}
 
 	// Block inner loop
-	for c.ctx.BlockStep < user.MaxSteps {
+block:
+	for atomic.LoadUint32(&c.ctx.BlockStep) < user.MaxSteps {
 		select {
 		case v := <-ch:
 			// If it was false, something went wrong and we should quit
@@ -135,8 +122,27 @@ func (c *Consensus) consensus() {
 
 			// If not, we proceed to the next phase by maxing out the
 			// step counter.
-			c.ctx.BlockStep = user.MaxSteps
+			break block
 		default:
+			if bytes.Equal(c.ctx.BlockHash, make([]byte, 32)) {
+				if c.generator {
+					// Generate block and score, and propagate
+					if err := generation.Block(c.ctx); err != nil {
+						// Log
+						c.generator = false
+						return
+					}
+				}
+
+				if err := collection.Block(c.ctx); err != nil {
+					// Log
+					c.StopProvisioning()
+					return
+				}
+			}
+
+			atomic.AddUint32(&c.ctx.BlockStep, 1)
+
 			// Vote on received block. The context object should hold a winning
 			// block hash after this function returns.
 			if err := reduction.Block(c.ctx); err != nil {
@@ -145,23 +151,18 @@ func (c *Consensus) consensus() {
 				return
 			}
 
-			if c.ctx.BlockHash != nil {
-				continue
-			}
-
-			// If we did not get a result, increase the multiplier and
-			// exit the loop.
-			c.ctx.BlockStep = user.MaxSteps
-			if c.ctx.Multiplier < 10 {
-				c.ctx.Multiplier = c.ctx.Multiplier * 2
+			if !bytes.Equal(c.ctx.WinningBlockHash, make([]byte, 32)) {
+				break
 			}
 		}
 	}
 
+	// Empty QuitChan
+	c.ctx.QuitChan = make(chan bool, 1)
+
 	// If we did not get a result, restart the consensus from block generation.
-	if c.ctx.BlockHash == nil {
-		c.RoundChan <- 1
-		return
+	if bytes.Equal(c.ctx.WinningBlockHash, make([]byte, 32)) {
+		goto block
 	}
 
 	// Block generators don't need to keep up after this point
@@ -169,11 +170,15 @@ func (c *Consensus) consensus() {
 		return
 	}
 
+	// Signature set phase
+	c.ctx.Multiplier = 1
+
 	// Fire off parallel set agreement phase
 	go agreement.SignatureSet(c.ctx, ch)
 
 	// Signature set inner loop
-	for c.ctx.SigSetStep < user.MaxSteps {
+sigset:
+	for atomic.LoadUint32(&c.ctx.SigSetStep) < user.MaxSteps {
 		select {
 		case v := <-ch:
 			// If it was false, something went wrong and we should quit
@@ -185,21 +190,21 @@ func (c *Consensus) consensus() {
 
 			// Propagate block
 			// TODO: set signature
-			if bytes.Equal(c.ctx.BlockHash, c.ctx.CandidateBlock.Header.Hash) {
-				m := payload.NewMsgInv()
-				m.AddBlock(c.ctx.CandidateBlock)
-				if err := c.ctx.SendMessage(c.ctx.Magic, m); err != nil {
-					// Log
-					c.StopProvisioning()
-					return
-				}
-			}
+			// if bytes.Equal(c.ctx.BlockHash, c.ctx.CandidateBlock.Header.Hash) {
+			// 	m := payload.NewMsgInv()
+			// 	m.AddBlock(c.ctx.CandidateBlock)
+			// 	if err := c.ctx.SendMessage(c.ctx.Magic, m); err != nil {
+			// 		// Log
+			// 		c.StopProvisioning()
+			// 		return
+			// 	}
+			// }
 
-			return
+			break sigset
 		default:
 			// If this is the first step, or if we returned without a decisive vote,
 			// collect signature sets
-			if c.ctx.SigSetHash == nil {
+			if bytes.Equal(c.ctx.SigSetHash, make([]byte, 32)) {
 				if err := generation.SignatureSet(c.ctx); err != nil {
 					// Log
 					c.StopProvisioning()
@@ -213,6 +218,8 @@ func (c *Consensus) consensus() {
 				}
 			}
 
+			atomic.AddUint32(&c.ctx.SigSetStep, 1)
+
 			// Vote on received signature set
 			if err := reduction.SignatureSet(c.ctx); err != nil {
 				// Log
@@ -220,15 +227,28 @@ func (c *Consensus) consensus() {
 				return
 			}
 
-			// Increase multiplier
-			if c.ctx.Multiplier < 10 {
-				c.ctx.Multiplier = c.ctx.Multiplier * 2
+			if !bytes.Equal(c.ctx.WinningSigSetHash, make([]byte, 32)) {
+				break
 			}
 		}
 	}
 
-	// Reset multiplier
+	// Empty QuitChan
+	c.ctx.QuitChan = make(chan bool, 1)
+
+	if bytes.Equal(c.ctx.WinningSigSetHash, make([]byte, 32)) {
+		c.ctx.StopChan <- true
+		goto block
+	}
+
+	// Reset
 	c.ctx.Multiplier = 1
+	c.ctx.BlockQueue.Map.Delete(c.ctx.Round)
+	c.ctx.SigSetQueue.Map.Delete(c.ctx.Round)
+	atomic.StoreUint32(&c.ctx.BlockStep, 1)
+	atomic.StoreUint32(&c.ctx.SigSetStep, 1)
+
+	c.ctx.Round++
 }
 
 func (c *Consensus) StartGenerating() error {
