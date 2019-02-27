@@ -21,7 +21,7 @@ func TestDeterministicSortition(t *testing.T) {
 	}
 
 	// Run sortition to get 50 members out
-	committee, err := sortition.CreateCommittee(100, 50000, 1, 50, members, stakes)
+	committee, err := sortition.CreateCommittee(100, 50000, 1, members, stakes)
 	if err != nil {
 		t.Fatal(err)
 	}
