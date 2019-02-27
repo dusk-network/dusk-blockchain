@@ -12,7 +12,7 @@ type Queue struct {
 }
 
 // Get will get all the messages for a certain round and step
-func (q *Queue) Get(round uint64, step uint8) []*payload.MsgConsensus {
+func (q *Queue) Get(round uint64, step uint32) []*payload.MsgConsensus {
 	m, ok := q.Load(round)
 	if !ok {
 		return nil
@@ -27,7 +27,7 @@ func (q *Queue) Get(round uint64, step uint8) []*payload.MsgConsensus {
 }
 
 // Put will put a message in the array for the designated round and step
-func (q *Queue) Put(round uint64, step uint8, msg *payload.MsgConsensus) {
+func (q *Queue) Put(round uint64, step uint32, msg *payload.MsgConsensus) {
 	m, ok := q.Load(round)
 	if !ok {
 		newMap := new(sync.Map)

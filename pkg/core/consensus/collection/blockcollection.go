@@ -2,6 +2,7 @@ package collection
 
 import (
 	"bytes"
+	"sync/atomic"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -27,7 +28,7 @@ func Block(ctx *user.Context) error {
 	for {
 		select {
 		case <-timer.C:
-			ctx.BlockStep++
+			atomic.AddUint32(&ctx.BlockStep, 1)
 			return nil
 		case m := <-ctx.CandidateScoreChan:
 			if m.Round != ctx.Round {

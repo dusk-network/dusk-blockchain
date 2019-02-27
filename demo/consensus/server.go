@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -22,18 +24,18 @@ import (
 
 // Server is the node server
 type Server struct {
-	nonce uint64
-	peers []*peermgr.Peer
-	tx    *transactions.Stealth
-	cfg   *peermgr.Config
-	ctx   *user.Context
-	wg    sync.WaitGroup
+	nonce   uint64
+	port    string
+	msgChan chan string
+	peers   []*peermgr.Peer
+	tx      *transactions.Stealth
+	cfg     *peermgr.Config
+	ctx     *user.Context
+	wg      sync.WaitGroup
 }
 
 // OnAccept is the function that runs when a node tries to connect with us
 func (s *Server) OnAccept(conn net.Conn) {
-	fmt.Printf("someone has tried to connect to us, with the address %s\n", conn.RemoteAddr().String())
-
 	// Add peer to server's list of peers
 	peer := peermgr.NewPeer(conn, true, s.cfg)
 	peer.Run()
@@ -50,8 +52,6 @@ func (s *Server) OnAccept(conn net.Conn) {
 
 // OnConnection is the function that runs when we connect to another node
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	fmt.Printf("we have connected to the node with the address %s\n", conn.RemoteAddr().String())
-
 	// Add peer to server's list of peers
 	peer := peermgr.NewPeer(conn, false, s.cfg)
 	peer.Run()
@@ -78,9 +78,6 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 // This is currently only used for stake transactions, so we will always infer
 // that a received MsgTx contains a Stake TypeInfo.
 func (s *Server) OnTx(peer *peermgr.Peer, msg *payload.MsgTx) {
-
-	fmt.Printf("[TX] Received a tx from node with address %s\n", peer.RemoteAddr().String())
-
 	// Put information into our context object
 	pl := msg.Tx.TypeInfo.(*transactions.Stake)
 	s.ctx.Committee = append(s.ctx.Committee, pl.PubKeyEd)
@@ -124,6 +121,30 @@ func setupPeerConfig(s *Server, nonce uint64) *peermgr.Config {
 }
 
 func (s *Server) sendMessage(magic protocol.Magic, p wire.Payload) error {
+	var t string
+	t = string(p.Command())
+
+	if p.Command() == "consensus" {
+		msg := p.(*payload.MsgConsensus)
+		switch msg.ID {
+		case consensusmsg.BlockAgreementID:
+			t = "Block Agreement"
+		case consensusmsg.BlockReductionID:
+			t = "Block Reduction"
+		case consensusmsg.CandidateID:
+			t = "Block Candidate"
+		case consensusmsg.CandidateScoreID:
+			t = "Block Candidate Score"
+		case consensusmsg.SigSetAgreementID:
+			t = "Signature Set Agreement"
+		case consensusmsg.SigSetCandidateID:
+			t = "Signature Set Candidate"
+		case consensusmsg.SigSetReductionID:
+			t = "Signature Set Reduction"
+		}
+	}
+
+	s.msgChan <- fmt.Sprintf("%s: sending %s message to committee\n", s.port, t)
 	for _, peer := range s.peers {
 		if err := peer.WriteConsensus(p); err != nil {
 			return err
@@ -137,10 +158,6 @@ func (s *Server) process(m *payload.MsgConsensus) error {
 	err := msg.Process(s.ctx, m)
 	if err != nil && err.Priority == prerror.High {
 		return err.Err
-	}
-
-	if err != nil {
-		fmt.Println(err)
 	}
 
 	return nil

@@ -7,7 +7,12 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/demo/consensus/ui"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 
@@ -27,22 +32,59 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 )
 
+type registry struct {
+	*ui.UI
+}
+
+func (r *registry) register(num int, s *Server) {
+	node := &ui.Node{
+		Online:    true,
+		Port:      s.port,
+		Phase:     "Block Generation",
+		Step:      s.ctx.BlockStep,
+		Round:     s.ctx.Round,
+		Weight:    s.ctx.Weight,
+		LastBlock: hex.EncodeToString(s.ctx.LastHeader.Hash),
+	}
+
+	r.UI.Nodes.Store(num, node)
+}
+
 func main() {
+	r := &registry{
+		UI: &ui.UI{
+			Nodes:     &sync.Map{},
+			LogChan:   make(chan string, 100),
+			ChainChan: make(chan string, 100),
+			BlockTime: make(chan int64, 1),
+			BlockChan: make(chan *block.Block, 100),
+		},
+	}
 
-	rand.Seed(time.Now().UTC().UnixNano())
+	spawn(r)
 
-	// randWait := rand.Float64() * 2.0
-
-	numNodes, port, peers := getPortPeers()
-
-	nodes, err := strconv.Atoi(numNodes)
-	if err != nil {
+	if err := ui.Run(r.UI); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
 
-	s := setupServer(nodes)
+func spawn(r *registry) {
+	rand.Seed(time.Now().UTC().UnixNano())
+	var peers []string
+	port := 2000
+	for i := 1; i < 9; i++ {
+		go runNode(r, i, strconv.Itoa(port), peers)
+		peers = append(peers, strconv.Itoa(port))
+		r.UI.NodeStrings = append(r.UI.NodeStrings, "["+strconv.Itoa(i)+"] [127.0.0.1:"+strconv.Itoa(port)+"](fg-blue)")
+		port++
+		time.Sleep(250 * time.Millisecond)
+	}
+}
 
+func runNode(r *registry, num int, port string, peers []string) {
+	s := setupServer(7)
+	s.port = port
 	s.ctx = setupContext(s)
 
 	// setup connection manager struct
@@ -54,11 +96,49 @@ func main() {
 		}
 	}
 
+	var phase string
+
+	// Register the node
+	r.register(num, s)
+
+	// Set up updating routine
+	go func(r *registry, s *Server) {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		for {
+			select {
+			case <-ticker.C:
+				v, ok := r.UI.Nodes.Load(num)
+				if !ok {
+					os.Exit(1)
+				}
+
+				node := v.(*ui.Node)
+				round := atomic.LoadUint64(&s.ctx.Round)
+				node.Round = round
+				node.LastBlock = hex.EncodeToString(s.ctx.LastHeader.Hash)[0:16] + "..."
+				if strings.Contains(node.Phase, "Block") {
+					node.Step = atomic.LoadUint32(&s.ctx.BlockStep)
+				} else {
+					node.Step = atomic.LoadUint32(&s.ctx.SigSetStep)
+				}
+
+				node.Phase = phase
+
+				// Get out log messages
+				for len(s.msgChan) > 0 {
+					msg := <-s.msgChan
+					r.LogChan <- msg
+				}
+
+				r.UI.Nodes.Store(num, node)
+			}
+		}
+	}(r, s)
+
 	// wait for a connection, so we can start off simultaneously with another node
 	s.wg.Wait()
 
-	// Set up a random amount of latency to start off with
-	// time.Sleep(time.Duration(randWait) * time.Second)
+	r.UI.LastTime = time.Now().Unix()
 
 	// Trigger consensus loop
 	for {
@@ -67,55 +147,46 @@ func main() {
 
 		// Block phase
 
-		// Block generation
-		if err := generation.Block(s.ctx); err != nil {
-			fmt.Printf("error: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("our generated block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
-		if err := s.ctx.SetCommittee(s.ctx.BlockStep); err != nil {
-			fmt.Printf("error: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Block collection
-		if err := collection.Block(s.ctx); err != nil {
-			fmt.Printf("error: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("resulting block is %s\n", hex.EncodeToString(s.ctx.BlockHash))
-
 		// Start block agreement concurrently
 		c := make(chan bool, 1)
 		go agreement.Block(s.ctx, c)
 
 	block:
-		for s.ctx.BlockStep < user.MaxSteps {
+		for atomic.LoadUint32(&s.ctx.BlockStep) < user.MaxSteps {
 			select {
 			case v := <-c:
 				// If it was false, something went wrong and we should quit
 				if !v {
-					fmt.Println("error encountered during block agreement")
 					os.Exit(1)
 				}
 
 				// If not, we proceed to the next phase
 				break block
 			default:
-				// Vote on received block. The context object should hold a winning
-				// block hash after this function returns.
-				if err := reduction.Block(s.ctx); err != nil {
-					fmt.Printf("error: %v\n", err)
+				phase = "Block Generation"
+				if err := generation.Block(s.ctx); err != nil {
+					fmt.Println(err)
 					os.Exit(1)
 				}
 
-				if !bytes.Equal(s.ctx.BlockHash, make([]byte, 32)) {
-					break
+				// Block collection
+				phase = "Block Collection"
+				if err := collection.Block(s.ctx); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
 				}
 
-				break block
+				// Vote on received block. The context object should hold a winning
+				// block hash after this function returns.
+				phase = "Block Reduction/Agreement"
+				if err := reduction.Block(s.ctx); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+
+				if !bytes.Equal(s.ctx.WinningBlockHash, make([]byte, 32)) {
+					break
+				}
 			}
 		}
 
@@ -123,30 +194,22 @@ func main() {
 		s.ctx.QuitChan = make(chan bool, 1)
 
 		if bytes.Equal(s.ctx.WinningBlockHash, make([]byte, 32)) {
-			fmt.Println("no winning block hash")
-			s.ctx.StopChan <- true
 			continue
 		}
 
 		// Signature set phase
 		s.ctx.Multiplier = 1
 
-		if err := s.ctx.SetCommittee(s.ctx.SigSetStep); err != nil {
-			fmt.Printf("error: %v\n", err)
-			os.Exit(1)
-		}
-
 		// Fire off parallel set agreement phase
 		c = make(chan bool, 1)
 		go agreement.SignatureSet(s.ctx, c)
 
 	sigset:
-		for s.ctx.SigSetStep < user.MaxSteps {
+		for atomic.LoadUint32(&s.ctx.SigSetStep) < user.MaxSteps {
 			select {
 			case v := <-c:
 				// If it was false, something went wrong and we should quit
 				if !v {
-					fmt.Println("error encountered during signature set agreement")
 					os.Exit(1)
 				}
 
@@ -163,29 +226,29 @@ func main() {
 
 				break sigset
 			default:
-				if bytes.Equal(s.ctx.SigSetHash, make([]byte, 32)) {
+				if bytes.Equal(s.ctx.WinningSigSetHash, make([]byte, 32)) {
+					phase = "Signature Set Collection/Agreement"
 					if err := generation.SignatureSet(s.ctx); err != nil {
-						fmt.Printf("error: %v\n", err)
+						fmt.Println(err)
 						os.Exit(1)
 					}
 
 					if err := collection.SignatureSet(s.ctx); err != nil {
-						fmt.Printf("error: %v\n", err)
+						fmt.Println(err)
 						os.Exit(1)
 					}
 				}
 
 				// Vote on received signature set
+				phase = "Signature Set Reduction/Agreement"
 				if err := reduction.SignatureSet(s.ctx); err != nil {
-					fmt.Printf("error: %v\n", err)
+					fmt.Println(err)
 					os.Exit(1)
 				}
 
 				if !bytes.Equal(s.ctx.SigSetHash, make([]byte, 32)) {
 					break
 				}
-
-				fmt.Println("no winning signature set hash")
 			}
 		}
 
@@ -197,9 +260,6 @@ func main() {
 			continue
 		}
 
-		fmt.Printf("[FINAL RESULTS ROUND %v]\n\tblock hash: %s\n\tsignature set hash: %s\n",
-			s.ctx.Round, hex.EncodeToString(s.ctx.WinningBlockHash), hex.EncodeToString(s.ctx.WinningSigSetHash))
-
 		s.ctx.LastHeader.Height = s.ctx.Round
 		s.ctx.LastHeader.Hash = s.ctx.WinningBlockHash
 		s.ctx.Seed = s.ctx.CandidateBlock.Header.Seed
@@ -207,8 +267,14 @@ func main() {
 		s.ctx.BlockQueue.Map.Delete(s.ctx.Round)
 		s.ctx.SigSetQueue.Map.Delete(s.ctx.Round)
 		s.ctx.Multiplier = 1
-		s.ctx.BlockStep = 1
-		s.ctx.SigSetStep = 1
+		atomic.StoreUint32(&s.ctx.BlockStep, 1)
+		atomic.StoreUint32(&s.ctx.SigSetStep, 1)
+		r.UI.ChainChan <- fmt.Sprintf("%v - %s...\n", s.ctx.LastHeader.Height, hex.EncodeToString(s.ctx.WinningBlockHash)[0:16])
+		r.UI.BlockChan <- s.ctx.CandidateBlock
+
+		if num == 1 {
+			r.UI.BlockTime <- time.Now().Unix()
+		}
 
 		s.ctx.Round++
 	}
@@ -216,31 +282,32 @@ func main() {
 
 // gets the port and peers to connect to
 // from the command line arguments
-func getPortPeers() (string, string, []string) {
-	if len(os.Args) < 3 { // [programName, nodes,port,...]
-		fmt.Println("Please enter more arguments")
-		os.Exit(1)
-	}
+// func getPortPeers() (string, string, []string) {
+// 	if len(os.Args) < 3 { // [programName, nodes,port,...]
+// 		fmt.Println("Please enter more arguments")
+// 		os.Exit(1)
+// 	}
 
-	args := os.Args[1:] // Remove program name leaving [nodes, port, peers...]
+// 	args := os.Args[1:] // Remove program name leaving [nodes, port, peers...]
 
-	nodes := args[0]
-	port := args[1]
+// 	nodes := args[0]
+// 	port := args[1]
 
-	var peers []string
-	if len(args) > 2 {
-		peers = args[2:]
-	}
+// 	var peers []string
+// 	if len(args) > 2 {
+// 		peers = args[2:]
+// 	}
 
-	return nodes, port, peers
-}
+// 	return nodes, port, peers
+// }
 
 // setupServer creates the server struct
 // populating it with the configurations for peer
 func setupServer(nodes int) *Server {
 	// Setup server
 	s := &Server{
-		peers: make([]*peermgr.Peer, 0, 10),
+		peers:   make([]*peermgr.Peer, 0, 10),
+		msgChan: make(chan string, 100),
 	}
 
 	s.wg.Add(nodes)

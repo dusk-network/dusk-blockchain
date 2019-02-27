@@ -3,6 +3,7 @@ package reduction
 import (
 	"bytes"
 	"encoding/hex"
+	"sync/atomic"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
@@ -35,7 +36,7 @@ func SignatureSet(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.SigSetStep++
+	atomic.AddUint32(&ctx.SigSetStep, 1)
 
 	// Vote on collected signature set
 	if err := sigSetVote(ctx); err != nil {
@@ -49,22 +50,13 @@ func SignatureSet(ctx *user.Context) error {
 
 	// If SigSetHash is fallback, the committee has agreed to exit and restart
 	// consensus.
-	if bytes.Equal(ctx.SigSetHash, fallback) {
-		return nil
-	}
-
-	select {
-	case <-ctx.QuitChan:
-		ctx.QuitChan <- true
-		break
-	default:
+	if !bytes.Equal(ctx.SigSetHash, fallback) {
 		if err := agreement.SendSigSet(ctx); err != nil {
 			return err
 		}
 	}
 
-	ctx.SigSetStep++
-
+	atomic.AddUint32(&ctx.SigSetStep, 1)
 	return nil
 }
 
@@ -76,7 +68,7 @@ func sigSetVote(ctx *user.Context) error {
 		return nil
 	default:
 		// Set committee first
-		if err := ctx.SetCommittee(ctx.SigSetStep); err != nil {
+		if err := ctx.SetCommittee(atomic.LoadUint32(&ctx.SigSetStep)); err != nil {
 			return err
 		}
 
@@ -99,13 +91,13 @@ func sigSetVote(ctx *user.Context) error {
 			return err
 		}
 
-		sigEd, err := ctx.CreateSignature(pl, ctx.SigSetStep)
+		sigEd, err := ctx.CreateSignature(pl, atomic.LoadUint32(&ctx.SigSetStep))
 		if err != nil {
 			return err
 		}
 
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-			ctx.SigSetStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+			atomic.LoadUint32(&ctx.SigSetStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 		if err != nil {
 			return err
 		}
@@ -117,10 +109,12 @@ func sigSetVote(ctx *user.Context) error {
 
 func countSigSetVotes(ctx *user.Context) error {
 	// Set vote limit
-	voteLimit := uint8(len(ctx.Committee))
+	voteLimit := int(0.75 * float64(len(ctx.Committee)))
 	if voteLimit > 50 {
 		voteLimit = 50
 	}
+
+	var receivedCount uint8
 
 	// Keep a counter of how many votes have been cast for a specific set
 	counts := make(map[string]uint8)
@@ -152,7 +146,7 @@ func countSigSetVotes(ctx *user.Context) error {
 			ctx.SigSetHash = make([]byte, 32)
 			return nil
 		case m := <-ctx.SigSetReductionChan:
-			if m.Round != ctx.Round || m.Step != ctx.SigSetStep {
+			if m.Round != ctx.Round || m.Step != atomic.LoadUint32(&ctx.SigSetStep) {
 				break
 			}
 
@@ -171,8 +165,9 @@ func countSigSetVotes(ctx *user.Context) error {
 			voters[pkEd] = true
 			setStr := hex.EncodeToString(pl.SigSetHash)
 			counts[setStr] += votes
+			receivedCount += votes
 			sigSetVote, err := consensusmsg.NewVote(pl.SigSetHash, pl.PubKeyBLS,
-				pl.SigBLS, ctx.SigSetStep)
+				pl.SigBLS, atomic.LoadUint32(&ctx.SigSetStep))
 			if err != nil {
 				return err
 			}
@@ -187,7 +182,12 @@ func countSigSetVotes(ctx *user.Context) error {
 			}
 
 			// If a set exceeds vote threshold, we will end the loop.
-			if counts[setStr] < voteLimit {
+			if counts[setStr] < uint8(voteLimit) {
+				// But, if we got all votes for this current phase, we move on.
+				if receivedCount == uint8(voteLimit) {
+					return nil
+				}
+
 				break
 			}
 

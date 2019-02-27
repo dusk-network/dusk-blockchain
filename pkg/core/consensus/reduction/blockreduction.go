@@ -3,8 +3,7 @@ package reduction
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
-	"math/rand"
+	"sync/atomic"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -42,7 +41,7 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	ctx.BlockStep++
+	atomic.AddUint32(&ctx.BlockStep, 1)
 
 	// Vote on passed block
 	if err := blockVote(ctx); err != nil {
@@ -56,22 +55,13 @@ func Block(ctx *user.Context) error {
 
 	// If BlockHash is fallback, the committee has agreed to exit and restart
 	// consensus.
-	if bytes.Equal(ctx.BlockHash, fallback) {
-		return nil
-	}
-
-	select {
-	case <-ctx.QuitChan:
-		ctx.QuitChan <- true
-		break
-	default:
+	if !bytes.Equal(ctx.BlockHash, fallback) {
 		if err := agreement.SendBlock(ctx); err != nil {
 			return err
 		}
 	}
 
-	ctx.BlockStep++
-
+	atomic.AddUint32(&ctx.BlockStep, 1)
 	return nil
 }
 
@@ -83,7 +73,7 @@ func blockVote(ctx *user.Context) error {
 		return nil
 	default:
 		// Set committee first
-		if err := ctx.SetCommittee(ctx.BlockStep); err != nil {
+		if err := ctx.SetCommittee(atomic.LoadUint32(&ctx.BlockStep)); err != nil {
 			return err
 		}
 
@@ -93,48 +83,44 @@ func blockVote(ctx *user.Context) error {
 			return nil
 		}
 
-		r := rand.Intn(200)
-		if r > 2 {
-			// Sign block hash with BLS
-			sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
-			if err != nil {
-				return err
-			}
-
-			// Create reduction payload to gossip
-			pl, err := consensusmsg.NewBlockReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
-			if err != nil {
-				return err
-			}
-
-			// Sign the payload
-			sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
-			if err != nil {
-				return err
-			}
-
-			// Create message
-			msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash, ctx.BlockStep, sigEd,
-				[]byte(*ctx.Keys.EdPubKey), pl)
-			if err != nil {
-				return err
-			}
-
-			ctx.BlockReductionChan <- msg
-			return nil
+		// Sign block hash with BLS
+		sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.BlockHash)
+		if err != nil {
+			return err
 		}
 
-		fmt.Println("resulting: skipping")
+		// Create reduction payload to gossip
+		pl, err := consensusmsg.NewBlockReduction(ctx.BlockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
+		if err != nil {
+			return err
+		}
+
+		// Sign the payload
+		sigEd, err := ctx.CreateSignature(pl, atomic.LoadUint32(&ctx.BlockStep))
+		if err != nil {
+			return err
+		}
+
+		// Create message
+		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+			atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		if err != nil {
+			return err
+		}
+
+		ctx.BlockReductionChan <- msg
 		return nil
 	}
 }
 
 func countBlockVotes(ctx *user.Context) error {
 	// Set vote limit
-	voteLimit := uint8(len(ctx.Committee))
+	voteLimit := int(0.75 * float64(len(ctx.Committee)))
 	if voteLimit > 50 {
 		voteLimit = 50
 	}
+
+	var receivedCount uint8
 
 	// Keep a counter of how many votes have been cast for a specific block
 	counts := make(map[string]uint8)
@@ -166,7 +152,7 @@ func countBlockVotes(ctx *user.Context) error {
 			ctx.BlockHash = make([]byte, 32)
 			return nil
 		case m := <-ctx.BlockReductionChan:
-			if m.Round != ctx.Round || m.Step != ctx.BlockStep {
+			if m.Round != ctx.Round || m.Step != atomic.LoadUint32(&ctx.BlockStep) {
 				break
 			}
 
@@ -185,8 +171,9 @@ func countBlockVotes(ctx *user.Context) error {
 			voters[pkEd] = true
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
+			receivedCount += votes
 			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS,
-				pl.SigBLS, ctx.BlockStep)
+				pl.SigBLS, atomic.LoadUint32(&ctx.BlockStep))
 			if err != nil {
 				return err
 			}
@@ -201,11 +188,17 @@ func countBlockVotes(ctx *user.Context) error {
 			}
 
 			// If a block doesnt exceed the vote threshold, we keep going.
-			if counts[hashStr] < voteLimit {
+			if counts[hashStr] < uint8(voteLimit) {
+				// But, if we got all votes for this current phase, we move on.
+				if receivedCount == uint8(voteLimit) {
+					return nil
+				}
+
 				break
 			}
 
 			timer.Stop()
+
 			ctx.BlockHash = pl.BlockHash
 
 			// We will also cut all the votes that did not vote for the winning block.

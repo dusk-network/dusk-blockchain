@@ -14,8 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
@@ -127,7 +125,6 @@ func (p *Peer) Disconnect() {
 	close(p.quitch)
 	p.conn.Close()
 
-	log.WithField("prefix", "peer").Infof("Disconnected peer with address %s", p.addr)
 }
 
 // ProtocolVersion returns the protocol version
@@ -189,9 +186,7 @@ func (p *Peer) IsVerackReceived() bool {
 
 // NotifyDisconnect returns if the peer has disconnected
 func (p *Peer) NotifyDisconnect() bool {
-	log.WithField("prefix", "peer").Info("Peer has not disconnected yet")
 	<-p.quitch
-	log.WithField("prefix", "peer").Info("Peer has just disconnected")
 	return true
 }
 
@@ -227,7 +222,6 @@ loop:
 		case <-p.quitch:
 			break loop
 		case <-p.Detector.Quitch:
-			log.WithField("prefix", "peer").Infof("Peer %s stalled, disconnecting", p.addr)
 			break loop
 		}
 	}
@@ -239,7 +233,6 @@ loop:
 func (p *Peer) ReadLoop() {
 
 	idleTimer := time.AfterFunc(idleTimeout, func() {
-		log.WithField("prefix", "peer").Infof("Timing out peer %s", p.addr)
 		p.Disconnect()
 	})
 
@@ -255,7 +248,6 @@ loop:
 
 		if err != nil {
 			// This will also happen if Peer is disconnected
-			log.WithField("prefix", "peer").Infof("Connection to %s has been closed", p.addr)
 			break loop
 		}
 
@@ -265,11 +257,9 @@ loop:
 		switch msg := readmsg.(type) {
 
 		case *payload.MsgVersion:
-			log.WithField("prefix", "peer").Infof("Already received a '%s' from %s, disconnecting", commands.Version, p.addr)
 			break loop // We have already done the handshake, break loop and disconnect
 		case *payload.MsgVerAck:
 			if p.verackReceived {
-				log.WithField("prefix", "peer").Infof("Already received a '%s' from %s , disconnecting", commands.VerAck, p.addr)
 				break loop
 			}
 			p.statemutex.Lock() // This should not happen, however if it does, then we should set it.
@@ -309,8 +299,6 @@ loop:
 			p.OnPong(msg)
 		case *payload.MsgReject:
 			p.OnReject(msg)
-		default:
-			log.WithField("prefix", "peer").Warnf("Did not recognise message '%s'", msg.Command()) //Do not disconnect peer, just log message
 		}
 	}
 
@@ -336,7 +324,6 @@ func (p *Peer) WriteLoop() {
 
 // OnGetData Listener. Is called after receiving a 'getdata' msg
 func (p *Peer) OnGetData(msg *payload.MsgGetData) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetData, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnGetData != nil {
 			p.cfg.Handler.OnGetData(p, msg)
@@ -346,7 +333,6 @@ func (p *Peer) OnGetData(msg *payload.MsgGetData) {
 
 // OnTx Listener. Is called after receiving a 'tx' msg
 func (p *Peer) OnTx(msg *payload.MsgTx) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Tx, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnTx != nil {
 			p.cfg.Handler.OnTx(p, msg)
@@ -359,7 +345,6 @@ func (p *Peer) OnTx(msg *payload.MsgTx) {
 // In the last case we have to check if we already have the tx/block or not.
 // We need to send a 'getdata' msg to receive the actual tx/block(s).
 func (p *Peer) OnInv(msg *payload.MsgInv) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Inv, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnInv != nil {
 			p.cfg.Handler.OnInv(p, msg)
@@ -369,7 +354,6 @@ func (p *Peer) OnInv(msg *payload.MsgInv) {
 
 // OnGetHeaders Listener, outside of the anonymous func will be extra functionality like timing
 func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetHeaders, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnGetHeaders != nil {
 			p.cfg.Handler.OnGetHeaders(p, msg)
@@ -379,7 +363,6 @@ func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
 
 // OnAddr Listener. Is called after receiving a 'addr' msg
 func (p *Peer) OnAddr(msg *payload.MsgAddr) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Addr, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnAddr != nil {
 			p.cfg.Handler.OnAddr(p, msg)
@@ -389,7 +372,6 @@ func (p *Peer) OnAddr(msg *payload.MsgAddr) {
 
 // OnGetAddr Listener. Is called after receiving a 'getaddr' msg
 func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetAddr, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnGetAddr != nil {
 			p.cfg.Handler.OnGetAddr(p, msg)
@@ -399,7 +381,6 @@ func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
 
 // OnGetBlocks Listener. Is called after receiving a 'getblocks' msg
 func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.GetBlocks, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnGetBlocks != nil {
 			p.cfg.Handler.OnGetBlocks(p, msg)
@@ -409,7 +390,6 @@ func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
 
 // OnBlock Listener. Is called after receiving a 'blocks' msg
 func (p *Peer) OnBlock(msg *payload.MsgBlock) {
-	log.WithField("prefix", "peer").Debugf("Received a '%s' message (Height=%d) from %s", commands.Block, msg.Block.Header.Height, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnBlock != nil {
 			p.cfg.Handler.OnBlock(p, msg)
@@ -420,16 +400,13 @@ func (p *Peer) OnBlock(msg *payload.MsgBlock) {
 // OnVersion Listener will be called during the handshake, any error checking should be done here for 'version' msg.
 // This should only ever be called during the handshake. Any other place and the peer will disconnect.
 func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Version, p.addr)
 	if msg.Nonce == p.cfg.Nonce {
-		log.WithField("prefix", "peer").Infof("Received '%s' message from yourself", commands.Version)
 		p.conn.Close()
 		return errors.New("self connection, peer disconnected")
 	}
 
 	if protocol.NodeVer.Major != msg.Version.Major {
 		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
-		log.WithField("prefix", "peer").Infof("Incompatible protocol version")
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
 		p.Write(rejectMsg)
 
@@ -451,7 +428,6 @@ func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
 
 // OnConsensusMsg is called when the node receives a consensus message
 func (p *Peer) OnConsensusMsg(msg *payload.MsgConsensus) error {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Consensus, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnConsensus != nil {
 			p.cfg.Handler.OnConsensus(p, msg)
@@ -462,7 +438,6 @@ func (p *Peer) OnConsensusMsg(msg *payload.MsgConsensus) error {
 
 // OnHeaders Listener. Is called after receiving a 'headers' msg
 func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Headers, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnHeaders != nil {
 			p.cfg.Handler.OnHeaders(p, msg)
@@ -472,7 +447,6 @@ func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
 
 // OnConsensus Listener. Is called after receiving a 'consensus' msg
 func (p *Peer) OnConsensus(msg *payload.MsgConsensus) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Consensus, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnConsensus != nil {
 			p.cfg.Handler.OnConsensus(p, msg)
@@ -482,7 +456,6 @@ func (p *Peer) OnConsensus(msg *payload.MsgConsensus) {
 
 // OnCertificate Listener. Is called after receiving a 'certificate' msg
 func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Certificate, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnCertificate != nil {
 			p.cfg.Handler.OnCertificate(p, msg)
@@ -492,7 +465,6 @@ func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
 
 // OnCertificateReq Listener. Is called after receiving a 'certificatereq' msg
 func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.CertificateReq, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnCertificateReq != nil {
 			p.cfg.Handler.OnCertificateReq(p, msg)
@@ -502,7 +474,6 @@ func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
 
 // OnMemPool Listener. Is called after receiving a 'mempool' msg
 func (p *Peer) OnMemPool(msg *payload.MsgMemPool) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.MemPool, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnMemPool != nil {
 			p.cfg.Handler.OnMemPool(p, msg)
@@ -512,7 +483,6 @@ func (p *Peer) OnMemPool(msg *payload.MsgMemPool) {
 
 // OnNotFound Listener. Is called after receiving a 'notfound' msg
 func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.NotFound, p.addr)
 
 	// Remove the message we initially requested from the Detector
 	//TODO: Make a separate function and check whether we need more payload.InvXxx types (e.g. InvHdr)
@@ -532,7 +502,6 @@ func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
 
 // OnPing Listener. Is called after receiving a 'ping' msg
 func (p *Peer) OnPing(msg *payload.MsgPing) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Ping, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnPing != nil {
 			p.cfg.Handler.OnPing(p, msg)
@@ -542,7 +511,6 @@ func (p *Peer) OnPing(msg *payload.MsgPing) {
 
 // OnPong Listener. Is called after receiving a 'pong' msg
 func (p *Peer) OnPong(msg *payload.MsgPong) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Pong, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnPong != nil {
 			p.cfg.Handler.OnPong(p, msg)
@@ -552,7 +520,6 @@ func (p *Peer) OnPong(msg *payload.MsgPong) {
 
 // OnReject Listener. Is called after receiving a 'reject' msg
 func (p *Peer) OnReject(msg *payload.MsgReject) {
-	log.WithField("prefix", "peer").Infof(receivedMessageFromStr, commands.Reject, p.addr)
 	p.inch <- func() {
 		if p.cfg.Handler.OnReject != nil {
 			p.cfg.Handler.OnReject(p, msg)
@@ -566,7 +533,6 @@ func (p *Peer) OnReject(msg *payload.MsgReject) {
 
 // RequestHeaders will ask a peer for headers.
 func (p *Peer) RequestHeaders(hash []byte) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg requesting headers from %s", commands.GetHeaders, p.addr)
 	c := make(chan error)
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetHeaders)
@@ -583,7 +549,6 @@ func (p *Peer) RequestHeaders(hash []byte) error {
 // It will put a function on the outgoing peer queue to send a 'getdata' msg
 // to an other peer. An error from this function will return this error from RequestTx.
 func (p *Peer) RequestTx(tx transactions.Stealth) error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting transactions from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
 	p.outch <- func() {
@@ -601,7 +566,6 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 // It will put a function on the outgoing peer queue to send a 'getdata' msg to an other peer.
 // The same possible function error will be returned from this method.
 func (p *Peer) RequestBlocks(hashes [][]byte) error {
-	log.WithField("prefix", "peer").Debugf("Sending '%s' msg, requesting blocks from %s", commands.GetData, p.addr)
 	c := make(chan error)
 
 	blocks := make([]*block.Block, 0, len(hashes))
@@ -627,7 +591,6 @@ func (p *Peer) RequestBlocks(hashes [][]byte) error {
 // It will put a function on the outgoing peer queue to send a 'getaddr' msg to an other peer.
 // The same possible function error will be returned from this method.
 func (p *Peer) RequestAddresses() error {
-	log.WithField("prefix", "peer").Infof("Sending '%s' msg, requesting addresses from %s", commands.GetAddr, p.addr)
 	c := make(chan error)
 
 	p.outch <- func() {

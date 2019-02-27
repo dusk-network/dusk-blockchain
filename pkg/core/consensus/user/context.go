@@ -25,11 +25,11 @@ import (
 
 // Global consensus variables
 var (
-	maxMembers          = 200
-	MaxSteps      uint8 = 50
-	StepTime            = 500 * time.Millisecond
-	CandidateTime       = 500 * time.Millisecond
-	CommitteeSize uint8 = 50
+	maxMembers           = 200
+	MaxSteps      uint32 = 100
+	StepTime             = 2000 * time.Millisecond
+	CandidateTime        = 2000 * time.Millisecond
+	CommitteeSize uint8  = 50
 )
 
 // Context will hold all the necessary functions and
@@ -41,8 +41,8 @@ type Context struct {
 	Tau        uint64
 	Threshold  uint64
 	Round      uint64 // Current round
-	BlockStep  uint8  // Current step
-	SigSetStep uint8
+	BlockStep  uint32 // Current step
+	SigSetStep uint32
 	Seed       []byte        // Round seed
 	LastHeader *block.Header // Previous block
 	K          []byte        // secret
@@ -184,7 +184,7 @@ func (c *Context) Reset() {
 	c.WinningBlockHash = make([]byte, 32)
 	c.BlockVotes = nil
 	c.SigSetHash = make([]byte, 32)
-	c.WinningSigSetHash = nil
+	c.WinningSigSetHash = make([]byte, 32)
 	c.SigSetVotes = nil
 	c.CandidateBlock = &block.Block{}
 	c.Certificate = &block.Certificate{}
@@ -205,12 +205,14 @@ func (c *Context) Clear() {
 
 // CreateSignature will return the byte representation of a consensus message that
 // is signed with Ed25519.
-func (c *Context) CreateSignature(pl consensusmsg.Msg, step uint8) ([]byte, error) {
+func (c *Context) CreateSignature(pl consensusmsg.Msg, step uint32) ([]byte, error) {
 	edMsg := make([]byte, 12)
 	binary.LittleEndian.PutUint32(edMsg[0:], c.Version)
 	binary.LittleEndian.PutUint64(edMsg[4:], c.Round)
 	edMsg = append(edMsg, c.LastHeader.Hash...)
-	edMsg = append(edMsg, byte(step))
+	bStep := make([]byte, 4)
+	binary.LittleEndian.PutUint32(bStep[0:], step)
+	edMsg = append(edMsg, bStep...)
 	edMsg = append(edMsg, byte(pl.Type()))
 	buf := new(bytes.Buffer)
 	if err := pl.Encode(buf); err != nil {
@@ -222,7 +224,7 @@ func (c *Context) CreateSignature(pl consensusmsg.Msg, step uint8) ([]byte, erro
 }
 
 // SetCommittee will set the committee for the given step
-func (c *Context) SetCommittee(step uint8) error {
+func (c *Context) SetCommittee(step uint32) error {
 	currentCommittee, err := sortition.CreateCommittee(c.Round, c.W, step,
 		c.Committee, c.NodeWeights)
 	if err != nil {

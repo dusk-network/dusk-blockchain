@@ -1,6 +1,8 @@
 package generation
 
 import (
+	"sync/atomic"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
@@ -15,13 +17,13 @@ func SignatureSet(ctx *user.Context) error {
 		return err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl, ctx.SigSetStep)
+	sigEd, err := ctx.CreateSignature(pl, atomic.LoadUint32(&ctx.SigSetStep))
 	if err != nil {
 		return err
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.SigSetStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.SigSetStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}

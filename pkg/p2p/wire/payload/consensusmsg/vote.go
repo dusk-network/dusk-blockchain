@@ -1,6 +1,7 @@
 package consensusmsg
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 
@@ -12,11 +13,11 @@ type Vote struct {
 	Hash   []byte // The block hash or signature set hash voted on
 	PubKey []byte // BLS public key of the voter
 	Sig    []byte // Compressed BLS signature of the hash
-	Step   uint8  // Step this vote occurred at
+	Step   uint32 // Step this vote occurred at
 }
 
 // NewVote will return a Vote struct populated with the passed parameters.
-func NewVote(hash, pubKey, sig []byte, step uint8) (*Vote, error) {
+func NewVote(hash, pubKey, sig []byte, step uint32) (*Vote, error) {
 	if len(hash) != 32 {
 		return nil, errors.New("supplied hash for vote is improper length")
 	}
@@ -47,7 +48,7 @@ func (v *Vote) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteUint8(w, v.Step); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, v.Step); err != nil {
 		return err
 	}
 
@@ -68,7 +69,7 @@ func (v *Vote) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadUint8(r, &v.Step); err != nil {
+	if err := encoding.ReadUint32(r, binary.LittleEndian, &v.Step); err != nil {
 		return err
 	}
 

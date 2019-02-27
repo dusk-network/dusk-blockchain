@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -40,13 +41,13 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 	switch msg.ID {
 	case consensusmsg.BlockAgreementID, consensusmsg.BlockReductionID,
 		consensusmsg.CandidateID, consensusmsg.CandidateScoreID:
-		if ctx.Round < msg.Round || ctx.BlockStep < msg.Step {
+		if ctx.Round < msg.Round || atomic.LoadUint32(&ctx.BlockStep) < msg.Step {
 			ctx.BlockQueue.Put(msg.Round, msg.Step, msg)
 			return nil
 		}
 	case consensusmsg.SigSetAgreementID, consensusmsg.SigSetCandidateID,
 		consensusmsg.SigSetReductionID:
-		if ctx.Round < msg.Round || ctx.SigSetStep < msg.Step {
+		if ctx.Round < msg.Round || atomic.LoadUint32(&ctx.SigSetStep) < msg.Step {
 			ctx.SigSetQueue.Put(msg.Round, msg.Step, msg)
 			return nil
 		}
@@ -63,7 +64,7 @@ func Process(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrError {
 
 // ProcessBlockQueue will process messages in the queue
 func ProcessBlockQueue(ctx *user.Context) *prerror.PrError {
-	msgs := ctx.BlockQueue.Get(ctx.Round, ctx.BlockStep)
+	msgs := ctx.BlockQueue.Get(ctx.Round, atomic.LoadUint32(&ctx.BlockStep))
 	if msgs == nil {
 		return nil
 	}
@@ -80,7 +81,7 @@ func ProcessBlockQueue(ctx *user.Context) *prerror.PrError {
 
 // ProcessSigSetQueue will process messages in the queue
 func ProcessSigSetQueue(ctx *user.Context) *prerror.PrError {
-	msgs := ctx.SigSetQueue.Get(ctx.Round, ctx.SigSetStep)
+	msgs := ctx.SigSetQueue.Get(ctx.Round, atomic.LoadUint32(&ctx.SigSetStep))
 	if msgs == nil {
 		return nil
 	}
@@ -109,7 +110,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return nil
 	case consensusmsg.BlockReductionID:
 		// Check if we're on the same step
-		if ctx.BlockStep > msg.Step {
+		if atomic.LoadUint32(&ctx.BlockStep) > msg.Step {
 			return prerror.New(prerror.Low, errors.New("step mismatch"))
 		}
 
@@ -153,7 +154,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return nil
 	case consensusmsg.SigSetReductionID:
 		// Check if we're on the same step
-		if ctx.SigSetStep > msg.Step {
+		if atomic.LoadUint32(&ctx.SigSetStep) > msg.Step {
 			return prerror.New(prerror.Low, errors.New("step mismatch"))
 		}
 
@@ -222,10 +223,14 @@ func verifySortition(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrEr
 }
 
 func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
-	step uint8) *prerror.PrError {
+	step uint32) *prerror.PrError {
 	// A set should be of appropriate length, at least 2*0.75*len(committee)
-	limit := 2.0 * 0.75 * float64(len(ctx.CurrentCommittee))
-	if len(voteSet) < int(limit) {
+	limit := int(2 * 0.75 * float64(len(ctx.Committee)))
+	if limit > 100 {
+		limit = 100
+	}
+
+	if len(voteSet) < limit {
 		return prerror.New(prerror.Low, errors.New("vote set is too small"))
 	}
 

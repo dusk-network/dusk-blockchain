@@ -3,6 +3,7 @@ package agreement
 import (
 	"bytes"
 	"encoding/hex"
+	"sync/atomic"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -15,18 +16,16 @@ import (
 // until a decision is reached.
 func Block(ctx *user.Context, c chan bool) {
 	// Store our sets on every step for certificate generation
-	sets := make(map[uint8][]*consensusmsg.Vote)
+	sets := make(map[uint32][]*consensusmsg.Vote)
 
 	// Make a counter to keep track of how many votes have been cast in a step
-	counter := make(map[uint8]int)
+	counter := make(map[uint32]int)
 
 	// Make a map to keep track if a node has voted in a certain step
-	voted := make(map[uint8]map[string]bool)
+	voted := make(map[uint32]map[string]bool)
 
 	for {
 		select {
-		case <-ctx.StopChan:
-			return
 		case m := <-ctx.BlockAgreementChan:
 			if m.Round != ctx.Round {
 				break
@@ -143,13 +142,13 @@ func SendBlock(ctx *user.Context) error {
 		return err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
+	sigEd, err := ctx.CreateSignature(pl, atomic.LoadUint32(&ctx.BlockStep))
 	if err != nil {
 		return err
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.BlockStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}

@@ -40,12 +40,6 @@ func (p *Peer) Handshake() error {
 		return errHandShakeTimeout
 	}
 
-	// Log the handshake
-	if p.inbound {
-		log.WithField("prefix", "peer").Infof("Inbound handshake with %s successful", p.RemoteAddr().String())
-	} else {
-		log.WithField("prefix", "peer").Infof("Outbound handshake with %s successful", p.RemoteAddr().String())
-	}
 	return nil
 }
 

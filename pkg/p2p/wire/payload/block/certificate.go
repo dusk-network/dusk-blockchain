@@ -2,6 +2,7 @@ package block
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -12,11 +13,11 @@ import (
 // Certificate defines a block certificate made as a result from the consensus.
 type Certificate struct {
 	BRBatchedSig []byte   // Batched BLS signature of the block reduction phase (33 bytes)
-	BRStep       uint8    // Step the block reduction terminated at
+	BRStep       uint32   // Step the block reduction terminated at
 	BRPubKeys    [][]byte // BLS public keys associated with the signature
 
 	SRBatchedSig []byte   // Batched BLS signature of the signature set reduction phase (33 bytes)
-	SRStep       uint8    // Step the signature set reduction terminated at
+	SRStep       uint32   // Step the signature set reduction terminated at
 	SRPubKeys    [][]byte // BLS public keys associated with the signature
 
 	Hash []byte
@@ -45,7 +46,7 @@ func (c *Certificate) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteUint8(w, c.BRStep); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, c.BRStep); err != nil {
 		return err
 	}
 
@@ -63,7 +64,7 @@ func (c *Certificate) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteUint8(w, c.SRStep); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, c.SRStep); err != nil {
 		return err
 	}
 
@@ -99,7 +100,7 @@ func (c *Certificate) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadUint8(r, &c.BRStep); err != nil {
+	if err := encoding.ReadUint32(r, binary.LittleEndian, &c.BRStep); err != nil {
 		return err
 	}
 
@@ -119,7 +120,7 @@ func (c *Certificate) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadUint8(r, &c.SRStep); err != nil {
+	if err := encoding.ReadUint32(r, binary.LittleEndian, &c.SRStep); err != nil {
 		return err
 	}
 

@@ -11,7 +11,7 @@ import (
 
 // CreateCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step.
-func CreateCommittee(round, totalWeight uint64, step uint8, committee [][]byte,
+func CreateCommittee(round, totalWeight uint64, step uint32, committee [][]byte,
 	stakes map[string]uint64) ([][]byte, error) {
 	var currentCommittee [][]byte
 	W := new(big.Int).SetUint64(totalWeight)
@@ -20,11 +20,11 @@ func CreateCommittee(round, totalWeight uint64, step uint8, committee [][]byte,
 		size = 50
 	}
 
-	for i := 0; i < size; i++ {
+	for i := uint8(0); i < uint8(size); i++ {
 		// Create message to hash
-		msg := make([]byte, 10)
+		msg := make([]byte, 12)
 		binary.LittleEndian.PutUint64(msg[:8], round)
-		msg = append(msg, byte(step))
+		binary.LittleEndian.PutUint32(msg[8:], step)
 		msg = append(msg, byte(i))
 
 		// Hash message

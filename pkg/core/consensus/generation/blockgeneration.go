@@ -2,6 +2,7 @@ package generation
 
 import (
 	"encoding/binary"
+	"sync/atomic"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -67,13 +68,13 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
+	sigEd, err := ctx.CreateSignature(pl, atomic.LoadUint32(&ctx.BlockStep))
 	if err != nil {
 		return err
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.BlockStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return err
 	}
@@ -82,13 +83,13 @@ func Block(ctx *user.Context) error {
 
 	// Create candidate msg
 	pl2 := consensusmsg.NewCandidate(candidateBlock)
-	sigEd2, err := ctx.CreateSignature(pl2, ctx.BlockStep)
+	sigEd2, err := ctx.CreateSignature(pl2, atomic.LoadUint32(&ctx.BlockStep))
 	if err != nil {
 		return err
 	}
 
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.BlockStep, sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
 	if err != nil {
 		return err
 	}

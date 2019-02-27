@@ -1,6 +1,7 @@
 package consensusmsg
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 
@@ -12,13 +13,13 @@ type SigSetAgreement struct {
 	BlockHash []byte
 	SetHash   []byte
 	VoteSet   []*Vote
-	Step      uint8
+	Step      uint32
 }
 
 // NewSigSetAgreement returns a SigSetAgreement struct populated with the specified information.
 // This function provides checks for fixed-size fields, and will return an error
 // if the checks fail.
-func NewSigSetAgreement(blockHash, setHash []byte, voteSet []*Vote, step uint8) (*SigSetAgreement, error) {
+func NewSigSetAgreement(blockHash, setHash []byte, voteSet []*Vote, step uint32) (*SigSetAgreement, error) {
 	if len(blockHash) != 32 {
 		return nil, errors.New("wire: supplied block hash for signature set agreement payload is improper length")
 	}
@@ -56,7 +57,7 @@ func (s *SigSetAgreement) Encode(w io.Writer) error {
 		}
 	}
 
-	if err := encoding.WriteUint8(w, s.Step); err != nil {
+	if err := encoding.WriteUint32(w, binary.LittleEndian, s.Step); err != nil {
 		return err
 	}
 
@@ -87,7 +88,7 @@ func (s *SigSetAgreement) Decode(r io.Reader) error {
 		}
 	}
 
-	if err := encoding.ReadUint8(r, &s.Step); err != nil {
+	if err := encoding.ReadUint32(r, binary.LittleEndian, &s.Step); err != nil {
 		return err
 	}
 
