@@ -42,13 +42,13 @@ func TestBlockCollection(t *testing.T) {
 
 	// Make candidate payload and message
 	pl := consensusmsg.NewCandidate(blk)
-	sigEd, err := ctx.CreateSignature(pl)
+	sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round,
-		ctx.LastHeader.Hash, ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.LastHeader.Hash, ctx.BlockStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,18 +60,23 @@ func TestBlockCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pl2, err := consensusmsg.NewCandidateScore(300, proof, blk.Header.Hash, blk.Header.Seed)
+	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sigEd2, err := ctx.CreateSignature(pl2)
+	pl2, err := consensusmsg.NewCandidateScore(byte32, proof, byte32, blk.Header.Hash, blk.Header.Seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sigEd2, err := ctx.CreateSignature(pl2, ctx.BlockStep)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
+		ctx.BlockStep, sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -116,9 +121,12 @@ func TestBlockCollectionNoBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// BlockHash and CandidateBlock should be nil
-	assert.Nil(t, ctx.BlockHash)
-	assert.Empty(t, ctx.CandidateBlock)
+	// BlockHash and CandidateBlock should be empty
+	emptyCandidate := &block.Block{
+		Header: &block.Header{},
+	}
+	assert.Equal(t, make([]byte, 32), ctx.BlockHash)
+	assert.Equal(t, emptyCandidate, ctx.CandidateBlock)
 
 	// Reset candidate timer
 	user.CandidateTime = 60 * time.Second

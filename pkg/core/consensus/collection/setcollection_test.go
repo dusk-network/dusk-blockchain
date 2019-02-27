@@ -38,7 +38,8 @@ func TestSignatureSetCollection(t *testing.T) {
 	}
 
 	ctx.BlockHash = hash
-	voteSet, err := createVotes(ctx, 15)
+	ctx.WinningBlockHash = hash
+	voteSet, err := createVotes(ctx, 15, ctx.SigSetStep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +50,7 @@ func TestSignatureSetCollection(t *testing.T) {
 	// Shuffle vote set
 	var otherVotes []*consensusmsg.Vote
 	otherVotes = append(otherVotes, voteSet...)
-	otherVotes[0] = otherVotes[1]
+	otherVotes[0], otherVotes[1] = otherVotes[1], otherVotes[0]
 
 	// Create votes
 	vote1, err := newSigSetCandidate(ctx, 500, otherVotes)
@@ -122,7 +123,7 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	ctx.Weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = c.BlockHash
-	ctx.Step = c.Step
+	ctx.SigSetStep = c.SigSetStep
 	ctx.SigSetVotes = voteSet
 
 	// Add to our committee
@@ -134,9 +135,9 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 		return nil, err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl)
+	sigEd, err := ctx.CreateSignature(pl, ctx.SigSetStep)
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.SigSetStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +145,7 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	return msg, nil
 }
 
-func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
+func createVotes(ctx *user.Context, amount int, step uint32) ([]*consensusmsg.Vote, error) {
 	var voteSet []*consensusmsg.Vote
 	for i := 0; i < amount; i++ {
 		keys, err := user.NewRandKeys()
@@ -181,13 +182,13 @@ func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
 
 		// Create two votes and add them to the array
 		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
-			ctx.Step)
+			step)
 		if err != nil {
 			return nil, err
 		}
 
 		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
-			ctx.Step-1)
+			step-1)
 		if err != nil {
 			return nil, err
 		}
