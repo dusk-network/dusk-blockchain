@@ -163,18 +163,22 @@ func runNode(r *registry, num int, port string, peers []string) {
 				// If not, we proceed to the next phase
 				break block
 			default:
-				phase = "Block Generation"
-				if err := generation.Block(s.ctx); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
+				if bytes.Equal(s.ctx.BlockHash, make([]byte, 32)) {
+					phase = "Block Generation"
+					if err := generation.Block(s.ctx); err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
+
+					// Block collection
+					phase = "Block Collection"
+					if err := collection.Block(s.ctx); err != nil {
+						fmt.Println(err)
+						os.Exit(1)
+					}
 				}
 
-				// Block collection
-				phase = "Block Collection"
-				if err := collection.Block(s.ctx); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
+				atomic.AddUint32(&s.ctx.BlockStep, 1)
 
 				// Vote on received block. The context object should hold a winning
 				// block hash after this function returns.
@@ -238,6 +242,8 @@ func runNode(r *registry, num int, port string, peers []string) {
 						os.Exit(1)
 					}
 				}
+
+				atomic.AddUint32(&s.ctx.SigSetStep, 1)
 
 				// Vote on received signature set
 				phase = "Signature Set Reduction/Agreement"
@@ -374,8 +380,19 @@ func setupContext(s *Server) *user.Context {
 	out := transactions.NewOutput(uint64(weight), byte32, byte32)
 	stake.AddInput(in)
 	stake.AddOutput(out)
-	s.tx = transactions.NewTX(transactions.StakeType, stake)
-	if err := s.tx.SetHash(); err != nil {
+	s.stake = transactions.NewTX(transactions.StakeType, stake)
+	if err := s.stake.SetHash(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	bid := transactions.NewBid(1000, ctx.K, 100)
+	in2 := transactions.NewInput(byte32, byte32, 0, byte32)
+	out2 := transactions.NewOutput(uint64(weight), byte32, byte32)
+	bid.AddInput(in2)
+	bid.AddOutput(out2)
+	s.bid = transactions.NewTX(transactions.BidType, bid)
+	if err := s.bid.SetHash(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

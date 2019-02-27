@@ -28,7 +28,8 @@ type Server struct {
 	port    string
 	msgChan chan string
 	peers   []*peermgr.Peer
-	tx      *transactions.Stealth
+	stake   *transactions.Stealth
+	bid     *transactions.Stealth
 	cfg     *peermgr.Config
 	ctx     *user.Context
 	wg      sync.WaitGroup
@@ -42,7 +43,13 @@ func (s *Server) OnAccept(conn net.Conn) {
 	s.peers = append(s.peers, peer)
 
 	// Send them our stake
-	if err := peer.Write(payload.NewMsgTx(s.tx)); err != nil {
+	if err := peer.Write(payload.NewMsgTx(s.stake)); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Send them our bid
+	if err := peer.Write(payload.NewMsgTx(s.bid)); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -58,7 +65,13 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	s.peers = append(s.peers, peer)
 
 	// Send them our stake
-	if err := peer.Write(payload.NewMsgTx(s.tx)); err != nil {
+	if err := peer.Write(payload.NewMsgTx(s.stake)); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Send them our bid
+	if err := peer.Write(payload.NewMsgTx(s.bid)); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -79,18 +92,34 @@ func (s *Server) OnConsensus(peer *peermgr.Peer, msg *payload.MsgConsensus) {
 // that a received MsgTx contains a Stake TypeInfo.
 func (s *Server) OnTx(peer *peermgr.Peer, msg *payload.MsgTx) {
 	// Put information into our context object
-	pl := msg.Tx.TypeInfo.(*transactions.Stake)
-	s.ctx.Committee = append(s.ctx.Committee, pl.PubKeyEd)
-	s.ctx.W += pl.Output.Amount
-	pkEd := hex.EncodeToString(pl.PubKeyEd)
-	s.ctx.NodeWeights[pkEd] = pl.Output.Amount
-	pkBLS := hex.EncodeToString(pl.PubKeyBLS)
-	s.ctx.NodeBLS[pkBLS] = pl.PubKeyEd
+	switch msg.Tx.Type {
+	case transactions.StakeType:
+		pl := msg.Tx.TypeInfo.(*transactions.Stake)
+		s.ctx.Committee = append(s.ctx.Committee, pl.PubKeyEd)
+		s.ctx.W += pl.Output.Amount
+		pkEd := hex.EncodeToString(pl.PubKeyEd)
+		s.ctx.NodeWeights[pkEd] = pl.Output.Amount
+		pkBLS := hex.EncodeToString(pl.PubKeyBLS)
+		s.ctx.NodeBLS[pkBLS] = pl.PubKeyEd
 
-	// Sort committee
-	sort.SliceStable(s.ctx.Committee, func(i int, j int) bool {
-		return hex.EncodeToString(s.ctx.Committee[i]) < hex.EncodeToString(s.ctx.Committee[j])
-	})
+		// Sort committee
+		sort.SliceStable(s.ctx.Committee, func(i int, j int) bool {
+			return hex.EncodeToString(s.ctx.Committee[i]) < hex.EncodeToString(s.ctx.Committee[j])
+		})
+	case transactions.BidType:
+		pl := msg.Tx.TypeInfo.(*transactions.Bid)
+		s.ctx.SortedPubList = append(s.ctx.SortedPubList, pl.Secret)
+
+		// Sort publist and put it into PubList
+		sort.SliceStable(s.ctx.SortedPubList, func(i int, j int) bool {
+			return hex.EncodeToString(s.ctx.SortedPubList[i]) < hex.EncodeToString(s.ctx.SortedPubList[j])
+		})
+
+		s.ctx.PubList = make([]byte, 0)
+		for _, x := range s.ctx.SortedPubList {
+			s.ctx.PubList = append(s.ctx.PubList, x...)
+		}
+	}
 }
 
 func setupPeerConfig(s *Server, nonce uint64) *peermgr.Config {
