@@ -2,7 +2,7 @@ package collection
 
 import (
 	"bytes"
-	"sync/atomic"
+	"math/big"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -27,8 +27,14 @@ func Block(ctx *user.Context) error {
 
 	for {
 		select {
+		case <-ctx.QuitChan:
+			ctx.QuitChan <- true
+			if !timer.Stop() {
+				<-timer.C
+			}
+
+			return nil
 		case <-timer.C:
-			atomic.AddUint32(&ctx.BlockStep, 1)
 			return nil
 		case m := <-ctx.CandidateScoreChan:
 			if m.Round != ctx.Round {
@@ -37,10 +43,12 @@ func Block(ctx *user.Context) error {
 
 			pl := m.Payload.(*consensusmsg.CandidateScore)
 
+			score := big.NewInt(0).SetBytes(pl.Score)
+			scoreNum := score.Uint64()
 			// If the received score is higher than our current one, replace
 			// the current score with the received score, and store the block hash.
-			if pl.Score > highest {
-				highest = pl.Score
+			if scoreNum > highest {
+				highest = scoreNum
 				ctx.BlockHash = pl.CandidateHash
 
 				// Gossip it to the rest of the network

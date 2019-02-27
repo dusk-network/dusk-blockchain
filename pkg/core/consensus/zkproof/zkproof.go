@@ -1,51 +1,107 @@
 package zkproof
 
+// #cgo LDFLAGS: -L./ -lblindbid -framework Security
+// #include "./libblindbid.h"
+import "C"
 import (
 	"bytes"
-	"io"
+	"errors"
+	"math/big"
+	"unsafe"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	ristretto "github.com/bwesterb/go-ristretto"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 )
 
-// Zkproof is the zkproof generated for the block generation procedure
-// XXX; STUB
-type Zkproof struct {
+func Prog(ctx *user.Context) (yInv []byte, zImg []byte) {
+	var ds ristretto.Scalar
+
+	ds.SetBigInt(big.NewInt(int64(ctx.D)))
+	dBytes := ds.Bytes()
+	dPtr := sliceToPtr(dBytes)
+	kPtr := sliceToPtr(ctx.K)
+	seedPtr := sliceToPtr(ctx.Seed)
+
+	yInv = make([]byte, 32)
+	zImg = make([]byte, 32)
+
+	xPtr := toPtr(ctx.X)
+	yPtr := toPtr(ctx.Y)
+	yInvPtr := toPtr(yInv)
+	qPtr := toPtr(ctx.Q)
+	zImgPtr := toPtr(zImg)
+
+	C.prog(seedPtr, kPtr, dPtr, qPtr, xPtr, yPtr, yInvPtr, zImgPtr)
+
+	return
 }
 
 // Prove generates the zero-knowledge proof of the blind-bid
-func Prove(X, Y, Z, M, k []byte, Q, d uint64) *Zkproof {
-	return &Zkproof{}
+func Prove(ctx *user.Context, yInv, zImg []byte) ([]byte, error) {
+	pubListBuf := C.struct_Buffer{
+		ptr: sliceToPtr(ctx.PubList),
+		len: C.size_t(len(ctx.PubList)),
+	}
+
+	var ds ristretto.Scalar
+
+	ds.SetBigInt(big.NewInt(int64(ctx.D)))
+	dBytes := ds.Bytes()
+
+	dPtr := sliceToPtr(dBytes)
+	kPtr := sliceToPtr(ctx.K)
+	seedPtr := sliceToPtr(ctx.Seed)
+	yPtr := toPtr(ctx.Y)
+	yInvPtr := toPtr(yInv)
+	qPtr := toPtr(ctx.Q)
+	zImgPtr := toPtr(zImg)
+
+	var j uint64
+	for i := 0; i < len(ctx.PubList); i += 32 {
+		currX := ctx.PubList[i : i+32]
+		if bytes.Equal(currX, ctx.X) {
+			break
+		}
+
+		j++
+	}
+
+	result := C.prove(dPtr, kPtr, yPtr, yInvPtr, qPtr, zImgPtr, seedPtr, &pubListBuf, C.ulong(j))
+	if result == nil {
+		return nil, errors.New("result is nil")
+	}
+
+	return C.GoBytes(unsafe.Pointer(result.ptr), C.int(result.len)), nil
 }
 
 // Verify verifies the correctness of the zk proof
-func (z *Zkproof) Verify() bool {
-	return true
-}
-
-// Encode serialises the zk proof into a io.Writer interface
-func (z *Zkproof) Encode(w io.Writer) error {
-
-	randData, _ := crypto.RandEntropy(40)
-	_, err := w.Write(randData)
-	if err != nil {
-		return err
+func Verify(ctx *user.Context, proof, seed, q, zImg []byte) bool {
+	pubListBuf := C.struct_Buffer{
+		ptr: sliceToPtr(ctx.PubList),
+		len: C.size_t(len(ctx.PubList)),
 	}
 
-	return nil
-}
-
-// Bytes serialises the zk proof into a byte slice
-// and returns the byte slice
-func (z *Zkproof) Bytes() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := z.Encode(buf)
-	if err != nil {
-		return nil, err
+	proofBuf := C.struct_Buffer{
+		ptr: sliceToPtr(proof),
+		len: C.size_t(len(proof)),
 	}
-	return buf.Bytes(), nil
+
+	seedPtr := sliceToPtr(seed)
+	qPtr := toPtr(q)
+	zImgPtr := toPtr(zImg)
+
+	verified := C.verify(&proofBuf, seedPtr, &pubListBuf, qPtr, zImgPtr)
+
+	return verified == C.bool(true)
 }
 
-// Decode serialises the zk proof from a byte slice
-func (z *Zkproof) Decode(r io.Reader) error {
-	return nil
+func sliceToPtr(data []byte) *C.uchar {
+	cData := C.CBytes(data)
+	cDataPtr := (*C.uchar)(cData)
+	return cDataPtr
+}
+
+func toPtr(data []byte) *C.uchar {
+	return (*C.uchar)(unsafe.Pointer(&data[0]))
 }

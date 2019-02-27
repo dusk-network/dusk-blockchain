@@ -3,7 +3,6 @@ package collection
 import (
 	"bytes"
 	"encoding/hex"
-	"sync/atomic"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -27,8 +26,14 @@ func SignatureSet(ctx *user.Context) error {
 
 	for {
 		select {
+		case <-ctx.QuitChan:
+			ctx.QuitChan <- true
+			if !timer.Stop() {
+				<-timer.C
+			}
+
+			return nil
 		case <-timer.C:
-			atomic.AddUint32(&ctx.SigSetStep, 1)
 			return nil
 		case m := <-ctx.SigSetCandidateChan:
 			if m.Round != ctx.Round {
