@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"sync"
 	"testing"
-	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
 
@@ -20,9 +19,6 @@ import (
 
 // This test will test signature set collection.
 func TestSignatureSetCollection(t *testing.T) {
-	// Put step timer down to avoid long waiting times
-	user.StepTime = 3 * time.Second
-
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -101,9 +97,6 @@ func TestSignatureSetCollection(t *testing.T) {
 
 	// We should now have otherVotes
 	assert.Equal(t, otherVotes, ctx.SigSetVotes)
-
-	// Reset step timer
-	user.StepTime = 20 * time.Second
 }
 
 func newSigSetCandidate(c *user.Context, weight uint64,
