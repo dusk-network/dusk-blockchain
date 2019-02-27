@@ -150,10 +150,6 @@ block:
 				c.StopProvisioning()
 				return
 			}
-
-			if !bytes.Equal(c.ctx.WinningBlockHash, make([]byte, 32)) {
-				break
-			}
 		}
 	}
 
@@ -225,10 +221,6 @@ sigset:
 				// Log
 				c.StopProvisioning()
 				return
-			}
-
-			if !bytes.Equal(c.ctx.WinningSigSetHash, make([]byte, 32)) {
-				break
 			}
 		}
 	}
