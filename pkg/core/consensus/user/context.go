@@ -133,15 +133,17 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 	}
 
 	ctx := &Context{
-		Version:             10000, // Placeholder
-		Tau:                 tau,
-		Round:               round,
-		BlockStep:           1,
-		SigSetStep:          1,
-		Seed:                seed,
-		Magic:               magic,
-		Multiplier:          1,
-		CandidateBlock:      &block.Block{},
+		Version:    10000, // Placeholder
+		Tau:        tau,
+		Round:      round,
+		BlockStep:  1,
+		SigSetStep: 1,
+		Seed:       seed,
+		Magic:      magic,
+		Multiplier: 1,
+		CandidateBlock: &block.Block{
+			Header: &block.Header{},
+		},
 		Certificate:         &block.Certificate{},
 		D:                   d,
 		K:                   k,
@@ -196,7 +198,9 @@ func (c *Context) Reset() {
 	c.SigSetHash = make([]byte, 32)
 	c.WinningSigSetHash = make([]byte, 32)
 	c.SigSetVotes = nil
-	c.CandidateBlock = &block.Block{}
+	c.CandidateBlock = &block.Block{
+		Header: &block.Header{},
+	}
 	c.Certificate = &block.Certificate{}
 }
 
