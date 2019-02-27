@@ -2,9 +2,9 @@ package generation
 
 import (
 	"encoding/binary"
+	"math/big"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
@@ -23,21 +23,16 @@ func Block(ctx *user.Context) error {
 		return err
 	}
 
-	k, err := crypto.RandEntropy(32)
-	if err != nil {
-		return err
-	}
+	yInv, zImg := zkproof.Prog(ctx)
 
-	ctx.K = k
-
-	// check threshold (eligibility)
-	if ctx.Q <= ctx.Tau {
+	score := big.NewInt(0).SetBytes(ctx.Q).Uint64()
+	if score < ctx.Tau {
 		return nil
 	}
 
 	// Generate ZkProof and Serialise
 	// XXX: Prove may return error, so chaining like this may not be possible once zk implemented
-	zkBytes, err := zkproof.Prove(ctx.X, ctx.Y, ctx.Z, ctx.M, ctx.K, ctx.Q, ctx.D).Bytes()
+	zkBytes, err := zkproof.Prove(ctx, yInv, zImg)
 	if err != nil {
 		return err
 	}
@@ -60,6 +55,7 @@ func Block(ctx *user.Context) error {
 	pl, err := consensusmsg.NewCandidateScore(
 		ctx.Q,                      // score
 		zkBytes,                    // zkproof
+		zImg,                       // Identity hash
 		candidateBlock.Header.Hash, // candidateHash
 		ctx.Seed,                   // seed for this round // XXX(TOG): could we use round number/Block height?
 	)
@@ -124,16 +120,11 @@ func generateParams(ctx *user.Context) error {
 	if err != nil {
 		return err
 	}
-	Q, err := Score(ctx.D, Y)
-	if err != nil {
-		return err
-	}
 
 	ctx.M = M
 	ctx.X = X
 	ctx.Y = Y
 	ctx.Z = Z
-	ctx.Q = Q
 
 	return nil
 
