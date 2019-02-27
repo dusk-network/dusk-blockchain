@@ -179,13 +179,13 @@ func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 
 		// Create two votes and add them to the array
 		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
-			ctx.Step)
+			ctx.SigSetStep)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
-			ctx.Step-1)
+			ctx.SigSetStep-1)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -211,13 +211,13 @@ func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 			return nil, nil, err
 		}
 
-		sigEd, err := c.CreateSignature(pl)
+		sigEd, err := c.CreateSignature(pl, ctx.SigSetStep)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		msg, err := payload.NewMsgConsensus(c.Version, c.Round, c.LastHeader.Hash,
-			c.Step, sigEd, []byte(*c.Keys.EdPubKey), pl)
+			c.SigSetStep, sigEd, []byte(*c.Keys.EdPubKey), pl)
 		if err != nil {
 			return nil, nil, err
 		}
