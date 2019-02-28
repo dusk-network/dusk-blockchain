@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"sync"
 	"testing"
-	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -20,9 +19,6 @@ import (
 
 // Test if votes during signature set reduction happen successfully.
 func TestSignatureSetReductionVote(t *testing.T) {
-	// Lower step timer to reduce waiting
-	user.StepTime = 1 * time.Second
-
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -62,16 +58,13 @@ func TestSignatureSetReductionVote(t *testing.T) {
 	if err := reduction.SignatureSet(ctx); err != nil {
 		t.Fatal(err)
 	}
-
-	// Reset step timer
-	user.StepTime = 20 * time.Second
 }
 
 func TestSignatureSetReductionDecisive(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 500, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,6 +92,20 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 
 	ctx.SigSetHash = setHash
 
+	// Log current SigSetHash
+	var currHash []byte
+	currHash = append(currHash, ctx.SigSetHash...)
+
+	// SigSetHash should now be set
+	// Make vote that will win by a large margin
+	vote1, vote2, err := newVoteSigSet(ctx, 1000, block, ctx.SigSetHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx.SigSetReductionChan <- vote1
+	ctx.SigSetReductionChan <- vote2
+
 	// Run signature set reduction function
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -110,33 +117,6 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 		wg.Done()
 	}()
 
-	// Wait one second..
-	time.Sleep(1 * time.Second)
-
-	// SigSetHash should now be set
-	// Make vote that will win by a large margin
-	vote1, err := newVoteSigSet(ctx, 1000, block, ctx.SigSetHash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Log current SigSetHash
-	var currHash []byte
-	currHash = append(currHash, ctx.SigSetHash...)
-
-	// Send vote
-	ctx.SigSetReductionChan <- vote1
-
-	// Wait one second..
-	time.Sleep(1 * time.Second)
-
-	// Make new vote, send it, and wait for function to return
-	vote2, err := newVoteSigSet(ctx, 1000, block, ctx.SigSetHash)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx.SigSetReductionChan <- vote2
 	wg.Wait()
 
 	// Function should have returned and we should have the same sigsethash
@@ -144,9 +124,6 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 }
 
 func TestSignatureSetReductionIndecisive(t *testing.T) {
-	// Adjust timer to reduce waiting times
-	user.StepTime = 1 * time.Second
-
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -184,19 +161,16 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 	}
 
 	// Function should have returned and we should have a nil sigsethash
-	assert.Nil(t, ctx.SigSetHash)
-
-	// Reset step timer
-	user.StepTime = 20 * time.Second
+	assert.Equal(t, make([]byte, 32), ctx.SigSetHash)
 }
 
 func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
-	setHash []byte) (*payload.MsgConsensus, error) {
+	setHash []byte) (*payload.MsgConsensus, *payload.MsgConsensus, error) {
 	// Create context
 	keys, _ := user.NewRandKeys()
 	ctx, err := user.NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Populate mappings on passed context
@@ -205,18 +179,19 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 
 	// Populate new context fields
 	ctx.Weight = weight
+	c.W += weight
 	ctx.LastHeader = c.LastHeader
 	ctx.SigSetHash = setHash
 	ctx.BlockHash = winningBlock
-	ctx.Step = c.Step
+	ctx.SigSetStep = c.SigSetStep
 
 	// Add to our committee
-	c.CurrentCommittee = append(c.CurrentCommittee, []byte(*keys.EdPubKey))
+	c.Committee = append(c.Committee, []byte(*keys.EdPubKey))
 
 	// Sign sig set with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Set BLS key on context
@@ -226,21 +201,32 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	// Create sigsetvote payload to gossip
 	pl, err := consensusmsg.NewSigSetReduction(winningBlock, ctx.SigSetHash, sigBLS, blsPubBytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl)
+	sigEd, err := ctx.CreateSignature(pl, ctx.SigSetStep)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.SigSetStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return msg, nil
+	sigEd2, err := ctx.CreateSignature(pl, ctx.SigSetStep+1)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	msg2, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.SigSetStep+1, sigEd2, []byte(*ctx.Keys.EdPubKey), pl)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return msg, msg2, nil
 }
 
 func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
@@ -280,13 +266,13 @@ func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
 
 		// Create two votes and add them to the array
 		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
-			ctx.Step)
+			ctx.SigSetStep)
 		if err != nil {
 			return nil, err
 		}
 
 		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
-			ctx.Step-1)
+			ctx.SigSetStep-1)
 		if err != nil {
 			return nil, err
 		}

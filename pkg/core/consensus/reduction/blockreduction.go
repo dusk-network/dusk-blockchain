@@ -116,11 +116,16 @@ func blockVote(ctx *user.Context) error {
 func countBlockVotes(ctx *user.Context) error {
 	// Set vote limit
 	voteLimit := int(0.75 * float64(len(ctx.Committee)))
-	if voteLimit > 50 {
-		voteLimit = 50
+	if voteLimit > 38 {
+		voteLimit = 38
 	}
 
-	var receivedCount uint8
+	limit := len(ctx.Committee)
+	if limit > 50 {
+		limit = 50
+	}
+
+	var receivedCount int
 
 	// Keep a counter of how many votes have been cast for a specific block
 	counts := make(map[string]uint8)
@@ -138,6 +143,12 @@ func countBlockVotes(ctx *user.Context) error {
 	}
 
 	for {
+		// If we got all votes for this current phase, we move on.
+		if receivedCount == limit {
+			ctx.BlockHash = make([]byte, 32)
+			return nil
+		}
+
 		select {
 		case <-ctx.QuitChan:
 			// Send another value to get through the phase
@@ -171,7 +182,7 @@ func countBlockVotes(ctx *user.Context) error {
 			voters[pkEd] = true
 			hashStr := hex.EncodeToString(pl.BlockHash)
 			counts[hashStr] += votes
-			receivedCount += votes
+			receivedCount += int(votes)
 			blockVote, err := consensusmsg.NewVote(pl.BlockHash, pl.PubKeyBLS,
 				pl.SigBLS, atomic.LoadUint32(&ctx.BlockStep))
 			if err != nil {
@@ -189,11 +200,6 @@ func countBlockVotes(ctx *user.Context) error {
 
 			// If a block doesnt exceed the vote threshold, we keep going.
 			if counts[hashStr] < uint8(voteLimit) {
-				// But, if we got all votes for this current phase, we move on.
-				if receivedCount == uint8(voteLimit) {
-					return nil
-				}
-
 				break
 			}
 
