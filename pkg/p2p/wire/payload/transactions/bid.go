@@ -12,15 +12,15 @@ type Bid struct {
 	Inputs []*Input
 	*Output
 	Timelock uint64
-	Secret   []byte
+	M        []byte
 	Fee      uint64
 }
 
 // NewBid returns a Bid struct populated with the passed parameters.
-func NewBid(timelock uint64, secret []byte, fee uint64) *Bid {
+func NewBid(timelock uint64, m []byte, fee uint64) *Bid {
 	return &Bid{
 		Timelock: timelock,
-		Secret:   secret,
+		M:        m,
 		Fee:      fee,
 	}
 }
@@ -56,7 +56,7 @@ func (b *Bid) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, b.Secret); err != nil {
+	if err := encoding.Write256(w, b.M); err != nil {
 		return err
 	}
 
@@ -92,7 +92,7 @@ func (b *Bid) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &b.Secret); err != nil {
+	if err := encoding.Read256(r, &b.M); err != nil {
 		return err
 	}
 
