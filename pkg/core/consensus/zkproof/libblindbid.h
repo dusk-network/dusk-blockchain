@@ -8,14 +8,6 @@ struct Buffer {
   size_t len;
 };
 
-void prog(const uint8_t *seed_ptr,
-          const uint8_t *k_ptr,
-          const uint8_t *d_ptr,
-          uint8_t *q_ptr,
-          uint8_t *x_ptr,
-          uint8_t *y_ptr,
-          uint8_t *y_inv_ptr,
-          uint8_t *z_img_ptr);
 
 struct Buffer *prove(const uint8_t *d_ptr,
             const uint8_t *k_ptr,
@@ -25,10 +17,12 @@ struct Buffer *prove(const uint8_t *d_ptr,
             const uint8_t *z_img_ptr,
             const uint8_t *seed_ptr,
             struct Buffer *pub_list,
-            uintptr_t toggle);
+            struct Buffer *constants,
+            uint8_t toggle);
 
 bool verify(struct Buffer *buff,
             const uint8_t *seed_ptr,
             struct Buffer *pub_list,
             const uint8_t *q_ptr,
-            const uint8_t *z_img_ptr);
+            const uint8_t *z_img_ptr,
+            struct Buffer *constants);
