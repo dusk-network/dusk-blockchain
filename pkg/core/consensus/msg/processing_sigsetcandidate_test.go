@@ -17,7 +17,7 @@ func TestVerifySigSetCandidate(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,17 +28,17 @@ func TestVerifySigSetCandidate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set and message
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x04, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestSigSetCandidateDeviatingBlock(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,8 +75,8 @@ func TestSigSetCandidateDeviatingBlock(t *testing.T) {
 	}
 
 	// Increment step counter, and set up committee
-	ctx.Step++
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	ctx.SigSetStep++
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestSigSetCandidateDeviatingBlock(t *testing.T) {
 	ctx.CurrentCommittee = committee
 
 	// Verify the message (should fail with low priority error)
-	ctx.BlockHash = make([]byte, 32)
+	ctx.WinningBlockHash = make([]byte, 32)
 	err2 := msg.Process(ctx, m)
 	if err2 == nil {
 		t.Fatal("deviating block check did not work")

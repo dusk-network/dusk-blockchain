@@ -22,7 +22,7 @@ func TestVerifyBlockAgreement(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,20 +36,16 @@ func TestVerifyBlockAgreement(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
-		ctx.Committee, ctx.NodeWeights)
-	if err != nil {
+	if err := ctx.SetCommittee(ctx.BlockStep); err != nil {
 		t.Fatal(err)
 	}
-
-	ctx.CurrentCommittee = committee
 
 	// Verify the message
 	err2 := msg.Process(ctx, m)
@@ -76,7 +72,7 @@ func TestBlockAgreementNotInCommittee(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +92,7 @@ func TestBlockAgreementNotInCommittee(t *testing.T) {
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -133,14 +129,14 @@ func TestBlockAgreementSmallVoteSet(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 50,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -177,14 +173,14 @@ func TestBlockAgreementVoterStakeCheck(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -231,14 +227,14 @@ func TestBlockAgreementVoterBLSCheck(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -284,14 +280,14 @@ func TestBlockAgreementVoterCommitteeCheck(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -339,14 +335,14 @@ func TestBlockAgreementVoterSigCheck(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, true, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -383,14 +379,14 @@ func TestBlockAgreementVoterStepCheck(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -427,14 +423,14 @@ func TestBlockAgreementVoterHashCheck(t *testing.T) {
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.BlockStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.BlockStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -479,18 +475,19 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 
 		c.LastHeader = ctx.LastHeader
 		c.Weight = 500
+		ctx.W += 500
 		c.BlockHash = blockHash
 
 		ctxs = append(ctxs, c)
 	}
 
-	committee1, err := sortition.CreateCommittee(ctx.Round, ctx.W, 1, uint8(amount), ctx.Committee,
+	committee1, err := sortition.CreateCommittee(ctx.Round, ctx.W, 1, ctx.Committee,
 		ctx.NodeWeights)
 	if err != nil {
 		return nil, err
 	}
 
-	committee2, err := sortition.CreateCommittee(ctx.Round, ctx.W, 2, uint8(amount), ctx.Committee,
+	committee2, err := sortition.CreateCommittee(ctx.Round, ctx.W, 2, ctx.Committee,
 		ctx.NodeWeights)
 	if err != nil {
 		return nil, err
@@ -503,7 +500,14 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 
 	// Make message from one of the context objects we just created
 	var pl consensusmsg.Msg
-	c := ctxs[0]
+	pk := committee2[1]
+	var sendCtx *user.Context
+	for _, c := range ctxs {
+		if bytes.Equal([]byte(*c.Keys.EdPubKey), pk) {
+			sendCtx = c
+			break
+		}
+	}
 	switch consensusmsg.ID(id) {
 	case consensusmsg.BlockAgreementID:
 		pl, err = consensusmsg.NewBlockAgreement(blockHash, voteSet)
@@ -516,13 +520,13 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 			return nil, err
 		}
 	case consensusmsg.SigSetAgreementID:
-		hash, err := c.HashVotes(voteSet)
+		hash, err := sendCtx.HashVotes(voteSet)
 		if err != nil {
 			return nil, err
 		}
 
 		// Adjust votes to vote for the hash instead
-		voteSet, err := createVotes(committee1, committee2, ctxs, blockHash, spoofSig, spoofStep, spoofHash)
+		voteSet, err := createVotes(committee1, committee2, ctxs, hash, spoofSig, spoofStep, spoofHash)
 		if err != nil {
 			return nil, err
 		}
@@ -535,14 +539,13 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 		return nil, errors.New("wrong id for vote set and message creation")
 	}
 
-	c.Step = ctx.Step
-	sigEd, err := c.CreateSignature(pl)
+	sigEd, err := sendCtx.CreateSignature(pl, 2)
 	if err != nil {
 		return nil, err
 	}
 
-	m, err := payload.NewMsgConsensus(c.Version, c.Round, c.LastHeader.Hash, c.Step,
-		sigEd, []byte(*c.Keys.EdPubKey), pl)
+	m, err := payload.NewMsgConsensus(sendCtx.Version, sendCtx.Round, sendCtx.LastHeader.Hash, 2,
+		sigEd, []byte(*sendCtx.Keys.EdPubKey), pl)
 	if err != nil {
 		return nil, err
 	}

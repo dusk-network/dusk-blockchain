@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
+
+	ristretto "github.com/bwesterb/go-ristretto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 
@@ -79,6 +82,13 @@ func ProcessBlockQueue(ctx *user.Context) *prerror.PrError {
 		}
 	}
 
+	// Empty queue for this step
+	m, ok := ctx.BlockQueue.Load(ctx.Round)
+	if !ok {
+		return nil
+	}
+
+	m.(*sync.Map).Store(atomic.LoadUint32(&ctx.BlockStep), make([]*payload.MsgConsensus, 0))
 	return nil
 }
 
@@ -96,6 +106,14 @@ func ProcessSigSetQueue(ctx *user.Context) *prerror.PrError {
 		}
 	}
 
+	// Empty queue for this step
+	m, ok := ctx.SigSetQueue.Load(ctx.Round)
+	if !ok {
+		return nil
+	}
+
+	m.(*sync.Map).Store(atomic.LoadUint32(&ctx.SigSetStep), make([]*payload.MsgConsensus, 0))
+
 	return nil
 }
 
@@ -105,13 +123,21 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateScoreID:
 		pl := msg.Payload.(*consensusmsg.CandidateScore)
-		if !zkproof.Verify(ctx, pl.Proof, pl.Seed, pl.Score, pl.ZImg) {
-			return prerror.New(prerror.Low, errors.New("proof verification failed"))
+
+		// Check first if the publist contains valid bids
+		if err := checkPubList(ctx, pl.PubList); err != nil {
+			return err
 		}
 
 		score := big.NewInt(0).SetBytes(pl.Score).Uint64()
 		if score < ctx.Tau {
 			return prerror.New(prerror.Low, errors.New("candidate score below threshold"))
+		}
+
+		seedScalar := ristretto.Scalar{}
+		seedScalar.SetBigInt(big.NewInt(0).SetBytes(pl.Seed))
+		if !zkproof.Verify(pl.Proof, seedScalar.Bytes(), pl.PubList, pl.Score, pl.Z) {
+			return prerror.New(prerror.Low, errors.New("proof verification failed"))
 		}
 
 		ctx.CandidateScoreChan <- msg
@@ -158,6 +184,12 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return nil
 	case consensusmsg.SigSetCandidateID:
 		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
+
+		// We discard any deviating block hashes after the block reduction phase
+		if !bytes.Equal(pl.WinningBlockHash, ctx.WinningBlockHash) {
+			return prerror.New(prerror.Low, errors.New("wrong block hash"))
+		}
+
 		if err := verifyVoteSet(ctx, pl.SignatureSet, pl.WinningBlockHash, pl.Step); err != nil {
 			return err
 		}
@@ -209,6 +241,37 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return prerror.New(prerror.Low, fmt.Errorf("consensus: consensus payload has unrecognized ID %v",
 			msg.Payload.Type()))
 	}
+}
+
+func checkPubList(ctx *user.Context, pl []byte) *prerror.PrError {
+	// Reconstruct
+	if len(pl)%32 != 0 {
+		return prerror.New(prerror.Low, errors.New("malformed publist"))
+	}
+
+	bids := len(pl) / 32
+	index := 0
+	var pubList [][]byte
+	for i := 0; i < bids; i++ {
+		pubList = append(pubList, pl[index:index+32])
+		index += 32
+	}
+
+	// Check
+loop:
+	for _, x := range pubList {
+		for _, x2 := range ctx.PubList {
+			if bytes.Equal(x, x2.Bytes()) {
+				continue loop
+			}
+		}
+
+		if !bytes.Equal(x, ctx.X) {
+			return prerror.New(prerror.Low, errors.New("invalid publist"))
+		}
+	}
+
+	return nil
 }
 
 func verifyBLSKey(ctx *user.Context, pubKeyEd, pubKeyBls []byte) bool {

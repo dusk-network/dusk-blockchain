@@ -16,7 +16,7 @@ func TestVerifyBlockReduction(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestVerifyBlockReduction(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	ctx.Committee = append(ctx.Committee, m.PubKey)
 
 	// Verify the message
 	err2 := msg.Process(ctx, m)
@@ -46,7 +46,7 @@ func TestBlockReductionWrongStep(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,10 +63,10 @@ func TestBlockReductionWrongStep(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	ctx.Committee = append(ctx.Committee, m.PubKey)
 
 	// Change our step and verify the message (should fail with low priority error)
-	ctx.Step++
+	ctx.BlockStep++
 	err2 := msg.Process(ctx, m)
 	if err2 == nil {
 		t.Fatal("step check did not work")
@@ -81,7 +81,7 @@ func TestBlockReductionNotInCommittee(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestBlockReductionWrongBLSKey(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestBlockReductionWrongBLSKey(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	ctx.Committee = append(ctx.Committee, m.PubKey)
 
 	// Clear out our bls key mapping
 	ctx.NodeBLS = make(map[string][]byte)
@@ -149,7 +149,7 @@ func TestBlockReductionWrongBLSSig(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestBlockReductionWrongBLSSig(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	ctx.Committee = append(ctx.Committee, m.PubKey)
 
 	// Verify the message (should fail with low priority error)
 	err2 := msg.Process(ctx, m)

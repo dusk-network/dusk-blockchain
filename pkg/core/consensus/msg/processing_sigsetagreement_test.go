@@ -19,7 +19,7 @@ func TestVerifySigSetAgreement(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,17 +30,18 @@ func TestVerifySigSetAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 	ctx.BlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
-	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
+	ctx.SigSetStep++
+	m, err := createVoteSetAndMsg(ctx, ctx.BlockHash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +60,7 @@ func TestSigSetAgreementNotInCommittee(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,10 +71,10 @@ func TestSigSetAgreementNotInCommittee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +94,7 @@ func TestSigSetAgreementNotInCommittee(t *testing.T) {
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +117,7 @@ func TestSigSetAgreementWrongBlock(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +128,7 @@ func TestSigSetAgreementWrongBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set with a different hash
 	hash, err := crypto.RandEntropy(32)
@@ -135,14 +136,14 @@ func TestSigSetAgreementWrongBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +166,7 @@ func TestSigSetAgreementSmallVoteSet(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,17 +177,22 @@ func TestSigSetAgreementSmallVoteSet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Increase committee
+	for i := 0; i < 20; i++ {
+		ctx.Committee = append(ctx.Committee, make([]byte, 32))
+	}
+
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 50,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +215,7 @@ func TestSigSetAgreementVoterStakeCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,17 +226,17 @@ func TestSigSetAgreementVoterStakeCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -263,7 +269,7 @@ func TestSigSetAgreementVoterBLSCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,17 +280,17 @@ func TestSigSetAgreementVoterBLSCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -316,7 +322,7 @@ func TestSigSetAgreementVoterCommitteeCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,17 +333,17 @@ func TestSigSetAgreementVoterCommitteeCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -371,7 +377,7 @@ func TestSigSetAgreementVoterSigCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,17 +388,17 @@ func TestSigSetAgreementVoterSigCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, true, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -415,7 +421,7 @@ func TestSigSetAgreementVoterStepCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,17 +432,17 @@ func TestSigSetAgreementVoterStepCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
@@ -459,7 +465,7 @@ func TestSigSetAgreementVoterHashCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,17 +476,17 @@ func TestSigSetAgreementVoterHashCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx.BlockHash = emptyBlock.Header.Hash
+	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
 	// Create vote set
-	ctx.Step++
+	ctx.SigSetStep++
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x06, false, false, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Set up committee
-	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.Step, 10,
+	committee, err := sortition.CreateCommittee(ctx.Round, ctx.W, ctx.SigSetStep,
 		ctx.Committee, ctx.NodeWeights)
 	if err != nil {
 		t.Fatal(err)
