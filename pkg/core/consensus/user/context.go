@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"golang.org/x/crypto/ed25519"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
@@ -39,12 +40,12 @@ type Context struct {
 	// Common variables
 	Version    uint32
 	Tau        uint64
-	Round      uint64        // Current round
-	BlockStep  uint32        // Current step of block phase
-	SigSetStep uint32        // Current step of signature set phase
-	Seed       []byte        // Round seed
-	LastHeader *block.Header // Previous block
-	K          []byte        // secret
+	Round      uint64           // Current round
+	BlockStep  uint32           // Current step of block phase
+	SigSetStep uint32           // Current step of signature set phase
+	Seed       []byte           // Round seed
+	LastHeader *block.Header    // Previous block
+	K          ristretto.Scalar // secret
 	Keys       *Keys
 	Magic      protocol.Magic
 	Multiplier uint8 // Time multiplier
@@ -73,12 +74,11 @@ type Context struct {
 	WinningSigSetHash []byte               // Winning signature set hash
 
 	/// Tracking fields
-	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
-	CurrentCommittee [][]byte          // Set of public keys of committee members for a current step
-	NodeWeights      map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
-	NodeBLS          map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
-	SortedPubList    [][]byte          // Bidder public list which lexicographically sorts all values
-	PubList          []byte
+	Committee        [][]byte           // Lexicogaphically ordered provisioner public keys
+	CurrentCommittee [][]byte           // Set of public keys of committee members for a current step
+	NodeWeights      map[string]uint64  // Other nodes' Ed25519 public keys mapped to their stake weights
+	NodeBLS          map[string][]byte  // Other nodes' BLS public keys mapped to their Ed25519 public keys
+	PubList          []ristretto.Scalar // Bidder public list which lexicographically sorts all values
 
 	/// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
@@ -127,11 +127,6 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Map: new(sync.Map),
 	}
 
-	k, err := crypto.RandEntropy(32)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := &Context{
 		Version:    10000, // Placeholder
 		Tau:        tau,
@@ -146,7 +141,7 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		},
 		Certificate:         &block.Certificate{},
 		D:                   d,
-		K:                   k,
+		K:                   ristretto.Scalar{},
 		X:                   make([]byte, 32),
 		Y:                   make([]byte, 32),
 		Q:                   make([]byte, 32),
