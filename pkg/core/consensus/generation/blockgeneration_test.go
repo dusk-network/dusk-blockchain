@@ -3,6 +3,8 @@ package generation_test
 import (
 	"testing"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +17,16 @@ func TestBlockGeneration(t *testing.T) {
 	ctx, err := user.NewContext(20, 5000, 0, 150000, nil, protocol.TestNet, randtestKeys(t))
 	assert.Nil(t, err)
 	ctx.K.Rand()
+	for i := 0; i < 10; i++ {
+		bytes, err := crypto.RandEntropy(32)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var bid user.Bid
+		copy(bid[:], bytes[:])
+		ctx.PubList.AddBid(bid)
+	}
 
 	err = generation.Block(ctx)
 	assert.Nil(t, err)
