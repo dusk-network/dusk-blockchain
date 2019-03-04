@@ -441,11 +441,11 @@ func newMessage(c *user.Context, blockHash []byte, id uint8,
 		return nil, err
 	}
 
-	pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+	pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 	pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
 	c.NodeWeights[pkEd] = 500
 	c.W += 500
-	c.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
+	c.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockStep = c.BlockStep
 	ctx.SigSetStep = c.SigSetStep
@@ -553,7 +553,7 @@ func newMessage(c *user.Context, blockHash []byte, id uint8,
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, c.LastHeader.Hash, step,
-		sigEd, []byte(*keys.EdPubKey), pl)
+		sigEd, keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return nil, err
 	}

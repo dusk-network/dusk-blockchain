@@ -462,10 +462,10 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 
 		// Set these keys in our context values to pass processing
 		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
-		pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 		ctx.NodeWeights[pkEd] = 500
-		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
-		ctx.Committee = append(ctx.Committee, []byte(*keys.EdPubKey))
+		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
+		ctx.Committee = append(ctx.Committee, keys.EdPubKeyBytes())
 
 		// Make dummy context for score creation
 		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
@@ -503,7 +503,7 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 	pk := committee2[1]
 	var sendCtx *user.Context
 	for _, c := range ctxs {
-		if bytes.Equal([]byte(*c.Keys.EdPubKey), pk) {
+		if bytes.Equal(c.Keys.EdPubKeyBytes(), pk) {
 			sendCtx = c
 			break
 		}
