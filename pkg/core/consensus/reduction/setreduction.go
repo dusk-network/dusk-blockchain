@@ -73,7 +73,7 @@ func sigSetVote(ctx *user.Context) error {
 		}
 
 		// If we are not in the committee, then don't vote
-		votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
+		votes := sortition.Verify(ctx.CurrentCommittee, ctx.Keys.EdPubKeyBytes())
 		if votes == 0 {
 			return nil
 		}
@@ -97,7 +97,7 @@ func sigSetVote(ctx *user.Context) error {
 		}
 
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-			atomic.LoadUint32(&ctx.SigSetStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+			atomic.LoadUint32(&ctx.SigSetStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 		if err != nil {
 			return err
 		}

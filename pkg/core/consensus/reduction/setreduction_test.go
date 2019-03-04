@@ -50,9 +50,9 @@ func TestSignatureSetReductionVote(t *testing.T) {
 	ctx.SigSetHash = setHash
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
 
 	// Start block reduction with us as the only committee member
 	if err := reduction.SignatureSet(ctx); err != nil {
@@ -174,8 +174,8 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	}
 
 	// Populate mappings on passed context
-	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
-	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+	c.NodeWeights[hex.EncodeToString(keys.EdPubKeyBytes())] = weight
+	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = keys.EdPubKeyBytes()
 
 	// Populate new context fields
 	ctx.Weight = weight
@@ -186,7 +186,7 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	ctx.SigSetStep = c.SigSetStep
 
 	// Add to our committee
-	c.Committee = append(c.Committee, []byte(*keys.EdPubKey))
+	c.Committee = append(c.Committee, keys.EdPubKeyBytes())
 
 	// Sign sig set with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
@@ -196,7 +196,7 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 
 	// Set BLS key on context
 	blsPubBytes := ctx.Keys.BLSPubKey.Marshal()
-	c.NodeBLS[hex.EncodeToString([]byte(*keys.EdPubKey))] = blsPubBytes
+	c.NodeBLS[hex.EncodeToString(keys.EdPubKeyBytes())] = blsPubBytes
 
 	// Create sigsetvote payload to gossip
 	pl, err := consensusmsg.NewSigSetReduction(winningBlock, ctx.SigSetHash, sigBLS, blsPubBytes)
@@ -210,7 +210,7 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.SigSetStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.SigSetStep, sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -221,7 +221,7 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	}
 
 	msg2, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.SigSetStep+1, sigEd2, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.SigSetStep+1, sigEd2, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -239,9 +239,9 @@ func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
 
 		// Set these keys in our context values to pass processing
 		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
-		pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 		ctx.NodeWeights[pkEd] = 500
-		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
+		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
 
 		// Make dummy context for score creation
 		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)

@@ -38,9 +38,9 @@ func TestBlockReductionVote(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
 
 	// Start block reduction with us as the only committee member
 	if err := reduction.Block(ctx); err != nil {
@@ -67,9 +67,9 @@ func TestBlockReductionDecisive(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
 
 	// Make 50 votes and send them to the channel beforehand
 	otherVotes := make([]*payload.MsgConsensus, 0)
@@ -124,9 +124,9 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
 
 	// Make another block hash that voters will vote on
 	otherBlock, _ := crypto.RandEntropy(32)
@@ -178,9 +178,9 @@ func TestBlockReductionFallback(t *testing.T) {
 	ctx.Weight = 500
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
 
 	// Make 50 votes and send them to the channel beforehand
 	otherVotes := make([]*payload.MsgConsensus, 0)
@@ -234,9 +234,9 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
 
 	// Make 50 votes without sending them (will increase our committee size without
 	// voting)
@@ -280,8 +280,8 @@ func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus,
 	c.W += uint64(weight)
 
 	// Populate mappings on passed context
-	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = uint64(weight)
-	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+	c.NodeWeights[hex.EncodeToString(keys.EdPubKeyBytes())] = uint64(weight)
+	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = keys.EdPubKeyBytes()
 
 	// Populate new context fields
 	ctx.Weight = uint64(weight)
@@ -290,7 +290,7 @@ func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus,
 	ctx.BlockStep = c.BlockStep
 
 	// Add to our committee
-	c.Committee = append(c.Committee, []byte(*keys.EdPubKey))
+	c.Committee = append(c.Committee, keys.EdPubKeyBytes())
 
 	// Sign block hash with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, blockHash)
@@ -310,7 +310,7 @@ func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus,
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.BlockStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.BlockStep, sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -321,7 +321,7 @@ func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus,
 	}
 
 	msg2, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.BlockStep+1, sigEd2, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.BlockStep+1, sigEd2, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return nil, nil, err
 	}

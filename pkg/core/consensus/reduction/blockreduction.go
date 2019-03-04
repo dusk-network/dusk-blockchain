@@ -78,7 +78,7 @@ func blockVote(ctx *user.Context) error {
 		}
 
 		// If we are not in the committee, then don't vote
-		votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
+		votes := sortition.Verify(ctx.CurrentCommittee, ctx.Keys.EdPubKeyBytes())
 		if votes == 0 {
 			return nil
 		}
@@ -103,7 +103,7 @@ func blockVote(ctx *user.Context) error {
 
 		// Create message
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-			atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+			atomic.LoadUint32(&ctx.BlockStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 		if err != nil {
 			return err
 		}
