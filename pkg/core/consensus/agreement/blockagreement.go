@@ -89,42 +89,7 @@ func Block(ctx *user.Context, c chan bool) {
 
 			ctx.WinningBlockHash = pl.BlockHash
 
-			// // Populate certificate
-			// ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.SigSetVotes))
-			// for i := 0; i < len(ctx.SigSetVotes); i++ {
-			// 	pkBLS := hex.EncodeToString(ctx.SigSetVotes[i].PubKey)
-			// 	ctx.Certificate.BRPubKeys = append(ctx.Certificate.BRPubKeys,
-			// 		ctx.NodeBLS[pkBLS])
-			// }
-
-			// agSig := &bls.Signature{}
-			// if err := agSig.Decompress(ctx.SigSetVotes[0].Sig); err != nil {
-			// 	// Log
-			// 	c <- false
-			// 	return
-			// }
-
-			// // Batch all the signatures together
-			// for i, vote := range voteSet {
-			// 	// Skip the one we already got (agSig)
-			// 	if i == 0 {
-			// 		continue
-			// 	}
-
-			// 	sig := &bls.Signature{}
-			// 	if err := sig.Decompress(vote.Sig); err != nil {
-			// 		// Log
-			// 		c <- false
-			// 		return
-			// 	}
-
-			// 	agSig.Aggregate(sig)
-			// 	ctx.Certificate.BRPubKeys[i] = vote.PubKey
-			// }
-
-			// cSig := agSig.Compress()
-			// ctx.Certificate.BRBatchedSig = cSig
-
+			// We save the winning step for the signature set phase
 			ctx.Certificate.BRStep = m.Step
 
 			c <- true
