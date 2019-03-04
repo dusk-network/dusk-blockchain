@@ -23,7 +23,13 @@ func Block(ctx *user.Context) error {
 	dScalar := zkproof.Uint64ToScalar(ctx.D)
 	seedScalar := ristretto.Scalar{}
 	seedScalar.Derive(ctx.Seed)
-	pubList := ctx.PubList.GetRandomBids(10)
+	bids := ctx.PubList.GetRandomBids(10)
+	pubList := make([]ristretto.Scalar, len(bids))
+	for i, bid := range bids {
+		bidScalar := zkproof.BytesToScalar(bid[:])
+		pubList[i] = bidScalar
+	}
+
 	proof, q, z, pL := zkproof.Prove(dScalar, ctx.K, seedScalar, pubList)
 
 	score := big.NewInt(0).SetBytes(q).Uint64()
