@@ -9,8 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	ristretto "github.com/bwesterb/go-ristretto"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
@@ -125,17 +123,23 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		pl := msg.Payload.(*consensusmsg.CandidateScore)
 
 		// Check first if the publist contains valid bids
-		if err := checkPubList(ctx, pl.PubList); err != nil {
+		pubList, err := user.CreatePubList(pl.PubList)
+		if err != nil {
 			return err
 		}
 
+		if err := ctx.PubList.ValidateBids(pubList); err != nil {
+			return err
+		}
+
+		// Check if the score exceeds the threshold
 		score := big.NewInt(0).SetBytes(pl.Score).Uint64()
 		if score < ctx.Tau {
 			return prerror.New(prerror.Low, errors.New("candidate score below threshold"))
 		}
 
-		seedScalar := ristretto.Scalar{}
-		seedScalar.SetBigInt(big.NewInt(0).SetBytes(pl.Seed))
+		// Verify the proof
+		seedScalar := zkproof.BytesToScalar(pl.Seed)
 		if !zkproof.Verify(pl.Proof, seedScalar.Bytes(), pl.PubList, pl.Score, pl.Z) {
 			return prerror.New(prerror.Low, errors.New("proof verification failed"))
 		}
@@ -241,37 +245,6 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return prerror.New(prerror.Low, fmt.Errorf("consensus: consensus payload has unrecognized ID %v",
 			msg.Payload.Type()))
 	}
-}
-
-func checkPubList(ctx *user.Context, pl []byte) *prerror.PrError {
-	// Reconstruct
-	if len(pl)%32 != 0 {
-		return prerror.New(prerror.Low, errors.New("malformed publist"))
-	}
-
-	bids := len(pl) / 32
-	index := 0
-	var pubList [][]byte
-	for i := 0; i < bids; i++ {
-		pubList = append(pubList, pl[index:index+32])
-		index += 32
-	}
-
-	// Check
-loop:
-	for _, x := range pubList {
-		for _, x2 := range ctx.PubList {
-			if bytes.Equal(x, x2.Bytes()) {
-				continue loop
-			}
-		}
-
-		if !bytes.Equal(x, ctx.X) {
-			return prerror.New(prerror.Low, errors.New("invalid publist"))
-		}
-	}
-
-	return nil
 }
 
 func verifyBLSKey(ctx *user.Context, pubKeyEd, pubKeyBls []byte) bool {
