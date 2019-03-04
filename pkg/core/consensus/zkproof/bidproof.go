@@ -4,6 +4,7 @@ package zkproof
 // #include "./libblindbid.h"
 import "C"
 import (
+	"encoding/binary"
 	"math/rand"
 	"time"
 	"unsafe"
@@ -223,5 +224,15 @@ func BytesToScalar(d []byte) ristretto.Scalar {
 	var buf [32]byte
 	copy(buf[:], d[:])
 	x.SetBytes(&buf)
+	return x
+}
+
+// Uint64ToScalar will turn a uint64 into a scalar and return it.
+func Uint64ToScalar(n uint64) ristretto.Scalar {
+	x := ristretto.Scalar{}
+
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], n)
+	x.Derive(buf[:])
 	return x
 }
