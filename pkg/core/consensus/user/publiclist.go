@@ -91,7 +91,11 @@ func (p *PublicList) AddBid(bid []byte) error {
 }
 
 // RemoveBid will iterate over a public list and remove a specified bid.
-func (p *PublicList) RemoveBid(bid []byte) {
+func (p *PublicList) RemoveBid(bid []byte) error {
+	if len(bid) != 32 {
+		return fmt.Errorf("bid should be 32 bytes, is %v bytes", len(bid))
+	}
+
 	for i, b := range *p {
 		if bytes.Equal(bid, b[:]) {
 			list := *p
@@ -99,4 +103,6 @@ func (p *PublicList) RemoveBid(bid []byte) {
 			*p = list
 		}
 	}
+
+	return nil
 }
