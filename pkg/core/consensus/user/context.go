@@ -74,11 +74,11 @@ type Context struct {
 	WinningSigSetHash []byte               // Winning signature set hash
 
 	/// Tracking fields
-	Committee        [][]byte           // Lexicogaphically ordered provisioner public keys
-	CurrentCommittee [][]byte           // Set of public keys of committee members for a current step
-	NodeWeights      map[string]uint64  // Other nodes' Ed25519 public keys mapped to their stake weights
-	NodeBLS          map[string][]byte  // Other nodes' BLS public keys mapped to their Ed25519 public keys
-	PubList          []ristretto.Scalar // Bidder public list which lexicographically sorts all values
+	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
+	CurrentCommittee [][]byte          // Set of public keys of committee members for a current step
+	NodeWeights      map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
+	NodeBLS          map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
+	PubList          PublicList        // Bidder public list
 
 	/// Message channels
 	CandidateScoreChan  chan *payload.MsgConsensus
