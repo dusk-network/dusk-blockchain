@@ -19,7 +19,7 @@ func Block(ctx *user.Context, c chan bool) {
 	sets := make(map[uint32][]*consensusmsg.Vote)
 
 	// Make a counter to keep track of how many votes have been cast in a step
-	counter := make(map[uint32]int)
+	counter := make(map[uint32]uint8)
 
 	// Make a map to keep track if a node has voted in a certain step
 	voted := make(map[uint32]map[string]bool)
@@ -47,7 +47,7 @@ func Block(ctx *user.Context, c chan bool) {
 			voted[m.Step][pkEd] = true
 
 			// Store set if it's ours
-			if bytes.Equal(m.PubKey, []byte(*ctx.Keys.EdPubKey)) {
+			if bytes.Equal(m.PubKey, ctx.Keys.EdPubKeyBytes()) {
 				sets[m.Step] = pl.VoteSet
 			}
 
@@ -60,8 +60,7 @@ func Block(ctx *user.Context, c chan bool) {
 				return
 			}
 
-			votes := sortition.Verify(committee, m.PubKey)
-			counter[m.Step] += int(votes)
+			counter[m.Step] += committee[pkEd]
 
 			// Gossip the message
 			if err := ctx.SendMessage(ctx.Magic, m); err != nil {
@@ -71,13 +70,13 @@ func Block(ctx *user.Context, c chan bool) {
 			}
 
 			// Check if we have exceeded the limit.
-			size := len(ctx.Committee)
+			size := len(*ctx.Committee)
 			if size > 50 {
 				size = 50
 			}
 
 			limit := float64(size) * 0.75
-			if counter[m.Step] < int(limit) {
+			if counter[m.Step] < uint8(limit) {
 				break
 			}
 
@@ -89,42 +88,7 @@ func Block(ctx *user.Context, c chan bool) {
 
 			ctx.WinningBlockHash = pl.BlockHash
 
-			// // Populate certificate
-			// ctx.Certificate.BRPubKeys = make([][]byte, len(ctx.SigSetVotes))
-			// for i := 0; i < len(ctx.SigSetVotes); i++ {
-			// 	pkBLS := hex.EncodeToString(ctx.SigSetVotes[i].PubKey)
-			// 	ctx.Certificate.BRPubKeys = append(ctx.Certificate.BRPubKeys,
-			// 		ctx.NodeBLS[pkBLS])
-			// }
-
-			// agSig := &bls.Signature{}
-			// if err := agSig.Decompress(ctx.SigSetVotes[0].Sig); err != nil {
-			// 	// Log
-			// 	c <- false
-			// 	return
-			// }
-
-			// // Batch all the signatures together
-			// for i, vote := range voteSet {
-			// 	// Skip the one we already got (agSig)
-			// 	if i == 0 {
-			// 		continue
-			// 	}
-
-			// 	sig := &bls.Signature{}
-			// 	if err := sig.Decompress(vote.Sig); err != nil {
-			// 		// Log
-			// 		c <- false
-			// 		return
-			// 	}
-
-			// 	agSig.Aggregate(sig)
-			// 	ctx.Certificate.BRPubKeys[i] = vote.PubKey
-			// }
-
-			// cSig := agSig.Compress()
-			// ctx.Certificate.BRBatchedSig = cSig
-
+			// We save the winning step for the signature set phase
 			ctx.Certificate.BRStep = m.Step
 
 			c <- true
@@ -148,7 +112,7 @@ func SendBlock(ctx *user.Context) error {
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return err
 	}

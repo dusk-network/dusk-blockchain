@@ -24,7 +24,7 @@ func TestCandidateScoreEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg, err := NewCandidateScore(200, proof, byte32, bls)
+	msg, err := NewCandidateScore(byte32, proof, byte32, byte32, bls, proof)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,11 +57,24 @@ func TestCandidateScoreChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewCandidateScore(200, proof, wrongByte32, wrongByte32); err == nil {
+	bls, err := crypto.RandEntropy(31)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := NewCandidateScore(wrongByte32, proof, byte32, byte32, bls, proof); err == nil {
+		t.Fatal("check for score did not work")
+	}
+
+	if _, err := NewCandidateScore(byte32, proof, wrongByte32, byte32, bls, proof); err == nil {
+		t.Fatal("check for z did not work")
+	}
+
+	if _, err := NewCandidateScore(byte32, proof, byte32, wrongByte32, bls, proof); err == nil {
 		t.Fatal("check for candidatehash did not work")
 	}
 
-	if _, err := NewCandidateScore(200, proof, byte32, byte32); err == nil {
+	if _, err := NewCandidateScore(byte32, proof, byte32, byte32, byte32, proof); err == nil {
 		t.Fatal("check for seed did not work")
 	}
 }

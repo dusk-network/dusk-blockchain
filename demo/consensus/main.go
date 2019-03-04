@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/demo/consensus/ui"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
@@ -365,15 +367,15 @@ func setupContext(s *Server) *user.Context {
 	}
 
 	// Set values for provisioning
-	ctx.Committee = append(ctx.Committee, []byte(*keys.EdPubKey))
+	ctx.Committee = append(ctx.Committee, keys.EdPubKeyBytes())
 	ctx.Weight = uint64(weight)
-	pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+	pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 	pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
 	ctx.NodeBLS[pkBLS] = *keys.EdPubKey
 	ctx.NodeWeights[pkEd] = uint64(weight)
 
 	// Make a staking transaction which mirrors this to other nodes
-	stake := transactions.NewStake(1000, 100, []byte(*keys.EdPubKey),
+	stake := transactions.NewStake(1000, 100, keys.EdPubKeyBytes(),
 		keys.BLSPubKey.Marshal())
 	byte32, _ := crypto.RandEntropy(32)
 	in := transactions.NewInput(byte32, byte32, 0, byte32)
@@ -386,7 +388,8 @@ func setupContext(s *Server) *user.Context {
 		os.Exit(1)
 	}
 
-	bid := transactions.NewBid(1000, ctx.K, 100)
+	m := zkproof.CalculateM(ctx.K)
+	bid := transactions.NewBid(1000, m.Bytes(), 100)
 	in2 := transactions.NewInput(byte32, byte32, 0, byte32)
 	out2 := transactions.NewOutput(uint64(weight), byte32, byte32)
 	bid.AddInput(in2)

@@ -34,13 +34,11 @@ func TestReset(t *testing.T) {
 	ctx, err := user.NewContext(tau, 0, 0, 150000, nil, protocol.TestNet, keys)
 
 	// check consensus values were resetted
-	assert.Nil(t, ctx.X, nil, nil)
-	assert.Nil(t, ctx.Y, nil, nil)
+	assert.Equal(t, ctx.X, make([]byte, 32))
+	assert.Equal(t, ctx.Y, make([]byte, 32))
 	assert.Nil(t, ctx.Z, nil, nil)
 	assert.Nil(t, ctx.M, nil, nil)
-	assert.Nil(t, ctx.K, nil, nil)
-	assert.Equal(t, uint64(0), ctx.Q)
-	assert.Equal(t, uint64(0), ctx.D)
+	assert.Equal(t, ctx.Q, make([]byte, 32))
 }
 
 // Convenience function for provisioner tests

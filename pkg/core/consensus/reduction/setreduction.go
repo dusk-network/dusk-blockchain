@@ -68,12 +68,13 @@ func sigSetVote(ctx *user.Context) error {
 		return nil
 	default:
 		// Set committee first
-		if err := ctx.SetCommittee(atomic.LoadUint32(&ctx.SigSetStep)); err != nil {
+		if err := sortition.SetCommittee(ctx, atomic.LoadUint32(&ctx.SigSetStep)); err != nil {
 			return err
 		}
 
 		// If we are not in the committee, then don't vote
-		votes := sortition.Verify(ctx.CurrentCommittee, []byte(*ctx.Keys.EdPubKey))
+		pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
+		votes := ctx.CurrentCommittee[pkEd]
 		if votes == 0 {
 			return nil
 		}
@@ -97,7 +98,7 @@ func sigSetVote(ctx *user.Context) error {
 		}
 
 		msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-			atomic.LoadUint32(&ctx.SigSetStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+			atomic.LoadUint32(&ctx.SigSetStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 		if err != nil {
 			return err
 		}
@@ -109,12 +110,17 @@ func sigSetVote(ctx *user.Context) error {
 
 func countSigSetVotes(ctx *user.Context) error {
 	// Set vote limit
-	voteLimit := int(0.75 * float64(len(ctx.Committee)))
-	if voteLimit > 50 {
-		voteLimit = 50
+	voteLimit := int(0.75 * float64(len(*ctx.Committee)))
+	if voteLimit > 38 {
+		voteLimit = 38
 	}
 
-	var receivedCount uint8
+	limit := len(*ctx.Committee)
+	if limit > 50 {
+		limit = 50
+	}
+
+	var receivedCount int
 
 	// Keep a counter of how many votes have been cast for a specific set
 	counts := make(map[string]uint8)
@@ -132,6 +138,12 @@ func countSigSetVotes(ctx *user.Context) error {
 	}
 
 	for {
+		// If we got all votes for this current phase, we move on.
+		if receivedCount == limit {
+			ctx.SigSetHash = make([]byte, 32)
+			return nil
+		}
+
 		select {
 		case <-ctx.QuitChan:
 			// Send another value to get through the phase
@@ -159,13 +171,13 @@ func countSigSetVotes(ctx *user.Context) error {
 			}
 
 			// Get amount of votes
-			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
+			votes := ctx.CurrentCommittee[pkEd]
 
 			// Log information
 			voters[pkEd] = true
 			setStr := hex.EncodeToString(pl.SigSetHash)
 			counts[setStr] += votes
-			receivedCount += votes
+			receivedCount += int(votes)
 			sigSetVote, err := consensusmsg.NewVote(pl.SigSetHash, pl.PubKeyBLS,
 				pl.SigBLS, atomic.LoadUint32(&ctx.SigSetStep))
 			if err != nil {
@@ -183,11 +195,6 @@ func countSigSetVotes(ctx *user.Context) error {
 
 			// If a set exceeds vote threshold, we will end the loop.
 			if counts[setStr] < uint8(voteLimit) {
-				// But, if we got all votes for this current phase, we move on.
-				if receivedCount == uint8(voteLimit) {
-					return nil
-				}
-
 				break
 			}
 

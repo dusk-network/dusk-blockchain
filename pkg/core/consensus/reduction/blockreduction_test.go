@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -22,9 +21,6 @@ import (
 
 // Test if votes during block reduction happen successfully.
 func TestBlockReductionVote(t *testing.T) {
-	// Lower step timer to reduce waiting
-	user.StepTime = 1 * time.Second
-
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -42,17 +38,16 @@ func TestBlockReductionVote(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Start block reduction with us as the only committee member
 	if err := reduction.Block(ctx); err != nil {
 		t.Fatal(err)
 	}
-
-	// Reset step timer
-	user.StepTime = 20 * time.Second
 }
 
 // Test the Block function with many votes coming in.
@@ -60,7 +55,7 @@ func TestBlockReductionDecisive(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 500, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,20 +69,26 @@ func TestBlockReductionDecisive(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make 50 votes and send them to the channel beforehand
+	otherVotes := make([]*payload.MsgConsensus, 0)
 	for i := 0; i < 50; i++ {
-		weight := rand.Intn(10000)
-		weight += 100 // Avoid stakes being too low to participate
-		msg, err := newVoteReduction(ctx, candidateBlock)
+		msg, msg2, err := newVoteReduction(ctx, candidateBlock)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		ctx.BlockReductionChan <- msg
+		otherVotes = append(otherVotes, msg2)
+	}
+
+	for _, v := range otherVotes {
+		ctx.BlockReductionChan <- v
 	}
 
 	wg := sync.WaitGroup{}
@@ -113,7 +114,7 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 500, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,21 +128,29 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make another block hash that voters will vote on
 	otherBlock, _ := crypto.RandEntropy(32)
 
 	// Make 50 votes and send them to the channel beforehand
+	otherVotes := make([]*payload.MsgConsensus, 0)
 	for i := 0; i < 50; i++ {
-		msg, err := newVoteReduction(ctx, otherBlock)
+		msg, msg2, err := newVoteReduction(ctx, otherBlock)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		ctx.BlockReductionChan <- msg
+		otherVotes = append(otherVotes, msg2)
+	}
+
+	for _, v := range otherVotes {
+		ctx.BlockReductionChan <- v
 	}
 
 	wg := sync.WaitGroup{}
@@ -166,7 +175,7 @@ func TestBlockReductionFallback(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 500, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,18 +184,26 @@ func TestBlockReductionFallback(t *testing.T) {
 	ctx.Weight = 500
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
-	// Make 50 fallback votes and send them to the channel beforehand
+	// Make 50 votes and send them to the channel beforehand
+	otherVotes := make([]*payload.MsgConsensus, 0)
 	for i := 0; i < 50; i++ {
-		msg, err := newVoteReduction(ctx, make([]byte, 32))
+		msg, msg2, err := newVoteReduction(ctx, make([]byte, 32))
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		ctx.BlockReductionChan <- msg
+		otherVotes = append(otherVotes, msg2)
+	}
+
+	for _, v := range otherVotes {
+		ctx.BlockReductionChan <- v
 	}
 
 	wg := sync.WaitGroup{}
@@ -203,7 +220,7 @@ func TestBlockReductionFallback(t *testing.T) {
 	wg.Wait()
 
 	// Block hash should be nil
-	assert.Nil(t, ctx.BlockHash)
+	assert.Equal(t, make([]byte, 32), ctx.BlockHash)
 }
 
 // Test Block function with a low amount of votes coming in.
@@ -211,7 +228,7 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 500000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 500, 15000, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,19 +242,18 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	ctx.CandidateBlock = &block.Block{}
 
 	// Set ourselves as committee member
-	pkEd := hex.EncodeToString([]byte(*ctx.Keys.EdPubKey))
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, []byte(*ctx.Keys.EdPubKey))
-
-	// Adjust timer to reduce waiting times
-	user.StepTime = 1 * time.Second
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make 50 votes without sending them (will increase our committee size without
 	// voting)
 	for i := 0; i < 50; i++ {
 		weight := rand.Intn(10000)
 		weight += 100 // Avoid stakes being too low to participate
-		if _, err := newVoteReduction(ctx, candidateBlock); err != nil {
+		if _, _, err := newVoteReduction(ctx, candidateBlock); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -256,59 +272,71 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	wg.Wait()
 
 	// Empty block hash should have come out
-	assert.Nil(t, ctx.BlockHash)
-
-	// Reset step timer
-	user.StepTime = 20 * time.Second
+	assert.Equal(t, make([]byte, 32), ctx.BlockHash)
 }
 
 // Convenience function to generate a vote for the reduction phase,
 // to emulate a received MsgReduction over the wire
-func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus, error) {
+func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus,
+	*payload.MsgConsensus, error) {
 	// Create context
 	keys, _ := user.NewRandKeys()
 	ctx, err := user.NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	weight := rand.Intn(10000)
+	c.W += uint64(weight)
 
 	// Populate mappings on passed context
-	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = uint64(weight)
-	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+	c.NodeWeights[hex.EncodeToString(keys.EdPubKeyBytes())] = uint64(weight)
+	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = keys.EdPubKeyBytes()
 
 	// Populate new context fields
 	ctx.Weight = uint64(weight)
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = blockHash
-	ctx.Step = c.Step
+	ctx.BlockStep = c.BlockStep
 
-	// Add to our committee, so they get at least one vote
-	c.CurrentCommittee = append(c.CurrentCommittee, []byte(*keys.EdPubKey))
+	// Add to our committee
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		return nil, nil, err
+	}
 
 	// Sign block hash with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, blockHash)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Create reduction payload to gossip
 	pl, err := consensusmsg.NewBlockReduction(blockHash, sigBLS, ctx.Keys.BLSPubKey.Marshal())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl)
+	sigEd, err := ctx.CreateSignature(pl, ctx.BlockStep)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.BlockStep, sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return msg, nil
+	sigEd2, err := ctx.CreateSignature(pl, ctx.BlockStep+1)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	msg2, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
+		ctx.BlockStep+1, sigEd2, ctx.Keys.EdPubKeyBytes(), pl)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return msg, msg2, nil
 }

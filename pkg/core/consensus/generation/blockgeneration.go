@@ -1,17 +1,16 @@
 package generation
 
 import (
-	"encoding/binary"
 	"math/big"
 	"sync/atomic"
 	"time"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/consensusmsg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 )
 
@@ -19,23 +18,28 @@ import (
 
 // Block will generate a blockMsg and ScoreMsg if node is eligible.
 func Block(ctx *user.Context) error {
-	err := generateParams(ctx)
-	if err != nil {
-		return err
-	}
-
-	yInv, zImg := zkproof.Prog(ctx)
-
-	score := big.NewInt(0).SetBytes(ctx.Q).Uint64()
-	if score < ctx.Tau {
-		return nil
-	}
-
 	// Generate ZkProof and Serialise
 	// XXX: Prove may return error, so chaining like this may not be possible once zk implemented
-	zkBytes, err := zkproof.Prove(ctx, yInv, zImg)
-	if err != nil {
-		return err
+	dScalar := zkproof.Uint64ToScalar(ctx.D)
+	seedScalar := ristretto.Scalar{}
+	seedScalar.Derive(ctx.Seed)
+	numBids := len(ctx.PubList)
+	if numBids > 10 {
+		numBids = 10
+	}
+
+	bids := ctx.PubList.GetRandomBids(numBids)
+	pubList := make([]ristretto.Scalar, len(bids))
+	for i, bid := range bids {
+		bidScalar := zkproof.BytesToScalar(bid[:])
+		pubList[i] = bidScalar
+	}
+
+	proof, q, z, pL := zkproof.Prove(dScalar, ctx.K, seedScalar, pubList)
+
+	score := big.NewInt(0).SetBytes(q).Uint64()
+	if score < ctx.Tau {
+		return nil
 	}
 
 	// Seed is the candidate signature of the previous seed
@@ -54,11 +58,12 @@ func Block(ctx *user.Context) error {
 
 	// Create score msg
 	pl, err := consensusmsg.NewCandidateScore(
-		ctx.Q,                      // score
-		zkBytes,                    // zkproof
-		zImg,                       // Identity hash
+		q,                          // score
+		proof,                      // zkproof
+		z,                          // Identity hash
 		candidateBlock.Header.Hash, // candidateHash
 		ctx.Seed,                   // seed for this round // XXX(TOG): could we use round number/Block height?
+		pL,
 	)
 	if err != nil {
 		return err
@@ -70,7 +75,7 @@ func Block(ctx *user.Context) error {
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return err
 	}
@@ -85,7 +90,7 @@ func Block(ctx *user.Context) error {
 	}
 
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		atomic.LoadUint32(&ctx.BlockStep), sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd2, ctx.Keys.EdPubKeyBytes(), pl2)
 	if err != nil {
 		return err
 	}
@@ -99,102 +104,6 @@ func Block(ctx *user.Context) error {
 	ctx.CandidateBlock = candidateBlock
 
 	return nil
-}
-
-// generate M, X, Y, Z, Q
-func generateParams(ctx *user.Context) error {
-	// XXX: generating X, Y, Z in this way is in-efficient. Passing the parameters in directly from previous computation is better.
-	// Wait until, specs for this has been semi-finalised
-	M, err := GenerateM(ctx.K)
-	if err != nil {
-		return err
-	}
-	X, err := GenerateX(ctx.D, ctx.K)
-	if err != nil {
-		return err
-	}
-	Y, err := GenerateY(ctx.D, ctx.LastHeader.Seed, ctx.K)
-	if err != nil {
-		return err
-	}
-	Z, err := generateZ(ctx.LastHeader.Seed, ctx.K)
-	if err != nil {
-		return err
-	}
-
-	ctx.M = M
-	ctx.X = X
-	ctx.Y = Y
-	ctx.Z = Z
-
-	return nil
-
-}
-
-// GenerateM will return M so that M = H(k)
-func GenerateM(k []byte) ([]byte, error) {
-	M, err := hash.Sha3256(k)
-	if err != nil {
-		return nil, err
-	}
-
-	return M, nil
-}
-
-// GenerateX will return X so that X = H(d, M)
-func GenerateX(d uint64, k []byte) ([]byte, error) {
-
-	M, err := GenerateM(k)
-
-	dM := make([]byte, 8, 40)
-
-	binary.LittleEndian.PutUint64(dM, d)
-
-	dM = append(dM, M...)
-
-	X, err := hash.Sha3256(dM)
-	if err != nil {
-		return nil, err
-	}
-
-	return X, nil
-}
-
-// GenerateY will return Y so that Y = H(S, X)
-func GenerateY(d uint64, S, k []byte) ([]byte, error) {
-
-	X, err := GenerateX(d, k)
-	if err != nil {
-		return nil, err
-	}
-
-	SX := make([]byte, 0, 64) // X = 32 , prevSeed = 32
-	SX = append(SX, S...)
-	SX = append(SX, X...)
-
-	Y, err := hash.Sha3256(SX)
-	if err != nil {
-		return nil, err
-	}
-
-	return Y, nil
-}
-
-// Z = H(S, M)
-func generateZ(S, k []byte) ([]byte, error) {
-
-	M, err := GenerateM(k)
-
-	SM := make([]byte, 0, 64) // M = 32 , prevSeed = 32
-	SM = append(SM, S...)
-	SM = append(SM, M...)
-
-	Z, err := hash.Sha3256(SM)
-	if err != nil {
-		return nil, err
-	}
-
-	return Z, nil
 }
 
 func newCandidateBlock(ctx *user.Context) (*block.Block, error) {

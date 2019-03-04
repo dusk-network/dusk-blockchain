@@ -1,21 +1,20 @@
 package sortition
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"math/big"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
 
 // CreateCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step.
-func CreateCommittee(round, totalWeight uint64, step uint32, committee [][]byte,
-	stakes map[string]uint64) ([][]byte, error) {
-	var currentCommittee [][]byte
+func CreateCommittee(round, totalWeight uint64, step uint32, committee *user.Committee,
+	stakes map[string]uint64) (map[string]uint8, error) {
+	currentCommittee := make(map[string]uint8)
 	W := new(big.Int).SetUint64(totalWeight)
-	size := len(committee)
+	size := len(*committee)
 	if size > 50 {
 		size = 50
 	}
@@ -39,30 +38,27 @@ func CreateCommittee(round, totalWeight uint64, step uint32, committee [][]byte,
 		score := scoreNum.Uint64()
 
 		// Walk through the committee set and keep deducting until we reach zero
-		for _, pk := range committee {
-			pkStr := hex.EncodeToString(pk)
-			if stakes[pkStr] >= score {
-				currentCommittee = append(currentCommittee, pk)
+		for _, m := range *committee {
+			if stakes[m.String()] >= score {
+				currentCommittee[m.String()]++
 				break
 			}
 
-			score -= stakes[pkStr]
+			score -= stakes[m.String()]
 		}
 	}
 
 	return currentCommittee, nil
 }
 
-// Verify will check if a public key is included in a passed committee, and return
-// how many times they appear.
-func Verify(committee [][]byte, pk []byte) uint8 {
-	// Check if this node is eligible, and how many votes they get
-	votes := uint8(0)
-	for _, pkB := range committee {
-		if bytes.Equal(pkB, pk) {
-			votes++
-		}
+// SetCommittee will set the committee for the given step
+func SetCommittee(ctx *user.Context, step uint32) error {
+	currentCommittee, err := CreateCommittee(ctx.Round, ctx.W, step,
+		ctx.Committee, ctx.NodeWeights)
+	if err != nil {
+		return err
 	}
 
-	return votes
+	ctx.CurrentCommittee = currentCommittee
+	return nil
 }

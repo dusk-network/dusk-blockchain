@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
+
+	ristretto "github.com/bwesterb/go-ristretto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 
@@ -79,6 +82,13 @@ func ProcessBlockQueue(ctx *user.Context) *prerror.PrError {
 		}
 	}
 
+	// Empty queue for this step
+	m, ok := ctx.BlockQueue.Load(ctx.Round)
+	if !ok {
+		return nil
+	}
+
+	m.(*sync.Map).Store(atomic.LoadUint32(&ctx.BlockStep), make([]*payload.MsgConsensus, 0))
 	return nil
 }
 
@@ -96,6 +106,14 @@ func ProcessSigSetQueue(ctx *user.Context) *prerror.PrError {
 		}
 	}
 
+	// Empty queue for this step
+	m, ok := ctx.SigSetQueue.Load(ctx.Round)
+	if !ok {
+		return nil
+	}
+
+	m.(*sync.Map).Store(atomic.LoadUint32(&ctx.SigSetStep), make([]*payload.MsgConsensus, 0))
+
 	return nil
 }
 
@@ -105,13 +123,28 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 	switch msg.Payload.Type() {
 	case consensusmsg.CandidateScoreID:
 		pl := msg.Payload.(*consensusmsg.CandidateScore)
-		if !zkproof.Verify(ctx, pl.Proof, pl.Seed, pl.Score, pl.ZImg) {
-			return prerror.New(prerror.Low, errors.New("proof verification failed"))
+
+		// Check first if the publist contains valid bids
+		pubList, err := user.CreatePubList(pl.PubList)
+		if err != nil {
+			return err
 		}
 
+		if err := ctx.PubList.ValidateBids(pubList, ctx.X); err != nil {
+			return err
+		}
+
+		// Check if the score exceeds the threshold
 		score := big.NewInt(0).SetBytes(pl.Score).Uint64()
 		if score < ctx.Tau {
 			return prerror.New(prerror.Low, errors.New("candidate score below threshold"))
+		}
+
+		// Verify the proof
+		seedScalar := ristretto.Scalar{}
+		seedScalar.Derive(pl.Seed)
+		if !zkproof.Verify(pl.Proof, seedScalar.Bytes(), pl.PubList, pl.Score, pl.Z) {
+			return prerror.New(prerror.Low, errors.New("proof verification failed"))
 		}
 
 		ctx.CandidateScoreChan <- msg
@@ -158,6 +191,12 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		return nil
 	case consensusmsg.SigSetCandidateID:
 		pl := msg.Payload.(*consensusmsg.SigSetCandidate)
+
+		// We discard any deviating block hashes after the block reduction phase
+		if !bytes.Equal(pl.WinningBlockHash, ctx.WinningBlockHash) {
+			return prerror.New(prerror.Low, errors.New("wrong block hash"))
+		}
+
 		if err := verifyVoteSet(ctx, pl.SignatureSet, pl.WinningBlockHash, pl.Step); err != nil {
 			return err
 		}
@@ -226,8 +265,8 @@ func verifySortition(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrEr
 	}
 
 	// Check if this node is eligible to vote in this step
-	votes := sortition.Verify(committee, msg.PubKey)
-	if votes == 0 {
+	pkEd := hex.EncodeToString(msg.PubKey)
+	if committee[pkEd] == 0 {
 		return prerror.New(prerror.Low, errors.New("node is not included in committee"))
 	}
 
@@ -237,9 +276,9 @@ func verifySortition(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrEr
 func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 	step uint32) *prerror.PrError {
 	// A set should be of appropriate length, at least 2*0.75*len(committee)
-	limit := int(2 * 0.75 * float64(len(ctx.Committee)))
-	if limit > 100 {
-		limit = 100
+	limit := int(2 * 0.75 * float64(len(*ctx.Committee)))
+	if limit > 75 {
+		limit = 75
 	}
 
 	if len(voteSet) < limit {
@@ -278,8 +317,8 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 		}
 
 		// A voting node should have been part of this or the previous committee
-		if votes := sortition.Verify(committee, ctx.NodeBLS[pkBLS]); votes == 0 {
-			if votes = sortition.Verify(prevCommittee, ctx.NodeBLS[pkBLS]); votes == 0 {
+		if committee[pkEd] == 0 {
+			if prevCommittee[pkEd] == 0 {
 				return prerror.New(prerror.Low, errors.New("vote is not from committee"))
 			}
 		}

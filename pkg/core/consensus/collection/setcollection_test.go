@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"sync"
 	"testing"
-	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
 
@@ -20,9 +19,6 @@ import (
 
 // This test will test signature set collection.
 func TestSignatureSetCollection(t *testing.T) {
-	// Put step timer down to avoid long waiting times
-	user.StepTime = 3 * time.Second
-
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
@@ -38,7 +34,8 @@ func TestSignatureSetCollection(t *testing.T) {
 	}
 
 	ctx.BlockHash = hash
-	voteSet, err := createVotes(ctx, 15)
+	ctx.WinningBlockHash = hash
+	voteSet, err := createVotes(ctx, 15, ctx.SigSetStep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +46,7 @@ func TestSignatureSetCollection(t *testing.T) {
 	// Shuffle vote set
 	var otherVotes []*consensusmsg.Vote
 	otherVotes = append(otherVotes, voteSet...)
-	otherVotes[0] = otherVotes[1]
+	otherVotes[0], otherVotes[1] = otherVotes[1], otherVotes[0]
 
 	// Create votes
 	vote1, err := newSigSetCandidate(ctx, 500, otherVotes)
@@ -100,9 +97,6 @@ func TestSignatureSetCollection(t *testing.T) {
 
 	// We should now have otherVotes
 	assert.Equal(t, otherVotes, ctx.SigSetVotes)
-
-	// Reset step timer
-	user.StepTime = 20 * time.Second
 }
 
 func newSigSetCandidate(c *user.Context, weight uint64,
@@ -115,18 +109,19 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	}
 
 	// Populate mappings on passed context
-	c.NodeWeights[hex.EncodeToString([]byte(*keys.EdPubKey))] = weight
-	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = []byte(*keys.EdPubKey)
+	pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
+	c.NodeWeights[pkEd] = weight
+	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = keys.EdPubKeyBytes()
 
 	// Populate new context fields
 	ctx.Weight = weight
 	ctx.LastHeader = c.LastHeader
 	ctx.BlockHash = c.BlockHash
-	ctx.Step = c.Step
+	ctx.SigSetStep = c.SigSetStep
 	ctx.SigSetVotes = voteSet
 
 	// Add to our committee
-	c.CurrentCommittee = append(c.CurrentCommittee, []byte(*keys.EdPubKey))
+	c.CurrentCommittee[pkEd] = 1
 
 	// Create payload, signature and message
 	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes, 1)
@@ -134,9 +129,9 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 		return nil, err
 	}
 
-	sigEd, err := ctx.CreateSignature(pl)
+	sigEd, err := ctx.CreateSignature(pl, ctx.SigSetStep)
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.Step, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.SigSetStep, sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +139,7 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	return msg, nil
 }
 
-func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
+func createVotes(ctx *user.Context, amount int, step uint32) ([]*consensusmsg.Vote, error) {
 	var voteSet []*consensusmsg.Vote
 	for i := 0; i < amount; i++ {
 		keys, err := user.NewRandKeys()
@@ -154,9 +149,9 @@ func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
 
 		// Set these keys in our context values to pass processing
 		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
-		pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 		ctx.NodeWeights[pkEd] = 500
-		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
+		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
 
 		// Make dummy context for score creation
 		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
@@ -181,13 +176,13 @@ func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
 
 		// Create two votes and add them to the array
 		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
-			ctx.Step)
+			step)
 		if err != nil {
 			return nil, err
 		}
 
 		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
-			ctx.Step-1)
+			step-1)
 		if err != nil {
 			return nil, err
 		}

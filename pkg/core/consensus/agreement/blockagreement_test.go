@@ -154,9 +154,9 @@ func createVotesBlock(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 
 		// Set these keys in our context values to pass processing
 		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
-		pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 		ctx.NodeWeights[pkEd] = 500
-		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
+		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
 
 		// Make dummy context for score creation
 		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
@@ -167,8 +167,8 @@ func createVotesBlock(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 		c.LastHeader = ctx.LastHeader
 		c.Weight = 500
 		c.BlockHash = ctx.BlockHash
-		ctx.Committee = append(ctx.Committee, []byte(*c.Keys.EdPubKey))
-		ctx.CurrentCommittee = append(ctx.CurrentCommittee, []byte(*c.Keys.EdPubKey))
+		ctx.Committee.AddMember(c.Keys.EdPubKeyBytes())
+		ctx.CurrentCommittee[pkEd] = 1
 
 		// Create vote signatures
 		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
@@ -183,13 +183,13 @@ func createVotesBlock(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 
 		// Create two votes and add them to the array
 		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
-			ctx.Step)
+			ctx.BlockStep)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
-			ctx.Step-1)
+			ctx.BlockStep-1)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -210,13 +210,13 @@ func createVotesBlock(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 			return nil, nil, err
 		}
 
-		sigEd, err := c.CreateSignature(pl)
+		sigEd, err := c.CreateSignature(pl, ctx.BlockStep)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		msg, err := payload.NewMsgConsensus(c.Version, c.Round, c.LastHeader.Hash,
-			c.Step, sigEd, []byte(*c.Keys.EdPubKey), pl)
+			c.BlockStep, sigEd, c.Keys.EdPubKeyBytes(), pl)
 		if err != nil {
 			return nil, nil, err
 		}
