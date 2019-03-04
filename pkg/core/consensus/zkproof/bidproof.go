@@ -4,6 +4,7 @@ package zkproof
 // #include "./libblindbid.h"
 import "C"
 import (
+	"bytes"
 	"math/big"
 	"math/rand"
 	"time"
@@ -125,6 +126,7 @@ func shuffle(x ristretto.Scalar, vals []ristretto.Scalar) ([]ristretto.Scalar, u
 
 	// append x to slice
 	values := append(vals, x)
+	values = removeDuplicates(x, values)
 
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 
@@ -137,6 +139,24 @@ func shuffle(x ristretto.Scalar, vals []ristretto.Scalar) ([]ristretto.Scalar, u
 		}
 	}
 	return ret, index
+}
+
+func removeDuplicates(x ristretto.Scalar, values []ristretto.Scalar) []ristretto.Scalar {
+	foundOnce := false
+	for i, v := range values {
+		if !bytes.Equal(x.Bytes(), v.Bytes()) {
+			continue
+		}
+
+		if !foundOnce {
+			foundOnce = true
+			continue
+		}
+
+		values = append(values[:i], values[i+1:]...)
+	}
+
+	return values
 }
 
 // genConstants will generate the constants for
