@@ -22,7 +22,7 @@ func TestVerifyBlockAgreement(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 0, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestVerifyBlockAgreement(t *testing.T) {
 	}
 
 	// Set up committee
-	if err := ctx.SetCommittee(ctx.BlockStep); err != nil {
+	if err := sortition.SetCommittee(ctx, ctx.BlockStep); err != nil {
 		t.Fatal(err)
 	}
 
@@ -58,7 +58,7 @@ func TestBlockAgreementNotInCommittee(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,11 @@ func TestBlockAgreementNotInCommittee(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ctx.Committee = append(ctx.Committee, newMember)
+		// Add them to our committee
+		if err := ctx.Committee.AddMember(newMember); err != nil {
+			t.Fatal(err)
+		}
+
 		pkEd := hex.EncodeToString(newMember)
 		ctx.NodeWeights[pkEd] = 500
 		ctx.W += 500
@@ -115,7 +119,7 @@ func TestBlockAgreementSmallVoteSet(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,6 +137,13 @@ func TestBlockAgreementSmallVoteSet(t *testing.T) {
 	m, err := createVoteSetAndMsg(ctx, emptyBlock.Header.Hash, 10, 0x03, false, false, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Now enlarge our committee
+	for i := 0; i < 50; i++ {
+		if err := ctx.Committee.AddMember(make([]byte, 32)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Set up committee
@@ -159,7 +170,7 @@ func TestBlockAgreementVoterStakeCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +224,7 @@ func TestBlockAgreementVoterBLSCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +277,7 @@ func TestBlockAgreementVoterCommitteeCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,13 +307,13 @@ func TestBlockAgreementVoterCommitteeCheck(t *testing.T) {
 	ctx.CurrentCommittee = committee
 
 	// Cut out some committee members except for message sender
-	for i, pkBytes := range ctx.Committee {
-		if bytes.Equal(pkBytes, m.PubKey) {
+	for i, member := range *ctx.Committee {
+		if bytes.Equal(member[:], m.PubKey) {
 			continue
 		}
 
 		if i%2 == 0 {
-			ctx.Committee = append(ctx.Committee[i:], ctx.Committee[:i+1]...)
+			ctx.Committee.RemoveMember(member[:])
 		}
 	}
 
@@ -321,7 +332,7 @@ func TestBlockAgreementVoterSigCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +376,7 @@ func TestBlockAgreementVoterStepCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 0, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +420,7 @@ func TestBlockAgreementVoterHashCheck(t *testing.T) {
 	// Create context
 	seed, _ := crypto.RandEntropy(32)
 	keys, _ := user.NewRandKeys()
-	ctx, err := user.NewContext(0, 0, 5000, 15000, seed, protocol.TestNet, keys)
+	ctx, err := user.NewContext(0, 0, 0, 10, seed, protocol.TestNet, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -465,7 +476,9 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 		ctx.NodeWeights[pkEd] = 500
 		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
-		ctx.Committee = append(ctx.Committee, keys.EdPubKeyBytes())
+		if err := ctx.Committee.AddMember(keys.EdPubKeyBytes()); err != nil {
+			return nil, err
+		}
 
 		// Make dummy context for score creation
 		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
@@ -500,7 +513,14 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 
 	// Make message from one of the context objects we just created
 	var pl consensusmsg.Msg
-	pk := committee2[1]
+	var pk []byte
+	for node := range committee2 {
+		pk, err = hex.DecodeString(node)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var sendCtx *user.Context
 	for _, c := range ctxs {
 		if bytes.Equal(c.Keys.EdPubKeyBytes(), pk) {
@@ -553,12 +573,17 @@ func createVoteSetAndMsg(ctx *user.Context, blockHash []byte, amount int,
 	return m, nil
 }
 
-func createVotes(committee1, committee2 [][]byte, ctxs []*user.Context,
+func createVotes(committee1, committee2 map[string]uint8, ctxs []*user.Context,
 	hash []byte, spoofSig, spoofStep, spoofHash bool) ([]*consensusmsg.Vote, error) {
 	var voteSet []*consensusmsg.Vote
 
-	for _, pk := range committee1 {
+	for pkStr := range committee1 {
 		for _, user := range ctxs {
+			pk, err := hex.DecodeString(pkStr)
+			if err != nil {
+				return nil, err
+			}
+
 			if !bytes.Equal(pk, []byte(*user.Keys.EdPubKey)) {
 				continue
 			}
@@ -589,8 +614,13 @@ func createVotes(committee1, committee2 [][]byte, ctxs []*user.Context,
 		}
 	}
 
-	for _, pk := range committee2 {
+	for pkStr := range committee2 {
 		for _, user := range ctxs {
+			pk, err := hex.DecodeString(pkStr)
+			if err != nil {
+				return nil, err
+			}
+
 			if !bytes.Equal(pk, []byte(*user.Keys.EdPubKey)) {
 				continue
 			}

@@ -1,6 +1,7 @@
 package msg_test
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -31,7 +32,8 @@ func TestVerifyCandidate(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Verify the message
 	err2 := msg.Process(ctx, m)

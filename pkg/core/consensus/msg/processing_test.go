@@ -42,7 +42,8 @@ func TestFaultyMsgRound(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Change our round and verify the message (should fail)
 	ctx.Round++
@@ -77,7 +78,8 @@ func TestFaultyMsgLastHeader(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Change our header hash and verify the message (should fail)
 	ctx.LastHeader.Hash = make([]byte, 32)
@@ -112,7 +114,8 @@ func TestFaultyMsgVersion(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Change our version and verify the message (should fail)
 	ctx.Version = 20000
@@ -147,7 +150,8 @@ func TestFaultyMsgSig(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Change their Ed25519 public key and verify the message (should fail)
 	m.PubKey = make([]byte, 32)
@@ -182,7 +186,8 @@ func TestFutureMsgRoundBlock(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Decrement our round and verify the message (should go into ctx.BlockQueue)
 	ctx.Round--
@@ -216,7 +221,8 @@ func TestFutureMsgStepBlock(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Decrement our step and verify the message (should go into ctx.todo)
 	ctx.BlockStep--
@@ -261,9 +267,12 @@ func TestProcessingBlockQueue(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m1.PubKey)
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m2.PubKey)
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m3.PubKey)
+	pkEd1 := hex.EncodeToString(m1.PubKey)
+	ctx.CurrentCommittee[pkEd1] = 1
+	pkEd2 := hex.EncodeToString(m2.PubKey)
+	ctx.CurrentCommittee[pkEd2] = 1
+	pkEd3 := hex.EncodeToString(m3.PubKey)
+	ctx.CurrentCommittee[pkEd3] = 1
 
 	// Decrement our step and verify the messages (should go into ctx.todo)
 	ctx.BlockStep--
@@ -317,7 +326,8 @@ func TestFutureMsgRoundSigSet(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Decrement our round and verify the message (should go into ctx.BlockQueue)
 	ctx.Round--
@@ -351,7 +361,8 @@ func TestFutureMsgStepSigSet(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m.PubKey)
+	pkEd := hex.EncodeToString(m.PubKey)
+	ctx.CurrentCommittee[pkEd] = 1
 
 	// Decrement our step and verify the message (should go into ctx.todo)
 	ctx.SigSetStep--
@@ -396,9 +407,12 @@ func TestProcessingSigSetQueue(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m1.PubKey)
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m2.PubKey)
-	ctx.CurrentCommittee = append(ctx.CurrentCommittee, m3.PubKey)
+	pkEd1 := hex.EncodeToString(m1.PubKey)
+	ctx.CurrentCommittee[pkEd1] = 1
+	pkEd2 := hex.EncodeToString(m2.PubKey)
+	ctx.CurrentCommittee[pkEd2] = 1
+	pkEd3 := hex.EncodeToString(m3.PubKey)
+	ctx.CurrentCommittee[pkEd3] = 1
 
 	// Decrement our step and verify the messages (should go into ctx.todo)
 	ctx.SigSetStep--
@@ -474,7 +488,7 @@ func newMessage(c *user.Context, blockHash []byte, id uint8,
 
 		m := zkproof.CalculateM(ctx.K)
 		x := zkproof.CalculateX(dScalar, m)
-		c.PubList.AddBid()
+		c.PubList.AddBid(x)
 
 		seedScalar := ristretto.Scalar{}
 		seedScalar.Derive(ctx.Seed)

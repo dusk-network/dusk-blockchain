@@ -34,7 +34,9 @@ func TestVerifySigSetReduction(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify the message
 	err2 := msg.Process(ctx, m)
@@ -64,7 +66,9 @@ func TestSigSetReductionDeviatingBlock(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Change our block hash
 	otherBlock, err := crypto.RandEntropy(32)
@@ -106,7 +110,9 @@ func TestSigSetReductionWrongStep(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx.WinningBlockHash = emptyBlock.Header.Hash
 
@@ -177,7 +183,9 @@ func TestSigSetReductionWrongBLSKey(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Clear out our bls key mapping
 	ctx.NodeBLS = make(map[string][]byte)
@@ -215,7 +223,9 @@ func TestSigSetReductionWrongBLSSig(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify the message (should fail with low priority error)
 	err2 := msg.Process(ctx, m)

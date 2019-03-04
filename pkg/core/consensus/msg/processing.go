@@ -265,8 +265,8 @@ func verifySortition(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrEr
 	}
 
 	// Check if this node is eligible to vote in this step
-	votes := sortition.Verify(committee, msg.PubKey)
-	if votes == 0 {
+	pkEd := hex.EncodeToString(msg.PubKey)
+	if committee[pkEd] == 0 {
 		return prerror.New(prerror.Low, errors.New("node is not included in committee"))
 	}
 
@@ -276,9 +276,9 @@ func verifySortition(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrEr
 func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 	step uint32) *prerror.PrError {
 	// A set should be of appropriate length, at least 2*0.75*len(committee)
-	limit := int(2 * 0.75 * float64(len(ctx.Committee)))
-	if limit > 100 {
-		limit = 100
+	limit := int(2 * 0.75 * float64(len(*ctx.Committee)))
+	if limit > 75 {
+		limit = 75
 	}
 
 	if len(voteSet) < limit {
@@ -317,8 +317,8 @@ func verifyVoteSet(ctx *user.Context, voteSet []*consensusmsg.Vote, hash []byte,
 		}
 
 		// A voting node should have been part of this or the previous committee
-		if votes := sortition.Verify(committee, ctx.NodeBLS[pkBLS]); votes == 0 {
-			if votes = sortition.Verify(prevCommittee, ctx.NodeBLS[pkBLS]); votes == 0 {
+		if committee[pkEd] == 0 {
+			if prevCommittee[pkEd] == 0 {
 				return prerror.New(prerror.Low, errors.New("vote is not from committee"))
 			}
 		}

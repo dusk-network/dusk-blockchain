@@ -33,7 +33,9 @@ func TestVerifyBlockReduction(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify the message
 	err2 := msg.Process(ctx, m)
@@ -63,7 +65,9 @@ func TestBlockReductionWrongStep(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Change our step and verify the message (should fail with low priority error)
 	ctx.BlockStep++
@@ -129,7 +133,9 @@ func TestBlockReductionWrongBLSKey(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Clear out our bls key mapping
 	ctx.NodeBLS = make(map[string][]byte)
@@ -166,7 +172,9 @@ func TestBlockReductionWrongBLSSig(t *testing.T) {
 	}
 
 	// Add them to our committee
-	ctx.Committee = append(ctx.Committee, m.PubKey)
+	if err := ctx.Committee.AddMember(m.PubKey); err != nil {
+		t.Fatal(err)
+	}
 
 	// Verify the message (should fail with low priority error)
 	err2 := msg.Process(ctx, m)
