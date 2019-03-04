@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/rand"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
+
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
@@ -36,7 +40,7 @@ func CreatePubList(pl []byte) (PublicList, *prerror.PrError) {
 }
 
 // ValidateBids will check if pl contains valid bids.
-func (p PublicList) ValidateBids(pl PublicList) *prerror.PrError {
+func (p PublicList) ValidateBids(pl PublicList, ourBid []byte) *prerror.PrError {
 loop:
 	for _, x := range pl {
 		for _, x2 := range p {
@@ -45,10 +49,29 @@ loop:
 			}
 		}
 
-		return prerror.New(prerror.Low, errors.New("invalid public list"))
+		if !bytes.Equal(x[:], ourBid) {
+			return prerror.New(prerror.Low, errors.New("invalid public list"))
+		}
 	}
 
 	return nil
+}
+
+// GetRandomBids will get an amount of bids from the public list, to make a
+// slice of scalars to be used for proof generation.
+func (p PublicList) GetRandomBids(amount int) []ristretto.Scalar {
+	// Shuffle the public list
+	rand.Shuffle(len(p), func(i, j int) { p[i], p[j] = p[j], p[i] })
+
+	// Create our set
+	set := make([]ristretto.Scalar, amount)
+	for i := 0; i < amount; i++ {
+		bid := p[i][:]
+		bidScalar := zkproof.BytesToScalar(bid)
+		set[i] = bidScalar
+	}
+
+	return set
 }
 
 // AddBid will add a bid to the public list p.
