@@ -51,9 +51,10 @@ type Context struct {
 	Multiplier uint8 // Time multiplier
 
 	// Block generator values
-	D          uint64 // bidWeight
-	X, Y, Z, M []byte
-	Q          []byte
+	D       uint64 // bidWeight
+	Y, Z, M []byte
+	X       Bid
+	Q       []byte
 
 	// Provisioner values
 	/// General
@@ -142,7 +143,6 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		Certificate:         &block.Certificate{},
 		D:                   d,
 		K:                   ristretto.Scalar{},
-		X:                   make([]byte, 32),
 		Y:                   make([]byte, 32),
 		Q:                   make([]byte, 32),
 		CandidateScoreChan:  make(chan *payload.MsgConsensus, 100),
@@ -180,7 +180,6 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 // Reset removes all information that was generated during the consensus
 func (c *Context) Reset() {
 	// Block generator
-	c.X = make([]byte, 32)
 	c.Y = make([]byte, 32)
 	c.Z = nil
 	c.M = nil
