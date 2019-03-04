@@ -2,7 +2,6 @@ package msg_test
 
 import (
 	"encoding/hex"
-	"math/big"
 	"testing"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
@@ -471,17 +470,17 @@ func newMessage(c *user.Context, blockHash []byte, id uint8,
 	var step uint32
 	switch consensusmsg.ID(id) {
 	case consensusmsg.CandidateScoreID:
-		dScalar := ristretto.Scalar{}
-		dScalar.SetBigInt(big.NewInt(0).SetUint64(ctx.D))
+		dScalar := zkproof.Uint64ToScalar(ctx.D)
 
 		m := zkproof.CalculateM(ctx.K)
 		x := zkproof.CalculateX(dScalar, m)
-		c.PubList = append(c.PubList, x)
+		c.PubList.AddBid(x.Bytes())
 
 		seedScalar := ristretto.Scalar{}
-		seedScalar.SetBigInt(big.NewInt(0).SetBytes(ctx.Seed))
+		seedScalar.Derive(ctx.Seed)
 
-		proof, q, z, pubList := zkproof.Prove(dScalar, ctx.K, seedScalar, ctx.PubList)
+		pL := make([]ristretto.Scalar, 0)
+		proof, q, z, pubList := zkproof.Prove(dScalar, ctx.K, seedScalar, pL)
 
 		pl, err = consensusmsg.NewCandidateScore(q, proof, z, blockHash, ctx.Seed, pubList)
 		if err != nil {

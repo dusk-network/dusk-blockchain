@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	ristretto "github.com/bwesterb/go-ristretto"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
@@ -139,7 +141,8 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 		}
 
 		// Verify the proof
-		seedScalar := zkproof.BytesToScalar(pl.Seed)
+		seedScalar := ristretto.Scalar{}
+		seedScalar.Derive(pl.Seed)
 		if !zkproof.Verify(pl.Proof, seedScalar.Bytes(), pl.PubList, pl.Score, pl.Z) {
 			return prerror.New(prerror.Low, errors.New("proof verification failed"))
 		}
