@@ -48,7 +48,7 @@ func TestBlockCollection(t *testing.T) {
 	}
 
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round,
-		ctx.LastHeader.Hash, ctx.BlockStep, sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		ctx.LastHeader.Hash, ctx.BlockStep, sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestBlockCollection(t *testing.T) {
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		ctx.BlockStep, sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
+		ctx.BlockStep, sigEd2, ctx.Keys.EdPubKeyBytes(), pl2)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
