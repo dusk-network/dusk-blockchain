@@ -75,7 +75,7 @@ func (p PublicList) GetRandomBids(amount int) []ristretto.Scalar {
 }
 
 // AddBid will add a bid to the public list p.
-func (p PublicList) AddBid(bid []byte) error {
+func (p *PublicList) AddBid(bid []byte) error {
 	if len(bid) != 32 {
 		return fmt.Errorf("bid should be 32 bytes, is %v bytes", len(bid))
 	}
@@ -86,15 +86,17 @@ func (p PublicList) AddBid(bid []byte) error {
 		return err
 	}
 
-	p = append(p, b)
+	*p = append(*p, b)
 	return nil
 }
 
 // RemoveBid will iterate over a public list and remove a specified bid.
-func (p PublicList) RemoveBid(bid []byte) {
-	for i, b := range p {
+func (p *PublicList) RemoveBid(bid []byte) {
+	for i, b := range *p {
 		if bytes.Equal(bid, b[:]) {
-			p = append(p[:i], p[i+1:]...)
+			list := *p
+			list = append(list[:i], list[i+1:]...)
+			*p = list
 		}
 	}
 }
