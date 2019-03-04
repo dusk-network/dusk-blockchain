@@ -11,7 +11,6 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"golang.org/x/crypto/ed25519"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/sortition"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 
@@ -75,8 +74,8 @@ type Context struct {
 	WinningSigSetHash []byte               // Winning signature set hash
 
 	/// Tracking fields
-	Committee        [][]byte          // Lexicogaphically ordered provisioner public keys
-	CurrentCommittee [][]byte          // Set of public keys of committee members for a current step
+	Committee        *Committee        // Lexicogaphically ordered provisioner public keys
+	CurrentCommittee map[string]uint8  // Set of public keys of committee members for a current step
 	NodeWeights      map[string]uint64 // Other nodes' Ed25519 public keys mapped to their stake weights
 	NodeBLS          map[string][]byte // Other nodes' BLS public keys mapped to their Ed25519 public keys
 	PubList          PublicList        // Bidder public list
@@ -154,6 +153,8 @@ func NewContext(tau, d, totalWeight, round uint64, seed []byte, magic protocol.M
 		SigSetAgreementChan: make(chan *payload.MsgConsensus, 100),
 		QuitChan:            make(chan bool, 1),
 		StopChan:            make(chan bool, 1),
+		Committee:           &Committee{},
+		CurrentCommittee:    make(map[string]uint8),
 		BlockQueue:          blockQueue,
 		SigSetQueue:         sigSetQueue,
 		W:                   totalWeight,
@@ -229,18 +230,6 @@ func (c *Context) CreateSignature(pl consensusmsg.Msg, step uint32) ([]byte, err
 
 	edMsg = append(edMsg, buf.Bytes()...)
 	return c.EDSign(c.Keys.EdSecretKey, edMsg), nil
-}
-
-// SetCommittee will set the committee for the given step
-func (c *Context) SetCommittee(step uint32) error {
-	currentCommittee, err := sortition.CreateCommittee(c.Round, c.W, step,
-		c.Committee, c.NodeWeights)
-	if err != nil {
-		return err
-	}
-
-	c.CurrentCommittee = currentCommittee
-	return nil
 }
 
 // dummy functions

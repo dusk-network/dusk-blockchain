@@ -75,6 +75,13 @@ func (p PublicList) GetRandomBids(amount int) []Bid {
 
 // AddBid will add a bid to the public list p.
 func (p *PublicList) AddBid(bid Bid) {
+	// Check for duplicates
+	for _, b := range *p {
+		if b.Equals(bid) {
+			return
+		}
+	}
+
 	*p = append(*p, bid)
 }
 
