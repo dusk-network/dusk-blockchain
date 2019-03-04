@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 )
 
 // The number of rounds or each mimc hash
@@ -100,9 +101,11 @@ func Verify(proof, seed, pubList, q, zImg []byte) bool {
 }
 
 // CalculateX calculates the blind bid X
-func CalculateX(d, m ristretto.Scalar) ristretto.Scalar {
+func CalculateX(d, m ristretto.Scalar) user.Bid {
 	x := mimcHash(d, m)
-	return x
+	var bid user.Bid
+	copy(bid[:], x.Bytes()[:])
+	return bid
 }
 
 // CalculateM calculates H(k)
