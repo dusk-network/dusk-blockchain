@@ -12,8 +12,7 @@ func (c *Consensus) AddGenerator(bid *transactions.Bid) {
 	// Set X value in publist
 	dScalar := ristretto.Scalar{}
 	dScalar.SetBigInt(big.NewInt(0).SetUint64(bid.Output.Amount))
-	mScalar := ristretto.Scalar{}
-	mScalar.SetBigInt(big.NewInt(0).SetBytes(bid.M))
-	x := zkproof.CalculateX(dScalar, mScalar)
+	m := zkproof.BytesToScalar(bid.M)
+	x := zkproof.CalculateX(dScalar, m)
 	c.ctx.PubList = append(c.ctx.PubList, x)
 }
