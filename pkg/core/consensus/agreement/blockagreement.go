@@ -47,7 +47,7 @@ func Block(ctx *user.Context, c chan bool) {
 			voted[m.Step][pkEd] = true
 
 			// Store set if it's ours
-			if bytes.Equal(m.PubKey, []byte(*ctx.Keys.EdPubKey)) {
+			if bytes.Equal(m.PubKey, ctx.Keys.EdPubKeyBytes()) {
 				sets[m.Step] = pl.VoteSet
 			}
 
@@ -113,7 +113,7 @@ func SendBlock(ctx *user.Context) error {
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return err
 	}

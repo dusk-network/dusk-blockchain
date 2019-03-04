@@ -150,9 +150,9 @@ func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 
 		// Set these keys in our context values to pass processing
 		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
-		pkEd := hex.EncodeToString([]byte(*keys.EdPubKey))
+		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
 		ctx.NodeWeights[pkEd] = 500
-		ctx.NodeBLS[pkBLS] = []byte(*keys.EdPubKey)
+		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
 
 		// Make dummy context for score creation
 		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
@@ -163,8 +163,8 @@ func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 		c.LastHeader = ctx.LastHeader
 		c.Weight = 500
 		c.BlockHash = ctx.BlockHash
-		ctx.Committee = append(ctx.Committee, []byte(*c.Keys.EdPubKey))
-		ctx.CurrentCommittee = append(ctx.CurrentCommittee, []byte(*c.Keys.EdPubKey))
+		ctx.Committee = append(ctx.Committee, c.Keys.EdPubKeyBytes())
+		ctx.CurrentCommittee = append(ctx.CurrentCommittee, c.Keys.EdPubKeyBytes())
 
 		// Create vote signatures
 		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
@@ -217,7 +217,7 @@ func createVotesSigSet(ctx *user.Context, amount int) ([]*consensusmsg.Vote,
 		}
 
 		msg, err := payload.NewMsgConsensus(c.Version, c.Round, c.LastHeader.Hash,
-			c.SigSetStep, sigEd, []byte(*c.Keys.EdPubKey), pl)
+			c.SigSetStep, sigEd, c.Keys.EdPubKeyBytes(), pl)
 		if err != nil {
 			return nil, nil, err
 		}
