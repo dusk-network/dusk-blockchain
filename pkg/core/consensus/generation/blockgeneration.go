@@ -24,7 +24,8 @@ func Block(ctx *user.Context) error {
 	dScalar.SetBigInt(big.NewInt(0).SetUint64(ctx.D))
 	seedScalar := ristretto.Scalar{}
 	seedScalar.SetBigInt(big.NewInt(0).SetBytes(ctx.Seed))
-	proof, q, z, pL := zkproof.Prove(dScalar, ctx.K, seedScalar, ctx.PubList)
+	pubList := ctx.PubList.GetRandomBids(10)
+	proof, q, z, pL := zkproof.Prove(dScalar, ctx.K, seedScalar, pubList)
 
 	score := big.NewInt(0).SetBytes(q).Uint64()
 	if score < ctx.Tau {
