@@ -14,5 +14,5 @@ func (c *Consensus) AddGenerator(bid *transactions.Bid) {
 	dScalar.SetBigInt(big.NewInt(0).SetUint64(bid.Output.Amount))
 	m := zkproof.BytesToScalar(bid.M)
 	x := zkproof.CalculateX(dScalar, m)
-	c.ctx.PubList = append(c.ctx.PubList, x)
+	c.ctx.PubList.AddBid(x.Bytes())
 }
