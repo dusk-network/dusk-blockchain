@@ -29,10 +29,6 @@ func TestProofVerify(t *testing.T) {
 
 	proof, qBytes, zBytes, pL := zkproof.Prove(d, k, seed, pubList)
 
-	fmt.Printf("Score is %d \n", qBytes)
-	fmt.Printf("Z is %d \n", zBytes)
-	fmt.Printf("proof is %d \n", zBytes)
-
 	res := zkproof.Verify(proof, seed.Bytes(), pL, qBytes, zBytes)
 	fmt.Println(res)
 }
