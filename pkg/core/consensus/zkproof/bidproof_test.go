@@ -14,7 +14,7 @@ func TestProofVerify(t *testing.T) {
 
 	dAsBytes := d.Bytes()
 
-	d = bytesToScalar(dAsBytes)
+	d = zkproof.BytesToScalar(dAsBytes)
 
 	// secret number
 	k := genRandScalar()
@@ -37,13 +37,4 @@ func genRandScalar() ristretto.Scalar {
 	c := ristretto.Scalar{}
 	c.Rand()
 	return c
-}
-
-func bytesToScalar(d []byte) ristretto.Scalar {
-	x := ristretto.Scalar{}
-
-	var buf [32]byte
-	copy(buf[:], d[:])
-	x.SetBytes(&buf)
-	return x
 }

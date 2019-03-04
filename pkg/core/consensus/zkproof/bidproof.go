@@ -215,3 +215,13 @@ func constantsToBytes(cconstants []ristretto.Scalar) []byte {
 	}
 	return c
 }
+
+// BytesToScalar will take a slice of bytes and return it as a scalar.
+func BytesToScalar(d []byte) ristretto.Scalar {
+	x := ristretto.Scalar{}
+
+	var buf [32]byte
+	copy(buf[:], d[:])
+	x.SetBytes(&buf)
+	return x
+}
