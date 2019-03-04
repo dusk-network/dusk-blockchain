@@ -4,7 +4,7 @@ package zkproof
 // #include "./libblindbid.h"
 import "C"
 import (
-	"encoding/binary"
+	"math/big"
 	"math/rand"
 	"time"
 	"unsafe"
@@ -234,8 +234,6 @@ func BytesToScalar(d []byte) ristretto.Scalar {
 func Uint64ToScalar(n uint64) ristretto.Scalar {
 	x := ristretto.Scalar{}
 
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], n)
-	x.Derive(buf[:])
+	x.SetBigInt(big.NewInt(0).SetUint64(n))
 	return x
 }
