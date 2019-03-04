@@ -474,7 +474,7 @@ func newMessage(c *user.Context, blockHash []byte, id uint8,
 
 		m := zkproof.CalculateM(ctx.K)
 		x := zkproof.CalculateX(dScalar, m)
-		c.PubList.AddBid(x.Bytes())
+		c.PubList.AddBid()
 
 		seedScalar := ristretto.Scalar{}
 		seedScalar.Derive(ctx.Seed)
