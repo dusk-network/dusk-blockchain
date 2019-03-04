@@ -35,24 +35,20 @@ func TestSignatureSetReductionVote(t *testing.T) {
 
 	ctx.CandidateBlock = &block.Block{}
 
-	// Create vote set
-	voteSet, err := createVotes(ctx, 50)
+	// Create fake vote set
+	voteSet, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx.SigSetVotes = voteSet
-	setHash, err := ctx.HashVotes(voteSet)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx.SigSetHash = setHash
+	ctx.SigSetHash = voteSet
 
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Start block reduction with us as the only committee member
 	if err := reduction.SignatureSet(ctx); err != nil {
@@ -77,24 +73,26 @@ func TestSignatureSetReductionDecisive(t *testing.T) {
 	}
 
 	ctx.BlockHash = block
+	ctx.WinningBlockHash = block
 
-	// Create vote set
-	voteSet, err := createVotes(ctx, 50)
+	// Create fake vote set
+	voteSet, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx.SigSetVotes = voteSet
-	setHash, err := ctx.HashVotes(voteSet)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx.SigSetHash = setHash
+	ctx.SigSetHash = voteSet
 
 	// Log current SigSetHash
 	var currHash []byte
 	currHash = append(currHash, ctx.SigSetHash...)
+
+	// Set ourselves as committee member
+	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
+	ctx.NodeWeights[pkEd] = 500
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// SigSetHash should now be set
 	// Make vote that will win by a large margin
@@ -141,19 +139,13 @@ func TestSignatureSetReductionIndecisive(t *testing.T) {
 
 	ctx.BlockHash = block
 
-	// Create vote set
-	voteSet, err := createVotes(ctx, 50)
+	// Create fake vote set
+	voteSet, err := crypto.RandEntropy(32)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx.SigSetVotes = voteSet
-	setHash, err := ctx.HashVotes(voteSet)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx.SigSetHash = setHash
+	ctx.SigSetHash = voteSet
 
 	// The function will return as soon as it doesn't get a decisive outcome.
 	if err := reduction.SignatureSet(ctx); err != nil {
@@ -186,7 +178,9 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	ctx.SigSetStep = c.SigSetStep
 
 	// Add to our committee
-	c.Committee = append(c.Committee, keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		return nil, nil, err
+	}
 
 	// Sign sig set with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, ctx.SigSetHash)
@@ -229,57 +223,58 @@ func newVoteSigSet(c *user.Context, weight uint64, winningBlock,
 	return msg, msg2, nil
 }
 
-func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
-	var voteSet []*consensusmsg.Vote
-	for i := 0; i < amount; i++ {
-		keys, err := user.NewRandKeys()
-		if err != nil {
-			return nil, err
-		}
+// func createVotes(ctx *user.Context, amount int) ([]*consensusmsg.Vote, error) {
+// 	var voteSet []*consensusmsg.Vote
+// 	for i := 0; i < amount; i++ {
+// 		keys, err := user.NewRandKeys()
+// 		if err != nil {
+// 			return nil, err
+// 		}
 
-		// Set these keys in our context values to pass processing
-		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
-		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
-		ctx.NodeWeights[pkEd] = 500
-		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
+// 		// Set these keys in our context values to pass processing
+// 		pkBLS := hex.EncodeToString(keys.BLSPubKey.Marshal())
+// 		pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
+// 		ctx.NodeWeights[pkEd] = 500
+// 		ctx.NodeBLS[pkBLS] = keys.EdPubKeyBytes()
+// 		ctx.W += 500
 
-		// Make dummy context for score creation
-		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
-		if err != nil {
-			return nil, err
-		}
+// 		// Make dummy context for score creation
+// 		c, err := user.NewContext(0, 0, ctx.W, ctx.Round, ctx.Seed, ctx.Magic, keys)
+// 		if err != nil {
+// 			return nil, err
+// 		}
 
-		c.LastHeader = ctx.LastHeader
-		c.Weight = 500
-		c.BlockHash = ctx.BlockHash
+// 		c.LastHeader = ctx.LastHeader
+// 		c.Weight = 500
+// 		c.BlockHash = ctx.BlockHash
 
-		// Create vote signatures
-		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
-		if err != nil {
-			return nil, err
-		}
+// 		// Create vote signatures
+// 		sig1, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
+// 		if err != nil {
+// 			return nil, err
+// 		}
 
-		sig2, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
-		if err != nil {
-			return nil, err
-		}
+// 		sig2, err := ctx.BLSSign(keys.BLSSecretKey, keys.BLSPubKey, ctx.BlockHash)
+// 		if err != nil {
+// 			return nil, err
+// 		}
 
-		// Create two votes and add them to the array
-		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
-			ctx.SigSetStep)
-		if err != nil {
-			return nil, err
-		}
+// 		// Create two votes and add them to the array
+// 		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
+// 			ctx.SigSetStep)
+// 		if err != nil {
+// 			return nil, err
+// 		}
 
-		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
-			ctx.SigSetStep-1)
-		if err != nil {
-			return nil, err
-		}
+// 		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
+// 			ctx.SigSetStep-1)
+// 		if err != nil {
+// 			return nil, err
+// 		}
 
-		voteSet = append(voteSet, vote1)
-		voteSet = append(voteSet, vote2)
-	}
+// 		voteSet = append(voteSet, vote1)
+// 		voteSet = append(voteSet, vote2)
+// 	}
 
-	return voteSet, nil
-}
+// 	return voteSet, nil
+// }

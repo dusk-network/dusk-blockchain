@@ -40,7 +40,9 @@ func TestBlockReductionVote(t *testing.T) {
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Start block reduction with us as the only committee member
 	if err := reduction.Block(ctx); err != nil {
@@ -69,7 +71,9 @@ func TestBlockReductionDecisive(t *testing.T) {
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make 50 votes and send them to the channel beforehand
 	otherVotes := make([]*payload.MsgConsensus, 0)
@@ -126,7 +130,9 @@ func TestBlockReductionOtherBlock(t *testing.T) {
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make another block hash that voters will vote on
 	otherBlock, _ := crypto.RandEntropy(32)
@@ -180,7 +186,9 @@ func TestBlockReductionFallback(t *testing.T) {
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make 50 votes and send them to the channel beforehand
 	otherVotes := make([]*payload.MsgConsensus, 0)
@@ -236,7 +244,9 @@ func TestBlockReductionIndecisive(t *testing.T) {
 	// Set ourselves as committee member
 	pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
 	ctx.NodeWeights[pkEd] = 500
-	ctx.Committee = append(ctx.Committee, ctx.Keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		t.Fatal(err)
+	}
 
 	// Make 50 votes without sending them (will increase our committee size without
 	// voting)
@@ -290,7 +300,9 @@ func newVoteReduction(c *user.Context, blockHash []byte) (*payload.MsgConsensus,
 	ctx.BlockStep = c.BlockStep
 
 	// Add to our committee
-	c.Committee = append(c.Committee, keys.EdPubKeyBytes())
+	if err := ctx.Committee.AddMember(ctx.Keys.EdPubKeyBytes()); err != nil {
+		return nil, nil, err
+	}
 
 	// Sign block hash with BLS
 	sigBLS, err := ctx.BLSSign(ctx.Keys.BLSSecretKey, ctx.Keys.BLSPubKey, blockHash)

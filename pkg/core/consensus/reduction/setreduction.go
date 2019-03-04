@@ -68,12 +68,13 @@ func sigSetVote(ctx *user.Context) error {
 		return nil
 	default:
 		// Set committee first
-		if err := ctx.SetCommittee(atomic.LoadUint32(&ctx.SigSetStep)); err != nil {
+		if err := sortition.SetCommittee(ctx, atomic.LoadUint32(&ctx.SigSetStep)); err != nil {
 			return err
 		}
 
 		// If we are not in the committee, then don't vote
-		votes := sortition.Verify(ctx.CurrentCommittee, ctx.Keys.EdPubKeyBytes())
+		pkEd := hex.EncodeToString(ctx.Keys.EdPubKeyBytes())
+		votes := ctx.CurrentCommittee[pkEd]
 		if votes == 0 {
 			return nil
 		}
@@ -109,12 +110,12 @@ func sigSetVote(ctx *user.Context) error {
 
 func countSigSetVotes(ctx *user.Context) error {
 	// Set vote limit
-	voteLimit := int(0.75 * float64(len(ctx.Committee)))
-	if voteLimit > 50 {
-		voteLimit = 50
+	voteLimit := int(0.75 * float64(len(*ctx.Committee)))
+	if voteLimit > 38 {
+		voteLimit = 38
 	}
 
-	limit := len(ctx.Committee)
+	limit := len(*ctx.Committee)
 	if limit > 50 {
 		limit = 50
 	}
@@ -170,7 +171,7 @@ func countSigSetVotes(ctx *user.Context) error {
 			}
 
 			// Get amount of votes
-			votes := sortition.Verify(ctx.CurrentCommittee, m.PubKey)
+			votes := ctx.CurrentCommittee[pkEd]
 
 			// Log information
 			voters[pkEd] = true
