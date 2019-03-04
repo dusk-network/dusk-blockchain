@@ -128,7 +128,7 @@ func verifyPayload(ctx *user.Context, msg *payload.MsgConsensus) *prerror.PrErro
 			return err
 		}
 
-		if err := ctx.PubList.ValidateBids(pubList); err != nil {
+		if err := ctx.PubList.ValidateBids(pubList, ctx.X); err != nil {
 			return err
 		}
 
