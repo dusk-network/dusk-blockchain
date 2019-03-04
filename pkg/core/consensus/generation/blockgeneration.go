@@ -70,7 +70,7 @@ func Block(ctx *user.Context) error {
 	}
 
 	msgScore, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		atomic.LoadUint32(&ctx.BlockStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func Block(ctx *user.Context) error {
 	}
 
 	msgCandidate, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		atomic.LoadUint32(&ctx.BlockStep), sigEd2, []byte(*ctx.Keys.EdPubKey), pl2)
+		atomic.LoadUint32(&ctx.BlockStep), sigEd2, ctx.Keys.EdPubKeyBytes(), pl2)
 	if err != nil {
 		return err
 	}

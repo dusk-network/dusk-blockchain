@@ -23,7 +23,7 @@ func SignatureSet(ctx *user.Context) error {
 	}
 
 	msg, err := payload.NewMsgConsensus(ctx.Version, ctx.Round, ctx.LastHeader.Hash,
-		atomic.LoadUint32(&ctx.SigSetStep), sigEd, []byte(*ctx.Keys.EdPubKey), pl)
+		atomic.LoadUint32(&ctx.SigSetStep), sigEd, ctx.Keys.EdPubKeyBytes(), pl)
 	if err != nil {
 		return err
 	}
