@@ -109,7 +109,8 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	}
 
 	// Populate mappings on passed context
-	c.NodeWeights[hex.EncodeToString(keys.EdPubKeyBytes())] = weight
+	pkEd := hex.EncodeToString(keys.EdPubKeyBytes())
+	c.NodeWeights[pkEd] = weight
 	c.NodeBLS[hex.EncodeToString(keys.BLSPubKey.Marshal())] = keys.EdPubKeyBytes()
 
 	// Populate new context fields
@@ -120,7 +121,7 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	ctx.SigSetVotes = voteSet
 
 	// Add to our committee
-	c.CurrentCommittee = append(c.CurrentCommittee, keys.EdPubKeyBytes())
+	c.CurrentCommittee[pkEd] = 1
 
 	// Create payload, signature and message
 	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes, 1)

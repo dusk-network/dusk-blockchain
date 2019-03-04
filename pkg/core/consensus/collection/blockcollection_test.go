@@ -65,7 +65,7 @@ func TestBlockCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pl2, err := consensusmsg.NewCandidateScore(byte32, proof, byte32, blk.Header.Hash, blk.Header.Seed)
+	pl2, err := consensusmsg.NewCandidateScore(byte32, proof, byte32, blk.Header.Hash, blk.Header.Seed, byte32)
 	if err != nil {
 		t.Fatal(err)
 	}
