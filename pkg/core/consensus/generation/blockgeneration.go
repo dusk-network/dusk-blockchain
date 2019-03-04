@@ -20,10 +20,9 @@ import (
 func Block(ctx *user.Context) error {
 	// Generate ZkProof and Serialise
 	// XXX: Prove may return error, so chaining like this may not be possible once zk implemented
-	dScalar := ristretto.Scalar{}
-	dScalar.SetBigInt(big.NewInt(0).SetUint64(ctx.D))
+	dScalar := zkproof.Uint64ToScalar(ctx.D)
 	seedScalar := ristretto.Scalar{}
-	seedScalar.SetBigInt(big.NewInt(0).SetBytes(ctx.Seed))
+	seedScalar.Derive(ctx.Seed)
 	pubList := ctx.PubList.GetRandomBids(10)
 	proof, q, z, pL := zkproof.Prove(dScalar, ctx.K, seedScalar, pubList)
 
