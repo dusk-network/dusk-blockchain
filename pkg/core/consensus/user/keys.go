@@ -22,6 +22,12 @@ func (k *Keys) Clear() {
 	k.EdSecretKey = nil
 }
 
+// EdPubKeyBytes returns the byte slice of the ed25519 public key of this Keys
+// struct.
+func (k *Keys) EdPubKeyBytes() []byte {
+	return []byte(*k.EdPubKey)
+}
+
 // // NewKeys will construct new Keys to be used during consensus
 // // keys should already be generated here, just pass them through as params
 // func NewKeys() (*Keys, error) {
