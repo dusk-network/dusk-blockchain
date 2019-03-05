@@ -102,12 +102,21 @@ func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
 }
 
 // Write to a peer
-func (p *Peer) Write(msg wire.Payload) error {
+func (p *Peer) write(msg wire.Payload) error {
 	return wire.WriteMessage(p.conn, p.cfg.Magic, msg)
 }
 
+// Write to a peer
+// Safe for concurrent access
+func (p *Peer) Write(msg wire.Payload) error {
+	p.outch <- func() {
+		p.write(msg)
+	}
+	return nil
+}
+
 // Read from a peer
-func (p *Peer) Read() (wire.Payload, error) {
+func (p *Peer) read() (wire.Payload, error) {
 	return wire.ReadMessage(p.conn, p.cfg.Magic)
 }
 
@@ -241,7 +250,7 @@ loop:
 
 		idleTimer.Reset(idleTimeout) // reset timer on each loop
 
-		readmsg, err := p.Read()
+		readmsg, err := p.read()
 
 		// Message read; stop Timer
 		idleTimer.Stop()
@@ -408,7 +417,7 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 	if protocol.NodeVer.Major != msg.Version.Major {
 		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
 		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
-		p.Write(rejectMsg)
+		p.write(rejectMsg)
 
 		return errors.New(err)
 	}
@@ -538,7 +547,7 @@ func (p *Peer) RequestHeaders(hash []byte) error {
 		p.Detector.AddMessage(commands.GetHeaders)
 		stop := make([]byte, 32)
 		getHeaders := payload.NewMsgGetHeaders(hash, stop)
-		err := p.Write(getHeaders)
+		err := p.write(getHeaders)
 		c <- err
 	}
 
@@ -555,7 +564,7 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 		p.Detector.AddMessage(commands.GetData)
 		getdata := payload.NewMsgGetData()
 		getdata.AddTx(tx.R)
-		err := p.Write(getdata)
+		err := p.write(getdata)
 		c <- err
 	}
 
@@ -580,7 +589,7 @@ func (p *Peer) RequestBlocks(hashes [][]byte) error {
 		p.Detector.AddMessage(commands.GetData)
 		getdata := payload.NewMsgGetData()
 		getdata.AddBlocks(blocks)
-		err := p.Write(getdata)
+		err := p.write(getdata)
 		c <- err
 	}
 
@@ -596,7 +605,7 @@ func (p *Peer) RequestAddresses() error {
 	p.outch <- func() {
 		p.Detector.AddMessage(commands.GetAddr)
 		getaddr := payload.NewMsgGetAddr()
-		err := p.Write(getaddr)
+		err := p.write(getaddr)
 		c <- err
 	}
 
@@ -605,7 +614,7 @@ func (p *Peer) RequestAddresses() error {
 
 func (p *Peer) WriteConsensus(msg wire.Payload) error {
 	p.outch <- func() {
-		p.Write(msg)
+		p.write(msg)
 	}
 	return nil
 }
