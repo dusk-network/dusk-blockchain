@@ -1,10 +1,11 @@
 package stall
 
 import (
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"testing"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
@@ -24,9 +25,8 @@ func TestAddRemoveMessage(t *testing.T) {
 	mp := d.GetMessages()
 
 	assert.Equal(t, 1, len(mp))
-	assert.IsType(t, time.Time{}, mp[commands.GetAddr])
 
-	d.RemoveMessage(commands.GetAddr)
+	d.RemoveMessage(commands.Addr)
 	mp = d.GetMessages()
 
 	assert.Equal(t, 0, len(mp))
