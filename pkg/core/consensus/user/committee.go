@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"sort"
 )
 
 // Member represents the bytes of a provisioner node's Ed25519 public key.
@@ -61,4 +62,13 @@ func (c *Committee) RemoveMember(pk []byte) error {
 	}
 
 	return nil
+}
+
+// Sort will sort the committee lexicographically
+func (c *Committee) Sort() {
+	list := *c
+	sort.SliceStable(list, func(i, j int) bool {
+		return list[i].String() < list[j].String()
+	})
+	*c = list
 }
