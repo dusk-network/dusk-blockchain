@@ -136,6 +136,11 @@ func (p *Peer) Disconnect() {
 
 }
 
+//Disconnected returns true if the peer has disconnected
+func (p *Peer) Disconnected() bool {
+	return atomic.LoadInt32(&p.disconnected) != 0
+}
+
 // ProtocolVersion returns the protocol version
 func (p *Peer) ProtocolVersion() *protocol.Version {
 	return p.protoVer
@@ -206,7 +211,7 @@ func (p *Peer) NotifyDisconnect() bool {
 func (p *Peer) PingLoop() { /*not implemented in other neo clients*/ }
 
 // Run is used to start communicating with the peer, completes the handshake and starts observing
-// for messages coming in
+// for messages coming in and allows for queing of outgoing messages
 func (p *Peer) Run() error {
 
 	err := p.Handshake()

@@ -52,7 +52,7 @@ func TestInboundHandshake(t *testing.T) {
 	address := ":20338"
 
 	go func() {
-		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,14 +78,12 @@ func TestInboundHandshake(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		version, err := sendAndReadVersion(t, conn, rand.Uint64())
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		assert.NotEqual(t, nil, version)
-
 		msgVerack := payload.NewMsgVerAck()
 		if err != nil {
 			t.Fatal(err)
@@ -117,7 +115,7 @@ func TestOutboundHandshake(t *testing.T) {
 	address := ":20338"
 
 	go func() {
-		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -179,7 +177,7 @@ func TestHandshakeCancelled(t *testing.T) {
 	address := ":20338"
 
 	go func() {
-		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +236,7 @@ func TestHandshakeWrongVersion(t *testing.T) {
 	address := ":20338"
 
 	go func() {
-		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -314,7 +312,7 @@ func TestHandshakeNoVerack(t *testing.T) {
 	address := ":20338"
 
 	go func() {
-		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -365,7 +363,7 @@ func TestHandshakeSelfConnect(t *testing.T) {
 	address := ":20338"
 	cfg := createConfig()
 	go func() {
-		conn, err := net.DialTimeout("tcp", address, 200*time.Second)
+		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -426,12 +424,9 @@ func TestPeerDisconnect(t *testing.T) {
 	inbound := true
 
 	p := peermgr.NewPeer(conn, inbound, createConfig())
-
 	p.Disconnect()
-	verack := payload.NewMsgVerAck()
-	err := p.Write(verack)
 
-	assert.NotEqual(t, err, nil)
+	assert.Equal(t, true, p.Disconnected())
 
 	// Check if Stall detector is still running
 	_, ok := <-p.Detector.Quitch

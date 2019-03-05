@@ -69,7 +69,7 @@ func (p *Peer) inboundHandShake() error {
 	}
 
 	verack := payload.NewMsgVerAck()
-	err = p.Write(verack)
+	err = p.write(verack)
 	return p.readVerack()
 }
 
@@ -93,7 +93,7 @@ func (p *Peer) outboundHandShake() error {
 	if err != nil {
 		return err
 	}
-	return p.Write(verack)
+	return p.write(verack)
 }
 
 func (p *Peer) writeLocalMsgVersion() error {
@@ -118,7 +118,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 
 	messageVer := payload.NewMsgVersion(version, &fromAddr, toAddr, protocol.FullNode, p.cfg.Nonce)
 
-	return p.Write(messageVer)
+	return p.write(messageVer)
 }
 
 func (p *Peer) readRemoteMsgVersion() error {
