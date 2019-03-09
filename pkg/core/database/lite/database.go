@@ -14,7 +14,7 @@ var (
 	driverName = "Lite_v0.1.0"
 )
 
-// DB provides
+// DB on top of underlying storage sqlite3
 type DB struct {
 	// underlying storage is Sqlite3. If needed, it might be replaced with redis
 	storage *sql.DB
@@ -26,6 +26,7 @@ type DB struct {
 }
 
 // NewDatabase returns a pointer to a newly created or existing LevelDB blockchain db
+// If open in Serialized mode, one connection be shared by multiple goroutines
 func NewDatabase(path string, readonly bool) (*DB, error) {
 
 	// TODO: Open in Serialized mode
@@ -33,7 +34,7 @@ func NewDatabase(path string, readonly bool) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Create bestchain table if not exist
+	// Create HEADERS table if not exist
 	query := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS HEADERS (
 		hash            		TEXT    PRIMARY KEY  	NOT NULL,
 		height           		INT     NOT NULL)

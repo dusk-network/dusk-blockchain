@@ -3,7 +3,7 @@ Package database represents a database layer in Dusk Network. Current design sho
 
 ###  Terminology
 
-`Storage`: Underlying storage might be any of kind the KV stores like BoltDB, LMDB, LevelDB, RocksDB, Redis or non-KV stores SQLite or even a custom flat-file store.
+`Storage`: Underlying storage might be any of kind the KV stores like BoltDB, LMDB, LevelDB, RocksDB, Redis, non-KV stores like SQLite or even a custom ACID-complient flat-file store.
 
 `Backend/Driver`: represents a DB implementation that uses one or multiple underlying storages to provide Block chain database specifics with regard to particular purpose. It must satisfy Driver, DB and Tx intefaces.
 
@@ -14,11 +14,11 @@ Interfaces exposed to upper layers:
 - `database.Tx`: A transaction layer tightly coupled with Blockchain specifics to fully benefit from underlying storage capabilities
 
 
-### Drivers
+### Available Drivers
 
-- /database/heavy driver is designed to provide efficient, robust and persistent Dusk Blockchain DB on top of syndtr/goleveldb/leveldb store. It must be Mainnet-complient.
+- `/database/heavy` driver is designed to provide efficient, robust and persistent Dusk Blockchain DB on top of syndtr/goleveldb/leveldb store. It must be Mainnet-complient.
 
-- /database/lite driver is designed to provide human-readable Dusk Blockchain DB for Devnet needs only. As is based on sqlite, any SQL browser can be used as blockchain explorer.
+- `/database/lite` driver is designed to provide human-readable Dusk Blockchain DB for Devnet needs only. As is based on sqlite, any SQL browser can be used as blockchain explorer.
 
 ### Code example:
 
@@ -54,12 +54,14 @@ db.Close()
 
 ```
 
-Supported features:
+### Additional features
+
+Additional features to be provided by a Driver:
 
 - Read-only transactions/connections
+- One read-write transactions, many read-only transactions
 - Validated storage conn
-- (pending) Profiling / Stats to collect statistics around latency and history of transactions
-- (pending) Traces to log transactions data for DevNet/TestNet needs
-- (pending) Alarming to trigger an event to upper layers in case of critical Backend or Storage failure
-- (pending) Iterators/Cursors
-- TODO
+- Profiling / Stats to collect statistics around latency and history of transactions
+- Traces to log transactions data
+- Alarming to trigger an event to upper layers in case of critical Backend or Storage failure
+- Iterators/Cursors

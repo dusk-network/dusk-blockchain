@@ -7,7 +7,7 @@ import (
 
 var ()
 
-// Tx provides a root bucket against which all read and writes occur.
+// Tx Transaction layer
 type Tx struct {
 	closed   bool
 	writable bool

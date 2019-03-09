@@ -9,8 +9,8 @@ import (
 // driver.
 type Driver interface {
 	// Open returns a new connection to the database.
-	// The name is a string in a driver-specific format.
-	Open(name string, network protocol.Magic, readonly bool) (DB, error)
+	// The path is a string in a driver-specific format.
+	Open(path string, network protocol.Magic, readonly bool) (DB, error)
 }
 
 // Tx represents transaction layer.
@@ -19,22 +19,13 @@ type Driver interface {
 // should be carefully considered
 type Tx interface {
 
-	// Read-write Transactions
+	// TODO: Define transactions to satisfy Dusk Block chain DB specifics
 
+	// Read-write Transactions
 	WriteHeader(h *block.Header) error
-	//WriteBlockTransactions(blocks []*block.Block) error
 
 	// Read-only Transactions
-
-	//GetBlockHeaderByHeight(height uint64) (*block.Header, error)
-	//GetBlockHeaderByRange(start uint64, stop uint64) ([]*block.Header, error)
-	//GetBlockHeaderByHash(hash []byte) (*block.Header, error)
-	//GetLatestHeader returns the most recent header.
 	GetBlockHeaderByHash(hash []byte) (*block.Header, error)
-
-	// GetBlock will return the block from the received hash
-	//GetBlock(hash []byte) (*block.Block, error)
-	//BlockExists(hdr *block.Header) bool
 
 	// Atomic storage.
 	Commit() error

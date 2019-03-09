@@ -10,7 +10,6 @@ var (
 	prefixHeader = []byte{0x01}
 )
 
-// Tx provides a root bucket against which all read and writes occur.
 type Tx struct {
 	closed   bool
 	writable bool
@@ -39,12 +38,12 @@ func (t Tx) WriteHeader(header *block.Header) error {
 }
 
 func (t Tx) Commit() error {
-	// LevelDB provides ACID support already
+	// LevelDB is supposed to be ACID-complient
 	return nil
 }
 
 func (t Tx) Rollback() error {
-	// LevelDB provides ACID support already
+	// LevelDB is supposed to be ACID-complient
 	return nil
 }
 
