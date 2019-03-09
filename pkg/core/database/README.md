@@ -59,7 +59,7 @@ db.Close()
 Additional features to be provided by a Driver:
 
 - Read-only transactions/connections
-- One read-write transactions, many read-only transactions
+- One read-write transaction, many read-only transactions
 - Validated storage conn
 - Profiling / Stats to collect statistics around latency and history of transactions
 - Traces to log transactions data
