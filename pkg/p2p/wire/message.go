@@ -140,10 +140,6 @@ func ReadMessage(r io.Reader, magic protocol.Magic) (Payload, error) {
 		m := &payload.MsgCertificate{}
 		err := m.Decode(payloadBuf)
 		return m, err
-	case commands.Consensus:
-		m := &payload.MsgConsensus{}
-		err := m.Decode(payloadBuf)
-		return m, err
 	case commands.NotFound:
 		m := payload.NewMsgNotFound()
 		err := m.Decode(payloadBuf)
