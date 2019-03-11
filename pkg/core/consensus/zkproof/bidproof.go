@@ -14,6 +14,14 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 )
 
+// ZkProof holds all of the returned values from a generated proof.
+type ZkProof struct {
+	Proof        []byte
+	Score        []byte
+	Z            []byte
+	ProofBidList []byte
+}
+
 // The number of rounds or each mimc hash
 const mimcRounds = 90
 
@@ -21,10 +29,10 @@ const mimcRounds = 90
 var constants = genConstants()
 var conBytes = constantsToBytes(constants)
 
-// Prove creates a zkproof using d,k, seed and pubList
+// Prove creates a zkproof using d,k, seed and BidList
 // This will be accessed by the consensus
 // This will return the proof as a byte slice
-func Prove(d, k, seed ristretto.Scalar, pubList []ristretto.Scalar) ([]byte, []byte, []byte, []byte) {
+func Prove(d, k, seed ristretto.Scalar, bidList []ristretto.Scalar) ZkProof {
 
 	// generate intermediate values
 	q, x, y, yInv, z := prog(d, k, seed)
@@ -46,17 +54,17 @@ func Prove(d, k, seed ristretto.Scalar, pubList []ristretto.Scalar) ([]byte, []b
 	seedPtr := toPtr(seedBytes)
 
 	// shuffle x in slice
-	pubList, i := shuffle(x, pubList)
+	shuffledBidList, i := shuffle(x, bidList)
 	index := C.uint8_t(i)
 
-	pL := make([]byte, 0, 32*len(pubList))
-	for i := 0; i < len(pubList); i++ {
-		pL = append(pL, pubList[i].Bytes()...)
+	bL := make([]byte, 0, 32*len(shuffledBidList))
+	for i := 0; i < len(shuffledBidList); i++ {
+		bL = append(bL, shuffledBidList[i].Bytes()...)
 	}
 
-	pubListBuff := C.struct_Buffer{
-		ptr: sliceToPtr(pL),
-		len: C.size_t(len(pL)),
+	bidListBuff := C.struct_Buffer{
+		ptr: sliceToPtr(bL),
+		len: C.size_t(len(bL)),
 	}
 
 	constListBuff := C.struct_Buffer{
@@ -64,15 +72,21 @@ func Prove(d, k, seed ristretto.Scalar, pubList []ristretto.Scalar) ([]byte, []b
 		len: C.size_t(len(conBytes)),
 	}
 
-	result := C.prove(dPtr, kPtr, yPtr, yInvPtr, qPtr, zPtr, seedPtr, &pubListBuff, &constListBuff, index)
+	result := C.prove(dPtr, kPtr, yPtr, yInvPtr, qPtr, zPtr, seedPtr,
+		&bidListBuff, &constListBuff, index)
 	data := bufferToBytes(*result)
 
-	return data, q.Bytes(), z.Bytes(), pL
+	return ZkProof{
+		Proof:        data,
+		Score:        q.Bytes(),
+		Z:            z.Bytes(),
+		ProofBidList: bL,
+	}
 }
 
 // Verify take a proof in byte format and returns true or false depending on whether
 // it is successful
-func Verify(proof, seed, pubList, q, zImg []byte) bool {
+func Verify(proof, seed, bidList, q, zImg []byte) bool {
 	pBuf := C.struct_Buffer{
 		ptr: sliceToPtr(proof),
 		len: C.size_t(len(proof)),
@@ -82,9 +96,9 @@ func Verify(proof, seed, pubList, q, zImg []byte) bool {
 	zImgPtr := toPtr(zImg)
 	seedPtr := sliceToPtr(seed)
 
-	pubListBuff := C.struct_Buffer{
-		ptr: sliceToPtr(pubList),
-		len: C.size_t(len(pubList)),
+	bidListBuff := C.struct_Buffer{
+		ptr: sliceToPtr(bidList),
+		len: C.size_t(len(bidList)),
 	}
 
 	constListBuff := C.struct_Buffer{
@@ -92,7 +106,7 @@ func Verify(proof, seed, pubList, q, zImg []byte) bool {
 		len: C.size_t(len(conBytes)),
 	}
 
-	verified := C.verify(&pBuf, seedPtr, &pubListBuff, qPtr, zImgPtr, &constListBuff)
+	verified := C.verify(&pBuf, seedPtr, &bidListBuff, qPtr, zImgPtr, &constListBuff)
 
 	if verified {
 		return true

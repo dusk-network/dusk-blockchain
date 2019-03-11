@@ -22,12 +22,12 @@ func TestProofVerify(t *testing.T) {
 	seed := genRandScalar()
 
 	// public list of bids
-	pubList := make([]ristretto.Scalar, 0, 5)
+	BidList := make([]ristretto.Scalar, 0, 5)
 	for i := 0; i < 5; i++ {
-		pubList = append(pubList, genRandScalar())
+		BidList = append(BidList, genRandScalar())
 	}
 
-	proof, qBytes, zBytes, pL := zkproof.Prove(d, k, seed, pubList)
+	proof, qBytes, zBytes, pL := zkproof.Prove(d, k, seed, BidList)
 
 	res := zkproof.Verify(proof, seed.Bytes(), pL, qBytes, zBytes)
 	fmt.Println(res)
