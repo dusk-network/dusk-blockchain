@@ -16,82 +16,80 @@ func (b Bid) Equals(bid Bid) bool {
 	return bytes.Equal(b[:], bid[:])
 }
 
-// PublicList is a list of bid X values.
-type PublicList []Bid
+// BidList is a list of bid X values.
+type BidList []Bid
 
-// CreatePubList will turn a slice of bytes into a PublicList.
-func CreatePubList(pl []byte) (PublicList, *prerror.PrError) {
+// ReconstructBidListSubset will turn a slice of bytes into a BidList.
+func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
 	if len(pl)%32 != 0 {
 		return nil, prerror.New(prerror.Low, errors.New("malformed public list"))
 	}
 
 	numBids := len(pl) / 32
 	r := bytes.NewReader(pl)
-	pubList := make(PublicList, numBids)
+	BidList := make(BidList, numBids)
 	for i := 0; i < numBids; i++ {
 		var bid Bid
 		if _, err := r.Read(bid[:]); err != nil {
 			return nil, prerror.New(prerror.High, err)
 		}
 
-		pubList[i] = bid
+		BidList[i] = bid
 	}
 
-	return pubList, nil
+	return BidList, nil
 }
 
 // ValidateBids will check if pl contains valid bids.
-func (p PublicList) ValidateBids(pl PublicList, ourBid Bid) *prerror.PrError {
+func (b BidList) ValidateBids(bidListSubset BidList) *prerror.PrError {
 loop:
-	for _, x := range pl {
-		for _, x2 := range p {
+	for _, x := range bidListSubset {
+		for _, x2 := range b {
 			if x.Equals(x2) {
 				continue loop
 			}
 		}
 
-		if !x.Equals(ourBid) {
-			return prerror.New(prerror.Low, errors.New("invalid public list"))
-		}
+		return prerror.New(prerror.Low, errors.New("invalid public list"))
 	}
 
 	return nil
 }
 
-// GetRandomBids will get an amount of bids from the public list, to make a
-// slice of scalars to be used for proof generation.
-func (p PublicList) GetRandomBids(amount int) []Bid {
+// Subset will shuffle the BidList, and returns a specified amount of
+// bids from it.
+func (b BidList) Subset(amount int) []Bid {
 	// Shuffle the public list
-	rand.Shuffle(len(p), func(i, j int) { p[i], p[j] = p[j], p[i] })
+	rand.Shuffle(len(b), func(i, j int) { b[i], b[j] = b[j], b[i] })
 
-	// Create our set
-	set := make([]Bid, amount)
+	// Create our subset
+	subset := make([]Bid, amount)
 	for i := 0; i < amount; i++ {
-		set[i] = p[i]
+		subset[i] = b[i]
 	}
 
-	return set
+	return subset
 }
 
 // AddBid will add a bid to the public list p.
-func (p *PublicList) AddBid(bid Bid) {
+func (b *BidList) AddBid(bid Bid) {
 	// Check for duplicates
-	for _, b := range *p {
-		if b.Equals(bid) {
+	for _, bidFromList := range *b {
+		if bidFromList.Equals(bid) {
 			return
 		}
 	}
 
-	*p = append(*p, bid)
+	*b = append(*b, bid)
 }
 
 // RemoveBid will iterate over a public list and remove a specified bid.
-func (p *PublicList) RemoveBid(bid Bid) {
-	for i, b := range *p {
-		if b.Equals(bid) {
-			list := *p
+func (b *BidList) RemoveBid(bid Bid) {
+	for i, bidFromList := range *b {
+		if bidFromList.Equals(bid) {
+			list := *b
 			list = append(list[:i], list[i+1:]...)
-			*p = list
+			*b = list
 		}
 	}
 }
