@@ -56,17 +56,17 @@ db.Close()
 
 ### Additional features
 
-Additional features to be provided by a Driver:
+Additional features that can be provided by a Driver:
 
 - Read-only transactions/connections
-- One read-write transactions, many read-only transactions
 - Validated storage connection
-- Profiling / Stats strutures to collect statistics around latency and history of any transaction
-- Traces to log transactions data
-- Alarming to trigger an event in case of critical backend or storage failure
+- Profiling: Collect transactions and connections statistics
+- Traces: Log transactions data
+- Alarming: Trigger an event in case of critical backend or storage failure
 - Iterators/Cursors
+- Thread-safety: One read-write transaction, many read-only transactions
 
 
 ### Pending development
 
-- Implement a driver that uses RocksDB, LDBM or BoltDB as a KV store. This driver should serve as a second option for Mainnet. 
+- Implement a driver that uses RocksDB, LDBM or BoltDB as a KV store. This driver should serve as a second option for Mainnet needs. 
