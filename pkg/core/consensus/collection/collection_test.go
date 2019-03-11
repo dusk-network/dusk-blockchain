@@ -44,7 +44,7 @@ func TestSignatureSetCollection(t *testing.T) {
 	ctx.Weight = 200
 
 	// Shuffle vote set
-	var otherVotes []*consensusmsg.Vote
+	var otherVotes []*payload.Vote
 	otherVotes = append(otherVotes, voteSet...)
 	otherVotes[0], otherVotes[1] = otherVotes[1], otherVotes[0]
 
@@ -100,7 +100,7 @@ func TestSignatureSetCollection(t *testing.T) {
 }
 
 func newSigSetCandidate(c *user.Context, weight uint64,
-	voteSet []*consensusmsg.Vote) (*payload.MsgConsensus, error) {
+	voteSet []*payload.Vote) (*payload.MsgConsensus, error) {
 	// Create context
 	keys, _ := user.NewRandKeys()
 	ctx, err := user.NewContext(0, 0, c.W, c.Round, c.Seed, c.Magic, keys)
@@ -124,7 +124,7 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	c.CurrentCommittee[pkEd] = 1
 
 	// Create payload, signature and message
-	pl, err := consensusmsg.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes, 1)
+	pl, err := payload.NewSigSetCandidate(ctx.BlockHash, ctx.SigSetVotes, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +139,8 @@ func newSigSetCandidate(c *user.Context, weight uint64,
 	return msg, nil
 }
 
-func createVotes(ctx *user.Context, amount int, step uint32) ([]*consensusmsg.Vote, error) {
-	var voteSet []*consensusmsg.Vote
+func createVotes(ctx *user.Context, amount int, step uint32) ([]*payload.Vote, error) {
+	var voteSet []*payload.Vote
 	for i := 0; i < amount; i++ {
 		keys, err := user.NewRandKeys()
 		if err != nil {
@@ -175,13 +175,13 @@ func createVotes(ctx *user.Context, amount int, step uint32) ([]*consensusmsg.Vo
 		}
 
 		// Create two votes and add them to the array
-		vote1, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
+		vote1, err := payload.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig1,
 			step)
 		if err != nil {
 			return nil, err
 		}
 
-		vote2, err := consensusmsg.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
+		vote2, err := payload.NewVote(ctx.BlockHash, keys.BLSPubKey.Marshal(), sig2,
 			step-1)
 		if err != nil {
 			return nil, err
