@@ -20,6 +20,8 @@ type Driver interface {
 type Tx interface {
 
 	// TODO: Define transactions to satisfy Dusk Block chain DB specifics
+	// As convention any read-transaction can be prefixed with Get,
+	// any write-transaction can be prefixed with Write
 
 	// Read-write Transactions
 	WriteHeader(h *block.Header) error
@@ -34,8 +36,15 @@ type Tx interface {
 
 // DB a thin layer on top of block chain DB
 type DB interface {
+
+	// Returns unique database Type identifier
 	Type() string
+
+	// To provide a managed execution a read-only transaction
 	View(fn func(tx Tx) error) error
+	// To provide a managed execution of read-write transaction
 	Update(fn func(tx Tx) error) error
+
+	// TBD
 	Close() error
 }
