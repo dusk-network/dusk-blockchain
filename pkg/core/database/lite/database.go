@@ -10,10 +10,6 @@ import (
 	"time"
 )
 
-var (
-	driverName = "Lite_v0.1.0"
-)
-
 // DB on top of underlying storage sqlite3
 type DB struct {
 	// underlying storage is Sqlite3. If needed, it might be replaced with redis
@@ -29,7 +25,6 @@ type DB struct {
 // If open in Serialized mode, one connection be shared by multiple goroutines
 func NewDatabase(path string, readonly bool) (*DB, error) {
 
-	// TODO: Open in Serialized mode
 	storage, err := sql.Open("sqlite3", "./"+path)
 	if err != nil {
 		return nil, err
@@ -50,12 +45,12 @@ func NewDatabase(path string, readonly bool) (*DB, error) {
 	return &DB{storage, path, false, true}, nil
 }
 
-func (db *DB) isOpen() bool {
+func (db DB) isOpen() bool {
 	return db.opened
 }
 
 // Begin builds (read-only or read-write) Tx, do initial validations
-func (db *DB) Begin(writable bool) (database.Tx, error) {
+func (db DB) Begin(writable bool) (database.Tx, error) {
 	// If the database was opened with Options.ReadOnly, return an error.
 	if db.readOnly && writable {
 		return nil, errors.New("Database is read-only")
@@ -65,13 +60,13 @@ func (db *DB) Begin(writable bool) (database.Tx, error) {
 	}
 
 	// Create a transaction associated with the database.
-	t := Tx{writable: writable, db: db}
+	t := Tx{writable: writable, db: &db}
 
 	return t, nil
 }
 
 // Update provides an execution of managed, read-write Tx
-func (db *DB) Update(fn func(database.Tx) error) error {
+func (db DB) Update(fn func(database.Tx) error) error {
 	start := time.Now()
 	t, err := db.Begin(true)
 	if err != nil {
@@ -86,7 +81,7 @@ func (db *DB) Update(fn func(database.Tx) error) error {
 }
 
 // View provides an execution of managed, read-only Tx
-func (db *DB) View(fn func(database.Tx) error) error {
+func (db DB) View(fn func(database.Tx) error) error {
 	start := time.Now()
 	t, err := db.Begin(false)
 	if err != nil {
@@ -99,13 +94,9 @@ func (db *DB) View(fn func(database.Tx) error) error {
 	duration := time.Since(start)
 	log.WithField("prefix", "database").Debugf("Transaction duration %d", duration.Nanoseconds())
 
-	return nil
+	return err
 }
 
-func (db *DB) Type() string {
-	return driverName
-}
-
-func (db *DB) Close() error {
+func (db DB) Close() error {
 	return nil
 }

@@ -6,6 +6,11 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
+var (
+	// DriverName Unique name of Lite driver
+	DriverName = "Lite_v0.1.0"
+)
+
 type driver struct {
 }
 
@@ -16,8 +21,16 @@ func (d driver) Open(path string, network protocol.Magic, readonly bool) (databa
 	return NewDatabase(path, readonly)
 }
 
+func (d driver) Name() string {
+	return DriverName
+}
+
 func init() {
 	// Register the Lite driver.
 	driver := driver{}
-	database.Register(driverName, driver)
+	err := database.Register(driver)
+
+	if err != nil {
+		panic(err)
+	}
 }

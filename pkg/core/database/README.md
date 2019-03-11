@@ -24,13 +24,12 @@ Interfaces exposed to upper layers:
 
 ```
 
-// By changing Driver type, one can switch between different backends
+// By changing Driver name, one can switch between different backends
 // Each backend is bound to one or multiple underlying stores
-databaseDriverType := "Lite"
 readonly := false
 
 // Retrieve
-driver := database.From(databaseDriverType)
+driver, _ := database.From(lite.DriverName)
 db, err := driver.Open(path, protocol.DevNet, readonly)
 
 h := &block.Header{}

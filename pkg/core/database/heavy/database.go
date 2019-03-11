@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	driverName    = "heavy_v0.1.0"
 	storageIsOpen = false
 )
 
@@ -52,7 +51,7 @@ func NewDatabase(path string, readonly bool) (*DB, error) {
 }
 
 // Begin builds (read-only or read-write) Tx, do initial validations
-func (db *DB) Begin(writable bool) (database.Tx, error) {
+func (db DB) Begin(writable bool) (database.Tx, error) {
 	// If the database was opened with Options.ReadOnly, return an error.
 	if db.readOnly && writable {
 		return nil, errors.New("Database is read-only")
@@ -71,13 +70,13 @@ func (db *DB) Begin(writable bool) (database.Tx, error) {
 	}
 
 	// Create a transaction associated with the database.
-	t := &Tx{writable: writable, db: db}
+	t := &Tx{writable: writable, db: &db}
 
 	return t, nil
 }
 
 // Update provides an execution of managed, read-write Tx
-func (db *DB) Update(fn func(database.Tx) error) error {
+func (db DB) Update(fn func(database.Tx) error) error {
 	start := time.Now()
 	t, err := db.Begin(true)
 	if err != nil {
@@ -92,7 +91,7 @@ func (db *DB) Update(fn func(database.Tx) error) error {
 }
 
 // View provides an execution of managed, read-only Tx
-func (db *DB) View(fn func(database.Tx) error) error {
+func (db DB) View(fn func(database.Tx) error) error {
 	start := time.Now()
 	t, err := db.Begin(false)
 	if err != nil {
@@ -105,18 +104,14 @@ func (db *DB) View(fn func(database.Tx) error) error {
 	duration := time.Since(start)
 	log.WithField("prefix", "database").Debugf("Transaction duration %d", duration.Nanoseconds())
 
-	return nil
+	return err
 }
 
-func (db *DB) isOpen() bool {
+func (db DB) isOpen() bool {
 	return storageIsOpen
 }
 
-func (db *DB) Type() string {
-	return driverName
-}
-
-func (db *DB) Close() error {
+func (db DB) Close() error {
 	return nil
 }
 

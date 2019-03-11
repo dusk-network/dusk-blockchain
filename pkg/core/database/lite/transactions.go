@@ -5,8 +5,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
 
-var ()
-
 // Tx Transaction layer
 type Tx struct {
 	closed   bool

@@ -5,27 +5,42 @@ import (
 	"testing"
 )
 
+func unregisterAllDrivers() {
+	driversMu.Lock()
+	defer driversMu.Unlock()
+	// For tests.
+	drivers = make(map[string]Driver)
+}
+
+// Dummy DriverA
 type driverA struct{}
 
 func (d driverA) Open(path string, network protocol.Magic, readonly bool) (DB, error) {
 	return nil, nil
 }
+func (d driverA) Name() string {
+	return "driver_a"
+}
 
+// Dummy DriverB
 type driverB struct{}
 
 func (d driverB) Open(path string, network protocol.Magic, readonly bool) (DB, error) {
 	return nil, nil
 }
+func (d driverB) Name() string {
+	return "driver_b"
+}
 
 func TestDuplicatedDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	err := Register("driver_a", &driverA{})
+	err := Register(&driverA{})
 	if err != nil {
 		t.Fatal("Registering DB driver failed")
 	}
 
-	err = Register("driver_a", &driverA{})
+	err = Register(&driverA{})
 	if err == nil {
 		t.Fatal("Error for duplicated driver not returned")
 	}
@@ -34,8 +49,8 @@ func TestDuplicatedDriver(t *testing.T) {
 func TestListDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	Register("driver_b", &driverB{})
-	Register("driver_a", &driverA{})
+	Register(&driverB{})
+	Register(&driverA{})
 
 	allDrivers := Drivers()
 
@@ -51,16 +66,16 @@ func TestListDriver(t *testing.T) {
 func TestRetrieveDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	Register("driver_b", &driverB{})
-	Register("driver_a", &driverA{})
+	Register(&driverB{})
+	Register(&driverA{})
 
-	driver := From("driver_a")
-	if driver == nil {
+	driver, err := From("driver_a")
+	if driver == nil || err != nil {
 		t.Fatal("A registerd driver not found")
 	}
 
-	driver = From("driver_non")
-	if driver != nil {
+	driver, err = From("driver_non")
+	if driver != nil || err == nil {
 		t.Fatal("Invalid driver")
 	}
 }
