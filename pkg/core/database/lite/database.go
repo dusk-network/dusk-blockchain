@@ -53,10 +53,10 @@ func (db DB) isOpen() bool {
 func (db DB) Begin(writable bool) (database.Tx, error) {
 	// If the database was opened with Options.ReadOnly, return an error.
 	if db.readOnly && writable {
-		return nil, errors.New("Database is read-only")
+		return nil, errors.New("database is read-only")
 	}
 	if !db.isOpen() {
-		return nil, errors.New("Database is not open")
+		return nil, errors.New("database is not open")
 	}
 
 	// Create a transaction associated with the database.

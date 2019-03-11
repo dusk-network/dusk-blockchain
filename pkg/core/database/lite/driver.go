@@ -16,7 +16,7 @@ type driver struct {
 
 func (d driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
 	if network != protocol.DevNet {
-		return nil, errors.New("Lite Driver supports only DevNet")
+		return nil, errors.New("lite Driver supports only DevNet")
 	}
 	return NewDatabase(path, readonly)
 }

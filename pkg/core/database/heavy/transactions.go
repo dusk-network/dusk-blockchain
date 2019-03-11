@@ -5,13 +5,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
 
-var (
-	// HEADER is the prefix for a header key
-	prefixHeader = []byte{0x01}
-)
-
 type Tx struct {
-	closed   bool
 	writable bool
 	db       *DB
 }

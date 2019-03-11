@@ -7,7 +7,6 @@ import (
 
 // Tx Transaction layer
 type Tx struct {
-	closed   bool
 	writable bool
 	db       *DB
 }

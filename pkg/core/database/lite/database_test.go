@@ -32,6 +32,10 @@ func TestReadWriteDatabase(t *testing.T) {
 		return err
 	})
 
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
 	var retrievedHeight uint64
 	// read-only Tx
 	err = db.View(func(tx database.Tx) error {
@@ -39,6 +43,10 @@ func TestReadWriteDatabase(t *testing.T) {
 		retrievedHeight = header.Height
 		return err
 	})
+
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 
 	if retrievedHeight != h.Height {
 		t.Fatal("Wrong read/write tx")
