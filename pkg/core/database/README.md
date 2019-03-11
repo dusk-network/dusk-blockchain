@@ -3,22 +3,22 @@ Package database represents a database layer in Dusk Network. Current design sho
 
 ###  Terminology
 
-`Storage`: Underlying storage might be any of kind the KV stores like BoltDB, LMDB, LevelDB, RocksDB, Redis, non-KV stores like SQLite or even a custom ACID-complient flat-file store.
+`Storage`: Underlying storage can be any kind of KV stores (BoltDB, LMDB, LevelDB, RocksDB, Redis), non-KV stores (SQLite) or even a custom ACID-complient flat-file store.
 
-`Backend/Driver`: represents a DB implementation that uses one or multiple underlying storages to provide Block chain database specifics with regard to particular purpose. It must satisfy Driver, DB and Tx intefaces.
+`Backend/Driver`: represents a DB implementation that uses one or multiple underlying storages to provide block chain database specifics with regard to particular purpose. It must implement Driver, DB and Tx intefaces.
 
 Interfaces exposed to upper layers:
 
 - `database.Driver`: DB connection initiator. Inspired by database/sql/driver
 - `database.DB`: A thin layer on top of database.Tx providing a manageable Tx execution. Inspired by BoltDB
-- `database.Tx`: A transaction layer tightly coupled with Blockchain specifics to fully benefit from underlying storage capabilities
+- `database.Tx`: A transaction layer tightly coupled with DUSK block chain specifics to fully benefit from underlying storage capabilities
 
 
 ### Available Drivers
 
-- `/database/heavy` driver is designed to provide efficient, robust and persistent Dusk Blockchain DB on top of syndtr/goleveldb/leveldb store. It must be Mainnet-complient.
+- `/database/heavy` driver is designed to provide efficient, robust and persistent DUSK block chain DB on top of syndtr/goleveldb/leveldb store (unofficial LevelDB porting). It must be Mainnet-complient.
 
-- `/database/lite` driver is designed to provide human-readable Dusk Blockchain DB for Devnet needs only. As is based on sqlite, any SQL browser can be used as blockchain explorer.
+- `/database/lite` driver is designed to provide human-readable DUSK block chain DB for DevNet needs only. As is based on SQLite3, any SQL browser can be used as blockchain explorer.
 
 ### Code example:
 
@@ -60,8 +60,13 @@ Additional features to be provided by a Driver:
 
 - Read-only transactions/connections
 - One read-write transactions, many read-only transactions
-- Validated storage conn
-- Profiling / Stats to collect statistics around latency and history of transactions
+- Validated storage connection
+- Profiling / Stats strutures to collect statistics around latency and history of any transaction
 - Traces to log transactions data
-- Alarming to trigger an event to upper layers in case of critical Backend or Storage failure
+- Alarming to trigger an event in case of critical backend or storage failure
 - Iterators/Cursors
+
+
+### Pending development
+
+- Implement a driver that uses RocksDB, LDBM or BoltDB as a KV store. This driver should serve as a second option for Mainnet. 
