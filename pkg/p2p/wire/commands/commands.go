@@ -28,13 +28,6 @@ const (
 	CertificateReq Cmd = "certificatereq"
 	Certificate    Cmd = "certificate"
 
-	// Consensus commands
-	Score     Cmd = "score"
-	Candidate Cmd = "candidate"
-	Reduction Cmd = "reduction"
-	Agreement Cmd = "agreement"
-	SigSet    Cmd = "sigset"
-
 	// Error commands
 	NotFound Cmd = "notfound"
 	Reject   Cmd = "reject"
