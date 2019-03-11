@@ -5,14 +5,18 @@
 package peermgr
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -68,6 +72,8 @@ type Peer struct {
 
 	conn net.Conn
 
+	eventBus *wire.EventBus
+
 	cfg *Config
 
 	// Atomic vals
@@ -86,13 +92,14 @@ type Peer struct {
 
 // NewPeer is called after a connection to a peer was successful.
 // Inbound as well as Outbound.
-func NewPeer(conn net.Conn, inbound bool, cfg *Config) *Peer {
+func NewPeer(conn net.Conn, inbound bool, cfg *Config, eventBus *wire.EventBus) *Peer {
 	p := &Peer{
 		inch:     make(chan func(), inputBufferSize),
 		outch:    make(chan func(), outputBufferSize),
 		quitch:   make(chan struct{}, 1),
 		inbound:  inbound,
 		conn:     conn,
+		eventBus: eventBus,
 		addr:     conn.RemoteAddr().String(),
 		Detector: stall.NewDetector(responseTime, tickerInterval),
 		cfg:      cfg,
@@ -107,8 +114,46 @@ func (p *Peer) Write(msg wire.Payload) error {
 }
 
 // Read from a peer
-func (p *Peer) Read() (wire.Payload, error) {
-	return wire.ReadMessage(p.conn, p.cfg.Magic)
+func (p *Peer) readHeader() (*MessageHeader, error) {
+	headerBytes, err := p.readHeaderBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	headerBuffer := bytes.NewReader(headerBytes)
+
+	header, err := decodeMessageHeader(headerBuffer)
+	if err != nil {
+		return nil, err
+	}
+
+	return header, nil
+}
+
+func (p *Peer) readHeaderBytes() ([]byte, error) {
+	buffer := make([]byte, HeaderSize)
+	if _, err := io.ReadFull(p.conn, buffer); err != nil {
+		return nil, err
+	}
+
+	return buffer, nil
+}
+
+func (p *Peer) readPayload(length uint32) (*bytes.Buffer, error) {
+	buffer := make([]byte, length)
+	if _, err := io.ReadFull(p.conn, buffer); err != nil {
+		return nil, err
+	}
+
+	return bytes.NewBuffer(buffer), nil
+}
+
+func (p *Peer) headerMagicIsValid(header *MessageHeader) bool {
+	return p.cfg.Magic == header.Magic
+}
+
+func payloadChecksumIsValid(payloadBuffer *bytes.Buffer, checksum uint32) bool {
+	return crypto.CompareChecksum(payloadBuffer.Bytes(), checksum)
 }
 
 // Disconnect disconnects from a peer
@@ -241,64 +286,21 @@ loop:
 
 		idleTimer.Reset(idleTimeout) // reset timer on each loop
 
-		readmsg, err := p.Read()
-
-		// Message read; stop Timer
-		idleTimer.Stop()
-
+		header, err := p.readHeader()
 		if err != nil {
 			// This will also happen if Peer is disconnected
 			break loop
 		}
 
-		// Remove message as pending from the stall detector
-		p.Detector.RemoveMessage(readmsg.Command())
+		// Message read; stop Timer
+		idleTimer.Stop()
 
-		switch msg := readmsg.(type) {
+		if p.headerMagicIsValid(header) {
+			payloadBuffer, err := p.readPayload(header.Length)
 
-		case *payload.MsgVersion:
-			break loop // We have already done the handshake, break loop and disconnect
-		case *payload.MsgVerAck:
-			if p.verackReceived {
-				break loop
+			if payloadChecksumIsValid(payloadBuffer, header.Checksum) {
+				p.eventBus.Publish(string(header.Command), payloadBuffer)
 			}
-			p.statemutex.Lock() // This should not happen, however if it does, then we should set it.
-			p.verackReceived = true
-			p.statemutex.Unlock()
-		case *payload.MsgAddr:
-			p.OnAddr(msg)
-		case *payload.MsgGetAddr:
-			p.OnGetAddr(msg)
-		case *payload.MsgGetBlocks:
-			p.OnGetBlocks(msg)
-		case *payload.MsgBlock:
-			p.OnBlock(msg)
-		case *payload.MsgHeaders:
-			p.OnHeaders(msg)
-		case *payload.MsgGetHeaders:
-			p.OnGetHeaders(msg)
-		case *payload.MsgInv:
-			p.OnInv(msg)
-		case *payload.MsgGetData:
-			p.OnGetData(msg)
-		case *payload.MsgTx:
-			p.OnTx(msg)
-		case *payload.MsgConsensus:
-			p.OnConsensusMsg(msg)
-		case *payload.MsgCertificate:
-			p.OnCertificate(msg)
-		case *payload.MsgCertificateReq:
-			p.OnCertificateReq(msg)
-		case *payload.MsgMemPool:
-			p.OnMemPool(msg)
-		case *payload.MsgNotFound:
-			p.OnNotFound(msg)
-		case *payload.MsgPing:
-			p.OnPing(msg)
-		case *payload.MsgPong:
-			p.OnPong(msg)
-		case *payload.MsgReject:
-			p.OnReject(msg)
 		}
 	}
 
