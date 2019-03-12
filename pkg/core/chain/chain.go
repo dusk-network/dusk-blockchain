@@ -180,6 +180,8 @@ func checkTXMalformed(tx transactions.TypeInfo) error {
 
 	// Version
 
+	// XXX: Checks here have been delayed until we refactor the transaction/blocks structure
+
 	err := checkRangeProof(rangeproof.Proof{})
 	if err != nil {
 		return err
