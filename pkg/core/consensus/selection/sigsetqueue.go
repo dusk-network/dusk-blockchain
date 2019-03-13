@@ -1,4 +1,4 @@
-package collection
+package selection
 
 type sigSetQueue map[uint64]map[uint8][]*sigSetMessage
 

@@ -1,4 +1,4 @@
-package collection_test
+package selection_test
 
 import (
 	"bytes"
@@ -17,8 +17,8 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -103,7 +103,7 @@ func TestSigSetCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := collection.NewSetSelector(eventBus, timerLength, validateFunc,
+	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
 		verifyVoteFunc, committeeStore)
 
 	go setSelector.Listen()
@@ -206,7 +206,7 @@ func TestInvalidVoteSetSigSetCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := collection.NewSetSelector(eventBus, timerLength, validateFunc,
+	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
 		verifyVoteFunc, committeeStore)
 
 	go setSelector.Listen()
@@ -309,7 +309,7 @@ func TestInvalidSignatureSigSetCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := collection.NewSetSelector(eventBus, timerLength, validateFunc,
+	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
 		verifyVoteFunc, committeeStore)
 
 	go setSelector.Listen()
@@ -404,7 +404,7 @@ func TestSigSetCollectionQueue(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := collection.NewSetSelector(eventBus, timerLength, validateFunc,
+	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
 		verifyVoteFunc, committeeStore)
 
 	go setSelector.Listen()

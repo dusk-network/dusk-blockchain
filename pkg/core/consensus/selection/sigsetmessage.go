@@ -1,4 +1,4 @@
-package collection
+package selection
 
 import (
 	"encoding/binary"

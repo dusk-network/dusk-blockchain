@@ -1,4 +1,4 @@
-package collection
+package selection
 
 import (
 	"bytes"
@@ -15,6 +15,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
+// SetSelector contains information about the state of the consensus.
+// It also maintains a message queue, with messages intended for the SetSelector.
 type SetSelector struct {
 	eventBus                *wire.EventBus
 	sigSetChannel           <-chan *bytes.Buffer

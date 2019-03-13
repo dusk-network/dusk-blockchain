@@ -1,4 +1,4 @@
-package collection_test
+package selection_test
 
 import (
 	"bytes"
@@ -9,10 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/collection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -33,7 +33,7 @@ func TestScoreCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	scoreSelector := collection.NewScoreSelector(eventBus, timerLength, validateFunc,
+	scoreSelector := selection.NewScoreSelector(eventBus, timerLength, validateFunc,
 		verifyProofFunc)
 
 	go scoreSelector.Listen()
@@ -85,7 +85,7 @@ func TestInvalidProofScoreCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	scoreSelector := collection.NewScoreSelector(eventBus, timerLength, validateFunc,
+	scoreSelector := selection.NewScoreSelector(eventBus, timerLength, validateFunc,
 		verifyProofFunc)
 
 	go scoreSelector.Listen()
@@ -137,7 +137,7 @@ func TestInvalidSignatureScoreCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	scoreSelector := collection.NewScoreSelector(eventBus, timerLength, validateFunc,
+	scoreSelector := selection.NewScoreSelector(eventBus, timerLength, validateFunc,
 		verifyProofFunc)
 
 	go scoreSelector.Listen()
@@ -190,7 +190,7 @@ func TestScoreCollectionQueue(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	scoreSelector := collection.NewScoreSelector(eventBus, timerLength, validateFunc,
+	scoreSelector := selection.NewScoreSelector(eventBus, timerLength, validateFunc,
 		verifyProofFunc)
 
 	go scoreSelector.Listen()
