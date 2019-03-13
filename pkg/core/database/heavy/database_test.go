@@ -4,21 +4,27 @@ import (
 	"encoding/binary"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"io/ioutil"
 	"os"
 	"testing"
 )
 
 func TestReadWriteDatabase(t *testing.T) {
 
-	path := "temp.db"
-	dir, _ := os.Getwd()
-	os.Remove(dir + "/" + path)
+	// on-disk data must be erased before each test run
+	storeDir, err := ioutil.TempDir(os.TempDir(), "store_")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	defer os.RemoveAll(storeDir)
 
-	db, err := NewDatabase(path, false)
+	db, err := NewDatabase(storeDir, false)
 
 	if err != nil {
 		t.Fatal("Failed on initiating new Database")
 	}
+
+	defer db.Close()
 
 	// Dummy header data to verify read/write capabilities
 	h := &block.Header{}
@@ -40,6 +46,9 @@ func TestReadWriteDatabase(t *testing.T) {
 	// read-only Tx
 	err = db.View(func(tx database.Tx) error {
 		header, err := tx.GetBlockHeaderByHash(h.Hash)
+		if err != nil {
+			return err
+		}
 		retrievedHeight = header.Height
 		return err
 	})
@@ -52,6 +61,4 @@ func TestReadWriteDatabase(t *testing.T) {
 		t.Fatal("Wrong read/write tx")
 	}
 
-	// delete temp db
-	os.Remove(dir + "/" + path)
 }

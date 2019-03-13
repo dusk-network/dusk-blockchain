@@ -16,6 +16,21 @@ type Driver interface {
 	Name() string
 }
 
+type Round = uint64
+
+type Tx_v2 interface {
+	FetchBlockHeader(hash []byte) (*block.Header, error)
+	FetchBlockHeaderByRound(number Round) (*block.Header, error)
+	FetchBlockHeaderByRange(from Round, to Round) ([]*block.Header, error) //todo
+	FetchBlockExists(header *block.Header) (bool, error)
+	FetchLatestBlockHeader() (*block.Header, error)
+
+	// Store prefixed methods should garentee the
+	StoreBlock(block []*block.Block) error
+	StoreHeaders(hdrs []*block.Header) error
+	StoreBlockTransactions(blocks []*block.Block) error
+}
+
 // Tx represents transaction layer.
 // A Database driver must provide a robust implementation of each method
 // This is what is exposed/visible to all upper layers so changes here

@@ -40,7 +40,12 @@ func NewDatabase(path string, readonly bool) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	stmt.Exec()
+
+	_, err = stmt.Exec()
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &DB{storage, path, false, true}, nil
 }

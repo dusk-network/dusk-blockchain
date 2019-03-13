@@ -49,8 +49,8 @@ func TestDuplicatedDriver(t *testing.T) {
 func TestListDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	Register(&driverB{})
-	Register(&driverA{})
+	_ = Register(&driverB{})
+	_ = Register(&driverA{})
 
 	allDrivers := Drivers()
 
@@ -66,7 +66,7 @@ func TestListDriver(t *testing.T) {
 func TestRetrieveDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	Register(&driverB{})
+	_ = Register(&driverB{})
 	Register(&driverA{})
 
 	driver, err := From("driver_a")

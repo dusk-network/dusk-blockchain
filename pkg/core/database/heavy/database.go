@@ -62,15 +62,18 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 	// describe below
 
 	// A database may only be opened by one process at a time.
-	// The leveldb implementation acquires a lock from the operating system to prevent misuse. Within a single process, the same leveldb::DB object may be safely shared by multiple concurrent threads. I.e., different threads may write into or fetch iterators or call Get on the same database without any external synchronization
+	// The leveldb implementation acquires a lock from the operating system to prevent misuse.
+	// Within a single process, the same leveldb::DB object may be safely shared by multiple concurrent threads.
+	// I.e., different threads may write into or fetch iterators or call Get on the same database without any external synchronization
 
 	// Exit if the database is not open yet.
 	if !db.isOpen() {
 		return nil, errors.New("Database is not open")
 	}
 
-	// Create a transaction associated with the database.
-	t := &Tx{writable: writable, db: &db}
+	// Create a transaction instance.
+	batch := new(leveldb.Batch)
+	t := &Tx{writable: writable, db: &db, batch: batch, closed: false}
 
 	return t, nil
 }
@@ -85,9 +88,17 @@ func (db DB) Update(fn func(database.Tx) error) error {
 
 	// If an error is returned from the function then rollback and return error.
 	err = fn(t)
+
+	// TODO: Move this to Tx Commit
 	duration := time.Since(start)
 	log.WithField("prefix", "database").Debugf("Transaction duration %d", duration.Nanoseconds())
-	return err
+
+	if err != nil {
+		// If we fail at the point of building tx, no commit will be applied
+		return err
+	}
+
+	return t.Commit()
 }
 
 // View provides an execution of managed, read-only Tx
@@ -112,6 +123,10 @@ func (db DB) isOpen() bool {
 }
 
 func (db DB) Close() error {
+	if storageIsOpen {
+		db.storage.Close()
+		storageIsOpen = false
+	}
 	return nil
 }
 
