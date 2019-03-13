@@ -50,13 +50,25 @@ type Provisioners []Member
 
 // AddMember will add a Member to the Provisioners by using the bytes of an Ed25519
 // public key.
-func (p *Provisioners) AddMember(pubKeyEd []byte, stake uint64) error {
+func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error {
 	if len(pubKeyEd) != 32 {
 		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
 	}
 
+	if len(pubKeyBLS) != 129 {
+		return fmt.Errorf("public key is %v bytes long instead of 128", len(pubKeyBLS))
+	}
+
 	var m Member
 	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
+
+	pubKey := &bls.PublicKey{}
+	if err := pubKey.Unmarshal(pubKeyBLS); err != nil {
+		return err
+	}
+
+	m.PublicKeyBLS = *pubKey
+	m.Stake = stake
 
 	// Check for duplicates
 	for _, member := range *p {
@@ -99,7 +111,7 @@ func (p *Provisioners) RemoveMember(pubKeyEd []byte) error {
 // GetStake will find a certain provisioner in the committee by BLS public key,
 // and return their stake.
 func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
-	if len(pubKeyBLS) != 128 {
+	if len(pubKeyBLS) != 129 {
 		return 0, fmt.Errorf("public key is %v bytes long instead of 128", len(pubKeyBLS))
 	}
 
