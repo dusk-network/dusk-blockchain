@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,16 +11,20 @@ import (
 )
 
 func TestWriteReadMessage(t *testing.T) {
+	pver := protocol.NodeVer
+
 	addr1 := payload.NewNetAddress("202.108.250.180", 9999)
 	addr2 := payload.NewNetAddress("224.164.2.18", 9999)
 
-	msg := payload.NewMsgVersion(protocol.ProtocolVersion, addr1, addr2)
+	services := protocol.FullNode
+
+	msg := payload.NewMsgVersion(pver, addr1, addr2, services, rand.Uint64())
 	buf := new(bytes.Buffer)
-	if err := WriteMessage(buf, protocol.DevNet, msg); err != nil {
+	if err := WriteMessage(buf, protocol.MainNet, msg); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2, err := ReadMessage(buf, protocol.DevNet)
+	msg2, err := ReadMessage(buf, protocol.MainNet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,11 +36,11 @@ func TestWriteReadMessageNoPayload(t *testing.T) {
 	msg := payload.NewMsgVerAck()
 	bs := make([]byte, 0, HeaderSize)
 	buf := bytes.NewBuffer(bs)
-	if err := WriteMessage(buf, protocol.DevNet, msg); err != nil {
+	if err := WriteMessage(buf, protocol.MainNet, msg); err != nil {
 		t.Fatal(err)
 	}
 
-	msg2, err := ReadMessage(buf, protocol.DevNet)
+	msg2, err := ReadMessage(buf, protocol.MainNet)
 	if err != nil {
 		t.Fatal(err)
 	}

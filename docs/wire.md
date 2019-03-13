@@ -42,7 +42,7 @@ Once your message is ready to be sent, you can do so with the `WriteMessage` fun
 
 ```go
 // Error handling omitted for clarity
-wire.WriteMessage(peer.Conn, wire.DevNet, msg)
+wire.WriteMessage(peer.Conn, wire.MainNet, msg)
 ```
 
 This function will then prepend a header to your message, encode your message to binary and send it over the wire, to the specified peer.
@@ -53,7 +53,7 @@ A received message can be read from the wire with the `ReadMessage` function.
 
 ```go
 // Error handling omitted for clarity
-payload, err := wire.ReadMessage(peer.Conn, wire.DevNet)
+payload, err := wire.ReadMessage(peer.Conn, wire.MainNet)
 ```
 
 This will decode the message header and then use the header information to properly decode the payload. It then returns the payload, which is denoted as an interface value. We can identify the payload type by doing a type assertion like so:

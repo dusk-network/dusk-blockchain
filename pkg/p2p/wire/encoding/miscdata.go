@@ -69,3 +69,24 @@ func Write512(w io.Writer, b []byte) error {
 	}
 	return nil
 }
+
+// ReadBLS will read a compressed bls signature (33 bytes) from r into b.
+func ReadBLS(r io.Reader, b *[]byte) error {
+	*b = make([]byte, 33)
+	n, err := r.Read(*b)
+	if err != nil || n != len(*b) {
+		return fmt.Errorf("encoding: ReadBLS read %v/33 bytes - %v", n, err)
+	}
+	return nil
+}
+
+// WriteBLS will write a compressed bls signature (33 bytes) to w.
+func WriteBLS(w io.Writer, b []byte) error {
+	if len(b) != 33 {
+		return fmt.Errorf("b is not proper size - expected 33 bytes, is actually %d bytes", len(b))
+	}
+	if _, err := w.Write(b); err != nil {
+		return err
+	}
+	return nil
+}

@@ -1,18 +1,17 @@
 package stall
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
 
-// stall detector will keep track of all pendingMessages
-// If any message takes too long to reply
-// the detector will disconnect the peer
-
+// Detector is stall detector that will keep track of all pending messages.
+// If any message takes too long to reply the detector will disconnect the peer.
 type Detector struct {
 	responseTime time.Duration
 	tickInterval time.Duration
@@ -28,9 +27,9 @@ type Detector struct {
 	disconnected int32
 }
 
-// rT is the responseTime and signals how long
-// a peer has to reply back to a sent message
-// tickerInterval is how often the detector wil check for stalled messages
+// NewDetector returns a new Detector.
+// rT is the responseTime and signals how long a peer has to reply back to a sent message.
+// tickerInterval is how often the detector wil check for stalled messages.
 func NewDetector(rTime time.Duration, tickerInterval time.Duration) *Detector {
 	d := &Detector{
 		responseTime: rTime,
@@ -51,14 +50,16 @@ loop:
 		select {
 		case <-ticker.C:
 			now := time.Now()
+			d.lock.Lock()
 			for _, deadline := range d.responses {
 				if now.After(deadline) {
-					fmt.Println("Deadline passed")
+					log.WithField("prefix", "stall").Info("Deadline passed")
 					ticker.Stop()
+					d.lock.Unlock()
 					break loop
 				}
 			}
-
+			d.lock.Unlock()
 		}
 	}
 	d.Quit()
@@ -66,21 +67,19 @@ loop:
 	ticker.Stop()
 }
 
-// Quit is a concurrent safe way to call the Quit channel
-// Without blocking
+// Quit is a concurrent safe way to call the Quit channel without blocking
 func (d *Detector) Quit() {
 	// return if already disconnected
 	if atomic.LoadInt32(&d.disconnected) != 0 {
 		return
 	}
-
 	atomic.AddInt32(&d.disconnected, 1)
 	close(d.Quitch)
 }
 
-// Call this function when we send a message to a peer
-// The command passed through is the command that we sent
-// and not the command we expect to receive
+// AddMessage adds a msg to the Detector.
+// Call this function when we send a message to a peer.
+// The command passed through is the command that we sent and not the command we expect to receive.
 func (d *Detector) AddMessage(cmd commands.Cmd) {
 	cmds := d.addMessage(cmd)
 	d.lock.Lock()
@@ -90,11 +89,12 @@ func (d *Detector) AddMessage(cmd commands.Cmd) {
 	d.lock.Unlock()
 }
 
-// Call this function when we receive a message from
-// peer. This will remove the pendingresponse message from the map.
-// The command passed through is the command we received
+// RemoveMessage removes a msg from the Detector.
+// Call this function when we receive a message from a peer.
+// This will remove the pendingresponse message from the map.
+// The command passed through is the command we received.
 func (d *Detector) RemoveMessage(cmd commands.Cmd) {
-	cmds := d.addMessage(cmd)
+	cmds := d.removeMessage(cmd)
 	d.lock.Lock()
 	for _, cmd := range cmds {
 		delete(d.responses, cmd)
@@ -110,8 +110,7 @@ func (d *Detector) DeleteAll() {
 	d.lock.Unlock()
 }
 
-// GetMessages Will return a map of all of the pendingResponses
-// and their deadlines
+// GetMessages will return a map of all of the pendingResponses and their deadlines
 func (d *Detector) GetMessages() map[commands.Cmd]time.Time {
 	var resp map[commands.Cmd]time.Time
 	d.lock.Lock()
@@ -120,36 +119,34 @@ func (d *Detector) GetMessages() map[commands.Cmd]time.Time {
 	return resp
 }
 
-// when a message is added, we will add a deadline for
-// expected response
+// When a message is added, we will add a deadline for expected response
 func (d *Detector) addMessage(cmd commands.Cmd) []commands.Cmd {
 
 	cmds := []commands.Cmd{}
 
 	switch cmd {
-	case commands.GetHeaders:
+	case commands.Headers, commands.GetHeaders:
 		// We now will expect a Headers Message
 		cmds = append(cmds, commands.Headers)
-	case commands.GetAddr:
-		// We now will expect a Headers Message
+	case commands.Addr, commands.GetAddr:
+		// We now will expect a Addr Message
 		cmds = append(cmds, commands.Addr)
-
 	case commands.GetData:
 		// We will now expect a block/tx message
 		// We can optimise this by including the exact inventory type, however it is not needed
 		cmds = append(cmds, commands.Block)
 		cmds = append(cmds, commands.Tx)
-	case commands.GetBlocks:
+	case commands.Inv, commands.GetBlocks:
 		// we will now expect a inv message
 		cmds = append(cmds, commands.Inv)
-	case commands.Version:
+	case commands.VerAck, commands.Version:
 		// We will now expect a verack
 		cmds = append(cmds, commands.VerAck)
 	}
 	return cmds
 }
 
-// if receive a message, we will delete it from pending
+// If receive a message, we will delete it from pending
 func (d *Detector) removeMessage(cmd commands.Cmd) []commands.Cmd {
 
 	cmds := []commands.Cmd{}

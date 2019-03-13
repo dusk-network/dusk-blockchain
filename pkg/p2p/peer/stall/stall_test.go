@@ -1,12 +1,18 @@
 package stall
 
 import (
+	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 )
+
+func init() {
+	log.SetOutput(ioutil.Discard)
+}
 
 func TestAddRemoveMessage(t *testing.T) {
 
@@ -42,8 +48,11 @@ loop:
 		}
 	}
 	// cleanup
+	mp.detector.lock.Lock()
 	mp.online = false
+	mp.detector.lock.Unlock()
 }
+
 func TestDeadlineWorks(t *testing.T) {
 
 	responseTime := 2 * time.Second
@@ -51,15 +60,17 @@ func TestDeadlineWorks(t *testing.T) {
 
 	d := NewDetector(responseTime, tickerInterval)
 	mp := mockPeer{online: true, detector: d}
+
 	go mp.loop()
 
 	d.AddMessage(commands.GetAddr)
 	time.Sleep(responseTime + 1*time.Second)
 
 	k := make(map[commands.Cmd]time.Time)
+	d.lock.Lock()
 	assert.Equal(t, k, d.responses)
+	d.lock.Unlock()
 	assert.Equal(t, false, mp.online)
-
 }
 func TestDeadlineShouldNotBeEmpty(t *testing.T) {
 	responseTime := 10 * time.Second
