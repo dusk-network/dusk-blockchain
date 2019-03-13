@@ -79,7 +79,7 @@ func NewScoreSelector(eventBus *wire.EventBus, timerLength time.Duration,
 	roundUpdateID := scoreSelector.eventBus.Subscribe(msg.RoundUpdateTopic, roundUpdateChannel)
 	scoreSelector.roundUpdateID = roundUpdateID
 
-	quitID := scoreSelector.eventBus.Subscribe("quit", quitChannel)
+	quitID := scoreSelector.eventBus.Subscribe(msg.QuitTopic, quitChannel)
 	scoreSelector.quitID = quitID
 
 	return scoreSelector
@@ -102,7 +102,7 @@ func (s *ScoreSelector) Listen() {
 		case <-s.quitChannel:
 			s.eventBus.Unsubscribe(string(commands.Score), s.scoreID)
 			s.eventBus.Unsubscribe(msg.RoundUpdateTopic, s.roundUpdateID)
-			s.eventBus.Unsubscribe("quit", s.quitID)
+			s.eventBus.Unsubscribe(msg.QuitTopic, s.quitID)
 			return
 		case result := <-s.outputChannel:
 			s.collecting = false
@@ -127,13 +127,18 @@ func (s *ScoreSelector) Listen() {
 			// If the ScoreCollector was just initialised, we start off from the
 			// round and step of the first score message we receive.
 			if s.round == 0 && s.step == 0 {
-				s.round = message.Round
-				s.step = message.Step
+				s.initialise(message)
 			}
 
 			s.handleMessage(message)
 		}
 	}
+}
+
+// TODO: find a better way to do this
+func (s *ScoreSelector) initialise(message *scoreMessage) {
+	s.round = message.Round
+	s.step = message.Step
 }
 
 func (s *ScoreSelector) handleMessage(message *scoreMessage) {

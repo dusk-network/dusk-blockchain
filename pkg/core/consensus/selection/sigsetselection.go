@@ -90,7 +90,7 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 		winningBlockHashChannel)
 	setSelector.winningBlockHashID = winningBlockHashID
 
-	quitID := setSelector.eventBus.Subscribe("quit", quitChannel)
+	quitID := setSelector.eventBus.Subscribe(msg.QuitTopic, quitChannel)
 	setSelector.quitID = quitID
 
 	return setSelector
@@ -116,7 +116,7 @@ func (s *SetSelector) Listen() {
 			s.eventBus.Unsubscribe(string(commands.SigSet), s.sigSetID)
 			s.eventBus.Unsubscribe(msg.RoundUpdateTopic, s.roundUpdateID)
 			s.eventBus.Unsubscribe(string(commands.Agreement), s.winningBlockHashID)
-			s.eventBus.Unsubscribe("quit", s.quitID)
+			s.eventBus.Unsubscribe(msg.QuitTopic, s.quitID)
 			return
 		case result := <-s.outputChannel:
 			s.collecting = false
@@ -147,9 +147,7 @@ func (s *SetSelector) Listen() {
 			// If the SetSelector was just initialised, we start off from the
 			// round and step of the first sigset message we receive.
 			if s.round == 0 && s.step == 0 {
-				s.round = message.Round
-				s.step = message.Step
-				if err := s.setVotingCommittee(); err != nil {
+				if err := s.initialise(message); err != nil {
 					// Log
 					return
 				}
@@ -158,6 +156,13 @@ func (s *SetSelector) Listen() {
 			s.handleMessage(message)
 		}
 	}
+}
+
+// TODO: find a better way to do this
+func (s *SetSelector) initialise(message *sigSetMessage) error {
+	s.round = message.Round
+	s.step = message.Step
+	return s.setVotingCommittee()
 }
 
 func (s *SetSelector) handleMessage(message *sigSetMessage) {
