@@ -1,6 +1,7 @@
 package database
 
 import (
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
@@ -18,19 +19,6 @@ type Driver interface {
 
 type Round = uint64
 
-type Tx_v2 interface {
-	FetchBlockHeader(hash []byte) (*block.Header, error)
-	FetchBlockHeaderByRound(number Round) (*block.Header, error)
-	FetchBlockHeaderByRange(from Round, to Round) ([]*block.Header, error) //todo
-	FetchBlockExists(header *block.Header) (bool, error)
-	FetchLatestBlockHeader() (*block.Header, error)
-
-	// Store prefixed methods should garentee the
-	StoreBlock(block []*block.Block) error
-	StoreHeaders(hdrs []*block.Header) error
-	StoreBlockTransactions(blocks []*block.Block) error
-}
-
 // Tx represents transaction layer.
 // A Database driver must provide a robust implementation of each method
 // This is what is exposed/visible to all upper layers so changes here
@@ -38,14 +26,19 @@ type Tx_v2 interface {
 type Tx interface {
 
 	// Read-write Transactions
-	WriteHeader(h *block.Header) error
+	FetchBlockHeader(hash []byte) (*block.Header, error)
+	FetchBlockTransactions(hash []byte) ([]merkletree.Payload, error)
+	// TODO: FetchBlockHeaderByRound(number Round) (*block.Header, error)
+	FetchBlockExists(header *block.Header) (bool, error)
+	// TODO: FetchLatestBlockHeader() (*block.Header, error)
 
-	// Read-only Transactions
-	GetBlockHeaderByHash(hash []byte) (*block.Header, error)
+	// Store prefixed methods should garentee the
+	StoreBlock(block *block.Block) error
 
 	// Atomic storage.
 	Commit() error
 	Rollback() error
+	Close()
 }
 
 // DB a thin layer on top of block chain DB

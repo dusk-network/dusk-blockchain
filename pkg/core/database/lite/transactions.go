@@ -2,6 +2,7 @@ package lite
 
 import (
 	"encoding/hex"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
 
@@ -55,6 +56,22 @@ func (t Tx) Rollback() error {
 	return nil
 }
 
-func (t Tx) BlockExists(hdr *block.Header) bool {
-	return false
+func (t Tx) Close() {
+}
+
+func (t Tx) FetchBlockHeader(hash []byte) (*block.Header, error) {
+	return nil, nil
+}
+func (t Tx) FetchBlockTransactions(hash []byte) ([]merkletree.Payload, error) {
+	return nil, nil
+}
+
+// TODO: FetchBlockHeaderByRound(number Round) (*block.Header, error)
+func (t Tx) FetchBlockExists(header *block.Header) (bool, error) {
+	return false, nil
+}
+
+// Store prefixed methods should garentee the
+func (t Tx) StoreBlock(block *block.Block) error {
+	return nil
 }

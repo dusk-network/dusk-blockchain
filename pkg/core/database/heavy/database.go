@@ -71,9 +71,19 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 		return nil, errors.New("Database is not open")
 	}
 
+	snapshot, err := db.storage.GetSnapshot()
+
+	if err != nil {
+		return nil, err
+	}
+
 	// Create a transaction instance.
 	batch := new(leveldb.Batch)
-	t := &Tx{writable: writable, db: &db, batch: batch, closed: false}
+	t := &Tx{writable: writable,
+		db:       &db,
+		snapshot: snapshot,
+		batch:    batch,
+		closed:   false}
 
 	return t, nil
 }
@@ -82,9 +92,12 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 func (db DB) Update(fn func(database.Tx) error) error {
 	start := time.Now()
 	t, err := db.Begin(true)
+
 	if err != nil {
 		return err
 	}
+
+	defer t.Close()
 
 	// If an error is returned from the function then rollback and return error.
 	err = fn(t)
@@ -105,9 +118,12 @@ func (db DB) Update(fn func(database.Tx) error) error {
 func (db DB) View(fn func(database.Tx) error) error {
 	start := time.Now()
 	t, err := db.Begin(false)
+
 	if err != nil {
 		return err
 	}
+
+	defer t.Close()
 
 	// If an error is returned from the function then pass it through.
 	err = fn(t)
