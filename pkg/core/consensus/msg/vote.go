@@ -1,8 +1,10 @@
 package msg
 
 import (
+	"bytes"
 	"io"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
@@ -59,4 +61,54 @@ func decodeVote(r io.Reader) (*Vote, error) {
 		SignedHash: signedHash,
 		Step:       step,
 	}, nil
+}
+
+func HashVoteSet(voteSet []*Vote) ([]byte, error) {
+	encodedVoteSet, err := EncodeVoteSet(voteSet)
+	if err != nil {
+		return nil, err
+	}
+
+	// Hash bytes
+	sigSetHash, err := hash.Sha3256(encodedVoteSet)
+	if err != nil {
+		return nil, err
+	}
+
+	return sigSetHash, nil
+}
+
+func EncodeVoteSet(voteSet []*Vote) ([]byte, error) {
+	buffer := new(bytes.Buffer)
+	if err := encoding.WriteVarInt(buffer, uint64(len(voteSet))); err != nil {
+		return nil, err
+	}
+
+	for _, vote := range voteSet {
+		if err := encodeVote(vote, buffer); err != nil {
+			return nil, err
+		}
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func encodeVote(vote *Vote, w io.Writer) error {
+	if err := encoding.Write256(w, vote.VotedHash); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(w, vote.PubKeyBLS); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteBLS(w, vote.SignedHash); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(w, vote.Step); err != nil {
+		return err
+	}
+
+	return nil
 }
