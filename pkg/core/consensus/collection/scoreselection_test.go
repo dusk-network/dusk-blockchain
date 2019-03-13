@@ -4,14 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -21,15 +17,6 @@ import (
 )
 
 func TestScoreCollection(t *testing.T) {
-	oldReconstructBidListSubset := collection.ReconstructBidListSubset
-	defer func() {
-		collection.ReconstructBidListSubset = oldReconstructBidListSubset
-	}()
-
-	collection.ReconstructBidListSubset = func(pl []byte) (user.BidList, *prerror.PrError) {
-		return user.BidList{}, nil
-	}
-
 	validateFunc := func(*bytes.Buffer) error {
 		return nil
 	}
@@ -82,15 +69,6 @@ func TestScoreCollection(t *testing.T) {
 }
 
 func TestInvalidProofScoreCollection(t *testing.T) {
-	oldReconstructBidListSubset := collection.ReconstructBidListSubset
-	defer func() {
-		collection.ReconstructBidListSubset = oldReconstructBidListSubset
-	}()
-
-	collection.ReconstructBidListSubset = func(pl []byte) (user.BidList, *prerror.PrError) {
-		return user.BidList{}, nil
-	}
-
 	validateFunc := func(*bytes.Buffer) error {
 		return nil
 	}
@@ -143,15 +121,6 @@ func TestInvalidProofScoreCollection(t *testing.T) {
 }
 
 func TestInvalidSignatureScoreCollection(t *testing.T) {
-	oldReconstructBidListSubset := collection.ReconstructBidListSubset
-	defer func() {
-		collection.ReconstructBidListSubset = oldReconstructBidListSubset
-	}()
-
-	collection.ReconstructBidListSubset = func(pl []byte) (user.BidList, *prerror.PrError) {
-		return user.BidList{}, nil
-	}
-
 	validateFunc := func(*bytes.Buffer) error {
 		return errors.New("verification failed")
 	}
@@ -205,15 +174,6 @@ func TestInvalidSignatureScoreCollection(t *testing.T) {
 }
 
 func TestScoreCollectionQueue(t *testing.T) {
-	oldReconstructBidListSubset := collection.ReconstructBidListSubset
-	defer func() {
-		collection.ReconstructBidListSubset = oldReconstructBidListSubset
-	}()
-
-	collection.ReconstructBidListSubset = func(pl []byte) (user.BidList, *prerror.PrError) {
-		return user.BidList{}, nil
-	}
-
 	validateFunc := func(*bytes.Buffer) error {
 		return nil
 	}
@@ -246,7 +206,6 @@ func TestScoreCollectionQueue(t *testing.T) {
 
 	// wait for a result from outgoingChannel
 	result1 := <-outgoingChannel
-	fmt.Println("got result 1")
 
 	// we should have gotten blockHash1 from outgoingChannel
 	assert.Equal(t, blockHash1, result1.Bytes())
@@ -268,11 +227,12 @@ func TestScoreCollectionQueue(t *testing.T) {
 	// the queue should now hold messages on round 2, step 1
 	// we will increment the round, which should cause the other messages
 	// to be retrieved, and another collection round should start
-	eventBus.Publish("roundupdate", new(bytes.Buffer))
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, 2)
+	eventBus.Publish("roundupdate", bytes.NewBuffer(roundBytes))
 
 	// wait for another result from outgoingChannel
 	result2 := <-outgoingChannel
-	fmt.Println("got result 2")
 
 	// we should have gotten blockHash2 from outgoingChannel
 	assert.Equal(t, blockHash2, result2.Bytes())
@@ -309,7 +269,7 @@ func newScoreMessage(score, round uint64, step uint8) (*bytes.Buffer, []byte, er
 		return nil, nil, err
 	}
 
-	bidListSubset, err := crypto.RandEntropy(100)
+	bidListSubset, err := crypto.RandEntropy(0)
 	if err != nil {
 		return nil, nil, err
 	}

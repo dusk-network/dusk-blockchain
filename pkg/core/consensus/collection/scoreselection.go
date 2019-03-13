@@ -2,6 +2,7 @@ package collection
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"math/big"
 	"time"
@@ -15,8 +16,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 )
-
-var ReconstructBidListSubset = user.ReconstructBidListSubset
 
 // ScoreSelector contains information about the state of the consensus.
 // It also maintains a message queue, with messages intended for the ScoreSelector.
@@ -107,12 +106,14 @@ func (s *ScoreSelector) Listen() {
 			return
 		case result := <-s.outputChannel:
 			s.collecting = false
-			s.step++
 
 			buffer := bytes.NewBuffer(result)
 			s.eventBus.Publish("outgoing", buffer)
-		case <-s.roundUpdateChannel:
-			s.moveToNextRound()
+
+			s.step++
+		case roundBuffer := <-s.roundUpdateChannel:
+			round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
+			s.updateRound(round)
 		case messageBytes := <-s.scoreChannel:
 			if err := s.validate(messageBytes); err != nil {
 				break
@@ -217,7 +218,7 @@ func (s ScoreSelector) verifyScoreMessage(m *scoreMessage) *prerror.PrError {
 }
 
 func (s ScoreSelector) validateBidListSubset(BidListSubsetBytes []byte) *prerror.PrError {
-	BidListSubset, err := ReconstructBidListSubset(BidListSubsetBytes)
+	BidListSubset, err := user.ReconstructBidListSubset(BidListSubsetBytes)
 	if err != nil {
 		return err
 	}
@@ -225,9 +226,9 @@ func (s ScoreSelector) validateBidListSubset(BidListSubsetBytes []byte) *prerror
 	return s.bidList.ValidateBids(BidListSubset)
 }
 
-func (s *ScoreSelector) moveToNextRound() {
+func (s *ScoreSelector) updateRound(round uint64) {
 	s.queue.Clear(s.round)
-	s.round++
+	s.round = round
 	s.step = 1
 }
 

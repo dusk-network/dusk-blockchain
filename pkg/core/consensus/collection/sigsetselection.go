@@ -2,15 +2,11 @@ package collection
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"io"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -20,55 +16,66 @@ import (
 )
 
 type SetSelector struct {
-	eventBus           *wire.EventBus
-	sigSetChannel      <-chan *bytes.Buffer
-	sigSetID           uint32
-	roundUpdateChannel <-chan *bytes.Buffer
-	roundUpdateID      uint32
-	quitChannel        <-chan *bytes.Buffer
-	quitID             uint32
+	eventBus                *wire.EventBus
+	sigSetChannel           <-chan *bytes.Buffer
+	sigSetID                uint32
+	roundUpdateChannel      <-chan *bytes.Buffer
+	roundUpdateID           uint32
+	winningBlockHashChannel <-chan *bytes.Buffer
+	winningBlockHashID      uint32
+	quitChannel             <-chan *bytes.Buffer
+	quitID                  uint32
 
 	round       uint64
 	step        uint8
-	totalWeight uint64
 	timerLength time.Duration
 
 	collecting       bool
 	inputChannel     chan *sigSetMessage
 	outputChannel    chan []byte
 	setSizeThreshold int
+	winningBlockHash []byte
 
-	provisioners    *user.Provisioners
+	committeeStore  *user.CommitteeStore
 	votingCommittee map[string]uint8
 
 	// injected functions
-	validate func(*bytes.Buffer) error
+	validate   func(*bytes.Buffer) error
+	verifyVote func(*msg.Vote, []byte, uint8, map[string]uint8,
+		map[string]uint8) *prerror.PrError
 
 	queue *sigSetQueue
 }
 
-// NewSetSelector will return a pointer to a ScoreSelector with the passed
+// NewSetSelector will return a pointer to a SetSelector with the passed
 // parameters.
 func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
-	validateFunc func(*bytes.Buffer) error) *SetSelector {
+	validateFunc func(*bytes.Buffer) error,
+	verifyVoteFunc func(*msg.Vote, []byte, uint8, map[string]uint8,
+		map[string]uint8) *prerror.PrError,
+	committeeStore *user.CommitteeStore) *SetSelector {
 
 	queue := newSigSetQueue()
 	sigSetChannel := make(chan *bytes.Buffer, 100)
 	roundUpdateChannel := make(chan *bytes.Buffer, 1)
+	winningBlockHashChannel := make(chan *bytes.Buffer, 1)
 	quitChannel := make(chan *bytes.Buffer, 1)
 	inputChannel := make(chan *sigSetMessage, 100)
 	outputChannel := make(chan []byte, 1)
 
 	setSelector := &SetSelector{
-		eventBus:           eventBus,
-		sigSetChannel:      sigSetChannel,
-		roundUpdateChannel: roundUpdateChannel,
-		quitChannel:        quitChannel,
-		timerLength:        timerLength,
-		validate:           validateFunc,
-		inputChannel:       inputChannel,
-		outputChannel:      outputChannel,
-		queue:              &queue,
+		eventBus:                eventBus,
+		sigSetChannel:           sigSetChannel,
+		roundUpdateChannel:      roundUpdateChannel,
+		winningBlockHashChannel: winningBlockHashChannel,
+		quitChannel:             quitChannel,
+		timerLength:             timerLength,
+		inputChannel:            inputChannel,
+		outputChannel:           outputChannel,
+		committeeStore:          committeeStore,
+		validate:                validateFunc,
+		verifyVote:              verifyVoteFunc,
+		queue:                   &queue,
 	}
 
 	sigSetID := setSelector.eventBus.Subscribe(string(commands.SigSet), sigSetChannel)
@@ -76,6 +83,10 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 
 	roundUpdateID := setSelector.eventBus.Subscribe(msg.RoundUpdateTopic, roundUpdateChannel)
 	setSelector.roundUpdateID = roundUpdateID
+
+	winningBlockHashID := setSelector.eventBus.Subscribe(string(commands.Agreement),
+		winningBlockHashChannel)
+	setSelector.winningBlockHashID = winningBlockHashID
 
 	quitID := setSelector.eventBus.Subscribe("quit", quitChannel)
 	setSelector.quitID = quitID
@@ -88,11 +99,13 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 // current consensus state.
 func (s *SetSelector) Listen() {
 	for {
-		// Check queue first
-		queuedMessages := s.queue.GetMessages(s.round, s.step)
-		if queuedMessages != nil {
-			for _, message := range queuedMessages {
-				s.handleMessage(message)
+		// Check queue first, if we have received a winning block hash
+		if s.winningBlockHash != nil {
+			queuedMessages := s.queue.GetMessages(s.round, s.step)
+			if queuedMessages != nil {
+				for _, message := range queuedMessages {
+					s.handleMessage(message)
+				}
 			}
 		}
 
@@ -100,20 +113,25 @@ func (s *SetSelector) Listen() {
 		case <-s.quitChannel:
 			s.eventBus.Unsubscribe(string(commands.SigSet), s.sigSetID)
 			s.eventBus.Unsubscribe(msg.RoundUpdateTopic, s.roundUpdateID)
+			s.eventBus.Unsubscribe(string(commands.Agreement), s.winningBlockHashID)
 			s.eventBus.Unsubscribe("quit", s.quitID)
 			return
 		case result := <-s.outputChannel:
 			s.collecting = false
+
+			buffer := bytes.NewBuffer(result)
+			s.eventBus.Publish("outgoing", buffer)
+
 			s.step++
 			if err := s.setVotingCommittee(); err != nil {
 				// Log
 				return
 			}
-
-			buffer := bytes.NewBuffer(result)
-			s.eventBus.Publish("outgoing", buffer)
-		case <-s.roundUpdateChannel:
-			s.moveToNextRound()
+		case roundBuffer := <-s.roundUpdateChannel:
+			round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
+			s.updateRound(round)
+		case winningBlockHash := <-s.winningBlockHashChannel:
+			s.winningBlockHash = winningBlockHash.Bytes()
 		case messageBytes := <-s.sigSetChannel:
 			if err := s.validate(messageBytes); err != nil {
 				break
@@ -124,11 +142,15 @@ func (s *SetSelector) Listen() {
 				break
 			}
 
-			// If the ScoreCollector was just initialised, we start off from the
-			// round and step of the first score message we receive.
+			// If the SetSelector was just initialised, we start off from the
+			// round and step of the first sigset message we receive.
 			if s.round == 0 && s.step == 0 {
 				s.round = message.Round
 				s.step = message.Step
+				if err := s.setVotingCommittee(); err != nil {
+					// Log
+					return
+				}
 			}
 
 			s.handleMessage(message)
@@ -137,20 +159,20 @@ func (s *SetSelector) Listen() {
 }
 
 func (s *SetSelector) handleMessage(message *sigSetMessage) {
-	if s.shouldBeProcessed(message) {
+	if s.shouldBeProcessed(message) && s.winningBlockHashKnown() {
 		if !s.collecting {
 			s.collecting = true
 			go s.selectBestSignatureSet(s.inputChannel, s.outputChannel)
 		}
 
 		s.inputChannel <- message
-	} else if s.shouldBeStored(message) {
+	} else if s.shouldBeStored(message) || !s.winningBlockHashKnown() {
 		s.queue.PutMessage(message.Round, message.Step, message)
 	}
 }
 
-// SelectBestSignatureSet will receive signature set candidate messages through
-// setCandidateChannel for a set amount of time. The function will store the
+// selectBestSignatureSet will receive signature set candidate messages through
+// inputChannel for a set amount of time. The function will store the
 // vote set of the node with the highest stake. When the timer runs out,
 // the stored vote set is returned.
 func (s *SetSelector) selectBestSignatureSet(inputChannel <-chan *sigSetMessage,
@@ -168,41 +190,50 @@ func (s *SetSelector) selectBestSignatureSet(inputChannel <-chan *sigSetMessage,
 	for {
 		select {
 		case <-timer.C:
-			voteSetHash, err := hashVoteSet(bestVoteSet)
-			if err != nil {
-				// Log
-				return
-			}
-
-			outputChannel <- voteSetHash
-			return
-		case m := <-inputChannel:
-			err := s.verifySigSetMessage(m)
-			if err != nil && err.Priority == prerror.High {
-				// Log
-				return
-			} else if err != nil && err.Priority == prerror.Low {
-				break
-			}
-
-			pubKeyStr := hex.EncodeToString(m.PubKeyBLS)
-			if s.votingCommittee[pubKeyStr] != 0 {
-				stake, err := s.provisioners.GetStake(m.PubKeyBLS)
+			if bestVoteSet != nil {
+				voteSetHash, err := msg.HashVoteSet(bestVoteSet)
 				if err != nil {
+					// Log
 					return
 				}
 
-				if stake > highest {
-					highest = stake
-					bestVoteSet = m.SigSet
-				}
+				outputChannel <- voteSetHash
+			} else {
+				outputChannel <- nil
+			}
+
+			return
+		case m := <-inputChannel:
+			prErr := s.verifySigSetMessage(m)
+			if prErr != nil && prErr.Priority == prerror.High {
+				// Log
+				return
+			} else if prErr != nil && prErr.Priority == prerror.Low {
+				break
+			}
+
+			committee := s.committeeStore.Get()
+			stake, err := committee.GetStake(m.PubKeyBLS)
+			if err != nil {
+				return
+			}
+
+			if stake > highest {
+				highest = stake
+				bestVoteSet = m.SigSet
 			}
 		}
 	}
 }
 
 func (s SetSelector) verifySigSetMessage(m *sigSetMessage) *prerror.PrError {
-	// TODO: winning block hash check
+	if !bytes.Equal(s.winningBlockHash, m.WinningBlockHash) {
+		return prerror.New(prerror.Low, errors.New("vote set is for the wrong block hash"))
+	}
+
+	if err := verifyVoteSetSignature(m); err != nil {
+		return err
+	}
 
 	if err := s.verifyVoteSet(m.SigSet, m.WinningBlockHash, m.Step); err != nil {
 		return err
@@ -211,31 +242,46 @@ func (s SetSelector) verifySigSetMessage(m *sigSetMessage) *prerror.PrError {
 	return nil
 }
 
+func verifyVoteSetSignature(m *sigSetMessage) *prerror.PrError {
+	voteSetHash, err := msg.HashVoteSet(m.SigSet)
+	if err != nil {
+		return prerror.New(prerror.High, err)
+	}
+
+	if err := msg.VerifyBLSSignature(m.PubKeyBLS, voteSetHash, m.SignedSigSet); err != nil {
+		return prerror.New(prerror.Low, err)
+	}
+
+	return nil
+}
+
 func (s SetSelector) verifyVoteSet(voteSet []*msg.Vote, hash []byte,
 	step uint8) *prerror.PrError {
 
+	// Create committees
+	committee := s.committeeStore.Get()
+	votingCommittee1, err := committee.CreateVotingCommittee(s.round,
+		s.committeeStore.TotalWeight(), step)
+	if err != nil {
+		return prerror.New(prerror.High, err)
+	}
+
+	votingCommittee2, err := committee.CreateVotingCommittee(s.round,
+		s.committeeStore.TotalWeight(), step-1)
+	if err != nil {
+		return prerror.New(prerror.High, err)
+	}
+
 	// Size check
+	s.updateSetSizeThreshold(votingCommittee1)
 	if err := s.validateVoteSetLength(voteSet); err != nil {
 		return err
 	}
 
-	// Create committees
-	committee1, err := s.provisioners.CreateVotingCommittee(s.round, s.totalWeight, step)
-	if err != nil {
-		return prerror.New(prerror.High, err)
-	}
-
-	committee2, err := s.provisioners.CreateVotingCommittee(s.round, s.totalWeight, step-1)
-	if err != nil {
-		return prerror.New(prerror.High, err)
-	}
-
 	for _, vote := range voteSet {
-		if err := checkVoterEligibility(vote.PubKeyBLS, committee1, committee2); err != nil {
-			return err
-		}
+		if err := s.verifyVote(vote, hash, step, votingCommittee1,
+			votingCommittee2); err != nil {
 
-		if err := verifyVote(vote, hash, step); err != nil {
 			return err
 		}
 	}
@@ -251,101 +297,10 @@ func (s SetSelector) validateVoteSetLength(voteSet []*msg.Vote) *prerror.PrError
 	return nil
 }
 
-func checkVoterEligibility(pubKeyBLS []byte, committee1,
-	committee2 map[string]uint8) *prerror.PrError {
-
-	pubKeyStr := hex.EncodeToString(pubKeyBLS)
-	if committee1[pubKeyStr] == 0 {
-		if committee2[pubKeyStr] == 0 {
-			return prerror.New(prerror.Low, errors.New("voter is not eligible to vote"))
-		}
-	}
-
-	return nil
-}
-
-func verifyVote(vote *msg.Vote, hash []byte, step uint8) *prerror.PrError {
-	// A set should purely contain votes for one single hash
-	if !bytes.Equal(hash, vote.VotedHash) {
-		return prerror.New(prerror.Low, errors.New("voteset contains a vote "+
-			"for the wrong hash"))
-	}
-
-	// A vote should be from the same step or the step before, in comparison
-	// to the passed step parameter
-	if notFromValidStep(vote.Step, step) {
-		return prerror.New(prerror.Low, errors.New("vote is from another cycle"))
-	}
-
-	// Verify signature
-	if err := verifyBLSSignature(vote.PubKeyBLS, vote.VotedHash, vote.SignedHash); err != nil {
-		return prerror.New(prerror.Low, errors.New("BLS verification failed"))
-	}
-
-	return nil
-}
-
-func notFromValidStep(voteStep, setStep uint8) bool {
-	return voteStep != setStep && voteStep+1 != setStep
-}
-
-func verifyBLSSignature(pubKeyBytes, message, signature []byte) error {
-	pubKeyBLS := &bls.PublicKey{}
-	if err := pubKeyBLS.Unmarshal(pubKeyBytes); err != nil {
-		return err
-	}
-
-	sig := &bls.Signature{}
-	if err := sig.Decompress(signature); err != nil {
-		return err
-	}
-
-	apk := bls.NewApk(pubKeyBLS)
-	return bls.Verify(apk, message, sig)
-}
-
-func hashVoteSet(voteSet []*msg.Vote) ([]byte, error) {
-	// Encode signature set
-	buffer := new(bytes.Buffer)
-	for _, vote := range voteSet {
-		if err := encodeVote(vote, buffer); err != nil {
-			return nil, err
-		}
-	}
-
-	// Hash bytes and set it on context
-	sigSetHash, err := hash.Sha3256(buffer.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	return sigSetHash, nil
-
-}
-
-func encodeVote(vote *msg.Vote, w io.Writer) error {
-	if err := encoding.Write256(w, vote.VotedHash); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarBytes(w, vote.PubKeyBLS); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteBLS(w, vote.SignedHash); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(w, vote.Step); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (s *SetSelector) setVotingCommittee() error {
-	votingCommittee, err := s.provisioners.CreateVotingCommittee(s.round,
-		s.totalWeight, s.step)
+	committee := s.committeeStore.Get()
+	votingCommittee, err := committee.CreateVotingCommittee(s.round,
+		s.committeeStore.TotalWeight(), s.step)
 	if err != nil {
 		return err
 	}
@@ -354,10 +309,14 @@ func (s *SetSelector) setVotingCommittee() error {
 	return nil
 }
 
-func (s *SetSelector) moveToNextRound() error {
+func (s *SetSelector) updateSetSizeThreshold(votingCommittee map[string]uint8) {
+	s.setSizeThreshold = int(2 * float64(len(votingCommittee)) * 0.75)
+}
+
+func (s *SetSelector) updateRound(round uint64) error {
 	s.queue.Clear(s.round)
-	// TODO: include round in roundupdate message buffer
-	s.round++
+	s.winningBlockHash = nil
+	s.round = round
 	s.step = 1
 	if err := s.setVotingCommittee(); err != nil {
 		return err
@@ -378,4 +337,8 @@ func (s SetSelector) shouldBeProcessed(m *sigSetMessage) bool {
 
 func (s SetSelector) shouldBeStored(m *sigSetMessage) bool {
 	return m.Round > s.round || m.Step > s.step
+}
+
+func (s SetSelector) winningBlockHashKnown() bool {
+	return s.winningBlockHash != nil
 }
