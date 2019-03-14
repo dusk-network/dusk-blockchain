@@ -10,9 +10,8 @@ import (
 	"sort"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"golang.org/x/crypto/ed25519"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+	"golang.org/x/crypto/ed25519"
 )
 
 // Member contains the bytes of a provisioner's Ed25519 public key,
@@ -47,6 +46,16 @@ func (m Member) BLSString() string {
 
 // Provisioners is a slice of Members, and makes up the current provisioner committee.
 type Provisioners []Member
+
+// GetMember  returns a member of the provisioners from its BLS key
+func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
+	for _, provisioner := range *p {
+		if bytes.Equal(provisioner.PublicKeyBLS.Marshal(), pubKeyBLS) {
+			return &provisioner
+		}
+	}
+	return nil
+}
 
 // AddMember will add a Member to the Provisioners by using the bytes of an Ed25519
 // public key.
@@ -186,6 +195,7 @@ func createSortitionMessage(round uint64, step uint8, i uint8) []byte {
 // walks through the committee set, while deducting each node's stake from the score
 // until we reach zero. The public key of the node that the function ends on
 // will be returned as a hexadecimal string.
+// TODO: change name!
 func (p Provisioners) getCommitteeMember(hash []byte, W *big.Int) (string, error) {
 
 	// Generate score

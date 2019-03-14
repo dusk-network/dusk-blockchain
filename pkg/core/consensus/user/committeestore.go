@@ -6,9 +6,7 @@ import (
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
@@ -67,6 +65,11 @@ func (c *CommitteeStore) TotalWeight() uint64 {
 // Get the provisioner committee and return it
 func (c *CommitteeStore) Get() Provisioners {
 	return *c.provisioners
+}
+
+// PartakesInCommittee checks if the BLS key belongs to one of the Provisioners in the committee
+func (c *CommitteeStore) PartakesInCommittee(pubKeyBLS []byte) bool {
+	return c.provisioners.GetMember(pubKeyBLS) != nil
 }
 
 func decodeNewProvisioner(r io.Reader) ([]byte, []byte, uint64, error) {
