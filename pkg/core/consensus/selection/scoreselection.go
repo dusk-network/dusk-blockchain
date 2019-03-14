@@ -20,13 +20,15 @@ import (
 // ScoreSelector contains information about the state of the consensus.
 // It also maintains a message queue, with messages intended for the ScoreSelector.
 type ScoreSelector struct {
-	eventBus           *wire.EventBus
-	scoreChannel       <-chan *bytes.Buffer
-	scoreID            uint32
-	roundUpdateChannel <-chan *bytes.Buffer
-	roundUpdateID      uint32
-	quitChannel        <-chan *bytes.Buffer
-	quitID             uint32
+	eventBus              *wire.EventBus
+	scoreChannel          <-chan *bytes.Buffer
+	scoreID               uint32
+	roundUpdateChannel    <-chan *bytes.Buffer
+	roundUpdateID         uint32
+	initializationChannel <-chan *bytes.Buffer
+	initializationID      uint32
+	quitChannel           <-chan *bytes.Buffer
+	quitID                uint32
 
 	round       uint64
 	step        uint8
@@ -55,6 +57,7 @@ func NewScoreSelector(eventBus *wire.EventBus, timerLength time.Duration,
 	bidList := &user.BidList{}
 	scoreChannel := make(chan *bytes.Buffer, 100)
 	roundUpdateChannel := make(chan *bytes.Buffer, 1)
+	initializationChannel := make(chan *bytes.Buffer, 1)
 	quitChannel := make(chan *bytes.Buffer, 1)
 	inputChannel := make(chan *scoreMessage, 100)
 	outputChannel := make(chan []byte, 1)
@@ -63,6 +66,7 @@ func NewScoreSelector(eventBus *wire.EventBus, timerLength time.Duration,
 		eventBus:               eventBus,
 		scoreChannel:           scoreChannel,
 		roundUpdateChannel:     roundUpdateChannel,
+		initializationChannel:  initializationChannel,
 		quitChannel:            quitChannel,
 		timerLength:            timerLength,
 		bidList:                bidList,
@@ -79,6 +83,10 @@ func NewScoreSelector(eventBus *wire.EventBus, timerLength time.Duration,
 	roundUpdateID := scoreSelector.eventBus.Subscribe(msg.RoundUpdateTopic, roundUpdateChannel)
 	scoreSelector.roundUpdateID = roundUpdateID
 
+	initializationID := scoreSelector.eventBus.Subscribe(msg.InitializationTopic,
+		initializationChannel)
+	scoreSelector.initializationID = initializationID
+
 	quitID := scoreSelector.eventBus.Subscribe(msg.QuitTopic, quitChannel)
 	scoreSelector.quitID = quitID
 
@@ -89,15 +97,10 @@ func NewScoreSelector(eventBus *wire.EventBus, timerLength time.Duration,
 // collection logic, and manage the incoming messages with regards to the
 // current consensus state.
 func (s *ScoreSelector) Listen() {
-	for {
-		// Check queue first
-		queuedMessages := s.queue.GetMessages(s.round, s.step)
-		if queuedMessages != nil {
-			for _, message := range queuedMessages {
-				s.handleMessage(message)
-			}
-		}
+	// First, wait to initialise
+	s.initialise()
 
+	for {
 		select {
 		case <-s.quitChannel:
 			s.eventBus.Unsubscribe(string(topics.Score), s.scoreID)
@@ -124,21 +127,23 @@ func (s *ScoreSelector) Listen() {
 				break
 			}
 
-			// If the ScoreCollector was just initialised, we start off from the
-			// round and step of the first score message we receive.
-			if s.round == 0 && s.step == 0 {
-				s.initialise(message)
-			}
-
 			s.handleMessage(message)
+		default:
+			queuedMessages := s.queue.GetMessages(s.round, s.step)
+			if queuedMessages != nil {
+				for _, message := range queuedMessages {
+					s.handleMessage(message)
+				}
+			}
 		}
 	}
 }
 
-// TODO: find a better way to do this
-func (s *ScoreSelector) initialise(message *scoreMessage) {
-	s.round = message.Round
-	s.step = message.Step
+func (s *ScoreSelector) initialise() {
+	roundBuffer := <-s.initializationChannel
+	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
+	s.round = round
+	s.step = 1
 }
 
 func (s *ScoreSelector) handleMessage(message *scoreMessage) {

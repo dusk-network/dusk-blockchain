@@ -8,7 +8,9 @@ func newScoreQueue() scoreQueue {
 
 func (s scoreQueue) GetMessages(round uint64, step uint8) []*scoreMessage {
 	if s[round][step] != nil {
-		return s[round][step]
+		messages := s[round][step]
+		s[round][step] = nil
+		return messages
 	}
 
 	return nil

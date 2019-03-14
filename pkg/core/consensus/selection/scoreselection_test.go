@@ -30,8 +30,8 @@ func TestScoreCollection(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
@@ -39,6 +39,11 @@ func TestScoreCollection(t *testing.T) {
 		verifyProofFunc)
 
 	go scoreSelector.Listen()
+
+	// initialise score selector
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
 
 	// send three messages with different scores
 	message1, _, err := newScoreMessage(500, 1, 1)
@@ -60,8 +65,8 @@ func TestScoreCollection(t *testing.T) {
 
 	eventBus.Publish("score", message3)
 
-	// wait for a result from outgoingChannel
-	result := <-outgoingChannel
+	// wait for a result from selectionResultChannel
+	result := <-selectionResultChannel
 
 	// Check if it's the same as the block hash in message3
 	assert.Equal(t, blockHash, result.Bytes())
@@ -82,8 +87,8 @@ func TestInvalidProofScoreCollection(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
@@ -91,6 +96,11 @@ func TestInvalidProofScoreCollection(t *testing.T) {
 		verifyProofFunc)
 
 	go scoreSelector.Listen()
+
+	// initialise score selector
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
 
 	// send three messages with different scores
 	message1, _, err := newScoreMessage(500, 1, 1)
@@ -112,8 +122,8 @@ func TestInvalidProofScoreCollection(t *testing.T) {
 
 	eventBus.Publish("score", message3)
 
-	// wait for a result from outgoingChannel
-	result := <-outgoingChannel
+	// wait for a result from selectionResultChannel
+	result := <-selectionResultChannel
 
 	// Should be nil, as we got no proper messages
 	assert.Nil(t, result.Bytes())
@@ -134,8 +144,8 @@ func TestInvalidSignatureScoreCollection(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
@@ -143,6 +153,11 @@ func TestInvalidSignatureScoreCollection(t *testing.T) {
 		verifyProofFunc)
 
 	go scoreSelector.Listen()
+
+	// initialise score selector
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
 
 	// send three messages with different scores
 	message1, _, err := newScoreMessage(500, 1, 1)
@@ -167,9 +182,9 @@ func TestInvalidSignatureScoreCollection(t *testing.T) {
 	// wait a bit...
 	time.Sleep(200 * time.Millisecond)
 
-	// outgoingChannel should be empty, as the collection round should not
+	// selectionResultChannel should be empty, as the collection round should not
 	// have started
-	assert.Empty(t, outgoingChannel)
+	assert.Empty(t, selectionResultChannel)
 
 	// Kill goroutine
 	eventBus.Publish(msg.QuitTopic, nil)
@@ -187,8 +202,8 @@ func TestScoreCollectionQueue(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
@@ -197,47 +212,31 @@ func TestScoreCollectionQueue(t *testing.T) {
 
 	go scoreSelector.Listen()
 
-	// send one message to set off collection, and initialise our round
-	// and step
-	message1, blockHash1, err := newScoreMessage(500, 1, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eventBus.Publish("score", message1)
-
-	// wait for a result from outgoingChannel
-	result1 := <-outgoingChannel
-
-	// we should have gotten blockHash1 from outgoingChannel
-	assert.Equal(t, blockHash1, result1.Bytes())
-
-	// send two messages one round ahead, which should be stored
-	message2, _, err := newScoreMessage(1500, 2, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eventBus.Publish("score", message2)
-	message3, blockHash2, err := newScoreMessage(5000, 2, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eventBus.Publish("score", message3)
-
-	// the queue should now hold messages on round 2, step 1
-	// we will increment the round, which should cause the other messages
-	// to be retrieved, and another collection round should start
+	// initialise score selector
 	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, 2)
-	eventBus.Publish("roundupdate", bytes.NewBuffer(roundBytes))
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
 
-	// wait for another result from outgoingChannel
-	result2 := <-outgoingChannel
+	// send a message one round ahead, which should be stored
+	message, blockHash, err := newScoreMessage(1500, 2, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// we should have gotten blockHash2 from outgoingChannel
-	assert.Equal(t, blockHash2, result2.Bytes())
+	eventBus.Publish("score", message)
+
+	// the queue should now hold a message on round 2, step 1
+	// we will increment the round, which should cause the message
+	// to be retrieved, and a collection round should start
+	roundUpdateBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundUpdateBytes, 2)
+	eventBus.Publish("roundupdate", bytes.NewBuffer(roundUpdateBytes))
+
+	// wait for a result from selectionResultChannel
+	result := <-selectionResultChannel
+
+	// we should have gotten blockHash2 from selectionResultChannel
+	assert.Equal(t, blockHash, result.Bytes())
 
 	// Kill goroutine
 	eventBus.Publish(msg.QuitTopic, nil)
