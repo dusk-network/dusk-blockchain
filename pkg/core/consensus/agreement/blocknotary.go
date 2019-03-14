@@ -8,32 +8,80 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+type AgreementEventCollector struct {
+	StepEventCollector
+	committee    user.Committee
+	currentRound uint64
+	resultChan   chan<- *AgreementMessage
+}
+
+func NewAgreementEventCollector(committee user.Committee, resultChan chan *AgreementMessage) *AgreementEventCollector {
+	return &AgreementEventCollector{
+		currentRound: 0,
+		resultChan:   resultChan,
+		committee:    committee,
+	}
+}
+
+func (c *AgreementEventCollector) Contains(event CommitteeEvent) bool {
+	agreementMsg, ok := event.(*AgreementMessage)
+	if !ok {
+		return false
+	}
+
+	return c.IsDuplicate(agreementMsg, agreementMsg.Step)
+}
+
+func (c *AgreementEventCollector) Aggregate(event CommitteeEvent) error {
+	agreementMsg := event.(*AgreementMessage)
+	if !c.shouldBeSkipped(agreementMsg) {
+		nrAgreements := c.Store(agreementMsg, agreementMsg.Step)
+		// did we reach the quorum?
+		if nrAgreements >= c.committee.Quorum() {
+			// notify the Notary
+			go func() { c.resultChan <- agreementMsg }()
+			c.Clear()
+		}
+	}
+	return nil
+}
+
+func (c *AgreementEventCollector) UpdateRound(round uint64) {
+	c.currentRound = round
+}
+
+// ShouldBeSkipped checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
+// NOTE: currentRound is handled by some other process, so it is not this component's responsibility to handle corner cases (for example being on an obsolete round because of a disconnect, etc)
+func (c *AgreementEventCollector) shouldBeSkipped(m *AgreementMessage) bool {
+	isDupe := c.Contains(m)
+	isPleb := !m.BelongsToCommittee(c.committee)
+	isIrrelevant := c.currentRound != m.Round
+	err := c.verify(m)
+	failedVerification := err != nil
+	return isDupe || isPleb || isIrrelevant || failedVerification
+}
+
+func (c *AgreementEventCollector) verify(m *AgreementMessage) error {
+	return c.committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
+}
+
 // BlockNotary notifies when there is a consensus on a block hash
 type BlockNotary struct {
-	eventBus              *wire.EventBus
-	blockAgreementChannel <-chan *bytes.Buffer
-	blockAgreementID      uint32
-	quitChannel           <-chan *bytes.Buffer
-	quitID                uint32
-	committeeStore        *user.CommitteeStore
-	currentRound          uint64
-	decoder               EventDecoder
-	agreementCollector    *StepEventCollector
+	*EventCommitteeSubscriber
+	currentRound uint64
+	aggrChan     <-chan *AgreementMessage
 }
 
 // NewBlockNotary creates a BlockNotary by injecting the EventBus, the CommitteeStore and the message validation primitive
-func NewBlockNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	committeeStore *user.CommitteeStore) *BlockNotary {
-	quitChannel := make(chan *bytes.Buffer, 1)
-	blockAgreementChannel := make(chan *bytes.Buffer, 100)
+func NewBlockNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, committee *user.CommitteeStore) *BlockNotary {
+	aggrChan := make(chan *AgreementMessage, 1)
+	collector := NewAgreementEventCollector(committee, aggrChan)
+	subscriber := NewEventCommitteeSubscriber(eventBus, newDecoder(validateFunc), collector, string(msg.BlockAgreementTopic))
 
 	return &BlockNotary{
-		eventBus:              eventBus,
-		blockAgreementChannel: blockAgreementChannel,
-		quitChannel:           quitChannel,
-		committeeStore:        committeeStore,
-		agreementCollector:    newStepEventCollector(),
-		decoder:               newDecoder(validateFunc),
+		EventCommitteeSubscriber: subscriber,
+		currentRound:             0,
+		aggrChan:                 aggrChan,
 	}
 }
 
@@ -42,61 +90,12 @@ func NewBlockNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) er
 // A phase update should be propagated when we get enough blockAgreement messages for a certain blockhash
 // BlockNotary gets a currentRound somehow
 func (b *BlockNotary) Listen() {
+	go b.Receive(msg.BlockAgreementTopic)
 	for {
 		select {
-		case <-b.quitChannel:
-			b.eventBus.Unsubscribe(string(msg.BlockAgreementTopic), b.blockAgreementID)
-			b.eventBus.Unsubscribe(string(msg.QuitTopic), b.quitID)
-			return
-		case blockAgreement := <-b.blockAgreementChannel:
-			d, err := b.decoder.Decode(*blockAgreement)
-			if err != nil {
-				break
-			}
-			// casting to an AgreementMessage as we know what Decoder we are using
-			am := d.(*AgreementMessage)
-			if b.shouldBeSkipped(am) {
-				break
-			}
-
-			err = b.Aggregate(d, am.Round, am.Step)
-			if err != nil {
-				break
-			}
+		case message := <-b.aggrChan:
+			buffer := bytes.NewBuffer(message.BlockHash)
+			b.eventBus.Publish(msg.PhaseUpdateTopic, buffer)
 		}
 	}
-}
-
-func (b *BlockNotary) Aggregate(event CommitteeEvent, round uint64, step uint8) error {
-
-	// storing the event always since we are gonna cleanup anyway if quorum is reached
-	nrAgreements := b.agreementCollector.Store(event, step)
-	// did we reach the quorum?
-	if nrAgreements >= b.committeeStore.Quorum() {
-		// notify everybody
-		b.notifyAgreedBlockHash(event.(*AgreementMessage).BlockHash)
-		b.agreementCollector = newStepEventCollector()
-	}
-
-	return nil
-}
-
-// shouldBeSkipped checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
-// NOTE: currentRound is handled by some other process, so it is not this component's responsibility to handle corner cases (for example being on an obsolete round because of a disconnect, etc)
-func (b *BlockNotary) shouldBeSkipped(m *AgreementMessage) bool {
-	isDupe := b.agreementCollector.IsDuplicate(m, m.Step)
-	isPleb := !m.BelongsToCommittee(b.committeeStore)
-	isIrrelevant := b.currentRound != m.Round
-	err := b.Verify(m)
-	failedVerification := err != nil
-	return isDupe || isPleb || isIrrelevant || failedVerification
-}
-
-func (b *BlockNotary) Verify(m *AgreementMessage) error {
-	return b.committeeStore.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
-}
-
-func (b *BlockNotary) notifyAgreedBlockHash(blockHash []byte) {
-	buffer := bytes.NewBuffer(blockHash)
-	b.eventBus.Publish(msg.PhaseUpdateTopic, buffer)
 }

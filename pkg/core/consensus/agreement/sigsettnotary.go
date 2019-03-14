@@ -16,7 +16,7 @@ type SigSetNotary struct {
 	sigSetAgreementID       uint32
 	quitChannel             <-chan *bytes.Buffer
 	quitID                  uint32
-	committeeStore          *user.CommitteeStore
+	committeeStore          *user.Committee
 	currentRound            uint64
 	sigSetAgreementPerSteps map[uint8][]*sigSetAgreementMessage
 	validate                func(*bytes.Buffer) error

@@ -20,6 +20,7 @@ type EventDecoder interface {
 }
 
 type CommitteeEventCollector interface {
+	Contains(CommitteeEvent) bool
 	Aggregate(CommitteeEvent) error
 }
 
@@ -109,6 +110,12 @@ func newStepEventCollector() *StepEventCollector {
 	return &StepEventCollector{}
 }
 
+func (sec StepEventCollector) Clear() {
+	for key := range sec {
+		delete(sec, key)
+	}
+}
+
 // IsDuplicate checks if we already collected this event
 func (sec StepEventCollector) IsDuplicate(event CommitteeEvent, step uint8) bool {
 	for _, stored := range sec[step] {
@@ -133,23 +140,22 @@ func (sec StepEventCollector) Store(event CommitteeEvent, step uint8) int {
 	return len(eventList)
 }
 
-type Notary struct {
+type EventCommitteeSubscriber struct {
 	eventBus       *wire.EventBus
 	msgChan        <-chan *bytes.Buffer
 	msgChanID      uint32
 	quitChan       <-chan *bytes.Buffer
 	quitChanID     uint32
-	committeeStore *user.Committee
+	committeeStore user.Committee
 	currentRound   uint64
 	decoder        EventDecoder
 	collector      CommitteeEventCollector
 }
 
-func NewNotary(eventBus *wire.EventBus,
+func NewEventCommitteeSubscriber(eventBus *wire.EventBus,
 	decoder EventDecoder,
 	collector CommitteeEventCollector,
-	committeeStore *user.Committee,
-	topic string) *Notary {
+	topic string) *EventCommitteeSubscriber {
 
 	quitChan := make(chan *bytes.Buffer, 1)
 	msgChan := make(chan *bytes.Buffer, 100)
@@ -157,19 +163,17 @@ func NewNotary(eventBus *wire.EventBus,
 	msgChanID := eventBus.Subscribe(topic, msgChan)
 	quitChanID := eventBus.Subscribe(string(msg.QuitTopic), msgChan)
 
-	return &Notary{
-		eventBus:       eventBus,
-		msgChan:        msgChan,
-		msgChanID:      msgChanID,
-		quitChan:       quitChan,
-		quitChanID:     quitChanID,
-		committeeStore: committeeStore,
-		collector:      collector,
-		decoder:        decoder,
+	return &EventCommitteeSubscriber{
+		eventBus:   eventBus,
+		msgChan:    msgChan,
+		msgChanID:  msgChanID,
+		quitChan:   quitChan,
+		quitChanID: quitChanID,
+		decoder:    decoder,
 	}
 }
 
-func (n *Notary) Listen(topic string) {
+func (n *EventCommitteeSubscriber) Receive(topic string) {
 	for {
 		select {
 		case <-n.quitChan:
