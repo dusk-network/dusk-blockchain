@@ -137,16 +137,6 @@ func (r *Reducer) Listen() {
 
 	for {
 		select {
-		case <-r.quitChannel:
-			r.eventBus.Unsubscribe(string(topics.BlockReduction),
-				r.blockReductionID)
-			r.eventBus.Unsubscribe(string(topics.SigSetReduction),
-				r.sigSetReductionID)
-			r.eventBus.Unsubscribe(msg.RoundUpdateTopic, r.roundUpdateID)
-			r.eventBus.Unsubscribe(msg.SelectionResultTopic, r.selectionResultID)
-			r.eventBus.Unsubscribe(string(topics.Agreement), r.winningBlockHashID)
-			r.eventBus.Unsubscribe(msg.QuitTopic, r.quitID)
-			return
 		case result := <-r.outputChannel:
 			if r.eligibleToVote() && result != nil {
 				if err := r.voteAgreement(result); err != nil {
@@ -159,9 +149,6 @@ func (r *Reducer) Listen() {
 			r.currentHash = nil
 			r.incrementStep()
 			r.reducing = false
-		case roundBuffer := <-r.roundUpdateChannel:
-			round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-			r.updateRound(round)
 		case selectionResult := <-r.selectionResultChannel:
 			if r.currentHash == nil {
 				r.currentHash = selectionResult.Bytes()
@@ -170,8 +157,6 @@ func (r *Reducer) Listen() {
 					r.voteReduction()
 				}
 			}
-		case winningBlockHash := <-r.winningBlockHashChannel:
-			r.moveToSigSetPhase(winningBlockHash.Bytes())
 		case messageBytes := <-r.blockReductionChannel:
 			if err := r.validate(messageBytes); err != nil {
 				break
@@ -199,10 +184,12 @@ func (r *Reducer) Listen() {
 
 			if queuedMessages != nil {
 				for _, message := range queuedMessages {
-					if message.IsSigSetReductionMessage() == r.inSigSetPhase {
-						r.handleMessage(message)
-					}
+					r.handleMessage(message)
 				}
+			}
+
+			if !r.reducing {
+				r.checkForUpdates()
 			}
 		}
 	}
@@ -214,6 +201,32 @@ func (r *Reducer) initialise() error {
 	r.round = round
 	r.step = 1
 	return r.setVotingCommittee()
+}
+
+// These are checks for events that change the Reducer's state. We should only
+// check these channels while the Reducer is not currently running reduction.
+// Additionally, the quitChannel check is in this function as well, so that
+// we don't leave a reduction goroutine hanging if we get the quit signal.
+func (r *Reducer) checkForUpdates() {
+	select {
+	case <-r.quitChannel:
+		r.eventBus.Unsubscribe(string(topics.BlockReduction),
+			r.blockReductionID)
+		r.eventBus.Unsubscribe(string(topics.SigSetReduction),
+			r.sigSetReductionID)
+		r.eventBus.Unsubscribe(msg.RoundUpdateTopic, r.roundUpdateID)
+		r.eventBus.Unsubscribe(msg.SelectionResultTopic, r.selectionResultID)
+		r.eventBus.Unsubscribe(string(topics.Agreement), r.winningBlockHashID)
+		r.eventBus.Unsubscribe(msg.QuitTopic, r.quitID)
+		return
+	case winningBlockHash := <-r.winningBlockHashChannel:
+		r.moveToSigSetPhase(winningBlockHash.Bytes())
+	case roundBuffer := <-r.roundUpdateChannel:
+		round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
+		r.updateRound(round)
+	default:
+		break
+	}
 }
 
 func (r *Reducer) handleMessage(message reductionMessage) {
