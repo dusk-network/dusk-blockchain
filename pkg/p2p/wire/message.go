@@ -6,16 +6,16 @@ import (
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // Payload defines the message payload.
 type Payload interface {
 	Encode(w io.Writer) error
 	Decode(r io.Reader) error
-	Command() commands.Cmd
+	Command() topics.Topic
 }
 
 // WriteMessage will write a Dusk wire message to w.
@@ -24,7 +24,7 @@ func WriteMessage(w io.Writer, magic protocol.Magic, p Payload) error {
 		return err
 	}
 
-	byteCmd := commands.CmdToByteArray(p.Command())
+	byteCmd := topics.TopicToByteArray(p.Command())
 	if err := binary.Write(w, binary.LittleEndian, byteCmd); err != nil {
 		return err
 	}
