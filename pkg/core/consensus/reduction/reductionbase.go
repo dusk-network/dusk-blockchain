@@ -1,9 +1,11 @@
 package reduction
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
@@ -53,4 +55,37 @@ func decodeReductionBase(r io.Reader) (*reductionBase, error) {
 		Round:      round,
 		Step:       step,
 	}, nil
+}
+
+func (r Reducer) createReductionMessage() (*bytes.Buffer, error) {
+	buffer := bytes.NewBuffer(r.currentHash)
+
+	signedHash, err := bls.Sign(r.BLSSecretKey, r.BLSPubKey, r.currentHash)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteBLS(buffer, signedHash.Compress()); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteVarBytes(buffer, r.BLSPubKey.Marshal()); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, r.round); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteUint8(buffer, r.step); err != nil {
+		return nil, err
+	}
+
+	if r.inSigSetPhase {
+		if err := encoding.Write256(buffer, r.winningBlockHash); err != nil {
+			return nil, err
+		}
+	}
+
+	return buffer, nil
 }
