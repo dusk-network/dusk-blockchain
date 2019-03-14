@@ -3,7 +3,11 @@ package user
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"io"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
@@ -20,7 +24,7 @@ type CommitteeStore struct {
 	addProvisionerID      uint32
 
 	provisioners *Provisioners
-	totalWeight  uint64
+	TotalWeight  uint64
 }
 
 func NewCommitteeStore(eventBus *wire.EventBus) *CommitteeStore {
@@ -53,20 +57,69 @@ func (c *CommitteeStore) Listen() {
 				break
 			}
 
-			c.totalWeight += amount
+			c.TotalWeight += amount
 			c.eventBus.Publish(msg.ProvisionerAddedTopic, newProvisionerBytes)
 		}
 	}
 }
 
-// TotalWeight will return the totalWeight field of the CommitteeStore.
-func (c *CommitteeStore) TotalWeight() uint64 {
-	return c.totalWeight
+// Get the provisioner committee and return it
+func (c CommitteeStore) Get() Provisioners {
+	return *c.provisioners
 }
 
-// Get the provisioner committee and return it
-func (c *CommitteeStore) Get() Provisioners {
-	return *c.provisioners
+// Threshold returns the voting threshold for a round
+func (c CommitteeStore) Threshold() int {
+	committeeSize := len(*c.provisioners)
+	if committeeSize > 50 {
+		committeeSize = 50
+	}
+
+	threshold := int(float64(committeeSize) * 0.75)
+	return threshold
+}
+
+func (c CommitteeStore) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
+	step uint8) *prerror.PrError {
+
+	for _, vote := range voteSet {
+		if !fromValidStep(vote.Step, step) {
+			return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
+		}
+
+		votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
+			c.TotalWeight, vote.Step)
+		if err != nil {
+			return prerror.New(prerror.High, err)
+		}
+
+		if err := checkVoterEligibility(vote.PubKeyBLS, votingCommittee); err != nil {
+			return err
+		}
+
+		if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
+			vote.SignedHash); err != nil {
+
+			return prerror.New(prerror.Low, errors.New("BLS verification failed"))
+		}
+	}
+
+	return nil
+}
+
+func fromValidStep(voteStep, setStep uint8) bool {
+	return voteStep == setStep || voteStep+1 == setStep
+}
+
+func checkVoterEligibility(pubKeyBLS []byte,
+	votingCommittee map[string]uint8) *prerror.PrError {
+
+	pubKeyStr := hex.EncodeToString(pubKeyBLS)
+	if votingCommittee[pubKeyStr] == 0 {
+		return prerror.New(prerror.Low, errors.New("voter is not eligible to vote"))
+	}
+
+	return nil
 }
 
 func decodeNewProvisioner(r io.Reader) ([]byte, []byte, uint64, error) {
