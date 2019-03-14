@@ -2,6 +2,7 @@ package agreement
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -32,7 +33,7 @@ func (c *AgreementEventCollector) Contains(event CommitteeEvent) bool {
 	return c.IsDuplicate(agreementMsg, agreementMsg.Step)
 }
 
-func (c *AgreementEventCollector) Aggregate(event CommitteeEvent) error {
+func (c *AgreementEventCollector) Collect(event CommitteeEvent) error {
 	agreementMsg := event.(*AgreementMessage)
 	if !c.shouldBeSkipped(agreementMsg) {
 		nrAgreements := c.Store(agreementMsg, agreementMsg.Step)
@@ -67,21 +68,35 @@ func (c *AgreementEventCollector) verify(m *AgreementMessage) error {
 
 // BlockNotary notifies when there is a consensus on a block hash
 type BlockNotary struct {
-	*EventCommitteeSubscriber
-	currentRound uint64
-	aggrChan     <-chan *AgreementMessage
+	eventBus               *wire.EventBus
+	agreementMsgSubscriber *EventCommitteeSubscriber
+	collector              *AgreementEventCollector
+	roundMsgSubscriber     *EventSubscriber
+	aggrChan               <-chan *AgreementMessage
+	roundChan              chan *bytes.Buffer
 }
 
 // NewBlockNotary creates a BlockNotary by injecting the EventBus, the CommitteeStore and the message validation primitive
-func NewBlockNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, committee *user.CommitteeStore) *BlockNotary {
+func NewBlockNotary(eventBus *wire.EventBus,
+	validateFunc func(*bytes.Buffer) error,
+	committee *user.CommitteeStore) *BlockNotary {
+
 	aggrChan := make(chan *AgreementMessage, 1)
+	roundChan := make(chan *bytes.Buffer, 1)
+
 	collector := NewAgreementEventCollector(committee, aggrChan)
-	subscriber := NewEventCommitteeSubscriber(eventBus, newDecoder(validateFunc), collector, string(msg.BlockAgreementTopic))
+	roundSubscriber := NewEventSubscriber(eventBus, msg.RoundUpdateTopic)
+	subscriber := NewEventCommitteeSubscriber(eventBus,
+		newAgreementEventDecoder(validateFunc),
+		collector, string(msg.BlockAgreementTopic))
 
 	return &BlockNotary{
-		EventCommitteeSubscriber: subscriber,
-		currentRound:             0,
-		aggrChan:                 aggrChan,
+		eventBus:               eventBus,
+		agreementMsgSubscriber: subscriber,
+		roundMsgSubscriber:     roundSubscriber,
+		aggrChan:               aggrChan,
+		roundChan:              roundChan,
+		collector:              collector,
 	}
 }
 
@@ -90,12 +105,16 @@ func NewBlockNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) er
 // A phase update should be propagated when we get enough blockAgreement messages for a certain blockhash
 // BlockNotary gets a currentRound somehow
 func (b *BlockNotary) Listen() {
-	go b.Receive(msg.BlockAgreementTopic)
+	go b.agreementMsgSubscriber.ReceiveEventCommittee()
+	go b.roundMsgSubscriber.ReceiveEvent(b.roundChan)
 	for {
 		select {
 		case message := <-b.aggrChan:
 			buffer := bytes.NewBuffer(message.BlockHash)
 			b.eventBus.Publish(msg.PhaseUpdateTopic, buffer)
+		case roundUpdate := <-b.roundChan:
+			round := binary.LittleEndian.Uint64(roundUpdate.Bytes())
+			b.collector.UpdateRound(round)
 		}
 	}
 }
