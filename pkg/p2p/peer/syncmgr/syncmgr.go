@@ -100,7 +100,7 @@ func (s *Syncmgr) OnGetHeaders(p *peermgr.Peer, msg *payload.MsgGetHeaders) {
 	if err == nil {
 		p.Write(msgHeaders)
 	} else {
-		log.WithField("prefix", "syncmgr").Errorf("Failed to send '%s' to requesting peer %s: %s", commands.Headers, p.RemoteAddr().String(), err)
+		log.WithField("prefix", "syncmgr").Errorf("Failed to send '%s' to requesting peer %s: %s", topics.Headers, p.RemoteAddr().String(), err)
 	}
 }
 
@@ -111,7 +111,7 @@ func (s *Syncmgr) OnHeaders(p *peermgr.Peer, msg *payload.MsgHeaders) {
 
 	// Any headers received?
 	if len(msg.Headers) < 1 {
-		log.WithField("prefix", "syncmgr").Infof("'%s' msg is empty", commands.Headers)
+		log.WithField("prefix", "syncmgr").Infof("'%s' msg is empty", topics.Headers)
 		return
 	}
 
@@ -227,14 +227,14 @@ func (s *Syncmgr) OnGetData(p *peermgr.Peer, msg *payload.MsgGetData) {
 				log.WithField("prefix", "syncmgr").Fatalf("Failed to read Block by hash %x", vector.Hash)
 			}
 		default:
-			log.WithField("prefix", "syncmgr").Errorf("Unknown InvType in '%s' msg from %s", commands.Inv, p.RemoteAddr().String())
+			log.WithField("prefix", "syncmgr").Errorf("Unknown InvType in '%s' msg from %s", topics.Inv, p.RemoteAddr().String())
 		}
 	}
 }
 
 // OnGetBlocks receives 'getblocks' msg from a peer, then passes it to the blockchain to process.
 func (s *Syncmgr) OnGetBlocks(p *peermgr.Peer, msg *payload.MsgGetBlocks) {
-	log.WithField("prefix", "syncmgr").Debugf("Received a '%s' msg from %s", commands.GetBlocks, p.RemoteAddr().String())
+	log.WithField("prefix", "syncmgr").Debugf("Received a '%s' msg from %s", topics.GetBlocks, p.RemoteAddr().String())
 	//TODO
 }
 

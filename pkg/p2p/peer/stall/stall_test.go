@@ -20,17 +20,17 @@ func TestAddRemoveMessage(t *testing.T) {
 	tickerInterval := 1 * time.Second
 
 	d := NewDetector(responseTime, tickerInterval)
-	d.AddMessage(commands.GetAddr)
+	d.AddMessage(topics.GetAddr)
 	mp := d.GetMessages()
 
 	assert.Equal(t, 1, len(mp))
-	assert.IsType(t, time.Time{}, mp[commands.GetAddr])
+	assert.IsType(t, time.Time{}, mp[topics.GetAddr])
 
-	d.RemoveMessage(commands.GetAddr)
+	d.RemoveMessage(topics.GetAddr)
 	mp = d.GetMessages()
 
 	assert.Equal(t, 0, len(mp))
-	assert.Empty(t, mp[commands.GetAddr])
+	assert.Empty(t, mp[topics.GetAddr])
 }
 
 type mockPeer struct {
@@ -63,10 +63,10 @@ func TestDeadlineWorks(t *testing.T) {
 
 	go mp.loop()
 
-	d.AddMessage(commands.GetAddr)
+	d.AddMessage(topics.GetAddr)
 	time.Sleep(responseTime + 1*time.Second)
 
-	k := make(map[commands.Cmd]time.Time)
+	k := make(map[topics.Topic]time.Time)
 	d.lock.Lock()
 	assert.Equal(t, k, d.responses)
 	d.lock.Unlock()
@@ -77,9 +77,9 @@ func TestDeadlineShouldNotBeEmpty(t *testing.T) {
 	tickerInterval := 1 * time.Second
 
 	d := NewDetector(responseTime, tickerInterval)
-	d.AddMessage(commands.GetAddr)
+	d.AddMessage(topics.GetAddr)
 	time.Sleep(1 * time.Second)
 
-	k := make(map[commands.Cmd]time.Time)
+	k := make(map[topics.Topic]time.Time)
 	assert.NotEqual(t, k, d.responses)
 }
