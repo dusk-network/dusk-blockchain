@@ -34,6 +34,8 @@ type Reducer struct {
 	selectionResultID       uint32
 	winningBlockHashChannel <-chan *bytes.Buffer
 	winningBlockHashID      uint32
+	initializationChannel   <-chan *bytes.Buffer
+	initializationID        uint32
 	quitChannel             <-chan *bytes.Buffer
 	quitID                  uint32
 
@@ -70,6 +72,7 @@ func NewReducer(eventBus *wire.EventBus, timerLength time.Duration,
 	roundUpdateChannel := make(chan *bytes.Buffer, 1)
 	selectionResultChannel := make(chan *bytes.Buffer, 10)
 	winningBlockHashChannel := make(chan *bytes.Buffer, 1)
+	initializationChannel := make(chan *bytes.Buffer, 1)
 	quitChannel := make(chan *bytes.Buffer, 1)
 	inputChannel := make(chan reductionMessage, 100)
 	outputChannel := make(chan []byte, 1)
@@ -81,6 +84,7 @@ func NewReducer(eventBus *wire.EventBus, timerLength time.Duration,
 		roundUpdateChannel:      roundUpdateChannel,
 		selectionResultChannel:  selectionResultChannel,
 		winningBlockHashChannel: winningBlockHashChannel,
+		initializationChannel:   initializationChannel,
 		quitChannel:             quitChannel,
 		timerLength:             timerLength,
 		inputChannel:            inputChannel,
@@ -111,6 +115,10 @@ func NewReducer(eventBus *wire.EventBus, timerLength time.Duration,
 		winningBlockHashChannel)
 	reducer.winningBlockHashID = winningBlockHashID
 
+	initializationID := reducer.eventBus.Subscribe(msg.InitializationTopic,
+		initializationChannel)
+	reducer.initializationID = initializationID
+
 	quitID := reducer.eventBus.Subscribe(msg.QuitTopic, quitChannel)
 	reducer.quitID = quitID
 
@@ -121,18 +129,13 @@ func NewReducer(eventBus *wire.EventBus, timerLength time.Duration,
 // reduction logic, and manage the incoming messages with regards to the
 // current consensus state.
 func (r *Reducer) Listen() {
+	// First, wait to initialise
+	if err := r.initialise(); err != nil {
+		// Log
+		return
+	}
+
 	for {
-		// Check queue first
-		queuedMessages := r.queue.GetMessages(r.round, r.step)
-
-		if queuedMessages != nil {
-			for _, message := range queuedMessages {
-				if message.IsSigSetReductionMessage() == r.inSigSetPhase {
-					r.handleMessage(message)
-				}
-			}
-		}
-
 		select {
 		case <-r.quitChannel:
 			r.eventBus.Unsubscribe(string(topics.BlockReduction),
@@ -140,6 +143,7 @@ func (r *Reducer) Listen() {
 			r.eventBus.Unsubscribe(string(topics.SigSetReduction),
 				r.sigSetReductionID)
 			r.eventBus.Unsubscribe(msg.RoundUpdateTopic, r.roundUpdateID)
+			r.eventBus.Unsubscribe(msg.SelectionResultTopic, r.selectionResultID)
 			r.eventBus.Unsubscribe(string(topics.Agreement), r.winningBlockHashID)
 			r.eventBus.Unsubscribe(msg.QuitTopic, r.quitID)
 			return
@@ -151,8 +155,10 @@ func (r *Reducer) Listen() {
 				}
 			}
 
+			r.eventBus.Publish(msg.ReductionResultTopic, bytes.NewBuffer(r.currentHash))
 			r.currentHash = nil
 			r.incrementStep()
+			r.reducing = false
 		case roundBuffer := <-r.roundUpdateChannel:
 			round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 			r.updateRound(round)
@@ -176,9 +182,7 @@ func (r *Reducer) Listen() {
 				break
 			}
 
-			if err := r.processMessage(message); err != nil {
-				break
-			}
+			r.handleMessage(message)
 		case messageBytes := <-r.sigSetReductionChannel:
 			if err := r.validate(messageBytes); err != nil {
 				break
@@ -189,41 +193,27 @@ func (r *Reducer) Listen() {
 				break
 			}
 
-			if err := r.processMessage(message); err != nil {
-				break
+			r.handleMessage(message)
+		default:
+			queuedMessages := r.queue.GetMessages(r.round, r.step)
+
+			if queuedMessages != nil {
+				for _, message := range queuedMessages {
+					if message.IsSigSetReductionMessage() == r.inSigSetPhase {
+						r.handleMessage(message)
+					}
+				}
 			}
 		}
 	}
 }
 
-func (r Reducer) processMessage(message reductionMessage) error {
-	// If the Reducer was just initialised, we start off from the
-	// round and step of the first reduction message we receive.
-	if r.round == 0 && r.step == 0 {
-		if err := r.initialise(message); err != nil {
-			// Log
-			return err
-		}
-	}
-
-	r.handleMessage(message)
-	return nil
-}
-
-// TODO: find a better way to do this
-func (r *Reducer) initialise(message reductionMessage) error {
-	commonFields := message.GetCommonFields()
-	r.round = commonFields.Round
-	r.step = commonFields.Step
-	if err := r.setVotingCommittee(); err != nil {
-		return err
-	}
-
-	if message.IsSigSetReductionMessage() {
-		r.inSigSetPhase = true
-	}
-
-	return nil
+func (r *Reducer) initialise() error {
+	roundBuffer := <-r.initializationChannel
+	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
+	r.round = round
+	r.step = 1
+	return r.setVotingCommittee()
 }
 
 func (r *Reducer) handleMessage(message reductionMessage) {
@@ -258,7 +248,7 @@ func (r *Reducer) runReduction() {
 	}
 
 	hash2, voteSet2 := r.decideOnHash()
-	r.reducing = false
+	r.currentHash = hash2
 
 	if r.reductionSuccessful(hash1, hash2, voteSet1, voteSet2) {
 		fullVoteSet := append(voteSet1, voteSet2...)
@@ -292,19 +282,20 @@ func (r Reducer) voteReduction() error {
 	}
 
 	// Send to wire
-	r.eventBus.Publish("outgoing", fullMessage)
+	r.eventBus.Publish(msg.OutgoingReductionTopic, fullMessage)
 	return nil
 }
 
 func (r Reducer) reductionSuccessful(hash1, hash2 []byte, voteSet1,
 	voteSet2 []*msg.Vote) bool {
 
-	notNil := hash1 != nil && hash2 != nil
+	notEmpty := !bytes.Equal(hash1, make([]byte, 32)) &&
+		!bytes.Equal(hash2, make([]byte, 32))
 	sameResults := bytes.Equal(hash1, hash2)
-	voteSetsAreValid := len(voteSet1) == r.committeeStore.Threshold() &&
-		len(voteSet2) == r.committeeStore.Threshold()
+	voteSetsAreCorrectLength := len(voteSet1) >= r.committeeStore.Threshold() &&
+		len(voteSet2) >= r.committeeStore.Threshold()
 
-	return notNil && sameResults && voteSetsAreValid
+	return notEmpty && sameResults && voteSetsAreCorrectLength
 }
 
 func (r Reducer) voteAgreement(voteSetBytes []byte) error {
@@ -320,7 +311,7 @@ func (r Reducer) voteAgreement(voteSetBytes []byte) error {
 	}
 
 	// Send to wire
-	r.eventBus.Publish("outgoing", fullMessage)
+	r.eventBus.Publish(msg.OutgoingAgreementTopic, fullMessage)
 	return nil
 }
 
@@ -419,9 +410,14 @@ func (r *Reducer) decideOnHash() ([]byte, []*msg.Vote) {
 			votedHashStr := hex.EncodeToString(commonFields.VotedHash)
 
 			// Add votes for this block
-			votesPerHash[votedHashStr] += r.votingCommittee[pubKeyStr]
+			voteCount := r.votingCommittee[pubKeyStr]
+			votesPerHash[votedHashStr] += voteCount
 
-			r.addVotesToVoteSet(voteSet, pubKeyStr, commonFields)
+			// Add votes to vote set
+			for i := uint8(0); i < voteCount; i++ {
+				vote := createVote(commonFields)
+				voteSet = append(voteSet, vote)
+			}
 
 			if r.thresholdExceeded(votesPerHash[votedHashStr]) {
 				// Clean up the vote set, to remove votes for other blocks.
@@ -458,16 +454,6 @@ func (r Reducer) checkWinningBlockHash(hash []byte) error {
 	}
 
 	return nil
-}
-
-func (r Reducer) addVotesToVoteSet(voteSet []*msg.Vote, pubKeyBLSStr string,
-	commonFields reductionBase) {
-
-	voteCount := r.votingCommittee[pubKeyBLSStr]
-	vote := createVote(commonFields)
-	for i := uint8(0); i < voteCount; i++ {
-		voteSet = append(voteSet, vote)
-	}
 }
 
 func createVote(commonFields reductionBase) *msg.Vote {
@@ -511,12 +497,14 @@ func (r *Reducer) incrementStep() error {
 func (r *Reducer) moveToSigSetPhase(winningBlockHash []byte) {
 	r.winningBlockHash = winningBlockHash
 	r.inSigSetPhase = true
+	r.currentHash = nil
 	r.step = 1
 }
 
 func (r *Reducer) updateRound(round uint64) error {
 	r.queue.Clear(r.round)
 	r.winningBlockHash = nil
+	r.currentHash = nil
 	r.inSigSetPhase = false
 	r.round = round
 	r.step = 1
