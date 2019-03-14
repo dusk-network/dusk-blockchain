@@ -110,17 +110,3 @@ func (s *sigSetAgreementMessage) equal(other *sigSetAgreementMessage) bool {
 	return s.agreementMessage.equal(other.agreementMessage) &&
 		bytes.Equal(s.SigSetHash, other.SigSetHash)
 }
-
-func (s *agreementMessage) verifyVoteSetSignature() error {
-	//TODO
-	return nil
-
-}
-
-func (s *agreementMessage) verifyVoteSet() error {
-	/*
-		for ...
-		msg.VerifyVote()
-	*/
-	return nil
-}

@@ -129,7 +129,7 @@ func (p *Peer) readRemoteMsgVersion() error {
 
 	version, ok := readmsg.(*payload.MsgVersion)
 	if !ok {
-		err := fmt.Sprintf("Did not receive the expected '%s' message", commands.Version)
+		err := fmt.Sprintf("Did not receive the expected '%s' message", topics.Version)
 		return errors.New(err)
 	}
 

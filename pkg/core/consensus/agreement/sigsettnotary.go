@@ -69,7 +69,7 @@ func (s *SigSetNotary) processMsg(m *sigSetAgreementMessage) {
 	if s.shouldBeStored(m) {
 		sigSetAgreements := s.sigSetAgreementPerSteps[m.Step]
 		if sigSetAgreements == nil {
-			sigSetAgreements = make([]*sigSetAgreementMessage, s.committeeStore.Threshold)
+			sigSetAgreements = make([]*sigSetAgreementMessage, s.committeeStore.Threshold())
 		}
 
 		// storing the sigSetAgreement for the proper step
@@ -89,14 +89,14 @@ func (s *SigSetNotary) shouldBeSkipped(m *sigSetAgreementMessage) bool {
 	isDupe := s.isDuplicate(m)
 	isPleb := !s.committeeStore.PartakesInCommittee(m.PubKeyBLS)
 	isIrrelevant := s.currentRound != m.Round
-	// err := b.verifyVote(m.VoteSet, m.Step )
-	// failedVerification := err != nil
-	return isDupe || isPleb || isIrrelevant // || failedVerification
+	err := s.committeeStore.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
+	failedVerification := err != nil
+	return isDupe || isPleb || isIrrelevant || failedVerification
 }
 
 func (s *SigSetNotary) shouldBeStored(m *sigSetAgreementMessage) bool {
 	agreementList := s.sigSetAgreementPerSteps[m.Step]
-	return agreementList == nil || m.Round > s.currentRound || len(agreementList)+1 < s.committeeStore.Threshold
+	return agreementList == nil || m.Round > s.currentRound || len(agreementList)+1 < s.committeeStore.Threshold()
 }
 
 func (s *SigSetNotary) notifyRoundUpdate(r uint64) {

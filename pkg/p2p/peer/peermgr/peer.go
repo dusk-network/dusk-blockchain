@@ -409,7 +409,7 @@ func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
 
 	if protocol.NodeVer.Major != msg.Version.Major {
 		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
-		rejectMsg := payload.NewMsgReject(string(commands.Version), payload.RejectInvalid, "invalid")
+		rejectMsg := payload.NewMsgReject(string(topics.Version), payload.RejectInvalid, "invalid")
 		p.Write(rejectMsg)
 
 		return errors.New(err)
@@ -490,9 +490,9 @@ func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
 	//TODO: Make a separate function and check whether we need more payload.InvXxx types (e.g. InvHdr)
 	for _, vector := range msg.Vectors {
 		if vector.Type == payload.InvBlock {
-			p.Detector.RemoveMessage(commands.GetHeaders)
+			p.Detector.RemoveMessage(topics.GetHeaders)
 		} else {
-			p.Detector.RemoveMessage(commands.Tx)
+			p.Detector.RemoveMessage(topics.Tx)
 		}
 	}
 	p.inch <- func() {
@@ -537,7 +537,7 @@ func (p *Peer) OnReject(msg *payload.MsgReject) {
 func (p *Peer) RequestHeaders(hash []byte) error {
 	c := make(chan error)
 	p.outch <- func() {
-		p.Detector.AddMessage(commands.GetHeaders)
+		p.Detector.AddMessage(topics.GetHeaders)
 		stop := make([]byte, 32)
 		getHeaders := payload.NewMsgGetHeaders(hash, stop)
 		err := p.Write(getHeaders)
@@ -554,7 +554,7 @@ func (p *Peer) RequestTx(tx transactions.Stealth) error {
 	c := make(chan error)
 
 	p.outch <- func() {
-		p.Detector.AddMessage(commands.GetData)
+		p.Detector.AddMessage(topics.GetData)
 		getdata := payload.NewMsgGetData()
 		getdata.AddTx(tx.R)
 		err := p.Write(getdata)
@@ -579,7 +579,7 @@ func (p *Peer) RequestBlocks(hashes [][]byte) error {
 	}
 
 	p.outch <- func() {
-		p.Detector.AddMessage(commands.GetData)
+		p.Detector.AddMessage(topics.GetData)
 		getdata := payload.NewMsgGetData()
 		getdata.AddBlocks(blocks)
 		err := p.Write(getdata)
@@ -596,7 +596,7 @@ func (p *Peer) RequestAddresses() error {
 	c := make(chan error)
 
 	p.outch <- func() {
-		p.Detector.AddMessage(commands.GetAddr)
+		p.Detector.AddMessage(topics.GetAddr)
 		getaddr := payload.NewMsgGetAddr()
 		err := p.Write(getaddr)
 		c <- err

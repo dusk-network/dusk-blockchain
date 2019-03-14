@@ -3,14 +3,24 @@ package user
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
 const addProvisionerTopic = "addprovisioner"
+
+type Committee interface {
+	// isMember can accept a BLS Public Key or an Ed25519
+	IsMember([]byte) bool
+	VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError
+	Quorum() int
+}
 
 type CommitteeStore struct {
 	eventBus              *wire.EventBus
@@ -18,7 +28,7 @@ type CommitteeStore struct {
 	addProvisionerID      uint32
 
 	provisioners *Provisioners
-	totalWeight  uint64
+	TotalWeight  uint64
 }
 
 func NewCommitteeStore(eventBus *wire.EventBus) *CommitteeStore {
@@ -51,25 +61,73 @@ func (c *CommitteeStore) Listen() {
 				break
 			}
 
-			c.totalWeight += amount
+			c.TotalWeight += amount
 			c.eventBus.Publish(msg.ProvisionerAddedTopic, newProvisionerBytes)
 		}
 	}
 }
 
-// TotalWeight will return the totalWeight field of the CommitteeStore.
-func (c *CommitteeStore) TotalWeight() uint64 {
-	return c.totalWeight
-}
-
 // Get the provisioner committee and return it
-func (c *CommitteeStore) Get() Provisioners {
+func (c CommitteeStore) Get() Provisioners {
 	return *c.provisioners
 }
 
 // PartakesInCommittee checks if the BLS key belongs to one of the Provisioners in the committee
-func (c *CommitteeStore) PartakesInCommittee(pubKeyBLS []byte) bool {
+func (c *CommitteeStore) IsMember(pubKeyBLS []byte) bool {
 	return c.provisioners.GetMember(pubKeyBLS) != nil
+}
+
+// Quorum returns the amount of votes to reach a quorum
+func (c CommitteeStore) Quorum() int {
+	committeeSize := len(*c.provisioners)
+	if committeeSize > 50 {
+		committeeSize = 50
+	}
+
+	quorum := int(float64(committeeSize) * 0.75)
+	return quorum
+}
+
+func (c CommitteeStore) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError {
+
+	for _, vote := range voteSet {
+		if !fromValidStep(vote.Step, step) {
+			return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
+		}
+
+		votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
+			c.TotalWeight, vote.Step)
+		if err != nil {
+			return prerror.New(prerror.High, err)
+		}
+
+		if err := checkVoterEligibility(vote.PubKeyBLS, votingCommittee); err != nil {
+			return err
+		}
+
+		if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
+			vote.SignedHash); err != nil {
+
+			return prerror.New(prerror.Low, errors.New("BLS verification failed"))
+		}
+	}
+
+	return nil
+}
+
+func fromValidStep(voteStep, setStep uint8) bool {
+	return voteStep == setStep || voteStep+1 == setStep
+}
+
+func checkVoterEligibility(pubKeyBLS []byte,
+	votingCommittee map[string]uint8) *prerror.PrError {
+
+	pubKeyStr := hex.EncodeToString(pubKeyBLS)
+	if votingCommittee[pubKeyStr] == 0 {
+		return prerror.New(prerror.Low, errors.New("voter is not eligible to vote"))
+	}
+
+	return nil
 }
 
 func decodeNewProvisioner(r io.Reader) ([]byte, []byte, uint64, error) {

@@ -10,15 +10,15 @@ import (
 
 // BlockNotary notifies when there is a consensus on a block hash
 type BlockNotary struct {
-	eventBus               *wire.EventBus
-	blockAgreementChannel  <-chan *bytes.Buffer
-	blockAgreementID       uint32
-	quitChannel            <-chan *bytes.Buffer
-	quitID                 uint32
-	committeeStore         *user.CommitteeStore
-	currentRound           uint64
-	blockAgreementsPerStep map[uint8][]*blockAgreementMessage
-	validate               func(*bytes.Buffer) error
+	eventBus              *wire.EventBus
+	blockAgreementChannel <-chan *bytes.Buffer
+	blockAgreementID      uint32
+	quitChannel           <-chan *bytes.Buffer
+	quitID                uint32
+	committeeStore        *user.CommitteeStore
+	currentRound          uint64
+	decoder               EventDecoder
+	agreementCollector    *StepEventCollector
 }
 
 // NewBlockNotary creates a BlockNotary by injecting the EventBus, the CommitteeStore and the message validation primitive
@@ -28,12 +28,12 @@ func NewBlockNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) er
 	blockAgreementChannel := make(chan *bytes.Buffer, 100)
 
 	return &BlockNotary{
-		eventBus:               eventBus,
-		blockAgreementChannel:  blockAgreementChannel,
-		quitChannel:            quitChannel,
-		committeeStore:         committeeStore,
-		blockAgreementsPerStep: make(map[uint8][]*blockAgreementMessage),
-		validate:               validateFunc,
+		eventBus:              eventBus,
+		blockAgreementChannel: blockAgreementChannel,
+		quitChannel:           quitChannel,
+		committeeStore:        committeeStore,
+		agreementCollector:    newStepEventCollector(),
+		decoder:               newDecoder(validateFunc),
 	}
 }
 
@@ -49,72 +49,51 @@ func (b *BlockNotary) Listen() {
 			b.eventBus.Unsubscribe(string(msg.QuitTopic), b.quitID)
 			return
 		case blockAgreement := <-b.blockAgreementChannel:
-			if err := b.validate(blockAgreement); err != nil {
-				return
-			}
-
-			blockAgreementMsg, err := decodeBlockAgreement(blockAgreement)
+			d, err := b.decoder.Decode(*blockAgreement)
 			if err != nil {
 				break
 			}
-			b.processMsg(blockAgreementMsg)
+			// casting to an AgreementMessage as we know what Decoder we are using
+			am := d.(*AgreementMessage)
+			if b.shouldBeSkipped(am) {
+				break
+			}
+
+			err = b.Aggregate(d, am.Round, am.Step)
+			if err != nil {
+				break
+			}
 		}
 	}
 }
 
-// processMsg checks the message to see if it is valid, aka:
-//	- run all validations on the message
-//  - verify that the message is in the same round of the BlockNotary
-func (b *BlockNotary) processMsg(m *blockAgreementMessage) {
+func (b *BlockNotary) Aggregate(event CommitteeEvent, round uint64, step uint8) error {
 
-	if b.shouldBeSkipped(m) {
-		return
+	// storing the event always since we are gonna cleanup anyway if quorum is reached
+	nrAgreements := b.agreementCollector.Store(event, step)
+	// did we reach the quorum?
+	if nrAgreements >= b.committeeStore.Quorum() {
+		// notify everybody
+		b.notifyAgreedBlockHash(event.(*AgreementMessage).BlockHash)
+		b.agreementCollector = newStepEventCollector()
 	}
 
-	if b.shouldBeStored(m) {
-		blockAgreementList := b.blockAgreementsPerStep[m.Step]
-		if blockAgreementList == nil {
-			blockAgreementList = make([]*blockAgreementMessage, b.committeeStore.Threshold)
-		}
-
-		// storing the agreement vote for the proper step
-		blockAgreementList = append(blockAgreementList, m)
-		b.blockAgreementsPerStep[m.Step] = blockAgreementList
-		return
-	}
-
-	// if we reach the treshold for a step, this invalidates the agreements still pending
-	//confirming the blockhash voted upon
-	b.notifyAgreedBlockHash(m.BlockHash)
-	// clean the map up
-	b.blockAgreementsPerStep = make(map[uint8][]*blockAgreementMessage)
+	return nil
 }
 
 // shouldBeSkipped checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
 // NOTE: currentRound is handled by some other process, so it is not this component's responsibility to handle corner cases (for example being on an obsolete round because of a disconnect, etc)
-func (b *BlockNotary) shouldBeSkipped(m *blockAgreementMessage) bool {
-	isDupe := b.isDuplicate(m)
-	isPleb := !b.committeeStore.PartakesInCommittee(m.PubKeyBLS)
+func (b *BlockNotary) shouldBeSkipped(m *AgreementMessage) bool {
+	isDupe := b.agreementCollector.IsDuplicate(m, m.Step)
+	isPleb := !m.BelongsToCommittee(b.committeeStore)
 	isIrrelevant := b.currentRound != m.Round
-	// err := b.verifyVote(m.VoteSet, m.Step )
-	// failedVerification := err != nil
-	return isDupe || isPleb || isIrrelevant // || failedVerification
+	err := b.Verify(m)
+	failedVerification := err != nil
+	return isDupe || isPleb || isIrrelevant || failedVerification
 }
 
-// shouldBeStored checks if the message did not trigger a threshold
-func (b *BlockNotary) shouldBeStored(m *blockAgreementMessage) bool {
-	agreementList := b.blockAgreementsPerStep[m.Step]
-	return agreementList == nil || len(agreementList)+1 < b.committeeStore.Threshold
-}
-
-func (b *BlockNotary) isDuplicate(m *blockAgreementMessage) bool {
-	for _, previousAgreement := range b.blockAgreementsPerStep[m.Step] {
-		if m.equal(previousAgreement) {
-			return true
-		}
-	}
-
-	return false
+func (b *BlockNotary) Verify(m *AgreementMessage) error {
+	return b.committeeStore.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
 }
 
 func (b *BlockNotary) notifyAgreedBlockHash(blockHash []byte) {
