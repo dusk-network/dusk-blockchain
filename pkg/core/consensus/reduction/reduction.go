@@ -231,8 +231,7 @@ func (r *Reducer) handleMessage(message reductionMessage) {
 }
 
 // runReduction will run a two-step reduction cycle. After two steps of voting,
-// the results are checked. If this check is successful, the resulting hash
-// and the combination of the two vote sets is sent to the outputChannel.
+// the results are put into a function that deals with the outcome.
 func (r *Reducer) runReduction() {
 	hash1, voteSet1 := r.decideOnHash()
 	r.currentHash = hash1
@@ -249,6 +248,14 @@ func (r *Reducer) runReduction() {
 
 	hash2, voteSet2 := r.decideOnHash()
 	r.currentHash = hash2
+
+	r.handleReductionResults(hash1, hash2, voteSet1, voteSet2)
+}
+
+// handleReductionResults will send the proper result to the output channel,
+// depending on the passed parameters.
+func (r Reducer) handleReductionResults(hash1, hash2 []byte, voteSet1,
+	voteSet2 []*msg.Vote) {
 
 	if r.reductionSuccessful(hash1, hash2, voteSet1, voteSet2) {
 		fullVoteSet := append(voteSet1, voteSet2...)
@@ -291,7 +298,9 @@ func (r Reducer) reductionSuccessful(hash1, hash2 []byte, voteSet1,
 
 	notEmpty := !bytes.Equal(hash1, make([]byte, 32)) &&
 		!bytes.Equal(hash2, make([]byte, 32))
+
 	sameResults := bytes.Equal(hash1, hash2)
+
 	voteSetsAreCorrectLength := len(voteSet1) >= r.committeeStore.Threshold() &&
 		len(voteSet2) >= r.committeeStore.Threshold()
 
@@ -313,49 +322,6 @@ func (r Reducer) voteAgreement(voteSetBytes []byte) error {
 	// Send to wire
 	r.eventBus.Publish(msg.OutgoingAgreementTopic, fullMessage)
 	return nil
-}
-
-func (r Reducer) createAgreementMessage(voteSetBytes []byte) (*bytes.Buffer, error) {
-	buffer := bytes.NewBuffer(voteSetBytes)
-
-	signedVoteSet, err := bls.Sign(r.BLSSecretKey, r.BLSPubKey, voteSetBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteBLS(buffer, signedVoteSet.Compress()); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteVarBytes(buffer, r.BLSPubKey.Marshal()); err != nil {
-		return nil, err
-	}
-
-	if r.inSigSetPhase {
-		if err := encoding.Write256(buffer, r.winningBlockHash); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := encoding.Write256(buffer, r.currentHash); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, r.round); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint8(buffer, r.step); err != nil {
-		return nil, err
-	}
-
-	if r.inSigSetPhase {
-		if err := encoding.Write256(buffer, r.currentHash); err != nil {
-			return nil, err
-		}
-	}
-
-	return buffer, nil
 }
 
 func (r Reducer) addPubKeyAndSig(message *bytes.Buffer,
@@ -477,6 +443,11 @@ func removeDeviatingVotes(voteSet []*msg.Vote, hash []byte) {
 	}
 }
 
+func (r *Reducer) incrementStep() error {
+	r.step++
+	return r.setVotingCommittee()
+}
+
 func (r *Reducer) setVotingCommittee() error {
 	committee := r.committeeStore.Get()
 	votingCommittee, err := committee.CreateVotingCommittee(r.round,
@@ -487,11 +458,6 @@ func (r *Reducer) setVotingCommittee() error {
 
 	r.votingCommittee = votingCommittee
 	return nil
-}
-
-func (r *Reducer) incrementStep() error {
-	r.step++
-	return r.setVotingCommittee()
 }
 
 func (r *Reducer) moveToSigSetPhase(winningBlockHash []byte) {
@@ -529,4 +495,47 @@ func (r Reducer) isFromCorrectPhase(m reductionMessage) bool {
 func (r Reducer) shouldBeStored(m reductionMessage) bool {
 	commonFields := m.GetCommonFields()
 	return commonFields.Round > r.round || commonFields.Step > r.step
+}
+
+func (r Reducer) createAgreementMessage(voteSetBytes []byte) (*bytes.Buffer, error) {
+	buffer := bytes.NewBuffer(voteSetBytes)
+
+	signedVoteSet, err := bls.Sign(r.BLSSecretKey, r.BLSPubKey, voteSetBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteBLS(buffer, signedVoteSet.Compress()); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteVarBytes(buffer, r.BLSPubKey.Marshal()); err != nil {
+		return nil, err
+	}
+
+	if r.inSigSetPhase {
+		if err := encoding.Write256(buffer, r.winningBlockHash); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := encoding.Write256(buffer, r.currentHash); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, r.round); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteUint8(buffer, r.step); err != nil {
+		return nil, err
+	}
+
+	if r.inSigSetPhase {
+		if err := encoding.Write256(buffer, r.currentHash); err != nil {
+			return nil, err
+		}
+	}
+
+	return buffer, nil
 }
