@@ -10,7 +10,7 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -37,8 +37,8 @@ type ScoreSelector struct {
 	outputChannel chan []byte
 
 	// injected functions
-	validate    func(*bytes.Buffer) error
-	verifyProof func([]byte, []byte, []byte, []byte, []byte) bool
+	verifyEd25519Signature func(*bytes.Buffer) error
+	verifyProof            func([]byte, []byte, []byte, []byte, []byte) bool
 
 	bidList *user.BidList
 	tau     uint64
@@ -48,7 +48,7 @@ type ScoreSelector struct {
 // NewScoreSelector will return a pointer to a ScoreSelector with the passed
 // parameters.
 func NewScoreSelector(eventBus *wire.EventBus, timerLength time.Duration,
-	validateFunc func(*bytes.Buffer) error,
+	verifyEd25519SignatureFunc func(*bytes.Buffer) error,
 	verifyProofFunc func([]byte, []byte, []byte, []byte, []byte) bool) *ScoreSelector {
 
 	queue := newScoreQueue()
@@ -60,20 +60,20 @@ func NewScoreSelector(eventBus *wire.EventBus, timerLength time.Duration,
 	outputChannel := make(chan []byte, 1)
 
 	scoreSelector := &ScoreSelector{
-		eventBus:           eventBus,
-		scoreChannel:       scoreChannel,
-		roundUpdateChannel: roundUpdateChannel,
-		quitChannel:        quitChannel,
-		timerLength:        timerLength,
-		bidList:            bidList,
-		validate:           validateFunc,
-		verifyProof:        verifyProofFunc,
-		inputChannel:       inputChannel,
-		outputChannel:      outputChannel,
-		queue:              &queue,
+		eventBus:               eventBus,
+		scoreChannel:           scoreChannel,
+		roundUpdateChannel:     roundUpdateChannel,
+		quitChannel:            quitChannel,
+		timerLength:            timerLength,
+		bidList:                bidList,
+		verifyEd25519Signature: verifyEd25519SignatureFunc,
+		verifyProof:            verifyProofFunc,
+		inputChannel:           inputChannel,
+		outputChannel:          outputChannel,
+		queue:                  &queue,
 	}
 
-	scoreID := scoreSelector.eventBus.Subscribe(string(commands.Score), scoreChannel)
+	scoreID := scoreSelector.eventBus.Subscribe(string(topics.Score), scoreChannel)
 	scoreSelector.scoreID = scoreID
 
 	roundUpdateID := scoreSelector.eventBus.Subscribe(msg.RoundUpdateTopic, roundUpdateChannel)
@@ -100,7 +100,7 @@ func (s *ScoreSelector) Listen() {
 
 		select {
 		case <-s.quitChannel:
-			s.eventBus.Unsubscribe(string(commands.Score), s.scoreID)
+			s.eventBus.Unsubscribe(string(topics.Score), s.scoreID)
 			s.eventBus.Unsubscribe(msg.RoundUpdateTopic, s.roundUpdateID)
 			s.eventBus.Unsubscribe(msg.QuitTopic, s.quitID)
 			return
@@ -108,14 +108,14 @@ func (s *ScoreSelector) Listen() {
 			s.collecting = false
 
 			buffer := bytes.NewBuffer(result)
-			s.eventBus.Publish("outgoing", buffer)
+			s.eventBus.Publish(msg.SelectionResultTopic, buffer)
 
 			s.step++
 		case roundBuffer := <-s.roundUpdateChannel:
 			round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 			s.updateRound(round)
 		case messageBytes := <-s.scoreChannel:
-			if err := s.validate(messageBytes); err != nil {
+			if err := s.verifyEd25519Signature(messageBytes); err != nil {
 				break
 			}
 

@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
@@ -24,12 +24,11 @@ import (
 )
 
 func TestSigSetCollection(t *testing.T) {
-	validateFunc := func(*bytes.Buffer) error {
+	verifyEd25519SignatureFunc := func(*bytes.Buffer) error {
 		return nil
 	}
 
-	verifyVoteFunc := func(*msg.Vote, []byte, uint8, map[string]uint8,
-		map[string]uint8) *prerror.PrError {
+	verifyVoteSetFunc := func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError {
 		return nil
 	}
 
@@ -103,13 +102,13 @@ func TestSigSetCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
-		verifyVoteFunc, committeeStore)
+	setSelector := selection.NewSetSelector(eventBus, timerLength, verifyEd25519SignatureFunc,
+		verifyVoteSetFunc, committeeStore)
 
 	go setSelector.Listen()
 
 	// first, we set a winning block hash
-	eventBus.Publish(string(commands.Agreement), bytes.NewBuffer(winningBlockHash))
+	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// Send messages
 	eventBus.Publish("sigset", message1)
@@ -127,12 +126,11 @@ func TestSigSetCollection(t *testing.T) {
 }
 
 func TestInvalidVoteSetSigSetCollection(t *testing.T) {
-	validateFunc := func(*bytes.Buffer) error {
+	verifyEd25519SignatureFunc := func(*bytes.Buffer) error {
 		return nil
 	}
 
-	verifyVoteFunc := func(*msg.Vote, []byte, uint8, map[string]uint8,
-		map[string]uint8) *prerror.PrError {
+	verifyVoteSetFunc := func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError {
 		return prerror.New(prerror.Low, errors.New("invalid vote set"))
 	}
 
@@ -206,13 +204,13 @@ func TestInvalidVoteSetSigSetCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
-		verifyVoteFunc, committeeStore)
+	setSelector := selection.NewSetSelector(eventBus, timerLength, verifyEd25519SignatureFunc,
+		verifyVoteSetFunc, committeeStore)
 
 	go setSelector.Listen()
 
 	// first, we set a winning block hash
-	eventBus.Publish(string(commands.Agreement), bytes.NewBuffer(winningBlockHash))
+	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// Send messages
 	eventBus.Publish("sigset", message1)
@@ -230,12 +228,11 @@ func TestInvalidVoteSetSigSetCollection(t *testing.T) {
 }
 
 func TestInvalidSignatureSigSetCollection(t *testing.T) {
-	validateFunc := func(*bytes.Buffer) error {
+	verifyEd25519SignatureFunc := func(*bytes.Buffer) error {
 		return errors.New("verification failed")
 	}
 
-	verifyVoteFunc := func(*msg.Vote, []byte, uint8, map[string]uint8,
-		map[string]uint8) *prerror.PrError {
+	verifyVoteSetFunc := func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError {
 		return nil
 	}
 
@@ -309,13 +306,13 @@ func TestInvalidSignatureSigSetCollection(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
-		verifyVoteFunc, committeeStore)
+	setSelector := selection.NewSetSelector(eventBus, timerLength, verifyEd25519SignatureFunc,
+		verifyVoteSetFunc, committeeStore)
 
 	go setSelector.Listen()
 
 	// first, we set a winning block hash
-	eventBus.Publish(string(commands.Agreement), bytes.NewBuffer(winningBlockHash))
+	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// Send messages
 	eventBus.Publish("sigset", message1)
@@ -333,12 +330,11 @@ func TestInvalidSignatureSigSetCollection(t *testing.T) {
 }
 
 func TestSigSetCollectionQueue(t *testing.T) {
-	validateFunc := func(*bytes.Buffer) error {
+	verifyEd25519SignatureFunc := func(*bytes.Buffer) error {
 		return nil
 	}
 
-	verifyVoteFunc := func(*msg.Vote, []byte, uint8, map[string]uint8,
-		map[string]uint8) *prerror.PrError {
+	verifyVoteSetFunc := func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError {
 		return nil
 	}
 
@@ -404,13 +400,13 @@ func TestSigSetCollectionQueue(t *testing.T) {
 
 	// Make a score selector with a short timeout
 	timerLength := 100 * time.Millisecond
-	setSelector := selection.NewSetSelector(eventBus, timerLength, validateFunc,
-		verifyVoteFunc, committeeStore)
+	setSelector := selection.NewSetSelector(eventBus, timerLength, verifyEd25519SignatureFunc,
+		verifyVoteSetFunc, committeeStore)
 
 	go setSelector.Listen()
 
 	// first, we set a winning block hash
-	eventBus.Publish(string(commands.Agreement), bytes.NewBuffer(winningBlockHash))
+	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// send message, which should give us a result identical to voteSetHash1
 	eventBus.Publish("sigset", message1)
@@ -434,7 +430,7 @@ func TestSigSetCollectionQueue(t *testing.T) {
 	eventBus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(roundBytes))
 
 	// set winning block hash again
-	eventBus.Publish(string(commands.Agreement), bytes.NewBuffer(winningBlockHash))
+	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// wait for a result from outgoingChannel
 	result2 := <-outgoingChannel

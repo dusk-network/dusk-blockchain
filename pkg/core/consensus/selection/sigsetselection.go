@@ -12,7 +12,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // SetSelector contains information about the state of the consensus.
@@ -35,16 +35,14 @@ type SetSelector struct {
 	collecting       bool
 	inputChannel     chan *sigSetMessage
 	outputChannel    chan []byte
-	setSizeThreshold int
 	winningBlockHash []byte
 
 	committeeStore  *user.CommitteeStore
 	votingCommittee map[string]uint8
 
 	// injected functions
-	validate   func(*bytes.Buffer) error
-	verifyVote func(*msg.Vote, []byte, uint8, map[string]uint8,
-		map[string]uint8) *prerror.PrError
+	verifyEd25519Signature func(*bytes.Buffer) error
+	verifyVoteSet          func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError
 
 	queue *sigSetQueue
 }
@@ -52,9 +50,8 @@ type SetSelector struct {
 // NewSetSelector will return a pointer to a SetSelector with the passed
 // parameters.
 func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
-	validateFunc func(*bytes.Buffer) error,
-	verifyVoteFunc func(*msg.Vote, []byte, uint8, map[string]uint8,
-		map[string]uint8) *prerror.PrError,
+	verifyEd25519SignatureFunc func(*bytes.Buffer) error,
+	verifyVoteSetFunc func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError,
 	committeeStore *user.CommitteeStore) *SetSelector {
 
 	queue := newSigSetQueue()
@@ -75,18 +72,18 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 		inputChannel:            inputChannel,
 		outputChannel:           outputChannel,
 		committeeStore:          committeeStore,
-		validate:                validateFunc,
-		verifyVote:              verifyVoteFunc,
+		verifyEd25519Signature:  verifyEd25519SignatureFunc,
+		verifyVoteSet:           verifyVoteSetFunc,
 		queue:                   &queue,
 	}
 
-	sigSetID := setSelector.eventBus.Subscribe(string(commands.SigSet), sigSetChannel)
+	sigSetID := setSelector.eventBus.Subscribe(string(topics.SigSet), sigSetChannel)
 	setSelector.sigSetID = sigSetID
 
 	roundUpdateID := setSelector.eventBus.Subscribe(msg.RoundUpdateTopic, roundUpdateChannel)
 	setSelector.roundUpdateID = roundUpdateID
 
-	winningBlockHashID := setSelector.eventBus.Subscribe(string(commands.Agreement),
+	winningBlockHashID := setSelector.eventBus.Subscribe(string(topics.Agreement),
 		winningBlockHashChannel)
 	setSelector.winningBlockHashID = winningBlockHashID
 
@@ -113,9 +110,9 @@ func (s *SetSelector) Listen() {
 
 		select {
 		case <-s.quitChannel:
-			s.eventBus.Unsubscribe(string(commands.SigSet), s.sigSetID)
+			s.eventBus.Unsubscribe(string(topics.SigSet), s.sigSetID)
 			s.eventBus.Unsubscribe(msg.RoundUpdateTopic, s.roundUpdateID)
-			s.eventBus.Unsubscribe(string(commands.Agreement), s.winningBlockHashID)
+			s.eventBus.Unsubscribe(string(topics.Agreement), s.winningBlockHashID)
 			s.eventBus.Unsubscribe(msg.QuitTopic, s.quitID)
 			return
 		case result := <-s.outputChannel:
@@ -135,7 +132,7 @@ func (s *SetSelector) Listen() {
 		case winningBlockHash := <-s.winningBlockHashChannel:
 			s.winningBlockHash = winningBlockHash.Bytes()
 		case messageBytes := <-s.sigSetChannel:
-			if err := s.validate(messageBytes); err != nil {
+			if err := s.verifyEd25519Signature(messageBytes); err != nil {
 				break
 			}
 
@@ -242,7 +239,13 @@ func (s SetSelector) verifySigSetMessage(m *sigSetMessage) *prerror.PrError {
 		return err
 	}
 
-	if err := s.verifyVoteSet(m.SigSet, m.WinningBlockHash, m.Step); err != nil {
+	if err := s.validateVoteSetLength(m.SigSet); err != nil {
+		return err
+	}
+
+	if err := s.verifyVoteSet(m.SigSet, m.WinningBlockHash,
+		m.Round, m.Step); err != nil {
+
 		return err
 	}
 
@@ -262,42 +265,8 @@ func verifyVoteSetSignature(m *sigSetMessage) *prerror.PrError {
 	return nil
 }
 
-func (s SetSelector) verifyVoteSet(voteSet []*msg.Vote, hash []byte,
-	step uint8) *prerror.PrError {
-
-	// Create committees
-	committee := s.committeeStore.Get()
-	votingCommittee1, err := committee.CreateVotingCommittee(s.round,
-		s.committeeStore.TotalWeight(), step)
-	if err != nil {
-		return prerror.New(prerror.High, err)
-	}
-
-	votingCommittee2, err := committee.CreateVotingCommittee(s.round,
-		s.committeeStore.TotalWeight(), step-1)
-	if err != nil {
-		return prerror.New(prerror.High, err)
-	}
-
-	// Size check
-	s.updateSetSizeThreshold(votingCommittee1)
-	if err := s.validateVoteSetLength(voteSet); err != nil {
-		return err
-	}
-
-	for _, vote := range voteSet {
-		if err := s.verifyVote(vote, hash, step, votingCommittee1,
-			votingCommittee2); err != nil {
-
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (s SetSelector) validateVoteSetLength(voteSet []*msg.Vote) *prerror.PrError {
-	if len(voteSet) < s.setSizeThreshold {
+	if len(voteSet) < s.committeeStore.Threshold() {
 		return prerror.New(prerror.Low, errors.New("vote set is too small"))
 	}
 
@@ -307,17 +276,13 @@ func (s SetSelector) validateVoteSetLength(voteSet []*msg.Vote) *prerror.PrError
 func (s *SetSelector) setVotingCommittee() error {
 	committee := s.committeeStore.Get()
 	votingCommittee, err := committee.CreateVotingCommittee(s.round,
-		s.committeeStore.TotalWeight(), s.step)
+		s.committeeStore.TotalWeight, s.step)
 	if err != nil {
 		return err
 	}
 
 	s.votingCommittee = votingCommittee
 	return nil
-}
-
-func (s *SetSelector) updateSetSizeThreshold(votingCommittee map[string]uint8) {
-	s.setSizeThreshold = int(2 * float64(len(votingCommittee)) * 0.75)
 }
 
 func (s *SetSelector) updateRound(round uint64) error {
