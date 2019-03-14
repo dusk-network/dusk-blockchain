@@ -123,7 +123,7 @@ func TestSigSetCollection(t *testing.T) {
 	assert.Equal(t, voteSetHash, result.Bytes())
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func TestInvalidVoteSetSigSetCollection(t *testing.T) {
@@ -226,7 +226,7 @@ func TestInvalidVoteSetSigSetCollection(t *testing.T) {
 	assert.Nil(t, result.Bytes())
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func TestInvalidSignatureSigSetCollection(t *testing.T) {
@@ -329,7 +329,7 @@ func TestInvalidSignatureSigSetCollection(t *testing.T) {
 	assert.Empty(t, outgoingChannel)
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func TestSigSetCollectionQueue(t *testing.T) {
@@ -443,7 +443,7 @@ func TestSigSetCollectionQueue(t *testing.T) {
 	assert.Equal(t, voteSetHash2, result2.Bytes())
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func newVoteSet(amount int, hash []byte, step uint8) ([]*msg.Vote, error) {

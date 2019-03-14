@@ -46,7 +46,7 @@ func (b *BlockNotary) Listen() {
 		select {
 		case <-b.quitChannel:
 			b.eventBus.Unsubscribe(string(msg.BlockAgreementTopic), b.blockAgreementID)
-			b.eventBus.Unsubscribe(string("quit"), b.quitID)
+			b.eventBus.Unsubscribe(string(msg.QuitTopic), b.quitID)
 			return
 		case blockAgreement := <-b.blockAgreementChannel:
 			if err := b.validate(blockAgreement); err != nil {

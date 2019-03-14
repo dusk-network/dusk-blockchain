@@ -46,7 +46,7 @@ func (s *SigSetNotary) Listen() {
 		select {
 		case <-s.quitChannel:
 			s.eventBus.Unsubscribe(string(msg.SigSetAgreementTopic), s.sigSetAgreementID)
-			s.eventBus.Unsubscribe(string("quit"), s.quitID)
+			s.eventBus.Unsubscribe(string(msg.QuitTopic), s.quitID)
 			return
 		case sigSetAgreement := <-s.sigSetAgreementChannel:
 			sigSetAgreementMsg, err := decodeSigSetAgreement(sigSetAgreement)

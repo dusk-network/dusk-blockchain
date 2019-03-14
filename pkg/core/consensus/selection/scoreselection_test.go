@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
 	"github.com/stretchr/testify/assert"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
@@ -65,7 +67,7 @@ func TestScoreCollection(t *testing.T) {
 	assert.Equal(t, blockHash, result.Bytes())
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func TestInvalidProofScoreCollection(t *testing.T) {
@@ -117,7 +119,7 @@ func TestInvalidProofScoreCollection(t *testing.T) {
 	assert.Nil(t, result.Bytes())
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func TestInvalidSignatureScoreCollection(t *testing.T) {
@@ -170,7 +172,7 @@ func TestInvalidSignatureScoreCollection(t *testing.T) {
 	assert.Empty(t, outgoingChannel)
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func TestScoreCollectionQueue(t *testing.T) {
@@ -238,7 +240,7 @@ func TestScoreCollectionQueue(t *testing.T) {
 	assert.Equal(t, blockHash2, result2.Bytes())
 
 	// Kill goroutine
-	eventBus.Publish("quit", nil)
+	eventBus.Publish(msg.QuitTopic, nil)
 }
 
 func newScoreMessage(score, round uint64, step uint8) (*bytes.Buffer, []byte, error) {
