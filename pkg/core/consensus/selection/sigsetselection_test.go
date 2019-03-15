@@ -35,8 +35,8 @@ func TestSigSetCollection(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// subscribe to provisioneradded topic
 	provisionerAddedChannel := make(chan *bytes.Buffer, 3)
@@ -107,16 +107,21 @@ func TestSigSetCollection(t *testing.T) {
 
 	go setSelector.Listen()
 
+	// initialise set selector
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+
 	// first, we set a winning block hash
 	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// Send messages
-	eventBus.Publish("sigset", message1)
-	eventBus.Publish("sigset", message2)
-	eventBus.Publish("sigset", message3)
+	eventBus.Publish(string(topics.SigSet), message1)
+	eventBus.Publish(string(topics.SigSet), message2)
+	eventBus.Publish(string(topics.SigSet), message3)
 
-	// wait for a result from outgoingChannel
-	result := <-outgoingChannel
+	// wait for a result from selectionResultChannel
+	result := <-selectionResultChannel
 
 	// result should be equal to vote set hash
 	assert.Equal(t, voteSetHash, result.Bytes())
@@ -137,8 +142,8 @@ func TestInvalidVoteSetSigSetCollection(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// subscribe to provisioneradded topic
 	provisionerAddedChannel := make(chan *bytes.Buffer, 3)
@@ -209,16 +214,21 @@ func TestInvalidVoteSetSigSetCollection(t *testing.T) {
 
 	go setSelector.Listen()
 
+	// initialise set selector
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+
 	// first, we set a winning block hash
 	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// Send messages
-	eventBus.Publish("sigset", message1)
-	eventBus.Publish("sigset", message2)
-	eventBus.Publish("sigset", message3)
+	eventBus.Publish(string(topics.SigSet), message1)
+	eventBus.Publish(string(topics.SigSet), message2)
+	eventBus.Publish(string(topics.SigSet), message3)
 
-	// wait for a result from outgoingChannel
-	result := <-outgoingChannel
+	// wait for a result from selectionResultChannel
+	result := <-selectionResultChannel
 
 	// result should be nil
 	assert.Nil(t, result.Bytes())
@@ -239,8 +249,8 @@ func TestInvalidSignatureSigSetCollection(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// subscribe to provisioneradded topic
 	provisionerAddedChannel := make(chan *bytes.Buffer, 3)
@@ -311,19 +321,24 @@ func TestInvalidSignatureSigSetCollection(t *testing.T) {
 
 	go setSelector.Listen()
 
+	// initialise set selector
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+
 	// first, we set a winning block hash
 	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
 	// Send messages
-	eventBus.Publish("sigset", message1)
-	eventBus.Publish("sigset", message2)
-	eventBus.Publish("sigset", message3)
+	eventBus.Publish(string(topics.SigSet), message1)
+	eventBus.Publish(string(topics.SigSet), message2)
+	eventBus.Publish(string(topics.SigSet), message3)
 
 	// wait a bit...
 	time.Sleep(200 * time.Millisecond)
 
-	// outgoingChannel should be empty
-	assert.Empty(t, outgoingChannel)
+	// selectionResultChannel should be empty
+	assert.Empty(t, selectionResultChannel)
 
 	// Kill goroutine
 	eventBus.Publish(msg.QuitTopic, nil)
@@ -341,11 +356,11 @@ func TestSigSetCollectionQueue(t *testing.T) {
 	eventBus := wire.New()
 
 	// subscribe to the outgoing topic
-	outgoingChannel := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe("outgoing", outgoingChannel)
+	selectionResultChannel := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.SelectionResultTopic, selectionResultChannel)
 
 	// subscribe to provisioneradded topic
-	provisionerAddedChannel := make(chan *bytes.Buffer, 3)
+	provisionerAddedChannel := make(chan *bytes.Buffer, 1)
 	eventBus.Subscribe(msg.ProvisionerAddedTopic, provisionerAddedChannel)
 
 	// Create a committee store
@@ -357,44 +372,26 @@ func TestSigSetCollectionQueue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// make a vote set for round 1
-	voteSet1, err := newVoteSet(3, winningBlockHash, 1)
+	// make a vote set
+	voteSet, err := newVoteSet(3, winningBlockHash, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// make a vote set for round 2
-	voteSet2, err := newVoteSet(3, winningBlockHash, 1)
+	// make a message for round 2
+	message, voteSetHash, pubKeyBLS, err := newSigSetMessage(winningBlockHash,
+		voteSet, 2, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// make a message for each round
-	message1, voteSetHash1, pubKeyBLS1, err := newSigSetMessage(winningBlockHash,
-		voteSet1, 1, 1)
+	// add a provisioner
+	provisionerMessage, err := newProvisionerMessage(pubKeyBLS, 200)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	message2, voteSetHash2, pubKeyBLS2, err := newSigSetMessage(winningBlockHash,
-		voteSet2, 2, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// add two provisioners
-	provisionerMessage1, err := newProvisionerMessage(pubKeyBLS1, 200)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// give the second provisioner a huge chance of being included
-	provisionerMessage2, err := newProvisionerMessage(pubKeyBLS2, 100000)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	eventBus.Publish("addprovisioner", provisionerMessage1)
+	eventBus.Publish("addprovisioner", provisionerMessage)
 
 	<-provisionerAddedChannel
 
@@ -405,38 +402,30 @@ func TestSigSetCollectionQueue(t *testing.T) {
 
 	go setSelector.Listen()
 
-	// first, we set a winning block hash
-	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
+	// initialise set selector
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes[:8], 1)
+	eventBus.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
 
-	// send message, which should give us a result identical to voteSetHash1
-	eventBus.Publish("sigset", message1)
-
-	// wait for a result from outgoingChannel
-	result1 := <-outgoingChannel
-
-	// result should be equal to vote set hash 1
-	assert.Equal(t, voteSetHash1, result1.Bytes())
-
-	// send other messages
-	eventBus.Publish("addprovisioner", provisionerMessage2)
-
-	<-provisionerAddedChannel
-
-	eventBus.Publish("sigset", message2)
+	// send message, should be queued
+	eventBus.Publish(string(topics.SigSet), message)
 
 	// increment round
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes[:8], 2)
-	eventBus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(roundBytes))
+	roundUpdateBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundUpdateBytes[:8], 2)
+	eventBus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(roundUpdateBytes))
 
-	// set winning block hash again
+	// wait a moment...
+	time.Sleep(100 * time.Millisecond)
+
+	// set winning block hash
 	eventBus.Publish(string(topics.Agreement), bytes.NewBuffer(winningBlockHash))
 
-	// wait for a result from outgoingChannel
-	result2 := <-outgoingChannel
+	// wait for a result from selectionResultChannel
+	result := <-selectionResultChannel
 
-	// result should be equal to vote set hash 2
-	assert.Equal(t, voteSetHash2, result2.Bytes())
+	// result should be equal to vote set hash
+	assert.Equal(t, voteSetHash, result.Bytes())
 
 	// Kill goroutine
 	eventBus.Publish(msg.QuitTopic, nil)

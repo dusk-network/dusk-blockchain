@@ -8,7 +8,9 @@ func newReductionQueue() reductionQueue {
 
 func (s reductionQueue) GetMessages(round uint64, step uint8) []reductionMessage {
 	if s[round][step] != nil {
-		return s[round][step]
+		messages := s[round][step]
+		s[round][step] = nil
+		return messages
 	}
 
 	return nil

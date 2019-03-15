@@ -25,6 +25,8 @@ type SetSelector struct {
 	roundUpdateID           uint32
 	winningBlockHashChannel <-chan *bytes.Buffer
 	winningBlockHashID      uint32
+	initializationChannel   <-chan *bytes.Buffer
+	initializationID        uint32
 	quitChannel             <-chan *bytes.Buffer
 	quitID                  uint32
 
@@ -58,6 +60,7 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 	sigSetChannel := make(chan *bytes.Buffer, 100)
 	roundUpdateChannel := make(chan *bytes.Buffer, 1)
 	winningBlockHashChannel := make(chan *bytes.Buffer, 1)
+	initializationChannel := make(chan *bytes.Buffer, 1)
 	quitChannel := make(chan *bytes.Buffer, 1)
 	inputChannel := make(chan *sigSetMessage, 100)
 	outputChannel := make(chan []byte, 1)
@@ -67,6 +70,7 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 		sigSetChannel:           sigSetChannel,
 		roundUpdateChannel:      roundUpdateChannel,
 		winningBlockHashChannel: winningBlockHashChannel,
+		initializationChannel:   initializationChannel,
 		quitChannel:             quitChannel,
 		timerLength:             timerLength,
 		inputChannel:            inputChannel,
@@ -87,6 +91,10 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 		winningBlockHashChannel)
 	setSelector.winningBlockHashID = winningBlockHashID
 
+	initializationID := setSelector.eventBus.Subscribe(msg.InitializationTopic,
+		initializationChannel)
+	setSelector.initializationID = initializationID
+
 	quitID := setSelector.eventBus.Subscribe(msg.QuitTopic, quitChannel)
 	setSelector.quitID = quitID
 
@@ -97,17 +105,13 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 // collection logic, and manage the incoming messages with regards to the
 // current consensus state.
 func (s *SetSelector) Listen() {
-	for {
-		// Check queue first, if we have received a winning block hash
-		if s.winningBlockHash != nil {
-			queuedMessages := s.queue.GetMessages(s.round, s.step)
-			if queuedMessages != nil {
-				for _, message := range queuedMessages {
-					s.handleMessage(message)
-				}
-			}
-		}
+	// First, wait to initialise
+	if err := s.initialise(); err != nil {
+		// Log
+		return
+	}
 
+	for {
 		select {
 		case <-s.quitChannel:
 			s.eventBus.Unsubscribe(string(topics.SigSet), s.sigSetID)
@@ -119,7 +123,7 @@ func (s *SetSelector) Listen() {
 			s.collecting = false
 
 			buffer := bytes.NewBuffer(result)
-			s.eventBus.Publish("outgoing", buffer)
+			s.eventBus.Publish(msg.SelectionResultTopic, buffer)
 
 			s.step++
 			if err := s.setVotingCommittee(); err != nil {
@@ -141,24 +145,25 @@ func (s *SetSelector) Listen() {
 				break
 			}
 
-			// If the SetSelector was just initialised, we start off from the
-			// round and step of the first sigset message we receive.
-			if s.round == 0 && s.step == 0 {
-				if err := s.initialise(message); err != nil {
-					// Log
-					return
+			s.handleMessage(message)
+		default:
+			if s.winningBlockHash != nil {
+				queuedMessages := s.queue.GetMessages(s.round, s.step)
+				if queuedMessages != nil {
+					for _, message := range queuedMessages {
+						s.handleMessage(message)
+					}
 				}
 			}
-
-			s.handleMessage(message)
 		}
 	}
 }
 
-// TODO: find a better way to do this
-func (s *SetSelector) initialise(message *sigSetMessage) error {
-	s.round = message.Round
-	s.step = message.Step
+func (s *SetSelector) initialise() error {
+	roundBuffer := <-s.initializationChannel
+	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
+	s.round = round
+	s.step = 1
 	return s.setVotingCommittee()
 }
 
