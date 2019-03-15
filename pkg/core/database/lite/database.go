@@ -65,9 +65,10 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 	}
 
 	// Create a transaction associated with the database.
-	t := Tx{writable: writable, db: &db}
+	// DISABLED
+	// t := Tx{writable: writable, db: &db}
 
-	return t, nil
+	return nil, nil
 }
 
 // Update provides an execution of managed, read-write Tx

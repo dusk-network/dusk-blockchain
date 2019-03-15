@@ -17,19 +17,20 @@ type Driver interface {
 	Name() string
 }
 
-type Round = uint64
-
 // Tx represents transaction layer.
 // A Database driver must provide a robust implementation of each method
 // This is what is exposed/visible to all upper layers so changes here
 // should be carefully considered
+//
+// Tx should provide basic transactions to fetch and store.
+// High-level transactions are supposed to be implemented by the Consumer
 type Tx interface {
 
 	// Read-write Transactions
 	FetchBlockHeader(hash []byte) (*block.Header, error)
 	FetchBlockTransactions(hash []byte) ([]merkletree.Payload, error)
-	// TODO: FetchBlockHeaderByRound(number Round) (*block.Header, error)
-	FetchBlockExists(header *block.Header) (bool, error)
+	FetchBlockHashByHeight(height uint64) ([]byte, error)
+	FetchBlockExists(hash []byte) (bool, error)
 	// TODO: FetchLatestBlockHeader() (*block.Header, error)
 
 	// Store prefixed methods should garentee the

@@ -66,12 +66,12 @@ func (t Tx) FetchBlockTransactions(hash []byte) ([]merkletree.Payload, error) {
 	return nil, nil
 }
 
-// TODO: FetchBlockHeaderByRound(number Round) (*block.Header, error)
+// FetchBlockHeaderByRound not implemented
 func (t Tx) FetchBlockExists(header *block.Header) (bool, error) {
 	return false, nil
 }
 
-// Store prefixed methods should garentee the
+// StoreBlock not implemented
 func (t Tx) StoreBlock(block *block.Block) error {
 	return nil
 }

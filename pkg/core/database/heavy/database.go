@@ -1,12 +1,10 @@
 package heavy
 
 import (
-	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"os"
-	"time"
 )
 
 var (
@@ -71,6 +69,7 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 		return nil, errors.New("Database is not open")
 	}
 
+	// Snapshot to be released on Tx.Close
 	snapshot, err := db.storage.GetSnapshot()
 
 	if err != nil {
@@ -78,7 +77,11 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 	}
 
 	// Create a transaction instance.
-	batch := new(leveldb.Batch)
+	var batch *leveldb.Batch = nil
+	if writable {
+		batch = new(leveldb.Batch)
+	}
+
 	t := &Tx{writable: writable,
 		db:       &db,
 		snapshot: snapshot,
@@ -90,7 +93,8 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 
 // Update provides an execution of managed, read-write Tx
 func (db DB) Update(fn func(database.Tx) error) error {
-	start := time.Now()
+
+	// Create a writable tx for atomic update
 	t, err := db.Begin(true)
 
 	if err != nil {
@@ -102,12 +106,10 @@ func (db DB) Update(fn func(database.Tx) error) error {
 	// If an error is returned from the function then rollback and return error.
 	err = fn(t)
 
-	// TODO: Move this to Tx Commit
-	duration := time.Since(start)
-	log.WithField("prefix", "database").Debugf("Transaction duration %d", duration.Nanoseconds())
+	// Handing panic event to rollback tx is not needed.
+	// If we fail at that point, no commit will be applied into backend storage
 
 	if err != nil {
-		// If we fail at the point of building tx, no commit will be applied
 		return err
 	}
 
@@ -116,7 +118,7 @@ func (db DB) Update(fn func(database.Tx) error) error {
 
 // View provides an execution of managed, read-only Tx
 func (db DB) View(fn func(database.Tx) error) error {
-	start := time.Now()
+
 	t, err := db.Begin(false)
 
 	if err != nil {
@@ -127,9 +129,6 @@ func (db DB) View(fn func(database.Tx) error) error {
 
 	// If an error is returned from the function then pass it through.
 	err = fn(t)
-
-	duration := time.Since(start)
-	log.WithField("prefix", "database").Debugf("Transaction duration %d", duration.Nanoseconds())
 
 	return err
 }
