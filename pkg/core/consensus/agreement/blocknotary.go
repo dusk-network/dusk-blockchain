@@ -10,6 +10,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+// CommitteeEvent expresses a vote on a block hash
 type CommitteeEvent struct {
 	VoteSet       []*msg.Vote
 	SignedVoteSet []byte
@@ -20,17 +21,20 @@ type CommitteeEvent struct {
 	validate      func(*bytes.Buffer) error
 }
 
+// Equal as specified in the Event interface
 func (a *CommitteeEvent) Equal(e Event) bool {
 	other, ok := e.(*CommitteeEvent)
 	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) && (a.Round == other.Round) && (a.Step == other.Step)
 }
 
+// Create a CommitteeEvent
 func newCommiteeEvent(validate func(*bytes.Buffer) error) *CommitteeEvent {
 	return &CommitteeEvent{
 		validate: validate,
 	}
 }
 
+// Unmarshal unmarshals the buffer into a CommitteeEvent
 func (a *CommitteeEvent) Unmarshal(r *bytes.Buffer) error {
 	if err := a.validate(r); err != nil {
 		return err
@@ -65,6 +69,7 @@ func (a *CommitteeEvent) Unmarshal(r *bytes.Buffer) error {
 	return nil
 }
 
+// CommitteeCollector is a helper that groups common operations performed on Events related to a committee
 type CommitteeCollector struct {
 	StepEventCollector
 	committee    user.Committee
@@ -79,20 +84,18 @@ func (cc *CommitteeCollector) ShouldBeSkipped(m *CommitteeEvent) bool {
 	isPleb := !cc.committee.IsMember(m.PubKeyBLS)
 	//TODO: the round element needs to be reassessed
 	isIrrelevant := cc.currentRound != 0 && cc.currentRound < m.Round
-	err := cc.Verify(m)
+	err := cc.committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
 	failedVerification := err != nil
 	return isDupe || isPleb || isIrrelevant || failedVerification
 }
 
-func (cc *CommitteeCollector) Verify(m *CommitteeEvent) error {
-	return cc.committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
-}
-
+// BlockCollector collects CommitteeEvent. When a Quorum is reached, it propagates the new Block Hash to the proper channel
 type BlockCollector struct {
 	*CommitteeCollector
 	blockChan chan<- *CommitteeEvent
 }
 
+// NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages
 func NewBlockCollector(committee user.Committee, blockChan chan *CommitteeEvent, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
 	cc := &CommitteeCollector{
@@ -106,10 +109,12 @@ func NewBlockCollector(committee user.Committee, blockChan chan *CommitteeEvent,
 	}
 }
 
+// UpdateRound is used to change the current round
 func (c *BlockCollector) UpdateRound(round uint64) {
 	c.currentRound = round
 }
 
+// Collect as specifiec in the EventCollector interface. It dispatches the unmarshalled CommitteeEvent to Process method
 func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
 	ev := newCommiteeEvent(c.validateFunc)
 	if err := c.GetCommitteeEvent(buffer, ev); err != nil {
@@ -122,6 +127,7 @@ func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
 	return nil
 }
 
+// Process checks if the quorum is reached and if it isn't simply stores the Event in the proper step
 func (c *BlockCollector) Process(event *CommitteeEvent) {
 	nrAgreements := c.Store(event, event.Step)
 	// did we reach the quorum?
@@ -186,10 +192,12 @@ func (b *BlockNotary) Listen() {
 	}
 }
 
+// RoundCollector is a simple wrapper over a channel to get round notifications
 type RoundCollector struct {
 	roundChan chan uint64
 }
 
+// Collect as specified in the EventCollector interface. In this case Collect simply performs unmarshalling of the round event
 func (r *RoundCollector) Collect(roundBuffer *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 	r.roundChan <- round

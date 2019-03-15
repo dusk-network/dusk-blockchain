@@ -7,29 +7,28 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+// The Event is an Entity that represents the Messages travelling on the EventBus. It would normally present always the same fields. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
 type Event interface {
 	Unmarshal(*bytes.Buffer) error
 	Equal(Event) bool
 }
 
+// EventCollector is the interface for collecting Events. Pretty much processors involves some degree of Event collection (either until a Quorum is reached or until a Timeout). This Interface is typically implemented by a struct that will perform some Event unmarshalling.
 type EventCollector interface {
 	Collect(*bytes.Buffer) error
 }
 
-type CommitteeEventCollector interface {
-	Contains(*CommitteeEvent) bool
-}
-
-// StepEventCollector is an helper for common operations on stored events
+// StepEventCollector is an helper for common operations on stored Event Arrays
 type StepEventCollector map[uint8][]Event
 
+// Clear up the Collector
 func (sec StepEventCollector) Clear() {
 	for key := range sec {
 		delete(sec, key)
 	}
 }
 
-// IsDuplicate checks if we already collected this event
+// Contains checks if we already collected this event
 func (sec StepEventCollector) Contains(event Event, step uint8) bool {
 	for _, stored := range sec[step] {
 		if event.Equal(stored) {
@@ -40,6 +39,7 @@ func (sec StepEventCollector) Contains(event Event, step uint8) bool {
 	return false
 }
 
+// Store the Event keeping track of the step it belongs to
 func (sec StepEventCollector) Store(event Event, step uint8) int {
 	eventList := sec[step]
 	if eventList == nil {
@@ -57,6 +57,7 @@ func (sec StepEventCollector) GetCommitteeEvent(buffer *bytes.Buffer, event Even
 	return event.Unmarshal(buffer)
 }
 
+// EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events
 type EventSubscriber struct {
 	eventBus       *wire.EventBus
 	eventCollector EventCollector
@@ -67,6 +68,7 @@ type EventSubscriber struct {
 	topic          string
 }
 
+// NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus. The EventBus, EventCollector and Topic are injected
 func NewEventSubscriber(eventBus *wire.EventBus, collector EventCollector, topic string) *EventSubscriber {
 
 	quitChan := make(chan *bytes.Buffer, 1)
@@ -86,6 +88,7 @@ func NewEventSubscriber(eventBus *wire.EventBus, collector EventCollector, topic
 	}
 }
 
+// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect
 func (n *EventSubscriber) Accept() {
 	for {
 		select {
