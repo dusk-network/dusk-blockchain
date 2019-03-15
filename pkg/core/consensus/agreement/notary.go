@@ -10,21 +10,16 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-type CommitteeEvent interface {
-	Equal(CommitteeEvent) bool
-	BelongsToCommittee(user.Committee) bool
-}
-
 type CommitteeEventDecoder interface {
-	Decode(bytes.Buffer) (CommitteeEvent, error)
+	Decode(bytes.Buffer) (*CommitteeEvent, error)
 }
 
 type CommitteeEventCollector interface {
-	Contains(CommitteeEvent) bool
-	Collect(CommitteeEvent) error
+	Contains(*CommitteeEvent) bool
+	Collect(*CommitteeEvent) error
 }
 
-type AgreementMessage struct {
+type CommitteeEvent struct {
 	VoteSet       []*msg.Vote
 	SignedVoteSet []byte
 	PubKeyBLS     []byte
@@ -33,16 +28,11 @@ type AgreementMessage struct {
 	BlockHash     []byte
 }
 
-func (a *AgreementMessage) BelongsToCommittee(committee user.Committee) bool {
+func (a *CommitteeEvent) BelongsToCommittee(committee user.Committee) bool {
 	return committee.IsMember(a.PubKeyBLS)
 }
 
-func (a *AgreementMessage) Equal(e CommitteeEvent) bool {
-	other, ok := e.(*AgreementMessage)
-	if !ok {
-		return false
-	}
-
+func (a *CommitteeEvent) Equal(other *CommitteeEvent) bool {
 	return (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) && (a.Round == other.Round) && (a.Step == other.Step)
 }
 
@@ -56,7 +46,7 @@ func newAgreementEventDecoder(validate func(*bytes.Buffer) error) *agreementDeco
 	}
 }
 
-func (ad *agreementDecoder) Decode(r bytes.Buffer) (CommitteeEvent, error) {
+func (ad *agreementDecoder) Decode(r bytes.Buffer) (*CommitteeEvent, error) {
 	if err := ad.validate(&r); err != nil {
 		return nil, err
 	}
@@ -91,7 +81,7 @@ func (ad *agreementDecoder) Decode(r bytes.Buffer) (CommitteeEvent, error) {
 		return nil, err
 	}
 
-	decoded := &AgreementMessage{
+	decoded := &CommitteeEvent{
 		VoteSet:       voteSet,
 		SignedVoteSet: signedVoteSet,
 		PubKeyBLS:     pubKeyBLS,
@@ -104,7 +94,7 @@ func (ad *agreementDecoder) Decode(r bytes.Buffer) (CommitteeEvent, error) {
 }
 
 // StepEventCollector is an helper for common operations on stored events
-type StepEventCollector map[uint8][]CommitteeEvent
+type StepEventCollector map[uint8][]*CommitteeEvent
 
 func newStepEventCollector() *StepEventCollector {
 	return &StepEventCollector{}
@@ -117,8 +107,8 @@ func (sec StepEventCollector) Clear() {
 }
 
 // IsDuplicate checks if we already collected this event
-func (sec StepEventCollector) IsDuplicate(event CommitteeEvent, step uint8) bool {
-	for _, stored := range sec[step] {
+func (sec StepEventCollector) Contains(event *CommitteeEvent) bool {
+	for _, stored := range sec[event.Step] {
 		if event.Equal(stored) {
 			return true
 		}
@@ -127,16 +117,16 @@ func (sec StepEventCollector) IsDuplicate(event CommitteeEvent, step uint8) bool
 	return false
 }
 
-func (sec StepEventCollector) Store(event CommitteeEvent, step uint8) int {
-	eventList := sec[step]
+func (sec StepEventCollector) Store(event *CommitteeEvent) int {
+	eventList := sec[event.Step]
 	if eventList == nil {
 		// TODO: should this have the Quorum as limit
-		eventList = make([]CommitteeEvent, 100)
+		eventList = make([]*CommitteeEvent, 100)
 	}
 
 	// storing the agreement vote for the proper step
 	eventList = append(eventList, event)
-	sec[step] = eventList
+	sec[event.Step] = eventList
 	return len(eventList)
 }
 

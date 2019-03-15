@@ -13,10 +13,10 @@ type AgreementEventCollector struct {
 	StepEventCollector
 	committee    user.Committee
 	currentRound uint64
-	resultChan   chan<- *AgreementMessage
+	resultChan   chan<- *CommitteeEvent
 }
 
-func NewAgreementEventCollector(committee user.Committee, resultChan chan *AgreementMessage) *AgreementEventCollector {
+func NewAgreementEventCollector(committee user.Committee, resultChan chan *CommitteeEvent) *AgreementEventCollector {
 	return &AgreementEventCollector{
 		currentRound: 0,
 		resultChan:   resultChan,
@@ -24,23 +24,13 @@ func NewAgreementEventCollector(committee user.Committee, resultChan chan *Agree
 	}
 }
 
-func (c *AgreementEventCollector) Contains(event CommitteeEvent) bool {
-	agreementMsg, ok := event.(*AgreementMessage)
-	if !ok {
-		return false
-	}
-
-	return c.IsDuplicate(agreementMsg, agreementMsg.Step)
-}
-
-func (c *AgreementEventCollector) Collect(event CommitteeEvent) error {
-	agreementMsg := event.(*AgreementMessage)
-	if !c.shouldBeSkipped(agreementMsg) {
-		nrAgreements := c.Store(agreementMsg, agreementMsg.Step)
+func (c *AgreementEventCollector) Collect(event *CommitteeEvent) error {
+	if !c.shouldBeSkipped(event) {
+		nrAgreements := c.Store(event)
 		// did we reach the quorum?
 		if nrAgreements >= c.committee.Quorum() {
 			// notify the Notary
-			go func() { c.resultChan <- agreementMsg }()
+			go func() { c.resultChan <- event }()
 			c.Clear()
 		}
 	}
@@ -53,7 +43,7 @@ func (c *AgreementEventCollector) UpdateRound(round uint64) {
 
 // ShouldBeSkipped checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
 // NOTE: currentRound is handled by some other process, so it is not this component's responsibility to handle corner cases (for example being on an obsolete round because of a disconnect, etc)
-func (c *AgreementEventCollector) shouldBeSkipped(m *AgreementMessage) bool {
+func (c *AgreementEventCollector) shouldBeSkipped(m *CommitteeEvent) bool {
 	isDupe := c.Contains(m)
 	isPleb := !m.BelongsToCommittee(c.committee)
 	isIrrelevant := c.currentRound != m.Round
@@ -62,7 +52,7 @@ func (c *AgreementEventCollector) shouldBeSkipped(m *AgreementMessage) bool {
 	return isDupe || isPleb || isIrrelevant || failedVerification
 }
 
-func (c *AgreementEventCollector) verify(m *AgreementMessage) error {
+func (c *AgreementEventCollector) verify(m *CommitteeEvent) error {
 	return c.committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
 }
 
@@ -72,7 +62,7 @@ type BlockNotary struct {
 	agreementMsgSubscriber *EventCommitteeSubscriber
 	collector              *AgreementEventCollector
 	roundMsgSubscriber     *EventSubscriber
-	aggrChan               <-chan *AgreementMessage
+	aggrChan               <-chan *CommitteeEvent
 	roundChan              chan *bytes.Buffer
 }
 
@@ -81,7 +71,7 @@ func NewBlockNotary(eventBus *wire.EventBus,
 	validateFunc func(*bytes.Buffer) error,
 	committee *user.CommitteeStore) *BlockNotary {
 
-	aggrChan := make(chan *AgreementMessage, 1)
+	aggrChan := make(chan *CommitteeEvent, 1)
 	roundChan := make(chan *bytes.Buffer, 1)
 
 	collector := NewAgreementEventCollector(committee, aggrChan)
