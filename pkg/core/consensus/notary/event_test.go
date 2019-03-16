@@ -15,12 +15,13 @@ type MockCollector struct{ f func(*bytes.Buffer) error }
 func (m *MockCollector) Collect(b *bytes.Buffer) error { return m.f(b) }
 
 func TestSubscriber(t *testing.T) {
+	resultChan := make(chan *bytes.Buffer)
 	bus := wire.New()
 	tbytes, _ := crypto.RandEntropy(32)
 	tbuf := bytes.NewBuffer(tbytes)
 	collector := &MockCollector{
 		func(b *bytes.Buffer) error {
-			require.Equal(t, tbuf, t)
+			resultChan <- b
 			return nil
 		},
 	}
@@ -29,5 +30,6 @@ func TestSubscriber(t *testing.T) {
 	go sub.Accept()
 
 	bus.Publish("pippo", tbuf)
-
+	res := <-resultChan
+	require.Equal(t, res, tbuf)
 }
