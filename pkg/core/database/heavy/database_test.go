@@ -278,8 +278,8 @@ func TestReadOnlyTx(t *testing.T) {
 	}
 
 	defer func() {
-		defer db.Close()
-		defer os.RemoveAll(db.path)
+		db.Close()
+		os.RemoveAll(db.path)
 	}()
 
 	snapshotBefore, _ := db.storage.GetSnapshot()
