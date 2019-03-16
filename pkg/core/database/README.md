@@ -22,6 +22,8 @@ Interfaces exposed to upper layers:
 
 ### Code example:
 
+More code examples can be found in `/database/heavy/database_test.go`
+
 ```
 
 // By changing Driver name, one can switch between different backends
@@ -32,24 +34,49 @@ readonly := false
 driver, _ := database.From(lite.DriverName)
 db, err := driver.Open(path, protocol.DevNet, readonly)
 
-h := &block.Header{}
-// Populate h
+if err != nil {
+	...
+}
 
-// a managed read-write DB Tx
+defer db.Close()
+
+blocks := make([]*block.Block, 100)
+// Populate blocks here ...
+
+// a managed read-write DB Tx to store all blocks via atomic update
 err = db.Update(func(tx database.Tx) error {
-	err := tx.WriteHeader(h)
-	return err
+	for _, block := range blocks {
+		err := tx.StoreBlock(block)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 })
 
-// a managed read-only DB Tx
-retrievedHeight := 0
-err = db.View(func(tx database.Tx) error {
-	header, err := tx.GetBlockHeaderByHash(h.Hash)
-	retrievedHeight = header.Height
-	return err
+if err != nil {
+	fmt.Printf("Transaction failed. No blocks stored")
+	return
+}
+
+ // a managed read-only DB Tx to check if all blocks have been stored
+_ = db.View(func(tx database.Tx) error {
+	for _, block := range blocks {
+		exists, err := tx.FetchBlockExists(block.Header.Hash)
+		if err != nil {
+			fmt.Printf(err.Error())
+			return nil
+		}
+
+		if !exists {
+			fmt.Printf("Block with Height %d was not found", block.Header.Height)
+			return nil
+		}
+	}
+	return nil
 })
 
-db.Close()
+
 
 ```
 
