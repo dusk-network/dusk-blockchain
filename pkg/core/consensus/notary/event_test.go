@@ -68,9 +68,7 @@ func (me *MockEvent) Equal(ev n.Event) bool {
 	return reflect.DeepEqual(me, ev)
 }
 
-func (me *MockEvent) Unmarshal(b *bytes.Buffer) error {
-	return nil
-}
+func (me *MockEvent) Unmarshal(b *bytes.Buffer) error { return nil }
 
 func TestSECOperations(t *testing.T) {
 	sec := &n.StepEventCollector{}

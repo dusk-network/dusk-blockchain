@@ -92,15 +92,16 @@ func (cc *CommitteeCollector) ShouldBeSkipped(m *CommitteeEvent) bool {
 // BlockCollector collects CommitteeEvent. When a Quorum is reached, it propagates the new Block Hash to the proper channel
 type BlockCollector struct {
 	*CommitteeCollector
-	blockChan chan<- *CommitteeEvent
+	blockChan chan<- []byte
 }
 
 // NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages
-func NewBlockCollector(committee user.Committee, blockChan chan *CommitteeEvent, validateFunc func(*bytes.Buffer) error) *BlockCollector {
+func NewBlockCollector(committee user.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
 	cc := &CommitteeCollector{
-		committee:    committee,
-		validateFunc: validateFunc,
+		StepEventCollector: make(map[uint8][]Event),
+		committee:          committee,
+		validateFunc:       validateFunc,
 	}
 
 	return &BlockCollector{
@@ -133,7 +134,7 @@ func (c *BlockCollector) Process(event *CommitteeEvent) {
 	// did we reach the quorum?
 	if nrAgreements >= c.committee.Quorum() {
 		// notify the Notary
-		go func() { c.blockChan <- event }()
+		go func() { c.blockChan <- event.BlockHash }()
 		c.Clear()
 	}
 }
@@ -143,7 +144,7 @@ type BlockNotary struct {
 	eventBus        *wire.EventBus
 	blockSubscriber *EventSubscriber
 	roundSubscriber *EventSubscriber
-	blockChan       <-chan *CommitteeEvent
+	blockChan       <-chan []byte
 	roundChan       <-chan uint64
 	blockCollector  *BlockCollector
 }
@@ -153,7 +154,7 @@ func NewBlockNotary(eventBus *wire.EventBus,
 	validateFunc func(*bytes.Buffer) error,
 	committee *user.CommitteeStore) *BlockNotary {
 
-	blockChan := make(chan *CommitteeEvent, 1)
+	blockChan := make(chan []byte, 1)
 	roundChan := make(chan uint64, 1)
 
 	blockCollector := NewBlockCollector(committee, blockChan, validateFunc)
@@ -183,8 +184,8 @@ func (b *BlockNotary) Listen() {
 	go b.roundSubscriber.Accept()
 	for {
 		select {
-		case message := <-b.blockChan:
-			buffer := bytes.NewBuffer(message.BlockHash)
+		case blockHash := <-b.blockChan:
+			buffer := bytes.NewBuffer(blockHash)
 			b.eventBus.Publish(msg.PhaseUpdateTopic, buffer)
 		case round := <-b.roundChan:
 			b.blockCollector.UpdateRound(round)

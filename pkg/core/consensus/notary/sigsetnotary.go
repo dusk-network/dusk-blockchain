@@ -53,8 +53,9 @@ type SigSetCollector struct {
 func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validateFunc func(*bytes.Buffer) error) *SigSetCollector {
 
 	cc := &CommitteeCollector{
-		committee:    committee,
-		validateFunc: validateFunc,
+		StepEventCollector: make(map[uint8][]Event),
+		committee:          committee,
+		validateFunc:       validateFunc,
 	}
 	return &SigSetCollector{
 		CommitteeCollector: cc,
