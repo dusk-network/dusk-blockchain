@@ -47,7 +47,7 @@ func (sec StepEventCollector) Store(event Event, step uint8) int {
 	}
 
 	if eventList == nil {
-		eventList = make([]Event, 0)
+		eventList = make([]Event, 0, 100)
 	}
 
 	// storing the agreement vote for the proper step

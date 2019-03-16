@@ -91,7 +91,7 @@ func (s *SigSetCollector) Process(event *SigSetEvent) {
 		if event.Round > s.currentRound {
 			events := s.futureRounds[event.Round]
 			if events == nil {
-				events = make([]*SigSetEvent, s.committee.Quorum())
+				events = make([]*SigSetEvent, 0, s.committee.Quorum())
 			}
 			events = append(events, event)
 			s.futureRounds[event.Round] = events
