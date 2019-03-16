@@ -1,4 +1,4 @@
-package agreement
+package notary
 
 import (
 	"bytes"
@@ -51,10 +51,6 @@ func (sec StepEventCollector) Store(event Event, step uint8) int {
 	eventList = append(eventList, event)
 	sec[step] = eventList
 	return len(eventList)
-}
-
-func (sec StepEventCollector) GetCommitteeEvent(buffer *bytes.Buffer, event Event) error {
-	return event.Unmarshal(buffer)
 }
 
 // EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events

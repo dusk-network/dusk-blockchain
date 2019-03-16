@@ -1,4 +1,4 @@
-package agreement
+package notary
 
 import (
 	"bytes"
@@ -66,7 +66,7 @@ func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validat
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
 func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
 	ev := newSigSetEvent(s.validateFunc)
-	if err := s.GetCommitteeEvent(buffer, ev); err != nil {
+	if err := ev.Unmarshal(buffer); err != nil {
 		return err
 	}
 

@@ -1,4 +1,4 @@
-package agreement
+package notary
 
 import (
 	"bytes"
@@ -117,7 +117,7 @@ func (c *BlockCollector) UpdateRound(round uint64) {
 // Collect as specifiec in the EventCollector interface. It dispatches the unmarshalled CommitteeEvent to Process method
 func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
 	ev := newCommiteeEvent(c.validateFunc)
-	if err := c.GetCommitteeEvent(buffer, ev); err != nil {
+	if err := ev.Unmarshal(buffer); err != nil {
 		return err
 	}
 
