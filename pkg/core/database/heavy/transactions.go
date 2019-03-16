@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	// Atomic updates enabled/disabled
+	// Atomic updates enabled/disabled. Could be false only on testing specific
+	// cases
 	atomicUpdateEnabled = true
 
 	// Explicitly show we don't want fsync on each batch write
 	fsyncEnabled = false
 
-	// TODO: NoWriteMerge is needed?
 	optionNoWriteMerge = false
 )
 
@@ -37,8 +37,6 @@ var (
 	HEIGHT_PREFIX = []byte{0x33}
 )
 
-// A writable transaction would Put/Delete into leveldb.Batch only
-// to achieve atomicity on changing blockchain state
 type Tx struct {
 	writable bool
 	db       *DB
@@ -46,24 +44,16 @@ type Tx struct {
 	// Get/Has/Iterate calls must be applied into the snapshot only
 	snapshot *leveldb.Snapshot
 
-	// Put/Delete calls must be applied into the batch only
-	// Tx does implement atomicity by batch levelDB.
-	// Batch is constructed during the Tx but committed only on Tx completion
-	// See also (t *Tx) Commit()
-	// TODO: Safe in concurrent execution?
-	//		Can we have safely multiple batches open at the same time
-	//
+	// Put/Delete calls must be applied into this batch only. Tx does implement
+	// atomicity by a levelDB.Batch constructed during the Tx.
 	batch  *leveldb.Batch
 	closed bool
 }
 
-// TODO:  tests
-// Store the entire block data into storage. No validations are applied.
-// Method simply stores the block data into Tx Batch via atomic update
-//
-// Storage state change is held only when Commit() is called on Tx completion
-// Block.Header.Hash -> Encoded(Block.Header.Fields)
-// TX + block.Header.Hash +
+// Store the entire block data into storage. No validations are applied. Method
+// simply stores the block data into a LevelDB batch. Storage state changes only
+// when Commit() is called on Tx completion See also the method body to get an
+// idea of Key-Value data schemas
 func (t Tx) StoreBlock(block *block.Block) error {
 
 	if atomicUpdateEnabled {
@@ -72,14 +62,9 @@ func (t Tx) StoreBlock(block *block.Block) error {
 		}
 	}
 
-	// TODO: Do we need to Check HasBlock( blockHeaderFields )
+	// Schema Key = header_prefix + block.header.hash Value =
+	// encoded(block.fields)
 
-	// Key-Value Schema:
-	//
-	// KEY = HEADER_PREFIX + Block.Header.Hash
-	// VALUE = Encoded( Block.Fields )
-
-	// Block.Header.Hash -> Block.Header.Fields()
 	blockHeaderFields := new(bytes.Buffer)
 	if err := block.Header.Encode(blockHeaderFields); err != nil {
 		return err
@@ -89,18 +74,18 @@ func (t Tx) StoreBlock(block *block.Block) error {
 	value := blockHeaderFields.Bytes()
 	t.Put(key, value)
 
-	// Put block transaction data.
-	// A KV pair per a single transaction is added into the store
+	// Put block transaction data. A KV pair per a single transaction is added
+	// into the store
 	for index, v := range block.Txs {
 
 		tx := v.(*transactions.Stealth)
 
-		// Key-Value Schema:
+		// Schema
 		//
-		// KEY = TX_PREFIX + Block.Header.Hash + Tx.R
-		// VALUE = Encoded(index) + Encoded( Block.Transaction[index] )
+		// Key = tx_prefix + block.header.hash + Tx.R Value = Encoded(index) +
+		// Encoded(block.transaction[index])
 		//
-		// For the retrival of transactions data by Header.Hash
+		// For the retrival of transactions data by block.header.hash
 
 		key := append(TX_PREFIX, block.Header.Hash...)
 		key = append(key, tx.R...)
@@ -113,9 +98,8 @@ func (t Tx) StoreBlock(block *block.Block) error {
 		t.Put(key, value)
 	}
 
-	// Key-Value Schema:
-	// KEY = HEIGHT_PREFIX + Block.Header.Height
-	// VALUE = Block.Header.Hash
+	// Schema Key = height_prefix + block.header.height Value =
+	// block.header.hash
 	//
 	// To support fast header lookup by height
 
@@ -133,16 +117,17 @@ func (t Tx) StoreBlock(block *block.Block) error {
 	return nil
 }
 
-// encodeBlockTx Returns Tx Bytes prefixed with Tx Index value
+// encodeBlockTx tries to serialize index and bytes of *transactions.Stealth
 func (t Tx) encodeBlockTx(tx *transactions.Stealth, index uint32) ([]byte, error) {
 
 	buf := new(bytes.Buffer)
 
-	// Append index value
+	// Write index value
 	if err := t.writeUint32(buf, index); err != nil {
 		return nil, err
 	}
 
+	// Write transactions.Stealth bytes
 	err := tx.Encode(buf)
 	if err != nil {
 		return nil, err
@@ -151,12 +136,12 @@ func (t Tx) encodeBlockTx(tx *transactions.Stealth, index uint32) ([]byte, error
 	return buf.Bytes(), nil
 }
 
-// encodeBlockTx Returns Tx Bytes prefixed with Tx Index value
+// decodeBlockTx tries to deserialize index and bytes of a transaction.Stealth
 func (t Tx) decodeBlockTx(data []byte) (*transactions.Stealth, uint32, error) {
 
 	buf := bytes.NewReader(data)
 
-	// Append index value
+	// Read index value
 	var index uint32
 	if err := t.readUint32(buf, &index); err != nil {
 		return nil, 0, err
@@ -170,7 +155,7 @@ func (t Tx) decodeBlockTx(data []byte) (*transactions.Stealth, uint32, error) {
 	return tx, index, nil
 }
 
-// writeUint32 Tx utility to use a common byteOrder on internal encoding
+// writeUint32 Tx utility to use a Tx byteOrder on internal encoding
 func (t Tx) writeUint32(w io.Writer, value uint32) error {
 	var b [4]byte
 	byteOrder.PutUint32(b[:], value)
@@ -178,8 +163,8 @@ func (t Tx) writeUint32(w io.Writer, value uint32) error {
 	return err
 }
 
-// ReadUint32 will read four bytes and convert them to a uint32
-// from the specified byte order. The result is put into v.
+// ReadUint32 will read four bytes and convert them to a uint32 from the Tx
+// byteOrder. The result is put into v.
 func (t Tx) readUint32(r io.Reader, v *uint32) error {
 	var b [4]byte
 	n, err := r.Read(b[:])
@@ -198,8 +183,7 @@ func (t Tx) writeUint64(w io.Writer, value uint64) error {
 	return err
 }
 
-// Commit writes a batch to LevelDB storage.
-// See also fsyncEnabled variable
+// Commit writes a batch to LevelDB storage. See also fsyncEnabled variable
 func (t *Tx) Commit() error {
 	if !t.writable {
 		return errors.New("read-only transaction cannot commit changes")
@@ -212,21 +196,20 @@ func (t *Tx) Commit() error {
 	return t.db.storage.Write(t.batch, writeOptions)
 }
 
+// Rollback is not used by database layer
 func (t Tx) Rollback() error {
-	// Achieved already by deprecating the leveldb.Batch
 	t.batch.Reset()
 	return nil
 }
 
-// Close Releases the retrieved snapshot. Do not forget it when
-// unmanaged Tx is used
+// Close Releases the retrieved snapshot. Do not forget it when unmanaged Tx is
+// used
 func (t *Tx) Close() {
 	t.snapshot.Release()
 	t.closed = true
 }
 
 func (t Tx) FetchBlockExists(hash []byte) (bool, error) {
-	// TODO: Do we need special readOptions here
 	key := append(HEADER_PREFIX, hash...)
 	result, err := t.snapshot.Has(key, nil)
 	return result, err
@@ -260,7 +243,6 @@ func (t Tx) FetchBlockTransactions(hashHeader []byte) ([]merkletree.Payload, err
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
 	defer iterator.Release()
 
-	var txCount uint32
 	for iterator.Next() {
 		value := iterator.Value()
 		tx, index, err := t.decodeBlockTx(value)
@@ -270,11 +252,10 @@ func (t Tx) FetchBlockTransactions(hashHeader []byte) ([]merkletree.Payload, err
 		}
 
 		tempTxs[index] = tx
-		txCount++
 	}
 
 	// Reorder Tx slice as per retrieved indeces
-	resultTxs := make([]merkletree.Payload, txCount)
+	resultTxs := make([]merkletree.Payload, len(tempTxs))
 	for k, v := range tempTxs {
 		resultTxs[k] = v
 	}
@@ -284,10 +265,8 @@ func (t Tx) FetchBlockTransactions(hashHeader []byte) ([]merkletree.Payload, err
 
 func (t Tx) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 
-	// TODO: duplicated code
+	// Get height bytes
 	heightBuf := new(bytes.Buffer)
-
-	// Append index value
 	if err := t.writeUint64(heightBuf, height); err != nil {
 		return nil, err
 	}

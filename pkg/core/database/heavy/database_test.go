@@ -16,32 +16,31 @@ import (
 
 func TestFetchBlockExists(t *testing.T) {
 
+	// Initialize db and a slice of 30 blocks with 10 transactions.Stealth each
 	db, blocks, err := newTestContext(t, 30, 1)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer db.Close()
-	defer os.RemoveAll(db.path)
 
-	// Store all blocks
-	// read-write Tx
-	err = db.Update(func(tx database.Tx) error {
+	defer func() {
+		db.Close()
+		os.RemoveAll(db.path)
+	}()
+
+	// Store all blocks read-write Tx
+	_ = db.Update(func(tx database.Tx) error {
 		for _, block := range blocks {
 			err := tx.StoreBlock(block)
 			if err != nil {
-				return err
+				t.Fatal(err.Error())
+				return nil
 			}
 		}
 		return nil
 	})
 
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	// Verify all blocks have been stored successfully
-	// read-only Tx
-	err = db.View(func(tx database.Tx) error {
+	// Verify all blocks have been stored successfully read-only Tx
+	_ = db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 			exists, err := tx.FetchBlockExists(block.Header.Hash)
 			if err != nil {
@@ -56,32 +55,29 @@ func TestFetchBlockExists(t *testing.T) {
 		}
 		return nil
 	})
-
-	if err != nil {
-		t.Fatal(err.Error())
-	}
 }
 
 func TestFetchBlockHeader(t *testing.T) {
 
-	// Timeout threshold not to be exceeded when running this test
-	timeoutDuration := time.Duration(10 * time.Second)
+	// Initialize db and a slice of 88 blocks with 10 transactions.Stealth each
 	db, blocks, err := newTestContext(t, 88, 10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer db.Close()
-	defer os.RemoveAll(db.path)
 
-	// Store all blocks
-	err = storeBlocksAsync(t, db, blocks, timeoutDuration)
+	defer func() {
+		db.Close()
+		os.RemoveAll(db.path)
+	}()
+
+	// Try to store all blocks for less than 10 seconds
+	err = storeBlocksAsync(t, db, blocks, time.Duration(10*time.Second))
 
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	// Verify all blocks headers data have been stored successfully
-	// read-only Tx
+	// Verify all blocks headers data have been stored successfully read-only Tx
 	err = db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 			fheader, err := tx.FetchBlockHeader(block.Header.Hash)
@@ -111,29 +107,29 @@ func TestFetchBlockHeader(t *testing.T) {
 
 func TestFetchTransactions(t *testing.T) {
 
-	// Timeout threshold not to be exceeded when running this test
-	// Currently not more than ~0.2s are needed to complete the storing
-	timeoutDuration := time.Duration(10 * time.Second)
+	// Initialize db and a slice of 88 blocks with 10 transactions.Stealth each
 	db, blocks, err := newTestContext(t, 88, 10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer db.Close()
-	defer os.RemoveAll(db.path)
 
-	// Store all blocks
-	err = storeBlocksAsync(t, db, blocks, timeoutDuration)
+	defer func() {
+		db.Close()
+		os.RemoveAll(db.path)
+	}()
+
+	// Try to store all blocks for less than 10 seconds
+	err = storeBlocksAsync(t, db, blocks, time.Duration(10*time.Second))
 
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	// Verify all blocks Txs have been stored successfully
-	// read Tx
+	// Verify all blocks Txs have been stored successfully read Tx
 	err = db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 
-			// Fetch all transactions that belongs to this block
+			// Fetch all transactions that belong to this block
 			fblockTxs, err := tx.FetchBlockTransactions(block.Header.Hash)
 
 			if err != nil {
@@ -173,14 +169,19 @@ func TestFetchTransactions(t *testing.T) {
 
 func TestFetchByHeight(t *testing.T) {
 
+	// Initialize db and a slice of 100 blocks with 1 transactions.Stealth each
 	db, blocks, err := newTestContext(t, 100, 1)
+
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer db.Close()
-	defer os.RemoveAll(db.path)
 
-	// Store all blocks
+	defer func() {
+		db.Close()
+		os.RemoveAll(db.path)
+	}()
+
+	// Store all blocks (no concurrency)
 	err = db.Update(func(tx database.Tx) error {
 		for _, block := range blocks {
 			err := tx.StoreBlock(block)
@@ -201,6 +202,7 @@ func TestFetchByHeight(t *testing.T) {
 			headerHash, err := tx.FetchBlockHashByHeight(uint64(height))
 			if err != nil {
 				t.Fatalf(err.Error())
+				return nil
 			}
 
 			if !bytes.Equal(block.Header.Hash, headerHash) {
@@ -212,23 +214,28 @@ func TestFetchByHeight(t *testing.T) {
 	})
 }
 
-// TestAtomicUpdates ensures no change is applied into storage state when
-// DB writable tx does fail
+// TestAtomicUpdates ensures no change is applied into storage state when DB
+// writable tx does fail
 func TestAtomicUpdates(t *testing.T) {
 
+	// Initialize db and a slice of 10 blocks with 2 transactions.Stealth each
 	blocksCount := 10
 	db, blocks, err := newTestContext(t, blocksCount, 2)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer db.Close()
-	defer os.RemoveAll(db.path)
 
+	defer func() {
+		db.Close()
+		os.RemoveAll(db.path)
+	}()
+
+	// Save current storage state
 	snapshotBefore, _ := db.storage.GetSnapshot()
 	defer snapshotBefore.Release()
 
-	// Try to store all blocks and make it fail at last iteration
-	// read-write Tx
+	// Try to store all blocks and make it fail at last iteration of read-write
+	// Tx
 	forcedError := errors.New("force majeure situation")
 	err = db.Update(func(tx database.Tx) error {
 
@@ -239,9 +246,8 @@ func TestAtomicUpdates(t *testing.T) {
 			}
 
 			if height == blocksCount-1 {
-				// Simulate an exception on storing last block
-				// As a result we expect to see no changes applied
-				// into backend storage state
+				// Simulate an exception on storing last block. As a result we
+				// expect to see no changes applied into backend storage state
 				return forcedError
 			}
 		}
@@ -249,11 +255,11 @@ func TestAtomicUpdates(t *testing.T) {
 	})
 
 	if err != forcedError {
-		t.Fatalf("We expect to see here the so-called ForcedError. Failure is not always a bad thing")
+		t.Fatalf("ForcedError must be returned from previous statement. Failure is not always a bad thing")
 	}
 
-	// Check there are no changes applied into storage state by
-	// simply comparing the leveldb snapshots
+	// Check there are no changes applied into storage state by simply comparing
+	// the leveldb snapshots
 	snapshotAfter, _ := db.storage.GetSnapshot()
 	defer snapshotAfter.Release()
 
@@ -262,21 +268,24 @@ func TestAtomicUpdates(t *testing.T) {
 	}
 }
 
-// TestReadOnlyTx ensures that a read-only DB tx cannot touch the
-// storage state
+// TestReadOnlyTx ensures that a read-only DB tx cannot touch the storage state
 func TestReadOnlyTx(t *testing.T) {
 
+	// Initialize db and a slice of 3 blocks with 1 transactions.Stealth each
 	db, blocks, err := newTestContext(t, 3, 1)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer db.Close()
-	defer os.RemoveAll(db.path)
+
+	defer func() {
+		defer db.Close()
+		defer os.RemoveAll(db.path)
+	}()
 
 	snapshotBefore, _ := db.storage.GetSnapshot()
 	defer snapshotBefore.Release()
 
-	// Try to call StoreBlock when on read-only DB Tx
+	// Try to call StoreBlock on a read-only DB Tx
 	err = db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 			err := tx.StoreBlock(block)
@@ -288,11 +297,11 @@ func TestReadOnlyTx(t *testing.T) {
 	})
 
 	if err == nil {
-		t.Fatal("StoreBlock should not be allowed on read-only DB Tx")
+		t.Fatal("Any writable Tx must not be allowed on read-only DB Tx")
 	}
 
-	// Check there are no changes applied into storage state by
-	// simply comparing the leveldb snapshots
+	// Check there are no changes applied into storage state by simply comparing
+	// the leveldb snapshots
 	snapshotAfter, _ := db.storage.GetSnapshot()
 	defer snapshotAfter.Release()
 
@@ -303,14 +312,14 @@ func TestReadOnlyTx(t *testing.T) {
 
 // Helper functions used above
 
-// helperStoreBlocksAsync is a helper function to store a set of blocks in a concurrent manner
-// Make a DB transaction with a few StoreBlock calls
+// storeBlocksAsync is a helper function to store a slice of blocks in a
+// concurrent manner.
 func storeBlocksAsync(t *testing.T, db *DB, blocks []*block.Block, timeoutDuration time.Duration) error {
 
 	batchBlocksCount := 10
 	blocksCount := len(blocks)
 	var wg sync.WaitGroup
-	// For each slice of N blocks built a batch to be performed concurrently
+	// For each slice of N blocks build a batch to be performed concurrently
 	for batchIndex := 0; batchIndex <= blocksCount/batchBlocksCount; batchIndex++ {
 
 		// get a slice of all blocks
@@ -322,7 +331,8 @@ func storeBlocksAsync(t *testing.T, db *DB, blocks []*block.Block, timeoutDurati
 			to = blocksCount
 		}
 
-		// Start a separate unit to perform a DB tx with multiple StoreBlock calls
+		// Start a separate unit to perform a DB tx with multiple StoreBlock
+		// calls
 		wg.Add(1)
 		go func(blocks []*block.Block, wg *sync.WaitGroup) {
 
@@ -346,17 +356,16 @@ func storeBlocksAsync(t *testing.T, db *DB, blocks []*block.Block, timeoutDurati
 	timeouted := waitTimeout(&wg, timeoutDuration)
 
 	if timeouted {
-		// Also it might be due to too many
+		// Also it might be due to too slow write call
 		return errors.New("Seems like we've got a deadlock situation on storing blocks in concurrent way")
 	}
 
 	return nil
 }
 
-// newTestContext must guarantee that each test run is based on
-// brand new (isolated) DB and a slice of block.Block and no collisions can happen between tests
-//
-// TODO: A TestContext struct can encapsulate db.Close and dbPath deletion
+// newTestContext must guarantee that each test-run is based on brand new
+// (isolated) DB and a slice of block.Block. No collisions can happen between
+// tests
 func newTestContext(t *testing.T, blocksCount int, txsCount int) (*DB, []*block.Block, error) {
 
 	if t != nil {

@@ -12,8 +12,6 @@ var (
 )
 
 // DB on top of underlying storage syndtr/goleveldb/leveldb
-// Note that this repo seems to be unofficial LevelDB porting to golang
-// (not built by LevelDB Authors)
 type DB struct {
 	storage *leveldb.DB
 	path    string
@@ -31,7 +29,6 @@ func NewDatabase(path string, readonly bool) (*DB, error) {
 	}
 
 	// Open Dusk blockchain db or create (if it not alresdy exists)
-	// TODO: Support read-only LevelDB option
 	storage, err := leveldb.OpenFile(path, nil)
 
 	// Try to recover if corrupted
@@ -48,21 +45,23 @@ func NewDatabase(path string, readonly bool) (*DB, error) {
 	return &DB{storage, path, readonly}, nil
 }
 
-// Begin builds (read-only or read-write) Tx, do initial validations
+// Begin builds read-only or read-write Tx
 func (db DB) Begin(writable bool) (database.Tx, error) {
 	// If the database was opened with Options.ReadOnly, return an error.
 	if db.readOnly && writable {
 		return nil, errors.New("Database is read-only")
 	}
 
-	// In case of writable Tx, it's now the time to obtain writer lock.
-	// This is not necessary in case of LevelDB store due its concurrency Control as
+	// In case of writable Tx, it's now the time to obtain writer lock. This is
+	// not necessary in case of LevelDB store due its concurrency Control as
 	// describe below
 
-	// A database may only be opened by one process at a time.
-	// The leveldb implementation acquires a lock from the operating system to prevent misuse.
-	// Within a single process, the same leveldb::DB object may be safely shared by multiple concurrent threads.
-	// I.e., different threads may write into or fetch iterators or call Get on the same database without any external synchronization
+	// A database may only be opened by one process at a time. The leveldb
+	// implementation acquires a lock from the operating system to prevent
+	// misuse. Within a single process, the same leveldb::DB object may be
+	// safely shared by multiple concurrent threads. I.e., different threads may
+	// write into or fetch iterators or call Get on the same database without
+	// any external synchronization
 
 	// Exit if the database is not open yet.
 	if !db.isOpen() {
@@ -76,12 +75,14 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 		return nil, err
 	}
 
-	// Create a transaction instance.
+	// Batch to be used by a writable Tx.
 	var batch *leveldb.Batch = nil
 	if writable {
 		batch = new(leveldb.Batch)
 	}
 
+	// Create a transaction instance. Mind Tx.Close() must be called when Tx is
+	// done
 	t := &Tx{writable: writable,
 		db:       &db,
 		snapshot: snapshot,
@@ -106,8 +107,8 @@ func (db DB) Update(fn func(database.Tx) error) error {
 	// If an error is returned from the function then rollback and return error.
 	err = fn(t)
 
-	// Handing panic event to rollback tx is not needed.
-	// If we fail at that point, no commit will be applied into backend storage
+	// Handing a panic event to rollback tx is not needed. If we fail at that
+	// point, no commit will be applied into backend storage
 
 	if err != nil {
 		return err
