@@ -39,12 +39,15 @@ func (sec StepEventCollector) Contains(event Event, step uint8) bool {
 	return false
 }
 
-// Store the Event keeping track of the step it belongs to
+// Store the Event keeping track of the step it belongs to. It silently ignores duplicates (meaning it does not store an event in case it is already found at the step specified). It returns the number of events stored at specified step *after* the store operation
 func (sec StepEventCollector) Store(event Event, step uint8) int {
 	eventList := sec[step]
+	if sec.Contains(event, step) {
+		return len(eventList)
+	}
+
 	if eventList == nil {
-		// TODO: should this have the Quorum as limit
-		eventList = make([]Event, 100)
+		eventList = make([]Event, 0)
 	}
 
 	// storing the agreement vote for the proper step
@@ -71,7 +74,7 @@ func NewEventSubscriber(eventBus *wire.EventBus, collector EventCollector, topic
 	msgChan := make(chan *bytes.Buffer, 100)
 
 	msgChanID := eventBus.Subscribe(topic, msgChan)
-	quitChanID := eventBus.Subscribe(string(msg.QuitTopic), msgChan)
+	quitChanID := eventBus.Subscribe(string(msg.QuitTopic), quitChan)
 
 	return &EventSubscriber{
 		eventBus:       eventBus,
