@@ -7,32 +7,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
-
-type MockUnmarshaller struct {
-	event *BlockEvent
-	err   error
-}
-
-func (m *MockUnmarshaller) Unmarshal(b *bytes.Buffer, e Event) error {
-	if m.err != nil {
-		return m.err
-	}
-
-	blsPub, _ := crypto.RandEntropy(32)
-	ev := e.(*BlockEvent)
-	ev.Step = m.event.Step
-	ev.Round = m.event.Round
-	ev.BlockHash = m.event.BlockHash
-	ev.PubKeyBLS = blsPub
-	return nil
-}
 
 func TestSimpleBlockCollection(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
@@ -41,7 +19,7 @@ func TestSimpleBlockCollection(t *testing.T) {
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
-	bc.Unmarshaller = mockUnmarshaller(blockHash, 1, 1)
+	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
 	bc.Collect(bytes.NewBuffer([]byte{}))
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
@@ -62,7 +40,7 @@ func TestNoQuorumCollection(t *testing.T) {
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
-	bc.Unmarshaller = mockUnmarshaller(blockHash, 1, 1)
+	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
 	bc.Collect(bytes.NewBuffer([]byte{}))
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
@@ -84,7 +62,7 @@ func TestSkipNoMember(t *testing.T) {
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
-	bc.Unmarshaller = mockUnmarshaller(blockHash, 1, 1)
+	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
 	select {
@@ -101,7 +79,7 @@ func TestBlockNotary(t *testing.T) {
 	notary := NewBlockNotary(bus, nil, committee)
 
 	blockHash := []byte("pippo")
-	notary.blockCollector.Unmarshaller = mockUnmarshaller(blockHash, 1, 1)
+	notary.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
 	go notary.Listen()
 
 	blockChan := make(chan *bytes.Buffer)
@@ -119,7 +97,7 @@ func TestBlockNotary(t *testing.T) {
 	// we need to wait for the round update to be propagated before publishing other round related messages. This is what this timeout is about
 	<-time.After(100 * time.Millisecond)
 
-	notary.blockCollector.Unmarshaller = mockUnmarshaller(blockHash, 1, 2)
+	notary.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 2)
 	bus.Publish(msg.BlockAgreementTopic, bytes.NewBuffer([]byte("test")))
 
 	select {
@@ -132,26 +110,33 @@ func TestBlockNotary(t *testing.T) {
 
 }
 
-func mockCommittee(quorum int, isMember bool, verification error) user.Committee {
-	committeeMock := &mocks.Committee{}
-	committeeMock.On("Quorum").Return(quorum)
-	committeeMock.On("VerifyVoteSet",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(verification)
-	committeeMock.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
-	return committeeMock
+type MockBEUnmarshaller struct {
+	event *BlockEvent
+	err   error
 }
 
-func mockUnmarshaller(blockHash []byte, round uint64, step uint8) EventUnmarshaller {
+func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e Event) error {
+	if m.err != nil {
+		return m.err
+	}
+
+	blsPub, _ := crypto.RandEntropy(32)
+	ev := e.(*BlockEvent)
+	ev.Step = m.event.Step
+	ev.Round = m.event.Round
+	ev.BlockHash = m.event.BlockHash
+	ev.PubKeyBLS = blsPub
+	return nil
+}
+
+func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) EventUnmarshaller {
 	ev := &BlockEvent{
 		BlockHash: blockHash,
 		Step:      step,
 		Round:     round,
 	}
 
-	return &MockUnmarshaller{
+	return &MockBEUnmarshaller{
 		event: ev,
 		err:   nil,
 	}

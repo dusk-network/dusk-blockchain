@@ -9,8 +9,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -183,4 +186,16 @@ func newVote(hash []byte, pub []byte, sig []byte, step uint8) *msg.Vote {
 		SignedHash: sig,
 		Step:       step,
 	}
+}
+
+func mockCommittee(quorum int, isMember bool, verification error) user.Committee {
+	committeeMock := &mocks.Committee{}
+	committeeMock.On("Quorum").Return(quorum)
+	committeeMock.On("VerifyVoteSet",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(verification)
+	committeeMock.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
+	return committeeMock
 }

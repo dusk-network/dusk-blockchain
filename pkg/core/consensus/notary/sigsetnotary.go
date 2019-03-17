@@ -56,11 +56,12 @@ type SigSetCollector struct {
 }
 
 // NewSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
-func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validateFunc func(*bytes.Buffer) error) *SigSetCollector {
+func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
 
 	cc := &CommitteeCollector{
 		StepEventCollector: make(map[uint8][]Event),
 		committee:          committee,
+		currentRound:       currentRound,
 	}
 	return &SigSetCollector{
 		CommitteeCollector: cc,
@@ -72,7 +73,7 @@ func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validat
 
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
 func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
-	ev := &SigSetEvent{}
+	ev := &SigSetEvent{committeeEvent: &committeeEvent{}}
 	if err := s.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
 	}
@@ -85,7 +86,7 @@ func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
 func (s *SigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 	step := m.Step
 	sigSetList := s.CommitteeCollector.StepEventCollector[step]
-	return sigSetList == nil || len(sigSetList)+1 < s.committee.Quorum() || m.Round > s.currentRound
+	return len(sigSetList)+1 < s.committee.Quorum() || m.Round > s.currentRound
 }
 
 // Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
@@ -130,22 +131,24 @@ type SigSetNotary struct {
 	eventBus         *wire.EventBus
 	sigSetSubscriber *EventSubscriber
 	roundChan        <-chan uint64
+	sigSetCollector  *SigSetCollector
 }
 
 // NewSigSetNotary creates a SigSetNotary by injecting the EventBus, the Committee and the message validation primitive
-func NewSigSetNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, committee user.Committee) *SigSetNotary {
+func NewSigSetNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, committee user.Committee, currentRound uint64) *SigSetNotary {
 
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := make(chan uint64, 1)
 	// creating the collector used in the EventSubscriber
-	roundCollector := NewSigSetCollector(committee, roundChan, validateFunc)
+	sigSetCollector := NewSigSetCollector(committee, roundChan, validateFunc, currentRound)
 	// creating the EventSubscriber listening to msg.SigSetAgreementTopic
-	sigSetSubscriber := NewEventSubscriber(eventBus, roundCollector, string(msg.SigSetAgreementTopic))
+	sigSetSubscriber := NewEventSubscriber(eventBus, sigSetCollector, string(msg.SigSetAgreementTopic))
 
 	return &SigSetNotary{
 		eventBus:         eventBus,
 		sigSetSubscriber: sigSetSubscriber,
 		roundChan:        roundChan,
+		sigSetCollector:  sigSetCollector,
 	}
 }
 
