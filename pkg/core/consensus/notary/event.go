@@ -138,10 +138,9 @@ func (cc *CommitteeCollector) ShouldBeSkipped(m *committeeEvent) bool {
 	isDupe := cc.Contains(m, m.Step)
 	isPleb := !cc.committee.IsMember(m.PubKeyBLS)
 	//TODO: the round element needs to be reassessed
-	isIrrelevant := cc.currentRound != 0 && cc.currentRound < m.Round
 	err := cc.committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
 	failedVerification := err != nil
-	return isDupe || isPleb || isIrrelevant || failedVerification
+	return isDupe || isPleb || failedVerification
 }
 
 // EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events

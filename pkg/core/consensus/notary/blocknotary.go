@@ -49,9 +49,12 @@ func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
 		return err
 	}
 
-	if !c.ShouldBeSkipped(ev) {
-		c.Process(ev)
+	isIrrelevant := c.currentRound != 0 && c.currentRound != ev.Round
+	if c.ShouldBeSkipped(ev) || isIrrelevant {
+		return nil
 	}
+
+	c.Process(ev)
 	return nil
 }
 
@@ -79,7 +82,7 @@ type BlockNotary struct {
 // NewBlockNotary creates a BlockNotary by injecting the EventBus, the CommitteeStore and the message validation primitive
 func NewBlockNotary(eventBus *wire.EventBus,
 	validateFunc func(*bytes.Buffer) error,
-	committee *user.CommitteeStore) *BlockNotary {
+	committee user.Committee) *BlockNotary {
 
 	blockChan := make(chan []byte, 1)
 	roundChan := make(chan uint64, 1)

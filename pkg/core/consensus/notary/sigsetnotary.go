@@ -90,7 +90,8 @@ func (s *SigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 
 // Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
 func (s *SigSetCollector) Process(event *SigSetEvent) {
-	if s.ShouldBeSkipped(event.committeeEvent) {
+	isIrrelevant := s.currentRound != 0 && s.currentRound < event.Round
+	if s.ShouldBeSkipped(event.committeeEvent) || isIrrelevant {
 		return
 	}
 
