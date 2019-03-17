@@ -12,28 +12,33 @@ import (
 
 // SigSetEvent is a CommitteeEvent decorated with the signature set hash
 type SigSetEvent struct {
-	*CommitteeEvent
+	*committeeEvent
 	sigSetHash []byte
-}
-
-func newSigSetEvent(validate func(*bytes.Buffer) error) *SigSetEvent {
-	return &SigSetEvent{
-		CommitteeEvent: newCommiteeEvent(validate),
-	}
 }
 
 // Equal as specified in the Event interface
 func (sse *SigSetEvent) Equal(e Event) bool {
-	return sse.CommitteeEvent.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
+	return sse.committeeEvent.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
+}
+
+type sigSetEventUnmarshaller struct {
+	*committeeEventUnmarshaller
+}
+
+func newSigSetEventUnmarshaller(validate func(*bytes.Buffer) error) *committeeEventUnmarshaller {
+	return &committeeEventUnmarshaller{validate}
 }
 
 // Unmarshal as specified in the Event interface
-func (sse *SigSetEvent) Unmarshal(r *bytes.Buffer) error {
-	if err := sse.CommitteeEvent.Unmarshal(r); err != nil {
+func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev Event) error {
+	// if the type checking is unsuccessful, it means that the injection is wrong. So panic!
+	sigSetEv := ev.(*SigSetEvent)
+
+	if err := sseu.committeeEventUnmarshaller.Unmarshal(r, sigSetEv.committeeEvent); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sse.sigSetHash); err != nil {
+	if err := encoding.Read256(r, &sigSetEv.sigSetHash); err != nil {
 		return err
 	}
 
@@ -47,6 +52,7 @@ type SigSetCollector struct {
 	*CommitteeCollector
 	roundChan    chan<- uint64
 	futureRounds map[uint64][]*SigSetEvent
+	Unmarshaller EventUnmarshaller
 }
 
 // NewSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
@@ -55,19 +61,19 @@ func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validat
 	cc := &CommitteeCollector{
 		StepEventCollector: make(map[uint8][]Event),
 		committee:          committee,
-		validateFunc:       validateFunc,
 	}
 	return &SigSetCollector{
 		CommitteeCollector: cc,
 		roundChan:          roundChan,
 		futureRounds:       make(map[uint64][]*SigSetEvent),
+		Unmarshaller:       newSigSetEventUnmarshaller(validateFunc),
 	}
 }
 
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
 func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
-	ev := newSigSetEvent(s.validateFunc)
-	if err := ev.Unmarshal(buffer); err != nil {
+	ev := &SigSetEvent{}
+	if err := s.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
 	}
 
@@ -84,7 +90,7 @@ func (s *SigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 
 // Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
 func (s *SigSetCollector) Process(event *SigSetEvent) {
-	if s.ShouldBeSkipped(event.CommitteeEvent) {
+	if s.ShouldBeSkipped(event.committeeEvent) {
 		return
 	}
 

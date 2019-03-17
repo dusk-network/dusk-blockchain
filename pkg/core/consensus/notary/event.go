@@ -2,14 +2,21 @@ package notary
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-// The Event is an Entity that represents the Messages travelling on the EventBus. It would normally present always the same fields. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
+// EventUnmarshaller unmarshals an Event from a buffer. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
+type EventUnmarshaller interface {
+	Unmarshal(*bytes.Buffer, Event) error
+}
+
+// The Event is an Entity that represents the Messages travelling on the EventBus. It would normally present always the same fields.
 type Event interface {
-	Unmarshal(*bytes.Buffer) error
 	Equal(Event) bool
 }
 
@@ -54,6 +61,87 @@ func (sec StepEventCollector) Store(event Event, step uint8) int {
 	eventList = append(eventList, event)
 	sec[step] = eventList
 	return len(eventList)
+}
+
+// A committeeEvent is an embeddable struct that groups common operations on notaries
+type committeeEvent struct {
+	VoteSet       []*msg.Vote
+	SignedVoteSet []byte
+	PubKeyBLS     []byte
+	Round         uint64
+	Step          uint8
+	BlockHash     []byte
+}
+
+// Equal as specified in the Event interface
+func (a *committeeEvent) Equal(e Event) bool {
+	other, ok := e.(*committeeEvent)
+	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) && (a.Round == other.Round) && (a.Step == other.Step)
+}
+
+type committeeEventUnmarshaller struct {
+	validate func(*bytes.Buffer) error
+}
+
+func newCommitteeEventUnmarshaller(validate func(*bytes.Buffer) error) *committeeEventUnmarshaller {
+	return &committeeEventUnmarshaller{validate}
+}
+
+// Unmarshal unmarshals the buffer into a CommitteeEvent
+func (a *committeeEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev Event) error {
+	if err := a.validate(r); err != nil {
+		return err
+	}
+
+	// if the injection is unsuccessful, panic
+	committeeEvent := ev.(*committeeEvent)
+
+	voteSet, err := msg.DecodeVoteSet(r)
+	if err != nil {
+		return err
+	}
+	committeeEvent.VoteSet = voteSet
+
+	if err := encoding.ReadBLS(r, &committeeEvent.SignedVoteSet); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadVarBytes(r, &committeeEvent.PubKeyBLS); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, &committeeEvent.BlockHash); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &committeeEvent.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(r, &committeeEvent.Step); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CommitteeCollector is a helper that groups common operations performed on Events related to a committee
+type CommitteeCollector struct {
+	StepEventCollector
+	committee    user.Committee
+	currentRound uint64
+}
+
+// ShouldBeSkipped checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
+// NOTE: currentRound is handled by some other process, so it is not this component's responsibility to handle corner cases (for example being on an obsolete round because of a disconnect, etc)
+func (cc *CommitteeCollector) ShouldBeSkipped(m *committeeEvent) bool {
+	isDupe := cc.Contains(m, m.Step)
+	isPleb := !cc.committee.IsMember(m.PubKeyBLS)
+	//TODO: the round element needs to be reassessed
+	isIrrelevant := cc.currentRound != 0 && cc.currentRound < m.Round
+	err := cc.committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
+	failedVerification := err != nil
+	return isDupe || isPleb || isIrrelevant || failedVerification
 }
 
 // EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events

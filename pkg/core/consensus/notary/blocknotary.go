@@ -7,106 +7,33 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-// CommitteeEvent expresses a vote on a block hash
-type CommitteeEvent struct {
-	VoteSet       []*msg.Vote
-	SignedVoteSet []byte
-	PubKeyBLS     []byte
-	Round         uint64
-	Step          uint8
-	BlockHash     []byte
-	validate      func(*bytes.Buffer) error
-}
+// BlockEvent expresses a vote on a block hash. It is a real type alias of committeeEvent
+type BlockEvent = committeeEvent
 
-// Equal as specified in the Event interface
-func (a *CommitteeEvent) Equal(e Event) bool {
-	other, ok := e.(*CommitteeEvent)
-	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) && (a.Round == other.Round) && (a.Step == other.Step)
-}
-
-// Create a CommitteeEvent
-func newCommiteeEvent(validate func(*bytes.Buffer) error) *CommitteeEvent {
-	return &CommitteeEvent{
-		validate: validate,
-	}
-}
-
-// Unmarshal unmarshals the buffer into a CommitteeEvent
-func (a *CommitteeEvent) Unmarshal(r *bytes.Buffer) error {
-	if err := a.validate(r); err != nil {
-		return err
-	}
-
-	voteSet, err := msg.DecodeVoteSet(r)
-	if err != nil {
-		return err
-	}
-	a.VoteSet = voteSet
-
-	if err := encoding.ReadBLS(r, &a.SignedVoteSet); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &a.PubKeyBLS); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &a.BlockHash); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &a.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &a.Step); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// CommitteeCollector is a helper that groups common operations performed on Events related to a committee
-type CommitteeCollector struct {
-	StepEventCollector
-	committee    user.Committee
-	currentRound uint64
-	validateFunc func(*bytes.Buffer) error
-}
-
-// ShouldBeSkipped checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
-// NOTE: currentRound is handled by some other process, so it is not this component's responsibility to handle corner cases (for example being on an obsolete round because of a disconnect, etc)
-func (cc *CommitteeCollector) ShouldBeSkipped(m *CommitteeEvent) bool {
-	isDupe := cc.Contains(m, m.Step)
-	isPleb := !cc.committee.IsMember(m.PubKeyBLS)
-	//TODO: the round element needs to be reassessed
-	isIrrelevant := cc.currentRound != 0 && cc.currentRound < m.Round
-	err := cc.committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
-	failedVerification := err != nil
-	return isDupe || isPleb || isIrrelevant || failedVerification
-}
+// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real type alias of committeeEventUnmarshaller
+type BlockEventUnmarshaller = committeeEventUnmarshaller
 
 // BlockCollector collects CommitteeEvent. When a Quorum is reached, it propagates the new Block Hash to the proper channel
 type BlockCollector struct {
 	*CommitteeCollector
-	blockChan chan<- []byte
+	blockChan    chan<- []byte
+	Unmarshaller EventUnmarshaller
 }
 
-// NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages
+// NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages.
 func NewBlockCollector(committee user.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
 	cc := &CommitteeCollector{
 		StepEventCollector: make(map[uint8][]Event),
 		committee:          committee,
-		validateFunc:       validateFunc,
 	}
 
 	return &BlockCollector{
 		CommitteeCollector: cc,
 		blockChan:          blockChan,
+		Unmarshaller:       newCommitteeEventUnmarshaller(validateFunc),
 	}
 }
 
@@ -117,8 +44,8 @@ func (c *BlockCollector) UpdateRound(round uint64) {
 
 // Collect as specifiec in the EventCollector interface. It dispatches the unmarshalled CommitteeEvent to Process method
 func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
-	ev := newCommiteeEvent(c.validateFunc)
-	if err := ev.Unmarshal(buffer); err != nil {
+	ev := &BlockEvent{}
+	if err := c.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
 	}
 
@@ -129,7 +56,7 @@ func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
 }
 
 // Process checks if the quorum is reached and if it isn't simply stores the Event in the proper step
-func (c *BlockCollector) Process(event *CommitteeEvent) {
+func (c *BlockCollector) Process(event *BlockEvent) {
 	nrAgreements := c.Store(event, event.Step)
 	// did we reach the quorum?
 	if nrAgreements >= c.committee.Quorum() {
