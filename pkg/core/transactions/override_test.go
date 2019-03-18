@@ -33,18 +33,18 @@ func TestBidHashNotStandard(t *testing.T) {
 
 	// Calculate `Standard` hash for each tx
 
-	bidSHash, err := bidTx.Standard.Hash()
+	bidSHash, err := bidTx.Standard.CalculateHash()
 	assert.Nil(err)
 
-	timeLockSHash, err := timeLockTX.Standard.Hash()
+	timeLockSHash, err := timeLockTX.Standard.CalculateHash()
 	assert.Nil(err)
 
 	// Calculate hashes for their types
 
-	bidHash, err := bidTxClone.Hash()
+	bidHash, err := bidTxClone.CalculateHash()
 	assert.Nil(err)
 
-	timeLockHash, err := timeLockTxClone.Hash()
+	timeLockHash, err := timeLockTxClone.CalculateHash()
 	assert.Nil(err)
 
 	// ensure that they do not equal their standard hashes

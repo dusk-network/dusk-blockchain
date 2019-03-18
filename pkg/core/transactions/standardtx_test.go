@@ -28,10 +28,10 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert.True(tx.Equals(decTX))
 
 	// Check that Hashes are equal
-	txid, err := tx.Hash()
+	txid, err := tx.CalculateHash()
 	assert.Nil(err)
 
-	decTxid, err := decTX.Hash()
+	decTxid, err := decTX.CalculateHash()
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
