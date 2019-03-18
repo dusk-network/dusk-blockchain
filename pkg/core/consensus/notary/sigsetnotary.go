@@ -91,13 +91,14 @@ func (s *SigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 
 // Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
 func (s *SigSetCollector) Process(event *SigSetEvent) {
-	isIrrelevant := s.currentRound != 0 && s.currentRound < event.Round
+	isIrrelevant := s.currentRound != 0 && s.currentRound > event.Round
 	if s.ShouldBeSkipped(event.committeeEvent) || isIrrelevant {
 		return
 	}
 
 	if s.ShouldBeStored(event) {
 		if event.Round > s.currentRound {
+			//rounds in the future should be handled later. For now we just store messages related to future rounds
 			events := s.futureRounds[event.Round]
 			if events == nil {
 				events = make([]*SigSetEvent, 0, s.committee.Quorum())
@@ -120,7 +121,9 @@ func (s *SigSetCollector) nextRound() {
 	go func() { s.roundChan <- s.currentRound }()
 	s.Clear()
 
+	//picking messages related to next round (now current)
 	currentEvents := s.futureRounds[s.currentRound]
+	//processing messages store so far
 	for _, event := range currentEvents {
 		s.Process(event)
 	}
