@@ -1,7 +1,6 @@
 package block
 
 import (
-	"errors"
 	"io"
 	"time"
 
@@ -9,14 +8,14 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 // Block defines a block on the Dusk blockchain.
 type Block struct {
 	Header *Header
-	Txs    []merkletree.Payload
+	Txs    []transactions.Transaction
 }
 
 // NewBlock will return an empty Block with an empty BlockHeader.
@@ -71,7 +70,14 @@ func (b *Block) SetPrevBlock(prevHeader *Header) {
 
 // SetRoot will set the block merkle root hash.
 func (b *Block) SetRoot() error {
-	tree, err := merkletree.NewTree(b.Txs)
+
+	// convert Transaction interface to Payload interface
+	var txs []merkletree.Payload
+	for _, tx := range b.Txs {
+		txs = append(txs, tx)
+	}
+
+	tree, err := merkletree.NewTree(txs)
 	if err != nil {
 		return err
 	}
@@ -81,7 +87,7 @@ func (b *Block) SetRoot() error {
 }
 
 // AddTx will add a transaction to the block.
-func (b *Block) AddTx(tx *transactions.Stealth) {
+func (b *Block) AddTx(tx transactions.Transaction) {
 	b.Txs = append(b.Txs, tx)
 }
 
@@ -120,12 +126,7 @@ func (b *Block) Encode(w io.Writer) error {
 		return err
 	}
 
-	for _, v := range b.Txs {
-		tx, ok := v.(*transactions.Stealth)
-		if !ok {
-			return errors.New("non-tx object found in block txs array")
-		}
-
+	for _, tx := range b.Txs {
 		if err := tx.Encode(w); err != nil {
 			return err
 		}
@@ -146,15 +147,11 @@ func (b *Block) Decode(r io.Reader) error {
 		return err
 	}
 
-	b.Txs = make([]merkletree.Payload, lTxs)
-	for i := uint64(0); i < lTxs; i++ {
-		tx := &transactions.Stealth{}
-		if err := tx.Decode(r); err != nil {
-			return err
-		}
-
-		b.Txs[i] = tx
+	txs, err := transactions.FromReader(r, lTxs)
+	if err != nil {
+		return err
 	}
+	b.Txs = txs
 
 	return nil
 }
