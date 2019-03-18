@@ -18,6 +18,7 @@ const addProvisionerTopic = "addprovisioner"
 type Committee interface {
 	// isMember can accept a BLS Public Key or an Ed25519
 	IsMember([]byte) bool
+	GetVotingCommittee(uint64, uint8) (map[string]uint8, error)
 	VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError
 	Quorum() int
 }
@@ -77,6 +78,10 @@ func (c *CommitteeStore) IsMember(pubKeyBLS []byte) bool {
 	return c.provisioners.GetMember(pubKeyBLS) != nil
 }
 
+func (c *CommitteeStore) GetVotingCommittee(round uint64, step uint8) (map[string]uint8, error) {
+	return c.provisioners.CreateVotingCommittee(round, c.TotalWeight, step)
+}
+
 // Quorum returns the amount of votes to reach a quorum
 func (c CommitteeStore) Quorum() int {
 	committeeSize := len(*c.provisioners)
@@ -88,9 +93,16 @@ func (c CommitteeStore) Quorum() int {
 	return quorum
 }
 
-func (c CommitteeStore) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError {
+func (c CommitteeStore) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
+	step uint8) *prerror.PrError {
+
+	var amountOfVotes uint8
 
 	for _, vote := range voteSet {
+		if err := checkDuplicates(voteSet, vote); err != nil {
+			return err
+		}
+
 		if !fromValidStep(vote.Step, step) {
 			return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
 		}
@@ -101,7 +113,8 @@ func (c CommitteeStore) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round ui
 			return prerror.New(prerror.High, err)
 		}
 
-		if err := checkVoterEligibility(vote.PubKeyBLS, votingCommittee); err != nil {
+		pubKeyStr := hex.EncodeToString(vote.PubKeyBLS)
+		if err := checkVoterEligibility(pubKeyStr, votingCommittee); err != nil {
 			return err
 		}
 
@@ -109,6 +122,22 @@ func (c CommitteeStore) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round ui
 			vote.SignedHash); err != nil {
 
 			return prerror.New(prerror.Low, errors.New("BLS verification failed"))
+		}
+
+		amountOfVotes += votingCommittee[pubKeyStr]
+	}
+
+	if int(amountOfVotes) < c.Quorum() {
+		return prerror.New(prerror.Low, errors.New("vote set too small"))
+	}
+
+	return nil
+}
+
+func checkDuplicates(voteSet []*msg.Vote, vote *msg.Vote) *prerror.PrError {
+	for _, v := range voteSet {
+		if v.Equals(vote) {
+			return prerror.New(prerror.Low, errors.New("vote set contains duplicate vote"))
 		}
 	}
 
@@ -119,10 +148,9 @@ func fromValidStep(voteStep, setStep uint8) bool {
 	return voteStep == setStep || voteStep+1 == setStep
 }
 
-func checkVoterEligibility(pubKeyBLS []byte,
+func checkVoterEligibility(pubKeyStr string,
 	votingCommittee map[string]uint8) *prerror.PrError {
 
-	pubKeyStr := hex.EncodeToString(pubKeyBLS)
 	if votingCommittee[pubKeyStr] == 0 {
 		return prerror.New(prerror.Low, errors.New("voter is not eligible to vote"))
 	}
