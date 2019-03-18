@@ -2,17 +2,22 @@ package heavy
 
 import (
 	"encoding/binary"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"os"
 	"testing"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
 
 func TestReadWriteDatabase(t *testing.T) {
 
 	path := "temp.db"
 	dir, _ := os.Getwd()
-	os.Remove(dir + "/" + path)
+	// Make sure directory is empty
+	err := os.RemoveAll(dir + "/" + path)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 
 	db, err := NewDatabase(path, false)
 
@@ -53,5 +58,8 @@ func TestReadWriteDatabase(t *testing.T) {
 	}
 
 	// delete temp db
-	os.Remove(dir + "/" + path)
+	err = os.RemoveAll(dir + "/" + path)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 }
