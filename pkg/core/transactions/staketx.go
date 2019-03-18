@@ -30,11 +30,14 @@ func NewStake(ver uint8, lock, fee uint64, pubKeyEd, pubKeyBLS []byte) (*Stake, 
 		return nil, errors.New("bls public key is not 33 bytes")
 	}
 
-	return &Stake{
+	s := &Stake{
 		TimeLock:  *NewTimeLock(ver, lock, fee),
 		PubKeyEd:  pubKeyEd,
 		PubKeyBLS: pubKeyBLS,
-	}, nil
+	}
+	s.TxType = StakeType
+
+	return s, nil
 }
 
 // Encode implements the Encoder interface
@@ -67,12 +70,6 @@ func (s *Stake) Decode(r io.Reader) error {
 		return err
 	}
 	return nil
-}
-
-// Type returns the transaction type
-// Implements the TypeInfo interface
-func (s *Stake) Type() TxType {
-	return StakeType
 }
 
 // StandardTX returns the embedded standard tx

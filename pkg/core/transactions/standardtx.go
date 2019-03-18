@@ -21,6 +21,8 @@ type Standard struct {
 	Outputs Outputs
 	// Fee is the assosciated fee attached to the transaction. This is in cleartext.
 	Fee uint64
+	// TxType represents the transaction type
+	TxType TxType
 }
 
 // NewStandard will return a Standard transaction
@@ -29,6 +31,7 @@ func NewStandard(ver uint8, fee uint64) *Standard {
 	return &Standard{
 		Version: ver,
 		Fee:     fee,
+		TxType:  StandardType,
 	}
 }
 
@@ -67,6 +70,10 @@ func (s *Standard) Encode(w io.Writer) error {
 		return err
 	}
 
+	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -102,6 +109,12 @@ func (s *Standard) Decode(r io.Reader) error {
 		return err
 	}
 
+	var Type uint8
+	if err := encoding.ReadUint8(r, &Type); err != nil {
+		return err
+	}
+	s.TxType = TxType(Type)
+
 	return nil
 }
 
@@ -118,7 +131,7 @@ func (s *Standard) CalculateHash() ([]byte, error) {
 // Type returns the associated TxType for the Standard struct.
 // Implements the TypeInfo interface
 func (s *Standard) Type() TxType {
-	return StandardType
+	return s.TxType
 }
 
 // StandardTX returns the standard struct
@@ -152,4 +165,13 @@ func (s *Standard) Equals(other *Standard) bool {
 	// calculating the hash. What we can do, is state this edge case and analyse our use-cases.
 
 	return true
+}
+
+// FromReader will decode into a slice of transactions
+func FromReader(r io.Reader, numOfTXs uint64) ([]Transaction, error) {
+	// Decode Coinbase first
+
+	// Decode rest of transactions
+
+	return nil, nil
 }

@@ -35,6 +35,9 @@ func TestEncodeDecodeBid(t *testing.T) {
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
+
+	// Check that type is correct
+	assert.Equal(BidType, decTX.TxType)
 }
 
 func TestMalformedBid(t *testing.T) {

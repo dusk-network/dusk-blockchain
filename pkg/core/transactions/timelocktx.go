@@ -26,10 +26,12 @@ type TimeLock struct {
 // NewTimeLock will return a TimeLock transaction
 // Given the tx version, the locktime and the fee
 func NewTimeLock(ver uint8, lock, fee uint64) *TimeLock {
-	return &TimeLock{
+	t := &TimeLock{
 		Standard: *NewStandard(ver, fee),
 		Lock:     lock,
 	}
+	t.TxType = TimelockType
+	return t
 }
 
 // Encode implements the Encoder interface
@@ -54,12 +56,6 @@ func (t *TimeLock) Decode(r io.Reader) error {
 		return err
 	}
 	return nil
-}
-
-// Type returns the transaction type
-// Implements the TypeInfo interface
-func (t *TimeLock) Type() TxType {
-	return TimelockType
 }
 
 // StandardTX returns the embedded standard tx

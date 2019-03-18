@@ -35,6 +35,9 @@ func TestEncodeDecodeTLock(t *testing.T) {
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
+
+	// Check that type is correct
+	assert.Equal(TimelockType, decTX.TxType)
 }
 
 func TestEqualsMethodTimeLock(t *testing.T) {

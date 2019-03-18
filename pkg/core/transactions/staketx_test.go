@@ -36,6 +36,9 @@ func TestEncodeDecodeStake(t *testing.T) {
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
+
+	// Check that type is correct
+	assert.Equal(StakeType, decTX.TxType)
 }
 
 func TestEqualsMethodStake(t *testing.T) {

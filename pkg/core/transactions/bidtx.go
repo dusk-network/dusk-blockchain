@@ -25,10 +25,13 @@ func NewBid(ver uint8, lock, fee uint64, M []byte) (*Bid, error) {
 		return nil, errors.New("m is not 32 bytes")
 	}
 
-	return &Bid{
+	b := &Bid{
 		TimeLock: *NewTimeLock(ver, lock, fee),
 		M:        M,
-	}, nil
+	}
+	b.TxType = BidType
+
+	return b, nil
 }
 
 // Encode implements the Encoder interface
@@ -53,12 +56,6 @@ func (b *Bid) Decode(r io.Reader) error {
 		return err
 	}
 	return nil
-}
-
-// Type returns the transaction type
-// Implements the TypeInfo interface
-func (b *Bid) Type() TxType {
-	return BidType
 }
 
 // StandardTX returns the embedded standard tx

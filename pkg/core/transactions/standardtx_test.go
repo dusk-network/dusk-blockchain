@@ -35,6 +35,9 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
+
+	// Check that type is correct
+	assert.Equal(StandardType, decTX.TxType)
 }
 
 func TestEqualsMethodStandard(t *testing.T) {
