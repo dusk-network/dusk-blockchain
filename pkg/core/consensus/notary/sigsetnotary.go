@@ -17,7 +17,7 @@ type SigSetEvent struct {
 }
 
 // Equal as specified in the Event interface
-func (sse *SigSetEvent) Equal(e Event) bool {
+func (sse *SigSetEvent) Equal(e wire.Event) bool {
 	return sse.committeeEvent.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
 }
 
@@ -30,7 +30,7 @@ func newSigSetEventUnmarshaller(validate func(*bytes.Buffer) error) *committeeEv
 }
 
 // Unmarshal as specified in the Event interface
-func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev Event) error {
+func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	// if the type checking is unsuccessful, it means that the injection is wrong. So panic!
 	sigSetEv := ev.(*SigSetEvent)
 
@@ -52,14 +52,14 @@ type SigSetCollector struct {
 	*CommitteeCollector
 	roundChan    chan<- uint64
 	futureRounds map[uint64][]*SigSetEvent
-	Unmarshaller EventUnmarshaller
+	Unmarshaller wire.EventUnmarshaller
 }
 
 // NewSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
 func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
 
 	cc := &CommitteeCollector{
-		StepEventCollector: make(map[uint8][]Event),
+		StepEventCollector: make(map[uint8][]wire.Event),
 		committee:          committee,
 		currentRound:       currentRound,
 	}
@@ -132,7 +132,7 @@ func (s *SigSetCollector) nextRound() {
 // SigSetNotary creates the proper EventSubscriber to listen to the SigSetEvent notifications
 type SigSetNotary struct {
 	eventBus         *wire.EventBus
-	sigSetSubscriber *EventSubscriber
+	sigSetSubscriber *wire.EventSubscriber
 	roundChan        <-chan uint64
 	sigSetCollector  *SigSetCollector
 }
@@ -145,7 +145,7 @@ func NewSigSetNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) e
 	// creating the collector used in the EventSubscriber
 	sigSetCollector := NewSigSetCollector(committee, roundChan, validateFunc, currentRound)
 	// creating the EventSubscriber listening to msg.SigSetAgreementTopic
-	sigSetSubscriber := NewEventSubscriber(eventBus, sigSetCollector, string(msg.SigSetAgreementTopic))
+	sigSetSubscriber := wire.NewEventSubscriber(eventBus, sigSetCollector, string(msg.SigSetAgreementTopic))
 
 	return &SigSetNotary{
 		eventBus:         eventBus,

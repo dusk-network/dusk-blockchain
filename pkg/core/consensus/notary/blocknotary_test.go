@@ -115,7 +115,7 @@ type MockBEUnmarshaller struct {
 	err   error
 }
 
-func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e Event) error {
+func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -129,7 +129,7 @@ func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e Event) error {
 	return nil
 }
 
-func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) EventUnmarshaller {
+func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
 	ev := &BlockEvent{
 		BlockHash: blockHash,
 		Step:      step,

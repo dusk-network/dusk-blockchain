@@ -99,7 +99,7 @@ type mockSEUnmarshaller struct {
 	err   error
 }
 
-func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e Event) error {
+func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -113,7 +113,7 @@ func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e Event) error {
 	return nil
 }
 
-func newMockSEUnmarshaller(blockHash []byte, round uint64, step uint8) EventUnmarshaller {
+func newMockSEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
 	ev := &SigSetEvent{
 		committeeEvent: &committeeEvent{},
 	}

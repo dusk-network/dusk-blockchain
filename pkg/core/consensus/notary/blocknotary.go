@@ -19,14 +19,14 @@ type BlockEventUnmarshaller = committeeEventUnmarshaller
 type BlockCollector struct {
 	*CommitteeCollector
 	blockChan    chan<- []byte
-	Unmarshaller EventUnmarshaller
+	Unmarshaller wire.EventUnmarshaller
 }
 
 // NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages.
 func NewBlockCollector(committee user.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
 	cc := &CommitteeCollector{
-		StepEventCollector: make(map[uint8][]Event),
+		StepEventCollector: make(map[uint8][]wire.Event),
 		committee:          committee,
 	}
 
@@ -72,8 +72,8 @@ func (c *BlockCollector) Process(event *BlockEvent) {
 // BlockNotary notifies when there is a consensus on a block hash
 type BlockNotary struct {
 	eventBus        *wire.EventBus
-	blockSubscriber *EventSubscriber
-	roundSubscriber *EventSubscriber
+	blockSubscriber *wire.EventSubscriber
+	roundSubscriber *wire.EventSubscriber
 	blockChan       <-chan []byte
 	roundChan       <-chan uint64
 	blockCollector  *BlockCollector
@@ -88,12 +88,12 @@ func NewBlockNotary(eventBus *wire.EventBus,
 	roundChan := make(chan uint64, 1)
 
 	blockCollector := NewBlockCollector(committee, blockChan, validateFunc)
-	blockSubscriber := NewEventSubscriber(eventBus,
+	blockSubscriber := wire.NewEventSubscriber(eventBus,
 		blockCollector,
 		string(msg.BlockAgreementTopic))
 
 	roundCollector := &RoundCollector{roundChan}
-	roundSubscriber := NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
+	roundSubscriber := wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
 
 	return &BlockNotary{
 		eventBus:        eventBus,
