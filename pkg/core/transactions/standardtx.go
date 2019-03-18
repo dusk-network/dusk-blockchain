@@ -10,6 +10,8 @@ import (
 // Standard is a generic transaction. It can also be seen as a stealth transaction.
 // It is used to make basic payments on the dusk network.
 type Standard struct {
+	// TxType represents the transaction type
+	TxType TxType
 	// Version is the transaction version. It does not use semver.
 	// A new transaction version denotes a modification of the previous structure
 	Version uint8 // 1 byte
@@ -21,8 +23,6 @@ type Standard struct {
 	Outputs Outputs
 	// Fee is the assosciated fee attached to the transaction. This is in cleartext.
 	Fee uint64
-	// TxType represents the transaction type
-	TxType TxType
 }
 
 // NewStandard will return a Standard transaction
@@ -47,6 +47,10 @@ func (s *Standard) AddOutput(output *Output) {
 
 // Encode a Standard transaction and write it to an io.Writer
 func (s *Standard) Encode(w io.Writer) error {
+	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
+		return err
+	}
+
 	if err := encoding.WriteVarInt(w, uint64(len(s.Inputs))); err != nil {
 		return err
 	}
@@ -70,15 +74,18 @@ func (s *Standard) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // Decode a reader into a standard transaction struct.
 func (s *Standard) Decode(r io.Reader) error {
+
+	var Type uint8
+	if err := encoding.ReadUint8(r, &Type); err != nil {
+		return err
+	}
+	s.TxType = TxType(Type)
+
 	lInputs, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -108,12 +115,6 @@ func (s *Standard) Decode(r io.Reader) error {
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &s.Fee); err != nil {
 		return err
 	}
-
-	var Type uint8
-	if err := encoding.ReadUint8(r, &Type); err != nil {
-		return err
-	}
-	s.TxType = TxType(Type)
 
 	return nil
 }
