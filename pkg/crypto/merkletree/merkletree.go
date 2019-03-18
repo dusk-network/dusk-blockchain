@@ -11,7 +11,6 @@ import (
 // Types implementing this interface can be items of the Merkletree
 type Payload interface {
 	CalculateHash() ([]byte, error)
-	Equals(other Payload) (bool, error)
 }
 
 // Tree struct representing the merkletree data structure.
@@ -191,7 +190,7 @@ func VerifyTree(t *Tree) (bool, error) {
 //VerifyContent verifies whether a piece of data is in the merkle tree
 func (t *Tree) VerifyContent(data Payload) (bool, error) {
 	for _, leaf := range t.Leaves {
-		ok, err := leaf.Data.Equals(data)
+		ok, err := equals(leaf.Data, data)
 		if err != nil {
 			return false, err
 		}
@@ -227,4 +226,18 @@ func (t *Tree) VerifyContent(data Payload) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// equals returns true, if two payloads hash to the same value
+func equals(a, b Payload) (bool, error) {
+	hashA, err := a.CalculateHash()
+	if err != nil {
+		return false, err
+	}
+	hashB, err := b.CalculateHash()
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(hashA, hashB), nil
 }

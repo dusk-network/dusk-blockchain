@@ -14,7 +14,7 @@ type testValues struct {
 	enc string
 }
 
-var n = 5000000
+var n = 500
 var testPairs = make([]testValues, 0, n)
 
 func initTestPairs() {
@@ -61,9 +61,9 @@ func TestEncodingAndDecoding(t *testing.T) {
 }
 
 func testEncDecLoop(t *testing.T, alph *Alphabet) {
-	for j := 1; j < 256; j++ {
+	for j := 1; j < 20; j++ {
 		var b = make([]byte, j)
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 10; i++ {
 			rand.Read(b)
 			fe := EncodingAlphabet(b, alph)
 
