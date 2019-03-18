@@ -1,20 +1,20 @@
 package topics
 
-// Topic defines a command
+// Topic defines a topic
 type Topic string
 
-// Size is the size of a command field in bytes
+// Size is the size of a topic field in bytes
 const Size = 15
 
-// A list of all valid protocol commands
+// A list of all valid protocol topics
 const (
-	// Standard commands
+	// Standard topics
 	Version Topic = "version"
 	VerAck  Topic = "verack"
 	Ping    Topic = "ping"
 	Pong    Topic = "pong"
 
-	// Data exchange commands
+	// Data exchange topics
 	Addr           Topic = "addr"
 	GetAddr        Topic = "getaddr"
 	GetData        Topic = "getdata"
@@ -28,7 +28,7 @@ const (
 	CertificateReq Topic = "certificatereq"
 	Certificate    Topic = "certificate"
 
-	// Consensus commands
+	// Consensus topics
 	Candidate       Topic = "candidate"
 	Score           Topic = "score"
 	SigSet          Topic = "sigset"
@@ -36,7 +36,13 @@ const (
 	SigSetReduction Topic = "sigsetreduction"
 	Agreement       Topic = "agreement"
 
-	// Error commands
+	// Blockchain topics
+	ChainInfo Topic = "chaininfo"
+
+	// RPC topics
+	RPCChainInfo Topic = "rpcchaininfo"
+
+	// Error topics
 	NotFound Topic = "notfound"
 	Reject   Topic = "reject"
 )

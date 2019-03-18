@@ -7,7 +7,6 @@ package peermgr
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -20,10 +19,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
@@ -131,7 +126,7 @@ func (p *Peer) readHeader() (*MessageHeader, error) {
 }
 
 func (p *Peer) readHeaderBytes() ([]byte, error) {
-	buffer := make([]byte, HeaderSize)
+	buffer := make([]byte, MessageHeaderSize)
 	if _, err := io.ReadFull(p.conn, buffer); err != nil {
 		return nil, err
 	}
@@ -245,14 +240,14 @@ func (p *Peer) PingLoop() { /*not implemented in other neo clients*/ }
 // for messages coming in
 func (p *Peer) Run() error {
 
-	err := p.Handshake()
+	// err := p.Handshake()
 
 	go p.StartProtocol()
 	go p.ReadLoop()
 	go p.WriteLoop()
 
 	//go p.PingLoop() // since it is not implemented. It will disconnect all other impls.
-	return err
+	return nil
 
 }
 
@@ -296,11 +291,11 @@ loop:
 		idleTimer.Stop()
 
 		if p.headerMagicIsValid(header) {
-			payloadBuffer, err := p.readPayload(header.Length)
+			// payloadBuffer, err := p.readPayload(header.Length)
 
-			if payloadChecksumIsValid(payloadBuffer, header.Checksum) {
-				p.eventBus.Publish(string(header.Command), payloadBuffer)
-			}
+			// if payloadChecksumIsValid(payloadBuffer, header.Checksum) {
+			// 	p.eventBus.Publish(string(header.Command), payloadBuffer)
+			// }
 		}
 	}
 
@@ -318,291 +313,6 @@ func (p *Peer) WriteLoop() {
 			p.Disconnect()
 		}
 	}
-}
-
-/**
- * Received data requests from other peers
- */
-
-// OnGetData Listener. Is called after receiving a 'getdata' msg
-func (p *Peer) OnGetData(msg *payload.MsgGetData) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnGetData != nil {
-			p.cfg.Handler.OnGetData(p, msg)
-		}
-	}
-}
-
-// OnTx Listener. Is called after receiving a 'tx' msg
-func (p *Peer) OnTx(msg *payload.MsgTx) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnTx != nil {
-			p.cfg.Handler.OnTx(p, msg)
-		}
-	}
-}
-
-// OnInv Listener. Is called after receiving a 'inv' msg
-// It could be received in reply to 'getblocks' or unsolicited.
-// In the last case we have to check if we already have the tx/block or not.
-// We need to send a 'getdata' msg to receive the actual tx/block(s).
-func (p *Peer) OnInv(msg *payload.MsgInv) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnInv != nil {
-			p.cfg.Handler.OnInv(p, msg)
-		}
-	}
-}
-
-// OnGetHeaders Listener, outside of the anonymous func will be extra functionality like timing
-func (p *Peer) OnGetHeaders(msg *payload.MsgGetHeaders) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnGetHeaders != nil {
-			p.cfg.Handler.OnGetHeaders(p, msg)
-		}
-	}
-}
-
-// OnAddr Listener. Is called after receiving a 'addr' msg
-func (p *Peer) OnAddr(msg *payload.MsgAddr) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnAddr != nil {
-			p.cfg.Handler.OnAddr(p, msg)
-		}
-	}
-}
-
-// OnGetAddr Listener. Is called after receiving a 'getaddr' msg
-func (p *Peer) OnGetAddr(msg *payload.MsgGetAddr) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnGetAddr != nil {
-			p.cfg.Handler.OnGetAddr(p, msg)
-		}
-	}
-}
-
-// OnGetBlocks Listener. Is called after receiving a 'getblocks' msg
-func (p *Peer) OnGetBlocks(msg *payload.MsgGetBlocks) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnGetBlocks != nil {
-			p.cfg.Handler.OnGetBlocks(p, msg)
-		}
-	}
-}
-
-// OnBlock Listener. Is called after receiving a 'blocks' msg
-func (p *Peer) OnBlock(msg *payload.MsgBlock) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnBlock != nil {
-			p.cfg.Handler.OnBlock(p, msg)
-		}
-	}
-}
-
-// OnVersion Listener will be called during the handshake, any error checking should be done here for 'version' msg.
-// This should only ever be called during the handshake. Any other place and the peer will disconnect.
-func (p *Peer) OnVersion(msg *payload.MsgVersion) error {
-	if msg.Nonce == p.cfg.Nonce {
-		p.conn.Close()
-		return errors.New("self connection, peer disconnected")
-	}
-
-	if protocol.NodeVer.Major != msg.Version.Major {
-		err := fmt.Sprintf("Received an incompatible protocol version from %s", p.addr)
-		rejectMsg := payload.NewMsgReject(string(topics.Version), payload.RejectInvalid, "invalid")
-		p.Write(rejectMsg)
-
-		return errors.New(err)
-	}
-
-	p.versionKnown = true
-	p.protoVer = msg.Version
-	p.services = msg.Services
-	p.createdAt = time.Now()
-	return nil
-}
-
-// OnVerack Listener will be called during the handshake.
-// This should only ever be called during the handshake. Any other place and the peer will disconnect.
-func (p *Peer) OnVerack(msg *payload.MsgVerAck) error {
-	return nil
-}
-
-// OnConsensusMsg is called when the node receives a consensus message
-func (p *Peer) OnConsensusMsg(msg *payload.MsgConsensus) error {
-	p.inch <- func() {
-		if p.cfg.Handler.OnConsensus != nil {
-			p.cfg.Handler.OnConsensus(p, msg)
-		}
-	}
-	return nil
-}
-
-// OnHeaders Listener. Is called after receiving a 'headers' msg
-func (p *Peer) OnHeaders(msg *payload.MsgHeaders) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnHeaders != nil {
-			p.cfg.Handler.OnHeaders(p, msg)
-		}
-	}
-}
-
-// OnConsensus Listener. Is called after receiving a 'consensus' msg
-func (p *Peer) OnConsensus(msg *payload.MsgConsensus) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnConsensus != nil {
-			p.cfg.Handler.OnConsensus(p, msg)
-		}
-	}
-}
-
-// OnCertificate Listener. Is called after receiving a 'certificate' msg
-func (p *Peer) OnCertificate(msg *payload.MsgCertificate) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnCertificate != nil {
-			p.cfg.Handler.OnCertificate(p, msg)
-		}
-	}
-}
-
-// OnCertificateReq Listener. Is called after receiving a 'certificatereq' msg
-func (p *Peer) OnCertificateReq(msg *payload.MsgCertificateReq) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnCertificateReq != nil {
-			p.cfg.Handler.OnCertificateReq(p, msg)
-		}
-	}
-}
-
-// OnMemPool Listener. Is called after receiving a 'mempool' msg
-func (p *Peer) OnMemPool(msg *payload.MsgMemPool) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnMemPool != nil {
-			p.cfg.Handler.OnMemPool(p, msg)
-		}
-	}
-}
-
-// OnNotFound Listener. Is called after receiving a 'notfound' msg
-func (p *Peer) OnNotFound(msg *payload.MsgNotFound) {
-
-	// Remove the message we initially requested from the Detector
-	//TODO: Make a separate function and check whether we need more payload.InvXxx types (e.g. InvHdr)
-	for _, vector := range msg.Vectors {
-		if vector.Type == payload.InvBlock {
-			p.Detector.RemoveMessage(topics.GetHeaders)
-		} else {
-			p.Detector.RemoveMessage(topics.Tx)
-		}
-	}
-	p.inch <- func() {
-		if p.cfg.Handler.OnNotFound != nil {
-			p.cfg.Handler.OnNotFound(p, msg)
-		}
-	}
-}
-
-// OnPing Listener. Is called after receiving a 'ping' msg
-func (p *Peer) OnPing(msg *payload.MsgPing) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnPing != nil {
-			p.cfg.Handler.OnPing(p, msg)
-		}
-	}
-}
-
-// OnPong Listener. Is called after receiving a 'pong' msg
-func (p *Peer) OnPong(msg *payload.MsgPong) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnPong != nil {
-			p.cfg.Handler.OnPong(p, msg)
-		}
-	}
-}
-
-// OnReject Listener. Is called after receiving a 'reject' msg
-func (p *Peer) OnReject(msg *payload.MsgReject) {
-	p.inch <- func() {
-		if p.cfg.Handler.OnReject != nil {
-			p.cfg.Handler.OnReject(p, msg)
-		}
-	}
-}
-
-/**
- * Requesting data from other peers
- */
-
-// RequestHeaders will ask a peer for headers.
-func (p *Peer) RequestHeaders(hash []byte) error {
-	c := make(chan error)
-	p.outch <- func() {
-		p.Detector.AddMessage(topics.GetHeaders)
-		stop := make([]byte, 32)
-		getHeaders := payload.NewMsgGetHeaders(hash, stop)
-		err := p.Write(getHeaders)
-		c <- err
-	}
-
-	return <-c
-}
-
-// RequestTx will ask a peer for a transaction.
-// It will put a function on the outgoing peer queue to send a 'getdata' msg
-// to an other peer. An error from this function will return this error from RequestTx.
-func (p *Peer) RequestTx(tx transactions.Stealth) error {
-	c := make(chan error)
-
-	p.outch <- func() {
-		p.Detector.AddMessage(topics.GetData)
-		getdata := payload.NewMsgGetData()
-		getdata.AddTx(tx.R)
-		err := p.Write(getdata)
-		c <- err
-	}
-
-	return <-c
-}
-
-// RequestBlocks will ask a peer for blocks.
-// It will put a function on the outgoing peer queue to send a 'getdata' msg to an other peer.
-// The same possible function error will be returned from this method.
-func (p *Peer) RequestBlocks(hashes [][]byte) error {
-	c := make(chan error)
-
-	blocks := make([]*block.Block, 0, len(hashes))
-	for _, hash := range hashes {
-		// Create a block from requested hash
-		b := block.NewBlock()
-		b.Header.Hash = hash
-		blocks = append(blocks, b)
-	}
-
-	p.outch <- func() {
-		p.Detector.AddMessage(topics.GetData)
-		getdata := payload.NewMsgGetData()
-		getdata.AddBlocks(blocks)
-		err := p.Write(getdata)
-		c <- err
-	}
-
-	return <-c
-}
-
-// RequestAddresses will ask a peer for addresses.
-// It will put a function on the outgoing peer queue to send a 'getaddr' msg to an other peer.
-// The same possible function error will be returned from this method.
-func (p *Peer) RequestAddresses() error {
-	c := make(chan error)
-
-	p.outch <- func() {
-		p.Detector.AddMessage(topics.GetAddr)
-		getaddr := payload.NewMsgGetAddr()
-		err := p.Write(getaddr)
-		c <- err
-	}
-
-	return <-c
 }
 
 func (p *Peer) WriteConsensus(msg wire.Payload) error {
