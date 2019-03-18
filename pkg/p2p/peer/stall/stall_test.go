@@ -1,13 +1,14 @@
 package stall
 
 import (
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"testing"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func init() {

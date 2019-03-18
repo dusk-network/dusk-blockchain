@@ -1,7 +1,6 @@
 package peermgr
 
 import (
-	"errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,39 +31,6 @@ func (pm *PeerMgr) Disconnect(p *Peer) {
 	p.Disconnect()
 	// Once disconnected, we remove it from the list
 	// and look for more peers to connect to
-}
-
-// RequestHeaders will request the headers from the most available peer.
-// As of now, it requests from the first peer in the list, TODO
-func (pm *PeerMgr) RequestHeaders(hash []byte) (*Peer, error) {
-
-	if len(pm.peers) == 0 {
-		return nil, errors.New("Peer Manager currently has no peers")
-	}
-
-	return pm.peers[0], pm.peers[0].RequestHeaders(hash)
-}
-
-// RequestBlocks will request blocks from the most available peer
-// As of now, it requests from the first peer in the list, TODO
-func (pm *PeerMgr) RequestBlocks(hashes [][]byte) (*Peer, error) {
-
-	if len(pm.peers) == 0 {
-		return nil, errors.New("Peer Manager currently has no peers")
-	}
-
-	return pm.peers[0], pm.peers[0].RequestBlocks(hashes)
-}
-
-// RequestAddresses will request the addrs from the most available peer.
-// As of now, it requests from the first peer in the list, TODO
-func (pm *PeerMgr) RequestAddresses() error {
-
-	if len(pm.peers) == 0 {
-		return errors.New("Peer Manager currently has no peers")
-	}
-
-	return pm.peers[0].RequestAddresses()
 }
 
 // AddPeer will add a new peer for the PeerManager to use
