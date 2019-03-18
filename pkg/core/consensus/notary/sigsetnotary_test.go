@@ -15,7 +15,7 @@ import (
 
 func TestSigSetNotary(t *testing.T) {
 
-	bus, _, _ := initNotary()
+	bus, _, _ := initNotary(1)
 	roundChan := make(chan *bytes.Buffer)
 	bus.Subscribe(msg.RoundUpdateTopic, roundChan)
 	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
@@ -30,7 +30,7 @@ func TestSigSetNotary(t *testing.T) {
 }
 
 func TestFutureRounds(t *testing.T) {
-	bus, collector, _ := initNotary()
+	bus, collector, _ := initNotary(1)
 	//the Unmarshaller unmarshals messages for a future round
 	collector.Unmarshaller = newMockSEUnmarshaller([]byte("whatever"), 2, 1)
 
@@ -47,9 +47,46 @@ func TestFutureRounds(t *testing.T) {
 	}
 }
 
-func initNotary() (*wire.EventBus, *SigSetCollector, user.Committee) {
+func TestProcessFutureRounds(t *testing.T) {
+	bus, collector, _ := initNotary(2)
+	//the Unmarshaller unmarshals messages for a future round
+	collector.Unmarshaller = newMockSEUnmarshaller([]byte("whatever"), 2, 1)
+
+	roundChan := make(chan *bytes.Buffer)
+	bus.Subscribe(msg.RoundUpdateTopic, roundChan)
+	// accumulating messages for future rounds to be processed
+	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+	<-time.After(50 * time.Millisecond)
+
+	// triggering a round update
+	//setting the mock to unmarshal messages for current round
+	collector.Unmarshaller = newMockSEUnmarshaller([]byte("whatever"), 1, 1)
+	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+
+	for i := 0; i < 2; i++ {
+		select {
+		case roundUpdate := <-roundChan:
+			round := binary.LittleEndian.Uint64(roundUpdate.Bytes())
+			switch i {
+			case 0:
+				assert.Equal(t, uint64(2), round)
+				return
+			case 1:
+				assert.Equal(t, uint64(3), round)
+				return
+			}
+		case <-time.After(100 * time.Millisecond):
+			// success
+			assert.FailNow(t, "Time out in receiving 2 round updates")
+		}
+	}
+}
+
+func initNotary(quorum int) (*wire.EventBus, *SigSetCollector, user.Committee) {
 	bus := wire.New()
-	committee := mockCommittee(1, true, nil)
+	committee := mockCommittee(quorum, true, nil)
 	notary := NewSigSetNotary(bus, nil, committee, uint64(1))
 
 	notary.sigSetCollector.Unmarshaller = newMockSEUnmarshaller([]byte("mock"), 1, 1)
