@@ -8,19 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
-
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
 func TestSigSetCollection(t *testing.T) {
@@ -43,7 +40,7 @@ func TestSigSetCollection(t *testing.T) {
 	eventBus.Subscribe(msg.ProvisionerAddedTopic, provisionerAddedChannel)
 
 	// Create a committee store
-	committeeStore := user.NewCommitteeStore(eventBus)
+	committeeStore := committee.NewCommitteeStore(eventBus)
 	go committeeStore.Listen()
 
 	winningBlockHash, err := crypto.RandEntropy(32)
@@ -150,7 +147,7 @@ func TestInvalidVoteSetSigSetCollection(t *testing.T) {
 	eventBus.Subscribe(msg.ProvisionerAddedTopic, provisionerAddedChannel)
 
 	// Create a committee store
-	committeeStore := user.NewCommitteeStore(eventBus)
+	committeeStore := committee.NewCommitteeStore(eventBus)
 	go committeeStore.Listen()
 
 	winningBlockHash, err := crypto.RandEntropy(32)
@@ -257,7 +254,7 @@ func TestInvalidSignatureSigSetCollection(t *testing.T) {
 	eventBus.Subscribe(msg.ProvisionerAddedTopic, provisionerAddedChannel)
 
 	// Create a committee store
-	committeeStore := user.NewCommitteeStore(eventBus)
+	committeeStore := committee.NewCommitteeStore(eventBus)
 	go committeeStore.Listen()
 
 	winningBlockHash, err := crypto.RandEntropy(32)
@@ -364,7 +361,7 @@ func TestSigSetCollectionQueue(t *testing.T) {
 	eventBus.Subscribe(msg.ProvisionerAddedTopic, provisionerAddedChannel)
 
 	// Create a committee store
-	committeeStore := user.NewCommitteeStore(eventBus)
+	committeeStore := committee.NewCommitteeStore(eventBus)
 	go committeeStore.Listen()
 
 	winningBlockHash, err := crypto.RandEntropy(32)

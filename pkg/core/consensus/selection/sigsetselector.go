@@ -1,24 +1,17 @@
 package selection
 
-import (
-	"bytes"
-	"encoding/binary"
-	"encoding/hex"
-	"errors"
-	"time"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-)
-
-type SigSetSelectionCollector {
+/*
+type SigSetCollector {
+	*committee.Collector
 	timerLength time.Duration
-	
+	Unmarshaller wire.EventUnmarshaller
+}
 
+func NewSigSetCollector(c committee.Committee, validateFunc func(*bytes.Buffer) error) *SigSetCollector {
+	return &SigSetCollector{
+		Collector: *committee.Collector,
+	}
+	// TODO: continue
 }
 
 // SetSelector contains information about the state of the consensus.
@@ -28,7 +21,7 @@ type SigSetSelector struct {
 	sigSetSubscriber *wire.EventSubscriber
 	roudSubscriber *wire.EventSubscriber
 	winningBlockSubscriber *wire.EventSubscriber
-	
+
 
 	collecting       bool
 	inputChannel     chan *sigSetMessage
@@ -315,3 +308,5 @@ func (s SetSelector) shouldBeStored(m *sigSetMessage) bool {
 func (s SetSelector) winningBlockHashKnown() bool {
 	return s.winningBlockHash != nil
 }
+
+*/

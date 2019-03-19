@@ -7,12 +7,11 @@ import (
 	"errors"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
-
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
 // SetSelector contains information about the state of the consensus.
@@ -39,7 +38,7 @@ type SetSelector struct {
 	outputChannel    chan []byte
 	winningBlockHash []byte
 
-	committeeStore  *user.CommitteeStore
+	committeeStore  *committee.Store
 	votingCommittee map[string]uint8
 
 	// injected functions
@@ -54,7 +53,7 @@ type SetSelector struct {
 func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 	verifyEd25519SignatureFunc func(*bytes.Buffer) error,
 	verifyVoteSetFunc func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError,
-	committeeStore *user.CommitteeStore) *SetSelector {
+	committeeStore *committee.Store) *SetSelector {
 
 	queue := newSigSetQueue()
 	sigSetChannel := make(chan *bytes.Buffer, 100)
@@ -271,7 +270,7 @@ func verifyVoteSetSignature(m *sigSetMessage) *prerror.PrError {
 }
 
 func (s SetSelector) validateVoteSetLength(voteSet []*msg.Vote) *prerror.PrError {
-	if len(voteSet) < s.committeeStore.Threshold() {
+	if len(voteSet) < s.committeeStore.Quorum() {
 		return prerror.New(prerror.Low, errors.New("vote set is too small"))
 	}
 
