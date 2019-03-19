@@ -131,18 +131,10 @@ func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 }
 
 func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
-<<<<<<< Updated upstream
 	ev := committee.NewEvent()
 	ev.BlockHash = blockHash
 	ev.Step = step
 	ev.Round = round
-=======
-	ev := &BlockEvent{
-		BlockHash: blockHash,
-		Step:      step,
-		Round:     round,
-	}
->>>>>>> Stashed changes
 
 	return &MockBEUnmarshaller{
 		event: ev,

@@ -25,15 +25,9 @@ type BlockCollector struct {
 // NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages.
 func NewBlockCollector(c committee.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
-<<<<<<< Updated upstream
 	cc := &committee.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
 		Committee:          c,
-=======
-	cc := &CommitteeCollector{
-		StepEventCollector: make(map[uint8][]wire.Event),
-		committee:          committee,
->>>>>>> Stashed changes
 	}
 
 	return &BlockCollector{
@@ -88,11 +82,7 @@ func NewBlockNotary(eventBus *wire.EventBus,
 	blockChan := make(chan []byte, 1)
 	roundChan := make(chan uint64, 1)
 
-<<<<<<< Updated upstream
 	blockCollector := NewBlockCollector(c, blockChan, validateFunc)
-=======
-	blockCollector := NewBlockCollector(committee, blockChan, validateFunc)
->>>>>>> Stashed changes
 	blockSubscriber := wire.NewEventSubscriber(eventBus,
 		blockCollector,
 		string(msg.BlockAgreementTopic))

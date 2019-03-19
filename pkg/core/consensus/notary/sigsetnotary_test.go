@@ -114,13 +114,7 @@ func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 }
 
 func newMockSEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
-<<<<<<< Updated upstream
 	ev := NewSigSetEvent()
-=======
-	ev := &SigSetEvent{
-		committeeEvent: &committeeEvent{},
-	}
->>>>>>> Stashed changes
 	ev.BlockHash = blockHash
 	ev.Round = round
 	ev.Step = step
