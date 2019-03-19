@@ -23,7 +23,11 @@ func NewSigSetEvent() *SigSetEvent {
 
 // Equal as specified in the Event interface
 func (sse *SigSetEvent) Equal(e wire.Event) bool {
+<<<<<<< Updated upstream
 	return sse.Event.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
+=======
+	return sse.committeeEvent.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
+>>>>>>> Stashed changes
 }
 
 type sigSetEventUnmarshaller struct {
@@ -65,10 +69,17 @@ type SigSetCollector struct {
 // NewSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
 func NewSigSetCollector(c committee.Committee, roundChan chan uint64, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
 
+<<<<<<< Updated upstream
 	cc := &committee.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
 		Committee:          c,
 		CurrentRound:       currentRound,
+=======
+	cc := &CommitteeCollector{
+		StepEventCollector: make(map[uint8][]wire.Event),
+		committee:          committee,
+		currentRound:       currentRound,
+>>>>>>> Stashed changes
 	}
 	return &SigSetCollector{
 		Collector:    cc,

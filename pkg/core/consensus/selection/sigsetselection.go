@@ -38,7 +38,11 @@ type SetSelector struct {
 	outputChannel    chan []byte
 	winningBlockHash []byte
 
+<<<<<<< Updated upstream
 	committeeStore  *committee.Store
+=======
+	committee       user.Committee
+>>>>>>> Stashed changes
 	votingCommittee map[string]uint8
 
 	// injected functions
@@ -52,8 +56,12 @@ type SetSelector struct {
 // parameters.
 func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 	verifyEd25519SignatureFunc func(*bytes.Buffer) error,
+<<<<<<< Updated upstream
 	verifyVoteSetFunc func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError,
 	committeeStore *committee.Store) *SetSelector {
+=======
+	committee user.Committee) *SetSelector {
+>>>>>>> Stashed changes
 
 	queue := newSigSetQueue()
 	sigSetChannel := make(chan *bytes.Buffer, 100)
@@ -74,9 +82,8 @@ func NewSetSelector(eventBus *wire.EventBus, timerLength time.Duration,
 		timerLength:             timerLength,
 		inputChannel:            inputChannel,
 		outputChannel:           outputChannel,
-		committeeStore:          committeeStore,
+		committee:               committee,
 		verifyEd25519Signature:  verifyEd25519SignatureFunc,
-		verifyVoteSet:           verifyVoteSetFunc,
 		queue:                   &queue,
 	}
 
@@ -187,7 +194,7 @@ func (s *SetSelector) selectBestSignatureSet(inputChannel <-chan *sigSetMessage,
 	outputChannel chan<- []byte) {
 
 	// Variable to keep track of the highest stake we've received.
-	var highest uint64
+	// var highest uint64
 
 	// Variable to keep track of the vote set associated with the
 	// highest stake we've received
@@ -220,16 +227,19 @@ func (s *SetSelector) selectBestSignatureSet(inputChannel <-chan *sigSetMessage,
 				break
 			}
 
-			committee := s.committeeStore.Get()
-			stake, err := committee.GetStake(m.PubKeyBLS)
-			if err != nil {
-				return
-			}
+			// committee, err := s.committee.GetVotingCommittee(s.round, s.step)
+			// if err != nil {
+			// 	return
+			// }
+			// stake, err := committee.GetStake(m.PubKeyBLS)
+			// if err != nil {
+			// 	return
+			// }
 
-			if stake > highest {
-				highest = stake
-				bestVoteSet = m.SigSet
-			}
+			// if stake > highest {
+			// 	highest = stake
+			// 	bestVoteSet = m.SigSet
+			// }
 		}
 	}
 }
@@ -247,7 +257,7 @@ func (s SetSelector) verifySigSetMessage(m *sigSetMessage) *prerror.PrError {
 		return err
 	}
 
-	if err := s.verifyVoteSet(m.SigSet, m.WinningBlockHash,
+	if err := s.committee.VerifyVoteSet(m.SigSet, m.WinningBlockHash,
 		m.Round, m.Step); err != nil {
 
 		return err
@@ -270,7 +280,11 @@ func verifyVoteSetSignature(m *sigSetMessage) *prerror.PrError {
 }
 
 func (s SetSelector) validateVoteSetLength(voteSet []*msg.Vote) *prerror.PrError {
+<<<<<<< Updated upstream
 	if len(voteSet) < s.committeeStore.Quorum() {
+=======
+	if len(voteSet) < s.committee.Quorum() {
+>>>>>>> Stashed changes
 		return prerror.New(prerror.Low, errors.New("vote set is too small"))
 	}
 
@@ -278,14 +292,14 @@ func (s SetSelector) validateVoteSetLength(voteSet []*msg.Vote) *prerror.PrError
 }
 
 func (s *SetSelector) setVotingCommittee() error {
-	committee := s.committeeStore.Get()
-	votingCommittee, err := committee.CreateVotingCommittee(s.round,
-		s.committeeStore.TotalWeight, s.step)
-	if err != nil {
-		return err
-	}
+	// committee := s.committeeStore.Get()
+	// votingCommittee, err := committee.CreateVotingCommittee(s.round,
+	// 	s.committeeStore.TotalWeight, s.step)
+	// if err != nil {
+	// 	return err
+	// }
 
-	s.votingCommittee = votingCommittee
+	// s.votingCommittee = votingCommittee
 	return nil
 }
 

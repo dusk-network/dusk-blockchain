@@ -19,23 +19,20 @@ type blockReduction = reductionEvent
 
 type blockReductionCollector struct {
 	*reductionCollector
-	hashChannel   chan<- []byte
-	resultChannel chan<- []byte
-	unmarshaller  EventUnmarshaller
+	unmarshaller wire.EventUnmarshaller
 
 	reducing bool
 }
 
 func newBlockReductionCollector(committee user.Committee, timerLength time.Duration,
-	validateFunc func(*bytes.Buffer) error, hashChannel, resultChannel chan []byte) *blockReductionCollector {
+	validateFunc func(*bytes.Buffer) error,
+	hashChannel, resultChannel chan *bytes.Buffer) *blockReductionCollector {
 
-	reductionCollector := newReductionCollector(committee, hashChannel,
-		resultChannel, timerLength, validateFunc)
+	reductionCollector := newReductionCollector(committee, timerLength, validateFunc,
+		hashChannel, resultChannel)
 
 	blockReductionCollector := &blockReductionCollector{
 		reductionCollector: reductionCollector,
-		hashChannel:        hashChannel,
-		resultChannel:      resultChannel,
 		unmarshaller:       newReductionEventUnmarshaller(validateFunc),
 	}
 
@@ -69,51 +66,70 @@ func (brc *blockReductionCollector) process(m *blockReduction) {
 	}
 }
 
-type blockReducer struct {
-	eventBus        *wire.EventBus
-	hashSubscriber  *EventSubscriber
-	roundSubscriber *EventSubscriber
+type BlockReducer struct {
+	eventBus            *wire.EventBus
+	reductionSubscriber *wire.EventSubscriber
+	voteSubscriber      *wire.EventSubscriber
+	roundSubscriber     *wire.EventSubscriber
 	*blockReductionCollector
 
-	hashChannel   <-chan []byte
-	resultChannel <-chan []byte
-	roundChannel  <-chan uint64
+	// channels linked to subscribers
+	voteChannel  <-chan []byte
+	roundChannel <-chan uint64
+
+	// channels linked to the reductioncollector
+	hashChannel   <-chan *bytes.Buffer
+	resultChannel <-chan *bytes.Buffer
 }
 
-func newBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	committee user.Committee, timerLength time.Duration) *blockReducer {
+func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
+	committee user.Committee, timerLength time.Duration) *BlockReducer {
 
-	hashChannel := make(chan []byte, 100)
+	voteChannel := make(chan []byte, 1)
 	roundChannel := make(chan uint64, 1)
-	resultChannel := make(chan []byte, 1)
+
+	hashChannel := make(chan *bytes.Buffer, 1)
+	resultChannel := make(chan *bytes.Buffer, 1)
 
 	reductionCollector := newBlockReductionCollector(committee, timerLength,
 		validateFunc, hashChannel, resultChannel)
-	hashSubscriber := NewEventSubscriber(eventBus, reductionCollector,
+	reductionSubscriber := wire.NewEventSubscriber(eventBus, reductionCollector,
 		string(topics.BlockReduction))
 
-	roundCollector := &RoundCollector{roundChannel}
-	roundSubscriber := NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
+	voteCollector := &voteCollector{voteChannel}
+	voteSubscriber := wire.NewEventSubscriber(eventBus, voteCollector, string(msg.SelectionResultTopic))
 
-	blockReducer := &blockReducer{
+	roundCollector := &roundCollector{roundChannel}
+	roundSubscriber := wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
+
+	blockReducer := &BlockReducer{
 		eventBus:                eventBus,
-		hashSubscriber:          hashSubscriber,
+		reductionSubscriber:     reductionSubscriber,
+		voteSubscriber:          voteSubscriber,
 		roundSubscriber:         roundSubscriber,
 		blockReductionCollector: reductionCollector,
+		voteChannel:             voteChannel,
+		roundChannel:            roundChannel,
+		hashChannel:             hashChannel,
+		resultChannel:           resultChannel,
 	}
 
 	return blockReducer
 }
 
-func (br blockReducer) vote(hash []byte, round uint64, step uint8) error {
+func (br BlockReducer) vote(hash []byte, round uint64, step uint8) error {
 	if !br.voted {
-		buffer := bytes.NewBuffer(hash)
+		buffer := new(bytes.Buffer)
 
 		if err := encoding.WriteUint64(buffer, binary.LittleEndian, round); err != nil {
 			return err
 		}
 
 		if err := encoding.WriteUint8(buffer, step); err != nil {
+			return err
+		}
+
+		if err := encoding.Write256(buffer, hash); err != nil {
 			return err
 		}
 
@@ -124,20 +140,22 @@ func (br blockReducer) vote(hash []byte, round uint64, step uint8) error {
 	return nil
 }
 
-func (br *blockReducer) Listen() {
-	go br.hashSubscriber.Accept()
+func (br *BlockReducer) Listen() {
+	go br.reductionSubscriber.Accept()
+	go br.voteSubscriber.Accept()
 	go br.roundSubscriber.Accept()
 
 	for {
 		select {
-		case blockHash := <-br.hashChannel:
+		case blockHash := <-br.voteChannel:
 			if err := br.vote(blockHash, br.currentRound, br.currentStep); err != nil {
 				// Log
 				return
 			}
+		case reductionVote := <-br.hashChannel:
+			br.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
 		case result := <-br.resultChannel:
-			buffer := bytes.NewBuffer(result)
-			br.eventBus.Publish(msg.OutgoingAgreementTopic, buffer)
+			br.eventBus.Publish(msg.OutgoingAgreementTopic, result)
 		default:
 			br.checkQueue()
 
@@ -148,17 +166,18 @@ func (br *blockReducer) Listen() {
 	}
 }
 
-func (br blockReducer) checkQueue() {
+func (br BlockReducer) checkQueue() {
 	queuedMessages := br.queue.GetMessages(br.currentRound, br.currentStep)
 
 	if queuedMessages != nil {
 		for _, message := range queuedMessages {
-			br.process(message)
+			m := message.(*blockReduction)
+			br.process(m)
 		}
 	}
 }
 
-func (br *blockReducer) checkRoundChannel() {
+func (br *BlockReducer) checkRoundChannel() {
 	select {
 	case round := <-br.roundChannel:
 		br.updateRound(round)
@@ -167,13 +186,22 @@ func (br *blockReducer) checkRoundChannel() {
 	}
 }
 
-// RoundCollector is a simple wrapper over a channel to get round notifications
-type RoundCollector struct {
+type voteCollector struct {
+	voteChannel chan<- []byte
+}
+
+func (v *voteCollector) Collect(blockBuffer *bytes.Buffer) error {
+	v.voteChannel <- blockBuffer.Bytes()
+	return nil
+}
+
+// roundCollector is a simple wrapper over a channel to get round notifications
+type roundCollector struct {
 	roundChan chan<- uint64
 }
 
 // Collect as specified in the EventCollector interface. In this case Collect simply performs unmarshalling of the round event
-func (r *RoundCollector) Collect(roundBuffer *bytes.Buffer) error {
+func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 	r.roundChan <- round
 	return nil

@@ -2,11 +2,13 @@ package reduction
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 type reductionCollector struct {
@@ -20,15 +22,15 @@ type reductionCollector struct {
 	votingCommittee map[string]uint8
 	queue           *reductionQueue
 	inputChannel    chan *reductionEvent
-	hashChannel     chan<- []byte
-	resultChannel   chan<- []byte
+	hashChannel     chan<- *bytes.Buffer
+	resultChannel   chan<- *bytes.Buffer
 	validate        func(*bytes.Buffer) error
 	voted           bool
 }
 
-func newReductionCollector(committee user.Committee, hashChannel chan []byte,
-	resultChannel chan []byte, timerLength time.Duration,
-	validateFunc func(*bytes.Buffer) error) *reductionCollector {
+func newReductionCollector(committee user.Committee, timerLength time.Duration,
+	validateFunc func(*bytes.Buffer) error,
+	hashChannel, resultChannel chan *bytes.Buffer) *reductionCollector {
 
 	queue := newReductionQueue()
 
@@ -92,6 +94,26 @@ func (rc *reductionCollector) setVotingCommittee() error {
 	return nil
 }
 
+func (rc reductionCollector) voteOn(hash []byte) error {
+	buffer := new(bytes.Buffer)
+
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, rc.currentRound); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(buffer, rc.currentStep); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(buffer, hash); err != nil {
+		return err
+	}
+
+	rc.hashChannel <- buffer
+	rc.voted = true
+	return nil
+}
+
 // runReduction will run a two-step reduction cycle. After two steps of voting,
 // the results are put into a function that deals with the outcome.
 func (rc *reductionCollector) runReduction() {
@@ -102,7 +124,10 @@ func (rc *reductionCollector) runReduction() {
 	}
 
 	// Vote on the result of first step
-	rc.hashChannel <- hash1
+	if err := rc.voteOn(hash1); err != nil {
+		// Log
+		return
+	}
 
 	hash2, voteSet2 := rc.decideOnHash()
 
@@ -188,15 +213,30 @@ func (rc reductionCollector) handleReductionResults(hash1, hash2 []byte, voteSet
 	voteSet2 []*msg.Vote) error {
 
 	if rc.reductionSuccessful(hash1, hash2, voteSet1, voteSet2) {
+		buffer := new(bytes.Buffer)
+		if err := encoding.WriteUint64(buffer, binary.LittleEndian, rc.currentRound); err != nil {
+			return err
+		}
+
+		if err := encoding.WriteUint8(buffer, rc.currentStep); err != nil {
+			return err
+		}
+
+		if err := encoding.Write256(buffer, hash2); err != nil {
+			return err
+		}
+
 		fullVoteSet := append(voteSet1, voteSet2...)
 		encodedVoteSet, err := msg.EncodeVoteSet(fullVoteSet)
 		if err != nil {
 			return err
 		}
 
-		result := append(hash2, encodedVoteSet...)
+		if _, err := buffer.Write(encodedVoteSet); err != nil {
+			return err
+		}
 
-		rc.resultChannel <- result
+		rc.resultChannel <- buffer
 	}
 
 	return nil
