@@ -3,6 +3,7 @@ package reduction
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -25,11 +26,9 @@ type blockReductionCollector struct {
 }
 
 func newBlockReductionCollector(committee committee.Committee, timerLength time.Duration,
-	validateFunc func(*bytes.Buffer) error,
-	hashChannel, resultChannel chan *bytes.Buffer) *blockReductionCollector {
+	validateFunc func(*bytes.Buffer) error) *blockReductionCollector {
 
-	reductionCollector := newReductionCollector(committee, timerLength, validateFunc,
-		hashChannel, resultChannel)
+	reductionCollector := newReductionCollector(committee, timerLength)
 
 	blockReductionCollector := &blockReductionCollector{
 		reductionCollector: reductionCollector,
@@ -40,7 +39,16 @@ func newBlockReductionCollector(committee committee.Committee, timerLength time.
 }
 
 func (brc *blockReductionCollector) updateRound(round uint64) {
+	brc.queue.Clear(brc.currentRound)
 	brc.currentRound = round
+	brc.currentStep = 1
+
+	if brc.reducing {
+		brc.stopSelector()
+		brc.reducing = false
+	}
+
+	brc.Clear()
 }
 
 func (brc *blockReductionCollector) Collect(buffer *bytes.Buffer) error {
@@ -57,10 +65,12 @@ func (brc *blockReductionCollector) process(m *BlockReduction) {
 	if brc.shouldBeProcessed(m) && blsVerified(m) {
 		if !brc.reducing {
 			brc.reducing = true
-			go brc.runReduction()
+			go brc.startSelector()
 		}
 
-		brc.inputChannel <- m
+		brc.incomingReductionChannel <- m
+		pubKeyStr := hex.EncodeToString(m.PubKeyBLS)
+		brc.Store(m, pubKeyStr)
 	} else if brc.shouldBeStored(m) && blsVerified(m) {
 		brc.queue.PutMessage(m.Round, m.Step, m)
 	}
@@ -76,10 +86,6 @@ type BlockReducer struct {
 	// channels linked to subscribers
 	voteChannel  <-chan []byte
 	roundChannel <-chan uint64
-
-	// channels linked to the reductioncollector
-	hashChannel   <-chan *bytes.Buffer
-	resultChannel <-chan *bytes.Buffer
 }
 
 func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
@@ -88,19 +94,18 @@ func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) e
 	voteChannel := make(chan []byte, 1)
 	roundChannel := make(chan uint64, 1)
 
-	hashChannel := make(chan *bytes.Buffer, 1)
-	resultChannel := make(chan *bytes.Buffer, 1)
-
 	reductionCollector := newBlockReductionCollector(committee, timerLength,
-		validateFunc, hashChannel, resultChannel)
+		validateFunc)
 	reductionSubscriber := wire.NewEventSubscriber(eventBus, reductionCollector,
 		string(topics.BlockReduction))
 
 	voteCollector := &voteCollector{voteChannel}
-	voteSubscriber := wire.NewEventSubscriber(eventBus, voteCollector, string(msg.SelectionResultTopic))
+	voteSubscriber := wire.NewEventSubscriber(eventBus, voteCollector,
+		string(msg.SelectionResultTopic))
 
 	roundCollector := &roundCollector{roundChannel}
-	roundSubscriber := wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
+	roundSubscriber := wire.NewEventSubscriber(eventBus, roundCollector,
+		string(msg.RoundUpdateTopic))
 
 	blockReducer := &BlockReducer{
 		eventBus:                eventBus,
@@ -110,34 +115,27 @@ func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) e
 		blockReductionCollector: reductionCollector,
 		voteChannel:             voteChannel,
 		roundChannel:            roundChannel,
-		hashChannel:             hashChannel,
-		resultChannel:           resultChannel,
 	}
 
 	return blockReducer
 }
 
-func (br BlockReducer) vote(hash []byte, round uint64, step uint8) error {
-	if !br.voted {
-		buffer := new(bytes.Buffer)
+func (br BlockReducer) addVoteInfo(data []byte) (*bytes.Buffer, error) {
+	buffer := new(bytes.Buffer)
 
-		if err := encoding.WriteUint64(buffer, binary.LittleEndian, round); err != nil {
-			return err
-		}
-
-		if err := encoding.WriteUint8(buffer, step); err != nil {
-			return err
-		}
-
-		if err := encoding.Write256(buffer, hash); err != nil {
-			return err
-		}
-
-		br.eventBus.Publish(msg.OutgoingReductionTopic, buffer)
-		br.voted = true
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, br.currentRound); err != nil {
+		return nil, err
 	}
 
-	return nil
+	if err := encoding.WriteUint8(buffer, br.currentStep); err != nil {
+		return nil, err
+	}
+
+	if _, err := buffer.Write(data); err != nil {
+		return nil, err
+	}
+
+	return buffer, nil
 }
 
 func (br *BlockReducer) Listen() {
@@ -148,14 +146,39 @@ func (br *BlockReducer) Listen() {
 	for {
 		select {
 		case blockHash := <-br.voteChannel:
-			if err := br.vote(blockHash, br.currentRound, br.currentStep); err != nil {
+			if !br.votedThisStep {
+				vote, err := br.addVoteInfo(blockHash)
+				if err != nil {
+					// Log
+					return
+				}
+
+				br.eventBus.Publish(msg.OutgoingReductionTopic, vote)
+				br.votedThisStep = true
+			}
+		case blockHash := <-br.hashChannel:
+			br.incrementStep()
+			vote, err := br.addVoteInfo(blockHash)
+			if err != nil {
 				// Log
 				return
 			}
-		case reductionVote := <-br.hashChannel:
-			br.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
+
+			br.eventBus.Publish(msg.OutgoingReductionTopic, vote)
+			br.votedThisStep = true
 		case result := <-br.resultChannel:
-			br.eventBus.Publish(msg.OutgoingAgreementTopic, result)
+			if result != nil {
+				vote, err := br.addVoteInfo(result)
+				if err != nil {
+					// Log
+					return
+				}
+
+				br.eventBus.Publish(msg.OutgoingAgreementTopic, vote)
+			}
+
+			br.incrementStep()
+			br.reducing = false
 		default:
 			br.checkQueue()
 

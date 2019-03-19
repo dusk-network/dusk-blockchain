@@ -9,8 +9,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-// reductionEventCollector is an helper for common operations on stored Event Arrays
-type reductionEventCollector map[string][]wire.Event
+// reductionEventCollector is a helper for common operations on stored Event Arrays
+type reductionEventCollector map[string]wire.Event
 
 // Clear up the Collector
 func (rec reductionEventCollector) Clear() {
@@ -19,32 +19,22 @@ func (rec reductionEventCollector) Clear() {
 	}
 }
 
-// Contains checks if we already collected this event
-func (rec reductionEventCollector) Contains(event wire.Event, hash string) bool {
-	for _, stored := range rec[hash] {
-		if event.Equal(stored) {
-			return true
-		}
+// Contains checks if we already collected an event for this public key
+func (rec reductionEventCollector) Contains(pubKey string) bool {
+	if rec[pubKey] != nil {
+		return true
 	}
 
 	return false
 }
 
 // Store the Event keeping track of the step it belongs to. It silently ignores duplicates (meaning it does not store an event in case it is already found at the step specified). It returns the number of events stored at specified step *after* the store operation
-func (rec reductionEventCollector) Store(event wire.Event, hash string) int {
-	eventList := rec[hash]
-	if rec.Contains(event, hash) {
-		return len(eventList)
+func (rec reductionEventCollector) Store(event wire.Event, pubKey string) {
+	if rec.Contains(pubKey) {
+		return
 	}
 
-	if eventList == nil {
-		eventList = make([]wire.Event, 0, 100)
-	}
-
-	// storing the agreement vote for the proper step
-	eventList = append(eventList, event)
-	rec[hash] = eventList
-	return len(eventList)
+	rec[pubKey] = event
 }
 
 type Event struct {
