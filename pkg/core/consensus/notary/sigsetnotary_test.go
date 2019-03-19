@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -84,9 +84,9 @@ func TestProcessFutureRounds(t *testing.T) {
 	}
 }
 
-func initNotary(quorum int) (*wire.EventBus, *SigSetCollector, user.Committee) {
+func initNotary(quorum int) (*wire.EventBus, *SigSetCollector, committee.Committee) {
 	bus := wire.New()
-	committee := mockCommittee(quorum, true, nil)
+	committee := committee.MockCommittee(quorum, true, nil)
 	notary := NewSigSetNotary(bus, nil, committee, uint64(1))
 
 	notary.sigSetCollector.Unmarshaller = newMockSEUnmarshaller([]byte("mock"), 1, 1)

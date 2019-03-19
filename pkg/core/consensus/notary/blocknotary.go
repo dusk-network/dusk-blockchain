@@ -4,48 +4,43 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 // BlockEvent expresses a vote on a block hash. It is a real type alias of notaryEvent
-type BlockEvent = eventHeader
+type BlockEvent = committee.Event
 
 // BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
-type BlockEventUnmarshaller = eventHeaderUnmarshaller
+type BlockEventUnmarshaller = committee.EventUnMarshaller
 
 // BlockCollector collects CommitteeEvent. When a Quorum is reached, it propagates the new Block Hash to the proper channel
 type BlockCollector struct {
-	*consensus.Collector
+	*committee.Collector
 	blockChan    chan<- []byte
+	currentRound uint64
 	Unmarshaller wire.EventUnmarshaller
 }
 
 // NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages.
-func NewBlockCollector(committee user.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
+func NewBlockCollector(c committee.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
-	cc := &consensus.Collector{
+	cc := &committee.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
-		committee:          committee,
+		Committee:          c,
 	}
 
 	return &BlockCollector{
 		Collector:    cc,
 		blockChan:    blockChan,
-		Unmarshaller: newCommitteeEventUnmarshaller(validateFunc),
+		Unmarshaller: committee.NewEventUnMarshaller(validateFunc),
 	}
-}
-
-// UpdateRound is used to change the current round
-func (c *BlockCollector) UpdateRound(round uint64) {
-	c.currentRound = round
 }
 
 // Collect as specifiec in the EventCollector interface. It dispatches the unmarshalled CommitteeEvent to Process method
 func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
-	ev := &BlockEvent{}
+	ev := committee.NewEvent() // BlockEvent is an alias of committee.Event
 	if err := c.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
 	}
@@ -63,7 +58,7 @@ func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
 func (c *BlockCollector) Process(event *BlockEvent) {
 	nrAgreements := c.Store(event, event.Step)
 	// did we reach the quorum?
-	if nrAgreements >= c.committee.Quorum() {
+	if nrAgreements >= c.Committee.Quorum() {
 		// notify the Notary
 		go func() { c.blockChan <- event.BlockHash }()
 		c.Clear()
@@ -83,12 +78,12 @@ type BlockNotary struct {
 // NewBlockNotary creates a BlockNotary by injecting the EventBus, the CommitteeStore and the message validation primitive
 func NewBlockNotary(eventBus *wire.EventBus,
 	validateFunc func(*bytes.Buffer) error,
-	committee user.Committee) *BlockNotary {
+	c committee.Committee) *BlockNotary {
 
 	blockChan := make(chan []byte, 1)
 	roundChan := make(chan uint64, 1)
 
-	blockCollector := NewBlockCollector(committee, blockChan, validateFunc)
+	blockCollector := NewBlockCollector(c, blockChan, validateFunc)
 	blockSubscriber := wire.NewEventSubscriber(eventBus,
 		blockCollector,
 		string(msg.BlockAgreementTopic))

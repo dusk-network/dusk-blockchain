@@ -1,35 +1,34 @@
-package notary
+package committee_test
 
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	c "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-func TestNotaryEventHeaderUnmarshaller(t *testing.T) {
+func TestEventUnmarshal(t *testing.T) {
 	validateFunc := func(*bytes.Buffer) error {
 		return nil
 	}
-	unmarshaller := newNotaryEventHeaderUnmarshaller(validateFunc)
+	unmarshaller := c.NewEventUnMarshaller(validateFunc)
 
 	step := uint8(1)
 	round := uint64(120)
 	blockHash, err := crypto.RandEntropy(32)
 	assert.Empty(t, err)
-	buf, err := mockNotaryEventBuffer(blockHash, round, step)
+	buf, err := mockEventBuffer(blockHash, round, step)
 	assert.Empty(t, err)
 
-	ev := &notaryEvent{}
+	ev := c.NewEvent()
 	assert.Empty(t, unmarshaller.Unmarshal(buf, ev))
 	assert.Equal(t, ev.Step, step)
 	assert.Equal(t, ev.Round, round)
@@ -40,33 +39,34 @@ func TestNotaryEventHeaderUnmarshaller(t *testing.T) {
 	assert.NotEmpty(t, ev.PubKeyBLS)
 }
 
-func mockNotaryEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer, error) {
+func mockEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer, error) {
 	pub, priv, _ := bls.GenKeyPair(rand.Reader)
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		return nil, err
 	}
-	signedVote, err := bls.Sign(privKeyBLS, pubKeyBLS, byte32)
+	signedVote, err := bls.Sign(priv, pub, byte32)
 	if err != nil {
 		return nil, err
 	}
 
-	vote := newVote(byte32, pubKeyBLS.Marshal(), signedVote.Compress(), step)
+	vote := newVote(byte32, pub.Marshal(), signedVote.Compress(), step)
 
-	eh := *eventHeader{
+	eh := &c.Event{
 		EventHeader: &consensus.EventHeader{
-			Round: round,
-			Step: step,
+			Round:     round,
+			Step:      step,
 			PubKeyBLS: pub.Marshal(),
-		}
-		SignedVoteSet: signedVote,
-		VoteSet: []*msg.Vote{vote},
-		BlockHash: byte32,
+		},
+		SignedVoteSet: signedVote.Compress(),
+		VoteSet:       []*msg.Vote{vote},
+		BlockHash:     blockHash,
 	}
 
-	ehm := &eventHeaderMarshaller{}
+	ehm := &c.EventUnMarshaller{}
 	buf := new(bytes.Buffer)
-	return ehm.Marshal(buf, eh), nil
+	ehm.Marshal(buf, eh)
+	return buf, nil
 }
 
 func newVote(hash []byte, pub []byte, sig []byte, step uint8) *msg.Vote {
@@ -78,7 +78,7 @@ func newVote(hash []byte, pub []byte, sig []byte, step uint8) *msg.Vote {
 	}
 }
 
-func mockCommittee(quorum int, isMember bool, verification error) user.Committee {
+func MockCommittee(quorum int, isMember bool, verification error) c.Committee {
 	committeeMock := &mocks.Committee{}
 	committeeMock.On("Quorum").Return(quorum)
 	committeeMock.On("VerifyVoteSet",

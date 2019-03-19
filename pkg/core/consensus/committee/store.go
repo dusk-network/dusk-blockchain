@@ -1,4 +1,4 @@
-package user
+package committee
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -15,20 +16,13 @@ import (
 
 const addProvisionerTopic = "addprovisioner"
 
-type Committee interface {
-	// isMember can accept a BLS Public Key or an Ed25519
-	IsMember([]byte) bool
-	GetVotingCommittee(uint64, uint8) (map[string]uint8, error)
-	VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError
-	Quorum() int
-}
-
+// CommitteeStore is the component that handles Committee formation and management
 type CommitteeStore struct {
 	eventBus              *wire.EventBus
 	addProvisionerChannel <-chan *bytes.Buffer
 	addProvisionerID      uint32
 
-	provisioners *Provisioners
+	provisioners *user.Provisioners
 	TotalWeight  uint64
 }
 
@@ -38,7 +32,7 @@ func NewCommitteeStore(eventBus *wire.EventBus) *CommitteeStore {
 	committeeStore := &CommitteeStore{
 		eventBus:              eventBus,
 		addProvisionerChannel: addProvisionerChannel,
-		provisioners:          &Provisioners{},
+		provisioners:          &user.Provisioners{},
 	}
 
 	addProvisionerID := committeeStore.eventBus.Subscribe(addProvisionerTopic,
@@ -69,15 +63,16 @@ func (c *CommitteeStore) Listen() {
 }
 
 // Get the provisioner committee and return it
-func (c CommitteeStore) Get() Provisioners {
+func (c CommitteeStore) Get() user.Provisioners {
 	return *c.provisioners
 }
 
-// PartakesInCommittee checks if the BLS key belongs to one of the Provisioners in the committee
+// IsMember checks if the BLS key belongs to one of the Provisioners in the committee
 func (c *CommitteeStore) IsMember(pubKeyBLS []byte) bool {
 	return c.provisioners.GetMember(pubKeyBLS) != nil
 }
 
+// GetVotingCommittee returns a voting comittee
 func (c *CommitteeStore) GetVotingCommittee(round uint64, step uint8) (map[string]uint8, error) {
 	return c.provisioners.CreateVotingCommittee(round, c.TotalWeight, step)
 }

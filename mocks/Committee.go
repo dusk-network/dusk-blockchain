@@ -11,6 +11,29 @@ type Committee struct {
 	mock.Mock
 }
 
+// GetVotingCommittee provides a mock function with given fields: _a0, _a1
+func (_m *Committee) GetVotingCommittee(_a0 uint64, _a1 uint8) (map[string]uint8, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 map[string]uint8
+	if rf, ok := ret.Get(0).(func(uint64, uint8) map[string]uint8); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]uint8)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(uint64, uint8) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // IsMember provides a mock function with given fields: _a0
 func (_m *Committee) IsMember(_a0 []byte) bool {
 	ret := _m.Called(_a0)
