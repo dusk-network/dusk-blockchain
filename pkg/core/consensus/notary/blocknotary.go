@@ -19,7 +19,6 @@ type BlockEventUnmarshaller = committee.EventUnMarshaller
 type BlockCollector struct {
 	*committee.Collector
 	blockChan    chan<- []byte
-	currentRound uint64
 	Unmarshaller wire.EventUnmarshaller
 }
 
@@ -45,7 +44,7 @@ func (c *BlockCollector) Collect(buffer *bytes.Buffer) error {
 		return err
 	}
 
-	isIrrelevant := c.currentRound != 0 && c.currentRound != ev.Round
+	isIrrelevant := c.CurrentRound != 0 && c.CurrentRound != ev.Round
 	if c.ShouldBeSkipped(ev) || isIrrelevant {
 		return nil
 	}

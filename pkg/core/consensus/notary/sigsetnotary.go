@@ -80,7 +80,7 @@ func NewSigSetCollector(c committee.Committee, roundChan chan uint64, validateFu
 
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
 func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
-	ev := &SigSetEvent{Event: &committee.Event{}}
+	ev := NewSigSetEvent()
 	if err := s.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
 	}

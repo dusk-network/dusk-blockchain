@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	c "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -76,16 +74,4 @@ func newVote(hash []byte, pub []byte, sig []byte, step uint8) *msg.Vote {
 		SignedHash: sig,
 		Step:       step,
 	}
-}
-
-func MockCommittee(quorum int, isMember bool, verification error) c.Committee {
-	committeeMock := &mocks.Committee{}
-	committeeMock.On("Quorum").Return(quorum)
-	committeeMock.On("VerifyVoteSet",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(verification)
-	committeeMock.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
-	return committeeMock
 }

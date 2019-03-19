@@ -16,8 +16,8 @@ import (
 
 const addProvisionerTopic = "addprovisioner"
 
-// CommitteeStore is the component that handles Committee formation and management
-type CommitteeStore struct {
+// Store is the component that handles Committee formation and management
+type Store struct {
 	eventBus              *wire.EventBus
 	addProvisionerChannel <-chan *bytes.Buffer
 	addProvisionerID      uint32
@@ -26,10 +26,11 @@ type CommitteeStore struct {
 	TotalWeight  uint64
 }
 
-func NewCommitteeStore(eventBus *wire.EventBus) *CommitteeStore {
+// NewCommitteeStore creates a new Store
+func NewCommitteeStore(eventBus *wire.EventBus) *Store {
 	addProvisionerChannel := make(chan *bytes.Buffer, 100)
 
-	committeeStore := &CommitteeStore{
+	committeeStore := &Store{
 		eventBus:              eventBus,
 		addProvisionerChannel: addProvisionerChannel,
 		provisioners:          &user.Provisioners{},
@@ -42,7 +43,8 @@ func NewCommitteeStore(eventBus *wire.EventBus) *CommitteeStore {
 	return committeeStore
 }
 
-func (c *CommitteeStore) Listen() {
+// Listen for
+func (c *Store) Listen() {
 	for {
 		select {
 		case newProvisionerBytes := <-c.addProvisionerChannel:
@@ -63,22 +65,22 @@ func (c *CommitteeStore) Listen() {
 }
 
 // Get the provisioner committee and return it
-func (c CommitteeStore) Get() user.Provisioners {
+func (c Store) Get() user.Provisioners {
 	return *c.provisioners
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
-func (c *CommitteeStore) IsMember(pubKeyBLS []byte) bool {
+func (c *Store) IsMember(pubKeyBLS []byte) bool {
 	return c.provisioners.GetMember(pubKeyBLS) != nil
 }
 
 // GetVotingCommittee returns a voting comittee
-func (c *CommitteeStore) GetVotingCommittee(round uint64, step uint8) (map[string]uint8, error) {
+func (c *Store) GetVotingCommittee(round uint64, step uint8) (map[string]uint8, error) {
 	return c.provisioners.CreateVotingCommittee(round, c.TotalWeight, step)
 }
 
 // Quorum returns the amount of votes to reach a quorum
-func (c CommitteeStore) Quorum() int {
+func (c Store) Quorum() int {
 	committeeSize := len(*c.provisioners)
 	if committeeSize > 50 {
 		committeeSize = 50
@@ -88,7 +90,8 @@ func (c CommitteeStore) Quorum() int {
 	return quorum
 }
 
-func (c CommitteeStore) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
+// VerifyVoteSet checks the signature of the set
+func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
 	step uint8) *prerror.PrError {
 
 	var amountOfVotes uint8

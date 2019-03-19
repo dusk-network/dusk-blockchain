@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -130,11 +131,10 @@ func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 }
 
 func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
-	ev := &BlockEvent{
-		BlockHash: blockHash,
-		Step:      step,
-		Round:     round,
-	}
+	ev := committee.NewEvent()
+	ev.BlockHash = blockHash
+	ev.Step = step
+	ev.Round = round
 
 	return &MockBEUnmarshaller{
 		event: ev,

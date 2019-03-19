@@ -86,7 +86,7 @@ func TestProcessFutureRounds(t *testing.T) {
 
 func initNotary(quorum int) (*wire.EventBus, *SigSetCollector, committee.Committee) {
 	bus := wire.New()
-	committee := committee.MockCommittee(quorum, true, nil)
+	committee := mockCommittee(quorum, true, nil)
 	notary := NewSigSetNotary(bus, nil, committee, uint64(1))
 
 	notary.sigSetCollector.Unmarshaller = newMockSEUnmarshaller([]byte("mock"), 1, 1)
@@ -114,9 +114,7 @@ func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 }
 
 func newMockSEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
-	ev := &SigSetEvent{
-		committeeEvent: &committeeEvent{},
-	}
+	ev := NewSigSetEvent()
 	ev.BlockHash = blockHash
 	ev.Round = round
 	ev.Step = step
