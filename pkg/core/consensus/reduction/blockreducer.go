@@ -11,11 +11,11 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 )
 
-type blockReduction = reductionEvent
+type BlockReduction = Event
 
 type blockReductionCollector struct {
 	*reductionCollector
@@ -24,7 +24,7 @@ type blockReductionCollector struct {
 	reducing bool
 }
 
-func newBlockReductionCollector(committee user.Committee, timerLength time.Duration,
+func newBlockReductionCollector(committee committee.Committee, timerLength time.Duration,
 	validateFunc func(*bytes.Buffer) error,
 	hashChannel, resultChannel chan *bytes.Buffer) *blockReductionCollector {
 
@@ -44,7 +44,7 @@ func (brc *blockReductionCollector) updateRound(round uint64) {
 }
 
 func (brc *blockReductionCollector) Collect(buffer *bytes.Buffer) error {
-	event := &reductionEvent{}
+	event := &Event{}
 	if err := brc.unmarshaller.Unmarshal(buffer, event); err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (brc *blockReductionCollector) Collect(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func (brc *blockReductionCollector) process(m *blockReduction) {
+func (brc *blockReductionCollector) process(m *BlockReduction) {
 	if brc.shouldBeProcessed(m) && blsVerified(m) {
 		if !brc.reducing {
 			brc.reducing = true
@@ -83,7 +83,7 @@ type BlockReducer struct {
 }
 
 func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	committee user.Committee, timerLength time.Duration) *BlockReducer {
+	committee committee.Committee, timerLength time.Duration) *BlockReducer {
 
 	voteChannel := make(chan []byte, 1)
 	roundChannel := make(chan uint64, 1)
@@ -171,7 +171,7 @@ func (br BlockReducer) checkQueue() {
 
 	if queuedMessages != nil {
 		for _, message := range queuedMessages {
-			m := message.(*blockReduction)
+			m := message.(*BlockReduction)
 			br.process(m)
 		}
 	}

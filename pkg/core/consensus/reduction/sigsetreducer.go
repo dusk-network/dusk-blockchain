@@ -8,19 +8,19 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-type sigSetReduction struct {
-	*reductionEvent
+type SigSetReduction struct {
+	*Event
 	winningBlockHash []byte
 }
 
-func (ssr *sigSetReduction) Equal(e wire.Event) bool {
-	return ssr.reductionEvent.Equal(e) &&
-		bytes.Equal(ssr.winningBlockHash, e.(*sigSetReduction).winningBlockHash)
+func (ssr *SigSetReduction) Equal(e wire.Event) bool {
+	return ssr.Event.Equal(e) &&
+		bytes.Equal(ssr.winningBlockHash, e.(*SigSetReduction).winningBlockHash)
 }
 
 type sigSetReductionUnmarshaller struct {
@@ -32,9 +32,9 @@ func newSigSetReductionUnmarshaller(validate func(*bytes.Buffer) error) *reducti
 }
 
 func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
-	sigSetReduction := e.(*sigSetReduction)
+	sigSetReduction := e.(*SigSetReduction)
 
-	if err := ssru.reductionEventUnmarshaller.Unmarshal(r, sigSetReduction.reductionEvent); err != nil {
+	if err := ssru.reductionEventUnmarshaller.Unmarshal(r, sigSetReduction.Event); err != nil {
 		return err
 	}
 
@@ -53,7 +53,7 @@ type sigSetReductionCollector struct {
 	winningBlockHash []byte
 }
 
-func newSigSetReductionCollector(committee user.Committee, timerLength time.Duration,
+func newSigSetReductionCollector(committee committee.Committee, timerLength time.Duration,
 	validateFunc func(*bytes.Buffer) error,
 	hashChannel, resultChannel chan *bytes.Buffer) *sigSetReductionCollector {
 
@@ -73,12 +73,12 @@ func (ssrc *sigSetReductionCollector) updateRound(round uint64) {
 	ssrc.currentRound = round
 }
 
-func (ssrc sigSetReductionCollector) correctWinningBlockHash(m *sigSetReduction) bool {
+func (ssrc sigSetReductionCollector) correctWinningBlockHash(m *SigSetReduction) bool {
 	return bytes.Equal(m.winningBlockHash, ssrc.winningBlockHash)
 }
 
 func (ssrc *sigSetReductionCollector) Collect(buffer *bytes.Buffer) error {
-	event := &sigSetReduction{}
+	event := &SigSetReduction{}
 	if err := ssrc.unmarshaller.Unmarshal(buffer, event); err != nil {
 		return err
 	}
@@ -87,8 +87,8 @@ func (ssrc *sigSetReductionCollector) Collect(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func (ssrc *sigSetReductionCollector) process(m *sigSetReduction) {
-	if ssrc.shouldBeProcessed(m.reductionEvent) && blsVerified(m.reductionEvent) &&
+func (ssrc *sigSetReductionCollector) process(m *SigSetReduction) {
+	if ssrc.shouldBeProcessed(m.Event) && blsVerified(m.Event) &&
 		ssrc.winningBlockHash != nil && ssrc.correctWinningBlockHash(m) {
 
 		if !ssrc.reducing {
@@ -96,8 +96,8 @@ func (ssrc *sigSetReductionCollector) process(m *sigSetReduction) {
 			go ssrc.runReduction()
 		}
 
-		ssrc.inputChannel <- m.reductionEvent
-	} else if ssrc.shouldBeStored(m.reductionEvent) && blsVerified(m.reductionEvent) {
+		ssrc.inputChannel <- m.Event
+	} else if ssrc.shouldBeStored(m.Event) && blsVerified(m.Event) {
 		ssrc.queue.PutMessage(m.Round, m.Step, m)
 	}
 }
@@ -121,7 +121,7 @@ type SigSetReducer struct {
 }
 
 func NewSigSetReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	committee user.Committee, timerLength time.Duration) *SigSetReducer {
+	committee committee.Committee, timerLength time.Duration) *SigSetReducer {
 
 	voteChannel := make(chan []byte, 1)
 	phaseUpdateChannel := make(chan []byte, 1)
@@ -222,7 +222,7 @@ func (sr SigSetReducer) checkQueue() {
 
 	if queuedMessages != nil {
 		for _, message := range queuedMessages {
-			m := message.(*sigSetReduction)
+			m := message.(*SigSetReduction)
 			sr.process(m)
 		}
 	}

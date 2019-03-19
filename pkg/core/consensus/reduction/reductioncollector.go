@@ -6,14 +6,14 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 type reductionCollector struct {
 	*reductionEventCollector
-	committee    user.Committee
+	committee    committee.Committee
 	currentRound uint64
 	currentStep  uint8
 
@@ -21,14 +21,14 @@ type reductionCollector struct {
 
 	votingCommittee map[string]uint8
 	queue           *reductionQueue
-	inputChannel    chan *reductionEvent
+	inputChannel    chan *Event
 	hashChannel     chan<- *bytes.Buffer
 	resultChannel   chan<- *bytes.Buffer
 	validate        func(*bytes.Buffer) error
 	voted           bool
 }
 
-func newReductionCollector(committee user.Committee, timerLength time.Duration,
+func newReductionCollector(committee committee.Committee, timerLength time.Duration,
 	validateFunc func(*bytes.Buffer) error,
 	hashChannel, resultChannel chan *bytes.Buffer) *reductionCollector {
 
@@ -39,7 +39,7 @@ func newReductionCollector(committee user.Committee, timerLength time.Duration,
 		committee:               committee,
 		timerLength:             timerLength,
 		queue:                   &queue,
-		inputChannel:            make(chan *reductionEvent, 100),
+		inputChannel:            make(chan *Event, 100),
 		hashChannel:             hashChannel,
 		resultChannel:           resultChannel,
 		validate:                validateFunc,
@@ -48,11 +48,11 @@ func newReductionCollector(committee user.Committee, timerLength time.Duration,
 	return reductionCollector
 }
 
-func blsVerified(m *reductionEvent) bool {
+func blsVerified(m *Event) bool {
 	return msg.VerifyBLSSignature(m.PubKeyBLS, m.VotedHash, m.SignedHash) == nil
 }
 
-func (rc reductionCollector) shouldBeProcessed(m *reductionEvent) bool {
+func (rc reductionCollector) shouldBeProcessed(m *Event) bool {
 	hashStr := hex.EncodeToString(m.VotedHash)
 	isDupe := rc.Contains(m, hashStr)
 
@@ -64,7 +64,7 @@ func (rc reductionCollector) shouldBeProcessed(m *reductionEvent) bool {
 	return !isDupe && isVoter && isRelevant
 }
 
-func (rc reductionCollector) shouldBeStored(m *reductionEvent) bool {
+func (rc reductionCollector) shouldBeStored(m *Event) bool {
 	futureRound := rc.currentRound < m.Round
 	futureStep := rc.currentStep < m.Step
 
@@ -190,7 +190,7 @@ func (rc *reductionCollector) decideOnHash() ([]byte, []*msg.Vote) {
 	}
 }
 
-func createVote(m *reductionEvent) *msg.Vote {
+func createVote(m *Event) *msg.Vote {
 	return &msg.Vote{
 		VotedHash:  m.VotedHash,
 		PubKeyBLS:  m.PubKeyBLS,

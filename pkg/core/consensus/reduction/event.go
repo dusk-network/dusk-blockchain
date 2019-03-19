@@ -47,7 +47,7 @@ func (rec reductionEventCollector) Store(event wire.Event, hash string) int {
 	return len(eventList)
 }
 
-type reductionEvent struct {
+type Event struct {
 	VotedHash  []byte
 	SignedHash []byte
 	PubKeyBLS  []byte
@@ -56,9 +56,9 @@ type reductionEvent struct {
 }
 
 // Equal as specified in the Event interface
-func (r *reductionEvent) Equal(e wire.Event) bool {
-	other, ok := e.(*reductionEvent)
-	return ok && (bytes.Equal(r.PubKeyBLS, other.PubKeyBLS)) && (r.Round == other.Round) && (r.Step == other.Step)
+func (e *Event) Equal(ev wire.Event) bool {
+	other, ok := ev.(*Event)
+	return ok && (bytes.Equal(e.PubKeyBLS, other.PubKeyBLS)) && (e.Round == other.Round) && (e.Step == other.Step)
 }
 
 type reductionEventUnmarshaller struct {
@@ -75,7 +75,7 @@ func (a *reductionEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 		return err
 	}
 
-	reductionEvent, ok := ev.(*reductionEvent)
+	reductionEvent, ok := ev.(*Event)
 	if !ok {
 		return errors.New("type casting event failed")
 	}
