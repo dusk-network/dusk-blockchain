@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -12,29 +13,29 @@ import (
 
 // SigSetEvent is a CommitteeEvent decorated with the signature set hash
 type SigSetEvent struct {
-	*committeeEvent
+	*eventHeader
 	sigSetHash []byte
 }
 
 // Equal as specified in the Event interface
 func (sse *SigSetEvent) Equal(e wire.Event) bool {
-	return sse.committeeEvent.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
+	return sse.eventHeader.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
 }
 
 type sigSetEventUnmarshaller struct {
-	*committeeEventUnmarshaller
+	*eventHeaderUnmarshaller
 }
 
-func newSigSetEventUnmarshaller(validate func(*bytes.Buffer) error) *committeeEventUnmarshaller {
-	return &committeeEventUnmarshaller{validate}
+func newSigSetEventUnmarshaller(validate func(*bytes.Buffer) error) *eventHeaderUnmarshaller {
+	return &eventHeaderUnmarshaller{validate}
 }
 
 // Unmarshal as specified in the Event interface
-func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func (sseu *sigSetEventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	// if the type checking is unsuccessful, it means that the injection is wrong. So panic!
 	sigSetEv := ev.(*SigSetEvent)
 
-	if err := sseu.committeeEventUnmarshaller.Unmarshal(r, sigSetEv.committeeEvent); err != nil {
+	if err := sseu.eventHeaderUnmarshaller.Unmarshal(r, sigSetEv.notaryEvent); err != nil {
 		return err
 	}
 
@@ -49,7 +50,7 @@ func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 // The SigSetEvents for the current round are grouped by step. Future messages are grouped by round number
 // Finally a round update should be propagated when we get enough SigSetEvent messages for a given step
 type SigSetCollector struct {
-	*CommitteeCollector
+	*consensus.Collector
 	roundChan    chan<- uint64
 	futureRounds map[uint64][]*SigSetEvent
 	Unmarshaller wire.EventUnmarshaller
@@ -58,22 +59,22 @@ type SigSetCollector struct {
 // NewSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
 func NewSigSetCollector(committee user.Committee, roundChan chan uint64, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
 
-	cc := &CommitteeCollector{
+	cc := &consensus.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
 		committee:          committee,
 		currentRound:       currentRound,
 	}
 	return &SigSetCollector{
-		CommitteeCollector: cc,
-		roundChan:          roundChan,
-		futureRounds:       make(map[uint64][]*SigSetEvent),
-		Unmarshaller:       newSigSetEventUnmarshaller(validateFunc),
+		Collector:    cc,
+		roundChan:    roundChan,
+		futureRounds: make(map[uint64][]*SigSetEvent),
+		Unmarshaller: newSigSetEventUnmarshaller(validateFunc),
 	}
 }
 
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
 func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
-	ev := &SigSetEvent{committeeEvent: &committeeEvent{}}
+	ev := &SigSetEvent{notaryEvent: &notaryEvent{}}
 	if err := s.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
 	}
@@ -85,14 +86,14 @@ func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
 // ShouldBeStored checks if the message should be stored either in the current round queue or among future messages
 func (s *SigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 	step := m.Step
-	sigSetList := s.CommitteeCollector.StepEventCollector[step]
+	sigSetList := s.Collector.StepEventCollector[step]
 	return len(sigSetList)+1 < s.committee.Quorum() || m.Round > s.currentRound
 }
 
 // Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
 func (s *SigSetCollector) Process(event *SigSetEvent) {
 	isIrrelevant := s.currentRound != 0 && s.currentRound > event.Round
-	if s.ShouldBeSkipped(event.committeeEvent) || isIrrelevant {
+	if s.ShouldBeSkipped(event.notaryEvent) || isIrrelevant {
 		return
 	}
 

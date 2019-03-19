@@ -11,6 +11,11 @@ type EventUnmarshaller interface {
 	Unmarshal(*bytes.Buffer, Event) error
 }
 
+// EventMarshaller is the specular operation of an EventUnmarshaller. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
+type EventMarshaller interface {
+	Marshal(*bytes.Buffer, Event) error
+}
+
 // The Event is an Entity that represents the Messages travelling on the EventBus. It would normally present always the same fields.
 type Event interface {
 	Equal(Event) bool

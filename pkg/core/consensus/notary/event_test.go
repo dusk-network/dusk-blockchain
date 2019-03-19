@@ -16,20 +16,20 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-func TestCommitteeEventUnmarshaller(t *testing.T) {
+func TestNotaryEventHeaderUnmarshaller(t *testing.T) {
 	validateFunc := func(*bytes.Buffer) error {
 		return nil
 	}
-	unmarshaller := newCommitteeEventUnmarshaller(validateFunc)
+	unmarshaller := newNotaryEventHeaderUnmarshaller(validateFunc)
 
 	step := uint8(1)
 	round := uint64(120)
 	blockHash, err := crypto.RandEntropy(32)
 	assert.Empty(t, err)
-	buf, err := mockCommitteeEventBuffer(blockHash, round, step)
+	buf, err := mockNotaryEventBuffer(blockHash, round, step)
 	assert.Empty(t, err)
 
-	ev := &committeeEvent{}
+	ev := &notaryEvent{}
 	assert.Empty(t, unmarshaller.Unmarshal(buf, ev))
 	assert.Equal(t, ev.Step, step)
 	assert.Equal(t, ev.Round, round)
@@ -40,15 +40,8 @@ func TestCommitteeEventUnmarshaller(t *testing.T) {
 	assert.NotEmpty(t, ev.PubKeyBLS)
 }
 
-func mockCommitteeEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer, error) {
+func mockNotaryEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer, error) {
 	pub, priv, _ := bls.GenKeyPair(rand.Reader)
-
-	return newCommitteeEventBuffer(blockHash, round, step, pub, priv)
-}
-
-func newCommitteeEventBuffer(blockHash []byte, round uint64, step uint8,
-	pubKeyBLS *bls.PublicKey, privKeyBLS *bls.SecretKey) (*bytes.Buffer, error) {
-
 	byte32, err := crypto.RandEntropy(32)
 	if err != nil {
 		return nil, err
@@ -60,41 +53,20 @@ func newCommitteeEventBuffer(blockHash []byte, round uint64, step uint8,
 
 	vote := newVote(byte32, pubKeyBLS.Marshal(), signedVote.Compress(), step)
 
-	votes := []*msg.Vote{vote}
-
-	bvotes, err := msg.EncodeVoteSet(votes)
-	if err != nil {
-		return nil, err
+	eh := *eventHeader{
+		EventHeader: &consensus.EventHeader{
+			Round: round,
+			Step: step,
+			PubKeyBLS: pub.Marshal(),
+		}
+		SignedVoteSet: signedVote,
+		VoteSet: []*msg.Vote{vote},
+		BlockHash: byte32,
 	}
 
-	buffer := bytes.NewBuffer(bvotes)
-
-	signedBlockHash, err := bls.Sign(privKeyBLS, pubKeyBLS, blockHash)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteBLS(buffer, signedBlockHash.Compress()); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteVarBytes(buffer, pubKeyBLS.Marshal()); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.Write256(buffer, blockHash); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, round); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint8(buffer, step); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
+	ehm := &eventHeaderMarshaller{}
+	buf := new(bytes.Buffer)
+	return ehm.Marshal(buf, eh), nil
 }
 
 func newVote(hash []byte, pub []byte, sig []byte, step uint8) *msg.Vote {

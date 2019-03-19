@@ -4,20 +4,21 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-// BlockEvent expresses a vote on a block hash. It is a real type alias of committeeEvent
-type BlockEvent = committeeEvent
+// BlockEvent expresses a vote on a block hash. It is a real type alias of notaryEvent
+type BlockEvent = eventHeader
 
-// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real type alias of committeeEventUnmarshaller
-type BlockEventUnmarshaller = committeeEventUnmarshaller
+// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
+type BlockEventUnmarshaller = eventHeaderUnmarshaller
 
 // BlockCollector collects CommitteeEvent. When a Quorum is reached, it propagates the new Block Hash to the proper channel
 type BlockCollector struct {
-	*CommitteeCollector
+	*consensus.Collector
 	blockChan    chan<- []byte
 	Unmarshaller wire.EventUnmarshaller
 }
@@ -25,15 +26,15 @@ type BlockCollector struct {
 // NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages.
 func NewBlockCollector(committee user.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
-	cc := &CommitteeCollector{
+	cc := &consensus.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
 		committee:          committee,
 	}
 
 	return &BlockCollector{
-		CommitteeCollector: cc,
-		blockChan:          blockChan,
-		Unmarshaller:       newCommitteeEventUnmarshaller(validateFunc),
+		Collector:    cc,
+		blockChan:    blockChan,
+		Unmarshaller: newCommitteeEventUnmarshaller(validateFunc),
 	}
 }
 
