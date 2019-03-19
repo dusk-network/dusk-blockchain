@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 // EventUnmarshaller unmarshals an Event from a buffer. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
@@ -56,7 +55,7 @@ func (sec StepEventCollector) Store(event Event, step uint8) int {
 	}
 
 	if eventList == nil {
-		eventList = make([]wire.Event, 0, 100)
+		eventList = make([]Event, 0, 100)
 	}
 
 	// storing the agreement vote for the proper step
