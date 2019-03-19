@@ -1,9 +1,9 @@
 package connlstnr
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"net"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 )
 
 // Config contains all functions which will be set by the caller to setup the connection listener
@@ -24,7 +24,4 @@ type Config struct {
 
 	// Failed is used to tell the AddrMgr that they had tried connecting an address and have failed
 	Failed func(string)
-
-	// GetLatestHeader returns the most recent header
-	GetLatestHeader func() (*payload.BlockHeader, error)
 }

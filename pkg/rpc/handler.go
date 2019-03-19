@@ -20,11 +20,11 @@ type JSONResponse struct {
 	Error  string `json:"error"`
 }
 
-// HandleRequest takes a JSON-RPC request and parses it, then returns the result to the
+// handleRequest takes a JSON-RPC request and parses it, then returns the result to the
 // message sender.
-func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request, isAdmin bool) {
+func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, isAdmin bool) {
 	// Only handle requests if server is started
-	if !s.Started {
+	if !s.started {
 		return
 	}
 
@@ -43,7 +43,7 @@ func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
 	}
 
 	// Parse and run passed method
-	result, err := s.RunCmd(&req, isAdmin)
+	result, err := s.runCmd(&req, isAdmin)
 	if err != nil {
 		// Request was unauthorized, so return a http.Error
 		w.Header().Add("WWW-Authenticate", `Basic realm="duskd admin RPC"`)
@@ -61,13 +61,13 @@ func (s *Server) HandleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
 	}
 }
 
-// RunCmd parses and runs the specified method. Server is included as the receiver in case
+// runCmd parses and runs the specified method. Server is included as the receiver in case
 // the method needs to modify anything on the RPC server.
-func (s *Server) RunCmd(r *JSONRequest, isAdmin bool) (*JSONResponse, error) {
+func (s *Server) runCmd(r *JSONRequest, isAdmin bool) (*JSONResponse, error) {
 	var resp JSONResponse
 
 	// Get method
-	fn, ok := RPCCmd[r.Method]
+	fn, ok := rpcCmd[r.Method]
 	if !ok {
 		resp.Result = "error"
 		resp.Error = "method unrecognized"
@@ -75,10 +75,8 @@ func (s *Server) RunCmd(r *JSONRequest, isAdmin bool) (*JSONResponse, error) {
 	}
 
 	// Check if it is an admin-only method first if caller is not admin
-	if !isAdmin {
-		if RPCAdminCmd[r.Method] {
-			return nil, fmt.Errorf("unauthorized call to method %v", r.Method)
-		}
+	if !isAdmin && rpcAdminCmd[r.Method] {
+		return nil, fmt.Errorf("unauthorized call to method %v", r.Method)
 	}
 
 	// Run method and return result

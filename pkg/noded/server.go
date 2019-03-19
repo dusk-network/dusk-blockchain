@@ -11,7 +11,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/connmgr/connlstnr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermgr"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/syncmgr"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
@@ -54,9 +53,6 @@ func setup() {
 	server.Run()
 
 	ip, _ := util.GetOutboundIP()
-
-	nodeAddr := payload.NetAddress{ip, config.EnvNetCfg.Peer.Port}
-	log.WithField("prefix", "noded").Infof("Node server is running on %s", nodeAddr.String())
 
 	// Prevent the server from stopping.
 	// Server can only be stopped by 'done <- true' or Ctrl-C.
@@ -111,7 +107,6 @@ func (s *NodeServer) setupConnMgr(sm *syncmgr.Syncmgr, am *addrmgr.Addrmgr, bc *
 		am.ConnectionComplete,
 		am.NewAddres,
 		am.Failed,
-		bc.GetLatestHeader,
 	})
 
 	return connmgr.New(connmgr.Config{

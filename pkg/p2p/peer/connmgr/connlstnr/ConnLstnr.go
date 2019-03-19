@@ -1,8 +1,9 @@
 package connlstnr
 
 import (
-	log "github.com/sirupsen/logrus"
 	"net"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // connlstnr listens to events typically related to connections
@@ -36,10 +37,6 @@ func (c *connlstnr) OnConnection(conn net.Conn, addr string) {
 
 	log.WithField("prefix", "connmgr").Infof("Connected successfully to peer %s", p.RemoteAddr().String())
 
-	latestHdr, _ := c.config.GetLatestHeader()
-	if err = p.RequestHeaders(latestHdr.Hash); err != nil {
-		log.WithField("prefix", "connmgr").Errorf("Failed to request headers from peer %s: %s", addr, err.Error())
-	}
 }
 
 // OnAccept is called when a successful inbound connection has been made

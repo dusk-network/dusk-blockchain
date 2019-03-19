@@ -16,6 +16,10 @@ type Vote struct {
 	Step       uint8  // Step this vote occurred at
 }
 
+func (v *Vote) Equals(other *Vote) bool {
+	return bytes.Equal(v.PubKeyBLS, other.PubKeyBLS) && v.Step == other.Step
+}
+
 func DecodeVoteSet(r io.Reader) ([]*Vote, error) {
 	lVotes, err := encoding.ReadVarInt(r)
 	if err != nil {
