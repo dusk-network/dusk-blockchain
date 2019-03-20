@@ -79,7 +79,8 @@ type EventSubscriber struct {
 }
 
 // NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus. The EventBus, EventCollector and Topic are injected
-func NewEventSubscriber(eventBus *EventBus, collector EventCollector, topic string) {
+func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
+	topic string) *EventSubscriber {
 
 	quitChan := make(chan *bytes.Buffer, 1)
 	msgChan := make(chan *bytes.Buffer, 100)
@@ -87,7 +88,7 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector, topic stri
 	msgChanID := eventBus.Subscribe(topic, msgChan)
 	quitChanID := eventBus.Subscribe(string(QuitTopic), quitChan)
 
-	es := &EventSubscriber{
+	return &EventSubscriber{
 		eventBus:       eventBus,
 		msgChan:        msgChan,
 		msgChanID:      msgChanID,
@@ -96,8 +97,6 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector, topic stri
 		topic:          topic,
 		eventCollector: collector,
 	}
-
-	go es.Accept()
 }
 
 // Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect
