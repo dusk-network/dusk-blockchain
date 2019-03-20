@@ -79,7 +79,8 @@ type EventSubscriber struct {
 }
 
 // NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus. The EventBus, EventCollector and Topic are injected
-func NewEventSubscriber(eventBus *EventBus, collector EventCollector, topic string) *EventSubscriber {
+func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
+	topic string) *EventSubscriber {
 
 	quitChan := make(chan *bytes.Buffer, 1)
 	msgChan := make(chan *bytes.Buffer, 100)
