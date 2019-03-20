@@ -85,7 +85,7 @@ func (rc reductionCollector) startSelector() {
 	rc.resultChannel = make(chan []byte, 1)
 
 	// create a new selector and start it
-	rs := newReductionSelector(rc.incomingReductionChannel, rc.hashChannel,
+	rs := newHashSelector(rc.incomingReductionChannel, rc.hashChannel,
 		rc.resultChannel, rc.committee.Quorum(), rc.timeOut)
 
 	go rs.runReduction()
