@@ -9,7 +9,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-type reductionSelector struct {
+type hashSelector struct {
 	incomingReductionChannel chan *Event
 	hashChannel              chan []byte
 	resultChannel            chan []byte
@@ -19,11 +19,11 @@ type reductionSelector struct {
 	timeOut time.Duration
 }
 
-func newReductionSelector(incomingReductionChannel chan *Event,
+func newHashSelector(incomingReductionChannel chan *Event,
 	hashChannel, resultChannel chan []byte, quorum int,
-	timeOut time.Duration) *reductionSelector {
+	timeOut time.Duration) *hashSelector {
 
-	return &reductionSelector{
+	return &hashSelector{
 		incomingReductionChannel: incomingReductionChannel,
 		hashChannel:              hashChannel,
 		resultChannel:            resultChannel,
@@ -32,36 +32,36 @@ func newReductionSelector(incomingReductionChannel chan *Event,
 	}
 }
 
-func (rs reductionSelector) sendHash(hash []byte) {
-	rs.hashChannel <- hash
+func (hs hashSelector) sendHash(hash []byte) {
+	hs.hashChannel <- hash
 }
 
-func (rs reductionSelector) sendEndResult(endResult []byte) {
-	rs.resultChannel <- endResult
+func (hs hashSelector) sendEndResult(endResult []byte) {
+	hs.resultChannel <- endResult
 }
 
 // runReduction will run a two-step reduction cycle. After two steps of voting,
 // the results are put into a function that deals with the outcome.
-func (rs *reductionSelector) runReduction() {
+func (hs *hashSelector) runReduction() {
 
 	// step 1
-	hash1 := rs.decideOnHash()
+	hash1 := hs.decideOnHash()
 
-	rs.sendHash(hash1)
+	hs.sendHash(hash1)
 
 	// step 2
-	hash2 := rs.decideOnHash()
+	hash2 := hs.decideOnHash()
 
-	if rs.reductionSuccessful(hash1, hash2) {
-		result, err := rs.combineHashAndVoteSet(hash2)
+	if hs.reductionSuccessful(hash1, hash2) {
+		result, err := hs.combineHashAndVoteSet(hash2)
 		if err != nil {
 			// Log
 			return
 		}
 
-		rs.sendEndResult(result)
+		hs.sendEndResult(result)
 	} else {
-		rs.sendEndResult(nil)
+		hs.sendEndResult(nil)
 	}
 }
 
@@ -71,11 +71,11 @@ func (rs *reductionSelector) runReduction() {
 // particular hash receives enough votes, the function returns that hash.
 // If instead, the timer runs out before quorum is reached on a hash, the function
 // returns the fallback value (32 empty bytes), with an empty vote set.
-func (rs *reductionSelector) decideOnHash() []byte {
+func (hs *hashSelector) decideOnHash() []byte {
 	// Keep track of how many votes have been cast for a specific hash
 	votesPerHash := make(map[string]uint8)
 
-	timer := time.NewTimer(rs.timeOut)
+	timer := time.NewTimer(hs.timeOut)
 
 	for {
 		select {
@@ -83,7 +83,7 @@ func (rs *reductionSelector) decideOnHash() []byte {
 			// Return empty hash and empty vote set if we did not get a winner
 			// before timeout
 			return make([]byte, 32)
-		case m := <-rs.incomingReductionChannel:
+		case m := <-hs.incomingReductionChannel:
 			votedHashStr := hex.EncodeToString(m.VotedHash)
 
 			// Add vote for this block
@@ -91,11 +91,11 @@ func (rs *reductionSelector) decideOnHash() []byte {
 
 			// Add vote to vote set
 			vote := createVote(m)
-			rs.voteSet = append(rs.voteSet, vote)
+			hs.voteSet = append(hs.voteSet, vote)
 
-			if int(votesPerHash[votedHashStr]) >= rs.quorum {
+			if int(votesPerHash[votedHashStr]) >= hs.quorum {
 				// Clean up the vote set, to remove votes for other blocks.
-				rs.removeDeviatingVotes(m.VotedHash)
+				hs.removeDeviatingVotes(m.VotedHash)
 
 				return m.VotedHash
 			}
@@ -112,23 +112,23 @@ func createVote(m *Event) *msg.Vote {
 	}
 }
 
-func (rs *reductionSelector) removeDeviatingVotes(hash []byte) {
-	for i, vote := range rs.voteSet {
+func (hs *hashSelector) removeDeviatingVotes(hash []byte) {
+	for i, vote := range hs.voteSet {
 		if !bytes.Equal(vote.VotedHash, hash) {
-			rs.voteSet = append(rs.voteSet[:i], rs.voteSet[i+1:]...)
+			hs.voteSet = append(hs.voteSet[:i], hs.voteSet[i+1:]...)
 		}
 	}
 }
 
 // combineHashAndVoteSet will return the bytes that should be sent back to the
 // collector after a full reduction cycle.
-func (rs reductionSelector) combineHashAndVoteSet(hash []byte) ([]byte, error) {
+func (hs hashSelector) combineHashAndVoteSet(hash []byte) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	if err := encoding.Write256(buffer, hash); err != nil {
 		return nil, err
 	}
 
-	encodedVoteSet, err := msg.EncodeVoteSet(rs.voteSet)
+	encodedVoteSet, err := msg.EncodeVoteSet(hs.voteSet)
 	if err != nil {
 		return nil, err
 	}
@@ -141,13 +141,13 @@ func (rs reductionSelector) combineHashAndVoteSet(hash []byte) ([]byte, error) {
 }
 
 // check whether a reduction cycle had a successful outcome.
-func (rs reductionSelector) reductionSuccessful(hash1, hash2 []byte) bool {
+func (hs hashSelector) reductionSuccessful(hash1, hash2 []byte) bool {
 	notEmpty := !bytes.Equal(hash1, make([]byte, 32)) &&
 		!bytes.Equal(hash2, make([]byte, 32))
 
 	sameResults := bytes.Equal(hash1, hash2)
 
-	voteSetsAreCorrectLength := len(rs.voteSet) >= rs.quorum*2
+	voteSetsAreCorrectLength := len(hs.voteSet) >= hs.quorum*2
 
 	return notEmpty && sameResults && voteSetsAreCorrectLength
 }
