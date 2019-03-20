@@ -13,18 +13,19 @@ var (
 type driver struct {
 }
 
-func (d driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
-	return NewDatabase(path, readonly)
+// Open creates goleveldb storage on first call and reuse it until
+// driver.Close() call. See also openStorage
+func (d *driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
+	return NewDatabase(path, network, readonly)
 }
 
-func (d driver) Name() string {
+func (d *driver) Name() string {
 	return DriverName
 }
 
 func init() {
 	driver := driver{}
-	err := database.Register(driver)
-
+	err := database.Register(&driver)
 	if err != nil {
 		panic(err)
 	}

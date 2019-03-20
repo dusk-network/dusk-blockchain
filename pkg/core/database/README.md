@@ -20,6 +20,9 @@ Interfaces exposed to upper layers:
 
 - `/database/lite` driver is designed to provide human-readable Dusk blockchain DB for DevNet needs only. As is based on SQLite3, any SQL browser can be used as blockchain explorer.
 
+### Testing Drivers
+- `/database/testing` implements a boilerplate method to verify if a registered driver does satisfy minimum database requirements. The package defines a set of unit tests that are executed only on registered drivers. It can serve also as a detailed and working database guideline.
+
 ### Code example:
 
 More code examples can be found in `/database/heavy/database_test.go`
@@ -92,8 +95,3 @@ Additional features that can be provided by a Driver:
 - Iterators/Cursors
 - Safe Concurrency model: One read-write transaction, many read-only transactions
 - Redundancy: blockchain data stored in a secondary in-memory or on-disk structure
-
-
-### Pending development
-
-- Implement a driver that uses RocksDB, LDBM or BoltDB as a KV store. This driver should serve as a second option for Mainnet needs. 

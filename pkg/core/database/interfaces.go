@@ -9,7 +9,7 @@ import (
 // Driver is the interface that must be implemented by a database
 // driver.
 type Driver interface {
-	// Open returns a new connection to the database.
+	// Open returns a new connection to a blockchain database.
 	// The path is a string in a driver-specific format.
 	Open(path string, network protocol.Magic, readonly bool) (DB, error)
 
@@ -31,7 +31,6 @@ type Tx interface {
 	FetchBlockTransactions(hash []byte) ([]merkletree.Payload, error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
-	// TODO: FetchLatestBlockHeader() (*block.Header, error)
 
 	// Store prefixed methods should garentee the
 	StoreBlock(block *block.Block) error

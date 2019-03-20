@@ -82,8 +82,8 @@ func (t Tx) StoreBlock(block *block.Block) error {
 
 		// Schema
 		//
-		// Key = tx_prefix + block.header.hash + Tx.R Value = Encoded(index) +
-		// Encoded(block.transaction[index])
+		// Key = tx_prefix + block.header.hash + Tx.R
+		// Value = index + block.transaction[index]
 		//
 		// For the retrival of transactions data by block.header.hash
 
@@ -98,8 +98,8 @@ func (t Tx) StoreBlock(block *block.Block) error {
 		t.Put(key, value)
 	}
 
-	// Schema Key = height_prefix + block.header.height Value =
-	// block.header.hash
+	// Key = height_prefix + block.header.height
+	// Value = block.header.hash
 	//
 	// To support fast header lookup by height
 

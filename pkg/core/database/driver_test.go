@@ -28,6 +28,7 @@ type driverB struct{}
 func (d driverB) Open(path string, network protocol.Magic, readonly bool) (DB, error) {
 	return nil, nil
 }
+
 func (d driverB) Name() string {
 	return "driver_b"
 }
@@ -49,8 +50,8 @@ func TestDuplicatedDriver(t *testing.T) {
 func TestListDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	_ = Register(&driverB{})
-	_ = Register(&driverA{})
+	Register(&driverB{})
+	Register(&driverA{})
 
 	allDrivers := Drivers()
 
@@ -66,7 +67,7 @@ func TestListDriver(t *testing.T) {
 func TestRetrieveDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	_ = Register(&driverB{})
+	Register(&driverB{})
 	Register(&driverA{})
 
 	driver, err := From("driver_a")

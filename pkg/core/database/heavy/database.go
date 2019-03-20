@@ -1,48 +1,73 @@
 package heavy
 
 import (
+	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"os"
+	"sync"
 )
 
 var (
-	storageIsOpen = false
+	// See openStorage for detailed explanation
+	_storage   *leveldb.DB
+	_storageMu sync.Mutex
 )
 
 // DB on top of underlying storage syndtr/goleveldb/leveldb
 type DB struct {
+	// an alias to the global storage var
 	storage *leveldb.DB
-	path    string
 
-	// If true, accepts read-only Tx
+	// Read-only mode provided at heavy.DB level If true, accepts read-only Tx
 	readOnly bool
 }
 
-// NewDatabase a singleton connection to storage
-func NewDatabase(path string, readonly bool) (*DB, error) {
+// openStorage is a wrapper around leveldb.OpenFile to provide singleton
+// leveldb.DB instance
+//
+// leveldb.OpenFile returns a new filesystem-backed storage implementation with
+// the given path. This also acquire a file lock, so any subsequent attempt to
+// open the same path will fail.
+//
+// Even opening with leveldb.Options{ ReadOnly: true} an err EAGAIN is returned
+func openStorage(path string) (*leveldb.DB, error) {
+	_storageMu.Lock()
+	defer _storageMu.Unlock()
 
-	if storageIsOpen {
-		// Not recommended to be open more than once
-		return nil, errors.New("Please note that LevelDB is not designed for multi-instance access")
+	var err error
+	if _storage == nil {
+		var s *leveldb.DB
+		s, err = leveldb.OpenFile(path, nil)
+
+		// Try to recover if corrupted
+		if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
+			s, err = leveldb.RecoverFile(path, nil)
+		}
+
+		if _, accessdenied := err.(*os.PathError); accessdenied {
+			err = errors.New("Could not open or create db")
+		}
+
+		if s != nil && err == nil {
+			_storage = s
+		}
+	}
+	return _storage, err
+}
+
+// NewDatabase create or open backend storage (goleveldb) on the specified path
+// Readonly option is pseudo read-only mode implemented by heavy.Database
+func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
+
+	storage, err := openStorage(path)
+	if err != nil {
+		return nil, err
 	}
 
-	// Open Dusk blockchain db or create (if it not alresdy exists)
-	storage, err := leveldb.OpenFile(path, nil)
-
-	// Try to recover if corrupted
-	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
-		storage, err = leveldb.RecoverFile(path, nil)
-	}
-
-	if _, accessdenied := err.(*os.PathError); accessdenied {
-		return nil, errors.New("Could not open or create db")
-	}
-
-	storageIsOpen = true
-
-	return &DB{storage, path, readonly}, nil
+	return DB{storage, readonly}, nil
 }
 
 // Begin builds read-only or read-write Tx
@@ -83,29 +108,28 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 
 	// Create a transaction instance. Mind Tx.Close() must be called when Tx is
 	// done
-	t := &Tx{writable: writable,
+	tx := &Tx{writable: writable,
 		db:       &db,
 		snapshot: snapshot,
 		batch:    batch,
 		closed:   false}
 
-	return t, nil
+	return tx, nil
 }
 
 // Update provides an execution of managed, read-write Tx
 func (db DB) Update(fn func(database.Tx) error) error {
 
 	// Create a writable tx for atomic update
-	t, err := db.Begin(true)
-
+	tx, err := db.Begin(true)
 	if err != nil {
 		return err
 	}
 
-	defer t.Close()
+	defer tx.Close()
 
 	// If an error is returned from the function then rollback and return error.
-	err = fn(t)
+	err = fn(tx)
 
 	// Handing a panic event to rollback tx is not needed. If we fail at that
 	// point, no commit will be applied into backend storage
@@ -114,38 +138,46 @@ func (db DB) Update(fn func(database.Tx) error) error {
 		return err
 	}
 
-	return t.Commit()
+	return tx.Commit()
 }
 
 // View provides an execution of managed, read-only Tx
 func (db DB) View(fn func(database.Tx) error) error {
 
-	t, err := db.Begin(false)
-
+	tx, err := db.Begin(false)
 	if err != nil {
 		return err
 	}
 
-	defer t.Close()
+	defer tx.Close()
 
 	// If an error is returned from the function then pass it through.
-	err = fn(t)
-
+	err = fn(tx)
 	return err
 }
 
 func (db DB) isOpen() bool {
-	return storageIsOpen
+	// Unfortunately, goleveldb does not expose DB.IsOpen/DB.IsClose calls
+	return db.storage != nil
 }
 
+// Close does not close the underlying storage as we need to reuse it within
+// another DB instances. Note that we rely on the Finalizer that goleveldb is
+// setting at the point of leveldb.DB.openDB
 func (db DB) Close() error {
-	if storageIsOpen {
-		db.storage.Close()
-		storageIsOpen = false
-	}
+	db.storage = nil
 	return nil
 }
 
-func init() {
-	storageIsOpen = false
+func (db DB) LogStats() {
+	var stat leveldb.DBStats
+	err := db.storage.Stats(&stat)
+	if err != nil {
+		fmt.Print(err)
+	}
+	fmt.Printf("%+v", stat)
+}
+
+func (db DB) GetSnapshot() (*leveldb.Snapshot, error) {
+	return db.storage.GetSnapshot()
 }
