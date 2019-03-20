@@ -90,6 +90,25 @@ func (c Store) Quorum() int {
 	return quorum
 }
 
+// Priority returns true in case pubKey2 has higher stake than pubKey1
+func (c Store) Priority(pubKey1, pubKey2 []byte) bool {
+	m1 := c.provisioners.GetMember(pubKey1)
+	m2 := c.provisioners.GetMember(pubKey1)
+	if m1 == m2 {
+		return false
+	}
+
+	if m1 == nil {
+		return true
+	}
+
+	if m2 == nil {
+		return false
+	}
+
+	return m1.Stake < m2.Stake
+}
+
 // VerifyVoteSet checks the signature of the set
 func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
 	step uint8) *prerror.PrError {

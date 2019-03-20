@@ -2,8 +2,8 @@ package notary
 
 import (
 	"bytes"
-	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -25,15 +25,9 @@ type BlockCollector struct {
 // NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages.
 func NewBlockCollector(c committee.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
-<<<<<<< Updated upstream
 	cc := &committee.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
 		Committee:          c,
-=======
-	cc := &CommitteeCollector{
-		StepEventCollector: make(map[uint8][]wire.Event),
-		committee:          committee,
->>>>>>> Stashed changes
 	}
 
 	return &BlockCollector{
@@ -88,16 +82,12 @@ func NewBlockNotary(eventBus *wire.EventBus,
 	blockChan := make(chan []byte, 1)
 	roundChan := make(chan uint64, 1)
 
-<<<<<<< Updated upstream
 	blockCollector := NewBlockCollector(c, blockChan, validateFunc)
-=======
-	blockCollector := NewBlockCollector(committee, blockChan, validateFunc)
->>>>>>> Stashed changes
 	blockSubscriber := wire.NewEventSubscriber(eventBus,
 		blockCollector,
 		string(msg.BlockAgreementTopic))
 
-	roundCollector := &RoundCollector{roundChan}
+	roundCollector := &consensus.RoundCollector{roundChan}
 	roundSubscriber := wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
 
 	return &BlockNotary{
@@ -126,16 +116,4 @@ func (b *BlockNotary) Listen() {
 			b.blockCollector.UpdateRound(round)
 		}
 	}
-}
-
-// RoundCollector is a simple wrapper over a channel to get round notifications
-type RoundCollector struct {
-	roundChan chan uint64
-}
-
-// Collect as specified in the EventCollector interface. In this case Collect simply performs unmarshalling of the round event
-func (r *RoundCollector) Collect(roundBuffer *bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-	r.roundChan <- round
-	return nil
 }
