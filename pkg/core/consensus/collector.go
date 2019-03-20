@@ -162,6 +162,7 @@ type RoundCollector struct {
 	RoundChan chan uint64
 }
 
+// InitRoundCollector initializes a RoundCollector and fires up the EventSubscriber as well. Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
 func InitRoundCollector(eventBus *wire.EventBus) *RoundCollector {
 	roundChan := make(chan uint64, 1)
 	roundCollector := &RoundCollector{roundChan}
@@ -176,10 +177,12 @@ func (r *RoundCollector) Collect(roundBuffer *bytes.Buffer) error {
 	return nil
 }
 
+// PhaseCollector collects phase updates (aka BlockHash updates)
 type PhaseCollector struct {
 	BlockHashChan chan []byte
 }
 
+// InitPhaseCollector initializes a PhaseCollector and fires up the EventSubscriber as well. Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
 func InitPhaseCollector(eventBus *wire.EventBus) *PhaseCollector {
 	phaseUpdateChan := make(chan []byte)
 	collector := &PhaseCollector{phaseUpdateChan}
