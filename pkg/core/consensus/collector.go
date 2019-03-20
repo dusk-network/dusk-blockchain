@@ -165,7 +165,8 @@ type RoundCollector struct {
 func InitRoundCollector(eventBus *wire.EventBus) *RoundCollector {
 	roundChan := make(chan uint64, 1)
 	roundCollector := &RoundCollector{roundChan}
-	go wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic)).Accept()
+	go wire.NewEventSubscriber(eventBus, roundCollector,
+		string(msg.RoundUpdateTopic)).Accept()
 	return roundCollector
 }
 
@@ -183,7 +184,8 @@ type PhaseCollector struct {
 func InitPhaseCollector(eventBus *wire.EventBus) *PhaseCollector {
 	phaseUpdateChan := make(chan []byte)
 	collector := &PhaseCollector{phaseUpdateChan}
-	go wire.NewEventSubscriber(eventBus, collector, string(msg.SigSetAgreementTopic)).Accept()
+	go wire.NewEventSubscriber(eventBus, collector,
+		string(msg.SigSetAgreementTopic)).Accept()
 	return collector
 }
 
