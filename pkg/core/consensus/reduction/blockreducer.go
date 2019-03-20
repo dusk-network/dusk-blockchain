@@ -3,7 +3,6 @@ package reduction
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -16,19 +15,48 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 )
 
-type BlockReduction = Event
+type (
 
-type blockReductionCollector struct {
-	*reductionCollector
-	unmarshaller wire.EventUnmarshaller
+	// BlockReduction is a block phase reduction event.
+	BlockReduction = Event
 
-	reducing bool
-}
+	// blockReductionCollector is responsible for unmarshalling incoming
+	// block reduction messages, and then passing them to the BlockReducer
+	// to be processed accordingly.
+	blockReductionCollector struct {
+		*reductionCollector
+		unmarshaller wire.EventUnmarshaller
+	}
 
-func newBlockReductionCollector(committee committee.Committee, timerLength time.Duration,
+	// BlockReducer is responsible for handling incoming block reduction messages.
+	// It sends the proper messages to a reduction selector, and processes the
+	// outcomes produced by this selector.
+	BlockReducer struct {
+		eventBus            *wire.EventBus
+		reductionSubscriber *wire.EventSubscriber
+		voteSubscriber      *wire.EventSubscriber
+		roundSubscriber     *wire.EventSubscriber
+		*blockReductionCollector
+
+		// channels linked to subscribers
+		voteChannel  <-chan []byte
+		roundChannel <-chan uint64
+	}
+
+	// roundCollector is a simple wrapper over a channel to get round notifications
+	roundCollector struct {
+		roundChan chan<- uint64
+	}
+
+	voteCollector struct {
+		voteChannel chan<- []byte
+	}
+)
+
+func newBlockReductionCollector(committee committee.Committee, timeOut time.Duration,
 	validateFunc func(*bytes.Buffer) error) *blockReductionCollector {
 
-	reductionCollector := newReductionCollector(committee, timerLength)
+	reductionCollector := newReductionCollector(committee, timeOut)
 
 	blockReductionCollector := &blockReductionCollector{
 		reductionCollector: reductionCollector,
@@ -44,11 +72,12 @@ func (brc *blockReductionCollector) updateRound(round uint64) {
 	brc.currentStep = 1
 
 	if brc.reducing {
-		brc.stopSelector()
+		brc.disconnectSelector()
 		brc.reducing = false
 	}
 
 	brc.Clear()
+	brc.getQueuedMessages()
 }
 
 func (brc *blockReductionCollector) Collect(buffer *bytes.Buffer) error {
@@ -61,40 +90,13 @@ func (brc *blockReductionCollector) Collect(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func (brc *blockReductionCollector) process(m *BlockReduction) {
-	if brc.shouldBeProcessed(m) && blsVerified(m) {
-		if !brc.reducing {
-			brc.reducing = true
-			go brc.startSelector()
-		}
-
-		brc.incomingReductionChannel <- m
-		pubKeyStr := hex.EncodeToString(m.PubKeyBLS)
-		brc.Store(m, pubKeyStr)
-	} else if brc.shouldBeStored(m) && blsVerified(m) {
-		brc.queue.PutMessage(m.Round, m.Step, m)
-	}
-}
-
-type BlockReducer struct {
-	eventBus            *wire.EventBus
-	reductionSubscriber *wire.EventSubscriber
-	voteSubscriber      *wire.EventSubscriber
-	roundSubscriber     *wire.EventSubscriber
-	*blockReductionCollector
-
-	// channels linked to subscribers
-	voteChannel  <-chan []byte
-	roundChannel <-chan uint64
-}
-
 func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	committee committee.Committee, timerLength time.Duration) *BlockReducer {
+	committee committee.Committee, timeOut time.Duration) *BlockReducer {
 
 	voteChannel := make(chan []byte, 1)
 	roundChannel := make(chan uint64, 1)
 
-	reductionCollector := newBlockReductionCollector(committee, timerLength,
+	reductionCollector := newBlockReductionCollector(committee, timeOut,
 		validateFunc)
 	reductionSubscriber := wire.NewEventSubscriber(eventBus, reductionCollector,
 		string(topics.BlockReduction))
@@ -120,6 +122,46 @@ func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) e
 	return blockReducer
 }
 
+func (br *BlockReducer) Listen() {
+	go br.reductionSubscriber.Accept()
+	go br.voteSubscriber.Accept()
+	go br.roundSubscriber.Accept()
+
+	for {
+		select {
+		case round := <-br.roundChannel:
+			br.updateRound(round)
+		case blockHash := <-br.voteChannel:
+			if !br.votedThisStep {
+				if err := br.sendVoteData(blockHash, msg.OutgoingReductionTopic); err != nil {
+					// Log
+					return
+				}
+
+				br.votedThisStep = true
+			}
+		case blockHash := <-br.hashChannel:
+			br.incrementStep()
+			if err := br.sendVoteData(blockHash, msg.OutgoingReductionTopic); err != nil {
+				// Log
+				return
+			}
+
+			br.votedThisStep = true
+		case result := <-br.resultChannel:
+			if result != nil {
+				if err := br.sendVoteData(result, msg.OutgoingAgreementTopic); err != nil {
+					// Log
+					return
+				}
+			}
+
+			br.reducing = false
+			br.incrementStep()
+		}
+	}
+}
+
 func (br BlockReducer) addVoteInfo(data []byte) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 
@@ -138,92 +180,25 @@ func (br BlockReducer) addVoteInfo(data []byte) (*bytes.Buffer, error) {
 	return buffer, nil
 }
 
-func (br *BlockReducer) Listen() {
-	go br.reductionSubscriber.Accept()
-	go br.voteSubscriber.Accept()
-	go br.roundSubscriber.Accept()
-
-	for {
-		select {
-		case blockHash := <-br.voteChannel:
-			if !br.votedThisStep {
-				vote, err := br.addVoteInfo(blockHash)
-				if err != nil {
-					// Log
-					return
-				}
-
-				br.eventBus.Publish(msg.OutgoingReductionTopic, vote)
-				br.votedThisStep = true
-			}
-		case blockHash := <-br.hashChannel:
-			br.incrementStep()
-			vote, err := br.addVoteInfo(blockHash)
-			if err != nil {
-				// Log
-				return
-			}
-
-			br.eventBus.Publish(msg.OutgoingReductionTopic, vote)
-			br.votedThisStep = true
-		case result := <-br.resultChannel:
-			if result != nil {
-				vote, err := br.addVoteInfo(result)
-				if err != nil {
-					// Log
-					return
-				}
-
-				br.eventBus.Publish(msg.OutgoingAgreementTopic, vote)
-			}
-
-			br.incrementStep()
-			br.reducing = false
-		default:
-			br.checkQueue()
-
-			if !br.reducing {
-				br.checkRoundChannel()
-			}
-		}
+func (br BlockReducer) sendVoteData(data []byte, topic string) error {
+	voteData, err := br.addVoteInfo(data)
+	if err != nil {
+		return err
 	}
+
+	br.eventBus.Publish(topic, voteData)
+	return nil
 }
 
-func (br BlockReducer) checkQueue() {
-	queuedMessages := br.queue.GetMessages(br.currentRound, br.currentStep)
-
-	if queuedMessages != nil {
-		for _, message := range queuedMessages {
-			m := message.(*BlockReduction)
-			br.process(m)
-		}
-	}
-}
-
-func (br *BlockReducer) checkRoundChannel() {
-	select {
-	case round := <-br.roundChannel:
-		br.updateRound(round)
-	default:
-		break
-	}
-}
-
-type voteCollector struct {
-	voteChannel chan<- []byte
-}
-
+// Collect implements the EventCollector interface.
+// Will simply send the received buffer as a slice of bytes.
 func (v *voteCollector) Collect(blockBuffer *bytes.Buffer) error {
 	v.voteChannel <- blockBuffer.Bytes()
 	return nil
 }
 
-// roundCollector is a simple wrapper over a channel to get round notifications
-type roundCollector struct {
-	roundChan chan<- uint64
-}
-
-// Collect as specified in the EventCollector interface. In this case Collect simply performs unmarshalling of the round event
+// Collect implements the EventCollector interface.
+// In this case Collect simply performs unmarshalling of the round event.
 func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 	r.roundChan <- round

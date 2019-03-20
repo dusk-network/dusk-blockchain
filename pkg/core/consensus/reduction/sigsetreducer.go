@@ -14,11 +14,14 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+// SigSetReduction is a signature set phase reduction event.
 type SigSetReduction struct {
 	*Event
 	winningBlockHash []byte
 }
 
+// Equal checks if the SigSetReduction is Equal to the passed Event.
+// Implements Event interface.
 func (ssr *SigSetReduction) Equal(e wire.Event) bool {
 	return ssr.Event.Equal(e) &&
 		bytes.Equal(ssr.winningBlockHash, e.(*SigSetReduction).winningBlockHash)
@@ -29,7 +32,7 @@ type sigSetReductionUnmarshaller struct {
 }
 
 func newSigSetReductionUnmarshaller(validate func(*bytes.Buffer) error) *reductionEventUnmarshaller {
-	return &reductionEventUnmarshaller{validate}
+	return newReductionEventUnmarshaller(validate)
 }
 
 func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
@@ -54,10 +57,10 @@ type sigSetReductionCollector struct {
 	winningBlockHash []byte
 }
 
-func newSigSetReductionCollector(committee committee.Committee, timerLength time.Duration,
+func newSigSetReductionCollector(committee committee.Committee, timeOut time.Duration,
 	validateFunc func(*bytes.Buffer) error) *sigSetReductionCollector {
 
-	reductionCollector := newReductionCollector(committee, timerLength)
+	reductionCollector := newReductionCollector(committee, timeOut)
 
 	sigSetReductionCollector := &sigSetReductionCollector{
 		reductionCollector: reductionCollector,
@@ -74,7 +77,7 @@ func (ssrc *sigSetReductionCollector) updateRound(round uint64) {
 	ssrc.currentStep = 1
 
 	if ssrc.reducing {
-		ssrc.stopSelector()
+		ssrc.disconnectSelector()
 		ssrc.reducing = false
 	}
 
@@ -127,13 +130,13 @@ type SigSetReducer struct {
 }
 
 func NewSigSetReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	committee committee.Committee, timerLength time.Duration) *SigSetReducer {
+	committee committee.Committee, timeOut time.Duration) *SigSetReducer {
 
 	voteChannel := make(chan []byte, 1)
 	phaseUpdateChannel := make(chan []byte, 1)
 	roundChannel := make(chan uint64, 1)
 
-	reductionCollector := newSigSetReductionCollector(committee, timerLength,
+	reductionCollector := newSigSetReductionCollector(committee, timeOut,
 		validateFunc)
 	reductionSubscriber := wire.NewEventSubscriber(eventBus, reductionCollector,
 		string(topics.BlockReduction))

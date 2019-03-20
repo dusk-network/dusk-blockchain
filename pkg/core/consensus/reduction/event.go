@@ -2,9 +2,8 @@ package reduction
 
 import (
 	"bytes"
-	"encoding/binary"
-	"errors"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -37,12 +36,11 @@ func (rec reductionEventCollector) Store(event wire.Event, pubKey string) {
 	rec[pubKey] = event
 }
 
+// Event is a basic reduction event.
 type Event struct {
+	*consensus.EventHeader
 	VotedHash  []byte
 	SignedHash []byte
-	PubKeyBLS  []byte
-	Round      uint64
-	Step       uint8
 }
 
 // Equal as specified in the Event interface
@@ -52,41 +50,27 @@ func (e *Event) Equal(ev wire.Event) bool {
 }
 
 type reductionEventUnmarshaller struct {
-	validate func(*bytes.Buffer) error
+	*consensus.EventHeaderUnmarshaller
 }
 
 func newReductionEventUnmarshaller(validate func(*bytes.Buffer) error) *reductionEventUnmarshaller {
-	return &reductionEventUnmarshaller{validate}
+	return &reductionEventUnmarshaller{
+		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(validate),
+	}
 }
 
 // Unmarshal unmarshals the buffer into a CommitteeEvent
 func (a *reductionEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	if err := a.validate(r); err != nil {
+	rev := ev.(*Event)
+	if err := a.EventHeaderUnmarshaller.Unmarshal(r, rev.EventHeader); err != nil {
 		return err
 	}
 
-	reductionEvent, ok := ev.(*Event)
-	if !ok {
-		return errors.New("type casting event failed")
-	}
-
-	if err := encoding.Read256(r, &reductionEvent.VotedHash); err != nil {
+	if err := encoding.Read256(r, &rev.VotedHash); err != nil {
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &reductionEvent.SignedHash); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &reductionEvent.PubKeyBLS); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &reductionEvent.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &reductionEvent.Step); err != nil {
+	if err := encoding.ReadBLS(r, &rev.SignedHash); err != nil {
 		return err
 	}
 
