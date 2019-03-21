@@ -1,10 +1,12 @@
-package transactions
+package transactions_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 func TestEncodeDecodeStake(t *testing.T) {
@@ -12,7 +14,7 @@ func TestEncodeDecodeStake(t *testing.T) {
 	assert := assert.New(t)
 
 	// random Stake tx
-	tx, err := randomStakeTx(t, false)
+	tx, err := helper.RandomStakeTx(t, false)
 	assert.Nil(err)
 
 	// Encode TX into a buffer
@@ -21,7 +23,7 @@ func TestEncodeDecodeStake(t *testing.T) {
 	assert.Nil(err)
 
 	// Decode buffer into a Stake TX struct
-	decTX := &Stake{}
+	decTX := &transactions.Stake{}
 	err = decTX.Decode(buf)
 	assert.Nil(err)
 
@@ -38,43 +40,20 @@ func TestEncodeDecodeStake(t *testing.T) {
 	assert.True(bytes.Equal(txid, decTxid))
 
 	// Check that type is correct
-	assert.Equal(StakeType, decTX.TxType)
+	assert.Equal(transactions.StakeType, decTX.TxType)
 }
 
 func TestEqualsMethodStake(t *testing.T) {
 
 	assert := assert.New(t)
 
-	a, err := randomStakeTx(t, false)
+	a, err := helper.RandomStakeTx(t, false)
 	assert.Nil(err)
-	b, err := randomStakeTx(t, false)
+	b, err := helper.RandomStakeTx(t, false)
 	assert.Nil(err)
 	c := a
 
 	assert.False(a.Equals(b))
 	assert.False(b.Equals(c))
 	assert.True(a.Equals(c))
-}
-
-func randomStakeTx(t *testing.T, malformed bool) (*Stake, error) {
-
-	var numInputs, numOutputs = 23, 34
-	var lock uint64 = 20000
-	var fee uint64 = 20
-
-	edKey := randomSlice(t, 32)
-	blsKey := randomSlice(t, 33)
-
-	tx, err := NewStake(0, lock, fee, edKey, blsKey)
-	if err != nil {
-		return tx, err
-	}
-
-	// Inputs
-	tx.Inputs = randomInputs(t, numInputs, malformed)
-
-	// Outputs
-	tx.Outputs = randomOutputs(t, numOutputs, malformed)
-
-	return tx, nil
 }

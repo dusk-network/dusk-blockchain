@@ -1,10 +1,12 @@
-package transactions
+package transactions_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 func TestEncodeDecodeStandard(t *testing.T) {
@@ -12,7 +14,7 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert := assert.New(t)
 
 	// random standard tx
-	tx := randomStandardTx(t, false)
+	tx := helper.RandomStandardTx(t, false)
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
@@ -20,7 +22,7 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert.Nil(err)
 
 	// Decode buffer into a standard TX struct
-	decTX := &Standard{}
+	decTX := &transactions.Standard{}
 	err = decTX.Decode(buf)
 	assert.Nil(err)
 
@@ -37,34 +39,18 @@ func TestEncodeDecodeStandard(t *testing.T) {
 	assert.True(bytes.Equal(txid, decTxid))
 
 	// Check that type is correct
-	assert.Equal(StandardType, decTX.TxType)
+	assert.Equal(transactions.StandardType, decTX.TxType)
 }
 
 func TestEqualsMethodStandard(t *testing.T) {
 
 	assert := assert.New(t)
 
-	a := randomStandardTx(t, false)
-	b := randomStandardTx(t, false)
+	a := helper.RandomStandardTx(t, false)
+	b := helper.RandomStandardTx(t, false)
 	c := a
 
 	assert.False(a.Equals(b))
 	assert.False(b.Equals(c))
 	assert.True(a.Equals(c))
-}
-
-func randomStandardTx(t *testing.T, malformed bool) *Standard {
-
-	var numInputs, numOutputs = 10, 10
-	var fee uint64 = 20
-
-	tx := NewStandard(0, fee)
-
-	// Inputs
-	tx.Inputs = randomInputs(t, numInputs, malformed)
-
-	// Outputs
-	tx.Outputs = randomOutputs(t, numOutputs, malformed)
-
-	return tx
 }

@@ -1,10 +1,11 @@
-package transactions
+package transactions_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 )
 
 // Consider refactoring, as functionality is the same for all transactions
@@ -21,10 +22,10 @@ func TestBidHashNotStandard(t *testing.T) {
 	// Instantiate all possible transactions
 
 	//BidTx
-	bidTx, err := randomBidTx(t, false)
+	bidTx, err := helper.RandomBidTx(t, false)
 	assert.Nil(err)
 	// TimeLockTx
-	timeLockTX := randomTLockTx(t, false)
+	timeLockTX := helper.RandomTLockTx(t, false)
 
 	// Clone all possible transactions
 

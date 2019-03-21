@@ -1,11 +1,12 @@
-package block
+package block_test
 
 import (
 	"bytes"
-	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 )
 
 func TestEncodeDecodeHeader(t *testing.T) {
@@ -13,7 +14,7 @@ func TestEncodeDecodeHeader(t *testing.T) {
 	assert := assert.New(t)
 
 	// Create a random header
-	hdr := randomHeader(t)
+	hdr := helper.RandomHeader(t)
 	err := hdr.SetHash()
 	assert.Nil(err)
 
@@ -23,34 +24,10 @@ func TestEncodeDecodeHeader(t *testing.T) {
 	assert.Nil(err)
 
 	// Decode buffer into a header struct
-	decHdr := &Header{}
+	decHdr := &block.Header{}
 	err = decHdr.Decode(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
 	assert.True(hdr.Equals(decHdr))
-}
-
-func randomHeader(t *testing.T) *Header {
-
-	h := &Header{
-		Version:   0,
-		Timestamp: 2000,
-		Height:    200,
-
-		PrevBlock: randomSlice(t, 32),
-		Seed:      randomSlice(t, 33),
-		TxRoot:    randomSlice(t, 32),
-
-		CertHash: randomSlice(t, 32),
-	}
-
-	return h
-}
-
-func randomSlice(t *testing.T, size uint32) []byte {
-	randSlice := make([]byte, size)
-	_, err := rand.Read(randSlice)
-	assert.Nil(t, err)
-	return randSlice
 }
