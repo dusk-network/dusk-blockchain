@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -12,7 +14,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -39,12 +40,12 @@ type ConsensusFactory struct {
 	initChannel    chan uint64
 
 	timerLength time.Duration
-	committee   user.Committee
+	committee   committee.Committee
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, timerLength time.Duration,
-	committee user.Committee) *ConsensusFactory {
+	committee committee.Committee) *ConsensusFactory {
 
 	initChannel := make(chan uint64, 1)
 
@@ -74,10 +75,10 @@ func (c *ConsensusFactory) StartConsensus() {
 
 	scoreSelector.Listen()
 
-	setSelector := selection.NewSetSelector(c.eventBus, c.timerLength,
-		msg.VerifyEd25519Signature, c.committee)
+	setFilter := selection.NewSigSetFilter(c.eventBus, msg.VerifyEd25519Signature,
+		c.committee, c.timerLength)
 
-	setSelector.Listen()
+	setFilter.Listen()
 
 	blockReducer := reduction.NewBlockReducer(c.eventBus, msg.VerifyEd25519Signature,
 		c.committee, c.timerLength)
