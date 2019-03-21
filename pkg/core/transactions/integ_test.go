@@ -10,7 +10,7 @@ import (
 
 func TestDecodeTransactions(t *testing.T) {
 	txs := helper.RandomSliceOfTxs(t)
-	r := txsToReader(t, txs)
+	r := helper.TxsToReader(t, txs)
 
 	decTxs, err := transactions.FromReader(r, uint64(len(txs)))
 	assert.Nil(t, err)
