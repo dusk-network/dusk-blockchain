@@ -15,8 +15,7 @@ import (
 
 func TestSimpleBlockCollection(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
-	blockChan := make(chan []byte, 1)
-	bc := NewBlockCollector(committeeMock, blockChan, nil)
+	bc := NewBlockCollector(committeeMock, nil)
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
@@ -25,7 +24,7 @@ func TestSimpleBlockCollection(t *testing.T) {
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
 	select {
-	case res := <-blockChan:
+	case res := <-bc.BlockChan:
 		assert.Equal(t, blockHash, res)
 		// testing that we clean after collection
 		assert.Equal(t, 0, len(bc.StepEventCollector))
@@ -36,8 +35,7 @@ func TestSimpleBlockCollection(t *testing.T) {
 
 func TestNoQuorumCollection(t *testing.T) {
 	committeeMock := mockCommittee(3, true, nil)
-	blockChan := make(chan []byte, 1)
-	bc := NewBlockCollector(committeeMock, blockChan, nil)
+	bc := NewBlockCollector(committeeMock, nil)
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
@@ -46,7 +44,7 @@ func TestNoQuorumCollection(t *testing.T) {
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
 	select {
-	case <-blockChan:
+	case <-bc.BlockChan:
 		assert.Fail(t, "Collection was not supposed to complete since Quorum should not be reached")
 	case <-time.After(100 * time.Millisecond):
 		// testing that we still have collected for 1 step
@@ -58,8 +56,7 @@ func TestNoQuorumCollection(t *testing.T) {
 
 func TestSkipNoMember(t *testing.T) {
 	committeeMock := mockCommittee(1, false, nil)
-	blockChan := make(chan []byte, 1)
-	bc := NewBlockCollector(committeeMock, blockChan, nil)
+	bc := NewBlockCollector(committeeMock, nil)
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
@@ -67,7 +64,7 @@ func TestSkipNoMember(t *testing.T) {
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
 	select {
-	case <-blockChan:
+	case <-bc.BlockChan:
 		assert.Fail(t, "Collection was not supposed to complete since Quorum should not be reached")
 	case <-time.After(50 * time.Millisecond):
 		// test successfull

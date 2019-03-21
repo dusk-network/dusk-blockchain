@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -35,12 +34,13 @@ type (
 		timerLength time.Duration
 	}
 
-	// Broker is the component that supervises the collection of SigSetSelection events
+	// Broker is the component that supervises a collection of events
 	Broker struct {
 		eventBus        *wire.EventBus
 		phaseUpdateChan <-chan []byte
 		roundUpdateChan <-chan uint64
 		collector       *Collector
+		topic           string
 	}
 )
 
@@ -154,7 +154,7 @@ func (s *Collector) stopSelection() {
 }
 
 // NewBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, handler EventHandler, timeout time.Duration) *Broker {
+func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, handler EventHandler, timeout time.Duration, topic string) *Broker {
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundCollector(eventBus).RoundChan
 	phaseChan := consensus.InitPhaseCollector(eventBus).BlockHashChan
@@ -165,6 +165,7 @@ func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, 
 		collector:       collector,
 		roundUpdateChan: roundChan,
 		phaseUpdateChan: phaseChan,
+		topic:           topic,
 	}
 }
 
@@ -177,7 +178,7 @@ func (f *Broker) Listen() {
 		case phaseUpdate := <-f.phaseUpdateChan:
 			f.collector.StartSelection(phaseUpdate)
 		case bestEvent := <-f.collector.BestEventChan:
-			f.eventBus.Publish(string(msg.SelectionResultTopic), bestEvent)
+			f.eventBus.Publish(f.topic, bestEvent)
 		}
 	}
 }

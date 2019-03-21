@@ -57,13 +57,13 @@ func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 // Finally a round update should be propagated when we get enough SigSetEvent messages for a given step
 type SigSetCollector struct {
 	*committee.Collector
-	roundChan    chan<- uint64
+	RoundChan    chan uint64
 	futureRounds map[uint64][]*SigSetEvent
 	Unmarshaller wire.EventUnmarshaller
 }
 
 // NewSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
-func NewSigSetCollector(c committee.Committee, roundChan chan uint64, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
+func NewSigSetCollector(c committee.Committee, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
 
 	cc := &committee.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
@@ -72,10 +72,19 @@ func NewSigSetCollector(c committee.Committee, roundChan chan uint64, validateFu
 	}
 	return &SigSetCollector{
 		Collector:    cc,
-		roundChan:    roundChan,
+		RoundChan:    make(chan uint64),
 		futureRounds: make(map[uint64][]*SigSetEvent),
 		Unmarshaller: newSigSetEventUnmarshaller(validateFunc),
 	}
+}
+
+// InitSigSetCollector creates a SigSetCollector while also firing the proper subscriber the collector needs to listen to. In this case it listens to SigSetAgreementTopic
+func InitSigSetCollector(eventBus *wire.EventBus, c committee.Committee, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
+	// creating the collector used in the EventSubscriber
+	sigSetCollector := NewSigSetCollector(c, validateFunc, currentRound)
+	// creating the EventSubscriber listening to msg.SigSetAgreementTopic
+	go wire.NewEventSubscriber(eventBus, sigSetCollector, string(msg.SigSetAgreementTopic)).Accept()
+	return sigSetCollector
 }
 
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
@@ -125,7 +134,7 @@ func (s *SigSetCollector) Process(ev *SigSetEvent) {
 func (s *SigSetCollector) nextRound() {
 	s.UpdateRound(s.CurrentRound + 1)
 	// notify the Notary
-	go func() { s.roundChan <- s.CurrentRound }()
+	go func() { s.RoundChan <- s.CurrentRound }()
 	s.Clear()
 
 	//picking messages related to next round (now current)
@@ -138,38 +147,25 @@ func (s *SigSetCollector) nextRound() {
 
 // SigSetNotary creates the proper EventSubscriber to listen to the SigSetEvent notifications
 type SigSetNotary struct {
-	eventBus         *wire.EventBus
-	sigSetSubscriber *wire.EventSubscriber
-	roundChan        <-chan uint64
-	sigSetCollector  *SigSetCollector
+	eventBus        *wire.EventBus
+	sigSetCollector *SigSetCollector
 }
 
 // NewSigSetNotary creates a SigSetNotary by injecting the EventBus, the Committee and the message validation primitive
 func NewSigSetNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, c committee.Committee, currentRound uint64) *SigSetNotary {
 
-	//creating the channel whereto notifications about round updates are push onto
-	roundChan := make(chan uint64, 1)
-	// creating the collector used in the EventSubscriber
-	sigSetCollector := NewSigSetCollector(c, roundChan, validateFunc, currentRound)
-	// creating the EventSubscriber listening to msg.SigSetAgreementTopic
-	sigSetSubscriber := wire.NewEventSubscriber(eventBus, sigSetCollector, string(msg.SigSetAgreementTopic))
-
 	return &SigSetNotary{
-		eventBus:         eventBus,
-		sigSetSubscriber: sigSetSubscriber,
-		roundChan:        roundChan,
-		sigSetCollector:  sigSetCollector,
+		eventBus:        eventBus,
+		sigSetCollector: InitSigSetCollector(eventBus, c, validateFunc, currentRound),
 	}
 }
 
 // Listen triggers the EventSubscriber to accept Events from the EventBus
 func (ssn *SigSetNotary) Listen() {
-	// firing the goroutine to let the EventSubscriber listen to the topic of interest
-	go ssn.sigSetSubscriber.Accept()
 	for {
 		select {
 		// When it is the right moment, the collector publishes round updates to the round channel
-		case newRound := <-ssn.roundChan:
+		case newRound := <-ssn.sigSetCollector.RoundChan:
 			// Marshalling the round update
 			b := make([]byte, 8)
 			binary.LittleEndian.PutUint64(b, newRound)

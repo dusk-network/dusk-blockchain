@@ -18,12 +18,12 @@ type BlockEventUnmarshaller = committee.EventUnMarshaller
 // BlockCollector collects CommitteeEvent. When a Quorum is reached, it propagates the new Block Hash to the proper channel
 type BlockCollector struct {
 	*committee.Collector
-	blockChan    chan<- []byte
+	BlockChan    chan []byte
 	Unmarshaller wire.EventUnmarshaller
 }
 
 // NewBlockCollector is injected with the committee, a channel where to publish the new Block Hash and the validator function for shallow checking of the marshalled form of the CommitteeEvent messages.
-func NewBlockCollector(c committee.Committee, blockChan chan []byte, validateFunc func(*bytes.Buffer) error) *BlockCollector {
+func NewBlockCollector(c committee.Committee, validateFunc func(*bytes.Buffer) error) *BlockCollector {
 
 	cc := &committee.Collector{
 		StepEventCollector: make(map[uint8][]wire.Event),
@@ -32,9 +32,17 @@ func NewBlockCollector(c committee.Committee, blockChan chan []byte, validateFun
 
 	return &BlockCollector{
 		Collector:    cc,
-		blockChan:    blockChan,
+		BlockChan:    make(chan []byte, 1),
 		Unmarshaller: committee.NewEventUnMarshaller(validateFunc),
 	}
+}
+
+// InitBlockCollector is a helper to minimize the wiring of EventSubscribers, collector and channels
+func InitBlockCollector(eventBus *wire.EventBus, c committee.Committee, validateFunc func(*bytes.Buffer) error) *BlockCollector {
+	collector := NewBlockCollector(c, validateFunc)
+	go wire.NewEventSubscriber(eventBus, collector,
+		string(msg.BlockAgreementTopic)).Accept()
+	return collector
 }
 
 // Collect as specifiec in the EventCollector interface. It dispatches the unmarshalled CommitteeEvent to Process method
@@ -59,19 +67,16 @@ func (c *BlockCollector) Process(event *BlockEvent) {
 	// did we reach the quorum?
 	if nrAgreements >= c.Committee.Quorum() {
 		// notify the Notary
-		go func() { c.blockChan <- event.BlockHash }()
+		go func() { c.BlockChan <- event.BlockHash }()
 		c.Clear()
 	}
 }
 
 // BlockNotary notifies when there is a consensus on a block hash
 type BlockNotary struct {
-	eventBus        *wire.EventBus
-	blockSubscriber *wire.EventSubscriber
-	roundSubscriber *wire.EventSubscriber
-	blockChan       <-chan []byte
-	roundChan       <-chan uint64
-	blockCollector  *BlockCollector
+	eventBus       *wire.EventBus
+	blockCollector *BlockCollector
+	roundCollector *consensus.RoundCollector
 }
 
 // NewBlockNotary creates a BlockNotary by injecting the EventBus, the CommitteeStore and the message validation primitive
@@ -79,24 +84,13 @@ func NewBlockNotary(eventBus *wire.EventBus,
 	validateFunc func(*bytes.Buffer) error,
 	c committee.Committee) *BlockNotary {
 
-	blockChan := make(chan []byte, 1)
-	roundChan := make(chan uint64, 1)
-
-	blockCollector := NewBlockCollector(c, blockChan, validateFunc)
-	blockSubscriber := wire.NewEventSubscriber(eventBus,
-		blockCollector,
-		string(msg.BlockAgreementTopic))
-
-	roundCollector := &consensus.RoundCollector{roundChan}
-	roundSubscriber := wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
+	roundCollector := consensus.InitRoundCollector(eventBus)
+	blockCollector := InitBlockCollector(eventBus, c, validateFunc)
 
 	return &BlockNotary{
-		eventBus:        eventBus,
-		blockSubscriber: blockSubscriber,
-		roundSubscriber: roundSubscriber,
-		blockChan:       blockChan,
-		roundChan:       roundChan,
-		blockCollector:  blockCollector,
+		eventBus:       eventBus,
+		roundCollector: roundCollector,
+		blockCollector: blockCollector,
 	}
 }
 
@@ -105,14 +99,12 @@ func NewBlockNotary(eventBus *wire.EventBus,
 // A phase update should be propagated when we get enough blockAgreement messages for a certain blockhash
 // BlockNotary gets a currentRound somehow
 func (b *BlockNotary) Listen() {
-	go b.blockSubscriber.Accept()
-	go b.roundSubscriber.Accept()
 	for {
 		select {
-		case blockHash := <-b.blockChan:
+		case blockHash := <-b.blockCollector.BlockChan:
 			buffer := bytes.NewBuffer(blockHash)
 			b.eventBus.Publish(msg.PhaseUpdateTopic, buffer)
-		case round := <-b.roundChan:
+		case round := <-b.roundCollector.RoundChan:
 			b.blockCollector.UpdateRound(round)
 		}
 	}
