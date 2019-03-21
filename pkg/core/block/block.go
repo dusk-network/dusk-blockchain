@@ -165,6 +165,10 @@ func (b *Block) Equals(other *Block) bool {
 		return false
 	}
 
+	if len(b.Txs) != len(other.Txs) {
+		return false
+	}
+
 	for i := range b.Txs {
 		tx := b.Txs[i]
 		otherTx := other.Txs[i]

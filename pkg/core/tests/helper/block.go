@@ -18,6 +18,26 @@ func RandomBlock(t *testing.T) *block.Block {
 	return b
 }
 
+//RandomCertificate returns a random block certificate  for testing
+func RandomCertificate(t *testing.T) *block.Certificate {
+	c := &block.Certificate{
+		BRBatchedSig: RandomSlice(t, 33),
+		BRStep:       20,
+
+		SRBatchedSig: RandomSlice(t, 33),
+		SRStep:       12,
+	}
+
+	for i := 0; i < 10; i++ {
+		c.BRPubKeys = append(c.BRPubKeys, RandomSlice(t, 33))
+		c.SRPubKeys = append(c.SRPubKeys, RandomSlice(t, 33))
+	}
+
+	err := c.SetHash()
+	assert.Nil(t, err)
+	return c
+}
+
 // RandomHeader returns a random header for testing
 func RandomHeader(t *testing.T) *block.Header {
 
