@@ -17,10 +17,6 @@ func (t TestPayload) CalculateHash() ([]byte, error) {
 	return hash.Sha3256([]byte(t.x))
 }
 
-func (t TestPayload) Equals(other Payload) (bool, error) {
-	return t.x == other.(TestPayload).x, nil
-}
-
 /*
 bellaHash := byte[]{
 	123, 84, 169, 215, 192, 54, 108, 20, 6, 245, 41, 14, 121, 178, 145, 55, 94, 238, 113, 30, 4, 1, 80, 41, 151, 97, 73, 228, 46, 101, 217, 66
