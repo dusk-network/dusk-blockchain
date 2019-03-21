@@ -6,17 +6,16 @@ import (
 
 	"github.com/pkg/errors"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 )
 
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	prevBlock block.Block
-	db        database.DB
+	db        Database
 }
 
 // AcceptBlock will accept a block if
@@ -60,12 +59,12 @@ func (c Chain) VerifyBlock(blk block.Block) error {
 
 	// 2. Verify each tx - stateful
 	for _, merklePl := range blk.Txs {
-		tx, ok := merklePl.(transactions.TypeInfo)
+		tx, ok := merklePl.(transactions.Transaction)
 		if !ok {
-			return errors.New("could not assert tx type as TypeInfo")
+			return errors.New("tx does not implement the transaction interface")
 		}
 
-		err = checkTXDoubleSpent(tx)
+		err = c.checkTXDoubleSpent(tx.StandardTX().Inputs)
 		if err != nil {
 			return errors.Wrapf(err, "could not verify block with hash %s", hex.EncodeToString(blk.Header.Hash))
 		}
@@ -81,7 +80,8 @@ func (c Chain) VerifyBlock(blk block.Block) error {
 // The key-image database is equivalently our utxo database in bitcoin.
 // - Not malformed
 // Returns nil if a tx is valid
-func (c Chain) VerifyTX(tx transactions.TypeInfo) error {
+func (c Chain) VerifyTX(tx transactions.Transaction) error {
+	//1. stateless checks
 	err := checkTXMalformed(tx)
 	if err != nil {
 		return err
@@ -92,7 +92,8 @@ func (c Chain) VerifyTX(tx transactions.TypeInfo) error {
 		return err
 	}
 
-	err = checkTXDoubleSpent(tx)
+	// stateful checks
+	err = c.checkTXDoubleSpent(tx.StandardTX().Inputs)
 	if err != nil {
 		return err
 	}
@@ -111,14 +112,11 @@ func (c *Chain) writeBlock(blk block.Block) error {
 // returns nil, if block does not exist
 func (c Chain) checkBlockExists(blk block.Block) error {
 
-	return c.db.View(func(tx database.Tx) error {
-		hdr, err := tx.GetBlockHeaderByHash(blk.Header.Hash)
-		if hdr != nil {
-			return errors.New("chain: block is already present in the database")
-		}
-		return err
-	})
-
+	hdr, err := c.db.getBlockHeaderByHash(blk.Header.Hash)
+	if hdr != nil {
+		return errors.New("chain: block is already present in the database")
+	}
+	return err
 }
 
 // checks whether a block is malformed,
@@ -161,7 +159,7 @@ func (c Chain) checkBlockMalformed(blk block.Block) error {
 
 	// 2. Stateless checks on transactions
 	for _, merklePl := range blk.Txs {
-		tx, ok := merklePl.(transactions.TypeInfo)
+		tx, ok := merklePl.(transactions.Transaction)
 		if !ok {
 			return errors.New("could not assert tx type as TypeInfo")
 		}
@@ -176,11 +174,13 @@ func (c Chain) checkBlockMalformed(blk block.Block) error {
 
 // Checks whether a transaction
 // is malformed. These are stateless checks
-func checkTXMalformed(tx transactions.TypeInfo) error {
+func checkTXMalformed(tx transactions.Transaction) error {
 
 	// Version
 
-	// XXX: Checks here have been delayed until we refactor the transaction/blocks structure
+	// Check standard fields
+
+	// Check if
 
 	err := checkRangeProof(rangeproof.Proof{})
 	if err != nil {
@@ -200,11 +200,23 @@ func checkRangeProof(p rangeproof.Proof) error {
 	return nil
 }
 
-// checks that the transaction has not been spent by checking
-// the database for that key image
+// checks that the transaction has not been spent by checking the database for that key image
 // returns nil if item not in database
-func checkTXDoubleSpent(tx transactions.TypeInfo) error {
+func (c Chain) checkTXDoubleSpent(inputs transactions.Inputs) error {
 
-	// 1. Check if keyImage is already in database
-	return nil
+	var err error
+
+	// 1. Check keyImage for each input has not been used already
+	for _, input := range inputs {
+		has, err := c.db.hasKeyImage(input.KeyImage)
+		if err != nil {
+			return err
+		}
+		if has {
+			return errors.New("keyimage has already been used")
+		}
+		return err
+	}
+
+	return err
 }
