@@ -75,7 +75,12 @@ func (t *TimeLock) CalculateHash() ([]byte, error) {
 }
 
 // Equals returns true if two timelocks tx's are the same
-func (t *TimeLock) Equals(other *TimeLock) bool {
+func (t *TimeLock) Equals(tr Transaction) bool {
+
+	other, ok := tr.(*TimeLock)
+	if !ok {
+		return false
+	}
 
 	if !t.Standard.Equals(&other.Standard) {
 		return false

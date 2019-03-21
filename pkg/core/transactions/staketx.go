@@ -89,7 +89,12 @@ func (s *Stake) CalculateHash() ([]byte, error) {
 }
 
 // Equals returns true if two Stake tx's are the same
-func (s *Stake) Equals(other *Stake) bool {
+func (s *Stake) Equals(t Transaction) bool {
+
+	other, ok := t.(*Stake)
+	if !ok {
+		return false
+	}
 
 	if !s.Standard.Equals(&other.Standard) {
 		return false

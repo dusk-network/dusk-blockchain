@@ -75,7 +75,12 @@ func (b *Bid) CalculateHash() ([]byte, error) {
 }
 
 // Equals returns true if two Bid tx's are the same
-func (b *Bid) Equals(other *Bid) bool {
+func (b *Bid) Equals(t Transaction) bool {
+
+	other, ok := t.(*Bid)
+	if !ok {
+		return false
+	}
 
 	if !b.Standard.Equals(&other.Standard) {
 		return false

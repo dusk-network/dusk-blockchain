@@ -115,7 +115,6 @@ func (s *Standard) Decode(r io.Reader) error {
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &s.Fee); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -142,7 +141,12 @@ func (s Standard) StandardTX() Standard {
 }
 
 // Equals returns true if two standard tx's are the same
-func (s *Standard) Equals(other *Standard) bool {
+func (s *Standard) Equals(t Transaction) bool {
+
+	other, ok := t.(*Standard)
+	if !ok {
+		return false
+	}
 
 	if s.Version != other.Version {
 		return false
@@ -166,13 +170,4 @@ func (s *Standard) Equals(other *Standard) bool {
 	// calculating the hash. What we can do, is state this edge case and analyse our use-cases.
 
 	return true
-}
-
-// FromReader will decode into a slice of transactions
-func FromReader(r io.Reader, numOfTXs uint64) ([]Transaction, error) {
-	// Decode Coinbase first
-
-	// Decode rest of transactions
-
-	return nil, nil
 }

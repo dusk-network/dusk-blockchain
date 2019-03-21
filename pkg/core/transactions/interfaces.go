@@ -33,5 +33,6 @@ type Transaction interface {
 	Decoder
 	TypeInfo
 	merkletree.Payload
+	Equals(Transaction) bool
 	StandardTX() Standard
 }
