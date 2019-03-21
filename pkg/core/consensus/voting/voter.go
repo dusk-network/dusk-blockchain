@@ -2,7 +2,9 @@ package voting
 
 import (
 	"bytes"
-	"encoding/hex"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
@@ -14,44 +16,69 @@ import (
 
 // Voter is responsible for signing and sending out consensus related
 // voting messages to the wire.
-type Voter struct {
-	eventBus                          *wire.EventBus
-	outgoingBlockReductionSubscriber  *wire.EventSubscriber
-	outgoingSigSetReductionSubscriber *wire.EventSubscriber
-	outgoingSigSetSubScriber          *wire.EventSubscriber
-	outgoingBlockAgreementSubscriber  *wire.EventSubscriber
-	outgoingSigSetAgreementSubscriber *wire.EventSubscriber
+type (
+	Voter struct {
+		eventBus *wire.EventBus
+		*consensus.EventHeaderMarshaller
 
-	blockReductionChannel  chan *reduction
-	sigSetReductionChannel chan *sigSetReduction
+		reductionChannel   chan *reduction
+		agreementChannel   chan *agreement
+		phaseUpdateChannel chan []byte
+		roundUpdateChannel chan uint64
 
-	*user.Keys
-	committee user.Committee
-}
+		winningBlockHash []byte
+		*user.Keys
+		committee committee.Committee
+	}
+	reduction struct {
+		round     uint64
+		step      uint8
+		votedHash []byte
+	}
+
+	reductionCollector struct {
+		reductionChannel chan *reduction
+	}
+
+	agreement struct {
+		round   uint64
+		step    uint8
+		hash    []byte
+		voteSet []*msg.Vote
+	}
+
+	agreementCollector struct {
+		agreementChannel chan *agreement
+	}
+)
 
 // NewVoter will return an initialized Voter struct.
 func NewVoter(eventBus *wire.EventBus, keys *user.Keys,
-	committee user.Committee) *Voter {
+	committee committee.Committee) *Voter {
 
-	blockReductionChannel := make(chan *reduction, 2)
-	sigSetReductionChannel := make(chan *sigSetReduction, 2)
+	reductionChannel := make(chan *reduction, 2)
+	agreementChannel := make(chan *agreement, 1)
 
-	blockReductionCollector := &blockReductionCollector{blockReductionChannel}
-	blockReductionSubscriber := wire.NewEventSubscriber(eventBus, blockReductionCollector,
-		string(msg.OutgoingReductionTopic))
+	reductionCollector := &reductionCollector{reductionChannel}
+	wire.NewEventSubscriber(eventBus, reductionCollector,
+		string(msg.OutgoingReductionTopic)).Accept()
 
-	sigSetReductionCollector := &sigSetReductionCollector{sigSetReductionChannel}
-	sigSetReductionSubscriber := wire.NewEventSubscriber(eventBus, sigSetReductionCollector,
-		string(msg.OutgoingReductionTopic))
+	agreementCollector := &agreementCollector{agreementChannel}
+	wire.NewEventSubscriber(eventBus, agreementCollector,
+		msg.OutgoingAgreementTopic).Accept()
+
+	phaseUpdateCollector := consensus.InitPhaseCollector(eventBus)
+	roundUpdateCollector := consensus.InitRoundCollector(eventBus)
 
 	return &Voter{
-		eventBus:                          eventBus,
-		outgoingBlockReductionSubscriber:  blockReductionSubscriber,
-		outgoingSigSetReductionSubscriber: sigSetReductionSubscriber,
-		blockReductionChannel:             blockReductionChannel,
-		sigSetReductionChannel:            sigSetReductionChannel,
-		Keys:                              keys,
-		committee:                         committee,
+		eventBus:              eventBus,
+		EventHeaderMarshaller: &consensus.EventHeaderMarshaller{},
+		reductionChannel:      reductionChannel,
+		agreementChannel:      agreementChannel,
+		phaseUpdateChannel:    phaseUpdateCollector.BlockHashChan,
+		roundUpdateChannel:    roundUpdateCollector.RoundChan,
+		Keys:                  keys,
+		committee:             committee,
 	}
 }
 
@@ -70,52 +97,52 @@ func (v Voter) addPubKeyAndSig(message *bytes.Buffer,
 	return buffer, nil
 }
 
-func (v Voter) checkEligibility(round uint64, step uint8) (bool, error) {
-	votingCommittee, err := v.committee.GetVotingCommittee(round, step)
-	if err != nil {
-		return false, err
-	}
-
-	pubKeyStr := hex.EncodeToString(v.BLSPubKey.Marshal())
-	return votingCommittee[pubKeyStr] > 0, nil
+func (v Voter) eligibleToVote() bool {
+	return v.committee.IsMember(v.Keys.BLSPubKey.Marshal())
 }
 
 // Listen will set the Voter up to listen for incoming requests to vote.
 func (v Voter) Listen() {
-	go v.outgoingBlockAgreementSubscriber.Accept()
-	go v.outgoingBlockReductionSubscriber.Accept()
-	go v.outgoingSigSetAgreementSubscriber.Accept()
-	go v.outgoingSigSetReductionSubscriber.Accept()
-	go v.outgoingSigSetSubScriber.Accept()
-
 	for {
 		select {
-		case br := <-v.blockReductionChannel:
-			eligible, err := v.checkEligibility(br.round, br.step)
-			if err != nil {
-				// Log
-				return
-			}
-
-			if eligible {
-				if err := v.voteBlockReduction(br); err != nil {
+		case blockHash := <-v.phaseUpdateChannel:
+			v.winningBlockHash = blockHash
+		case <-v.roundUpdateChannel:
+			v.winningBlockHash = nil
+		case r := <-v.reductionChannel:
+			if v.eligibleToVote() {
+				if err := v.voteReduction(r); err != nil {
 					// Log
 					return
 				}
 			}
-		case sr := <-v.sigSetReductionChannel:
-			eligible, err := v.checkEligibility(sr.round, sr.step)
-			if err != nil {
-				// Log
-				return
-			}
-
-			if eligible {
-				if err := v.voteSigSetReduction(sr); err != nil {
+		case a := <-v.agreementChannel:
+			if v.eligibleToVote() {
+				if err := v.voteAgreement(a); err != nil {
 					// Log
 					return
 				}
 			}
 		}
 	}
+}
+
+func (r *reductionCollector) Collect(reductionBuffer *bytes.Buffer) error {
+	reduction, err := unmarshalReduction(reductionBuffer)
+	if err != nil {
+		return err
+	}
+
+	r.reductionChannel <- reduction
+	return nil
+}
+
+func (a *agreementCollector) Collect(agreementBuffer *bytes.Buffer) error {
+	agreement, err := unmarshalAgreement(agreementBuffer)
+	if err != nil {
+		return err
+	}
+
+	a.agreementChannel <- agreement
+	return nil
 }

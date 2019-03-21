@@ -2,33 +2,41 @@ package reduction
 
 import (
 	"bytes"
-	"encoding/binary"
-	"encoding/hex"
+	"errors"
 	"time"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// SigSetReduction is a signature set phase reduction event.
-type SigSetReduction struct {
-	*Event
-	winningBlockHash []byte
-}
+type (
+	// SigSetReduction is a reduction event for the signature set phase.
+	SigSetReduction struct {
+		*Event
+		winningBlockHash []byte
+	}
 
-// Equal checks if the SigSetReduction is Equal to the passed Event.
-// Implements Event interface.
+	sigSetReductionUnmarshaller struct {
+		*reductionEventUnmarshaller
+	}
+
+	// SigSetReducer is responsible for handling incoming signature set reduction
+	// messages. It sends the proper messages to a reduction sequencer, and
+	// processes the outcomes produced by this sequencer.
+	SigSetReducer struct {
+		*Reducer
+		selectionChannel <-chan []byte
+		winningBlockHash []byte
+	}
+)
+
+// Equal implements Event interface.
 func (ssr *SigSetReduction) Equal(e wire.Event) bool {
 	return ssr.Event.Equal(e) &&
 		bytes.Equal(ssr.winningBlockHash, e.(*SigSetReduction).winningBlockHash)
-}
-
-type sigSetReductionUnmarshaller struct {
-	*reductionEventUnmarshaller
 }
 
 func newSigSetReductionUnmarshaller(validate func(*bytes.Buffer) error) *reductionEventUnmarshaller {
@@ -42,230 +50,76 @@ func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &sigSetReduction.winningBlockHash); err != nil {
+	if err := encoding.Read256(r, &sigSetReduction.winningBlockHash); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-type sigSetReductionCollector struct {
-	*reductionCollector
-	unmarshaller wire.EventUnmarshaller
-
-	reducing         bool
-	winningBlockHash []byte
-}
-
-func newSigSetReductionCollector(committee committee.Committee, timeOut time.Duration,
-	validateFunc func(*bytes.Buffer) error) *sigSetReductionCollector {
-
-	reductionCollector := newReductionCollector(committee, timeOut)
-
-	sigSetReductionCollector := &sigSetReductionCollector{
-		reductionCollector: reductionCollector,
-		unmarshaller:       newSigSetReductionUnmarshaller(validateFunc),
-	}
-
-	return sigSetReductionCollector
-}
-
-func (ssrc *sigSetReductionCollector) updateRound(round uint64) {
-	ssrc.queue.Clear(ssrc.currentRound)
-	ssrc.winningBlockHash = nil
-	ssrc.currentRound = round
-	ssrc.currentStep = 1
-
-	if ssrc.reducing {
-		ssrc.disconnectSelector()
-		ssrc.reducing = false
-	}
-
-	ssrc.Clear()
-}
-
-func (ssrc sigSetReductionCollector) correctWinningBlockHash(m *SigSetReduction) bool {
-	return bytes.Equal(m.winningBlockHash, ssrc.winningBlockHash)
-}
-
-func (ssrc *sigSetReductionCollector) Collect(buffer *bytes.Buffer) error {
-	event := &SigSetReduction{}
-	if err := ssrc.unmarshaller.Unmarshal(buffer, event); err != nil {
-		return err
-	}
-
-	ssrc.process(event)
-	return nil
-}
-
-func (ssrc *sigSetReductionCollector) process(m *SigSetReduction) {
-	if ssrc.shouldBeProcessed(m.Event) && blsVerified(m.Event) &&
-		ssrc.winningBlockHash != nil && ssrc.correctWinningBlockHash(m) {
-
-		if !ssrc.reducing {
-			ssrc.reducing = true
-			go ssrc.startSelector()
-		}
-
-		ssrc.incomingReductionChannel <- m.Event
-		pubKeyStr := hex.EncodeToString(m.PubKeyBLS)
-		ssrc.Store(m, pubKeyStr)
-	} else if ssrc.shouldBeStored(m.Event) && blsVerified(m.Event) {
-		ssrc.queue.PutMessage(m.Round, m.Step, m)
-	}
-}
-
-type SigSetReducer struct {
-	eventBus              *wire.EventBus
-	reductionSubscriber   *wire.EventSubscriber
-	phaseUpdateSubscriber *wire.EventSubscriber
-	voteSubscriber        *wire.EventSubscriber
-	roundSubscriber       *wire.EventSubscriber
-	*sigSetReductionCollector
-
-	// channels linked to subscribers
-	voteChannel        <-chan []byte
-	phaseUpdateChannel <-chan []byte
-	roundChannel       <-chan uint64
-}
-
+// NewSigSetReducer will create a new signature set reducer and return it. The
+// signature set reducer will subscribe to the appropriate topics, and only needs
+// to be started by calling Listen, after being returned.
 func NewSigSetReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
 	committee committee.Committee, timeOut time.Duration) *SigSetReducer {
 
-	voteChannel := make(chan []byte, 1)
-	phaseUpdateChannel := make(chan []byte, 1)
-	roundChannel := make(chan uint64, 1)
+	selectionChannel := make(chan []byte, 1)
 
-	reductionCollector := newSigSetReductionCollector(committee, timeOut,
-		validateFunc)
-	reductionSubscriber := wire.NewEventSubscriber(eventBus, reductionCollector,
-		string(topics.BlockReduction))
-
-	phaseUpdateCollector := &phaseUpdateCollector{phaseUpdateChannel}
-	phaseUpdateSubscriber := wire.NewEventSubscriber(eventBus, phaseUpdateCollector,
-		string(msg.PhaseUpdateTopic))
-
-	voteCollector := &voteCollector{voteChannel}
-	voteSubscriber := wire.NewEventSubscriber(eventBus, voteCollector, string(msg.SelectionResultTopic))
-
-	roundCollector := &roundCollector{roundChannel}
-	roundSubscriber := wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic))
+	setSelectionCollector := &selectionCollector{selectionChannel}
+	wire.NewEventSubscriber(eventBus, setSelectionCollector,
+		string(msg.SelectionResultTopic)).Accept()
 
 	sigSetReducer := &SigSetReducer{
-		eventBus:                 eventBus,
-		reductionSubscriber:      reductionSubscriber,
-		phaseUpdateSubscriber:    phaseUpdateSubscriber,
-		voteSubscriber:           voteSubscriber,
-		roundSubscriber:          roundSubscriber,
-		sigSetReductionCollector: reductionCollector,
-		voteChannel:              voteChannel,
-		roundChannel:             roundChannel,
+		Reducer:          newReducer(eventBus, validateFunc, committee, timeOut),
+		selectionChannel: selectionChannel,
 	}
+
+	wire.NewEventSubscriber(eventBus, sigSetReducer,
+		string(topics.SigSetReduction)).Accept()
 
 	return sigSetReducer
 }
 
-func (sr SigSetReducer) addVoteInfo(data []byte) (*bytes.Buffer, error) {
-	buffer := new(bytes.Buffer)
-
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, sr.currentRound); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint8(buffer, sr.currentStep); err != nil {
-		return nil, err
-	}
-
-	if _, err := buffer.Write(data); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.Write256(buffer, sr.winningBlockHash); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
-}
-
+// Listen will start the signature set reducer. It will wait for messages on it's
+// event channels, and handle them accordingly.
 func (sr *SigSetReducer) Listen() {
-	go sr.reductionSubscriber.Accept()
-	go sr.phaseUpdateSubscriber.Accept()
-	go sr.voteSubscriber.Accept()
-	go sr.roundSubscriber.Accept()
-
 	for {
 		select {
-		case sigSetHash := <-sr.voteChannel:
-			if !sr.votedThisStep {
-				vote, err := sr.addVoteInfo(sigSetHash)
-				if err != nil {
-					// Log
-					return
-				}
-
-				sr.eventBus.Publish(msg.OutgoingReductionTopic, vote)
-				sr.votedThisStep = true
-			}
-		case sigSetHash := <-sr.hashChannel:
-			sr.incrementStep()
-			vote, err := sr.addVoteInfo(sigSetHash)
-			if err != nil {
-				// Log
-				return
-			}
-
-			sr.eventBus.Publish(msg.OutgoingReductionTopic, vote)
-			sr.votedThisStep = true
-		case result := <-sr.resultChannel:
-			if result != nil {
-				vote, err := sr.addVoteInfo(result)
-				if err != nil {
-					// Log
-					return
-				}
-
-				sr.eventBus.Publish(msg.OutgoingAgreementTopic, vote)
-			}
-
-			sr.incrementStep()
-			sr.reducing = false
-		default:
+		case round := <-sr.roundChannel:
+			sr.stopChannel <- true
+			sr.winningBlockHash = nil
+			sr.updateRound(round)
+		case blockHash := <-sr.phaseUpdateChannel:
+			sr.winningBlockHash = blockHash
+		case setHash := <-sr.selectionChannel:
 			if sr.winningBlockHash != nil {
-				sr.checkQueue()
-			}
-
-			if !sr.reducing {
-				sr.checkRoundChannel()
+				go sr.startSequencer(setHash)
+				go sr.listenSequencer()
 			}
 		}
 	}
 }
 
-func (sr SigSetReducer) checkQueue() {
-	queuedMessages := sr.queue.GetMessages(sr.currentRound, sr.currentStep)
-
-	if queuedMessages != nil {
-		for _, message := range queuedMessages {
-			m := message.(*SigSetReduction)
-			sr.process(m)
-		}
+// Collect implements the EventCollector interface.
+// Unmarshal a signature set reduction message, verify the signature and then
+// pass it down for processing.
+func (sr *SigSetReducer) Collect(buffer *bytes.Buffer) error {
+	event := &SigSetReduction{}
+	if err := sr.unmarshaller.Unmarshal(buffer, event); err != nil {
+		return err
 	}
-}
 
-func (sr *SigSetReducer) checkRoundChannel() {
-	select {
-	case round := <-sr.roundChannel:
-		sr.updateRound(round)
-	default:
-		break
+	// verify correctness of included BLS public key and signature
+	if err := msg.VerifyBLSSignature(event.PubKeyBLS, event.VotedHash,
+		event.SignedHash); err != nil {
+
+		return errors.New("sig set reduction: BLS verification failed")
 	}
-}
 
-type phaseUpdateCollector struct {
-	phaseUpdateChannel chan<- []byte
-}
+	if !bytes.Equal(sr.winningBlockHash, event.winningBlockHash) {
+		return errors.New("sig set reduction: vote has wrong winning block hash")
+	}
 
-func (p *phaseUpdateCollector) Collect(phaseUpdateBuffer *bytes.Buffer) error {
-	p.phaseUpdateChannel <- phaseUpdateBuffer.Bytes()
+	sr.process(event.Event)
 	return nil
 }
