@@ -147,11 +147,10 @@ func (b *Block) Decode(r io.Reader) error {
 		return err
 	}
 
-	txs, err := transactions.FromReader(r, lTxs)
+	b.Txs, err = transactions.FromReader(r, lTxs)
 	if err != nil {
 		return err
 	}
-	b.Txs = txs
 
 	return nil
 }
