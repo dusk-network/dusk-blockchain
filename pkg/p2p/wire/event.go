@@ -7,30 +7,85 @@ import (
 // QuitTopic is the topic to make all components quit
 const QuitTopic = "topic"
 
-// EventUnmarshaller unmarshals an Event from a buffer. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
-type EventUnmarshaller interface {
-	Unmarshal(*bytes.Buffer, Event) error
+type (
+
+	// The Event is an Entity that represents the Messages travelling on the EventBus. It would normally present always the same fields.
+	Event interface {
+		Sender() []byte
+		Equal(Event) bool
+	}
+
+	// EventUnmarshaller unmarshals an Event from a buffer. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
+	EventUnmarshaller interface {
+		Unmarshal(*bytes.Buffer, Event) error
+	}
+
+	// EventMarshaller is the specular operation of an EventUnmarshaller. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
+	EventMarshaller interface {
+		Marshal(*bytes.Buffer, Event) error
+	}
+
+	EventPrioritizer interface {
+		Priority(Event, Event) bool
+	}
+
+	// EventCollector is the interface for collecting Events. Pretty much processors involves some degree of Event collection (either until a Quorum is reached or until a Timeout). This Interface is typically implemented by a struct that will perform some Event unmarshalling.
+	EventCollector interface {
+		Collect(*bytes.Buffer) error
+	}
+
+	// StepEventCollector is an helper for common operations on stored Event Arrays
+	// TODO: move this inside the collector
+	StepEventCollector map[uint8][]Event
+
+	// EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events
+	EventSubscriber struct {
+		eventBus       *EventBus
+		eventCollector EventCollector
+		msgChan        <-chan *bytes.Buffer
+		msgChanID      uint32
+		quitChan       <-chan *bytes.Buffer
+		quitChanID     uint32
+		topic          string
+	}
+
+	// EventSelector is a helper to help choosing
+	EventSelector struct {
+		EventChan     chan Event
+		BestEventChan chan Event
+		StopChan      chan bool
+		prioritizer   EventPrioritizer
+	}
+)
+
+//NewEventSelector creates the Selector
+func NewEventSelector(p EventPrioritizer) *EventSelector {
+	return &EventSelector{
+		EventChan:     make(chan Event),
+		BestEventChan: make(chan Event),
+		StopChan:      make(chan bool),
+		prioritizer:   p,
+	}
 }
 
-// EventMarshaller is the specular operation of an EventUnmarshaller. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
-type EventMarshaller interface {
-	Marshal(*bytes.Buffer, Event) error
-}
+// PickBest picks the best event depending on the priority of the sender
+func (s *EventSelector) PickBest() {
+	var bestEvent Event
 
-// The Event is an Entity that represents the Messages travelling on the EventBus. It would normally present always the same fields.
-type Event interface {
-	Sender() []byte
-	Equal(Event) bool
+	for {
+		select {
+		case ev := <-s.EventChan:
+			if s.prioritizer.Priority(bestEvent, ev) {
+				bestEvent = ev
+			}
+		case shouldNotify := <-s.StopChan:
+			if shouldNotify {
+				s.BestEventChan <- bestEvent
+			}
+			return
+		}
+	}
 }
-
-// EventCollector is the interface for collecting Events. Pretty much processors involves some degree of Event collection (either until a Quorum is reached or until a Timeout). This Interface is typically implemented by a struct that will perform some Event unmarshalling.
-type EventCollector interface {
-	Collect(*bytes.Buffer) error
-}
-
-// StepEventCollector is an helper for common operations on stored Event Arrays
-// TODO: move this inside the collector
-type StepEventCollector map[uint8][]Event
 
 // Clear up the Collector
 func (sec StepEventCollector) Clear() {
@@ -65,17 +120,6 @@ func (sec StepEventCollector) Store(event Event, step uint8) int {
 	eventList = append(eventList, event)
 	sec[step] = eventList
 	return len(eventList)
-}
-
-// EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events
-type EventSubscriber struct {
-	eventBus       *EventBus
-	eventCollector EventCollector
-	msgChan        <-chan *bytes.Buffer
-	msgChanID      uint32
-	quitChan       <-chan *bytes.Buffer
-	quitChanID     uint32
-	topic          string
 }
 
 // NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus. The EventBus, EventCollector and Topic are injected

@@ -2,7 +2,6 @@ package committee
 
 import (
 	"bytes"
-	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -14,13 +13,12 @@ import (
 type (
 	// Committee is the interface for operations depending on the set of Provisioners extracted for a fiven step
 	Committee interface {
+		wire.Prioritizer
 		// isMember can accept a BLS Public Key or an Ed25519
 		IsMember([]byte) bool
 		GetVotingCommittee(uint64, uint8) (map[string]uint8, error)
 		VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError
 		Quorum() int
-		// Priority is a way to categorize members of a committee. Suitable implementation details are stake, scores, etc. Returns true if the second argument has priority over the first, false otherwise
-		Priority([]byte, []byte) bool
 	}
 
 	//Event is the message that encapsulates data relevant for components relying on committee information
@@ -50,7 +48,6 @@ type (
 		BestEventChan chan wire.Event
 		StopChan      chan bool
 		committee     Committee
-		timerLength   time.Duration
 	}
 )
 
@@ -155,40 +152,4 @@ func (cc *Collector) ShouldSkip(ev wire.Event, round uint64, step uint8) bool {
 // UpdateRound is a utility function that can be overridden by the embedding collector in case of custom behaviour when updating the current round
 func (cc *Collector) UpdateRound(round uint64) {
 	cc.CurrentRound = round
-}
-
-//NewSelector creates the Selector
-func NewSelector(c Committee, timeout time.Duration) *Selector {
-	return &Selector{
-		EventChan:     make(chan wire.Event),
-		BestEventChan: make(chan wire.Event),
-		StopChan:      make(chan bool),
-		committee:     c,
-		timerLength:   timeout,
-	}
-}
-
-// PickBest picks the best event depending on the priority of the sender
-func (s *Selector) PickBest() {
-	var bestEvent wire.Event
-	timer := time.NewTimer(s.timerLength)
-
-	for {
-		select {
-		case ev := <-s.EventChan:
-			if s.committee.Priority(bestEvent.Sender(), ev.Sender()) {
-				bestEvent = ev
-			}
-		case <-timer.C:
-			s.pick(bestEvent)
-			return
-		case <-s.StopChan:
-			s.pick(bestEvent)
-			return
-		}
-	}
-}
-
-func (s *Selector) pick(ev wire.Event) {
-	s.BestEventChan <- ev
 }
