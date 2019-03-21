@@ -8,21 +8,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type (
-	// SigSetReduction is a reduction event for the signature set phase.
-	SigSetReduction struct {
-		*Event
-		winningBlockHash []byte
-	}
-
-	sigSetReductionUnmarshaller struct {
-		*reductionEventUnmarshaller
-	}
-
 	// SigSetReducer is responsible for handling incoming signature set reduction
 	// messages. It sends the proper messages to a reduction sequencer, and
 	// processes the outcomes produced by this sequencer.
@@ -32,30 +21,6 @@ type (
 		winningBlockHash []byte
 	}
 )
-
-// Equal implements Event interface.
-func (ssr *SigSetReduction) Equal(e wire.Event) bool {
-	return ssr.Event.Equal(e) &&
-		bytes.Equal(ssr.winningBlockHash, e.(*SigSetReduction).winningBlockHash)
-}
-
-func newSigSetReductionUnmarshaller(validate func(*bytes.Buffer) error) *reductionEventUnmarshaller {
-	return newReductionEventUnmarshaller(validate)
-}
-
-func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
-	sigSetReduction := e.(*SigSetReduction)
-
-	if err := ssru.reductionEventUnmarshaller.Unmarshal(r, sigSetReduction.Event); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &sigSetReduction.winningBlockHash); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // NewSigSetReducer will create a new signature set reducer and return it. The
 // signature set reducer will subscribe to the appropriate topics, and only needs
@@ -93,8 +58,8 @@ func (sr *SigSetReducer) Listen() {
 			sr.winningBlockHash = blockHash
 		case setHash := <-sr.selectionChannel:
 			if sr.winningBlockHash != nil {
-				go sr.startSequencer(setHash)
-				go sr.listenSequencer()
+				sr.vote(setHash, msg.OutgoingReductionTopic)
+				go sr.startSequencer()
 			}
 		}
 	}
