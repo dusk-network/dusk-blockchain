@@ -154,3 +154,25 @@ func (b *Block) Decode(r io.Reader) error {
 
 	return nil
 }
+
+// Equals returns true if two blocks are equal
+func (b *Block) Equals(other *Block) bool {
+	if other == nil {
+		return false
+	}
+
+	if !b.Header.Equals(other.Header) {
+		return false
+	}
+
+	for i := range b.Txs {
+		tx := b.Txs[i]
+		otherTx := other.Txs[i]
+
+		if !tx.Equals(otherTx) {
+			return false
+		}
+	}
+
+	return true
+}
