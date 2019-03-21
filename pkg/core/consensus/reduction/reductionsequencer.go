@@ -5,154 +5,94 @@ import (
 	"encoding/hex"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 )
 
 type reductionSequencer struct {
-	*reductionEventCollector
-	committee    committee.Committee
-	currentRound uint64
-	currentStep  uint8
-
-	timeOut                  time.Duration
-	queue                    *consensus.EventQueue
 	outgoingReductionChannel chan []byte
 	outgoingAgreementChannel chan []byte
 	voteSetStore             []*msg.Vote
 
 	incomingReductionChannel chan *Event
-	sequencerDone            bool
+	quorum                   int
+	timeOut                  time.Duration
 }
 
-func newReductionSequencer(committee committee.Committee,
-	timeOut time.Duration) *reductionSequencer {
-
-	queue := consensus.NewEventQueue()
-
-	reductionSequencer := &reductionSequencer{
-		reductionEventCollector:  &reductionEventCollector{},
-		committee:                committee,
-		timeOut:                  timeOut,
-		queue:                    &queue,
+func newReductionSequencer(quorum int, timeOut time.Duration) *reductionSequencer {
+	return &reductionSequencer{
 		outgoingReductionChannel: make(chan []byte, 1),
 		outgoingAgreementChannel: make(chan []byte, 1),
-	}
-
-	return reductionSequencer
-}
-
-func (rs *reductionSequencer) process(m *Event) {
-	if rs.shouldBeProcessed(m) {
-		rs.incomingReductionChannel <- m
-		pubKeyStr := hex.EncodeToString(m.PubKeyBLS)
-		rs.Store(m, pubKeyStr)
-	} else if rs.shouldBeStored(m) {
-		rs.queue.PutEvent(m.Round, m.Step, m)
+		incomingReductionChannel: make(chan *Event, 100),
+		quorum:                   quorum,
+		timeOut:                  timeOut,
 	}
 }
 
-func (rs reductionSequencer) processQueuedMessages() {
-	queuedEvents := rs.queue.GetEvents(rs.currentRound, rs.currentStep)
+func (rs *reductionSequencer) startSequence() {
+	hash1 := rs.selectHash()
+	rs.dispatchReductionVote(hash1)
+	hash2 := rs.selectHash()
 
-	if queuedEvents != nil {
-		for _, event := range queuedEvents {
-			ev := event.(*Event)
-			rs.process(ev)
-		}
+	// if we got the desired results, then we send out an agreement vote
+	if rs.sequenceSuccessful(hash1, hash2) {
+		rs.dispatchAgreementVote(hash2)
 	}
 }
 
-func (rs *reductionSequencer) incrementStep() {
-	rs.currentStep++
-	rs.Clear()
+func (rs reductionSequencer) sequenceSuccessful(hash1, hash2 []byte) bool {
+	notNil := hash1 != nil && hash2 != nil
+	sameResult := bytes.Equal(hash1, hash2)
+	correctVoteSetLength := len(rs.voteSetStore) >= rs.quorum
+
+	return notNil && sameResult && correctVoteSetLength
 }
 
-func (rs *reductionSequencer) updateRound(round uint64) {
-	rs.queue.Clear(rs.currentRound)
-	rs.currentRound = round
-	rs.currentStep = 1
-	rs.incomingReductionChannel = nil
-	rs.sequencerDone = false
-
-	rs.Clear()
+func (rs reductionSequencer) dispatchReductionVote(hash []byte) {
+	rs.outgoingReductionChannel <- hash
 }
 
-func (rs *reductionSequencer) startSequencer(hash []byte) {
-	// step 1
-
-	// vote for the received hash
-	rs.dispatchReductionVote(hash)
-	// select the hash with the most votes
-	hash = rs.next()
-
-	// step 2
-	rs.incrementStep()
-	// vote for the returned hash
-	rs.dispatchReductionVote(hash)
-	// select best voted hash again
-	hash = rs.next()
-
-	hashAndVoteSet, err := rs.combineHashAndVoteSet(hash)
+func (rs reductionSequencer) dispatchAgreementVote(hash []byte) error {
+	voteSetBytes, err := msg.EncodeVoteSet(rs.voteSetStore)
 	if err != nil {
-		// Log
-		return
+		return err
 	}
 
-	rs.dispatchAgreementVote(hashAndVoteSet)
-	rs.incrementStep()
-	// sequencer done
+	hashAndVoteSet := append(hash, voteSetBytes...)
+	rs.outgoingAgreementChannel <- hashAndVoteSet
+	return nil
 }
 
-func (rs *reductionSequencer) next() []byte {
-	rs.incomingReductionChannel = make(chan *Event, 100)
-	rs.processQueuedMessages()
-	hash, voteSet := selectHash(rs.incomingReductionChannel, rs.committee.Quorum(),
-		rs.timeOut)
-
-	rs.voteSetStore = append(rs.voteSetStore, voteSet...)
-	rs.incomingReductionChannel = nil
-	return hash
-}
-
-func selectHash(incomingReductionChannel chan *Event,
-	quorum int, timeOut time.Duration) ([]byte, []*msg.Vote) {
+func (rs *reductionSequencer) selectHash() []byte {
 	// Keep track of how many votes have been cast for a specific hash
 	votesPerHash := make(map[string]uint8)
 
-	// Initalize a vote set, to add incoming votes to
-	var voteSet []*msg.Vote
-
-	timer := time.NewTimer(timeOut)
+	timer := time.NewTimer(rs.timeOut)
 
 	for {
 		select {
-		case m := <-incomingReductionChannel:
-			votedHashStr := hex.EncodeToString(m.VotedHash)
-
+		case m := <-rs.incomingReductionChannel:
 			// Add vote for this block
+			votedHashStr := hex.EncodeToString(m.VotedHash)
 			votesPerHash[votedHashStr]++
 
 			// Add vote to vote set
 			vote := createVote(m)
-			voteSet = append(voteSet, vote)
+			rs.voteSetStore = append(rs.voteSetStore, vote)
 
-			if int(votesPerHash[votedHashStr]) >= quorum {
+			if int(votesPerHash[votedHashStr]) >= rs.quorum {
 				// Clean up the vote set, to remove votes for other blocks.
-				for i, vote := range voteSet {
+				for i, vote := range rs.voteSetStore {
 					if !bytes.Equal(vote.VotedHash, m.VotedHash) {
-						voteSet = append(voteSet[:i], voteSet[i+1:]...)
+						rs.voteSetStore = append(rs.voteSetStore[:i],
+							rs.voteSetStore[i+1:]...)
 					}
 				}
 
-				return m.VotedHash, voteSet
+				return m.VotedHash
 			}
 		case <-timer.C:
-			// Return empty hash and empty vote set if we did not get a winner
-			// before timeout
-			return make([]byte, 32), nil
+			// Return empty hash if we did not get a winner before timeout
+			return make([]byte, 32)
 		}
 	}
 }
@@ -164,38 +104,4 @@ func createVote(m *Event) *msg.Vote {
 		SignedHash: m.SignedHash,
 		Step:       m.Step,
 	}
-}
-
-func (rs *reductionSequencer) combineHashAndVoteSet(hash []byte) ([]byte, error) {
-	voteSetBytes, err := msg.EncodeVoteSet(rs.voteSetStore)
-	if err != nil {
-		return nil, err
-	}
-
-	rs.voteSetStore = nil
-	return append(hash, voteSetBytes...), nil
-}
-
-func (rs reductionSequencer) shouldBeProcessed(m *Event) bool {
-	pubKeyStr := hex.EncodeToString(m.PubKeyBLS)
-	isDupe := rs.Contains(pubKeyStr)
-	isMember := rs.committee.IsMember(m.PubKeyBLS)
-	isRelevant := rs.currentRound == m.Round && rs.currentStep == m.Step
-
-	return !isDupe && isMember && isRelevant && rs.incomingReductionChannel != nil
-}
-
-func (rs reductionSequencer) shouldBeStored(m *Event) bool {
-	futureRound := rs.currentRound <= m.Round
-	futureStep := rs.currentStep <= m.Step
-
-	return futureRound || futureStep
-}
-
-func (rs reductionSequencer) dispatchReductionVote(data []byte) {
-	rs.outgoingReductionChannel <- data
-}
-
-func (rs reductionSequencer) dispatchAgreementVote(data []byte) {
-	rs.outgoingAgreementChannel <- data
 }
