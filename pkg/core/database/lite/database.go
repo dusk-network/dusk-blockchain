@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-// DB on top of underlying storage sqlite3
+// DB based on sqlite3 as underlying storage
 type DB struct {
-	// underlying storage is Sqlite3. If needed, it might be replaced with redis
+	//  If needed, it might be replaced with redis
 	storage *sql.DB
 	path    string
 

@@ -9,8 +9,8 @@ import (
 // Driver is the interface that must be implemented by a database
 // driver.
 type Driver interface {
-	// Open returns a new connection to a blockchain database.
-	// The path is a string in a driver-specific format.
+	// Open returns a new connection to a blockchain database. The path is a
+	// string in a driver-specific format.
 	Open(path string, network protocol.Magic, readonly bool) (DB, error)
 
 	// Returns unique driver identifier to be registered with
@@ -22,17 +22,17 @@ type Driver interface {
 // This is what is exposed/visible to all upper layers so changes here
 // should be carefully considered
 //
-// Tx should provide basic transactions to fetch and store.
+// Tx should provide basic transactions to fetch and store blockchain data.
 // High-level transactions are supposed to be implemented by the Consumer
 type Tx interface {
 
-	// Read-write Transactions
+	// Read-only Transactions
 	FetchBlockHeader(hash []byte) (*block.Header, error)
 	FetchBlockTransactions(hash []byte) ([]merkletree.Payload, error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
 
-	// Store prefixed methods should garentee the
+	// Read-write Transactions
 	StoreBlock(block *block.Block) error
 
 	// Atomic storage.
@@ -44,11 +44,10 @@ type Tx interface {
 // DB a thin layer on top of block chain DB
 type DB interface {
 
-	// To provide a managed execution a read-only transaction
+	// To provide a managed execution of a read-only transaction
 	View(fn func(tx Tx) error) error
-	// To provide a managed execution of read-write transaction
+	// To provide a managed execution of a read-write transaction
 	Update(fn func(tx Tx) error) error
 
-	// TBD
 	Close() error
 }

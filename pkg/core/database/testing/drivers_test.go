@@ -36,9 +36,10 @@ var (
 func TestMain(m *testing.M) {
 
 	var code int
+	// Run on all registered drivers.
 	for _, driverName := range database.Drivers() {
 		code = _TestDriver(m, driverName)
-		// the exit code might be needed by proper CI execution
+		// the exit code might be needed on proper CI execution
 		if code != 0 {
 			os.Exit(code)
 		}
@@ -46,6 +47,8 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// _TestDriver executes all tests (declared in this file) in the context of a
+// driver specified by driverName
 func _TestDriver(m *testing.M, driverName string) int {
 
 	// Cleanup TestMain iteration context
@@ -64,8 +67,10 @@ func _TestDriver(m *testing.M, driverName string) int {
 		return 1
 	}
 
-	// Retrieve a handler to an existing driver. If no errors, driver.Close
-	// must be called when database is not used anymore.
+	// Cleanup backend files only when running in testing mode
+	defer os.RemoveAll(storeDir)
+
+	// Retrieve a handler to an existing driver.
 	drvr, err = database.From(driverName)
 
 	if err != nil {
@@ -83,13 +88,15 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 	defer db.Close()
 
-	// Cleanup backend files only when running in testing mode
-	defer os.RemoveAll(storeDir)
-
 	// Generate a few blocks to be used as mock objects
 	blocks, err = generateBlocks(1000, 10)
 	if err != nil {
 		fmt.Println(err)
+		return 1
+	}
+
+	if len(blocks) == 0 {
+		fmt.Println("Empty block slice. That's weird")
 		return 1
 	}
 
@@ -101,19 +108,20 @@ func _TestDriver(m *testing.M, driverName string) int {
 	}
 
 	// Now run all tests which would use the provided context
-	code := m.Run()
-	return code
+	return m.Run()
 }
 
 func TestStoreBlock(t *testing.T) {
 
 	t.Parallel()
 
+	// Generate additional blocks to store
 	genBlocks, err := generateBlocks(10, 10)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
+	done := false
 	err = db.Update(func(tx database.Tx) error {
 		for _, block := range genBlocks {
 			err := tx.StoreBlock(block)
@@ -121,18 +129,23 @@ func TestStoreBlock(t *testing.T) {
 				return err
 			}
 		}
+		done = true
 		return nil
 	})
 
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+
+	if !done {
+		t.Fatal("No work done by the transaction")
+	}
 }
 func TestFetchBlockExists(t *testing.T) {
 
 	t.Parallel()
 
-	// Verify all blocks have been stored successfully read-only Tx
+	// Verify all blocks can be found by Header.Hash
 	_ = db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 			exists, err := tx.FetchBlockExists(block.Header.Hash)
@@ -153,7 +166,7 @@ func TestFetchBlockHeader(t *testing.T) {
 
 	t.Parallel()
 
-	// Verify all blocks headers data have been stored successfully read-only Tx
+	// Verify all blocks headers can be fetched by Header.Hash
 	err := db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 			fheader, err := tx.FetchBlockHeader(block.Header.Hash)
@@ -169,6 +182,7 @@ func TestFetchBlockHeader(t *testing.T) {
 			originBuf := new(bytes.Buffer)
 			_ = block.Header.Encode(originBuf)
 
+			// Ensure the fetched header is what the original header bytes are
 			if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
 				return errors.New("block.Header not retrieved properly from storage")
 			}
@@ -184,7 +198,7 @@ func TestFetchTransactions(t *testing.T) {
 
 	t.Parallel()
 
-	// Verify all blocks Txs have been stored successfully read Tx
+	// Verify all blocks transactions can be fetched by Header.Hash
 	err := db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 
@@ -195,8 +209,8 @@ func TestFetchTransactions(t *testing.T) {
 				t.Fatalf(err.Error())
 			}
 
-			// Ensure all retrieved transactions are equal to origin Block.Txs
-			// and the transactions order is kept
+			// Ensure all retrieved transactions are equal to the original Block.Txs
+			// and the transactions order is the same too
 			for index, v := range block.Txs {
 
 				if index >= len(fblockTxs) {
@@ -229,7 +243,7 @@ func TestFetchBlockHashByHeight(t *testing.T) {
 
 	t.Parallel()
 
-	// Storage Lookup by Height
+	// Blocks lookup by Height
 	_ = db.View(func(tx database.Tx) error {
 		for _, block := range blocks {
 			headerHash, err := tx.FetchBlockHashByHeight(block.Header.Height)
@@ -346,6 +360,8 @@ func TestReadOnlyTx(t *testing.T) {
 		}
 	}
 }
+
+// TestReadOnlyDB_Mode ensures a DB in read-only mode can only run read-only Tx
 func TestReadOnlyDB_Mode(t *testing.T) {
 
 	t.Parallel()

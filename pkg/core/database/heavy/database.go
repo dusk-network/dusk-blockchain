@@ -21,7 +21,7 @@ type DB struct {
 	// an alias to the global storage var
 	storage *leveldb.DB
 
-	// Read-only mode provided at heavy.DB level If true, accepts read-only Tx
+	// Read-only mode provided at heavy.DB level. If true, accepts read-only Tx
 	readOnly bool
 }
 
@@ -58,8 +58,9 @@ func openStorage(path string) (*leveldb.DB, error) {
 	return _storage, err
 }
 
-// NewDatabase create or open backend storage (goleveldb) on the specified path
-// Readonly option is pseudo read-only mode implemented by heavy.Database
+// NewDatabase create or open backend storage (goleveldb) located at the
+// specified path. Readonly option is pseudo read-only mode implemented by
+// heavy.Database. Not to be confused with read-only goleveldb mode
 func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
 
 	storage, err := openStorage(path)
@@ -72,7 +73,8 @@ func NewDatabase(path string, network protocol.Magic, readonly bool) (database.D
 
 // Begin builds read-only or read-write Tx
 func (db DB) Begin(writable bool) (database.Tx, error) {
-	// If the database was opened with Options.ReadOnly, return an error.
+	// If the database was opened with DB.readonly flag true, we cannot create
+	// a writable tx
 	if db.readOnly && writable {
 		return nil, errors.New("Database is read-only")
 	}
@@ -93,7 +95,7 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 		return nil, errors.New("Database is not open")
 	}
 
-	// Snapshot to be released on Tx.Close
+	// Snapshot is a DB snapshot. It must be released on Tx.Close()
 	snapshot, err := db.storage.GetSnapshot()
 
 	if err != nil {
@@ -117,7 +119,7 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 	return tx, nil
 }
 
-// Update provides an execution of managed, read-write Tx
+// Update provides an execution of a managed read-write Tx
 func (db DB) Update(fn func(database.Tx) error) error {
 
 	// Create a writable tx for atomic update
@@ -129,6 +131,7 @@ func (db DB) Update(fn func(database.Tx) error) error {
 	defer tx.Close()
 
 	// If an error is returned from the function then rollback and return error.
+	// rollback here simply means to skip the commit step
 	err = fn(tx)
 
 	// Handing a panic event to rollback tx is not needed. If we fail at that
@@ -141,7 +144,7 @@ func (db DB) Update(fn func(database.Tx) error) error {
 	return tx.Commit()
 }
 
-// View provides an execution of managed, read-only Tx
+// View provides an execution of a managed read-only Tx
 func (db DB) View(fn func(database.Tx) error) error {
 
 	tx, err := db.Begin(false)
@@ -163,7 +166,8 @@ func (db DB) isOpen() bool {
 
 // Close does not close the underlying storage as we need to reuse it within
 // another DB instances. Note that we rely on the Finalizer that goleveldb is
-// setting at the point of leveldb.DB.openDB
+// setting at the point of leveldb.DB.openDB to call leveldb.DB.Close() when
+// the process is terminating
 func (db DB) Close() error {
 	db.storage = nil
 	return nil

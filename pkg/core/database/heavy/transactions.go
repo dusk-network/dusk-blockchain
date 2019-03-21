@@ -11,6 +11,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"io"
+	"math"
 )
 
 const (
@@ -18,23 +19,29 @@ const (
 	// cases
 	atomicUpdateEnabled = true
 
-	// Explicitly show we don't want fsync on each batch write
-	fsyncEnabled = false
+	// Explicitly show we don't want fsync in sake of faster writes.
+	//
+	// If false, and the machine crashes, then some recent writes may be lost.
+	// Note that if it is just the process that crashes (and the machine does
+	// not) then no writes will be lost.
+	optionFsyncEnabled = false
 
 	optionNoWriteMerge = false
 )
 
 var (
 	// writeOptions used by both non-Batch and Batch leveldb.Put
-	writeOptions = &opt.WriteOptions{NoWriteMerge: optionNoWriteMerge, Sync: fsyncEnabled}
+	writeOptions = &opt.WriteOptions{NoWriteMerge: optionNoWriteMerge, Sync: optionFsyncEnabled}
 
 	// ByteOrder to be used on any internal en/decoding
 	byteOrder = binary.LittleEndian
 
-	// Key values prefixes
-	HEADER_PREFIX = []byte{0x11}
-	TX_PREFIX     = []byte{0x22}
-	HEIGHT_PREFIX = []byte{0x33}
+	// Key values prefixes. Optional here would be to define different tuples of
+	// prefixes per each network type so that we can recognize DB network in
+	// runtime.
+	HEADER_PREFIX = []byte{0x01}
+	TX_PREFIX     = []byte{0x02}
+	HEIGHT_PREFIX = []byte{0x03}
 )
 
 type Tx struct {
@@ -44,7 +51,7 @@ type Tx struct {
 	// Get/Has/Iterate calls must be applied into the snapshot only
 	snapshot *leveldb.Snapshot
 
-	// Put/Delete calls must be applied into this batch only. Tx does implement
+	// Put/Delete calls must be applied into a batch only. Tx does implement
 	// atomicity by a levelDB.Batch constructed during the Tx.
 	batch  *leveldb.Batch
 	closed bool
@@ -73,6 +80,10 @@ func (t Tx) StoreBlock(block *block.Block) error {
 	key := append(HEADER_PREFIX, block.Header.Hash...)
 	value := blockHeaderFields.Bytes()
 	t.Put(key, value)
+
+	if len(block.Txs) > math.MaxUint32 {
+		return errors.New("too many transactions.")
+	}
 
 	// Put block transaction data. A KV pair per a single transaction is added
 	// into the store
@@ -147,6 +158,7 @@ func (t Tx) decodeBlockTx(data []byte) (*transactions.Stealth, uint32, error) {
 		return nil, 0, err
 	}
 
+	// Read transaction bytes
 	tx := &transactions.Stealth{}
 	if err := tx.Decode(buf); err != nil {
 		return nil, 0, err
@@ -202,7 +214,7 @@ func (t Tx) Rollback() error {
 	return nil
 }
 
-// Close Releases the retrieved snapshot. Do not forget it when unmanaged Tx is
+// Close releases the retrieved snapshot. It must be called when unmanaged Tx is
 // used
 func (t *Tx) Close() {
 	t.snapshot.Release()
@@ -239,7 +251,8 @@ func (t Tx) FetchBlockTransactions(hashHeader []byte) ([]merkletree.Payload, err
 	scanFilter := append(TX_PREFIX, hashHeader...)
 	tempTxs := make(map[uint32]merkletree.Payload)
 
-	// Read all the transactions, first do a prefix scan on TX + header hash
+	// Read all the transactions that belong to a single block
+	// Scan filter = TX_PREFIX + block.header.hash
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
 	defer iterator.Release()
 
