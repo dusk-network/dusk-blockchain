@@ -1,30 +1,37 @@
-package score
+package selection
 
 import (
 	"bytes"
-	"errors"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type (
-	Prioritizer struct 
+	// EventHandler encapsulate logic specific to the various Collectors. Each Collector needs to verify, prioritize and extract information from Events. EventHandler is the interface that abstracts these operations away. The implementors of this interface is the real differentiator of the various consensus components
+	EventHandler interface {
+		wire.EventVerifier
+		wire.EventPrioritizer
+		NewEvent() wire.Event
+		Stage(wire.Event) (uint64, uint8)
+	}
 
 	// Collector is the collector of SigSetEvents. It manages the EventQueue and the Selector to pick the best signature for a given step
 	Collector struct {
-		CurrentRound  uint64
-		CurrentStep   uint8
-		BestEventChan chan *bytes.Buffer
+		CurrentRound     uint64
+		CurrentStep      uint8
+		CurrentBlockHash []byte
+		BestEventChan    chan *bytes.Buffer
 		// this is the dump of future messages, categorized by different steps and different rounds
 		queue        *consensus.EventQueue
 		Unmarshaller wire.EventUnmarshaller
 		Marshaller   wire.EventMarshaller
 
-		selector    Selector
+		selector    *wire.EventSelector
+		handler     EventHandler
 		timerLength time.Duration
 	}
 
@@ -37,70 +44,55 @@ type (
 	}
 )
 
-func (p *Prioritizer) Priority(first wire.Event, second wire.Event) bool {
-	ev1 := first.(Event)
-	ev2 := second.(Event)
-	return ev1.Score < ev2.Score
-}
-
-func NewSelector() {
-
-}
-
-// selectBestBlockHash will receive score messages from the inputChannel for a
-// certain amount of time. It will store the highest score along with it's
-// accompanied block hash, and will send the block hash associated to the highest
-// score into the outputChannel once the timer runs out.
-func (s *Selector) PickBest() {
-
-}
-
-// NewSigSetEvent is an alias for a committee.NewEvent. The alias would make it simpler to refactor in case we realize we need some customization in the SigSetEvent
-var NewSigSetEvent = committee.NewEvent
-
-// NewSigSetCollector creates a new Collector
-func NewSigSetCollector(c committee.Committee, bestEventChan chan *bytes.Buffer, validateFunc func(*bytes.Buffer) error, timerLength time.Duration) *Collector {
-	unMarshaller := committee.NewEventUnMarshaller(validateFunc)
+// NewCollector creates a new Collector
+func NewCollector(bestEventChan chan *bytes.Buffer, validateFunc func(*bytes.Buffer) error, handler EventHandler, timerLength time.Duration) *Collector {
+	unMarshaller := NewUnMarshaller(validateFunc)
 	return &Collector{
 		BestEventChan: bestEventChan,
 		Unmarshaller:  unMarshaller,
 		Marshaller:    unMarshaller,
+		selector:      nil,
+		handler:       handler,
 	}
 }
 
-// InitSigSetCollector instantiates a Collector and triggers the related EventSubscriber. It is a helper method for those needing access to the Collector
-func InitSigSetCollector(c committee.Committee, validateFunc func(*bytes.Buffer) error, timeout time.Duration, eventBus *wire.EventBus) *Collector {
+// InitCollector instantiates a Collector and triggers the related EventSubscriber. It is a helper method for those needing access to the Collector
+func InitCollector(validateFunc func(*bytes.Buffer) error, handler EventHandler, timeout time.Duration, eventBus *wire.EventBus) *Collector {
 	bestEventChan := make(chan *bytes.Buffer, 1)
-	collector := NewSigSetCollector(c, bestEventChan, validateFunc, timeout)
-	go wire.NewEventSubscriber(eventBus, collector, string(msg.SigSetSelectionTopic)).Accept()
+	collector := NewCollector(bestEventChan, validateFunc, handler, timeout)
+	go wire.NewEventSubscriber(eventBus, collector, string(topics.Score)).Accept()
 	return collector
 }
 
 // Collect as specified in the EventCollector interface. It delegates unmarshalling to the SigSetUnMarshaller which also validates the signatures.
 func (s *Collector) Collect(r *bytes.Buffer) error {
-	ev := NewSigSetEvent()
+	ev := s.handler.NewEvent()
+
 	if err := s.Unmarshaller.Unmarshal(r, ev); err != nil {
 		return err
 	}
 
-	// delegating the committee to verify the vote set
-	//TODO: verify stuff
-
+	// verify
+	if err := s.handler.Verify(ev); err != nil {
+		return err
+	}
 
 	s.process(ev)
 	return nil
 }
 
 // process sends SigSetEvent to the selector. The messages have already been validated and verified
-func (s *Collector) process(ev *Event) {
+func (s *Collector) process(ev wire.Event) {
+	round, step := s.handler.Stage(ev)
+
 	// Not anymore
-	if s.isObsolete(ev) {
+	if s.isObsolete(round, step) {
 		return
 	}
 
 	// Not yet
-	if s.isEarly(ev) {
-		s.queue.PutEvent(ev.Round, ev.Step, ev)
+	if s.isEarly(round, step) {
+		s.queue.PutEvent(round, step, ev)
 		return
 	}
 
@@ -108,12 +100,12 @@ func (s *Collector) process(ev *Event) {
 	s.selector.EventChan <- ev
 }
 
-func (s *Collector) isObsolete(ev *Event) bool {
-	return ev.Round < s.CurrentRound || ev.Step < s.CurrentStep
+func (s *Collector) isObsolete(round uint64, step uint8) bool {
+	return round < s.CurrentRound || step < s.CurrentStep
 }
 
-func (s *Collector) isEarly(ev *Event) bool {
-	return ev.Round > s.CurrentRound || ev.Step > s.CurrentStep || s.selector == nil
+func (s *Collector) isEarly(round uint64, step uint8) bool {
+	return round > s.CurrentRound || step > s.CurrentStep || s.selector == nil
 }
 
 // UpdateRound stops the selection and cleans up the queue up to the round specified.
@@ -128,7 +120,7 @@ func (s *Collector) UpdateRound(round uint64) {
 func (s *Collector) StartSelection(blockHash []byte) {
 	s.CurrentBlockHash = blockHash
 	// creating a new selector
-	//TODO: create selector
+	s.selector = wire.NewEventSelector(s.handler)
 	// letting selector collect the best
 	go s.selector.PickBest()
 	// listening to the selector and collect its pick
@@ -138,7 +130,7 @@ func (s *Collector) StartSelection(blockHash []byte) {
 	queued, step := s.queue.ConsumeNextStepEvents(s.CurrentRound)
 	if step == s.CurrentStep {
 		for _, ev := range queued {
-			s.process(ev.(*SigSetEvent))
+			s.process(ev)
 		}
 	}
 }
@@ -147,10 +139,9 @@ func (s *Collector) StartSelection(blockHash []byte) {
 func (s *Collector) listenSelection() {
 	ev := <-s.selector.BestEventChan
 	s.CurrentStep++
-	sigSetEvent := ev.(*SigSetEvent)
 	b := make([]byte, 32)
 	buf := bytes.NewBuffer(b)
-	s.Marshaller.Marshal(buf, sigSetEvent)
+	s.Marshaller.Marshal(buf, ev)
 	s.BestEventChan <- buf
 }
 
@@ -162,13 +153,12 @@ func (s *Collector) stopSelection() {
 	}
 }
 
-// NewSigSetFilter creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func NewSigSetFilter(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, c committee.Committee, timeout time.Duration) *Broker {
+// NewBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
+func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, handler EventHandler, timeout time.Duration) *Broker {
 	//creating the channel whereto notifications about round updates are push onto
-
 	roundChan := consensus.InitRoundCollector(eventBus).RoundChan
 	phaseChan := consensus.InitPhaseCollector(eventBus).BlockHashChan
-	collector := InitSigSetCollector(c, validateFunc, timeout, eventBus)
+	collector := InitCollector(validateFunc, handler, timeout, eventBus)
 
 	return &Broker{
 		eventBus:        eventBus,

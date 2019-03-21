@@ -13,7 +13,7 @@ import (
 type (
 	// Committee is the interface for operations depending on the set of Provisioners extracted for a fiven step
 	Committee interface {
-		wire.Prioritizer
+		wire.EventPrioritizer
 		// isMember can accept a BLS Public Key or an Ed25519
 		IsMember([]byte) bool
 		GetVotingCommittee(uint64, uint8) (map[string]uint8, error)

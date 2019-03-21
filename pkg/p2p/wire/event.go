@@ -26,7 +26,12 @@ type (
 	}
 
 	EventPrioritizer interface {
-		Priority(Event, Event) bool
+		Priority(Event, Event) Event
+	}
+
+	EventVerifier interface {
+		// Verify an Event optionally using a Hash
+		Verify(Event) error
 	}
 
 	// EventCollector is the interface for collecting Events. Pretty much processors involves some degree of Event collection (either until a Quorum is reached or until a Timeout). This Interface is typically implemented by a struct that will perform some Event unmarshalling.
@@ -75,9 +80,7 @@ func (s *EventSelector) PickBest() {
 	for {
 		select {
 		case ev := <-s.EventChan:
-			if s.prioritizer.Priority(bestEvent, ev) {
-				bestEvent = ev
-			}
+			bestEvent = s.prioritizer.Priority(bestEvent, ev)
 		case shouldNotify := <-s.StopChan:
 			if shouldNotify {
 				s.BestEventChan <- bestEvent

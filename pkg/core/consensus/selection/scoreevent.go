@@ -1,4 +1,4 @@
-package score
+package selection
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 
 type (
 	// Event represents the Score Message with the fields consistent with the Blind Bid data structure
-	Event struct {
+	ScoreEvent struct {
 		// Fields related to the consensus
 		Round uint64
 		Step  uint8
@@ -31,13 +31,13 @@ type (
 )
 
 // Equal as specified in the Event interface
-func (e *Event) Equal(ev wire.Event) bool {
-	other, ok := ev.(*Event)
+func (e *ScoreEvent) Equal(ev wire.Event) bool {
+	other, ok := ev.(*ScoreEvent)
 	return ok && other.Round == e.Round && bytes.Equal(other.CandidateHash, e.CandidateHash)
 }
 
 // Sender of a Score event is the anonymous Z
-func (e *Event) Sender() []byte {
+func (e *ScoreEvent) Sender() []byte {
 	return e.Z
 }
 
@@ -55,7 +55,7 @@ func (um *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	sev := ev.(*Event)
+	sev := ev.(*ScoreEvent)
 
 	// Decoding Round
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &sev.Round); err != nil {
@@ -99,7 +99,7 @@ func (um *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 // * Consensus Header [Round; Step]
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
 func (um *UnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	sev := ev.(*Event)
+	sev := ev.(*ScoreEvent)
 
 	if err := encoding.WriteUint64(r, binary.LittleEndian, sev.Round); err != nil {
 		return err
