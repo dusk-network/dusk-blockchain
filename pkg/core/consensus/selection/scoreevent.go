@@ -9,7 +9,7 @@ import (
 )
 
 type (
-	// Event represents the Score Message with the fields consistent with the Blind Bid data structure
+	// ScoreEvent represents the Score Message with the fields consistent with the Blind Bid data structure
 	ScoreEvent struct {
 		// Fields related to the consensus
 		Round uint64
@@ -48,7 +48,7 @@ func NewUnMarshaller(validate func(*bytes.Buffer) error) *UnMarshaller {
 
 // Unmarshal unmarshals the buffer into a Score Event
 // Field order is the following:
-// * Consensus Header [BLS Public Key; Round; Step]
+// * Consensus Header [Round; Step]
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash]
 func (um *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	if err := um.validate(r); err != nil {
