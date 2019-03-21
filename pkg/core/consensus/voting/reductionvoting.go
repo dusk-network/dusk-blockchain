@@ -57,7 +57,7 @@ func (v Voter) voteReduction(br *reduction) error {
 }
 
 func (v Voter) createReductionMessage(r *reduction) (*bytes.Buffer, error) {
-	buffer := bytes.NewBuffer(r.votedHash)
+	buffer := new(bytes.Buffer)
 	header := &consensus.EventHeader{
 		PubKeyBLS: v.Keys.BLSPubKey.Marshal(),
 		Round:     r.round,
