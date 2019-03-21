@@ -6,8 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
@@ -20,55 +21,114 @@ type (
 	// BlockReduction is a block phase reduction event.
 	BlockReduction = Event
 
-	// BlockReducer is responsible for handling incoming block reduction messages.
-	// It sends the proper messages to a reduction selector, and processes the
-	// outcomes produced by this selector.
-	BlockReducer struct {
+	// Reducer is a collection of common fields and methods, both used by the
+	// BlockReducer and SigSetReducer.
+	Reducer struct {
 		eventBus *wire.EventBus
 		*reductionSequencer
 		unmarshaller wire.EventUnmarshaller
 
 		// channels linked to subscribers
-		blockSelectionChannel <-chan []byte
-		roundChannel          <-chan uint64
-		phaseUpdateChannel    <-chan []byte
+		roundChannel       <-chan uint64
+		phaseUpdateChannel <-chan []byte
 
-		stopChannel      chan bool
-		sequencerStopped bool
+		stopChannel chan bool
 	}
 
-	blockSelectionCollector struct {
-		blockSelectionChannel chan<- []byte
+	// BlockReducer is responsible for handling incoming block reduction messages.
+	// It sends the proper messages to a reduction sequencer, and processes the
+	// outcomes produced by this sequencer.
+	BlockReducer struct {
+		*Reducer
+		selectionChannel <-chan []byte
+	}
+
+	selectionCollector struct {
+		selectionChannel chan<- []byte
 	}
 )
 
-// NewBlockReducer will create a new block reducer and return it. The block reducer
-// will subscribe to the appropriate topics, and only needs to be started by calling
-// Listen, after being returned.
-func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	committee committee.Committee, timeOut time.Duration) *BlockReducer {
-
-	blockSelectionChannel := make(chan []byte, 1)
+// newReducer will create a new standard reducer and return it.
+func newReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
+	committee committee.Committee, timeOut time.Duration) *Reducer {
 
 	reductionSequencer := newReductionSequencer(committee, timeOut)
-
-	blockSelectionCollector := &blockSelectionCollector{blockSelectionChannel}
-	wire.NewEventSubscriber(eventBus, blockSelectionCollector,
-		string(msg.SelectionResultTopic)).Accept()
 
 	roundCollector := consensus.InitRoundCollector(eventBus)
 	phaseUpdateCollector := consensus.InitPhaseCollector(eventBus)
 
-	blockReducer := &BlockReducer{
-		eventBus:              eventBus,
-		reductionSequencer:    reductionSequencer,
-		unmarshaller:          newReductionEventUnmarshaller(validateFunc),
-		blockSelectionChannel: blockSelectionChannel,
-		roundChannel:          roundCollector.RoundChan,
-		phaseUpdateChannel:    phaseUpdateCollector.BlockHashChan,
+	return &Reducer{
+		eventBus:           eventBus,
+		reductionSequencer: reductionSequencer,
+		unmarshaller:       newReductionEventUnmarshaller(validateFunc),
+		roundChannel:       roundCollector.RoundChan,
+		phaseUpdateChannel: phaseUpdateCollector.BlockHashChan,
+	}
+}
+
+func (r Reducer) addVoteInfo(data []byte) (*bytes.Buffer, error) {
+	buffer := new(bytes.Buffer)
+
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, r.currentRound); err != nil {
+		return nil, err
 	}
 
-	wire.NewEventSubscriber(eventBus, blockReducer, string(topics.BlockReduction)).Accept()
+	if err := encoding.WriteUint8(buffer, r.currentStep); err != nil {
+		return nil, err
+	}
+
+	if _, err := buffer.Write(data); err != nil {
+		return nil, err
+	}
+
+	return buffer, nil
+}
+
+// listen for output from the sequencer, and handle accordingly
+func (r *Reducer) listenSequencer() {
+	for {
+		select {
+		case <-r.stopChannel:
+			// stop listening to the sequencer
+			return
+		case hash := <-r.outgoingReductionChannel:
+			voteData, err := r.addVoteInfo(hash)
+			if err != nil {
+				// Log
+				return
+			}
+
+			r.eventBus.Publish(msg.OutgoingReductionTopic, voteData)
+		case hashAndVoteSet := <-r.outgoingAgreementChannel:
+			voteData, err := r.addVoteInfo(hashAndVoteSet)
+			if err != nil {
+				// Log
+				return
+			}
+
+			r.eventBus.Publish(msg.OutgoingAgreementTopic, voteData)
+
+			// sequencer is now done, so we can return
+			return
+		}
+	}
+}
+
+func NewBlockReducer(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
+	committee committee.Committee, timeOut time.Duration) *BlockReducer {
+
+	selectionChannel := make(chan []byte, 1)
+	blockSelectionCollector := &selectionCollector{selectionChannel}
+	wire.NewEventSubscriber(eventBus, blockSelectionCollector,
+		string(msg.SelectionResultTopic)).Accept()
+
+	blockReducer := &BlockReducer{
+		Reducer:          newReducer(eventBus, validateFunc, committee, timeOut),
+		selectionChannel: selectionChannel,
+	}
+
+	wire.NewEventSubscriber(eventBus, blockReducer,
+		string(topics.BlockReduction)).Accept()
 
 	return blockReducer
 }
@@ -82,42 +142,12 @@ func (br *BlockReducer) Listen() {
 			br.updateRound(round)
 		case <-br.phaseUpdateChannel:
 			br.stopChannel <- true
-			br.sequencerStopped = true
-		case blockHash := <-br.blockSelectionChannel:
-			if !br.sequencerStopped {
+			br.sequencerDone = true
+		case blockHash := <-br.selectionChannel:
+			if !br.sequencerDone {
 				go br.startSequencer(blockHash)
 				go br.listenSequencer()
 			}
-		}
-	}
-}
-
-// listen for output from the sequencer, and handle accordingly
-func (br *BlockReducer) listenSequencer() {
-	for {
-		select {
-		case <-br.stopChannel:
-			// stop listening to the sequencer
-			return
-		case hash := <-br.outgoingReductionChannel:
-			voteData, err := br.addVoteInfo(hash)
-			if err != nil {
-				// Log
-				return
-			}
-
-			br.eventBus.Publish(msg.OutgoingReductionTopic, voteData)
-		case hashAndVoteSet := <-br.outgoingAgreementChannel:
-			voteData, err := br.addVoteInfo(hashAndVoteSet)
-			if err != nil {
-				// Log
-				return
-			}
-
-			br.eventBus.Publish(msg.OutgoingAgreementTopic, voteData)
-
-			// sequencer is now done, so we can return
-			return
 		}
 	}
 }
@@ -142,27 +172,9 @@ func (br *BlockReducer) Collect(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func (br BlockReducer) addVoteInfo(data []byte) (*bytes.Buffer, error) {
-	buffer := new(bytes.Buffer)
-
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, br.currentRound); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint8(buffer, br.currentStep); err != nil {
-		return nil, err
-	}
-
-	if _, err := buffer.Write(data); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
-}
-
 // Collect implements the EventCollector interface.
 // Will simply send the received buffer as a slice of bytes.
-func (v *blockSelectionCollector) Collect(blockBuffer *bytes.Buffer) error {
-	v.blockSelectionChannel <- blockBuffer.Bytes()
+func (s *selectionCollector) Collect(buffer *bytes.Buffer) error {
+	s.selectionChannel <- buffer.Bytes()
 	return nil
 }
