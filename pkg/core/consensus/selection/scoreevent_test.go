@@ -2,6 +2,7 @@ package selection
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,4 +44,14 @@ func TestUnMarshal(t *testing.T) {
 	other := &ScoreEvent{}
 	assert.NoError(t, unMarshaller.Unmarshal(buf, other))
 	assert.Equal(t, se, other)
+	assert.True(t, other.Equal(se))
+}
+
+func TestInvalidEventReturnError(t *testing.T) {
+	se := &ScoreEvent{}
+	validate := func(r *bytes.Buffer) error {
+		return errors.New("Nope")
+	}
+	unMarshaller := NewUnMarshaller(validate)
+	assert.Error(t, unMarshaller.Unmarshal(nil, se))
 }

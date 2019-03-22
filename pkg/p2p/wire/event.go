@@ -60,6 +60,8 @@ type (
 		BestEventChan chan Event
 		StopChan      chan bool
 		prioritizer   EventPrioritizer
+		// this field is for testing purposes only
+		bestEvent Event
 	}
 )
 
@@ -70,20 +72,20 @@ func NewEventSelector(p EventPrioritizer) *EventSelector {
 		BestEventChan: make(chan Event),
 		StopChan:      make(chan bool),
 		prioritizer:   p,
+		bestEvent:     nil,
 	}
 }
 
 // PickBest picks the best event depending on the priority of the sender
 func (s *EventSelector) PickBest() {
-	var bestEvent Event
 
 	for {
 		select {
 		case ev := <-s.EventChan:
-			bestEvent = s.prioritizer.Priority(bestEvent, ev)
+			s.bestEvent = s.prioritizer.Priority(s.bestEvent, ev)
 		case shouldNotify := <-s.StopChan:
 			if shouldNotify {
-				s.BestEventChan <- bestEvent
+				s.BestEventChan <- s.bestEvent
 			}
 			return
 		}
