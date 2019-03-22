@@ -2,7 +2,6 @@ package reduction
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -17,6 +16,7 @@ type (
 
 	reductionEventUnmarshaller struct {
 		*consensus.EventHeaderUnmarshaller
+		*consensus.EventHeaderMarshaller
 	}
 
 	// BlockHandler is responsible for performing operations that need to know
@@ -30,6 +30,7 @@ type (
 func newReductionEventUnmarshaller(validate func(*bytes.Buffer) error) *reductionEventUnmarshaller {
 	return &reductionEventUnmarshaller{
 		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(validate),
+		EventHeaderMarshaller:   &consensus.EventHeaderMarshaller{},
 	}
 }
 
@@ -45,6 +46,23 @@ func (a *reductionEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 	}
 
 	if err := encoding.ReadBLS(r, &bev.SignedHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *reductionEventUnmarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+	bev := ev.(*blockEvent)
+	if err := a.EventHeaderMarshaller.Marshal(r, bev.EventHeader); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, bev.VotedHash); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, bev.SignedHash); err != nil {
 		return err
 	}
 
@@ -78,13 +96,13 @@ func (b BlockHandler) Stage(e wire.Event) (uint64, uint8) {
 }
 
 // Hash returns the voted hash on the passed blockEvent
-func (b BlockHandler) Hash(e wire.Event) string {
+func (b BlockHandler) Hash(e wire.Event) []byte {
 	ev, ok := e.(*blockEvent)
 	if !ok {
-		return ""
+		return nil
 	}
 
-	return hex.EncodeToString(ev.VotedHash)
+	return ev.VotedHash
 }
 
 // Verify the blockEvent

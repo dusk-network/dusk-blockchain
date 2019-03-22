@@ -2,7 +2,6 @@ package reduction
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
@@ -44,12 +43,24 @@ func newSigSetReductionUnmarshaller(validate func(*bytes.Buffer) error) *sigSetR
 
 func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 	sigSetEvent := e.(*sigSetEvent)
-
 	if err := ssru.reductionEventUnmarshaller.Unmarshal(r, sigSetEvent.Event); err != nil {
 		return err
 	}
 
 	if err := encoding.Read256(r, &sigSetEvent.blockHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (ssru *sigSetReductionUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
+	sigSetEvent := e.(*sigSetEvent)
+	if err := ssru.reductionEventUnmarshaller.Marshal(r, sigSetEvent.Event); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, sigSetEvent.blockHash); err != nil {
 		return err
 	}
 
@@ -83,13 +94,13 @@ func (s SigSetHandler) Stage(e wire.Event) (uint64, uint8) {
 }
 
 // Hash returns the voted hash on the passed sigSetEvent
-func (s SigSetHandler) Hash(e wire.Event) string {
+func (s SigSetHandler) Hash(e wire.Event) []byte {
 	ev, ok := e.(*sigSetEvent)
 	if !ok {
-		return ""
+		return nil
 	}
 
-	return hex.EncodeToString(ev.VotedHash)
+	return ev.VotedHash
 }
 
 // Verify the sigSetEvent
