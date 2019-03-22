@@ -124,10 +124,12 @@ func (um *UnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
+	// BidList
 	if err := encoding.WriteVarBytes(r, sev.BidListSubset); err != nil {
 		return err
 	}
 
+	// Seed
 	if err := encoding.WriteBLS(r, sev.Seed); err != nil {
 		return err
 	}
