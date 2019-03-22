@@ -2,7 +2,8 @@ package msg
 
 const InitializationTopic = "initialization"
 const RoundUpdateTopic = "roundupdate"
-const SelectionResultTopic = "selectionresult"
+const BlockSelectionTopic = "blockSelection"
+const SetSelectionTopic = "setSelection"
 const ReductionResultTopic = "reductionresult"
 const NewProvisionerTopic = "newprovisioner"
 const ProvisionerAddedTopic = "provisioneradded"
