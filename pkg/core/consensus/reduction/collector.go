@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -82,7 +80,7 @@ func (s selectionCollector) Collect(buffer *bytes.Buffer) error {
 
 func newCollector(eventBus *wire.EventBus, committee committee.Committee,
 	validateFunc func(*bytes.Buffer) error, handler eventHandler,
-	timeOut time.Duration) *collector {
+	reductionTopic string, timeOut time.Duration) *collector {
 
 	queue := consensus.NewEventQueue()
 	collector := &collector{
@@ -96,8 +94,7 @@ func newCollector(eventBus *wire.EventBus, committee committee.Committee,
 		agreementVoteChannel:   make(chan *bytes.Buffer, 1),
 	}
 
-	wire.NewEventSubscriber(eventBus, collector,
-		string(topics.BlockReduction)).Accept()
+	wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
 	return collector
 }
 
@@ -161,10 +158,9 @@ func (c collector) isEarly(round uint64, step uint8) bool {
 }
 
 func (c *collector) startReduction() {
-	go c.flushQueue()
-
-	// start a timer
 	timer := time.NewTimer(c.timeOut)
+
+	go c.flushQueue()
 	select {
 	case <-timer.C:
 		c.stopReduction()
@@ -172,6 +168,7 @@ func (c *collector) startReduction() {
 	case votes := <-c.collectedVotesChannel:
 		c.voteStore = append(c.voteStore, votes...)
 		timer.Stop()
+		c.reductionResultChannel <- c.handler.Hash(votes[0])
 	}
 }
 
@@ -248,23 +245,24 @@ func (c collector) marshalVoteSet(r *bytes.Buffer) error {
 
 // NewBroker will return a reduction broker.
 func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	handler eventHandler, committee committee.Committee,
-	timeOut time.Duration) *Broker {
+	handler eventHandler, committee committee.Committee, selectionTopic,
+	reductionTopic string, timeOut time.Duration) *Broker {
 
-	collector := newCollector(eventBus, committee, validateFunc, handler, timeOut)
+	collector := newCollector(eventBus, committee, validateFunc, handler,
+		reductionTopic, timeOut)
 
 	selectionChannel := make(chan []byte, 1)
 	selectionCollector := selectionCollector{selectionChannel}
 	wire.NewEventSubscriber(eventBus, selectionCollector,
-		msg.SelectionResultTopic).Accept()
+		selectionTopic).Accept()
 
-	roundCollector := consensus.InitRoundCollector(eventBus)
+	roundChannel := consensus.InitRoundCollector(eventBus).RoundChan
 
 	return &Broker{
 		eventBus:         eventBus,
 		collector:        collector,
 		selectionChannel: selectionChannel,
-		roundChannel:     roundCollector.RoundChan,
+		roundChannel:     roundChannel,
 	}
 }
 
@@ -274,9 +272,6 @@ func (b *Broker) Listen() {
 		select {
 		case round := <-b.roundChannel:
 			b.updateRound(round)
-		case <-b.phaseUpdateChannel:
-			b.stopReduction()
-			b.stopReduction()
 		case hash := <-b.selectionChannel:
 			reductionVote, _ := b.addRoundAndStep(hash)
 			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)

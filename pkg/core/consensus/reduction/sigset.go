@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -69,13 +71,21 @@ func (ssru *sigSetReductionUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) 
 
 // NewSigSetHandler will return a SigSetHandler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
-func NewSigSetHandler(committee committee.Committee,
+func NewSigSetHandler(eventBus *wire.EventBus, committee committee.Committee,
 	validateFunc func(*bytes.Buffer) error) *SigSetHandler {
 
-	return &SigSetHandler{
+	phaseChannel := consensus.InitPhaseCollector(eventBus).BlockHashChan
+	sigSetHandler := &SigSetHandler{
 		committee:                   committee,
 		sigSetReductionUnmarshaller: newSigSetReductionUnmarshaller(validateFunc),
 	}
+
+	go func() {
+		for {
+			sigSetHandler.blockHash = <-phaseChannel
+		}
+	}()
+	return sigSetHandler
 }
 
 // NewEvent returns a sigSetEvent
