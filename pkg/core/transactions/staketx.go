@@ -30,11 +30,14 @@ func NewStake(ver uint8, lock, fee uint64, pubKeyEd, pubKeyBLS []byte) (*Stake, 
 		return nil, errors.New("bls public key is not 33 bytes")
 	}
 
-	return &Stake{
+	s := &Stake{
 		TimeLock:  *NewTimeLock(ver, lock, fee),
 		PubKeyEd:  pubKeyEd,
 		PubKeyBLS: pubKeyBLS,
-	}, nil
+	}
+	s.TxType = StakeType
+
+	return s, nil
 }
 
 // Encode implements the Encoder interface
@@ -69,12 +72,6 @@ func (s *Stake) Decode(r io.Reader) error {
 	return nil
 }
 
-// Type returns the transaction type
-// Implements the TypeInfo interface
-func (s *Stake) Type() TxType {
-	return StakeType
-}
-
 // StandardTX returns the embedded standard tx
 // Implements Transaction interface.
 func (s Stake) StandardTX() Standard {
@@ -92,7 +89,12 @@ func (s *Stake) CalculateHash() ([]byte, error) {
 }
 
 // Equals returns true if two Stake tx's are the same
-func (s *Stake) Equals(other *Stake) bool {
+func (s *Stake) Equals(t Transaction) bool {
+
+	other, ok := t.(*Stake)
+	if !ok {
+		return false
+	}
 
 	if !s.Standard.Equals(&other.Standard) {
 		return false
