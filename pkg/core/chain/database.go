@@ -89,6 +89,9 @@ func (l *ldb) writeBlock(blk block.Block) error {
 	// Write TXs
 	for _, tx := range blk.Txs {
 		err := l.writeTX(tx)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
