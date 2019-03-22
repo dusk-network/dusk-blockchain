@@ -38,16 +38,15 @@ type (
 		reductionResultChannel chan []byte
 		reductionVoteChannel   chan *bytes.Buffer
 		agreementVoteChannel   chan *bytes.Buffer
-		committee              committee.Committee
-		timeOut                time.Duration
-		handler                eventHandler
 
+		committee committee.Committee
+		timeOut   time.Duration
+		handler   eventHandler
 		reductionEventCollector
 		currentRound uint64
 		currentStep  uint8
 		queue        *consensus.EventQueue
 		voteStore    []wire.Event
-		stopChannel  chan bool
 		reducing     bool
 	}
 
@@ -138,6 +137,13 @@ func (c *collector) process(ev wire.Event) {
 	}
 }
 
+func (c collector) flushQueue() {
+	queuedEvents := c.queue.GetEvents(c.currentRound, c.currentStep)
+	for _, event := range queuedEvents {
+		c.process(event)
+	}
+}
+
 func (c *collector) updateRound(round uint64) {
 	c.queue.Clear(c.currentRound)
 	c.stopReduction()
@@ -155,11 +161,7 @@ func (c collector) isEarly(round uint64, step uint8) bool {
 }
 
 func (c *collector) startReduction() {
-	// flush queue
-	queuedEvents := c.queue.GetEvents(c.currentRound, c.currentStep)
-	for _, event := range queuedEvents {
-		c.process(event)
-	}
+	go c.flushQueue()
 
 	// start a timer
 	timer := time.NewTimer(c.timeOut)
@@ -272,6 +274,9 @@ func (b *Broker) Listen() {
 		select {
 		case round := <-b.roundChannel:
 			b.updateRound(round)
+		case <-b.phaseUpdateChannel:
+			b.stopReduction()
+			b.stopReduction()
 		case hash := <-b.selectionChannel:
 			reductionVote, _ := b.addRoundAndStep(hash)
 			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
