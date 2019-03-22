@@ -36,7 +36,7 @@ func TestUnMarshal(t *testing.T) {
 	validate := func(buf *bytes.Buffer) error { return nil }
 	unMarshaller := NewUnMarshaller(validate)
 
-	bin := make([]byte, 3000)
+	bin := make([]byte, 0, 3000)
 	buf := bytes.NewBuffer(bin)
 	assert.NoError(t, unMarshaller.Marshal(buf, se))
 
