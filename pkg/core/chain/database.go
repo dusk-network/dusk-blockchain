@@ -40,7 +40,7 @@ func NewDatabase(path string, readonly bool) (Database, error) {
 	}
 
 	if _, accessdenied := err.(*os.PathError); accessdenied {
-		return nil, errors.New("Could not open or create db")
+		return nil, errors.New("could not open or create db")
 	}
 
 	return &ldb{storage, path, readonly}, nil
