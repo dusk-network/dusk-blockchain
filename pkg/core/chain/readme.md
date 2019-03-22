@@ -40,6 +40,8 @@
 - Check the error wrapping, for places that I could wrap errors to make them more descriptive and helpful
 - check errors are prefixed with "chain:" - wrap only api functions for this
 
+-createIssue: We need the ring signature dummy inputs to be added per input
+
 ## TODO
 
 - Modify transaction/block code in wire(blocking), add checks for transactions in chain
