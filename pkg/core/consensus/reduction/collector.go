@@ -189,6 +189,7 @@ func (c *collector) listenReduction() {
 	// after the second result, we check the voteStore and the two hashes.
 	// if we have a good result, we send an agreement vote
 	hash2 := <-c.reductionResultChannel
+	c.reducing = false
 	if c.reductionSuccessful(hash1, hash2) {
 		buf := bytes.NewBuffer(hash2)
 		c.marshalVoteSet(buf)
@@ -197,7 +198,6 @@ func (c *collector) listenReduction() {
 	}
 
 	c.currentStep++
-	c.reducing = false
 }
 
 func (c *collector) stopReduction() {
