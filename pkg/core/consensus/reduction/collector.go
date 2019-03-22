@@ -140,9 +140,10 @@ func (c *collector) process(ev wire.Event) {
 
 func (c *collector) updateRound(round uint64) {
 	c.queue.Clear(c.currentRound)
+	c.stopReduction()
+	c.stopReduction()
 	c.currentRound = round
 	c.currentStep = 1
-	c.Clear()
 }
 
 func (c collector) isRelevant(round uint64, step uint8) bool {
@@ -154,8 +155,6 @@ func (c collector) isEarly(round uint64, step uint8) bool {
 }
 
 func (c *collector) startReduction() {
-	c.reducing = true
-
 	// flush queue
 	queuedEvents := c.queue.GetEvents(c.currentRound, c.currentStep)
 	for _, event := range queuedEvents {
@@ -172,13 +171,13 @@ func (c *collector) startReduction() {
 		c.voteStore = append(c.voteStore, votes...)
 		timer.Stop()
 	}
-
-	c.reducing = false
 }
 
 // reduction is ran in segments of two steps. this function will listen for and
 // handle both results.
 func (c *collector) listenReduction() {
+	c.reducing = true
+
 	// after receiving the first result, send it to the broker as a reduction vote
 	hash1 := <-c.reductionResultChannel
 	c.currentStep++
@@ -196,6 +195,7 @@ func (c *collector) listenReduction() {
 	}
 
 	c.currentStep++
+	c.reducing = false
 }
 
 func (c *collector) stopReduction() {
@@ -275,8 +275,8 @@ func (b *Broker) Listen() {
 		case hash := <-b.selectionChannel:
 			reductionVote, _ := b.addRoundAndStep(hash)
 			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
-			go b.startReduction()
 			go b.listenReduction()
+			go b.startReduction()
 		case reductionVote := <-b.reductionVoteChannel:
 			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
 			go b.startReduction()
