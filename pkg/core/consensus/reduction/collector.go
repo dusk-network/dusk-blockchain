@@ -22,6 +22,9 @@ type (
 		SignedHash []byte
 	}
 
+	// A collector used during the reduction.
+	reductionEventCollector map[string][]wire.Event
+
 	eventHandler interface {
 		wire.EventVerifier
 		NewEvent() wire.Event
@@ -78,6 +81,41 @@ func (s selectionCollector) Collect(buffer *bytes.Buffer) error {
 	return nil
 }
 
+// Clear up the Collector
+func (rec reductionEventCollector) Clear() {
+	for key := range rec {
+		delete(rec, key)
+	}
+}
+
+// Contains checks if we already collected this event
+func (rec reductionEventCollector) Contains(e wire.Event, hash string) bool {
+	for _, stored := range rec[hash] {
+		if e.Equal(stored) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Store the Event keeping track of the hash it belongs to.
+func (rec reductionEventCollector) Store(e wire.Event, hash string) int {
+	eventList := rec[hash]
+	if rec.Contains(e, hash) {
+		return len(eventList)
+	}
+
+	if eventList == nil {
+		eventList = make([]wire.Event, 0, 50)
+	}
+
+	// store the event for the appropriate hash
+	eventList = append(eventList, e)
+	rec[hash] = eventList
+	return len(eventList)
+}
+
 func newCollector(eventBus *wire.EventBus, committee committee.Committee,
 	validateFunc func(*bytes.Buffer) error, handler eventHandler,
 	reductionTopic string, timeOut time.Duration) *collector {
@@ -98,9 +136,6 @@ func newCollector(eventBus *wire.EventBus, committee committee.Committee,
 	return collector
 }
 
-// Collect implements the EventCollector interface.
-// Unmarshal a reduction message, verify the signature and then
-// pass it down for processing.
 func (c *collector) Collect(buffer *bytes.Buffer) error {
 	ev := c.handler.NewEvent()
 	if err := c.handler.Unmarshal(buffer, ev); err != nil {
