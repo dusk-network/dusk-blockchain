@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -13,7 +12,9 @@ import (
 )
 
 type (
-	sigSetEvent struct {
+	// SigSetCollector is the public collector used outside of the Broker (which use the unexported one)
+	SigSetCollector struct{}
+	sigSetEvent     struct {
 		*Event
 		blockHash []byte
 	}
@@ -30,6 +31,18 @@ type (
 		blockHash []byte
 	}
 )
+
+func (ssc *SigSetCollector) Collect(ev wire.Event) {
+
+}
+
+func InitSigSetSelectionChan(eventBus *wire.EventBus) chan []byte {
+	selectionChannel := make(chan []byte, 1)
+	selectionCollector := selectionCollector{selectionChannel}
+	wire.NewEventSubscriber(eventBus, selectionCollector,
+		string(msg.SigSetSelectionTopic)).Accept()
+	return selectionChannel
+}
 
 // Equal implements Event interface.
 func (sse *sigSetEvent) Equal(e wire.Event) bool {

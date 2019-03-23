@@ -10,65 +10,51 @@ import (
 )
 
 type (
-	// EventHandler encapsulate logic specific to the various Collectors. Each Collector needs to verify, prioritize and extract information from Events. EventHandler is the interface that abstracts these operations away. The implementors of this interface is the real differentiator of the various consensus components
-	EventHandler interface {
-		wire.EventVerifier
-		wire.EventPrioritizer
-		NewEvent() wire.Event
-		Stage(wire.Event) (uint64, uint8)
-	}
-
-	// Collector is the collector of SigSetEvents. It manages the EventQueue and the Selector to pick the best signature for a given step
-	Collector struct {
+	// collector is the collector of SigSetEvents. It manages the EventQueue and the Selector to pick the best signature for a given step
+	collector struct {
 		CurrentRound     uint64
 		CurrentStep      uint8
 		CurrentBlockHash []byte
 		BestEventChan    chan *bytes.Buffer
 		// this is the dump of future messages, categorized by different steps and different rounds
-		queue        *consensus.EventQueue
-		Unmarshaller wire.EventUnmarshaller
-		Marshaller   wire.EventMarshaller
-
+		queue       *consensus.EventQueue
 		selector    *wire.EventSelector
-		handler     EventHandler
+		handler     consensus.EventHandler
 		timerLength time.Duration
 	}
 
-	// Broker is the component that supervises a collection of events
-	Broker struct {
+	// broker is the component that supervises a collection of events
+	broker struct {
 		eventBus        *wire.EventBus
 		phaseUpdateChan <-chan []byte
 		roundUpdateChan <-chan uint64
-		collector       *Collector
+		collector       *collector
 		topic           string
 	}
 )
 
 // NewCollector creates a new Collector
-func NewCollector(bestEventChan chan *bytes.Buffer, validateFunc func(*bytes.Buffer) error, handler EventHandler, timerLength time.Duration) *Collector {
-	unMarshaller := NewUnMarshaller(validateFunc)
-	return &Collector{
+func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandler, timerLength time.Duration) *collector {
+	return &collector{
 		BestEventChan: bestEventChan,
-		Unmarshaller:  unMarshaller,
-		Marshaller:    unMarshaller,
 		selector:      nil,
 		handler:       handler,
 	}
 }
 
-// InitCollector instantiates a Collector and triggers the related EventSubscriber. It is a helper method for those needing access to the Collector
-func InitCollector(validateFunc func(*bytes.Buffer) error, handler EventHandler, timeout time.Duration, eventBus *wire.EventBus) *Collector {
+// initCollector instantiates a Collector and triggers the related EventSubscriber. It is a helper method for those needing access to the Collector
+func initCollector(handler consensus.EventHandler, timeout time.Duration, eventBus *wire.EventBus) *collector {
 	bestEventChan := make(chan *bytes.Buffer, 1)
-	collector := NewCollector(bestEventChan, validateFunc, handler, timeout)
+	collector := newCollector(bestEventChan, handler, timeout)
 	go wire.NewEventSubscriber(eventBus, collector, string(topics.Score)).Accept()
 	return collector
 }
 
 // Collect as specified in the EventCollector interface. It delegates unmarshalling to the SigSetUnMarshaller which also validates the signatures.
-func (s *Collector) Collect(r *bytes.Buffer) error {
+func (s *collector) Collect(r *bytes.Buffer) error {
 	ev := s.handler.NewEvent()
 
-	if err := s.Unmarshaller.Unmarshal(r, ev); err != nil {
+	if err := s.handler.Unmarshal(r, ev); err != nil {
 		return err
 	}
 
@@ -82,7 +68,7 @@ func (s *Collector) Collect(r *bytes.Buffer) error {
 }
 
 // process sends SigSetEvent to the selector. The messages have already been validated and verified
-func (s *Collector) process(ev wire.Event) {
+func (s *collector) process(ev wire.Event) {
 	round, step := s.handler.Stage(ev)
 
 	// Not anymore
@@ -100,16 +86,16 @@ func (s *Collector) process(ev wire.Event) {
 	s.selector.EventChan <- ev
 }
 
-func (s *Collector) isObsolete(round uint64, step uint8) bool {
+func (s *collector) isObsolete(round uint64, step uint8) bool {
 	return round < s.CurrentRound || step < s.CurrentStep
 }
 
-func (s *Collector) isEarly(round uint64, step uint8) bool {
+func (s *collector) isEarly(round uint64, step uint8) bool {
 	return round > s.CurrentRound || step > s.CurrentStep || s.selector == nil
 }
 
 // UpdateRound stops the selection and cleans up the queue up to the round specified.
-func (s *Collector) UpdateRound(round uint64) {
+func (s *collector) UpdateRound(round uint64) {
 	s.CurrentRound = round
 	s.CurrentStep = 1
 	s.stopSelection()
@@ -117,7 +103,7 @@ func (s *Collector) UpdateRound(round uint64) {
 }
 
 // StartSelection starts the selection of the best SigSetEvent. It also consumes stored events related to the current step
-func (s *Collector) StartSelection(blockHash []byte) {
+func (s *collector) StartSelection(blockHash []byte) {
 	s.CurrentBlockHash = blockHash
 	// creating a new selector
 	s.selector = wire.NewEventSelector(s.handler)
@@ -136,31 +122,31 @@ func (s *Collector) StartSelection(blockHash []byte) {
 }
 
 // listenSelection triggers a goroutine that notifies the Broker through its channel after having incremented the Collector step
-func (s *Collector) listenSelection() {
+func (s *collector) listenSelection() {
 	ev := <-s.selector.BestEventChan
 	s.CurrentStep++
 	b := make([]byte, 32)
 	buf := bytes.NewBuffer(b)
-	s.Marshaller.Marshal(buf, ev)
+	s.handler.Marshal(buf, ev)
 	s.BestEventChan <- buf
 }
 
 // stopSelection notifies the Selector to stop selecting
-func (s *Collector) stopSelection() {
+func (s *collector) stopSelection() {
 	if s.selector != nil {
 		s.selector.StopChan <- true
 		s.selector = nil
 	}
 }
 
-// NewBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, handler EventHandler, timeout time.Duration, topic string) *Broker {
+// newBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
+func newBroker(eventBus *wire.EventBus, handler consensus.EventHandler, timeout time.Duration, topic string) *broker {
 	//creating the channel whereto notifications about round updates are push onto
-	roundChan := consensus.InitRoundCollector(eventBus).RoundChan
-	phaseChan := consensus.InitPhaseCollector(eventBus).BlockHashChan
-	collector := InitCollector(validateFunc, handler, timeout, eventBus)
+	roundChan := consensus.InitRoundUpdate(eventBus)
+	phaseChan := consensus.InitPhaseUpdate(eventBus)
+	collector := initCollector(handler, timeout, eventBus)
 
-	return &Broker{
+	return &broker{
 		eventBus:        eventBus,
 		collector:       collector,
 		roundUpdateChan: roundChan,
@@ -170,7 +156,7 @@ func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, 
 }
 
 // Listen on the eventBus for relevant topics to feed the collector
-func (f *Broker) Listen() {
+func (f *broker) Listen() {
 	for {
 		select {
 		case roundUpdate := <-f.roundUpdateChan:
@@ -182,3 +168,5 @@ func (f *Broker) Listen() {
 		}
 	}
 }
+
+// TODO export the public SelectionCollector

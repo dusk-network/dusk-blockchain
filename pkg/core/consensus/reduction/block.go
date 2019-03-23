@@ -87,30 +87,19 @@ func (b BlockHandler) NewEvent() wire.Event {
 
 // Stage returns the round and step of the passed blockEvent
 func (b BlockHandler) Stage(e wire.Event) (uint64, uint8) {
-	ev, ok := e.(*blockEvent)
-	if !ok {
-		return 0, 0
-	}
-
+	ev := e.(*blockEvent)
 	return ev.Round, ev.Step
 }
 
 // Hash returns the voted hash on the passed blockEvent
 func (b BlockHandler) Hash(e wire.Event) []byte {
-	ev, ok := e.(*blockEvent)
-	if !ok {
-		return nil
-	}
-
+	ev := e.(*blockEvent)
 	return ev.VotedHash
 }
 
 // Verify the blockEvent
 func (b BlockHandler) Verify(e wire.Event) error {
-	ev, ok := e.(*blockEvent)
-	if !ok {
-		return errors.New("block handler: type casting error")
-	}
+	ev := e.(*blockEvent)
 
 	if err := msg.VerifyBLSSignature(ev.PubKeyBLS, ev.VotedHash, ev.SignedHash); err != nil {
 		return err

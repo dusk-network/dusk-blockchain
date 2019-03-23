@@ -6,10 +6,9 @@ import (
 	"encoding/hex"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -23,27 +22,26 @@ type (
 	}
 
 	// A collector used during the reduction.
-	reductionEventCollector map[string][]wire.Event
+	// reductionEventCollector map[string][]wire.Event
 
 	eventHandler interface {
 		wire.EventVerifier
+		wire.EventUnMarshaller
 		NewEvent() wire.Event
-		Unmarshal(*bytes.Buffer, wire.Event) error
-		Marshal(*bytes.Buffer, wire.Event) error
 		Stage(wire.Event) (uint64, uint8)
 		Hash(wire.Event) []byte
 	}
 
 	collector struct {
+		consensus.StepEventCollector
 		collectedVotesChannel  chan []wire.Event
 		reductionResultChannel chan []byte
 		reductionVoteChannel   chan *bytes.Buffer
 		agreementVoteChannel   chan *bytes.Buffer
 
-		committee committee.Committee
-		timeOut   time.Duration
-		handler   eventHandler
-		reductionEventCollector
+		committee    committee.Committee
+		timeOut      time.Duration
+		handler      eventHandler
 		currentRound uint64
 		currentStep  uint8
 		queue        *consensus.EventQueue
@@ -79,41 +77,6 @@ func (e *Event) Equal(ev wire.Event) bool {
 func (s selectionCollector) Collect(buffer *bytes.Buffer) error {
 	s.selectionChannel <- buffer.Bytes()
 	return nil
-}
-
-// Clear up the Collector
-func (rec reductionEventCollector) Clear() {
-	for key := range rec {
-		delete(rec, key)
-	}
-}
-
-// Contains checks if we already collected this event
-func (rec reductionEventCollector) Contains(e wire.Event, hash string) bool {
-	for _, stored := range rec[hash] {
-		if e.Equal(stored) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Store the Event keeping track of the hash it belongs to.
-func (rec reductionEventCollector) Store(e wire.Event, hash string) int {
-	eventList := rec[hash]
-	if rec.Contains(e, hash) {
-		return len(eventList)
-	}
-
-	if eventList == nil {
-		eventList = make([]wire.Event, 0, 50)
-	}
-
-	// store the event for the appropriate hash
-	eventList = append(eventList, e)
-	rec[hash] = eventList
-	return len(eventList)
 }
 
 func newCollector(eventBus *wire.EventBus, committee committee.Committee,
@@ -163,7 +126,7 @@ func (c *collector) process(ev wire.Event) {
 	hash := hex.EncodeToString(c.handler.Hash(ev))
 	count := c.Store(ev, hash)
 	if count > c.committee.Quorum() {
-		votes := c.reductionEventCollector[hash]
+		votes := c.StepEventCollector[hash]
 		c.collectedVotesChannel <- votes
 		c.Clear()
 	}

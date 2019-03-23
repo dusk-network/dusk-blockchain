@@ -84,13 +84,11 @@ func TestProcessFutureRounds(t *testing.T) {
 	}
 }
 
-func initNotary(quorum int) (*wire.EventBus, *SigSetCollector, committee.Committee) {
+func initNotary(quorum int) (*wire.EventBus, *sigSetCollector, committee.Committee) {
 	bus := wire.New()
 	committee := mockCommittee(quorum, true, nil)
-	notary := NewSigSetNotary(bus, nil, committee, uint64(1))
-
+	notary := LaunchSignatureSetNotary(bus, committee, uint64(1))
 	notary.sigSetCollector.Unmarshaller = newMockSEUnmarshaller([]byte("mock"), 1, 1)
-	go notary.Listen()
 	return bus, notary.sigSetCollector, committee
 }
 

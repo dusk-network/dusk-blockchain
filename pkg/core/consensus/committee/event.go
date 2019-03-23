@@ -37,7 +37,7 @@ type (
 
 	// Collector is a helper that groups common operations performed on Events related to a committee
 	Collector struct {
-		wire.StepEventCollector
+		consensus.StepEventCollector
 		Committee    Committee
 		CurrentRound uint64
 	}
@@ -65,10 +65,10 @@ func (ceh *Event) Equal(e wire.Event) bool {
 }
 
 // NewEventUnMarshaller creates a new EventUnMarshaller. Internally it creates an EventHeaderUnMarshaller which takes care of Decoding and Encoding operations
-func NewEventUnMarshaller(validate func(*bytes.Buffer) error) *EventUnMarshaller {
+func NewEventUnMarshaller() *EventUnMarshaller {
 	return &EventUnMarshaller{
 		EventHeaderMarshaller:   new(consensus.EventHeaderMarshaller),
-		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(validate),
+		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(),
 	}
 }
 
@@ -144,7 +144,7 @@ func (cc *Collector) ShouldBeSkipped(m *Event) bool {
 
 // ShouldSkip checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
 func (cc *Collector) ShouldSkip(ev wire.Event, round uint64, step uint8) bool {
-	isDupe := cc.Contains(ev, step)
+	isDupe := cc.Contains(ev, string(step))
 	isPleb := !cc.Committee.IsMember(ev.Sender())
 	return isDupe || isPleb
 }

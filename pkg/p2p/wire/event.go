@@ -25,12 +25,19 @@ type (
 		Marshal(*bytes.Buffer, Event) error
 	}
 
+	// EventUnMarshaller is a convenient interface providing both Marshalling and Unmarshalling capabilities
+	EventUnMarshaller interface {
+		EventMarshaller
+		EventUnmarshaller
+	}
+
+	// EventPrioritizer is used by the EventSelector to prioritize events (normally to return the best collected after a timespan)
 	EventPrioritizer interface {
 		Priority(Event, Event) Event
 	}
 
+	// EventVerifier is the interface to verify an Event
 	EventVerifier interface {
-		// Verify an Event optionally using a Hash
 		Verify(Event) error
 	}
 
@@ -38,10 +45,6 @@ type (
 	EventCollector interface {
 		Collect(*bytes.Buffer) error
 	}
-
-	// StepEventCollector is an helper for common operations on stored Event Arrays
-	// TODO: move this inside the collector
-	StepEventCollector map[uint8][]Event
 
 	// EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events
 	EventSubscriber struct {
@@ -90,41 +93,6 @@ func (s *EventSelector) PickBest() {
 			return
 		}
 	}
-}
-
-// Clear up the Collector
-func (sec StepEventCollector) Clear() {
-	for key := range sec {
-		delete(sec, key)
-	}
-}
-
-// Contains checks if we already collected this event
-func (sec StepEventCollector) Contains(event Event, step uint8) bool {
-	for _, stored := range sec[step] {
-		if event.Equal(stored) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// Store the Event keeping track of the step it belongs to. It silently ignores duplicates (meaning it does not store an event in case it is already found at the step specified). It returns the number of events stored at specified step *after* the store operation
-func (sec StepEventCollector) Store(event Event, step uint8) int {
-	eventList := sec[step]
-	if sec.Contains(event, step) {
-		return len(eventList)
-	}
-
-	if eventList == nil {
-		eventList = make([]Event, 0, 100)
-	}
-
-	// storing the agreement vote for the proper step
-	eventList = append(eventList, event)
-	sec[step] = eventList
-	return len(eventList)
 }
 
 // NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus. The EventBus, EventCollector and Topic are injected

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"math/big"
+	"time"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -12,24 +13,61 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-type (
-	ScoreHandler struct {
-		bidList user.BidList
-	}
+// LaunchScoreComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders
+func LaunchScoreComponent(eventBus *wire.EventBus, timeout time.Duration) *broker {
+	handler := newScoreHandler(eventBus)
+	broker := newBroker(eventBus, handler, timeout, string(msg.BestScoreTopic))
+	go broker.Listen()
+	return broker
+}
 
-	BidListCollector struct {
-		BidListChan chan user.BidList
+// InitBestScoreUpdate is the utility function to create and wire a channel for notifications of the best ScoreEvent
+func InitBestScoreUpdate(eventBus *wire.EventBus) chan *ScoreEvent {
+	bestScoreChan := make(chan *ScoreEvent, 1)
+	collector := &scoreCollector{
+		bestScoreChan: bestScoreChan,
+		unMarshaller:  newScoreUnMarshaller(),
 	}
-)
+	go wire.NewEventSubscriber(eventBus, collector, string(msg.BestScoreTopic)).Accept()
+	return bestScoreChan
+}
 
-func createSubcriber(eventBus *wire.EventBus) chan user.BidList {
+// InitBidListUpdate creates and initiates a channel for the updates in the BidList
+func InitBidListUpdate(eventBus *wire.EventBus) chan user.BidList {
 	bidListChan := make(chan user.BidList)
-	collector := &BidListCollector{bidListChan}
+	collector := &bidListCollector{bidListChan}
 	wire.NewEventSubscriber(eventBus, collector, string(msg.BidListTopic)).Accept()
 	return bidListChan
 }
 
-func (l *BidListCollector) Collect(r *bytes.Buffer) error {
+type (
+	scoreHandler struct {
+		bidList      user.BidList
+		unMarshaller *scoreUnMarshaller
+	}
+
+	bidListCollector struct {
+		BidListChan chan user.BidList
+	}
+
+	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
+	scoreCollector struct {
+		bestScoreChan chan *ScoreEvent
+		unMarshaller  *scoreUnMarshaller
+	}
+)
+
+func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
+	ev := &ScoreEvent{}
+	if err := sc.unMarshaller.Unmarshal(r, ev); err != nil {
+		return err
+	}
+	sc.bestScoreChan <- ev
+	return nil
+}
+
+// Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
+func (l *bidListCollector) Collect(r *bytes.Buffer) error {
 	bidList, err := user.ReconstructBidListSubset(r.Bytes())
 	if err != nil {
 		return nil
@@ -38,9 +76,12 @@ func (l *BidListCollector) Collect(r *bytes.Buffer) error {
 	return nil
 }
 
-func NewScoreHandler(eventBus *wire.EventBus) *ScoreHandler {
-	bidListChan := createSubcriber(eventBus)
-	sh := &ScoreHandler{}
+// NewScoreHandler returns a ScoreHandler, which encapsulates specific operations (e.g. verification, validation, marshalling and unmarshalling)
+func newScoreHandler(eventBus *wire.EventBus) *scoreHandler {
+	bidListChan := InitBidListUpdate(eventBus)
+	sh := &scoreHandler{
+		unMarshaller: newScoreUnMarshaller(),
+	}
 	go func() {
 		bidList := <-bidListChan
 		sh.bidList = bidList
@@ -48,17 +89,25 @@ func NewScoreHandler(eventBus *wire.EventBus) *ScoreHandler {
 	return sh
 }
 
-func (p *ScoreHandler) NewEvent() wire.Event {
+func (p *scoreHandler) NewEvent() wire.Event {
 	return &ScoreEvent{}
 }
 
-func (p *ScoreHandler) Stage(e wire.Event) (uint64, uint8) {
+func (p *scoreHandler) Unmarshal(r *bytes.Buffer, e wire.Event) error {
+	return p.unMarshaller.Unmarshal(r, e)
+}
+
+func (p *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
+	return p.unMarshaller.Marshal(r, e)
+}
+
+func (p *scoreHandler) Stage(e wire.Event) (uint64, uint8) {
 	ev := e.(*ScoreEvent)
 	return ev.Round, ev.Step
 }
 
 // Priority returns true if the
-func (p *ScoreHandler) Priority(first, second wire.Event) wire.Event {
+func (p *scoreHandler) Priority(first, second wire.Event) wire.Event {
 	ev1 := first.(*ScoreEvent)
 	ev2 := second.(*ScoreEvent)
 	score1 := big.NewInt(0).SetBytes(ev1.Score).Uint64()
@@ -70,7 +119,7 @@ func (p *ScoreHandler) Priority(first, second wire.Event) wire.Event {
 	return ev1
 }
 
-func (p *ScoreHandler) Verify(ev wire.Event) error {
+func (p *scoreHandler) Verify(ev wire.Event) error {
 	m := ev.(*ScoreEvent)
 
 	// Check first if the BidList contains valid bids
@@ -88,7 +137,7 @@ func (p *ScoreHandler) Verify(ev wire.Event) error {
 	return nil
 }
 
-func (p *ScoreHandler) validateBidListSubset(bidListSubsetBytes []byte) error {
+func (p *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) error {
 	bidListSubset, err := user.ReconstructBidListSubset(bidListSubsetBytes)
 	if err != nil {
 		return err

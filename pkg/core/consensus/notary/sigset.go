@@ -10,11 +10,44 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-// SigSetEvent is a CommitteeEvent decorated with the signature set hash
-type SigSetEvent struct {
-	*committee.Event
-	sigSetHash []byte
+// LaunchSignatureSetNotary creates and ignites a SigSetNotary by injecting the EventBus, the Committee and the message validation primitive
+func LaunchSignatureSetNotary(eventBus *wire.EventBus, c committee.Committee, currentRound uint64) *sigSetNotary {
+
+	ssn := &sigSetNotary{
+		eventBus:        eventBus,
+		sigSetCollector: initSigSetCollector(eventBus, c, currentRound),
+	}
+	go ssn.Listen()
+	return ssn
 }
+
+type (
+	// SigSetEvent is a CommitteeEvent decorated with the signature set hash
+	SigSetEvent struct {
+		*committee.Event
+		sigSetHash []byte
+	}
+
+	// sigSetNotary creates the proper EventSubscriber to listen to the SigSetEvent notification. It is not supposed to be used directly
+	sigSetNotary struct {
+		eventBus        *wire.EventBus
+		sigSetCollector *sigSetCollector
+	}
+
+	sigSetEventUnmarshaller struct {
+		*committee.EventUnMarshaller
+	}
+
+	// sigSetCollector collects SigSetEvent and decides whether it needs to propagate a round update. It gets the Quorum from the Committee interface and communicates through a channel to notify of round increments. Whenever it gets messages from future rounds, it queues them until their round becomes the current one.
+	// The SigSetEvents for the current round are grouped by step. Future messages are grouped by round number
+	// Finally a round update should be propagated when we get enough SigSetEvent messages for a given step
+	sigSetCollector struct {
+		*committee.Collector
+		RoundChan    chan uint64
+		futureRounds map[uint64][]*SigSetEvent
+		Unmarshaller wire.EventUnmarshaller
+	}
+)
 
 // NewSigSetEvent creates a SigSetEvent
 func NewSigSetEvent() *SigSetEvent {
@@ -26,13 +59,25 @@ func (sse *SigSetEvent) Equal(e wire.Event) bool {
 	return sse.Event.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
 }
 
-type sigSetEventUnmarshaller struct {
-	*committee.EventUnMarshaller
+// Listen triggers the EventSubscriber to accept Events from the EventBus
+func (ssn *sigSetNotary) Listen() {
+	for {
+		select {
+		// When it is the right moment, the collector publishes round updates to the round channel
+		case newRound := <-ssn.sigSetCollector.RoundChan:
+			// Marshalling the round update
+			b := make([]byte, 8)
+			binary.LittleEndian.PutUint64(b, newRound)
+			buf := bytes.NewBuffer(b)
+			// publishing to the EventBus
+			ssn.eventBus.Publish(msg.RoundUpdateTopic, buf)
+		}
+	}
 }
 
-func newSigSetEventUnmarshaller(validate func(*bytes.Buffer) error) *sigSetEventUnmarshaller {
+func newSigSetEventUnmarshaller() *sigSetEventUnmarshaller {
 	return &sigSetEventUnmarshaller{
-		EventUnMarshaller: committee.NewEventUnMarshaller(validate),
+		EventUnMarshaller: committee.NewEventUnMarshaller(),
 	}
 }
 
@@ -52,43 +97,33 @@ func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 	return nil
 }
 
-// SigSetCollector collects SigSetEvent and decides whether it needs to propagate a round update. It gets the Quorum from the Committee interface and communicates through a channel to notify of round increments. Whenever it gets messages from future rounds, it queues them until their round becomes the current one.
-// The SigSetEvents for the current round are grouped by step. Future messages are grouped by round number
-// Finally a round update should be propagated when we get enough SigSetEvent messages for a given step
-type SigSetCollector struct {
-	*committee.Collector
-	RoundChan    chan uint64
-	futureRounds map[uint64][]*SigSetEvent
-	Unmarshaller wire.EventUnmarshaller
-}
-
-// NewSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
-func NewSigSetCollector(c committee.Committee, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
+// newSigSetCollector accepts a committee, a channel whereto publish the result and a validateFunc
+func newSigSetCollector(c committee.Committee, currentRound uint64) *sigSetCollector {
 
 	cc := &committee.Collector{
-		StepEventCollector: make(map[uint8][]wire.Event),
+		StepEventCollector: make(map[string][]wire.Event),
 		Committee:          c,
 		CurrentRound:       currentRound,
 	}
-	return &SigSetCollector{
+	return &sigSetCollector{
 		Collector:    cc,
 		RoundChan:    make(chan uint64),
 		futureRounds: make(map[uint64][]*SigSetEvent),
-		Unmarshaller: newSigSetEventUnmarshaller(validateFunc),
+		Unmarshaller: newSigSetEventUnmarshaller(),
 	}
 }
 
-// InitSigSetCollector creates a SigSetCollector while also firing the proper subscriber the collector needs to listen to. In this case it listens to SigSetAgreementTopic
-func InitSigSetCollector(eventBus *wire.EventBus, c committee.Committee, validateFunc func(*bytes.Buffer) error, currentRound uint64) *SigSetCollector {
+// initSigSetCollector creates a SigSetCollector while also firing the proper subscriber the collector needs to listen to. In this case it listens to SigSetAgreementTopic
+func initSigSetCollector(eventBus *wire.EventBus, c committee.Committee, currentRound uint64) *sigSetCollector {
 	// creating the collector used in the EventSubscriber
-	sigSetCollector := NewSigSetCollector(c, validateFunc, currentRound)
+	sigSetCollector := newSigSetCollector(c, currentRound)
 	// creating the EventSubscriber listening to msg.SigSetAgreementTopic
 	go wire.NewEventSubscriber(eventBus, sigSetCollector, string(msg.SigSetAgreementTopic)).Accept()
 	return sigSetCollector
 }
 
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
-func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
+func (s *sigSetCollector) Collect(buffer *bytes.Buffer) error {
 	ev := NewSigSetEvent()
 	if err := s.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
@@ -99,14 +134,14 @@ func (s *SigSetCollector) Collect(buffer *bytes.Buffer) error {
 }
 
 // ShouldBeStored checks if the message should be stored either in the current round queue or among future messages
-func (s *SigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
+func (s *sigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 	step := m.Step
-	sigSetList := s.Collector.StepEventCollector[step]
+	sigSetList := s.Collector.StepEventCollector[string(step)]
 	return len(sigSetList)+1 < s.Committee.Quorum() || m.Round > s.CurrentRound
 }
 
 // Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
-func (s *SigSetCollector) Process(ev *SigSetEvent) {
+func (s *sigSetCollector) Process(ev *SigSetEvent) {
 	isIrrelevant := s.CurrentRound != 0 && s.CurrentRound > ev.Round
 	if s.ShouldBeSkipped(ev.Event) || isIrrelevant {
 		return
@@ -124,14 +159,14 @@ func (s *SigSetCollector) Process(ev *SigSetEvent) {
 			return
 		}
 
-		s.Store(ev, ev.Step)
+		s.Store(ev, string(ev.Step))
 		return
 	}
 
 	s.nextRound()
 }
 
-func (s *SigSetCollector) nextRound() {
+func (s *sigSetCollector) nextRound() {
 	s.UpdateRound(s.CurrentRound + 1)
 	// notify the Notary
 	go func() { s.RoundChan <- s.CurrentRound }()
@@ -142,36 +177,5 @@ func (s *SigSetCollector) nextRound() {
 	//processing messages store so far
 	for _, event := range currentEvents {
 		s.Process(event)
-	}
-}
-
-// SigSetNotary creates the proper EventSubscriber to listen to the SigSetEvent notifications
-type SigSetNotary struct {
-	eventBus        *wire.EventBus
-	sigSetCollector *SigSetCollector
-}
-
-// NewSigSetNotary creates a SigSetNotary by injecting the EventBus, the Committee and the message validation primitive
-func NewSigSetNotary(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error, c committee.Committee, currentRound uint64) *SigSetNotary {
-
-	return &SigSetNotary{
-		eventBus:        eventBus,
-		sigSetCollector: InitSigSetCollector(eventBus, c, validateFunc, currentRound),
-	}
-}
-
-// Listen triggers the EventSubscriber to accept Events from the EventBus
-func (ssn *SigSetNotary) Listen() {
-	for {
-		select {
-		// When it is the right moment, the collector publishes round updates to the round channel
-		case newRound := <-ssn.sigSetCollector.RoundChan:
-			// Marshalling the round update
-			b := make([]byte, 8)
-			binary.LittleEndian.PutUint64(b, newRound)
-			buf := bytes.NewBuffer(b)
-			// publishing to the EventBus
-			ssn.eventBus.Publish(msg.RoundUpdateTopic, buf)
-		}
 	}
 }

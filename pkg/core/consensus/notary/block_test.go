@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -15,7 +17,7 @@ import (
 
 func TestSimpleBlockCollection(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
-	bc := NewBlockCollector(committeeMock, nil)
+	bc := newBlockCollector(committeeMock)
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
@@ -35,7 +37,7 @@ func TestSimpleBlockCollection(t *testing.T) {
 
 func TestNoQuorumCollection(t *testing.T) {
 	committeeMock := mockCommittee(3, true, nil)
-	bc := NewBlockCollector(committeeMock, nil)
+	bc := newBlockCollector(committeeMock)
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
@@ -50,13 +52,13 @@ func TestNoQuorumCollection(t *testing.T) {
 		// testing that we still have collected for 1 step
 		assert.Equal(t, 1, len(bc.StepEventCollector))
 		// testing that we collected 2 messages
-		assert.Equal(t, 2, len(bc.StepEventCollector[1]))
+		assert.Equal(t, 2, len(bc.StepEventCollector[string(1)]))
 	}
 }
 
 func TestSkipNoMember(t *testing.T) {
 	committeeMock := mockCommittee(1, false, nil)
-	bc := NewBlockCollector(committeeMock, nil)
+	bc := newBlockCollector(committeeMock)
 	bc.UpdateRound(1)
 
 	blockHash := []byte("pippo")
@@ -74,11 +76,9 @@ func TestSkipNoMember(t *testing.T) {
 func TestBlockNotary(t *testing.T) {
 	bus := wire.New()
 	committee := mockCommittee(1, true, nil)
-	notary := NewBlockNotary(bus, nil, committee)
-
+	notary := LaunchBlockNotary(bus, committee)
 	blockHash := []byte("pippo")
 	notary.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
-	go notary.Listen()
 
 	blockChan := make(chan *bytes.Buffer)
 	bus.Subscribe(msg.PhaseUpdateTopic, blockChan)
@@ -137,4 +137,16 @@ func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUn
 		event: ev,
 		err:   nil,
 	}
+}
+
+func mockCommittee(quorum int, isMember bool, verification error) committee.Committee {
+	committeeMock := &mocks.Committee{}
+	committeeMock.On("Quorum").Return(quorum)
+	committeeMock.On("VerifyVoteSet",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(verification)
+	committeeMock.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
+	return committeeMock
 }

@@ -17,6 +17,15 @@ type (
 		Step      uint8
 	}
 
+	// EventHandler encapsulate logic specific to the various Collectors. Each Collector needs to verify, prioritize and extract information from Events. EventHandler is the interface that abstracts these operations away. The implementors of this interface is the real differentiator of the various consensus components
+	EventHandler interface {
+		wire.EventVerifier
+		wire.EventPrioritizer
+		wire.EventUnMarshaller
+		NewEvent() wire.Event
+		Stage(wire.Event) (uint64, uint8)
+	}
+
 	// EventHeaderMarshaller marshals a consensus EventHeader as follows:
 	// - BLS Public Key
 	// - Round
@@ -25,12 +34,43 @@ type (
 
 	// EventHeaderUnmarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
 	EventHeaderUnmarshaller struct {
-		validate func(*bytes.Buffer) error
+		Validate func(*bytes.Buffer) error
 	}
 
 	// EventQueue is a Queue of Events grouped by rounds and steps
 	EventQueue map[uint64]map[uint8][]wire.Event
+
+	// StepEventCollector is an helper for common operations on stored Event Arrays
+	StepEventCollector map[string][]wire.Event
+
+	// phaseCollector is not supposed to be used directly. Components interested in Phase Updates should import InitPhaseUpdate instead
+	phaseCollector struct {
+		blockHashChan chan []byte
+	}
+
+	// roundCollector is a simple wrapper over a channel to get round notifications. It is not supposed to be used directly. Components interestesd in Round updates should use InitRoundUpdate instead
+	roundCollector struct {
+		roundChan chan uint64
+	}
 )
+
+// InitRoundUpdate initializes a Round update channel and fires up the EventSubscriber as well. Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
+func InitRoundUpdate(eventBus *wire.EventBus) chan uint64 {
+	roundChan := make(chan uint64, 1)
+	roundCollector := &roundCollector{roundChan}
+	go wire.NewEventSubscriber(eventBus, roundCollector,
+		string(msg.RoundUpdateTopic)).Accept()
+	return roundChan
+}
+
+// InitPhaseUpdate initializes a channel for blockHash and fires up the EventSubscriber as well. Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
+func InitPhaseUpdate(eventBus *wire.EventBus) chan []byte {
+	phaseUpdateChan := make(chan []byte)
+	collector := &phaseCollector{phaseUpdateChan}
+	go wire.NewEventSubscriber(eventBus, collector,
+		string(msg.SigSetAgreementTopic)).Accept()
+	return phaseUpdateChan
+}
 
 // Equal as specified in the Event interface
 func (a *EventHeader) Equal(e wire.Event) bool {
@@ -63,13 +103,13 @@ func (ehm *EventHeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 }
 
 // NewEventHeaderUnmarshaller creates an EventHeaderUnmarshaller delegating validation to the validate function
-func NewEventHeaderUnmarshaller(validate func(*bytes.Buffer) error) *EventHeaderUnmarshaller {
-	return &EventHeaderUnmarshaller{validate}
+func NewEventHeaderUnmarshaller() *EventHeaderUnmarshaller {
+	return &EventHeaderUnmarshaller{msg.VerifyEd25519Signature}
 }
 
 // Unmarshal unmarshals the buffer into a ConsensusEvent
 func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	if err := a.validate(r); err != nil {
+	if err := a.Validate(r); err != nil {
 		return err
 	}
 
@@ -157,42 +197,49 @@ func (s EventQueue) ConsumeUntil(round uint64) map[uint64]map[uint8][]wire.Event
 	return ret
 }
 
-// RoundCollector is a simple wrapper over a channel to get round notifications
-type RoundCollector struct {
-	RoundChan chan uint64
+// Clear up the Collector
+func (sec StepEventCollector) Clear() {
+	for key := range sec {
+		delete(sec, key)
+	}
 }
 
-// InitRoundCollector initializes a RoundCollector and fires up the EventSubscriber as well. Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
-func InitRoundCollector(eventBus *wire.EventBus) *RoundCollector {
-	roundChan := make(chan uint64, 1)
-	roundCollector := &RoundCollector{roundChan}
-	go wire.NewEventSubscriber(eventBus, roundCollector,
-		string(msg.RoundUpdateTopic)).Accept()
-	return roundCollector
+// Contains checks if we already collected this event
+func (sec StepEventCollector) Contains(event wire.Event, step string) bool {
+	for _, stored := range sec[step] {
+		if event.Equal(stored) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Store the Event keeping track of the step it belongs to. It silently ignores duplicates (meaning it does not store an event in case it is already found at the step specified). It returns the number of events stored at specified step *after* the store operation
+func (sec StepEventCollector) Store(event wire.Event, step string) int {
+	eventList := sec[step]
+	if sec.Contains(event, step) {
+		return len(eventList)
+	}
+
+	if eventList == nil {
+		eventList = make([]wire.Event, 0, 100)
+	}
+
+	// storing the agreement vote for the proper step
+	eventList = append(eventList, event)
+	sec[step] = eventList
+	return len(eventList)
 }
 
 // Collect as specified in the EventCollector interface. In this case Collect simply performs unmarshalling of the round event
-func (r *RoundCollector) Collect(roundBuffer *bytes.Buffer) error {
+func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-	r.RoundChan <- round
+	r.roundChan <- round
 	return nil
 }
 
-// PhaseCollector collects phase updates (aka BlockHash updates)
-type PhaseCollector struct {
-	BlockHashChan chan []byte
-}
-
-// InitPhaseCollector initializes a PhaseCollector and fires up the EventSubscriber as well. Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
-func InitPhaseCollector(eventBus *wire.EventBus) *PhaseCollector {
-	phaseUpdateChan := make(chan []byte)
-	collector := &PhaseCollector{phaseUpdateChan}
-	go wire.NewEventSubscriber(eventBus, collector,
-		string(msg.SigSetAgreementTopic)).Accept()
-	return collector
-}
-
-func (p *PhaseCollector) Collect(phaseBuffer *bytes.Buffer) error {
-	p.BlockHashChan <- phaseBuffer.Bytes()
+func (p *phaseCollector) Collect(phaseBuffer *bytes.Buffer) error {
+	p.blockHashChan <- phaseBuffer.Bytes()
 	return nil
 }
