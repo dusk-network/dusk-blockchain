@@ -37,12 +37,12 @@ type (
 // Equal implements Event interface.
 func (sse *SigSetEvent) Equal(e wire.Event) bool {
 	return sse.BlockEvent.Equal(e) &&
-		bytes.Equal(sse.blockHash, e.(*SigSetEvent).blockHash)
+		bytes.Equal(sse.BlockHash, e.(*SigSetEvent).BlockHash)
 }
 
 func newSigSetUnMarshaller() *sigSetUnmarshaller {
 	return &sigSetUnmarshaller{
-		unMarshaller: newUnMarshaller(),
+		blockUnMarshaller: newBlockUnMarshaller(),
 	}
 }
 
@@ -52,7 +52,7 @@ func (ssru *sigSetUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sigSetEvent.blockHash); err != nil {
+	if err := encoding.Read256(r, &sigSetEvent.BlockHash); err != nil {
 		return err
 	}
 
@@ -65,7 +65,7 @@ func (ssru *sigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 		return err
 	}
 
-	if err := encoding.Write256(r, sigSetEvent.blockHash); err != nil {
+	if err := encoding.Write256(r, sigSetEvent.BlockHash); err != nil {
 		return err
 	}
 
@@ -76,8 +76,8 @@ func (ssru *sigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 func newSigSetHandler(eventBus *wire.EventBus, committee committee.Committee) *sigSetHandler {
 	phaseChannel := consensus.InitPhaseUpdate(eventBus)
 	sigSetHandler := &sigSetHandler{
-		committee:                   committee,
-		sigSetReductionUnmarshaller: newSigSetReductionUnmarshaller(),
+		committee:          committee,
+		sigSetUnmarshaller: newSigSetUnMarshaller(),
 	}
 
 	go func() {
@@ -123,7 +123,7 @@ func (s sigSetHandler) Verify(e wire.Event) error {
 		return err
 	}
 
-	if !bytes.Equal(s.blockHash, ev.blockHash) {
+	if !bytes.Equal(s.blockHash, ev.BlockHash) {
 		return errors.New("sig set handler: block hash mismatch")
 	}
 

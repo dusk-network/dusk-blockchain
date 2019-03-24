@@ -63,17 +63,11 @@ func newCoordinator(state *consensusState, collectedVotesChan chan []wire.Event,
 }
 
 func (c *coordinator) begin(timeout time.Duration) error {
-	var hash1, hash2 *bytes.Buffer
 	// this is a blocking call
 	events := c.firstStep.fetch(timeout)
-	if events == nil {
-		// TODO: clean the stepCollector
-		events = []wire.Event{nil}
-	}
 	c.state.Step++
-	hash1 = bytes.NewBuffer(make([]byte, 32))
-	if err := c.handler.EmbedVoteHash(events[0], hash1); err != nil {
-		//TODO: check the impact of the error on the overall algorithm
+	hash1, err := c.encodeEv(events)
+	if err != nil {
 		return err
 	}
 	if err := c.handler.MarshalHeader(hash1, c.state); err != nil {
@@ -81,13 +75,12 @@ func (c *coordinator) begin(timeout time.Duration) error {
 	}
 	c.reductionVoteChan <- hash1
 
-	// c.voteStore = append(c.voteStore, events...)
-	c.state.Step++
-	if err := c.handler.EmbedVoteHash(events[0]); err != nil {
+	eventsSecondStep := c.secondStep.fetch(timeout)
+	hash2, err := c.encodeEv(eventsSecondStep)
+	if err != nil {
 		return err
 	}
 
-	hash2 = c.secondStep.fetch(timeout)
 	if c.isReductionSuccessful(hash1, hash2, events) {
 		if err := c.handler.MarshalVoteSet(hash2, events); err != nil {
 			return err
@@ -97,10 +90,24 @@ func (c *coordinator) begin(timeout time.Duration) error {
 		}
 		c.agreementVoteChan <- hash2
 	}
-	c.state++
+	c.state.Step++
+	return nil
 }
 
-func (c *coordinator) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wire.Events) bool {
+func (c *coordinator) encodeEv(events []wire.Event) (*bytes.Buffer, error) {
+	if events == nil {
+		// TODO: clean the stepCollector
+		events = []wire.Event{nil}
+	}
+	hash := bytes.NewBuffer(make([]byte, 32))
+	if err := c.handler.EmbedVoteHash(events[0], hash); err != nil {
+		//TODO: check the impact of the error on the overall algorithm
+		return nil, err
+	}
+	return hash, nil
+}
+
+func (c *coordinator) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wire.Event) bool {
 	bothNotNil := hash1 != nil && hash2 != nil
 	identicalResults := bytes.Equal(hash1.Bytes(), hash2.Bytes())
 	voteSetCorrectLength := len(events) >= c.committee.Quorum()*2
