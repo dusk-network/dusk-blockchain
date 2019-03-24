@@ -79,13 +79,15 @@ func (s *SigSetHandler) Marshal(r *bytes.Buffer, ev wire.Event) error {
 
 // NewEvent creates a new SigSetEvent struct prototype
 func (s *SigSetHandler) NewEvent() wire.Event {
-	return &ScoreEvent{}
+	return &SigSetEvent{}
 }
 
-// Stage extracts the Round and Step information from an Event
-func (s *SigSetHandler) Stage(e wire.Event) (uint64, uint8) {
-	sse := e.(*SigSetEvent)
-	return sse.Round, sse.Step
+// ExtractHeader extracts the Round and Step information from an Event
+func (s *SigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
+	ev := e.(*SigSetEvent)
+	h.Round = ev.Round
+	h.Step = ev.Step
+	h.PubKeyBLS = ev.PubKeyBLS
 }
 
 // Priority is used to prioritize events. In the case of SigSetHandler, the priority is delegated to the Committee considering that they decide which vote selection should be chosen

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
@@ -101,9 +102,11 @@ func (p *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return p.unMarshaller.Marshal(r, e)
 }
 
-func (p *scoreHandler) Stage(e wire.Event) (uint64, uint8) {
+func (p *scoreHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
 	ev := e.(*ScoreEvent)
-	return ev.Round, ev.Step
+	h.Round = ev.Round
+	h.Step = ev.Step
+	h.PubKeyBLS = ev.Z
 }
 
 // Priority returns true if the

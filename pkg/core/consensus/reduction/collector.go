@@ -14,22 +14,9 @@ import (
 )
 
 type (
-	// Event is a basic reduction event.
-	Event struct {
-		*consensus.EventHeader
-		VotedHash  []byte
-		SignedHash []byte
-	}
-
-	// A collector used during the reduction.
-	// reductionEventCollector map[string][]wire.Event
-
-	eventHandler interface {
-		wire.EventVerifier
-		wire.EventUnMarshaller
-		NewEvent() wire.Event
-		Stage(wire.Event) (uint64, uint8)
-		Hash(wire.Event) []byte
+	reductionHandler interface {
+		consensus.EventHandler
+		ExtractVoteHash(wire.Event, *bytes.Buffer) error
 	}
 
 	collector struct {
@@ -41,7 +28,7 @@ type (
 
 		committee    committee.Committee
 		timeOut      time.Duration
-		handler      eventHandler
+		handler      reductionHandler
 		currentRound uint64
 		currentStep  uint8
 		queue        *consensus.EventQueue
@@ -51,11 +38,11 @@ type (
 
 	// Broker is the message broker for the reduction process.
 	Broker struct {
-		eventBus *wire.EventBus
-		*collector
+		eventBus  *wire.EventBus
+		collector *collector
 
 		// channels linked to subscribers
-		roundChannel       <-chan uint64
+		roundUpdateChannel <-chan uint64
 		phaseUpdateChannel <-chan []byte
 		selectionChannel   <-chan []byte
 	}
@@ -65,13 +52,6 @@ type (
 	}
 )
 
-// Equal as specified in the Event interface
-func (e *Event) Equal(ev wire.Event) bool {
-	other, ok := ev.(*Event)
-	return ok && (bytes.Equal(e.PubKeyBLS, other.PubKeyBLS)) &&
-		(e.Round == other.Round) && (e.Step == other.Step)
-}
-
 // Collect implements the EventCollector interface.
 // Will simply send the received buffer as a slice of bytes.
 func (s selectionCollector) Collect(buffer *bytes.Buffer) error {
@@ -80,7 +60,7 @@ func (s selectionCollector) Collect(buffer *bytes.Buffer) error {
 }
 
 func newCollector(eventBus *wire.EventBus, committee committee.Committee,
-	validateFunc func(*bytes.Buffer) error, handler eventHandler,
+	handler reductionHandler,
 	reductionTopic string, timeOut time.Duration) *collector {
 
 	queue := consensus.NewEventQueue()
@@ -109,21 +89,24 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 		return err
 	}
 
-	round, step := c.handler.Stage(ev)
-	if c.isRelevant(round, step) {
+	header := &consensus.EventHeader{}
+	c.handler.ExtractHeader(ev, header)
+	if c.isRelevant(header.Round, header.Step) {
 		c.process(ev)
 		return nil
 	}
 
-	if c.isEarly(round, step) {
-		c.queue.PutEvent(round, step, ev)
+	if c.isEarly(header.Round, header.Step) {
+		c.queue.PutEvent(header.Round, header.Step, ev)
 	}
 
 	return nil
 }
 
 func (c *collector) process(ev wire.Event) {
-	hash := hex.EncodeToString(c.handler.Hash(ev))
+	b := make([]byte, 0, 32)
+	c.handler.ExtractVoteHash(ev, bytes.NewBuffer(b))
+	hash := hex.EncodeToString(b)
 	count := c.Store(ev, hash)
 	if count > c.committee.Quorum() {
 		votes := c.StepEventCollector[hash]
@@ -166,7 +149,9 @@ func (c *collector) startReduction() {
 	case votes := <-c.collectedVotesChannel:
 		c.voteStore = append(c.voteStore, votes...)
 		timer.Stop()
-		c.reductionResultChannel <- c.handler.Hash(votes[0])
+		v := make([]byte, 0, 32)
+		c.handler.ExtractVoteHash(votes[0], bytes.NewBuffer(v))
+		c.reductionResultChannel <- v
 	}
 }
 
@@ -242,25 +227,25 @@ func (c collector) marshalVoteSet(r *bytes.Buffer) error {
 }
 
 // NewBroker will return a reduction broker.
-func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
-	handler eventHandler, committee committee.Committee, selectionTopic,
+func NewBroker(eventBus *wire.EventBus,
+	handler reductionHandler, committee committee.Committee, selectionTopic,
 	reductionTopic string, timeOut time.Duration) *Broker {
 
-	collector := newCollector(eventBus, committee, validateFunc, handler,
+	collector := newCollector(eventBus, committee, handler,
 		reductionTopic, timeOut)
 
 	selectionChannel := make(chan []byte, 1)
 	selectionCollector := selectionCollector{selectionChannel}
-	wire.NewEventSubscriber(eventBus, selectionCollector,
+	go wire.NewEventSubscriber(eventBus, selectionCollector,
 		selectionTopic).Accept()
 
-	roundChannel := consensus.InitRoundCollector(eventBus).RoundChan
+	roundChannel := consensus.InitRoundUpdate(eventBus)
 
 	return &Broker{
-		eventBus:         eventBus,
-		collector:        collector,
-		selectionChannel: selectionChannel,
-		roundChannel:     roundChannel,
+		eventBus:           eventBus,
+		collector:          collector,
+		selectionChannel:   selectionChannel,
+		roundUpdateChannel: roundChannel,
 	}
 }
 
@@ -268,17 +253,19 @@ func NewBroker(eventBus *wire.EventBus, validateFunc func(*bytes.Buffer) error,
 func (b *Broker) Listen() {
 	for {
 		select {
-		case round := <-b.roundChannel:
-			b.updateRound(round)
+		case round := <-b.roundUpdateChannel:
+			b.collector.updateRound(round)
 		case hash := <-b.selectionChannel:
-			reductionVote, _ := b.addRoundAndStep(hash)
+			// the first reduction step is triggered by a sigSetSelection message
+			reductionVote, _ := b.collector.addRoundAndStep(hash)
 			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
-			go b.listenReduction()
-			go b.startReduction()
-		case reductionVote := <-b.reductionVoteChannel:
+			go b.collector.listenReduction()
+			go b.collector.startReduction()
+		case reductionVote := <-b.collector.reductionVoteChannel:
 			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
-			go b.startReduction()
-		case agreementVote := <-b.agreementVoteChannel:
+			// the second reduction step is triggered by a reductionVote result
+			go b.collector.startReduction()
+		case agreementVote := <-b.collector.agreementVoteChannel:
 			b.eventBus.Publish(msg.OutgoingAgreementTopic, agreementVote)
 		}
 	}

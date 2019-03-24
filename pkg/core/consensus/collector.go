@@ -23,7 +23,7 @@ type (
 		wire.EventPrioritizer
 		wire.EventUnMarshaller
 		NewEvent() wire.Event
-		Stage(wire.Event) (uint64, uint8)
+		ExtractHeader(wire.Event, *EventHeader)
 	}
 
 	// EventHeaderMarshaller marshals a consensus EventHeader as follows:

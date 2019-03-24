@@ -69,16 +69,17 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 
 // process sends SigSetEvent to the selector. The messages have already been validated and verified
 func (s *collector) process(ev wire.Event) {
-	round, step := s.handler.Stage(ev)
+	h := &consensus.EventHeader{}
+	s.handler.ExtractHeader(ev, h)
 
 	// Not anymore
-	if s.isObsolete(round, step) {
+	if s.isObsolete(h.Round, h.Step) {
 		return
 	}
 
 	// Not yet
-	if s.isEarly(round, step) {
-		s.queue.PutEvent(round, step, ev)
+	if s.isEarly(h.Round, h.Step) {
+		s.queue.PutEvent(h.Round, h.Step, ev)
 		return
 	}
 

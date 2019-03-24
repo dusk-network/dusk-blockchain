@@ -14,8 +14,10 @@ import (
 type (
 	// SigSetCollector is the public collector used outside of the Broker (which use the unexported one)
 	SigSetCollector struct{}
-	sigSetEvent     struct {
-		*Event
+
+	// SigSetEvent is the event related to the completed reduction of a Signature Set for a specific round (TODO: and step?)
+	SigSetEvent struct {
+		*BlockEvent
 		blockHash []byte
 	}
 
@@ -23,42 +25,30 @@ type (
 		*reductionEventUnmarshaller
 	}
 
-	// SigSetHandler is responsible for performing operations that need to know
+	// sigSetHandler is responsible for performing operations that need to know
 	// about specific event fields.
-	SigSetHandler struct {
+	sigSetHandler struct {
 		committee committee.Committee
 		*sigSetReductionUnmarshaller
 		blockHash []byte
 	}
 )
 
-func (ssc *SigSetCollector) Collect(ev wire.Event) {
-
-}
-
-func InitSigSetSelectionChan(eventBus *wire.EventBus) chan []byte {
-	selectionChannel := make(chan []byte, 1)
-	selectionCollector := selectionCollector{selectionChannel}
-	wire.NewEventSubscriber(eventBus, selectionCollector,
-		string(msg.SigSetSelectionTopic)).Accept()
-	return selectionChannel
-}
-
 // Equal implements Event interface.
-func (sse *sigSetEvent) Equal(e wire.Event) bool {
-	return sse.Event.Equal(e) &&
-		bytes.Equal(sse.blockHash, e.(*sigSetEvent).blockHash)
+func (sse *SigSetEvent) Equal(e wire.Event) bool {
+	return sse.BlockEvent.Equal(e) &&
+		bytes.Equal(sse.blockHash, e.(*SigSetEvent).blockHash)
 }
 
-func newSigSetReductionUnmarshaller(validate func(*bytes.Buffer) error) *sigSetReductionUnmarshaller {
+func newSigSetReductionUnmarshaller() *sigSetReductionUnmarshaller {
 	return &sigSetReductionUnmarshaller{
-		reductionEventUnmarshaller: newReductionEventUnmarshaller(validate),
+		reductionEventUnmarshaller: newReductionEventUnmarshaller(),
 	}
 }
 
 func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
-	sigSetEvent := e.(*sigSetEvent)
-	if err := ssru.reductionEventUnmarshaller.Unmarshal(r, sigSetEvent.Event); err != nil {
+	sigSetEvent := e.(*SigSetEvent)
+	if err := ssru.reductionEventUnmarshaller.Unmarshal(r, sigSetEvent.BlockEvent); err != nil {
 		return err
 	}
 
@@ -70,8 +60,8 @@ func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event
 }
 
 func (ssru *sigSetReductionUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
-	sigSetEvent := e.(*sigSetEvent)
-	if err := ssru.reductionEventUnmarshaller.Marshal(r, sigSetEvent.Event); err != nil {
+	sigSetEvent := e.(*SigSetEvent)
+	if err := ssru.reductionEventUnmarshaller.Marshal(r, sigSetEvent.BlockEvent); err != nil {
 		return err
 	}
 
@@ -82,15 +72,12 @@ func (ssru *sigSetReductionUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) 
 	return nil
 }
 
-// NewSigSetHandler will return a SigSetHandler, injected with the passed committee
-// and an unmarshaller which uses the injected validation function.
-func NewSigSetHandler(eventBus *wire.EventBus, committee committee.Committee,
-	validateFunc func(*bytes.Buffer) error) *SigSetHandler {
-
-	phaseChannel := consensus.InitPhaseCollector(eventBus).BlockHashChan
-	sigSetHandler := &SigSetHandler{
+// newSigSetHandler will return a SigSetHandler, injected with the passed committee and an unmarshaller
+func newSigSetHandler(eventBus *wire.EventBus, committee committee.Committee) *sigSetHandler {
+	phaseChannel := consensus.InitPhaseUpdate(eventBus)
+	sigSetHandler := &sigSetHandler{
 		committee:                   committee,
-		sigSetReductionUnmarshaller: newSigSetReductionUnmarshaller(validateFunc),
+		sigSetReductionUnmarshaller: newSigSetReductionUnmarshaller(),
 	}
 
 	go func() {
@@ -102,37 +89,28 @@ func NewSigSetHandler(eventBus *wire.EventBus, committee committee.Committee,
 }
 
 // NewEvent returns a sigSetEvent
-func (s SigSetHandler) NewEvent() wire.Event {
-	return &sigSetEvent{}
+func (s sigSetHandler) NewEvent() wire.Event {
+	return &SigSetEvent{}
 }
 
-// Stage returns the round and step of the passed sigSetEvent
-func (s SigSetHandler) Stage(e wire.Event) (uint64, uint8) {
-	ev, ok := e.(*sigSetEvent)
-	if !ok {
-		return 0, 0
-	}
-
-	return ev.Round, ev.Step
+func (b *sigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
+	ev := e.(*BlockEvent)
+	h.Round = ev.Round
+	h.Step = ev.Step
+	h.PubKeyBLS = ev.PubKeyBLS
 }
 
-// Hash returns the voted hash on the passed sigSetEvent
-func (s SigSetHandler) Hash(e wire.Event) []byte {
-	ev, ok := e.(*sigSetEvent)
-	if !ok {
-		return nil
+func (b *sigSetHandler) ExtractVoteHash(e wire.Event, r *bytes.Buffer) error {
+	ev := e.(*BlockEvent)
+	if err := encoding.Write256(r, ev.VotedHash); err != nil {
+		return err
 	}
-
-	return ev.VotedHash
+	return nil
 }
 
 // Verify the sigSetEvent
-func (s SigSetHandler) Verify(e wire.Event) error {
-	ev, ok := e.(*sigSetEvent)
-	if !ok {
-		return errors.New("block handler: type casting error")
-	}
-
+func (s sigSetHandler) Verify(e wire.Event) error {
+	ev := e.(*SigSetEvent)
 	if err := msg.VerifyBLSSignature(ev.PubKeyBLS, ev.VotedHash, ev.SignedHash); err != nil {
 		return err
 	}
