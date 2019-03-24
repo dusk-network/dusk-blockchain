@@ -17,7 +17,9 @@ type (
 	handler interface {
 		consensus.EventHandler
 		// TODO: not sure we need this
-		ExtractVoteHash(wire.Event, *bytes.Buffer) error
+		EmbedVoteHash(wire.Event, *bytes.Buffer) error
+		MarshalHeader(r *bytes.Buffer, state *consensusState) error
+		MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error
 	}
 
 	consensusState struct {
@@ -32,17 +34,17 @@ type (
 
 	collector struct {
 		consensus.StepEventCollector
-		collectedVotesChannel chan []wire.Event
-		reductionResultChan   chan []byte
-		reductionVoteChannel  chan *bytes.Buffer
-		agreementVoteChan     chan *bytes.Buffer
+		collectedVotesChan  chan []wire.Event
+		reductionResultChan chan *bytes.Buffer
+		reductionVoteChan   chan *bytes.Buffer
+		agreementVoteChan   chan *bytes.Buffer
 
-		committee committee.Committee
-		timeOut   time.Duration
-		handler   handler
-		state     *consensusState
-		queue     *consensus.EventQueue
-		reducing  bool
+		committee   committee.Committee
+		timeout     time.Duration
+		handler     handler
+		state       *consensusState
+		queue       *consensus.EventQueue
+		coordinator *coordinator
 	}
 
 	// Broker is the message broker for the reduction process.
@@ -110,21 +112,19 @@ func (s selectionCollector) Collect(buffer *bytes.Buffer) error {
 	return nil
 }
 
-func newCollector(eventBus *wire.EventBus, committee committee.Committee, state *consensusState,
-	handler handler,
-	reductionTopic string, timeOut time.Duration) *collector {
+func newCollector(eventBus *wire.EventBus, committee committee.Committee, state *consensusState, handler handler, reductionTopic string, timeout time.Duration) *collector {
 
 	queue := consensus.NewEventQueue()
 	collector := &collector{
-		handler:               handler,
-		queue:                 &queue,
-		committee:             committee,
-		state:                 state,
-		timeOut:               timeOut,
-		collectedVotesChannel: make(chan []wire.Event, 1),
-		reductionResultChan:   make(chan []byte, 1),
-		reductionVoteChannel:  make(chan *bytes.Buffer, 1),
-		agreementVoteChan:     make(chan *bytes.Buffer, 1),
+		handler:             handler,
+		queue:               &queue,
+		committee:           committee,
+		state:               state,
+		timeout:             timeout,
+		collectedVotesChan:  make(chan []wire.Event, 1),
+		reductionResultChan: make(chan *bytes.Buffer, 1),
+		reductionVoteChan:   make(chan *bytes.Buffer, 1),
+		agreementVoteChan:   make(chan *bytes.Buffer, 1),
 	}
 
 	wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
@@ -157,12 +157,13 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 
 func (c *collector) process(ev wire.Event) {
 	b := make([]byte, 0, 32)
-	c.handler.ExtractVoteHash(ev, bytes.NewBuffer(b))
+	// TODO: for the sigset reduction the hash is actually the blockhash and the voteHash. Check this
+	c.handler.EmbedVoteHash(ev, bytes.NewBuffer(b))
 	hash := hex.EncodeToString(b)
 	count := c.Store(ev, hash)
 	if count > c.committee.Quorum() {
 		votes := c.StepEventCollector[hash]
-		c.collectedVotesChannel <- votes
+		c.collectedVotesChan <- votes
 		c.Clear()
 	}
 }
@@ -175,90 +176,40 @@ func (c collector) flushQueue() {
 }
 
 func (c *collector) updateRound(round uint64) {
-
 	c.state.Round = round
 	c.state.Step = 1
 
 	c.queue.Clear(c.state.Round)
-	//TODO change the following
-	c.stopReduction()
-	c.stopReduction()
+	c.Clear()
+	if c.coordinator != nil {
+		c.coordinator.end()
+		c.coordinator = nil
+	}
 }
 
 func (c collector) isRelevant(round uint64, step uint8) bool {
-	return c.state.Round == round && c.state.Step == step && c.reducing
+	return c.state.Round == round && c.state.Step == step && c.coordinator != nil
 }
 
 func (c collector) isEarly(round uint64, step uint8) bool {
-	return c.state.Round <= round || c.state.Step <= step
+	return c.state.Round < round || c.state.Round == round && c.state.Step < step
 }
 
 func (c *collector) startReduction() {
-	timer := time.NewTimer(c.timeOut)
+	c.coordinator = newCoordinator(c.state, c.collectedVotesChan, c.reductionVoteChan, c.agreementVoteChan, c.handler, c.committee)
 
 	go c.flushQueue()
-	select {
-	case <-timer.C:
-		c.stopReduction()
-		c.reductionResultChan <- make([]byte, 32)
-	case votes := <-c.collectedVotesChannel:
-		c.voteStore = append(c.voteStore, votes...)
-		timer.Stop()
-		v := make([]byte, 0, 32)
-		c.handler.EmbedVoteHash(votes[0], bytes.NewBuffer(v))
-		c.reductionResultChan <- v
-	}
-}
-
-// reduction is ran in segments of two steps. this function will listen for and
-// handle both results.
-func (c *collector) listenReduction() {
-	c.reducing = true
-
-	// after receiving the first result, send it to the broker as a reduction vote
-	hash1 := <-c.reductionResultChan
-	c.state.Step++
-	reductionVote, _ := c.addRoundAndStep(hash1)
-	c.reductionVoteChannel <- reductionVote
-
-	// after the second result, we check the voteStore and the two hashes.
-	// if we have a good result, we send an agreement vote
-	hash2 := <-c.reductionResultChan
-	c.reducing = false
-	if c.reductionSuccessful(hash1, hash2) {
-		buf := bytes.NewBuffer(hash2)
-		c.marshalVoteSet(buf)
-		agreementVote, _ := c.addRoundAndStep(buf.Bytes())
-		c.agreementVoteChan <- agreementVote
-	}
-
-	c.state.Step++
-}
-
-func (c *collector) stopReduction() {
-	if c.reducing {
-		c.collectedVotesChannel <- nil
-		c.Clear()
-	}
-}
-
-func (c collector) reductionSuccessful(hash1, hash2 []byte) bool {
-	bothNotNil := hash1 != nil && hash2 != nil
-	identicalResults := bytes.Equal(hash1, hash2)
-	voteSetCorrectLength := len(c.voteStore) >= c.committee.Quorum()*2
-
-	return bothNotNil && identicalResults && voteSetCorrectLength
+	go c.coordinator.begin(c.timeout)
 }
 
 // NewBroker will return a reduction broker.
 func NewBroker(eventBus *wire.EventBus,
 	handler handler, committee committee.Committee, selectionTopic,
-	reductionTopic string, timeOut time.Duration) *Broker {
+	reductionTopic string, timeout time.Duration) *Broker {
 
 	state := &consensusState{}
 
-	collector := newCollector(eventBus, committee, state, handler,
-		reductionTopic, timeOut)
+	collector := newCollector(eventBus, committee, state, handler, reductionTopic, timeout)
 
 	selectionChan := make(chan *bytes.Buffer, 1)
 	selectionCollector := selectionCollector{
@@ -285,12 +236,12 @@ func (b *Broker) Listen() {
 		case round := <-b.roundUpdateChan:
 			b.collector.updateRound(round)
 		case buf := <-b.selectionChan:
+			// TODO: make sure we get only one hash instead of a full Event. Maybe consider using Marshal
 			// the first reduction step is triggered by a sigSetSelection message
 			b.unMarshaller.MarshalHeader(buf, b.collector.state)
 			b.eventBus.Publish(msg.OutgoingReductionTopic, buf)
-			go b.collector.listenReduction()
 			go b.collector.startReduction()
-		case reductionVote := <-b.collector.reductionVoteChannel:
+		case reductionVote := <-b.collector.reductionVoteChan:
 			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
 			// the second reduction step is triggered by a reductionVote result
 			go b.collector.startReduction()

@@ -89,12 +89,17 @@ func (b *blockHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
 	ev := e.(*BlockEvent)
 	h.Round = ev.Round
 	h.Step = ev.Step
-	h.PubKeyBLS = ev.PubKeyBLS
 }
 
-func (b *blockHandler) ExtractVoteHash(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*BlockEvent)
-	if err := encoding.Write256(r, ev.VotedHash); err != nil {
+func (b *blockHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
+	var votedHash []byte
+	if e == nil {
+		votedHash = make([]byte, 32)
+	} else {
+		ev := e.(*BlockEvent)
+		votedHash = ev.VotedHash
+	}
+	if err := encoding.Write256(r, votedHash); err != nil {
 		return err
 	}
 	return nil

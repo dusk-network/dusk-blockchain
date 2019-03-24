@@ -18,7 +18,7 @@ type (
 	// SigSetEvent is the event related to the completed reduction of a Signature Set for a specific round (TODO: and step?)
 	SigSetEvent struct {
 		*BlockEvent
-		blockHash []byte
+		BlockHash []byte
 	}
 
 	sigSetUnmarshaller struct {
@@ -97,12 +97,20 @@ func (b *sigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
 	ev := e.(*BlockEvent)
 	h.Round = ev.Round
 	h.Step = ev.Step
-	h.PubKeyBLS = ev.PubKeyBLS
 }
 
-func (b *sigSetHandler) ExtractVoteHash(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*BlockEvent)
-	if err := encoding.Write256(r, ev.VotedHash); err != nil {
+func (b *sigSetHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
+	var votedHash, blockHash []byte
+	if e == nil {
+		votedHash, blockHash = make([]byte, 32), make([]byte, 32)
+	} else {
+		ev := e.(*SigSetEvent)
+		votedHash, blockHash = ev.VotedHash, ev.BlockHash
+	}
+	if err := encoding.Write256(r, votedHash); err != nil {
+		return err
+	}
+	if err := encoding.Write256(r, blockHash); err != nil {
 		return err
 	}
 	return nil
