@@ -19,16 +19,15 @@ type (
 		SignedHash []byte
 	}
 
-	reductionEventUnmarshaller struct {
-		*consensus.EventHeaderUnmarshaller
-		*consensus.EventHeaderMarshaller
+	blockUnMarshaller struct {
+		*unMarshaller
 	}
 
 	// BlockHandler is responsible for performing operations that need to know
 	// about specific event fields.
 	blockHandler struct {
 		committee committee.Committee
-		*reductionEventUnmarshaller
+		*blockUnMarshaller
 	}
 )
 
@@ -39,15 +38,14 @@ func (e *BlockEvent) Equal(ev wire.Event) bool {
 		(e.Round == other.Round) && (e.Step == other.Step)
 }
 
-func newReductionEventUnmarshaller() *reductionEventUnmarshaller {
-	return &reductionEventUnmarshaller{
-		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(),
-		EventHeaderMarshaller:   &consensus.EventHeaderMarshaller{},
+func newBlockUnMarshaller() *blockUnMarshaller {
+	return &blockUnMarshaller{
+		unMarshaller: newUnMarshaller(),
 	}
 }
 
 // Unmarshal unmarshals the buffer into a CommitteeEvent
-func (a *reductionEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func (a *blockUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	bev := ev.(*BlockEvent)
 	if err := a.EventHeaderUnmarshaller.Unmarshal(r, bev.EventHeader); err != nil {
 		return err
@@ -64,12 +62,9 @@ func (a *reductionEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 	return nil
 }
 
-func (a *reductionEventUnmarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+// Marshal solely the VotedHash and SignedHash. Marshalling of the EventHeader is done separately since the round and step are managed elsewhere
+func (a *blockUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	bev := ev.(*BlockEvent)
-	if err := a.EventHeaderMarshaller.Marshal(r, bev.EventHeader); err != nil {
-		return err
-	}
-
 	if err := encoding.Write256(r, bev.VotedHash); err != nil {
 		return err
 	}
@@ -85,8 +80,8 @@ func (a *reductionEventUnmarshaller) Marshal(r *bytes.Buffer, ev wire.Event) err
 // and an unmarshaller which uses the injected validation function.
 func newBlockHandler(committee committee.Committee) *blockHandler {
 	return &blockHandler{
-		committee:                  committee,
-		reductionEventUnmarshaller: newReductionEventUnmarshaller(),
+		committee:         committee,
+		blockUnMarshaller: newBlockUnMarshaller(),
 	}
 }
 

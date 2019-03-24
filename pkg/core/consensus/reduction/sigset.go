@@ -21,15 +21,15 @@ type (
 		blockHash []byte
 	}
 
-	sigSetReductionUnmarshaller struct {
-		*reductionEventUnmarshaller
+	sigSetUnmarshaller struct {
+		*blockUnMarshaller
 	}
 
 	// sigSetHandler is responsible for performing operations that need to know
 	// about specific event fields.
 	sigSetHandler struct {
 		committee committee.Committee
-		*sigSetReductionUnmarshaller
+		*sigSetUnmarshaller
 		blockHash []byte
 	}
 )
@@ -40,15 +40,15 @@ func (sse *SigSetEvent) Equal(e wire.Event) bool {
 		bytes.Equal(sse.blockHash, e.(*SigSetEvent).blockHash)
 }
 
-func newSigSetReductionUnmarshaller() *sigSetReductionUnmarshaller {
-	return &sigSetReductionUnmarshaller{
-		reductionEventUnmarshaller: newReductionEventUnmarshaller(),
+func newSigSetUnMarshaller() *sigSetUnmarshaller {
+	return &sigSetUnmarshaller{
+		unMarshaller: newUnMarshaller(),
 	}
 }
 
-func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
+func (ssru *sigSetUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 	sigSetEvent := e.(*SigSetEvent)
-	if err := ssru.reductionEventUnmarshaller.Unmarshal(r, sigSetEvent.BlockEvent); err != nil {
+	if err := ssru.blockUnMarshaller.Unmarshal(r, sigSetEvent.BlockEvent); err != nil {
 		return err
 	}
 
@@ -59,9 +59,9 @@ func (ssru *sigSetReductionUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event
 	return nil
 }
 
-func (ssru *sigSetReductionUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
+func (ssru *sigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 	sigSetEvent := e.(*SigSetEvent)
-	if err := ssru.reductionEventUnmarshaller.Marshal(r, sigSetEvent.BlockEvent); err != nil {
+	if err := ssru.blockUnMarshaller.Marshal(r, sigSetEvent.BlockEvent); err != nil {
 		return err
 	}
 

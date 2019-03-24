@@ -6,56 +6,60 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-type stepStopWatch struct {
-	resultChan         chan []wire.Event
+type eventStopWatch struct {
 	collectedVotesChan chan []wire.Event
 	stopChan           chan interface{}
 	timer              *time.Timer
 }
 
-func newStepStopWatch(resultChan, collectedVotesChan chan []wire.Event) *stepStopWatch {
-	return &stepStopWatch{
-		resultChan:         resultChan,
+func newEventStopWatch(collectedVotesChan chan []wire.Event) *stepStopWatch {
+	return &eventStopWatch{
 		collectedVotesChan: collectedVotesChan,
 		stopChan:           make(chan interface{}, 1),
 	}
 }
 
-func (ssw *stepStopWatch) start(timeout time.Duration) {
+func (ssw *eventStopWatch) fetch(timeout time.Duration) []wire.Event {
 	ssw.timer = time.NewTimer(timeout)
 	select {
 	case <-ssw.timer.C:
-		ssw.resultChan <- nil
+		return nil
 	case collectedVotes := <-ssw.collectedVotesChan:
 		ssw.timer.Stop()
-		ssw.resultChan <- collectedVotes
+		return collectedVotes
 	case <-ssw.stopChan:
 		ssw.timer.Stop()
 		ssw.collectedVotesChan = nil
+		return nil
 	}
 }
 
-func (ssw *stepStopWatch) stop() {
+func (ssw *eventStopWatch) stop() {
 	ssw.stopChan <- true
 }
 
 type coordinator struct {
-	firstStep  *stepStopWatch
-	secondStep *stepStopWatch
+	state      *consensusState
+	firstStep  *eventStopWatch
+	secondStep *eventStopWatch
 	voteStore  []wire.Event
 }
 
-func newCoordinator(collectedVotesChan, reductionVoteChan, agreementVoteChan chan []wire.Event, timeout time.Duration) *coordinator {
+func newCoordinator(state *consensusState, collectedVotesChan, reductionVoteChan, agreementVoteChan chan []wire.Event, stepChan chan uint8, timeout time.Duration) *coordinator {
 	return &coordinator{
-		firstStep:  newStepStopWatch(reductionVoteChan, collectedVotesChan),
-		secondStep: newStepStopWatch(agreementVoteChan, collectedVotesChan),
-		voteStore:  make([]wire.Event, 0, 100),
+		firstStep:         newEventStopWatch(collectedVotesChan),
+		secondStep:        newEventStopWatch(collectedVotesChan),
+		reductionVoteChan: reductionVoteChan,
+		agreementVoteChan: agreementVoteChan,
+		voteStore:         make([]wire.Event, 0, 100),
 	}
 }
 
 func (c *coordinator) begin(timeout time.Duration) {
-	c.firstStep.start(timeout)
-	c.secondStep.start(timeout)
+	events := c.firstStep.fetch(timeout)
+	c.state.Step++
+
+	c.secondStep.fetch(timeout)
 }
 
 func (c *coordinator) end() {
