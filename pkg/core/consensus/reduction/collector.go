@@ -16,7 +16,7 @@ type (
 		consensus.StepEventCollector
 		collectedVotesChan chan []wire.Event
 		queue              *consensus.EventQueue
-		coordinator        *coordinator
+		reducer            *reducer
 		ctx                *context
 	}
 
@@ -119,14 +119,14 @@ func (c *collector) updateRound(round uint64) {
 
 	c.queue.Clear(c.ctx.state.Round)
 	c.Clear()
-	if c.coordinator != nil {
-		c.coordinator.end()
-		c.coordinator = nil
+	if c.reducer != nil {
+		c.reducer.end()
+		c.reducer = nil
 	}
 }
 
 func (c collector) isRelevant(round uint64, step uint8) bool {
-	return c.ctx.state.Round == round && c.ctx.state.Step == step && c.coordinator != nil
+	return c.ctx.state.Round == round && c.ctx.state.Step == step && c.reducer != nil
 }
 
 func (c collector) isEarly(round uint64, step uint8) bool {
@@ -134,11 +134,11 @@ func (c collector) isEarly(round uint64, step uint8) bool {
 }
 
 func (c *collector) startReduction() {
-	c.coordinator = newCoordinator(c.collectedVotesChan, c.ctx)
+	c.reducer = newCoordinator(c.collectedVotesChan, c.ctx)
 
 	go c.flushQueue()
 	// TODO: what to do with errors?
-	go c.coordinator.begin()
+	go c.reducer.begin()
 }
 
 // NewBroker will return a reduction broker.

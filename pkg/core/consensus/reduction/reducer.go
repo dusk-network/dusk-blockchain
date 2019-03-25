@@ -41,21 +41,21 @@ func (esw *eventStopWatch) stop() {
 	esw.stopChan <- true
 }
 
-type coordinator struct {
+type reducer struct {
 	firstStep  *eventStopWatch
 	secondStep *eventStopWatch
 	ctx        *context
 }
 
-func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context) *coordinator {
-	return &coordinator{
+func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context) *reducer {
+	return &reducer{
 		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
 		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
 		ctx:        ctx,
 	}
 }
 
-func (c *coordinator) begin() error {
+func (c *reducer) begin() error {
 	// this is a blocking call
 	events := c.firstStep.fetch()
 	c.ctx.state.Step++
@@ -87,7 +87,7 @@ func (c *coordinator) begin() error {
 	return nil
 }
 
-func (c *coordinator) encodeEv(events []wire.Event) (*bytes.Buffer, error) {
+func (c *reducer) encodeEv(events []wire.Event) (*bytes.Buffer, error) {
 	if events == nil {
 		// TODO: clean the stepCollector
 		events = []wire.Event{nil}
@@ -100,7 +100,7 @@ func (c *coordinator) encodeEv(events []wire.Event) (*bytes.Buffer, error) {
 	return hash, nil
 }
 
-func (c *coordinator) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wire.Event) bool {
+func (c *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wire.Event) bool {
 	bothNotNil := hash1 != nil && hash2 != nil
 	identicalResults := bytes.Equal(hash1.Bytes(), hash2.Bytes())
 	voteSetCorrectLength := len(events) >= c.ctx.committee.Quorum()*2
@@ -108,7 +108,7 @@ func (c *coordinator) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events [
 	return bothNotNil && identicalResults && voteSetCorrectLength
 }
 
-func (c *coordinator) end() {
+func (c *reducer) end() {
 	c.firstStep.stop()
 	c.secondStep.stop()
 }
