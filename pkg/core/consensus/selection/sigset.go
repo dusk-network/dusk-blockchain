@@ -31,7 +31,7 @@ func InitBestSigSetUpdate(eventBus *wire.EventBus) chan []byte {
 }
 
 type (
-	// SigSetHandler is the
+	// SigSetHandler aggregates operations specific to the SigSet Selection operations
 	SigSetHandler struct {
 		committee    committee.Committee
 		blockHash    []byte
@@ -39,7 +39,6 @@ type (
 	}
 
 	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent.
-	// TODO: SigSetEvent is different than a Committee Event although the outline is the same. In fact the SignedVoteSet is absent from the selection and in its place there should be the VoteHash
 	SigSetEvent = committee.Event
 
 	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
