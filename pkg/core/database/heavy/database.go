@@ -1,7 +1,6 @@
 package heavy
 
 import (
-	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -21,7 +20,7 @@ type DB struct {
 	// an alias to the global storage var
 	storage *leveldb.DB
 
-	// Read-only mode provided at heavy.DB level. If true, accepts read-only Tx
+	// Read-only mode provided at heavy.DB level. If true, accepts read-only Transaction
 	readOnly bool
 }
 
@@ -48,7 +47,7 @@ func openStorage(path string) (*leveldb.DB, error) {
 		}
 
 		if _, accessdenied := err.(*os.PathError); accessdenied {
-			err = errors.New("Could not open or create db")
+			err = errors.New("could not open or create db")
 		}
 
 		if s != nil && err == nil {
@@ -71,17 +70,17 @@ func NewDatabase(path string, network protocol.Magic, readonly bool) (database.D
 	return DB{storage, readonly}, nil
 }
 
-// Begin builds read-only or read-write Tx
-func (db DB) Begin(writable bool) (database.Tx, error) {
+// Begin builds read-only or read-write Transaction
+func (db DB) Begin(writable bool) (database.Transaction, error) {
 	// If the database was opened with DB.readonly flag true, we cannot create
-	// a writable tx
+	// a writable transaction
 	if db.readOnly && writable {
-		return nil, errors.New("Database is read-only")
+		return nil, errors.New("database is read-only")
 	}
 
-	// In case of writable Tx, it's now the time to obtain writer lock. This is
-	// not necessary in case of LevelDB store due its concurrency Control as
-	// describe below
+	// In case of writable transaction, it's now the time to obtain writer lock.
+	// This is not necessary in case of LevelDB store due its concurrency
+	// Control as describe below
 
 	// A database may only be opened by one process at a time. The leveldb
 	// implementation acquires a lock from the operating system to prevent
@@ -92,71 +91,66 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 
 	// Exit if the database is not open yet.
 	if !db.isOpen() {
-		return nil, errors.New("Database is not open")
+		return nil, errors.New("database is not open")
 	}
 
-	// Snapshot is a DB snapshot. It must be released on Tx.Close()
+	// Snapshot is a DB snapshot. It must be released on Transaction.Close()
 	snapshot, err := db.storage.GetSnapshot()
 
 	if err != nil {
 		return nil, err
 	}
 
-	// Batch to be used by a writable Tx.
-	var batch *leveldb.Batch = nil
+	// Batch to be used by a writable Transaction.
+	var batch *leveldb.Batch
 	if writable {
 		batch = new(leveldb.Batch)
 	}
 
-	// Create a transaction instance. Mind Tx.Close() must be called when Tx is
-	// done
-	tx := &Tx{writable: writable,
+	// Create a transaction instance. Mind Transaction.Close() must be called
+	// when Transaction is done
+	t := &transaction{writable: writable,
 		db:       &db,
 		snapshot: snapshot,
 		batch:    batch,
 		closed:   false}
 
-	return tx, nil
+	return t, nil
 }
 
-// Update provides an execution of a managed read-write Tx
-func (db DB) Update(fn func(database.Tx) error) error {
+func (db DB) Update(fn func(database.Transaction) error) error {
 
-	// Create a writable tx for atomic update
-	tx, err := db.Begin(true)
+	// Create a writable transaction for atomic update
+	t, err := db.Begin(true)
 	if err != nil {
 		return err
 	}
 
-	defer tx.Close()
+	defer t.Close()
 
 	// If an error is returned from the function then rollback and return error.
 	// rollback here simply means to skip the commit step
-	err = fn(tx)
+	err = fn(t)
 
-	// Handing a panic event to rollback tx is not needed. If we fail at that
-	// point, no commit will be applied into backend storage
+	// Handing a panic event to rollback Transaction is not needed. If we fail
+	// at that point, no commit will be applied into backend storage
 
 	if err != nil {
 		return err
 	}
 
-	return tx.Commit()
+	return t.Commit()
 }
 
-// View provides an execution of a managed read-only Tx
-func (db DB) View(fn func(database.Tx) error) error {
+func (db DB) View(fn func(database.Transaction) error) error {
 
-	tx, err := db.Begin(false)
+	t, err := db.Begin(false)
 	if err != nil {
 		return err
 	}
 
-	defer tx.Close()
-
-	// If an error is returned from the function then pass it through.
-	err = fn(tx)
-	return err
+	defer t.Close()
+	return fn(t)
 }
 
 func (db DB) isOpen() bool {
@@ -173,15 +167,8 @@ func (db DB) Close() error {
 	return nil
 }
 
-func (db DB) LogStats() {
-	var stat leveldb.DBStats
-	err := db.storage.Stats(&stat)
-	if err != nil {
-		fmt.Print(err)
-	}
-	fmt.Printf("%+v", stat)
-}
-
+// GetSnapshot returns current storage snapshot. To be used only by
+// database/testing pkg
 func (db DB) GetSnapshot() (*leveldb.Snapshot, error) {
 	return db.storage.GetSnapshot()
 }

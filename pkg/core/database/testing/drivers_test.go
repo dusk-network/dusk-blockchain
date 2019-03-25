@@ -8,10 +8,12 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"io/ioutil"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -111,20 +113,20 @@ func _TestDriver(m *testing.M, driverName string) int {
 	return m.Run()
 }
 
-func TestStoreBlock(t *testing.T) {
+func TestStoreBlock(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	// Generate additional blocks to store
 	genBlocks, err := generateBlocks(10, 10)
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 
 	done := false
-	err = db.Update(func(tx database.Tx) error {
+	err = db.Update(func(t database.Transaction) error {
 		for _, block := range genBlocks {
-			err := tx.StoreBlock(block)
+			err := t.StoreBlock(block)
 			if err != nil {
 				return err
 			}
@@ -134,42 +136,42 @@ func TestStoreBlock(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 
 	if !done {
-		t.Fatal("No work done by the transaction")
+		test.Fatal("No work done by the transaction")
 	}
 }
-func TestFetchBlockExists(t *testing.T) {
+func TestFetchBlockExists(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	// Verify all blocks can be found by Header.Hash
-	_ = db.View(func(tx database.Tx) error {
+	_ = db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
-			exists, err := tx.FetchBlockExists(block.Header.Hash)
+			exists, err := t.FetchBlockExists(block.Header.Hash)
 			if err != nil {
-				t.Fatalf(err.Error())
+				test.Fatalf(err.Error())
 				return nil
 			}
 
 			if !exists {
-				t.Fatalf("Block with Height %d was not found", block.Header.Height)
+				test.Fatalf("Block with Height %d was not found", block.Header.Height)
 				return nil
 			}
 		}
 		return nil
 	})
 }
-func TestFetchBlockHeader(t *testing.T) {
+func TestFetchBlockHeader(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	// Verify all blocks headers can be fetched by Header.Hash
-	err := db.View(func(tx database.Tx) error {
+	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
-			fheader, err := tx.FetchBlockHeader(block.Header.Hash)
+			fheader, err := t.FetchBlockHeader(block.Header.Hash)
 			if err != nil {
 				return err
 			}
@@ -191,22 +193,22 @@ func TestFetchBlockHeader(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 }
-func TestFetchTransactions(t *testing.T) {
+func TestFetchBlockTxs(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	// Verify all blocks transactions can be fetched by Header.Hash
-	err := db.View(func(tx database.Tx) error {
+	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
 
 			// Fetch all transactions that belong to this block
-			fblockTxs, err := tx.FetchBlockTransactions(block.Header.Hash)
+			fblockTxs, err := t.FetchBlockTxs(block.Header.Hash)
 
 			if err != nil {
-				t.Fatalf(err.Error())
+				test.Fatalf(err.Error())
 			}
 
 			// Ensure all retrieved transactions are equal to the original Block.Txs
@@ -222,6 +224,10 @@ func TestFetchTransactions(t *testing.T) {
 				fetchedBuf := new(bytes.Buffer)
 				_ = fblockTx.Encode(fetchedBuf)
 
+				if len(fetchedBuf.Bytes()) == 0 {
+					test.Fatal("Empty tx fetched")
+				}
+
 				// Get bytes of the origin transactions.Stealth to compare with
 				oBlockTx := v.(*transactions.Stealth)
 				originBuf := new(bytes.Buffer)
@@ -236,24 +242,24 @@ func TestFetchTransactions(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 }
-func TestFetchBlockHashByHeight(t *testing.T) {
+func TestFetchBlockHashByHeight(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	// Blocks lookup by Height
-	_ = db.View(func(tx database.Tx) error {
+	_ = db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
-			headerHash, err := tx.FetchBlockHashByHeight(block.Header.Height)
+			headerHash, err := t.FetchBlockHashByHeight(block.Header.Height)
 			if err != nil {
-				t.Fatalf(err.Error())
+				test.Fatalf(err.Error())
 				return nil
 			}
 
 			if !bytes.Equal(block.Header.Hash, headerHash) {
-				t.Fatalf("FetchBlockHeaderByHeight failed on height %d", block.Header.Height)
+				test.Fatalf("FetchBlockHeaderByHeight failed on height %d", block.Header.Height)
 				return nil
 			}
 		}
@@ -263,14 +269,14 @@ func TestFetchBlockHashByHeight(t *testing.T) {
 
 // TestAtomicUpdates ensures no change is applied into storage state when DB
 // writable tx does fail
-func TestAtomicUpdates(t *testing.T) {
+func TestAtomicUpdates(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	genBlocks, err := generateBlocks(10, 2)
 
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 
 	// Save current storage state to compare later
@@ -284,10 +290,10 @@ func TestAtomicUpdates(t *testing.T) {
 	// Try to store all genBlocks and make it fail at last iteration of
 	// read-write Tx
 	forcedError := errors.New("force majeure situation")
-	err = db.Update(func(tx database.Tx) error {
+	err = db.Update(func(t database.Transaction) error {
 
 		for height, block := range genBlocks {
-			err := tx.StoreBlock(block)
+			err := t.StoreBlock(block)
 			if err != nil {
 				return err
 			}
@@ -302,7 +308,7 @@ func TestAtomicUpdates(t *testing.T) {
 	})
 
 	if err != forcedError {
-		t.Fatalf("ForcedError must be returned from previous statement. Failure is not always a bad thing")
+		test.Fatalf("ForcedError must be returned from previous statement. Failure is not always a bad thing")
 	}
 
 	// Check there are no changes applied into storage state by simply comparing
@@ -314,15 +320,15 @@ func TestAtomicUpdates(t *testing.T) {
 		defer snapshotAfter.Release()
 
 		if snapshotAfter.String() != snapshotBefore.(*leveldb.Snapshot).String() {
-			t.Fatalf("Backend storage state has changed.")
+			test.Fatalf("Backend storage state has changed.")
 		}
 	}
 }
 
 // TestReadOnlyTx ensures that a read-only DB tx cannot touch the storage state
-func TestReadOnlyTx(t *testing.T) {
+func TestReadOnlyTx(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	// Save current storage state to compare later
 	// Supported only in heavy.DB for now
@@ -333,9 +339,9 @@ func TestReadOnlyTx(t *testing.T) {
 	}
 
 	// Try to call StoreBlock on a read-only DB Tx
-	err := db.View(func(tx database.Tx) error {
+	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
-			err := tx.StoreBlock(block)
+			err := t.StoreBlock(block)
 			if err != nil {
 				return err
 			}
@@ -344,7 +350,7 @@ func TestReadOnlyTx(t *testing.T) {
 	})
 
 	if err == nil {
-		t.Fatal("Any writable Tx must not be allowed on read-only DB Tx")
+		test.Fatal("Any writable Tx must not be allowed on read-only DB Tx")
 	}
 
 	// Check there are no changes applied into storage state by simply comparing
@@ -356,25 +362,25 @@ func TestReadOnlyTx(t *testing.T) {
 		defer snapshotAfter.Release()
 
 		if snapshotAfter.String() != snapshotBefore.(*leveldb.Snapshot).String() {
-			t.Fatalf("Backend storage state has changed.")
+			test.Fatalf("Backend storage state has changed.")
 		}
 	}
 }
 
 // TestReadOnlyDB_Mode ensures a DB in read-only mode can only run read-only Tx
-func TestReadOnlyDB_Mode(t *testing.T) {
+func TestReadOnlyDB_Mode(test *testing.T) {
 
-	t.Parallel()
+	test.Parallel()
 
 	// Create database in read-write mode
 	readonly := false
 	dbReadWrite, err := drvr.Open(storeDir, protocol.DevNet, readonly)
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 
 	if dbReadWrite == nil {
-		t.Fatalf("Cannot create read-write database ")
+		test.Fatalf("Cannot create read-write database ")
 	}
 
 	defer dbReadWrite.Close()
@@ -383,11 +389,11 @@ func TestReadOnlyDB_Mode(t *testing.T) {
 	readonly = true
 	dbReadOnly, err := drvr.Open(storeDir, protocol.DevNet, readonly)
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 
 	if dbReadOnly == nil {
-		t.Fatalf("Cannot open database in read-only mode")
+		test.Fatalf("Cannot open database in read-only mode")
 	}
 
 	defer dbReadOnly.Close()
@@ -395,13 +401,13 @@ func TestReadOnlyDB_Mode(t *testing.T) {
 	// Initialize db and a slice of 100 blocks with 2 transactions.Stealth each
 	genBlocks, err := generateBlocks(100, 2)
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 
 	// Store all blocks with read-write DB
-	err = dbReadWrite.Update(func(tx database.Tx) error {
+	err = dbReadWrite.Update(func(t database.Transaction) error {
 		for _, block := range genBlocks {
-			err := tx.StoreBlock(block)
+			err := t.StoreBlock(block)
 			if err != nil {
 				return err
 			}
@@ -410,20 +416,20 @@ func TestReadOnlyDB_Mode(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatal(err.Error())
+		test.Fatal(err.Error())
 	}
 
 	// Storage Lookup by Height to ensure read-only DB can read
-	_ = dbReadOnly.View(func(tx database.Tx) error {
+	_ = dbReadOnly.View(func(t database.Transaction) error {
 		for _, block := range genBlocks {
-			headerHash, err := tx.FetchBlockHashByHeight(uint64(block.Header.Height))
+			headerHash, err := t.FetchBlockHashByHeight(uint64(block.Header.Height))
 			if err != nil {
-				t.Fatalf(err.Error())
+				test.Fatalf(err.Error())
 				return nil
 			}
 
 			if !bytes.Equal(block.Header.Hash, headerHash) {
-				t.Fatalf("FetchBlockHeaderByHeight failed on height %d", block.Header.Height)
+				test.Fatalf("FetchBlockHeaderByHeight failed on height %d", block.Header.Height)
 				return nil
 			}
 		}
@@ -431,9 +437,9 @@ func TestReadOnlyDB_Mode(t *testing.T) {
 	})
 
 	// Ensure read-only DB cannot write
-	err = dbReadOnly.Update(func(tx database.Tx) error {
+	err = dbReadOnly.Update(func(t database.Transaction) error {
 		for _, block := range blocks {
-			err := tx.StoreBlock(block)
+			err := t.StoreBlock(block)
 			if err != nil {
 				return err
 			}
@@ -442,6 +448,85 @@ func TestReadOnlyDB_Mode(t *testing.T) {
 	})
 
 	if err == nil {
-		t.Fatal("A read-only DB is not permitted to make storage changes")
+		test.Fatal("A read-only DB is not permitted to make storage changes")
 	}
+}
+func TestFetchBlockTxByHash(test *testing.T) {
+
+	test.Parallel()
+
+	done := false
+	// Ensure we can fetch one by one each transaction by its TxID without
+	// providing block.header.hash
+	err := db.View(func(t database.Transaction) error {
+		for _, block := range blocks {
+			for index, v := range block.Txs {
+				originTx := v.(*transactions.Stealth)
+
+				// FetchBlockTxByHash
+				tx, fetchedIndex, fetchedBlockHash, err := t.FetchBlockTxByHash(originTx.R)
+
+				if err != nil {
+					test.Fatal(err.Error())
+				}
+
+				fetchedTx := tx.(*transactions.Stealth)
+
+				if fetchedIndex != uint32(index) {
+					test.Fatal("Invalid index fetched")
+				}
+
+				if !bytes.Equal(fetchedBlockHash, block.Header.Hash) {
+					test.Fatal("This tx does not belong to the right block")
+				}
+
+				fetchedBuf := new(bytes.Buffer)
+				_ = fetchedTx.Encode(fetchedBuf)
+
+				if len(fetchedBuf.Bytes()) == 0 {
+					test.Fatal("Empty tx fetched")
+				}
+
+				originBuf := new(bytes.Buffer)
+				_ = originTx.Encode(originBuf)
+
+				if !bytes.Equal(fetchedBuf.Bytes(), originBuf.Bytes()) {
+					test.Fatal("Invalid tx fetched")
+				}
+
+				done = true
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	if !done {
+		test.Fatal("Incomplete test")
+	}
+
+	// Ensure it fails properly when txID is non-existing tx
+	// FetchBlockTxByHash
+	_ = db.View(func(t database.Transaction) error {
+		invalidTxID, _ := crypto.RandEntropy(32)
+
+		// FetchBlockTxByHash
+		tx, fetchedIndex, fetchedBlockHash, err := t.FetchBlockTxByHash(invalidTxID)
+
+		if err == nil {
+			test.Fatal("Error is expected when non-existing Tx is looked up")
+		}
+
+		if fetchedIndex != math.MaxUint32 {
+			test.Fatal("Invalid index fetched")
+		}
+
+		if tx != nil || fetchedBlockHash != nil {
+			test.Fatal("Found non-existing tx?")
+		}
+		return nil
+	})
 }

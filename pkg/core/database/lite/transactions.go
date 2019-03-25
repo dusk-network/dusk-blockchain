@@ -8,8 +8,7 @@ import (
 
 // Tx Transaction layer
 type Tx struct {
-	writable bool
-	db       *DB
+	db *DB
 }
 
 // GetBlockHeaderByHash gives the block header from the hash

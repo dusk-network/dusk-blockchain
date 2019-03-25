@@ -36,40 +36,47 @@ var (
 	// ByteOrder to be used on any internal en/decoding
 	byteOrder = binary.LittleEndian
 
-	// Key values prefixes. Optional here would be to define different tuples of
-	// prefixes per each network type so that we can recognize DB network in
-	// runtime.
-	HEADER_PREFIX = []byte{0x01}
-	TX_PREFIX     = []byte{0x02}
-	HEIGHT_PREFIX = []byte{0x03}
+	// Key values prefixes to provide prefix-based sorting mechanism
+	HeaderPrefix = []byte{0x01}
+	TxPrefix     = []byte{0x02}
+	HeightPrefix = []byte{0x03}
+	TxIdPrefix   = []byte{0x04}
 )
 
-type Tx struct {
+type transaction struct {
 	writable bool
 	db       *DB
 
 	// Get/Has/Iterate calls must be applied into the snapshot only
 	snapshot *leveldb.Snapshot
 
-	// Put/Delete calls must be applied into a batch only. Tx does implement
-	// atomicity by a levelDB.Batch constructed during the Tx.
+	// Put/Delete calls must be applied into a batch only. Transaction does
+	// implement atomicity by a levelDB.Batch constructed during the
+	// Transaction.
 	batch  *leveldb.Batch
 	closed bool
 }
 
-// Store the entire block data into storage. No validations are applied. Method
-// simply stores the block data into a LevelDB batch. Storage state changes only
-// when Commit() is called on Tx completion See also the method body to get an
-// idea of Key-Value data schemas
-func (t Tx) StoreBlock(block *block.Block) error {
+// StoreBlock stores the entire block data into storage. No validations are
+// applied. Method simply stores the block data into LevelDB storage in an
+// atomic way. That said, storage state changes only when Commit() is called on
+// Transaction completion.
+//
+// See also the method body to get an idea of Key-Value data schemas.
+//
+// It is assumed that StoreBlock would be called much less times than Fetch*
+// APIs. Based on that, extra indexing data is put to provide fast-read lookups
+func (t transaction) StoreBlock(block *block.Block) error {
 
 	if atomicUpdateEnabled {
 		if t.batch == nil {
-			return errors.New("StoreBlock on read-only tx")
+			// t.batch is initialized only on a open, read-write transaction
+			// (built with transaction.Update())
+			return errors.New("StoreBlock cannot be called on read-only transaction")
 		}
 	}
 
-	// Schema Key = header_prefix + block.header.hash Value =
+	// Schema Key = HeaderPrefix + block.header.hash Value =
 	// encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
@@ -77,12 +84,12 @@ func (t Tx) StoreBlock(block *block.Block) error {
 		return err
 	}
 
-	key := append(HEADER_PREFIX, block.Header.Hash...)
+	key := append(HeaderPrefix, block.Header.Hash...)
 	value := blockHeaderFields.Bytes()
-	t.Put(key, value)
+	t.put(key, value)
 
 	if len(block.Txs) > math.MaxUint32 {
-		return errors.New("too many transactions.")
+		return errors.New("too many transactions")
 	}
 
 	// Put block transaction data. A KV pair per a single transaction is added
@@ -93,12 +100,12 @@ func (t Tx) StoreBlock(block *block.Block) error {
 
 		// Schema
 		//
-		// Key = tx_prefix + block.header.hash + Tx.R
+		// Key = TxPrefix + block.header.hash + Tx.R
 		// Value = index + block.transaction[index]
 		//
 		// For the retrival of transactions data by block.header.hash
 
-		key := append(TX_PREFIX, block.Header.Hash...)
+		key := append(TxPrefix, block.Header.Hash...)
 		key = append(key, tx.R...)
 		value, err := t.encodeBlockTx(tx, uint32(index))
 
@@ -106,10 +113,18 @@ func (t Tx) StoreBlock(block *block.Block) error {
 			return err
 		}
 
-		t.Put(key, value)
+		t.put(key, value)
+
+		// Schema
+		//
+		// Key = TxPrefix + Tx.R
+		// Value = block.header.hash
+		//
+		// For the retrival of a single transaction by TxId
+		t.put(append(TxIdPrefix, tx.R...), block.Header.Hash)
 	}
 
-	// Key = height_prefix + block.header.height
+	// Key = HeightPrefix + block.header.height
 	// Value = block.header.hash
 	//
 	// To support fast header lookup by height
@@ -121,15 +136,15 @@ func (t Tx) StoreBlock(block *block.Block) error {
 		return err
 	}
 
-	key = append(HEIGHT_PREFIX, heightBuf.Bytes()...)
+	key = append(HeightPrefix, heightBuf.Bytes()...)
 	value = block.Header.Hash
-	t.Put(key, value)
+	t.put(key, value)
 
 	return nil
 }
 
 // encodeBlockTx tries to serialize index and bytes of *transactions.Stealth
-func (t Tx) encodeBlockTx(tx *transactions.Stealth, index uint32) ([]byte, error) {
+func (t transaction) encodeBlockTx(tx *transactions.Stealth, index uint32) ([]byte, error) {
 
 	buf := new(bytes.Buffer)
 
@@ -148,7 +163,7 @@ func (t Tx) encodeBlockTx(tx *transactions.Stealth, index uint32) ([]byte, error
 }
 
 // decodeBlockTx tries to deserialize index and bytes of a transaction.Stealth
-func (t Tx) decodeBlockTx(data []byte) (*transactions.Stealth, uint32, error) {
+func (t transaction) decodeBlockTx(data []byte) (*transactions.Stealth, uint32, error) {
 
 	buf := bytes.NewReader(data)
 
@@ -168,7 +183,7 @@ func (t Tx) decodeBlockTx(data []byte) (*transactions.Stealth, uint32, error) {
 }
 
 // writeUint32 Tx utility to use a Tx byteOrder on internal encoding
-func (t Tx) writeUint32(w io.Writer, value uint32) error {
+func (t transaction) writeUint32(w io.Writer, value uint32) error {
 	var b [4]byte
 	byteOrder.PutUint32(b[:], value)
 	_, err := w.Write(b[:])
@@ -177,7 +192,7 @@ func (t Tx) writeUint32(w io.Writer, value uint32) error {
 
 // ReadUint32 will read four bytes and convert them to a uint32 from the Tx
 // byteOrder. The result is put into v.
-func (t Tx) readUint32(r io.Reader, v *uint32) error {
+func (t transaction) readUint32(r io.Reader, v *uint32) error {
 	var b [4]byte
 	n, err := r.Read(b[:])
 	if err != nil || n != len(b) {
@@ -188,7 +203,7 @@ func (t Tx) readUint32(r io.Reader, v *uint32) error {
 }
 
 // writeUint32 Tx utility to use a common byteOrder on internal encoding
-func (t Tx) writeUint64(w io.Writer, value uint64) error {
+func (t transaction) writeUint64(w io.Writer, value uint64) error {
 	var b [8]byte
 	byteOrder.PutUint64(b[:], value)
 	_, err := w.Write(b[:])
@@ -196,7 +211,7 @@ func (t Tx) writeUint64(w io.Writer, value uint64) error {
 }
 
 // Commit writes a batch to LevelDB storage. See also fsyncEnabled variable
-func (t *Tx) Commit() error {
+func (t *transaction) Commit() error {
 	if !t.writable {
 		return errors.New("read-only transaction cannot commit changes")
 	}
@@ -209,27 +224,30 @@ func (t *Tx) Commit() error {
 }
 
 // Rollback is not used by database layer
-func (t Tx) Rollback() error {
+func (t transaction) Rollback() error {
 	t.batch.Reset()
 	return nil
 }
 
-// Close releases the retrieved snapshot. It must be called when unmanaged Tx is
-// used
-func (t *Tx) Close() {
+// Close releases the retrieved snapshot and resets any open batch(s). It must
+// be called explicitly when a transaction is run in a unmanaged way
+func (t *transaction) Close() {
 	t.snapshot.Release()
+	if t.batch != nil {
+		t.batch.Reset()
+	}
 	t.closed = true
 }
 
-func (t Tx) FetchBlockExists(hash []byte) (bool, error) {
-	key := append(HEADER_PREFIX, hash...)
+func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
+	key := append(HeaderPrefix, hash...)
 	result, err := t.snapshot.Has(key, nil)
 	return result, err
 }
 
-func (t Tx) FetchBlockHeader(hash []byte) (*block.Header, error) {
+func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 
-	key := append(HEADER_PREFIX, hash...)
+	key := append(HeaderPrefix, hash...)
 	value, err := t.snapshot.Get(key, nil)
 
 	if err != nil {
@@ -246,9 +264,9 @@ func (t Tx) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	return header, nil
 }
 
-func (t Tx) FetchBlockTransactions(hashHeader []byte) ([]merkletree.Payload, error) {
+func (t transaction) FetchBlockTxs(hashHeader []byte) ([]merkletree.Payload, error) {
 
-	scanFilter := append(TX_PREFIX, hashHeader...)
+	scanFilter := append(TxPrefix, hashHeader...)
 	tempTxs := make(map[uint32]merkletree.Payload)
 
 	// Read all the transactions that belong to a single block
@@ -276,7 +294,7 @@ func (t Tx) FetchBlockTransactions(hashHeader []byte) ([]merkletree.Payload, err
 	return resultTxs, nil
 }
 
-func (t Tx) FetchBlockHashByHeight(height uint64) ([]byte, error) {
+func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 
 	// Get height bytes
 	heightBuf := new(bytes.Buffer)
@@ -284,7 +302,7 @@ func (t Tx) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	key := append(HEIGHT_PREFIX, heightBuf.Bytes()...)
+	key := append(HeightPrefix, heightBuf.Bytes()...)
 	value, err := t.snapshot.Get(key, nil)
 
 	if err != nil {
@@ -294,13 +312,52 @@ func (t Tx) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	return value, nil
 }
 
-func (t Tx) Put(key []byte, value []byte) {
+func (t transaction) put(key []byte, value []byte) {
 
-	if atomicUpdateEnabled {
-		if t.batch != nil {
-			t.batch.Put(key, value)
-		}
-	} else {
-		_ = t.db.storage.Put(key, value, writeOptions)
+	if !t.writable {
+		return
 	}
+
+	if t.batch != nil {
+		t.batch.Put(key, value)
+	} else {
+		// fail-fast when a writable tx is not capable of storing data
+		panic("leveldb batch is unreachable")
+	}
+}
+
+func (t transaction) FetchBlockTxByHash(txID []byte) (merkletree.Payload, uint32, []byte, error) {
+
+	var txIndex uint32 = math.MaxUint32
+
+	// Fetch the block header hash that this Tx belongs to
+	key := append(TxIdPrefix, txID...)
+	hashHeader, err := t.snapshot.Get(key, nil)
+
+	if err != nil {
+		return nil, txIndex, nil, errors.New("block transaction not found: " + err.Error())
+	}
+
+	// Fetch all the transactions that belong to a single block
+	// Return only the transaction that is associated to txID
+	scanFilter := append(TxPrefix, hashHeader...)
+
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
+	defer iterator.Release()
+
+	for iterator.Next() {
+		value := iterator.Value()
+		tx, index, err := t.decodeBlockTx(value)
+
+		if err == nil {
+			if bytes.Equal(tx.R, txID) {
+				return tx, index, hashHeader, nil
+			}
+		}
+	}
+
+	// If we get here, the transaction is available but something went wrong
+	// with decoding the transaction
+
+	return nil, txIndex, nil, errors.New("block tx is available but fetching it fails")
 }

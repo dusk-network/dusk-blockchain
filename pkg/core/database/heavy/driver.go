@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	// DriverName Unique name of Heavy driver
+	// DriverName is the unique identifier for the heavy driver
 	DriverName = "heavy_v0.1.0"
 )
 

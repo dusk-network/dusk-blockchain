@@ -54,8 +54,8 @@ func (db DB) isOpen() bool {
 	return db.opened
 }
 
-// Begin builds (read-only or read-write) Tx, do initial validations
-func (db DB) Begin(writable bool) (database.Tx, error) {
+// Begin builds (read-only or read-write) Transaction, do initial validations
+func (db DB) Begin(writable bool) (database.Transaction, error) {
 	// If the database was opened with Options.ReadOnly, return an error.
 	if db.readOnly && writable {
 		return nil, errors.New("database is read-only")
@@ -71,8 +71,8 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 	return nil, nil
 }
 
-// Update provides an execution of managed, read-write Tx
-func (db DB) Update(fn func(database.Tx) error) error {
+// Update provides an execution of managed, read-write Transaction
+func (db DB) Update(fn func(database.Transaction) error) error {
 	start := time.Now()
 	t, err := db.Begin(true)
 	if err != nil {
@@ -87,7 +87,7 @@ func (db DB) Update(fn func(database.Tx) error) error {
 }
 
 // View provides an execution of managed, read-only Tx
-func (db DB) View(fn func(database.Tx) error) error {
+func (db DB) View(fn func(database.Transaction) error) error {
 	start := time.Now()
 	t, err := db.Begin(false)
 	if err != nil {

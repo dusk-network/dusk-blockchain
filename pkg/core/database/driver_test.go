@@ -45,13 +45,26 @@ func TestDuplicatedDriver(t *testing.T) {
 	if err == nil {
 		t.Fatal("Error for duplicated driver not returned")
 	}
+
+	if len(Drivers()) != 1 {
+		t.Fatal("The second registering should fail")
+	}
 }
 
 func TestListDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	Register(&driverB{})
-	Register(&driverA{})
+	err := Register(&driverB{})
+
+	if err != nil {
+		t.Fatal("Registering DB driverB failed")
+	}
+
+	err = Register(&driverA{})
+
+	if err != nil {
+		t.Fatal("Registering DB driverA failed")
+	}
 
 	allDrivers := Drivers()
 
@@ -67,8 +80,17 @@ func TestListDriver(t *testing.T) {
 func TestRetrieveDriver(t *testing.T) {
 
 	unregisterAllDrivers()
-	Register(&driverB{})
-	Register(&driverA{})
+	err := Register(&driverB{})
+
+	if err != nil {
+		t.Fatal("Registering DB driverB failed")
+	}
+
+	err = Register(&driverA{})
+
+	if err != nil {
+		t.Fatal("Registering DB driverA failed")
+	}
 
 	driver, err := From("driver_a")
 	if driver == nil || err != nil {

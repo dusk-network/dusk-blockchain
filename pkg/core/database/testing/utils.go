@@ -15,7 +15,7 @@ import (
 
 // storeBlocksAsync is a helper function to store a slice of blocks in a
 // concurrent manner.
-func storeBlocksAsync(t *testing.T, db database.DB, blocks []*block.Block, timeoutDuration time.Duration) error {
+func storeBlocksAsync(test *testing.T, db database.DB, blocks []*block.Block, timeoutDuration time.Duration) error {
 
 	routinesCount := runtime.NumCPU()
 	blocksCount := len(blocks)
@@ -38,10 +38,10 @@ func storeBlocksAsync(t *testing.T, db database.DB, blocks []*block.Block, timeo
 		go func(blocks []*block.Block, wg *sync.WaitGroup) {
 
 			defer wg.Done()
-			_ = db.Update(func(tx database.Tx) error {
+			_ = db.Update(func(t database.Transaction) error {
 
 				for _, block := range blocks {
-					err := tx.StoreBlock(block)
+					err := t.StoreBlock(block)
 					if err != nil {
 						return err
 					}
