@@ -21,7 +21,7 @@ type (
 	}
 
 	// Broker is the message broker for the reduction process.
-	Broker struct {
+	broker struct {
 		eventBus  *wire.EventBus
 		collector *collector
 		// utility context to group interfaces and channels to be passed around
@@ -141,10 +141,10 @@ func (c *collector) startReduction() {
 	go c.reducer.begin()
 }
 
-// NewBroker will return a reduction broker.
-func NewBroker(eventBus *wire.EventBus,
+// newBroker will return a reduction broker.
+func newBroker(eventBus *wire.EventBus,
 	handler handler, committee committee.Committee, selectionTopic,
-	reductionTopic string, timeout time.Duration) *Broker {
+	reductionTopic string, timeout time.Duration) *broker {
 
 	ctx := newCtx(handler, committee, timeout)
 	collector := newCollector(eventBus, reductionTopic, ctx)
@@ -158,7 +158,7 @@ func NewBroker(eventBus *wire.EventBus,
 
 	roundChannel := consensus.InitRoundUpdate(eventBus)
 
-	return &Broker{
+	return &broker{
 		eventBus:        eventBus,
 		selectionChan:   selectionChan,
 		roundUpdateChan: roundChannel,
@@ -169,7 +169,7 @@ func NewBroker(eventBus *wire.EventBus,
 }
 
 // Listen for incoming messages.
-func (b *Broker) Listen() {
+func (b *broker) Listen() {
 	for {
 		select {
 		case round := <-b.roundUpdateChan:

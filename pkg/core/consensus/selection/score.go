@@ -14,8 +14,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-// LaunchScoreComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-func LaunchScoreComponent(eventBus *wire.EventBus, timeout time.Duration) *broker {
+// LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
+func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration) *broker {
 	handler := newScoreHandler(eventBus)
 	broker := newBroker(eventBus, handler, timeout, string(msg.BestScoreTopic))
 	go broker.Listen()

@@ -3,13 +3,22 @@ package reduction
 import (
 	"bytes"
 	"errors"
+	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
+
+func LaunchSigSetReducer(eventBus *wire.EventBus, committee committee.Committee, timeout time.Duration) *broker {
+	handler := newSigSetHandler(eventBus, committee)
+	broker := newBroker(eventBus, handler, committee, string(msg.SigSetSelectionTopic), string(topics.SigSetReduction), timeout)
+	go broker.Listen()
+	return broker
+}
 
 type (
 	// SigSetCollector is the public collector used outside of the Broker (which use the unexported one)
@@ -88,18 +97,23 @@ func newSigSetHandler(eventBus *wire.EventBus, committee committee.Committee) *s
 	return sigSetHandler
 }
 
+// Priority is not used for this handler
+func (s *sigSetHandler) Priority(ev1, ev2 wire.Event) wire.Event {
+	return nil
+}
+
 // NewEvent returns a sigSetEvent
-func (s sigSetHandler) NewEvent() wire.Event {
+func (s *sigSetHandler) NewEvent() wire.Event {
 	return &SigSetEvent{}
 }
 
-func (b *sigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
+func (s *sigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
 	ev := e.(*BlockEvent)
 	h.Round = ev.Round
 	h.Step = ev.Step
 }
 
-func (b *sigSetHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
+func (s *sigSetHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
 	var votedHash, blockHash []byte
 	if e == nil {
 		votedHash, blockHash = make([]byte, 32), make([]byte, 32)
@@ -117,7 +131,7 @@ func (b *sigSetHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
 }
 
 // Verify the sigSetEvent
-func (s sigSetHandler) Verify(e wire.Event) error {
+func (s *sigSetHandler) Verify(e wire.Event) error {
 	ev := e.(*SigSetEvent)
 	if err := msg.VerifyBLSSignature(ev.PubKeyBLS, ev.VotedHash, ev.SignedHash); err != nil {
 		return err

@@ -3,13 +3,22 @@ package reduction
 import (
 	"bytes"
 	"errors"
+	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
+
+func LaunchBlockReducer(eventBus *wire.EventBus, committee committee.Committee, timeout time.Duration) *broker {
+	handler := newBlockHandler(committee)
+	broker := newBroker(eventBus, handler, committee, string(msg.BlockSelectionTopic), string(topics.BlockReduction), timeout)
+	go broker.Listen()
+	return broker
+}
 
 type (
 	// BlockEvent is a basic reduction event.
@@ -122,5 +131,10 @@ func (b *blockHandler) Verify(e wire.Event) error {
 		return errors.New("block handler: voter not eligible to vote")
 	}
 
+	return nil
+}
+
+// Priority is not used for this handler
+func (b *blockHandler) Priority(ev1, ev2 wire.Event) wire.Event {
 	return nil
 }
