@@ -25,7 +25,7 @@ func InitBestSigSetUpdate(eventBus *wire.EventBus) chan []byte {
 	selectionCollector := &sigSetCollector{
 		bestVotedHashChan: bestVotedHashChan,
 	}
-	wire.NewEventSubscriber(eventBus, selectionCollector,
+	go wire.NewEventSubscriber(eventBus, selectionCollector,
 		string(msg.SigSetSelectionTopic)).Accept()
 	return bestVotedHashChan
 }
