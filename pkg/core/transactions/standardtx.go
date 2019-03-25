@@ -10,6 +10,8 @@ import (
 // Standard is a generic transaction. It can also be seen as a stealth transaction.
 // It is used to make basic payments on the dusk network.
 type Standard struct {
+	// TxType represents the transaction type
+	TxType TxType
 	// Version is the transaction version. It does not use semver.
 	// A new transaction version denotes a modification of the previous structure
 	Version uint8 // 1 byte
@@ -29,6 +31,7 @@ func NewStandard(ver uint8, fee uint64) *Standard {
 	return &Standard{
 		Version: ver,
 		Fee:     fee,
+		TxType:  StandardType,
 	}
 }
 
@@ -44,6 +47,10 @@ func (s *Standard) AddOutput(output *Output) {
 
 // Encode a Standard transaction and write it to an io.Writer
 func (s *Standard) Encode(w io.Writer) error {
+	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
+		return err
+	}
+
 	if err := encoding.WriteVarInt(w, uint64(len(s.Inputs))); err != nil {
 		return err
 	}
@@ -72,6 +79,13 @@ func (s *Standard) Encode(w io.Writer) error {
 
 // Decode a reader into a standard transaction struct.
 func (s *Standard) Decode(r io.Reader) error {
+
+	var Type uint8
+	if err := encoding.ReadUint8(r, &Type); err != nil {
+		return err
+	}
+	s.TxType = TxType(Type)
+
 	lInputs, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -101,7 +115,6 @@ func (s *Standard) Decode(r io.Reader) error {
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &s.Fee); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -118,7 +131,7 @@ func (s *Standard) CalculateHash() ([]byte, error) {
 // Type returns the associated TxType for the Standard struct.
 // Implements the TypeInfo interface
 func (s *Standard) Type() TxType {
-	return StandardType
+	return s.TxType
 }
 
 // StandardTX returns the standard struct
@@ -128,7 +141,12 @@ func (s Standard) StandardTX() Standard {
 }
 
 // Equals returns true if two standard tx's are the same
-func (s *Standard) Equals(other *Standard) bool {
+func (s *Standard) Equals(t Transaction) bool {
+
+	other, ok := t.(*Standard)
+	if !ok {
+		return false
+	}
 
 	if s.Version != other.Version {
 		return false

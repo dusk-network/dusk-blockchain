@@ -15,6 +15,8 @@ import (
 // Question(TOG): Why is the Ephemeral Key included in the coinbase TX? What is it's size? (32Bytes)
 // Question(TOG): Why do we need to include the provisioner rewards for the previous block?
 type Coinbase struct {
+	// TxType represents the transaction type
+	TxType TxType
 	// TxID is the transaction identifier for the current transaction
 	TxID []byte
 	// SetInclusionProof is a proof that returns true
@@ -50,6 +52,10 @@ func (c *Coinbase) AddReward(output *Output) {
 
 // Encode implements the Encoder interface
 func (c *Coinbase) Encode(w io.Writer) error {
+	if err := encoding.WriteUint8(w, uint8(c.TxType)); err != nil {
+		return err
+	}
+
 	if err := encoding.WriteVarBytes(w, c.Proof); err != nil {
 		return err
 	}
@@ -77,6 +83,12 @@ func (c *Coinbase) Encode(w io.Writer) error {
 
 // Decode implements the Decoder interface
 func (c *Coinbase) Decode(r io.Reader) error {
+
+	var Type uint8
+	if err := encoding.ReadUint8(r, &Type); err != nil {
+		return err
+	}
+	c.TxType = TxType(Type)
 	if err := encoding.ReadVarBytes(r, &c.Proof); err != nil {
 		return err
 	}
@@ -127,7 +139,13 @@ func (c *Coinbase) StandardTX() Standard {
 }
 
 // Equals returns true, if two coinbase tx's are equal
-func (c *Coinbase) Equals(other *Coinbase) bool {
+func (c *Coinbase) Equals(t Transaction) bool {
+
+	other, ok := t.(*Coinbase)
+	if !ok {
+		return false
+	}
+
 	if !bytes.Equal(c.EphemeralKey, other.EphemeralKey) {
 		return false
 	}

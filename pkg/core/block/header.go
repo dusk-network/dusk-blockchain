@@ -132,3 +132,41 @@ func (b *Header) Bytes() ([]byte, error) {
 	err := b.Encode(buf)
 	return buf.Bytes(), err
 }
+
+//Equals returns true if headers are equal
+func (b *Header) Equals(other *Header) bool {
+
+	if other == nil {
+		return false
+	}
+
+	if b.Version != other.Version {
+		return false
+	}
+
+	if b.Timestamp != other.Timestamp {
+		return false
+	}
+
+	if !bytes.Equal(b.PrevBlock, other.PrevBlock) {
+		return false
+	}
+
+	if !bytes.Equal(b.Seed, other.Seed) {
+		return false
+	}
+
+	if !bytes.Equal(b.TxRoot, other.TxRoot) {
+		return false
+	}
+
+	if !bytes.Equal(b.CertHash, other.CertHash) {
+		return false
+	}
+
+	if !bytes.Equal(b.Hash, other.Hash) {
+		return false
+	}
+
+	return true
+}
