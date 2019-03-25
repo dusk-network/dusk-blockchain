@@ -7,6 +7,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -28,7 +29,8 @@ type (
 
 		// channels linked to subscribers
 		roundUpdateChan <-chan uint64
-		selectionChan   <-chan *bytes.Buffer
+		sigSetChan      <-chan []byte
+		scoreChan       <-chan []byte
 
 		// utility
 		unMarshaller *unMarshaller
@@ -36,18 +38,7 @@ type (
 		outgoingReductionTopic string
 		outgoingAgreementTopic string
 	}
-
-	selectionCollector struct {
-		selectionChan chan<- *bytes.Buffer
-	}
 )
-
-// Collect implements the EventCollector interface.
-// Will simply send the received buffer as a slice of bytes.
-func (s selectionCollector) Collect(buffer *bytes.Buffer) error {
-	s.selectionChan <- buffer
-	return nil
-}
 
 func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) *collector {
 
@@ -149,24 +140,21 @@ func newBroker(eventBus *wire.EventBus,
 	ctx := newCtx(handler, committee, timeout)
 	collector := newCollector(eventBus, reductionTopic, ctx)
 
-	selectionChan := make(chan *bytes.Buffer, 1)
-	selectionCollector := selectionCollector{
-		selectionChan: selectionChan,
-	}
-	go wire.NewEventSubscriber(eventBus, selectionCollector,
-		selectionTopic).Accept()
+	scoreChan := selection.InitBestScoreUpdate(eventBus)
+	sigSetChan := selection.InitBestSigSetUpdate(eventBus)
 
 	roundChannel := consensus.InitRoundUpdate(eventBus)
 
 	return &broker{
 		eventBus:               eventBus,
-		selectionChan:          selectionChan,
 		roundUpdateChan:        roundChannel,
 		unMarshaller:           newUnMarshaller(),
 		ctx:                    ctx,
 		collector:              collector,
 		outgoingReductionTopic: outgoingReductionTopic,
 		outgoingAgreementTopic: outgoingAgreementTopic,
+		scoreChan:              scoreChan,
+		sigSetChan:             sigSetChan,
 	}
 }
 
@@ -176,20 +164,24 @@ func (b *broker) Listen() {
 		select {
 		case round := <-b.roundUpdateChan:
 			b.collector.updateRound(round)
-		case buf := <-b.selectionChan:
-			// the first reduction step is triggered by a sigSetSelection message
-			if err := b.unMarshaller.MarshalHeader(buf, b.ctx.state); err != nil {
-				panic(err)
-			}
-
-			b.eventBus.Publish(b.outgoingReductionTopic, buf)
-			go b.collector.startReduction()
+		case scoreHash := <-b.scoreChan:
+			b.forwardSelection(scoreHash)
+		case sigSetHash := <-b.sigSetChan:
+			b.forwardSelection(sigSetHash)
 		case reductionVote := <-b.ctx.reductionVoteChan:
 			b.eventBus.Publish(b.outgoingReductionTopic, reductionVote)
-			// the second reduction step is triggered by a reductionVote result
 			go b.collector.startReduction()
 		case agreementVote := <-b.ctx.agreementVoteChan:
 			b.eventBus.Publish(b.outgoingAgreementTopic, agreementVote)
 		}
 	}
+}
+
+func (b *broker) forwardSelection(hash []byte) {
+	buf := bytes.NewBuffer(hash)
+	if err := b.ctx.handler.MarshalHeader(buf, b.ctx.state); err != nil {
+		panic(err)
+	}
+	b.eventBus.Publish(b.outgoingReductionTopic, buf)
+	go b.collector.startReduction()
 }

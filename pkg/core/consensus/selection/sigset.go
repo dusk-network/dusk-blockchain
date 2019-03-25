@@ -20,15 +20,14 @@ func LaunchSignatureSelector(c committee.Committee, eventBus *wire.EventBus, tim
 }
 
 //InitSigSetSelection is a utility function to create and wire up a SigSetEvent channel ready to yield the best SigSetEvent
-func InitSigSetSelection(eventBus *wire.EventBus) chan *SigSetEvent {
-	selectionChannel := make(chan *SigSetEvent, 1)
+func InitBestSigSetUpdate(eventBus *wire.EventBus) chan []byte {
+	bestVotedHashChan := make(chan []byte, 1)
 	selectionCollector := &sigSetCollector{
-		bestSigSetChan: selectionChannel,
-		unMarshaller:   committee.NewEventUnMarshaller(),
+		bestVotedHashChan: bestVotedHashChan,
 	}
 	wire.NewEventSubscriber(eventBus, selectionCollector,
 		string(msg.SigSetSelectionTopic)).Accept()
-	return selectionChannel
+	return bestVotedHashChan
 }
 
 type (
@@ -39,7 +38,8 @@ type (
 		unMarshaller *SigSetUnMarshaller
 	}
 
-	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent
+	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent.
+	// TODO: SigSetEvent is different than a Committee Event although the outline is the same. In fact the SignedVoteSet is absent from the selection and in its place there should be the VoteHash
 	SigSetEvent = committee.Event
 
 	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
@@ -47,8 +47,7 @@ type (
 
 	// sigSetCollector is the private struct helping the plumbing of the SigSet channel whereto public selected SigSetEvent get published
 	sigSetCollector struct {
-		bestSigSetChan chan *SigSetEvent
-		unMarshaller   *SigSetUnMarshaller
+		bestVotedHashChan chan []byte
 	}
 )
 
@@ -118,11 +117,14 @@ func (s *SigSetHandler) Verify(event wire.Event) error {
 	return nil
 }
 
+// Collect a message and transform it into a selection message to be consumed by the other components.
 func (ssc *sigSetCollector) Collect(r *bytes.Buffer) error {
 	ev := &SigSetEvent{}
-	if err := ssc.unMarshaller.Unmarshal(r, ev); err != nil {
+	unmarshaller := committee.NewEventUnMarshaller()
+	if err := unmarshaller.Unmarshal(r, ev); err != nil {
 		return err
 	}
-	ssc.bestSigSetChan <- ev
+	// SignedVoteSet is actually the votedHash
+	ssc.bestVotedHashChan <- ev.SignedVoteSet
 	return nil
 }

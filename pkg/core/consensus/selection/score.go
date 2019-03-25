@@ -23,14 +23,13 @@ func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duratio
 }
 
 // InitBestScoreUpdate is the utility function to create and wire a channel for notifications of the best ScoreEvent
-func InitBestScoreUpdate(eventBus *wire.EventBus) chan *ScoreEvent {
-	bestScoreChan := make(chan *ScoreEvent, 1)
+func InitBestScoreUpdate(eventBus *wire.EventBus) chan []byte {
+	bestVotedScoreHashChan := make(chan []byte, 1)
 	collector := &scoreCollector{
-		bestScoreChan: bestScoreChan,
-		unMarshaller:  newScoreUnMarshaller(),
+		bestVotedScoreHashChan: bestVotedScoreHashChan,
 	}
 	go wire.NewEventSubscriber(eventBus, collector, string(msg.BestScoreTopic)).Accept()
-	return bestScoreChan
+	return bestVotedScoreHashChan
 }
 
 // InitBidListUpdate creates and initiates a channel for the updates in the BidList
@@ -53,17 +52,17 @@ type (
 
 	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
 	scoreCollector struct {
-		bestScoreChan chan *ScoreEvent
-		unMarshaller  *scoreUnMarshaller
+		bestVotedScoreHashChan chan []byte
 	}
 )
 
 func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
 	ev := &ScoreEvent{}
-	if err := sc.unMarshaller.Unmarshal(r, ev); err != nil {
+	unmarshaller := newScoreUnMarshaller()
+	if err := unmarshaller.Unmarshal(r, ev); err != nil {
 		return err
 	}
-	sc.bestScoreChan <- ev
+	sc.bestVotedScoreHashChan <- ev.VoteHash
 	return nil
 }
 

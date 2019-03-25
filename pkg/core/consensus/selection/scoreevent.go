@@ -22,7 +22,7 @@ type (
 		Z             []byte
 		BidListSubset []byte
 		Seed          []byte
-		CandidateHash []byte
+		VoteHash      []byte
 	}
 
 	// scoreUnMarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
@@ -34,7 +34,7 @@ type (
 // Equal as specified in the Event interface
 func (e *ScoreEvent) Equal(ev wire.Event) bool {
 	other, ok := ev.(*ScoreEvent)
-	return ok && other.Round == e.Round && bytes.Equal(other.CandidateHash, e.CandidateHash)
+	return ok && other.Round == e.Round && bytes.Equal(other.VoteHash, e.VoteHash)
 }
 
 // Sender of a Score event is the anonymous Z
@@ -88,7 +88,7 @@ func (um *scoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.CandidateHash); err != nil {
+	if err := encoding.Read256(r, &sev.VoteHash); err != nil {
 		return err
 	}
 
@@ -136,7 +136,7 @@ func (um *scoreUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	// CandidateHash
-	if err := encoding.Write256(r, sev.CandidateHash); err != nil {
+	if err := encoding.Write256(r, sev.VoteHash); err != nil {
 		return err
 	}
 	return nil

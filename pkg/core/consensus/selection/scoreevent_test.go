@@ -31,9 +31,9 @@ func TestUnMarshal(t *testing.T) {
 		Z:             z,
 		Seed:          seed,
 		BidListSubset: bidListSubset,
-		CandidateHash: candidateHash,
+		VoteHash:      candidateHash,
 	}
-	unMarshaller := newScoreUnMarshaller()
+	unMarshaller := NewScoreUnMarshaller()
 	unMarshaller.validateFunc = func(r *bytes.Buffer) error {
 		return nil
 	}
