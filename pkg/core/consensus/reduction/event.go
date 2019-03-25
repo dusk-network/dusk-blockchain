@@ -30,29 +30,15 @@ func newUnMarshaller() *unMarshaller {
 	}
 }
 
-func (a *unMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
-	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
-		return err
-	}
-
-	for _, event := range evs {
-		if err := a.Marshal(r, event); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (a *unMarshaller) MarshalHeader(r *bytes.Buffer, state *consensusState) error {
 	buffer := new(bytes.Buffer)
 	// Decoding Round
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &state.Round); err != nil {
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, state.Round); err != nil {
 		return err
 	}
 
 	// Decoding Step
-	if err := encoding.ReadUint8(r, &state.Step); err != nil {
+	if err := encoding.WriteUint8(buffer, state.Step); err != nil {
 		return err
 	}
 
