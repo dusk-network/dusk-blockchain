@@ -4,93 +4,86 @@ import (
 	"bytes"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 type eventStopWatch struct {
 	collectedVotesChan chan []wire.Event
 	stopChan           chan interface{}
-	timer              *time.Timer
+	timer              *timer
 }
 
-func newEventStopWatch(collectedVotesChan chan []wire.Event) *eventStopWatch {
+func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *timer) *eventStopWatch {
 	return &eventStopWatch{
 		collectedVotesChan: collectedVotesChan,
 		stopChan:           make(chan interface{}, 1),
+		timer:              timer,
 	}
 }
 
-func (ssw *eventStopWatch) fetch(timeout time.Duration) []wire.Event {
-	ssw.timer = time.NewTimer(timeout)
+func (esw *eventStopWatch) fetch() []wire.Event {
+	timer := time.NewTimer(esw.timer.timeout)
 	select {
-	case <-ssw.timer.C:
+	case <-timer.C:
+		esw.timer.timeoutChan <- true
 		return nil
-	case collectedVotes := <-ssw.collectedVotesChan:
-		ssw.timer.Stop()
+	case collectedVotes := <-esw.collectedVotesChan:
+		timer.Stop()
 		return collectedVotes
-	case <-ssw.stopChan:
-		ssw.timer.Stop()
-		ssw.collectedVotesChan = nil
+	case <-esw.stopChan:
+		timer.Stop()
+		esw.collectedVotesChan = nil
 		return nil
 	}
 }
 
-func (ssw *eventStopWatch) stop() {
-	ssw.stopChan <- true
+func (esw *eventStopWatch) stop() {
+	esw.stopChan <- true
 }
 
 type coordinator struct {
-	state             *consensusState
-	firstStep         *eventStopWatch
-	secondStep        *eventStopWatch
-	reductionVoteChan chan *bytes.Buffer
-	agreementVoteChan chan *bytes.Buffer
-	handler           handler
-	committee         committee.Committee
+	firstStep  *eventStopWatch
+	secondStep *eventStopWatch
+	ctx        *context
 }
 
-func newCoordinator(state *consensusState, collectedVotesChan chan []wire.Event, reductionVoteChan, agreementVoteChan chan *bytes.Buffer, handler handler, committee committee.Committee) *coordinator {
+func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context) *coordinator {
 	return &coordinator{
-		state:             state,
-		firstStep:         newEventStopWatch(collectedVotesChan),
-		secondStep:        newEventStopWatch(collectedVotesChan),
-		reductionVoteChan: reductionVoteChan,
-		agreementVoteChan: agreementVoteChan,
-		handler:           handler,
-		committee:         committee,
+		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
+		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
+		ctx:        ctx,
 	}
 }
 
-func (c *coordinator) begin(timeout time.Duration) error {
+func (c *coordinator) begin() error {
 	// this is a blocking call
-	events := c.firstStep.fetch(timeout)
-	c.state.Step++
+	events := c.firstStep.fetch()
+	c.ctx.state.Step++
 	hash1, err := c.encodeEv(events)
 	if err != nil {
 		return err
 	}
-	if err := c.handler.MarshalHeader(hash1, c.state); err != nil {
+	if err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state); err != nil {
 		return err
 	}
-	c.reductionVoteChan <- hash1
+	c.ctx.reductionVoteChan <- hash1
 
-	eventsSecondStep := c.secondStep.fetch(timeout)
+	eventsSecondStep := c.secondStep.fetch()
 	hash2, err := c.encodeEv(eventsSecondStep)
 	if err != nil {
 		return err
 	}
 
 	if c.isReductionSuccessful(hash1, hash2, events) {
-		if err := c.handler.MarshalVoteSet(hash2, events); err != nil {
+		if err := c.ctx.handler.MarshalVoteSet(hash2, events); err != nil {
 			return err
 		}
-		if err := c.handler.MarshalHeader(hash2, c.state); err != nil {
+		if err := c.ctx.handler.MarshalHeader(hash2, c.ctx.state); err != nil {
 			return err
 		}
-		c.agreementVoteChan <- hash2
+		c.ctx.agreementVoteChan <- hash2
 	}
-	c.state.Step++
+	c.ctx.state.Step++
 	return nil
 }
 
@@ -100,7 +93,7 @@ func (c *coordinator) encodeEv(events []wire.Event) (*bytes.Buffer, error) {
 		events = []wire.Event{nil}
 	}
 	hash := bytes.NewBuffer(make([]byte, 32))
-	if err := c.handler.EmbedVoteHash(events[0], hash); err != nil {
+	if err := c.ctx.handler.EmbedVoteHash(events[0], hash); err != nil {
 		//TODO: check the impact of the error on the overall algorithm
 		return nil, err
 	}
@@ -110,7 +103,7 @@ func (c *coordinator) encodeEv(events []wire.Event) (*bytes.Buffer, error) {
 func (c *coordinator) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wire.Event) bool {
 	bothNotNil := hash1 != nil && hash2 != nil
 	identicalResults := bytes.Equal(hash1.Bytes(), hash2.Bytes())
-	voteSetCorrectLength := len(events) >= c.committee.Quorum()*2
+	voteSetCorrectLength := len(events) >= c.ctx.committee.Quorum()*2
 
 	return bothNotNil && identicalResults && voteSetCorrectLength
 }

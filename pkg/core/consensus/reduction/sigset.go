@@ -15,7 +15,7 @@ type (
 	// SigSetCollector is the public collector used outside of the Broker (which use the unexported one)
 	SigSetCollector struct{}
 
-	// SigSetEvent is the event related to the completed reduction of a Signature Set for a specific round (TODO: and step?)
+	// SigSetEvent is the event related to the completed reduction of a Signature Set for a specific round
 	SigSetEvent struct {
 		*BlockEvent
 		BlockHash []byte

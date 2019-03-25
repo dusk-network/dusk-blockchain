@@ -9,6 +9,12 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+type selectionChan chan *bytes.Buffer
+
+func InitSelection() *selectionChan {
+	return nil
+}
+
 type (
 	// collector is the collector of SigSetEvents. It manages the EventQueue and the Selector to pick the best signature for a given step
 	collector struct {
@@ -17,10 +23,9 @@ type (
 		CurrentBlockHash []byte
 		BestEventChan    chan *bytes.Buffer
 		// this is the dump of future messages, categorized by different steps and different rounds
-		queue       *consensus.EventQueue
-		selector    *wire.EventSelector
-		handler     consensus.EventHandler
-		timerLength time.Duration
+		queue    *consensus.EventQueue
+		selector *wire.EventSelector
+		handler  consensus.EventHandler
 	}
 
 	// broker is the component that supervises a collection of events
@@ -128,8 +133,11 @@ func (s *collector) listenSelection() {
 	s.CurrentStep++
 	b := make([]byte, 32)
 	buf := bytes.NewBuffer(b)
-	s.handler.Marshal(buf, ev)
-	s.BestEventChan <- buf
+	if err := s.handler.Marshal(buf, ev); err == nil {
+		s.BestEventChan <- buf
+		return
+	}
+	// TODO: what should we do if we have an error in the marshalling?
 }
 
 // stopSelection notifies the Selector to stop selecting
@@ -169,5 +177,3 @@ func (f *broker) Listen() {
 		}
 	}
 }
-
-// TODO export the public SelectionCollector
