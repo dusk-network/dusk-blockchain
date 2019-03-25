@@ -15,7 +15,7 @@ import (
 
 func LaunchSigSetReducer(eventBus *wire.EventBus, committee committee.Committee, timeout time.Duration) *broker {
 	handler := newSigSetHandler(eventBus, committee)
-	broker := newBroker(eventBus, handler, committee, string(msg.SigSetSelectionTopic), string(topics.SigSetReduction), timeout)
+	broker := newBroker(eventBus, handler, committee, string(msg.SigSetSelectionTopic), string(topics.SigSetReduction), string(msg.OutgoingSigSetReductionTopic), string(msg.OutgoingSigSetAgreementTopic), timeout)
 	go broker.Listen()
 	return broker
 }

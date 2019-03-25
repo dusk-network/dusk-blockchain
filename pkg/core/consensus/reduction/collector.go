@@ -7,7 +7,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -33,6 +32,9 @@ type (
 
 		// utility
 		unMarshaller *unMarshaller
+
+		outgoingReductionTopic string
+		outgoingAgreementTopic string
 	}
 
 	selectionCollector struct {
@@ -94,7 +96,6 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 
 func (c *collector) process(ev wire.Event) {
 	b := make([]byte, 0, 32)
-	// TODO: for the sigset reduction the hash is actually the blockhash and the voteHash. Check this
 	if err := c.ctx.handler.EmbedVoteHash(ev, bytes.NewBuffer(b)); err == nil {
 		hash := hex.EncodeToString(b)
 		count := c.Store(ev, hash)
@@ -137,14 +138,13 @@ func (c *collector) startReduction() {
 	c.reducer = newCoordinator(c.collectedVotesChan, c.ctx)
 
 	go c.flushQueue()
-	// TODO: what to do with errors?
 	go c.reducer.begin()
 }
 
 // newBroker will return a reduction broker.
 func newBroker(eventBus *wire.EventBus,
 	handler handler, committee committee.Committee, selectionTopic,
-	reductionTopic string, timeout time.Duration) *broker {
+	reductionTopic string, outgoingReductionTopic, outgoingAgreementTopic string, timeout time.Duration) *broker {
 
 	ctx := newCtx(handler, committee, timeout)
 	collector := newCollector(eventBus, reductionTopic, ctx)
@@ -159,12 +159,14 @@ func newBroker(eventBus *wire.EventBus,
 	roundChannel := consensus.InitRoundUpdate(eventBus)
 
 	return &broker{
-		eventBus:        eventBus,
-		selectionChan:   selectionChan,
-		roundUpdateChan: roundChannel,
-		unMarshaller:    newUnMarshaller(),
-		ctx:             ctx,
-		collector:       collector,
+		eventBus:               eventBus,
+		selectionChan:          selectionChan,
+		roundUpdateChan:        roundChannel,
+		unMarshaller:           newUnMarshaller(),
+		ctx:                    ctx,
+		collector:              collector,
+		outgoingReductionTopic: outgoingReductionTopic,
+		outgoingAgreementTopic: outgoingAgreementTopic,
 	}
 }
 
@@ -180,14 +182,14 @@ func (b *broker) Listen() {
 				panic(err)
 			}
 
-			b.eventBus.Publish(msg.OutgoingReductionTopic, buf)
+			b.eventBus.Publish(b.outgoingReductionTopic, buf)
 			go b.collector.startReduction()
 		case reductionVote := <-b.ctx.reductionVoteChan:
-			b.eventBus.Publish(msg.OutgoingReductionTopic, reductionVote)
+			b.eventBus.Publish(b.outgoingReductionTopic, reductionVote)
 			// the second reduction step is triggered by a reductionVote result
 			go b.collector.startReduction()
 		case agreementVote := <-b.ctx.agreementVoteChan:
-			b.eventBus.Publish(msg.OutgoingAgreementTopic, agreementVote)
+			b.eventBus.Publish(b.outgoingAgreementTopic, agreementVote)
 		}
 	}
 }

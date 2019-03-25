@@ -16,7 +16,7 @@ import (
 // LaunchBlockReducer creates and wires a broker, initiating the components that have to do with Block Reduction
 func LaunchBlockReducer(eventBus *wire.EventBus, committee committee.Committee, timeout time.Duration) *broker {
 	handler := newBlockHandler(committee)
-	broker := newBroker(eventBus, handler, committee, string(msg.BlockSelectionTopic), string(topics.BlockReduction), timeout)
+	broker := newBroker(eventBus, handler, committee, string(msg.BlockSelectionTopic), string(topics.BlockReduction), string(msg.OutgoingBlockReductionTopic), string(msg.OutgoingBlockAgreementTopic), timeout)
 	go broker.Listen()
 	return broker
 }
