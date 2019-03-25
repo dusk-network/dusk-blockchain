@@ -36,3 +36,14 @@ func (in Inputs) Equals(other Inputs) bool {
 	}
 	return true
 }
+
+// HasDuplicates checks whether any of the inputs contain duplciates
+// This is done by checking their keyImages
+func (in Inputs) HasDuplicates() bool {
+	for i, j := 0, len(in)-1; i < j; i, j = i+1, j-1 {
+		if bytes.Equal(in[i].KeyImage, in[j].KeyImage) {
+			return true
+		}
+	}
+	return false
+}

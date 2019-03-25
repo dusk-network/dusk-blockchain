@@ -11,30 +11,41 @@ import (
 type Outputs []*Output
 
 // Len implements the sort interface
-func (in Outputs) Len() int { return len(in) }
+func (out Outputs) Len() int { return len(out) }
 
 // Less implements the sort interface
-func (in Outputs) Less(i, j int) bool { return bytes.Compare(in[i].DestKey, in[j].DestKey) == -1 }
+func (out Outputs) Less(i, j int) bool { return bytes.Compare(out[i].DestKey, out[j].DestKey) == -1 }
 
 // Swap implements the sort interface
-func (in Outputs) Swap(i, j int) { in[i], in[j] = in[j], in[i] }
+func (out Outputs) Swap(i, j int) { out[i], out[j] = out[j], out[i] }
 
 // Equals returns true, if two slices of Outputs are the same
-func (in Outputs) Equals(other Outputs) bool {
+func (out Outputs) Equals(other Outputs) bool {
 	// Sort both sets incase they are out of order
-	sort.Sort(in)
+	sort.Sort(out)
 	sort.Sort(other)
 
-	if len(in) != len(other) {
+	if len(out) != len(other) {
 		return false
 	}
 
-	for i := range in {
-		firstInput := in[i]
+	for i := range out {
+		firstInput := out[i]
 		secondInput := other[i]
 		if !firstInput.Equals(secondInput) {
 			return false
 		}
 	}
 	return true
+}
+
+// HasDuplicates checks whether an output contains a duplicate
+// This is done by checking that there are no matching Destination keys
+func (out Outputs) HasDuplicates() bool {
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		if bytes.Equal(out[i].DestKey, out[j].DestKey) {
+			return true
+		}
+	}
+	return false
 }
