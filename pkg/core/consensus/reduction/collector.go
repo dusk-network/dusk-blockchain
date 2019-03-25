@@ -175,9 +175,11 @@ func (b *broker) Listen() {
 		case round := <-b.roundUpdateChan:
 			b.collector.updateRound(round)
 		case buf := <-b.selectionChan:
-			// TODO: make sure we get only one hash instead of a full Event. Maybe consider using Marshal
 			// the first reduction step is triggered by a sigSetSelection message
-			_ = b.unMarshaller.MarshalHeader(buf, b.ctx.state)
+			if err := b.unMarshaller.MarshalHeader(buf, b.ctx.state); err != nil {
+				panic(err)
+			}
+
 			b.eventBus.Publish(msg.OutgoingReductionTopic, buf)
 			go b.collector.startReduction()
 		case reductionVote := <-b.ctx.reductionVoteChan:

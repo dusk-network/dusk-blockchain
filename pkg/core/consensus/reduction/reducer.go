@@ -55,49 +55,40 @@ func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context) *reducer
 	}
 }
 
-func (c *reducer) begin() error {
+func (c *reducer) begin() {
 	// this is a blocking call
 	events := c.firstStep.fetch()
 	c.ctx.state.Step++
-	hash1, err := c.encodeEv(events)
-	if err != nil {
-		return err
-	}
+	hash1 := c.encodeEv(events)
 	if err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state); err != nil {
-		return err
+		panic(err)
 	}
 	c.ctx.reductionVoteChan <- hash1
 
 	eventsSecondStep := c.secondStep.fetch()
-	hash2, err := c.encodeEv(eventsSecondStep)
-	if err != nil {
-		return err
-	}
+	hash2 := c.encodeEv(eventsSecondStep)
 
 	if c.isReductionSuccessful(hash1, hash2, events) {
 		if err := c.ctx.handler.MarshalVoteSet(hash2, events); err != nil {
-			return err
+			panic(err)
 		}
 		if err := c.ctx.handler.MarshalHeader(hash2, c.ctx.state); err != nil {
-			return err
+			panic(err)
 		}
 		c.ctx.agreementVoteChan <- hash2
 	}
 	c.ctx.state.Step++
-	return nil
 }
 
-func (c *reducer) encodeEv(events []wire.Event) (*bytes.Buffer, error) {
+func (c *reducer) encodeEv(events []wire.Event) *bytes.Buffer {
 	if events == nil {
-		// TODO: clean the stepCollector
 		events = []wire.Event{nil}
 	}
 	hash := bytes.NewBuffer(make([]byte, 32))
 	if err := c.ctx.handler.EmbedVoteHash(events[0], hash); err != nil {
-		//TODO: check the impact of the error on the overall algorithm
-		return nil, err
+		panic(err)
 	}
-	return hash, nil
+	return hash
 }
 
 func (c *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wire.Event) bool {
