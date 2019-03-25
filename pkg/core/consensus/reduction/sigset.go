@@ -13,9 +13,15 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func LaunchSigSetReducer(eventBus *wire.EventBus, committee committee.Committee, timeout time.Duration) *broker {
+// LaunchSigSetReducer creates and wires a broker, initiating the components that
+// have to do with Signature Set Reduction
+func LaunchSigSetReducer(eventBus *wire.EventBus, committee committee.Committee,
+	timeout time.Duration) *broker {
+
 	handler := newSigSetHandler(eventBus, committee)
-	broker := newBroker(eventBus, handler, committee, string(msg.SigSetSelectionTopic), string(topics.SigSetReduction), string(msg.OutgoingSigSetReductionTopic), string(msg.OutgoingSigSetAgreementTopic), timeout)
+	broker := newBroker(eventBus, handler, committee, string(topics.SigSetReduction),
+		string(msg.OutgoingSigSetReductionTopic),
+		string(msg.OutgoingSigSetAgreementTopic), timeout)
 	go broker.Listen()
 	return broker
 }
@@ -81,6 +87,25 @@ func (ssru *sigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return nil
 }
 
+func (ssru *sigSetUnmarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
+	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
+		return err
+	}
+
+	for _, event := range evs {
+		ev := event.(*SigSetEvent)
+		if err := ssru.EventHeaderMarshaller.Marshal(r, ev.EventHeader); err != nil {
+			return err
+		}
+
+		if err := ssru.Marshal(r, event); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // newSigSetHandler will return a SigSetHandler, injected with the passed committee and an unmarshaller
 func newSigSetHandler(eventBus *wire.EventBus, committee committee.Committee) *sigSetHandler {
 	phaseChannel := consensus.InitPhaseUpdate(eventBus)
@@ -104,7 +129,11 @@ func (s *sigSetHandler) Priority(ev1, ev2 wire.Event) wire.Event {
 
 // NewEvent returns a sigSetEvent
 func (s *sigSetHandler) NewEvent() wire.Event {
-	return &SigSetEvent{}
+	return &SigSetEvent{
+		BlockEvent: &BlockEvent{
+			EventHeader: &consensus.EventHeader{},
+		},
+	}
 }
 
 func (s *sigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {

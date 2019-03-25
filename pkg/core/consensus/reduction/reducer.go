@@ -68,8 +68,9 @@ func (c *reducer) begin() {
 	eventsSecondStep := c.secondStep.fetch()
 	hash2 := c.encodeEv(eventsSecondStep)
 
-	if c.isReductionSuccessful(hash1, hash2, events) {
-		if err := c.ctx.handler.MarshalVoteSet(hash2, events); err != nil {
+	allEvents := append(events, eventsSecondStep...)
+	if c.isReductionSuccessful(hash1, hash2, allEvents) {
+		if err := c.ctx.handler.MarshalVoteSet(hash2, allEvents); err != nil {
 			panic(err)
 		}
 		if err := c.ctx.handler.MarshalHeader(hash2, c.ctx.state); err != nil {
@@ -84,7 +85,7 @@ func (c *reducer) encodeEv(events []wire.Event) *bytes.Buffer {
 	if events == nil {
 		events = []wire.Event{nil}
 	}
-	hash := bytes.NewBuffer(make([]byte, 32))
+	hash := new(bytes.Buffer)
 	if err := c.ctx.handler.EmbedVoteHash(events[0], hash); err != nil {
 		panic(err)
 	}

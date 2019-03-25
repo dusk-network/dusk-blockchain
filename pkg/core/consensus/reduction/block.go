@@ -13,10 +13,16 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// LaunchBlockReducer creates and wires a broker, initiating the components that have to do with Block Reduction
-func LaunchBlockReducer(eventBus *wire.EventBus, committee committee.Committee, timeout time.Duration) *broker {
+// LaunchBlockReducer creates and wires a broker, initiating the components that
+// have to do with Block Reduction
+func LaunchBlockReducer(eventBus *wire.EventBus, committee committee.Committee,
+	timeout time.Duration) *broker {
+
 	handler := newBlockHandler(committee)
-	broker := newBroker(eventBus, handler, committee, string(msg.BlockSelectionTopic), string(topics.BlockReduction), string(msg.OutgoingBlockReductionTopic), string(msg.OutgoingBlockAgreementTopic), timeout)
+	broker := newBroker(eventBus, handler, committee,
+		string(topics.BlockReduction), string(msg.OutgoingBlockReductionTopic),
+		string(msg.OutgoingBlockAgreementTopic), timeout)
+
 	go broker.Listen()
 	return broker
 }
@@ -79,8 +85,27 @@ func (a *blockUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.Write256(r, bev.SignedHash); err != nil {
+	if err := encoding.WriteBLS(r, bev.SignedHash); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (a *blockUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
+	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
+		return err
+	}
+
+	for _, event := range evs {
+		ev := event.(*BlockEvent)
+		if err := a.EventHeaderMarshaller.Marshal(r, ev.EventHeader); err != nil {
+			return err
+		}
+
+		if err := a.Marshal(r, event); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -117,7 +142,9 @@ func (b *blockHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
 
 // NewEvent returns a blockEvent
 func (b *blockHandler) NewEvent() wire.Event {
-	return &BlockEvent{}
+	return &BlockEvent{
+		EventHeader: &consensus.EventHeader{},
+	}
 }
 
 // Verify the blockEvent

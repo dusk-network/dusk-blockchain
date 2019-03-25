@@ -29,8 +29,8 @@ type (
 
 		// channels linked to subscribers
 		roundUpdateChan <-chan uint64
-		sigSetChan      <-chan []byte
-		scoreChan       <-chan []byte
+		sigSetChan      chan []byte
+		scoreChan       chan []byte
 
 		// utility
 		unMarshaller *unMarshaller
@@ -44,12 +44,13 @@ func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) 
 
 	queue := consensus.NewEventQueue()
 	collector := &collector{
+		StepEventCollector: consensus.StepEventCollector{},
 		queue:              &queue,
 		collectedVotesChan: make(chan []wire.Event, 1),
 		ctx:                ctx,
 	}
 
-	wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
+	go wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
 	go collector.onTimeout()
 	return collector
 }
@@ -86,9 +87,9 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 }
 
 func (c *collector) process(ev wire.Event) {
-	b := make([]byte, 0, 32)
-	if err := c.ctx.handler.EmbedVoteHash(ev, bytes.NewBuffer(b)); err == nil {
-		hash := hex.EncodeToString(b)
+	b := new(bytes.Buffer)
+	if err := c.ctx.handler.EmbedVoteHash(ev, b); err == nil {
+		hash := hex.EncodeToString(b.Bytes())
 		count := c.Store(ev, hash)
 		if count > c.ctx.committee.Quorum() {
 			votes := c.StepEventCollector[hash]
@@ -133,9 +134,9 @@ func (c *collector) startReduction() {
 }
 
 // newBroker will return a reduction broker.
-func newBroker(eventBus *wire.EventBus,
-	handler handler, committee committee.Committee, selectionTopic,
-	reductionTopic string, outgoingReductionTopic, outgoingAgreementTopic string, timeout time.Duration) *broker {
+func newBroker(eventBus *wire.EventBus, handler handler,
+	committee committee.Committee, reductionTopic, outgoingReductionTopic,
+	outgoingAgreementTopic string, timeout time.Duration) *broker {
 
 	ctx := newCtx(handler, committee, timeout)
 	collector := newCollector(eventBus, reductionTopic, ctx)
@@ -170,7 +171,6 @@ func (b *broker) Listen() {
 			b.forwardSelection(sigSetHash)
 		case reductionVote := <-b.ctx.reductionVoteChan:
 			b.eventBus.Publish(b.outgoingReductionTopic, reductionVote)
-			go b.collector.startReduction()
 		case agreementVote := <-b.ctx.agreementVoteChan:
 			b.eventBus.Publish(b.outgoingAgreementTopic, agreementVote)
 		}
