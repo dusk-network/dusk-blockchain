@@ -2,15 +2,15 @@ package addrmgr
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
 	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload"
+	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/noded/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 const (
@@ -37,45 +37,45 @@ type addrStats struct {
 // Addrmgr holds maps to keep info of new, good, bad addresses
 type Addrmgr struct {
 	addrmtx   sync.RWMutex
-	goodAddrs map[*payload.NetAddress]addrStats
-	newAddrs  map[*payload.NetAddress]struct{}
-	badAddrs  map[*payload.NetAddress]addrStats
-	knownList map[string]*payload.NetAddress // this contains all of the addresses in badAddrs, newAddrs and goodAddrs
+	goodAddrs map[*wire.NetAddress]addrStats
+	newAddrs  map[*wire.NetAddress]struct{}
+	badAddrs  map[*wire.NetAddress]addrStats
+	knownList map[string]*wire.NetAddress // this contains all of the addresses in badAddrs, newAddrs and goodAddrs
 }
 
 // New creates a new address manager
 func New() *Addrmgr {
 	am := &Addrmgr{
 		sync.RWMutex{},
-		make(map[*payload.NetAddress]addrStats, 100),
-		make(map[*payload.NetAddress]struct{}, 100),
-		make(map[*payload.NetAddress]addrStats, 100),
-		make(map[string]*payload.NetAddress, 100),
+		make(map[*wire.NetAddress]addrStats, 100),
+		make(map[*wire.NetAddress]struct{}, 100),
+		make(map[*wire.NetAddress]addrStats, 100),
+		make(map[string]*wire.NetAddress, 100),
 	}
 
 	am.AddAddrs(am.getPermanentAddresses())
 	return am
 }
 
-func (a *Addrmgr) getPermanentAddresses() []*payload.NetAddress {
+func (a *Addrmgr) getPermanentAddresses() []*wire.NetAddress {
 	// Add the (permanent) seed addresses to the Address Manager
-	var netAddrs []*payload.NetAddress
+	var netAddrs []*wire.NetAddress
 	addrs := config.EnvNetCfg.Peer.Seeds
 	for _, addr := range addrs {
 		s := strings.Split(addr, ":")
 		port, _ := strconv.ParseUint(s[1], 10, 16)
-		netAddrs = append(netAddrs, payload.NewNetAddress(s[0], uint16(port)))
+		netAddrs = append(netAddrs, wire.NewNetAddress(s[0], uint16(port)))
 	}
 	return netAddrs
 }
 
 // AddAddrs will add new addresses into the newaddr list
 // This is safe for concurrent access.
-func (a *Addrmgr) AddAddrs(newAddrs []*payload.NetAddress) {
+func (a *Addrmgr) AddAddrs(newAddrs []*wire.NetAddress) {
 
 	newAddrs = removeDuplicates(newAddrs)
 
-	var nas []*payload.NetAddress
+	var nas []*wire.NetAddress
 	for _, addr := range newAddrs {
 		a.addrmtx.Lock()
 
@@ -98,9 +98,9 @@ func (a *Addrmgr) AddAddrs(newAddrs []*payload.NetAddress) {
 // - Known
 // - has been successfully connected to in the last week
 // - Note: that while users are launching full nodes from their laptops, the one week marker will need to be modified.
-func (a *Addrmgr) Good() []payload.NetAddress {
+func (a *Addrmgr) Good() []wire.NetAddress {
 
-	var goodAddrs []payload.NetAddress
+	var goodAddrs []wire.NetAddress
 
 	var oneWeekAgo = time.Now().Add(((time.Hour * 24) * 7) * -1)
 
@@ -119,9 +119,9 @@ func (a *Addrmgr) Good() []payload.NetAddress {
 }
 
 // Unconnected addresses are addresses in the newAddr list.
-func (a *Addrmgr) Unconnected() []payload.NetAddress {
+func (a *Addrmgr) Unconnected() []wire.NetAddress {
 
-	var unconnAddrs []payload.NetAddress
+	var unconnAddrs []wire.NetAddress
 
 	a.addrmtx.RLock()
 	for addr := range a.newAddrs {
@@ -134,9 +134,9 @@ func (a *Addrmgr) Unconnected() []payload.NetAddress {
 // Bad addresses are addresses in the badAddr list.
 // They are put there if we have tried to connect
 // to them in the past and it failed.
-func (a *Addrmgr) Bad() []payload.NetAddress {
+func (a *Addrmgr) Bad() []wire.NetAddress {
 
-	var badAddrs []payload.NetAddress
+	var badAddrs []wire.NetAddress
 
 	a.addrmtx.RLock()
 	for addr := range a.badAddrs {
@@ -245,7 +245,7 @@ func (a *Addrmgr) Failed(addr string) {
 
 // GetGoodAddresses give the best addresses we have from good.
 // TODO: Remove, is duplicate of Good()
-func (a *Addrmgr) GetGoodAddresses() []payload.NetAddress {
+func (a *Addrmgr) GetGoodAddresses() []wire.NetAddress {
 	a.addrmtx.RLock()
 	defer a.addrmtx.RUnlock()
 	return a.Good()
@@ -267,10 +267,10 @@ func (a *Addrmgr) NewAddres() (string, error) {
 }
 
 // https://www.dotnetperls.com/duplicates-go
-func removeDuplicates(elements []*payload.NetAddress) []*payload.NetAddress {
+func removeDuplicates(elements []*wire.NetAddress) []*wire.NetAddress {
 
 	encountered := map[string]bool{}
-	result := []*payload.NetAddress{}
+	result := []*wire.NetAddress{}
 
 	for _, element := range elements {
 		if encountered[element.String()] == true {

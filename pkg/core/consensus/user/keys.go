@@ -22,11 +22,11 @@ func (k *Keys) Clear() {
 	k.EdSecretKey = nil
 }
 
-// // NewKeys will construct new Keys to be used during consensus
-// // keys should already be generated here, just pass them through as params
-// func NewKeys() (*Keys, error) {
-// 	return &Keys{}, nil
-// }
+// EdPubKeyBytes returns the byte slice of the ed25519 public key of this Keys
+// struct.
+func (k *Keys) EdPubKeyBytes() []byte {
+	return []byte(*k.EdPubKey)
+}
 
 // NewRandKeys will generate and return new bls and ed25519
 // keys to be used in consensus

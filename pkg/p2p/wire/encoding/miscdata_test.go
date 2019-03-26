@@ -131,3 +131,55 @@ func Test512Length(t *testing.T) {
 		t.Fatal("did not throw error when serializing byte slice of improper length")
 	}
 }
+
+func TestBLSEncodeDecode(t *testing.T) {
+	byte33, err := crypto.RandEntropy(33)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Serialize
+	buf := new(bytes.Buffer)
+	if err := WriteBLS(buf, byte33); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check if it serialized correctly
+	assert.Equal(t, buf.Bytes(), byte33)
+	assert.Equal(t, len(buf.Bytes()), 33)
+
+	// Deserialize
+	var hash []byte
+	if err := ReadBLS(buf, &hash); err != nil {
+		t.Fatal(err)
+	}
+
+	// Content should be the same
+	assert.Equal(t, hash, byte33)
+}
+
+func TestBLSLength(t *testing.T) {
+	byte16, err := crypto.RandEntropy(16)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Serialize
+	buf := new(bytes.Buffer)
+	err = WriteBLS(buf, byte16) // This should fail
+	if err == nil {
+		t.Fatal("did not throw error when serializing byte slice of improper length")
+	}
+
+	buf.Reset()
+	byte80, err := crypto.RandEntropy(80)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Serialize
+	err = WriteBLS(buf, byte80) // This should also fail
+	if err == nil {
+		t.Fatal("did not throw error when serializing byte slice of improper length")
+	}
+}
