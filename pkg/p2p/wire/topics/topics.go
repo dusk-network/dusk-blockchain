@@ -6,7 +6,7 @@ type Topic string
 // Size is the size of a topic field in bytes
 const Size = 15
 
-// A list of all valid protocol topics
+// A list of all valid topics
 const (
 	// Standard topics
 	Version Topic = "version"
@@ -38,13 +38,14 @@ const (
 	SigSetAgreement Topic = "sigsetagreement"
 
 	// Peer topics
-	PeerCandidate       Topic = "peercandidate"
-	PeerScore           Topic = "peerscore"
-	PeerSigSet          Topic = "peersigset"
-	PeerBlockReduction  Topic = "peerblockreduction"
-	PeerSigSetReduction Topic = "peersigsetreduction"
-	PeerBlockAgreement  Topic = "peerblockagreement"
-	PeerSigSetAgreement Topic = "peersigsetagreement"
+	Propagate             Topic = "propagate"
+	GossipCandidate       Topic = "gossipcandidate"
+	GossipScore           Topic = "gossipscore"
+	GossipSigSet          Topic = "gossipsigset"
+	GossipBlockReduction  Topic = "gossipblockreduction"
+	GossipSigSetReduction Topic = "gossipsigsetreduction"
+	GossipBlockAgreement  Topic = "gossipblockagreement"
+	GossipSigSetAgreement Topic = "gossipsigsetagreement"
 
 	// Blockchain topics
 	ChainInfo Topic = "chaininfo"
