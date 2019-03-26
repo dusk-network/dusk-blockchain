@@ -63,10 +63,6 @@ func (b *Header) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, b.TxRoot); err != nil {
-		return err
-	}
-
 	return nil
 }
 
