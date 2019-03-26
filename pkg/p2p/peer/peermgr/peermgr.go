@@ -36,5 +36,5 @@ func (pm *PeerMgr) Disconnect(p *Peer) {
 // AddPeer will add a new peer for the PeerManager to use
 func (pm *PeerMgr) AddPeer(p *Peer) {
 	pm.peers = append(pm.peers, p)
-	log.WithField("prefix", "peermgr").Infof("Adding peer %s into the Peer Manager", p.RemoteAddr().String())
+	log.WithField("prefix", "peermgr").Infof("Adding peer %s into the Peer Manager", p.Conn.RemoteAddr().String())
 }
