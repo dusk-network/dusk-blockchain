@@ -8,7 +8,11 @@ import (
 	datadog "gopkg.in/zorkian/go-datadog-api.v2"
 )
 
-func launchBlockTimeMonitor(eventBus *wire.EventBus, client *datadog.Client, roundChan <-chan uint64) {
+type Client interface {
+	PostMetrics([]datadog.Metric) error
+}
+
+func launchBlockTimeMonitor(eventBus *wire.EventBus, client Client, roundChan <-chan uint64) {
 	var lastBlockTime *time.Time
 	for {
 		<-roundChan
