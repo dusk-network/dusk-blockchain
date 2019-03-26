@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -24,8 +26,8 @@ func LaunchSignatureSetNotary(eventBus *wire.EventBus, c committee.Committee, cu
 type (
 	// SigSetEvent is a CommitteeEvent decorated with the signature set hash
 	SigSetEvent struct {
-		*committee.Event
-		sigSetHash []byte
+		*committee.NotaryEvent
+		SigSetHash []byte
 	}
 
 	// sigSetNotary creates the proper EventSubscriber to listen to the SigSetEvent notification. It is not supposed to be used directly
@@ -34,8 +36,8 @@ type (
 		sigSetCollector *sigSetCollector
 	}
 
-	sigSetEventUnmarshaller struct {
-		*committee.EventUnMarshaller
+	SigSetEventUnmarshaller struct {
+		*committee.NotaryEventUnMarshaller
 	}
 
 	// sigSetCollector collects SigSetEvent and decides whether it needs to propagate a round update. It gets the Quorum from the Committee interface and communicates through a channel to notify of round increments. Whenever it gets messages from future rounds, it queues them until their round becomes the current one.
@@ -51,12 +53,12 @@ type (
 
 // NewSigSetEvent creates a SigSetEvent
 func NewSigSetEvent() *SigSetEvent {
-	return &SigSetEvent{Event: committee.NewEvent()}
+	return &SigSetEvent{NotaryEvent: committee.NewNotaryEvent()}
 }
 
 // Equal as specified in the Event interface
 func (sse *SigSetEvent) Equal(e wire.Event) bool {
-	return sse.Event.Equal(e) && bytes.Equal(sse.sigSetHash, e.(*SigSetEvent).sigSetHash)
+	return sse.NotaryEvent.Equal(e) && bytes.Equal(sse.SigSetHash, e.(*SigSetEvent).SigSetHash)
 }
 
 // Listen triggers the EventSubscriber to accept Events from the EventBus
@@ -75,22 +77,22 @@ func (ssn *sigSetNotary) Listen() {
 	}
 }
 
-func newSigSetEventUnmarshaller() *sigSetEventUnmarshaller {
-	return &sigSetEventUnmarshaller{
-		EventUnMarshaller: committee.NewEventUnMarshaller(),
+func NewSigSetEventUnmarshaller() *SigSetEventUnmarshaller {
+	return &SigSetEventUnmarshaller{
+		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(reduction.NewSigSetUnMarshaller()),
 	}
 }
 
 // Unmarshal as specified in the Event interface
-func (sseu *sigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func (sseu *SigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	// if the type checking is unsuccessful, it means that the injection is wrong. So panic!
 	sigSetEv := ev.(*SigSetEvent)
 
-	if err := sseu.EventUnMarshaller.Unmarshal(r, sigSetEv.Event); err != nil {
+	if err := sseu.EventUnMarshaller.Unmarshal(r, sigSetEv.NotaryEvent); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sigSetEv.sigSetHash); err != nil {
+	if err := encoding.Read256(r, &sigSetEv.SigSetHash); err != nil {
 		return err
 	}
 
@@ -109,7 +111,7 @@ func newSigSetCollector(c committee.Committee, currentRound uint64) *sigSetColle
 		Collector:    cc,
 		RoundChan:    make(chan uint64),
 		futureRounds: make(map[uint64][]*SigSetEvent),
-		Unmarshaller: newSigSetEventUnmarshaller(),
+		Unmarshaller: NewSigSetEventUnmarshaller(),
 	}
 }
 
@@ -143,7 +145,7 @@ func (s *sigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 // Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
 func (s *sigSetCollector) Process(ev *SigSetEvent) {
 	isIrrelevant := s.CurrentRound != 0 && s.CurrentRound > ev.Round
-	if s.ShouldBeSkipped(ev.Event) || isIrrelevant {
+	if s.ShouldBeSkipped(ev.NotaryEvent) || isIrrelevant {
 		return
 	}
 

@@ -39,7 +39,7 @@ type (
 	}
 
 	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent.
-	SigSetEvent = committee.Event
+	SigSetEvent = committee.NotaryEvent
 
 	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
 	SigSetUnMarshaller = committee.EventUnMarshaller

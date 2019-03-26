@@ -27,7 +27,7 @@ func LaunchBlockNotary(eventBus *wire.EventBus,
 
 type (
 	// BlockEvent expresses a vote on a block hash. It is a real type alias of committee.Event
-	BlockEvent = committee.Event
+	BlockEvent = committee.NotaryEvent
 
 	// BlockNotary notifies when there is a consensus on a block hash
 	blockNotary struct {
@@ -36,8 +36,8 @@ type (
 		roundUpdateChan chan uint64
 	}
 
-	// blockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
-	blockEventUnmarshaller = committee.EventUnMarshaller
+	// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
+	BlockEventUnmarshaller = committee.EventUnMarshaller
 
 	// blockCollector collects CommitteeEvent. When a Quorum is reached, it propagates the new Block Hash to the proper channel
 	blockCollector struct {
@@ -87,7 +87,7 @@ func initBlockCollector(eventBus *wire.EventBus, c committee.Committee) *blockCo
 
 // Collect as specifiec in the EventCollector interface. It dispatches the unmarshalled CommitteeEvent to Process method
 func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
-	ev := committee.NewEvent() // BlockEvent is an alias of committee.Event
+	ev := committee.NewNotaryEvent() // BlockEvent is an alias of committee.Event
 	if err := c.Unmarshaller.Unmarshal(buffer, ev); err != nil {
 		return err
 	}

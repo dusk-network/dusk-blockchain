@@ -32,38 +32,38 @@ type (
 
 	// SigSetEvent is the event related to the completed reduction of a Signature Set for a specific round
 	SigSetEvent struct {
-		*BlockEvent
+		*committee.ReductionEvent
 		BlockHash []byte
 	}
 
-	sigSetUnmarshaller struct {
-		*blockUnMarshaller
+	SigSetUnmarshaller struct {
+		*unMarshaller
 	}
 
 	// sigSetHandler is responsible for performing operations that need to know
 	// about specific event fields.
 	sigSetHandler struct {
 		committee committee.Committee
-		*sigSetUnmarshaller
+		*SigSetUnmarshaller
 		blockHash []byte
 	}
 )
 
 // Equal implements Event interface.
 func (sse *SigSetEvent) Equal(e wire.Event) bool {
-	return sse.BlockEvent.Equal(e) &&
+	return sse.ReductionEvent.Equal(e) &&
 		bytes.Equal(sse.BlockHash, e.(*SigSetEvent).BlockHash)
 }
 
-func newSigSetUnMarshaller() *sigSetUnmarshaller {
-	return &sigSetUnmarshaller{
-		blockUnMarshaller: newBlockUnMarshaller(),
+func NewSigSetUnMarshaller() *SigSetUnmarshaller {
+	return &SigSetUnmarshaller{
+		unMarshaller: newUnMarshaller(),
 	}
 }
 
-func (ssru *sigSetUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
+func (ssru *SigSetUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 	sigSetEvent := e.(*SigSetEvent)
-	if err := ssru.blockUnMarshaller.Unmarshal(r, sigSetEvent.BlockEvent); err != nil {
+	if err := ssru.unMarshaller.Unmarshal(r, sigSetEvent.ReductionEvent); err != nil {
 		return err
 	}
 
@@ -74,9 +74,13 @@ func (ssru *sigSetUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 	return nil
 }
 
-func (ssru *sigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
+func (ssru *SigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 	sigSetEvent := e.(*SigSetEvent)
-	if err := ssru.blockUnMarshaller.Marshal(r, sigSetEvent.BlockEvent); err != nil {
+	if err := ssru.EventHeaderMarshaller.Marshal(r, sigSetEvent.EventHeader); err != nil {
+		return err
+	}
+
+	if err := ssru.unMarshaller.Marshal(r, sigSetEvent.ReductionEvent); err != nil {
 		return err
 	}
 
@@ -87,17 +91,12 @@ func (ssru *sigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return nil
 }
 
-func (ssru *sigSetUnmarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
+func (ssru *SigSetUnmarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
 	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
 		return err
 	}
 
 	for _, event := range evs {
-		ev := event.(*SigSetEvent)
-		if err := ssru.EventHeaderMarshaller.Marshal(r, ev.EventHeader); err != nil {
-			return err
-		}
-
 		if err := ssru.Marshal(r, event); err != nil {
 			return err
 		}
@@ -111,7 +110,7 @@ func newSigSetHandler(eventBus *wire.EventBus, committee committee.Committee) *s
 	phaseChannel := consensus.InitPhaseUpdate(eventBus)
 	sigSetHandler := &sigSetHandler{
 		committee:          committee,
-		sigSetUnmarshaller: newSigSetUnMarshaller(),
+		SigSetUnmarshaller: NewSigSetUnMarshaller(),
 	}
 
 	go func() {
@@ -130,14 +129,14 @@ func (s *sigSetHandler) Priority(ev1, ev2 wire.Event) wire.Event {
 // NewEvent returns a sigSetEvent
 func (s *sigSetHandler) NewEvent() wire.Event {
 	return &SigSetEvent{
-		BlockEvent: &BlockEvent{
+		ReductionEvent: &committee.ReductionEvent{
 			EventHeader: &consensus.EventHeader{},
 		},
 	}
 }
 
 func (s *sigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
-	ev := e.(*BlockEvent)
+	ev := e.(*committee.ReductionEvent)
 	h.Round = ev.Round
 	h.Step = ev.Step
 }

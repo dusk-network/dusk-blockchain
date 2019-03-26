@@ -3,7 +3,6 @@ package committee
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"io"
 
@@ -113,7 +112,7 @@ func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
 }
 
 // VerifyVoteSet checks the signature of the set
-func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
+func (c Store) VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64,
 	step uint8) *prerror.PrError {
 
 	var amountOfVotes uint8
@@ -123,28 +122,28 @@ func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
 			return err
 		}
 
-		if !fromValidStep(vote.Step, step) {
-			return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
-		}
+		// if !fromValidStep(vote.Step, step) {
+		// 	return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
+		// }
 
-		votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
-			c.TotalWeight, vote.Step)
-		if err != nil {
-			return prerror.New(prerror.High, err)
-		}
+		// votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
+		// 	c.TotalWeight, vote.Step)
+		// if err != nil {
+		// 	return prerror.New(prerror.High, err)
+		// }
 
-		pubKeyStr := hex.EncodeToString(vote.PubKeyBLS)
-		if err := checkVoterEligibility(pubKeyStr, votingCommittee); err != nil {
-			return err
-		}
+		// pubKeyStr := hex.EncodeToString(vote.Sender())
+		// if err := checkVoterEligibility(pubKeyStr, votingCommittee); err != nil {
+		// 	return err
+		// }
 
-		if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
-			vote.SignedHash); err != nil {
+		// if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
+		// 	vote.SignedHash); err != nil {
 
-			return prerror.New(prerror.Low, errors.New("BLS verification failed"))
-		}
+		// 	return prerror.New(prerror.Low, errors.New("BLS verification failed"))
+		// }
 
-		amountOfVotes += votingCommittee[pubKeyStr]
+		// amountOfVotes += votingCommittee[pubKeyStr]
 	}
 
 	if int(amountOfVotes) < c.Quorum() {
@@ -154,9 +153,9 @@ func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
 	return nil
 }
 
-func checkDuplicates(voteSet []*msg.Vote, vote *msg.Vote) *prerror.PrError {
+func checkDuplicates(voteSet []wire.Event, vote wire.Event) *prerror.PrError {
 	for _, v := range voteSet {
-		if v.Equals(vote) {
+		if v.Equal(vote) {
 			return prerror.New(prerror.Low, errors.New("vote set contains duplicate vote"))
 		}
 	}

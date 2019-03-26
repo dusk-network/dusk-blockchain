@@ -28,100 +28,25 @@ func LaunchBlockReducer(eventBus *wire.EventBus, committee committee.Committee,
 }
 
 type (
-	// BlockEvent is a basic reduction event.
-	BlockEvent struct {
-		*consensus.EventHeader
-		VotedHash  []byte
-		SignedHash []byte
-	}
-
-	blockUnMarshaller struct {
-		*unMarshaller
-	}
-
 	// BlockHandler is responsible for performing operations that need to know
 	// about specific event fields.
 	blockHandler struct {
 		committee committee.Committee
-		*blockUnMarshaller
+		*unMarshaller
 	}
 )
-
-// Equal as specified in the Event interface
-func (e *BlockEvent) Equal(ev wire.Event) bool {
-	other, ok := ev.(*BlockEvent)
-	return ok && (bytes.Equal(e.PubKeyBLS, other.PubKeyBLS)) &&
-		(e.Round == other.Round) && (e.Step == other.Step)
-}
-
-func newBlockUnMarshaller() *blockUnMarshaller {
-	return &blockUnMarshaller{
-		unMarshaller: newUnMarshaller(),
-	}
-}
-
-// Unmarshal unmarshals the buffer into a CommitteeEvent
-func (a *blockUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	bev := ev.(*BlockEvent)
-	if err := a.EventHeaderUnmarshaller.Unmarshal(r, bev.EventHeader); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &bev.VotedHash); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadBLS(r, &bev.SignedHash); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Marshal solely the VotedHash and SignedHash. Marshalling of the EventHeader is done separately since the round and step are managed elsewhere
-func (a *blockUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	bev := ev.(*BlockEvent)
-	if err := encoding.Write256(r, bev.VotedHash); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteBLS(r, bev.SignedHash); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (a *blockUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
-	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
-		return err
-	}
-
-	for _, event := range evs {
-		ev := event.(*BlockEvent)
-		if err := a.EventHeaderMarshaller.Marshal(r, ev.EventHeader); err != nil {
-			return err
-		}
-
-		if err := a.Marshal(r, event); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 
 // newBlockHandler will return a BlockHandler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
 func newBlockHandler(committee committee.Committee) *blockHandler {
 	return &blockHandler{
-		committee:         committee,
-		blockUnMarshaller: newBlockUnMarshaller(),
+		committee:    committee,
+		unMarshaller: newUnMarshaller(),
 	}
 }
 
 func (b *blockHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
-	ev := e.(*BlockEvent)
+	ev := e.(*committee.ReductionEvent)
 	h.Round = ev.Round
 	h.Step = ev.Step
 }
@@ -131,7 +56,7 @@ func (b *blockHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
 	if e == nil {
 		votedHash = make([]byte, 32)
 	} else {
-		ev := e.(*BlockEvent)
+		ev := e.(*committee.ReductionEvent)
 		votedHash = ev.VotedHash
 	}
 	if err := encoding.Write256(r, votedHash); err != nil {
@@ -142,14 +67,14 @@ func (b *blockHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
 
 // NewEvent returns a blockEvent
 func (b *blockHandler) NewEvent() wire.Event {
-	return &BlockEvent{
+	return &committee.ReductionEvent{
 		EventHeader: &consensus.EventHeader{},
 	}
 }
 
 // Verify the blockEvent
 func (b *blockHandler) Verify(e wire.Event) error {
-	ev := e.(*BlockEvent)
+	ev := e.(*committee.ReductionEvent)
 
 	if err := msg.VerifyBLSSignature(ev.PubKeyBLS, ev.VotedHash, ev.SignedHash); err != nil {
 		return err
