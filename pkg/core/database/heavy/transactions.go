@@ -406,7 +406,7 @@ func (t transaction) getInputs(tx *transactions.Stealth) []*transactions.Input {
 		return typeInfo.Inputs
 
 	case transactions.TimelockType:
-		typeInfo := tx.TypeInfo.(*transactions.Standard)
+		typeInfo := tx.TypeInfo.(*transactions.Timelock)
 		return typeInfo.Inputs
 	}
 	return nil
