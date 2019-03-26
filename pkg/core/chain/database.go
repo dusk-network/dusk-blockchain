@@ -33,12 +33,10 @@ func (c *Chain) writeBlock(blk block.Block) error {
 // argument has already been saved into our database
 // returns nil, if block does not exist
 func (c Chain) checkBlockExists(blk block.Block) error {
-
-	hdr, err := c.db.getBlockHeaderByHash(blk.Header.Hash)
-	if hdr != nil {
-		return errors.New("chain: block is already present in the database")
+	if blk.Equals(&c.prevBlock) {
+		return errors.New("block already saved")
 	}
-	return err
+	return nil
 }
 
 type ldb struct {

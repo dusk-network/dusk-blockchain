@@ -36,9 +36,22 @@ func TestVerifyBlockRight(t *testing.T) {
 	os.RemoveAll("temp")
 }
 
-func TestNew(t *testing.T) {
-	_, err := New()
+func TestDemoSaveFunctionality(t *testing.T) {
+	chn, err := New()
 	assert.Nil(t, err)
+
+	for i := 1; i < 5; i++ {
+
+		nextBlock := helper.RandomBlock(t)
+		nextBlock.Header.PrevBlock = chn.prevBlock.Header.Hash
+		nextBlock.Header.Height = uint64(i)
+		err = chn.AcceptBlock(*nextBlock)
+		assert.Nil(t, err)
+	}
+
+	err = chn.AcceptBlock(chn.prevBlock)
+	assert.NotNil(t, err)
+
 }
 func TestVerifyValidLockTime(t *testing.T) {
 
