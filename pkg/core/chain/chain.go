@@ -11,6 +11,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
 )
 
+var consensusSeconds = 10
+
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
@@ -55,12 +57,12 @@ func (c Chain) VerifyBlock(blk block.Block) error {
 		return errors.Wrapf(err, "could not verify block with hash %s", hex.EncodeToString(blk.Header.Hash))
 	}
 
-	for _, merklePayload := range blk.Txs {
+	for i, merklePayload := range blk.Txs {
 		tx, ok := merklePayload.(transactions.Transaction)
 		if !ok {
 			return errors.New("tx does not implement the transaction interface")
 		}
-		if err := c.VerifyTX(tx); err != nil {
+		if err := c.verifyTX(uint32(i), uint64(blk.Header.Timestamp), tx); err != nil {
 			return err
 		}
 	}
@@ -73,11 +75,29 @@ func (c Chain) VerifyBlock(blk block.Block) error {
 // Returns nil if a tx is valid
 func (c *Chain) VerifyTX(tx transactions.Transaction) error {
 
+	approxBlockTime := uint64(consensusSeconds) + uint64(c.prevBlock.Header.Timestamp)
+
+	if err := c.verifyTX(0, approxBlockTime, tx); err != nil {
+		return err
+	}
+	return nil
+}
+
+//VerifyTX will verify whether a transaction is valid by checking:
+// - It has not been double spent
+// - It is not malformed
+// Index indicates the position that the transaction is in, in a block
+// If it is a solo transaction, this is set to 0
+// blockTime indicates what time the transaction will be included in a block
+// If it is a solo transaction, the blockTime is calculated by using currentBlockTime+consensusSeconds
+// Returns nil if a tx is valid
+func (c *Chain) verifyTX(index uint32, blockTime uint64, tx transactions.Transaction) error {
+
 	if err := c.checkStandardTx(tx.StandardTX()); err != nil {
 		return err
 	}
 
-	if err := c.checkSpecialFields(tx); err != nil {
+	if err := c.checkSpecialFields(index, blockTime, tx); err != nil {
 		return err
 	}
 
