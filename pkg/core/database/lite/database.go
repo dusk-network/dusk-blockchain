@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-// DB on top of underlying storage sqlite3
+// DB based on sqlite3 as underlying storage
 type DB struct {
-	// underlying storage is Sqlite3. If needed, it might be replaced with redis
+	//  If needed, it might be replaced with redis
 	storage *sql.DB
 	path    string
 
@@ -40,7 +40,12 @@ func NewDatabase(path string, readonly bool) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	stmt.Exec()
+
+	_, err = stmt.Exec()
+
+	if err != nil {
+		return nil, err
+	}
 
 	return &DB{storage, path, false, true}, nil
 }
@@ -49,8 +54,8 @@ func (db DB) isOpen() bool {
 	return db.opened
 }
 
-// Begin builds (read-only or read-write) Tx, do initial validations
-func (db DB) Begin(writable bool) (database.Tx, error) {
+// Begin builds (read-only or read-write) Transaction, do initial validations
+func (db DB) Begin(writable bool) (database.Transaction, error) {
 	// If the database was opened with Options.ReadOnly, return an error.
 	if db.readOnly && writable {
 		return nil, errors.New("database is read-only")
@@ -60,13 +65,14 @@ func (db DB) Begin(writable bool) (database.Tx, error) {
 	}
 
 	// Create a transaction associated with the database.
-	t := Tx{writable: writable, db: &db}
+	// DISABLED
+	// t := Tx{writable: writable, db: &db}
 
-	return t, nil
+	return nil, nil
 }
 
-// Update provides an execution of managed, read-write Tx
-func (db DB) Update(fn func(database.Tx) error) error {
+// Update provides an execution of managed, read-write Transaction
+func (db DB) Update(fn func(database.Transaction) error) error {
 	start := time.Now()
 	t, err := db.Begin(true)
 	if err != nil {
@@ -81,7 +87,7 @@ func (db DB) Update(fn func(database.Tx) error) error {
 }
 
 // View provides an execution of managed, read-only Tx
-func (db DB) View(fn func(database.Tx) error) error {
+func (db DB) View(fn func(database.Transaction) error) error {
 	start := time.Now()
 	t, err := db.Begin(false)
 	if err != nil {

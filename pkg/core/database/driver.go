@@ -20,12 +20,12 @@ func Register(driver Driver) error {
 	defer driversMu.Unlock()
 
 	if driver == nil {
-		return errors.New("database: Register a nil driver ")
+		return errors.New("cannot register a nil driver")
 	}
 
 	name := driver.Name()
 	if _, dup := drivers[name]; dup {
-		return errors.New("database: Register called twice for driver " + name)
+		return errors.New("duplicated driver name: " + name)
 	}
 	drivers[name] = driver
 	return nil

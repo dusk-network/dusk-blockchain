@@ -2,13 +2,13 @@ package lite
 
 import (
 	"encoding/hex"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 )
 
 // Tx Transaction layer
 type Tx struct {
-	writable bool
-	db       *DB
+	db *DB
 }
 
 // GetBlockHeaderByHash gives the block header from the hash
@@ -55,6 +55,22 @@ func (t Tx) Rollback() error {
 	return nil
 }
 
-func (t Tx) BlockExists(hdr *block.Header) bool {
-	return false
+func (t Tx) Close() {
+}
+
+func (t Tx) FetchBlockHeader(hash []byte) (*block.Header, error) {
+	return nil, nil
+}
+func (t Tx) FetchBlockTransactions(hash []byte) ([]merkletree.Payload, error) {
+	return nil, nil
+}
+
+// FetchBlockHeaderByRound not implemented
+func (t Tx) FetchBlockExists(header *block.Header) (bool, error) {
+	return false, nil
+}
+
+// StoreBlock not implemented
+func (t Tx) StoreBlock(block *block.Block) error {
+	return nil
 }

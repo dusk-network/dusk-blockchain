@@ -6,25 +6,24 @@ import (
 )
 
 var (
-	// DriverName Unique name of Heavy driver
+	// DriverName is the unique identifier for the heavy driver
 	DriverName = "heavy_v0.1.0"
 )
 
 type driver struct {
 }
 
-func (d driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
-	return NewDatabase(path, readonly)
+func (d *driver) Open(path string, network protocol.Magic, readonly bool) (database.DB, error) {
+	return NewDatabase(path, network, readonly)
 }
 
-func (d driver) Name() string {
+func (d *driver) Name() string {
 	return DriverName
 }
 
 func init() {
 	driver := driver{}
-	err := database.Register(driver)
-
+	err := database.Register(&driver)
 	if err != nil {
 		panic(err)
 	}
