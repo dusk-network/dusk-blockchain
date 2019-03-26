@@ -8,16 +8,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	c "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-func TestEventUnmarshal(t *testing.T) {
-	validateFunc := func(*bytes.Buffer) error {
-		return nil
-	}
-	unmarshaller := c.NewEventUnMarshaller(validateFunc)
+func TestNotaryEventUnmarshal(t *testing.T) {
+	unmarshaller := c.NewNotaryEventUnMarshaller(c.NewReductionEventUnMarshaller())
 
 	step := uint8(1)
 	round := uint64(120)
@@ -26,7 +23,7 @@ func TestEventUnmarshal(t *testing.T) {
 	buf, err := mockEventBuffer(blockHash, round, step)
 	assert.Empty(t, err)
 
-	ev := c.NewEvent()
+	ev := c.NewNotaryEvent()
 	assert.Empty(t, unmarshaller.Unmarshal(buf, ev))
 	assert.Equal(t, ev.Step, step)
 	assert.Equal(t, ev.Round, round)
@@ -48,30 +45,33 @@ func mockEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer,
 		return nil, err
 	}
 
-	vote := newVote(byte32, pub.Marshal(), signedVote.Compress(), step)
+	vote := newReductionEvent(byte32, pub.Marshal(), signedVote.Compress(), step)
 
-	eh := &c.Event{
+	eh := &c.NotaryEvent{
 		EventHeader: &consensus.EventHeader{
 			Round:     round,
 			Step:      step,
 			PubKeyBLS: pub.Marshal(),
 		},
 		SignedVoteSet: signedVote.Compress(),
-		VoteSet:       []*msg.Vote{vote},
+		VoteSet:       []wire.Event{vote},
 		BlockHash:     blockHash,
 	}
 
-	ehm := &c.EventUnMarshaller{}
+	ehm := c.NewNotaryEventUnMarshaller(c.NewReductionEventUnMarshaller())
 	buf := new(bytes.Buffer)
 	ehm.Marshal(buf, eh)
 	return buf, nil
 }
 
-func newVote(hash []byte, pub []byte, sig []byte, step uint8) *msg.Vote {
-	return &msg.Vote{
+func newReductionEvent(hash []byte, pub []byte, sig []byte, step uint8) *c.ReductionEvent {
+	return &c.ReductionEvent{
+		EventHeader: &consensus.EventHeader{
+			PubKeyBLS: pub,
+			Round:     1,
+			Step:      1,
+		},
 		VotedHash:  hash,
-		PubKeyBLS:  pub,
 		SignedHash: sig,
-		Step:       step,
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -11,8 +13,7 @@ import (
 
 type (
 	unMarshaller struct {
-		*consensus.EventHeaderUnmarshaller
-		*consensus.EventHeaderMarshaller
+		*committee.ReductionEventUnMarshaller
 	}
 
 	handler interface {
@@ -23,11 +24,8 @@ type (
 	}
 )
 
-func newUnMarshaller() *unMarshaller {
-	return &unMarshaller{
-		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(),
-		EventHeaderMarshaller:   &consensus.EventHeaderMarshaller{},
-	}
+func newUnMarshaller(validate func(*bytes.Buffer) error) *unMarshaller {
+	return &unMarshaller{committee.NewReductionEventUnMarshaller(validate)}
 }
 
 func (a *unMarshaller) MarshalHeader(r *bytes.Buffer, state *consensusState) error {

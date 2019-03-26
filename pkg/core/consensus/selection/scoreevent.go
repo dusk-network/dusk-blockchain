@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -44,7 +43,7 @@ func (e *ScoreEvent) Sender() []byte {
 
 // newScoreUnMarshaller creates a new Event UnMarshaller which takes care of Decoding and Encoding operations
 func newScoreUnMarshaller() *scoreUnMarshaller {
-	return &scoreUnMarshaller{validateFunc: msg.VerifyEd25519Signature}
+	return &scoreUnMarshaller{}
 }
 
 // Unmarshal unmarshals the buffer into a Score Event

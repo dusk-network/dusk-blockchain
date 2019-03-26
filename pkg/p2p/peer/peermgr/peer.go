@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
@@ -53,30 +55,36 @@ var (
 	receivedMessageFromStr = "Received a '%s' message from %s"
 )
 
+// Config holds
+type Config struct {
+	Magic protocol.Magic
+	Nonce uint64
+}
+
 // Peer holds all configuration and state to be able to communicate with other peers.
 // Every Peer has a Detector that keeps track of pending messages that require a synchronous response.
 type Peer struct {
 	// Unchangeable state: concurrent safe
-	addr      string
-	protoVer  *protocol.Version
-	inbound   bool
-	userAgent string
-	services  protocol.ServiceFlag
-	createdAt time.Time
-	relay     bool
+	Addr      string
+	ProtoVer  *protocol.Version
+	Inbound   bool
+	UserAgent string
+	Services  protocol.ServiceFlag
+	CreatedAt time.Time
+	Relay     bool
 
-	conn net.Conn
+	Conn net.Conn
 
 	eventBus *wire.EventBus
 
-	cfg *Config
+	magic protocol.Magic
 
 	// Atomic vals
-	disconnected int32
+	Disconnected int32
 
 	statemutex     sync.Mutex
-	verackReceived bool
-	versionKnown   bool
+	VerackReceived bool
+	VersionKnown   bool
 
 	*stall.Detector
 
@@ -87,25 +95,62 @@ type Peer struct {
 
 // NewPeer is called after a connection to a peer was successful.
 // Inbound as well as Outbound.
-func NewPeer(conn net.Conn, inbound bool, cfg *Config, eventBus *wire.EventBus) *Peer {
+func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.EventBus) *Peer {
 	p := &Peer{
 		inch:     make(chan func(), inputBufferSize),
 		outch:    make(chan func(), outputBufferSize),
 		quitch:   make(chan struct{}, 1),
-		inbound:  inbound,
-		conn:     conn,
+		Inbound:  inbound,
+		Conn:     conn,
 		eventBus: eventBus,
-		addr:     conn.RemoteAddr().String(),
+		Addr:     conn.RemoteAddr().String(),
 		Detector: stall.NewDetector(responseTime, tickerInterval),
-		cfg:      cfg,
+		magic:    magic,
 	}
 
+	go wire.NewEventSubscriber(eventBus, p, string(topics.Propagate)).Accept()
 	return p
 }
 
+// Collect implements wire.EventCollector.
+// Receive messages, and propagate them to the network.
+func (p *Peer) Collect(msg *bytes.Buffer) error {
+	return p.Write(msg)
+}
+
 // Write to a peer
-func (p *Peer) Write(msg wire.Payload) error {
-	return wire.WriteMessage(p.conn, p.cfg.Magic, msg)
+func (p *Peer) Write(msg *bytes.Buffer) error {
+	p.outch <- func() {
+		p.Conn.Write(msg.Bytes())
+	}
+
+	return nil
+}
+
+// Disconnect disconnects from a peer
+func (p *Peer) Disconnect() {
+	// return if already disconnected
+	if atomic.LoadInt32(&p.Disconnected) != 0 {
+		return
+	}
+
+	atomic.AddInt32(&p.Disconnected, 1)
+
+	p.Detector.Quit()
+	close(p.quitch)
+	p.Conn.Close()
+}
+
+// Net returns the protocol magic
+func (p *Peer) Net() protocol.Magic {
+	return p.magic
+}
+
+// Port returns the port
+func (p *Peer) Port() uint16 {
+	s := strings.Split(p.Conn.RemoteAddr().String(), ":")
+	port, _ := strconv.ParseUint(s[1], 10, 16)
+	return uint16(port)
 }
 
 // Read from a peer
@@ -127,7 +172,7 @@ func (p *Peer) readHeader() (*MessageHeader, error) {
 
 func (p *Peer) readHeaderBytes() ([]byte, error) {
 	buffer := make([]byte, MessageHeaderSize)
-	if _, err := io.ReadFull(p.conn, buffer); err != nil {
+	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
 		return nil, err
 	}
 
@@ -136,7 +181,7 @@ func (p *Peer) readHeaderBytes() ([]byte, error) {
 
 func (p *Peer) readPayload(length uint32) (*bytes.Buffer, error) {
 	buffer := make([]byte, length)
-	if _, err := io.ReadFull(p.conn, buffer); err != nil {
+	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
 		return nil, err
 	}
 
@@ -144,93 +189,12 @@ func (p *Peer) readPayload(length uint32) (*bytes.Buffer, error) {
 }
 
 func (p *Peer) headerMagicIsValid(header *MessageHeader) bool {
-	return p.cfg.Magic == header.Magic
+	return p.magic == header.Magic
 }
 
 func payloadChecksumIsValid(payloadBuffer *bytes.Buffer, checksum uint32) bool {
 	return crypto.CompareChecksum(payloadBuffer.Bytes(), checksum)
 }
-
-// Disconnect disconnects from a peer
-func (p *Peer) Disconnect() {
-
-	// return if already disconnected
-	if atomic.LoadInt32(&p.disconnected) != 0 {
-		return
-	}
-
-	atomic.AddInt32(&p.disconnected, 1)
-
-	p.Detector.Quit()
-	close(p.quitch)
-	p.conn.Close()
-
-}
-
-// ProtocolVersion returns the protocol version
-func (p *Peer) ProtocolVersion() *protocol.Version {
-	return p.protoVer
-}
-
-// Net returns the protocol magic
-func (p *Peer) Net() protocol.Magic {
-	return p.cfg.Magic
-}
-
-// Port returns the port
-func (p *Peer) Port() uint16 {
-	s := strings.Split(p.RemoteAddr().String(), ":")
-	port, _ := strconv.ParseUint(s[1], 10, 16)
-	return uint16(port)
-}
-
-// CreatedAt returns the created at time
-func (p *Peer) CreatedAt() time.Time {
-	return p.createdAt
-}
-
-// CanRelay returns if the peer can be relayed
-func (p *Peer) CanRelay() bool {
-	return p.relay
-}
-
-// LocalAddr returns the local address of the peer
-func (p *Peer) LocalAddr() net.Addr {
-	return p.conn.LocalAddr()
-}
-
-// RemoteAddr returns the remote address of the peer
-func (p *Peer) RemoteAddr() net.Addr {
-	return p.conn.RemoteAddr()
-}
-
-// Services returns the services of the peer
-func (p *Peer) Services() protocol.ServiceFlag {
-	return p.services
-}
-
-// Inbound returns if the peer is inbound
-func (p *Peer) Inbound() bool {
-	return p.inbound
-}
-
-// UserAgent returns the user agent of the peer
-func (p *Peer) UserAgent() string {
-	return p.userAgent
-}
-
-// IsVerackReceived returns if the peer returned the 'verack' msg
-func (p *Peer) IsVerackReceived() bool {
-	return p.verackReceived
-}
-
-// NotifyDisconnect returns if the peer has disconnected
-func (p *Peer) NotifyDisconnect() bool {
-	<-p.quitch
-	return true
-}
-
-//End of Exposed API functions//
 
 // PingLoop not implemented yet.
 // Will cause this client to disconnect from all other implementations
@@ -255,7 +219,7 @@ func (p *Peer) Run() error {
 // Should be ran after handshake
 func (p *Peer) StartProtocol() {
 loop:
-	for atomic.LoadInt32(&p.disconnected) == 0 {
+	for atomic.LoadInt32(&p.Disconnected) == 0 {
 		select {
 		case f := <-p.inch:
 			f()
@@ -276,36 +240,35 @@ func (p *Peer) ReadLoop() {
 		p.Disconnect()
 	})
 
-loop:
-	for atomic.LoadInt32(&p.disconnected) == 0 {
+	for atomic.LoadInt32(&p.Disconnected) == 0 {
 
 		idleTimer.Reset(idleTimeout) // reset timer on each loop
 
 		header, err := p.readHeader()
+		idleTimer.Stop()
 		if err != nil {
 			// This will also happen if Peer is disconnected
-			break loop
+			p.Disconnect()
+			return
 		}
-
-		// Message read; stop Timer
-		idleTimer.Stop()
 
 		if p.headerMagicIsValid(header) {
-			// payloadBuffer, err := p.readPayload(header.Length)
+			payloadBuffer, err := p.readPayload(header.Length)
+			if err != nil {
+				p.Disconnect()
+				return
+			}
 
-			// if payloadChecksumIsValid(payloadBuffer, header.Checksum) {
-			// 	p.eventBus.Publish(string(header.Command), payloadBuffer)
-			// }
+			if payloadChecksumIsValid(payloadBuffer, header.Checksum) {
+				p.eventBus.Publish(string(header.Topic), payloadBuffer)
+			}
 		}
 	}
-
-	idleTimer.Stop()
-	p.Disconnect()
 }
 
 // WriteLoop will queue all messages to be written to the peer
 func (p *Peer) WriteLoop() {
-	for atomic.LoadInt32(&p.disconnected) == 0 {
+	for atomic.LoadInt32(&p.Disconnected) == 0 {
 		select {
 		case f := <-p.outch:
 			f()
@@ -313,11 +276,4 @@ func (p *Peer) WriteLoop() {
 			p.Disconnect()
 		}
 	}
-}
-
-func (p *Peer) WriteConsensus(msg wire.Payload) error {
-	p.outch <- func() {
-		p.Write(msg)
-	}
-	return nil
 }

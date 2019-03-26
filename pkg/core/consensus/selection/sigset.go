@@ -39,7 +39,7 @@ type (
 	}
 
 	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent.
-	SigSetEvent = committee.Event
+	SigSetEvent = committee.NotaryEvent
 
 	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
 	SigSetUnMarshaller = committee.EventUnMarshaller
@@ -57,7 +57,7 @@ func newSigSetHandler(c committee.Committee, eventBus *wire.EventBus) *SigSetHan
 		committee: c,
 		blockHash: nil,
 		// TODO: get rid of validateFunc
-		unMarshaller: committee.NewEventUnMarshaller(),
+		unMarshaller: committee.NewEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 	go func() {
 		sigSetHandler.blockHash = <-phaseChan
@@ -119,7 +119,7 @@ func (s *SigSetHandler) Verify(event wire.Event) error {
 // Collect a message and transform it into a selection message to be consumed by the other components.
 func (ssc *sigSetCollector) Collect(r *bytes.Buffer) error {
 	ev := &SigSetEvent{}
-	unmarshaller := committee.NewEventUnMarshaller()
+	unmarshaller := committee.NewEventUnMarshaller(msg.VerifyEd25519Signature)
 	if err := unmarshaller.Unmarshal(r, ev); err != nil {
 		return err
 	}

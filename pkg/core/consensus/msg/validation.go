@@ -10,13 +10,13 @@ import (
 )
 
 func VerifyEd25519Signature(messageBytes *bytes.Buffer) error {
-	signedMessage, err := decodeSignedMessage(messageBytes)
-	if err != nil {
+	var signedMessage []byte
+	if err := encoding.Read512(messageBytes, &signedMessage); err != nil {
 		return err
 	}
 
-	pubKey, err := decodePubKey(messageBytes)
-	if err != nil {
+	var pubKey []byte
+	if err := encoding.Read256(messageBytes, &pubKey); err != nil {
 		return err
 	}
 
@@ -25,24 +25,6 @@ func VerifyEd25519Signature(messageBytes *bytes.Buffer) error {
 	}
 
 	return nil
-}
-
-func decodeSignedMessage(messageBytes *bytes.Buffer) ([]byte, error) {
-	var signedMessage []byte
-	if err := encoding.Read512(messageBytes, &signedMessage); err != nil {
-		return nil, err
-	}
-
-	return signedMessage, nil
-}
-
-func decodePubKey(messageBytes *bytes.Buffer) ([]byte, error) {
-	var pubKey []byte
-	if err := encoding.Read256(messageBytes, &pubKey); err != nil {
-		return nil, err
-	}
-
-	return pubKey, nil
 }
 
 func VerifyBLSSignature(pubKeyBytes, message, signature []byte) error {
