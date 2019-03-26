@@ -10,9 +10,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// Voter is responsible for signing and sending out consensus related
+// Sender is responsible for signing and sending out consensus related
 // voting messages to the wire.
-type Voter struct {
+type Sender struct {
 	eventBus               *wire.EventBus
 	blockReductionChannel  chan *bytes.Buffer
 	blockAgreementChannel  chan *bytes.Buffer
@@ -20,9 +20,8 @@ type Voter struct {
 	sigSetAgreementChannel chan *bytes.Buffer
 }
 
-// NewVoter will return an initialized Voter struct.
-func NewVoter(eventBus *wire.EventBus, keys *user.Keys, committee committee.Committee) *Voter {
-
+// NewSender will return an initialized Sender struct.
+func NewSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Committee) *Sender {
 	blockReductionChannel := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
 		unmarshalBlockReduction, newBlockReductionSigner(keys, committee))
 	sigSetReductionChannel := initCollector(eventBus, msg.OutgoingSigSetReductionTopic,
@@ -32,7 +31,7 @@ func NewVoter(eventBus *wire.EventBus, keys *user.Keys, committee committee.Comm
 	sigSetAgreementChannel := initCollector(eventBus, msg.OutgoingSigSetAgreementTopic,
 		unmarshalSigSetAgreement, newSigSetAgreementSigner(keys, committee))
 
-	return &Voter{
+	return &Sender{
 		eventBus:               eventBus,
 		blockReductionChannel:  blockReductionChannel,
 		sigSetReductionChannel: sigSetReductionChannel,
@@ -41,20 +40,18 @@ func NewVoter(eventBus *wire.EventBus, keys *user.Keys, committee committee.Comm
 	}
 }
 
-// Listen will set the Voter up to listen for incoming requests to vote.
-// TODO: create topics that the peer manager listens to. currently using
-// the topics that are normally associated with incoming messages.
-func (v *Voter) Listen() {
+// Listen will set the Sender up to listen for incoming requests to vote.
+func (v *Sender) Listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
-			v.eventBus.Publish(string(topics.BlockReduction), m)
+			v.eventBus.Publish(string(topics.PeerBlockReduction), m)
 		case m := <-v.sigSetReductionChannel:
-			v.eventBus.Publish(string(topics.SigSetReduction), m)
+			v.eventBus.Publish(string(topics.PeerSigSetReduction), m)
 		case m := <-v.blockAgreementChannel:
-			v.eventBus.Publish(string(topics.BlockAgreement), m)
+			v.eventBus.Publish(string(topics.PeerBlockAgreement), m)
 		case m := <-v.sigSetAgreementChannel:
-			v.eventBus.Publish(string(topics.SigSetAgreement), m)
+			v.eventBus.Publish(string(topics.PeerSigSetAgreement), m)
 		}
 	}
 }
