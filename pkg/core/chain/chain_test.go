@@ -35,6 +35,11 @@ func TestVerifyBlockRight(t *testing.T) {
 
 	os.RemoveAll("temp")
 }
+
+func TestNew(t *testing.T) {
+	_, err := New()
+	assert.Nil(t, err)
+}
 func TestVerifyValidLockTime(t *testing.T) {
 
 	blk := helper.RandomBlock(t)

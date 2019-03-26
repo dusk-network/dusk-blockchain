@@ -25,6 +25,7 @@ type Database interface {
 // writeBlock is called after all of the checks on the block pass
 // returns nil, if write to database was successful
 func (c *Chain) writeBlock(blk block.Block) error {
+	c.prevBlock = blk
 	return nil
 }
 
