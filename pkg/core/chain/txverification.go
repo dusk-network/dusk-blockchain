@@ -7,43 +7,49 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
-func (c *Chain) checkSpecialFields(index uint32, blockTime uint64, tx transactions.Transaction) error {
+func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transactions.Transaction) error {
 	switch x := tx.(type) {
 	case *transactions.TimeLock:
-		return c.verifyTimelock(index, blockTime, x)
+		return c.verifyTimelock(txIndex, blockTime, x)
 	case *transactions.Bid:
-		return c.verifyBid(index, blockTime, x)
+		return c.verifyBid(txIndex, blockTime, x)
 	case *transactions.Coinbase:
-		return c.verifyCoinbase(index, x)
+		return c.verifyCoinbase(txIndex, x)
 	case *transactions.Stake:
-		return c.verifyStake(index, blockTime, x)
+		return c.verifyStake(txIndex, blockTime, x)
+	case *transactions.Standard:
+		return c.verifyStandard(x)
 	default:
 		return errors.New("unknown transaction type")
 	}
 }
 
-func (c *Chain) verifyCoinbase(index uint32, tx *transactions.Coinbase) error {
-	if index != 0 {
+func (c *Chain) verifyStandard(tx *transactions.Standard) error {
+	return nil
+}
+
+func (c *Chain) verifyCoinbase(txIndex uint64, tx *transactions.Coinbase) error {
+	if txIndex != 0 {
 		return errors.New("coinbase transaction is not in the first position")
 	}
 	return nil
 }
 
-func (c *Chain) verifyBid(index uint32, blockTime uint64, tx *transactions.Bid) error {
+func (c *Chain) verifyBid(index uint64, blockTime uint64, tx *transactions.Bid) error {
 	if err := c.checkLockTimeValid(tx.Lock, blockTime); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Chain) verifyStake(index uint32, blockTime uint64, tx *transactions.Stake) error {
+func (c *Chain) verifyStake(index uint64, blockTime uint64, tx *transactions.Stake) error {
 	if err := c.checkLockTimeValid(tx.Lock, blockTime); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Chain) verifyTimelock(index uint32, blockTime uint64, tx *transactions.TimeLock) error {
+func (c *Chain) verifyTimelock(index uint64, blockTime uint64, tx *transactions.TimeLock) error {
 	if err := c.checkLockTimeValid(tx.Lock, blockTime); err != nil {
 		return err
 	}
@@ -51,8 +57,8 @@ func (c *Chain) verifyTimelock(index uint32, blockTime uint64, tx *transactions.
 }
 
 func (c *Chain) checkLockTimeValid(lockTime, blockTime uint64) error {
-	if lockTime >= 0x8000000000000000 {
-		return c.checkLockValidHeight(lockTime - 0x8000000000000000)
+	if lockTime >= transactions.TimeLockBlockZero {
+		return c.checkLockValidHeight(lockTime - transactions.TimeLockBlockZero)
 	}
 	return c.checkLockValidTime(lockTime, blockTime)
 }

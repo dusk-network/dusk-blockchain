@@ -62,7 +62,7 @@ func (c Chain) VerifyBlock(blk block.Block) error {
 		if !ok {
 			return errors.New("tx does not implement the transaction interface")
 		}
-		if err := c.verifyTX(uint32(i), uint64(blk.Header.Timestamp), tx); err != nil {
+		if err := c.verifyTX(uint64(i), uint64(blk.Header.Timestamp), tx); err != nil {
 			return err
 		}
 	}
@@ -91,9 +91,9 @@ func (c *Chain) VerifyTX(tx transactions.Transaction) error {
 // blockTime indicates what time the transaction will be included in a block
 // If it is a solo transaction, the blockTime is calculated by using currentBlockTime+consensusSeconds
 // Returns nil if a tx is valid
-func (c *Chain) verifyTX(index uint32, blockTime uint64, tx transactions.Transaction) error {
+func (c *Chain) verifyTX(index uint64, blockTime uint64, tx transactions.Transaction) error {
 
-	if err := c.checkStandardTx(tx.StandardTX()); err != nil {
+	if err := c.checkStandardTx(tx.StandardTX()); err != nil && tx.Type() != transactions.CoinbaseType {
 		return err
 	}
 
@@ -134,6 +134,7 @@ func (c Chain) checkBlockHeader(blk block.Block) error {
 	if err := blk.SetRoot(); err != nil {
 		return errors.New("could not calculate the merkle tree root for this header")
 	}
+
 	if !bytes.Equal(tR, blk.Header.TxRoot) {
 		return errors.New("merkle root mismatch")
 	}
@@ -188,13 +189,6 @@ func (c Chain) checkStandardTx(tx transactions.Standard) error {
 }
 
 func checkRangeProof(p rangeproof.Proof) error {
-	ok, err := rangeproof.Verify(p)
-	if !ok {
-		return errors.New("rangeproof verification failed")
-	}
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
