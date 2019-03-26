@@ -11,6 +11,14 @@ type Logger interface {
 	Connect(<-chan *Event)
 }
 
+// LaunchLoggers should do a plugin lookup and use the Connect method. For now, it accepts Loggers as a parameter and the plugging is delegated to the caller until the plugin system will be ready
+func LaunchLoggers(eventBus *wire.EventBus, l []Logger) {
+	logChan := InitLogCollector(eventBus)
+	for _, logger := range l {
+		logger.Connect(logChan)
+	}
+}
+
 const (
 	LogTopic = "LOG"
 
@@ -101,12 +109,4 @@ func InitLogCollector(eventBus *wire.EventBus) chan *Event {
 	collector := &collector{logChan}
 	go wire.NewEventSubscriber(eventBus, collector, LogTopic).Accept()
 	return logChan
-}
-
-// LaunchLoggers should do a plugin lookup and use the Connect method. For now, it accepts Loggers as a parameter and the plugging is delegated to the caller until the plugin system will be ready
-func LaunchLoggers(eventBus *wire.EventBus, l []Logger) {
-	logChan := InitLogCollector(eventBus)
-	for _, logger := range l {
-		logger.Connect(logChan)
-	}
 }
