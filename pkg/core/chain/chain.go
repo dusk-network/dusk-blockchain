@@ -54,7 +54,11 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 func (c Chain) VerifyBlock(blk block.Block) error {
 
 	if err := c.checkBlockHeader(blk); err != nil {
-		return errors.Wrapf(err, "could not verify block with hash %s", hex.EncodeToString(blk.Header.Hash))
+		return errors.Wrapf(err, " block header verification failed with hash %s", hex.EncodeToString(blk.Header.Hash))
+	}
+
+	if err := checkMultiCoinbases(blk.Txs); err != nil {
+		return err
 	}
 
 	for i, merklePayload := range blk.Txs {
@@ -185,6 +189,28 @@ func (c Chain) checkStandardTx(tx transactions.Standard) error {
 		return err
 	}
 
+	return nil
+}
+
+// returns an error if there is more than one coinbase transaction
+//  in the list or if there are none
+func checkMultiCoinbases(txs []transactions.Transaction) error {
+
+	var seen bool
+
+	for _, tx := range txs {
+		if tx.Type() != transactions.CoinbaseType {
+			continue
+		}
+		if seen {
+			return errors.New("multiple coinbase transactions present")
+		}
+		seen = true
+	}
+
+	if !seen {
+		return errors.New("no coinbase transactions in the list")
+	}
 	return nil
 }
 
