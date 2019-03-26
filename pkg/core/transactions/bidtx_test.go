@@ -1,10 +1,12 @@
-package transactions
+package transactions_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 func TestEncodeDecodeBid(t *testing.T) {
@@ -12,7 +14,7 @@ func TestEncodeDecodeBid(t *testing.T) {
 	assert := assert.New(t)
 
 	// random bid tx
-	tx, err := randomBidTx(t, false)
+	tx, err := helper.RandomBidTx(t, false)
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
@@ -20,7 +22,7 @@ func TestEncodeDecodeBid(t *testing.T) {
 	assert.Nil(err)
 
 	// Decode buffer into a bid TX struct
-	decTX := &Bid{}
+	decTX := &transactions.Bid{}
 	err = decTX.Decode(buf)
 	assert.Nil(err)
 
@@ -35,6 +37,9 @@ func TestEncodeDecodeBid(t *testing.T) {
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
+
+	// Check that type is correct
+	assert.Equal(transactions.BidType, decTX.TxType)
 }
 
 func TestMalformedBid(t *testing.T) {
@@ -42,7 +47,7 @@ func TestMalformedBid(t *testing.T) {
 	assert := assert.New(t)
 
 	// random bid tx
-	tx, err := randomBidTx(t, true)
+	tx, err := helper.RandomBidTx(t, true)
 	assert.Nil(tx)
 	assert.NotNil(err)
 }
@@ -51,38 +56,13 @@ func TestEqualsMethodBid(t *testing.T) {
 
 	assert := assert.New(t)
 
-	a, err := randomBidTx(t, false)
+	a, err := helper.RandomBidTx(t, false)
 	assert.Nil(err)
-	b, err := randomBidTx(t, false)
+	b, err := helper.RandomBidTx(t, false)
 	assert.Nil(err)
 	c := a
 
 	assert.False(a.Equals(b))
 	assert.False(b.Equals(c))
 	assert.True(a.Equals(c))
-}
-
-func randomBidTx(t *testing.T, malformed bool) (*Bid, error) {
-
-	var numInputs, numOutputs = 23, 34
-	var lock uint64 = 20000
-	var fee uint64 = 20
-	var M = randomSlice(t, 32)
-
-	if malformed {
-		M = randomSlice(t, 12)
-	}
-
-	tx, err := NewBid(0, lock, fee, M)
-	if err != nil {
-		return tx, err
-	}
-
-	// Inputs
-	tx.Inputs = randomInputs(t, numInputs, malformed)
-
-	// Outputs
-	tx.Outputs = randomOutputs(t, numOutputs, malformed)
-
-	return tx, err
 }

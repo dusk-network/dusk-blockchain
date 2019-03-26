@@ -1,10 +1,12 @@
-package transactions
+package transactions_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 func TestEncodeDecodeTLock(t *testing.T) {
@@ -12,7 +14,7 @@ func TestEncodeDecodeTLock(t *testing.T) {
 	assert := assert.New(t)
 
 	// random timelock tx
-	tx := randomTLockTx(t, false)
+	tx := helper.RandomTLockTx(t, false)
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
@@ -20,7 +22,7 @@ func TestEncodeDecodeTLock(t *testing.T) {
 	assert.Nil(err)
 
 	// Decode buffer into a TimeLock TX struct
-	decTX := &TimeLock{}
+	decTX := &transactions.TimeLock{}
 	err = decTX.Decode(buf)
 	assert.Nil(err)
 
@@ -35,34 +37,20 @@ func TestEncodeDecodeTLock(t *testing.T) {
 	assert.Nil(err)
 
 	assert.True(bytes.Equal(txid, decTxid))
+
+	// Check that type is correct
+	assert.Equal(transactions.TimelockType, decTX.TxType)
 }
 
 func TestEqualsMethodTimeLock(t *testing.T) {
 
 	assert := assert.New(t)
 
-	a := randomTLockTx(t, false)
-	b := randomTLockTx(t, false)
+	a := helper.RandomTLockTx(t, false)
+	b := helper.RandomTLockTx(t, false)
 	c := a
 
 	assert.False(a.Equals(b))
 	assert.False(b.Equals(c))
 	assert.True(a.Equals(c))
-}
-
-func randomTLockTx(t *testing.T, malformed bool) *TimeLock {
-
-	var numInputs, numOutputs = 23, 34
-	var lock uint64 = 20000
-	var fee uint64 = 20
-
-	tx := NewTimeLock(0, lock, fee)
-
-	// Inputs
-	tx.Inputs = randomInputs(t, numInputs, malformed)
-
-	// Outputs
-	tx.Outputs = randomOutputs(t, numOutputs, malformed)
-
-	return tx
 }

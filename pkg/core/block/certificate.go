@@ -142,3 +142,50 @@ func (c *Certificate) Decode(r io.Reader) error {
 
 	return nil
 }
+
+// Equals returns true if both certificates are equal
+func (c *Certificate) Equals(other *Certificate) bool {
+
+	if other == nil {
+		return false
+	}
+
+	if !bytes.Equal(c.BRBatchedSig, other.BRBatchedSig) {
+		return false
+	}
+
+	if c.BRStep != other.BRStep {
+		return false
+	}
+
+	if len(c.BRPubKeys) != len(other.BRPubKeys) {
+		return false
+	}
+
+	if len(c.SRPubKeys) != len(other.SRPubKeys) {
+		return false
+	}
+
+	for i := range c.BRPubKeys {
+
+		brPubKey := c.BRPubKeys[i]
+		otherBrPubKey := other.BRPubKeys[i]
+
+		if !bytes.Equal(brPubKey, otherBrPubKey) {
+			return false
+		}
+	}
+
+	for i := range c.SRPubKeys {
+
+		srPubKey := c.SRPubKeys[i]
+		otherSrPubKey := other.SRPubKeys[i]
+
+		if !bytes.Equal(srPubKey, otherSrPubKey) {
+			return false
+		}
+	}
+
+	return true
+
+}

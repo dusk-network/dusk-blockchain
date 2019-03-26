@@ -1,6 +1,10 @@
 package transactions
 
-import "io"
+import (
+	"io"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
+)
 
 // Encoder encodes a given struct into an io.writer
 type Encoder interface {
@@ -28,5 +32,7 @@ type Transaction interface {
 	Encoder
 	Decoder
 	TypeInfo
+	merkletree.Payload
+	Equals(Transaction) bool
 	StandardTX() Standard
 }

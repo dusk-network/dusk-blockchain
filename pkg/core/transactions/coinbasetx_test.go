@@ -1,10 +1,12 @@
-package transactions
+package transactions_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 func TestEncodeDecodeCoinbase(t *testing.T) {
@@ -12,7 +14,7 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 	assert := assert.New(t)
 
 	// random coinbase tx
-	tx := randomCoinBaseTx(t, false)
+	tx := helper.RandomCoinBaseTx(t, false)
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
@@ -20,7 +22,7 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 	assert.Nil(err)
 
 	// Decode buffer into a coinbase TX struct
-	decTX := &Coinbase{}
+	decTX := &transactions.Coinbase{}
 	err = decTX.Decode(buf)
 	assert.Nil(err)
 
@@ -41,22 +43,11 @@ func TestEqualsMethodCoinBase(t *testing.T) {
 
 	assert := assert.New(t)
 
-	a := randomCoinBaseTx(t, false)
-	b := randomCoinBaseTx(t, false)
+	a := helper.RandomCoinBaseTx(t, false)
+	b := helper.RandomCoinBaseTx(t, false)
 	c := a
 
 	assert.False(a.Equals(b))
 	assert.False(b.Equals(c))
 	assert.True(a.Equals(c))
-}
-
-func randomCoinBaseTx(t *testing.T, malformed bool) *Coinbase {
-
-	proof := randomSlice(t, 2000)
-	key := randomSlice(t, 32)
-	address := randomSlice(t, 32)
-
-	tx := NewCoinbase(proof, key, address)
-
-	return tx
 }
