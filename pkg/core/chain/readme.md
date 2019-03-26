@@ -44,6 +44,6 @@
 
 ## TODO
 
-- Modify transaction/block code in wire(blocking), add checks for transactions in chain
+- Removed checks for rangeproof, until the specs for it and verifyign amounts are sorted out. Next bulletpoint outlines such check
 
-- TESTS (Blocking)
+- need to check input and output and fees check out
