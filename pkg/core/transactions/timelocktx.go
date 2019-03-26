@@ -23,6 +23,10 @@ type TimeLock struct {
 	Lock uint64
 }
 
+// TimeLockBlockZero is the integer that represents the blockHeight of zero for
+// a timelock transaction
+const TimeLockBlockZero = 0x8000000000000000
+
 // NewTimeLock will return a TimeLock transaction
 // Given the tx version, the locktime and the fee
 func NewTimeLock(ver uint8, lock, fee uint64) *TimeLock {
