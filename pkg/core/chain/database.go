@@ -21,6 +21,24 @@ type Database interface {
 	hasKeyImage(hash []byte) (bool, error)
 }
 
+// writeBlock is called after all of the checks on the block pass
+// returns nil, if write to database was successful
+func (c *Chain) writeBlock(blk block.Block) error {
+	return nil
+}
+
+// hasBlock checks whether the block passed as an
+// argument has already been saved into our database
+// returns nil, if block does not exist
+func (c Chain) checkBlockExists(blk block.Block) error {
+
+	hdr, err := c.db.getBlockHeaderByHash(blk.Header.Hash)
+	if hdr != nil {
+		return errors.New("chain: block is already present in the database")
+	}
+	return err
+}
+
 type ldb struct {
 	storage *leveldb.DB
 	path    string
