@@ -144,19 +144,29 @@ func (c Chain) checkBlockHeader(blk block.Block) error {
 // Checks whether the standard fields are correct.
 // These checks are both stateless and stateful.
 func (c Chain) checkStandardTx(tx transactions.Standard) error {
-	// Version -- Currently we only accept Version 0
+	// Version -- currently we only accept Version 0
 	if tx.Version != 0 {
 		return errors.New("invalid transaction version")
 	}
 
-	// Type - Currently we only have five types
+	// Type - currently we only have five types
 	if tx.TxType > 5 {
 		return errors.New("invalid transaction type")
+	}
+
+	// Inputs - must contain at least one
+	if len(tx.Inputs) == 0 {
+		return errors.New("transaction must contain atleast one input")
 	}
 
 	// Inputs - should not have duplicate key images
 	if tx.Inputs.HasDuplicates() {
 		return errors.New("there are duplicate key images in this transaction")
+	}
+
+	// Outputs - must contain atleast one
+	if len(tx.Outputs) == 0 {
+		return errors.New("transaction must contain atleast one output")
 	}
 
 	// Outputs - should not have duplicate destination keys
