@@ -104,10 +104,9 @@ func TestReductionTimeout(t *testing.T) {
 func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	keys, _ := user.NewRandKeys()
 	signedHash, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, hash)
-	hdrMarshaller := consensus.EventHeaderMarshaller{}
-	marshaller := newBlockUnMarshaller()
+	marshaller := committee.NewReductionEventUnMarshaller(nil)
 
-	bev := &BlockEvent{
+	bev := &committee.ReductionEvent{
 		EventHeader: &consensus.EventHeader{
 			PubKeyBLS: keys.BLSPubKey.Marshal(),
 			Round:     round,
@@ -118,7 +117,6 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	}
 
 	buf := new(bytes.Buffer)
-	hdrMarshaller.Marshal(buf, bev.EventHeader)
 	marshaller.Marshal(buf, bev)
 	edSig := ed25519.Sign(*keys.EdSecretKey, buf.Bytes())
 	completeBuf := bytes.NewBuffer(edSig)

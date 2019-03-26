@@ -103,8 +103,8 @@ func (ehm *EventHeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 }
 
 // NewEventHeaderUnmarshaller creates an EventHeaderUnmarshaller delegating validation to the validate function
-func NewEventHeaderUnmarshaller() *EventHeaderUnmarshaller {
-	return &EventHeaderUnmarshaller{msg.VerifyEd25519Signature}
+func NewEventHeaderUnmarshaller(validate func(*bytes.Buffer) error) *EventHeaderUnmarshaller {
+	return &EventHeaderUnmarshaller{validate}
 }
 
 // Unmarshal unmarshals the buffer into a ConsensusEvent

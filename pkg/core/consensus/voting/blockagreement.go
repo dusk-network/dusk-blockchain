@@ -3,6 +3,8 @@ package voting
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -19,8 +21,9 @@ type blockAgreementSigner struct {
 
 func newBlockAgreementSigner(keys *user.Keys, c committee.Committee) *blockAgreementSigner {
 	return &blockAgreementSigner{
-		eventSigner:             newEventSigner(keys, c),
-		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(committee.NewReductionEventUnMarshaller()),
+		eventSigner: newEventSigner(keys, c),
+		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(committee.NewReductionEventUnMarshaller(nil),
+			msg.VerifyEd25519Signature),
 	}
 }
 

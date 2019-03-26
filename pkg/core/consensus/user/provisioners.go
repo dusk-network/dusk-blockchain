@@ -48,9 +48,18 @@ func (m Member) BLSString() string {
 type Provisioners []Member
 
 // GetMember  returns a member of the provisioners from its BLS key
-func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
+func (p *Provisioners) GetMemberBLS(pubKeyBLS []byte) *Member {
 	for _, provisioner := range *p {
 		if bytes.Equal(provisioner.PublicKeyBLS.Marshal(), pubKeyBLS) {
+			return &provisioner
+		}
+	}
+	return nil
+}
+
+func (p *Provisioners) GetMemberEd(pubKeyEd []byte) *Member {
+	for _, provisioner := range *p {
+		if bytes.Equal([]byte(provisioner.PublicKeyEd), pubKeyEd) {
 			return &provisioner
 		}
 	}

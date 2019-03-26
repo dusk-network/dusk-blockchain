@@ -79,7 +79,8 @@ func (ssn *sigSetNotary) Listen() {
 
 func NewSigSetEventUnmarshaller() *SigSetEventUnmarshaller {
 	return &SigSetEventUnmarshaller{
-		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(reduction.NewSigSetUnMarshaller()),
+		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(
+			reduction.NewSigSetUnMarshaller(nil), msg.VerifyEd25519Signature),
 	}
 }
 

@@ -55,9 +55,9 @@ func (sse *SigSetEvent) Equal(e wire.Event) bool {
 		bytes.Equal(sse.BlockHash, e.(*SigSetEvent).BlockHash)
 }
 
-func NewSigSetUnMarshaller() *SigSetUnmarshaller {
+func NewSigSetUnMarshaller(validate func(*bytes.Buffer) error) *SigSetUnmarshaller {
 	return &SigSetUnmarshaller{
-		unMarshaller: newUnMarshaller(),
+		unMarshaller: newUnMarshaller(validate),
 	}
 }
 
@@ -91,6 +91,29 @@ func (ssru *SigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return nil
 }
 
+func (ssru *SigSetUnmarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event, error) {
+	length, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return nil, err
+	}
+
+	evs := make([]wire.Event, length)
+	for i := uint64(0); i < length; i++ {
+		rev := &SigSetEvent{
+			ReductionEvent: &committee.ReductionEvent{
+				EventHeader: &consensus.EventHeader{},
+			},
+		}
+		if err := ssru.Unmarshal(r, rev); err != nil {
+			return nil, err
+		}
+
+		evs[i] = rev
+	}
+
+	return evs, nil
+}
+
 func (ssru *SigSetUnmarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
 	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
 		return err
@@ -110,7 +133,7 @@ func newSigSetHandler(eventBus *wire.EventBus, committee committee.Committee) *s
 	phaseChannel := consensus.InitPhaseUpdate(eventBus)
 	sigSetHandler := &sigSetHandler{
 		committee:          committee,
-		SigSetUnmarshaller: NewSigSetUnMarshaller(),
+		SigSetUnmarshaller: NewSigSetUnMarshaller(msg.VerifyEd25519Signature),
 	}
 
 	go func() {

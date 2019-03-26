@@ -10,11 +10,14 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+// LaunchVotingComponent will start a sender, which initializes its own
+// signers, and will proceed to listen on the event bus for relevant
+// messages.
 func LaunchVotingComponent(eventBus *wire.EventBus, keys *user.Keys,
 	committee committee.Committee) *sender {
 
 	sender := newSender(eventBus, keys, committee)
-	go sender.Listen()
+	go sender.listen()
 	return sender
 }
 
@@ -28,7 +31,8 @@ type sender struct {
 	sigSetAgreementChannel chan *bytes.Buffer
 }
 
-// newSender will return an initialized sender struct.
+// newSender will return an initialized sender struct. It will also spawn all
+// the needed signers, and their channels get connected to the sender.
 func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Committee) *sender {
 	blockReductionChannel := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
 		unmarshalBlockReduction, newBlockReductionSigner(keys, committee))
@@ -49,17 +53,17 @@ func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Com
 }
 
 // Listen will set the sender up to listen for incoming requests to vote.
-func (v *sender) Listen() {
+func (v *sender) listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
-			v.eventBus.Publish(string(topics.PeerBlockReduction), m)
+			v.eventBus.Publish(string(topics.GossipBlockReduction), m)
 		case m := <-v.sigSetReductionChannel:
-			v.eventBus.Publish(string(topics.PeerSigSetReduction), m)
+			v.eventBus.Publish(string(topics.GossipSigSetReduction), m)
 		case m := <-v.blockAgreementChannel:
-			v.eventBus.Publish(string(topics.PeerBlockAgreement), m)
+			v.eventBus.Publish(string(topics.GossipBlockAgreement), m)
 		case m := <-v.sigSetAgreementChannel:
-			v.eventBus.Publish(string(topics.PeerSigSetAgreement), m)
+			v.eventBus.Publish(string(topics.GossipSigSetAgreement), m)
 		}
 	}
 }

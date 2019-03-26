@@ -2,6 +2,7 @@ package voting
 
 import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -17,7 +18,7 @@ type sigSetReductionSigner struct {
 func newSigSetReductionSigner(keys *user.Keys, c committee.Committee) *sigSetReductionSigner {
 	return &sigSetReductionSigner{
 		eventSigner:        newEventSigner(keys, c),
-		SigSetUnmarshaller: reduction.NewSigSetUnMarshaller(),
+		SigSetUnmarshaller: reduction.NewSigSetUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 

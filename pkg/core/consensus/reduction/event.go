@@ -24,8 +24,8 @@ type (
 	}
 )
 
-func newUnMarshaller() *unMarshaller {
-	return &unMarshaller{committee.NewReductionEventUnMarshaller()}
+func newUnMarshaller(validate func(*bytes.Buffer) error) *unMarshaller {
+	return &unMarshaller{committee.NewReductionEventUnMarshaller(validate)}
 }
 
 func (a *unMarshaller) MarshalHeader(r *bytes.Buffer, state *consensusState) error {

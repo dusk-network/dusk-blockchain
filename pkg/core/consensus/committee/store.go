@@ -69,8 +69,16 @@ func (c Store) Get() user.Provisioners {
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
-func (c *Store) IsMember(pubKeyBLS []byte) bool {
-	return c.provisioners.GetMember(pubKeyBLS) != nil
+func (c *Store) IsMember(pubKey []byte) bool {
+	if len(pubKey) == 129 {
+		return c.provisioners.GetMemberBLS(pubKey) != nil
+	}
+
+	if len(pubKey) == 32 {
+		return c.provisioners.GetMemberEd(pubKey) != nil
+	}
+
+	return false
 }
 
 // GetVotingCommittee returns a voting comittee
@@ -91,8 +99,8 @@ func (c Store) Quorum() int {
 
 // Priority returns true in case pubKey2 has higher stake than pubKey1
 func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
-	m1 := c.provisioners.GetMember(ev1.Sender())
-	m2 := c.provisioners.GetMember(ev2.Sender())
+	m1 := c.provisioners.GetMemberBLS(ev1.Sender())
+	m2 := c.provisioners.GetMemberBLS(ev2.Sender())
 	if m1 == m2 {
 		return ev1
 	}

@@ -93,22 +93,24 @@ func (ceh *NotaryEvent) Equal(e wire.Event) bool {
 	return ok && ceh.EventHeader.Equal(other) && bytes.Equal(other.SignedVoteSet, ceh.SignedVoteSet)
 }
 
-func NewEventUnMarshaller() *EventUnMarshaller {
+func NewEventUnMarshaller(validate func(*bytes.Buffer) error) *EventUnMarshaller {
 	return &EventUnMarshaller{
 		EventHeaderMarshaller:   new(consensus.EventHeaderMarshaller),
-		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(),
+		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(validate),
 	}
 }
 
-func NewReductionEventUnMarshaller() *ReductionEventUnMarshaller {
-	return &ReductionEventUnMarshaller{NewEventUnMarshaller()}
+func NewReductionEventUnMarshaller(validate func(*bytes.Buffer) error) *ReductionEventUnMarshaller {
+	return &ReductionEventUnMarshaller{NewEventUnMarshaller(validate)}
 }
 
 // NewNotaryEventUnMarshaller creates a new NotaryEventUnMarshaller. Internally it creates an EventHeaderUnMarshaller which takes care of Decoding and Encoding operations
-func NewNotaryEventUnMarshaller(ru ReductionUnmarshaller) *NotaryEventUnMarshaller {
+func NewNotaryEventUnMarshaller(ru ReductionUnmarshaller,
+	validate func(*bytes.Buffer) error) *NotaryEventUnMarshaller {
+
 	return &NotaryEventUnMarshaller{
 		ReductionUnmarshaller: ru,
-		EventUnMarshaller:     NewEventUnMarshaller(),
+		EventUnMarshaller:     NewEventUnMarshaller(validate),
 	}
 }
 
@@ -156,9 +158,14 @@ func (a *ReductionEventUnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.E
 
 	evs := make([]wire.Event, length)
 	for i := uint64(0); i < length; i++ {
-		if err := a.Unmarshal(r, evs[i]); err != nil {
+		rev := &ReductionEvent{
+			EventHeader: &consensus.EventHeader{},
+		}
+		if err := a.Unmarshal(r, rev); err != nil {
 			return nil, err
 		}
+
+		evs[i] = rev
 	}
 
 	return evs, nil

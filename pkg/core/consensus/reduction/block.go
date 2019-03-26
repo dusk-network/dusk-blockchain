@@ -41,7 +41,7 @@ type (
 func newBlockHandler(committee committee.Committee) *blockHandler {
 	return &blockHandler{
 		committee:    committee,
-		unMarshaller: newUnMarshaller(),
+		unMarshaller: newUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 
