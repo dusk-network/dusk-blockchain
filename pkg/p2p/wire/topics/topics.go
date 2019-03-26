@@ -34,7 +34,17 @@ const (
 	SigSet          Topic = "sigset"
 	BlockReduction  Topic = "blockreduction"
 	SigSetReduction Topic = "sigsetreduction"
-	Agreement       Topic = "agreement"
+	BlockAgreement  Topic = "blockagreement"
+	SigSetAgreement Topic = "sigsetagreement"
+
+	// Peer topics
+	PeerCandidate       Topic = "peercandidate"
+	PeerScore           Topic = "peerscore"
+	PeerSigSet          Topic = "peersigset"
+	PeerBlockReduction  Topic = "peerblockreduction"
+	PeerSigSetReduction Topic = "peersigsetreduction"
+	PeerBlockAgreement  Topic = "peerblockagreement"
+	PeerSigSetAgreement Topic = "peersigsetagreement"
 
 	// Blockchain topics
 	ChainInfo Topic = "chaininfo"
