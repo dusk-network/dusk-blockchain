@@ -13,6 +13,7 @@ import (
 
 // Database is a mock database interface until Database is functional
 type Database interface {
+	getBestBlock() (*block.Block, error)
 	getBlockHeaderByHash(hash []byte) (*block.Header, error)
 	writeBlockHeader(hdr *block.Header) error
 	writeBlock(blk block.Block) error
@@ -152,6 +153,10 @@ func (l *ldb) writeTX(tx transactions.Transaction) error {
 	}
 	return l.storage.Put(key, val, nil)
 
+}
+
+func (l *ldb) getBestBlock() (*block.Block, error) {
+	return nil, nil
 }
 
 func toBytes(f func(io.Writer) error) ([]byte, error) {

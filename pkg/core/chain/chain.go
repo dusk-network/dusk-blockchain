@@ -20,6 +20,19 @@ type Chain struct {
 	db        Database
 }
 
+//New returns a new chain object
+func New(db Database) (*Chain, error) {
+	blk, err := db.getBestBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Chain{
+		db:        db,
+		prevBlock: *blk,
+	}, nil
+}
+
 // AcceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
