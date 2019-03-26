@@ -37,6 +37,10 @@ type Transaction interface {
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
 
+	// Check if an input keyImage is already stored. If succeeds, it returns
+	// also txID the input belongs to
+	FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error)
+
 	// Read-write transactions
 	StoreBlock(block *block.Block) error
 

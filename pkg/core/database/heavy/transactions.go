@@ -37,10 +37,11 @@ var (
 	byteOrder = binary.LittleEndian
 
 	// Key values prefixes to provide prefix-based sorting mechanism
-	HeaderPrefix = []byte{0x01}
-	TxPrefix     = []byte{0x02}
-	HeightPrefix = []byte{0x03}
-	TxIdPrefix   = []byte{0x04}
+	HeaderPrefix   = []byte{0x01}
+	TxPrefix       = []byte{0x02}
+	HeightPrefix   = []byte{0x03}
+	TxIdPrefix     = []byte{0x04}
+	KeyImagePrefix = []byte{0x05}
 )
 
 type transaction struct {
@@ -122,6 +123,18 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		//
 		// For the retrival of a single transaction by TxId
 		t.put(append(TxIdPrefix, tx.R...), block.Header.Hash)
+
+		// Schema
+		//
+		// Key = KeyImagePrefix + tx.input.KeyImage
+		// Value = tx.R
+		//
+		// To make FetchKeyImageExists functioning
+		inputs := t.getInputs(tx)
+		for _, input := range inputs {
+			t.put(append(KeyImagePrefix, input.KeyImage...), tx.R)
+		}
+
 	}
 
 	// Key = HeightPrefix + block.header.height
@@ -131,7 +144,7 @@ func (t transaction) StoreBlock(block *block.Block) error {
 
 	heightBuf := new(bytes.Buffer)
 
-	// Append index value
+	// Append height value
 	if err := t.writeUint64(heightBuf, block.Header.Height); err != nil {
 		return err
 	}
@@ -321,7 +334,7 @@ func (t transaction) put(key []byte, value []byte) {
 	if t.batch != nil {
 		t.batch.Put(key, value)
 	} else {
-		// fail-fast when a writable tx is not capable of storing data
+		// fail-fast when a writable transaction is not capable of storing data
 		panic("leveldb batch is unreachable")
 	}
 }
@@ -338,7 +351,7 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (merkletree.Payload, uint32
 		return nil, txIndex, nil, errors.New("block transaction not found: " + err.Error())
 	}
 
-	// Fetch all the transactions that belong to a single block
+	// Fetch all the txs that belong to a single block
 	// Return only the transaction that is associated to txID
 	scanFilter := append(TxPrefix, hashHeader...)
 
@@ -360,4 +373,41 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (merkletree.Payload, uint32
 	// with decoding the transaction
 
 	return nil, txIndex, nil, errors.New("block tx is available but fetching it fails")
+}
+
+func (t transaction) FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error) {
+	exists = false
+	key := append(KeyImagePrefix, keyImage...)
+
+	err = errors.New("KeyImage not found")
+
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
+	defer iterator.Release()
+
+	for iterator.Next() {
+		txID = iterator.Value()
+		// Ensure that the keyImage exists and belongs to an input of a real tx
+		tx, _, hashHeader, err := t.FetchBlockTxByHash(txID)
+		if tx != nil && err == nil && hashHeader != nil {
+			exists = true
+			return exists, txID, err
+		}
+	}
+
+	return exists, txID, err
+}
+
+// getInputs retrieves a slice of the inputs of Standard and Timelock txs
+func (t transaction) getInputs(tx *transactions.Stealth) []*transactions.Input {
+
+	switch tx.Type {
+	case transactions.StandardType:
+		typeInfo := tx.TypeInfo.(*transactions.Standard)
+		return typeInfo.Inputs
+
+	case transactions.TimelockType:
+		typeInfo := tx.TypeInfo.(*transactions.Standard)
+		return typeInfo.Inputs
+	}
+	return nil
 }

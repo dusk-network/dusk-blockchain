@@ -90,8 +90,8 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 	defer db.Close()
 
-	// Generate a few blocks to be used as mock objects
-	blocks, err = generateBlocks(1000, 10)
+	// Generate a few blocks to be used as sample objects
+	blocks, err = generateBlocks(300, 10)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -262,6 +262,82 @@ func TestFetchBlockHashByHeight(test *testing.T) {
 				test.Fatalf("FetchBlockHeaderByHeight failed on height %d", block.Header.Height)
 				return nil
 			}
+		}
+		return nil
+	})
+}
+
+func TestFetchKeyImageExists(test *testing.T) {
+
+	test.Parallel()
+
+	// Ensure all KeyImages have been stored to the KeyImage "table"
+	err := db.View(func(t database.Transaction) error {
+		for _, block := range blocks {
+			for _, v := range block.Txs {
+				tx := v.(*transactions.Stealth)
+
+				var inputs []*transactions.Input
+				switch tx.Type {
+				case transactions.StandardType:
+					typeInfo := tx.TypeInfo.(*transactions.Standard)
+					inputs = typeInfo.Inputs
+
+				case transactions.TimelockType:
+					typeInfo := tx.TypeInfo.(*transactions.Standard)
+					inputs = typeInfo.Inputs
+				}
+
+				for _, input := range inputs {
+
+					if len(input.KeyImage) == 0 {
+						test.Fatal("Testing with empty keyImage")
+					}
+
+					exists, txID, err := t.FetchKeyImageExists(input.KeyImage)
+
+					if !exists {
+						test.Fatal("FetchKeyImageExists cannot find keyImage")
+					}
+
+					if txID == nil {
+						test.Fatal("FetchKeyImageExists found keyImage on invalid tx")
+					}
+
+					if err != nil {
+						test.Fatal(err.Error())
+					}
+				}
+
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	// Ensure it fails properly when a non-existing KeyImage is checked
+	_ = db.View(func(t database.Transaction) error {
+		invalidKeyImage, _ := crypto.RandEntropy(32)
+
+		if len(invalidKeyImage) == 0 {
+			test.Fatal("Testing with empty KeyImage")
+		}
+
+		exists, txID, err := t.FetchKeyImageExists(invalidKeyImage)
+
+		if exists {
+			test.Fatal("KeyImage is not supposed to be found")
+		}
+
+		if txID != nil {
+			test.Fatal("Invalid TxID for non-existing KeyImage")
+		}
+
+		if err == nil {
+			test.Fatal("Missing error when fetching non-existing KeyImage")
 		}
 		return nil
 	})
