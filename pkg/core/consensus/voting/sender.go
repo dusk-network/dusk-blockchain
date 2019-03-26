@@ -10,9 +10,17 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// Sender is responsible for signing and sending out consensus related
+func LaunchVotingComponent(eventBus *wire.EventBus, keys *user.Keys,
+	committee committee.Committee) *sender {
+
+	sender := newSender(eventBus, keys, committee)
+	go sender.Listen()
+	return sender
+}
+
+// sender is responsible for signing and sending out consensus related
 // voting messages to the wire.
-type Sender struct {
+type sender struct {
 	eventBus               *wire.EventBus
 	blockReductionChannel  chan *bytes.Buffer
 	blockAgreementChannel  chan *bytes.Buffer
@@ -20,8 +28,8 @@ type Sender struct {
 	sigSetAgreementChannel chan *bytes.Buffer
 }
 
-// NewSender will return an initialized Sender struct.
-func NewSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Committee) *Sender {
+// newSender will return an initialized sender struct.
+func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Committee) *sender {
 	blockReductionChannel := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
 		unmarshalBlockReduction, newBlockReductionSigner(keys, committee))
 	sigSetReductionChannel := initCollector(eventBus, msg.OutgoingSigSetReductionTopic,
@@ -31,7 +39,7 @@ func NewSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Com
 	sigSetAgreementChannel := initCollector(eventBus, msg.OutgoingSigSetAgreementTopic,
 		unmarshalSigSetAgreement, newSigSetAgreementSigner(keys, committee))
 
-	return &Sender{
+	return &sender{
 		eventBus:               eventBus,
 		blockReductionChannel:  blockReductionChannel,
 		sigSetReductionChannel: sigSetReductionChannel,
@@ -40,8 +48,8 @@ func NewSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Com
 	}
 }
 
-// Listen will set the Sender up to listen for incoming requests to vote.
-func (v *Sender) Listen() {
+// Listen will set the sender up to listen for incoming requests to vote.
+func (v *sender) Listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
