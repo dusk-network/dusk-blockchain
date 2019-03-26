@@ -51,81 +51,43 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 // returns nil if a block is valid
 func (c Chain) VerifyBlock(blk block.Block) error {
 
-	// 1. Check whether a block is malformed - stateless
-	err := c.checkBlockMalformed(blk)
-	if err != nil {
+	if err := c.checkBlockHeader(blk); err != nil {
 		return errors.Wrapf(err, "could not verify block with hash %s", hex.EncodeToString(blk.Header.Hash))
 	}
 
-	// 2. Verify each tx - stateful
-	for _, merklePl := range blk.Txs {
-		tx, ok := merklePl.(transactions.Transaction)
+	for _, merklePayload := range blk.Txs {
+		tx, ok := merklePayload.(transactions.Transaction)
 		if !ok {
 			return errors.New("tx does not implement the transaction interface")
 		}
-
-		err = c.checkTXDoubleSpent(tx.StandardTX().Inputs)
-		if err != nil {
-			return errors.Wrapf(err, "could not verify block with hash %s", hex.EncodeToString(blk.Header.Hash))
+		if err := c.VerifyTX(tx); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
 //VerifyTX will verify whether a transaction is valid by checking:
-// - Not been double spent
-// In order to check if a transaction has been double spent,
-// we need to check that the key-image has not been used before.
-// The key-image database is equivalently our utxo database in bitcoin.
-// - Not malformed
+// - It has not been double spent
+// - It is not malformed
 // Returns nil if a tx is valid
-func (c Chain) VerifyTX(tx transactions.Transaction) error {
-	//1. stateless checks
-	err := checkTXMalformed(tx)
-	if err != nil {
+func (c *Chain) VerifyTX(tx transactions.Transaction) error {
+
+	if err := c.checkStandardTx(tx.StandardTX()); err != nil {
 		return err
 	}
 
-	err = checkRangeProof(rangeproof.Proof{})
-	if err != nil {
-		return err
-	}
-
-	// stateful checks
-	err = c.checkTXDoubleSpent(tx.StandardTX().Inputs)
-	if err != nil {
+	if err := c.checkSpecialFields(tx); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// writeBlock is called after all of the checks on the block pass
-// returns nil, if write to database was successful
-func (c *Chain) writeBlock(blk block.Block) error {
-	return nil
-}
-
-// hasBlock checks whether the block passed as an
-// argument has already been saved into our database
-// returns nil, if block does not exist
-func (c Chain) checkBlockExists(blk block.Block) error {
-
-	hdr, err := c.db.getBlockHeaderByHash(blk.Header.Hash)
-	if hdr != nil {
-		return errors.New("chain: block is already present in the database")
-	}
-	return err
-}
-
-// checks whether a block is malformed,
-// which in turn checks whether any transactions are malformed
-// These are stateless checks
+// checks whether a block header is malformed,
+// These are stateless and stateful checks
 // returns nil, if all checks pass
-func (c Chain) checkBlockMalformed(blk block.Block) error {
-
-	// 1. Stateless checks on block
+func (c Chain) checkBlockHeader(blk block.Block) error {
 
 	// Version
 	if blk.Header.Version > 0 {
@@ -149,43 +111,49 @@ func (c Chain) checkBlockMalformed(blk block.Block) error {
 
 	// Merkle tree check -- Check is here as the root is not calculated on decode
 	tR := blk.Header.TxRoot
-	err := blk.SetRoot()
-	if err != nil {
-		return errors.New("could not calculate merkle tree root")
+	if err := blk.SetRoot(); err != nil {
+		return errors.New("could not calculate the merkle tree root for this header")
 	}
 	if !bytes.Equal(tR, blk.Header.TxRoot) {
 		return errors.New("merkle root mismatch")
 	}
 
-	// 2. Stateless checks on transactions
-	for _, merklePl := range blk.Txs {
-		tx, ok := merklePl.(transactions.Transaction)
-		if !ok {
-			return errors.New("could not assert tx type as TypeInfo")
-		}
-		err := checkTXMalformed(tx)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
-// Checks whether a transaction
-// is malformed. These are stateless checks
-func checkTXMalformed(tx transactions.Transaction) error {
+// Checks whether the standard fields are correct.
+// These checks are both stateless and stateful.
+func (c Chain) checkStandardTx(tx transactions.Standard) error {
+	// Version -- Currently we only accept Version 0
+	if tx.Version != 0 {
+		return errors.New("invalid transaction version")
+	}
 
-	// Version
+	// Type - Currently we only have five types
+	if tx.TxType > 5 {
+		return errors.New("invalid transaction type")
+	}
 
-	// Check standard fields
+	// Inputs - should not have duplicate key images
+	if tx.Inputs.HasDuplicates() {
+		return errors.New("there are duplicate key images in this transaction")
+	}
 
-	// Check if
+	// Outputs - should not have duplicate destination keys
+	if tx.Outputs.HasDuplicates() {
+		return errors.New("there are duplicate destination keys in this transaction")
+	}
 
-	err := checkRangeProof(rangeproof.Proof{})
-	if err != nil {
+	// Rangeproof - should be valid
+	if err := checkRangeProof(rangeproof.Proof{}); err != nil {
 		return err
 	}
+
+	// KeyImage - should not be present in the database
+	if err := c.checkTXDoubleSpent(tx.Inputs); err != nil {
+		return err
+	}
+
 	return nil
 }
 
