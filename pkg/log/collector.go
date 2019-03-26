@@ -7,6 +7,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+type Logger interface {
+	Connect(<-chan *Event)
+}
+
 const (
 	LogTopic = "LOG"
 
@@ -15,17 +19,19 @@ const (
 	Err  uint8 = iota
 )
 
-type collector struct {
-	logChan chan *Event
-}
+type (
+	collector struct {
+		logChan chan *Event
+	}
 
-type Event struct {
-	Msg        string
-	Severity   uint8
-	Originator string
-}
+	Event struct {
+		Msg        string
+		Severity   uint8
+		Originator string
+	}
 
-type UnMarshaller struct{}
+	UnMarshaller struct{}
+)
 
 func NewEvent(sender string) *Event {
 	return &Event{
@@ -95,4 +101,12 @@ func InitLogCollector(eventBus *wire.EventBus) chan *Event {
 	collector := &collector{logChan}
 	go wire.NewEventSubscriber(eventBus, collector, LogTopic).Accept()
 	return logChan
+}
+
+// LaunchLoggers should do a plugin lookup and use the Connect method. For now, it accepts Loggers as a parameter and the plugging is delegated to the caller until the plugin system will be ready
+func LaunchLoggers(eventBus *wire.EventBus, l []Logger) {
+	logChan := InitLogCollector(eventBus)
+	for _, logger := range l {
+		logger.Connect(logChan)
+	}
 }
