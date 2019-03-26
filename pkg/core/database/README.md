@@ -18,9 +18,14 @@ Interfaces exposed to upper layers:
 
 - `/database/heavy` driver is designed to provide efficient, robust and persistent DUSK block chain DB on top of syndtr/goleveldb/leveldb store (unofficial LevelDB porting). It must be Mainnet-complient.
 
-- `/database/lite` driver is designed to provide human-readable DUSK block chain DB for DevNet needs only. As is based on SQLite3, any SQL browser can be used as blockchain explorer.
+- `/database/lite` driver is designed to provide human-readable Dusk blockchain DB for DevNet needs only. As is based on SQLite3, any SQL browser can be used as blockchain explorer.
+
+### Testing Drivers
+- `/database/testing` implements a boilerplate method to verify if a registered driver does satisfy minimum database requirements. The package defines a set of unit tests that are executed only on registered drivers. It can serve also as a detailed and working database guideline.
 
 ### Code example:
+
+More code examples can be found in `/database/heavy/database_test.go`
 
 ```
 
@@ -32,24 +37,49 @@ readonly := false
 driver, _ := database.From(lite.DriverName)
 db, err := driver.Open(path, protocol.DevNet, readonly)
 
-h := &block.Header{}
-// Populate h
+if err != nil {
+	...
+}
 
-// a managed read-write DB Tx
+defer db.Close()
+
+blocks := make([]*block.Block, 100)
+// Populate blocks here ...
+
+// a managed read-write DB Tx to store all blocks via atomic update
 err = db.Update(func(tx database.Tx) error {
-	err := tx.WriteHeader(h)
-	return err
+	for _, block := range blocks {
+		err := tx.StoreBlock(block)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 })
 
-// a managed read-only DB Tx
-retrievedHeight := 0
-err = db.View(func(tx database.Tx) error {
-	header, err := tx.GetBlockHeaderByHash(h.Hash)
-	retrievedHeight = header.Height
-	return err
+if err != nil {
+	fmt.Printf("Transaction failed. No blocks stored")
+	return
+}
+
+ // a managed read-only DB Tx to check if all blocks have been stored
+_ = db.View(func(tx database.Tx) error {
+	for _, block := range blocks {
+		exists, err := tx.FetchBlockExists(block.Header.Hash)
+		if err != nil {
+			fmt.Printf(err.Error())
+			return nil
+		}
+
+		if !exists {
+			fmt.Printf("Block with Height %d was not found", block.Header.Height)
+			return nil
+		}
+	}
+	return nil
 })
 
-db.Close()
+
 
 ```
 
@@ -63,9 +93,5 @@ Additional features that can be provided by a Driver:
 - Traces: Log transactions data
 - Alarming: Trigger an event in case of critical backend or storage failure
 - Iterators/Cursors
-- Thread-safety: One read-write transaction, many read-only transactions
-
-
-### Pending development
-
-- Implement a driver that uses RocksDB, LDBM or BoltDB as a KV store. This driver should serve as a second option for Mainnet needs. 
+- Safe Concurrency model: One read-write transaction, many read-only transactions
+- Redundancy: blockchain data stored in a secondary in-memory or on-disk structure
