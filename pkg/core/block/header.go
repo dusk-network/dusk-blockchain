@@ -72,6 +72,10 @@ func (b *Header) Encode(w io.Writer) error {
 		return err
 	}
 
+	if err := encoding.Write256(w, b.TxRoot); err != nil {
+		return err
+	}
+
 	if err := encoding.Write256(w, b.CertHash); err != nil {
 		return err
 	}

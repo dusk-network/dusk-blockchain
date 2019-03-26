@@ -37,6 +37,8 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	blk1.Header.Timestamp = blk0.Header.Timestamp + 100
 	err = blk1.SetRoot()
 	assert.Nil(t, err)
+	err = blk1.SetHash()
+	assert.Nil(t, err)
 
 	return blk0, blk1
 }
