@@ -7,13 +7,13 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
-// RandomSliceofTxs returns a random slice of transactions for testing
+// RandomSliceOfTxs returns a random slice of transactions for testing
 func RandomSliceOfTxs(t *testing.T) []transactions.Transaction {
 	var txs []transactions.Transaction
 
 	txs = append(txs, RandomCoinBaseTx(t, false))
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 10; i++ {
 
 		txs = append(txs, RandomStandardTx(t, false))
 		txs = append(txs, RandomTLockTx(t, false))
