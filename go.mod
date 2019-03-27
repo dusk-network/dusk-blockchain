@@ -16,6 +16,7 @@ require (
 	github.com/stretchr/testify v1.2.2
 	github.com/syndtr/goleveldb v0.0.0-20181128100959-b001fa50d6b2
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
+	gitlab.dusk.network/dusk-core/blindbidproof v0.0.0-20190222151059-1356e7db1584 // indirect
 	gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0
 	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9
 	golang.org/x/sys v0.0.0-20181221143128-b4a75ba826a6 // indirect
