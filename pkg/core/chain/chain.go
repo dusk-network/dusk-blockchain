@@ -3,6 +3,8 @@ package chain
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+
 	"github.com/pkg/errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
@@ -15,12 +17,13 @@ var consensusSeconds = 10
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
+	eventBus  *wire.EventBus
 	prevBlock block.Block
 	db        Database
 }
 
 //New returns a new chain object
-func New() (*Chain, error) {
+func New(eventBus *wire.EventBus) (*Chain, error) {
 	db, err := NewDatabase("demo", false)
 	if err != nil {
 		return nil, err
@@ -42,6 +45,7 @@ func New() (*Chain, error) {
 	}
 
 	return &Chain{
+		eventBus:  eventBus,
 		db:        db,
 		prevBlock: *genesisBlock,
 	}, nil
