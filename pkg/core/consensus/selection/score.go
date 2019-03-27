@@ -83,8 +83,9 @@ func newScoreHandler(eventBus *wire.EventBus) *scoreHandler {
 		unMarshaller: newScoreUnMarshaller(),
 	}
 	go func() {
-		bidList := <-bidListChan
-		sh.bidList = bidList
+		for {
+			sh.bidList = <-bidListChan
+		}
 	}()
 	return sh
 }
