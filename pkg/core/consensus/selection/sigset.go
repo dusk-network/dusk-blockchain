@@ -60,7 +60,9 @@ func newSigSetHandler(c committee.Committee, eventBus *wire.EventBus) *SigSetHan
 		unMarshaller: committee.NewEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 	go func() {
-		sigSetHandler.blockHash = <-phaseChan
+		for {
+			sigSetHandler.blockHash = <-phaseChan
+		}
 	}()
 	return sigSetHandler
 }
