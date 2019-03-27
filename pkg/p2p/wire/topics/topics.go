@@ -38,14 +38,7 @@ const (
 	SigSetAgreement Topic = "sigsetagreement"
 
 	// Peer topics
-	Propagate             Topic = "propagate"
-	GossipCandidate       Topic = "gossipcandidate"
-	GossipScore           Topic = "gossipscore"
-	GossipSigSet          Topic = "gossipsigset"
-	GossipBlockReduction  Topic = "gossipblockreduction"
-	GossipSigSetReduction Topic = "gossipsigsetreduction"
-	GossipBlockAgreement  Topic = "gossipblockagreement"
-	GossipSigSetAgreement Topic = "gossipsigsetagreement"
+	Gossip Topic = "gossip"
 
 	// Blockchain topics
 	ChainInfo Topic = "chaininfo"

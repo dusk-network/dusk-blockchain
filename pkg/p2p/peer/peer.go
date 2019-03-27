@@ -1,8 +1,8 @@
-// Package peermgr uses channels to simulate the queue handler with the actor model.
+// Package peer uses channels to simulate the queue handler with the actor model.
 // A suitable number k ,should be set for channel size, because if #numOfMsg > k, we lose determinism.
 // k chosen should be large enough that when filled, it shall indicate that the peer has stopped
 // responding, since we do not have a pingMSG, we will need another way to shut down peers.
-package peermgr
+package peer
 
 import (
 	"bytes"
@@ -11,7 +11,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -66,7 +65,6 @@ type Peer struct {
 	Addr      string
 	ProtoVer  *protocol.Version
 	Inbound   bool
-	UserAgent string
 	Services  protocol.ServiceFlag
 	CreatedAt time.Time
 	Relay     bool
@@ -80,7 +78,6 @@ type Peer struct {
 	// Atomic vals
 	Disconnected int32
 
-	statemutex     sync.Mutex
 	VerackReceived bool
 	VersionKnown   bool
 
@@ -106,14 +103,22 @@ func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.E
 		magic:    magic,
 	}
 
-	go wire.NewEventSubscriber(eventBus, p, string(topics.Propagate)).Accept()
+	go wire.NewEventSubscriber(eventBus, p, string(topics.Gossip)).Accept()
 	return p
 }
 
 // Collect implements wire.EventCollector.
-// Receive messages, and propagate them to the network.
-func (p *Peer) Collect(msg *bytes.Buffer) error {
-	return p.Write(msg)
+// Receive messages, add headers, and propagate them to the network.
+func (p *Peer) Collect(message *bytes.Buffer) error {
+	var topicBytes [15]byte
+	message.Read(topicBytes[:])
+	topic := topics.ByteArrayToTopic(topicBytes)
+	messageWithHeader, err := addHeader(message, p.magic, topic)
+	if err != nil {
+		return err
+	}
+
+	return p.Write(messageWithHeader)
 }
 
 // Write to a peer
@@ -194,15 +199,35 @@ func payloadChecksumIsValid(payloadBuffer *bytes.Buffer, checksum uint32) bool {
 	return crypto.CompareChecksum(payloadBuffer.Bytes(), checksum)
 }
 
-// PingLoop not implemented yet.
-// Will cause this client to disconnect from all other implementations
-func (p *Peer) PingLoop() { /*not implemented in other neo clients*/ }
+func (p *Peer) ReadMessage() (topics.Topic, *bytes.Buffer, error) {
+	header, err := p.readHeader()
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !p.headerMagicIsValid(header) {
+		return "", nil, errors.New("invalid header magic")
+	}
+
+	payloadBuffer, err := p.readPayload(header.Length)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !payloadChecksumIsValid(payloadBuffer, header.Checksum) {
+		return "", nil, errors.New("invalid payload checksum")
+	}
+
+	return header.Topic, payloadBuffer, nil
+}
 
 // Run is used to start communicating with the peer, completes the handshake and starts observing
 // for messages coming in and allows for queing of outgoing messages
 func (p *Peer) Run() error {
 
-	// err := p.Handshake()
+	if err := p.Handshake(); err != nil {
+		return err
+	}
 
 	go p.StartProtocol()
 	go p.ReadLoop()
@@ -233,34 +258,20 @@ loop:
 // ReadLoop will block on the read until a message is read.
 // Should only be called after handshake is complete on a seperate go-routine.
 func (p *Peer) ReadLoop() {
-
 	idleTimer := time.AfterFunc(idleTimeout, func() {
 		p.Disconnect()
 	})
 
 	for atomic.LoadInt32(&p.Disconnected) == 0 {
-
 		idleTimer.Reset(idleTimeout) // reset timer on each loop
 
-		header, err := p.readHeader()
-		idleTimer.Stop()
+		topic, payload, err := p.ReadMessage()
 		if err != nil {
-			// This will also happen if Peer is disconnected
 			p.Disconnect()
 			return
 		}
 
-		if p.headerMagicIsValid(header) {
-			payloadBuffer, err := p.readPayload(header.Length)
-			if err != nil {
-				p.Disconnect()
-				return
-			}
-
-			if payloadChecksumIsValid(payloadBuffer, header.Checksum) {
-				p.eventBus.Publish(string(header.Topic), payloadBuffer)
-			}
-		}
+		p.eventBus.Publish(string(topic), payload)
 	}
 }
 
