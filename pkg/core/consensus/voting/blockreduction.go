@@ -26,15 +26,11 @@ func (bs *blockReductionSigner) eligibleToVote() bool {
 	return bs.committee.IsMember(bs.Keys.BLSPubKey.Marshal())
 }
 
-func (bs *blockReductionSigner) addBLSPubKey(ev wire.Event) {
-	e := ev.(*committee.ReductionEvent)
-	e.EventHeader.PubKeyBLS = bs.BLSPubKey.Marshal()
-}
-
 func (bs *blockReductionSigner) signBLS(ev wire.Event) error {
 	e := ev.(*committee.ReductionEvent)
 	signedHash, err := bls.Sign(bs.BLSSecretKey, bs.BLSPubKey, e.VotedHash)
 	e.SignedHash = signedHash.Compress()
+	e.EventHeader.PubKeyBLS = bs.BLSPubKey.Marshal()
 	return err
 }
 

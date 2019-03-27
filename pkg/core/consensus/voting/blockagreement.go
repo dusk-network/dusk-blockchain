@@ -31,11 +31,6 @@ func (as *blockAgreementSigner) eligibleToVote() bool {
 	return as.committee.IsMember(as.Keys.BLSPubKey.Marshal())
 }
 
-func (as *blockAgreementSigner) addBLSPubKey(ev wire.Event) {
-	e := ev.(*notary.BlockEvent)
-	e.EventHeader.PubKeyBLS = as.BLSPubKey.Marshal()
-}
-
 func (as *blockAgreementSigner) signBLS(ev wire.Event) error {
 	e := ev.(*notary.BlockEvent)
 	buffer := new(bytes.Buffer)
@@ -45,6 +40,7 @@ func (as *blockAgreementSigner) signBLS(ev wire.Event) error {
 
 	signedVoteSet, err := bls.Sign(as.BLSSecretKey, as.BLSPubKey, buffer.Bytes())
 	e.SignedVoteSet = signedVoteSet.Compress()
+	e.EventHeader.PubKeyBLS = as.BLSPubKey.Marshal()
 	return err
 }
 
