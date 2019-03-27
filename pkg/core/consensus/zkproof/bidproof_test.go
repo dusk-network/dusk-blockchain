@@ -1,40 +1,63 @@
 package zkproof_test
 
 import (
-	"fmt"
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 )
 
-func TestProofVerify(t *testing.T) {
-	// amount in the bidding transaction
+func TestProveVerify(t *testing.T) {
+	//for n := 0; n < 20; n++ {
 	d := genRandScalar()
-
-	dAsBytes := d.Bytes()
-
-	d = zkproof.BytesToScalar(dAsBytes)
-
-	// secret number
 	k := genRandScalar()
-	// seed from block
 	seed := genRandScalar()
 
 	// public list of bids
-	BidList := make([]ristretto.Scalar, 0, 5)
+	pubList := make([]ristretto.Scalar, 0, 5)
 	for i := 0; i < 5; i++ {
-		BidList = append(BidList, genRandScalar())
+		pubList = append(pubList, genRandScalar())
 	}
 
-	proof, qBytes, zBytes, pL := zkproof.Prove(d, k, seed, BidList)
+	proof := zkproof.Prove(d, k, seed, pubList)
+	res := zkproof.Verify(proof.Proof, seed.Bytes(), proof.ProofBidList, proof.Score, proof.Z)
+	assert.Equal(t, true, res)
+	//}
+}
 
-	res := zkproof.Verify(proof, seed.Bytes(), pL, qBytes, zBytes)
-	fmt.Println(res)
+func BenchmarkProveVerify(b *testing.B) {
+
+	b.ReportAllocs()
+
+	d := genRandScalar()
+	k := genRandScalar()
+	seed := genRandScalar()
+
+	// public list of bids
+	pubList := make([]ristretto.Scalar, 0, 5)
+	for i := 0; i < 5; i++ {
+		pubList = append(pubList, genRandScalar())
+	}
+	b.ResetTimer()
+	b.N = 20
+	for n := 0; n < b.N; n++ {
+		proof := zkproof.Prove(d, k, seed, pubList)
+		zkproof.Verify(proof.Proof, seed.Bytes(), proof.ProofBidList, proof.Score, proof.Z)
+	}
 }
 
 func genRandScalar() ristretto.Scalar {
 	c := ristretto.Scalar{}
 	c.Rand()
 	return c
+}
+
+func bytesToScalar(d []byte) ristretto.Scalar {
+	x := ristretto.Scalar{}
+
+	var buf [32]byte
+	copy(buf[:], d[:])
+	x.SetBytes(&buf)
+	return x
 }

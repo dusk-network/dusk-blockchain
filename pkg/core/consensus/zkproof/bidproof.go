@@ -1,14 +1,12 @@
 package zkproof
 
-// #cgo LDFLAGS: -L./ -lblindbid -framework Security
-// #include "./libblindbid.h"
-import "C"
 import (
 	"bytes"
 	"math/big"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"time"
-	"unsafe"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -27,57 +25,53 @@ const mimcRounds = 90
 
 // constants used in MIMC
 var constants = genConstants()
-var conBytes = constantsToBytes(constants)
+var pipePath = tempFilePath("pipe-channel")
 
 // Prove creates a zkproof using d,k, seed and BidList
 // This will be accessed by the consensus
 // This will return the proof as a byte slice
 func Prove(d, k, seed ristretto.Scalar, bidList []ristretto.Scalar) ZkProof {
+	pipe := NamedPipe{Path: pipePath}
 
 	// generate intermediate values
 	q, x, y, yInv, z := prog(d, k, seed)
 
-	dBytes := d.Bytes()
-	kBytes := k.Bytes()
-	yBytes := y.Bytes()
-	yInvBytes := yInv.Bytes()
-	qBytes := q.Bytes()
-	zBytes := z.Bytes()
-	seedBytes := seed.Bytes()
-
-	dPtr := toPtr(dBytes)
-	kPtr := toPtr(kBytes)
-	yPtr := toPtr(yBytes)
-	yInvPtr := toPtr(yInvBytes)
-	qPtr := toPtr(qBytes)
-	zPtr := toPtr(zBytes)
-	seedPtr := toPtr(seedBytes)
-
 	// shuffle x in slice
-	shuffledBidList, i := shuffle(x, bidList)
-	index := C.uint8_t(i)
+	bidList, i := shuffle(x, bidList)
 
-	bL := make([]byte, 0, 32*len(shuffledBidList))
-	for i := 0; i < len(shuffledBidList); i++ {
-		bL = append(bL, shuffledBidList[i].Bytes()...)
+	bL := make([]byte, 0, 32*len(bidList))
+	for i := 0; i < len(bidList); i++ {
+		bL = append(bL, bidList[i].Bytes()...)
 	}
 
-	bidListBuff := C.struct_Buffer{
-		ptr: sliceToPtr(bL),
-		len: C.size_t(len(bL)),
+	bytes := BytesArray{}
+
+	// set opcode
+	bytes.WriteUint8(1) // Prove
+	// set payload
+	bytes.Write(d.Bytes())
+	bytes.Write(k.Bytes())
+	bytes.Write(y.Bytes())
+	bytes.Write(yInv.Bytes())
+	bytes.Write(q.Bytes())
+	bytes.Write(z.Bytes())
+	bytes.Write(seed.Bytes())
+	bytes.Write(bL)
+	bytes.WriteUint8(i)
+
+	// write to pipeline
+	if err := pipe.WriteBytes(bytes); err != nil {
+		panic(err)
 	}
 
-	constListBuff := C.struct_Buffer{
-		ptr: sliceToPtr(conBytes),
-		len: C.size_t(len(conBytes)),
+	// read the result
+	bytes, err := pipe.ReadBytes()
+	if err != nil {
+		panic(err)
 	}
-
-	result := C.prove(dPtr, kPtr, yPtr, yInvPtr, qPtr, zPtr, seedPtr,
-		&bidListBuff, &constListBuff, index)
-	data := bufferToBytes(*result)
 
 	return ZkProof{
-		Proof:        data,
+		Proof:        bytes.Bytes(),
 		Score:        q.Bytes(),
 		Z:            z.Bytes(),
 		ProofBidList: bL,
@@ -87,32 +81,31 @@ func Prove(d, k, seed ristretto.Scalar, bidList []ristretto.Scalar) ZkProof {
 // Verify take a proof in byte format and returns true or false depending on whether
 // it is successful
 func Verify(proof, seed, bidList, q, zImg []byte) bool {
-	pBuf := C.struct_Buffer{
-		ptr: sliceToPtr(proof),
-		len: C.size_t(len(proof)),
+	pipe := NamedPipe{Path: pipePath}
+	bytes := BytesArray{}
+
+	// set opcode
+	bytes.WriteUint8(2) // Verify
+	// set payload
+	bytes.Write(proof)
+	bytes.Write(seed)
+	bytes.Write(bidList)
+	bytes.Write(q)
+	bytes.Write(zImg)
+
+	// write to pipeline
+	if err := pipe.WriteBytes(bytes); err != nil {
+		panic(err)
 	}
 
-	qPtr := toPtr(q)
-	zImgPtr := toPtr(zImg)
-	seedPtr := sliceToPtr(seed)
-
-	bidListBuff := C.struct_Buffer{
-		ptr: sliceToPtr(bidList),
-		len: C.size_t(len(bidList)),
+	// read the result
+	bytes, err := pipe.ReadBytes()
+	if err != nil {
+		panic(err)
 	}
 
-	constListBuff := C.struct_Buffer{
-		ptr: sliceToPtr(conBytes),
-		len: C.size_t(len(conBytes)),
-	}
+	return bytes.Bytes()[0] == 1
 
-	verified := C.verify(&pBuf, seedPtr, &bidListBuff, qPtr, zImgPtr, &constListBuff)
-
-	if verified {
-		return true
-	}
-
-	return false
 }
 
 // CalculateX calculates the blind bid X
@@ -242,10 +235,6 @@ func mimcHash(left, right ristretto.Scalar) ristretto.Scalar {
 
 }
 
-func bufferToBytes(buf C.struct_Buffer) []byte {
-	return C.GoBytes(unsafe.Pointer(buf.ptr), C.int(buf.len))
-}
-
 func constantsToBytes(cconstants []ristretto.Scalar) []byte {
 	c := make([]byte, 0, 90*32)
 	for i := 0; i < len(constants); i++ {
@@ -270,4 +259,8 @@ func Uint64ToScalar(n uint64) ristretto.Scalar {
 
 	x.SetBigInt(big.NewInt(0).SetUint64(n))
 	return x
+}
+
+func tempFilePath(name string) string {
+	return filepath.Join(os.TempDir(), name)
 }
