@@ -28,7 +28,6 @@ type (
 
 	signer interface {
 		committee.ReductionUnmarshaller
-		addBLSPubKey(wire.Event)
 		signBLS(wire.Event) error
 		signEd25519([]byte) []byte
 		EdPubKeyBytes() []byte
@@ -62,7 +61,6 @@ func (c *collector) createVote(ev wire.Event) *bytes.Buffer {
 		return nil
 	}
 
-	c.signer.addBLSPubKey(ev)
 	c.signer.signBLS(ev)
 	buffer := new(bytes.Buffer)
 	c.signer.Marshal(buffer, ev)
