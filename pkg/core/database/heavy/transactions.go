@@ -7,6 +7,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
@@ -15,10 +16,6 @@ import (
 )
 
 const (
-	// Atomic updates enabled/disabled. Could be false only on testing specific
-	// cases
-	atomicUpdateEnabled = true
-
 	// Explicitly show we don't want fsync in sake of faster writes.
 	//
 	// If false, and the machine crashes, then some recent writes may be lost.
@@ -69,12 +66,10 @@ type transaction struct {
 // APIs. Based on that, extra indexing data is put to provide fast-read lookups
 func (t transaction) StoreBlock(block *block.Block) error {
 
-	if atomicUpdateEnabled {
-		if t.batch == nil {
-			// t.batch is initialized only on a open, read-write transaction
-			// (built with transaction.Update())
-			return errors.New("StoreBlock cannot be called on read-only transaction")
-		}
+	if t.batch == nil {
+		// t.batch is initialized only on a open, read-write transaction
+		// (built with transaction.Update())
+		return errors.New("StoreBlock cannot be called on read-only transaction")
 	}
 
 	// Schema Key = HeaderPrefix + block.header.hash Value =
@@ -254,14 +249,27 @@ func (t *transaction) Close() {
 
 func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
 	key := append(HeaderPrefix, hash...)
-	result, err := t.snapshot.Has(key, nil)
-	return result, err
+	exists, err := t.snapshot.Has(key, nil)
+
+	// goleveldb returns nilIfNotFound
+	// see also nilIfNotFound in leveldb/db.go
+	if !exists && err == nil {
+		// overwrite error message
+		err = database.ErrBlockNotFound
+	}
+
+	return exists, err
 }
 
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 
 	key := append(HeaderPrefix, hash...)
 	value, err := t.snapshot.Get(key, nil)
+
+	if err == leveldb.ErrNotFound {
+		// overwrite error message
+		err = database.ErrBlockNotFound
+	}
 
 	if err != nil {
 		return nil, err
@@ -319,6 +327,10 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	value, err := t.snapshot.Get(key, nil)
 
 	if err != nil {
+		if err == leveldb.ErrNotFound {
+			// overwrite error message
+			err = database.ErrBlockNotFound
+		}
 		return nil, err
 	}
 
@@ -348,7 +360,12 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (merkletree.Payload, uint32
 	hashHeader, err := t.snapshot.Get(key, nil)
 
 	if err != nil {
-		return nil, txIndex, nil, errors.New("block transaction not found: " + err.Error())
+		if err == leveldb.ErrNotFound {
+			// overwrite error message
+			err = database.ErrTxNotFound
+		}
+
+		return nil, txIndex, nil, err
 	}
 
 	// Fetch all the txs that belong to a single block
@@ -376,17 +393,16 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (merkletree.Payload, uint32
 }
 
 func (t transaction) FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error) {
-	exists = false
+	err = database.ErrKeyImageNotFound
+
 	key := append(KeyImagePrefix, keyImage...)
-
-	err = errors.New("KeyImage not found")
-
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
 	defer iterator.Release()
 
 	for iterator.Next() {
+		// Get txID that keyImage is assigned to
 		txID = iterator.Value()
-		// Ensure that the keyImage exists and belongs to an input of a real tx
+		// Ensure that the keyImage belongs to an input of a real tx
 		tx, _, hashHeader, err := t.FetchBlockTxByHash(txID)
 		if tx != nil && err == nil && hashHeader != nil {
 			exists = true

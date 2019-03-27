@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -163,6 +164,22 @@ func TestFetchBlockExists(test *testing.T) {
 		}
 		return nil
 	})
+
+	// FetchBlockExists with error
+	_ = db.View(func(t database.Transaction) error {
+		randHash, _ := crypto.RandEntropy(32)
+		exists, err := t.FetchBlockExists(randHash)
+		if err != database.ErrBlockNotFound {
+			test.Fatalf("ErrBlockNotFound expected here when block with this height not found")
+			return nil
+		}
+
+		if exists {
+			test.Fatalf("Block not supposed to exist")
+		}
+
+		return nil
+	})
 }
 func TestFetchBlockHeader(test *testing.T) {
 
@@ -195,6 +212,18 @@ func TestFetchBlockHeader(test *testing.T) {
 	if err != nil {
 		test.Fatal(err.Error())
 	}
+
+	// Block lookup by hash with error
+	_ = db.View(func(t database.Transaction) error {
+		randHash, _ := crypto.RandEntropy(64)
+		_, err := t.FetchBlockHeader(randHash)
+		if err != database.ErrBlockNotFound {
+			test.Fatalf("ErrBlockNotFound expected here when block with this height not found")
+			return nil
+		}
+
+		return nil
+	})
 }
 func TestFetchBlockTxs(test *testing.T) {
 
@@ -263,6 +292,20 @@ func TestFetchBlockHashByHeight(test *testing.T) {
 				return nil
 			}
 		}
+		return nil
+	})
+
+	// Blocks lookup by Height with error
+	_ = db.View(func(t database.Transaction) error {
+		heightEntropy, _ := crypto.RandEntropy(64)
+		randHeight := binary.LittleEndian.Uint64(heightEntropy)
+
+		_, err := t.FetchBlockHashByHeight(randHeight)
+		if err != database.ErrBlockNotFound {
+			test.Fatalf("ErrBlockNotFound expected here when block with this height not found")
+			return nil
+		}
+
 		return nil
 	})
 }
@@ -336,8 +379,8 @@ func TestFetchKeyImageExists(test *testing.T) {
 			test.Fatal("Invalid TxID for non-existing KeyImage")
 		}
 
-		if err == nil {
-			test.Fatal("Missing error when fetching non-existing KeyImage")
+		if err != database.ErrKeyImageNotFound {
+			test.Fatal("ErrKeyImageNotFound is expected when fetching non-existing KeyImage")
 		}
 		return nil
 	})
@@ -592,8 +635,8 @@ func TestFetchBlockTxByHash(test *testing.T) {
 		// FetchBlockTxByHash
 		tx, fetchedIndex, fetchedBlockHash, err := t.FetchBlockTxByHash(invalidTxID)
 
-		if err == nil {
-			test.Fatal("Error is expected when non-existing Tx is looked up")
+		if err != database.ErrTxNotFound {
+			test.Fatal("ErrTxNotFound is expected when non-existing Tx is looked up")
 		}
 
 		if fetchedIndex != math.MaxUint32 {

@@ -1,9 +1,22 @@
 package database
 
 import (
+	"errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+)
+
+var (
+	// Common blockchain database errors. See also database/testing for the
+	// cases where they are returned
+
+	// ErrTxNotFound returned on a keyImage lookup
+	ErrKeyImageNotFound = errors.New("database: keyImage not found")
+	// ErrTxNotFound returned on a tx lookup by hash
+	ErrTxNotFound = errors.New("database: transaction not found")
+	// ErrBlockNotFound returned on a block lookup by hash or height
+	ErrBlockNotFound = errors.New("database: block not found")
 )
 
 // A Driver represents an application programming interface for accessing
@@ -50,7 +63,7 @@ type Transaction interface {
 	Close()
 }
 
-// DB is a thin layer on top of database.Tx providing a manageable Tx execution
+// DB is a thin layer on top of Transaction providing a manageable execution
 type DB interface {
 
 	// View provides a managed execution of a read-only transaction
@@ -60,6 +73,9 @@ type DB interface {
 	//
 	// An atomic transaction is an indivisible and irreducible series of
 	// database operations such that either all occur, or nothing occurs.
+	//
+	// Transaction commit will happen only if no error is returned by `fn`
+	// and no panic is raised on `fn` execution.
 	Update(fn func(t Transaction) error) error
 
 	Close() error
