@@ -118,16 +118,15 @@ func (p *Peer) Collect(message *bytes.Buffer) error {
 		return err
 	}
 
-	return p.Write(messageWithHeader)
+	p.Write(messageWithHeader)
+	return nil
 }
 
 // Write to a peer
-func (p *Peer) Write(msg *bytes.Buffer) error {
+func (p *Peer) Write(msg *bytes.Buffer) {
 	p.outch <- func() {
 		p.Conn.Write(msg.Bytes())
 	}
-
-	return nil
 }
 
 // Disconnect disconnects from a peer
@@ -199,7 +198,7 @@ func payloadChecksumIsValid(payloadBuffer *bytes.Buffer, checksum uint32) bool {
 	return crypto.CompareChecksum(payloadBuffer.Bytes(), checksum)
 }
 
-func (p *Peer) ReadMessage() (topics.Topic, *bytes.Buffer, error) {
+func (p *Peer) readMessage() (topics.Topic, *bytes.Buffer, error) {
 	header, err := p.readHeader()
 	if err != nil {
 		return "", nil, err
@@ -224,28 +223,22 @@ func (p *Peer) ReadMessage() (topics.Topic, *bytes.Buffer, error) {
 // Run is used to start communicating with the peer, completes the handshake and starts observing
 // for messages coming in and allows for queing of outgoing messages
 func (p *Peer) Run() error {
-
+	go p.writeLoop()
 	if err := p.Handshake(); err != nil {
 		return err
 	}
 
-	go p.StartProtocol()
-	go p.ReadLoop()
-	go p.WriteLoop()
-
-	//go p.PingLoop() // since it is not implemented. It will disconnect all other impls.
+	go p.startProtocol()
+	go p.readLoop()
 	return nil
-
 }
 
 // StartProtocol is run as a go-routine, will act as our queue for messages.
 // Should be ran after handshake
-func (p *Peer) StartProtocol() {
+func (p *Peer) startProtocol() {
 loop:
 	for atomic.LoadInt32(&p.Disconnected) == 0 {
 		select {
-		case f := <-p.inch:
-			f()
 		case <-p.quitch:
 			break loop
 		case <-p.Detector.Quitch:
@@ -257,15 +250,14 @@ loop:
 
 // ReadLoop will block on the read until a message is read.
 // Should only be called after handshake is complete on a seperate go-routine.
-func (p *Peer) ReadLoop() {
+func (p *Peer) readLoop() {
 	idleTimer := time.AfterFunc(idleTimeout, func() {
 		p.Disconnect()
 	})
 
 	for atomic.LoadInt32(&p.Disconnected) == 0 {
 		idleTimer.Reset(idleTimeout) // reset timer on each loop
-
-		topic, payload, err := p.ReadMessage()
+		topic, payload, err := p.readMessage()
 		if err != nil {
 			p.Disconnect()
 			return
@@ -276,13 +268,9 @@ func (p *Peer) ReadLoop() {
 }
 
 // WriteLoop will queue all messages to be written to the peer
-func (p *Peer) WriteLoop() {
+func (p *Peer) writeLoop() {
 	for atomic.LoadInt32(&p.Disconnected) == 0 {
-		select {
-		case f := <-p.outch:
-			f()
-		case <-p.Detector.Quitch: // if the detector quits, disconnect peer
-			p.Disconnect()
-		}
+		f := <-p.outch
+		f()
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
 )
 
+// VersionMessage is a version message on the dusk wire protocol.
 type VersionMessage struct {
 	Version     *protocol.Version
 	Timestamp   int64
@@ -61,7 +62,7 @@ func (p *Peer) inboundHandShake() error {
 		return err
 	}
 
-	topic, payload, err := p.ReadMessage()
+	topic, payload, err := p.readMessage()
 	if err != nil {
 		return err
 	}
@@ -84,10 +85,7 @@ func (p *Peer) inboundHandShake() error {
 		return err
 	}
 
-	if err := p.Write(verack); err != nil {
-		return err
-	}
-
+	p.Write(verack)
 	return p.readVerack()
 }
 
@@ -109,7 +107,8 @@ func (p *Peer) outboundHandShake() error {
 		return err
 	}
 
-	return p.Write(verack)
+	p.Write(verack)
+	return nil
 }
 
 func (p *Peer) writeLocalMsgVersion() error {
@@ -136,11 +135,13 @@ func (p *Peer) writeLocalMsgVersion() error {
 	if err != nil {
 		return err
 	}
-	return p.Write(messageWithHeader)
+
+	p.Write(messageWithHeader)
+	return nil
 }
 
 func (p *Peer) readRemoteMsgVersion() error {
-	topic, payload, err := p.ReadMessage()
+	topic, payload, err := p.readMessage()
 	if err != nil {
 		return err
 	}
@@ -158,7 +159,7 @@ func (p *Peer) readRemoteMsgVersion() error {
 }
 
 func (p *Peer) readVerack() error {
-	topic, _, err := p.ReadMessage()
+	topic, _, err := p.readMessage()
 	if err != nil {
 		return err
 	}
