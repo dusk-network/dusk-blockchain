@@ -11,7 +11,7 @@ var (
 	// Common blockchain database errors. See also database/testing for the
 	// cases where they are returned
 
-	// ErrTxNotFound returned on a keyImage lookup
+	// ErrKeyImageNotFound returned on a keyImage lookup
 	ErrKeyImageNotFound = errors.New("database: keyImage not found")
 	// ErrTxNotFound returned on a tx lookup by hash
 	ErrTxNotFound = errors.New("database: transaction not found")
