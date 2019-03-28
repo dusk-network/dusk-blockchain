@@ -8,6 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -18,10 +19,13 @@ import (
 func LaunchSigSetReducer(eventBus *wire.EventBus, committee committee.Committee,
 	timeout time.Duration) *broker {
 
+	sigSetChan := selection.InitBestSigSetUpdate(eventBus)
 	handler := newSigSetHandler(eventBus, committee)
-	broker := newBroker(eventBus, handler, committee, string(topics.SigSetReduction),
+	broker := newBroker(eventBus, handler, sigSetChan, committee,
+		string(topics.SigSetReduction),
 		string(msg.OutgoingSigSetReductionTopic),
-		string(msg.OutgoingSigSetAgreementTopic), timeout)
+		string(msg.OutgoingSigSetAgreementTopic),
+		string(msg.SigSetGenerationTopic), timeout)
 	go broker.Listen()
 	return broker
 }

@@ -2,6 +2,7 @@ package generation
 
 import (
 	"bytes"
+	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
@@ -79,6 +80,7 @@ func (g *generator) updateRound(round uint64) {
 }
 
 func (g *generator) generateScoreEvent() (*selection.ScoreEvent, error) {
+	fmt.Println("generating proof")
 	seed, err := crypto.RandEntropy(33)
 	if err != nil {
 		return nil, err
@@ -117,6 +119,7 @@ func (g *generator) sendScore(sev *selection.ScoreEvent) error {
 		return err
 	}
 
+	fmt.Println("sending proof")
 	g.eventBus.Publish(string(topics.Gossip), buffer)
 	return nil
 }

@@ -51,6 +51,13 @@ func newScoreUnMarshaller() *ScoreUnMarshaller {
 // * Consensus Header [Round; Step]
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash]
 func (um *ScoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+	// check if the buffer has contents first
+	// if not, we did not get any messages this round
+	// TODO: review this
+	if r.Len() == 0 {
+		return nil
+	}
+
 	if err := um.validateFunc(r); err != nil {
 		return err
 	}
@@ -99,7 +106,12 @@ func (um *ScoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 // * Consensus Header [Round; Step]
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
 func (um *ScoreUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	sev := ev.(*ScoreEvent)
+	// TODO: review
+	sev, ok := ev.(*ScoreEvent)
+	if !ok {
+		// ev is nil
+		return nil
+	}
 
 	if err := encoding.WriteUint64(r, binary.LittleEndian, sev.Round); err != nil {
 		return err

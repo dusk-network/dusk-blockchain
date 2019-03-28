@@ -2,6 +2,7 @@ package selection
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -18,6 +19,7 @@ type (
 		BestEventChan    chan *bytes.Buffer
 		// this is the dump of future messages, categorized by different steps and different rounds
 		queue     *consensus.EventQueue
+		timeOut   time.Duration
 		selector  *wire.EventSelector
 		handler   consensus.EventHandler
 		completed bool
@@ -40,6 +42,7 @@ func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandl
 		selector:      nil,
 		handler:       handler,
 		queue:         &consensus.EventQueue{},
+		timeOut:       timerLength,
 	}
 }
 
@@ -101,16 +104,24 @@ func (s *collector) UpdateRound(round uint64) {
 	s.CurrentRound = round
 	s.CurrentStep = 1
 	s.stopSelection()
+
+	// TODO: remove this and think of a better solution after the demo
 	s.completed = false
 	s.queue.ConsumeUntil(s.CurrentRound)
 }
 
 // StartSelection starts the selection of the best SigSetEvent. It also consumes stored events related to the current step
 func (s *collector) StartSelection() {
+	// TODO: remove
+	fmt.Println("starting selection")
 	// creating a new selector
 	s.selector = wire.NewEventSelector(s.handler)
 	// letting selector collect the best
 	go s.selector.PickBest()
+	// stopping the selector after timeout
+	time.AfterFunc(s.timeOut, func() {
+		s.selector.StopChan <- true
+	})
 	// listening to the selector and collect its pick
 	go s.listenSelection()
 
@@ -127,8 +138,7 @@ func (s *collector) StartSelection() {
 func (s *collector) listenSelection() {
 	ev := <-s.selector.BestEventChan
 	s.CurrentStep++
-	b := make([]byte, 32)
-	buf := bytes.NewBuffer(b)
+	buf := new(bytes.Buffer)
 	if err := s.handler.Marshal(buf, ev); err == nil {
 		s.BestEventChan <- buf
 		return
