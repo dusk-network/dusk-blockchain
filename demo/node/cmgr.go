@@ -51,7 +51,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 // Connect dials a connection with it's string, then on succession
 // we pass the connection and the address to the OnConn method
 func (c *connmgr) Connect(addr string) error {
-	conn, err := c.Dial(addr + ":8081")
+	conn, err := c.Dial(addr)
 	if err != nil {
 		return err
 	}
