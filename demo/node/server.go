@@ -134,6 +134,7 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
+	fmt.Println("attempting to accept connection to ", conn.RemoteAddr().String())
 	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus)
 	// send the latest block
 	buffer := new(bytes.Buffer)
@@ -150,6 +151,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
+	fmt.Println("attempting to connect to ", conn.RemoteAddr().String())
 	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus)
 	// get latest block
 	buf := make([]byte, 1024)
