@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 )
@@ -24,7 +23,7 @@ func main() {
 	} else {
 		for _, ip := range ips {
 			if err := connMgr.Connect(ip); err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				fmt.Println(err)
 			}
 
 		}
