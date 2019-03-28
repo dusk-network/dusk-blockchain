@@ -80,12 +80,10 @@ func (p *Peer) inboundHandShake() error {
 		return err
 	}
 
-	verack, err := addHeader(nil, p.magic, topics.VerAck)
-	if err != nil {
+	if err := p.WriteMessage(nil, topics.VerAck); err != nil {
 		return err
 	}
 
-	p.Write(verack)
 	return p.readVerack()
 }
 
@@ -102,13 +100,7 @@ func (p *Peer) outboundHandShake() error {
 		return err
 	}
 
-	verack, err := addHeader(nil, p.magic, topics.VerAck)
-	if err != nil {
-		return err
-	}
-
-	p.Write(verack)
-	return nil
+	return p.WriteMessage(nil, topics.VerAck)
 }
 
 func (p *Peer) writeLocalMsgVersion() error {
@@ -131,13 +123,8 @@ func (p *Peer) writeLocalMsgVersion() error {
 	if err != nil {
 		return err
 	}
-	messageWithHeader, err := addHeader(message, p.magic, topics.Version)
-	if err != nil {
-		return err
-	}
 
-	p.Write(messageWithHeader)
-	return nil
+	return p.WriteMessage(message, topics.Version)
 }
 
 func (p *Peer) readRemoteMsgVersion() error {

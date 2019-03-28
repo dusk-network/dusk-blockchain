@@ -14,6 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -52,14 +55,16 @@ var (
 	receivedMessageFromStr = "Received a '%s' message from %s"
 )
 
-// Config holds
+// Config holds a set of functions needed to directly work with the blockchain,
+// in case of a individual request (synchronization)
 type Config struct {
-	Magic protocol.Magic
-	Nonce uint64
+	GetHeaders func([]byte, []byte) []*block.Header
+	GetBlock   func([]byte) *block.Block
 }
 
 // Peer holds all configuration and state to be able to communicate with other peers.
 // Every Peer has a Detector that keeps track of pending messages that require a synchronous response.
+// The peer also holds a pointer to the chain, to directly request certain information.
 type Peer struct {
 	// Unchangeable state: concurrent safe
 	Addr      string
@@ -69,14 +74,14 @@ type Peer struct {
 	CreatedAt time.Time
 	Relay     bool
 
-	Conn net.Conn
-
+	Conn     net.Conn
 	eventBus *wire.EventBus
-
-	magic protocol.Magic
+	chain    *chain.Chain
+	magic    protocol.Magic
 
 	// Atomic vals
 	Disconnected int32
+	syncing      int32
 
 	VerackReceived bool
 	VersionKnown   bool
@@ -113,7 +118,13 @@ func (p *Peer) Collect(message *bytes.Buffer) error {
 	var topicBytes [15]byte
 	message.Read(topicBytes[:])
 	topic := topics.ByteArrayToTopic(topicBytes)
-	messageWithHeader, err := addHeader(message, p.magic, topic)
+	return p.WriteMessage(message, topic)
+}
+
+// WriteMessage will append a header with the specified topic to the passed
+// message, and write it to the peer.
+func (p *Peer) WriteMessage(msg *bytes.Buffer, topic topics.Topic) error {
+	messageWithHeader, err := addHeader(msg, p.magic, topic)
 	if err != nil {
 		return err
 	}
@@ -141,11 +152,6 @@ func (p *Peer) Disconnect() {
 	p.Detector.Quit()
 	close(p.quitch)
 	p.Conn.Close()
-}
-
-// Net returns the protocol magic
-func (p *Peer) Net() protocol.Magic {
-	return p.magic
 }
 
 // Port returns the port
@@ -225,6 +231,7 @@ func (p *Peer) readMessage() (topics.Topic, *bytes.Buffer, error) {
 func (p *Peer) Run() error {
 	go p.writeLoop()
 	if err := p.Handshake(); err != nil {
+		p.Disconnect()
 		return err
 	}
 
