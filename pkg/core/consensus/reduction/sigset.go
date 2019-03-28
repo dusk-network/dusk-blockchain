@@ -22,7 +22,7 @@ func LaunchSigSetReducer(eventBus *wire.EventBus, committee committee.Committee,
 	sigSetChan := selection.InitBestSigSetUpdate(eventBus)
 	handler := newSigSetHandler(eventBus, committee)
 	broker := newBroker(eventBus, handler, sigSetChan, committee,
-		string(topics.SigSetReduction),
+		topics.SigSetReduction,
 		string(msg.OutgoingSigSetReductionTopic),
 		string(msg.OutgoingSigSetAgreementTopic),
 		string(msg.SigSetGenerationTopic), timeout)
@@ -59,7 +59,7 @@ func (sse *SigSetEvent) Equal(e wire.Event) bool {
 		bytes.Equal(sse.BlockHash, e.(*SigSetEvent).BlockHash)
 }
 
-func NewSigSetUnMarshaller(validate func(*bytes.Buffer) error) *SigSetUnmarshaller {
+func NewSigSetUnMarshaller(validate func([]byte, []byte, []byte) error) *SigSetUnmarshaller {
 	return &SigSetUnmarshaller{
 		unMarshaller: newUnMarshaller(validate),
 	}

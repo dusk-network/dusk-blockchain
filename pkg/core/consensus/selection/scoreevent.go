@@ -26,7 +26,7 @@ type (
 
 	// ScoreUnMarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
 	ScoreUnMarshaller struct {
-		validateFunc func(*bytes.Buffer) error
+		validateFunc func([]byte, []byte, []byte) error
 	}
 )
 
@@ -56,10 +56,6 @@ func (um *ScoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	// TODO: review this
 	if r.Len() == 0 {
 		return nil
-	}
-
-	if err := um.validateFunc(r); err != nil {
-		return err
 	}
 
 	sev := ev.(*ScoreEvent)

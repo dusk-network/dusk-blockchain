@@ -22,7 +22,7 @@ func LaunchBlockReducer(eventBus *wire.EventBus, committee committee.Committee,
 	scoreChan := selection.InitBestScoreUpdate(eventBus)
 	handler := newBlockHandler(committee)
 	broker := newBroker(eventBus, handler, scoreChan, committee,
-		string(topics.BlockReduction), string(msg.OutgoingBlockReductionTopic),
+		topics.BlockReduction, string(msg.OutgoingBlockReductionTopic),
 		string(msg.OutgoingBlockAgreementTopic),
 		string(msg.BlockGenerationTopic), timeout)
 

@@ -11,6 +11,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type (
@@ -23,6 +24,9 @@ type (
 
 		// TODO: review this after demo. used to restart phase after reduction
 		regenerationChannel chan bool
+
+		// TODO: review re-propagation logic
+		repropagationChannel chan *bytes.Buffer
 	}
 
 	// Broker is the message broker for the reduction process.
@@ -44,6 +48,7 @@ type (
 
 		// TODO: review this after demo. used to restart phase after reduction
 		regenerationTopic string
+		reductionTopic    topics.Topic
 	}
 )
 
@@ -51,11 +56,12 @@ func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) 
 
 	queue := consensus.NewEventQueue()
 	collector := &collector{
-		StepEventCollector:  consensus.StepEventCollector{},
-		queue:               &queue,
-		collectedVotesChan:  make(chan []wire.Event, 1),
-		ctx:                 ctx,
-		regenerationChannel: make(chan bool, 1),
+		StepEventCollector:   consensus.StepEventCollector{},
+		queue:                &queue,
+		collectedVotesChan:   make(chan []wire.Event, 1),
+		ctx:                  ctx,
+		regenerationChannel:  make(chan bool, 1),
+		repropagationChannel: make(chan *bytes.Buffer, 100),
 	}
 
 	go wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
@@ -82,7 +88,11 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
-	if c.isRelevant(header.Round, header.Step) {
+	// TODO: review re-propagation logic
+	if c.isRelevant(header.Round, header.Step) &&
+		!c.Contains(ev, string(header.Step)) {
+		// TODO: review
+		c.repropagate(ev)
 		c.process(ev)
 		return nil
 	}
@@ -105,6 +115,13 @@ func (c *collector) process(ev wire.Event) {
 			c.Clear()
 		}
 	}
+}
+
+// TODO: review
+func (c *collector) repropagate(ev wire.Event) {
+	buf := new(bytes.Buffer)
+	c.ctx.handler.Marshal(buf, ev)
+	c.repropagationChannel <- buf
 }
 
 func (c collector) flushQueue() {
@@ -145,11 +162,11 @@ func (c *collector) startReduction() {
 // newBroker will return a reduction broker.
 // TODO: review regeneration
 func newBroker(eventBus *wire.EventBus, handler handler, selectionChannel chan []byte,
-	committee committee.Committee, reductionTopic, outgoingReductionTopic,
+	committee committee.Committee, reductionTopic topics.Topic, outgoingReductionTopic,
 	outgoingAgreementTopic, regenerationTopic string, timeout time.Duration) *broker {
 
 	ctx := newCtx(handler, committee, timeout)
-	collector := newCollector(eventBus, reductionTopic, ctx)
+	collector := newCollector(eventBus, string(reductionTopic), ctx)
 
 	roundChannel := consensus.InitRoundUpdate(eventBus)
 	return &broker{
@@ -163,6 +180,7 @@ func newBroker(eventBus *wire.EventBus, handler handler, selectionChannel chan [
 
 		// TODO: review
 		regenerationTopic: regenerationTopic,
+		reductionTopic:    reductionTopic,
 		selectionChan:     selectionChannel,
 	}
 }
@@ -184,6 +202,10 @@ func (b *broker) Listen() {
 			fmt.Println("reduction finished")
 			// TODO: review
 			b.eventBus.Publish(b.regenerationTopic, nil)
+		case ev := <-b.collector.repropagationChannel:
+			// TODO: review
+			message, _ := wire.AddTopic(ev, b.reductionTopic)
+			b.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
 }

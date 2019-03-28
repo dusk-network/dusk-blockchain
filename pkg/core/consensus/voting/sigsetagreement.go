@@ -27,6 +27,26 @@ func (as *sigSetAgreementSigner) eligibleToVote() bool {
 	return as.committee.IsMember(as.Keys.BLSPubKey.Marshal())
 }
 
+func (as *sigSetAgreementSigner) addSignatures(ev wire.Event) (*bytes.Buffer, error) {
+	e := ev.(*notary.SigSetEvent)
+	if err := as.signBLS(e); err != nil {
+		return nil, err
+	}
+
+	signBuffer := new(bytes.Buffer)
+	if err := as.Marshal(signBuffer, e); err != nil {
+		return nil, err
+	}
+
+	as.signEd25519(e, signBuffer.Bytes())
+	buffer := new(bytes.Buffer)
+	if err := as.Marshal(buffer, e); err != nil {
+		return nil, err
+	}
+
+	return buffer, nil
+}
+
 func (as *sigSetAgreementSigner) signBLS(ev wire.Event) error {
 	e := ev.(*notary.SigSetEvent)
 	buffer := new(bytes.Buffer)
@@ -40,6 +60,8 @@ func (as *sigSetAgreementSigner) signBLS(ev wire.Event) error {
 	return err
 }
 
-func (as *sigSetAgreementSigner) signEd25519(marshalledEvent []byte) []byte {
-	return ed25519.Sign(*as.EdSecretKey, marshalledEvent)
+func (as *sigSetAgreementSigner) signEd25519(e *notary.SigSetEvent, eventBytes []byte) {
+	signature := ed25519.Sign(*as.EdSecretKey, eventBytes)
+	e.EventHeader.Signature = signature
+	e.EventHeader.PubKeyEd = as.EdPubKeyBytes()
 }
