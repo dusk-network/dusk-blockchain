@@ -36,6 +36,7 @@ type Chain struct {
 }
 
 // New returns a new chain object
+// TODO: take out demo constructions (db, collectors) and improve it after demo
 func New(eventBus *wire.EventBus) (*Chain, error) {
 	db, err := NewDatabase("demo", false)
 	if err != nil {
@@ -64,6 +65,7 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 	return &Chain{
 		eventBus:     eventBus,
 		db:           db,
+		bidList:      &user.BidList{},
 		PrevBlock:    *genesisBlock,
 		blockChannel: blockChannel,
 		txChannel:    txChannel,

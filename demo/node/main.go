@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 )
@@ -24,23 +23,29 @@ func main() {
 	} else {
 		for _, ip := range ips {
 			if err := connMgr.Connect(ip); err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				fmt.Println(err)
 			}
 
 		}
 
-		// get highest block, and init consensus on 2 rounds after it
-		// +1 because the round is always height + 1
-		// +1 because we dont want to get stuck on a round thats currently happening
-		var highest block.Block
+		// get highest block
+		var highest *block.Block
 		for _, block := range srv.Blocks {
 			if block.Header.Height > highest.Header.Height {
-				highest = block
+				highest = &block
 			}
 		}
 
+		// if height is not 0, init consensus on 2 rounds after it
+		// +1 because the round is always height + 1
+		// +1 because we dont want to get stuck on a round thats currently happening
+		if highest != nil && highest.Header.Height != 0 {
+			srv.StartConsensus(highest.Header.Height + 2)
+		} else {
+			srv.StartConsensus(1)
+		}
 		fmt.Println("starting consensus")
-		srv.StartConsensus(highest.Header.Height + 2)
+
 	}
 
 	for {

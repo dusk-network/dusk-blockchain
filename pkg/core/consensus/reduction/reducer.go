@@ -2,6 +2,7 @@ package reduction
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -45,17 +46,25 @@ type reducer struct {
 	firstStep  *eventStopWatch
 	secondStep *eventStopWatch
 	ctx        *context
+
+	// TODO: review after demo. used to restart a phase after reduction
+	regenerationChannel chan bool
 }
 
-func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context) *reducer {
+func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context,
+	regenerationChannel chan bool) *reducer {
+
 	return &reducer{
-		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
-		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
-		ctx:        ctx,
+		firstStep:           newEventStopWatch(collectedVotesChan, ctx.timer),
+		secondStep:          newEventStopWatch(collectedVotesChan, ctx.timer),
+		ctx:                 ctx,
+		regenerationChannel: regenerationChannel,
 	}
 }
 
 func (c *reducer) begin() {
+	// TODO: remove
+	fmt.Println("starting reduction")
 	// this is a blocking call
 	events := c.firstStep.fetch()
 	c.ctx.state.Step++
@@ -79,6 +88,9 @@ func (c *reducer) begin() {
 		c.ctx.agreementVoteChan <- hash2
 	}
 	c.ctx.state.Step++
+
+	// TODO: review this. needed to loop the phase properly during demo
+	c.regenerationChannel <- true
 }
 
 func (c *reducer) encodeEv(events []wire.Event) *bytes.Buffer {

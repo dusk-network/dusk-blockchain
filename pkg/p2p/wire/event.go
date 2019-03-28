@@ -2,6 +2,8 @@ package wire
 
 import (
 	"bytes"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // QuitTopic is the topic to make all components quit
@@ -128,4 +130,18 @@ func (n *EventSubscriber) Accept() {
 			n.eventCollector.Collect(eventMsg)
 		}
 	}
+}
+
+func AddTopic(m *bytes.Buffer, topic topics.Topic) (*bytes.Buffer, error) {
+	buffer := new(bytes.Buffer)
+	topicBytes := topics.TopicToByteArray(topic)
+	if _, err := buffer.Write(topicBytes[:]); err != nil {
+		return nil, err
+	}
+
+	if _, err := buffer.Write(m.Bytes()); err != nil {
+		return nil, err
+	}
+
+	return buffer, nil
 }

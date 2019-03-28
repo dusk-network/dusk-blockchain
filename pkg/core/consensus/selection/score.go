@@ -3,6 +3,7 @@ package selection
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -72,13 +73,25 @@ func (f *scoreBroker) Listen() {
 			f.collector.UpdateRound(roundUpdate)
 			f.collector.StartSelection()
 		case <-f.phaseUpdateChan:
+			// TODO: think of better solution after demo
 			f.collector.completed = true
 		case <-f.selectionChan:
+			// TODO: think of better solution after demo
 			if !f.collector.completed {
 				f.collector.StartSelection()
 			}
 		case bestEvent := <-f.collector.BestEventChan:
-			f.eventBus.Publish(msg.BestScoreTopic, bestEvent)
+			// TODO: remove
+			fmt.Println("selected proof")
+
+			// TODO: moved step incrementation here, so we dont run ahead in case
+			// there's nobody generating blocks
+			if bestEvent.Len() != 0 {
+				f.collector.CurrentStep++
+				f.eventBus.Publish(msg.BestScoreTopic, bestEvent)
+			} else {
+				f.eventBus.Publish(msg.BlockGenerationTopic, nil)
+			}
 		}
 	}
 }
@@ -167,7 +180,12 @@ func (p *scoreHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
 
 // Priority returns true if the
 func (p *scoreHandler) Priority(first, second wire.Event) wire.Event {
-	ev1 := first.(*ScoreEvent)
+	ev1, ok := first.(*ScoreEvent)
+	if !ok {
+		// this happens when first is nil, in which case we should return second
+		return second
+	}
+
 	ev2 := second.(*ScoreEvent)
 	score1 := big.NewInt(0).SetBytes(ev1.Score).Uint64()
 	score2 := big.NewInt(0).SetBytes(ev2.Score).Uint64()

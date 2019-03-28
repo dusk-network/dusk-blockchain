@@ -57,31 +57,17 @@ func (v *sender) listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
-			message, _ := addTopic(m, topics.BlockReduction)
+			message, _ := wire.AddTopic(m, topics.BlockReduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.sigSetReductionChannel:
-			message, _ := addTopic(m, topics.SigSetReduction)
+			message, _ := wire.AddTopic(m, topics.SigSetReduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.blockAgreementChannel:
-			message, _ := addTopic(m, topics.BlockAgreement)
+			message, _ := wire.AddTopic(m, topics.BlockAgreement)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.sigSetAgreementChannel:
-			message, _ := addTopic(m, topics.SigSetAgreement)
+			message, _ := wire.AddTopic(m, topics.SigSetAgreement)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
-}
-
-func addTopic(m *bytes.Buffer, topic topics.Topic) (*bytes.Buffer, error) {
-	buffer := new(bytes.Buffer)
-	topicBytes := topics.TopicToByteArray(topic)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return nil, err
-	}
-
-	if _, err := buffer.Write(m.Bytes()); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
 }

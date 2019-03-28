@@ -29,7 +29,7 @@ func ConnectToSeeder() []string {
 		panic(err)
 	}
 
-	return strings.Split(string(buf), "\n")
+	return strings.Split(string(buf), ",")
 }
 
 func completeChallenge(conn net.Conn) error {

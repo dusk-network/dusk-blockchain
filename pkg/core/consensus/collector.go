@@ -12,6 +12,10 @@ import (
 type (
 	// EventHeader is an embeddable struct representing the consensus event header fields
 	EventHeader struct {
+		// TODO: ed25519 related fields added for demo to facilitate easy
+		// re-propagation. review
+		Signature []byte
+		PubKeyEd  []byte
 		PubKeyBLS []byte
 		Round     uint64
 		Step      uint8
@@ -34,7 +38,7 @@ type (
 
 	// EventHeaderUnmarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
 	EventHeaderUnmarshaller struct {
-		Validate func(*bytes.Buffer) error
+		Validate func([]byte, []byte, []byte) error
 	}
 
 	// EventQueue is a Queue of Events grouped by rounds and steps
@@ -87,6 +91,18 @@ func (a *EventHeader) Sender() []byte {
 func (ehm *EventHeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*EventHeader)
 
+	// TODO: review. added to be able to marshal events without signature and
+	// edwards pubkey, for signing purposes in the voting package.
+	if consensusEv.Signature != nil && consensusEv.PubKeyEd != nil {
+		if err := encoding.Write512(r, consensusEv.Signature); err != nil {
+			return err
+		}
+
+		if err := encoding.Write256(r, consensusEv.PubKeyEd); err != nil {
+			return err
+		}
+	}
+
 	if err := encoding.WriteVarBytes(r, consensusEv.PubKeyBLS); err != nil {
 		return err
 	}
@@ -103,18 +119,29 @@ func (ehm *EventHeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 }
 
 // NewEventHeaderUnmarshaller creates an EventHeaderUnmarshaller delegating validation to the validate function
-func NewEventHeaderUnmarshaller(validate func(*bytes.Buffer) error) *EventHeaderUnmarshaller {
+func NewEventHeaderUnmarshaller(validate func([]byte, []byte, []byte) error) *EventHeaderUnmarshaller {
 	return &EventHeaderUnmarshaller{validate}
 }
 
 // Unmarshal unmarshals the buffer into a ConsensusEvent
 func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	if err := a.Validate(r); err != nil {
+	// if the injection is unsuccessful, panic
+	consensusEv := ev.(*EventHeader)
+
+	// TODO: ed25519 related fields added for demo to facilitate easy
+	// re-propagation. review
+	if err := encoding.Read512(r, &consensusEv.Signature); err != nil {
 		return err
 	}
 
-	// if the injection is unsuccessful, panic
-	consensusEv := ev.(*EventHeader)
+	if err := encoding.Read256(r, &consensusEv.PubKeyEd); err != nil {
+		return err
+	}
+
+	// verify the signature here
+	if err := a.Validate(consensusEv.PubKeyEd, r.Bytes(), consensusEv.Signature); err != nil {
+		return err
+	}
 
 	// Decoding PubKey BLS
 	if err := encoding.ReadVarBytes(r, &consensusEv.PubKeyBLS); err != nil {

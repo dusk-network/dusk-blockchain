@@ -20,6 +20,6 @@ const OutgoingSigSetAgreementTopic = "outgoin_gsigset_agreement"
 const QuitTopic = "quit"
 const BidListTopic = "bidlistTopic"
 
-// DEMO:
+// TODO: demo topics, review/remove
 const StakeTopic = "stake"
 const BidTopic = "bid"

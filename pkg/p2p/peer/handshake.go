@@ -80,7 +80,7 @@ func (p *Peer) inboundHandShake() error {
 		return err
 	}
 
-	if err := p.WriteMessage(nil, topics.VerAck); err != nil {
+	if err := p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
 
@@ -189,7 +189,33 @@ func newVersionMessageBuffer(v *protocol.Version, from, to *wire.NetAddress,
 	return buffer, nil
 }
 func decodeVersionMessage(r *bytes.Buffer) (*VersionMessage, error) {
-	return nil, nil
+	versionMessage := &VersionMessage{}
+	if err := versionMessage.Version.Decode(r); err != nil {
+		return nil, err
+	}
+
+	var time uint64
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &time); err != nil {
+		return nil, err
+	}
+
+	versionMessage.Timestamp = int64(time)
+
+	if err := versionMessage.FromAddress.Decode(r); err != nil {
+		return nil, err
+	}
+
+	if err := versionMessage.ToAddress.Decode(r); err != nil {
+		return nil, err
+	}
+
+	var services uint64
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &services); err != nil {
+		return nil, err
+	}
+
+	versionMessage.Services = protocol.ServiceFlag(services)
+	return versionMessage, nil
 }
 
 func (p *Peer) verifyVersion(v *VersionMessage) error {

@@ -68,6 +68,7 @@ func Setup() *Server {
 	if err != nil {
 		panic(err)
 	}
+	go chain.Listen()
 
 	stakeChannel := initStakeCollector(eventBus)
 	bidChannel := initBidCollector(eventBus)
@@ -117,8 +118,10 @@ func (s *Server) Listen() {
 	for {
 		select {
 		case b := <-s.stakeChannel:
+			fmt.Println("stake received")
 			s.stakes = append(s.stakes, b)
 		case b := <-s.bidChannel:
+			fmt.Println("bid received")
 			s.bids = append(s.bids, b)
 		}
 	}
@@ -131,31 +134,49 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
+	fmt.Println("attempting to accept connection to ", conn.RemoteAddr().String())
 	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus)
 	// send the latest block
 	buffer := new(bytes.Buffer)
 	s.chain.PrevBlock.Encode(buffer)
-	peer.Conn.Write(buffer.Bytes())
-
-	if err := peer.Run(); err != nil {
-		fmt.Println(err)
+	if _, err := peer.Conn.Write(buffer.Bytes()); err != nil {
+		fmt.Println("error writing to peer, ", err)
+		peer.Disconnect()
 		return
 	}
+
+	if err := peer.Run(); err != nil {
+		fmt.Println("handshake error,", err)
+		return
+	}
+	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
 
 	s.sendStakesAndBids(peer)
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
+	fmt.Println("attempting to connect to ", conn.RemoteAddr().String())
 	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus)
 	// get latest block
 	buf := make([]byte, 1024)
-	peer.Conn.Read(buf)
+	if _, err := peer.Conn.Read(buf); err != nil {
+		fmt.Println("error reading from peer, ", err)
+		peer.Disconnect()
+		return
+	}
 	var blk block.Block
-	blk.Decode(bytes.NewBuffer(buf))
+	if err := blk.Decode(bytes.NewBuffer(buf)); err != nil {
+		fmt.Println("error decoding block, ", err)
+		peer.Disconnect()
+		return
+	}
+
 	s.Blocks = append(s.Blocks, blk)
 	if err := peer.Run(); err != nil {
-		fmt.Println(err)
+		fmt.Println("handshake error,", err)
+		return
 	}
+	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
 
 	s.sendStakesAndBids(peer)
 }
@@ -196,7 +217,8 @@ func makeStake(keys *user.Keys) *transactions.Stake {
 	stake.Inputs = transactions.Inputs{input}
 
 	outputAmount := rand.Int63n(100000)
-	commitment := big.NewInt(outputAmount).Bytes()
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	rangeProof, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
@@ -208,7 +230,8 @@ func makeStake(keys *user.Keys) *transactions.Stake {
 func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	k := ristretto.Scalar{}
 	k.Rand()
-	d := big.NewInt(rand.Int63n(100000))
+	outputAmount := rand.Int63n(100000)
+	d := big.NewInt(outputAmount)
 	dScalar := ristretto.Scalar{}
 	dScalar.SetBigInt(d)
 	m := zkproof.CalculateM(k)
@@ -219,7 +242,8 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
 	bid.Inputs = transactions.Inputs{input}
 
-	commitment := d.Bytes()
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	rangeProof, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)

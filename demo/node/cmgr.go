@@ -38,6 +38,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
+				fmt.Println(err)
 				continue
 			}
 
@@ -51,7 +52,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 // Connect dials a connection with it's string, then on succession
 // we pass the connection and the address to the OnConn method
 func (c *connmgr) Connect(addr string) error {
-	conn, err := c.Dial(":" + addr)
+	conn, err := c.Dial(addr)
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,7 @@ func (c *connmgr) Dial(addr string) (net.Conn, error) {
 	dialTimeout := 1 * time.Second
 	conn, err := net.DialTimeout("tcp", addr+":8081", dialTimeout)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("problem connecting to %s:8081 - %v", addr, err)
 	}
 	return conn, nil
 }
