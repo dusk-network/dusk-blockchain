@@ -38,6 +38,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
+				fmt.Println(err)
 				continue
 			}
 
