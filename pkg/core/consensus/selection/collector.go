@@ -137,7 +137,6 @@ func (s *collector) StartSelection() {
 // listenSelection triggers a goroutine that notifies the Broker through its channel after having incremented the Collector step
 func (s *collector) listenSelection() {
 	ev := <-s.selector.BestEventChan
-	s.CurrentStep++
 	buf := new(bytes.Buffer)
 	if err := s.handler.Marshal(buf, ev); err == nil {
 		s.BestEventChan <- buf
