@@ -40,7 +40,7 @@ func completeChallenge(conn net.Conn) error {
 	}
 
 	// get generated string out
-	generated := strings.Split(string(buf), "\n")[0]
+	generated := strings.Split(string(buf), ",")[0]
 
 	// hash it with the secret
 	hash := sha256.New()
