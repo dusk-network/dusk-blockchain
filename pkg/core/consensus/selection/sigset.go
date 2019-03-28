@@ -69,9 +69,11 @@ func (f *sigSetBroker) Listen() {
 		case bestEvent := <-f.collector.BestEventChan:
 			// TODO: remove
 			fmt.Println("selected set")
-			if bestEvent != nil {
+			if bestEvent.Len() != 0 {
 				f.collector.CurrentStep++
 				f.eventBus.Publish(msg.SigSetSelectionTopic, bestEvent)
+			} else {
+				f.eventBus.Publish(msg.SigSetGenerationTopic, nil)
 			}
 		}
 	}
