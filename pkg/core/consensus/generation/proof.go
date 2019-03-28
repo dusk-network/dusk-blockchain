@@ -8,35 +8,31 @@ import (
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
 // propose a block to the voting committee.
-func GenerateProof(d, threshold uint64, k, seed []byte,
-	BidList user.BidList) (zkproof.ZkProof, error) {
-
+func (g *generator) generateProof(seed []byte) (zkproof.ZkProof, error) {
 	// Turn values into scalars
-	dScalar := zkproof.Uint64ToScalar(d)
-	kScalar := zkproof.BytesToScalar(k)
 	seedScalar := ristretto.Scalar{}
 	seedScalar.Derive(seed)
 
 	// Create a slice of scalars with a number of random bids (up to 10)
-	bidListSubset := getBidListSubset(BidList)
+	bidListSubset := g.getBidListSubset()
 	bidListScalars := convertBidListToScalars(bidListSubset)
 
-	proof := zkproof.Prove(dScalar, kScalar, seedScalar, bidListScalars)
+	proof := zkproof.Prove(g.d, g.k, seedScalar, bidListScalars)
 
 	return proof, nil
 }
 
 // bidsToScalars will take a global public list, take a subset from it, and then
 // return it as a slice of scalars.
-func getBidListSubset(bidList user.BidList) user.BidList {
-	numBids := getNumBids(bidList)
-	return bidList.Subset(numBids)
+func (g *generator) getBidListSubset() user.BidList {
+	numBids := g.getNumBids()
+	return g.bidList.Subset(numBids)
 }
 
 // getNumBids will return how many bids to include in the bid list subset
 // for the proof.
-func getNumBids(bidList user.BidList) int {
-	numBids := len(bidList)
+func (g *generator) getNumBids() int {
+	numBids := len(*g.bidList)
 	if numBids > 10 {
 		numBids = 10
 	}

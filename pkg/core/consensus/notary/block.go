@@ -3,6 +3,9 @@ package notary
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -16,11 +19,13 @@ func LaunchBlockNotary(eventBus *wire.EventBus,
 	c committee.Committee) *blockNotary {
 
 	blockCollector := initBlockCollector(eventBus, c)
+	selectionChan := selection.InitSigSetSelectionCollector(eventBus)
 
 	blockNotary := &blockNotary{
 		eventBus:        eventBus,
 		roundUpdateChan: consensus.InitRoundUpdate(eventBus),
 		blockCollector:  blockCollector,
+		selectionChan:   selectionChan,
 	}
 
 	go blockNotary.Listen()
@@ -37,6 +42,7 @@ type (
 		eventBus        *wire.EventBus
 		blockCollector  *blockCollector
 		roundUpdateChan chan uint64
+		selectionChan   chan bool
 	}
 
 	// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real
@@ -48,7 +54,8 @@ type (
 	blockCollector struct {
 		*committee.Collector
 		BlockChan    chan []byte
-		Unmarshaller wire.EventUnmarshaller
+		Result       *BlockEvent
+		Unmarshaller *committee.NotaryEventUnMarshaller
 	}
 )
 
@@ -63,12 +70,35 @@ func (b *blockNotary) Listen() {
 	for {
 		select {
 		case blockHash := <-b.blockCollector.BlockChan:
+			b.sendResult()
 			buffer := bytes.NewBuffer(blockHash)
 			b.eventBus.Publish(msg.PhaseUpdateTopic, buffer)
 		case round := <-b.roundUpdateChan:
+			b.blockCollector.Result = nil
 			b.blockCollector.UpdateRound(round)
+		case <-b.selectionChan:
+			b.sendResult()
 		}
 	}
+}
+
+func (b *blockNotary) sendResult() error {
+	if b.blockCollector.Result == nil {
+		return nil
+	}
+
+	buffer := new(bytes.Buffer)
+	topicBytes := topics.TopicToByteArray(topics.SigSet)
+	if _, err := buffer.Write(topicBytes[:]); err != nil {
+		return err
+	}
+
+	if err := b.blockCollector.Unmarshaller.Marshal(buffer, b.blockCollector.Result); err != nil {
+		return err
+	}
+
+	b.eventBus.Publish(string(topics.SigSet), buffer)
+	return nil
 }
 
 // newBlockCollector is injected with the committee, a channel where to publish
@@ -122,6 +152,7 @@ func (c *blockCollector) Process(event *BlockEvent) {
 	if nrAgreements >= c.Committee.Quorum() {
 		// notify the Notary
 		go func() { c.BlockChan <- event.BlockHash }()
+		c.Result = event
 		c.Clear()
 	}
 }

@@ -12,9 +12,9 @@ import (
 )
 
 // LaunchSignatureSelector creates the component which responsibility is to collect the signatures until a quorum is reached
-func LaunchSignatureSelector(c committee.Committee, eventBus *wire.EventBus, timeout time.Duration) *broker {
+func LaunchSignatureSelector(c committee.Committee, eventBus *wire.EventBus, timeout time.Duration) *sigSetBroker {
 	handler := newSigSetHandler(c, eventBus)
-	broker := newBroker(eventBus, handler, timeout, string(msg.SigSetSelectionTopic))
+	broker := newSigSetBroker(eventBus, handler, timeout)
 	go broker.Listen()
 	return broker
 }
@@ -28,6 +28,47 @@ func InitBestSigSetUpdate(eventBus *wire.EventBus) chan []byte {
 	go wire.NewEventSubscriber(eventBus, selectionCollector,
 		string(msg.SigSetSelectionTopic)).Accept()
 	return bestVotedHashChan
+}
+
+func InitSigSetSelectionCollector(eventBus *wire.EventBus) chan bool {
+	selectionChan := make(chan bool, 1)
+	collector := &selectionCollector{selectionChan}
+	go wire.NewEventSubscriber(eventBus, collector, msg.SigSetGenerationTopic).Accept()
+	return selectionChan
+}
+
+// newSigSetBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
+func newSigSetBroker(eventBus *wire.EventBus, handler consensus.EventHandler, timeout time.Duration) *sigSetBroker {
+	//creating the channel whereto notifications about round updates are push onto
+	roundChan := consensus.InitRoundUpdate(eventBus)
+	phaseChan := consensus.InitPhaseUpdate(eventBus)
+	selectionChan := InitSigSetSelectionCollector(eventBus)
+	collector := initCollector(handler, timeout, eventBus)
+
+	return &sigSetBroker{
+		eventBus:        eventBus,
+		collector:       collector,
+		roundUpdateChan: roundChan,
+		phaseUpdateChan: phaseChan,
+		selectionChan:   selectionChan,
+	}
+}
+
+// Listen on the eventBus for relevant topics to feed the collector
+func (f *sigSetBroker) Listen() {
+	for {
+		select {
+		case roundUpdate := <-f.roundUpdateChan:
+			f.collector.UpdateRound(roundUpdate)
+		case phaseUpdate := <-f.phaseUpdateChan:
+			f.collector.CurrentBlockHash = phaseUpdate
+			f.collector.StartSelection()
+		case <-f.selectionChan:
+			f.collector.StartSelection()
+		case bestEvent := <-f.collector.BestEventChan:
+			f.eventBus.Publish(msg.SigSetSelectionTopic, bestEvent)
+		}
+	}
 }
 
 type (
@@ -47,6 +88,15 @@ type (
 	// sigSetCollector is the private struct helping the plumbing of the SigSet channel whereto public selected SigSetEvent get published
 	sigSetCollector struct {
 		bestVotedHashChan chan []byte
+	}
+
+	// broker is the component that supervises a collection of events
+	sigSetBroker struct {
+		eventBus        *wire.EventBus
+		phaseUpdateChan <-chan []byte
+		roundUpdateChan <-chan uint64
+		selectionChan   <-chan bool
+		collector       *collector
 	}
 )
 

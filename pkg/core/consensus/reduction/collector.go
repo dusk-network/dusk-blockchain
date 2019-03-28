@@ -169,8 +169,10 @@ func (b *broker) Listen() {
 			b.collector.updateRound(round)
 		case scoreHash := <-b.scoreChan:
 			b.forwardSelection(scoreHash)
+			b.eventBus.Publish(msg.BlockGenerationTopic, nil)
 		case sigSetHash := <-b.sigSetChan:
 			b.forwardSelection(sigSetHash)
+			b.eventBus.Publish(msg.SigSetGenerationTopic, nil)
 		case reductionVote := <-b.ctx.reductionVoteChan:
 			b.eventBus.Publish(b.outgoingReductionTopic, reductionVote)
 		case agreementVote := <-b.ctx.agreementVoteChan:

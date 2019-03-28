@@ -5,6 +5,10 @@ import (
 	"encoding/binary"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
+
+	"github.com/bwesterb/go-ristretto"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
@@ -41,11 +45,12 @@ type ConsensusFactory struct {
 	*user.Keys
 	timerLength time.Duration
 	committee   committee.Committee
+	d, k        ristretto.Scalar
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, timerLength time.Duration,
-	committee committee.Committee, keys *user.Keys) *ConsensusFactory {
+	committee committee.Committee, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
@@ -57,6 +62,8 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 		Keys:        keys,
 		timerLength: timerLength,
 		committee:   committee,
+		d:           d,
+		k:           k,
 	}
 }
 
@@ -65,6 +72,7 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 func (c *ConsensusFactory) StartConsensus() {
 	round := <-c.initChannel
 
+	generation.LaunchGeneratorComponent(c.eventBus, c.d, c.k)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)

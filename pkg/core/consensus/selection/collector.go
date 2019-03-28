@@ -9,12 +9,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-type selectionChan chan *bytes.Buffer
-
-func InitSelection() *selectionChan {
-	return nil
-}
-
 type (
 	// collector is the collector of SigSetEvents. It manages the EventQueue and the Selector to pick the best signature for a given step
 	collector struct {
@@ -23,20 +17,21 @@ type (
 		CurrentBlockHash []byte
 		BestEventChan    chan *bytes.Buffer
 		// this is the dump of future messages, categorized by different steps and different rounds
-		queue    *consensus.EventQueue
-		selector *wire.EventSelector
-		handler  consensus.EventHandler
+		queue     *consensus.EventQueue
+		selector  *wire.EventSelector
+		handler   consensus.EventHandler
+		completed bool
 	}
 
-	// broker is the component that supervises a collection of events
-	broker struct {
-		eventBus        *wire.EventBus
-		phaseUpdateChan <-chan []byte
-		roundUpdateChan <-chan uint64
-		collector       *collector
-		topic           string
+	selectionCollector struct {
+		selectionChan chan bool
 	}
 )
+
+func (sc *selectionCollector) Collect(r *bytes.Buffer) error {
+	sc.selectionChan <- true
+	return nil
+}
 
 // NewCollector creates a new Collector
 func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandler, timerLength time.Duration) *collector {
@@ -105,12 +100,12 @@ func (s *collector) UpdateRound(round uint64) {
 	s.CurrentRound = round
 	s.CurrentStep = 1
 	s.stopSelection()
+	s.completed = false
 	s.queue.ConsumeUntil(s.CurrentRound)
 }
 
 // StartSelection starts the selection of the best SigSetEvent. It also consumes stored events related to the current step
-func (s *collector) StartSelection(blockHash []byte) {
-	s.CurrentBlockHash = blockHash
+func (s *collector) StartSelection() {
 	// creating a new selector
 	s.selector = wire.NewEventSelector(s.handler)
 	// letting selector collect the best
@@ -145,35 +140,5 @@ func (s *collector) stopSelection() {
 	if s.selector != nil {
 		s.selector.StopChan <- true
 		s.selector = nil
-	}
-}
-
-// newBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func newBroker(eventBus *wire.EventBus, handler consensus.EventHandler, timeout time.Duration, topic string) *broker {
-	//creating the channel whereto notifications about round updates are push onto
-	roundChan := consensus.InitRoundUpdate(eventBus)
-	phaseChan := consensus.InitPhaseUpdate(eventBus)
-	collector := initCollector(handler, timeout, eventBus)
-
-	return &broker{
-		eventBus:        eventBus,
-		collector:       collector,
-		roundUpdateChan: roundChan,
-		phaseUpdateChan: phaseChan,
-		topic:           topic,
-	}
-}
-
-// Listen on the eventBus for relevant topics to feed the collector
-func (f *broker) Listen() {
-	for {
-		select {
-		case roundUpdate := <-f.roundUpdateChan:
-			f.collector.UpdateRound(roundUpdate)
-		case phaseUpdate := <-f.phaseUpdateChan:
-			f.collector.StartSelection(phaseUpdate)
-		case bestEvent := <-f.collector.BestEventChan:
-			f.eventBus.Publish(f.topic, bestEvent)
-		}
 	}
 }

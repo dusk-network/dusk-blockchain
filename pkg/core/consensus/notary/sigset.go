@@ -20,6 +20,7 @@ func LaunchSignatureSetNotary(eventBus *wire.EventBus, c committee.Committee, cu
 		sigSetCollector: initSigSetCollector(eventBus, c, currentRound),
 	}
 	go ssn.Listen()
+	ssn.sigSetCollector.RoundChan <- currentRound
 	return ssn
 }
 

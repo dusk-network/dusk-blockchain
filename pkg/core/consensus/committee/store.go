@@ -13,8 +13,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
-const addProvisionerTopic = "addprovisioner"
-
 // Store is the component that handles Committee formation and management
 type Store struct {
 	eventBus              *wire.EventBus
@@ -35,7 +33,7 @@ func NewCommitteeStore(eventBus *wire.EventBus) *Store {
 		provisioners:          &user.Provisioners{},
 	}
 
-	addProvisionerID := committeeStore.eventBus.Subscribe(addProvisionerTopic,
+	addProvisionerID := committeeStore.eventBus.Subscribe(msg.NewProvisionerTopic,
 		addProvisionerChannel)
 	committeeStore.addProvisionerID = addProvisionerID
 
