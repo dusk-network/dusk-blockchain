@@ -29,10 +29,10 @@ func main() {
 		}
 
 		// get highest block
-		var highest block.Block
+		var highest *block.Block
 		for _, block := range srv.Blocks {
 			if block.Header.Height > highest.Header.Height {
-				highest = block
+				highest = &block
 			}
 		}
 
@@ -40,11 +40,12 @@ func main() {
 		// +1 because the round is always height + 1
 		// +1 because we dont want to get stuck on a round thats currently happening
 		fmt.Println("starting consensus")
-		if highest.Header.Height != 0 {
-			srv.StartConsensus(highest.Header.Height + 2)
-		} else {
-			srv.StartConsensus(1)
+		if highest != nil {
+			if highest.Header.Height != 0 {
+				srv.StartConsensus(highest.Header.Height + 2)
+			}
 		}
+		srv.StartConsensus(1)
 	}
 
 	for {
