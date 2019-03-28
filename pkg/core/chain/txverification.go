@@ -1,19 +1,25 @@
 package chain
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/pkg/errors"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
 )
 
-// acceptTx will verify whether a transaction is valid by checking:
+// AcceptTx will verify whether a transaction is valid by checking:
 // - It has not been double spent
 // - It is not malformed
 // Returns nil if a tx is valid
-func (c *Chain) acceptTx(tx transactions.Transaction) error {
-	approxBlockTime := uint64(consensusSeconds) + uint64(c.prevBlock.Header.Timestamp)
+func (c *Chain) AcceptTx(tx transactions.Transaction) error {
+	if err := c.checkTxExists(tx); err != nil {
+		return err
+	}
+
+	approxBlockTime := uint64(consensusSeconds) + uint64(c.PrevBlock.Header.Timestamp)
 
 	if err := c.verifyTX(0, approxBlockTime, tx); err != nil {
 		return err
@@ -102,7 +108,12 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 
-		// DEMO: add blind bidder once tx is accepted
+		// DEMO: add blind bidder once tx is accepted, and tell the server
+		buffer := new(bytes.Buffer)
+		if err := x.Encode(buffer); err != nil {
+			return err
+		}
+		c.eventBus.Publish(msg.BidTopic, buffer)
 		return c.addBidder(x)
 	case *transactions.Coinbase:
 		return c.verifyCoinbase(txIndex, x)
@@ -111,7 +122,12 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 
-		// DEMO: add provisioner once tx is accepted
+		// DEMO: add provisioner once tx is accepted, and tell the server
+		buffer := new(bytes.Buffer)
+		if err := x.Encode(buffer); err != nil {
+			return err
+		}
+		c.eventBus.Publish(msg.StakeTopic, buffer)
 		return c.addProvisioner(x)
 	case *transactions.Standard:
 		return c.verifyStandard(x)
@@ -160,7 +176,7 @@ func (c *Chain) checkLockTimeValid(lockTime, blockTime uint64) error {
 }
 
 func (c *Chain) checkLockValidHeight(lockHeight uint64) error {
-	nextBlockHeight := c.prevBlock.Header.Height + 1
+	nextBlockHeight := c.PrevBlock.Header.Height + 1
 	if lockHeight < nextBlockHeight {
 		return fmt.Errorf("invalid lock height, lock expired at height %d , it is now height %d", lockHeight, nextBlockHeight)
 	}

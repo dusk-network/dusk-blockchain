@@ -12,7 +12,7 @@ import (
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
-func (c *Chain) acceptBlock(blk block.Block) error {
+func (c *Chain) AcceptBlock(blk block.Block) error {
 	// 1. Check that we have not seen this block before
 	if err := c.checkBlockExists(blk); err != nil {
 		return err
@@ -69,17 +69,17 @@ func (c Chain) checkBlockHeader(blk block.Block) error {
 	}
 
 	// blk.Headerhash = prevHeaderHash
-	if !bytes.Equal(blk.Header.PrevBlock, c.prevBlock.Header.Hash) {
+	if !bytes.Equal(blk.Header.PrevBlock, c.PrevBlock.Header.Hash) {
 		return errors.New("Previous block hash does not equal the previous hash in the current block")
 	}
 
 	// blk.Headerheight = prevHeaderHeight +1
-	if blk.Header.Height != c.prevBlock.Header.Height+1 {
+	if blk.Header.Height != c.PrevBlock.Header.Height+1 {
 		return errors.New("current block height is not one plus the previous block height")
 	}
 
 	// blk.Timestamp > prevTimestamp
-	if blk.Header.Timestamp <= c.prevBlock.Header.Timestamp {
+	if blk.Header.Timestamp <= c.PrevBlock.Header.Timestamp {
 		return errors.New("current timestamp is less than the previous timestamp")
 	}
 

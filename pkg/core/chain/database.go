@@ -15,6 +15,7 @@ import (
 type Database interface {
 	getBestBlock() (*block.Block, error)
 	getBlockHeaderByHash(hash []byte) (*block.Header, error)
+	getTxByHash(hash []byte) (transactions.Transaction, error)
 	writeBlockHeader(hdr *block.Header) error
 	writeBlock(blk block.Block) error
 	writeInput(input *transactions.Input) error
@@ -25,7 +26,7 @@ type Database interface {
 // writeBlock is called after all of the checks on the block pass
 // returns nil, if write to database was successful
 func (c *Chain) writeBlock(blk block.Block) error {
-	c.prevBlock = blk
+	c.PrevBlock = blk
 	return nil
 }
 
@@ -33,9 +34,18 @@ func (c *Chain) writeBlock(blk block.Block) error {
 // argument has already been saved into our database
 // returns nil, if block does not exist
 func (c Chain) checkBlockExists(blk block.Block) error {
-	if blk.Equals(&c.prevBlock) {
+	if blk.Equals(&c.PrevBlock) {
 		return errors.New("block already saved")
 	}
+	return nil
+}
+
+func (c Chain) checkTxExists(tx transactions.Transaction) error {
+	hash, _ := tx.CalculateHash()
+	if _, err := c.db.getTxByHash(hash); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -87,6 +97,19 @@ func (l *ldb) getBlockHeaderByHash(hash []byte) (*block.Header, error) {
 	}
 	return blockHeader, nil
 }
+
+func (l *ldb) getTxByHash(hash []byte) (transactions.Transaction, error) {
+	var prefix = []byte("TX")
+	var key = append(prefix, hash...)
+
+	_, err := l.storage.Get(key, nil) // Returns err if value not found
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
 func (l *ldb) writeBlockHeader(hdr *block.Header) error {
 	var prefix = []byte("HEADER")
 	var key = append(prefix, hdr.Hash...)

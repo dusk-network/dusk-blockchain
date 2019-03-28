@@ -20,13 +20,13 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
-var consensusSeconds = 10
+var consensusSeconds = 20
 
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus  *wire.EventBus
-	prevBlock block.Block
+	PrevBlock block.Block
 	db        Database
 	bidList   *user.BidList
 
@@ -35,7 +35,7 @@ type Chain struct {
 	txChannel    <-chan transactions.Transaction
 }
 
-//New returns a new chain object
+// New returns a new chain object
 func New(eventBus *wire.EventBus) (*Chain, error) {
 	db, err := NewDatabase("demo", false)
 	if err != nil {
@@ -64,7 +64,7 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 	return &Chain{
 		eventBus:     eventBus,
 		db:           db,
-		prevBlock:    *genesisBlock,
+		PrevBlock:    *genesisBlock,
 		blockChannel: blockChannel,
 		txChannel:    txChannel,
 	}, nil
@@ -75,9 +75,9 @@ func (c *Chain) Listen() {
 	for {
 		select {
 		case blk := <-c.blockChannel:
-			c.acceptBlock(*blk)
+			c.AcceptBlock(*blk)
 		case tx := <-c.txChannel:
-			c.acceptTx(tx)
+			c.AcceptTx(tx)
 		}
 	}
 }
@@ -85,7 +85,6 @@ func (c *Chain) Listen() {
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := new(bytes.Buffer)
 
-	// write topic
 	topicBytes := topics.TopicToByteArray(topics.Block)
 	if _, err := buffer.Write(topicBytes[:]); err != nil {
 		return err
@@ -102,7 +101,6 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 func (c *Chain) propagateTx(tx transactions.Transaction) error {
 	buffer := new(bytes.Buffer)
 
-	// write topic
 	topicBytes := topics.TopicToByteArray(topics.Tx)
 	if _, err := buffer.Write(topicBytes[:]); err != nil {
 		return err
