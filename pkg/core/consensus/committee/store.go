@@ -3,7 +3,6 @@ package committee
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"io"
 
@@ -13,8 +12,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
-
-const addProvisionerTopic = "addprovisioner"
 
 // Store is the component that handles Committee formation and management
 type Store struct {
@@ -36,7 +33,7 @@ func NewCommitteeStore(eventBus *wire.EventBus) *Store {
 		provisioners:          &user.Provisioners{},
 	}
 
-	addProvisionerID := committeeStore.eventBus.Subscribe(addProvisionerTopic,
+	addProvisionerID := committeeStore.eventBus.Subscribe(msg.NewProvisionerTopic,
 		addProvisionerChannel)
 	committeeStore.addProvisionerID = addProvisionerID
 
@@ -70,8 +67,16 @@ func (c Store) Get() user.Provisioners {
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
-func (c *Store) IsMember(pubKeyBLS []byte) bool {
-	return c.provisioners.GetMember(pubKeyBLS) != nil
+func (c *Store) IsMember(pubKey []byte) bool {
+	if len(pubKey) == 129 {
+		return c.provisioners.GetMemberBLS(pubKey) != nil
+	}
+
+	if len(pubKey) == 32 {
+		return c.provisioners.GetMemberEd(pubKey) != nil
+	}
+
+	return false
 }
 
 // GetVotingCommittee returns a voting comittee
@@ -92,8 +97,8 @@ func (c Store) Quorum() int {
 
 // Priority returns true in case pubKey2 has higher stake than pubKey1
 func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
-	m1 := c.provisioners.GetMember(ev1.Sender())
-	m2 := c.provisioners.GetMember(ev2.Sender())
+	m1 := c.provisioners.GetMemberBLS(ev1.Sender())
+	m2 := c.provisioners.GetMemberBLS(ev2.Sender())
 	if m1 == m2 {
 		return ev1
 	}
@@ -113,7 +118,7 @@ func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
 }
 
 // VerifyVoteSet checks the signature of the set
-func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
+func (c Store) VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64,
 	step uint8) *prerror.PrError {
 
 	var amountOfVotes uint8
@@ -123,28 +128,28 @@ func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
 			return err
 		}
 
-		if !fromValidStep(vote.Step, step) {
-			return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
-		}
+		// if !fromValidStep(vote.Step, step) {
+		// 	return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
+		// }
 
-		votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
-			c.TotalWeight, vote.Step)
-		if err != nil {
-			return prerror.New(prerror.High, err)
-		}
+		// votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
+		// 	c.TotalWeight, vote.Step)
+		// if err != nil {
+		// 	return prerror.New(prerror.High, err)
+		// }
 
-		pubKeyStr := hex.EncodeToString(vote.PubKeyBLS)
-		if err := checkVoterEligibility(pubKeyStr, votingCommittee); err != nil {
-			return err
-		}
+		// pubKeyStr := hex.EncodeToString(vote.Sender())
+		// if err := checkVoterEligibility(pubKeyStr, votingCommittee); err != nil {
+		// 	return err
+		// }
 
-		if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
-			vote.SignedHash); err != nil {
+		// if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
+		// 	vote.SignedHash); err != nil {
 
-			return prerror.New(prerror.Low, errors.New("BLS verification failed"))
-		}
+		// 	return prerror.New(prerror.Low, errors.New("BLS verification failed"))
+		// }
 
-		amountOfVotes += votingCommittee[pubKeyStr]
+		// amountOfVotes += votingCommittee[pubKeyStr]
 	}
 
 	if int(amountOfVotes) < c.Quorum() {
@@ -154,9 +159,9 @@ func (c Store) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64,
 	return nil
 }
 
-func checkDuplicates(voteSet []*msg.Vote, vote *msg.Vote) *prerror.PrError {
+func checkDuplicates(voteSet []wire.Event, vote wire.Event) *prerror.PrError {
 	for _, v := range voteSet {
-		if v.Equals(vote) {
+		if v.Equal(vote) {
 			return prerror.New(prerror.Low, errors.New("vote set contains duplicate vote"))
 		}
 	}

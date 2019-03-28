@@ -36,9 +36,9 @@ func TestRandomAddresses(t *testing.T) {
 		assert.Equal(t, nil, err)
 
 		assert.Equal(t, nil, err)
-		assert.Equal(t, key.KeySize, len(k.PrivateSpend))
+		assert.Equal(t, key.KeySize, len(k.PrivateSpend.Bytes()))
 		assert.Equal(t, key.KeySize, len(k.PublicSpend.Bytes()))
-		assert.Equal(t, key.KeySize, len(k.PrivateView))
+		assert.Equal(t, key.KeySize, len(k.PrivateView.Bytes()))
 		assert.Equal(t, key.KeySize, len(k.PublicView.Bytes()))
 
 		a, err := k.PublicAddress()

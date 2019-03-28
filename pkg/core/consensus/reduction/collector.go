@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
@@ -149,7 +151,7 @@ func newBroker(eventBus *wire.EventBus, handler handler,
 	return &broker{
 		eventBus:               eventBus,
 		roundUpdateChan:        roundChannel,
-		unMarshaller:           newUnMarshaller(),
+		unMarshaller:           newUnMarshaller(msg.VerifyEd25519Signature),
 		ctx:                    ctx,
 		collector:              collector,
 		outgoingReductionTopic: outgoingReductionTopic,
@@ -167,8 +169,10 @@ func (b *broker) Listen() {
 			b.collector.updateRound(round)
 		case scoreHash := <-b.scoreChan:
 			b.forwardSelection(scoreHash)
+			b.eventBus.Publish(msg.BlockGenerationTopic, nil)
 		case sigSetHash := <-b.sigSetChan:
 			b.forwardSelection(sigSetHash)
+			b.eventBus.Publish(msg.SigSetGenerationTopic, nil)
 		case reductionVote := <-b.ctx.reductionVoteChan:
 			b.eventBus.Publish(b.outgoingReductionTopic, reductionVote)
 		case agreementVote := <-b.ctx.agreementVoteChan:

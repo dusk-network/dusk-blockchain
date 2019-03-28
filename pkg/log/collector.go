@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -36,6 +37,7 @@ type (
 		Msg        string
 		Severity   uint8
 		Originator string
+		Time       time.Time
 	}
 
 	UnMarshaller struct{}
@@ -44,6 +46,7 @@ type (
 func NewEvent(sender string) *Event {
 	return &Event{
 		Originator: sender,
+		Time:       time.Now(),
 	}
 }
 

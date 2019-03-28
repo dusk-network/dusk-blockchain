@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -25,8 +24,8 @@ type (
 		VoteHash      []byte
 	}
 
-	// scoreUnMarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
-	scoreUnMarshaller struct {
+	// ScoreUnMarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
+	ScoreUnMarshaller struct {
 		validateFunc func(*bytes.Buffer) error
 	}
 )
@@ -43,15 +42,15 @@ func (e *ScoreEvent) Sender() []byte {
 }
 
 // newScoreUnMarshaller creates a new Event UnMarshaller which takes care of Decoding and Encoding operations
-func newScoreUnMarshaller() *scoreUnMarshaller {
-	return &scoreUnMarshaller{validateFunc: msg.VerifyEd25519Signature}
+func newScoreUnMarshaller() *ScoreUnMarshaller {
+	return &ScoreUnMarshaller{}
 }
 
 // Unmarshal unmarshals the buffer into a Score Event
 // Field order is the following:
 // * Consensus Header [Round; Step]
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash]
-func (um *scoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func (um *ScoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	if err := um.validateFunc(r); err != nil {
 		return err
 	}
@@ -99,7 +98,7 @@ func (um *scoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 // Field order is the following:
 // * Consensus Header [Round; Step]
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
-func (um *scoreUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+func (um *ScoreUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	sev := ev.(*ScoreEvent)
 
 	if err := encoding.WriteUint64(r, binary.LittleEndian, sev.Round); err != nil {

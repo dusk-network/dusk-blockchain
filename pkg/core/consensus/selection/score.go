@@ -15,9 +15,9 @@ import (
 )
 
 // LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration) *broker {
+func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration) *scoreBroker {
 	handler := newScoreHandler(eventBus)
-	broker := newBroker(eventBus, handler, timeout, string(msg.BestScoreTopic))
+	broker := newScoreBroker(eventBus, handler, timeout)
 	go broker.Listen()
 	return broker
 }
@@ -36,14 +36,57 @@ func InitBestScoreUpdate(eventBus *wire.EventBus) chan []byte {
 func InitBidListUpdate(eventBus *wire.EventBus) chan user.BidList {
 	bidListChan := make(chan user.BidList)
 	collector := &bidListCollector{bidListChan}
-	wire.NewEventSubscriber(eventBus, collector, string(msg.BidListTopic)).Accept()
+	go wire.NewEventSubscriber(eventBus, collector, string(msg.BidListTopic)).Accept()
 	return bidListChan
+}
+
+func InitScoreSelectionCollector(eventBus *wire.EventBus) chan bool {
+	selectionChan := make(chan bool, 1)
+	collector := &selectionCollector{selectionChan}
+	go wire.NewEventSubscriber(eventBus, collector, msg.BlockGenerationTopic).Accept()
+	return selectionChan
+}
+
+// newScoreBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
+func newScoreBroker(eventBus *wire.EventBus, handler consensus.EventHandler, timeout time.Duration) *scoreBroker {
+	//creating the channel whereto notifications about round updates are push onto
+	roundChan := consensus.InitRoundUpdate(eventBus)
+	phaseChan := consensus.InitPhaseUpdate(eventBus)
+	selectionChan := InitScoreSelectionCollector(eventBus)
+	collector := initCollector(handler, timeout, eventBus)
+
+	return &scoreBroker{
+		eventBus:        eventBus,
+		collector:       collector,
+		roundUpdateChan: roundChan,
+		phaseUpdateChan: phaseChan,
+		selectionChan:   selectionChan,
+	}
+}
+
+// Listen on the eventBus for relevant topics to feed the collector
+func (f *scoreBroker) Listen() {
+	for {
+		select {
+		case roundUpdate := <-f.roundUpdateChan:
+			f.collector.UpdateRound(roundUpdate)
+			f.collector.StartSelection()
+		case <-f.phaseUpdateChan:
+			f.collector.completed = true
+		case <-f.selectionChan:
+			if !f.collector.completed {
+				f.collector.StartSelection()
+			}
+		case bestEvent := <-f.collector.BestEventChan:
+			f.eventBus.Publish(msg.BestScoreTopic, bestEvent)
+		}
+	}
 }
 
 type (
 	scoreHandler struct {
 		bidList      user.BidList
-		unMarshaller *scoreUnMarshaller
+		unMarshaller *ScoreUnMarshaller
 	}
 
 	bidListCollector struct {
@@ -53,6 +96,19 @@ type (
 	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
 	scoreCollector struct {
 		bestVotedScoreHashChan chan []byte
+	}
+
+	scoreSelectionCollector struct {
+		scoreSelectionChan chan bool
+	}
+
+	// broker is the component that supervises a collection of events
+	scoreBroker struct {
+		eventBus        *wire.EventBus
+		phaseUpdateChan <-chan []byte
+		roundUpdateChan <-chan uint64
+		selectionChan   <-chan bool
+		collector       *collector
 	}
 )
 
@@ -83,8 +139,9 @@ func newScoreHandler(eventBus *wire.EventBus) *scoreHandler {
 		unMarshaller: newScoreUnMarshaller(),
 	}
 	go func() {
-		bidList := <-bidListChan
-		sh.bidList = bidList
+		for {
+			sh.bidList = <-bidListChan
+		}
 	}()
 	return sh
 }

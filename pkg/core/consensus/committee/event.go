@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -17,22 +16,45 @@ type (
 		// isMember can accept a BLS Public Key or an Ed25519
 		IsMember([]byte) bool
 		GetVotingCommittee(uint64, uint8) (map[string]uint8, error)
-		VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError
+		VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64, step uint8) *prerror.PrError
 		Quorum() int
 	}
 
-	//Event is the message that encapsulates data relevant for components relying on committee information
-	Event struct {
+	// NotaryEvent is the message that encapsulates data relevant for components relying on committee information
+	NotaryEvent struct {
 		*consensus.EventHeader
-		VoteSet       []*msg.Vote
+		VoteSet       []wire.Event
 		SignedVoteSet []byte
 		BlockHash     []byte
 	}
 
-	// EventUnMarshaller implements both Marshaller and Unmarshaller interface
+	// ReductionEvent is a basic reduction event.
+	ReductionEvent struct {
+		*consensus.EventHeader
+		VotedHash  []byte
+		SignedHash []byte
+	}
+
 	EventUnMarshaller struct {
 		*consensus.EventHeaderMarshaller
 		*consensus.EventHeaderUnmarshaller
+	}
+
+	ReductionEventUnMarshaller struct {
+		*EventUnMarshaller
+	}
+
+	ReductionUnmarshaller interface {
+		wire.EventMarshaller
+		wire.EventUnmarshaller
+		MarshalVoteSet(*bytes.Buffer, []wire.Event) error
+		UnmarshalVoteSet(*bytes.Buffer) ([]wire.Event, error)
+	}
+
+	// NotaryEventUnMarshaller implements both Marshaller and Unmarshaller interface
+	NotaryEventUnMarshaller struct {
+		*EventUnMarshaller
+		ReductionUnmarshaller
 	}
 
 	// Collector is a helper that groups common operations performed on Events related to a committee
@@ -51,33 +73,124 @@ type (
 	}
 )
 
-// NewEvent creates an empty Event
-func NewEvent() *Event {
-	return &Event{
+// NewNotaryEvent creates an empty Event
+func NewNotaryEvent() *NotaryEvent {
+	return &NotaryEvent{
 		EventHeader: &consensus.EventHeader{},
 	}
 }
 
 // Equal as specified in the Event interface
-func (ceh *Event) Equal(e wire.Event) bool {
-	other, ok := e.(*Event)
+func (e *ReductionEvent) Equal(ev wire.Event) bool {
+	other, ok := ev.(*ReductionEvent)
+	return ok && (bytes.Equal(e.PubKeyBLS, other.PubKeyBLS)) &&
+		(e.Round == other.Round) && (e.Step == other.Step)
+}
+
+// Equal as specified in the Event interface
+func (ceh *NotaryEvent) Equal(e wire.Event) bool {
+	other, ok := e.(*NotaryEvent)
 	return ok && ceh.EventHeader.Equal(other) && bytes.Equal(other.SignedVoteSet, ceh.SignedVoteSet)
 }
 
-// NewEventUnMarshaller creates a new EventUnMarshaller. Internally it creates an EventHeaderUnMarshaller which takes care of Decoding and Encoding operations
-func NewEventUnMarshaller() *EventUnMarshaller {
+func NewEventUnMarshaller(validate func(*bytes.Buffer) error) *EventUnMarshaller {
 	return &EventUnMarshaller{
 		EventHeaderMarshaller:   new(consensus.EventHeaderMarshaller),
-		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(),
+		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(validate),
 	}
+}
+
+func NewReductionEventUnMarshaller(validate func(*bytes.Buffer) error) *ReductionEventUnMarshaller {
+	return &ReductionEventUnMarshaller{NewEventUnMarshaller(validate)}
+}
+
+// NewNotaryEventUnMarshaller creates a new NotaryEventUnMarshaller. Internally it creates an EventHeaderUnMarshaller which takes care of Decoding and Encoding operations
+func NewNotaryEventUnMarshaller(ru ReductionUnmarshaller,
+	validate func(*bytes.Buffer) error) *NotaryEventUnMarshaller {
+
+	return &NotaryEventUnMarshaller{
+		ReductionUnmarshaller: ru,
+		EventUnMarshaller:     NewEventUnMarshaller(validate),
+	}
+}
+
+// Unmarshal unmarshals the buffer into a CommitteeEvent
+func (a *ReductionEventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+	bev := ev.(*ReductionEvent)
+	if err := a.EventHeaderUnmarshaller.Unmarshal(r, bev.EventHeader); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, &bev.VotedHash); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadBLS(r, &bev.SignedHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Marshal a ReductionEvent into a buffer.
+func (a *ReductionEventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+	bev := ev.(*ReductionEvent)
+	if err := a.EventHeaderMarshaller.Marshal(r, bev.EventHeader); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, bev.VotedHash); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteBLS(r, bev.SignedHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *ReductionEventUnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event, error) {
+	length, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return nil, err
+	}
+
+	evs := make([]wire.Event, length)
+	for i := uint64(0); i < length; i++ {
+		rev := &ReductionEvent{
+			EventHeader: &consensus.EventHeader{},
+		}
+		if err := a.Unmarshal(r, rev); err != nil {
+			return nil, err
+		}
+
+		evs[i] = rev
+	}
+
+	return evs, nil
+}
+
+func (a *ReductionEventUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
+	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
+		return err
+	}
+
+	for _, event := range evs {
+		if err := a.Marshal(r, event); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Unmarshal unmarshals the buffer into a CommitteeEventHeader
 // Field order is the following:
 // * Consensus Header [BLS Public Key; Round; Step]
 // * Committee Header [Signed Vote Set; Vote Set; BlockHash]
-func (ceu *EventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	cev := ev.(*Event)
+func (ceu *NotaryEventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+	cev := ev.(*NotaryEvent)
 	if err := ceu.EventHeaderUnmarshaller.Unmarshal(r, cev.EventHeader); err != nil {
 		return err
 	}
@@ -86,7 +199,7 @@ func (ceu *EventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	voteSet, err := msg.DecodeVoteSet(r)
+	voteSet, err := ceu.UnmarshalVoteSet(r)
 	if err != nil {
 		return err
 	}
@@ -103,8 +216,8 @@ func (ceu *EventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 // Field order is the following:
 // * Consensus Header [BLS Public Key; Round; Step]
 // * Committee Header [Signed Vote Set; Vote Set; BlockHash]
-func (ceu *EventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	cev := ev.(*Event)
+func (ceu *NotaryEventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+	cev := ev.(*NotaryEvent)
 	if err := ceu.EventHeaderMarshaller.Marshal(r, cev.EventHeader); err != nil {
 		return err
 	}
@@ -115,12 +228,7 @@ func (ceu *EventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	// Marshal VoteSet
-	bvotes, err := msg.EncodeVoteSet(cev.VoteSet)
-	if err != nil {
-		return err
-	}
-
-	if _, err := r.Write(bvotes); err != nil {
+	if err := ceu.MarshalVoteSet(r, cev.VoteSet); err != nil {
 		return err
 	}
 
@@ -134,7 +242,7 @@ func (ceu *EventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 //ShouldBeSkipped is a shortcut for validating if an Event is relevant
 // NOTE: currentRound is handled by some other process, so it is not this component's responsibility to handle corner cases (for example being on an obsolete round because of a disconnect, etc)
 // Deprecated: Collectors should use Collector.ShouldSkip instead, considering that verification of Events should be decoupled from syntactic validation and the decision flow should likely be handled differently by different components
-func (cc *Collector) ShouldBeSkipped(m *Event) bool {
+func (cc *Collector) ShouldBeSkipped(m *NotaryEvent) bool {
 	shouldSkip := cc.ShouldSkip(m, m.Round, m.Step)
 	//TODO: the round element needs to be reassessed
 	err := cc.Committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)

@@ -52,8 +52,6 @@ func New() *Addrmgr {
 		make(map[*wire.NetAddress]addrStats, 100),
 		make(map[string]*wire.NetAddress, 100),
 	}
-
-	am.AddAddrs(am.getPermanentAddresses())
 	return am
 }
 

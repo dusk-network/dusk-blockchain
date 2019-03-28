@@ -164,7 +164,7 @@ func (d *Detector) removeMessage(cmd topics.Topic) []topics.Topic {
 		// we will now expect a inv message
 		cmds = append(cmds, topics.Inv)
 	default:
-		// We will now expect a verack
+		// We will now delete the cmd itself
 		cmds = append(cmds, cmd)
 	}
 	return cmds

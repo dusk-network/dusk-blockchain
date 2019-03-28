@@ -6,7 +6,7 @@ type Topic string
 // Size is the size of a topic field in bytes
 const Size = 15
 
-// A list of all valid protocol topics
+// A list of all valid topics
 const (
 	// Standard topics
 	Version Topic = "version"
@@ -34,7 +34,11 @@ const (
 	SigSet          Topic = "sigset"
 	BlockReduction  Topic = "blockreduction"
 	SigSetReduction Topic = "sigsetreduction"
-	Agreement       Topic = "agreement"
+	BlockAgreement  Topic = "blockagreement"
+	SigSetAgreement Topic = "sigsetagreement"
+
+	// Peer topics
+	Gossip Topic = "gossip"
 
 	// Blockchain topics
 	ChainInfo Topic = "chaininfo"

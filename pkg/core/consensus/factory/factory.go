@@ -5,13 +5,17 @@ import (
 	"encoding/binary"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
+
+	"github.com/bwesterb/go-ristretto"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 
@@ -35,68 +39,48 @@ func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
 // consensus. It should also contain all the relevant information for the
 // processes it intends to start up.
 type ConsensusFactory struct {
-	eventBus       *wire.EventBus
-	initSubscriber *wire.EventSubscriber
-	initChannel    chan uint64
+	eventBus    *wire.EventBus
+	initChannel chan uint64
 
+	*user.Keys
 	timerLength time.Duration
 	committee   committee.Committee
+	d, k        ristretto.Scalar
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, timerLength time.Duration,
-	committee committee.Committee) *ConsensusFactory {
-
+	committee committee.Committee, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
-	initSubscriber := wire.NewEventSubscriber(eventBus,
-		initCollector, msg.InitializationTopic)
+	go wire.NewEventSubscriber(eventBus, initCollector, msg.InitializationTopic).Accept()
 
 	return &ConsensusFactory{
-		eventBus:       eventBus,
-		initSubscriber: initSubscriber,
-		initChannel:    initChannel,
-		timerLength:    timerLength,
-		committee:      committee,
+		eventBus:    eventBus,
+		initChannel: initChannel,
+		Keys:        keys,
+		timerLength: timerLength,
+		committee:   committee,
+		d:           d,
+		k:           k,
 	}
 }
 
-// StartConsensus will start listening to the initialization topic, wait for
-// a message to come in, and then proceed to start the consensus components.
+// StartConsensus will wait for a message to come in, and then proceed to
+// start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
-	go c.initSubscriber.Accept()
-
 	round := <-c.initChannel
 
-	// start processes
-	scoreSelector := selection.NewScoreSelector(c.eventBus, c.timerLength,
-		msg.VerifyEd25519Signature, zkproof.Verify)
+	generation.LaunchGeneratorComponent(c.eventBus, c.d, c.k)
+	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
-	scoreSelector.Listen()
+	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)
+	selection.LaunchSignatureSelector(c.committee, c.eventBus, c.timerLength)
 
-	setFilter := selection.NewSigSetFilter(c.eventBus, msg.VerifyEd25519Signature,
-		c.committee, c.timerLength)
+	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
+	reduction.LaunchSigSetReducer(c.eventBus, c.committee, c.timerLength)
 
-	setFilter.Listen()
-
-	blockReducer := reduction.NewBlockReducer(c.eventBus, msg.VerifyEd25519Signature,
-		c.committee, c.timerLength)
-
-	blockReducer.Listen()
-
-	setReducer := reduction.NewSigSetReducer(c.eventBus, msg.VerifyEd25519Signature,
-		c.committee, c.timerLength)
-
-	setReducer.Listen()
-
-	blockNotary := notary.NewBlockNotary(c.eventBus, msg.VerifyEd25519Signature,
-		c.committee)
-
-	blockNotary.Listen()
-
-	setNotary := notary.NewSigSetNotary(c.eventBus, msg.VerifyEd25519Signature,
-		c.committee, round)
-
-	setNotary.Listen()
+	notary.LaunchBlockNotary(c.eventBus, c.committee)
+	notary.LaunchSignatureSetNotary(c.eventBus, c.committee, round)
 }

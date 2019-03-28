@@ -3,7 +3,6 @@
 package mocks
 
 import mock "github.com/stretchr/testify/mock"
-import msg "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 import prerror "gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 import wire "gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
@@ -80,11 +79,11 @@ func (_m *Committee) Quorum() int {
 }
 
 // VerifyVoteSet provides a mock function with given fields: voteSet, hash, round, step
-func (_m *Committee) VerifyVoteSet(voteSet []*msg.Vote, hash []byte, round uint64, step uint8) *prerror.PrError {
+func (_m *Committee) VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64, step uint8) *prerror.PrError {
 	ret := _m.Called(voteSet, hash, round, step)
 
 	var r0 *prerror.PrError
-	if rf, ok := ret.Get(0).(func([]*msg.Vote, []byte, uint64, uint8) *prerror.PrError); ok {
+	if rf, ok := ret.Get(0).(func([]wire.Event, []byte, uint64, uint8) *prerror.PrError); ok {
 		r0 = rf(voteSet, hash, round, step)
 	} else {
 		if ret.Get(0) != nil {
