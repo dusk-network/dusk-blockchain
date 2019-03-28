@@ -3,6 +3,7 @@ package notary
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 
@@ -171,6 +172,7 @@ func (s *sigSetCollector) Process(ev *SigSetEvent) {
 }
 
 func (s *sigSetCollector) nextRound() {
+	fmt.Println("sig set notary: updating round")
 	s.UpdateRound(s.CurrentRound + 1)
 	// notify the Notary
 	go func() { s.RoundChan <- s.CurrentRound }()

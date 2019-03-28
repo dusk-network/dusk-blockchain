@@ -20,7 +20,7 @@ import (
 
 func LaunchGeneratorComponent(eventBus *wire.EventBus, d, k ristretto.Scalar) *generator {
 	generator := newGenerator(eventBus, d, k)
-	generator.Listen()
+	go generator.Listen()
 	return generator
 }
 
@@ -45,6 +45,7 @@ func newGenerator(eventBus *wire.EventBus, d, k ristretto.Scalar) *generator {
 		eventBus:     eventBus,
 		roundChannel: roundChannel,
 		marshaller:   &selection.ScoreUnMarshaller{},
+		bidList:      &user.BidList{},
 	}
 
 	go wire.NewEventSubscriber(eventBus, generator, msg.BlockGenerationTopic).Accept()
