@@ -144,6 +144,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
 
 	s.sendStakesAndBids(peer)
 }
@@ -158,7 +159,9 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	s.Blocks = append(s.Blocks, blk)
 	if err := peer.Run(); err != nil {
 		fmt.Println(err)
+		return
 	}
+	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
 
 	s.sendStakesAndBids(peer)
 }
