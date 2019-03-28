@@ -69,6 +69,9 @@ func (f *sigSetBroker) Listen() {
 		case bestEvent := <-f.collector.BestEventChan:
 			// TODO: remove
 			fmt.Println("selected set")
+
+			// TODO: moved step incrementation here, so we dont run ahead in case
+			// there's nobody generating blocks
 			if bestEvent.Len() != 0 {
 				f.collector.CurrentStep++
 				f.eventBus.Publish(msg.SigSetSelectionTopic, bestEvent)
