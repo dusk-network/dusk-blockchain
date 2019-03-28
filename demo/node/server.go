@@ -141,6 +141,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	s.chain.PrevBlock.Encode(buffer)
 	if _, err := peer.Conn.Write(buffer.Bytes()); err != nil {
 		fmt.Println("error writing to peer, ", err)
+		peer.Disconnect()
 		return
 	}
 
@@ -160,11 +161,13 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	buf := make([]byte, 1024)
 	if _, err := peer.Conn.Read(buf); err != nil {
 		fmt.Println("error reading from peer, ", err)
+		peer.Disconnect()
 		return
 	}
 	var blk block.Block
 	if err := blk.Decode(bytes.NewBuffer(buf)); err != nil {
 		fmt.Println("error decoding block, ", err)
+		peer.Disconnect()
 		return
 	}
 
