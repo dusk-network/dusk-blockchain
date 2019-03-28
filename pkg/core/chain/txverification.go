@@ -16,16 +16,19 @@ import (
 // Returns nil if a tx is valid
 func (c *Chain) AcceptTx(tx transactions.Transaction) error {
 	if err := c.checkTxExists(tx); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
 	approxBlockTime := uint64(consensusSeconds) + uint64(c.PrevBlock.Header.Timestamp)
 
 	if err := c.verifyTX(0, approxBlockTime, tx); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
 	if err := c.propagateTx(tx); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -108,7 +111,8 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 
-		// DEMO: add blind bidder once tx is accepted, and tell the server
+		// TODO: remove this after demo
+		// add blind bidder once tx is accepted, and tell the server
 		buffer := new(bytes.Buffer)
 		if err := x.Encode(buffer); err != nil {
 			return err
@@ -122,7 +126,8 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 
-		// DEMO: add provisioner once tx is accepted, and tell the server
+		// TODO: remove this after demo
+		// add provisioner once tx is accepted, and tell the server
 		buffer := new(bytes.Buffer)
 		if err := x.Encode(buffer); err != nil {
 			return err
