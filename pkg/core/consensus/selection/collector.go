@@ -39,6 +39,7 @@ func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandl
 		BestEventChan: bestEventChan,
 		selector:      nil,
 		handler:       handler,
+		queue:         &consensus.EventQueue{},
 	}
 }
 

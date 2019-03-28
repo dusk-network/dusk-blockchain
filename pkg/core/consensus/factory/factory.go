@@ -3,6 +3,7 @@ package factory
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
@@ -83,4 +84,6 @@ func (c *ConsensusFactory) StartConsensus() {
 
 	notary.LaunchBlockNotary(c.eventBus, c.committee)
 	notary.LaunchSignatureSetNotary(c.eventBus, c.committee, round)
+
+	fmt.Println("consensus started")
 }
