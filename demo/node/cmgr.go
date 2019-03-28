@@ -69,7 +69,7 @@ func (c *connmgr) Dial(addr string) (net.Conn, error) {
 	dialTimeout := 1 * time.Second
 	conn, err := net.DialTimeout("tcp", addr+":8081", dialTimeout)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("problem connecting to %s:8081 - %v", addr, err)
 	}
 	return conn, nil
 }

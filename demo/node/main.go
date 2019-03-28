@@ -40,12 +40,12 @@ func main() {
 		// +1 because the round is always height + 1
 		// +1 because we dont want to get stuck on a round thats currently happening
 		fmt.Println("starting consensus")
-		if highest != nil {
-			if highest.Header.Height != 0 {
-				srv.StartConsensus(highest.Header.Height + 2)
-			}
+		if highest != nil && highest.Header.Height != 0 {
+			srv.StartConsensus(highest.Header.Height + 2)
+		} else {
+			srv.StartConsensus(1)
 		}
-		srv.StartConsensus(1)
+
 	}
 
 	for {
