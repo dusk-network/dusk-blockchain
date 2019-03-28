@@ -19,6 +19,7 @@ func main() {
 
 	// if we are the first, initialize consensus on round 1
 	if len(ips) == 1 {
+		fmt.Println("starting consensus")
 		srv.StartConsensus(1)
 	} else {
 		for _, ip := range ips {
@@ -38,6 +39,7 @@ func main() {
 			}
 		}
 
+		fmt.Println("starting consensus")
 		srv.StartConsensus(highest.Header.Height + 2)
 	}
 
