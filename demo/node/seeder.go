@@ -29,7 +29,7 @@ func ConnectToSeeder() []string {
 		panic(err)
 	}
 
-	return strings.Split(string(buf), "\n")
+	return strings.Split(string(buf), ",")
 }
 
 func completeChallenge(conn net.Conn) error {
@@ -40,7 +40,7 @@ func completeChallenge(conn net.Conn) error {
 	}
 
 	// get generated string out
-	generated := strings.Split(string(buf), ",")[0]
+	generated := strings.Split(string(buf), "\n")[0]
 
 	// hash it with the secret
 	hash := sha256.New()
