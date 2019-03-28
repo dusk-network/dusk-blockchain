@@ -129,11 +129,10 @@ func (s *collector) listenSelection() {
 	s.CurrentStep++
 	b := make([]byte, 32)
 	buf := bytes.NewBuffer(b)
-	if err := s.handler.Marshal(buf, ev); err == nil {
-		s.BestEventChan <- buf
-		return
+	if err := s.handler.Marshal(buf, ev); err != nil {
+		panic(err)
 	}
-	// TODO: what should we do if we have an error in the marshalling?
+	s.BestEventChan <- buf
 }
 
 // stopSelection notifies the Selector to stop selecting
