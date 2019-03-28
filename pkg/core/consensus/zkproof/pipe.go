@@ -4,19 +4,21 @@ import (
 	"encoding/binary"
 	"errors"
 	"io/ioutil"
-	"os"
+	"syscall"
 )
 
+// BytesArray is a very basic structure that reflects the one used in the Rust process.
 type BytesArray struct {
 	bytes []byte
-	// this shouldn't be public
 	index int
 }
 
+// Bytes method returns the bytes hold in the BytesArray struct
 func (ba *BytesArray) Bytes() []byte {
 	return ba.bytes
 }
 
+// ReadUint8 reads the next byte in the BytesArray
 func (ba *BytesArray) ReadUint8() (uint8, error) {
 	if ba.index >= len(ba.bytes) {
 		return 0, errors.New("Index overflow")
@@ -26,6 +28,7 @@ func (ba *BytesArray) ReadUint8() (uint8, error) {
 	return value, nil
 }
 
+// ReadUint32 reads the next 4 bytes in the BytesArray as uint32
 func (ba *BytesArray) ReadUint32() (uint32, error) {
 	if ba.index >= len(ba.bytes) {
 		return 0, errors.New("Index overflow")
@@ -36,10 +39,12 @@ func (ba *BytesArray) ReadUint32() (uint32, error) {
 	return length, nil
 }
 
+// WriteUint8 writes a byte into a BytesArray struct
 func (ba *BytesArray) WriteUint8(value uint8) {
 	ba.bytes = append(ba.bytes, value)
 }
 
+// WriteUint32 writes a uint32 into a BytesArray struct
 func (ba *BytesArray) WriteUint32(v uint32) {
 	bytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bytes, v)
@@ -71,24 +76,21 @@ type NamedPipe struct {
 	Path string
 }
 
+// NewNamedPipe constructs a new named pipe using the path given
+func NewNamedPipe(path string) NamedPipe {
+	np := NamedPipe{Path: path}
+	syscall.Mkfifo(path, 0644)
+	return np
+}
+
+// ReadBytes consumes and return all the bytes in the named pipe
 func (p *NamedPipe) ReadBytes() (BytesArray, error) {
 	bytes, err := ioutil.ReadFile(p.Path)
 
 	return BytesArray{bytes: bytes, index: 0}, err
 }
 
+// WriteBytes write a BytesArray into the named pipe
 func (p *NamedPipe) WriteBytes(ba BytesArray) error {
-	f, err := os.OpenFile(p.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
-	defer f.Close()
-	if err != nil {
-		return err
-	}
-	nb, err := f.Write(ba.Bytes())
-	if err != nil {
-		return err
-	}
-	if nb != len(ba.Bytes()) {
-		return errors.New("lenghts don't match")
-	}
-	return nil
+	return ioutil.WriteFile(p.Path, ba.Bytes(), 0644)
 }

@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/demo/node/server"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 )
 
 func main() {
-	srv := server.Setup()
+	srv := Setup()
 	go srv.Listen()
-	ips := server.ConnectToSeeder()
-	connMgr := server.NewConnMgr(server.CmgrConfig{
+	ips := ConnectToSeeder()
+	connMgr := NewConnMgr(CmgrConfig{
 		Port:     "8081",
 		OnAccept: srv.OnAccept,
 		OnConn:   srv.OnConnection,

@@ -31,7 +31,7 @@ var pipePath = tempFilePath("pipe-channel")
 // This will be accessed by the consensus
 // This will return the proof as a byte slice
 func Prove(d, k, seed ristretto.Scalar, bidList []ristretto.Scalar) ZkProof {
-	pipe := NamedPipe{Path: pipePath}
+	pipe := NewNamedPipe(pipePath)
 
 	// generate intermediate values
 	q, x, y, yInv, z := prog(d, k, seed)
@@ -81,7 +81,7 @@ func Prove(d, k, seed ristretto.Scalar, bidList []ristretto.Scalar) ZkProof {
 // Verify take a proof in byte format and returns true or false depending on whether
 // it is successful
 func Verify(proof, seed, bidList, q, zImg []byte) bool {
-	pipe := NamedPipe{Path: pipePath}
+	pipe := NewNamedPipe(pipePath)
 	bytes := BytesArray{}
 
 	// set opcode
