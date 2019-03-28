@@ -83,7 +83,13 @@ func (f *scoreBroker) Listen() {
 		case bestEvent := <-f.collector.BestEventChan:
 			// TODO: remove
 			fmt.Println("selected proof")
-			f.eventBus.Publish(msg.BestScoreTopic, bestEvent)
+
+			// TODO: moved step incrementation here, so we dont run ahead in case
+			// there's nobody generating blocks
+			if bestEvent != nil {
+				f.collector.CurrentStep++
+				f.eventBus.Publish(msg.BestScoreTopic, bestEvent)
+			}
 		}
 	}
 }

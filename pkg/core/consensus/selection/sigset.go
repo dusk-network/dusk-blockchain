@@ -3,6 +3,7 @@ package selection
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -66,7 +67,12 @@ func (f *sigSetBroker) Listen() {
 		case <-f.selectionChan:
 			f.collector.StartSelection()
 		case bestEvent := <-f.collector.BestEventChan:
-			f.eventBus.Publish(msg.SigSetSelectionTopic, bestEvent)
+			// TODO: remove
+			fmt.Println("selected set")
+			if bestEvent != nil {
+				f.collector.CurrentStep++
+				f.eventBus.Publish(msg.SigSetSelectionTopic, bestEvent)
+			}
 		}
 	}
 }
