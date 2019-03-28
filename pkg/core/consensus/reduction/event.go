@@ -24,7 +24,7 @@ type (
 	}
 )
 
-func newUnMarshaller(validate func(*bytes.Buffer) error) *unMarshaller {
+func newUnMarshaller(validate func([]byte, []byte, []byte) error) *unMarshaller {
 	return &unMarshaller{committee.NewReductionEventUnMarshaller(validate)}
 }
 

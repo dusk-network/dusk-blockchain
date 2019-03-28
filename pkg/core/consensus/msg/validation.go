@@ -1,26 +1,14 @@
 package msg
 
 import (
-	"bytes"
 	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"golang.org/x/crypto/ed25519"
 )
 
-func VerifyEd25519Signature(messageBytes *bytes.Buffer) error {
-	var signedMessage []byte
-	if err := encoding.Read512(messageBytes, &signedMessage); err != nil {
-		return err
-	}
-
-	var pubKey []byte
-	if err := encoding.Read256(messageBytes, &pubKey); err != nil {
-		return err
-	}
-
-	if !ed25519.Verify(pubKey, messageBytes.Bytes(), signedMessage) {
+func VerifyEd25519Signature(pubKey, message, signature []byte) error {
+	if !ed25519.Verify(pubKey, message, signature) {
 		return errors.New("ed25519 verification failed")
 	}
 

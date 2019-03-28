@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
@@ -15,10 +17,13 @@ import (
 
 // LaunchSignatureSetNotary creates and ignites a SigSetNotary by injecting the EventBus, the Committee and the message validation primitive
 func LaunchSignatureSetNotary(eventBus *wire.EventBus, c committee.Committee, currentRound uint64) *sigSetNotary {
-
+	sigSetCollector := initSigSetCollector(eventBus, c, currentRound)
 	ssn := &sigSetNotary{
 		eventBus:        eventBus,
-		sigSetCollector: initSigSetCollector(eventBus, c, currentRound),
+		sigSetCollector: sigSetCollector,
+
+		// TODO: review
+		repropagationChannel: sigSetCollector.RepropagationChannel,
 	}
 	go ssn.Listen()
 	ssn.sigSetCollector.RoundChan <- currentRound
@@ -36,6 +41,9 @@ type (
 	sigSetNotary struct {
 		eventBus        *wire.EventBus
 		sigSetCollector *sigSetCollector
+
+		// TODO: review
+		repropagationChannel chan *bytes.Buffer
 	}
 
 	SigSetEventUnmarshaller struct {
@@ -49,7 +57,7 @@ type (
 		*committee.Collector
 		RoundChan    chan uint64
 		futureRounds map[uint64][]*SigSetEvent
-		Unmarshaller wire.EventUnmarshaller
+		Unmarshaller *SigSetEventUnmarshaller
 	}
 )
 
@@ -75,6 +83,9 @@ func (ssn *sigSetNotary) Listen() {
 			buf := bytes.NewBuffer(b)
 			// publishing to the EventBus
 			ssn.eventBus.Publish(msg.RoundUpdateTopic, buf)
+		case ev := <-ssn.repropagationChannel:
+			message, _ := wire.AddTopic(ev, topics.SigSetAgreement)
+			ssn.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
 }
@@ -106,9 +117,10 @@ func (sseu *SigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 func newSigSetCollector(c committee.Committee, currentRound uint64) *sigSetCollector {
 
 	cc := &committee.Collector{
-		StepEventCollector: make(map[string][]wire.Event),
-		Committee:          c,
-		CurrentRound:       currentRound,
+		StepEventCollector:   make(map[string][]wire.Event),
+		Committee:            c,
+		CurrentRound:         currentRound,
+		RepropagationChannel: make(chan *bytes.Buffer, 100),
 	}
 	return &sigSetCollector{
 		Collector:    cc,
@@ -164,6 +176,8 @@ func (s *sigSetCollector) Process(ev *SigSetEvent) {
 			return
 		}
 
+		// TODO: review
+		s.repropagate(ev)
 		s.Store(ev, string(ev.Step))
 		return
 	}
@@ -184,4 +198,11 @@ func (s *sigSetCollector) nextRound() {
 	for _, event := range currentEvents {
 		s.Process(event)
 	}
+}
+
+// TODO: review
+func (s *sigSetCollector) repropagate(ev *SigSetEvent) {
+	buf := new(bytes.Buffer)
+	s.Unmarshaller.Marshal(buf, ev)
+	s.RepropagationChannel <- buf
 }

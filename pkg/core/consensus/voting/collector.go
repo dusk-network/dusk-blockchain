@@ -28,9 +28,7 @@ type (
 
 	signer interface {
 		committee.ReductionUnmarshaller
-		signBLS(wire.Event) error
-		signEd25519([]byte) []byte
-		EdPubKeyBytes() []byte
+		addSignatures(wire.Event) (*bytes.Buffer, error)
 		eligibleToVote() bool
 	}
 )
@@ -61,23 +59,7 @@ func (c *collector) createVote(ev wire.Event) *bytes.Buffer {
 		return nil
 	}
 
-	c.signer.signBLS(ev)
-	buffer := new(bytes.Buffer)
-	c.signer.Marshal(buffer, ev)
-	signature := c.signer.signEd25519(buffer.Bytes())
-	return c.completeMessage(buffer.Bytes(), signature)
-}
-
-func (c *collector) completeMessage(marshalledEvent, signature []byte) *bytes.Buffer {
-	buffer := bytes.NewBuffer(signature)
-	if err := encoding.Write256(buffer, c.signer.EdPubKeyBytes()); err != nil {
-		panic("signer has malformed keys")
-	}
-
-	if _, err := buffer.Write(marshalledEvent); err != nil {
-		panic(err)
-	}
-
+	buffer, _ := c.signer.addSignatures(ev)
 	return buffer
 }
 

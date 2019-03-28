@@ -26,6 +26,9 @@ func LaunchBlockNotary(eventBus *wire.EventBus,
 		roundUpdateChan: consensus.InitRoundUpdate(eventBus),
 		blockCollector:  blockCollector,
 		selectionChan:   selectionChan,
+
+		// TODO: review
+		repropagationChannel: blockCollector.RepropagationChannel,
 	}
 
 	go blockNotary.Listen()
@@ -43,6 +46,9 @@ type (
 		blockCollector  *blockCollector
 		roundUpdateChan chan uint64
 		selectionChan   chan bool
+
+		// TODO: review
+		repropagationChannel chan *bytes.Buffer
 	}
 
 	// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real
@@ -78,6 +84,10 @@ func (b *blockNotary) Listen() {
 			b.blockCollector.UpdateRound(round)
 		case <-b.selectionChan:
 			b.sendResult()
+		case ev := <-b.repropagationChannel:
+			// TODO: review
+			message, _ := wire.AddTopic(ev, topics.BlockAgreement)
+			b.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
 }
@@ -106,8 +116,9 @@ func (b *blockNotary) sendResult() error {
 // marshalled form of the CommitteeEvent messages.
 func newBlockCollector(c committee.Committee) *blockCollector {
 	cc := &committee.Collector{
-		StepEventCollector: make(map[string][]wire.Event),
-		Committee:          c,
+		StepEventCollector:   make(map[string][]wire.Event),
+		Committee:            c,
+		RepropagationChannel: make(chan *bytes.Buffer, 100),
 	}
 
 	return &blockCollector{
@@ -140,6 +151,8 @@ func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
 		return nil
 	}
 
+	// TODO: review
+	c.repropagate(ev)
 	c.Process(ev)
 	return nil
 }
@@ -155,4 +168,11 @@ func (c *blockCollector) Process(event *BlockEvent) {
 		c.Result = event
 		c.Clear()
 	}
+}
+
+// TODO: review
+func (c *blockCollector) repropagate(event *BlockEvent) {
+	buf := new(bytes.Buffer)
+	c.Unmarshaller.Marshal(buf, event)
+	c.RepropagationChannel <- buf
 }

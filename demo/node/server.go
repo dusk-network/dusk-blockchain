@@ -68,6 +68,7 @@ func Setup() *Server {
 	if err != nil {
 		panic(err)
 	}
+	go chain.Listen()
 
 	stakeChannel := initStakeCollector(eventBus)
 	bidChannel := initBidCollector(eventBus)
@@ -117,8 +118,10 @@ func (s *Server) Listen() {
 	for {
 		select {
 		case b := <-s.stakeChannel:
+			fmt.Println("stake received")
 			s.stakes = append(s.stakes, b)
 		case b := <-s.bidChannel:
+			fmt.Println("bid received")
 			s.bids = append(s.bids, b)
 		}
 	}
@@ -196,7 +199,8 @@ func makeStake(keys *user.Keys) *transactions.Stake {
 	stake.Inputs = transactions.Inputs{input}
 
 	outputAmount := rand.Int63n(100000)
-	commitment := big.NewInt(outputAmount).Bytes()
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	rangeProof, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
@@ -208,7 +212,8 @@ func makeStake(keys *user.Keys) *transactions.Stake {
 func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	k := ristretto.Scalar{}
 	k.Rand()
-	d := big.NewInt(rand.Int63n(100000))
+	outputAmount := rand.Int63n(100000)
+	d := big.NewInt(outputAmount)
 	dScalar := ristretto.Scalar{}
 	dScalar.SetBigInt(d)
 	m := zkproof.CalculateM(k)
@@ -219,7 +224,8 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
 	bid.Inputs = transactions.Inputs{input}
 
-	commitment := d.Bytes()
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	rangeProof, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)

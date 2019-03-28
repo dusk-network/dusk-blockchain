@@ -42,8 +42,8 @@ func (c Chain) checkBlockExists(blk block.Block) error {
 
 func (c Chain) checkTxExists(tx transactions.Transaction) error {
 	hash, _ := tx.CalculateHash()
-	if _, err := c.db.getTxByHash(hash); err != nil {
-		return err
+	if _, err := c.db.getTxByHash(hash); err == nil {
+		return errors.New("tx already exists")
 	}
 
 	return nil

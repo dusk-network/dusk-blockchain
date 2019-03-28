@@ -1,6 +1,8 @@
 package voting
 
 import (
+	"bytes"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -26,14 +28,35 @@ func (bs *blockReductionSigner) eligibleToVote() bool {
 	return bs.committee.IsMember(bs.Keys.BLSPubKey.Marshal())
 }
 
-func (bs *blockReductionSigner) signBLS(ev wire.Event) error {
+func (bs *blockReductionSigner) addSignatures(ev wire.Event) (*bytes.Buffer, error) {
 	e := ev.(*committee.ReductionEvent)
+	if err := bs.signBLS(e); err != nil {
+		return nil, err
+	}
+
+	signBuffer := new(bytes.Buffer)
+	if err := bs.Marshal(signBuffer, e); err != nil {
+		return nil, err
+	}
+
+	bs.signEd25519(e, signBuffer.Bytes())
+	buffer := new(bytes.Buffer)
+	if err := bs.Marshal(buffer, e); err != nil {
+		return nil, err
+	}
+
+	return buffer, nil
+}
+
+func (bs *blockReductionSigner) signBLS(e *committee.ReductionEvent) error {
 	signedHash, err := bls.Sign(bs.BLSSecretKey, bs.BLSPubKey, e.VotedHash)
 	e.SignedHash = signedHash.Compress()
 	e.EventHeader.PubKeyBLS = bs.BLSPubKey.Marshal()
 	return err
 }
 
-func (bs *blockReductionSigner) signEd25519(marshalledEvent []byte) []byte {
-	return ed25519.Sign(*bs.EdSecretKey, marshalledEvent)
+func (bs *blockReductionSigner) signEd25519(e *committee.ReductionEvent, eventBytes []byte) {
+	signature := ed25519.Sign(*bs.EdSecretKey, eventBytes)
+	e.EventHeader.Signature = signature
+	e.EventHeader.PubKeyEd = bs.EdPubKeyBytes()
 }

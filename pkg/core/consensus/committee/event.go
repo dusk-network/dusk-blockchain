@@ -62,6 +62,9 @@ type (
 		consensus.StepEventCollector
 		Committee    Committee
 		CurrentRound uint64
+
+		// TODO: review
+		RepropagationChannel chan *bytes.Buffer
 	}
 
 	// Selector is basically a picker of Events based on the priority of their sender
@@ -93,20 +96,20 @@ func (ceh *NotaryEvent) Equal(e wire.Event) bool {
 	return ok && ceh.EventHeader.Equal(other) && bytes.Equal(other.SignedVoteSet, ceh.SignedVoteSet)
 }
 
-func NewEventUnMarshaller(validate func(*bytes.Buffer) error) *EventUnMarshaller {
+func NewEventUnMarshaller(validate func([]byte, []byte, []byte) error) *EventUnMarshaller {
 	return &EventUnMarshaller{
 		EventHeaderMarshaller:   new(consensus.EventHeaderMarshaller),
 		EventHeaderUnmarshaller: consensus.NewEventHeaderUnmarshaller(validate),
 	}
 }
 
-func NewReductionEventUnMarshaller(validate func(*bytes.Buffer) error) *ReductionEventUnMarshaller {
+func NewReductionEventUnMarshaller(validate func([]byte, []byte, []byte) error) *ReductionEventUnMarshaller {
 	return &ReductionEventUnMarshaller{NewEventUnMarshaller(validate)}
 }
 
 // NewNotaryEventUnMarshaller creates a new NotaryEventUnMarshaller. Internally it creates an EventHeaderUnMarshaller which takes care of Decoding and Encoding operations
 func NewNotaryEventUnMarshaller(ru ReductionUnmarshaller,
-	validate func(*bytes.Buffer) error) *NotaryEventUnMarshaller {
+	validate func([]byte, []byte, []byte) error) *NotaryEventUnMarshaller {
 
 	return &NotaryEventUnMarshaller{
 		ReductionUnmarshaller: ru,
