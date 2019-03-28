@@ -139,10 +139,13 @@ func (s *Server) OnAccept(conn net.Conn) {
 	// send the latest block
 	buffer := new(bytes.Buffer)
 	s.chain.PrevBlock.Encode(buffer)
-	peer.Conn.Write(buffer.Bytes())
+	if _, err := peer.Conn.Write(buffer.Bytes()); err != nil {
+		fmt.Println("error writing to peer, ", err)
+		return
+	}
 
 	if err := peer.Run(); err != nil {
-		fmt.Println(err)
+		fmt.Println("handshake error,", err)
 		return
 	}
 	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
@@ -155,12 +158,19 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus)
 	// get latest block
 	buf := make([]byte, 1024)
-	peer.Conn.Read(buf)
+	if _, err := peer.Conn.Read(buf); err != nil {
+		fmt.Println("error reading from peer, ", err)
+		return
+	}
 	var blk block.Block
-	blk.Decode(bytes.NewBuffer(buf))
+	if err := blk.Decode(bytes.NewBuffer(buf)); err != nil {
+		fmt.Println("error decoding block, ", err)
+		return
+	}
+
 	s.Blocks = append(s.Blocks, blk)
 	if err := peer.Run(); err != nil {
-		fmt.Println(err)
+		fmt.Println("handshake error,", err)
 		return
 	}
 	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
