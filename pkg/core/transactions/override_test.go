@@ -6,50 +6,50 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
-// Consider refactoring, as functionality is the same for all transactions
-// without adding an interface/ introducing unnecessary complexity
-// Once all transactions have been implemented, we can iterate all tx types to make sure
-// that we have tested against all transactions
-
-// Test that the tx type has overriden the standard
-// Hash function
+// Test that the tx type has overriden the standard hash function
 func TestBidHashNotStandard(t *testing.T) {
 
 	assert := assert.New(t)
 
-	// Instantiate all possible transactions
+	var txs []transactions.Transaction
 
-	//BidTx
+	// Possible tye
+
 	bidTx, err := helper.RandomBidTx(t, false)
 	assert.Nil(err)
-	// TimeLockTx
-	timeLockTX := helper.RandomTLockTx(t, false)
+	txs = append(txs, bidTx)
 
-	// Clone all possible transactions
+	timeLockTx := helper.RandomTLockTx(t, false)
+	txs = append(txs, timeLockTx)
 
-	bidTxClone := bidTx
-	timeLockTxClone := timeLockTX
-
-	// Calculate `Standard` hash for each tx
-
-	bidSHash, err := bidTx.Standard.CalculateHash()
+	stakeTx, err := helper.RandomStakeTx(t, false)
 	assert.Nil(err)
+	txs = append(txs, stakeTx)
 
-	timeLockSHash, err := timeLockTX.Standard.CalculateHash()
+	coinBaseTx := helper.RandomCoinBaseTx(t, false)
 	assert.Nil(err)
+	txs = append(txs, coinBaseTx)
 
-	// Calculate hashes for their types
+	for _, tx := range txs {
+		standardHash, txHash := calcTxAndStandardHash(t, tx)
+		assert.False(bytes.Equal(standardHash, txHash))
+	}
 
-	bidHash, err := bidTxClone.CalculateHash()
-	assert.Nil(err)
+}
 
-	timeLockHash, err := timeLockTxClone.CalculateHash()
-	assert.Nil(err)
+// calcTxAndStandardHash calculates the hash for the transaction and
+// then the hash for the underlying standardTx. This ensures that the txhash being used,
+// is not for the standardTx, unless this is explicitly called.
+func calcTxAndStandardHash(t *testing.T, tx transactions.Transaction) ([]byte, []byte) {
 
-	// ensure that they do not equal their standard hashes
-	assert.False(bytes.Equal(bidSHash, bidHash))
+	standard := tx.StandardTX()
+	standardHash, err := standard.CalculateHash()
 
-	assert.False(bytes.Equal(timeLockSHash, timeLockHash))
+	txHash, err := tx.CalculateHash()
+	assert.Nil(t, err)
+
+	return standardHash, txHash
 }
