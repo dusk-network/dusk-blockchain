@@ -118,14 +118,21 @@ func (s *Standard) Decode(r io.Reader) error {
 	return nil
 }
 
-// CalculateHash hashes all of the encoded fields in a tx, if it hash not been done already.
+// CalculateHash hashes all of the encoded fields in a tx, if this has not been done already.
 // The resulting byte array is also it's identifier
 //// Implements merkletree.Payload interface
 func (s *Standard) CalculateHash() ([]byte, error) {
 	if len(s.TxID) != 0 {
 		return s.TxID, nil
 	}
-	return hashBytes(s.Encode)
+
+	txid, err := hashBytes(s.Encode)
+	if err != nil {
+		return nil, err
+	}
+	s.TxID = txid
+
+	return s.TxID, nil
 }
 
 // Type returns the associated TxType for the Standard struct.
