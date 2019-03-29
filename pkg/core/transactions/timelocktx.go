@@ -64,14 +64,21 @@ func (t TimeLock) StandardTX() Standard {
 	return t.Standard
 }
 
-// CalculateHash hashes all of the encoded fields in a tx, if it hash not been done already.
+// CalculateHash hashes all of the encoded fields in a tx, if this has not been done already.
 // The resulting byte array is also it's identifier
 //// Implements merkletree.Payload interface
 func (t *TimeLock) CalculateHash() ([]byte, error) {
 	if len(t.TxID) != 0 {
 		return t.TxID, nil
 	}
-	return hashBytes(t.Encode)
+
+	txid, err := hashBytes(t.Encode)
+	if err != nil {
+		return nil, err
+	}
+	t.TxID = txid
+
+	return t.TxID, nil
 }
 
 // Equals returns true if two timelocks tx's are the same
