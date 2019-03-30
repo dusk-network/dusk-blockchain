@@ -91,12 +91,15 @@ func _TestDriver(m *testing.M, driverName string) int {
 	defer db.Close()
 
 	// Generate a few blocks to be used as sample objects
+	// Less blocks are used as we have CI out-of-memory error
 	t := &testing.T{}
-	blocks, err = generateBlocks(t, 20)
+	blocks, err = generateBlocks(t, 10)
 	if err != nil {
 		fmt.Println(err)
 		return 1
 	}
+
+	fmt.Println("Sample blocks generated")
 
 	if len(blocks) == 0 {
 		fmt.Println("Empty block slice. That's weird")
