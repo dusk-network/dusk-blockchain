@@ -26,7 +26,8 @@ func ConnectToSeeder() []string {
 	// get IP list
 	buf := make([]byte, 2048)
 	if _, err := conn.Read(buf); err != nil {
-		panic(err)
+		// panic(err) <- if the seeder return error == EOF,  return nil, dont panic
+		return nil
 	}
 
 	return strings.Split(string(buf), ",")

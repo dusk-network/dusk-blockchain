@@ -17,7 +17,7 @@ func main() {
 	})
 
 	// if we are the first, initialize consensus on round 1
-	if len(ips) < 2 {
+	if len(ips) == 0 {
 		fmt.Println("starting consensus")
 		srv.StartConsensus(1)
 	} else {
