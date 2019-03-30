@@ -8,12 +8,14 @@ import (
 )
 
 // RandomSliceofTxs returns a random slice of transactions for testing
-func RandomSliceOfTxs(t *testing.T) []transactions.Transaction {
+// Each tx batch represents all 4 non-coinbase tx types
+func RandomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transaction {
 	var txs []transactions.Transaction
 
 	txs = append(txs, RandomCoinBaseTx(t, false))
 
-	for i := 0; i < 20; i++ {
+	var i uint16
+	for ; i < txsBatchCount; i++ {
 
 		txs = append(txs, RandomStandardTx(t, false))
 		txs = append(txs, RandomTLockTx(t, false))

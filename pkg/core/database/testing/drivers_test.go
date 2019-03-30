@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"io/ioutil"
 	"math"
@@ -92,7 +91,8 @@ func _TestDriver(m *testing.M, driverName string) int {
 	defer db.Close()
 
 	// Generate a few blocks to be used as sample objects
-	blocks, err = generateBlocks(300, 10)
+	t := &testing.T{}
+	blocks, err = generateBlocks(t, 20)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -103,8 +103,8 @@ func _TestDriver(m *testing.M, driverName string) int {
 		return 1
 	}
 
-	// Try to store all blocks in concurrent manner for less than 10 seconds
-	err = storeBlocksAsync(nil, db, blocks, time.Duration(10*time.Second))
+	// Try to store all blocks in concurrent manner for less than 20 seconds
+	err = storeBlocksAsync(nil, db, blocks, time.Duration(20*time.Second))
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -119,7 +119,7 @@ func TestStoreBlock(test *testing.T) {
 	test.Parallel()
 
 	// Generate additional blocks to store
-	genBlocks, err := generateBlocks(10, 10)
+	genBlocks, err := generateBlocks(test, 2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -242,14 +242,14 @@ func TestFetchBlockTxs(test *testing.T) {
 
 			// Ensure all retrieved transactions are equal to the original Block.Txs
 			// and the transactions order is the same too
-			for index, v := range block.Txs {
+			for index, oBlockTx := range block.Txs {
 
 				if index >= len(fblockTxs) {
-					return errors.New("Missing instances of transactions.Stealth")
+					return errors.New("missing instance of transactions.Transaction")
 				}
 
-				// Get bytes of the fetched transactions.Stealth
-				fblockTx := fblockTxs[index].(*transactions.Stealth)
+				// Get bytes of the fetched transactions.Transaction
+				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
 				_ = fblockTx.Encode(fetchedBuf)
 
@@ -257,13 +257,12 @@ func TestFetchBlockTxs(test *testing.T) {
 					test.Fatal("Empty tx fetched")
 				}
 
-				// Get bytes of the origin transactions.Stealth to compare with
-				oBlockTx := v.(*transactions.Stealth)
+				// Get bytes of the origin transactions.Transaction to compare with
 				originBuf := new(bytes.Buffer)
 				_ = oBlockTx.Encode(originBuf)
 
 				if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
-					return errors.New("transactions.Stealth not retrieved properly from storage")
+					return errors.New("transactions.Transaction not retrieved properly from storage")
 				}
 			}
 		}
@@ -317,21 +316,8 @@ func TestFetchKeyImageExists(test *testing.T) {
 	// Ensure all KeyImages have been stored to the KeyImage "table"
 	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
-			for _, v := range block.Txs {
-				tx := v.(*transactions.Stealth)
-
-				var inputs []*transactions.Input
-				switch tx.Type {
-				case transactions.StandardType:
-					typeInfo := tx.TypeInfo.(*transactions.Standard)
-					inputs = typeInfo.Inputs
-
-				case transactions.TimelockType:
-					typeInfo := tx.TypeInfo.(*transactions.Standard)
-					inputs = typeInfo.Inputs
-				}
-
-				for _, input := range inputs {
+			for _, tx := range block.Txs {
+				for _, input := range tx.StandardTX().Inputs {
 
 					if len(input.KeyImage) == 0 {
 						test.Fatal("Testing with empty keyImage")
@@ -351,7 +337,6 @@ func TestFetchKeyImageExists(test *testing.T) {
 						test.Fatal(err.Error())
 					}
 				}
-
 			}
 		}
 		return nil
@@ -390,9 +375,11 @@ func TestFetchKeyImageExists(test *testing.T) {
 // writable tx does fail
 func TestAtomicUpdates(test *testing.T) {
 
-	test.Parallel()
+	// This test ensures that the underlying storage state does not change.
+	// That said, no parallelism should be applied.
+	// test.Parallel()
 
-	genBlocks, err := generateBlocks(10, 2)
+	genBlocks, err := generateBlocks(test, 2)
 
 	if err != nil {
 		test.Fatal(err.Error())
@@ -517,8 +504,8 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 
 	defer dbReadOnly.Close()
 
-	// Initialize db and a slice of 100 blocks with 2 transactions.Stealth each
-	genBlocks, err := generateBlocks(100, 2)
+	// Initialize db and a slice of 10 blocks with 2 transactions.Transaction each
+	genBlocks, err := generateBlocks(test, 2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -579,24 +566,22 @@ func TestFetchBlockTxByHash(test *testing.T) {
 	// providing block.header.hash
 	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
-			for index, v := range block.Txs {
-				originTx := v.(*transactions.Stealth)
+			for txIndex, originTx := range block.Txs {
 
 				// FetchBlockTxByHash
-				tx, fetchedIndex, fetchedBlockHash, err := t.FetchBlockTxByHash(originTx.R)
+				txID, _ := originTx.CalculateHash()
+				fetchedTx, fetchedIndex, fetchedBlockHash, err := t.FetchBlockTxByHash(txID)
 
 				if err != nil {
 					test.Fatal(err.Error())
 				}
 
-				fetchedTx := tx.(*transactions.Stealth)
-
-				if fetchedIndex != uint32(index) {
-					test.Fatal("Invalid index fetched")
-				}
-
 				if !bytes.Equal(fetchedBlockHash, block.Header.Hash) {
 					test.Fatal("This tx does not belong to the right block")
+				}
+
+				if fetchedIndex != uint32(txIndex) {
+					test.Fatal("Invalid index fetched")
 				}
 
 				fetchedBuf := new(bytes.Buffer)
@@ -633,13 +618,13 @@ func TestFetchBlockTxByHash(test *testing.T) {
 		invalidTxID, _ := crypto.RandEntropy(32)
 
 		// FetchBlockTxByHash
-		tx, fetchedIndex, fetchedBlockHash, err := t.FetchBlockTxByHash(invalidTxID)
+		tx, txIndex, fetchedBlockHash, err := t.FetchBlockTxByHash(invalidTxID)
 
 		if err != database.ErrTxNotFound {
 			test.Fatal("ErrTxNotFound is expected when non-existing Tx is looked up")
 		}
 
-		if fetchedIndex != math.MaxUint32 {
+		if txIndex != math.MaxUint32 {
 			test.Fatal("Invalid index fetched")
 		}
 

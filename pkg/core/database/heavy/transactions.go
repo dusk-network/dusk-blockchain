@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"io"
 	"math"
 )
@@ -72,6 +72,10 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		return errors.New("StoreBlock cannot be called on read-only transaction")
 	}
 
+	if len(block.Header.Hash) == 0 {
+		return fmt.Errorf("empty chain block hash")
+	}
+
 	// Schema Key = HeaderPrefix + block.header.hash Value =
 	// encoded(block.fields)
 
@@ -90,20 +94,28 @@ func (t transaction) StoreBlock(block *block.Block) error {
 
 	// Put block transaction data. A KV pair per a single transaction is added
 	// into the store
-	for index, v := range block.Txs {
+	for i, tx := range block.Txs {
 
-		tx := v.(*transactions.Stealth)
+		txID, err := tx.CalculateHash()
+
+		if err != nil {
+			return err
+		}
+
+		if len(txID) == 0 {
+			return fmt.Errorf("empty chain tx id")
+		}
 
 		// Schema
 		//
-		// Key = TxPrefix + block.header.hash + Tx.R
+		// Key = TxPrefix + block.header.hash + txID
 		// Value = index + block.transaction[index]
 		//
 		// For the retrival of transactions data by block.header.hash
 
 		key := append(TxPrefix, block.Header.Hash...)
-		key = append(key, tx.R...)
-		value, err := t.encodeBlockTx(tx, uint32(index))
+		key = append(key, txID...)
+		value, err := t.encodeBlockTx(tx, uint32(i))
 
 		if err != nil {
 			return err
@@ -113,11 +125,12 @@ func (t transaction) StoreBlock(block *block.Block) error {
 
 		// Schema
 		//
-		// Key = TxPrefix + Tx.R
+		// Key = TxPrefix + txID
 		// Value = block.header.hash
 		//
 		// For the retrival of a single transaction by TxId
-		t.put(append(TxIdPrefix, tx.R...), block.Header.Hash)
+
+		t.put(append(TxIdPrefix, txID...), block.Header.Hash)
 
 		// Schema
 		//
@@ -125,9 +138,8 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		// Value = tx.R
 		//
 		// To make FetchKeyImageExists functioning
-		inputs := t.getInputs(tx)
-		for _, input := range inputs {
-			t.put(append(KeyImagePrefix, input.KeyImage...), tx.R)
+		for _, input := range tx.StandardTX().Inputs {
+			t.put(append(KeyImagePrefix, input.KeyImage...), txID)
 		}
 
 	}
@@ -151,17 +163,25 @@ func (t transaction) StoreBlock(block *block.Block) error {
 	return nil
 }
 
-// encodeBlockTx tries to serialize index and bytes of *transactions.Stealth
-func (t transaction) encodeBlockTx(tx *transactions.Stealth, index uint32) ([]byte, error) {
+// encodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
+func (t transaction) encodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) {
 
 	buf := new(bytes.Buffer)
 
-	// Write index value
-	if err := t.writeUint32(buf, index); err != nil {
+	// Write tx type as first field
+	if err := buf.WriteByte(byte(tx.Type())); err != nil {
 		return nil, err
 	}
 
-	// Write transactions.Stealth bytes
+	// Write index value as second field.
+
+	// golevedb is ordering keys lexicographically. That said, the order of the
+	// stored KV is not the order of inserting
+	if err := t.writeUint32(buf, txIndex); err != nil {
+		return nil, err
+	}
+
+	// Write transactions.Transaction bytes
 	err := tx.Encode(buf)
 	if err != nil {
 		return nil, err
@@ -170,24 +190,71 @@ func (t transaction) encodeBlockTx(tx *transactions.Stealth, index uint32) ([]by
 	return buf.Bytes(), nil
 }
 
-// decodeBlockTx tries to deserialize index and bytes of a transaction.Stealth
-func (t transaction) decodeBlockTx(data []byte) (*transactions.Stealth, uint32, error) {
+// decodeBlockTx tries to decode a transactions.Transaction of `typeFilter` type from `data`
+// if typeFilter is database.AnyTxType then no filter is applied
+func (t transaction) decodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Transaction, uint32, error) {
 
-	buf := bytes.NewReader(data)
+	var txIndex uint32 = math.MaxUint32
 
-	// Read index value
-	var index uint32
-	if err := t.readUint32(buf, &index); err != nil {
-		return nil, 0, err
+	var tx transactions.Transaction
+	reader := bytes.NewReader(data)
+
+	// Peak the type from the first byte
+	typeBytes, err := reader.ReadByte()
+	if err != nil {
+		return nil, txIndex, err
+	}
+	txReadType := transactions.TxType(typeBytes)
+
+	if typeFilter != database.AnyTxType {
+		// Do not read and decode the rest of the bytes if the transaction type
+		// is not same as typeFilter
+		if typeFilter != txReadType {
+			return nil, txIndex, fmt.Errorf("tx of type %d not found", typeFilter)
+		}
 	}
 
-	// Read transaction bytes
-	tx := &transactions.Stealth{}
-	if err := tx.Decode(buf); err != nil {
-		return nil, 0, err
+	// Read tx index field
+	if err := t.readUint32(reader, &txIndex); err != nil {
+		return nil, txIndex, err
 	}
 
-	return tx, index, nil
+	switch txReadType {
+	case transactions.StandardType:
+		tx = &transactions.Standard{}
+		err := tx.Decode(reader)
+		if err != nil {
+			return nil, txIndex, err
+		}
+	case transactions.TimelockType:
+		tx = &transactions.TimeLock{}
+		err := tx.Decode(reader)
+		if err != nil {
+			return nil, txIndex, err
+		}
+	case transactions.BidType:
+		tx = &transactions.Bid{}
+		err := tx.Decode(reader)
+		if err != nil {
+			return nil, txIndex, err
+		}
+	case transactions.StakeType:
+		tx = &transactions.Stake{}
+		err := tx.Decode(reader)
+		if err != nil {
+			return nil, txIndex, err
+		}
+	case transactions.CoinbaseType:
+		tx = &transactions.Coinbase{}
+		err := tx.Decode(reader)
+		if err != nil {
+			return nil, txIndex, err
+		}
+	default:
+		return nil, txIndex, fmt.Errorf("unknown transaction type: %d", txReadType)
+	}
+
+	return tx, txIndex, nil
 }
 
 // writeUint32 Tx utility to use a Tx byteOrder on internal encoding
@@ -210,7 +277,7 @@ func (t transaction) readUint32(r io.Reader, v *uint32) error {
 	return nil
 }
 
-// writeUint32 Tx utility to use a common byteOrder on internal encoding
+// writeUint64 Tx utility to use a common byteOrder on internal encoding
 func (t transaction) writeUint64(w io.Writer, value uint64) error {
 	var b [8]byte
 	byteOrder.PutUint64(b[:], value)
@@ -285,10 +352,10 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	return header, nil
 }
 
-func (t transaction) FetchBlockTxs(hashHeader []byte) ([]merkletree.Payload, error) {
+func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transaction, error) {
 
 	scanFilter := append(TxPrefix, hashHeader...)
-	tempTxs := make(map[uint32]merkletree.Payload)
+	tempTxs := make(map[uint32]transactions.Transaction)
 
 	// Read all the transactions that belong to a single block
 	// Scan filter = TX_PREFIX + block.header.hash
@@ -297,19 +364,32 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]merkletree.Payload, err
 
 	for iterator.Next() {
 		value := iterator.Value()
-		tx, index, err := t.decodeBlockTx(value)
+		tx, txIndex, err := t.decodeBlockTx(value, database.AnyTxType)
 
 		if err != nil {
 			return nil, err
 		}
 
-		tempTxs[index] = tx
+		// If we don't fetch the correct indeces (tx positions), merkle tree
+		// changes and as result we've got new block hash
+		if _, ok := tempTxs[txIndex]; ok {
+			return nil, errors.New("duplicated tx index")
+		}
+
+		tempTxs[txIndex] = tx
 	}
 
 	// Reorder Tx slice as per retrieved indeces
-	resultTxs := make([]merkletree.Payload, len(tempTxs))
+	resultTxs := make([]transactions.Transaction, len(tempTxs))
 	for k, v := range tempTxs {
 		resultTxs[k] = v
+	}
+
+	// Let's ensure coinbase tx is here
+	if len(resultTxs) > 0 {
+		if resultTxs[0].Type() != transactions.CoinbaseType {
+			return resultTxs, errors.New("missing coinbase tx")
+		}
 	}
 
 	return resultTxs, nil
@@ -351,7 +431,12 @@ func (t transaction) put(key []byte, value []byte) {
 	}
 }
 
-func (t transaction) FetchBlockTxByHash(txID []byte) (merkletree.Payload, uint32, []byte, error) {
+// FetchBlockTxByHash seems to be an expensive transaction as it needs to
+// recalculate hashes of all txs of the block that txID is associated with.
+//
+// NB: txID is not serialized by transactions.Transaction.Encoder so it is
+// always recalculated on fetching from the storage.
+func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, uint32, []byte, error) {
 
 	var txIndex uint32 = math.MaxUint32
 
@@ -377,53 +462,41 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (merkletree.Payload, uint32
 
 	for iterator.Next() {
 		value := iterator.Value()
-		tx, index, err := t.decodeBlockTx(value)
+		tx, txIndex, err := t.decodeBlockTx(value, database.AnyTxType)
 
 		if err == nil {
-			if bytes.Equal(tx.R, txID) {
-				return tx, index, hashHeader, nil
+			fetchedTxID, err := tx.CalculateHash()
+
+			if err == nil {
+				if bytes.Equal(fetchedTxID, txID) {
+					return tx, txIndex, hashHeader, nil
+				}
 			}
 		}
 	}
 
 	// If we get here, the transaction is available but something went wrong
 	// with decoding the transaction
-
 	return nil, txIndex, nil, errors.New("block tx is available but fetching it fails")
 }
 
-func (t transaction) FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error) {
-	err = database.ErrKeyImageNotFound
+// FetchKeyImageExists checks if the KeyImage exists. If so, it also returns the
+// hash of its corresponding tx.
+//
+// Due to performance concerns, the found tx is not verified. By explicitly
+// calling FetchBlockTxByHash, a consumer can check if the tx is real
+func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
 
 	key := append(KeyImagePrefix, keyImage...)
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
-	defer iterator.Release()
+	txID, err := t.snapshot.Get(key, nil)
 
-	for iterator.Next() {
-		// Get txID that keyImage is assigned to
-		txID = iterator.Value()
-		// Ensure that the keyImage belongs to an input of a real tx
-		tx, _, hashHeader, err := t.FetchBlockTxByHash(txID)
-		if tx != nil && err == nil && hashHeader != nil {
-			exists = true
-			return exists, txID, err
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			// overwrite error message
+			err = database.ErrKeyImageNotFound
 		}
+		return false, nil, err
 	}
 
-	return exists, txID, err
-}
-
-// getInputs retrieves a slice of the inputs of Standard and Timelock txs
-func (t transaction) getInputs(tx *transactions.Stealth) []*transactions.Input {
-
-	switch tx.Type {
-	case transactions.StandardType:
-		typeInfo := tx.TypeInfo.(*transactions.Standard)
-		return typeInfo.Inputs
-
-	case transactions.TimelockType:
-		typeInfo := tx.TypeInfo.(*transactions.Timelock)
-		return typeInfo.Inputs
-	}
-	return nil
+	return true, txID, nil
 }

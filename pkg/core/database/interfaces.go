@@ -2,9 +2,10 @@ package database
 
 import (
 	"errors"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"math"
 )
 
 var (
@@ -17,6 +18,9 @@ var (
 	ErrTxNotFound = errors.New("database: transaction not found")
 	// ErrBlockNotFound returned on a block lookup by hash or height
 	ErrBlockNotFound = errors.New("database: block not found")
+
+	// AnyTxType is used as a filter value on FetchBlockTxByHash
+	AnyTxType transactions.TxType = math.MaxUint8
 )
 
 // A Driver represents an application programming interface for accessing
@@ -43,10 +47,10 @@ type Transaction interface {
 
 	FetchBlockHeader(hash []byte) (*block.Header, error)
 	// Fetch all of the Txs that belong to a block with this header.hash
-	FetchBlockTxs(hash []byte) ([]merkletree.Payload, error)
+	FetchBlockTxs(hash []byte) ([]transactions.Transaction, error)
 	// Fetch tx by txID. If succeeds, it returns tx data, tx index and
 	// hash of the block it belongs to.
-	FetchBlockTxByHash(txID []byte) (tx merkletree.Payload, txIndex uint32, blockHeaderHash []byte, err error)
+	FetchBlockTxByHash(txID []byte) (tx transactions.Transaction, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
 

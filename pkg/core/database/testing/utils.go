@@ -1,16 +1,25 @@
 package test
 
 import (
-	"encoding/binary"
 	"errors"
+	"fmt"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/payload/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+)
+
+var (
+	// heightCounter is used by generateBlocks as atomic counter
+	heightCounter uint64
+
+	// sampleTxsBatchCount
+	// Number of txs per a sample block is  = ( 1 + sampleTxsBatchCount * 4)
+	sampleTxsBatchCount uint16 = 2
 )
 
 // storeBlocksAsync is a helper function to store a slice of blocks in a
@@ -43,6 +52,7 @@ func storeBlocksAsync(test *testing.T, db database.DB, blocks []*block.Block, ti
 				for _, block := range blocks {
 					err := t.StoreBlock(block)
 					if err != nil {
+						fmt.Print(err.Error())
 						return err
 					}
 				}
@@ -65,84 +75,27 @@ func storeBlocksAsync(test *testing.T, db database.DB, blocks []*block.Block, ti
 }
 
 // A helper function to generate a set of blocks as mock objects
-func generateBlocks(blocksCount int, txsCount int) ([]*block.Block, error) {
+func generateBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
+
+	overallBlockTxs := (1 + 4*int(sampleTxsBatchCount))
+	overallTxsCount := blocksCount * overallBlockTxs
+	fmt.Printf("--- MSG  Generate sample data of %d blocks with %d txs each (overall txs %d)\n", blocksCount, overallBlockTxs, overallTxsCount)
 
 	newBlocks := make([]*block.Block, blocksCount)
+	for i := 0; i < blocksCount; i++ {
+		b := helper.RandomBlock(test, atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
+		newBlocks[i] = b
+	}
 
-	for index := 0; index < blocksCount; index++ {
-		b := block.NewBlock()
+	// Make all txs calculate and cache hash value.
+	for _, b := range newBlocks {
+		for _, tx := range b.Txs {
+			_, err := tx.CalculateHash()
 
-		// Add 10 transactions
-		for i := 0; i < txsCount; i++ {
-			byte32 := []byte{1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4}
-
-			sig, _ := crypto.RandEntropy(2000)
-
-			txPubKey, _ := crypto.RandEntropy(32)
-			pl := transactions.NewStandard(100)
-			s := transactions.NewTX(transactions.StandardType, pl)
-			in := transactions.NewInput(txPubKey, txPubKey, 0, sig)
-			pl.AddInput(in)
-			s.R = txPubKey
-
-			out := transactions.NewOutput(200, byte32, sig)
-			pl.AddOutput(out)
-			if err := s.SetHash(); err != nil {
+			if err != nil {
 				return nil, err
 			}
-
-			b.AddTx(s)
 		}
-
-		// Set Height
-		heightEntropy, _ := crypto.RandEntropy(64)
-		b.Header.Height = binary.LittleEndian.Uint64(heightEntropy)
-
-		// Spoof previous hash and seed
-		h, _ := crypto.RandEntropy(32)
-		b.Header.PrevBlock = h
-
-		s, _ := crypto.RandEntropy(33)
-		b.Header.Seed = s
-
-		// Add cert image
-		rand1, _ := crypto.RandEntropy(32)
-		rand2, _ := crypto.RandEntropy(32)
-
-		sig, _ := crypto.RandEntropy(33)
-
-		slice := make([][]byte, 0)
-		slice = append(slice, rand1)
-		slice = append(slice, rand2)
-
-		cert := &block.Certificate{
-			BRBatchedSig: sig,
-			BRStep:       4,
-			BRPubKeys:    slice,
-			SRBatchedSig: sig,
-			SRStep:       2,
-			SRPubKeys:    slice,
-		}
-
-		if err := cert.SetHash(); err != nil {
-			return nil, err
-		}
-
-		if err := b.AddCertHash(cert); err != nil {
-			return nil, err
-		}
-
-		// Finish off
-		if err := b.SetRoot(); err != nil {
-			return nil, err
-		}
-
-		b.Header.Timestamp = time.Now().Unix()
-		if err := b.SetHash(); err != nil {
-			return nil, err
-		}
-
-		newBlocks[index] = b
 	}
 
 	return newBlocks, nil
