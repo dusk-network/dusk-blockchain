@@ -15,7 +15,7 @@ func TestEncodeDecodeBlock(t *testing.T) {
 	assert := assert.New(t)
 
 	// random block
-	blk := helper.RandomBlock(t)
+	blk := helper.RandomBlock(t, 200, 20)
 
 	// Encode block into a buffer
 	buf := new(bytes.Buffer)
