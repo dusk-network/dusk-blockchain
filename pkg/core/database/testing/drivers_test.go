@@ -561,6 +561,8 @@ func TestFetchBlockTxByHash(test *testing.T) {
 
 	test.Parallel()
 
+	var maxTxToFetch uint16 = 30
+
 	done := false
 	// Ensure we can fetch one by one each transaction by its TxID without
 	// providing block.header.hash
@@ -599,6 +601,12 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 
 				done = true
+
+				// Limit the overall number of tx to fetch
+				maxTxToFetch--
+				if maxTxToFetch == 0 {
+					return nil
+				}
 			}
 		}
 		return nil
