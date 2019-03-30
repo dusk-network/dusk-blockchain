@@ -35,11 +35,11 @@ Unlike a Block Generator, a Provisioner node is required to deanonymize the valu
 
 The Provisioner is eligible to participate in five phases
 
-- Sigset Generation
-- Block Reduction
-- Sigset Reduction
-- Block Agreement
-- Sigset Agreement
+- `Sigset Generation`
+- `Block Reduction`
+- `Sigset Reduction`
+- `Block Agreement`
+- `Sigset Agreement`
 
 ### Event Driven Architecture
 
