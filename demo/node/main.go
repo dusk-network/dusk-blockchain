@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 )
@@ -49,6 +50,6 @@ func main() {
 	}
 
 	for {
-
+		time.Sleep(10 * time.Second)
 	}
 }
