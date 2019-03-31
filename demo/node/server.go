@@ -10,31 +10,21 @@ import (
 	"net"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
-
 	"github.com/bwesterb/go-ristretto"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
-
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 var timeOut = 6 * time.Second
@@ -138,7 +128,12 @@ func (s *Server) OnAccept(conn net.Conn) {
 	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus)
 	// send the latest block
 	buffer := new(bytes.Buffer)
-	s.chain.PrevBlock.Encode(buffer)
+	if err := s.chain.PrevBlock.Encode(buffer); err != nil {
+		fmt.Println("error encoding previous block, ", err)
+		peer.Disconnect()
+		return
+	}
+
 	if _, err := peer.Conn.Write(buffer.Bytes()); err != nil {
 		fmt.Println("error writing to peer, ", err)
 		peer.Disconnect()

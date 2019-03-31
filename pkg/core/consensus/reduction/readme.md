@@ -22,6 +22,7 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 
 #### SigSet Reduction Event
 
+| Field | Type |
 | opcode | uint8 |
 | round | uint64 |
 | step | uint64 |
