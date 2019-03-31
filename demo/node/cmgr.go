@@ -24,7 +24,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 	}
 
 	go func() {
-		addrPort := "127.0.0.1" + ":" + cfg.Port
+		addrPort := ":" + cfg.Port
 		listener, err := net.Listen("tcp", addrPort)
 
 		if err != nil {
