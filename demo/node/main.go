@@ -2,11 +2,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 )
 
 func main() {
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
 	srv := Setup()
 	go srv.Listen()
 	ips := ConnectToSeeder()
@@ -48,7 +52,8 @@ func main() {
 
 	}
 
-	for {
-
-	}
+	// Wait until the interrupt signal is received from an OS signal or
+	// shutdown is requested through one of the subsystems such as the RPC
+	// server.
+	<-interrupt
 }

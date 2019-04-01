@@ -6,21 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
-
 	"github.com/bwesterb/go-ristretto"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -71,7 +65,9 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 // StartConsensus will wait for a message to come in, and then proceed to
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
+	fmt.Printf("Starting consensus")
 	round := <-c.initChannel
+	fmt.Printf("Initing on round %d\n", round)
 
 	generation.LaunchGeneratorComponent(c.eventBus, c.d, c.k)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
