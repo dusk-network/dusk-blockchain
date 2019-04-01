@@ -110,6 +110,10 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 
 func (bus *EventBus) doPublish(handlers []*eventHandler, messageBuffer *bytes.Buffer) {
 	for _, handler := range handlers {
-		handler.messageChannel <- messageBuffer
+		select {
+		case handler.messageChannel <- messageBuffer:
+		default:
+			fmt.Printf("handler.messageChannel buffer failed for handler.id %d\n", handler.id)
+		}
 	}
 }
