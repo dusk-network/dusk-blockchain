@@ -25,10 +25,12 @@ var consensusSeconds = 20
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus  *wire.EventBus
+	eventBus *wire.EventBus
+	db       Database
+
+	// TODO: exposed for demo, possibly undo later
 	PrevBlock block.Block
-	db        Database
-	bidList   *user.BidList
+	BidList   *user.BidList
 
 	// collector channels
 	blockChannel <-chan *block.Block
@@ -65,7 +67,7 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 	return &Chain{
 		eventBus:     eventBus,
 		db:           db,
-		bidList:      &user.BidList{},
+		BidList:      &user.BidList{},
 		PrevBlock:    *genesisBlock,
 		blockChannel: blockChannel,
 		txChannel:    txChannel,
@@ -134,10 +136,10 @@ func (c *Chain) addProvisioner(tx *transactions.Stake) error {
 func (c *Chain) addBidder(tx *transactions.Bid) error {
 	totalAmount := getTxTotalOutputAmount(tx)
 	x := zkproof.CalculateX(zkproof.Uint64ToScalar(totalAmount), zkproof.BytesToScalar(tx.M))
-	c.bidList.AddBid(x)
+	c.BidList.AddBid(x)
 
 	var bidListBytes []byte
-	for _, bid := range *c.bidList {
+	for _, bid := range *c.BidList {
 		bidListBytes = append(bidListBytes, bid[:]...)
 	}
 
