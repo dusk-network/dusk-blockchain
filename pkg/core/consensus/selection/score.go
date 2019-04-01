@@ -7,7 +7,6 @@ import (
 	"time"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -83,11 +82,7 @@ func (f *scoreBroker) Listen() {
 				f.collector.StartSelection()
 			}
 		case bestEvent := <-f.collector.BestEventChan:
-			// TODO: remove
-			log.WithFields(log.Fields{}).Infoln()
-
-			// TODO: moved step incrementation here, so we dont run ahead in case
-			// there's nobody generating blocks
+			// TODO: moved step incrementation here, so we dont run ahead in case there's nobody generating blocks
 			if bestEvent.Len() != 0 {
 				f.collector.CurrentStep++
 				f.eventBus.Publish(msg.BestScoreTopic, bestEvent)
