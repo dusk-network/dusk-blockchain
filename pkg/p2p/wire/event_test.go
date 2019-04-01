@@ -89,26 +89,6 @@ func TestStopSelectorWithoutResult(t *testing.T) {
 		assert.Equal(t, &MockEvent{"one"}, selector.bestEvent)
 	}
 }
-func TestSECOperations(t *testing.T) {
-	sec := &StepEventCollector{}
-	ev1 := &MockEvent{"one"}
-	ev2 := &MockEvent{"two"}
-	ev3 := &MockEvent{"one"}
-
-	// checking if the length of the array of step is consistent
-	require.Equal(t, 1, sec.Store(ev1, 1))
-	require.Equal(t, 1, sec.Store(ev1, 1))
-	require.Equal(t, 1, sec.Store(ev1, 2))
-	require.Equal(t, 2, sec.Store(ev2, 2))
-	require.Equal(t, 2, sec.Store(ev3, 2))
-
-	sec.Clear()
-	require.Equal(t, 1, sec.Store(ev1, 1))
-	require.Equal(t, 1, sec.Store(ev1, 1))
-	require.Equal(t, 1, sec.Store(ev1, 2))
-	require.Equal(t, 2, sec.Store(ev2, 2))
-	require.Equal(t, 2, sec.Store(ev3, 2))
-}
 
 type MockPrioritizer struct{}
 
