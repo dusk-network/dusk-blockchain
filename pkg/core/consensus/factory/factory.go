@@ -41,11 +41,12 @@ type ConsensusFactory struct {
 	timerLength time.Duration
 	committee   committee.Committee
 	d, k        ristretto.Scalar
+	bidList     *user.BidList
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, timerLength time.Duration,
-	committee committee.Committee, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
+	committee committee.Committee, bidList *user.BidList, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
@@ -59,20 +60,21 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 		committee:   committee,
 		d:           d,
 		k:           k,
+		bidList:     bidList,
 	}
 }
 
 // StartConsensus will wait for a message to come in, and then proceed to
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
-	fmt.Printf("Starting consensus")
+	fmt.Println("Starting consensus")
 	round := <-c.initChannel
 	fmt.Printf("Initing on round %d\n", round)
 
-	generation.LaunchGeneratorComponent(c.eventBus, c.d, c.k)
+	generation.LaunchGeneratorComponent(c.eventBus, c.d, c.k, *c.bidList)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
-	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)
+	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength, *c.bidList)
 	selection.LaunchSignatureSelector(c.committee, c.eventBus, c.timerLength)
 
 	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
