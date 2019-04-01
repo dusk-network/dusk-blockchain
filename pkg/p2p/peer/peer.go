@@ -188,10 +188,6 @@ func (p *Peer) readHeaderBytes() ([]byte, error) {
 }
 
 func (p *Peer) readPayload(length uint32) (*bytes.Buffer, error) {
-	if length == 0 {
-		return nil, nil
-	}
-
 	buffer := make([]byte, length)
 	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
 		return nil, err
