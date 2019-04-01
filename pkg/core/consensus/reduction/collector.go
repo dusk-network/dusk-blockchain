@@ -47,8 +47,8 @@ type (
 		outgoingAgreementTopic string
 
 		// TODO: review this after demo. used to restart phase after reduction
-		regenerationTopic string
-		reductionTopic    topics.Topic
+		generationTopic string
+		reductionTopic  topics.Topic
 	}
 )
 
@@ -163,7 +163,7 @@ func (c *collector) startReduction() {
 // TODO: review regeneration
 func newBroker(eventBus *wire.EventBus, handler handler, selectionChannel chan []byte,
 	committee committee.Committee, reductionTopic topics.Topic, outgoingReductionTopic,
-	outgoingAgreementTopic, regenerationTopic string, timeout time.Duration) *broker {
+	outgoingAgreementTopic, generationTopic string, timeout time.Duration) *broker {
 
 	ctx := newCtx(handler, committee, timeout)
 	collector := newCollector(eventBus, string(reductionTopic), ctx)
@@ -179,9 +179,9 @@ func newBroker(eventBus *wire.EventBus, handler handler, selectionChannel chan [
 		outgoingAgreementTopic: outgoingAgreementTopic,
 
 		// TODO: review
-		regenerationTopic: regenerationTopic,
-		reductionTopic:    reductionTopic,
-		selectionChan:     selectionChannel,
+		generationTopic: generationTopic,
+		reductionTopic:  reductionTopic,
+		selectionChan:   selectionChannel,
 	}
 }
 
@@ -201,7 +201,7 @@ func (b *broker) Listen() {
 			// TODO: remove
 			fmt.Println("reduction finished")
 			// TODO: review
-			b.eventBus.Publish(b.regenerationTopic, nil)
+			b.eventBus.Publish(b.generationTopic, nil)
 		case ev := <-b.collector.repropagationChannel:
 			// TODO: review
 			message, _ := wire.AddTopic(ev, b.reductionTopic)
