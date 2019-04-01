@@ -102,13 +102,13 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
 	if handlers, ok := bus.handlers[topic]; ok {
-		go bus.doPublish(handlers, messageBuffer)
+		go bus.publish(handlers, messageBuffer)
 	}
 
-	go bus.doPublish(bus.broadcaster, messageBuffer)
+	go bus.publish(bus.broadcaster, messageBuffer)
 }
 
-func (bus *EventBus) doPublish(handlers []*eventHandler, messageBuffer *bytes.Buffer) {
+func (bus *EventBus) publish(handlers []*eventHandler, messageBuffer *bytes.Buffer) {
 	for _, handler := range handlers {
 		handler.messageChannel <- messageBuffer
 	}
