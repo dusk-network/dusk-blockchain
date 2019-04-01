@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -31,7 +33,7 @@ func InitBestSigSetUpdate(eventBus *wire.EventBus) chan []byte {
 	return bestVotedHashChan
 }
 
-func InitSigSetSelectionCollector(eventBus *wire.EventBus) chan bool {
+func InitSigSetGenerationCollector(eventBus *wire.EventBus) chan bool {
 	selectionChan := make(chan bool, 1)
 	collector := &selectionCollector{selectionChan}
 	go wire.NewEventSubscriber(eventBus, collector, msg.SigSetGenerationTopic).Accept()
@@ -43,15 +45,15 @@ func newSigSetBroker(eventBus *wire.EventBus, handler consensus.EventHandler, ti
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundUpdate(eventBus)
 	phaseChan := consensus.InitPhaseUpdate(eventBus)
-	selectionChan := InitSigSetSelectionCollector(eventBus)
-	collector := initCollector(handler, timeout, eventBus)
+	generationChan := InitSigSetGenerationCollector(eventBus)
+	collector := initCollector(handler, timeout, eventBus, string(topics.SigSet))
 
 	return &sigSetBroker{
 		eventBus:        eventBus,
 		collector:       collector,
 		roundUpdateChan: roundChan,
 		phaseUpdateChan: phaseChan,
-		selectionChan:   selectionChan,
+		generationChan:  generationChan,
 	}
 }
 
@@ -64,7 +66,7 @@ func (f *sigSetBroker) Listen() {
 		case phaseUpdate := <-f.phaseUpdateChan:
 			f.collector.CurrentBlockHash = phaseUpdate
 			f.collector.StartSelection()
-		case <-f.selectionChan:
+		case <-f.generationChan:
 			f.collector.StartSelection()
 		case bestEvent := <-f.collector.BestEventChan:
 			// TODO: remove
@@ -106,7 +108,7 @@ type (
 		eventBus        *wire.EventBus
 		phaseUpdateChan <-chan []byte
 		roundUpdateChan <-chan uint64
-		selectionChan   <-chan bool
+		generationChan  <-chan bool
 		collector       *collector
 	}
 )

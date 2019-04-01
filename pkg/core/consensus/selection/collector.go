@@ -7,7 +7,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type (
@@ -47,10 +46,10 @@ func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandl
 }
 
 // initCollector instantiates a Collector and triggers the related EventSubscriber. It is a helper method for those needing access to the Collector
-func initCollector(handler consensus.EventHandler, timeout time.Duration, eventBus *wire.EventBus) *collector {
+func initCollector(handler consensus.EventHandler, timeout time.Duration, eventBus *wire.EventBus, topic string) *collector {
 	bestEventChan := make(chan *bytes.Buffer, 1)
 	collector := newCollector(bestEventChan, handler, timeout)
-	go wire.NewEventSubscriber(eventBus, collector, string(topics.Score)).Accept()
+	go wire.NewEventSubscriber(eventBus, collector, topic).Accept()
 	return collector
 }
 
