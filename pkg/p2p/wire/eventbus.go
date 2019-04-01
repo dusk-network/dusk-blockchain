@@ -48,18 +48,24 @@ func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer
 }
 
 // Unsubscribe removes a handler defined for a topic.
-// Returns error if there are no handlers subscribed to the topic.
-func (bus *EventBus) Unsubscribe(topic string, id uint32) {
+// Returns true if a handler is found with the id and the topic specified
+func (bus *EventBus) Unsubscribe(topic string, id uint32) bool {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
+	return bus.unsubscribe(topic, id)
+}
+
+func (bus *EventBus) unsubscribe(topic string, id uint32) bool {
 	if _, ok := bus.handlers[topic]; ok {
 		for i, handler := range bus.handlers[topic] {
 			if handler.id == id {
 				bus.handlers[topic] = append(bus.handlers[topic][:i],
 					bus.handlers[topic][i+1:]...)
+				return true
 			}
 		}
 	}
+	return false
 }
 
 // SubscribeAll subscribes to all topics, and returns a unique ID associated
@@ -76,11 +82,16 @@ func (bus *EventBus) SubscribeAll(messageChannel chan<- *bytes.Buffer) uint32 {
 	return id
 }
 
-// UnsubscribeAll will unsubscribe from all topics. The function takes an ID
-// which points to the handler associated to the caller.
+// UnsubscribeAll will unsubscribe from all topics and broadcasting channel. The function takes an ID
+// which points to the handler associated to the caller. Wherever possible, `Unsubscribe` should be used instead as it is less intensive
 func (bus *EventBus) UnsubscribeAll(id uint32) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
+	for topic := range bus.handlers {
+		if ok := bus.unsubscribe(topic, id); ok {
+			break
+		}
+	}
 	for i, handler := range bus.broadcaster {
 		if handler.id == id {
 			bus.broadcaster = append(bus.broadcaster[:i], bus.broadcaster[i+1:]...)
@@ -92,6 +103,10 @@ func (bus *EventBus) UnsubscribeAll(id uint32) {
 func (bus *EventBus) HasHandler(topic string) bool {
 	bus.busLock.RLock()
 	defer bus.busLock.RUnlock()
+	return bus.hasHandler(topic)
+}
+
+func (bus *EventBus) hasHandler(topic string) bool {
 	_, ok := bus.handlers[topic]
 	return ok
 }

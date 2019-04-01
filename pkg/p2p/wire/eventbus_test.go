@@ -49,6 +49,11 @@ func TestUnsubscribeAll(t *testing.T) {
 	}
 }
 
+func TestHasHandler(t *testing.T) {
+	eb, _, _ := newEB(t)
+	assert.True(t, eb.HasHandler("whateverTopic"))
+}
+
 func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
 	eb := New()
 	myChan := make(chan *bytes.Buffer, 10)
