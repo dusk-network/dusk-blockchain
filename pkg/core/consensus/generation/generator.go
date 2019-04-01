@@ -124,7 +124,7 @@ func (g *generator) sendScore(sev *selection.ScoreEvent) error {
 	}
 
 	fmt.Println("sending proof")
-	g.eventBus.Publish(string(topics.Score), scoreBuffer)
+	// g.eventBus.Publish(string(topics.Score), scoreBuffer)
 	g.eventBus.Publish(string(topics.Gossip), buffer)
 	return nil
 }

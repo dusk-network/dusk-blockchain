@@ -25,7 +25,7 @@ type (
 		*consensus.EventHeader
 		VoteSet       []wire.Event
 		SignedVoteSet []byte
-		BlockHash     []byte
+		AgreedHash    []byte
 	}
 
 	// ReductionEvent is a basic reduction event.
@@ -214,7 +214,7 @@ func (ceu *NotaryEventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) er
 	}
 	cev.VoteSet = voteSet
 
-	if err := encoding.Read256(r, &cev.BlockHash); err != nil {
+	if err := encoding.Read256(r, &cev.AgreedHash); err != nil {
 		return err
 	}
 
@@ -247,7 +247,7 @@ func (ceu *NotaryEventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) erro
 		return err
 	}
 
-	if err := encoding.Write256(r, cev.BlockHash); err != nil {
+	if err := encoding.Write256(r, cev.AgreedHash); err != nil {
 		return err
 	}
 	// TODO: write the vote set to the buffer
@@ -260,7 +260,7 @@ func (ceu *NotaryEventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) erro
 func (cc *Collector) ShouldBeSkipped(m *NotaryEvent) bool {
 	shouldSkip := cc.ShouldSkip(m, m.Round, m.Step)
 	//TODO: the round element needs to be reassessed
-	err := cc.Committee.VerifyVoteSet(m.VoteSet, m.BlockHash, m.Round, m.Step)
+	err := cc.Committee.VerifyVoteSet(m.VoteSet, m.AgreedHash, m.Round, m.Step)
 	failedVerification := err != nil
 	return shouldSkip || failedVerification
 }

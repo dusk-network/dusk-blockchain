@@ -17,6 +17,7 @@ const OutgoingBlockReductionTopic = "outgoing_block_reduction"
 const OutgoingBlockAgreementTopic = "outgoing_block_agreement"
 const OutgoingSigSetReductionTopic = "outgoin_gsigset_reduction"
 const OutgoingSigSetAgreementTopic = "outgoin_gsigset_agreement"
+const OutgoingSigSetTopic = "outgoing_sigset"
 const QuitTopic = "quit"
 const BidListTopic = "bidlistTopic"
 

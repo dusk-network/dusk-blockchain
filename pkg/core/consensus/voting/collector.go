@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -126,8 +128,8 @@ func unmarshalBlockAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire
 		return nil, err
 	}
 
-	var blockHash []byte
-	if err := encoding.Read256(agreementBuffer, &blockHash); err != nil {
+	var agreedHash []byte
+	if err := encoding.Read256(agreementBuffer, &agreedHash); err != nil {
 		return nil, err
 	}
 
@@ -141,8 +143,8 @@ func unmarshalBlockAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire
 			Round: round,
 			Step:  step,
 		},
-		BlockHash: blockHash,
-		VoteSet:   voteSet,
+		AgreedHash: agreedHash,
+		VoteSet:    voteSet,
 	}, nil
 }
 
@@ -152,13 +154,24 @@ func unmarshalSigSetAgreement(agreementBuffer *bytes.Buffer, signer signer) (wir
 		return nil, err
 	}
 
-	var sigSetHash []byte
-	if err := encoding.Read256(agreementBuffer, &sigSetHash); err != nil {
+	var blockHash []byte
+	if err := encoding.Read256(agreementBuffer, &blockHash); err != nil {
 		return nil, err
 	}
 
 	return &notary.SigSetEvent{
 		NotaryEvent: agreement.(*committee.NotaryEvent),
-		SigSetHash:  sigSetHash,
+		BlockHash:   blockHash,
 	}, nil
+}
+
+func unmarshalSigSet(sigSetBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
+	ssev := &selection.SigSetEvent{
+		EventHeader: &consensus.EventHeader{},
+	}
+	if err := signer.Unmarshal(sigSetBuffer, ssev); err != nil {
+		return nil, err
+	}
+
+	return ssev, nil
 }

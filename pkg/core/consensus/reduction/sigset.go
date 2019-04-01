@@ -80,10 +80,6 @@ func (ssru *SigSetUnmarshaller) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 
 func (ssru *SigSetUnmarshaller) Marshal(r *bytes.Buffer, e wire.Event) error {
 	sigSetEvent := e.(*SigSetEvent)
-	if err := ssru.EventHeaderMarshaller.Marshal(r, sigSetEvent.EventHeader); err != nil {
-		return err
-	}
-
 	if err := ssru.unMarshaller.Marshal(r, sigSetEvent.ReductionEvent); err != nil {
 		return err
 	}
@@ -163,23 +159,20 @@ func (s *sigSetHandler) NewEvent() wire.Event {
 }
 
 func (s *sigSetHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
-	ev := e.(*committee.ReductionEvent)
+	ev := e.(*SigSetEvent)
 	h.Round = ev.Round
 	h.Step = ev.Step
 }
 
 func (s *sigSetHandler) EmbedVoteHash(e wire.Event, r *bytes.Buffer) error {
-	var votedHash, blockHash []byte
+	var votedHash []byte
 	if e == nil {
-		votedHash, blockHash = make([]byte, 32), make([]byte, 32)
+		votedHash = make([]byte, 32)
 	} else {
 		ev := e.(*SigSetEvent)
-		votedHash, blockHash = ev.VotedHash, ev.BlockHash
+		votedHash = ev.VotedHash
 	}
 	if err := encoding.Write256(r, votedHash); err != nil {
-		return err
-	}
-	if err := encoding.Write256(r, blockHash); err != nil {
 		return err
 	}
 	return nil
@@ -201,4 +194,17 @@ func (s *sigSetHandler) Verify(e wire.Event) error {
 	}
 
 	return nil
+}
+
+func (s *sigSetHandler) MarshalHeader(r *bytes.Buffer, state *consensusState) (*bytes.Buffer, error) {
+	buffer, err := s.unMarshaller.MarshalHeader(r, state)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := encoding.Write256(buffer, s.blockHash); err != nil {
+		return nil, err
+	}
+
+	return buffer, nil
 }

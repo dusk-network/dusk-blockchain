@@ -84,6 +84,7 @@ func (b *blockNotary) Listen() {
 			b.blockCollector.Result = nil
 			b.blockCollector.UpdateRound(round)
 		case <-b.generationChan:
+			// TODO: review
 			b.sendResult()
 		case ev := <-b.repropagationChannel:
 			// TODO: review
@@ -100,16 +101,12 @@ func (b *blockNotary) sendResult() error {
 	}
 
 	buffer := new(bytes.Buffer)
-	topicBytes := topics.TopicToByteArray(topics.SigSet)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
 	if err := b.blockCollector.Unmarshaller.Marshal(buffer, b.blockCollector.Result); err != nil {
 		return err
 	}
 
-	b.eventBus.Publish(string(topics.SigSet), buffer)
+	b.eventBus.Publish(string(msg.OutgoingSigSetTopic), buffer)
+	b.blockCollector.Result.Step++
 	return nil
 }
 
@@ -165,9 +162,12 @@ func (c *blockCollector) Process(event *BlockEvent) {
 	nrAgreements := c.Store(event, string(event.Step))
 	// did we reach the quorum?
 	if nrAgreements >= c.Committee.Quorum() {
-		// notify the Notary
-		c.BlockChan <- event.BlockHash
+		// TODO: review result store
+		event.Step = 1
 		c.Result = event
+
+		// notify the Notary
+		c.BlockChan <- event.AgreedHash
 		c.Clear()
 
 		// TODO: remove

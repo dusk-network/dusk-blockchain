@@ -97,6 +97,10 @@ func (c Store) Quorum() int {
 
 // Priority returns true in case pubKey2 has higher stake than pubKey1
 func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
+	if _, ok := ev1.(*NotaryEvent); !ok {
+		return ev2
+	}
+
 	m1 := c.provisioners.GetMemberBLS(ev1.Sender())
 	m2 := c.provisioners.GetMemberBLS(ev2.Sender())
 	if m1 == m2 {

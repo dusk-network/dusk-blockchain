@@ -32,7 +32,7 @@ type (
 	// SigSetEvent is a CommitteeEvent decorated with the signature set hash
 	SigSetEvent struct {
 		*committee.NotaryEvent
-		SigSetHash []byte
+		BlockHash []byte
 	}
 
 	// sigSetNotary creates the proper EventSubscriber to listen to the SigSetEvent notification. It is not supposed to be used directly
@@ -66,7 +66,7 @@ func NewSigSetEvent() *SigSetEvent {
 
 // Equal as specified in the Event interface
 func (sse *SigSetEvent) Equal(e wire.Event) bool {
-	return sse.NotaryEvent.Equal(e) && bytes.Equal(sse.SigSetHash, e.(*SigSetEvent).SigSetHash)
+	return sse.NotaryEvent.Equal(e) && bytes.Equal(sse.BlockHash, e.(*SigSetEvent).BlockHash)
 }
 
 // Listen triggers the EventSubscriber to accept Events from the EventBus
@@ -99,11 +99,27 @@ func (sseu *SigSetEventUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) e
 	// if the type checking is unsuccessful, it means that the injection is wrong. So panic!
 	sigSetEv := ev.(*SigSetEvent)
 
-	if err := sseu.EventUnMarshaller.Unmarshal(r, sigSetEv.NotaryEvent); err != nil {
+	if err := sseu.NotaryEventUnMarshaller.Unmarshal(r, sigSetEv.NotaryEvent); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sigSetEv.SigSetHash); err != nil {
+	if err := encoding.Read256(r, &sigSetEv.BlockHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Marshal as specified in the Event interface
+func (sseu *SigSetEventUnmarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+	// if the type checking is unsuccessful, it means that the injection is wrong. So panic!
+	sigSetEv := ev.(*SigSetEvent)
+
+	if err := sseu.NotaryEventUnMarshaller.Marshal(r, sigSetEv.NotaryEvent); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, sigSetEv.BlockHash); err != nil {
 		return err
 	}
 
@@ -138,8 +154,10 @@ func initSigSetCollector(eventBus *wire.EventBus, c committee.Committee, current
 
 // Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
 func (s *sigSetCollector) Collect(buffer *bytes.Buffer) error {
+	fmt.Println("get")
 	ev := NewSigSetEvent()
 	if err := s.Unmarshaller.Unmarshal(buffer, ev); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -183,10 +201,11 @@ func (s *sigSetCollector) Process(ev *SigSetEvent) {
 }
 
 func (s *sigSetCollector) nextRound() {
+	// TODO: remove
 	fmt.Println("sig set notary: updating round")
 	s.UpdateRound(s.CurrentRound + 1)
 	// notify the Notary
-	go func() { s.RoundChan <- s.CurrentRound }()
+	s.RoundChan <- s.CurrentRound
 	s.Clear()
 
 	//picking messages related to next round (now current)
