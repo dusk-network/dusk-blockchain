@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 )
 
 func main() {
@@ -51,19 +49,11 @@ func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
 		}
 	}
 
-	// get highest block
-	var highest *block.Block
-	for _, block := range srv.Blocks {
-		if block.Header.Height > highest.Header.Height {
-			highest = &block
-		}
-	}
-
 	// if height is not 0, init consensus on 2 rounds after it
 	// +1 because the round is always height + 1
 	// +1 because we dont want to get stuck on a round thats currently happening
-	if highest != nil && highest.Header.Height != 0 {
-		round := highest.Header.Height + 2
+	if srv.chain.PrevBlock.Header.Height != 0 {
+		round := srv.chain.PrevBlock.Header.Height + 2
 		fmt.Printf("Starting consensus from %d\n", round)
 		return round
 	}
