@@ -63,33 +63,17 @@ func (p *Peer) inboundHandShake() error {
 		return err
 	}
 
-	topic, payload, err := p.readMessage()
-	if err != nil {
-		fmt.Println("error reading message,", err)
+	if err := p.readVerack(); err != nil {
+		fmt.Println("error reading verack message,", err)
 		return err
 	}
 
-	if topic != topics.Version {
-		return fmt.Errorf("received %s message, when we expected %s message", topic, topics.Version)
-	}
-
-	version, err := decodeVersionMessage(payload)
-	if err != nil {
-		fmt.Println("error decoding version message,", err)
+	if err := p.readRemoteMsgVersion(); err != nil {
+		fmt.Println("error writing version message,", err)
 		return err
 	}
 
-	if err := p.verifyVersion(version); err != nil {
-		fmt.Println("error verifying version message,", err)
-		return err
-	}
-
-	if err := p.WriteMessage(nil, topics.VerAck); err != nil {
-		fmt.Println("error writing verack message,", err)
-		return err
-	}
-
-	return p.readVerack()
+	return p.WriteMessage(nil, topics.VerAck)
 }
 
 func (p *Peer) outboundHandShake() error {
@@ -142,7 +126,7 @@ func (p *Peer) readRemoteMsgVersion() error {
 	}
 
 	if topic != topics.Version {
-		return fmt.Errorf("Did not receive the expected '%s' message", topics.Version)
+		return fmt.Errorf("Did not receive the expected '%s' message - got %s", topics.Version, topic)
 	}
 
 	version, err := decodeVersionMessage(payload)
