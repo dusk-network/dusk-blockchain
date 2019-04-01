@@ -4,19 +4,14 @@ import (
 	"bytes"
 	"fmt"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-
 	"github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func LaunchGeneratorComponent(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *generator {

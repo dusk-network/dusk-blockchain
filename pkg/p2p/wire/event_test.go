@@ -70,7 +70,7 @@ func TestStopSelectorWithResult(t *testing.T) {
 	select {
 	case ev := <-selector.BestEventChan:
 		assert.Equal(t, &MockEvent{"one"}, ev)
-	case <-time.After(20):
+	case <-time.After(20 * time.Millisecond):
 		assert.FailNow(t, "Selector should have returned a value")
 	}
 }
