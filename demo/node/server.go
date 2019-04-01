@@ -104,6 +104,7 @@ func (t *txCollector) Collect(r *bytes.Buffer) error {
 	return nil
 }
 
+// Listen to new Stake notification and Blind Bids
 func (s *Server) Listen() {
 	for {
 		select {
