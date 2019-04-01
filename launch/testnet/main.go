@@ -13,13 +13,6 @@ func initLog() {
 
 func main() {
 	initLog()
-	/*
-		// Gracefully exiting on SIGNAL requires a channel
-		interrupt := make(chan os.Signal, 1)
-		//hooking the signal channel up to the interrupt coming from the OS
-		signal.Notify(interrupt, os.Interrupt)
-	*/
-
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup()
 	// listening to the blindbid and the stake channels
@@ -40,7 +33,6 @@ func main() {
 	// shutdown is requested through one of the subsystems such as the RPC
 	// server.
 	select {}
-	// <-interrupt
 }
 
 func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {

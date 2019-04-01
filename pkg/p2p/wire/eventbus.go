@@ -115,7 +115,7 @@ func (bus *EventBus) publish(handlers []*eventHandler, messageBuffer *bytes.Buff
 			log.WithFields(log.Fields{
 				"id":       handler.id,
 				"topic":    topic,
-				"prefix":   "eventbus",
+				"process":  "eventbus",
 				"capacity": len(handler.messageChannel),
 			}).Warnln("handler.messageChannel buffer failed")
 		}
