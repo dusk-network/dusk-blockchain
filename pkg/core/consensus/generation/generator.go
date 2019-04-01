@@ -19,8 +19,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-func LaunchGeneratorComponent(eventBus *wire.EventBus, d, k ristretto.Scalar) *generator {
-	generator := newGenerator(eventBus, d, k)
+func LaunchGeneratorComponent(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *generator {
+	generator := newGenerator(eventBus, d, k, bidList)
 	go generator.Listen()
 	return generator
 }
@@ -32,21 +32,25 @@ type generator struct {
 
 	*user.Keys
 	d, k       ristretto.Scalar
-	bidList    *user.BidList
+	bidList    user.BidList
 	marshaller *selection.ScoreUnMarshaller
 
 	// subscriber channels
 	roundChannel   <-chan uint64
-	bidListChannel <-chan *user.BidList
+	bidListChannel <-chan user.BidList
 }
 
-func newGenerator(eventBus *wire.EventBus, d, k ristretto.Scalar) *generator {
+func newGenerator(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *generator {
 	roundChannel := consensus.InitRoundUpdate(eventBus)
+	bidListChannel := selection.InitBidListUpdate(eventBus)
 	generator := &generator{
-		eventBus:     eventBus,
-		roundChannel: roundChannel,
-		marshaller:   &selection.ScoreUnMarshaller{},
-		bidList:      &user.BidList{},
+		eventBus:       eventBus,
+		roundChannel:   roundChannel,
+		marshaller:     &selection.ScoreUnMarshaller{},
+		bidList:        bidList,
+		d:              d,
+		k:              k,
+		bidListChannel: bidListChannel,
 	}
 
 	go wire.NewEventSubscriber(eventBus, generator, msg.BlockGenerationTopic).Accept()
