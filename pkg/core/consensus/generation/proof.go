@@ -32,7 +32,7 @@ func (g *generator) getBidListSubset() user.BidList {
 // getNumBids will return how many bids to include in the bid list subset
 // for the proof.
 func (g *generator) getNumBids() int {
-	numBids := len(*g.bidList)
+	numBids := len(g.bidList)
 	if numBids > 10 {
 		numBids = 10
 	}
