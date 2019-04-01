@@ -45,11 +45,11 @@ func (b *blockCollector) Collect(message *bytes.Buffer) error {
 }
 
 func (t *txCollector) Collect(message *bytes.Buffer) error {
-	var tx transactions.Transaction
-	if err := tx.Decode(message); err != nil {
+	txs, err := transactions.FromReader(message, 1)
+	if err != nil {
 		return err
 	}
 
-	t.txChannel <- tx
+	t.txChannel <- txs[0]
 	return nil
 }

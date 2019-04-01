@@ -41,7 +41,11 @@ func (c Chain) checkBlockExists(blk block.Block) error {
 }
 
 func (c Chain) checkTxExists(tx transactions.Transaction) error {
-	hash, _ := tx.CalculateHash()
+	hash, err := tx.CalculateHash()
+	if err != nil {
+		return err
+	}
+
 	if _, err := c.db.getTxByHash(hash); err == nil {
 		return errors.New("tx already exists")
 	}
@@ -150,7 +154,6 @@ func (l *ldb) writeInput(input *transactions.Input) error {
 }
 
 func (l *ldb) writeTX(tx transactions.Transaction) error {
-
 	// Write standard fields
 	hash, err := tx.CalculateHash()
 	if err != nil {

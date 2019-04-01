@@ -82,6 +82,10 @@ func (f *scoreBroker) Listen() {
 				f.collector.StartSelection()
 			}
 		case bestEvent := <-f.collector.BestEventChan:
+			if f.collector.completed {
+				break
+			}
+
 			// TODO: moved step incrementation here, so we dont run ahead in case there's nobody generating blocks
 			if bestEvent.Len() != 0 {
 				f.collector.CurrentStep++
