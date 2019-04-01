@@ -57,15 +57,19 @@ func (v *sender) listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
+			v.eventBus.Publish(string(topics.BlockReduction), m)
 			message, _ := wire.AddTopic(m, topics.BlockReduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.sigSetReductionChannel:
+			v.eventBus.Publish(string(topics.SigSetReduction), m)
 			message, _ := wire.AddTopic(m, topics.SigSetReduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.blockAgreementChannel:
+			v.eventBus.Publish(string(topics.BlockAgreement), m)
 			message, _ := wire.AddTopic(m, topics.BlockAgreement)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.sigSetAgreementChannel:
+			v.eventBus.Publish(string(topics.SigSetAgreement), m)
 			message, _ := wire.AddTopic(m, topics.SigSetAgreement)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		}

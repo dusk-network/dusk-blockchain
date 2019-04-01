@@ -2,6 +2,7 @@ package notary
 
 import (
 	"bytes"
+	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -123,10 +124,9 @@ func newBlockCollector(c committee.Committee) *blockCollector {
 	}
 
 	return &blockCollector{
-		Collector: cc,
-		BlockChan: make(chan []byte, 1),
-		Unmarshaller: committee.NewNotaryEventUnMarshaller(committee.NewReductionEventUnMarshaller(nil),
-			msg.VerifyEd25519Signature),
+		Collector:    cc,
+		BlockChan:    make(chan []byte, 1),
+		Unmarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 
@@ -135,7 +135,7 @@ func newBlockCollector(c committee.Committee) *blockCollector {
 func initBlockCollector(eventBus *wire.EventBus, c committee.Committee) *blockCollector {
 	collector := newBlockCollector(c)
 	go wire.NewEventSubscriber(eventBus, collector,
-		string(msg.BlockAgreementTopic)).Accept()
+		string(topics.BlockAgreement)).Accept()
 	return collector
 }
 
@@ -144,6 +144,7 @@ func initBlockCollector(eventBus *wire.EventBus, c committee.Committee) *blockCo
 func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
 	ev := committee.NewNotaryEvent() // BlockEvent is an alias of committee.Event
 	if err := c.Unmarshaller.Unmarshal(buffer, ev); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -165,9 +166,12 @@ func (c *blockCollector) Process(event *BlockEvent) {
 	// did we reach the quorum?
 	if nrAgreements >= c.Committee.Quorum() {
 		// notify the Notary
-		go func() { c.BlockChan <- event.BlockHash }()
+		c.BlockChan <- event.BlockHash
 		c.Result = event
 		c.Clear()
+
+		// TODO: remove
+		fmt.Println("block agreement reached")
 	}
 }
 

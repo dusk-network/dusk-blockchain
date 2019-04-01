@@ -96,7 +96,7 @@ type (
 	SigSetEvent = committee.NotaryEvent
 
 	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
-	SigSetUnMarshaller = committee.EventUnMarshaller
+	SigSetUnMarshaller = committee.NotaryEventUnMarshaller
 
 	// sigSetCollector is the private struct helping the plumbing of the SigSet channel whereto public selected SigSetEvent get published
 	sigSetCollector struct {
@@ -120,7 +120,7 @@ func newSigSetHandler(c committee.Committee, eventBus *wire.EventBus) *SigSetHan
 		committee: c,
 		blockHash: nil,
 		// TODO: get rid of validateFunc
-		unMarshaller: committee.NewEventUnMarshaller(msg.VerifyEd25519Signature),
+		unMarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 	go func() {
 		for {
@@ -142,7 +142,9 @@ func (s *SigSetHandler) Marshal(r *bytes.Buffer, ev wire.Event) error {
 
 // NewEvent creates a new SigSetEvent struct prototype
 func (s *SigSetHandler) NewEvent() wire.Event {
-	return &SigSetEvent{}
+	return &SigSetEvent{
+		EventHeader: &consensus.EventHeader{},
+	}
 }
 
 // ExtractHeader extracts the Round and Step information from an Event
@@ -183,8 +185,10 @@ func (s *SigSetHandler) Verify(event wire.Event) error {
 
 // Collect a message and transform it into a selection message to be consumed by the other components.
 func (ssc *sigSetCollector) Collect(r *bytes.Buffer) error {
-	ev := &SigSetEvent{}
-	unmarshaller := committee.NewEventUnMarshaller(msg.VerifyEd25519Signature)
+	ev := &SigSetEvent{
+		EventHeader: &consensus.EventHeader{},
+	}
+	unmarshaller := committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature)
 	if err := unmarshaller.Unmarshal(r, ev); err != nil {
 		return err
 	}

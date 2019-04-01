@@ -108,11 +108,10 @@ func NewReductionEventUnMarshaller(validate func([]byte, []byte, []byte) error) 
 }
 
 // NewNotaryEventUnMarshaller creates a new NotaryEventUnMarshaller. Internally it creates an EventHeaderUnMarshaller which takes care of Decoding and Encoding operations
-func NewNotaryEventUnMarshaller(ru ReductionUnmarshaller,
-	validate func([]byte, []byte, []byte) error) *NotaryEventUnMarshaller {
+func NewNotaryEventUnMarshaller(validate func([]byte, []byte, []byte) error) *NotaryEventUnMarshaller {
 
 	return &NotaryEventUnMarshaller{
-		ReductionUnmarshaller: ru,
+		ReductionUnmarshaller: NewReductionEventUnMarshaller(func([]byte, []byte, []byte) error { return nil }),
 		EventUnMarshaller:     NewEventUnMarshaller(validate),
 	}
 }
@@ -193,6 +192,13 @@ func (a *ReductionEventUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.
 // * Consensus Header [BLS Public Key; Round; Step]
 // * Committee Header [Signed Vote Set; Vote Set; BlockHash]
 func (ceu *NotaryEventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+	// check if the buffer has contents first
+	// if not, we did not get any messages this round
+	// TODO: review this
+	if r.Len() == 0 {
+		return nil
+	}
+
 	cev := ev.(*NotaryEvent)
 	if err := ceu.EventHeaderUnmarshaller.Unmarshal(r, cev.EventHeader); err != nil {
 		return err
@@ -220,7 +226,13 @@ func (ceu *NotaryEventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) er
 // * Consensus Header [BLS Public Key; Round; Step]
 // * Committee Header [Signed Vote Set; Vote Set; BlockHash]
 func (ceu *NotaryEventUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	cev := ev.(*NotaryEvent)
+	// TODO: review
+	cev, ok := ev.(*NotaryEvent)
+	if !ok {
+		// cev is nil
+		return nil
+	}
+
 	if err := ceu.EventHeaderMarshaller.Marshal(r, cev.EventHeader); err != nil {
 		return err
 	}

@@ -21,9 +21,8 @@ type blockAgreementSigner struct {
 
 func newBlockAgreementSigner(keys *user.Keys, c committee.Committee) *blockAgreementSigner {
 	return &blockAgreementSigner{
-		eventSigner: newEventSigner(keys, c),
-		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(committee.NewReductionEventUnMarshaller(nil),
-			msg.VerifyEd25519Signature),
+		eventSigner:             newEventSigner(keys, c),
+		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 

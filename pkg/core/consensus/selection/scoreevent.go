@@ -105,7 +105,7 @@ func (um *ScoreUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	// TODO: review
 	sev, ok := ev.(*ScoreEvent)
 	if !ok {
-		// ev is nil
+		// sev is nil
 		return nil
 	}
 

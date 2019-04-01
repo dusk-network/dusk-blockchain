@@ -44,11 +44,11 @@ func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
 	}
 
 	// trying to connect to the peers
-	for _, ip := range ips {
-		if err := connMgr.Connect(ip); err != nil {
-			log.WithField("IP", ip).Warnln(err)
-		}
-	}
+	// for _, ip := range ips {
+	// 	if err := connMgr.Connect(ip); err != nil {
+	// 		log.WithField("IP", ip).Warnln(err)
+	// 	}
+	// }
 
 	// if height is not 0, init consensus on 2 rounds after it
 	// +1 because the round is always height + 1

@@ -7,8 +7,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -92,8 +90,7 @@ func (ssn *sigSetNotary) Listen() {
 
 func NewSigSetEventUnmarshaller() *SigSetEventUnmarshaller {
 	return &SigSetEventUnmarshaller{
-		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(
-			reduction.NewSigSetUnMarshaller(nil), msg.VerifyEd25519Signature),
+		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 
@@ -135,7 +132,7 @@ func initSigSetCollector(eventBus *wire.EventBus, c committee.Committee, current
 	// creating the collector used in the EventSubscriber
 	sigSetCollector := newSigSetCollector(c, currentRound)
 	// creating the EventSubscriber listening to msg.SigSetAgreementTopic
-	go wire.NewEventSubscriber(eventBus, sigSetCollector, string(msg.SigSetAgreementTopic)).Accept()
+	go wire.NewEventSubscriber(eventBus, sigSetCollector, string(topics.SigSetAgreement)).Accept()
 	return sigSetCollector
 }
 
