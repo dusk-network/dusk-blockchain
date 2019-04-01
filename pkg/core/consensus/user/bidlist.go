@@ -22,7 +22,7 @@ type BidList []Bid
 // ReconstructBidListSubset will turn a slice of bytes into a BidList.
 func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
 	if len(pl)%32 != 0 {
-		return nil, prerror.New(prerror.Low, errors.New("malformed public list"))
+		return nil, prerror.New(prerror.Low, errors.New("malformed bidlist"))
 	}
 
 	numBids := len(pl) / 32
