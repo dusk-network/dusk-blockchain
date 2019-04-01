@@ -38,9 +38,6 @@ type Server struct {
 	// subscriber channels
 	stakeChannel chan *bytes.Buffer
 	bidChannel   chan *bytes.Buffer
-
-	// holder for blocks during initialization
-	Blocks []block.Block
 }
 
 type txCollector struct {
@@ -93,7 +90,7 @@ func Setup() *Server {
 	chain.AcceptTx(bid)
 
 	// start consensus factory
-	factory := factory.New(eventBus, timeOut, committee, keys, d, k)
+	factory := factory.New(eventBus, timeOut, committee, chain.BidList, keys, d, k)
 	go factory.StartConsensus()
 
 	return srv
@@ -181,7 +178,10 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		return
 	}
 
-	s.Blocks = append(s.Blocks, blk)
+	if s.chain.PrevBlock.Header.Height < blk.Header.Height {
+		s.chain.PrevBlock = blk
+	}
+
 	if err := peer.Run(); err != nil {
 		fmt.Println("handshake error,", err)
 		return
@@ -228,7 +228,7 @@ func makeStake(keys *user.Keys) *transactions.Stake {
 
 	outputAmount := rand.Int63n(100000)
 	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[:32], uint64(outputAmount))
+	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	rangeProof, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
@@ -253,7 +253,7 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	bid.Inputs = transactions.Inputs{input}
 
 	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[:32], uint64(outputAmount))
+	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	rangeProof, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
