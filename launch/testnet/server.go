@@ -47,22 +47,31 @@ type txCollector struct {
 	txChannel chan *bytes.Buffer
 }
 
+// Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
 func Setup() *Server {
+	// creating the eventbus
 	eventBus := wire.New()
+	// generating the keys
+	// TODO: this should probably lookup the keys on a local storage before recreating new ones
 	keys, _ := user.NewRandKeys()
 
+	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
 	committee := committee.NewCommitteeStore(eventBus)
 	go committee.Listen()
 
+	// creating and firing the chain process
 	chain, err := chain.New(eventBus)
 	if err != nil {
 		panic(err)
 	}
 	go chain.Listen()
 
+	// wiring up the Stake channel to the EventBus
 	stakeChannel := initStakeCollector(eventBus)
+	// wiring up the BlinBid channel to the EventBus
 	bidChannel := initBidCollector(eventBus)
 
+	// creating the Server
 	srv := &Server{
 		eventBus:     eventBus,
 		stakes:       []*bytes.Buffer{},
@@ -74,8 +83,13 @@ func Setup() *Server {
 
 	// make a stake and bid tx
 	stake := makeStake(keys)
+	// bid is the blind bid, k is the secret to be embedded in the tx and d is the amount of Dusk locked in the blindbid. This is to be changed into the Commitment to d: D
+
+	//NOTE: this is solely for testnet
 	bid, d, k := makeBid()
+	// saving the stake in the chain
 	chain.AcceptTx(stake)
+	// saving the bid in the chain
 	chain.AcceptTx(bid)
 
 	// start consensus factory
