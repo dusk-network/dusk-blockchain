@@ -19,13 +19,13 @@ func LaunchBlockNotary(eventBus *wire.EventBus,
 	c committee.Committee) *blockNotary {
 
 	blockCollector := initBlockCollector(eventBus, c)
-	selectionChan := selection.InitSigSetSelectionCollector(eventBus)
+	generationChan := selection.InitSigSetGenerationCollector(eventBus)
 
 	blockNotary := &blockNotary{
 		eventBus:        eventBus,
 		roundUpdateChan: consensus.InitRoundUpdate(eventBus),
 		blockCollector:  blockCollector,
-		selectionChan:   selectionChan,
+		generationChan:  generationChan,
 
 		// TODO: review
 		repropagationChannel: blockCollector.RepropagationChannel,
@@ -45,10 +45,10 @@ type (
 		eventBus        *wire.EventBus
 		blockCollector  *blockCollector
 		roundUpdateChan chan uint64
-		selectionChan   chan bool
 
 		// TODO: review
 		repropagationChannel chan *bytes.Buffer
+		generationChan       chan bool
 	}
 
 	// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real
@@ -82,7 +82,7 @@ func (b *blockNotary) Listen() {
 		case round := <-b.roundUpdateChan:
 			b.blockCollector.Result = nil
 			b.blockCollector.UpdateRound(round)
-		case <-b.selectionChan:
+		case <-b.generationChan:
 			b.sendResult()
 		case ev := <-b.repropagationChannel:
 			// TODO: review
@@ -92,6 +92,7 @@ func (b *blockNotary) Listen() {
 	}
 }
 
+// TODO: for the demo, this was added to vote during sigset selection.
 func (b *blockNotary) sendResult() error {
 	if b.blockCollector.Result == nil {
 		return nil
