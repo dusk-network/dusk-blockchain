@@ -16,3 +16,12 @@
 
 # Project settings for VSCode
 .vscode/
+
+# Logs
+*.log
+*.bak
+*CURRENT*
+*LOCK*
+*LOG
+*MANIFEST*
+*0000*
