@@ -7,6 +7,10 @@ import (
 	"math/big"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -16,8 +20,8 @@ import (
 )
 
 // LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration) *scoreBroker {
-	handler := newScoreHandler(eventBus)
+func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration, bidList user.BidList) *scoreBroker {
+	handler := newScoreHandler(eventBus, bidList)
 	broker := newScoreBroker(eventBus, handler, timeout)
 	go broker.Listen()
 	return broker
@@ -41,7 +45,7 @@ func InitBidListUpdate(eventBus *wire.EventBus) chan user.BidList {
 	return bidListChan
 }
 
-func InitScoreSelectionCollector(eventBus *wire.EventBus) chan bool {
+func InitBlockGenerationCollector(eventBus *wire.EventBus) chan bool {
 	selectionChan := make(chan bool, 1)
 	collector := &selectionCollector{selectionChan}
 	go wire.NewEventSubscriber(eventBus, collector, msg.BlockGenerationTopic).Accept()
@@ -53,15 +57,15 @@ func newScoreBroker(eventBus *wire.EventBus, handler consensus.EventHandler, tim
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundUpdate(eventBus)
 	phaseChan := consensus.InitPhaseUpdate(eventBus)
-	selectionChan := InitScoreSelectionCollector(eventBus)
-	collector := initCollector(handler, timeout, eventBus)
+	generationChan := InitBlockGenerationCollector(eventBus)
+	collector := initCollector(handler, timeout, eventBus, string(topics.Score))
 
 	return &scoreBroker{
 		eventBus:        eventBus,
 		collector:       collector,
 		roundUpdateChan: roundChan,
 		phaseUpdateChan: phaseChan,
-		selectionChan:   selectionChan,
+		generationChan:  generationChan,
 	}
 }
 
@@ -75,7 +79,7 @@ func (f *scoreBroker) Listen() {
 		case <-f.phaseUpdateChan:
 			// TODO: think of better solution after demo
 			f.collector.completed = true
-		case <-f.selectionChan:
+		case <-f.generationChan:
 			// TODO: think of better solution after demo
 			if !f.collector.completed {
 				f.collector.StartSelection()
@@ -120,7 +124,7 @@ type (
 		eventBus        *wire.EventBus
 		phaseUpdateChan <-chan []byte
 		roundUpdateChan <-chan uint64
-		selectionChan   <-chan bool
+		generationChan  <-chan bool
 		collector       *collector
 	}
 )
@@ -146,10 +150,11 @@ func (l *bidListCollector) Collect(r *bytes.Buffer) error {
 }
 
 // NewScoreHandler returns a ScoreHandler, which encapsulates specific operations (e.g. verification, validation, marshalling and unmarshalling)
-func newScoreHandler(eventBus *wire.EventBus) *scoreHandler {
+func newScoreHandler(eventBus *wire.EventBus, bidList user.BidList) *scoreHandler {
 	bidListChan := InitBidListUpdate(eventBus)
 	sh := &scoreHandler{
 		unMarshaller: newScoreUnMarshaller(),
+		bidList:      bidList,
 	}
 	go func() {
 		for {
@@ -214,7 +219,7 @@ func (p *scoreHandler) Verify(ev wire.Event) error {
 	return nil
 }
 
-func (p *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) error {
+func (p *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) *prerror.PrError {
 	bidListSubset, err := user.ReconstructBidListSubset(bidListSubsetBytes)
 	if err != nil {
 		return err
