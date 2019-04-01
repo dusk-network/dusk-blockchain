@@ -3,6 +3,7 @@ package wire
 import (
 	"bytes"
 
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -102,7 +103,7 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 	topic string) *EventSubscriber {
 
 	quitChan := make(chan *bytes.Buffer, 1)
-	msgChan := make(chan *bytes.Buffer, 100)
+	msgChan := make(chan *bytes.Buffer, 10)
 
 	msgChanID := eventBus.Subscribe(topic, msgChan)
 	quitChanID := eventBus.Subscribe(string(QuitTopic), quitChan)
@@ -127,6 +128,18 @@ func (n *EventSubscriber) Accept() {
 			n.eventBus.Unsubscribe(string(QuitTopic), n.quitChanID)
 			return
 		case eventMsg := <-n.msgChan:
+			if len(n.msgChan) > 1 {
+				log.WithFields(log.Fields{
+					"id":         n.msgChanID,
+					"topic":      n.topic,
+					"Unconsumed": len(n.msgChan),
+				}).Warnln("Channel is accumulating messages")
+			} else {
+				log.WithFields(log.Fields{
+					"id":    n.msgChanID,
+					"topic": n.topic,
+				}).Debug("Channel clean")
+			}
 			_ = n.eventCollector.Collect(eventMsg)
 		}
 	}
