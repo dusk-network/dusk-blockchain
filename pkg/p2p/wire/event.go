@@ -127,7 +127,7 @@ func (n *EventSubscriber) Accept() {
 			n.eventBus.Unsubscribe(string(QuitTopic), n.quitChanID)
 			return
 		case eventMsg := <-n.msgChan:
-			n.eventCollector.Collect(eventMsg)
+			_ = n.eventCollector.Collect(eventMsg)
 		}
 	}
 }

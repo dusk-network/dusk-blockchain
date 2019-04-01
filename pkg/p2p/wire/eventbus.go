@@ -2,7 +2,6 @@ package wire
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"sync"
 )
@@ -28,9 +27,9 @@ func New() *EventBus {
 	}
 }
 
-// doSubscribe handles the subscription logic and is utilized by the public
+// subscribe handles the subscription logic and is utilized by the public
 // Subscribe functions
-func (bus *EventBus) doSubscribe(topic string, handler *eventHandler) {
+func (bus *EventBus) subscribe(topic string, handler *eventHandler) {
 	bus.handlers[topic] = append(bus.handlers[topic], handler)
 }
 
@@ -39,7 +38,7 @@ func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
 	id := rand.Uint32()
-	bus.doSubscribe(topic, &eventHandler{
+	bus.subscribe(topic, &eventHandler{
 		id, messageChannel,
 	})
 
@@ -48,7 +47,7 @@ func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer
 
 // Unsubscribe removes a handler defined for a topic.
 // Returns error if there are no handlers subscribed to the topic.
-func (bus *EventBus) Unsubscribe(topic string, id uint32) error {
+func (bus *EventBus) Unsubscribe(topic string, id uint32) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
 	if _, ok := bus.handlers[topic]; ok {
@@ -56,11 +55,9 @@ func (bus *EventBus) Unsubscribe(topic string, id uint32) error {
 			if handler.id == id {
 				bus.handlers[topic] = append(bus.handlers[topic][:i],
 					bus.handlers[topic][i+1:]...)
-				return nil
 			}
 		}
 	}
-	return fmt.Errorf("topic %s doesn't exist", topic)
 }
 
 // SubscribeAll subscribes to all topics, and returns a unique ID associated
