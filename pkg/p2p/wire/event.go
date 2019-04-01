@@ -7,7 +7,7 @@ import (
 )
 
 // QuitTopic is the topic to make all components quit
-const QuitTopic = "topic"
+const QuitTopic = "quit"
 
 type (
 
