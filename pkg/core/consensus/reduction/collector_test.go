@@ -45,7 +45,7 @@ func TestReduction(t *testing.T) {
 
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
-	broker.scoreChan <- hash
+	broker.selectionChan <- hash
 
 	// send mocked events until we get a result from the outgoingAgreement channel
 	timer := time.After(1 * time.Second)
@@ -86,7 +86,7 @@ func TestReductionTimeout(t *testing.T) {
 
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
-	broker.scoreChan <- hash
+	broker.selectionChan <- hash
 
 	timer := time.After(1 * time.Second)
 	select {
