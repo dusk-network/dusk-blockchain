@@ -19,14 +19,11 @@ type (
 	SigSetHandler struct {
 		committee    committee.Committee
 		blockHash    []byte
-		unMarshaller *SigSetUnMarshaller
+		unMarshaller wire.EventUnMarshaller
 	}
 
 	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent.
 	SigSetEvent = committee.NotaryEvent
-
-	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
-	SigSetUnMarshaller = committee.NotaryEventUnMarshaller
 
 	// sigSetCollector is the private struct helping the plumbing of the SigSet channel whereto public selected SigSetEvent get published
 	sigSetCollector struct {
