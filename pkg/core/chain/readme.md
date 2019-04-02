@@ -33,17 +33,3 @@
 #### Specification
 
 - Chain is the only process with a RW copy to the database
-
-
-#### Notes
- 
-- Check the error wrapping, for places that I could wrap errors to make them more descriptive and helpful
-- check errors are prefixed with "chain:" - wrap only api functions for this
-
--createIssue: We need the ring signature dummy inputs to be added per input
-
-## TODO
-
-- Removed checks for rangeproof, until the specs for it and verifyign amounts are sorted out. Next bulletpoint outlines such check
-
-- need to check input and output and fees check out
