@@ -16,6 +16,7 @@ import (
 // Returns nil if a tx is valid
 func (c *Chain) AcceptTx(tx transactions.Transaction) error {
 	if err := c.checkTxExists(tx); err != nil {
+		// TODO: remove
 		fmt.Println(err)
 		return err
 	}
@@ -23,11 +24,13 @@ func (c *Chain) AcceptTx(tx transactions.Transaction) error {
 	approxBlockTime := uint64(consensusSeconds) + uint64(c.PrevBlock.Header.Timestamp)
 
 	if err := c.verifyTX(0, approxBlockTime, tx); err != nil {
+		// TODO: remove
 		fmt.Println(err)
 		return err
 	}
 
 	if err := c.propagateTx(tx); err != nil {
+		// TODO: remove
 		fmt.Println(err)
 		return err
 	}
@@ -118,6 +121,7 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 		c.eventBus.Publish(msg.BidTopic, buffer)
+		c.db.writeTX(x)
 		return c.addBidder(x)
 	case *transactions.Coinbase:
 		return c.verifyCoinbase(txIndex, x)
@@ -133,6 +137,7 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 		c.eventBus.Publish(msg.StakeTopic, buffer)
+		c.db.writeTX(x)
 		return c.addProvisioner(x)
 	case *transactions.Standard:
 		return c.verifyStandard(x)

@@ -14,6 +14,35 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+type (
+	// SigSetHandler aggregates operations specific to the SigSet Selection operations
+	SigSetHandler struct {
+		committee    committee.Committee
+		blockHash    []byte
+		unMarshaller *SigSetUnMarshaller
+	}
+
+	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent.
+	SigSetEvent = committee.NotaryEvent
+
+	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
+	SigSetUnMarshaller = committee.NotaryEventUnMarshaller
+
+	// sigSetCollector is the private struct helping the plumbing of the SigSet channel whereto public selected SigSetEvent get published
+	sigSetCollector struct {
+		bestVotedHashChan chan []byte
+	}
+
+	// broker is the component that supervises a collection of events
+	sigSetBroker struct {
+		eventBus        *wire.EventBus
+		phaseUpdateChan <-chan []byte
+		roundUpdateChan <-chan uint64
+		generationChan  <-chan bool
+		collector       *collector
+	}
+)
+
 // LaunchSignatureSelector creates the component which responsibility is to collect the signatures until a quorum is reached
 func LaunchSignatureSelector(c committee.Committee, eventBus *wire.EventBus, timeout time.Duration) *sigSetBroker {
 	handler := newSigSetHandler(c, eventBus)
@@ -62,6 +91,7 @@ func (f *sigSetBroker) Listen() {
 	for {
 		select {
 		case roundUpdate := <-f.roundUpdateChan:
+			f.collector.CurrentBlockHash = nil
 			f.collector.UpdateRound(roundUpdate)
 		case phaseUpdate := <-f.phaseUpdateChan:
 			f.collector.CurrentBlockHash = phaseUpdate
@@ -69,6 +99,10 @@ func (f *sigSetBroker) Listen() {
 		case <-f.generationChan:
 			f.collector.StartSelection()
 		case bestEvent := <-f.collector.BestEventChan:
+			// TODO: review
+			if f.collector.CurrentBlockHash == nil {
+				break
+			}
 			// TODO: remove
 			fmt.Println("selected set")
 
@@ -84,35 +118,6 @@ func (f *sigSetBroker) Listen() {
 	}
 }
 
-type (
-	// SigSetHandler aggregates operations specific to the SigSet Selection operations
-	SigSetHandler struct {
-		committee    committee.Committee
-		blockHash    []byte
-		unMarshaller *SigSetUnMarshaller
-	}
-
-	// SigSetEvent expresses a vote on a block hash. It is a real type alias of notaryEvent.
-	SigSetEvent = committee.NotaryEvent
-
-	// SigSetUnMarshaller is the unmarshaller of BlockEvents. It is a real type alias of notaryEventUnmarshaller
-	SigSetUnMarshaller = committee.EventUnMarshaller
-
-	// sigSetCollector is the private struct helping the plumbing of the SigSet channel whereto public selected SigSetEvent get published
-	sigSetCollector struct {
-		bestVotedHashChan chan []byte
-	}
-
-	// broker is the component that supervises a collection of events
-	sigSetBroker struct {
-		eventBus        *wire.EventBus
-		phaseUpdateChan <-chan []byte
-		roundUpdateChan <-chan uint64
-		generationChan  <-chan bool
-		collector       *collector
-	}
-)
-
 // newSigSetHandler creates a new SigSetHandler and wires it up to phase updates
 func newSigSetHandler(c committee.Committee, eventBus *wire.EventBus) *SigSetHandler {
 	phaseChan := consensus.InitPhaseUpdate(eventBus)
@@ -120,7 +125,7 @@ func newSigSetHandler(c committee.Committee, eventBus *wire.EventBus) *SigSetHan
 		committee: c,
 		blockHash: nil,
 		// TODO: get rid of validateFunc
-		unMarshaller: committee.NewEventUnMarshaller(msg.VerifyEd25519Signature),
+		unMarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 	go func() {
 		for {
@@ -142,7 +147,9 @@ func (s *SigSetHandler) Marshal(r *bytes.Buffer, ev wire.Event) error {
 
 // NewEvent creates a new SigSetEvent struct prototype
 func (s *SigSetHandler) NewEvent() wire.Event {
-	return &SigSetEvent{}
+	return &SigSetEvent{
+		EventHeader: &consensus.EventHeader{},
+	}
 }
 
 // ExtractHeader extracts the Round and Step information from an Event
@@ -165,7 +172,7 @@ func (s *SigSetHandler) Verify(event wire.Event) error {
 	if !ok {
 		return errors.New("Mismatched Type: expected SigSetEvent")
 	}
-	if !bytes.Equal(s.blockHash, ev.BlockHash) {
+	if !bytes.Equal(s.blockHash, ev.AgreedHash) {
 		return errors.New("Vote set is for the wrong block hash")
 	}
 
@@ -183,12 +190,15 @@ func (s *SigSetHandler) Verify(event wire.Event) error {
 
 // Collect a message and transform it into a selection message to be consumed by the other components.
 func (ssc *sigSetCollector) Collect(r *bytes.Buffer) error {
-	ev := &SigSetEvent{}
-	unmarshaller := committee.NewEventUnMarshaller(msg.VerifyEd25519Signature)
+	ev := &SigSetEvent{
+		EventHeader: &consensus.EventHeader{},
+	}
+	unmarshaller := committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature)
 	if err := unmarshaller.Unmarshal(r, ev); err != nil {
 		return err
 	}
 	// SignedVoteSet is actually the votedHash
-	ssc.bestVotedHashChan <- ev.SignedVoteSet
+	// TODO: this should be the hash of the vote set
+	ssc.bestVotedHashChan <- ev.SignedVoteSet[:32]
 	return nil
 }

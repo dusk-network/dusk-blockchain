@@ -74,9 +74,9 @@ type (
 //NewEventSelector creates the Selector
 func NewEventSelector(p EventPrioritizer) *EventSelector {
 	return &EventSelector{
-		EventChan:     make(chan Event),
-		BestEventChan: make(chan Event),
-		StopChan:      make(chan bool),
+		EventChan:     make(chan Event, 100),
+		BestEventChan: make(chan Event, 1),
+		StopChan:      make(chan bool, 1),
 		prioritizer:   p,
 		bestEvent:     nil,
 	}

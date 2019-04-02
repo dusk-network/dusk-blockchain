@@ -97,6 +97,10 @@ func (c Store) Quorum() int {
 
 // Priority returns true in case pubKey2 has higher stake than pubKey1
 func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
+	if _, ok := ev1.(*NotaryEvent); !ok {
+		return ev2
+	}
+
 	m1 := c.provisioners.GetMemberBLS(ev1.Sender())
 	m2 := c.provisioners.GetMemberBLS(ev2.Sender())
 	if m1 == m2 {
@@ -121,50 +125,36 @@ func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
 func (c Store) VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64,
 	step uint8) *prerror.PrError {
 
-	var amountOfVotes uint8
+	// var amountOfVotes uint8
 
-	for _, vote := range voteSet {
-		if err := checkDuplicates(voteSet, vote); err != nil {
-			return err
-		}
+	// for _, vote := range voteSet {
+	// if !fromValidStep(vote.Step, step) {
+	// 	return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
+	// }
 
-		// if !fromValidStep(vote.Step, step) {
-		// 	return prerror.New(prerror.Low, errors.New("vote does not belong to vote set"))
-		// }
+	// votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
+	// 	c.TotalWeight, vote.Step)
+	// if err != nil {
+	// 	return prerror.New(prerror.High, err)
+	// }
 
-		// votingCommittee, err := c.provisioners.CreateVotingCommittee(round,
-		// 	c.TotalWeight, vote.Step)
-		// if err != nil {
-		// 	return prerror.New(prerror.High, err)
-		// }
+	// pubKeyStr := hex.EncodeToString(vote.Sender())
+	// if err := checkVoterEligibility(pubKeyStr, votingCommittee); err != nil {
+	// 	return err
+	// }
 
-		// pubKeyStr := hex.EncodeToString(vote.Sender())
-		// if err := checkVoterEligibility(pubKeyStr, votingCommittee); err != nil {
-		// 	return err
-		// }
+	// if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
+	// 	vote.SignedHash); err != nil {
 
-		// if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
-		// 	vote.SignedHash); err != nil {
+	// 	return prerror.New(prerror.Low, errors.New("BLS verification failed"))
+	// }
 
-		// 	return prerror.New(prerror.Low, errors.New("BLS verification failed"))
-		// }
+	// amountOfVotes += votingCommittee[pubKeyStr]
+	// }
 
-		// amountOfVotes += votingCommittee[pubKeyStr]
-	}
-
-	if int(amountOfVotes) < c.Quorum() {
-		return prerror.New(prerror.Low, errors.New("vote set too small"))
-	}
-
-	return nil
-}
-
-func checkDuplicates(voteSet []wire.Event, vote wire.Event) *prerror.PrError {
-	for _, v := range voteSet {
-		if v.Equal(vote) {
-			return prerror.New(prerror.Low, errors.New("vote set contains duplicate vote"))
-		}
-	}
+	// if int(amountOfVotes) < c.Quorum() {
+	// 	return prerror.New(prerror.Low, errors.New("vote set too small"))
+	// }
 
 	return nil
 }

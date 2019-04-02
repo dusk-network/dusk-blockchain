@@ -2,6 +2,7 @@ package notary
 
 import (
 	"bytes"
+	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -83,6 +84,7 @@ func (b *blockNotary) Listen() {
 			b.blockCollector.Result = nil
 			b.blockCollector.UpdateRound(round)
 		case <-b.generationChan:
+			// TODO: review
 			b.sendResult()
 		case ev := <-b.repropagationChannel:
 			// TODO: review
@@ -99,16 +101,12 @@ func (b *blockNotary) sendResult() error {
 	}
 
 	buffer := new(bytes.Buffer)
-	topicBytes := topics.TopicToByteArray(topics.SigSet)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
 	if err := b.blockCollector.Unmarshaller.Marshal(buffer, b.blockCollector.Result); err != nil {
 		return err
 	}
 
-	b.eventBus.Publish(string(topics.SigSet), buffer)
+	b.eventBus.Publish(string(msg.OutgoingSigSetTopic), buffer)
+	b.blockCollector.Result.Step++
 	return nil
 }
 
@@ -123,10 +121,9 @@ func newBlockCollector(c committee.Committee) *blockCollector {
 	}
 
 	return &blockCollector{
-		Collector: cc,
-		BlockChan: make(chan []byte, 1),
-		Unmarshaller: committee.NewNotaryEventUnMarshaller(committee.NewReductionEventUnMarshaller(nil),
-			msg.VerifyEd25519Signature),
+		Collector:    cc,
+		BlockChan:    make(chan []byte, 1),
+		Unmarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 
@@ -135,7 +132,7 @@ func newBlockCollector(c committee.Committee) *blockCollector {
 func initBlockCollector(eventBus *wire.EventBus, c committee.Committee) *blockCollector {
 	collector := newBlockCollector(c)
 	go wire.NewEventSubscriber(eventBus, collector,
-		string(msg.BlockAgreementTopic)).Accept()
+		string(topics.BlockAgreement)).Accept()
 	return collector
 }
 
@@ -144,6 +141,7 @@ func initBlockCollector(eventBus *wire.EventBus, c committee.Committee) *blockCo
 func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
 	ev := committee.NewNotaryEvent() // BlockEvent is an alias of committee.Event
 	if err := c.Unmarshaller.Unmarshal(buffer, ev); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -164,10 +162,16 @@ func (c *blockCollector) Process(event *BlockEvent) {
 	nrAgreements := c.Store(event, string(event.Step))
 	// did we reach the quorum?
 	if nrAgreements >= c.Committee.Quorum() {
-		// notify the Notary
-		go func() { c.BlockChan <- event.BlockHash }()
+		// TODO: review result store
+		event.Step = 1
 		c.Result = event
+
+		// notify the Notary
+		c.BlockChan <- event.AgreedHash
 		c.Clear()
+
+		// TODO: remove
+		fmt.Println("block agreement reached")
 	}
 }
 

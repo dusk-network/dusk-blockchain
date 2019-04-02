@@ -29,6 +29,7 @@ type sender struct {
 	blockAgreementChannel  chan *bytes.Buffer
 	sigSetReductionChannel chan *bytes.Buffer
 	sigSetAgreementChannel chan *bytes.Buffer
+	sigSetChannel          chan *bytes.Buffer
 }
 
 // newSender will return an initialized sender struct. It will also spawn all
@@ -42,6 +43,8 @@ func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Com
 		unmarshalBlockAgreement, newBlockAgreementSigner(keys, committee))
 	sigSetAgreementChannel := initCollector(eventBus, msg.OutgoingSigSetAgreementTopic,
 		unmarshalSigSetAgreement, newSigSetAgreementSigner(keys, committee))
+	sigSetChannel := initCollector(eventBus, msg.OutgoingSigSetTopic, unmarshalSigSet,
+		newSigSetSigner(keys, committee))
 
 	return &sender{
 		eventBus:               eventBus,
@@ -49,6 +52,7 @@ func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Com
 		sigSetReductionChannel: sigSetReductionChannel,
 		blockAgreementChannel:  blockAgreementChannel,
 		sigSetAgreementChannel: sigSetAgreementChannel,
+		sigSetChannel:          sigSetChannel,
 	}
 }
 
@@ -57,16 +61,24 @@ func (v *sender) listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
+			// v.eventBus.Publish(string(topics.BlockReduction), m)
 			message, _ := wire.AddTopic(m, topics.BlockReduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.sigSetReductionChannel:
+			// v.eventBus.Publish(string(topics.SigSetReduction), m)
 			message, _ := wire.AddTopic(m, topics.SigSetReduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.blockAgreementChannel:
+			// v.eventBus.Publish(string(topics.BlockAgreement), m)
 			message, _ := wire.AddTopic(m, topics.BlockAgreement)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.sigSetAgreementChannel:
+			// v.eventBus.Publish(string(topics.SigSetAgreement), m)
 			message, _ := wire.AddTopic(m, topics.SigSetAgreement)
+			v.eventBus.Publish(string(topics.Gossip), message)
+		case m := <-v.sigSetChannel:
+			// v.eventBus.Publish(string(topics.SigSet), m)
+			message, _ := wire.AddTopic(m, topics.SigSet)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}

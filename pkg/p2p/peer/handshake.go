@@ -57,50 +57,41 @@ func (p *Peer) Handshake() error {
 // An other Peer wants to handshake with us.
 // We will send our Version with a MsgVerAck.
 func (p *Peer) inboundHandShake() error {
-	var err error
-	if err = p.writeLocalMsgVersion(); err != nil {
-		return err
-	}
-
-	topic, payload, err := p.readMessage()
-	if err != nil {
-		return err
-	}
-
-	if topic != topics.Version {
-		return fmt.Errorf("received %s message, when we expected %s message", topic, topics.Version)
-	}
-
-	version, err := decodeVersionMessage(payload)
-	if err != nil {
-		return err
-	}
-
-	if err := p.verifyVersion(version); err != nil {
-		return err
-	}
-
 	if err := p.writeLocalMsgVersion(); err != nil {
-		return err
-	}
-
-	return p.readVerack()
-}
-
-func (p *Peer) outboundHandShake() error {
-	if err := p.readRemoteMsgVersion(); err != nil {
-		return err
-	}
-
-	if err := p.writeLocalMsgVersion(); err != nil {
+		fmt.Println("error writing version message,", err)
 		return err
 	}
 
 	if err := p.readVerack(); err != nil {
+		fmt.Println("error reading verack message,", err)
 		return err
 	}
 
-	return p.WriteMessage(nil, topics.VerAck)
+	if err := p.readRemoteMsgVersion(); err != nil {
+		fmt.Println("error writing version message,", err)
+		return err
+	}
+
+	return p.WriteMessage(new(bytes.Buffer), topics.VerAck)
+}
+
+func (p *Peer) outboundHandShake() error {
+	if err := p.readRemoteMsgVersion(); err != nil {
+		fmt.Println("error writing version message,", err)
+		return err
+	}
+
+	if err := p.WriteMessage(new(bytes.Buffer), topics.VerAck); err != nil {
+		fmt.Println("error reading verack message,", err)
+		return err
+	}
+
+	if err := p.writeLocalMsgVersion(); err != nil {
+		fmt.Println("error reading message,", err)
+		return err
+	}
+
+	return p.readVerack()
 }
 
 func (p *Peer) writeLocalMsgVersion() error {
@@ -134,7 +125,7 @@ func (p *Peer) readRemoteMsgVersion() error {
 	}
 
 	if topic != topics.Version {
-		return fmt.Errorf("Did not receive the expected '%s' message", topics.Version)
+		return fmt.Errorf("did not receive the expected '%s' message - got %s", topics.Version, topic)
 	}
 
 	version, err := decodeVersionMessage(payload)
@@ -142,7 +133,8 @@ func (p *Peer) readRemoteMsgVersion() error {
 		return err
 	}
 
-	return p.verifyVersion(version)
+	fmt.Println(version)
+	return verifyVersion(version.Version)
 }
 
 func (p *Peer) readVerack() error {
@@ -152,7 +144,7 @@ func (p *Peer) readVerack() error {
 	}
 
 	if topic != topics.VerAck {
-		return errors.New("read message was not a Verack message")
+		return fmt.Errorf("did not receive the expected '%s' message - got %s", topics.VerAck, topic)
 	}
 
 	// should only be accessed on one go-routine
@@ -189,7 +181,11 @@ func newVersionMessageBuffer(v *protocol.Version, from, to *wire.NetAddress,
 	return buffer, nil
 }
 func decodeVersionMessage(r *bytes.Buffer) (*VersionMessage, error) {
-	versionMessage := &VersionMessage{}
+	versionMessage := &VersionMessage{
+		Version:     &protocol.Version{},
+		FromAddress: &wire.NetAddress{},
+		ToAddress:   &wire.NetAddress{},
+	}
 	if err := versionMessage.Version.Decode(r); err != nil {
 		return nil, err
 	}
@@ -218,8 +214,8 @@ func decodeVersionMessage(r *bytes.Buffer) (*VersionMessage, error) {
 	return versionMessage, nil
 }
 
-func (p *Peer) verifyVersion(v *VersionMessage) error {
-	if p.ProtoVer.Major != v.Version.Major {
+func verifyVersion(v *protocol.Version) error {
+	if protocol.NodeVer.Major != v.Major {
 		return errors.New("version mismatch")
 	}
 

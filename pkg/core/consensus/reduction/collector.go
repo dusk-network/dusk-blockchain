@@ -212,9 +212,10 @@ func (b *broker) Listen() {
 
 func (b *broker) forwardSelection(hash []byte) {
 	buf := bytes.NewBuffer(hash)
-	if err := b.ctx.handler.MarshalHeader(buf, b.ctx.state); err != nil {
+	vote, err := b.ctx.handler.MarshalHeader(buf, b.ctx.state)
+	if err != nil {
 		panic(err)
 	}
-	b.eventBus.Publish(b.outgoingReductionTopic, buf)
+	b.eventBus.Publish(b.outgoingReductionTopic, vote)
 	go b.collector.startReduction()
 }

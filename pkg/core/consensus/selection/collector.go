@@ -119,7 +119,9 @@ func (s *collector) StartSelection() {
 	go s.selector.PickBest()
 	// stopping the selector after timeout
 	time.AfterFunc(s.timeOut, func() {
-		s.selector.StopChan <- true
+		if s.selector != nil {
+			s.selector.StopChan <- true
+		}
 	})
 	// listening to the selector and collect its pick
 	go s.listenSelection()
@@ -147,7 +149,7 @@ func (s *collector) listenSelection() {
 // stopSelection notifies the Selector to stop selecting
 func (s *collector) stopSelection() {
 	if s.selector != nil {
-		s.selector.StopChan <- true
+		s.selector.StopChan <- false
 		s.selector = nil
 	}
 }

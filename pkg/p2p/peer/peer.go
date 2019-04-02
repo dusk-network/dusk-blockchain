@@ -108,7 +108,6 @@ func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.E
 		magic:    magic,
 	}
 
-	go wire.NewEventSubscriber(eventBus, p, string(topics.Gossip)).Accept()
 	return p
 }
 
@@ -235,6 +234,7 @@ func (p *Peer) Run() error {
 		return err
 	}
 
+	go wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip)).Accept()
 	go p.startProtocol()
 	go p.readLoop()
 	return nil

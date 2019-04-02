@@ -69,10 +69,11 @@ func (c *reducer) begin() {
 	events := c.firstStep.fetch()
 	c.ctx.state.Step++
 	hash1 := c.encodeEv(events)
-	if err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state); err != nil {
+	reductionVote, err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state)
+	if err != nil {
 		panic(err)
 	}
-	c.ctx.reductionVoteChan <- hash1
+	c.ctx.reductionVoteChan <- reductionVote
 
 	eventsSecondStep := c.secondStep.fetch()
 	hash2 := c.encodeEv(eventsSecondStep)
@@ -82,10 +83,11 @@ func (c *reducer) begin() {
 		if err := c.ctx.handler.MarshalVoteSet(hash2, allEvents); err != nil {
 			panic(err)
 		}
-		if err := c.ctx.handler.MarshalHeader(hash2, c.ctx.state); err != nil {
+		agreementVote, err := c.ctx.handler.MarshalHeader(hash2, c.ctx.state)
+		if err != nil {
 			panic(err)
 		}
-		c.ctx.agreementVoteChan <- hash2
+		c.ctx.agreementVoteChan <- agreementVote
 	}
 	c.ctx.state.Step++
 

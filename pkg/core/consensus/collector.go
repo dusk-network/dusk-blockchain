@@ -72,7 +72,7 @@ func InitPhaseUpdate(eventBus *wire.EventBus) chan []byte {
 	phaseUpdateChan := make(chan []byte)
 	collector := &phaseCollector{phaseUpdateChan}
 	go wire.NewEventSubscriber(eventBus, collector,
-		string(msg.SigSetAgreementTopic)).Accept()
+		string(msg.PhaseUpdateTopic)).Accept()
 	return phaseUpdateChan
 }
 
