@@ -14,7 +14,7 @@ import (
 )
 
 func TestNotaryEventUnmarshal(t *testing.T) {
-	unmarshaller := c.NewNotaryEventUnMarshaller(c.NewReductionEventUnMarshaller())
+	unmarshaller := c.NewNotaryEventUnMarshaller(validate)
 
 	step := uint8(1)
 	round := uint64(120)
@@ -27,7 +27,7 @@ func TestNotaryEventUnmarshal(t *testing.T) {
 	assert.Empty(t, unmarshaller.Unmarshal(buf, ev))
 	assert.Equal(t, ev.Step, step)
 	assert.Equal(t, ev.Round, round)
-	assert.Equal(t, ev.BlockHash, blockHash)
+	assert.Equal(t, ev.AgreedHash, blockHash)
 
 	assert.NotEmpty(t, ev.VoteSet)
 	assert.NotEmpty(t, ev.SignedVoteSet)
@@ -47,26 +47,33 @@ func mockEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer,
 
 	vote := newReductionEvent(byte32, pub.Marshal(), signedVote.Compress(), step)
 
+	byte64, _ := crypto.RandEntropy(64)
 	eh := &c.NotaryEvent{
 		EventHeader: &consensus.EventHeader{
+			Signature: byte64,
+			PubKeyEd:  byte32,
 			Round:     round,
 			Step:      step,
 			PubKeyBLS: pub.Marshal(),
 		},
 		SignedVoteSet: signedVote.Compress(),
 		VoteSet:       []wire.Event{vote},
-		BlockHash:     blockHash,
+		AgreedHash:    blockHash,
 	}
 
-	ehm := c.NewNotaryEventUnMarshaller(c.NewReductionEventUnMarshaller())
+	ehm := c.NewNotaryEventUnMarshaller(validate)
 	buf := new(bytes.Buffer)
 	ehm.Marshal(buf, eh)
 	return buf, nil
 }
 
 func newReductionEvent(hash []byte, pub []byte, sig []byte, step uint8) *c.ReductionEvent {
+	byte32, _ := crypto.RandEntropy(32)
+	byte64, _ := crypto.RandEntropy(64)
 	return &c.ReductionEvent{
 		EventHeader: &consensus.EventHeader{
+			Signature: byte64,
+			PubKeyEd:  byte32,
 			PubKeyBLS: pub,
 			Round:     1,
 			Step:      1,
@@ -74,4 +81,8 @@ func newReductionEvent(hash []byte, pub []byte, sig []byte, step uint8) *c.Reduc
 		VotedHash:  hash,
 		SignedHash: sig,
 	}
+}
+
+func validate(bs1, bs2, bs3 []byte) error {
+	return nil
 }
