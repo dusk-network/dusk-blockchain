@@ -5,15 +5,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"time"
 )
 
-//RandomBlock returns a random block for testing
-func RandomBlock(t *testing.T) *block.Block {
+//RandomBlock returns a random block for testing.
+// For `height` see also helper.RandomHeader
+// Fir txBatchCount see also helper.RandomSliceOfTxs
+func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block {
 	b := &block.Block{
-		Header: RandomHeader(t),
-		Txs:    RandomSliceOfTxs(t),
+		Header: RandomHeader(t, height),
+		Txs:    RandomSliceOfTxs(t, txBatchCount),
 	}
 	err := b.SetHash()
+
 	assert.Nil(t, err)
 	return b
 }
@@ -63,13 +67,14 @@ func RandomCertificate(t *testing.T) *block.Certificate {
 	return c
 }
 
-// RandomHeader returns a random header for testing
-func RandomHeader(t *testing.T) *block.Header {
+// RandomHeader returns a random header for testing. `height` randomness is up
+// to the caller. A global atomic counter per pkg can handle it
+func RandomHeader(t *testing.T, height uint64) *block.Header {
 
 	h := &block.Header{
 		Version:   0,
-		Timestamp: 2000,
-		Height:    200,
+		Timestamp: time.Now().Unix(),
+		Height:    height,
 
 		PrevBlock: RandomSlice(t, 32),
 		Seed:      RandomSlice(t, 33),

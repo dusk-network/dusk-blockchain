@@ -64,14 +64,21 @@ func (b Bid) StandardTX() Standard {
 	return b.Standard
 }
 
-// CalculateHash hashes all of the encoded fields in a tx, if it hash not been done already.
+// CalculateHash hashes all of the encoded fields in a tx, if this has not been done already.
 // The resulting byte array is also it's identifier
 // Implements merkletree.Payload interface
 func (b *Bid) CalculateHash() ([]byte, error) {
 	if len(b.TxID) != 0 {
 		return b.TxID, nil
 	}
-	return hashBytes(b.Encode)
+
+	txid, err := hashBytes(b.Encode)
+	if err != nil {
+		return nil, err
+	}
+	b.TxID = txid
+
+	return b.TxID, nil
 }
 
 // Equals returns true if two Bid tx's are the same
