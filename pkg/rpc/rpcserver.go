@@ -17,6 +17,11 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// Config is the configuration struct for the rpc server
+type Config struct {
+	RPCPort string
+}
+
 // Server defines the RPC server of the Dusk node.
 type Server struct {
 	started bool // Indicates whether or not server has started
