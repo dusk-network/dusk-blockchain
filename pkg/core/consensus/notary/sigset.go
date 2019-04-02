@@ -55,7 +55,7 @@ type (
 		*committee.Collector
 		RoundChan    chan uint64
 		futureRounds map[uint64][]*SigSetEvent
-		Unmarshaller *SigSetEventUnmarshaller
+		Unmarshaller wire.EventUnMarshaller
 	}
 )
 

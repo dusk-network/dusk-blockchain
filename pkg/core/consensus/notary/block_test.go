@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
@@ -82,7 +84,7 @@ func TestBlockNotary(t *testing.T) {
 
 	blockChan := make(chan *bytes.Buffer)
 	bus.Subscribe(msg.PhaseUpdateTopic, blockChan)
-	bus.Publish(msg.BlockAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.BlockAgreement), bytes.NewBuffer([]byte("test")))
 
 	result := <-blockChan
 	assert.Equal(t, result.String(), "pippo")
@@ -122,14 +124,19 @@ func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	ev := e.(*BlockEvent)
 	ev.Step = m.event.Step
 	ev.Round = m.event.Round
-	ev.BlockHash = m.event.BlockHash
+	ev.AgreedHash = m.event.AgreedHash
 	ev.PubKeyBLS = blsPub
 	return nil
 }
 
-func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
+// Marshal is not used by the mock unmarshaller.
+func (m *MockBEUnmarshaller) Marshal(b *bytes.Buffer, e wire.Event) error {
+	return nil
+}
+
+func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnMarshaller {
 	ev := committee.NewNotaryEvent()
-	ev.BlockHash = blockHash
+	ev.AgreedHash = blockHash
 	ev.Step = step
 	ev.Round = round
 

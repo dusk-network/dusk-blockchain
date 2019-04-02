@@ -52,17 +52,13 @@ type (
 		generationChan       chan bool
 	}
 
-	// BlockEventUnmarshaller is the unmarshaller of BlockEvents. It is a real
-	// type alias of notaryEventUnmarshaller
-	BlockEventUnmarshaller = committee.EventUnMarshaller
-
 	// blockCollector collects CommitteeEvent. When a Quorum is reached, it
 	// propagates the new Block Hash to the proper channel
 	blockCollector struct {
 		*committee.Collector
 		BlockChan    chan []byte
 		Result       *BlockEvent
-		Unmarshaller *committee.NotaryEventUnMarshaller
+		Unmarshaller wire.EventUnMarshaller
 	}
 )
 
@@ -141,7 +137,6 @@ func initBlockCollector(eventBus *wire.EventBus, c committee.Committee) *blockCo
 func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
 	ev := committee.NewNotaryEvent() // BlockEvent is an alias of committee.Event
 	if err := c.Unmarshaller.Unmarshal(buffer, ev); err != nil {
-		fmt.Println(err)
 		return err
 	}
 

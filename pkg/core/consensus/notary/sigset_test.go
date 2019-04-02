@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -18,7 +20,7 @@ func TestSigSetNotary(t *testing.T) {
 	bus, _, _ := initNotary(1)
 	roundChan := make(chan *bytes.Buffer)
 	bus.Subscribe(msg.RoundUpdateTopic, roundChan)
-	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
 
 	select {
 	case result := <-roundChan:
@@ -36,7 +38,7 @@ func TestFutureRounds(t *testing.T) {
 
 	roundChan := make(chan *bytes.Buffer)
 	bus.Subscribe(msg.RoundUpdateTopic, roundChan)
-	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
 
 	select {
 	case <-roundChan:
@@ -55,15 +57,15 @@ func TestProcessFutureRounds(t *testing.T) {
 	roundChan := make(chan *bytes.Buffer)
 	bus.Subscribe(msg.RoundUpdateTopic, roundChan)
 	// accumulating messages for future rounds to be processed
-	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
-	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
 	<-time.After(50 * time.Millisecond)
 
 	// triggering a round update
 	//setting the mock to unmarshal messages for current round
 	collector.Unmarshaller = newMockSEUnmarshaller([]byte("whatever"), 1, 1)
-	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
-	bus.Publish(msg.SigSetAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
 
 	for i := 0; i < 2; i++ {
 		select {
@@ -111,7 +113,12 @@ func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	return nil
 }
 
-func newMockSEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnmarshaller {
+// Marshal is not used by the mock unmarshaller.
+func (m *mockSEUnmarshaller) Marshal(b *bytes.Buffer, e wire.Event) error {
+	return nil
+}
+
+func newMockSEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnMarshaller {
 	ev := NewSigSetEvent()
 	ev.BlockHash = blockHash
 	ev.Round = round
