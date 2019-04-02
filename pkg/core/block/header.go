@@ -63,16 +63,16 @@ func (b *Header) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, b.TxRoot); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // Encode a Header struct and write to w.
 func (b *Header) Encode(w io.Writer) error {
 	if err := b.EncodeHashable(w); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(w, b.TxRoot); err != nil {
 		return err
 	}
 

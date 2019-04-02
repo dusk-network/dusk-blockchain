@@ -7,7 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/commands"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // Detector is stall detector that will keep track of all pending messages.
@@ -17,7 +17,7 @@ type Detector struct {
 	tickInterval time.Duration
 
 	lock      sync.Mutex
-	responses map[commands.Cmd]time.Time
+	responses map[topics.Topic]time.Time
 
 	// The detector is embedded into a peer and the peer watches this quit chan
 	// If this chan is closed, the peer disconnects
@@ -35,7 +35,7 @@ func NewDetector(rTime time.Duration, tickerInterval time.Duration) *Detector {
 		responseTime: rTime,
 		tickInterval: tickerInterval,
 		lock:         sync.Mutex{},
-		responses:    map[commands.Cmd]time.Time{},
+		responses:    map[topics.Topic]time.Time{},
 		Quitch:       make(chan struct{}),
 	}
 	go d.loop()
@@ -80,7 +80,7 @@ func (d *Detector) Quit() {
 // AddMessage adds a msg to the Detector.
 // Call this function when we send a message to a peer.
 // The command passed through is the command that we sent and not the command we expect to receive.
-func (d *Detector) AddMessage(cmd commands.Cmd) {
+func (d *Detector) AddMessage(cmd topics.Topic) {
 	cmds := d.addMessage(cmd)
 	d.lock.Lock()
 	for _, cmd := range cmds {
@@ -93,7 +93,7 @@ func (d *Detector) AddMessage(cmd commands.Cmd) {
 // Call this function when we receive a message from a peer.
 // This will remove the pendingresponse message from the map.
 // The command passed through is the command we received.
-func (d *Detector) RemoveMessage(cmd commands.Cmd) {
+func (d *Detector) RemoveMessage(cmd topics.Topic) {
 	cmds := d.removeMessage(cmd)
 	d.lock.Lock()
 	for _, cmd := range cmds {
@@ -106,65 +106,63 @@ func (d *Detector) RemoveMessage(cmd commands.Cmd) {
 // is called when the detector is being shut down
 func (d *Detector) DeleteAll() {
 	d.lock.Lock()
-	d.responses = make(map[commands.Cmd]time.Time)
+	d.responses = make(map[topics.Topic]time.Time)
 	d.lock.Unlock()
 }
 
 // GetMessages will return a map of all of the pendingResponses and their deadlines
-func (d *Detector) GetMessages() map[commands.Cmd]time.Time {
-	var resp map[commands.Cmd]time.Time
+func (d *Detector) GetMessages() map[topics.Topic]time.Time {
+	var resp map[topics.Topic]time.Time
 	d.lock.Lock()
 	resp = d.responses
 	d.lock.Unlock()
 	return resp
 }
 
-// When we send out a message, we expect a message in return.
-// If we send out a GetHeaders message, we expect a Headers message
-// in return.
-func (d *Detector) addMessage(cmd commands.Cmd) []commands.Cmd {
+// When a message is added, we will add a deadline for expected response
+func (d *Detector) addMessage(cmd topics.Topic) []topics.Topic {
 
-	cmds := []commands.Cmd{}
+	cmds := []topics.Topic{}
 
 	switch cmd {
-	case commands.GetHeaders:
+	case topics.Headers, topics.GetHeaders:
 		// We now will expect a Headers Message
-		cmds = append(cmds, commands.Headers)
-	case commands.GetAddr:
+		cmds = append(cmds, topics.Headers)
+	case topics.Addr, topics.GetAddr:
 		// We now will expect a Addr Message
-		cmds = append(cmds, commands.Addr)
-	case commands.GetData:
+		cmds = append(cmds, topics.Addr)
+	case topics.GetData:
 		// We will now expect a block/tx message
-		// or notfound
-		cmds = append(cmds, commands.Block)
-		cmds = append(cmds, commands.Tx)
-		cmds = append(cmds, commands.NotFound)
-	case commands.GetBlocks:
+		// We can optimise this by including the exact inventory type, however it is not needed
+		cmds = append(cmds, topics.Block)
+		cmds = append(cmds, topics.Tx)
+	case topics.Inv, topics.GetBlocks:
 		// we will now expect a inv message
-		cmds = append(cmds, commands.Inv)
-	case commands.Version:
+		cmds = append(cmds, topics.Inv)
+	case topics.VerAck, topics.Version:
 		// We will now expect a verack
-		cmds = append(cmds, commands.VerAck)
+		cmds = append(cmds, topics.VerAck)
 	}
 	return cmds
 }
 
 // If receive a message, we will delete it from pending
-func (d *Detector) removeMessage(cmd commands.Cmd) []commands.Cmd {
+func (d *Detector) removeMessage(cmd topics.Topic) []topics.Topic {
 
-	cmds := []commands.Cmd{}
+	cmds := []topics.Topic{}
 
 	switch cmd {
-	case commands.Block:
-		// We will now remove Block and Tx from pending
-		cmds = append(cmds, commands.Block)
-		cmds = append(cmds, commands.Tx)
-		cmds = append(cmds, commands.NotFound)
-	case commands.Tx:
-		// We will now delete a block and tx from pending
-		cmds = append(cmds, commands.Block)
-		cmds = append(cmds, commands.Tx)
-		cmds = append(cmds, commands.NotFound)
+	case topics.Block:
+		// We will now expect a block/tx message
+		cmds = append(cmds, topics.Block)
+		cmds = append(cmds, topics.Tx)
+	case topics.Tx:
+		// We will now expect a block/tx message
+		cmds = append(cmds, topics.Block)
+		cmds = append(cmds, topics.Tx)
+	case topics.GetBlocks:
+		// we will now expect a inv message
+		cmds = append(cmds, topics.Inv)
 	default:
 		// We will now delete the cmd itself
 		cmds = append(cmds, cmd)

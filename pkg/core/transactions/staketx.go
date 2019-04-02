@@ -26,9 +26,6 @@ func NewStake(ver uint8, lock, fee uint64, pubKeyEd, pubKeyBLS []byte) (*Stake, 
 	if len(pubKeyEd) != 32 {
 		return nil, errors.New("edwards public key is not 32 bytes")
 	}
-	if len(pubKeyBLS) != 33 {
-		return nil, errors.New("bls public key is not 33 bytes")
-	}
 
 	s := &Stake{
 		TimeLock:  *NewTimeLock(ver, lock, fee),
