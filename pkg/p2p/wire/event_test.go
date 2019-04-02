@@ -85,8 +85,10 @@ func TestStopSelectorWithoutResult(t *testing.T) {
 	select {
 	case <-selector.BestEventChan:
 		assert.FailNow(t, "Selector should have not returned a value")
-	case <-time.After(20):
+	case <-time.After(20 * time.Millisecond):
+		selector.bestEventLock.Lock()
 		assert.Equal(t, &MockEvent{"one"}, selector.bestEvent)
+		selector.bestEventLock.Unlock()
 	}
 }
 
