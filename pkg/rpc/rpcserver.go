@@ -20,6 +20,8 @@ import (
 // Config is the configuration struct for the rpc server
 type Config struct {
 	RPCPort string
+	RPCUser string
+	RPCPass string
 }
 
 // Server defines the RPC server of the Dusk node.
