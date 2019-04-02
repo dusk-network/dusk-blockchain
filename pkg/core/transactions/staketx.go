@@ -75,14 +75,21 @@ func (s Stake) StandardTX() Standard {
 	return s.Standard
 }
 
-// CalculateHash hashes all of the encoded fields in a tx, if it hash not been done already.
+// CalculateHash hashes all of the encoded fields in a tx, if this has not been done already.
 // The resulting byte array is also it's identifier
 // Implements merkletree.Payload interface
 func (s *Stake) CalculateHash() ([]byte, error) {
 	if len(s.TxID) != 0 {
 		return s.TxID, nil
 	}
-	return hashBytes(s.Encode)
+
+	txid, err := hashBytes(s.Encode)
+	if err != nil {
+		return nil, err
+	}
+	s.TxID = txid
+
+	return s.TxID, nil
 }
 
 // Equals returns true if two Stake tx's are the same

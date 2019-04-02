@@ -117,14 +117,21 @@ func (c *Coinbase) Decode(r io.Reader) error {
 	return nil
 }
 
-// CalculateHash hashes all of the encoded fields in a tx, if it hash not been done already.
+// CalculateHash hashes all of the encoded fields in a tx, if this has not been done already.
 // The resulting byte array is also it's identifier
 // Implements merkletree.Payload interface
 func (c *Coinbase) CalculateHash() ([]byte, error) {
 	if len(c.TxID) != 0 {
 		return c.TxID, nil
 	}
-	return hashBytes(c.Encode)
+
+	txid, err := hashBytes(c.Encode)
+	if err != nil {
+		return nil, err
+	}
+	c.TxID = txid
+
+	return c.TxID, nil
 }
 
 // Type returns the transaction type

@@ -14,7 +14,7 @@ func TestEncodeDecodeHeader(t *testing.T) {
 	assert := assert.New(t)
 
 	// Create a random header
-	hdr := helper.RandomHeader(t)
+	hdr := helper.RandomHeader(t, 200)
 	err := hdr.SetHash()
 	assert.Nil(err)
 
