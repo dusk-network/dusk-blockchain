@@ -93,7 +93,7 @@ func (m *MockSSEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 }
 
 func (m *MockSSEUnmarshaller) Marshal(b *bytes.Buffer, e wire.Event) error {
-	// add something to the buffer so the collector will think we got a result
+	// add something to the buffer so the collector will understand we got a result
 	if _, err := b.Write([]byte("pippo")); err != nil {
 		return err
 	}
