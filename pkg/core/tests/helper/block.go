@@ -25,15 +25,15 @@ func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block 
 // TwoLinkedBlocks returns two blocks that are linked via their headers
 func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	blk0 := &block.Block{
-		Header: RandomHeader(t),
-		Txs:    RandomSliceOfTxs(t),
+		Header: RandomHeader(t, 200),
+		Txs:    RandomSliceOfTxs(t, 20),
 	}
 	err := blk0.SetHash()
 	assert.Nil(t, err)
 
 	blk1 := &block.Block{
-		Header: RandomHeader(t),
-		Txs:    RandomSliceOfTxs(t),
+		Header: RandomHeader(t, 200),
+		Txs:    RandomSliceOfTxs(t, 20),
 	}
 
 	blk1.Header.PrevBlock = blk0.Header.Hash

@@ -9,7 +9,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
+	// Import here any supported drivers to verify if they are fully compliant
+	// to the blockchain database layer requirements
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"io/ioutil"
@@ -24,7 +25,7 @@ var (
 	drvr     database.Driver
 	db       database.DB
 	storeDir string
-	// Dummy data to populate DB initially
+	// Sample data to populate DB initially
 	blocks []*block.Block
 )
 
