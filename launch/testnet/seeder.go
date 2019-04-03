@@ -11,7 +11,7 @@ import (
 const secret = "v1W0imI82rqW2hT7odpI-"
 
 func ConnectToSeeder() []string {
-	conn, err := net.Dial("tcp", "voucher.dusk.network:8081")
+	conn, err := net.Dial("tcp", *voucher)
 	if err != nil {
 		panic(err)
 	}
@@ -49,8 +49,8 @@ func completeChallenge(conn net.Conn) error {
 		return err
 	}
 
-	// turn into uppercase string
-	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "\n"
+	// turn into uppercase string, add port
+	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "," + *port + "\n"
 
 	// write response
 	if _, err := conn.Write([]byte(ret)); err != nil {
