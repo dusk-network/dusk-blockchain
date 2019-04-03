@@ -54,12 +54,12 @@ type (
 	sigSetCollector struct {
 		*committee.Collector
 		RoundChan    chan uint64
-		futureRounds mapp
+		futureRounds eventmap
 		Unmarshaller wire.EventUnMarshaller
 	}
 )
 
-type mapp interface {
+type eventmap interface {
 	Set(uint64, *SigSetEvent) int
 	Get(uint64) []*SigSetEvent
 	Len() int

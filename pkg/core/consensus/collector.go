@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -42,9 +41,9 @@ type (
 		Validate func([]byte, []byte, []byte) error
 	}
 
-	// EventQueue is a Queue of Events grouped by rounds and steps
+	// EventQueue is a Queue of Events grouped by rounds and steps.
+	// NOTE: the EventQueue is purposefully not synchronized. The client can decide whether Mutexes or other sync primitives would be appropriate to use, depending on the context
 	EventQueue struct {
-		lock    *sync.Mutex
 		entries map[uint64]map[uint8][]wire.Event
 	}
 
@@ -168,13 +167,13 @@ func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) erro
 // NewEventQueue creates a new EventQueue. It is primarily used by Collectors to temporarily store messages not yet relevant to the collection process
 func NewEventQueue() *EventQueue {
 	entries := make(map[uint64]map[uint8][]wire.Event)
-	return &EventQueue{&sync.Mutex{}, entries}
+	return &EventQueue{
+		entries,
+	}
 }
 
 // GetEvents returns the events for a round and step
 func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	if s.entries[round][step] != nil {
 		messages := s.entries[round][step]
 		s.entries[round][step] = nil
@@ -186,8 +185,6 @@ func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
 
 // PutEvent stores an Event at a given round and step
 func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	// Initialise the map on this round if it was not yet created
 	if s.entries[round] == nil {
 		s.entries[round] = make(map[uint8][]wire.Event)
@@ -198,15 +195,11 @@ func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
 
 // Clear the queue
 func (s *EventQueue) Clear(round uint64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.entries[round] = nil
 }
 
 // ConsumeNextStepEvents retrieves the Events stored at the lowest step for a passed round and returns them. The step gets deleted
 func (s *EventQueue) ConsumeNextStepEvents(round uint64) ([]wire.Event, uint8) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	steps := s.entries[round]
 	if steps == nil {
 		return nil, 0
@@ -226,8 +219,6 @@ func (s *EventQueue) ConsumeNextStepEvents(round uint64) ([]wire.Event, uint8) {
 
 // ConsumeUntil consumes Events until the round specified (excluded). It returns the map slice deleted
 func (s *EventQueue) ConsumeUntil(round uint64) map[uint64]map[uint8][]wire.Event {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	ret := make(map[uint64]map[uint8][]wire.Event)
 	for k := range s.entries {
 		if k < round {

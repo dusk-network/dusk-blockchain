@@ -99,15 +99,16 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 	c.ctx.handler.ExtractHeader(ev, header)
 	// TODO: review re-propagation logic
 	c.lock.Lock()
-	defer c.lock.Unlock()
 	if c.isRelevant(header.Round, header.Step) &&
 		!c.Contains(ev, string(header.Step)) {
 		// TODO: review
 		c.repropagate(ev)
 		c.process(ev)
+		c.lock.Unlock()
 		return nil
 	}
 
+	c.lock.Unlock()
 	if c.isEarly(header.Round, header.Step) {
 		c.queue.PutEvent(header.Round, header.Step, ev)
 	}
