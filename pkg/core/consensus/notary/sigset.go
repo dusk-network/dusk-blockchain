@@ -5,12 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // LaunchSignatureSetNotary creates and ignites a SigSetNotary by injecting the EventBus, the Committee and the message validation primitive
@@ -54,14 +54,47 @@ type (
 	sigSetCollector struct {
 		*committee.Collector
 		RoundChan    chan uint64
-		futureRounds map[uint64][]*SigSetEvent
+		futureRounds eventmap
 		Unmarshaller wire.EventUnMarshaller
 	}
 )
 
+type eventmap interface {
+	Set(uint64, *SigSetEvent) int
+	Get(uint64) []*SigSetEvent
+	Len() int
+}
+
+type futureMap struct {
+	entries map[uint64][]*SigSetEvent
+}
+
+func newFutureMap() *futureMap {
+	return &futureMap{make(map[uint64][]*SigSetEvent)}
+}
+
+func (f *futureMap) Set(k uint64, v *SigSetEvent) int {
+	vs, ok := f.entries[k]
+	if !ok {
+		vs = make([]*SigSetEvent, 0)
+	}
+	f.entries[k] = append(vs, v)
+	return len(f.entries[k])
+}
+
+func (f *futureMap) Get(k uint64) []*SigSetEvent {
+	return f.entries[k]
+}
+
+func (f *futureMap) Len() int {
+	return len(f.entries)
+}
+
 // NewSigSetEvent creates a SigSetEvent
 func NewSigSetEvent() *SigSetEvent {
-	return &SigSetEvent{NotaryEvent: committee.NewNotaryEvent()}
+	return &SigSetEvent{
+		NotaryEvent: committee.NewNotaryEvent(),
+	}
 }
 
 // Equal as specified in the Event interface
@@ -138,7 +171,7 @@ func newSigSetCollector(c committee.Committee, currentRound uint64) *sigSetColle
 	return &sigSetCollector{
 		Collector:    cc,
 		RoundChan:    make(chan uint64),
-		futureRounds: make(map[uint64][]*SigSetEvent),
+		futureRounds: newFutureMap(),
 		Unmarshaller: NewSigSetEventUnmarshaller(),
 	}
 }
@@ -152,16 +185,17 @@ func initSigSetCollector(eventBus *wire.EventBus, c committee.Committee, current
 	return sigSetCollector
 }
 
-// Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls Process
+// Collect as specified in the EventCollector interface. It uses SigSetEvent.Unmarshal to populate the fields from the buffer and then it calls process
 func (s *sigSetCollector) Collect(buffer *bytes.Buffer) error {
-	fmt.Println("get")
+	log.WithField("prefix", "sigset agreement").Debug("Got message")
 	ev := NewSigSetEvent()
 	if err := s.Unmarshaller.Unmarshal(buffer, ev); err != nil {
-		fmt.Println(err)
+		//it is fine to log the error here instead of in the EventSubscriber as the latter is generic and we would lose info on which process is at fault
+		log.WithField("prefix", "sigset agreement").Error(err)
 		return err
 	}
 
-	s.Process(ev)
+	s.process(ev)
 	return nil
 }
 
@@ -172,8 +206,8 @@ func (s *sigSetCollector) ShouldBeStored(m *SigSetEvent) bool {
 	return len(sigSetList)+1 < s.Committee.Quorum() || m.Round > s.CurrentRound
 }
 
-// Process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
-func (s *sigSetCollector) Process(ev *SigSetEvent) {
+// process is a recursive function that checks whether the SigSetEvent notified should be ignored, stored or should trigger a round update. In the latter event, after notifying the round update in the proper channel and incrementing the round, it starts processing events which became relevant for this round
+func (s *sigSetCollector) process(ev *SigSetEvent) {
 	isIrrelevant := s.CurrentRound != 0 && s.CurrentRound > ev.Round
 	if s.ShouldBeSkipped(ev.NotaryEvent) || isIrrelevant {
 		return
@@ -182,12 +216,7 @@ func (s *sigSetCollector) Process(ev *SigSetEvent) {
 	if s.ShouldBeStored(ev) {
 		if ev.Round > s.CurrentRound {
 			//rounds in the future should be handled later. For now we just store messages related to future rounds
-			events := s.futureRounds[ev.Round]
-			if events == nil {
-				events = make([]*SigSetEvent, 0, s.Committee.Quorum())
-			}
-			events = append(events, ev)
-			s.futureRounds[ev.Round] = events
+			s.futureRounds.Set(ev.Round, ev)
 			return
 		}
 
@@ -201,24 +230,35 @@ func (s *sigSetCollector) Process(ev *SigSetEvent) {
 }
 
 func (s *sigSetCollector) nextRound() {
-	// TODO: remove
 	fmt.Println("sig set notary: updating round")
+	log.WithFields(log.Fields{
+		"prefix":       "sigset agreement",
+		"from round: ": s.CurrentRound,
+		"to round: ":   s.CurrentRound + 1,
+	}).Debug("Updating round")
+
 	s.UpdateRound(s.CurrentRound + 1)
 	// notify the Notary
 	s.RoundChan <- s.CurrentRound
 	s.Clear()
 
 	//picking messages related to next round (now current)
-	currentEvents := s.futureRounds[s.CurrentRound]
+	currentEvents := s.futureRounds.Get(s.CurrentRound)
 	//processing messages store so far
 	for _, event := range currentEvents {
-		s.Process(event)
+		s.process(event)
 	}
 }
 
 // TODO: review
 func (s *sigSetCollector) repropagate(ev *SigSetEvent) {
 	buf := new(bytes.Buffer)
-	s.Unmarshaller.Marshal(buf, ev)
+	if err := s.Unmarshaller.Marshal(buf, ev); err != nil {
+		log.WithFields(log.Fields{
+			"prefix": "sigset agreement",
+			"method": "repropagate",
+		}).Error(err)
+		return
+	}
 	s.RepropagationChannel <- buf
 }

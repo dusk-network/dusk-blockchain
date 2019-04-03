@@ -132,7 +132,7 @@ func (bus *EventBus) publish(handlers []*eventHandler, messageBuffer *bytes.Buff
 				"topic":    topic,
 				"process":  "eventbus",
 				"capacity": len(handler.messageChannel),
-			}).Warnln("handler.messageChannel buffer failed")
+			}).Debugln("handler.messageChannel buffer failed")
 		}
 	}
 }

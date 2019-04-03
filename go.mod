@@ -4,7 +4,6 @@ require (
 	github.com/bwesterb/go-ristretto v0.0.0-20181208130739-025c49a8861c
 	github.com/cenkalti/backoff v2.1.1+incompatible // indirect
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
-	github.com/mattn/go-sqlite3 v1.10.0
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/pkg/errors v0.8.0

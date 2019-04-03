@@ -196,7 +196,7 @@ func (s *sigSetHandler) Verify(e wire.Event) error {
 	return nil
 }
 
-func (s *sigSetHandler) MarshalHeader(r *bytes.Buffer, state *consensusState) (*bytes.Buffer, error) {
+func (s *sigSetHandler) MarshalHeader(r *bytes.Buffer, state consensusState) (*bytes.Buffer, error) {
 	buffer, err := s.unMarshaller.MarshalHeader(r, state)
 	if err != nil {
 		return nil, err
