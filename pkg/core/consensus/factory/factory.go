@@ -78,7 +78,7 @@ func (c *ConsensusFactory) StartConsensus() {
 
 	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
 
-	notary.LaunchBlockNotary(c.eventBus, c.committee)
+	notary.LaunchBlockNotary(c.eventBus, c.committee, round)
 
 	fmt.Println("consensus started")
 }

@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 	initLog()
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
-	srv := Setup()
+	srv := Setup("demo" + *port)
 	// listening to the blindbid and the stake channels
 	go srv.Listen()
 	// fetch neighbours addresses from the Seeder

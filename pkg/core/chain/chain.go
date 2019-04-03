@@ -39,8 +39,8 @@ type Chain struct {
 
 // New returns a new chain object
 // TODO: take out demo constructions (db, collectors) and improve it after demo
-func New(eventBus *wire.EventBus) (*Chain, error) {
-	db, err := NewDatabase("demo", false)
+func New(eventBus *wire.EventBus, dbName string) (*Chain, error) {
+	db, err := NewDatabase(dbName, false)
 	if err != nil {
 		return nil, err
 	}
