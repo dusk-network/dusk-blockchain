@@ -75,13 +75,10 @@ func (c *ConsensusFactory) StartConsensus() {
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength, *c.bidList)
-	selection.LaunchSignatureSelector(c.committee, c.eventBus, c.timerLength)
 
 	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
-	reduction.LaunchSigSetReducer(c.eventBus, c.committee, c.timerLength)
 
 	notary.LaunchBlockNotary(c.eventBus, c.committee)
-	notary.LaunchSignatureSetNotary(c.eventBus, c.committee, round)
 
 	fmt.Println("consensus started")
 }

@@ -53,7 +53,6 @@ func InitBlockGenerationCollector(eventBus *wire.EventBus) chan bool {
 func newScoreBroker(eventBus *wire.EventBus, handler consensus.EventHandler, timeout time.Duration) *scoreBroker {
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundUpdate(eventBus)
-	phaseChan := consensus.InitPhaseUpdate(eventBus)
 	generationChan := InitBlockGenerationCollector(eventBus)
 	collector := initCollector(handler, timeout, eventBus, string(topics.Score))
 
@@ -61,7 +60,6 @@ func newScoreBroker(eventBus *wire.EventBus, handler consensus.EventHandler, tim
 		eventBus:        eventBus,
 		collector:       collector,
 		roundUpdateChan: roundChan,
-		phaseUpdateChan: phaseChan,
 		generationChan:  generationChan,
 	}
 }
@@ -73,19 +71,9 @@ func (f *scoreBroker) Listen() {
 		case roundUpdate := <-f.roundUpdateChan:
 			f.collector.UpdateRound(roundUpdate)
 			f.collector.StartSelection()
-		case <-f.phaseUpdateChan:
-			// TODO: think of better solution after demo
-			f.collector.completed = true
 		case <-f.generationChan:
-			// TODO: think of better solution after demo
-			if !f.collector.completed {
-				f.collector.StartSelection()
-			}
+			f.collector.StartSelection()
 		case bestEvent := <-f.collector.BestEventChan:
-			if f.collector.completed {
-				break
-			}
-
 			// TODO: moved step incrementation here, so we dont run ahead in case there's nobody generating blocks
 			if bestEvent.Len() != 0 {
 				f.collector.CurrentStep++
@@ -119,7 +107,6 @@ type (
 	// broker is the component that supervises a collection of events
 	scoreBroker struct {
 		eventBus        *wire.EventBus
-		phaseUpdateChan <-chan []byte
 		roundUpdateChan <-chan uint64
 		generationChan  <-chan bool
 		collector       *collector

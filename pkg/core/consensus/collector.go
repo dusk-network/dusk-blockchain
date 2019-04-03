@@ -67,15 +67,6 @@ func InitRoundUpdate(eventBus *wire.EventBus) chan uint64 {
 	return roundChan
 }
 
-// InitPhaseUpdate initializes a channel for blockHash and fires up the EventSubscriber as well. Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
-func InitPhaseUpdate(eventBus *wire.EventBus) chan []byte {
-	phaseUpdateChan := make(chan []byte)
-	collector := &phaseCollector{phaseUpdateChan}
-	go wire.NewEventSubscriber(eventBus, collector,
-		string(msg.PhaseUpdateTopic)).Accept()
-	return phaseUpdateChan
-}
-
 // Equal as specified in the Event interface
 func (a *EventHeader) Equal(e wire.Event) bool {
 	other, ok := e.(*EventHeader)
