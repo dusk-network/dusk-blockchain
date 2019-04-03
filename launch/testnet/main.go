@@ -27,7 +27,7 @@ func main() {
 	ips := ConnectToSeeder()
 	//start the connection manager
 	connMgr := NewConnMgr(CmgrConfig{
-		Port:     "8081",
+		Port:     *port,
 		OnAccept: srv.OnAccept,
 		OnConn:   srv.OnConnection,
 	})
