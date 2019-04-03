@@ -2,7 +2,6 @@ package wire
 
 import (
 	"bytes"
-	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -68,15 +67,14 @@ type (
 		StopChan      chan bool
 		prioritizer   EventPrioritizer
 		// this field is for testing purposes only
-		bestEventLock sync.Mutex
-		bestEvent     Event
+		bestEvent Event
 	}
 )
 
 //NewEventSelector creates the Selector
 func NewEventSelector(p EventPrioritizer) *EventSelector {
 	return &EventSelector{
-		EventChan:     make(chan Event, 100),
+		EventChan:     make(chan Event),
 		BestEventChan: make(chan Event, 1),
 		StopChan:      make(chan bool, 1),
 		prioritizer:   p,
@@ -86,18 +84,13 @@ func NewEventSelector(p EventPrioritizer) *EventSelector {
 
 // PickBest picks the best event depending on the priority of the sender
 func (s *EventSelector) PickBest() {
-
 	for {
 		select {
 		case ev := <-s.EventChan:
-			s.bestEventLock.Lock()
 			s.bestEvent = s.prioritizer.Priority(s.bestEvent, ev)
-			s.bestEventLock.Unlock()
 		case shouldNotify := <-s.StopChan:
 			if shouldNotify {
-				s.bestEventLock.Lock()
 				s.BestEventChan <- s.bestEvent
-				s.bestEventLock.Unlock()
 			}
 			return
 		}
