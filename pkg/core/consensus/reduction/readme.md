@@ -13,6 +13,7 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 #### Block Reduction Event
 
 | Field | Type |
+|-------|------|
 | opcode | uint8 |
 | round | uint64 |
 | step | uint64 |
@@ -23,6 +24,7 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 #### SigSet Reduction Event
 
 | Field | Type |
+|-------|------|
 | opcode | uint8 |
 | round | uint64 |
 | step | uint64 |
@@ -33,8 +35,8 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 
 ### API
 
-    - LaunchBlockReducer(eventbus, committee, duration) - Launches a Block Reducer broker publishing on the `OutgoingBlockAgreementTopic` topic
-    - LaunchSigSetReducer(eventbus, committee, duration) - Launches a Block Reducer broker publishing on the `OutgoingSigSetAgreementTopic` topic
+- LaunchBlockReducer(eventbus, committee, duration) - Launches a Block Reducer broker publishing on the `OutgoingBlockAgreementTopic` topic
+- LaunchSigSetReducer(eventbus, committee, duration) - Launches a Block Reducer broker publishing on the `OutgoingSigSetAgreementTopic` topic
 
 ### Architecture
 
@@ -43,3 +45,11 @@ Both the `Block Reducer` and the `SigSet Reducer` components follow the event dr
 The `Reducer` entity is generic and spawns two `eventStopWatch` (one per step) to regulate the collection of the events and handle eventual timeout.
 
 Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to a `Collector`
+
+#### Block Reducer Diagram
+
+![](docs/Block\ Reduction.jpg)
+#### SigSet Reducer Diagram
+
+![](docs/SigSet\ Reduction.jpg)
+
