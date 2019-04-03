@@ -26,7 +26,6 @@ func TestReduction(t *testing.T) {
 	timeOut := 100 * time.Millisecond
 
 	broker := LaunchBlockReducer(eventBus, committeeMock, timeOut)
-
 	// listen for outgoing votes of either kind, so we can verify they are being
 	// sent out properly.
 	outgoingReduction := make(chan *bytes.Buffer, 2)
@@ -55,8 +54,8 @@ func TestReduction(t *testing.T) {
 		default:
 			ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(),
 				hash)
-
 			eventBus.Publish(string(topics.BlockReduction), ev)
+
 		}
 	}
 }

@@ -97,6 +97,7 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
+	fmt.Println("current step is ", c.ctx.state.Step(), "message received for step", header.Step)
 	// TODO: review re-propagation logic
 	c.lock.Lock()
 	if c.isRelevant(header.Round, header.Step) &&
@@ -110,6 +111,7 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 
 	c.lock.Unlock()
 	if c.isEarly(header.Round, header.Step) {
+		fmt.Println("message is early")
 		c.queue.PutEvent(header.Round, header.Step, ev)
 	}
 

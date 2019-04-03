@@ -79,7 +79,7 @@ func newCtx(handler handler, committee committee.Committee, timeout time.Duratio
 	return &context{
 		handler:           handler,
 		committee:         committee,
-		state:             &state{sync.RWMutex{}, 0, 0},
+		state:             &state{sync.RWMutex{}, 0, 1},
 		reductionVoteChan: make(chan *bytes.Buffer, 1),
 		agreementVoteChan: make(chan *bytes.Buffer, 1),
 		timer: &timer{
