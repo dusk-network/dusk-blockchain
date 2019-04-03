@@ -48,8 +48,8 @@ Like all the other consensus components, collection of the events and their mars
 
 #### Block Reducer Diagram
 
-![](docs/Block\ Reduction.jpg)
+![](docs/Block%20Reduction.jpg)
 #### SigSet Reducer Diagram
 
-![](docs/SigSet\ Reduction.jpg)
+![](docs/SigSet%20Reduction.jpg)
 
