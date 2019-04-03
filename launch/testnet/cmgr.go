@@ -24,7 +24,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 	}
 
 	go func() {
-		addrPort := ":" + cfg.Port
+		addrPort := "127.0.0.1:" + cfg.Port
 		listener, err := net.Listen("tcp", addrPort)
 
 		if err != nil {
@@ -68,9 +68,9 @@ func (c *connmgr) Connect(addr string) error {
 // Dial dials up a connection, given it's address string
 func (c *connmgr) Dial(addr string) (net.Conn, error) {
 	dialTimeout := 1 * time.Second
-	conn, err := net.DialTimeout("tcp", addr+":8081", dialTimeout)
+	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("problem connecting to %s:8081 - %v", addr, err)
+		return nil, fmt.Errorf("problem connecting to %s - %v", addr, err)
 	}
 	return conn, nil
 }
