@@ -86,6 +86,7 @@ func (c *collector) Clear() {
 }
 
 func (c *collector) Collect(buffer *bytes.Buffer) error {
+	fmt.Println("Received a message")
 	ev := c.ctx.handler.NewEvent()
 	if err := c.ctx.handler.Unmarshal(buffer, ev); err != nil {
 		return err
@@ -94,6 +95,7 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 	if err := c.ctx.handler.Verify(ev); err != nil {
 		return err
 	}
+	fmt.Println("message verified successfully")
 
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
