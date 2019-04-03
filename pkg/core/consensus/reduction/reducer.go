@@ -2,9 +2,9 @@ package reduction
 
 import (
 	"bytes"
-	"fmt"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -63,11 +63,10 @@ func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context,
 }
 
 func (c *reducer) begin() {
-	// TODO: remove
-	fmt.Println("starting reduction")
+	log.WithField("process", "reducer").Debugln("Beginning Reduction")
 	// this is a blocking call
 	events := c.firstStep.fetch()
-	c.ctx.state.Step++
+	c.ctx.state.IncrementStep()
 	hash1 := c.encodeEv(events)
 	reductionVote, err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state)
 	if err != nil {
@@ -89,7 +88,7 @@ func (c *reducer) begin() {
 		}
 		c.ctx.agreementVoteChan <- agreementVote
 	}
-	c.ctx.state.Step++
+	c.ctx.state.IncrementStep()
 
 	// TODO: review this. needed to loop the phase properly during demo
 	c.regenerationChannel <- true

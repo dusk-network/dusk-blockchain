@@ -6,24 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/ed25519"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"golang.org/x/crypto/ed25519"
 )
 
 func TestReduction(t *testing.T) {
@@ -48,7 +42,7 @@ func TestReduction(t *testing.T) {
 	broker.selectionChan <- hash
 
 	// send mocked events until we get a result from the outgoingAgreement channel
-	timer := time.After(1 * time.Second)
+	timer := time.After(2 * time.Second)
 	for {
 		select {
 		case <-outgoingAgreement:
@@ -59,7 +53,7 @@ func TestReduction(t *testing.T) {
 		case <-timer:
 			t.Fatal("reduction did not finish in time")
 		default:
-			ev := mockBlockEventBuffer(broker.ctx.state.Round, broker.ctx.state.Step,
+			ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(),
 				hash)
 
 			eventBus.Publish(string(topics.BlockReduction), ev)
@@ -117,7 +111,7 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	}
 
 	buf := new(bytes.Buffer)
-	marshaller.Marshal(buf, bev)
+	_ = marshaller.Marshal(buf, bev)
 	edSig := ed25519.Sign(*keys.EdSecretKey, buf.Bytes())
 	completeBuf := bytes.NewBuffer(edSig)
 	completeBuf.Write(keys.EdPubKeyBytes())

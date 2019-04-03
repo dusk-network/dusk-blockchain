@@ -139,12 +139,12 @@ func (n *EventSubscriber) Accept() {
 					"id":         n.msgChanID,
 					"topic":      n.topic,
 					"Unconsumed": len(n.msgChan),
-				}).Warnln("Channel is accumulating messages")
+				}).Debugln("Channel is accumulating messages")
 			} else {
 				log.WithFields(log.Fields{
 					"id":    n.msgChanID,
 					"topic": n.topic,
-				}).Debug("Channel clean")
+				}).Debugln("Channel clean")
 			}
 			_ = n.eventCollector.Collect(eventMsg)
 		}
