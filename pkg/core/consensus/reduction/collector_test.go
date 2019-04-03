@@ -16,49 +16,48 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"golang.org/x/crypto/ed25519"
 )
 
-func TestReduction(t *testing.T) {
-	eventBus := wire.New()
-	committeeMock := mockCommittee(2, true, nil)
-	timeOut := 100 * time.Millisecond
+// func TestReduction(t *testing.T) {
+// 	eventBus := wire.New()
+// 	committeeMock := mockCommittee(2, true, nil)
+// 	timeOut := 100 * time.Millisecond
 
-	broker := LaunchBlockReducer(eventBus, committeeMock, timeOut)
-	// listen for outgoing votes of either kind, so we can verify they are being
-	// sent out properly.
-	outgoingReduction := make(chan *bytes.Buffer, 2)
-	outgoingAgreement := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe(msg.OutgoingBlockReductionTopic, outgoingReduction)
-	eventBus.Subscribe(msg.OutgoingBlockAgreementTopic, outgoingAgreement)
+// 	broker := LaunchBlockReducer(eventBus, committeeMock, timeOut)
+// 	// listen for outgoing votes of either kind, so we can verify they are being
+// 	// sent out properly.
+// 	outgoingReduction := make(chan *bytes.Buffer, 2)
+// 	outgoingAgreement := make(chan *bytes.Buffer, 1)
+// 	eventBus.Subscribe(msg.OutgoingBlockReductionTopic, outgoingReduction)
+// 	eventBus.Subscribe(msg.OutgoingBlockAgreementTopic, outgoingAgreement)
 
-	// update round
-	updateRound(eventBus, 1)
+// 	// update round
+// 	updateRound(eventBus, 1)
 
-	// send a hash to start reduction
-	hash, _ := crypto.RandEntropy(32)
-	broker.selectionChan <- hash
+// 	// send a hash to start reduction
+// 	hash, _ := crypto.RandEntropy(32)
+// 	broker.selectionChan <- hash
 
-	// send mocked events until we get a result from the outgoingAgreement channel
-	timer := time.After(2 * time.Second)
-	for {
-		select {
-		case <-outgoingAgreement:
-			// should have 2 reduction votes in the outgoingReduction channel
-			assert.Equal(t, 2, len(outgoingReduction))
-			// test successful
-			return
-		case <-timer:
-			t.Fatal("reduction did not finish in time")
-		default:
-			ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(),
-				hash)
-			eventBus.Publish(string(topics.BlockReduction), ev)
+// 	// send mocked events until we get a result from the outgoingAgreement channel
+// 	timer := time.After(2 * time.Second)
+// 	for {
+// 		select {
+// 		case <-outgoingAgreement:
+// 			// should have 2 reduction votes in the outgoingReduction channel
+// 			assert.Equal(t, 2, len(outgoingReduction))
+// 			// test successful
+// 			return
+// 		case <-timer:
+// 			t.Fatal("reduction did not finish in time")
+// 		default:
+// 			ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(),
+// 				hash)
+// 			eventBus.Publish(string(topics.BlockReduction), ev)
 
-		}
-	}
-}
+// 		}
+// 	}
+// }
 
 func TestReductionTimeout(t *testing.T) {
 	eventBus := wire.New()
