@@ -44,10 +44,10 @@ Like all the other consensus components, collection of the events and their mars
 
 #### Block Agreement Diagram
 
-![](docs/Block Agreement.jpg)
+![](docs/Block%20Agreement.jpg)
 
 #### SigSet Agreement Diagram
 
-![](docs/SigSet Agreement.jpg)
+![](docs/SigSet%20Agreement.jpg)
 
 
