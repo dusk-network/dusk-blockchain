@@ -74,7 +74,7 @@ type (
 //NewEventSelector creates the Selector
 func NewEventSelector(p EventPrioritizer) *EventSelector {
 	return &EventSelector{
-		EventChan:     make(chan Event, 100),
+		EventChan:     make(chan Event),
 		BestEventChan: make(chan Event, 1),
 		StopChan:      make(chan bool, 1),
 		prioritizer:   p,
@@ -84,7 +84,6 @@ func NewEventSelector(p EventPrioritizer) *EventSelector {
 
 // PickBest picks the best event depending on the priority of the sender
 func (s *EventSelector) PickBest() {
-
 	for {
 		select {
 		case ev := <-s.EventChan:
@@ -133,12 +132,12 @@ func (n *EventSubscriber) Accept() {
 					"id":         n.msgChanID,
 					"topic":      n.topic,
 					"Unconsumed": len(n.msgChan),
-				}).Warnln("Channel is accumulating messages")
+				}).Debugln("Channel is accumulating messages")
 			} else {
 				log.WithFields(log.Fields{
 					"id":    n.msgChanID,
 					"topic": n.topic,
-				}).Debug("Channel clean")
+				}).Debugln("Channel clean")
 			}
 			_ = n.eventCollector.Collect(eventMsg)
 		}

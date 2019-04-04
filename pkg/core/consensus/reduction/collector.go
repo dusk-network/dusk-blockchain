@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"time"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -19,10 +19,11 @@ type (
 		consensus.StepEventCollector
 		collectedVotesChan chan []wire.Event
 		queue              *consensus.EventQueue
+		lock               sync.Mutex
 		reducer            *reducer
 		ctx                *context
 
-		// TODO: review this after demo. used to restart phase after reduction
+		// TODO: review this, used to restart phase after reduction
 		regenerationChannel chan bool
 
 		// TODO: review re-propagation logic
@@ -56,12 +57,14 @@ func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) 
 
 	queue := consensus.NewEventQueue()
 	collector := &collector{
+
 		StepEventCollector:   consensus.StepEventCollector{},
-		queue:                &queue,
+		queue:                queue,
 		collectedVotesChan:   make(chan []wire.Event, 1),
 		ctx:                  ctx,
 		regenerationChannel:  make(chan bool, 1),
 		repropagationChannel: make(chan *bytes.Buffer, 100),
+		lock:                 sync.Mutex{},
 	}
 
 	go wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
@@ -76,7 +79,14 @@ func (c *collector) onTimeout() {
 	}
 }
 
+func (c *collector) Clear() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.StepEventCollector.Clear()
+}
+
 func (c *collector) Collect(buffer *bytes.Buffer) error {
+	fmt.Println("Received a message")
 	ev := c.ctx.handler.NewEvent()
 	if err := c.ctx.handler.Unmarshal(buffer, ev); err != nil {
 		return err
@@ -85,19 +95,25 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 	if err := c.ctx.handler.Verify(ev); err != nil {
 		return err
 	}
+	fmt.Println("message verified successfully")
 
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
+	fmt.Println("current step is ", c.ctx.state.Step(), "message received for step", header.Step)
 	// TODO: review re-propagation logic
+	c.lock.Lock()
 	if c.isRelevant(header.Round, header.Step) &&
 		!c.Contains(ev, string(header.Step)) {
 		// TODO: review
 		c.repropagate(ev)
 		c.process(ev)
+		c.lock.Unlock()
 		return nil
 	}
 
+	c.lock.Unlock()
 	if c.isEarly(header.Round, header.Step) {
+		fmt.Println("message is early")
 		c.queue.PutEvent(header.Round, header.Step, ev)
 	}
 
@@ -120,22 +136,21 @@ func (c *collector) process(ev wire.Event) {
 // TODO: review
 func (c *collector) repropagate(ev wire.Event) {
 	buf := new(bytes.Buffer)
-	c.ctx.handler.Marshal(buf, ev)
+	_ = c.ctx.handler.Marshal(buf, ev)
 	c.repropagationChannel <- buf
 }
 
-func (c collector) flushQueue() {
-	queuedEvents := c.queue.GetEvents(c.ctx.state.Round, c.ctx.state.Step)
+func (c *collector) flushQueue() {
+	queuedEvents := c.queue.GetEvents(c.ctx.state.Round(), c.ctx.state.Step())
 	for _, event := range queuedEvents {
 		c.process(event)
 	}
 }
 
 func (c *collector) updateRound(round uint64) {
-	c.ctx.state.Round = round
-	c.ctx.state.Step = 1
+	c.ctx.state.Update(round)
 
-	c.queue.Clear(c.ctx.state.Round)
+	c.queue.Clear(c.ctx.state.Round())
 	c.Clear()
 	if c.reducer != nil {
 		c.reducer.end()
@@ -143,20 +158,22 @@ func (c *collector) updateRound(round uint64) {
 	}
 }
 
-func (c collector) isRelevant(round uint64, step uint8) bool {
-	return c.ctx.state.Round == round && c.ctx.state.Step == step && c.reducer != nil
+func (c *collector) isRelevant(round uint64, step uint8) bool {
+	return c.ctx.state.Cmp(round, step) == 0 && c.reducer != nil
 }
 
-func (c collector) isEarly(round uint64, step uint8) bool {
-	return c.ctx.state.Round < round || c.ctx.state.Round == round && c.ctx.state.Step < step
+func (c *collector) isEarly(round uint64, step uint8) bool {
+	return c.ctx.state.Cmp(round, step) > 0
 }
 
 func (c *collector) startReduction() {
 	// TODO: review
+	c.lock.Lock()
 	c.reducer = newCoordinator(c.collectedVotesChan, c.ctx, c.regenerationChannel)
 
-	go c.flushQueue()
 	go c.reducer.begin()
+	c.lock.Unlock()
+	c.flushQueue()
 }
 
 // newBroker will return a reduction broker.

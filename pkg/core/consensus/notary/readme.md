@@ -8,6 +8,8 @@ During the conduction of a technical analysis of sortition based consensus algor
 
 #### Block Agreement Event
 
+| Field | Type |
+|-------|------|
 | opcode | uint8 |
 | round | uint64 |
 | step | uint64 |
@@ -19,6 +21,7 @@ During the conduction of a technical analysis of sortition based consensus algor
 #### SigSet Agreement Event
 
 | Field | Type |
+|-------|------|
 | opcode | uint8 |
 | round | uint64 |
 | step | uint64 |
@@ -30,11 +33,21 @@ During the conduction of a technical analysis of sortition based consensus algor
 
 ### API
 
-    - LaunchBlockNotary(eventbus, committee, duration) - Launches a Block Agreement broker
-    - LaunchSigSetAgreement(eventbus, committee, duration) - Launches a SigSet Agreement broker
+- LaunchBlockNotary(eventbus, committee, duration) - Launches a Block Agreement broker
+- LaunchSigSetAgreement(eventbus, committee, duration) - Launches a SigSet Agreement broker
 
 ### Architecture
 
 Both the `Block Agreement` and the `SigSet Agreement` components follow the event driven paradigm. They both are connected to the node's `EventBus` through a generic `Agreement` and delegate event-specific operations to their own `EventHandler` implementation.
 
 Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to a `Collector`
+
+#### Block Agreement Diagram
+
+![](docs/Block%20Agreement.jpg)
+
+#### SigSet Agreement Diagram
+
+![](docs/SigSet%20Agreement.jpg)
+
+
