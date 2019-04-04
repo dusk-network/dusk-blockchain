@@ -3,7 +3,9 @@ package zkproof
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"sync"
 	"syscall"
 )
 
@@ -73,18 +75,23 @@ func (ba *BytesArray) Write(bytes []byte) {
 
 // NamedPipe holds data for a named pipe
 type NamedPipe struct {
-	Path string
+	Path  string
+	mutex sync.Mutex
 }
 
 // NewNamedPipe constructs a new named pipe using the path given
-func NewNamedPipe(path string) NamedPipe {
-	np := NamedPipe{Path: path}
+func NewNamedPipe(path string) *NamedPipe {
+	np := &NamedPipe{Path: path}
+	fmt.Println("Get named pipe at:", path)
 	syscall.Mkfifo(path, 0644)
 	return np
 }
 
 // ReadBytes consumes and return all the bytes in the named pipe
 func (p *NamedPipe) ReadBytes() (BytesArray, error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	bytes, err := ioutil.ReadFile(p.Path)
 
 	return BytesArray{bytes: bytes, index: 0}, err
@@ -92,5 +99,7 @@ func (p *NamedPipe) ReadBytes() (BytesArray, error) {
 
 // WriteBytes write a BytesArray into the named pipe
 func (p *NamedPipe) WriteBytes(ba BytesArray) error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	return ioutil.WriteFile(p.Path, ba.Bytes(), 0644)
 }
