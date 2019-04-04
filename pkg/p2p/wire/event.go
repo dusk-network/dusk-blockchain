@@ -59,44 +59,7 @@ type (
 		quitChanID     uint32
 		topic          string
 	}
-
-	// EventSelector is a helper to help choosing
-	EventSelector struct {
-		EventChan     chan Event
-		BestEventChan chan Event
-		StopChan      chan bool
-		prioritizer   EventPrioritizer
-		// this field is for testing purposes only
-		bestEvent Event
-	}
 )
-
-//NewEventSelector creates the Selector
-func NewEventSelector(p EventPrioritizer) *EventSelector {
-	return &EventSelector{
-		EventChan:     make(chan Event, 100),
-		BestEventChan: make(chan Event, 1),
-		StopChan:      make(chan bool, 1),
-		prioritizer:   p,
-		bestEvent:     nil,
-	}
-}
-
-// PickBest picks the best event depending on the priority of the sender
-func (s *EventSelector) PickBest() {
-
-	for {
-		select {
-		case ev := <-s.EventChan:
-			s.bestEvent = s.prioritizer.Priority(s.bestEvent, ev)
-		case shouldNotify := <-s.StopChan:
-			if shouldNotify {
-				s.BestEventChan <- s.bestEvent
-			}
-			return
-		}
-	}
-}
 
 // NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus. The EventBus, EventCollector and Topic are injected
 func NewEventSubscriber(eventBus *EventBus, collector EventCollector,

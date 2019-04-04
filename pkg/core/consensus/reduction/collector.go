@@ -107,6 +107,8 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 func (c *collector) process(ev wire.Event) {
 	b := new(bytes.Buffer)
 	if err := c.ctx.handler.EmbedVoteHash(ev, b); err == nil {
+		fmt.Println(b.Bytes())
+
 		hash := hex.EncodeToString(b.Bytes())
 		count := c.Store(ev, hash)
 		if count > c.ctx.committee.Quorum() {
