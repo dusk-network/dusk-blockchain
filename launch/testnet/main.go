@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -18,6 +20,7 @@ func initLog() {
 
 func main() {
 	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
 	initLog()
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup("demo" + *port)
