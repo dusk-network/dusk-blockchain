@@ -88,11 +88,7 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
-	// TODO: review re-propagation logic
-	if c.isRelevant(header.Round, header.Step) &&
-		!c.Contains(ev, string(header.Step)) {
-		// TODO: review
-		c.repropagate(ev)
+	if c.isRelevant(header.Round, header.Step) {
 		c.process(ev)
 		return nil
 	}
@@ -108,8 +104,12 @@ func (c *collector) process(ev wire.Event) {
 	b := new(bytes.Buffer)
 	if err := c.ctx.handler.EmbedVoteHash(ev, b); err == nil {
 		fmt.Println(b.Bytes())
-
 		hash := hex.EncodeToString(b.Bytes())
+		if !c.Contains(ev, hash) {
+			// TODO: review
+			c.repropagate(ev)
+		}
+
 		count := c.Store(ev, hash)
 		if count > c.ctx.committee.Quorum() {
 			votes := c.StepEventCollector[hash]
