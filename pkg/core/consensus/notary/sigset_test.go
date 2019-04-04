@@ -3,16 +3,16 @@ package notary
 import (
 	"bytes"
 	"encoding/binary"
+	"sync"
 	"testing"
 	"time"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func TestSigSetNotary(t *testing.T) {
@@ -45,7 +45,7 @@ func TestFutureRounds(t *testing.T) {
 		assert.FailNow(t, "No round update should have been propagated since the event refers to a future round")
 	case <-time.After(100 * time.Millisecond):
 		// success
-		assert.Equal(t, 1, len(collector.futureRounds))
+		assert.Equal(t, 1, collector.futureRounds.Len())
 	}
 }
 
@@ -63,7 +63,7 @@ func TestProcessFutureRounds(t *testing.T) {
 
 	// triggering a round update
 	//setting the mock to unmarshal messages for current round
-	collector.Unmarshaller = newMockSEUnmarshaller([]byte("whatever"), 1, 1)
+	collector.Unmarshaller.(*mockSEUnmarshaller).yield([]byte("whatever"), 1, 1)
 	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
 	bus.Publish(string(topics.SigSetAgreement), bytes.NewBuffer([]byte("test")))
 
@@ -91,15 +91,42 @@ func initNotary(quorum int) (*wire.EventBus, *sigSetCollector, committee.Committ
 	committee := mockCommittee(quorum, true, nil)
 	notary := LaunchSignatureSetNotary(bus, committee, uint64(1))
 	notary.sigSetCollector.Unmarshaller = newMockSEUnmarshaller([]byte("mock"), 1, 1)
+	notary.sigSetCollector.futureRounds = &mockMap{newFutureMap(), &sync.Mutex{}}
 	return bus, notary.sigSetCollector, committee
+}
+
+type mockMap struct {
+	*futureMap
+	lock *sync.Mutex
+}
+
+func (f *mockMap) Set(k uint64, v *SigSetEvent) int {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.futureMap.Set(k, v)
+}
+
+func (f *mockMap) Get(k uint64) []*SigSetEvent {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.entries[k]
+}
+
+func (f *mockMap) Len() int {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return len(f.entries)
 }
 
 type mockSEUnmarshaller struct {
 	event *SigSetEvent
 	err   error
+	lock  *sync.Mutex
 }
 
 func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	if m.err != nil {
 		return m.err
 	}
@@ -111,6 +138,14 @@ func (m *mockSEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	ev.BlockHash = m.event.BlockHash
 	ev.PubKeyBLS = blsPub
 	return nil
+}
+
+func (m *mockSEUnmarshaller) yield(blockHash []byte, round uint64, step uint8) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.event.BlockHash = blockHash
+	m.event.Round = round
+	m.event.Step = step
 }
 
 // Marshal is not used by the mock unmarshaller.
@@ -127,5 +162,6 @@ func newMockSEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.Even
 	return &mockSEUnmarshaller{
 		event: ev,
 		err:   nil,
+		lock:  &sync.Mutex{},
 	}
 }

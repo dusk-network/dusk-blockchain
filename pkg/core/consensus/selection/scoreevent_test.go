@@ -34,7 +34,7 @@ func TestUnMarshal(t *testing.T) {
 		VoteHash:      candidateHash,
 	}
 	unMarshaller := newScoreUnMarshaller()
-	unMarshaller.validateFunc = func(r *bytes.Buffer) error {
+	unMarshaller.validateFunc = func(r, s, t []byte) error {
 		return nil
 	}
 
