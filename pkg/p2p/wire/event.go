@@ -66,7 +66,7 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 	topic string) *EventSubscriber {
 
 	quitChan := make(chan *bytes.Buffer, 1)
-	msgChan := make(chan *bytes.Buffer, 10)
+	msgChan := make(chan *bytes.Buffer, 100)
 
 	msgChanID := eventBus.Subscribe(topic, msgChan)
 	quitChanID := eventBus.Subscribe(string(QuitTopic), quitChan)
