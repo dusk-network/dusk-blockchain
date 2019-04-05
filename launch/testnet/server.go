@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
@@ -120,10 +121,10 @@ func (s *Server) Listen() {
 	for {
 		select {
 		case b := <-s.stakeChannel:
-			fmt.Println("stake received")
+			log.WithField("process", "server").Debug("Stake received")
 			s.stakes = append(s.stakes, b)
 		case b := <-s.bidChannel:
-			fmt.Println("bid received")
+			log.WithField("process", "server").Debug("Bid received")
 			s.bids = append(s.bids, b)
 		}
 	}

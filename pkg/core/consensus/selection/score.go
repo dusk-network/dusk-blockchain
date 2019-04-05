@@ -16,6 +16,30 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 )
 
+type (
+	scoreHandler struct {
+		bidList      user.BidList
+		unMarshaller *ScoreUnMarshaller
+	}
+
+	bidListCollector struct {
+		BidListChan chan user.BidList
+	}
+
+	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
+	scoreCollector struct {
+		bestVotedScoreHashChan chan []byte
+	}
+
+	// broker is the component that supervises a collection of events
+	scoreBroker struct {
+		eventBus        *wire.EventBus
+		roundUpdateChan <-chan uint64
+		generationChan  <-chan bool
+		collector       *collector
+	}
+)
+
 // LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
 func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration, bidList user.BidList) *scoreBroker {
 	handler := newScoreHandler(eventBus, bidList)
@@ -81,37 +105,17 @@ func (f *scoreBroker) Listen() {
 			} else {
 				f.eventBus.Publish(msg.BlockGenerationTopic, nil)
 			}
+		case ev := <-f.collector.RepropagateChan:
+			// TODO: review
+			buf := new(bytes.Buffer)
+			if err := f.collector.handler.Marshal(buf, ev); err != nil {
+				panic(err)
+			}
+			message, _ := wire.AddTopic(buf, topics.Score)
+			f.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
 }
-
-type (
-	scoreHandler struct {
-		bidList      user.BidList
-		unMarshaller *ScoreUnMarshaller
-	}
-
-	bidListCollector struct {
-		BidListChan chan user.BidList
-	}
-
-	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
-	scoreCollector struct {
-		bestVotedScoreHashChan chan []byte
-	}
-
-	scoreSelectionCollector struct {
-		scoreSelectionChan chan bool
-	}
-
-	// broker is the component that supervises a collection of events
-	scoreBroker struct {
-		eventBus        *wire.EventBus
-		roundUpdateChan <-chan uint64
-		generationChan  <-chan bool
-		collector       *collector
-	}
-)
 
 func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
 	ev := &ScoreEvent{}

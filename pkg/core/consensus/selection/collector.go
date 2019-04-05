@@ -2,6 +2,7 @@ package selection
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,16 +17,28 @@ type (
 		CurrentStep      uint8
 		CurrentBlockHash []byte
 		BestEventChan    chan *bytes.Buffer
+		RepropagateChan  chan wire.Event
 		// this is the dump of future messages, categorized by different steps and different rounds
 		queue     *consensus.EventQueue
 		timeOut   time.Duration
-		selector  *wire.EventSelector
+		selector  *EventSelector
 		handler   consensus.EventHandler
 		completed bool
 	}
 
 	selectionCollector struct {
 		selectionChan chan bool
+	}
+
+	// EventSelector is a helper to help choosing
+	EventSelector struct {
+		EventChan       chan wire.Event
+		RepropagateChan chan wire.Event
+		BestEventChan   chan wire.Event
+		StopChan        chan bool
+		prioritizer     wire.EventPrioritizer
+		// this field is for testing purposes only
+		BestEvent wire.Event
 	}
 )
 
@@ -37,11 +50,12 @@ func (sc *selectionCollector) Collect(r *bytes.Buffer) error {
 // NewCollector creates a new Collector
 func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandler, timerLength time.Duration) *collector {
 	return &collector{
-		BestEventChan: bestEventChan,
-		selector:      nil,
-		handler:       handler,
-		queue:         &consensus.EventQueue{},
-		timeOut:       timerLength,
+		BestEventChan:   bestEventChan,
+		RepropagateChan: make(chan wire.Event, 100),
+		selector:        nil,
+		handler:         handler,
+		queue:           &consensus.EventQueue{},
+		timeOut:         timerLength,
 	}
 }
 
@@ -59,6 +73,13 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 
 	if err := s.handler.Unmarshal(r, ev); err != nil {
 		return err
+	}
+
+	if s.selector != nil {
+		event := s.handler.Priority(s.selector.BestEvent, ev)
+		if event == s.selector.BestEvent {
+			return errors.New("score of received event is lower than our current best event")
+		}
 	}
 
 	// verify
@@ -114,7 +135,7 @@ func (s *collector) StartSelection() {
 	// TODO: remove
 	fmt.Println("starting selection")
 	// creating a new selector
-	s.selector = wire.NewEventSelector(s.handler)
+	s.selector = NewEventSelector(s.handler, s.RepropagateChan)
 	// letting selector collect the best
 	go s.selector.PickBest()
 	// stopping the selector after timeout
@@ -151,5 +172,36 @@ func (s *collector) stopSelection() {
 	if s.selector != nil {
 		s.selector.StopChan <- false
 		s.selector = nil
+	}
+}
+
+//NewEventSelector creates the Selector
+func NewEventSelector(p wire.EventPrioritizer, repropagateChan chan wire.Event) *EventSelector {
+	return &EventSelector{
+		EventChan:       make(chan wire.Event, 100),
+		RepropagateChan: repropagateChan,
+		BestEventChan:   make(chan wire.Event, 1),
+		StopChan:        make(chan bool, 1),
+		prioritizer:     p,
+		BestEvent:       nil,
+	}
+}
+
+// PickBest picks the best event depending on the priority of the sender
+func (s *EventSelector) PickBest() {
+	for {
+		select {
+		case ev := <-s.EventChan:
+			s.BestEvent = s.prioritizer.Priority(s.BestEvent, ev)
+			// TODO: review - if this event replaced best event, repropagate
+			if s.BestEvent == ev {
+				s.RepropagateChan <- ev
+			}
+		case shouldNotify := <-s.StopChan:
+			if shouldNotify {
+				s.BestEventChan <- s.BestEvent
+			}
+			return
+		}
 	}
 }

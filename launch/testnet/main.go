@@ -2,14 +2,16 @@ package main
 
 import (
 	"flag"
+	"math/rand"
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
 // Flags
 var voucher = flag.String("voucher", "voucher.dusk.network", "hostname for the voucher seeder")
-var port = flag.String("port", "8081", "port for the node to bind on")
+var port = flag.String("port", "7000", "port for the node to bind on")
 
 func initLog() {
 	log.SetOutput(os.Stdout)
@@ -18,6 +20,7 @@ func initLog() {
 
 func main() {
 	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
 	initLog()
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup("demo" + *port)

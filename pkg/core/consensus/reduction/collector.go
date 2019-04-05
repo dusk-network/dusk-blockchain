@@ -99,13 +99,7 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
-	fmt.Println("current step is ", c.ctx.state.Step(), "message received for step", header.Step)
-	// TODO: review re-propagation logic
-	c.lock.Lock()
-	if c.isRelevant(header.Round, header.Step) &&
-		!c.Contains(ev, string(header.Step)) {
-		// TODO: review
-		c.repropagate(ev)
+	if c.isRelevant(header.Round, header.Step) {
 		c.process(ev)
 		c.lock.Unlock()
 		return nil
@@ -124,6 +118,11 @@ func (c *collector) process(ev wire.Event) {
 	b := new(bytes.Buffer)
 	if err := c.ctx.handler.EmbedVoteHash(ev, b); err == nil {
 		hash := hex.EncodeToString(b.Bytes())
+		if !c.Contains(ev, hash) {
+			// TODO: review
+			c.repropagate(ev)
+		}
+
 		count := c.Store(ev, hash)
 		if count > c.ctx.committee.Quorum() {
 			votes := c.StepEventCollector[hash]
