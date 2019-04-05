@@ -83,6 +83,7 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 	}
 
 	if err := c.ctx.handler.Verify(ev); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -103,10 +104,10 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 func (c *collector) process(ev wire.Event) {
 	b := new(bytes.Buffer)
 	if err := c.ctx.handler.EmbedVoteHash(ev, b); err == nil {
-		fmt.Println(b.Bytes())
 		hash := hex.EncodeToString(b.Bytes())
 		if !c.Contains(ev, hash) {
 			// TODO: review
+			fmt.Println("repropagate", hash)
 			c.repropagate(ev)
 		}
 
@@ -134,15 +135,15 @@ func (c collector) flushQueue() {
 }
 
 func (c *collector) updateRound(round uint64) {
-	c.ctx.state.Round = round
-	c.ctx.state.Step = 1
-
-	c.queue.Clear(c.ctx.state.Round)
-	c.Clear()
 	if c.reducer != nil {
 		c.reducer.end()
 		c.reducer = nil
 	}
+
+	c.ctx.state.Round = round
+	c.ctx.state.Step = 1
+	c.queue.Clear(c.ctx.state.Round)
+	c.Clear()
 }
 
 func (c collector) isRelevant(round uint64, step uint8) bool {
@@ -150,7 +151,7 @@ func (c collector) isRelevant(round uint64, step uint8) bool {
 }
 
 func (c collector) isEarly(round uint64, step uint8) bool {
-	return c.ctx.state.Round < round || c.ctx.state.Round == round && c.ctx.state.Step < step
+	return c.ctx.state.Round < round || c.ctx.state.Round == round && c.ctx.state.Step <= step
 }
 
 func (c *collector) startReduction() {
@@ -218,6 +219,7 @@ func (b *broker) forwardSelection(hash []byte) {
 	if err != nil {
 		panic(err)
 	}
+
 	b.eventBus.Publish(b.outgoingReductionTopic, vote)
 	go b.collector.startReduction()
 }
