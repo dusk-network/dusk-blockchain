@@ -295,6 +295,7 @@ loop:
 
 // ReadLoop will block on the read until a message is read.
 // Should only be called after handshake is complete on a seperate go-routine.
+// Eventual duplicated messages are silently discarded
 func (p *Peer) readLoop() {
 	idleTimer := time.AfterFunc(idleTimeout, func() {
 		p.Disconnect()
