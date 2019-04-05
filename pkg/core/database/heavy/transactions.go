@@ -76,8 +76,9 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		return fmt.Errorf("empty chain block hash")
 	}
 
-	// Schema Key = HeaderPrefix + block.header.hash Value =
-	// encoded(block.fields)
+	// Schema Key = HeaderPrefix + block.header.hash
+	//
+	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
 	if err := block.Header.Encode(blockHeaderFields); err != nil {
@@ -125,7 +126,7 @@ func (t transaction) StoreBlock(block *block.Block) error {
 
 		// Schema
 		//
-		// Key = TxPrefix + txID
+		// Key = TxIdPrefix + txID
 		// Value = block.header.hash
 		//
 		// For the retrival of a single transaction by TxId
@@ -135,7 +136,7 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		// Schema
 		//
 		// Key = KeyImagePrefix + tx.input.KeyImage
-		// Value = tx.R
+		// Value = txID
 		//
 		// To make FetchKeyImageExists functioning
 		for _, input := range tx.StandardTX().Inputs {
@@ -431,11 +432,6 @@ func (t transaction) put(key []byte, value []byte) {
 	}
 }
 
-// FetchBlockTxByHash seems to be an expensive transaction as it needs to
-// recalculate hashes of all txs of the block that txID is associated with.
-//
-// NB: txID is not serialized by transactions.Transaction.Encoder so it is
-// always recalculated on fetching from the storage.
 func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, uint32, []byte, error) {
 
 	var txIndex uint32 = math.MaxUint32
@@ -449,7 +445,6 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 			// overwrite error message
 			err = database.ErrTxNotFound
 		}
-
 		return nil, txIndex, nil, err
 	}
 
@@ -461,22 +456,33 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 	defer iterator.Release()
 
 	for iterator.Next() {
+
+		// Extract TxID from the key to avoid the need of CalculateHash
+		reader := bytes.NewReader(iterator.Key())
+		fetchedTxID := make([]byte, len(txID))
+		n, err := reader.ReadAt(fetchedTxID[:], int64(len(scanFilter)))
+
+		// We should always be capable of reading the TxID from the KEY
+		if err != nil || n == 0 {
+			return nil, txIndex, nil, fmt.Errorf("malformed transaction data")
+		}
+
+		// Check if this is the requested TxID
+		if !bytes.Equal(fetchedTxID[:], txID) {
+			continue
+		}
+
+		// TxID matched. Decode the Tx data
 		value := iterator.Value()
 		tx, txIndex, err := t.decodeBlockTx(value, database.AnyTxType)
 
-		if err == nil {
-			fetchedTxID, err := tx.CalculateHash()
-
-			if err == nil {
-				if bytes.Equal(fetchedTxID, txID) {
-					return tx, txIndex, hashHeader, nil
-				}
-			}
+		if err != nil {
+			return nil, txIndex, hashHeader, err
+		} else {
+			return tx, txIndex, hashHeader, nil
 		}
 	}
 
-	// If we get here, the transaction is available but something went wrong
-	// with decoding the transaction
 	return nil, txIndex, nil, errors.New("block tx is available but fetching it fails")
 }
 
