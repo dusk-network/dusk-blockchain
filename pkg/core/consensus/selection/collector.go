@@ -19,11 +19,10 @@ type (
 		BestEventChan    chan *bytes.Buffer
 		RepropagateChan  chan wire.Event
 		// this is the dump of future messages, categorized by different steps and different rounds
-		queue     *consensus.EventQueue
-		timeOut   time.Duration
-		selector  *EventSelector
-		handler   consensus.EventHandler
-		completed bool
+		queue    *consensus.EventQueue
+		timeOut  time.Duration
+		selector *EventSelector
+		handler  consensus.EventHandler
 	}
 
 	selectionCollector struct {
@@ -72,6 +71,7 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 	ev := s.handler.NewEvent()
 
 	if err := s.handler.Unmarshal(r, ev); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -84,6 +84,7 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 
 	// verify
 	if err := s.handler.Verify(ev); err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -121,12 +122,10 @@ func (s *collector) isEarly(round uint64, step uint8) bool {
 
 // UpdateRound stops the selection and cleans up the queue up to the round specified.
 func (s *collector) UpdateRound(round uint64) {
-	s.CurrentRound = round
-	s.CurrentStep = 1
 	s.stopSelection()
 
-	// TODO: remove this and think of a better solution after the demo
-	s.completed = false
+	s.CurrentRound = round
+	s.CurrentStep = 1
 	s.queue.ConsumeUntil(s.CurrentRound)
 }
 
@@ -159,6 +158,7 @@ func (s *collector) StartSelection() {
 // listenSelection triggers a goroutine that notifies the Broker through its channel after having incremented the Collector step
 func (s *collector) listenSelection() {
 	ev := <-s.selector.BestEventChan
+	s.selector = nil
 	buf := new(bytes.Buffer)
 	if err := s.handler.Marshal(buf, ev); err == nil {
 		s.BestEventChan <- buf
