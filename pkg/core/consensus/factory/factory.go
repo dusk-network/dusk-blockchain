@@ -71,7 +71,7 @@ func (c *ConsensusFactory) StartConsensus() {
 	round := <-c.initChannel
 	fmt.Printf("Initing on round %d\n", round)
 
-	generation.LaunchGeneratorComponent(c.eventBus, c.d, c.k, *c.bidList)
+	generation.LaunchCollectorComponent(c.eventBus, c.d, c.k, *c.bidList)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength, *c.bidList)
