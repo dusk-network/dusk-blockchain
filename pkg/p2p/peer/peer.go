@@ -152,10 +152,14 @@ func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.E
 // Collect implements wire.EventCollector.
 // Receive messages, add headers, and propagate them to the network.
 func (p *Peer) Collect(message *bytes.Buffer) error {
+	// copy the buffer here, as the pointer we just got is shared by
+	// all the other peers.
+	msg := *message
 	var topicBytes [15]byte
-	_, _ = message.Read(topicBytes[:])
+
+	_, _ = msg.Read(topicBytes[:])
 	topic := topics.ByteArrayToTopic(topicBytes)
-	return p.WriteMessage(message, topic)
+	return p.WriteMessage(&msg, topic)
 }
 
 // WriteMessage will append a header with the specified topic to the passed

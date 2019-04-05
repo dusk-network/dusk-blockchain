@@ -91,7 +91,7 @@ func (n *EventSubscriber) Accept() {
 			n.eventBus.Unsubscribe(string(QuitTopic), n.quitChanID)
 			return
 		case eventMsg := <-n.msgChan:
-			if len(n.msgChan) > 1 {
+			if len(n.msgChan) > 10 {
 				log.WithFields(log.Fields{
 					"id":         n.msgChanID,
 					"topic":      n.topic,

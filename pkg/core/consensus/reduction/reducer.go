@@ -122,6 +122,14 @@ func (c *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wir
 }
 
 func (c *reducer) end() {
+	// TODO: review, we replace the shared context pointer here, because the `begin`
+	// function will adjust the context state, resulting in issues during round
+	// updates. should possibly explore another way to adjust step state on the
+	// collector
+	c.ctx = newCtx(c.ctx.handler, c.ctx.committee, c.ctx.timer.timeout)
+	// TODO: cut off the regeneration channel so that the `begin` call does
+	// not mess with the selector, when it triggers regeneration.
+	c.regenerationChannel = make(chan bool, 1)
 	c.firstStep.stop()
 	c.secondStep.stop()
 }
