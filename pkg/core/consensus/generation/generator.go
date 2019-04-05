@@ -1,144 +1,65 @@
 package generation
 
 import (
-	"bytes"
 	"fmt"
 
-	"github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 )
 
-func LaunchGeneratorComponent(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *generator {
-	generator := newGenerator(eventBus, d, k, bidList)
-	go generator.Listen()
-	return generator
-}
-
 type generator struct {
-	eventBus     *wire.EventBus
-	currentRound uint64
-	currentStep  uint8
-
-	*user.Keys
-	d, k       ristretto.Scalar
-	bidList    user.BidList
-	marshaller *selection.ScoreUnMarshaller
-
-	// subscriber channels
-	roundChannel   <-chan uint64
-	bidListChannel <-chan user.BidList
+	proofChannel chan zkproof.ZkProof
 }
 
-func newGenerator(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *generator {
-	roundChannel := consensus.InitRoundUpdate(eventBus)
-	bidListChannel := selection.InitBidListUpdate(eventBus)
-	generator := &generator{
-		eventBus:       eventBus,
-		roundChannel:   roundChannel,
-		marshaller:     &selection.ScoreUnMarshaller{},
-		bidList:        bidList,
-		d:              d,
-		k:              k,
-		bidListChannel: bidListChannel,
-	}
-
-	go wire.NewEventSubscriber(eventBus, generator, msg.BlockGenerationTopic).Accept()
-	return generator
-}
-
-func (g *generator) Listen() {
-	for {
-		select {
-		case round := <-g.roundChannel:
-			g.updateRound(round)
-		case bidList := <-g.bidListChannel:
-			g.bidList = bidList
-		}
+func newGenerator() *generator {
+	return &generator{
+		proofChannel: make(chan zkproof.ZkProof, 1),
 	}
 }
 
-func (g *generator) updateRound(round uint64) {
-	g.currentRound = round
-	g.currentStep = 1
-	sev, err := g.generateScoreEvent()
-	if err != nil {
-		return
-	}
-
-	if err := g.sendScore(sev); err != nil {
-		return
-	}
-
-	g.currentStep++
-}
-
-func (g *generator) generateScoreEvent() (*selection.ScoreEvent, error) {
+// GenerateProof will generate the proof of blind bid, needed to successfully
+// propose a block to the voting committee.
+func (g *generator) generateProof(d, k ristretto.Scalar, bidList user.BidList,
+	seed []byte) {
 	fmt.Println("generating proof")
-	seed, err := crypto.RandEntropy(33)
-	if err != nil {
-		return nil, err
-	}
+	// Turn seed into scalar
+	seedScalar := ristretto.Scalar{}
+	seedScalar.Derive(seed)
 
-	proof, err := g.generateProof(seed)
-	if err != nil {
-		return nil, err
-	}
+	// Create a slice of scalars with a number of random bids (up to 10)
+	bidListSubset := getBidListSubset(bidList)
+	bidListScalars := convertBidListToScalars(bidListSubset)
 
-	hash, err := crypto.RandEntropy(32)
-	if err != nil {
-		return nil, err
-	}
-
-	return &selection.ScoreEvent{
-		Round:         g.currentRound,
-		Step:          g.currentStep,
-		Score:         proof.Score,
-		Proof:         proof.Proof,
-		Z:             proof.Z,
-		BidListSubset: proof.ProofBidList,
-		Seed:          seed,
-		VoteHash:      hash,
-	}, nil
+	proof := zkproof.Prove(d, k, seedScalar, bidListScalars)
+	g.proofChannel <- proof
 }
 
-func (g *generator) sendScore(sev *selection.ScoreEvent) error {
-	buffer := new(bytes.Buffer)
-	topicBytes := topics.TopicToByteArray(topics.Score)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
-	scoreBuffer := new(bytes.Buffer)
-	if err := g.marshaller.Marshal(scoreBuffer, sev); err != nil {
-		return err
-	}
-
-	if _, err := buffer.Write(scoreBuffer.Bytes()); err != nil {
-		return err
-	}
-
-	fmt.Println("sending proof")
-	// g.eventBus.Publish(string(topics.Score), scoreBuffer)
-	g.eventBus.Publish(string(topics.Gossip), buffer)
-	return nil
+// bidsToScalars will take a global public list, take a subset from it, and then
+// return it as a slice of scalars.
+func getBidListSubset(bidList user.BidList) user.BidList {
+	numBids := getNumBids(bidList)
+	return bidList.Subset(numBids)
 }
 
-func (g *generator) Collect(m *bytes.Buffer) error {
-	sev, err := g.generateScoreEvent()
-	if err != nil {
-		return err
+// getNumBids will return how many bids to include in the bid list subset
+// for the proof.
+func getNumBids(bidList user.BidList) int {
+	numBids := len(bidList)
+	if numBids > 10 {
+		numBids = 10
 	}
 
-	if err := g.sendScore(sev); err != nil {
-		return err
+	return numBids
+}
+
+// convertBidListToScalars will take a BidList, and create a slice of scalars from it.
+func convertBidListToScalars(bidList user.BidList) []ristretto.Scalar {
+	scalarList := make([]ristretto.Scalar, len(bidList))
+	for i, bid := range bidList {
+		bidScalar := zkproof.BytesToScalar(bid[:])
+		scalarList[i] = bidScalar
 	}
 
-	g.currentStep++
-	return nil
+	return scalarList
 }
