@@ -21,6 +21,7 @@ The `SigSet Selector` also handles the `SigSet Generation` process. The `Sigset 
 #### Score Event
 
 | Field | Type |
+|-------|------|
 | opcode | uint8 |
 | round | uint64 |
 | step | uint64 |
@@ -33,6 +34,7 @@ The `SigSet Selector` also handles the `SigSet Generation` process. The `Sigset 
 #### SigSet Generation Event
 
 | Field | Type |
+|-------|------|
 | opcode | uint8 |
 | round | uint64 |
 | step | uint64 |
@@ -42,9 +44,17 @@ The `SigSet Selector` also handles the `SigSet Generation` process. The `Sigset 
 
 ### API
 
-    - LaunchScoreSelectionComponent(eventbus, duration) - creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-    - LaunchSignatureSelector(eventbus, committee, duration) - Launches a the `SigSet Selector` component which responsibility is to collect the signature set until a quorum is reached, select the one associated with the highest Provisioner stake and propagate the selection further
+- LaunchScoreSelectionComponent(eventbus, duration) - creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
+- LaunchSignatureSelector(eventbus, committee, duration) - Launches a the `SigSet Selector` component which responsibility is to collect the signature set until a quorum is reached, select the one associated with the highest Provisioner stake and propagate the selection further
 
 ### Architecture
 
 Both the `Score Selector` and the `SigSet Selector` components follow the event driven paradigm. They both are connected to the node's `EventBus` through a generic `Collector` and delegate event-specific operations to their own `EventHandler`. They both make use of a `Selector` component to help code reuse.
+
+#### Score Selection Diagram
+
+![](docs/Score%20Selection.jpg)
+
+#### SigSet Selection Diagram
+
+![](docs/SigSet%20Selection.jpg)

@@ -30,4 +30,6 @@ The `committee` package also exposes the following function: - `NewCommitteeStor
 
 ### Architecture
 
+![](docs/Committee.jpg)
+
 The package includes a `CommitteeStore`, a `Committee` interface implementation that is wired to the `EventBus` and follows the _event-driven_ approach of the general Provisioner's architecture. The `CommitteeStore` listens to the `NewProvisionerTopic` topic and keeps track of the known `Provisioners` and their stake.

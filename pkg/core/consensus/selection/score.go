@@ -31,10 +31,6 @@ type (
 		bestVotedScoreHashChan chan []byte
 	}
 
-	scoreSelectionCollector struct {
-		scoreSelectionChan chan bool
-	}
-
 	// broker is the component that supervises a collection of events
 	scoreBroker struct {
 		eventBus        *wire.EventBus
