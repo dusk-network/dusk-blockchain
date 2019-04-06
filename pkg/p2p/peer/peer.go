@@ -113,7 +113,7 @@ func newDupeMap(eventbus *wire.EventBus) *dupeMap {
 func (d *dupeMap) cleanOnRound() {
 	for {
 		round := <-d.roundChan
-		d.tmpMap.UpdateHeigth(round)
+		d.tmpMap.UpdateHeight(round)
 	}
 }
 

@@ -11,7 +11,7 @@ type (
 	TmpMap struct {
 		lock      sync.RWMutex
 		msgSets   map[uint64]*hashSet
-		heigth    uint64
+		height    uint64
 		tolerance uint64
 	}
 
@@ -25,21 +25,21 @@ func NewTmpMap(tolerance uint64) *TmpMap {
 
 	return &TmpMap{
 		msgSets:   msgSets,
-		heigth:    0,
+		height:    0,
 		tolerance: tolerance,
 	}
 }
 
-func (t *TmpMap) UpdateHeigth(round uint64) {
+func (t *TmpMap) UpdateHeight(round uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	if t.heigth > round {
+	if t.height > round {
 		return
 	}
 	_, found := t.msgSets[round]
 	if !found {
 		t.msgSets[round] = newSet()
-		t.heigth = round
+		t.height = round
 		t.clean()
 	}
 }
@@ -47,7 +47,7 @@ func (t *TmpMap) UpdateHeigth(round uint64) {
 func (t *TmpMap) Has(b *bytes.Buffer) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	return t.has(b, t.heigth)
+	return t.has(b, t.height)
 }
 
 func (t *TmpMap) HasAnywhere(b *bytes.Buffer) bool {
@@ -84,24 +84,24 @@ func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
 func (t *TmpMap) Add(b *bytes.Buffer) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	return t.add(b, t.heigth)
+	return t.add(b, t.height)
 }
 
-func (t *TmpMap) AddAt(b *bytes.Buffer, heigth uint64) bool {
+func (t *TmpMap) AddAt(b *bytes.Buffer, height uint64) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	return t.add(b, heigth)
+	return t.add(b, height)
 }
 
 // Clean the TmpMap up to the upto argument
 func (t *TmpMap) clean() {
-	if t.heigth <= t.tolerance {
+	if t.height <= t.tolerance {
 		// don't clean
 		return
 	}
 
 	for r := range t.msgSets {
-		if r <= t.heigth-t.tolerance {
+		if r <= t.height-t.tolerance {
 			delete(t.msgSets, r)
 		}
 	}

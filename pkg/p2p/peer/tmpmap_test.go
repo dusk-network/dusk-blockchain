@@ -21,7 +21,7 @@ func TestHas(t *testing.T) {
 
 	assert.True(t, tmpMap.Has(testPayload))
 
-	tmpMap.UpdateHeigth(2)
+	tmpMap.UpdateHeight(2)
 	assert.False(t, tmpMap.Has(testPayload))
 	assert.False(t, tmpMap.HasAt(testPayload, 2))
 	assert.True(t, tmpMap.HasAnywhere(testPayload))
@@ -35,7 +35,7 @@ func TestAdd(t *testing.T) {
 	assert.False(t, tmpMap.Add(testPayload))
 	assert.True(t, tmpMap.Add(testPayload))
 
-	tmpMap.UpdateHeigth(4)
+	tmpMap.UpdateHeight(4)
 	assert.False(t, tmpMap.Add(testPayload))
 }
 
@@ -45,14 +45,14 @@ func TestClean(t *testing.T) {
 
 	assert.False(t, tmpMap.Add(testPayload))
 
-	tmpMap.UpdateHeigth(2)
+	tmpMap.UpdateHeight(2)
 	assert.False(t, tmpMap.Add(testPayload))
 
-	tmpMap.UpdateHeigth(5)
+	tmpMap.UpdateHeight(5)
 	assert.False(t, tmpMap.Add(testPayload))
 
 	// this should clean entries at heigth 2 and less
-	tmpMap.UpdateHeigth(6)
+	tmpMap.UpdateHeight(6)
 	assert.False(t, tmpMap.Add(testPayload))
 
 	assert.True(t, tmpMap.HasAnywhere(testPayload))
