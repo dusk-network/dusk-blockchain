@@ -17,7 +17,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
@@ -25,6 +24,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 var timeOut = 6 * time.Second
