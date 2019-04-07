@@ -10,10 +10,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 type (
@@ -203,7 +203,15 @@ func (p *scoreHandler) Verify(ev wire.Event) error {
 	// Verify the proof
 	seedScalar := ristretto.Scalar{}
 	seedScalar.Derive(m.Seed)
-	if !zkproof.Verify(m.Proof, seedScalar.Bytes(), m.BidListSubset, m.Score, m.Z) {
+
+	proof := zkproof.ZkProof{
+		Proof:         m.Proof,
+		Score:         m.Score,
+		Z:             m.Z,
+		BinaryBidList: m.BidListSubset,
+	}
+
+	if !proof.Verify(seedScalar) {
 		return errors.New("proof verification failed")
 	}
 

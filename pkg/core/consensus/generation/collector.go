@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
+	"gitlab.dusk.network/dusk-core/zkproof"
 
 	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -116,7 +116,7 @@ func (g *collector) generateScoreEvent(proof zkproof.ZkProof, seed []byte) (*sel
 		Score:         proof.Score,
 		Proof:         proof.Proof,
 		Z:             proof.Z,
-		BidListSubset: proof.ProofBidList,
+		BidListSubset: proof.BinaryBidList,
 		Seed:          seed,
 		VoteHash:      hash,
 	}, nil

@@ -5,7 +5,7 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 type generator struct {
@@ -57,7 +57,8 @@ func getNumBids(bidList user.BidList) int {
 func convertBidListToScalars(bidList user.BidList) []ristretto.Scalar {
 	scalarList := make([]ristretto.Scalar, len(bidList))
 	for i, bid := range bidList {
-		bidScalar := zkproof.BytesToScalar(bid[:])
+		bidScalar := ristretto.Scalar{}
+		bidScalar.UnmarshalBinary(bid[:])
 		scalarList[i] = bidScalar
 	}
 
