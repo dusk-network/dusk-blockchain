@@ -29,12 +29,11 @@ type (
 		currentStep  uint8
 
 		marshaller *selection.ScoreUnMarshaller
-		*user.Keys
-		d, k    ristretto.Scalar
-		bidList user.BidList
-		seed    []byte
+		d, k       ristretto.Scalar
+		bidList    user.BidList
+		seed       []byte
 
-		generator         *generator
+		generator         *proofGenerator
 		scoreEventChannel chan *bytes.Buffer
 		proofChannel      chan zkproof.ZkProof
 		stopChannel       chan bool
@@ -99,6 +98,7 @@ func (g *proofCollector) updateRound(round uint64) {
 }
 
 func (g *proofCollector) generateScoreEvent(proof zkproof.ZkProof) (*selection.ScoreEvent, error) {
+	// TODO: get an actual hash by generating a block
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		return nil, err

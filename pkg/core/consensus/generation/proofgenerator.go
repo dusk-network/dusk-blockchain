@@ -8,19 +8,19 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-type generator struct {
+type proofGenerator struct {
 	proofChannel chan zkproof.ZkProof
 }
 
-func newGenerator(proofChannel chan zkproof.ZkProof) *generator {
-	return &generator{
+func newGenerator(proofChannel chan zkproof.ZkProof) *proofGenerator {
+	return &proofGenerator{
 		proofChannel: proofChannel,
 	}
 }
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
 // propose a block to the voting committee.
-func (g *generator) generateProof(d, k ristretto.Scalar, bidList user.BidList,
+func (g *proofGenerator) generateProof(d, k ristretto.Scalar, bidList user.BidList,
 	seed []byte) {
 	fmt.Println("generating proof")
 	// Turn seed into scalar
