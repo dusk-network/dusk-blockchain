@@ -12,9 +12,9 @@ type generator struct {
 	proofChannel chan zkproof.ZkProof
 }
 
-func newGenerator() *generator {
+func newGenerator(proofChannel chan zkproof.ZkProof) *generator {
 	return &generator{
-		proofChannel: make(chan zkproof.ZkProof, 1),
+		proofChannel: proofChannel,
 	}
 }
 

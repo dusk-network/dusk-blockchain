@@ -34,6 +34,7 @@ type collector struct {
 	marshaller        *selection.ScoreUnMarshaller
 	generator         *generator
 	scoreEventChannel chan *selection.ScoreEvent
+	proofChannel      chan zkproof.ZkProof
 	stopChannel       chan bool
 
 	// subscriber channels
@@ -54,7 +55,6 @@ func newCollector(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.B
 		k:                 k,
 		scoreEventChannel: make(chan *selection.ScoreEvent, 1),
 		stopChannel:       make(chan bool, 1),
-		generator:         newGenerator(),
 	}
 
 	go wire.NewEventSubscriber(eventBus, collector, msg.BlockGenerationTopic).Accept()
@@ -80,13 +80,13 @@ func (g *collector) Listen() {
 
 func (g *collector) generate() {
 	g.stopChannel = make(chan bool, 1)
-	g.generator = newGenerator()
+	g.proofChannel = make(chan zkproof.ZkProof, 1)
+	g.generator = newGenerator(g.proofChannel)
 	seed, _ := crypto.RandEntropy(33)
 	go g.generator.generateProof(g.d, g.k, g.bidList, seed)
 	select {
 	case <-g.stopChannel:
-		return
-	case proof := <-g.generator.proofChannel:
+	case proof := <-g.proofChannel:
 		sev, err := g.generateScoreEvent(proof, seed)
 		if err != nil {
 			return
@@ -145,6 +145,8 @@ func (g *collector) sendScore(sev *selection.ScoreEvent) error {
 }
 
 func (g *collector) Collect(m *bytes.Buffer) error {
-	go g.generate()
+	if g.generator == nil {
+		go g.generate()
+	}
 	return nil
 }
