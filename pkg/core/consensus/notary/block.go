@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
@@ -89,7 +91,7 @@ func (b *blockNotary) Listen() {
 // marshalled form of the CommitteeEvent messages.
 func newBlockCollector(c committee.Committee, currentRound uint64) *blockCollector {
 	cc := &committee.Collector{
-		StepEventCollector:   make(map[string][]wire.Event),
+		StepEventCollector:   consensus.NewStepEventCollector(),
 		Committee:            c,
 		CurrentRound:         currentRound,
 		RepropagationChannel: make(chan *bytes.Buffer, 100),
