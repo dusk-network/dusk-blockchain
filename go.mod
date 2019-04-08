@@ -3,15 +3,6 @@ module gitlab.dusk.network/dusk-core/dusk-go
 require (
 	github.com/bwesterb/go-ristretto v1.0.0
 	github.com/cenkalti/backoff v2.1.1+incompatible // indirect
-<<<<<<< HEAD
-	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
-	github.com/onsi/ginkgo v1.7.0 // indirect
-	github.com/onsi/gomega v1.4.3 // indirect
-	github.com/pkg/errors v0.8.0
-	github.com/sirupsen/logrus v1.2.0
-	github.com/stretchr/testify v1.2.2
-	github.com/syndtr/goleveldb v0.0.0-20181128100959-b001fa50d6b2
-=======
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
@@ -22,7 +13,6 @@ require (
 	github.com/sirupsen/logrus v1.4.1
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
->>>>>>> zkproof-as-package
 	github.com/zorkian/go-datadog-api v2.19.0+incompatible // indirect
 	gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0
 	gitlab.dusk.network/dusk-core/zkproof v0.0.0-20190407000649-4f8f6ba4acd5
