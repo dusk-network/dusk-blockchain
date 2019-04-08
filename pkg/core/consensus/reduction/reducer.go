@@ -70,19 +70,19 @@ func (c *reducer) begin() {
 	log.WithField("process", "reducer").Debugln("Beginning Reduction")
 	// this is a blocking call
 	events := c.firstStep.fetch()
+	c.ctx.state.IncrementStep()
 	hash1 := c.encodeEv(events)
 	reductionVote, err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state)
 	if err != nil {
 		panic(err)
 	}
 	c.ctx.reductionVoteChan <- reductionVote
-	c.ctx.state.IncrementStep()
 
 	eventsSecondStep := c.secondStep.fetch()
 	hash2 := c.encodeEv(eventsSecondStep)
 
 	allEvents := append(events, eventsSecondStep...)
-	fmt.Println("hash1 is ", hex.EncodeToString(hash1.Bytes()))
+	fmt.Println("hash1 is", hex.EncodeToString(hash1.Bytes()))
 	fmt.Println("hash2 is", hex.EncodeToString(hash2.Bytes()))
 
 	if c.isReductionSuccessful(hash1, hash2, allEvents) {

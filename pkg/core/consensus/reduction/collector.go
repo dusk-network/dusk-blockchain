@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"sync"
 	"time"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -16,10 +15,9 @@ import (
 
 type (
 	collector struct {
-		consensus.StepEventCollector
+		*consensus.StepEventCollector
 		collectedVotesChan chan []wire.Event
 		queue              *consensus.EventQueue
-		lock               sync.Mutex
 		reducer            *reducer
 		ctx                *context
 
@@ -57,14 +55,12 @@ func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) 
 
 	queue := consensus.NewEventQueue()
 	collector := &collector{
-
-		StepEventCollector:   consensus.StepEventCollector{},
+		StepEventCollector:   consensus.NewStepEventCollector(),
 		queue:                queue,
 		collectedVotesChan:   make(chan []wire.Event, 1),
 		ctx:                  ctx,
 		regenerationChannel:  make(chan bool, 1),
 		repropagationChannel: make(chan *bytes.Buffer, 100),
-		lock:                 sync.Mutex{},
 	}
 
 	go wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
@@ -80,8 +76,6 @@ func (c *collector) onTimeout() {
 }
 
 func (c *collector) Clear() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.StepEventCollector.Clear()
 }
 
@@ -102,11 +96,9 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 	c.ctx.handler.ExtractHeader(ev, header)
 	if c.isRelevant(header.Round, header.Step) {
 		c.process(ev)
-		c.lock.Unlock()
 		return nil
 	}
 
-	c.lock.Unlock()
 	if c.isEarly(header.Round, header.Step) {
 		fmt.Println("message is early")
 		c.queue.PutEvent(header.Round, header.Step, ev)
@@ -121,13 +113,14 @@ func (c *collector) process(ev wire.Event) {
 		hash := hex.EncodeToString(b.Bytes())
 		if !c.Contains(ev, hash) {
 			// TODO: review
-			fmt.Println("repropagate", hash)
 			c.repropagate(ev)
 		}
 
+		// TODO: remove
+		fmt.Println("storing reduction message")
 		count := c.Store(ev, hash)
 		if count > c.ctx.committee.Quorum() {
-			votes := c.StepEventCollector[hash]
+			votes := c.StepEventCollector.Map[hash]
 			c.collectedVotesChan <- votes
 			c.Clear()
 		}
@@ -149,44 +142,29 @@ func (c *collector) flushQueue() {
 }
 
 func (c *collector) updateRound(round uint64) {
-<<<<<<< HEAD
 	c.ctx.state.Update(round)
 
 	c.queue.Clear(c.ctx.state.Round())
 	c.Clear()
-=======
->>>>>>> 280e521bde4fa718682c9480c010a6a7efcea6e0
 	if c.reducer != nil {
 		c.reducer.end()
 		c.reducer = nil
 	}
-
-	c.ctx.state.Round = round
-	c.ctx.state.Step = 1
-	c.queue.Clear(c.ctx.state.Round)
-	c.Clear()
 }
 
 func (c *collector) isRelevant(round uint64, step uint8) bool {
 	return c.ctx.state.Cmp(round, step) == 0 && c.reducer != nil
 }
 
-<<<<<<< HEAD
 func (c *collector) isEarly(round uint64, step uint8) bool {
-	return c.ctx.state.Cmp(round, step) > 0
-=======
-func (c collector) isEarly(round uint64, step uint8) bool {
-	return c.ctx.state.Round < round || c.ctx.state.Round == round && c.ctx.state.Step <= step
->>>>>>> 280e521bde4fa718682c9480c010a6a7efcea6e0
+	return c.ctx.state.Cmp(round, step) <= 0
 }
 
 func (c *collector) startReduction() {
 	// TODO: review
-	c.lock.Lock()
 	c.reducer = newCoordinator(c.collectedVotesChan, c.ctx, c.regenerationChannel)
 
 	go c.reducer.begin()
-	c.lock.Unlock()
 	c.flushQueue()
 }
 
