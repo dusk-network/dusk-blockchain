@@ -101,9 +101,8 @@ func (f *scoreBroker) Listen() {
 			}
 		case bestEvent := <-f.collector.BestEventChan:
 			// TODO: moved step incrementation here, so we dont run ahead in case there's nobody generating blocks
-			f.collector.CurrentStep++
-
 			if bestEvent.Len() != 0 {
+				f.collector.CurrentStep++
 				f.eventBus.Publish(msg.BestScoreTopic, bestEvent)
 			} else {
 				f.eventBus.Publish(msg.BlockGenerationTopic, nil)
