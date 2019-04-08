@@ -16,22 +16,16 @@ import (
 // Returns nil if a tx is valid
 func (c *Chain) AcceptTx(tx transactions.Transaction) error {
 	if err := c.checkTxExists(tx); err != nil {
-		// TODO: remove
-		fmt.Println(err)
 		return err
 	}
 
 	approxBlockTime := uint64(consensusSeconds) + uint64(c.PrevBlock.Header.Timestamp)
 
 	if err := c.verifyTX(0, approxBlockTime, tx); err != nil {
-		// TODO: remove
-		fmt.Println(err)
 		return err
 	}
 
 	if err := c.propagateTx(tx); err != nil {
-		// TODO: remove
-		fmt.Println(err)
 		return err
 	}
 
