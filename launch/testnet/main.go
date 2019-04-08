@@ -12,16 +12,29 @@ import (
 // Flags
 var voucher = flag.String("voucher", "voucher.dusk.network:8081", "hostname for the voucher seeder")
 var port = flag.String("port", "7000", "port for the node to bind on")
+var logToFile = flag.Bool("logtofile", false, "specifies if the log should be written to a file")
 
-func initLog() {
-	log.SetOutput(os.Stdout)
-	// log.SetLevel()
+func initLog(file *os.File) {
+	if *logToFile {
+		os.Stdout = file
+		log.SetOutput(file)
+	} else {
+		log.SetOutput(os.Stdout)
+	}
 }
 
 func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
-	initLog()
+
+	// Set up logging
+	file, err := os.Create("log" + *port + ".txt")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+	initLog(file)
+
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup("demo" + *port)
 	// listening to the blindbid and the stake channels
