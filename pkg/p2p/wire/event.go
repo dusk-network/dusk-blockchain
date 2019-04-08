@@ -100,6 +100,10 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 // Accept incoming (mashalled) Events on the topic of interest and dispatch them to the
 // EventCollector.Collect
 func (n *EventSubscriber) Accept() {
+	log.WithFields(log.Fields{
+		"id":    n.msgChanID,
+		"topic": n.topic,
+	}).Debugln("Accepting messages")
 	for {
 		select {
 		case <-n.quitChan:
@@ -113,13 +117,14 @@ func (n *EventSubscriber) Accept() {
 					"topic":      n.topic,
 					"Unconsumed": len(n.msgChan),
 				}).Debugln("Channel is accumulating messages")
-			} else {
-				log.WithFields(log.Fields{
-					"id":    n.msgChanID,
-					"topic": n.topic,
-				}).Debugln("Channel clean")
 			}
-			n.eventCollector.Collect(eventMsg)
+			if err := n.eventCollector.Collect(eventMsg); err != nil {
+				log.WithFields(log.Fields{
+					"id":         n.msgChanID,
+					"topic":      n.topic,
+					"Unconsumed": len(n.msgChan),
+				}).Warnln("Channel is accumulating messages")
+			}
 		}
 	}
 }
