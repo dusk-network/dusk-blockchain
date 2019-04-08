@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -48,7 +49,10 @@ type (
 	}
 
 	// StepEventCollector is an helper for common operations on stored Event Arrays
-	StepEventCollector map[string][]wire.Event
+	StepEventCollector struct {
+		sync.RWMutex
+		Map map[string][]wire.Event
+	}
 
 	// phaseCollector is not supposed to be used directly. Components interested in Phase Updates should import InitPhaseUpdate instead
 	phaseCollector struct {
@@ -220,16 +224,26 @@ func (s *EventQueue) ConsumeUntil(round uint64) map[uint64]map[uint8][]wire.Even
 	return ret
 }
 
+func NewStepEventCollector() *StepEventCollector {
+	return &StepEventCollector{
+		Map: make(map[string][]wire.Event),
+	}
+}
+
 // Clear up the Collector
 func (sec StepEventCollector) Clear() {
-	for key := range sec {
-		delete(sec, key)
+	sec.Lock()
+	defer sec.Unlock()
+	for key := range sec.Map {
+		delete(sec.Map, key)
 	}
 }
 
 // Contains checks if we already collected this event
 func (sec StepEventCollector) Contains(event wire.Event, step string) bool {
-	for _, stored := range sec[step] {
+	sec.RLock()
+	defer sec.RUnlock()
+	for _, stored := range sec.Map[step] {
 		if event.Equal(stored) {
 			return true
 		}
@@ -240,7 +254,9 @@ func (sec StepEventCollector) Contains(event wire.Event, step string) bool {
 
 // Store the Event keeping track of the step it belongs to. It silently ignores duplicates (meaning it does not store an event in case it is already found at the step specified). It returns the number of events stored at specified step *after* the store operation
 func (sec StepEventCollector) Store(event wire.Event, step string) int {
-	eventList := sec[step]
+	sec.RLock()
+	eventList := sec.Map[step]
+	sec.RUnlock()
 	if sec.Contains(event, step) {
 		return len(eventList)
 	}
@@ -251,7 +267,9 @@ func (sec StepEventCollector) Store(event wire.Event, step string) int {
 
 	// storing the agreement vote for the proper step
 	eventList = append(eventList, event)
-	sec[step] = eventList
+	sec.Lock()
+	sec.Map[step] = eventList
+	sec.Unlock()
 	return len(eventList)
 }
 
