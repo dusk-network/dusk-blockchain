@@ -32,6 +32,10 @@ func (s *Set) has(k string) bool {
 	return found
 }
 
+func (s *Set) Size() int {
+	return len(s.entries)
+}
+
 func repr(data []byte) string {
 	hashed, _ := hash.Xxhash(data)
 	return string(hashed)
