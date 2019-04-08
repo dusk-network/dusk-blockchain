@@ -14,7 +14,7 @@ func TestNewAddress(t *testing.T) {
 	k, err := key.New(en)
 	assert.Equal(t, nil, err)
 
-	want := "3PXJRmur5X1FhAD8qRi1UZ5S2np4FUdRikq3Q395LgVQV156kWZHS5DUmDPUkGZ15UJrqXfMwcNZjr5xRA2aqj89yJkeDGR"
+	want := "3P1cLPc3QqVQ193W9nE6Auk8HtsCvDYSpSh95paeyqNEvuMh7W6xjqT4pQZFLKta256CWCzLTBM92EnugcRe61NkCaDm7Fk"
 	got, err := k.PublicAddress()
 	assert.Equal(t, nil, err)
 	assert.Equal(t, want, got)
