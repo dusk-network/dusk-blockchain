@@ -15,7 +15,7 @@ var port = flag.String("port", "7000", "port for the node to bind on")
 var logToFile = flag.Bool("logtofile", false, "specifies if the log should be written to a file")
 
 func initLog(file *os.File) {
-	if *logToFile {
+	if file != nil {
 		os.Stdout = file
 		log.SetOutput(file)
 	} else {
@@ -28,12 +28,16 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// Set up logging
-	file, err := os.Create("log" + *port + ".txt")
-	if err != nil {
-		panic(err)
+	if *logToFile {
+		file, err := os.Create("log" + *port + ".txt")
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+		initLog(file)
+	} else {
+		initLog(nil)
 	}
-	defer file.Close()
-	initLog(file)
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup("demo" + *port)
