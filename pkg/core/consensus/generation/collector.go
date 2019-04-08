@@ -129,17 +129,11 @@ func (g *collector) sendScore(sev *selection.ScoreEvent) error {
 		return err
 	}
 
-	scoreBuffer := new(bytes.Buffer)
-	if err := g.marshaller.Marshal(scoreBuffer, sev); err != nil {
-		return err
-	}
-
-	if _, err := buffer.Write(scoreBuffer.Bytes()); err != nil {
+	if err := g.marshaller.Marshal(buffer, sev); err != nil {
 		return err
 	}
 
 	fmt.Println("sending proof")
-	// g.eventBus.Publish(string(topics.Score), scoreBuffer)
 	g.eventBus.Publish(string(topics.Gossip), buffer)
 	return nil
 }
