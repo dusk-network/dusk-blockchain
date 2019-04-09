@@ -8,14 +8,12 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-type proofGenerator struct {
-	proofChannel chan zkproof.ZkProof
+type generator interface {
+	generateProof(ristretto.Scalar, ristretto.Scalar, user.BidList, []byte,
+		chan zkproof.ZkProof)
 }
 
-func newGenerator(proofChannel chan zkproof.ZkProof) *proofGenerator {
-	return &proofGenerator{
-		proofChannel: proofChannel,
-	}
+type proofGenerator struct {
 }
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
@@ -32,7 +30,7 @@ func (g *proofGenerator) generateProof(d, k ristretto.Scalar, bidList user.BidLi
 	bidListScalars := convertBidListToScalars(bidListSubset)
 
 	proof := zkproof.Prove(d, k, seedScalar, bidListScalars)
-	g.proofChannel <- proof
+	proofChannel <- proof
 }
 
 // bidsToScalars will take a global public list, take a subset from it, and then

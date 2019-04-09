@@ -4,24 +4,20 @@ import (
 	"bytes"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/hashset"
 )
 
 type (
 	TmpMap struct {
 		lock      sync.RWMutex
-		msgSets   map[uint64]*hashSet
+		msgSets   map[uint64]*hashset.Set
 		height    uint64
 		tolerance uint64
-	}
-
-	hashSet struct {
-		set map[string]bool
 	}
 )
 
 func NewTmpMap(tolerance uint64) *TmpMap {
-	msgSets := make(map[uint64]*hashSet)
+	msgSets := make(map[uint64]*hashset.Set)
 
 	return &TmpMap{
 		msgSets:   msgSets,
@@ -38,7 +34,7 @@ func (t *TmpMap) UpdateHeight(round uint64) {
 	}
 	_, found := t.msgSets[round]
 	if !found {
-		t.msgSets[round] = newSet()
+		t.msgSets[round] = hashset.New()
 		t.height = round
 		t.clean()
 	}
@@ -69,14 +65,11 @@ func (t *TmpMap) HasAt(b *bytes.Buffer, heigth uint64) bool {
 }
 
 func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
-	h, _ := hash.Xxhash(b.Bytes())
-	hs := string(h)
-
 	set := t.msgSets[heigth]
 	if set == nil {
 		return false
 	}
-	return set.has(hs)
+	return set.Has(b.Bytes())
 }
 
 // Add the hash of a buffer to the blacklist.
@@ -111,33 +104,10 @@ func (t *TmpMap) clean() {
 func (t *TmpMap) add(b *bytes.Buffer, round uint64) bool {
 	set, found := t.msgSets[round]
 	if !found {
-		set = newSet()
+		set = hashset.New()
 	}
 
-	ret := set.add(b.Bytes())
+	ret := set.Add(b.Bytes())
 	t.msgSets[round] = set
 	return ret
-}
-
-func newSet() *hashSet {
-	return &hashSet{
-		make(map[string]bool),
-	}
-}
-
-func (s *hashSet) has(k string) bool {
-	_, found := s.set[k]
-	return found
-}
-
-// add the xxH64 hash of some data to the set. Returns false if the entry was already there
-func (s *hashSet) add(data []byte) bool {
-	hashed, err := hash.Xxhash(data)
-	if err != nil {
-		return false
-	}
-	hs := string(hashed)
-	_, found := s.set[hs]
-	s.set[hs] = true
-	return found
 }
