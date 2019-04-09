@@ -3,7 +3,6 @@ package reduction
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -28,17 +27,23 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 	timer := time.NewTimer(esw.timer.timeout)
 	select {
 	case <-timer.C:
-		fmt.Println("timer ran out")
 		esw.timer.timeoutChan <- true
+		stop(timer)
 		return nil
 	case collectedVotes := <-esw.collectedVotesChan:
-		fmt.Println("Collected votes:", collectedVotes)
-		timer.Stop()
+		stop(timer)
 		return collectedVotes
 	case <-esw.stopChan:
-		timer.Stop()
+		stop(timer)
 		esw.collectedVotesChan = nil
 		return nil
+	}
+}
+
+func stop(t *time.Timer) {
+	if t != nil {
+		t.Stop()
+		t = nil
 	}
 }
 
@@ -67,9 +72,10 @@ func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context,
 }
 
 func (c *reducer) begin() {
-	log.WithField("process", "reducer").Debugln("Beginning Reduction")
+	log.WithField("process", "reducer").Traceln("Beginning Reduction")
 	// this is a blocking call
 	events := c.firstStep.fetch()
+	log.WithField("process", "reducer").Traceln("First step completed")
 	c.ctx.state.IncrementStep()
 	hash1 := c.encodeEv(events)
 	reductionVote, err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state)
@@ -77,15 +83,19 @@ func (c *reducer) begin() {
 		panic(err)
 	}
 	c.ctx.reductionVoteChan <- reductionVote
-
 	eventsSecondStep := c.secondStep.fetch()
+	log.WithField("process", "reducer").Traceln("Second step completed")
 	hash2 := c.encodeEv(eventsSecondStep)
 
 	allEvents := append(events, eventsSecondStep...)
-	fmt.Println("hash1 is", hex.EncodeToString(hash1.Bytes()))
-	fmt.Println("hash2 is", hex.EncodeToString(hash2.Bytes()))
 
 	if c.isReductionSuccessful(hash1, hash2, allEvents) {
+
+		log.WithFields(log.Fields{
+			"process":    "reducer",
+			"votes":      len(allEvents),
+			"block hash": hex.EncodeToString(hash1.Bytes()),
+		}).Debugln("Reduction successful")
 		if err := c.ctx.handler.MarshalVoteSet(hash2, allEvents); err != nil {
 			panic(err)
 		}
@@ -98,7 +108,6 @@ func (c *reducer) begin() {
 	}
 	c.ctx.state.IncrementStep()
 
-	// TODO: review this. needed to loop the phase properly during demo
 	c.regenerationChannel <- true
 }
 
@@ -122,12 +131,12 @@ func (c *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wir
 }
 
 func (c *reducer) end() {
-	// TODO: review, we replace the shared context pointer here, because the `begin`
+	// NOTE: we replace the shared context pointer here, because the `begin`
 	// function will adjust the context state, resulting in issues during round
 	// updates. should possibly explore another way to adjust step state on the
 	// collector
 	c.ctx = newCtx(c.ctx.handler, c.ctx.committee, c.ctx.timer.timeout)
-	// TODO: cut off the regeneration channel so that the `begin` call does
+	// NOTE: cut off the regeneration channel so that the `begin` call does
 	// not mess with the selector, when it triggers regeneration.
 	c.regenerationChannel = make(chan bool, 1)
 	c.firstStep.stop()

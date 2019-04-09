@@ -45,6 +45,7 @@ type (
 	// EventQueue is a Queue of Events grouped by rounds and steps.
 	// NOTE: the EventQueue is purposefully not synchronized. The client can decide whether Mutexes or other sync primitives would be appropriate to use, depending on the context
 	EventQueue struct {
+		// sync.RWMutex
 		entries map[uint64]map[uint8][]wire.Event
 	}
 
@@ -163,12 +164,14 @@ func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) erro
 func NewEventQueue() *EventQueue {
 	entries := make(map[uint64]map[uint8][]wire.Event)
 	return &EventQueue{
-		entries,
+		entries: entries,
 	}
 }
 
 // GetEvents returns the events for a round and step
 func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
+	// s.Lock()
+	// defer s.Unlock()
 	if s.entries[round][step] != nil {
 		messages := s.entries[round][step]
 		s.entries[round][step] = nil
@@ -190,6 +193,8 @@ func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
 
 // Clear the queue
 func (s *EventQueue) Clear(round uint64) {
+	// s.Lock()
+	// defer s.Unlock()
 	s.entries[round] = nil
 }
 
@@ -231,7 +236,7 @@ func NewStepEventCollector() *StepEventCollector {
 }
 
 // Clear up the Collector
-func (sec StepEventCollector) Clear() {
+func (sec *StepEventCollector) Clear() {
 	sec.Lock()
 	defer sec.Unlock()
 	for key := range sec.Map {
@@ -240,7 +245,7 @@ func (sec StepEventCollector) Clear() {
 }
 
 // Contains checks if we already collected this event
-func (sec StepEventCollector) Contains(event wire.Event, step string) bool {
+func (sec *StepEventCollector) Contains(event wire.Event, step string) bool {
 	sec.RLock()
 	defer sec.RUnlock()
 	for _, stored := range sec.Map[step] {
@@ -253,7 +258,7 @@ func (sec StepEventCollector) Contains(event wire.Event, step string) bool {
 }
 
 // Store the Event keeping track of the step it belongs to. It silently ignores duplicates (meaning it does not store an event in case it is already found at the step specified). It returns the number of events stored at specified step *after* the store operation
-func (sec StepEventCollector) Store(event wire.Event, step string) int {
+func (sec *StepEventCollector) Store(event wire.Event, step string) int {
 	sec.RLock()
 	eventList := sec.Map[step]
 	sec.RUnlock()
