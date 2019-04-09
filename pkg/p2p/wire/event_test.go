@@ -32,7 +32,7 @@ func ranbuf() *bytes.Buffer {
 }
 
 func TestLameSubscriber(t *testing.T) {
-	bus := New()
+	bus := NewEventBus()
 	resultChan := make(chan *bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 	tbuf := ranbuf()
@@ -47,7 +47,7 @@ func TestLameSubscriber(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
-	bus := New()
+	bus := NewEventBus()
 	sub := NewEventSubscriber(bus, nil, "")
 	go func() {
 		time.Sleep(50 * time.Millisecond)

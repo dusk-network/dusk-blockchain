@@ -73,7 +73,7 @@ func TestSkipNoMember(t *testing.T) {
 }
 
 func TestBlockNotary(t *testing.T) {
-	bus := wire.New()
+	bus := wire.NewEventBus()
 	committee := mockCommittee(1, true, nil)
 	notary := LaunchBlockNotary(bus, committee, 1)
 	blockHash := []byte("pippo")

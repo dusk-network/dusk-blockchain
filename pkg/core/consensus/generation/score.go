@@ -17,8 +17,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// LaunchScoreComponent will start the processes for score generation.
-func LaunchScoreComponent(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *broker {
+// LaunchScoreGenerationComponent will start the processes for score generation.
+func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *broker {
 	broker := newBroker(eventBus, d, k, bidList)
 	go broker.Listen()
 	return broker

@@ -55,11 +55,6 @@ type (
 		Map map[string][]wire.Event
 	}
 
-	// phaseCollector is not supposed to be used directly. Components interested in Phase Updates should import InitPhaseUpdate instead
-	phaseCollector struct {
-		blockHashChan chan []byte
-	}
-
 	// roundCollector is a simple wrapper over a channel to get round notifications. It is not supposed to be used directly. Components interestesd in Round updates should use InitRoundUpdate instead
 	roundCollector struct {
 		roundChan chan uint64
@@ -282,10 +277,5 @@ func (sec *StepEventCollector) Store(event wire.Event, step string) int {
 func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 	r.roundChan <- round
-	return nil
-}
-
-func (p *phaseCollector) Collect(phaseBuffer *bytes.Buffer) error {
-	p.blockHashChan <- phaseBuffer.Bytes()
 	return nil
 }

@@ -27,7 +27,7 @@ import (
 func TestReduction(t *testing.T) {
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
-	eventBus := wire.New()
+	eventBus := wire.NewEventBus()
 	committeeMock := mockCommittee(2, true, nil)
 	timeOut := 200 * time.Millisecond
 
@@ -56,6 +56,7 @@ func TestReduction(t *testing.T) {
 
 	// send mocked events until we get a result from the outgoingAgreement channel
 	timer := time.After(2 * time.Second)
+	count := 0
 	for {
 		select {
 		case <-outgoingAgreement:
@@ -66,15 +67,19 @@ func TestReduction(t *testing.T) {
 		case <-timer:
 			t.Fatal("reduction did not finish in time")
 		default:
-			ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(), hash)
-			eventBus.Publish(string(topics.BlockReduction), ev)
-			time.Sleep(1 * time.Millisecond)
+			count++
+			// the committee is never more than 50 nodes. It does not make much sense to hammer the reducer more than that
+			if count < 50 {
+				ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(), hash)
+				eventBus.Publish(string(topics.BlockReduction), ev)
+				time.Sleep(1 * time.Millisecond)
+			}
 		}
 	}
 }
 
 func TestReductionTimeout(t *testing.T) {
-	eventBus := wire.New()
+	eventBus := wire.NewEventBus()
 	committeeMock := mockCommittee(2, true, nil)
 	timeOut := 200 * time.Millisecond
 

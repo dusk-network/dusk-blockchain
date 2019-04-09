@@ -39,12 +39,8 @@ func TestStopSelectorWithResult(t *testing.T) {
 	selector.EventChan <- &MockEvent{"three"}
 	selector.StopChan <- true
 
-	select {
-	case ev := <-selector.BestEventChan:
-		assert.Equal(t, &MockEvent{"one"}, ev)
-	case <-time.After(20 * time.Millisecond):
-		assert.FailNow(t, "Selector should have returned a value")
-	}
+	ev := <-selector.BestEventChan
+	assert.Equal(t, &MockEvent{"one"}, ev)
 }
 
 type MockPrioritizer struct{}
@@ -53,6 +49,10 @@ type MockPrioritizer struct{}
 func (mp *MockPrioritizer) Priority(f, s wire.Event) wire.Event {
 	if f == nil {
 		return s
+	}
+
+	if s == nil {
+		panic("really?")
 	}
 	return f
 }
