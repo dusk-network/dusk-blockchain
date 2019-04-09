@@ -8,8 +8,6 @@ import (
 	"net"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -60,26 +58,14 @@ func (p *Peer) Handshake() error {
 // We will send our Version with a MsgVerAck.
 func (p *Peer) outboundHandShake() error {
 	if err := p.writeLocalMsgVersion(); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "outbound",
-		}).Warnln("error writing version message,", err)
 		return err
 	}
 
 	if err := p.readVerack(); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "outbound",
-		}).Warnln("error reading verack message,", err)
 		return err
 	}
 
 	if err := p.readRemoteMsgVersion(); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "outbound",
-		}).Warnln("error reading version message,", err)
 		return err
 	}
 
@@ -90,10 +76,6 @@ func (p *Peer) outboundHandShake() error {
 	}
 
 	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "outbound",
-		}).Warnln("error writing verack message,", err)
 		return err
 	}
 
@@ -102,10 +84,6 @@ func (p *Peer) outboundHandShake() error {
 
 func (p *Peer) inboundHandShake() error {
 	if err := p.readRemoteMsgVersion(); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "inbound",
-		}).Warnln("error reading version message,", err)
 		return err
 	}
 
@@ -116,26 +94,14 @@ func (p *Peer) inboundHandShake() error {
 	}
 
 	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "inbound",
-		}).Warnln("error writing verack message,", err)
 		return err
 	}
 
 	if err := p.writeLocalMsgVersion(); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "inbound",
-		}).Warnln("error reading message,", err)
 		return err
 	}
 
 	if err := p.readVerack(); err != nil {
-		log.WithFields(log.Fields{
-			"process":   "peer",
-			"direction": "inbound",
-		}).Warnln("error reading verack message,", err)
 		return err
 	}
 	return nil
