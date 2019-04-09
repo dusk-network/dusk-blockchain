@@ -157,7 +157,11 @@ func (c *blockCollector) Process(event *BlockEvent) {
 }
 
 func (c *blockCollector) nextRound() {
-	log.WithField("process", "notary").Traceln("updating round")
+	log.WithFields(log.Fields{
+		"process": "notary",
+		"round":   c.CurrentRound + 1,
+	}).Debugln("updating round")
+
 	c.UpdateRound(c.CurrentRound + 1)
 	// notify the Notary
 	c.RoundChan <- c.CurrentRound
