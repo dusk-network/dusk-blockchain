@@ -54,9 +54,9 @@ func (p *Peer) Handshake() error {
 	return nil
 }
 
-// An other Peer wants to handshake with us.
+// We are trying to connect to another peer.
 // We will send our Version with a MsgVerAck.
-func (p *Peer) inboundHandShake() error {
+func (p *Peer) outboundHandShake() error {
 	if err := p.writeLocalMsgVersion(); err != nil {
 		fmt.Println("error writing version message,", err)
 		return err
@@ -68,21 +68,38 @@ func (p *Peer) inboundHandShake() error {
 	}
 
 	if err := p.readRemoteMsgVersion(); err != nil {
-		fmt.Println("error writing version message,", err)
+		fmt.Println("error reading version message,", err)
 		return err
 	}
 
-	return p.WriteMessage(new(bytes.Buffer), topics.VerAck)
+	buf := new(bytes.Buffer)
+	verAckMessage, err := addHeader(buf, p.magic, topics.VerAck)
+	if err != nil {
+		return err
+	}
+
+	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+		fmt.Println("error writing verack message,", err)
+		return err
+	}
+
+	return nil
 }
 
-func (p *Peer) outboundHandShake() error {
+func (p *Peer) inboundHandShake() error {
 	if err := p.readRemoteMsgVersion(); err != nil {
-		fmt.Println("error writing version message,", err)
+		fmt.Println("error reading version message,", err)
 		return err
 	}
 
-	if err := p.WriteMessage(new(bytes.Buffer), topics.VerAck); err != nil {
-		fmt.Println("error reading verack message,", err)
+	buf := new(bytes.Buffer)
+	verAckMessage, err := addHeader(buf, p.magic, topics.VerAck)
+	if err != nil {
+		return err
+	}
+
+	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+		fmt.Println("error writing verack message,", err)
 		return err
 	}
 
@@ -91,7 +108,11 @@ func (p *Peer) outboundHandShake() error {
 		return err
 	}
 
-	return p.readVerack()
+	if err := p.readVerack(); err != nil {
+		fmt.Println("error reading verack message,", err)
+		return err
+	}
+	return nil
 }
 
 func (p *Peer) writeLocalMsgVersion() error {
@@ -115,7 +136,13 @@ func (p *Peer) writeLocalMsgVersion() error {
 		return err
 	}
 
-	return p.WriteMessage(message, topics.Version)
+	messageWithHeader, err := addHeader(message, p.magic, topics.Version)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Conn.Write(messageWithHeader.Bytes())
+	return err
 }
 
 func (p *Peer) readRemoteMsgVersion() error {

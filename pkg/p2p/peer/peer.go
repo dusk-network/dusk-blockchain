@@ -270,15 +270,15 @@ func (p *Peer) readMessage() (topics.Topic, *bytes.Buffer, error) {
 // Run is used to start communicating with the peer, completes the handshake and starts observing
 // for messages coming in and allows for queing of outgoing messages
 func (p *Peer) Run() error {
-	go p.writeLoop()
 	if err := p.Handshake(); err != nil {
 		p.Disconnect()
 		return err
 	}
 
-	go wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip)).Accept()
+	go p.writeLoop()
 	go p.startProtocol()
 	go p.readLoop()
+	go wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip)).Accept()
 	return nil
 }
 

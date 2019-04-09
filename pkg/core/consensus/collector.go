@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -44,11 +45,15 @@ type (
 	// EventQueue is a Queue of Events grouped by rounds and steps.
 	// NOTE: the EventQueue is purposefully not synchronized. The client can decide whether Mutexes or other sync primitives would be appropriate to use, depending on the context
 	EventQueue struct {
+		// sync.RWMutex
 		entries map[uint64]map[uint8][]wire.Event
 	}
 
 	// StepEventCollector is an helper for common operations on stored Event Arrays
-	StepEventCollector map[string][]wire.Event
+	StepEventCollector struct {
+		sync.RWMutex
+		Map map[string][]wire.Event
+	}
 
 	// phaseCollector is not supposed to be used directly. Components interested in Phase Updates should import InitPhaseUpdate instead
 	phaseCollector struct {
@@ -159,12 +164,14 @@ func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) erro
 func NewEventQueue() *EventQueue {
 	entries := make(map[uint64]map[uint8][]wire.Event)
 	return &EventQueue{
-		entries,
+		entries: entries,
 	}
 }
 
 // GetEvents returns the events for a round and step
 func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
+	// s.Lock()
+	// defer s.Unlock()
 	if s.entries[round][step] != nil {
 		messages := s.entries[round][step]
 		s.entries[round][step] = nil
@@ -186,6 +193,8 @@ func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
 
 // Clear the queue
 func (s *EventQueue) Clear(round uint64) {
+	// s.Lock()
+	// defer s.Unlock()
 	s.entries[round] = nil
 }
 
@@ -220,16 +229,26 @@ func (s *EventQueue) ConsumeUntil(round uint64) map[uint64]map[uint8][]wire.Even
 	return ret
 }
 
+func NewStepEventCollector() *StepEventCollector {
+	return &StepEventCollector{
+		Map: make(map[string][]wire.Event),
+	}
+}
+
 // Clear up the Collector
-func (sec StepEventCollector) Clear() {
-	for key := range sec {
-		delete(sec, key)
+func (sec *StepEventCollector) Clear() {
+	sec.Lock()
+	defer sec.Unlock()
+	for key := range sec.Map {
+		delete(sec.Map, key)
 	}
 }
 
 // Contains checks if we already collected this event
-func (sec StepEventCollector) Contains(event wire.Event, step string) bool {
-	for _, stored := range sec[step] {
+func (sec *StepEventCollector) Contains(event wire.Event, step string) bool {
+	sec.RLock()
+	defer sec.RUnlock()
+	for _, stored := range sec.Map[step] {
 		if event.Equal(stored) {
 			return true
 		}
@@ -239,8 +258,10 @@ func (sec StepEventCollector) Contains(event wire.Event, step string) bool {
 }
 
 // Store the Event keeping track of the step it belongs to. It silently ignores duplicates (meaning it does not store an event in case it is already found at the step specified). It returns the number of events stored at specified step *after* the store operation
-func (sec StepEventCollector) Store(event wire.Event, step string) int {
-	eventList := sec[step]
+func (sec *StepEventCollector) Store(event wire.Event, step string) int {
+	sec.RLock()
+	eventList := sec.Map[step]
+	sec.RUnlock()
 	if sec.Contains(event, step) {
 		return len(eventList)
 	}
@@ -251,7 +272,9 @@ func (sec StepEventCollector) Store(event wire.Event, step string) int {
 
 	// storing the agreement vote for the proper step
 	eventList = append(eventList, event)
-	sec[step] = eventList
+	sec.Lock()
+	sec.Map[step] = eventList
+	sec.Unlock()
 	return len(eventList)
 }
 

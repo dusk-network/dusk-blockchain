@@ -12,29 +12,38 @@ const QuitTopic = "quit"
 
 type (
 
-	// The Event is an Entity that represents the Messages travelling on the EventBus. It would normally present always the same fields.
+	// The Event is an Entity that represents the Messages travelling on the EventBus.
+	// It would normally present always the same fields.
 	Event interface {
 		Sender() []byte
 		Equal(Event) bool
 	}
 
-	// EventUnmarshaller unmarshals an Event from a buffer. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
+	// EventUnmarshaller unmarshals an Event from a buffer. Following Golang's way of
+	// defining interfaces, it exposes an Unmarshal method which allows for flexibility
+	// and reusability across all the different components that need to read the buffer
+	// coming from the EventBus into different structs
 	EventUnmarshaller interface {
 		Unmarshal(*bytes.Buffer, Event) error
 	}
 
-	// EventMarshaller is the specular operation of an EventUnmarshaller. Following Golang's way of defining interfaces, it exposes an Unmarshal method which allows for flexibility and reusability across all the different components that need to read the buffer coming from the EventBus into different structs
+	// EventMarshaller is the specular operation of an EventUnmarshaller. Following
+	// Golang's way of defining interfaces, it exposes an Unmarshal method which allows
+	// for flexibility and reusability across all the different components that need to
+	// read the buffer coming from the EventBus into different structs
 	EventMarshaller interface {
 		Marshal(*bytes.Buffer, Event) error
 	}
 
-	// EventUnMarshaller is a convenient interface providing both Marshalling and Unmarshalling capabilities
+	// EventUnMarshaller is a convenient interface providing both Marshalling and
+	// Unmarshalling capabilities
 	EventUnMarshaller interface {
 		EventMarshaller
 		EventUnmarshaller
 	}
 
-	// EventPrioritizer is used by the EventSelector to prioritize events (normally to return the best collected after a timespan)
+	// EventPrioritizer is used by the EventSelector to prioritize events
+	// (normally to return the best collected after a timespan)
 	EventPrioritizer interface {
 		Priority(Event, Event) Event
 	}
@@ -44,12 +53,17 @@ type (
 		Verify(Event) error
 	}
 
-	// EventCollector is the interface for collecting Events. Pretty much processors involves some degree of Event collection (either until a Quorum is reached or until a Timeout). This Interface is typically implemented by a struct that will perform some Event unmarshalling.
+	// EventCollector is the interface for collecting Events. Pretty much processors
+	// involves some degree of Event collection (either until a Quorum is reached or
+	// until a Timeout). This Interface is typically implemented by a struct that will
+	// perform some Event unmarshalling.
 	EventCollector interface {
 		Collect(*bytes.Buffer) error
 	}
 
-	// EventSubscriber accepts events from the EventBus and takes care of reacting on quit Events. It delegates the business logic to the EventCollector which is supposed to handle the incoming events
+	// EventSubscriber accepts events from the EventBus and takes care of reacting on
+	// quit Events. It delegates the business logic to the EventCollector which is
+	// supposed to handle the incoming events
 	EventSubscriber struct {
 		eventBus       *EventBus
 		eventCollector EventCollector
@@ -61,7 +75,8 @@ type (
 	}
 )
 
-// NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus. The EventBus, EventCollector and Topic are injected
+// NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus.
+// The EventBus, EventCollector and Topic are injected
 func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 	topic string) *EventSubscriber {
 
@@ -82,8 +97,13 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 	}
 }
 
-// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect
+// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the
+// EventCollector.Collect
 func (n *EventSubscriber) Accept() {
+	log.WithFields(log.Fields{
+		"id":    n.msgChanID,
+		"topic": n.topic,
+	}).Debugln("Accepting messages")
 	for {
 		select {
 		case <-n.quitChan:
@@ -97,13 +117,14 @@ func (n *EventSubscriber) Accept() {
 					"topic":      n.topic,
 					"Unconsumed": len(n.msgChan),
 				}).Debugln("Channel is accumulating messages")
-			} else {
-				log.WithFields(log.Fields{
-					"id":    n.msgChanID,
-					"topic": n.topic,
-				}).Debugln("Channel clean")
 			}
-			_ = n.eventCollector.Collect(eventMsg)
+			if err := n.eventCollector.Collect(eventMsg); err != nil {
+				log.WithFields(log.Fields{
+					"id":         n.msgChanID,
+					"topic":      n.topic,
+					"Unconsumed": len(n.msgChan),
+				}).Warnln("Channel is accumulating messages")
+			}
 		}
 	}
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func TestSECOperations(t *testing.T) {
-	sec := &StepEventCollector{}
+	sec := NewStepEventCollector()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}
