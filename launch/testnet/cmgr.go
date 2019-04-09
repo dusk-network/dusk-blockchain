@@ -29,7 +29,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 		addrPort := ":" + cfg.Port
 		listener, err := net.Listen("tcp", addrPort)
 		if err != nil {
-			log.WithField("process", "connection manager").Warnln(err)
+			panic(err)
 		}
 
 		defer func() {
@@ -39,7 +39,10 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				log.WithField("process", "connection manager").Debugln(err)
+				log.WithFields(log.Fields{
+					"process": "connection manager",
+					"error":   err,
+				}).Warnln("error accepting connection request")
 				continue
 			}
 
