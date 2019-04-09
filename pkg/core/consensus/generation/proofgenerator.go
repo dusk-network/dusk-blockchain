@@ -19,7 +19,7 @@ type proofGenerator struct {
 // GenerateProof will generate the proof of blind bid, needed to successfully
 // propose a block to the voting committee.
 func (g *proofGenerator) generateProof(d, k ristretto.Scalar, bidList user.BidList,
-	seed []byte) {
+	seed []byte, proofChannel chan zkproof.ZkProof) {
 	log.WithField("process", "generation").Traceln("generating proof")
 	// Turn seed into scalar
 	seedScalar := ristretto.Scalar{}
