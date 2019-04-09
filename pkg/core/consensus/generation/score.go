@@ -33,7 +33,7 @@ type (
 		bidList    user.BidList
 		seed       []byte
 
-		generator         *proofGenerator
+		generator         generator
 		scoreEventChannel chan *bytes.Buffer
 		proofChannel      chan zkproof.ZkProof
 		stopChannel       chan bool
@@ -57,14 +57,14 @@ func newProofCollector(d, k ristretto.Scalar, bidList user.BidList) *proofCollec
 		bidList:           bidList,
 		scoreEventChannel: make(chan *bytes.Buffer, 1),
 		stopChannel:       make(chan bool, 1),
+		generator:         &proofGenerator{},
 	}
 }
 
 func (g *proofCollector) startGenerator() {
 	g.stopChannel = make(chan bool, 1)
 	g.proofChannel = make(chan zkproof.ZkProof, 1)
-	g.generator = newGenerator(g.proofChannel)
-	go g.generator.generateProof(g.d, g.k, g.bidList, g.seed)
+	go g.generator.generateProof(g.d, g.k, g.bidList, g.seed, g.proofChannel)
 	g.listenGenerator()
 }
 
@@ -114,16 +114,16 @@ func (g *proofCollector) generateScoreEvent(proof zkproof.ZkProof) (*selection.S
 
 func (g *proofCollector) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
 	buffer := new(bytes.Buffer)
-	topicBytes := topics.TopicToByteArray(topics.Score)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		panic(err)
-	}
-
 	if err := g.marshaller.Marshal(buffer, sev); err != nil {
 		panic(err)
 	}
 
-	return buffer
+	message, err := wire.AddTopic(buffer, topics.Score)
+	if err != nil {
+		panic(err)
+	}
+
+	return message
 }
 
 func newBroker(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *broker {
