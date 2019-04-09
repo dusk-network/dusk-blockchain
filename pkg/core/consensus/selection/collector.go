@@ -6,7 +6,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -177,7 +176,7 @@ func (s *collector) stopSelection() {
 //NewEventSelector creates the Selector
 func NewEventSelector(p wire.EventPrioritizer, repropagateChan chan wire.Event) *EventSelector {
 	return &EventSelector{
-		EventChan:       make(chan wire.Event, 100),
+		EventChan:       make(chan wire.Event),
 		RepropagateChan: repropagateChan,
 		BestEventChan:   make(chan wire.Event, 1),
 		StopChan:        make(chan bool, 1),
@@ -192,7 +191,6 @@ func (s *EventSelector) PickBest() {
 		select {
 		case ev := <-s.EventChan:
 			s.BestEvent = s.prioritizer.Priority(s.BestEvent, ev)
-			// TODO: review - if this event replaced best event, repropagate
 			if s.BestEvent == ev {
 				s.RepropagateChan <- ev
 			}

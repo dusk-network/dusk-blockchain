@@ -18,7 +18,7 @@ import (
 )
 
 func TestScoreGeneration(t *testing.T) {
-	eb := wire.New()
+	eb := wire.NewEventBus()
 	d := ristretto.Scalar{}
 	d.Rand()
 	k := ristretto.Scalar{}
@@ -29,7 +29,7 @@ func TestScoreGeneration(t *testing.T) {
 	eb.Subscribe(string(topics.Gossip), gossipChan)
 
 	// launch score component
-	broker := LaunchScoreComponent(eb, d, k, user.BidList{})
+	broker := LaunchScoreGenerationComponent(eb, d, k, user.BidList{})
 	// use mockgenerator
 	broker.generator = &mockGenerator{}
 	// update the round to start generation

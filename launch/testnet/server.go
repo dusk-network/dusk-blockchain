@@ -47,7 +47,7 @@ type txCollector struct {
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
 func Setup(dbName string) *Server {
 	// creating the eventbus
-	eventBus := wire.New()
+	eventBus := wire.NewEventBus()
 	// generating the keys
 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
 	keys, _ := user.NewRandKeys()

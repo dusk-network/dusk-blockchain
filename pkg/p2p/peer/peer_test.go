@@ -14,7 +14,7 @@ import (
 func TestDupeFilter(t *testing.T) {
 	test := bytes.NewBufferString("This is a test")
 
-	eventbus := wire.New()
+	eventbus := wire.NewEventBus()
 	dupeMap := newDupeMap(eventbus)
 	go dupeMap.cleanOnRound()
 
@@ -28,7 +28,7 @@ func TestDupeFilter(t *testing.T) {
 func TestDupeFilterCleanup(t *testing.T) {
 	test := bytes.NewBufferString("This is a test")
 
-	eventbus := wire.New()
+	eventbus := wire.NewEventBus()
 	dupeMap := newDupeMap(eventbus)
 	go dupeMap.cleanOnRound()
 

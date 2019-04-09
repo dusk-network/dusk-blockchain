@@ -78,13 +78,12 @@ func (b *blockHandler) NewEvent() wire.Event {
 // Verify the blockEvent
 func (b *blockHandler) Verify(e wire.Event) error {
 	ev := e.(*committee.ReductionEvent)
+	if !b.committee.IsMember(ev.PubKeyBLS) {
+		return errors.New("block handler: voter not eligible to vote")
+	}
 
 	if err := msg.VerifyBLSSignature(ev.PubKeyBLS, ev.VotedHash, ev.SignedHash); err != nil {
 		return err
-	}
-
-	if !b.committee.IsMember(ev.PubKeyBLS) {
-		return errors.New("block handler: voter not eligible to vote")
 	}
 
 	return nil

@@ -9,7 +9,7 @@ import (
 )
 
 func TestDemoSaveFunctionality(t *testing.T) {
-	eb := wire.New()
+	eb := wire.NewEventBus()
 	chn, err := New(eb, "testdb")
 	assert.Nil(t, err)
 

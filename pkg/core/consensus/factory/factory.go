@@ -74,7 +74,7 @@ func (c *ConsensusFactory) StartConsensus() {
 		"round":   round,
 	}).Debug("Received initial round")
 
-	generation.LaunchScoreComponent(c.eventBus, c.d, c.k, *c.bidList)
+	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k, *c.bidList)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength, *c.bidList)
