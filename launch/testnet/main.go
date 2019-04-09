@@ -15,6 +15,7 @@ var port = flag.String("port", "7000", "port for the node to bind on")
 var logToFile = flag.Bool("logtofile", false, "specifies if the log should be written to a file")
 
 func initLog(file *os.File) {
+	log.SetLevel(log.TraceLevel)
 	if file != nil {
 		os.Stdout = file
 		log.SetOutput(file)
