@@ -78,11 +78,7 @@ func (g *proofCollector) listenGenerator() {
 			return
 		}
 
-		marshalledEvent, err := g.marshalScore(sev)
-		if err != nil {
-			return
-		}
-
+		marshalledEvent := g.marshalScore(sev)
 		g.scoreEventChannel <- marshalledEvent
 	}
 }
@@ -116,18 +112,18 @@ func (g *proofCollector) generateScoreEvent(proof zkproof.ZkProof) (*selection.S
 	}, nil
 }
 
-func (g *proofCollector) marshalScore(sev *selection.ScoreEvent) (*bytes.Buffer, error) {
+func (g *proofCollector) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
 	buffer := new(bytes.Buffer)
 	topicBytes := topics.TopicToByteArray(topics.Score)
 	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	if err := g.marshaller.Marshal(buffer, sev); err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return buffer, nil
+	return buffer
 }
 
 func newBroker(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *broker {
