@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/hashset"
 )
 
 func TestHas(t *testing.T) {
@@ -14,9 +14,8 @@ func TestHas(t *testing.T) {
 
 	assert.False(t, tmpMap.Has(testPayload))
 
-	s := newSet()
-	h, _ := hash.Xxhash(testPayload.Bytes())
-	s.set[string(h)] = true
+	s := hashset.New()
+	s.Add(testPayload.Bytes())
 	tmpMap.msgSets[uint64(0)] = s
 
 	assert.True(t, tmpMap.Has(testPayload))
@@ -59,5 +58,4 @@ func TestClean(t *testing.T) {
 	assert.True(t, tmpMap.Has(testPayload))
 	assert.False(t, tmpMap.HasAt(testPayload, 2))
 	assert.True(t, tmpMap.HasAt(testPayload, 5))
-
 }
