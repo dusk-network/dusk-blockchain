@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"math/big"
 	"math/rand"
@@ -121,10 +120,10 @@ func (s *Server) Listen() {
 	for {
 		select {
 		case b := <-s.stakeChannel:
-			log.WithField("process", "server").Debug("Stake received")
+			log.WithField("process", "server").Debugln("stake received")
 			s.stakes = append(s.stakes, b)
 		case b := <-s.bidChannel:
-			log.WithField("process", "server").Debug("Bid received")
+			log.WithField("process", "server").Debugln("bid received")
 			s.bids = append(s.bids, b)
 		}
 	}
@@ -137,44 +136,44 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
-	fmt.Println("attempting to accept connection to ", conn.RemoteAddr().String())
+	log.WithField("process", "server").Debugln("attempting to accept connection to ", conn.RemoteAddr().String())
 	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus)
 	// send the latest block
 	buffer := new(bytes.Buffer)
 	if err := s.chain.PrevBlock.Encode(buffer); err != nil {
-		fmt.Println("error encoding previous block, ", err)
+		log.WithField("process", "server").Debugln("error encoding previous block, ", err)
 		peer.Disconnect()
 		return
 	}
 
 	if _, err := peer.Conn.Write(buffer.Bytes()); err != nil {
-		fmt.Println("error writing to peer, ", err)
+		log.WithField("process", "server").Debugln("error writing to peer, ", err)
 		peer.Disconnect()
 		return
 	}
 
 	if err := peer.Run(); err != nil {
-		fmt.Println("handshake error,", err)
+		log.WithField("process", "server").Debugln("handshake error,", err)
 		return
 	}
-	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
+	log.WithField("process", "server").Debugln("we have connected to " + peer.Conn.RemoteAddr().String())
 
 	s.sendStakesAndBids(peer)
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	fmt.Println("attempting to connect to ", conn.RemoteAddr().String())
+	log.WithField("process", "server").Debugln("attempting to connect to ", conn.RemoteAddr().String())
 	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus)
 	// get latest block
 	buf := make([]byte, 1024)
 	if _, err := peer.Conn.Read(buf); err != nil {
-		fmt.Println("error reading from peer, ", err)
+		log.WithField("process", "server").Debugln("error reading from peer, ", err)
 		peer.Disconnect()
 		return
 	}
 	var blk block.Block
 	if err := blk.Decode(bytes.NewBuffer(buf)); err != nil {
-		fmt.Println("error decoding block, ", err)
+		log.WithField("process", "server").Debugln("error decoding block, ", err)
 		peer.Disconnect()
 		return
 	}
@@ -184,10 +183,10 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}
 
 	if err := peer.Run(); err != nil {
-		fmt.Println("handshake error,", err)
+		log.WithField("process", "server").Debugln("handshake error,", err)
 		return
 	}
-	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
+	log.WithField("process", "server").Debugln("we have connected to " + peer.Conn.RemoteAddr().String())
 
 	s.sendStakesAndBids(peer)
 }

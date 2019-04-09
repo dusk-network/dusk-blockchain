@@ -3,9 +3,10 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"net"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const secret = "v1W0imI82rqW2hT7odpI-"
@@ -16,12 +17,12 @@ func ConnectToSeeder() []string {
 		panic(err)
 	}
 	defer conn.Close()
-	fmt.Println("connected to voucher seeder")
+	log.WithField("prefix", "main").Debugln("connected to voucher seeder")
 
 	if err := completeChallenge(conn); err != nil {
 		panic(err)
 	}
-	fmt.Println("challenge completed")
+	log.WithField("prefix", "main").Debugln("voucher seeder challenge completed")
 
 	// get IP list
 	buf := make([]byte, 2048)
