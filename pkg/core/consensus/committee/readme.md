@@ -1,10 +1,10 @@
 ## Committee
 
-The `Committee` represents the subset of Provisioners extracted at each Step in order to perform _block hash_ and _signature set_ voting. The `Committee` gets chosen according to a _deterministic sortition_.
+The `Committee` represents the subset of Provisioners extracted at each Step in order to perform _block hash_ voting. The `Committee` gets chosen according to a _deterministic sortition_.
 
 ### Deterministic Sortition
 
-Deterministic sortition is an optimization of cryptographic sortition introduced by Micali et al. it extends the functionality of cryptographic sortition in a Random Oracle setting in a non-interactive fashion, improving both the network throughput and space-efficiency.
+Deterministic sortition is an optimization of cryptographic sortition introduced by Micali et al. It extends the functionality of cryptographic sortition in a Random Oracle setting in a non-interactive fashion, improving both the network throughput and space-efficiency.
 
 Deterministic sortition is an algorithm that recursively hashes the public seed with situational parameters of each step, mapping the outcome to the current stakes of the Provisioners in order to extract a pseudo-random `Committee`, per step.
 
@@ -22,7 +22,7 @@ Deterministic sortition is an algorithm that recursively hashes the public seed 
 
 `Committee` is an interface that exposes the following functionalities:
 
-    - `IsMember([]byte)` bool: returns whether the ID of a provisioner (basically the `BLS Public Key` ) is included in the committee
+    - `IsMember([]byte)` bool: returns whether the ID of a provisioner (basically the `BLS Public Key`) is included in the committee
     - `Verify(eventHeader)` error: Verify if the `EventHeader` has been propagated by a `Committee` member and performs general validation of the event itself (i.e. checking for duplicates, verifying signatures, etc)
     - `Quorum()` int: returns the number of Committee members needed to form a _quorum_. This quantity depends on the amount of available `Provisioners` but it is constant after a certain threshold (normally 50)
 
