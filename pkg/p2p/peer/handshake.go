@@ -58,17 +58,14 @@ func (p *Peer) Handshake() error {
 // We will send our Version with a MsgVerAck.
 func (p *Peer) outboundHandShake() error {
 	if err := p.writeLocalMsgVersion(); err != nil {
-		fmt.Println("error writing version message,", err)
 		return err
 	}
 
 	if err := p.readVerack(); err != nil {
-		fmt.Println("error reading verack message,", err)
 		return err
 	}
 
 	if err := p.readRemoteMsgVersion(); err != nil {
-		fmt.Println("error reading version message,", err)
 		return err
 	}
 
@@ -79,7 +76,6 @@ func (p *Peer) outboundHandShake() error {
 	}
 
 	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
-		fmt.Println("error writing verack message,", err)
 		return err
 	}
 
@@ -88,7 +84,6 @@ func (p *Peer) outboundHandShake() error {
 
 func (p *Peer) inboundHandShake() error {
 	if err := p.readRemoteMsgVersion(); err != nil {
-		fmt.Println("error reading version message,", err)
 		return err
 	}
 
@@ -99,17 +94,14 @@ func (p *Peer) inboundHandShake() error {
 	}
 
 	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
-		fmt.Println("error writing verack message,", err)
 		return err
 	}
 
 	if err := p.writeLocalMsgVersion(); err != nil {
-		fmt.Println("error reading message,", err)
 		return err
 	}
 
 	if err := p.readVerack(); err != nil {
-		fmt.Println("error reading verack message,", err)
 		return err
 	}
 	return nil
@@ -160,7 +152,6 @@ func (p *Peer) readRemoteMsgVersion() error {
 		return err
 	}
 
-	fmt.Println(version)
 	return verifyVersion(version.Version)
 }
 

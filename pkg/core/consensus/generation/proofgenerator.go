@@ -1,7 +1,7 @@
 package generation
 
 import (
-	"fmt"
+	log "github.com/sirupsen/logrus"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -20,7 +20,7 @@ type proofGenerator struct {
 // propose a block to the voting committee.
 func (g *proofGenerator) generateProof(d, k ristretto.Scalar, bidList user.BidList,
 	seed []byte, proofChannel chan zkproof.ZkProof) {
-	fmt.Println("generating proof")
+	log.WithField("process", "generation").Traceln("generating proof")
 	// Turn seed into scalar
 	seedScalar := ristretto.Scalar{}
 	seedScalar.Derive(seed)

@@ -139,7 +139,7 @@ func (c *collector) updateRound(round uint64) {
 	log.WithFields(log.Fields{
 		"process": "reducer",
 		"round":   round,
-	}).Traceln("Updating round")
+	}).Debugln("Updating round")
 	c.ctx.state.Update(round)
 
 	c.queue.Clear(c.ctx.state.Round())
@@ -161,7 +161,7 @@ func (c *collector) isRelevant(round uint64, step uint8) bool {
 		"process": "reducer",
 		"cmp":     cmp,
 		"reducer": c.isReducing(),
-	}).Traceln("isRelevant mismatch")
+	}).Debugln("isRelevant mismatch")
 	return false
 }
 

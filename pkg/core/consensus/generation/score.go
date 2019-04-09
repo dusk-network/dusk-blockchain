@@ -2,7 +2,8 @@ package generation
 
 import (
 	"bytes"
-	"fmt"
+
+	log "github.com/sirupsen/logrus"
 
 	"gitlab.dusk.network/dusk-core/zkproof"
 
@@ -149,8 +150,7 @@ func (g *broker) Listen() {
 		case bidList := <-g.bidListChannel:
 			g.bidList = bidList
 		case scoreEvent := <-g.scoreEventChannel:
-			// TODO: remove
-			fmt.Println("sending proof")
+			log.WithField("process", "generation").Traceln("sending proof")
 			g.eventBus.Publish(string(topics.Gossip), scoreEvent)
 			g.currentStep++
 		}

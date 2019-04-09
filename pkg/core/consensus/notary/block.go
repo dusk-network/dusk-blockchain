@@ -3,7 +3,8 @@ package notary
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+
+	log "github.com/sirupsen/logrus"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
@@ -151,14 +152,16 @@ func (c *blockCollector) Process(event *BlockEvent) {
 		c.Clear()
 		c.nextRound()
 
-		// TODO: remove
-		fmt.Println("block agreement reached")
+		log.WithField("process", "notary").Traceln("block agreement reached")
 	}
 }
 
 func (c *blockCollector) nextRound() {
-	// TODO: remove
-	fmt.Println("block notary: updating round")
+	log.WithFields(log.Fields{
+		"process": "notary",
+		"round":   c.CurrentRound + 1,
+	}).Debugln("updating round")
+
 	c.UpdateRound(c.CurrentRound + 1)
 	// notify the Notary
 	c.RoundChan <- c.CurrentRound

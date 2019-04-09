@@ -3,8 +3,9 @@ package selection
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -71,8 +72,7 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 	ev := s.handler.NewEvent()
 
 	if err := s.handler.Unmarshal(r, ev); err != nil {
-		fmt.Println(err)
-		return err
+		panic(err)
 	}
 
 	if s.selector != nil {
@@ -84,7 +84,7 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 
 	// verify
 	if err := s.handler.Verify(ev); err != nil {
-		fmt.Println(err)
+		log.WithField("process", "selection").Debugln(err)
 		return err
 	}
 
@@ -131,8 +131,7 @@ func (s *collector) UpdateRound(round uint64) {
 
 // StartSelection starts the selection of the best SigSetEvent. It also consumes stored events related to the current step
 func (s *collector) StartSelection() {
-	// TODO: remove
-	fmt.Println("starting selection")
+	log.WithField("process", "selection").Traceln("starting selection")
 	// creating a new selector
 	s.selector = NewEventSelector(s.handler, s.RepropagateChan)
 	// letting selector collect the best
