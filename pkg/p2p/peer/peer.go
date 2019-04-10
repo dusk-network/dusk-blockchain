@@ -77,6 +77,8 @@ type Peer struct {
 
 	Conn     net.Conn
 	eventBus *wire.EventBus
+	quitID   uint32
+	gossipID uint32
 	chain    *chain.Chain
 	magic    protocol.Magic
 
@@ -193,6 +195,11 @@ func (p *Peer) Disconnect() {
 	p.Detector.Quit()
 	close(p.quitch)
 	p.Conn.Close()
+
+	if p.gossipID != 0 && p.quitID != 0 {
+		p.eventBus.Unsubscribe(string(topics.Gossip), p.gossipID)
+		p.eventBus.Unsubscribe(wire.QuitTopic, p.quitID)
+	}
 }
 
 // Port returns the port
@@ -278,8 +285,15 @@ func (p *Peer) Run() error {
 	go p.writeLoop()
 	go p.startProtocol()
 	go p.readLoop()
-	go wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip)).Accept()
+	p.subscribeToGossipEvents()
 	return nil
+}
+
+func (p *Peer) subscribeToGossipEvents() {
+	es := wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip))
+	p.quitID = es.QuitChanID
+	p.gossipID = es.MsgChanID
+	go es.Accept()
 }
 
 // StartProtocol is run as a go-routine, will act as our queue for messages.
