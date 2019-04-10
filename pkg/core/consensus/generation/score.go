@@ -158,8 +158,6 @@ func (g *broker) Listen() {
 }
 
 func (g *broker) Collect(m *bytes.Buffer) error {
-	if g.generator == nil {
-		go g.startGenerator()
-	}
+	go g.startGenerator()
 	return nil
 }
