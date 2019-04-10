@@ -45,7 +45,7 @@ type (
 	// EventQueue is a Queue of Events grouped by rounds and steps.
 	// NOTE: the EventQueue is purposefully not synchronized. The client can decide whether Mutexes or other sync primitives would be appropriate to use, depending on the context
 	EventQueue struct {
-		// sync.RWMutex
+		sync.RWMutex
 		entries map[uint64]map[uint8][]wire.Event
 	}
 
@@ -159,14 +159,15 @@ func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) erro
 func NewEventQueue() *EventQueue {
 	entries := make(map[uint64]map[uint8][]wire.Event)
 	return &EventQueue{
+		RWMutex: sync.RWMutex{},
 		entries: entries,
 	}
 }
 
 // GetEvents returns the events for a round and step
 func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
-	// s.Lock()
-	// defer s.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	if s.entries[round][step] != nil {
 		messages := s.entries[round][step]
 		s.entries[round][step] = nil
@@ -178,6 +179,9 @@ func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
 
 // PutEvent stores an Event at a given round and step
 func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
+	s.Lock()
+	defer s.Unlock()
+
 	// Initialise the map on this round if it was not yet created
 	if s.entries[round] == nil {
 		s.entries[round] = make(map[uint8][]wire.Event)
@@ -188,8 +192,8 @@ func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
 
 // Clear the queue
 func (s *EventQueue) Clear(round uint64) {
-	// s.Lock()
-	// defer s.Unlock()
+	s.Lock()
+	defer s.Unlock()
 	s.entries[round] = nil
 }
 
