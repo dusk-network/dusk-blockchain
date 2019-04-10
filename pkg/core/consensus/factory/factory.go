@@ -3,10 +3,10 @@ package factory
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -67,21 +67,21 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 // StartConsensus will wait for a message to come in, and then proceed to
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
-	fmt.Println("Starting consensus")
+	log.WithField("process", "factory").Info("Starting consensus")
 	round := <-c.initChannel
-	fmt.Printf("Initing on round %d\n", round)
+	log.WithFields(log.Fields{
+		"process": "factory",
+		"round":   round,
+	}).Debug("Received initial round")
 
-	generation.LaunchGeneratorComponent(c.eventBus, c.d, c.k, *c.bidList)
+	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k, *c.bidList)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength, *c.bidList)
-	selection.LaunchSignatureSelector(c.committee, c.eventBus, c.timerLength)
 
 	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
-	reduction.LaunchSigSetReducer(c.eventBus, c.committee, c.timerLength)
 
-	notary.LaunchBlockNotary(c.eventBus, c.committee)
-	notary.LaunchSignatureSetNotary(c.eventBus, c.committee, round)
+	notary.LaunchBlockNotary(c.eventBus, c.committee, round)
 
-	fmt.Println("consensus started")
+	log.WithField("process", "factory").Info("Consensus Started")
 }

@@ -20,4 +20,4 @@ The `Blind Bid` algorithm is outlined in the following steps
 
 ### Architecture
 
-The zk-proof generation is delegated to a dedicated process written in _rustlang_ which communicates with the main _golang_ process through _named pipes_ (also known as `FIFO`). Named pipes have been chosen over other `IPC` methodologies due to the excellent performance they offer. According to our benchmarks, _named pipes_ is twice more performant than _CGO_ (which allows _golang_ to perform calls to _C_ libraries) and comparable to calling the _rust_ process directly.
+The zk-proof generation is delegated to a dedicated process written in _rustlang_ which communicates with the main _golang_ process through _named pipes_ (also known as `FIFO`). Named pipes have been chosen over other `IPC` methodologies due to the excellent performance they offer. According to our benchmarks, _named pipes_ is two times more performant than _CGO_ (which allows _golang_ to perform calls to _C_ libraries) and comparable to calling the _rust_ process directly.

@@ -4,13 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -100,23 +97,6 @@ func unmarshalBlockReduction(reductionBuffer *bytes.Buffer, signer signer) (wire
 	}, nil
 }
 
-func unmarshalSigSetReduction(reductionBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
-	blockEvent, err := unmarshalBlockReduction(reductionBuffer, signer)
-	if err != nil {
-		return nil, err
-	}
-
-	var blockHash []byte
-	if err := encoding.Read256(reductionBuffer, &blockHash); err != nil {
-		return nil, err
-	}
-
-	return &reduction.SigSetEvent{
-		ReductionEvent: blockEvent.(*committee.ReductionEvent),
-		BlockHash:      blockHash,
-	}, nil
-}
-
 func unmarshalBlockAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
 	var round uint64
 	if err := encoding.ReadUint64(agreementBuffer, binary.LittleEndian, &round); err != nil {
@@ -146,32 +126,4 @@ func unmarshalBlockAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire
 		AgreedHash: agreedHash,
 		VoteSet:    voteSet,
 	}, nil
-}
-
-func unmarshalSigSetAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
-	agreement, err := unmarshalBlockAgreement(agreementBuffer, signer)
-	if err != nil {
-		return nil, err
-	}
-
-	var blockHash []byte
-	if err := encoding.Read256(agreementBuffer, &blockHash); err != nil {
-		return nil, err
-	}
-
-	return &notary.SigSetEvent{
-		NotaryEvent: agreement.(*committee.NotaryEvent),
-		BlockHash:   blockHash,
-	}, nil
-}
-
-func unmarshalSigSet(sigSetBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
-	ssev := &selection.SigSetEvent{
-		EventHeader: &consensus.EventHeader{},
-	}
-	if err := signer.Unmarshal(sigSetBuffer, ssev); err != nil {
-		return nil, err
-	}
-
-	return ssev, nil
 }

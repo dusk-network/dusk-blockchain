@@ -1,30 +1,60 @@
 package main
 
 import (
+	"flag"
+	"math/rand"
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func initLog() {
-	log.SetOutput(os.Stdout)
-	// log.SetLevel()
+// Flags
+var voucher = flag.String("voucher", "voucher.dusk.network:8081", "hostname for the voucher seeder")
+var port = flag.String("port", "7000", "port for the node to bind on")
+var logToFile = flag.Bool("logtofile", false, "specifies if the log should be written to a file")
+
+func initLog(file *os.File) {
+	log.SetLevel(log.TraceLevel)
+	if file != nil {
+		os.Stdout = file
+		log.SetOutput(file)
+	} else {
+		log.SetOutput(os.Stdout)
+	}
 }
 
 func main() {
-	initLog()
+	flag.Parse()
+	rand.Seed(time.Now().UnixNano())
+
+	// Set up logging
+	if *logToFile {
+		file, err := os.Create("log" + *port + ".txt")
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+		initLog(file)
+	} else {
+		initLog(nil)
+	}
+
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
-	srv := Setup()
+	srv := Setup("demo" + *port)
 	// listening to the blindbid and the stake channels
 	go srv.Listen()
 	// fetch neighbours addresses from the Seeder
 	ips := ConnectToSeeder()
 	//start the connection manager
 	connMgr := NewConnMgr(CmgrConfig{
-		Port:     "8081",
+		Port:     *port,
 		OnAccept: srv.OnAccept,
 		OnConn:   srv.OnConnection,
 	})
+
+	// wait a bit for everyone to start their cmgr
+	time.Sleep(time.Second * 1)
 
 	round := joinConsensus(connMgr, srv, ips)
 	srv.StartConsensus(round)
@@ -36,10 +66,9 @@ func main() {
 }
 
 func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
-
 	// if we are the first, initialize consensus on round 1
 	if len(ips) == 0 {
-		log.WithField("Process", "main").Infoln("tarting consensus from scratch")
+		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
 		return uint64(1)
 	}
 

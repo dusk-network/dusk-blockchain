@@ -5,19 +5,15 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
-
+	"github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 var consensusSeconds = 20
@@ -39,8 +35,8 @@ type Chain struct {
 
 // New returns a new chain object
 // TODO: take out demo constructions (db, collectors) and improve it after demo
-func New(eventBus *wire.EventBus) (*Chain, error) {
-	db, err := NewDatabase("demo", false)
+func New(eventBus *wire.EventBus, dbName string) (*Chain, error) {
+	db, err := NewDatabase(dbName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +132,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake) error {
 
 func (c *Chain) addBidder(tx *transactions.Bid) error {
 	totalAmount := getTxTotalOutputAmount(tx)
-	x := zkproof.CalculateX(zkproof.Uint64ToScalar(totalAmount), zkproof.BytesToScalar(tx.M))
+	x := calculateX(totalAmount, tx.M)
 	c.BidList.AddBid(x)
 
 	var bidListBytes []byte
@@ -155,4 +151,18 @@ func getTxTotalOutputAmount(tx transactions.Transaction) (totalAmount uint64) {
 	}
 
 	return
+}
+
+func calculateX(d uint64, m []byte) user.Bid {
+	dScalar := ristretto.Scalar{}
+	dScalar.SetBigInt(big.NewInt(0).SetUint64(d))
+
+	mScalar := ristretto.Scalar{}
+	mScalar.UnmarshalBinary(m)
+
+	x := zkproof.CalculateX(dScalar, mScalar)
+
+	var bid user.Bid
+	copy(bid[:], x.Bytes()[:])
+	return bid
 }

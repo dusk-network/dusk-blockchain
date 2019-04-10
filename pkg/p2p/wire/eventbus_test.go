@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNew(t *testing.T) {
+func TestNewEventBus(t *testing.T) {
 
-	eb := New()
+	eb := NewEventBus()
 	assert.NotNil(t, eb)
 }
 
 func TestSubscribe(t *testing.T) {
-	eb := New()
+	eb := NewEventBus()
 	myChan := make(chan *bytes.Buffer, 10)
 	assert.NotNil(t, eb.Subscribe("whateverTopic", myChan))
 }
@@ -55,7 +55,7 @@ func TestHasHandler(t *testing.T) {
 }
 
 func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
-	eb := New()
+	eb := NewEventBus()
 	myChan := make(chan *bytes.Buffer, 10)
 	id := eb.Subscribe("whateverTopic", myChan)
 	assert.NotNil(t, id)

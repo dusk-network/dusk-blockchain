@@ -8,22 +8,18 @@ The roles in the protocol are split between two different types: Block Generator
 
 Both bids and stakes have a registration period of `t`, which begins when a Bid or Stake transaction is included in a final block and is required to elapse before the full-node is eligible to participate in the consensus.
 
-SBA protocol can be conceptually defined with two inner loops (`Block Loop` and `Sigset Loop`), with execution of the `Sigset Loop` dependent on the successful termination of the `Block Loop`. `Block Loop` is responsible for forming a consensus on a uniform block and `Sigset Loop` is responsible for forming a uniform signature set of the `Provisioners` which attested the winning candidate block during the `Block Reduction` phase and is required to form a certificate to notarize the block.
+SBA protocol can be conceptually defined with an inner loop (`Block Loop`). `Block Loop` is responsible for reaching a consensus on a uniform block.
 
 #### Security Model
 
 The security model of SBA is based on _Snow White_, a provably secure Proof-of-Stake protocol. SBA is secure under a `∆-delayed` mildly adaptive adversary (an adversary who is required to choose the nodes controlling a maximum of f percent of the total stake he/she is willing to corrupt ∆ rounds before the actual corruption) and in a weakly synchronous network with a propagation delay of up to `δ` seconds.
 
-##### TODO
-
-- Remove the `SigSet Loop`. There is a strong possibility that we could retain the same security assumptions by ditching the `SigSet Loop` and keeping the sole `Block Loop`. This needs further research though
-
 #### Block Generator
 
 Block Generator is the first of the two full-node types eligible to participate in the consensus. To become a Block Generator, a full-node has to submit a `Bid Transaction`.
-The Block Generator is eligible to participate in one phase
+The Block Generator is eligible to participate in one phase:
 
-- Block Generation
+- `Block Generation`
 
 In the aforementioned phase, Block Generators participate in a non-interactive lottery to be able to forge a candidate block.
 
@@ -31,19 +27,18 @@ In the aforementioned phase, Block Generators participate in a non-interactive l
 
 Provisioner is the second of the two full-node types eligible to participate in the consensus.
 
-Unlike a Block Generator, a Provisioner node is required to deanonymize the value of the stake to be able to participate in the consensus. While it is technically possible to obfuscate the stake value, the team has de- cided against the latter as the addition of stake value obfuscation would have slowed down the consensus and simultaneously increased the block size.
+Unlike a Block Generator, a Provisioner node is required to deanonymize the value of the stake to be able to participate in the consensus. While it is technically possible to obfuscate the stake value, the team has decided against the latter as the addition of stake value obfuscation would have slowed down the consensus, and simultaneously increased the block size.
 
-The Provisioner is eligible to participate in five phases
+The Provisioner is eligible to participate in two phases:
 
-- `Sigset Generation`
 - `Block Reduction`
-- `Sigset Reduction`
 - `Block Agreement`
-- `Sigset Agreement`
+
+The two mentioned phases are the way for Provisioners to reach consensus on a single block, which can then be added to the chain.
 
 ### Event Driven Architecture
 
-The consensus architecture is _event-driven_, chosen for its characteristics of allowing highly scalable applications while keeping the various architectural components highly decoupled and single purposed. The various phases of the consensus are processed independently by single _components_, each _subscribing_ to and _publishing_ a variety of different _events_ and payloads through multiple _Topic Channels_, implemented through the `EventBus` struct.
+The consensus architecture is _event-driven_, chosen for its characteristics of allowing highly scalable applications while keeping the various architectural components highly decoupled and single-purposed. The various phases of the consensus are processed independently by single _components_, each _subscribing_ to and _publishing_ a variety of different _events_ and payloads through multiple _Topic Channels_, implemented through the `EventBus` struct.
 
 #### Broker Topology
 
@@ -59,11 +54,16 @@ Additionally, several other entities are utilized within the `Collector` to help
 
     - `EventHandler`: This entity contains the logic specific to the components and that cannot be shared
     - `EventQueue`: A temporary storage unit to collect messages referring to a future stage. This is possible given the asynchrony of the network which could result in nodes falling a bit behind in the event processing.
-    - `Selector`: A selector accumulates messages until a condition is met (i.e. a timeout), and selects and returns one of the accumulated messages according to a certain priority
+    - `StepEventCollector`: A map that stores consensus messages. This can be used to track message accumulation for specific keys, such as a step, or a particular block hash.
 
-### Common struct and interfaces
+### Common structures and interfaces
 
-The consensus package exposes the function to create and initialize the most common channels reused across the whole package. These common channels are for receiving notifications about Rounds (Block height) and Phases (Block Hash).
+The consensus package exposes the function to create and initialize the most common channel reused across the whole package. This common channel is for receiving notifications about Rounds.
 
     - InitRoundUpdate(eventbus) (chan uint64) returns a channel whereto round updates get published
-    - InitPhaseUpdate(eventbus) (chan uint64) returns a channel whereto phase  updates get published
+
+Additionally, the consensus package exposes a marshaller and unmarshaller for consensus message headers, as well as the `EventHeader` struct itself. These data structures and methods are common part of nearly all other consensus sub-packages, and help to reduce code duplication.
+
+    - `EventHeader`: This struct contains all the common fields included in all consensus messages, except for the `Score` message.
+    - `EventHeaderMarshaller`: A struct which contains the logic to turn an `EventHeader` into a byte stream representation of itself.
+    - `EventHeaderUnmarshaller`: A struct which contains the logic to turn the byte stream representation of an `EventHeader` into it's struct form.

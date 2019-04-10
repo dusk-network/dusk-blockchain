@@ -24,12 +24,9 @@ func LaunchVotingComponent(eventBus *wire.EventBus, keys *user.Keys,
 // sender is responsible for signing and sending out consensus related
 // voting messages to the wire.
 type sender struct {
-	eventBus               *wire.EventBus
-	blockReductionChannel  chan *bytes.Buffer
-	blockAgreementChannel  chan *bytes.Buffer
-	sigSetReductionChannel chan *bytes.Buffer
-	sigSetAgreementChannel chan *bytes.Buffer
-	sigSetChannel          chan *bytes.Buffer
+	eventBus              *wire.EventBus
+	blockReductionChannel chan *bytes.Buffer
+	blockAgreementChannel chan *bytes.Buffer
 }
 
 // newSender will return an initialized sender struct. It will also spawn all
@@ -37,22 +34,13 @@ type sender struct {
 func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Committee) *sender {
 	blockReductionChannel := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
 		unmarshalBlockReduction, newBlockReductionSigner(keys, committee))
-	sigSetReductionChannel := initCollector(eventBus, msg.OutgoingSigSetReductionTopic,
-		unmarshalSigSetReduction, newSigSetReductionSigner(keys, committee))
 	blockAgreementChannel := initCollector(eventBus, msg.OutgoingBlockAgreementTopic,
 		unmarshalBlockAgreement, newBlockAgreementSigner(keys, committee))
-	sigSetAgreementChannel := initCollector(eventBus, msg.OutgoingSigSetAgreementTopic,
-		unmarshalSigSetAgreement, newSigSetAgreementSigner(keys, committee))
-	sigSetChannel := initCollector(eventBus, msg.OutgoingSigSetTopic, unmarshalSigSet,
-		newSigSetSigner(keys, committee))
 
 	return &sender{
-		eventBus:               eventBus,
-		blockReductionChannel:  blockReductionChannel,
-		sigSetReductionChannel: sigSetReductionChannel,
-		blockAgreementChannel:  blockAgreementChannel,
-		sigSetAgreementChannel: sigSetAgreementChannel,
-		sigSetChannel:          sigSetChannel,
+		eventBus:              eventBus,
+		blockReductionChannel: blockReductionChannel,
+		blockAgreementChannel: blockAgreementChannel,
 	}
 }
 
@@ -61,24 +49,10 @@ func (v *sender) listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
-			// v.eventBus.Publish(string(topics.BlockReduction), m)
 			message, _ := wire.AddTopic(m, topics.BlockReduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
-		case m := <-v.sigSetReductionChannel:
-			// v.eventBus.Publish(string(topics.SigSetReduction), m)
-			message, _ := wire.AddTopic(m, topics.SigSetReduction)
-			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.blockAgreementChannel:
-			// v.eventBus.Publish(string(topics.BlockAgreement), m)
 			message, _ := wire.AddTopic(m, topics.BlockAgreement)
-			v.eventBus.Publish(string(topics.Gossip), message)
-		case m := <-v.sigSetAgreementChannel:
-			// v.eventBus.Publish(string(topics.SigSetAgreement), m)
-			message, _ := wire.AddTopic(m, topics.SigSetAgreement)
-			v.eventBus.Publish(string(topics.Gossip), message)
-		case m := <-v.sigSetChannel:
-			// v.eventBus.Publish(string(topics.SigSet), m)
-			message, _ := wire.AddTopic(m, topics.SigSet)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}

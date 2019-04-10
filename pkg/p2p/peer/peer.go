@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -47,6 +47,7 @@ const (
 	outputBufferSize = 100
 
 	// pingInterval = 20 * time.Second //Not implemented in Dusk clients
+	obsoleteMessageRound = 3
 )
 
 var (
@@ -91,21 +92,58 @@ type Peer struct {
 	inch   chan func() // Will handle all inbound connections from peer
 	outch  chan func() // Will handle all outbound connections to peer
 	quitch chan struct{}
+
+	dupeBlacklist *dupeMap
+}
+
+type dupeMap struct {
+	roundChan <-chan uint64 // Will get notification about new rounds in order...
+	tmpMap    *TmpMap       // ...to clean up the duplicate message blacklist
+}
+
+func newDupeMap(eventbus *wire.EventBus) *dupeMap {
+	roundChan := consensus.InitRoundUpdate(eventbus)
+	tmpMap := NewTmpMap(obsoleteMessageRound)
+	return &dupeMap{
+		roundChan,
+		tmpMap,
+	}
+}
+
+func (d *dupeMap) cleanOnRound() {
+	for {
+		round := <-d.roundChan
+		d.tmpMap.UpdateHeight(round)
+	}
+}
+
+func (d *dupeMap) canFwd(payload *bytes.Buffer) bool {
+	found := d.tmpMap.HasAnywhere(payload)
+	if found {
+		return false
+	}
+	d.tmpMap.Add(payload)
+	return true
 }
 
 // NewPeer is called after a connection to a peer was successful.
 // Inbound as well as Outbound.
 func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.EventBus) *Peer {
+
+	dupeBlacklist := newDupeMap(eventBus)
+	go dupeBlacklist.cleanOnRound()
+
 	p := &Peer{
-		inch:     make(chan func(), inputBufferSize),
-		outch:    make(chan func(), outputBufferSize),
-		quitch:   make(chan struct{}, 1),
-		Inbound:  inbound,
-		Conn:     conn,
-		eventBus: eventBus,
-		Addr:     conn.RemoteAddr().String(),
-		Detector: stall.NewDetector(responseTime, tickerInterval),
-		magic:    magic,
+		inch:          make(chan func(), inputBufferSize),
+		outch:         make(chan func(), outputBufferSize),
+		quitch:        make(chan struct{}, 1),
+		Inbound:       inbound,
+		Conn:          conn,
+		eventBus:      eventBus,
+		Addr:          conn.RemoteAddr().String(),
+		Detector:      stall.NewDetector(responseTime, tickerInterval),
+		magic:         magic,
+		dupeBlacklist: dupeBlacklist,
 	}
 
 	return p
@@ -114,10 +152,14 @@ func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.E
 // Collect implements wire.EventCollector.
 // Receive messages, add headers, and propagate them to the network.
 func (p *Peer) Collect(message *bytes.Buffer) error {
+	// copy the buffer here, as the pointer we just got is shared by
+	// all the other peers.
+	msg := *message
 	var topicBytes [15]byte
-	message.Read(topicBytes[:])
+
+	_, _ = msg.Read(topicBytes[:])
 	topic := topics.ByteArrayToTopic(topicBytes)
-	return p.WriteMessage(message, topic)
+	return p.WriteMessage(&msg, topic)
 }
 
 // WriteMessage will append a header with the specified topic to the passed
@@ -135,7 +177,7 @@ func (p *Peer) WriteMessage(msg *bytes.Buffer, topic topics.Topic) error {
 // Write to a peer
 func (p *Peer) Write(msg *bytes.Buffer) {
 	p.outch <- func() {
-		p.Conn.Write(msg.Bytes())
+		_, _ = p.Conn.Write(msg.Bytes())
 	}
 }
 
@@ -228,15 +270,15 @@ func (p *Peer) readMessage() (topics.Topic, *bytes.Buffer, error) {
 // Run is used to start communicating with the peer, completes the handshake and starts observing
 // for messages coming in and allows for queing of outgoing messages
 func (p *Peer) Run() error {
-	go p.writeLoop()
 	if err := p.Handshake(); err != nil {
 		p.Disconnect()
 		return err
 	}
 
-	go wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip)).Accept()
+	go p.writeLoop()
 	go p.startProtocol()
 	go p.readLoop()
+	go wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip)).Accept()
 	return nil
 }
 
@@ -257,6 +299,7 @@ loop:
 
 // ReadLoop will block on the read until a message is read.
 // Should only be called after handshake is complete on a seperate go-routine.
+// Eventual duplicated messages are silently discarded
 func (p *Peer) readLoop() {
 	idleTimer := time.AfterFunc(idleTimeout, func() {
 		p.Disconnect()
@@ -270,7 +313,10 @@ func (p *Peer) readLoop() {
 			return
 		}
 
-		p.eventBus.Publish(string(topic), payload)
+		// check if this message is a duplicate of another we already forwarded
+		if p.dupeBlacklist.canFwd(payload) {
+			p.eventBus.Publish(string(topic), payload)
+		}
 	}
 }
 

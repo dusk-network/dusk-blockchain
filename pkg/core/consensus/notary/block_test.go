@@ -19,8 +19,7 @@ import (
 
 func TestSimpleBlockCollection(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
-	bc := newBlockCollector(committeeMock)
-	bc.UpdateRound(1)
+	bc := newBlockCollector(committeeMock, 1)
 
 	blockHash := []byte("pippo")
 	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
@@ -28,10 +27,10 @@ func TestSimpleBlockCollection(t *testing.T) {
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
 	select {
-	case res := <-bc.BlockChan:
-		assert.Equal(t, blockHash, res)
+	case res := <-bc.RoundChan:
+		assert.Equal(t, uint64(2), res)
 		// testing that we clean after collection
-		assert.Equal(t, 0, len(bc.StepEventCollector))
+		assert.Equal(t, 0, len(bc.StepEventCollector.Map))
 	case <-time.After(1 * time.Second):
 		assert.Fail(t, "Collection did not complete")
 	}
@@ -39,8 +38,7 @@ func TestSimpleBlockCollection(t *testing.T) {
 
 func TestNoQuorumCollection(t *testing.T) {
 	committeeMock := mockCommittee(3, true, nil)
-	bc := newBlockCollector(committeeMock)
-	bc.UpdateRound(1)
+	bc := newBlockCollector(committeeMock, 1)
 
 	blockHash := []byte("pippo")
 	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
@@ -48,27 +46,26 @@ func TestNoQuorumCollection(t *testing.T) {
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
 	select {
-	case <-bc.BlockChan:
+	case <-bc.RoundChan:
 		assert.Fail(t, "Collection was not supposed to complete since Quorum should not be reached")
 	case <-time.After(100 * time.Millisecond):
 		// testing that we still have collected for 1 step
-		assert.Equal(t, 1, len(bc.StepEventCollector))
+		assert.Equal(t, 1, len(bc.StepEventCollector.Map))
 		// testing that we collected 2 messages
-		assert.Equal(t, 2, len(bc.StepEventCollector[string(1)]))
+		assert.Equal(t, 2, len(bc.StepEventCollector.Map[string(1)]))
 	}
 }
 
 func TestSkipNoMember(t *testing.T) {
 	committeeMock := mockCommittee(1, false, nil)
-	bc := newBlockCollector(committeeMock)
-	bc.UpdateRound(1)
+	bc := newBlockCollector(committeeMock, 1)
 
 	blockHash := []byte("pippo")
 	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
 	bc.Collect(bytes.NewBuffer([]byte{}))
 
 	select {
-	case <-bc.BlockChan:
+	case <-bc.RoundChan:
 		assert.Fail(t, "Collection was not supposed to complete since Quorum should not be reached")
 	case <-time.After(50 * time.Millisecond):
 		// test successfull
@@ -76,24 +73,28 @@ func TestSkipNoMember(t *testing.T) {
 }
 
 func TestBlockNotary(t *testing.T) {
-	bus := wire.New()
+	bus := wire.NewEventBus()
 	committee := mockCommittee(1, true, nil)
-	notary := LaunchBlockNotary(bus, committee)
+	notary := LaunchBlockNotary(bus, committee, 1)
 	blockHash := []byte("pippo")
 	notary.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
 
 	blockChan := make(chan *bytes.Buffer)
-	bus.Subscribe(msg.PhaseUpdateTopic, blockChan)
+	bus.Subscribe(msg.RoundUpdateTopic, blockChan)
+
+	// Get round out of the channel, that was put in from initialization
+	// It should be 1
+	initRound := <-blockChan
+	initNum := binary.LittleEndian.Uint64(initRound.Bytes())
+	assert.Equal(t, uint64(1), initNum)
+
 	bus.Publish(string(topics.BlockAgreement), bytes.NewBuffer([]byte("test")))
 
 	result := <-blockChan
-	assert.Equal(t, result.String(), "pippo")
+	resNum := binary.LittleEndian.Uint64(result.Bytes())
+	assert.Equal(t, resNum, uint64(2))
 
 	// test that after a round update messages for previous rounds get ignored
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(2))
-	bus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(b))
-
 	// we need to wait for the round update to be propagated before publishing other round related messages. This is what this timeout is about
 	<-time.After(100 * time.Millisecond)
 

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"math/big"
 	"math/rand"
@@ -11,13 +10,13 @@ import (
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
@@ -25,6 +24,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 var timeOut = 6 * time.Second
@@ -45,9 +45,9 @@ type txCollector struct {
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
-func Setup() *Server {
+func Setup(dbName string) *Server {
 	// creating the eventbus
-	eventBus := wire.New()
+	eventBus := wire.NewEventBus()
 	// generating the keys
 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
 	keys, _ := user.NewRandKeys()
@@ -57,7 +57,7 @@ func Setup() *Server {
 	go committee.Listen()
 
 	// creating and firing the chain process
-	chain, err := chain.New(eventBus)
+	chain, err := chain.New(eventBus, dbName)
 	if err != nil {
 		panic(err)
 	}
@@ -120,10 +120,10 @@ func (s *Server) Listen() {
 	for {
 		select {
 		case b := <-s.stakeChannel:
-			fmt.Println("stake received")
+			log.WithField("process", "server").Debugln("stake received")
 			s.stakes = append(s.stakes, b)
 		case b := <-s.bidChannel:
-			fmt.Println("bid received")
+			log.WithField("process", "server").Debugln("bid received")
 			s.bids = append(s.bids, b)
 		}
 	}
@@ -136,44 +136,69 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
-	fmt.Println("attempting to accept connection to ", conn.RemoteAddr().String())
+	log.WithFields(log.Fields{
+		"process": "server",
+		"address": conn.RemoteAddr().String(),
+	}).Debugln("attempting to accept a connection")
+
 	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus)
 	// send the latest block
 	buffer := new(bytes.Buffer)
 	if err := s.chain.PrevBlock.Encode(buffer); err != nil {
-		fmt.Println("error encoding previous block, ", err)
+		log.WithFields(log.Fields{
+			"process": "server",
+			"error":   err,
+		}).Warnln("problem encoding previous block")
 		peer.Disconnect()
 		return
 	}
 
 	if _, err := peer.Conn.Write(buffer.Bytes()); err != nil {
-		fmt.Println("error writing to peer, ", err)
+		log.WithFields(log.Fields{
+			"process": "server",
+			"error":   err,
+		}).Warnln("problem writing to peer")
 		peer.Disconnect()
 		return
 	}
 
 	if err := peer.Run(); err != nil {
-		fmt.Println("handshake error,", err)
+		log.WithFields(log.Fields{
+			"process": "server",
+			"error":   err,
+		}).Warnln("problem performing handshake")
 		return
 	}
-	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
+	log.WithFields(log.Fields{
+		"process": "server",
+		"address": peer.Conn.RemoteAddr().String(),
+	}).Debugln("connection established")
 
 	s.sendStakesAndBids(peer)
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	fmt.Println("attempting to connect to ", conn.RemoteAddr().String())
+	log.WithFields(log.Fields{
+		"process": "server",
+		"address": conn.RemoteAddr().String(),
+	}).Debugln("attempting to make a connection")
 	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus)
 	// get latest block
 	buf := make([]byte, 1024)
 	if _, err := peer.Conn.Read(buf); err != nil {
-		fmt.Println("error reading from peer, ", err)
+		log.WithFields(log.Fields{
+			"process": "server",
+			"error":   err,
+		}).Warnln("problem reading from peer")
 		peer.Disconnect()
 		return
 	}
 	var blk block.Block
 	if err := blk.Decode(bytes.NewBuffer(buf)); err != nil {
-		fmt.Println("error decoding block, ", err)
+		log.WithFields(log.Fields{
+			"process": "server",
+			"error":   err,
+		}).Warnln("problem decoding block")
 		peer.Disconnect()
 		return
 	}
@@ -183,10 +208,16 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}
 
 	if err := peer.Run(); err != nil {
-		fmt.Println("handshake error,", err)
+		log.WithFields(log.Fields{
+			"process": "server",
+			"error":   err,
+		}).Warnln("problem performing handshake")
 		return
 	}
-	fmt.Println("we have connected to " + peer.Conn.RemoteAddr().String())
+	log.WithFields(log.Fields{
+		"process": "server",
+		"address": peer.Conn.RemoteAddr().String(),
+	}).Debugln("connection established")
 
 	s.sendStakesAndBids(peer)
 }
