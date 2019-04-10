@@ -53,7 +53,7 @@ func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandl
 		RepropagateChan: make(chan wire.Event, 100),
 		selector:        nil,
 		handler:         handler,
-		queue:           &consensus.EventQueue{},
+		queue:           consensus.NewEventQueue(),
 		timeOut:         timerLength,
 	}
 }
@@ -130,7 +130,11 @@ func (s *collector) UpdateRound(round uint64) {
 
 // StartSelection starts the selection of the best SigSetEvent. It also consumes stored events related to the current step
 func (s *collector) StartSelection() {
-	log.WithField("process", "selection").Traceln("starting selection")
+	log.WithFields(log.Fields{
+		"process": "selection",
+		"round":   s.CurrentRound,
+		"step":    s.CurrentStep,
+	}).Debugln("starting selection")
 	// creating a new selector
 	s.selector = NewEventSelector(s.handler, s.RepropagateChan)
 	// letting selector collect the best

@@ -54,11 +54,9 @@ type (
 )
 
 func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) *collector {
-
-	queue := consensus.NewEventQueue()
 	collector := &collector{
 		StepEventCollector:   consensus.NewStepEventCollector(),
-		queue:                queue,
+		queue:                consensus.NewEventQueue(),
 		collectedVotesChan:   make(chan []wire.Event, 1),
 		ctx:                  ctx,
 		regenerationChannel:  make(chan bool, 1),
