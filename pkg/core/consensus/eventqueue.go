@@ -33,6 +33,11 @@ func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
 		s.entries[round] = make(map[uint8][]wire.Event)
 	}
 
+	// Initialise the array on this step if it was not yet created
+	if s.entries[round][step] == nil {
+		s.entries[round][step] = make([]wire.Event, 0)
+	}
+
 	s.entries[round][step] = append(s.entries[round][step], m)
 }
 
