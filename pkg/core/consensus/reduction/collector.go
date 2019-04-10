@@ -231,6 +231,7 @@ func (b *broker) Listen() {
 			log.WithFields(log.Fields{
 				"process": "reduction",
 				"round":   b.collector.ctx.state.Round(),
+				"step":    b.collector.ctx.state.Step(),
 			}).Debug("Reduction complete")
 			b.eventBus.Publish(b.generationTopic, nil)
 		case ev := <-b.collector.repropagationChannel:
