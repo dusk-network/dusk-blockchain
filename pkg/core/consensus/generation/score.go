@@ -3,11 +3,8 @@ package generation
 import (
 	"bytes"
 
-	log "github.com/sirupsen/logrus"
-
-	"gitlab.dusk.network/dusk-core/zkproof"
-
 	"github.com/bwesterb/go-ristretto"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
@@ -15,6 +12,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 // LaunchScoreGenerationComponent will start the processes for score generation.
@@ -36,7 +34,6 @@ type (
 
 		generator         generator
 		scoreEventChannel chan *bytes.Buffer
-		proofChannel      chan zkproof.ZkProof
 		stopChannel       chan bool
 	}
 
@@ -64,16 +61,16 @@ func newProofCollector(d, k ristretto.Scalar, bidList user.BidList) *proofCollec
 
 func (g *proofCollector) startGenerator() {
 	g.stopChannel = make(chan bool, 1)
-	g.proofChannel = make(chan zkproof.ZkProof, 1)
-	go g.generator.generateProof(g.d, g.k, g.bidList, g.seed, g.proofChannel)
-	g.listenGenerator()
+	proofChannel := make(chan zkproof.ZkProof, 1)
+	go g.generator.generateProof(g.d, g.k, g.bidList, g.seed, proofChannel)
+	g.listenGenerator(proofChannel)
 }
 
-func (g *proofCollector) listenGenerator() {
+func (g *proofCollector) listenGenerator(proofChannel chan zkproof.ZkProof) {
 	select {
 	case <-g.stopChannel:
 		return
-	case proof := <-g.proofChannel:
+	case proof := <-proofChannel:
 		sev, err := g.generateScoreEvent(proof)
 		if err != nil {
 			return
@@ -150,7 +147,7 @@ func (g *broker) Listen() {
 		case bidList := <-g.bidListChannel:
 			g.bidList = bidList
 		case scoreEvent := <-g.scoreEventChannel:
-			log.WithField("process", "generation").Traceln("sending proof")
+			log.WithField("process", "generation").Debugln("sending proof")
 			g.eventBus.Publish(string(topics.Gossip), scoreEvent)
 			g.currentStep++
 		}
@@ -158,8 +155,6 @@ func (g *broker) Listen() {
 }
 
 func (g *broker) Collect(m *bytes.Buffer) error {
-	if g.generator == nil {
-		go g.startGenerator()
-	}
+	go g.startGenerator()
 	return nil
 }

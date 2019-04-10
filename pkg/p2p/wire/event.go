@@ -68,9 +68,9 @@ type (
 		eventBus       *EventBus
 		eventCollector EventCollector
 		msgChan        <-chan *bytes.Buffer
-		msgChanID      uint32
+		MsgChanID      uint32
 		quitChan       <-chan *bytes.Buffer
-		quitChanID     uint32
+		QuitChanID     uint32
 		topic          string
 	}
 )
@@ -89,9 +89,9 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 	return &EventSubscriber{
 		eventBus:       eventBus,
 		msgChan:        msgChan,
-		msgChanID:      msgChanID,
+		MsgChanID:      msgChanID,
 		quitChan:       quitChan,
-		quitChanID:     quitChanID,
+		QuitChanID:     quitChanID,
 		topic:          topic,
 		eventCollector: collector,
 	}
@@ -101,26 +101,26 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 // EventCollector.Collect
 func (n *EventSubscriber) Accept() {
 	log.WithFields(log.Fields{
-		"id":    n.msgChanID,
+		"id":    n.MsgChanID,
 		"topic": n.topic,
 	}).Debugln("Accepting messages")
 	for {
 		select {
 		case <-n.quitChan:
-			n.eventBus.Unsubscribe(n.topic, n.msgChanID)
-			n.eventBus.Unsubscribe(string(QuitTopic), n.quitChanID)
+			n.eventBus.Unsubscribe(n.topic, n.MsgChanID)
+			n.eventBus.Unsubscribe(string(QuitTopic), n.QuitChanID)
 			return
 		case eventMsg := <-n.msgChan:
 			if len(n.msgChan) > 10 {
 				log.WithFields(log.Fields{
-					"id":         n.msgChanID,
+					"id":         n.MsgChanID,
 					"topic":      n.topic,
 					"Unconsumed": len(n.msgChan),
 				}).Debugln("Channel is accumulating messages")
 			}
 			if err := n.eventCollector.Collect(eventMsg); err != nil {
 				log.WithFields(log.Fields{
-					"id":         n.msgChanID,
+					"id":         n.MsgChanID,
 					"topic":      n.topic,
 					"Unconsumed": len(n.msgChan),
 				}).Warnln("Channel is accumulating messages")

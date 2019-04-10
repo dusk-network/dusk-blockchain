@@ -2,8 +2,7 @@ package consensus
 
 import "gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
-// EventQueue is a Queue of Events grouped by rounds and steps.
-// NOTE: the EventQueue is purposefully not synchronized. The client can decide whether Mutexes or other sync primitives would be appropriate to use, depending on the context
+// EventQueue is a Queue of Events grouped by rounds and steps. It is threadsafe through a sync.RWMutex
 type EventQueue struct {
 	entries map[uint64]map[uint8][]wire.Event
 }

@@ -30,7 +30,7 @@ func main() {
 
 	// Set up logging
 	if *logToFile {
-		file, err := os.Create("log" + *port + ".txt")
+		file, err := os.Create("node" + *port + ".log")
 		if err != nil {
 			panic(err)
 		}

@@ -69,7 +69,7 @@ func (s *state) Cmp(round uint64, step uint8) int {
 	defer s.lock.RUnlock()
 	cmp := s.round - round
 	if cmp == 0 {
-		return int(s.step - step)
+		return int(s.step) - int(step)
 	}
 
 	return int(cmp)
