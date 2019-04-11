@@ -32,7 +32,7 @@ user$ ./testnet --config=./pkg/config/default.dusk.toml --logger.level=error
 # Load config file found in $searchPaths and overwrite general.network value
 user$ DUSK_GENERAL_NETWORK=mainnet; ./testnet
 
-# Load config where a file config value is overwritten by both ENV var and CLI flag but CLI flag has highest priority
+# Load config where a file config value is overwritten by both ENV var and CLI flag but CLI flag has higher priority
 user$ DUSK_LOGGER_LEVEL=WARN; ./testnet --logger.level=error
 
 ```

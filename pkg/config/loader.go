@@ -20,20 +20,25 @@ const (
 	configFileName = "dusk"
 )
 
-var parser *Parser
+var (
+	r *Registry
+)
 
-type Parser struct {
+// Registry stores all loaded configurations according to the config order
+// NB It should be cheap to be copied by value
+type Registry struct {
 	UsedConfigFile string
 
 	// All configuration groups
-	General  GeneralConfiguration
-	Database DatabaseConfiguration
-	Network  NetworkConfiguration
-	Logger   LoggerConfiguration
-	Profile  ProfileConfiguration
+	General  generalConfiguration
+	Database databaseConfiguration
+	Network  networkConfiguration
+	Logger   loggerConfiguration
+	Profile  profileConfiguration
+	RPC      rpcServerConfiguration
 }
 
-// Parse makes an attempt to read and unmershal any configs from flag, env and
+// Load makes an attempt to read and unmershal any configs from flag, env and
 // dusk config file.
 //
 // It  uses the following precedence order. Each item takes precedence over the item below it:
@@ -45,12 +50,12 @@ type Parser struct {
 //
 // Dusk configuration file can be in form of TOML, JSON, YAML, HCL or Java
 // properties config files
-func Parse() error {
+func Load() error {
 
-	parser = new(Parser)
+	r = new(Registry)
 
 	// Initialization
-	if err := parser.init(); err != nil {
+	if err := r.init(); err != nil {
 		return err
 	}
 
@@ -60,13 +65,13 @@ func Parse() error {
 	return nil
 }
 
-// Get returns parser by value in order to avoid further modifications after
+// Get returns registry by value in order to avoid further modifications after
 // initial configuration loading
-func Get() Parser {
-	return *parser
+func Get() Registry {
+	return *r
 }
 
-func (parser *Parser) init() error {
+func (r *Registry) init() error {
 
 	// Make an attempt to find dusk.toml/dusk.json/dusk.yaml in any of the
 	// provided paths below
@@ -77,7 +82,7 @@ func (parser *Parser) init() error {
 	viper.AddConfigPath(searchPath2)
 
 	// Initialize and parse flags
-	confFile, err := parser.loadFlags()
+	confFile, err := loadFlags()
 
 	if err != nil {
 		return err
@@ -92,22 +97,22 @@ func (parser *Parser) init() error {
 		return fmt.Errorf("Error reading config file: %s", err)
 	}
 
-	parser.defineENV()
+	defineENV()
 
 	// Uncomment on debugging only. This will list all levels of configurations
 	// viper.Debug()
 
-	// Unmarshal all configurations from all conf levels to the parser struct
-	if err := viper.Unmarshal(&parser); err != nil {
+	// Unmarshal all configurations from all conf levels to the registry struct
+	if err := viper.Unmarshal(&r); err != nil {
 		return fmt.Errorf("unable to decode into struct, %v", err)
 	}
 
-	parser.UsedConfigFile = viper.ConfigFileUsed()
+	r.UsedConfigFile = viper.ConfigFileUsed()
 
 	return nil
 }
 
-func (parser *Parser) loadFlags() (string, error) {
+func loadFlags() (string, error) {
 
 	pflag.CommandLine.Init("Dusk node", pflag.ExitOnError)
 
@@ -118,7 +123,7 @@ func (parser *Parser) loadFlags() (string, error) {
 
 	// Define all supported flags.
 	// All flags should be verified `loader_test.go/TestSupportedFlags`
-	parser.defineFlags()
+	defineFlags()
 	configFile := pflag.String("config", "", "Set path to the config file")
 
 	// Bind all command line parameters to their corresponding file configs
@@ -136,13 +141,15 @@ func (parser *Parser) loadFlags() (string, error) {
 
 // define a set of flags as bindings to config file settings
 // The settings that are needed to be passed frequently by CLI should be added here
-func (parser *Parser) defineFlags() {
-	_ = pflag.String("logger.level", "", "override logger.level settings in config file")
-	_ = pflag.String("general.network", "testnet", "override general.network settings in config file")
+func defineFlags() {
+	_ = pflag.StringP("logger.level", "l", "", "override logger.level settings in config file")
+	_ = pflag.StringP("general.network", "n", "testnet", "override general.network settings in config file")
+	_ = pflag.StringP("network.port", "p", "7000", "port for the node to bind on")
+	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output")
 }
 
 // define a set of environment variables as bindings to config file settings
-func (parser *Parser) defineENV() {
+func defineENV() {
 
 	// Bind config key general.network to ENV var DUSK_GENERAL_NETWORK
 	if err := viper.BindEnv("general.network", "DUSK_GENERAL_NETWORK"); err != nil {

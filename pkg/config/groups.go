@@ -1,35 +1,42 @@
 package config
 
-type GeneralConfiguration struct {
+type generalConfiguration struct {
 	Network string
 }
 
-type LoggerConfiguration struct {
-	Level string
+type loggerConfiguration struct {
+	Level  string
+	Output string
 }
 
-type NetworkConfiguration struct {
-	Address string
+type networkConfiguration struct {
+	Seeder seedersConfiguration
+	Port   string
+}
+
+type seedersConfiguration struct {
+	Addresses []string
+	Fixed     []string
 }
 
 // pkg/core/database package configs
-type DatabaseConfiguration struct {
+type databaseConfiguration struct {
 	DriverName string
 	Path       string
 }
 
 // pprof configs
-type ProfileConfiguration struct {
+type profileConfiguration struct {
 	Address string
 
 	// enables CPU profiling for the current process.
 	// While profiling, the profile will be buffered and written to CPUProf file.
-	CpuFile string
+	CPUFile string
 	// Write mem profile to the specified file
 	MemFile string
 }
 
 // pkg/rpc package configs
-type RPCServerConfiguration struct {
+type rpcServerConfiguration struct {
 	Address string
 }

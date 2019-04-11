@@ -4,24 +4,29 @@
 [general]
 network = "testnet"
 
-# log configs are #live#
+# logger configs
 [logger]
-# log level  TODO
-level = "warn"
-# stdout or file path
-output = "dusk.log"
+# log levels can be any of error, warn, trace
+level = "trace"
+# 'stdout' or file name without ext
+# result filename would be $output$network.port.log
+output = "stdout"
     
-# P2P specific settings
+# P2P network specific settings
 [network]
-# host
-address="localhost:7071"
+
+# listens on all available unicast and anycast
+# IP addresses of the local system.
+
+# port for the node to bind on
+port=7000
 
 [network.seeder]
 # array of seeder servers
-addresses=["127.0.0.1:8081"]
-# fixed network addresses in case of seeder unavailability
-# supported only in devnet
-fixedNetwork= ["localhost:7071","localhost:7072","localhost:7073"]
+addresses=["voucher.dusk.network:8081"]
+# fixed network addresses to setup local P2P network
+# supported only in testnet
+fixed = []
 
 [database]
 # backend used to store chain
@@ -38,7 +43,9 @@ cert=""
 
 [profile]
 # profiling service address
-address="localhost:5050"
+# reachable at http://localhost:5050/debug/pprof
+# address="localhost:5050"
+
 # cpu.pprof
 cpuFile=""
 # mem.pprof

@@ -13,6 +13,7 @@ const (
 
 var initialArgs = os.Args
 
+// Changes in default.dusk.toml might break this test
 func TestDefaultConfigTOML(t *testing.T) {
 
 	Reset()
@@ -21,7 +22,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 	// Mock command line arguments
 	os.Args = append(os.Args, defaultDuskConfig)
 
-	if err := Parse(); err != nil {
+	if err := Load(); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
@@ -29,7 +30,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 		t.Error("Invalid general/network value")
 	}
 
-	if Get().Logger.Level != "warn" {
+	if Get().Logger.Level != "trace" {
 		t.Error("Invalid logger level")
 	}
 }
@@ -45,9 +46,11 @@ func TestSupportedFlags(t *testing.T) {
 	// Ensure here to list all supported CLI flags
 	os.Args = append(os.Args, "--logger.level=custom")
 	os.Args = append(os.Args, "--general.network=mainnet")
+	os.Args = append(os.Args, "--network.port=9876")
+	os.Args = append(os.Args, "--logger.output=modified")
 
 	// This relies on default.dusk.toml
-	if err := Parse(); err != nil {
+	if err := Load(); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
@@ -57,6 +60,14 @@ func TestSupportedFlags(t *testing.T) {
 
 	if Get().General.Network != "mainnet" {
 		t.Errorf("Invalid network value %s", Get().General.Network)
+	}
+
+	if Get().Logger.Output != "modified" {
+		t.Errorf("Invalid logger output %s", Get().Logger.Output)
+	}
+
+	if Get().Network.Port != "9876" {
+		t.Errorf("Invalid network port %s", Get().Network.Port)
 	}
 }
 
@@ -78,7 +89,7 @@ func TestSupportedEnv(t *testing.T) {
 	viper.AutomaticEnv()
 
 	// This relies on default.dusk.toml
-	if err := Parse(); err != nil {
+	if err := Load(); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
@@ -99,18 +110,18 @@ func TestReadOnly(t *testing.T) {
 	os.Args = append(os.Args, defaultDuskConfig)
 
 	// This relies on default.dusk.toml
-	if err := Parse(); err != nil {
+	if err := Load(); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().Logger.Level != "warn" {
+	if Get().Logger.Level != "trace" {
 		t.Error("Invalid logger level")
 	}
 
-	parser := Get()
-	parser.Logger.Level = "MODIFIED_level"
+	r := Get()
+	r.Logger.Level = "MODIFIED_level"
 
-	if Get().Logger.Level != "warn" {
+	if Get().Logger.Level != "trace" {
 		t.Errorf("Invalid config %s", Get().Logger.Level)
 	}
 }
