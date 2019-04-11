@@ -3,8 +3,12 @@ package selection
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
+	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -18,6 +22,7 @@ import (
 
 type (
 	scoreHandler struct {
+		sync.RWMutex
 		bidList      user.BidList
 		unMarshaller *ScoreUnMarshaller
 	}
@@ -35,14 +40,15 @@ type (
 	scoreBroker struct {
 		eventBus        *wire.EventBus
 		roundUpdateChan <-chan uint64
-		generationChan  <-chan bool
+		generationChan  <-chan state
+		bidListChan     <-chan user.BidList
 		collector       *collector
 	}
 )
 
 // LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration, bidList user.BidList) *scoreBroker {
-	handler := newScoreHandler(eventBus, bidList)
+func LaunchScoreSelectionComponent(eventBus *wire.EventBus, timeout time.Duration) *scoreBroker {
+	handler := newScoreHandler(eventBus)
 	broker := newScoreBroker(eventBus, handler, timeout)
 	go broker.Listen()
 	return broker
@@ -66,24 +72,26 @@ func InitBidListUpdate(eventBus *wire.EventBus) chan user.BidList {
 	return bidListChan
 }
 
-func InitBlockGenerationCollector(eventBus *wire.EventBus) chan bool {
-	selectionChan := make(chan bool, 1)
+func InitBlockGenerationCollector(eventBus *wire.EventBus) chan state {
+	selectionChan := make(chan state, 1)
 	collector := &selectionCollector{selectionChan}
 	go wire.NewEventSubscriber(eventBus, collector, msg.BlockGenerationTopic).Accept()
 	return selectionChan
 }
 
 // newScoreBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func newScoreBroker(eventBus *wire.EventBus, handler consensus.EventHandler, timeout time.Duration) *scoreBroker {
+func newScoreBroker(eventBus *wire.EventBus, handler scoreEventHandler, timeout time.Duration) *scoreBroker {
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundUpdate(eventBus)
 	generationChan := InitBlockGenerationCollector(eventBus)
+	bidListChan := InitBidListUpdate(eventBus)
 	collector := initCollector(handler, timeout, eventBus, string(topics.Score))
 
 	return &scoreBroker{
 		eventBus:        eventBus,
 		collector:       collector,
 		roundUpdateChan: roundChan,
+		bidListChan:     bidListChan,
 		generationChan:  generationChan,
 	}
 }
@@ -95,10 +103,17 @@ func (f *scoreBroker) Listen() {
 		case roundUpdate := <-f.roundUpdateChan:
 			f.collector.UpdateRound(roundUpdate)
 			f.collector.StartSelection()
-		case <-f.generationChan:
+		case state := <-f.generationChan:
+			log.WithFields(log.Fields{
+				"process": "selection",
+				"round":   state.round,
+				"step":    state.step,
+			}).Debugln("received regeneration message")
 			if f.collector.selector == nil {
 				f.collector.StartSelection()
 			}
+		case bidList := <-f.bidListChan:
+			f.collector.handler.UpdateBidList(bidList)
 		case bestEvent := <-f.collector.BestEventChan:
 			// TODO: moved step incrementation here, so we dont run ahead in case there's nobody generating blocks
 			if bestEvent.Len() != 0 {
@@ -107,7 +122,7 @@ func (f *scoreBroker) Listen() {
 			} else {
 				f.eventBus.Publish(msg.BlockGenerationTopic, nil)
 			}
-		case ev := <-f.collector.RepropagateChan:
+		case ev := <-f.collector.selector.repropagateChan:
 			// TODO: review
 			buf := new(bytes.Buffer)
 			if err := f.collector.handler.Marshal(buf, ev); err != nil {
@@ -140,18 +155,11 @@ func (l *bidListCollector) Collect(r *bytes.Buffer) error {
 }
 
 // NewScoreHandler returns a ScoreHandler, which encapsulates specific operations (e.g. verification, validation, marshalling and unmarshalling)
-func newScoreHandler(eventBus *wire.EventBus, bidList user.BidList) *scoreHandler {
-	bidListChan := InitBidListUpdate(eventBus)
-	sh := &scoreHandler{
+func newScoreHandler(eventBus *wire.EventBus) *scoreHandler {
+	return &scoreHandler{
+		RWMutex:      sync.RWMutex{},
 		unMarshaller: newScoreUnMarshaller(),
-		bidList:      bidList,
 	}
-	go func() {
-		for {
-			sh.bidList = <-bidListChan
-		}
-	}()
-	return sh
 }
 
 func (p *scoreHandler) NewEvent() wire.Event {
@@ -164,6 +172,13 @@ func (p *scoreHandler) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 
 func (p *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return p.unMarshaller.Marshal(r, e)
+}
+
+func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
+	fmt.Println("updating bid list")
+	p.Lock()
+	p.bidList = bidList
+	p.Unlock()
 }
 
 func (p *scoreHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
@@ -223,5 +238,7 @@ func (p *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) *prerror
 		return err
 	}
 
+	p.Lock()
+	defer p.Unlock()
 	return p.bidList.ValidateBids(bidListSubset)
 }

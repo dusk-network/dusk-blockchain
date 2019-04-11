@@ -2,11 +2,14 @@ package selection
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -17,49 +20,65 @@ type (
 		CurrentStep      uint8
 		CurrentBlockHash []byte
 		BestEventChan    chan *bytes.Buffer
-		RepropagateChan  chan wire.Event
 		// this is the dump of future messages, categorized by different steps and different rounds
-		queue    *consensus.EventQueue
-		timeOut  time.Duration
+		queue   *consensus.EventQueue
+		timeOut time.Duration
+		sync.RWMutex
 		selector *EventSelector
-		handler  consensus.EventHandler
+		handler  scoreEventHandler
+	}
+
+	scoreEventHandler interface {
+		consensus.EventHandler
+		UpdateBidList(user.BidList)
+	}
+
+	state struct {
+		round uint64
+		step  uint8
 	}
 
 	selectionCollector struct {
-		selectionChan chan bool
+		selectionChan chan state
 	}
 
 	// EventSelector is a helper to help choosing
 	EventSelector struct {
-		EventChan       chan wire.Event
-		RepropagateChan chan wire.Event
-		BestEventChan   chan wire.Event
-		StopChan        chan bool
+		repropagateChan chan wire.Event
+		bestEventChan   chan wire.Event
 		prioritizer     wire.EventPrioritizer
 		// this field is for testing purposes only
-		BestEvent wire.Event
+		sync.RWMutex
+		bestEvent wire.Event
 	}
 )
 
 func (sc *selectionCollector) Collect(r *bytes.Buffer) error {
-	sc.selectionChan <- true
+	round := binary.LittleEndian.Uint64(r.Bytes()[:8])
+	step := uint8(r.Bytes()[8])
+
+	state := state{
+		round: round,
+		step:  step,
+	}
+	sc.selectionChan <- state
 	return nil
 }
 
 // NewCollector creates a new Collector
-func newCollector(bestEventChan chan *bytes.Buffer, handler consensus.EventHandler, timerLength time.Duration) *collector {
+func newCollector(bestEventChan chan *bytes.Buffer, handler scoreEventHandler, timerLength time.Duration) *collector {
 	return &collector{
-		BestEventChan:   bestEventChan,
-		RepropagateChan: make(chan wire.Event, 100),
-		selector:        nil,
-		handler:         handler,
-		queue:           consensus.NewEventQueue(),
-		timeOut:         timerLength,
+		BestEventChan: bestEventChan,
+		selector:      NewEventSelector(handler),
+		handler:       handler,
+		queue:         consensus.NewEventQueue(),
+		timeOut:       timerLength,
+		RWMutex:       sync.RWMutex{},
 	}
 }
 
 // initCollector instantiates a Collector and triggers the related EventSubscriber. It is a helper method for those needing access to the Collector
-func initCollector(handler consensus.EventHandler, timeout time.Duration, eventBus *wire.EventBus, topic string) *collector {
+func initCollector(handler scoreEventHandler, timeout time.Duration, eventBus *wire.EventBus, topic string) *collector {
 	bestEventChan := make(chan *bytes.Buffer, 1)
 	collector := newCollector(bestEventChan, handler, timeout)
 	go wire.NewEventSubscriber(eventBus, collector, topic).Accept()
@@ -74,11 +93,12 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 		panic(err)
 	}
 
-	if s.selector != nil {
-		event := s.handler.Priority(s.selector.BestEvent, ev)
-		if event == s.selector.BestEvent {
-			return errors.New("score of received event is lower than our current best event")
-		}
+	s.selector.RLock()
+	bestEvent := s.selector.bestEvent
+	s.selector.RUnlock()
+	event := s.handler.Priority(bestEvent, ev)
+	if event == bestEvent {
+		return errors.New("score of received event is lower than our current best event")
 	}
 
 	// verify
@@ -98,17 +118,31 @@ func (s *collector) process(ev wire.Event) {
 
 	// Not anymore
 	if s.isObsolete(h.Round, h.Step) {
+		log.WithFields(log.Fields{
+			"process":         "selection",
+			"message round":   h.Round,
+			"message step":    h.Step,
+			"collector round": s.CurrentRound,
+			"collector step":  s.CurrentStep,
+		}).Debugln("discarding score message")
 		return
 	}
 
 	// Not yet
 	if s.isEarly(h.Round, h.Step) {
+		log.WithFields(log.Fields{
+			"process":         "selection",
+			"message round":   h.Round,
+			"message step":    h.Step,
+			"collector round": s.CurrentRound,
+			"collector step":  s.CurrentStep,
+		}).Debugln("queueing score message")
 		s.queue.PutEvent(h.Round, h.Step, ev)
 		return
 	}
 
 	// Just right :)
-	s.selector.EventChan <- ev
+	s.selector.CompareEvent(ev)
 }
 
 func (s *collector) isObsolete(round uint64, step uint8) bool {
@@ -121,7 +155,9 @@ func (s *collector) isEarly(round uint64, step uint8) bool {
 
 // UpdateRound stops the selection and cleans up the queue up to the round specified.
 func (s *collector) UpdateRound(round uint64) {
+	s.selector.Lock()
 	s.stopSelection()
+	s.selector.Unlock()
 
 	s.CurrentRound = round
 	s.CurrentStep = 1
@@ -135,15 +171,9 @@ func (s *collector) StartSelection() {
 		"round":   s.CurrentRound,
 		"step":    s.CurrentStep,
 	}).Debugln("starting selection")
-	// creating a new selector
-	s.selector = NewEventSelector(s.handler, s.RepropagateChan)
-	// letting selector collect the best
-	go s.selector.PickBest()
 	// stopping the selector after timeout
 	time.AfterFunc(s.timeOut, func() {
-		if s.selector != nil {
-			s.selector.StopChan <- true
-		}
+		s.selector.ReturnBest()
 	})
 	// listening to the selector and collect its pick
 	go s.listenSelection()
@@ -159,8 +189,7 @@ func (s *collector) StartSelection() {
 
 // listenSelection triggers a goroutine that notifies the Broker through its channel after having incremented the Collector step
 func (s *collector) listenSelection() {
-	ev := <-s.selector.BestEventChan
-	s.selector = nil
+	ev := <-s.selector.bestEventChan
 	buf := new(bytes.Buffer)
 	if err := s.handler.Marshal(buf, ev); err == nil {
 		s.BestEventChan <- buf
@@ -169,40 +198,31 @@ func (s *collector) listenSelection() {
 	s.BestEventChan <- buf
 }
 
-// stopSelection notifies the Selector to stop selecting
 func (s *collector) stopSelection() {
-	if s.selector != nil {
-		s.selector.StopChan <- false
-		s.selector = nil
-	}
+	s.selector.bestEvent = nil
 }
 
 //NewEventSelector creates the Selector
-func NewEventSelector(p wire.EventPrioritizer, repropagateChan chan wire.Event) *EventSelector {
+func NewEventSelector(p wire.EventPrioritizer) *EventSelector {
 	return &EventSelector{
-		EventChan:       make(chan wire.Event),
-		RepropagateChan: repropagateChan,
-		BestEventChan:   make(chan wire.Event, 1),
-		StopChan:        make(chan bool, 1),
+		repropagateChan: make(chan wire.Event, 100),
+		bestEventChan:   make(chan wire.Event),
 		prioritizer:     p,
-		BestEvent:       nil,
 	}
 }
 
-// PickBest picks the best event depending on the priority of the sender
-func (s *EventSelector) PickBest() {
-	for {
-		select {
-		case ev := <-s.EventChan:
-			s.BestEvent = s.prioritizer.Priority(s.BestEvent, ev)
-			if s.BestEvent == ev {
-				s.RepropagateChan <- ev
-			}
-		case shouldNotify := <-s.StopChan:
-			if shouldNotify {
-				s.BestEventChan <- s.BestEvent
-			}
-			return
-		}
+func (s *EventSelector) CompareEvent(ev wire.Event) {
+	s.Lock()
+	defer s.Unlock()
+	s.bestEvent = s.prioritizer.Priority(s.bestEvent, ev)
+	if s.bestEvent == ev {
+		s.repropagateChan <- ev
 	}
+}
+
+func (s *EventSelector) ReturnBest() {
+	s.Lock()
+	defer s.Unlock()
+	s.bestEventChan <- s.bestEvent
+	s.bestEvent = nil
 }
