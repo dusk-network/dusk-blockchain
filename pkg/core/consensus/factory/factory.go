@@ -49,7 +49,7 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
-	go wire.NewEventSubscriber(eventBus, initCollector, msg.InitializationTopic).Accept()
+	go wire.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()
 
 	return &ConsensusFactory{
 		eventBus:    eventBus,

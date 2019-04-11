@@ -106,13 +106,13 @@ func newBlockCollector(c committee.Committee, currentRound uint64) *blockCollect
 	}
 }
 
-// InitBlockCollector is a helper to minimize the wiring of EventSubscribers,
+// InitBlockCollector is a helper to minimize the wiring of TopicListeners,
 // collector and channels
 func initBlockCollector(eventBus *wire.EventBus, c committee.Committee,
 	currentRound uint64) *blockCollector {
 
 	collector := newBlockCollector(c, currentRound)
-	go wire.NewEventSubscriber(eventBus, collector,
+	go wire.NewTopicListener(eventBus, collector,
 		string(topics.BlockAgreement)).Accept()
 	collector.RoundChan <- currentRound
 	return collector

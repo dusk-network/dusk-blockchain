@@ -24,11 +24,11 @@ type (
 	}
 )
 
-// InitRoundUpdate initializes a Round update channel and fires up the EventSubscriber as well.
+// InitRoundUpdate initializes a Round update channel and fires up the TopicListener as well.
 // Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
-func InitRoundUpdate(eventBus *wire.EventBus) chan uint64 {
+func InitRoundUpdate(subscriber wire.EventSubscriber) chan uint64 {
 	roundChan := make(chan uint64, 1)
 	roundCollector := &roundCollector{roundChan}
-	go wire.NewEventSubscriber(eventBus, roundCollector, string(msg.RoundUpdateTopic)).Accept()
+	go wire.NewTopicListener(subscriber, roundCollector, string(msg.RoundUpdateTopic)).Accept()
 	return roundChan
 }

@@ -49,7 +49,7 @@ func initCollector(eventBus *wire.EventBus, topic string,
 		unmarshalFunc: unmarshalFunc,
 		signer:        signer,
 	}
-	go wire.NewEventSubscriber(eventBus, collector, topic).Accept()
+	go wire.NewTopicListener(eventBus, collector, topic).Accept()
 	return voteChannel
 }
 

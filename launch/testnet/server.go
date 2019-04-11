@@ -108,14 +108,14 @@ func Setup(dbName string) *Server {
 func initStakeCollector(eventBus *wire.EventBus) chan *bytes.Buffer {
 	stakeChannel := make(chan *bytes.Buffer, 100)
 	collector := &txCollector{stakeChannel}
-	go wire.NewEventSubscriber(eventBus, collector, msg.StakeTopic).Accept()
+	go wire.NewTopicListener(eventBus, collector, msg.StakeTopic).Accept()
 	return stakeChannel
 }
 
 func initBidCollector(eventBus *wire.EventBus) chan *bytes.Buffer {
 	bidChannel := make(chan *bytes.Buffer, 100)
 	collector := &txCollector{bidChannel}
-	go wire.NewEventSubscriber(eventBus, collector, msg.BidTopic).Accept()
+	go wire.NewTopicListener(eventBus, collector, msg.BidTopic).Accept()
 	return bidChannel
 }
 

@@ -257,7 +257,7 @@ func (p *Peer) Run() error {
 }
 
 func (p *Peer) subscribeToGossipEvents() {
-	es := wire.NewEventSubscriber(p.eventBus, p, string(topics.Gossip))
+	es := wire.NewTopicListener(p.eventBus, p, string(topics.Gossip))
 	p.quitID = es.QuitChanID
 	p.gossipID = es.MsgChanID
 	go es.Accept()

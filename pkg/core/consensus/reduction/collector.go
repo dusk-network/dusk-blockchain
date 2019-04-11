@@ -64,7 +64,7 @@ func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) 
 		repropagationChannel: make(chan *bytes.Buffer, 100),
 	}
 
-	go wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
+	go wire.NewTopicListener(eventBus, collector, reductionTopic).Accept()
 	go collector.onTimeout()
 	return collector
 }

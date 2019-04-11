@@ -37,7 +37,7 @@ func TestLameSubscriber(t *testing.T) {
 	collector := defaultMockCollector(resultChan, nil)
 	tbuf := ranbuf()
 
-	sub := NewEventSubscriber(bus, collector, "pippo")
+	sub := NewTopicListener(bus, collector, "pippo")
 	go sub.Accept()
 
 	bus.Publish("pippo", tbuf)
@@ -48,7 +48,7 @@ func TestLameSubscriber(t *testing.T) {
 
 func TestQuit(t *testing.T) {
 	bus := NewEventBus()
-	sub := NewEventSubscriber(bus, nil, "")
+	sub := NewTopicListener(bus, nil, "")
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		bus.Publish(string(msg.QuitTopic), nil)

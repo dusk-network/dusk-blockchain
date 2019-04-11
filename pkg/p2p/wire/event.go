@@ -61,11 +61,11 @@ type (
 		Collect(*bytes.Buffer) error
 	}
 
-	// EventSubscriber accepts events from the EventBus and takes care of reacting on
+	// TopicListener accepts events from the EventBus and takes care of reacting on
 	// quit Events. It delegates the business logic to the EventCollector which is
 	// supposed to handle the incoming events
-	EventSubscriber struct {
-		eventBus       *EventBus
+	TopicListener struct {
+		subscriber     EventSubscriber
 		eventCollector EventCollector
 		msgChan        <-chan *bytes.Buffer
 		MsgChanID      uint32
@@ -73,21 +73,34 @@ type (
 		QuitChanID     uint32
 		topic          string
 	}
+
+	EventSubscriber interface {
+		Subscribe(string, chan<- *bytes.Buffer) uint32
+		Unsubscribe(string, uint32) bool
+	}
+
+	EventPublisher interface {
+		Publish(string, *bytes.Buffer)
+	}
+
+	EventBroker interface {
+		EventSubscriber
+		EventPublisher
+	}
 )
 
-// NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus.
+// NewTopicListener creates the TopicListener listening to a topic on the EventBus.
 // The EventBus, EventCollector and Topic are injected
-func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
-	topic string) *EventSubscriber {
+func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topic string) *TopicListener {
 
 	quitChan := make(chan *bytes.Buffer, 1)
 	msgChan := make(chan *bytes.Buffer, 100)
 
-	msgChanID := eventBus.Subscribe(topic, msgChan)
-	quitChanID := eventBus.Subscribe(string(QuitTopic), quitChan)
+	msgChanID := subscriber.Subscribe(topic, msgChan)
+	quitChanID := subscriber.Subscribe(string(QuitTopic), quitChan)
 
-	return &EventSubscriber{
-		eventBus:       eventBus,
+	return &TopicListener{
+		subscriber:     subscriber,
 		msgChan:        msgChan,
 		MsgChanID:      msgChanID,
 		quitChan:       quitChan,
@@ -99,7 +112,7 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 
 // Accept incoming (mashalled) Events on the topic of interest and dispatch them to the
 // EventCollector.Collect
-func (n *EventSubscriber) Accept() {
+func (n *TopicListener) Accept() {
 	log.WithFields(log.Fields{
 		"id":    n.MsgChanID,
 		"topic": n.topic,
@@ -107,8 +120,8 @@ func (n *EventSubscriber) Accept() {
 	for {
 		select {
 		case <-n.quitChan:
-			n.eventBus.Unsubscribe(n.topic, n.MsgChanID)
-			n.eventBus.Unsubscribe(string(QuitTopic), n.QuitChanID)
+			n.subscriber.Unsubscribe(n.topic, n.MsgChanID)
+			n.subscriber.Unsubscribe(string(QuitTopic), n.QuitChanID)
 			return
 		case eventMsg := <-n.msgChan:
 			if len(n.msgChan) > 10 {
