@@ -2,7 +2,9 @@ package generation
 
 import (
 	"bytes"
-	"sync"
+	"encoding/hex"
+
+	"gitlab.dusk.network/dusk-core/zkproof"
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
@@ -13,10 +15,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/zkproof"
 )
-
-var empty = new(struct{})
 
 // LaunchScoreGenerationComponent will start the processes for score generation.
 func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scalar) *broker {
@@ -26,28 +25,16 @@ func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scal
 }
 
 type (
-	proofCollector struct {
-		state consensus.State
-
-		marshaller *selection.ScoreUnMarshaller
-		d, k       ristretto.Scalar
-		bidList    user.BidList
-		seed       []byte
-
-		generator generator
-		sync.RWMutex
-		listener          *listener
-		scoreEventChannel chan *bytes.Buffer
-	}
-
-	listener struct {
-		proofChannel chan zkproof.ZkProof
-		stopChannel  chan *struct{}
+	forwarder struct {
+		publisher  wire.EventPublisher
+		marshaller wire.EventMarshaller
+		state      consensus.State
+		seeds      map[string]uint64
 	}
 
 	broker struct {
-		eventBus *wire.EventBus
-		*proofCollector
+		proofGenerator *proofGenerator
+		forwarder      *forwarder
 
 		// subscriber channels
 		roundChannel   <-chan uint64
@@ -55,87 +42,64 @@ type (
 	}
 )
 
-func newProofCollector(d, k ristretto.Scalar) *proofCollector {
-	return &proofCollector{
-		state:             consensus.NewState(),
-		marshaller:        &selection.ScoreUnMarshaller{},
-		d:                 d,
-		k:                 k,
-		scoreEventChannel: make(chan *bytes.Buffer, 1),
-		RWMutex:           sync.RWMutex{},
-		generator:         &proofGenerator{sync.RWMutex{}},
-		listener: &listener{
-			stopChannel: make(chan *struct{}, 1),
-		},
+func newForwarder(publisher wire.EventPublisher) *forwarder {
+	return &forwarder{
+		publisher:  publisher,
+		marshaller: &selection.ScoreUnMarshaller{},
+		state:      consensus.NewState(),
+		seeds:      make(map[string]uint64),
 	}
 }
 
-func (g *proofCollector) startGenerator() {
-	g.Lock()
-	g.listener.stopChannel <- empty
-	g.Unlock()
-
-	stopChannel := make(chan *struct{}, 1)
-	proofChannel := make(chan zkproof.ZkProof, 1)
-	go g.generator.generateProof(g.d, g.k, g.bidList, g.seed, proofChannel)
-	g.listener = &listener{
-		proofChannel: proofChannel,
-		stopChannel:  stopChannel,
+func (f *forwarder) forward(proof zkproof.ZkProof, seed []byte) {
+	if bytes.Equal(seed, f.getLatestSeed()) {
+		f.generateScoreEvent(proof)
 	}
-	g.Lock()
-	defer g.Unlock()
-	g.listener.listenGenerator(g.generateScoreEvent)
 }
 
-func (l *listener) listenGenerator(generateScoreEvent func(zkproof.ZkProof)) {
-	go func() {
-		select {
-		case <-l.stopChannel:
-			return
-		case proof := <-l.proofChannel:
-			generateScoreEvent(proof)
+func (f *forwarder) getLatestSeed() []byte {
+	for seed, round := range f.seeds {
+		if round == f.state.Round() {
+			seedBytes, err := hex.DecodeString(seed)
+			if err != nil {
+				panic(err)
+			}
+
+			return seedBytes
 		}
-	}()
+	}
+
+	panic("uninitialized forwarder")
 }
 
-func (g *proofCollector) updateRound(round uint64) {
-	g.state.Update(round)
-	// TODO: make an actual seed by signing the previous block seed
-	g.seed, _ = crypto.RandEntropy(33)
-
-	g.startGenerator()
-}
-
-func (g *proofCollector) generateScoreEvent(proof zkproof.ZkProof) {
+func (f *forwarder) generateScoreEvent(proof zkproof.ZkProof) {
 	// TODO: get an actual hash by generating a block
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
 		panic(err)
 	}
 
-	sev := &selection.ScoreEvent{
-		Round:         g.state.Round(),
-		Step:          g.state.Step(),
+	sev := selection.ScoreEvent{
+		Round:         f.state.Round(),
 		Score:         proof.Score,
 		Proof:         proof.Proof,
 		Z:             proof.Z,
 		BidListSubset: proof.BinaryBidList,
-		Seed:          g.seed,
+		Seed:          f.getLatestSeed(),
 		VoteHash:      hash,
 	}
 
-	marshalledEvent := g.marshalScore(sev)
-	g.scoreEventChannel <- marshalledEvent
+	marshalledEvent := f.marshalScore(sev)
 	log.WithFields(log.Fields{
-		"process":       "generation",
-		"message round": sev.Round,
-		"message step":  sev.Step,
-	}).Debugln("created proof")
+		"process":         "generation",
+		"collector round": f.state.Round(),
+	}).Debugln("sending proof")
+	f.publisher.Publish(string(topics.Gossip), marshalledEvent)
 }
 
-func (g *proofCollector) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
+func (f *forwarder) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 	buffer := new(bytes.Buffer)
-	if err := g.marshaller.Marshal(buffer, sev); err != nil {
+	if err := f.marshaller.Marshal(buffer, sev); err != nil {
 		panic(err)
 	}
 
@@ -147,41 +111,45 @@ func (g *proofCollector) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
 	return message
 }
 
-func newBroker(eventBus *wire.EventBus, d, k ristretto.Scalar) *broker {
-	proofCollector := newProofCollector(d, k)
-	roundChannel := consensus.InitRoundUpdate(eventBus)
-	bidListChannel := selection.InitBidListUpdate(eventBus)
+func (f *forwarder) generateSeed(round uint64) []byte {
+	f.state.Update(round)
+	// TODO: make an actual seed by signing the previous block seed
+	seed, _ := crypto.RandEntropy(33)
+	f.seeds[hex.EncodeToString(seed)] = round
+	return seed
+}
+
+func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar) *broker {
+	proofGenerator := newProofGenerator(d, k)
+	roundChannel := consensus.InitRoundUpdate(eventBroker)
+	bidListChannel := selection.InitBidListUpdate(eventBroker)
 	broker := &broker{
-		eventBus:       eventBus,
-		proofCollector: proofCollector,
+		proofGenerator: proofGenerator,
 		roundChannel:   roundChannel,
 		bidListChannel: bidListChannel,
+		forwarder:      newForwarder(eventBroker),
 	}
 
-	go wire.NewEventSubscriber(eventBus, broker, msg.BlockGenerationTopic).Accept()
+	go wire.NewTopicListener(eventBroker, broker, msg.BlockGenerationTopic).Accept()
 	return broker
 }
 
-func (g *broker) Listen() {
+func (b *broker) Listen() {
 	for {
 		select {
-		case round := <-g.roundChannel:
-			g.updateRound(round)
-		case bidList := <-g.bidListChannel:
-			g.bidList = bidList
-		case scoreEvent := <-g.scoreEventChannel:
-			log.WithFields(log.Fields{
-				"process":         "generation",
-				"collector round": g.state.Round(),
-				"collector step":  g.state.Step(),
-			}).Debugln("sending proof")
-			g.eventBus.Publish(string(topics.Gossip), scoreEvent)
-			g.state.IncrementStep()
+		case round := <-b.roundChannel:
+			seed := b.forwarder.generateSeed(round)
+			proof := b.proofGenerator.generateProof(seed)
+			b.forwarder.forward(proof, seed)
+		case bidList := <-b.bidListChannel:
+			b.proofGenerator.updateBidList(bidList)
 		}
 	}
 }
 
-func (g *broker) Collect(m *bytes.Buffer) error {
-	g.startGenerator()
+func (b *broker) Collect(m *bytes.Buffer) error {
+	seed := b.forwarder.getLatestSeed()
+	proof := b.proofGenerator.generateProof(seed)
+	b.forwarder.forward(proof, seed)
 	return nil
 }
