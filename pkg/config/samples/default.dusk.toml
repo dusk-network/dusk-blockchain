@@ -1,0 +1,46 @@
+# Configs marked with #live# can be modified without node restart
+
+# general node configs
+[general]
+network = "testnet"
+
+# log configs are #live#
+[logger]
+# log level  TODO
+level = "warn"
+# stdout or file path
+output = "dusk.log"
+    
+# P2P specific settings
+[network]
+# host
+address="localhost:7071"
+
+[network.seeder]
+# array of seeder servers
+addresses=["127.0.0.1:8081"]
+# fixed network addresses in case of seeder unavailability
+# supported only in devnet
+fixedNetwork= ["localhost:7071","localhost:7072","localhost:7073"]
+
+[database]
+# backend used to store chain
+driverName = "heavy_v0.1.0"
+# backend storage path
+datadir = "chain"
+
+[rpc-server]
+# enable rpc service
+enabled=false
+user="default"
+pass="default"
+cert=""
+
+[profile]
+# profiling service address
+address="localhost:5050"
+# cpu.pprof
+cpuFile=""
+# mem.pprof
+memFile=""
+
