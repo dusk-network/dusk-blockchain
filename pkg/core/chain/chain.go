@@ -135,13 +135,17 @@ func (c *Chain) addBidder(tx *transactions.Bid) error {
 	x := calculateX(totalAmount, tx.M)
 	c.BidList.AddBid(x)
 
+	c.PropagateBidList()
+	return nil
+}
+
+func (c *Chain) PropagateBidList() {
 	var bidListBytes []byte
 	for _, bid := range *c.BidList {
 		bidListBytes = append(bidListBytes, bid[:]...)
 	}
 
 	c.eventBus.Publish(msg.BidListTopic, bytes.NewBuffer(bidListBytes))
-	return nil
 }
 
 func getTxTotalOutputAmount(tx transactions.Transaction) (totalAmount uint64) {
