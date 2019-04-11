@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"fmt"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -9,6 +11,7 @@ type (
 	State interface {
 		Round() uint64
 		Step() uint8
+		fmt.Stringer
 		Update(uint64)
 		IncrementStep()
 		Cmp(round uint64, step uint8) int
@@ -40,6 +43,11 @@ func (s *SyncState) Step() uint8 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.step
+}
+
+func (s *SyncState) String() string {
+	return "round: " + strconv.Itoa(int(s.Round())) +
+		" / step: " + strconv.Itoa(int(s.Step()))
 }
 
 func (s *SyncState) Update(round uint64) {
