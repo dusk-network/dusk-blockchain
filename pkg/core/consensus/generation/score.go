@@ -2,6 +2,7 @@ package generation
 
 import (
 	"bytes"
+	"sync"
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
@@ -15,26 +16,33 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
+var empty = new(struct{})
+
 // LaunchScoreGenerationComponent will start the processes for score generation.
-func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *broker {
-	broker := newBroker(eventBus, d, k, bidList)
+func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scalar) *broker {
+	broker := newBroker(eventBus, d, k)
 	go broker.Listen()
 	return broker
 }
 
 type (
 	proofCollector struct {
-		currentRound uint64
-		currentStep  uint8
+		state consensus.State
 
 		marshaller *selection.ScoreUnMarshaller
 		d, k       ristretto.Scalar
 		bidList    user.BidList
 		seed       []byte
 
-		generator         generator
+		generator generator
+		sync.RWMutex
+		listener          *listener
 		scoreEventChannel chan *bytes.Buffer
-		stopChannel       chan bool
+	}
+
+	listener struct {
+		proofChannel chan zkproof.ZkProof
+		stopChannel  chan *struct{}
 	}
 
 	broker struct {
@@ -47,67 +55,82 @@ type (
 	}
 )
 
-func newProofCollector(d, k ristretto.Scalar, bidList user.BidList) *proofCollector {
+func newProofCollector(d, k ristretto.Scalar) *proofCollector {
 	return &proofCollector{
+		state:             consensus.NewState(),
 		marshaller:        &selection.ScoreUnMarshaller{},
 		d:                 d,
 		k:                 k,
-		bidList:           bidList,
 		scoreEventChannel: make(chan *bytes.Buffer, 1),
-		stopChannel:       make(chan bool, 1),
-		generator:         &proofGenerator{},
+		RWMutex:           sync.RWMutex{},
+		generator:         &proofGenerator{sync.RWMutex{}},
+		listener: &listener{
+			stopChannel: make(chan *struct{}, 1),
+		},
 	}
 }
 
 func (g *proofCollector) startGenerator() {
-	g.stopChannel = make(chan bool, 1)
+	g.Lock()
+	g.listener.stopChannel <- empty
+	g.Unlock()
+
+	stopChannel := make(chan *struct{}, 1)
 	proofChannel := make(chan zkproof.ZkProof, 1)
 	go g.generator.generateProof(g.d, g.k, g.bidList, g.seed, proofChannel)
-	g.listenGenerator(proofChannel)
+	g.listener = &listener{
+		proofChannel: proofChannel,
+		stopChannel:  stopChannel,
+	}
+	g.Lock()
+	defer g.Unlock()
+	g.listener.listenGenerator(g.generateScoreEvent)
 }
 
-func (g *proofCollector) listenGenerator(proofChannel chan zkproof.ZkProof) {
-	select {
-	case <-g.stopChannel:
-		return
-	case proof := <-proofChannel:
-		sev, err := g.generateScoreEvent(proof)
-		if err != nil {
+func (l *listener) listenGenerator(generateScoreEvent func(zkproof.ZkProof)) {
+	go func() {
+		select {
+		case <-l.stopChannel:
 			return
+		case proof := <-l.proofChannel:
+			generateScoreEvent(proof)
 		}
-
-		marshalledEvent := g.marshalScore(sev)
-		g.scoreEventChannel <- marshalledEvent
-	}
+	}()
 }
 
 func (g *proofCollector) updateRound(round uint64) {
-	g.stopChannel <- true
-	g.currentRound = round
-	g.currentStep = 1
+	g.state.Update(round)
 	// TODO: make an actual seed by signing the previous block seed
 	g.seed, _ = crypto.RandEntropy(33)
 
-	go g.startGenerator()
+	g.startGenerator()
 }
 
-func (g *proofCollector) generateScoreEvent(proof zkproof.ZkProof) (*selection.ScoreEvent, error) {
+func (g *proofCollector) generateScoreEvent(proof zkproof.ZkProof) {
 	// TODO: get an actual hash by generating a block
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	return &selection.ScoreEvent{
-		Round:         g.currentRound,
-		Step:          g.currentStep,
+	sev := &selection.ScoreEvent{
+		Round:         g.state.Round(),
+		Step:          g.state.Step(),
 		Score:         proof.Score,
 		Proof:         proof.Proof,
 		Z:             proof.Z,
 		BidListSubset: proof.BinaryBidList,
 		Seed:          g.seed,
 		VoteHash:      hash,
-	}, nil
+	}
+
+	marshalledEvent := g.marshalScore(sev)
+	g.scoreEventChannel <- marshalledEvent
+	log.WithFields(log.Fields{
+		"process":       "generation",
+		"message round": sev.Round,
+		"message step":  sev.Step,
+	}).Debugln("created proof")
 }
 
 func (g *proofCollector) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
@@ -124,8 +147,8 @@ func (g *proofCollector) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
 	return message
 }
 
-func newBroker(eventBus *wire.EventBus, d, k ristretto.Scalar, bidList user.BidList) *broker {
-	proofCollector := newProofCollector(d, k, bidList)
+func newBroker(eventBus *wire.EventBus, d, k ristretto.Scalar) *broker {
+	proofCollector := newProofCollector(d, k)
 	roundChannel := consensus.InitRoundUpdate(eventBus)
 	bidListChannel := selection.InitBidListUpdate(eventBus)
 	broker := &broker{
@@ -147,14 +170,18 @@ func (g *broker) Listen() {
 		case bidList := <-g.bidListChannel:
 			g.bidList = bidList
 		case scoreEvent := <-g.scoreEventChannel:
-			log.WithField("process", "generation").Debugln("sending proof")
+			log.WithFields(log.Fields{
+				"process":         "generation",
+				"collector round": g.state.Round(),
+				"collector step":  g.state.Step(),
+			}).Debugln("sending proof")
 			g.eventBus.Publish(string(topics.Gossip), scoreEvent)
-			g.currentStep++
+			g.state.IncrementStep()
 		}
 	}
 }
 
 func (g *broker) Collect(m *bytes.Buffer) error {
-	go g.startGenerator()
+	g.startGenerator()
 	return nil
 }

@@ -1,6 +1,8 @@
 package generation
 
 import (
+	"sync"
+
 	log "github.com/sirupsen/logrus"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -14,6 +16,7 @@ type generator interface {
 }
 
 type proofGenerator struct {
+	sync.RWMutex
 }
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
@@ -26,7 +29,9 @@ func (g *proofGenerator) generateProof(d, k ristretto.Scalar, bidList user.BidLi
 	seedScalar.Derive(seed)
 
 	// Create a slice of scalars with a number of random bids (up to 10)
-	bidListSubset := getBidListSubset(bidList)
+	g.Lock()
+	bidListSubset := createBidListSubset(bidList)
+	g.Unlock()
 	bidListScalars := convertBidListToScalars(bidListSubset)
 
 	proof := zkproof.Prove(d, k, seedScalar, bidListScalars)
@@ -35,7 +40,7 @@ func (g *proofGenerator) generateProof(d, k ristretto.Scalar, bidList user.BidLi
 
 // bidsToScalars will take a global public list, take a subset from it, and then
 // return it as a slice of scalars.
-func getBidListSubset(bidList user.BidList) user.BidList {
+func createBidListSubset(bidList user.BidList) user.BidList {
 	numBids := getNumBids(bidList)
 	return bidList.Subset(numBids)
 }
