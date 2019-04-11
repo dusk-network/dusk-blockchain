@@ -16,8 +16,8 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -47,7 +47,6 @@ const (
 	outputBufferSize = 100
 
 	// pingInterval = 20 * time.Second //Not implemented in Dusk clients
-	obsoleteMessageRound = 3
 )
 
 var (
@@ -95,45 +94,13 @@ type Peer struct {
 	outch  chan func() // Will handle all outbound connections to peer
 	quitch chan struct{}
 
-	dupeBlacklist *dupeMap
-}
-
-type dupeMap struct {
-	roundChan <-chan uint64 // Will get notification about new rounds in order...
-	tmpMap    *TmpMap       // ...to clean up the duplicate message blacklist
-}
-
-func newDupeMap(eventbus *wire.EventBus) *dupeMap {
-	roundChan := consensus.InitRoundUpdate(eventbus)
-	tmpMap := NewTmpMap(obsoleteMessageRound)
-	return &dupeMap{
-		roundChan,
-		tmpMap,
-	}
-}
-
-func (d *dupeMap) cleanOnRound() {
-	for {
-		round := <-d.roundChan
-		d.tmpMap.UpdateHeight(round)
-	}
-}
-
-func (d *dupeMap) canFwd(payload *bytes.Buffer) bool {
-	found := d.tmpMap.HasAnywhere(payload)
-	if found {
-		return false
-	}
-	d.tmpMap.Add(payload)
-	return true
+	dupeBlacklist *dupemap.DupeMap
 }
 
 // NewPeer is called after a connection to a peer was successful.
 // Inbound as well as Outbound.
-func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.EventBus) *Peer {
-
-	dupeBlacklist := newDupeMap(eventBus)
-	go dupeBlacklist.cleanOnRound()
+func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.EventBus,
+	dupeMap *dupemap.DupeMap) *Peer {
 
 	p := &Peer{
 		inch:          make(chan func(), inputBufferSize),
@@ -145,7 +112,7 @@ func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.E
 		Addr:          conn.RemoteAddr().String(),
 		Detector:      stall.NewDetector(responseTime, tickerInterval),
 		magic:         magic,
-		dupeBlacklist: dupeBlacklist,
+		dupeBlacklist: dupeMap,
 	}
 
 	return p
@@ -328,7 +295,7 @@ func (p *Peer) readLoop() {
 		}
 
 		// check if this message is a duplicate of another we already forwarded
-		if p.dupeBlacklist.canFwd(payload) {
+		if p.dupeBlacklist.CanFwd(payload) {
 			p.eventBus.Publish(string(topic), payload)
 		}
 	}
