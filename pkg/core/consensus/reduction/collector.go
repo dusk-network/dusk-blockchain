@@ -2,6 +2,7 @@ package reduction
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"sync"
 	"time"
@@ -70,7 +71,7 @@ func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) 
 
 func (c *collector) onTimeout() {
 	for {
-		<-c.ctx.timer.timeoutChan
+		<-c.ctx.timer.TimeoutChan
 		c.Clear()
 	}
 }
@@ -85,13 +86,12 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 		return err
 	}
 
-	if err := c.ctx.handler.Verify(ev); err != nil {
-		return err
-	}
-
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
 	if c.isRelevant(header.Round, header.Step) {
+		if err := c.ctx.handler.Verify(ev); err != nil {
+			return err
+		}
 		c.process(ev)
 		return nil
 	}
@@ -138,16 +138,17 @@ func (c *collector) updateRound(round uint64) {
 		"process": "reducer",
 		"round":   round,
 	}).Debugln("Updating round")
-	c.ctx.state.Update(round)
-
-	c.queue.Clear(c.ctx.state.Round())
-	c.Clear()
 	c.lock.Lock()
 	if c.reducer != nil {
+		c.reducer.stale = true
 		c.reducer.end()
 		c.reducer = nil
 	}
 	c.lock.Unlock()
+	c.ctx.state.Update(round)
+
+	c.queue.Clear(c.ctx.state.Round())
+	c.Clear()
 }
 
 func (c *collector) isRelevant(round uint64, step uint8) bool {
@@ -231,7 +232,10 @@ func (b *broker) Listen() {
 				"round":   b.collector.ctx.state.Round(),
 				"step":    b.collector.ctx.state.Step(),
 			}).Debug("Reduction complete")
-			b.eventBus.Publish(b.generationTopic, nil)
+			roundAndStep := make([]byte, 8)
+			binary.LittleEndian.PutUint64(roundAndStep, b.ctx.state.Round())
+			roundAndStep = append(roundAndStep, byte(b.ctx.state.Step()))
+			b.eventBus.Publish(b.generationTopic, bytes.NewBuffer(roundAndStep))
 		case ev := <-b.collector.repropagationChannel:
 			message, _ := wire.AddTopic(ev, b.reductionTopic)
 			b.eventBus.Publish(string(topics.Gossip), message)

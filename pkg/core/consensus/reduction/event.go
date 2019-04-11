@@ -18,7 +18,7 @@ type (
 	handler interface {
 		consensus.EventHandler
 		EmbedVoteHash(wire.Event, *bytes.Buffer) error
-		MarshalHeader(r *bytes.Buffer, state consensusState) (*bytes.Buffer, error)
+		MarshalHeader(r *bytes.Buffer, state consensus.State) (*bytes.Buffer, error)
 		MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error
 	}
 )
@@ -27,7 +27,7 @@ func newUnMarshaller(validate func([]byte, []byte, []byte) error) *unMarshaller 
 	return &unMarshaller{committee.NewReductionEventUnMarshaller(validate)}
 }
 
-func (a *unMarshaller) MarshalHeader(r *bytes.Buffer, state consensusState) (*bytes.Buffer, error) {
+func (a *unMarshaller) MarshalHeader(r *bytes.Buffer, state consensus.State) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 	// Decoding Round
 	if err := encoding.WriteUint64(buffer, binary.LittleEndian, state.Round()); err != nil {
