@@ -9,16 +9,16 @@ import (
 
 type (
 	State interface {
+		fmt.Stringer
 		Round() uint64
 		Step() uint8
-		fmt.Stringer
 		Update(uint64)
 		IncrementStep()
 		Cmp(round uint64, step uint8) int
 	}
 
 	SyncState struct {
-		lock  sync.RWMutex
+		Lock  sync.RWMutex
 		round uint64
 		step  uint8
 	}
@@ -34,14 +34,14 @@ func NewState() *SyncState {
 }
 
 func (s *SyncState) Round() uint64 {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.Lock.RLock()
+	defer s.Lock.RUnlock()
 	return s.round
 }
 
 func (s *SyncState) Step() uint8 {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.Lock.RLock()
+	defer s.Lock.RUnlock()
 	return s.step
 }
 
@@ -51,22 +51,22 @@ func (s *SyncState) String() string {
 }
 
 func (s *SyncState) Update(round uint64) {
-	s.lock.Lock()
+	s.Lock.Lock()
 	s.round = round
 	s.step = 1
-	s.lock.Unlock()
+	s.Lock.Unlock()
 }
 
 func (s *SyncState) IncrementStep() {
-	s.lock.Lock()
+	s.Lock.Lock()
 	s.step++
-	s.lock.Unlock()
+	s.Lock.Unlock()
 }
 
 // Cmp returns negative number if the SyncState is in the future, 0 if they are the same and positive if the SyncState is in the past
 func (s *SyncState) Cmp(round uint64, step uint8) int {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.Lock.RLock()
+	defer s.Lock.RUnlock()
 	cmp := s.round - round
 	if cmp == 0 {
 		return int(s.step) - int(step)

@@ -74,15 +74,18 @@ type (
 		topic          string
 	}
 
+	// EventSubscriber subscribes a channel to Event notifications on a specific topic
 	EventSubscriber interface {
 		Subscribe(string, chan<- *bytes.Buffer) uint32
 		Unsubscribe(string, uint32) bool
 	}
 
+	// EventPublisher publishes serialized messages on a specific topic
 	EventPublisher interface {
 		Publish(string, *bytes.Buffer)
 	}
 
+	// EventBroker is an EventPublisher and an EventSubscriber
 	EventBroker interface {
 		EventSubscriber
 		EventPublisher

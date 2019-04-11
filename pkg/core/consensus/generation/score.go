@@ -2,9 +2,6 @@ package generation
 
 import (
 	"bytes"
-	"encoding/hex"
-
-	"gitlab.dusk.network/dusk-core/zkproof"
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
@@ -15,6 +12,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 // LaunchScoreGenerationComponent will start the processes for score generation.
@@ -28,13 +26,12 @@ type (
 	forwarder struct {
 		publisher  wire.EventPublisher
 		marshaller wire.EventMarshaller
-		state      consensus.State
-		seeds      map[string]uint64
 	}
 
 	broker struct {
 		proofGenerator *proofGenerator
 		forwarder      *forwarder
+		seeder         *seeder
 
 		// subscriber channels
 		roundChannel   <-chan uint64
@@ -46,33 +43,10 @@ func newForwarder(publisher wire.EventPublisher) *forwarder {
 	return &forwarder{
 		publisher:  publisher,
 		marshaller: &selection.ScoreUnMarshaller{},
-		state:      consensus.NewState(),
-		seeds:      make(map[string]uint64),
 	}
 }
 
-func (f *forwarder) forward(proof zkproof.ZkProof, seed []byte) {
-	if bytes.Equal(seed, f.getLatestSeed()) {
-		f.generateScoreEvent(proof)
-	}
-}
-
-func (f *forwarder) getLatestSeed() []byte {
-	for seed, round := range f.seeds {
-		if round == f.state.Round() {
-			seedBytes, err := hex.DecodeString(seed)
-			if err != nil {
-				panic(err)
-			}
-
-			return seedBytes
-		}
-	}
-
-	panic("uninitialized forwarder")
-}
-
-func (f *forwarder) generateScoreEvent(proof zkproof.ZkProof) {
+func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed []byte) {
 	// TODO: get an actual hash by generating a block
 	hash, err := crypto.RandEntropy(32)
 	if err != nil {
@@ -80,19 +54,19 @@ func (f *forwarder) generateScoreEvent(proof zkproof.ZkProof) {
 	}
 
 	sev := selection.ScoreEvent{
-		Round:         f.state.Round(),
+		Round:         round,
 		Score:         proof.Score,
 		Proof:         proof.Proof,
 		Z:             proof.Z,
 		BidListSubset: proof.BinaryBidList,
-		Seed:          f.getLatestSeed(),
+		Seed:          seed,
 		VoteHash:      hash,
 	}
 
 	marshalledEvent := f.marshalScore(sev)
 	log.WithFields(log.Fields{
 		"process":         "generation",
-		"collector round": f.state.Round(),
+		"collector round": round,
 	}).Debugln("sending proof")
 	f.publisher.Publish(string(topics.Gossip), marshalledEvent)
 }
@@ -111,14 +85,6 @@ func (f *forwarder) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 	return message
 }
 
-func (f *forwarder) generateSeed(round uint64) []byte {
-	f.state.Update(round)
-	// TODO: make an actual seed by signing the previous block seed
-	seed, _ := crypto.RandEntropy(33)
-	f.seeds[hex.EncodeToString(seed)] = round
-	return seed
-}
-
 func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar) *broker {
 	proofGenerator := newProofGenerator(d, k)
 	roundChannel := consensus.InitRoundUpdate(eventBroker)
@@ -128,6 +94,7 @@ func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar) *broker {
 		roundChannel:   roundChannel,
 		bidListChannel: bidListChannel,
 		forwarder:      newForwarder(eventBroker),
+		seeder:         &seeder{},
 	}
 
 	go wire.NewTopicListener(eventBroker, broker, msg.BlockGenerationTopic).Accept()
@@ -138,9 +105,9 @@ func (b *broker) Listen() {
 	for {
 		select {
 		case round := <-b.roundChannel:
-			seed := b.forwarder.generateSeed(round)
+			seed := b.seeder.GenerateSeed(round)
 			proof := b.proofGenerator.generateProof(seed)
-			b.forwarder.forward(proof, seed)
+			b.Forward(proof, seed)
 		case bidList := <-b.bidListChannel:
 			b.proofGenerator.updateBidList(bidList)
 		}
@@ -148,8 +115,20 @@ func (b *broker) Listen() {
 }
 
 func (b *broker) Collect(m *bytes.Buffer) error {
-	seed := b.forwarder.getLatestSeed()
+	seed := b.seeder.LatestSeed()
 	proof := b.proofGenerator.generateProof(seed)
-	b.forwarder.forward(proof, seed)
+	b.Forward(proof, seed)
 	return nil
+}
+
+func (b *broker) Forward(proof zkproof.ZkProof, seed []byte) {
+	b.seeder.RLock()
+	if b.seeder.isFresh(seed) {
+		round := b.seeder.round
+		b.seeder.RUnlock()
+		b.forwarder.forwardScoreEvent(proof, round, seed)
+		return
+	}
+
+	b.seeder.RUnlock()
 }
