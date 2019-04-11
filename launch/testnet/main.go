@@ -1,21 +1,26 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"math/rand"
 	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
-// Flags
-var voucher = flag.String("voucher", "voucher.dusk.network:8081", "hostname for the voucher seeder")
-var port = flag.String("port", "7000", "port for the node to bind on")
-var logToFile = flag.Bool("logtofile", false, "specifies if the log should be written to a file")
-
 func initLog(file *os.File) {
-	log.SetLevel(log.TraceLevel)
+
+	// apply logger level from configurations
+	level, err := log.ParseLevel(cfg.Get().Logger.Level)
+	if err == nil {
+		log.SetLevel(level)
+	} else {
+		log.SetLevel(log.TraceLevel)
+		log.Warnf("Parse logger level from config err: %v", err)
+	}
+
 	if file != nil {
 		os.Stdout = file
 		log.SetOutput(file)
@@ -25,12 +30,29 @@ func initLog(file *os.File) {
 }
 
 func main() {
-	flag.Parse()
+
+	// Loading all node configurations. Fail-fast if critical error occurs
+	if err := cfg.Load(); err != nil {
+		fmt.Printf("%v\n", err)
+		os.Exit(1)
+	}
+
+	profile, err := newProfile()
+
+	if err != nil {
+		fmt.Printf(" %v\n", err)
+		os.Exit(1)
+	}
+
+	defer profile.close()
+
+	port := cfg.Get().Network.Port
 	rand.Seed(time.Now().UnixNano())
 
 	// Set up logging
-	if *logToFile {
-		file, err := os.Create("node" + *port + ".log")
+	output := cfg.Get().Logger.Output
+	if cfg.Get().Logger.Output != "stdout" {
+		file, err := os.Create(output + port + ".log")
 		if err != nil {
 			panic(err)
 		}
@@ -40,15 +62,18 @@ func main() {
 		initLog(nil)
 	}
 
+	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
+	log.Infof("Selected network  %s", cfg.Get().General.Network)
+
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
-	srv := Setup("demo" + *port)
+	srv := Setup("demo" + port)
 	// listening to the blindbid and the stake channels
 	go srv.Listen()
 	// fetch neighbours addresses from the Seeder
 	ips := ConnectToSeeder()
 	//start the connection manager
 	connMgr := NewConnMgr(CmgrConfig{
-		Port:     *port,
+		Port:     port,
 		OnAccept: srv.OnAccept,
 		OnConn:   srv.OnConnection,
 	})

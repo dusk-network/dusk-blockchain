@@ -7,12 +7,28 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
 const secret = "v1W0imI82rqW2hT7odpI-"
 
 func ConnectToSeeder() []string {
-	conn, err := net.Dial("tcp", *voucher)
+
+	if cfg.Get().General.Network == "testnet" {
+		fixedNetwork := cfg.Get().Network.Seeder.Fixed
+		if len(fixedNetwork) > 0 {
+			log.Infof("Fixed-network config activated")
+			return fixedNetwork
+		}
+	}
+
+	seeders := cfg.Get().Network.Seeder.Addresses
+	if len(seeders) == 0 {
+		log.Errorf("Empty list of seeder addresses")
+		return nil
+	}
+
+	conn, err := net.Dial("tcp", seeders[0])
 	if err != nil {
 		panic(err)
 	}
@@ -51,7 +67,7 @@ func completeChallenge(conn net.Conn) error {
 	}
 
 	// turn into uppercase string, add port
-	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "," + *port + "\n"
+	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "," + cfg.Get().Network.Port + "\n"
 
 	// write response
 	if _, err := conn.Write([]byte(ret)); err != nil {
