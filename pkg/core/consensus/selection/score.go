@@ -10,10 +10,34 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/zkproof"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
+	"gitlab.dusk.network/dusk-core/zkproof"
+)
+
+type (
+	scoreHandler struct {
+		bidList      user.BidList
+		unMarshaller *ScoreUnMarshaller
+	}
+
+	bidListCollector struct {
+		BidListChan chan user.BidList
+	}
+
+	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
+	scoreCollector struct {
+		bestVotedScoreHashChan chan []byte
+	}
+
+	// broker is the component that supervises a collection of events
+	scoreBroker struct {
+		eventBus        *wire.EventBus
+		roundUpdateChan <-chan uint64
+		generationChan  <-chan bool
+		collector       *collector
+	}
 )
 
 // LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
@@ -53,7 +77,6 @@ func InitBlockGenerationCollector(eventBus *wire.EventBus) chan bool {
 func newScoreBroker(eventBus *wire.EventBus, handler consensus.EventHandler, timeout time.Duration) *scoreBroker {
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundUpdate(eventBus)
-	phaseChan := consensus.InitPhaseUpdate(eventBus)
 	generationChan := InitBlockGenerationCollector(eventBus)
 	collector := initCollector(handler, timeout, eventBus, string(topics.Score))
 
@@ -61,7 +84,6 @@ func newScoreBroker(eventBus *wire.EventBus, handler consensus.EventHandler, tim
 		eventBus:        eventBus,
 		collector:       collector,
 		roundUpdateChan: roundChan,
-		phaseUpdateChan: phaseChan,
 		generationChan:  generationChan,
 	}
 }
@@ -73,19 +95,11 @@ func (f *scoreBroker) Listen() {
 		case roundUpdate := <-f.roundUpdateChan:
 			f.collector.UpdateRound(roundUpdate)
 			f.collector.StartSelection()
-		case <-f.phaseUpdateChan:
-			// TODO: think of better solution after demo
-			f.collector.completed = true
 		case <-f.generationChan:
-			// TODO: think of better solution after demo
-			if !f.collector.completed {
+			if f.collector.selector == nil {
 				f.collector.StartSelection()
 			}
 		case bestEvent := <-f.collector.BestEventChan:
-			if f.collector.completed {
-				break
-			}
-
 			// TODO: moved step incrementation here, so we dont run ahead in case there's nobody generating blocks
 			if bestEvent.Len() != 0 {
 				f.collector.CurrentStep++
@@ -93,38 +107,17 @@ func (f *scoreBroker) Listen() {
 			} else {
 				f.eventBus.Publish(msg.BlockGenerationTopic, nil)
 			}
+		case ev := <-f.collector.RepropagateChan:
+			// TODO: review
+			buf := new(bytes.Buffer)
+			if err := f.collector.handler.Marshal(buf, ev); err != nil {
+				panic(err)
+			}
+			message, _ := wire.AddTopic(buf, topics.Score)
+			f.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
 }
-
-type (
-	scoreHandler struct {
-		bidList      user.BidList
-		unMarshaller *ScoreUnMarshaller
-	}
-
-	bidListCollector struct {
-		BidListChan chan user.BidList
-	}
-
-	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
-	scoreCollector struct {
-		bestVotedScoreHashChan chan []byte
-	}
-
-	scoreSelectionCollector struct {
-		scoreSelectionChan chan bool
-	}
-
-	// broker is the component that supervises a collection of events
-	scoreBroker struct {
-		eventBus        *wire.EventBus
-		phaseUpdateChan <-chan []byte
-		roundUpdateChan <-chan uint64
-		generationChan  <-chan bool
-		collector       *collector
-	}
-)
 
 func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
 	ev := &ScoreEvent{}
@@ -209,7 +202,15 @@ func (p *scoreHandler) Verify(ev wire.Event) error {
 	// Verify the proof
 	seedScalar := ristretto.Scalar{}
 	seedScalar.Derive(m.Seed)
-	if !zkproof.Verify(m.Proof, seedScalar.Bytes(), m.BidListSubset, m.Score, m.Z) {
+
+	proof := zkproof.ZkProof{
+		Proof:         m.Proof,
+		Score:         m.Score,
+		Z:             m.Z,
+		BinaryBidList: m.BidListSubset,
+	}
+
+	if !proof.Verify(seedScalar) {
 		return errors.New("proof verification failed")
 	}
 

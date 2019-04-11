@@ -3,25 +3,26 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"net"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const secret = "v1W0imI82rqW2hT7odpI-"
 
 func ConnectToSeeder() []string {
-	conn, err := net.Dial("tcp", "voucher.dusk.network:8081")
+	conn, err := net.Dial("tcp", *voucher)
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
-	fmt.Println("connected to voucher seeder")
+	log.WithField("prefix", "main").Debugln("connected to voucher seeder")
 
 	if err := completeChallenge(conn); err != nil {
 		panic(err)
 	}
-	fmt.Println("challenge completed")
+	log.WithField("prefix", "main").Debugln("voucher seeder challenge completed")
 
 	// get IP list
 	buf := make([]byte, 2048)
@@ -49,8 +50,8 @@ func completeChallenge(conn net.Conn) error {
 		return err
 	}
 
-	// turn into uppercase string
-	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "\n"
+	// turn into uppercase string, add port
+	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "," + *port + "\n"
 
 	// write response
 	if _, err := conn.Write([]byte(ret)); err != nil {

@@ -3,10 +3,10 @@ package reduction
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -16,10 +16,10 @@ import (
 
 type (
 	collector struct {
-		consensus.StepEventCollector
+		*consensus.StepEventCollector
 		collectedVotesChan chan []wire.Event
 		queue              *consensus.EventQueue
-		lock               sync.Mutex
+		lock               sync.RWMutex
 		reducer            *reducer
 		ctx                *context
 
@@ -54,17 +54,13 @@ type (
 )
 
 func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) *collector {
-
-	queue := consensus.NewEventQueue()
 	collector := &collector{
-
-		StepEventCollector:   consensus.StepEventCollector{},
-		queue:                queue,
+		StepEventCollector:   consensus.NewStepEventCollector(),
+		queue:                consensus.NewEventQueue(),
 		collectedVotesChan:   make(chan []wire.Event, 1),
 		ctx:                  ctx,
 		regenerationChannel:  make(chan bool, 1),
 		repropagationChannel: make(chan *bytes.Buffer, 100),
-		lock:                 sync.Mutex{},
 	}
 
 	go wire.NewEventSubscriber(eventBus, collector, reductionTopic).Accept()
@@ -80,13 +76,10 @@ func (c *collector) onTimeout() {
 }
 
 func (c *collector) Clear() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.StepEventCollector.Clear()
 }
 
 func (c *collector) Collect(buffer *bytes.Buffer) error {
-	fmt.Println("Received a message")
 	ev := c.ctx.handler.NewEvent()
 	if err := c.ctx.handler.Unmarshal(buffer, ev); err != nil {
 		return err
@@ -95,25 +88,15 @@ func (c *collector) Collect(buffer *bytes.Buffer) error {
 	if err := c.ctx.handler.Verify(ev); err != nil {
 		return err
 	}
-	fmt.Println("message verified successfully")
 
 	header := &consensus.EventHeader{}
 	c.ctx.handler.ExtractHeader(ev, header)
-	fmt.Println("current step is ", c.ctx.state.Step(), "message received for step", header.Step)
-	// TODO: review re-propagation logic
-	c.lock.Lock()
-	if c.isRelevant(header.Round, header.Step) &&
-		!c.Contains(ev, string(header.Step)) {
-		// TODO: review
-		c.repropagate(ev)
+	if c.isRelevant(header.Round, header.Step) {
 		c.process(ev)
-		c.lock.Unlock()
 		return nil
 	}
 
-	c.lock.Unlock()
 	if c.isEarly(header.Round, header.Step) {
-		fmt.Println("message is early")
 		c.queue.PutEvent(header.Round, header.Step, ev)
 	}
 
@@ -124,16 +107,19 @@ func (c *collector) process(ev wire.Event) {
 	b := new(bytes.Buffer)
 	if err := c.ctx.handler.EmbedVoteHash(ev, b); err == nil {
 		hash := hex.EncodeToString(b.Bytes())
+		if !c.Contains(ev, hash) {
+			c.repropagate(ev)
+		}
+
 		count := c.Store(ev, hash)
 		if count > c.ctx.committee.Quorum() {
-			votes := c.StepEventCollector[hash]
+			votes := c.StepEventCollector.Map[hash]
 			c.collectedVotesChan <- votes
 			c.Clear()
 		}
 	}
 }
 
-// TODO: review
 func (c *collector) repropagate(ev wire.Event) {
 	buf := new(bytes.Buffer)
 	_ = c.ctx.handler.Marshal(buf, ev)
@@ -148,36 +134,56 @@ func (c *collector) flushQueue() {
 }
 
 func (c *collector) updateRound(round uint64) {
+	log.WithFields(log.Fields{
+		"process": "reducer",
+		"round":   round,
+	}).Debugln("Updating round")
 	c.ctx.state.Update(round)
 
 	c.queue.Clear(c.ctx.state.Round())
 	c.Clear()
+	c.lock.Lock()
 	if c.reducer != nil {
 		c.reducer.end()
 		c.reducer = nil
 	}
+	c.lock.Unlock()
 }
 
 func (c *collector) isRelevant(round uint64, step uint8) bool {
-	return c.ctx.state.Cmp(round, step) == 0 && c.reducer != nil
+	cmp := c.ctx.state.Cmp(round, step)
+	if cmp == 0 && c.isReducing() {
+		return true
+	}
+	log.WithFields(log.Fields{
+		"process": "reducer",
+		"cmp":     cmp,
+		"reducer": c.isReducing(),
+	}).Debugln("isRelevant mismatch")
+	return false
+}
+
+func (c *collector) isReducing() bool {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.reducer != nil
 }
 
 func (c *collector) isEarly(round uint64, step uint8) bool {
-	return c.ctx.state.Cmp(round, step) > 0
+	return c.ctx.state.Cmp(round, step) <= 0
 }
 
 func (c *collector) startReduction() {
-	// TODO: review
+	log.Traceln("Starting Reduction")
 	c.lock.Lock()
 	c.reducer = newCoordinator(c.collectedVotesChan, c.ctx, c.regenerationChannel)
+	c.lock.Unlock()
 
 	go c.reducer.begin()
-	c.lock.Unlock()
 	c.flushQueue()
 }
 
 // newBroker will return a reduction broker.
-// TODO: review regeneration
 func newBroker(eventBus *wire.EventBus, handler handler, selectionChannel chan []byte,
 	committee committee.Committee, reductionTopic topics.Topic, outgoingReductionTopic,
 	outgoingAgreementTopic, generationTopic string, timeout time.Duration) *broker {
@@ -209,18 +215,24 @@ func (b *broker) Listen() {
 		case round := <-b.roundUpdateChan:
 			b.collector.updateRound(round)
 		case hash := <-b.selectionChan:
+			log.WithFields(log.Fields{
+				"process": "reduction",
+				"round":   b.collector.ctx.state.Round(),
+				"hash":    hex.EncodeToString(hash),
+			}).Debug("Got selection message")
 			b.forwardSelection(hash)
 		case reductionVote := <-b.ctx.reductionVoteChan:
 			b.eventBus.Publish(b.outgoingReductionTopic, reductionVote)
 		case agreementVote := <-b.ctx.agreementVoteChan:
 			b.eventBus.Publish(b.outgoingAgreementTopic, agreementVote)
 		case <-b.collector.regenerationChannel:
-			// TODO: remove
-			fmt.Println("reduction finished")
-			// TODO: review
+			log.WithFields(log.Fields{
+				"process": "reduction",
+				"round":   b.collector.ctx.state.Round(),
+				"step":    b.collector.ctx.state.Step(),
+			}).Debug("Reduction complete")
 			b.eventBus.Publish(b.generationTopic, nil)
 		case ev := <-b.collector.repropagationChannel:
-			// TODO: review
 			message, _ := wire.AddTopic(ev, b.reductionTopic)
 			b.eventBus.Publish(string(topics.Gossip), message)
 		}
@@ -233,6 +245,7 @@ func (b *broker) forwardSelection(hash []byte) {
 	if err != nil {
 		panic(err)
 	}
+
 	b.eventBus.Publish(b.outgoingReductionTopic, vote)
-	go b.collector.startReduction()
+	b.collector.startReduction()
 }

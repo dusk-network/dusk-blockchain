@@ -9,8 +9,8 @@ import (
 )
 
 func TestDemoSaveFunctionality(t *testing.T) {
-	eb := wire.New()
-	chn, err := New(eb)
+	eb := wire.NewEventBus()
+	chn, err := New(eb, "testdb")
 	assert.Nil(t, err)
 
 	for i := 1; i < 5; i++ {

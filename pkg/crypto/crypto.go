@@ -28,7 +28,7 @@ func RandEntropy(n uint32) ([]byte, error) {
 // Checksum hashes the data with Sha3256
 // and returns the first four bytes
 func Checksum(data []byte) (uint32, error) {
-	hash, err := hash.Sha3256(data)
+	hash, err := hash.Xxhash(data)
 	if err != nil {
 		return 0, err
 	}

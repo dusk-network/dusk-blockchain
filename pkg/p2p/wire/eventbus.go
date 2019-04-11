@@ -20,8 +20,8 @@ type eventHandler struct {
 	messageChannel chan<- *bytes.Buffer
 }
 
-// New returns new EventBus with empty handlers.
-func New() *EventBus {
+// NewEventBus returns new EventBus with empty handlers.
+func NewEventBus() *EventBus {
 	return &EventBus{
 		sync.RWMutex{},
 		make(map[string][]*eventHandler),
@@ -116,10 +116,10 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
 	if handlers, ok := bus.handlers[topic]; ok {
-		go bus.publish(handlers, messageBuffer, topic)
+		bus.publish(handlers, messageBuffer, topic)
 	}
 
-	go bus.publish(bus.broadcaster, messageBuffer, topic)
+	bus.publish(bus.broadcaster, messageBuffer, topic)
 }
 
 func (bus *EventBus) publish(handlers []*eventHandler, messageBuffer *bytes.Buffer, topic string) {

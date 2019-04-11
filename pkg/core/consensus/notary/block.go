@@ -2,12 +2,14 @@ package notary
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	log "github.com/sirupsen/logrus"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -16,17 +18,14 @@ import (
 // LaunchBlockNotary creates a BlockNotary by injecting the EventBus, the
 // CommitteeStore and the message validation primitive. The blocknotary is
 // returned solely for test purposes
-func LaunchBlockNotary(eventBus *wire.EventBus,
-	c committee.Committee) *blockNotary {
+func LaunchBlockNotary(eventBus *wire.EventBus, c committee.Committee,
+	currentRound uint64) *blockNotary {
 
-	blockCollector := initBlockCollector(eventBus, c)
-	generationChan := selection.InitSigSetGenerationCollector(eventBus)
+	blockCollector := initBlockCollector(eventBus, c, currentRound)
 
 	blockNotary := &blockNotary{
-		eventBus:        eventBus,
-		roundUpdateChan: consensus.InitRoundUpdate(eventBus),
-		blockCollector:  blockCollector,
-		generationChan:  generationChan,
+		eventBus:       eventBus,
+		blockCollector: blockCollector,
 
 		// TODO: review
 		repropagationChannel: blockCollector.RepropagationChannel,
@@ -43,9 +42,8 @@ type (
 
 	// BlockNotary notifies when there is a consensus on a block hash
 	blockNotary struct {
-		eventBus        *wire.EventBus
-		blockCollector  *blockCollector
-		roundUpdateChan chan uint64
+		eventBus       *wire.EventBus
+		blockCollector *blockCollector
 
 		// TODO: review
 		repropagationChannel chan *bytes.Buffer
@@ -57,8 +55,9 @@ type (
 	blockCollector struct {
 		*committee.Collector
 		BlockChan    chan []byte
-		Result       *BlockEvent
+		RoundChan    chan uint64
 		Unmarshaller wire.EventUnMarshaller
+		queue        map[uint64][]*BlockEvent
 	}
 )
 
@@ -72,16 +71,14 @@ type (
 func (b *blockNotary) Listen() {
 	for {
 		select {
-		case blockHash := <-b.blockCollector.BlockChan:
-			b.sendResult()
-			buffer := bytes.NewBuffer(blockHash)
-			b.eventBus.Publish(msg.PhaseUpdateTopic, buffer)
-		case round := <-b.roundUpdateChan:
-			b.blockCollector.Result = nil
-			b.blockCollector.UpdateRound(round)
-		case <-b.generationChan:
-			// TODO: review
-			b.sendResult()
+		case round := <-b.blockCollector.RoundChan:
+			// Marshalling the round update
+			bs := make([]byte, 8)
+			binary.LittleEndian.PutUint64(bs, round)
+			buf := bytes.NewBuffer(bs)
+			// publishing to the EventBus
+			b.eventBus.Publish(msg.RoundUpdateTopic, buf)
+		// case blockHash := <-b.blockCollector.BlockChan:
 		case ev := <-b.repropagationChannel:
 			// TODO: review
 			message, _ := wire.AddTopic(ev, topics.BlockAgreement)
@@ -90,45 +87,34 @@ func (b *blockNotary) Listen() {
 	}
 }
 
-// TODO: for the demo, this was added to vote during sigset selection.
-func (b *blockNotary) sendResult() error {
-	if b.blockCollector.Result == nil {
-		return nil
-	}
-
-	buffer := new(bytes.Buffer)
-	if err := b.blockCollector.Unmarshaller.Marshal(buffer, b.blockCollector.Result); err != nil {
-		return err
-	}
-
-	b.eventBus.Publish(string(msg.OutgoingSigSetTopic), buffer)
-	b.blockCollector.Result.Step++
-	return nil
-}
-
 // newBlockCollector is injected with the committee, a channel where to publish
 // the new Block Hash and the validator function for shallow checking of the
 // marshalled form of the CommitteeEvent messages.
-func newBlockCollector(c committee.Committee) *blockCollector {
+func newBlockCollector(c committee.Committee, currentRound uint64) *blockCollector {
 	cc := &committee.Collector{
-		StepEventCollector:   make(map[string][]wire.Event),
+		StepEventCollector:   consensus.NewStepEventCollector(),
 		Committee:            c,
+		CurrentRound:         currentRound,
 		RepropagationChannel: make(chan *bytes.Buffer, 100),
 	}
 
 	return &blockCollector{
 		Collector:    cc,
 		BlockChan:    make(chan []byte, 1),
+		RoundChan:    make(chan uint64, 1),
 		Unmarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 
 // InitBlockCollector is a helper to minimize the wiring of EventSubscribers,
 // collector and channels
-func initBlockCollector(eventBus *wire.EventBus, c committee.Committee) *blockCollector {
-	collector := newBlockCollector(c)
+func initBlockCollector(eventBus *wire.EventBus, c committee.Committee,
+	currentRound uint64) *blockCollector {
+
+	collector := newBlockCollector(c, currentRound)
 	go wire.NewEventSubscriber(eventBus, collector,
 		string(topics.BlockAgreement)).Accept()
+	collector.RoundChan <- currentRound
 	return collector
 }
 
@@ -145,6 +131,10 @@ func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
 		return nil
 	}
 
+	if c.shouldBeStored(ev) {
+		c.queue[ev.Round] = append(c.queue[ev.Round], ev)
+	}
+
 	// TODO: review
 	c.repropagate(ev)
 	c.Process(ev)
@@ -157,17 +147,36 @@ func (c *blockCollector) Process(event *BlockEvent) {
 	nrAgreements := c.Store(event, string(event.Step))
 	// did we reach the quorum?
 	if nrAgreements >= c.Committee.Quorum() {
-		// TODO: review result store
-		event.Step = 1
-		c.Result = event
-
 		// notify the Notary
-		c.BlockChan <- event.AgreedHash
+		// c.BlockChan <- event.AgreedHash
 		c.Clear()
+		c.nextRound()
 
-		// TODO: remove
-		fmt.Println("block agreement reached")
+		log.WithField("process", "notary").Traceln("block agreement reached")
 	}
+}
+
+func (c *blockCollector) nextRound() {
+	log.WithFields(log.Fields{
+		"process": "notary",
+		"round":   c.CurrentRound + 1,
+	}).Debugln("updating round")
+
+	c.UpdateRound(c.CurrentRound + 1)
+	// notify the Notary
+	c.RoundChan <- c.CurrentRound
+	c.Clear()
+
+	// picking messages related to next round (now current)
+	currentEvents := c.queue[c.CurrentRound]
+	// processing messages store so far
+	for _, event := range currentEvents {
+		c.Process(event)
+	}
+}
+
+func (c *blockCollector) shouldBeStored(event *BlockEvent) bool {
+	return event.Round > c.CurrentRound
 }
 
 // TODO: review

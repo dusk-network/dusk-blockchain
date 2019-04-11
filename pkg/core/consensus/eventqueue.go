@@ -2,8 +2,7 @@ package consensus
 
 import "gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
-// EventQueue is a Queue of Events grouped by rounds and steps.
-// NOTE: the EventQueue is purposefully not synchronized. The client can decide whether Mutexes or other sync primitives would be appropriate to use, depending on the context
+// EventQueue is a Queue of Events grouped by rounds and steps. It is threadsafe through a sync.RWMutex
 type EventQueue struct {
 	entries map[uint64]map[uint8][]wire.Event
 }
@@ -32,6 +31,11 @@ func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
 	// Initialise the map on this round if it was not yet created
 	if s.entries[round] == nil {
 		s.entries[round] = make(map[uint8][]wire.Event)
+	}
+
+	// Initialise the array on this step if it was not yet created
+	if s.entries[round][step] == nil {
+		s.entries[round][step] = make([]wire.Event, 0)
 	}
 
 	s.entries[round][step] = append(s.entries[round][step], m)
