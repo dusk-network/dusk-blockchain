@@ -12,6 +12,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+type janitor interface {
+	Clear()
+}
+
 type eventStopWatch struct {
 	collectedVotesChan chan []wire.Event
 	stopChan           chan interface{}
@@ -86,10 +90,11 @@ func (c *reducer) sendEvent(topic string, msg *bytes.Buffer) {
 	}
 }
 
-func (c *reducer) begin() {
+func (c *reducer) begin(janitor janitor) {
 	log.WithField("process", "reducer").Traceln("Beginning Reduction")
 	// this is a blocking call
 	events := c.firstStep.fetch()
+	janitor.Clear()
 	log.WithField("process", "reducer").Traceln("First step completed")
 	c.requestUpdate(c.ctx.state.IncrementStep)
 	hash1 := c.encodeEv(events)
@@ -99,13 +104,13 @@ func (c *reducer) begin() {
 	}
 	c.sendEvent(string(msg.OutgoingBlockReductionTopic), reductionVote)
 	eventsSecondStep := c.secondStep.fetch()
+	janitor.Clear()
 	log.WithField("process", "reducer").Traceln("Second step completed")
 	hash2 := c.encodeEv(eventsSecondStep)
 
 	allEvents := append(events, eventsSecondStep...)
 
 	if c.isReductionSuccessful(hash1, hash2, allEvents) {
-
 		log.WithFields(log.Fields{
 			"process":    "reducer",
 			"votes":      len(allEvents),
