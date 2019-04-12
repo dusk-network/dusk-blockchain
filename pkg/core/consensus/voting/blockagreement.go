@@ -3,6 +3,8 @@ package voting
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
@@ -36,18 +38,13 @@ func (as *blockAgreementSigner) addSignatures(ev wire.Event) (*bytes.Buffer, err
 		return nil, err
 	}
 
-	signBuffer := new(bytes.Buffer)
-	if err := as.Marshal(signBuffer, e); err != nil {
-		return nil, err
-	}
-
-	as.signEd25519(e, signBuffer.Bytes())
 	buffer := new(bytes.Buffer)
 	if err := as.Marshal(buffer, e); err != nil {
 		return nil, err
 	}
 
-	return buffer, nil
+	message := as.signEd25519(e, buffer)
+	return message, nil
 }
 
 func (as *blockAgreementSigner) signBLS(ev wire.Event) error {
@@ -63,8 +60,20 @@ func (as *blockAgreementSigner) signBLS(ev wire.Event) error {
 	return err
 }
 
-func (as *blockAgreementSigner) signEd25519(e *notary.BlockEvent, eventBytes []byte) {
-	signature := ed25519.Sign(*as.EdSecretKey, eventBytes)
-	e.EventHeader.Signature = signature
-	e.EventHeader.PubKeyEd = as.EdPubKeyBytes()
+func (as *blockAgreementSigner) signEd25519(e *notary.BlockEvent, eventBuf *bytes.Buffer) *bytes.Buffer {
+	signature := ed25519.Sign(*as.EdSecretKey, eventBuf.Bytes())
+	buf := new(bytes.Buffer)
+	if err := encoding.Write512(buf, signature); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.Write256(buf, as.EdPubKeyBytes()); err != nil {
+		panic(err)
+	}
+
+	if _, err := buf.Write(eventBuf.Bytes()); err != nil {
+		panic(err)
+	}
+
+	return buf
 }

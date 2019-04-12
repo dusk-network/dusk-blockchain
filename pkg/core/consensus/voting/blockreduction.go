@@ -8,6 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
 	"golang.org/x/crypto/ed25519"
 )
@@ -34,18 +35,13 @@ func (bs *blockReductionSigner) addSignatures(ev wire.Event) (*bytes.Buffer, err
 		return nil, err
 	}
 
-	signBuffer := new(bytes.Buffer)
-	if err := bs.Marshal(signBuffer, e); err != nil {
-		return nil, err
-	}
-
-	bs.signEd25519(e, signBuffer.Bytes())
 	buffer := new(bytes.Buffer)
 	if err := bs.Marshal(buffer, e); err != nil {
 		return nil, err
 	}
 
-	return buffer, nil
+	message := bs.signEd25519(e, buffer)
+	return message, nil
 }
 
 func (bs *blockReductionSigner) signBLS(e *committee.ReductionEvent) error {
@@ -55,8 +51,20 @@ func (bs *blockReductionSigner) signBLS(e *committee.ReductionEvent) error {
 	return err
 }
 
-func (bs *blockReductionSigner) signEd25519(e *committee.ReductionEvent, eventBytes []byte) {
-	signature := ed25519.Sign(*bs.EdSecretKey, eventBytes)
-	e.EventHeader.Signature = signature
-	e.EventHeader.PubKeyEd = bs.EdPubKeyBytes()
+func (bs *blockReductionSigner) signEd25519(e *committee.ReductionEvent, eventBuf *bytes.Buffer) *bytes.Buffer {
+	signature := ed25519.Sign(*bs.EdSecretKey, eventBuf.Bytes())
+	buf := new(bytes.Buffer)
+	if err := encoding.Write512(buf, signature); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.Write256(buf, bs.EdPubKeyBytes()); err != nil {
+		panic(err)
+	}
+
+	if _, err := buf.Write(eventBuf.Bytes()); err != nil {
+		panic(err)
+	}
+
+	return buf
 }

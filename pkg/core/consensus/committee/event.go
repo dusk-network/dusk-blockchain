@@ -179,6 +179,10 @@ func (a *ReductionEventUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.
 	}
 
 	for _, event := range evs {
+		rev := event.(*ReductionEvent)
+		if err := a.MarshalEdFields(r, rev.EventHeader); err != nil {
+			return err
+		}
 		if err := a.Marshal(r, event); err != nil {
 			return err
 		}
@@ -192,13 +196,6 @@ func (a *ReductionEventUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.
 // * Consensus Header [BLS Public Key; Round; Step]
 // * Committee Header [Signed Vote Set; Vote Set; BlockHash]
 func (ceu *NotaryEventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	// check if the buffer has contents first
-	// if not, we did not get any messages this round
-	// TODO: review this
-	if r.Len() == 0 {
-		return nil
-	}
-
 	cev := ev.(*NotaryEvent)
 	if err := ceu.EventHeaderUnmarshaller.Unmarshal(r, cev.EventHeader); err != nil {
 		return err

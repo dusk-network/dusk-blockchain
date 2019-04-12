@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -46,19 +47,6 @@ func (a *EventHeader) Sender() []byte {
 // Marshal an EventHeader into a Buffer
 func (ehm *EventHeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*EventHeader)
-
-	// TODO: review. added to be able to marshal events without signature and
-	// edwards pubkey, for signing purposes in the voting package.
-	if consensusEv.Signature != nil && consensusEv.PubKeyEd != nil {
-		if err := encoding.Write512(r, consensusEv.Signature); err != nil {
-			return err
-		}
-
-		if err := encoding.Write256(r, consensusEv.PubKeyEd); err != nil {
-			return err
-		}
-	}
-
 	if err := encoding.WriteVarBytes(r, consensusEv.PubKeyBLS); err != nil {
 		return err
 	}
@@ -74,6 +62,19 @@ func (ehm *EventHeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 	return nil
 }
 
+func (ehm *EventHeaderMarshaller) MarshalEdFields(r *bytes.Buffer, ev wire.Event) error {
+	evh := ev.(*EventHeader)
+	if err := encoding.Write512(r, evh.Signature); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, evh.PubKeyEd); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // NewEventHeaderUnmarshaller creates an EventHeaderUnmarshaller delegating validation to the validate function
 func NewEventHeaderUnmarshaller(validate func([]byte, []byte, []byte) error) *EventHeaderUnmarshaller {
 	return &EventHeaderUnmarshaller{validate}
@@ -83,9 +84,6 @@ func NewEventHeaderUnmarshaller(validate func([]byte, []byte, []byte) error) *Ev
 func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	// if the injection is unsuccessful, panic
 	consensusEv := ev.(*EventHeader)
-
-	// TODO: ed25519 related fields added for demo to facilitate easy
-	// re-propagation. review
 	if err := encoding.Read512(r, &consensusEv.Signature); err != nil {
 		return err
 	}
@@ -96,6 +94,8 @@ func (a *EventHeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) erro
 
 	// verify the signature here
 	if err := a.Validate(consensusEv.PubKeyEd, r.Bytes(), consensusEv.Signature); err != nil {
+		fmt.Println(consensusEv.PubKeyEd)
+		fmt.Println(consensusEv.Signature)
 		return err
 	}
 
