@@ -79,7 +79,7 @@ func (c *ConsensusFactory) StartConsensus() {
 		"round":   round,
 	}).Debug("Received initial round")
 
-	notary.LaunchBlockNotary(c.eventBus, c.committee, round)
+	notary.LaunchBlockAgreement(c.eventBus, c.committee, round)
 
 	log.WithField("process", "factory").Info("Consensus Started")
 }
