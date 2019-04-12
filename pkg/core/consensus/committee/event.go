@@ -264,9 +264,8 @@ func (cc *Collector) ShouldBeSkipped(m *NotaryEvent) bool {
 
 // ShouldSkip checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
 func (cc *Collector) ShouldSkip(ev wire.Event, round uint64, step uint8) bool {
-	isDupe := cc.Contains(ev, string(step))
 	isPleb := !cc.Committee.IsMember(ev.Sender())
-	return isDupe || isPleb
+	return isPleb
 }
 
 // UpdateRound is a utility function that can be overridden by the embedding collector in case of custom behaviour when updating the current round
