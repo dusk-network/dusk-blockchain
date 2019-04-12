@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -152,6 +154,10 @@ func (p *Peer) Write(msg *bytes.Buffer) {
 
 // Disconnect disconnects from a peer
 func (p *Peer) Disconnect() {
+	log.WithFields(log.Fields{
+		"process": "peer",
+		"address": p.Conn.RemoteAddr().String(),
+	}).Warnln("peer disconnected")
 	// return if already disconnected
 	if atomic.LoadInt32(&p.Disconnected) != 0 {
 		return
@@ -296,6 +302,7 @@ func (p *Peer) readLoop() {
 
 		// check if this message is a duplicate of another we already forwarded
 		if p.dupeBlacklist.CanFwd(payload) {
+			// TODO: handle message repropagation here instead of anywhere else
 			p.eventBus.Publish(string(topic), payload)
 		}
 	}
