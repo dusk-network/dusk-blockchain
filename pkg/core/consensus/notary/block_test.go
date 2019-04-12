@@ -30,7 +30,7 @@ func TestSimpleBlockCollection(t *testing.T) {
 	case res := <-bc.RoundChan:
 		assert.Equal(t, uint64(2), res)
 		// testing that we clean after collection
-		assert.Equal(t, 0, len(bc.StepEventCollector.Map))
+		assert.Equal(t, 0, len(bc.StepEventAccumulator.Map))
 	case <-time.After(1 * time.Second):
 		assert.Fail(t, "Collection did not complete")
 	}
@@ -50,9 +50,9 @@ func TestNoQuorumCollection(t *testing.T) {
 		assert.Fail(t, "Collection was not supposed to complete since Quorum should not be reached")
 	case <-time.After(100 * time.Millisecond):
 		// testing that we still have collected for 1 step
-		assert.Equal(t, 1, len(bc.StepEventCollector.Map))
+		assert.Equal(t, 1, len(bc.StepEventAccumulator.Map))
 		// testing that we collected 2 messages
-		assert.Equal(t, 2, len(bc.StepEventCollector.Map[string(1)]))
+		assert.Equal(t, 2, len(bc.StepEventAccumulator.Map[string(1)]))
 	}
 }
 

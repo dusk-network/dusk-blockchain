@@ -92,7 +92,7 @@ func (b *blockNotary) Listen() {
 // marshalled form of the CommitteeEvent messages.
 func newBlockCollector(c committee.Committee, currentRound uint64) *blockCollector {
 	cc := &committee.Collector{
-		StepEventCollector:   consensus.NewStepEventCollector(),
+		StepEventAccumulator:   consensus.NewStepEventAccumulator(),
 		Committee:            c,
 		CurrentRound:         currentRound,
 		RepropagationChannel: make(chan *bytes.Buffer, 100),

@@ -59,7 +59,7 @@ type (
 
 	// Collector is a helper that groups common operations performed on Events related to a committee
 	Collector struct {
-		*consensus.StepEventCollector
+		*consensus.StepEventAccumulator
 		Committee    Committee
 		CurrentRound uint64
 
