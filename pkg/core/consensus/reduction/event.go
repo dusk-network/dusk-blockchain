@@ -16,6 +16,7 @@ type (
 	}
 
 	handler interface {
+		wire.SignatureMarshaller
 		consensus.EventHandler
 		EmbedVoteHash(wire.Event, *bytes.Buffer) error
 		MarshalHeader(r *bytes.Buffer, state consensus.State) (*bytes.Buffer, error)

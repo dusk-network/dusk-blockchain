@@ -29,8 +29,9 @@ type (
 		// different rounds
 		queue *consensus.EventQueue
 
-		selector *eventSelector
-		handler  scoreEventHandler
+		selector  *eventSelector
+		handler   scoreEventHandler
+		publisher wire.EventPublisher
 	}
 
 	scoreEventHandler interface {
@@ -55,6 +56,7 @@ type (
 		bestEvent wire.Event
 		state     consensus.State
 		timer     *consensus.Timer
+		running   bool
 	}
 )
 
@@ -74,10 +76,11 @@ func (sc *selectionCollector) Collect(r *bytes.Buffer) error {
 func newCollector(publisher wire.EventPublisher, handler scoreEventHandler,
 	timerLength time.Duration, state consensus.State) *collector {
 	return &collector{
-		selector: newEventSelector(publisher, newScoreHandler(), timerLength, state),
-		handler:  handler,
-		queue:    consensus.NewEventQueue(),
-		state:    state,
+		selector:  newEventSelector(publisher, newScoreHandler(), timerLength, state),
+		handler:   handler,
+		queue:     consensus.NewEventQueue(),
+		state:     state,
+		publisher: publisher,
 	}
 }
 
@@ -97,8 +100,16 @@ func (s *collector) Collect(r *bytes.Buffer) error {
 		panic(err)
 	}
 
+	s.repropagate(*ev.(*ScoreEvent))
 	s.process(*ev.(*ScoreEvent))
 	return nil
+}
+
+func (s *collector) repropagate(ev wire.Event) {
+	buf := new(bytes.Buffer)
+	s.handler.Marshal(buf, ev)
+	msg, _ := wire.AddTopic(buf, topics.Score)
+	s.publisher.Publish(string(topics.Gossip), msg)
 }
 
 // process sends SigSetEvent to the selector. The messages have already been validated and verified
@@ -111,7 +122,6 @@ func (s *collector) process(ev ScoreEvent) {
 		log.WithFields(log.Fields{
 			"process":         "selection",
 			"message round":   h.Round,
-			"message step":    h.Step,
 			"collector state": s.state.String(),
 		}).Debugln("discarding score message")
 		return
@@ -122,7 +132,6 @@ func (s *collector) process(ev ScoreEvent) {
 		log.WithFields(log.Fields{
 			"process":         "selection",
 			"message round":   h.Round,
-			"message step":    h.Step,
 			"collector state": s.state.String(),
 		}).Debugln("queueing score message")
 		s.queue.PutEvent(h.Round, h.Step, ev)
@@ -180,6 +189,9 @@ func newEventSelector(publisher wire.EventPublisher, handler scoreEventHandler,
 
 // StartSelection starts the selection of the best ScoreEvent.
 func (s *eventSelector) startSelection() {
+	s.Lock()
+	s.running = true
+	s.Unlock()
 	log.WithFields(log.Fields{
 		"process":        "selection",
 		"selector state": s.state.String(),
@@ -196,9 +208,12 @@ func (s *eventSelector) startSelection() {
 		s.propagateBestEvent()
 	case <-s.timer.TimeoutChan:
 		s.Lock()
-		defer s.Unlock()
 		s.bestEvent = nil
+		s.Unlock()
 	}
+	s.Lock()
+	s.running = false
+	s.Unlock()
 }
 
 func (s *eventSelector) compareEvent(ev wire.Event) {
@@ -212,10 +227,6 @@ func (s *eventSelector) compareEvent(ev wire.Event) {
 			return
 		}
 
-		buf := new(bytes.Buffer)
-		s.marshaller.Marshal(buf, newBestEvent)
-		msg, _ := wire.AddTopic(buf, topics.Score)
-		s.publisher.Publish(string(topics.Gossip), msg)
 		s.Lock()
 		defer s.Unlock()
 		s.bestEvent = newBestEvent

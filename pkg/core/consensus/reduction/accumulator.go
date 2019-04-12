@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func launchAccumulator(ctx *context, publisher wire.EventPublisher, eventChan <-chan wire.Event) *accumulator {
@@ -48,25 +47,41 @@ func (a *accumulator) accumulate() {
 			continue
 		}
 
-		a.repropagate(ev)
-		b := new(bytes.Buffer)
-		if err := a.ctx.handler.EmbedVoteHash(ev, b); err == nil {
-			hash := hex.EncodeToString(b.Bytes())
-			count := a.sea.Store(ev, hash)
-			if count > a.ctx.committee.Quorum() {
-				votes := a.sea.Map[hash]
-				a.collectedVotesChan <- votes
-				a.sea.Clear()
+		if a.isRelevant(ev) {
+			b := new(bytes.Buffer)
+			if err := a.ctx.handler.EmbedVoteHash(ev, b); err == nil {
+				hash := hex.EncodeToString(b.Bytes())
+				count := a.sea.Store(ev, hash)
+				log.WithFields(log.Fields{
+					"process": "reduction",
+					"count":   count,
+				}).Debugln("collected reduction event")
+				if count >= a.ctx.committee.Quorum() {
+					log.WithFields(log.Fields{
+						"process": "reduction",
+					}).Debugln("reduction quorum reached")
+					votes := a.sea.Map[hash]
+					a.collectedVotesChan <- votes
+					a.sea.Clear()
+				}
 			}
 		}
 	}
 }
 
-func (a *accumulator) repropagate(ev wire.Event) {
-	buf := new(bytes.Buffer)
-	_ = a.ctx.handler.Marshal(buf, ev)
-	message, _ := wire.AddTopic(buf, topics.BlockReduction)
-	a.publisher.Publish(string(topics.Gossip), message)
+func (a *accumulator) isRelevant(ev wire.Event) bool {
+	header := &consensus.EventHeader{}
+	a.ctx.handler.ExtractHeader(ev, header)
+	relevant := a.ctx.state.Cmp(header.Round, header.Step) == 0
+	if !relevant {
+		log.WithFields(log.Fields{
+			"process": "reducer",
+			"round":   header.Round,
+			"step":    header.Step,
+			"state":   a.ctx.state.String(),
+		}).Debugln("isRelevant mismatch")
+	}
+	return relevant
 }
 
 // There is no mutex involved here, as this function is only ever called by the broker,
@@ -95,10 +110,11 @@ func (a *accumulator) updateRound(round uint64) {
 		"round":   round,
 	}).Debugln("Updating round")
 	if a.reducer != nil {
+		a.reducer.Lock()
 		a.reducer.stale = true
+		a.reducer.Unlock()
 		a.reducer.end()
 		a.reducer = nil
 	}
-	a.ctx.state.Update(round)
 	a.sea.Clear()
 }

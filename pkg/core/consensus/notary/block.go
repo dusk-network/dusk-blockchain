@@ -15,107 +15,52 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-// LaunchBlockNotary creates a BlockNotary by injecting the EventBus, the
-// CommitteeStore and the message validation primitive. The blocknotary is
-// returned solely for test purposes
-func LaunchBlockNotary(eventBus *wire.EventBus, c committee.Committee,
-	currentRound uint64) *blockNotary {
-
-	blockCollector := initBlockCollector(eventBus, c, currentRound)
-
-	blockNotary := &blockNotary{
-		eventBus:       eventBus,
-		blockCollector: blockCollector,
-
-		// TODO: review
-		repropagationChannel: blockCollector.RepropagationChannel,
-	}
-
-	go blockNotary.Listen()
-	return blockNotary
-}
-
 type (
 	// BlockEvent expresses a vote on a block hash. It is a real type alias of
 	// committee.Event
 	BlockEvent = committee.NotaryEvent
 
-	// BlockNotary notifies when there is a consensus on a block hash
-	blockNotary struct {
-		eventBus       *wire.EventBus
-		blockCollector *blockCollector
-
-		// TODO: review
-		repropagationChannel chan *bytes.Buffer
-		generationChan       chan bool
+	agreementMarshaller interface {
+		wire.EventUnMarshaller
+		wire.SignatureMarshaller
 	}
 
 	// blockCollector collects CommitteeEvent. When a Quorum is reached, it
 	// propagates the new Block Hash to the proper channel
 	blockCollector struct {
+		publisher wire.EventPublisher
 		*committee.Collector
-		BlockChan    chan []byte
-		RoundChan    chan uint64
-		Unmarshaller wire.EventUnMarshaller
+		Unmarshaller agreementMarshaller
 		queue        map[uint64][]*BlockEvent
 	}
 )
 
-// Listen to block agreement messages and signature set agreement messages and
-// propagates round and phase updates.
-// A round update should be propagated when we get enough sigSetAgreement messages
-// for a given step
-// A phase update should be propagated when we get enough blockAgreement messages
-// for a certain blockhash
-// BlockNotary gets a currentRound somehow
-func (b *blockNotary) Listen() {
-	for {
-		select {
-		case round := <-b.blockCollector.RoundChan:
-			// Marshalling the round update
-			bs := make([]byte, 8)
-			binary.LittleEndian.PutUint64(bs, round)
-			buf := bytes.NewBuffer(bs)
-			// publishing to the EventBus
-			b.eventBus.Publish(msg.RoundUpdateTopic, buf)
-		// case blockHash := <-b.blockCollector.BlockChan:
-		case ev := <-b.repropagationChannel:
-			// TODO: review
-			message, _ := wire.AddTopic(ev, topics.BlockAgreement)
-			b.eventBus.Publish(string(topics.Gossip), message)
-		}
-	}
+// LaunchBlockAgreement is a helper to minimize the wiring of TopicListeners,
+// collector and channels
+func LaunchBlockAgreement(eventBus *wire.EventBus, c committee.Committee,
+	currentRound uint64) *blockCollector {
+	collector := newBlockCollector(eventBus, c, currentRound)
+	collector.updateRound(currentRound)
+	go wire.NewTopicListener(eventBus, collector,
+		string(topics.BlockAgreement)).Accept()
+	return collector
 }
 
 // newBlockCollector is injected with the committee, a channel where to publish
 // the new Block Hash and the validator function for shallow checking of the
 // marshalled form of the CommitteeEvent messages.
-func newBlockCollector(c committee.Committee, currentRound uint64) *blockCollector {
+func newBlockCollector(publisher wire.EventPublisher, c committee.Committee, currentRound uint64) *blockCollector {
 	cc := &committee.Collector{
-		StepEventAccumulator:   consensus.NewStepEventAccumulator(),
+		StepEventAccumulator: consensus.NewStepEventAccumulator(),
 		Committee:            c,
 		CurrentRound:         currentRound,
-		RepropagationChannel: make(chan *bytes.Buffer, 100),
 	}
 
 	return &blockCollector{
 		Collector:    cc,
-		BlockChan:    make(chan []byte, 1),
-		RoundChan:    make(chan uint64, 1),
+		publisher:    publisher,
 		Unmarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
 	}
-}
-
-// InitBlockCollector is a helper to minimize the wiring of TopicListeners,
-// collector and channels
-func initBlockCollector(eventBus *wire.EventBus, c committee.Committee,
-	currentRound uint64) *blockCollector {
-
-	collector := newBlockCollector(c, currentRound)
-	go wire.NewTopicListener(eventBus, collector,
-		string(topics.BlockAgreement)).Accept()
-	collector.RoundChan <- currentRound
-	return collector
 }
 
 // Collect as specifiec in the EventCollector interface. It dispatches the
@@ -123,20 +68,44 @@ func initBlockCollector(eventBus *wire.EventBus, c committee.Committee,
 func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
 	ev := committee.NewNotaryEvent() // BlockEvent is an alias of committee.Event
 	if err := c.Unmarshaller.Unmarshal(buffer, ev); err != nil {
+		log.WithFields(log.Fields{
+			"process": "notary",
+			"error":   err,
+		}).Warnln("error unmarshalling event")
 		return err
 	}
 
-	isIrrelevant := c.CurrentRound != 0 && c.CurrentRound != ev.Round
-	if c.ShouldBeSkipped(ev) || isIrrelevant {
+	if c.ShouldBeSkipped(ev) {
+		log.WithFields(log.Fields{
+			"process": "notary",
+			"error":   "sender not a committee member",
+		}).Debugln("event dropped")
+		return nil
+	}
+
+	c.repropagate(ev)
+	isIrrelevant := c.CurrentRound > ev.Round && c.CurrentRound != 0
+	if isIrrelevant {
+		log.WithFields(log.Fields{
+			"process":         "notary",
+			"collector round": c.CurrentRound,
+			"message round":   ev.Round,
+			"message step":    ev.Step,
+		}).Debugln("event irrelevant")
 		return nil
 	}
 
 	if c.shouldBeStored(ev) {
+		log.WithFields(log.Fields{
+			"process":         "notary",
+			"collector round": c.CurrentRound,
+			"message round":   ev.Round,
+			"message step":    ev.Step,
+		}).Debugln("event stored")
 		c.queue[ev.Round] = append(c.queue[ev.Round], ev)
 	}
 
 	// TODO: review
-	c.repropagate(ev)
 	c.Process(ev)
 	return nil
 }
@@ -145,30 +114,39 @@ func (c *blockCollector) Collect(buffer *bytes.Buffer) error {
 // in the proper step
 func (c *blockCollector) Process(event *BlockEvent) {
 	nrAgreements := c.Store(event, string(event.Step))
+	log.WithFields(log.Fields{
+		"process": "notary",
+		"step":    event.Step,
+		"count":   nrAgreements,
+	}).Debugln("collected agreement event")
 	// did we reach the quorum?
 	if nrAgreements >= c.Committee.Quorum() {
+		log.WithField("process", "notary").Traceln("quorum reached")
 		// notify the Notary
-		// c.BlockChan <- event.AgreedHash
 		c.Clear()
-		c.nextRound()
+		c.updateRound(c.CurrentRound + 1)
 
 		log.WithField("process", "notary").Traceln("block agreement reached")
 	}
 }
 
-func (c *blockCollector) nextRound() {
+func (c *blockCollector) updateRound(round uint64) {
 	log.WithFields(log.Fields{
 		"process": "notary",
-		"round":   c.CurrentRound + 1,
+		"round":   round,
 	}).Debugln("updating round")
 
-	c.UpdateRound(c.CurrentRound + 1)
-	// notify the Notary
-	c.RoundChan <- c.CurrentRound
+	c.UpdateRound(round)
+	// Marshalling the round update
+	bs := make([]byte, 8)
+	binary.LittleEndian.PutUint64(bs, round)
+	buf := bytes.NewBuffer(bs)
+	// publishing to the EventBus
+	c.publisher.Publish(msg.RoundUpdateTopic, buf)
 	c.Clear()
 
 	// picking messages related to next round (now current)
-	currentEvents := c.queue[c.CurrentRound]
+	currentEvents := c.queue[round]
 	// processing messages store so far
 	for _, event := range currentEvents {
 		c.Process(event)
@@ -182,6 +160,8 @@ func (c *blockCollector) shouldBeStored(event *BlockEvent) bool {
 // TODO: review
 func (c *blockCollector) repropagate(event *BlockEvent) {
 	buf := new(bytes.Buffer)
+	c.Unmarshaller.MarshalEdFields(buf, event.EventHeader)
 	c.Unmarshaller.Marshal(buf, event)
-	c.RepropagationChannel <- buf
+	message, _ := wire.AddTopic(buf, topics.BlockAgreement)
+	c.publisher.Publish(string(topics.Gossip), message)
 }
