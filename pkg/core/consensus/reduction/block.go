@@ -11,7 +11,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // LaunchBlockReducer creates and wires a broker, initiating the components that
@@ -21,10 +20,7 @@ func LaunchBlockReducer(eventBus *wire.EventBus, committee committee.Committee,
 
 	scoreChan := selection.InitBestScoreUpdate(eventBus)
 	handler := newBlockHandler(committee)
-	broker := newBroker(eventBus, handler, scoreChan, committee,
-		topics.BlockReduction, string(msg.OutgoingBlockReductionTopic),
-		string(msg.OutgoingBlockAgreementTopic),
-		string(msg.BlockGenerationTopic), timeout)
+	broker := newBroker(eventBus, handler, scoreChan, committee, timeout)
 
 	go broker.Listen()
 	return broker

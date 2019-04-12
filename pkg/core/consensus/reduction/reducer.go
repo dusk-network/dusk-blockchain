@@ -2,11 +2,13 @@ package reduction
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -59,17 +61,17 @@ type reducer struct {
 	stale      bool
 
 	// TODO: review after demo. used to restart a phase after reduction
-	regenerationChannel chan bool
+	publisher wire.EventPublisher
 }
 
-func newCoordinator(collectedVotesChan chan []wire.Event, ctx *context,
-	regenerationChannel chan bool) *reducer {
+func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
+	publisher wire.EventPublisher) *reducer {
 
 	return &reducer{
-		firstStep:           newEventStopWatch(collectedVotesChan, ctx.timer),
-		secondStep:          newEventStopWatch(collectedVotesChan, ctx.timer),
-		ctx:                 ctx,
-		regenerationChannel: regenerationChannel,
+		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
+		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
+		ctx:        ctx,
+		publisher:  publisher,
 	}
 }
 
@@ -91,7 +93,7 @@ func (c *reducer) begin() {
 		panic(err)
 	}
 	c.requestUpdate(func() {
-		c.ctx.reductionVoteChan <- reductionVote
+		c.publisher.Publish(string(msg.OutgoingBlockReductionTopic), reductionVote)
 	})
 	eventsSecondStep := c.secondStep.fetch()
 	log.WithField("process", "reducer").Traceln("Second step completed")
@@ -115,12 +117,21 @@ func (c *reducer) begin() {
 		}
 
 		c.requestUpdate(func() {
-			c.ctx.agreementVoteChan <- agreementVote
+			c.publisher.Publish(string(msg.OutgoingBlockAgreementTopic), agreementVote)
 		})
 	}
+
 	c.requestUpdate(func() {
 		c.ctx.state.IncrementStep()
-		c.regenerationChannel <- true
+		log.WithFields(log.Fields{
+			"process": "reduction",
+			"round":   c.ctx.state.Round(),
+			"step":    c.ctx.state.Step(),
+		}).Debug("Reduction complete")
+		roundAndStep := make([]byte, 8)
+		binary.LittleEndian.PutUint64(roundAndStep, c.ctx.state.Round())
+		roundAndStep = append(roundAndStep, byte(c.ctx.state.Step()))
+		c.publisher.Publish(string(msg.BlockGenerationTopic), bytes.NewBuffer(roundAndStep))
 	})
 }
 

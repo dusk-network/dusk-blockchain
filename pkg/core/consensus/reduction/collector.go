@@ -2,7 +2,6 @@ package reduction
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"sync"
 	"time"
@@ -24,11 +23,7 @@ type (
 		reducer            *reducer
 		ctx                *context
 
-		// TODO: review this, used to restart phase after reduction
-		regenerationChannel chan bool
-
-		// TODO: review re-propagation logic
-		repropagationChannel chan *bytes.Buffer
+		publisher wire.EventPublisher
 	}
 
 	// Broker is the message broker for the reduction process.
@@ -54,17 +49,16 @@ type (
 	}
 )
 
-func newCollector(eventBus *wire.EventBus, reductionTopic string, ctx *context) *collector {
+func newCollector(eventBroker wire.EventBroker, reductionTopic string, ctx *context) *collector {
 	collector := &collector{
-		StepEventCollector:   consensus.NewStepEventCollector(),
-		queue:                consensus.NewEventQueue(),
-		collectedVotesChan:   make(chan []wire.Event, 1),
-		ctx:                  ctx,
-		regenerationChannel:  make(chan bool, 1),
-		repropagationChannel: make(chan *bytes.Buffer, 100),
+		StepEventCollector: consensus.NewStepEventCollector(),
+		queue:              consensus.NewEventQueue(),
+		collectedVotesChan: make(chan []wire.Event, 1),
+		ctx:                ctx,
+		publisher:          eventBroker,
 	}
 
-	go wire.NewTopicListener(eventBus, collector, reductionTopic).Accept()
+	go wire.NewTopicListener(eventBroker, collector, reductionTopic).Accept()
 	go collector.onTimeout()
 	return collector
 }
@@ -123,7 +117,8 @@ func (c *collector) process(ev wire.Event) {
 func (c *collector) repropagate(ev wire.Event) {
 	buf := new(bytes.Buffer)
 	_ = c.ctx.handler.Marshal(buf, ev)
-	c.repropagationChannel <- buf
+	message, _ := wire.AddTopic(buf, topics.BlockReduction)
+	c.publisher.Publish(string(topics.Gossip), message)
 }
 
 func (c *collector) flushQueue() {
@@ -177,7 +172,7 @@ func (c *collector) isEarly(round uint64, step uint8) bool {
 func (c *collector) startReduction() {
 	log.Traceln("Starting Reduction")
 	c.lock.Lock()
-	c.reducer = newCoordinator(c.collectedVotesChan, c.ctx, c.regenerationChannel)
+	c.reducer = newReducer(c.collectedVotesChan, c.ctx, c.publisher)
 	c.lock.Unlock()
 
 	go c.reducer.begin()
@@ -185,27 +180,20 @@ func (c *collector) startReduction() {
 }
 
 // newBroker will return a reduction broker.
-func newBroker(eventBus *wire.EventBus, handler handler, selectionChannel chan []byte,
-	committee committee.Committee, reductionTopic topics.Topic, outgoingReductionTopic,
-	outgoingAgreementTopic, generationTopic string, timeout time.Duration) *broker {
+func newBroker(eventBus *wire.EventBus, handler handler, selectionChannel chan []byte, committee committee.Committee, timeout time.Duration) *broker {
 
 	ctx := newCtx(handler, committee, timeout)
-	collector := newCollector(eventBus, string(reductionTopic), ctx)
+	collector := newCollector(eventBus, string(topics.BlockReduction), ctx)
 
 	roundChannel := consensus.InitRoundUpdate(eventBus)
 	return &broker{
-		eventBus:               eventBus,
-		roundUpdateChan:        roundChannel,
-		unMarshaller:           newUnMarshaller(msg.VerifyEd25519Signature),
-		ctx:                    ctx,
-		collector:              collector,
-		outgoingReductionTopic: outgoingReductionTopic,
-		outgoingAgreementTopic: outgoingAgreementTopic,
+		eventBus:        eventBus,
+		roundUpdateChan: roundChannel,
+		unMarshaller:    newUnMarshaller(msg.VerifyEd25519Signature),
+		ctx:             ctx,
+		collector:       collector,
 
-		// TODO: review
-		generationTopic: generationTopic,
-		reductionTopic:  reductionTopic,
-		selectionChan:   selectionChannel,
+		selectionChan: selectionChannel,
 	}
 }
 
@@ -222,23 +210,6 @@ func (b *broker) Listen() {
 				"hash":    hex.EncodeToString(hash),
 			}).Debug("Got selection message")
 			b.forwardSelection(hash)
-		case reductionVote := <-b.ctx.reductionVoteChan:
-			b.eventBus.Publish(b.outgoingReductionTopic, reductionVote)
-		case agreementVote := <-b.ctx.agreementVoteChan:
-			b.eventBus.Publish(b.outgoingAgreementTopic, agreementVote)
-		case <-b.collector.regenerationChannel:
-			log.WithFields(log.Fields{
-				"process": "reduction",
-				"round":   b.collector.ctx.state.Round(),
-				"step":    b.collector.ctx.state.Step(),
-			}).Debug("Reduction complete")
-			roundAndStep := make([]byte, 8)
-			binary.LittleEndian.PutUint64(roundAndStep, b.ctx.state.Round())
-			roundAndStep = append(roundAndStep, byte(b.ctx.state.Step()))
-			b.eventBus.Publish(b.generationTopic, bytes.NewBuffer(roundAndStep))
-		case ev := <-b.collector.repropagationChannel:
-			message, _ := wire.AddTopic(ev, b.reductionTopic)
-			b.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
 }
