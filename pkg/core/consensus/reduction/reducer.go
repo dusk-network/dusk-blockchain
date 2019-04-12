@@ -60,7 +60,6 @@ type reducer struct {
 	ctx        *context
 	stale      bool
 
-	// TODO: review after demo. used to restart a phase after reduction
 	publisher wire.EventPublisher
 }
 
@@ -81,6 +80,12 @@ func (c *reducer) requestUpdate(command func()) {
 	}
 }
 
+func (c *reducer) sendEvent(topic string, msg *bytes.Buffer) {
+	if !c.stale {
+		c.publisher.Publish(topic, msg)
+	}
+}
+
 func (c *reducer) begin() {
 	log.WithField("process", "reducer").Traceln("Beginning Reduction")
 	// this is a blocking call
@@ -92,9 +97,7 @@ func (c *reducer) begin() {
 	if err != nil {
 		panic(err)
 	}
-	c.requestUpdate(func() {
-		c.publisher.Publish(string(msg.OutgoingBlockReductionTopic), reductionVote)
-	})
+	c.sendEvent(string(msg.OutgoingBlockReductionTopic), reductionVote)
 	eventsSecondStep := c.secondStep.fetch()
 	log.WithField("process", "reducer").Traceln("Second step completed")
 	hash2 := c.encodeEv(eventsSecondStep)
@@ -116,9 +119,7 @@ func (c *reducer) begin() {
 			panic(err)
 		}
 
-		c.requestUpdate(func() {
-			c.publisher.Publish(string(msg.OutgoingBlockAgreementTopic), agreementVote)
-		})
+		c.sendEvent(string(msg.OutgoingBlockAgreementTopic), agreementVote)
 	}
 
 	c.requestUpdate(func() {
@@ -131,7 +132,7 @@ func (c *reducer) begin() {
 		roundAndStep := make([]byte, 8)
 		binary.LittleEndian.PutUint64(roundAndStep, c.ctx.state.Round())
 		roundAndStep = append(roundAndStep, byte(c.ctx.state.Step()))
-		c.publisher.Publish(string(msg.BlockGenerationTopic), bytes.NewBuffer(roundAndStep))
+		c.sendEvent(string(msg.BlockGenerationTopic), bytes.NewBuffer(roundAndStep))
 	})
 }
 
