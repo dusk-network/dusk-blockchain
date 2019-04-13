@@ -30,7 +30,7 @@ type (
 func newReductionHandler(committee committee.Committee) *reductionHandler {
 	return &reductionHandler{
 		Committee:             committee,
-		ReductionUnMarshaller: events.NewReductionUnMarshaller(msg.VerifyEd25519Signature),
+		ReductionUnMarshaller: events.NewReductionUnMarshaller(),
 	}
 }
 

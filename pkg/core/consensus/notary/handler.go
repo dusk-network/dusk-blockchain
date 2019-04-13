@@ -5,7 +5,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -18,7 +17,7 @@ type agreementHandler struct {
 func newAgreementHandler(committee committee.Committee) *agreementHandler {
 	return &agreementHandler{
 		Committee:             committee,
-		AgreementUnMarshaller: events.NewAgreementUnMarshaller(msg.VerifyEd25519Signature),
+		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
 	}
 }
 
