@@ -3,7 +3,6 @@ package events
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -17,9 +16,7 @@ type (
 	HeaderMarshaller struct{}
 
 	// HeaderUnmarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
-	HeaderUnmarshaller struct {
-		Validate func([]byte, []byte, []byte) error
-	}
+	HeaderUnmarshaller struct{}
 
 	UnMarshaller struct {
 		*HeaderMarshaller
@@ -75,29 +72,10 @@ func (ehm *HeaderMarshaller) MarshalEdFields(r *bytes.Buffer, ev wire.Event) err
 	return nil
 }
 
-// NewHeaderUnmarshaller creates an HeaderUnmarshaller delegating validation to the validate function
-func NewHeaderUnmarshaller(validate func([]byte, []byte, []byte) error) *HeaderUnmarshaller {
-	return &HeaderUnmarshaller{validate}
-}
-
 // Unmarshal unmarshals the buffer into a Consensus
 func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	// if the injection is unsuccessful, panic
 	consensusEv := ev.(*Header)
-	if err := encoding.Read512(r, &consensusEv.Signature); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &consensusEv.PubKeyEd); err != nil {
-		return err
-	}
-
-	// verify the signature here
-	if err := a.Validate(consensusEv.PubKeyEd, r.Bytes(), consensusEv.Signature); err != nil {
-		fmt.Println(consensusEv.PubKeyEd)
-		fmt.Println(consensusEv.Signature)
-		return err
-	}
 
 	// Decoding PubKey BLS
 	if err := encoding.ReadVarBytes(r, &consensusEv.PubKeyBLS); err != nil {
@@ -117,23 +95,23 @@ func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
-func NewUnMarshaller(validate func([]byte, []byte, []byte) error) *UnMarshaller {
+func NewUnMarshaller() *UnMarshaller {
 	return &UnMarshaller{
 		HeaderMarshaller:   new(HeaderMarshaller),
-		HeaderUnmarshaller: NewHeaderUnmarshaller(validate),
+		HeaderUnmarshaller: new(HeaderUnmarshaller),
 	}
 }
 
-func NewReductionUnMarshaller(validate func([]byte, []byte, []byte) error) *ReductionUnMarshaller {
-	return &ReductionUnMarshaller{NewUnMarshaller(validate)}
+func NewReductionUnMarshaller() *ReductionUnMarshaller {
+	return &ReductionUnMarshaller{NewUnMarshaller()}
 }
 
 // NewAgreementUnMarshaller creates a new AgreementUnMarshaller. Internally it creates an HeaderUnMarshaller which takes care of Decoding and Encoding operations
-func NewAgreementUnMarshaller(validate func([]byte, []byte, []byte) error) *AgreementUnMarshaller {
+func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 
 	return &AgreementUnMarshaller{
-		ReductionUnmarshaller: NewReductionUnMarshaller(func([]byte, []byte, []byte) error { return nil }),
-		UnMarshaller:          NewUnMarshaller(validate),
+		ReductionUnmarshaller: NewReductionUnMarshaller(),
+		UnMarshaller:          NewUnMarshaller(),
 	}
 }
 
