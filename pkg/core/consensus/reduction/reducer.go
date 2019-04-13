@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -11,6 +13,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
+
+type janitor interface {
+	Clear()
+}
 
 type eventStopWatch struct {
 	collectedVotesChan chan []wire.Event
@@ -58,7 +64,8 @@ type reducer struct {
 	firstStep  *eventStopWatch
 	secondStep *eventStopWatch
 	ctx        *context
-	stale      bool
+	sync.RWMutex
+	stale bool
 
 	publisher wire.EventPublisher
 }
@@ -75,21 +82,26 @@ func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
 }
 
 func (c *reducer) requestUpdate(command func()) {
+	c.RLock()
+	defer c.RUnlock()
 	if !c.stale {
 		command()
 	}
 }
 
 func (c *reducer) sendEvent(topic string, msg *bytes.Buffer) {
+	c.RLock()
+	defer c.RUnlock()
 	if !c.stale {
 		c.publisher.Publish(topic, msg)
 	}
 }
 
-func (c *reducer) begin() {
+func (c *reducer) begin(janitor janitor) {
 	log.WithField("process", "reducer").Traceln("Beginning Reduction")
 	// this is a blocking call
 	events := c.firstStep.fetch()
+	janitor.Clear()
 	log.WithField("process", "reducer").Traceln("First step completed")
 	c.requestUpdate(c.ctx.state.IncrementStep)
 	hash1 := c.encodeEv(events)
@@ -99,13 +111,13 @@ func (c *reducer) begin() {
 	}
 	c.sendEvent(string(msg.OutgoingBlockReductionTopic), reductionVote)
 	eventsSecondStep := c.secondStep.fetch()
+	janitor.Clear()
 	log.WithField("process", "reducer").Traceln("Second step completed")
 	hash2 := c.encodeEv(eventsSecondStep)
 
 	allEvents := append(events, eventsSecondStep...)
 
 	if c.isReductionSuccessful(hash1, hash2, allEvents) {
-
 		log.WithFields(log.Fields{
 			"process":    "reducer",
 			"votes":      len(allEvents),
@@ -114,6 +126,7 @@ func (c *reducer) begin() {
 		if err := c.ctx.handler.MarshalVoteSet(hash2, allEvents); err != nil {
 			panic(err)
 		}
+		fmt.Println("blockagreement", c.ctx.state.Step())
 		agreementVote, err := c.ctx.handler.MarshalHeader(hash2, c.ctx.state)
 		if err != nil {
 			panic(err)
@@ -130,6 +143,8 @@ func (c *reducer) begin() {
 			"step":    c.ctx.state.Step(),
 		}).Debug("Reduction complete")
 		roundAndStep := make([]byte, 8)
+		// TODO: consider using AsyncState and notification, rather than having
+		// a synchronized state.
 		binary.LittleEndian.PutUint64(roundAndStep, c.ctx.state.Round())
 		roundAndStep = append(roundAndStep, byte(c.ctx.state.Step()))
 		c.sendEvent(string(msg.BlockGenerationTopic), bytes.NewBuffer(roundAndStep))

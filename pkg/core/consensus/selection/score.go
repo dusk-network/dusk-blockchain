@@ -105,9 +105,11 @@ func (f *scoreBroker) Listen() {
 				"round":   state.round,
 				"step":    state.step,
 			}).Debugln("received regeneration message")
-			// TODO: this means we can lose relevant messages, find a better way
-			f.collector.selector.stopSelection()
-			go f.collector.selector.startSelection()
+			f.collector.selector.RLock()
+			if !f.collector.selector.running {
+				go f.collector.selector.startSelection()
+			}
+			f.collector.selector.RUnlock()
 		case bidList := <-f.bidListChan:
 			f.collector.selector.handler.UpdateBidList(bidList)
 		}

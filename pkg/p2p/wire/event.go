@@ -28,11 +28,15 @@ type (
 	}
 
 	// EventMarshaller is the specular operation of an EventUnmarshaller. Following
-	// Golang's way of defining interfaces, it exposes an Unmarshal method which allows
+	// Golang's way of defining interfaces, it exposes a Marshal method which allows
 	// for flexibility and reusability across all the different components that need to
 	// read the buffer coming from the EventBus into different structs
 	EventMarshaller interface {
 		Marshal(*bytes.Buffer, Event) error
+	}
+
+	SignatureMarshaller interface {
+		MarshalEdFields(*bytes.Buffer, Event) error
 	}
 
 	// EventUnMarshaller is a convenient interface providing both Marshalling and

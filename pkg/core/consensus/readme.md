@@ -54,7 +54,7 @@ Additionally, several other entities are utilized within the `Collector` to help
 
     - `EventHandler`: This entity contains the logic specific to the components and that cannot be shared
     - `EventQueue`: A temporary storage unit to collect messages referring to a future stage. This is possible given the asynchrony of the network which could result in nodes falling a bit behind in the event processing.
-    - `StepEventCollector`: A map that stores consensus messages. This can be used to track message accumulation for specific keys, such as a step, or a particular block hash.
+    - `StepEventAccumulator`: A map that stores consensus messages. This can be used to track message accumulation for specific keys, such as a step, or a particular block hash.
 
 ### Common structures and interfaces
 

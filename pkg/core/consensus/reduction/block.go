@@ -44,6 +44,11 @@ func newBlockHandler(committee committee.Committee) *blockHandler {
 	}
 }
 
+func (b *blockHandler) MarshalEdFields(r *bytes.Buffer, ev wire.Event) error {
+	rev := ev.(*committee.ReductionEvent)
+	return b.unMarshaller.EventHeaderMarshaller.MarshalEdFields(r, rev.EventHeader)
+}
+
 func (b *blockHandler) ExtractHeader(e wire.Event, h *consensus.EventHeader) {
 	ev := e.(*committee.ReductionEvent)
 	h.Round = ev.Round

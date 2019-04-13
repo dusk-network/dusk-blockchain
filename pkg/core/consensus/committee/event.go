@@ -59,7 +59,7 @@ type (
 
 	// Collector is a helper that groups common operations performed on Events related to a committee
 	Collector struct {
-		*consensus.StepEventCollector
+		*consensus.StepEventAccumulator
 		Committee    Committee
 		CurrentRound uint64
 
@@ -179,6 +179,10 @@ func (a *ReductionEventUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.
 	}
 
 	for _, event := range evs {
+		rev := event.(*ReductionEvent)
+		if err := a.MarshalEdFields(r, rev.EventHeader); err != nil {
+			return err
+		}
 		if err := a.Marshal(r, event); err != nil {
 			return err
 		}
@@ -192,13 +196,6 @@ func (a *ReductionEventUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.
 // * Consensus Header [BLS Public Key; Round; Step]
 // * Committee Header [Signed Vote Set; Vote Set; BlockHash]
 func (ceu *NotaryEventUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	// check if the buffer has contents first
-	// if not, we did not get any messages this round
-	// TODO: review this
-	if r.Len() == 0 {
-		return nil
-	}
-
 	cev := ev.(*NotaryEvent)
 	if err := ceu.EventHeaderUnmarshaller.Unmarshal(r, cev.EventHeader); err != nil {
 		return err
@@ -267,9 +264,8 @@ func (cc *Collector) ShouldBeSkipped(m *NotaryEvent) bool {
 
 // ShouldSkip checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
 func (cc *Collector) ShouldSkip(ev wire.Event, round uint64, step uint8) bool {
-	isDupe := cc.Contains(ev, string(step))
 	isPleb := !cc.Committee.IsMember(ev.Sender())
-	return isDupe || isPleb
+	return isPleb
 }
 
 // UpdateRound is a utility function that can be overridden by the embedding collector in case of custom behaviour when updating the current round
