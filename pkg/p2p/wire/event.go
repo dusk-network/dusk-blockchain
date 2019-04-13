@@ -61,6 +61,10 @@ type (
 		Collect(*bytes.Buffer) error
 	}
 
+	TopicProcessor interface {
+		Process(*bytes.Buffer) error
+	}
+
 	// TopicListener accepts events from the EventBus and takes care of reacting on
 	// quit Events. It delegates the business logic to the EventCollector which is
 	// supposed to handle the incoming events
@@ -113,9 +117,8 @@ func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topi
 	}
 }
 
-// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the
-// EventCollector.Collect
-func (n *TopicListener) Accept() {
+// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect. It accepts a variadic number of TopicProcessors which pre-process the buffer before passing it to the Collector
+func (n *TopicListener) Accept(processors ...TopicProcessor) {
 	log.WithFields(log.Fields{
 		"id":    n.MsgChanID,
 		"topic": n.topic,
@@ -126,7 +129,16 @@ func (n *TopicListener) Accept() {
 			n.subscriber.Unsubscribe(n.topic, n.MsgChanID)
 			n.subscriber.Unsubscribe(string(QuitTopic), n.QuitChanID)
 			return
-		case eventMsg := <-n.msgChan:
+		case eventBuffer := <-n.msgChan:
+			if err := preprocess(eventBuffer, processors...); err != nil {
+				log.WithError(err).WithFields(
+					log.Fields{
+						"process": "topic listner",
+						"topic":   n.topic,
+					}).Warnln("processor failure")
+				continue
+			}
+
 			if len(n.msgChan) > 10 {
 				log.WithFields(log.Fields{
 					"id":         n.MsgChanID,
@@ -134,7 +146,7 @@ func (n *TopicListener) Accept() {
 					"Unconsumed": len(n.msgChan),
 				}).Debugln("Channel is accumulating messages")
 			}
-			if err := n.eventCollector.Collect(eventMsg); err != nil {
+			if err := n.eventCollector.Collect(eventBuffer); err != nil {
 				log.WithFields(log.Fields{
 					"id":         n.MsgChanID,
 					"topic":      n.topic,
@@ -143,6 +155,15 @@ func (n *TopicListener) Accept() {
 			}
 		}
 	}
+}
+
+func preprocess(eventBuffer *bytes.Buffer, processors ...TopicProcessor) error {
+	for _, processor := range processors {
+		if err := processor.Process(eventBuffer); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AddTopic is a convenience function to add a specified topic at the start of
