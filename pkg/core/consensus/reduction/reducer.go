@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"sync"
 	"time"
 
@@ -12,11 +11,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-type janitor interface {
-	Clear()
-}
+var empty struct{}
 
 type eventStopWatch struct {
 	collectedVotesChan chan []wire.Event
@@ -36,7 +34,7 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 	timer := time.NewTimer(esw.timer.Timeout)
 	select {
 	case <-timer.C:
-		esw.timer.TimeoutChan <- true
+		esw.timer.TimeoutChan <- empty
 		stop(timer)
 		return nil
 	case collectedVotes := <-esw.collectedVotesChan:
@@ -64,6 +62,7 @@ type reducer struct {
 	firstStep  *eventStopWatch
 	secondStep *eventStopWatch
 	ctx        *context
+
 	sync.RWMutex
 	stale bool
 
@@ -72,105 +71,124 @@ type reducer struct {
 
 func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
 	publisher wire.EventPublisher) *reducer {
-
 	return &reducer{
-		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
-		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
-		ctx:        ctx,
-		publisher:  publisher,
+		ctx:       ctx,
+		publisher: publisher,
 	}
 }
 
-func (c *reducer) requestUpdate(command func()) {
-	c.RLock()
-	defer c.RUnlock()
-	if !c.stale {
-		command()
-	}
+func (r *reducer) isStale() bool {
+	r.RLock()
+	defer r.RUnlock()
+	return r.stale
 }
 
-func (c *reducer) sendEvent(topic string, msg *bytes.Buffer) {
-	c.RLock()
-	defer c.RUnlock()
-	if !c.stale {
-		c.publisher.Publish(topic, msg)
-	}
+// There is no mutex involved here, as this function is only ever called by the broker,
+// who does it synchronously. The reducer variable therefore can not be in a race
+// condition with another goroutine.
+func (r *reducer) startReduction(collectedVotesChan chan []wire.Event, hash []byte) {
+	log.Traceln("Starting Reduction")
+	r.sendReductionVote(bytes.NewBuffer(hash))
+	r.firstStep = newEventStopWatch(collectedVotesChan, r.ctx.timer)
+	r.secondStep = newEventStopWatch(collectedVotesChan, r.ctx.timer)
+	go r.begin()
 }
 
-func (c *reducer) begin(janitor janitor) {
+func (r *reducer) begin() {
 	log.WithField("process", "reducer").Traceln("Beginning Reduction")
-	// this is a blocking call
-	events := c.firstStep.fetch()
-	janitor.Clear()
+	events := r.firstStep.fetch()
 	log.WithField("process", "reducer").Traceln("First step completed")
-	c.requestUpdate(c.ctx.state.IncrementStep)
-	hash1 := c.encodeEv(events)
-	reductionVote, err := c.ctx.handler.MarshalHeader(hash1, c.ctx.state)
+	hash1 := r.extractHash(events)
+	if !r.isStale() {
+		r.ctx.state.IncrementStep()
+		r.sendReductionVote(hash1)
+	}
+
+	eventsSecondStep := r.secondStep.fetch()
+	log.WithField("process", "reducer").Traceln("Second step completed")
+	if !r.isStale() {
+		hash2 := r.extractHash(eventsSecondStep)
+		allEvents := append(events, eventsSecondStep...)
+		if r.isReductionSuccessful(hash1, hash2) {
+			log.WithFields(log.Fields{
+				"process":    "reducer",
+				"votes":      len(allEvents),
+				"block hash": hex.EncodeToString(hash1.Bytes()),
+			}).Debugln("Reduction successful")
+			r.sendAgreementVote(allEvents, hash2)
+		}
+
+		r.ctx.state.IncrementStep()
+		r.publishRegeneration()
+	}
+}
+
+func (r *reducer) sendReductionVote(hash *bytes.Buffer) {
+	vote, err := r.marshalHeader(hash)
 	if err != nil {
 		panic(err)
 	}
-	c.sendEvent(string(msg.OutgoingBlockReductionTopic), reductionVote)
-	eventsSecondStep := c.secondStep.fetch()
-	janitor.Clear()
-	log.WithField("process", "reducer").Traceln("Second step completed")
-	hash2 := c.encodeEv(eventsSecondStep)
-
-	allEvents := append(events, eventsSecondStep...)
-
-	if c.isReductionSuccessful(hash1, hash2, allEvents) {
-		log.WithFields(log.Fields{
-			"process":    "reducer",
-			"votes":      len(allEvents),
-			"block hash": hex.EncodeToString(hash1.Bytes()),
-		}).Debugln("Reduction successful")
-		if err := c.ctx.handler.MarshalVoteSet(hash2, allEvents); err != nil {
-			panic(err)
-		}
-		fmt.Println("blockagreement", c.ctx.state.Step())
-		agreementVote, err := c.ctx.handler.MarshalHeader(hash2, c.ctx.state)
-		if err != nil {
-			panic(err)
-		}
-
-		c.sendEvent(string(msg.OutgoingBlockAgreementTopic), agreementVote)
-	}
-
-	c.requestUpdate(func() {
-		c.ctx.state.IncrementStep()
-		log.WithFields(log.Fields{
-			"process": "reduction",
-			"round":   c.ctx.state.Round(),
-			"step":    c.ctx.state.Step(),
-		}).Debug("Reduction complete")
-		roundAndStep := make([]byte, 8)
-		// TODO: consider using AsyncState and notification, rather than having
-		// a synchronized state.
-		binary.LittleEndian.PutUint64(roundAndStep, c.ctx.state.Round())
-		roundAndStep = append(roundAndStep, byte(c.ctx.state.Step()))
-		c.sendEvent(string(msg.BlockGenerationTopic), bytes.NewBuffer(roundAndStep))
-	})
+	r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
 }
 
-func (c *reducer) encodeEv(events []wire.Event) *bytes.Buffer {
-	if events == nil {
-		events = []wire.Event{nil}
+func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
+	if err := r.ctx.handler.MarshalVoteSet(hash, events); err != nil {
+		panic(err)
 	}
+	agreementVote, err := r.marshalHeader(hash)
+	if err != nil {
+		panic(err)
+	}
+	r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
+}
+
+func (r *reducer) publishRegeneration() {
+	roundAndStep := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundAndStep, r.ctx.state.Round())
+	roundAndStep = append(roundAndStep, byte(r.ctx.state.Step()))
+	r.publisher.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(roundAndStep))
+}
+
+func (r *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer) bool {
+	bothNotNil := hash1 != nil && hash2 != nil
+	identicalResults := bytes.Equal(hash1.Bytes(), hash2.Bytes())
+	return bothNotNil && identicalResults
+}
+
+func (r *reducer) end() {
+	r.Lock()
+	r.stale = true
+	r.Unlock()
+	r.firstStep.stop()
+	r.secondStep.stop()
+}
+
+func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
+	if events == nil {
+		return bytes.NewBuffer(make([]byte, 32))
+	}
+
 	hash := new(bytes.Buffer)
-	if err := c.ctx.handler.EmbedVoteHash(events[0], hash); err != nil {
+	if err := r.ctx.handler.ExtractIdentifier(events[0], hash); err != nil {
 		panic(err)
 	}
 	return hash
 }
 
-func (c *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer, events []wire.Event) bool {
-	bothNotNil := hash1 != nil && hash2 != nil
-	identicalResults := bytes.Equal(hash1.Bytes(), hash2.Bytes())
-	voteSetCorrectLength := len(events) >= c.ctx.committee.Quorum()*2
+func (r *reducer) marshalHeader(hash *bytes.Buffer) (*bytes.Buffer, error) {
+	buffer := new(bytes.Buffer)
+	// Decoding Round
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, r.ctx.state.Round()); err != nil {
+		return nil, err
+	}
 
-	return bothNotNil && identicalResults && voteSetCorrectLength
-}
+	// Decoding Step
+	if err := encoding.WriteUint8(buffer, r.ctx.state.Step()); err != nil {
+		return nil, err
+	}
 
-func (c *reducer) end() {
-	c.firstStep.stop()
-	c.secondStep.stop()
+	if _, err := buffer.Write(hash.Bytes()); err != nil {
+		return nil, err
+	}
+	return buffer, nil
 }

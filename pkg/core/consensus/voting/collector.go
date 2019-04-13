@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -26,7 +25,7 @@ type (
 	}
 
 	signer interface {
-		committee.ReductionUnmarshaller
+		events.ReductionUnmarshaller
 		addSignatures(wire.Event) (*bytes.Buffer, error)
 		eligibleToVote() bool
 	}
@@ -88,8 +87,8 @@ func unmarshalBlockReduction(reductionBuffer *bytes.Buffer, signer signer) (wire
 		return nil, err
 	}
 
-	return &committee.ReductionEvent{
-		EventHeader: &consensus.EventHeader{
+	return &events.Reduction{
+		Header: &events.Header{
 			Round: round,
 			Step:  step,
 		},
@@ -118,8 +117,8 @@ func unmarshalBlockAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire
 		return nil, err
 	}
 
-	return &notary.BlockEvent{
-		EventHeader: &consensus.EventHeader{
+	return &events.Agreement{
+		Header: &events.Header{
 			Round: round,
 			Step:  step,
 		},

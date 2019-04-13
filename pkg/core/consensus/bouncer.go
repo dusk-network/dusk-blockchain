@@ -1,4 +1,4 @@
-package reduction
+package consensus
 
 import (
 	"bytes"
@@ -7,19 +7,19 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-type bouncer struct {
+type Bouncer struct {
 	publisher wire.EventPublisher
-	handler   handler
+	handler   EventHandler
 }
 
-func newBouncer(publisher wire.EventPublisher, handler handler) *bouncer {
-	return &bouncer{
+func NewBouncer(publisher wire.EventPublisher, handler EventHandler) *Bouncer {
+	return &Bouncer{
 		publisher: publisher,
 		handler:   handler,
 	}
 }
 
-func (b *bouncer) repropagate(ev wire.Event) {
+func (b *Bouncer) repropagate(ev wire.Event) {
 	buf := new(bytes.Buffer)
 	if err := b.handler.MarshalEdFields(buf, ev); err != nil {
 		panic(err)

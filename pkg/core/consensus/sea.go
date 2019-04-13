@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"bytes"
-	"encoding/binary"
 	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -62,11 +60,4 @@ func (sec *StepEventAccumulator) Store(event wire.Event, step string) int {
 	sec.Map[step] = eventList
 	sec.Unlock()
 	return len(eventList)
-}
-
-// Collect as specified in the EventCollector interface. In this case Collect simply performs unmarshalling of the round event
-func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-	r.roundChan <- round
-	return nil
 }
