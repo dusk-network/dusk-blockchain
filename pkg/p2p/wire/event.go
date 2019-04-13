@@ -134,7 +134,7 @@ func (n *TopicListener) Accept(processors ...TopicProcessor) {
 			n.subscriber.Unsubscribe(string(QuitTopic), n.QuitChanID)
 			return
 		case unprocessedEvBuffer := <-n.msgChan:
-			eventBuffer, err := preprocess(unprocessedEvBuffer, processors...)
+			eventBuffer, err := n.preprocess(unprocessedEvBuffer, processors...)
 			if err != nil {
 				log.WithError(err).WithFields(
 					log.Fields{
@@ -162,7 +162,7 @@ func (n *TopicListener) Accept(processors ...TopicProcessor) {
 	}
 }
 
-func preprocess(eventBuffer *bytes.Buffer, processors ...TopicProcessor) (*bytes.Buffer, error) {
+func (n *TopicListener) preprocess(eventBuffer *bytes.Buffer, processors ...TopicProcessor) (*bytes.Buffer, error) {
 	var err error
 	buf := eventBuffer
 	for _, processor := range processors {
