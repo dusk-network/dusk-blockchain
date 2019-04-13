@@ -45,6 +45,7 @@ func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
 	var newBuf bytes.Buffer
 	r := io.TeeReader(buf, &newBuf)
+
 	// NOTE: this should really be checked since a gigantic message can crash the machine
 	signed, err := ioutil.ReadAll(r)
 	if err != nil {
