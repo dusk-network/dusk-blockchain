@@ -1,4 +1,4 @@
-package committee_test
+package events_test
 
 import (
 	"bytes"
@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	c "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -49,7 +48,7 @@ func mockEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer,
 
 	byte64, _ := crypto.RandEntropy(64)
 	eh := &c.NotaryEvent{
-		EventHeader: &consensus.EventHeader{
+		EventHeader: &events.EventHeader{
 			Signature: byte64,
 			PubKeyEd:  byte32,
 			Round:     round,
@@ -61,7 +60,7 @@ func mockEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer,
 		AgreedHash:    blockHash,
 	}
 
-	ehm := c.NewNotaryEventUnMarshaller(validate)
+	ehm := events.NewNotaryEventUnMarshaller(validate)
 	buf := new(bytes.Buffer)
 	ehm.Marshal(buf, eh)
 	return buf, nil
@@ -71,7 +70,7 @@ func newReductionEvent(hash []byte, pub []byte, sig []byte, step uint8) *c.Reduc
 	byte32, _ := crypto.RandEntropy(32)
 	byte64, _ := crypto.RandEntropy(64)
 	return &c.ReductionEvent{
-		EventHeader: &consensus.EventHeader{
+		EventHeader: &events.EventHeader{
 			Signature: byte64,
 			PubKeyEd:  byte32,
 			PubKeyBLS: pub,

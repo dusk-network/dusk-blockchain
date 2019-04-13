@@ -3,6 +3,8 @@ package voting
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -15,13 +17,13 @@ import (
 
 type blockReductionSigner struct {
 	*eventSigner
-	*committee.ReductionEventUnMarshaller
+	*events.ReductionUnMarshaller
 }
 
 func newBlockReductionSigner(keys *user.Keys, c committee.Committee) *blockReductionSigner {
 	return &blockReductionSigner{
-		eventSigner:                newEventSigner(keys, c),
-		ReductionEventUnMarshaller: committee.NewReductionEventUnMarshaller(msg.VerifyEd25519Signature),
+		eventSigner:           newEventSigner(keys, c),
+		ReductionUnMarshaller: events.NewReductionUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 
@@ -30,7 +32,7 @@ func (bs *blockReductionSigner) eligibleToVote() bool {
 }
 
 func (bs *blockReductionSigner) addSignatures(ev wire.Event) (*bytes.Buffer, error) {
-	e := ev.(*committee.ReductionEvent)
+	e := ev.(*events.Reduction)
 	if err := bs.signBLS(e); err != nil {
 		return nil, err
 	}
@@ -44,14 +46,14 @@ func (bs *blockReductionSigner) addSignatures(ev wire.Event) (*bytes.Buffer, err
 	return message, nil
 }
 
-func (bs *blockReductionSigner) signBLS(e *committee.ReductionEvent) error {
+func (bs *blockReductionSigner) signBLS(e *events.Reduction) error {
 	signedHash, err := bls.Sign(bs.BLSSecretKey, bs.BLSPubKey, e.VotedHash)
 	e.SignedHash = signedHash.Compress()
-	e.EventHeader.PubKeyBLS = bs.BLSPubKey.Marshal()
+	e.Header.PubKeyBLS = bs.BLSPubKey.Marshal()
 	return err
 }
 
-func (bs *blockReductionSigner) signEd25519(e *committee.ReductionEvent, eventBuf *bytes.Buffer) *bytes.Buffer {
+func (bs *blockReductionSigner) signEd25519(e *events.Reduction, eventBuf *bytes.Buffer) *bytes.Buffer {
 	signature := ed25519.Sign(*bs.EdSecretKey, eventBuf.Bytes())
 	buf := new(bytes.Buffer)
 	if err := encoding.Write512(buf, signature); err != nil {

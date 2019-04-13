@@ -3,12 +3,13 @@ package voting
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
@@ -18,13 +19,13 @@ import (
 
 type blockAgreementSigner struct {
 	*eventSigner
-	*committee.NotaryEventUnMarshaller
+	*events.AgreementUnMarshaller
 }
 
 func newBlockAgreementSigner(keys *user.Keys, c committee.Committee) *blockAgreementSigner {
 	return &blockAgreementSigner{
-		eventSigner:             newEventSigner(keys, c),
-		NotaryEventUnMarshaller: committee.NewNotaryEventUnMarshaller(msg.VerifyEd25519Signature),
+		eventSigner:           newEventSigner(keys, c),
+		AgreementUnMarshaller: events.NewAgreementUnMarshaller(msg.VerifyEd25519Signature),
 	}
 }
 
@@ -33,7 +34,7 @@ func (as *blockAgreementSigner) eligibleToVote() bool {
 }
 
 func (as *blockAgreementSigner) addSignatures(ev wire.Event) (*bytes.Buffer, error) {
-	e := ev.(*notary.BlockEvent)
+	e := ev.(*events.Agreement)
 	if err := as.signBLS(e); err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func (as *blockAgreementSigner) addSignatures(ev wire.Event) (*bytes.Buffer, err
 }
 
 func (as *blockAgreementSigner) signBLS(ev wire.Event) error {
-	e := ev.(*notary.BlockEvent)
+	e := ev.(*events.Agreement)
 	buffer := new(bytes.Buffer)
 	if err := as.MarshalVoteSet(buffer, e.VoteSet); err != nil {
 		return err
@@ -56,11 +57,11 @@ func (as *blockAgreementSigner) signBLS(ev wire.Event) error {
 
 	signedVoteSet, err := bls.Sign(as.BLSSecretKey, as.BLSPubKey, buffer.Bytes())
 	e.SignedVoteSet = signedVoteSet.Compress()
-	e.EventHeader.PubKeyBLS = as.BLSPubKey.Marshal()
+	e.Header.PubKeyBLS = as.BLSPubKey.Marshal()
 	return err
 }
 
-func (as *blockAgreementSigner) signEd25519(e *notary.BlockEvent, eventBuf *bytes.Buffer) *bytes.Buffer {
+func (as *blockAgreementSigner) signEd25519(e *events.Agreement, eventBuf *bytes.Buffer) *bytes.Buffer {
 	signature := ed25519.Sign(*as.EdSecretKey, eventBuf.Bytes())
 	buf := new(bytes.Buffer)
 	if err := encoding.Write512(buf, signature); err != nil {
