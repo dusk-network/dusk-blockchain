@@ -21,7 +21,7 @@ func newCtx(handler handler, committee committee.Committee, timeout time.Duratio
 		state:     consensus.NewState(),
 		timer: &consensus.Timer{
 			Timeout:     timeout,
-			TimeoutChan: make(chan interface{}, 1),
+			TimeoutChan: make(chan struct{}, 1),
 		},
 	}
 }
