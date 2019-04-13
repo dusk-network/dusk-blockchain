@@ -5,14 +5,11 @@ import (
 	"encoding/binary"
 
 	log "github.com/sirupsen/logrus"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type broker struct {
@@ -37,7 +34,9 @@ func launchAgreementFilter(eventBroker wire.EventBroker, committee committee.Com
 	accumulator *consensus.Accumulator) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(eventBroker, committee, handler, state,
 		accumulator, false)
-	go wire.NewTopicListener(eventBroker, filter, string(topics.BlockAgreement)).Accept()
+	republisher := consensus.NewRepublisher(eventBroker, topics.BlockAgreement)
+	listener := wire.NewTopicListener(eventBroker, filter, string(topics.BlockAgreement))
+	go listener.Accept(republisher, &consensus.Validator{})
 	return filter
 }
 
