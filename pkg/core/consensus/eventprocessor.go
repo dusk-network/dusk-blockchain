@@ -8,6 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type (
@@ -16,18 +17,19 @@ type (
 
 	Republisher struct {
 		publisher wire.EventPublisher
-		topic     string
+		topic     topics.Topic
 	}
 )
 
-func NewRepublisher(publisher wire.EventPublisher, topic string) *Republisher {
+func NewRepublisher(publisher wire.EventPublisher, topic topics.Topic) *Republisher {
 	return &Republisher{publisher, topic}
 }
 
 func (b *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
 	bounced := eventBuffer
-	b.publisher.Publish(b.topic, eventBuffer)
-	return bounced, nil
+	msg, _ := wire.AddTopic(bounced, b.topic)
+	b.publisher.Publish(string(topics.Gossip), msg)
+	return eventBuffer, nil
 }
 
 // Process a buffer by validating the ED25519 Signature. It uses a io.TeeReader to preserve the original message. It returns a copy of the message
