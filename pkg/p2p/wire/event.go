@@ -62,7 +62,7 @@ type (
 	}
 
 	TopicProcessor interface {
-		Process(*bytes.Buffer) error
+		Process(*bytes.Buffer) (*bytes.Buffer, error)
 	}
 
 	// TopicListener accepts events from the EventBus and takes care of reacting on
@@ -129,8 +129,9 @@ func (n *TopicListener) Accept(processors ...TopicProcessor) {
 			n.subscriber.Unsubscribe(n.topic, n.MsgChanID)
 			n.subscriber.Unsubscribe(string(QuitTopic), n.QuitChanID)
 			return
-		case eventBuffer := <-n.msgChan:
-			if err := preprocess(eventBuffer, processors...); err != nil {
+		case unprocessedEvBuffer := <-n.msgChan:
+			eventBuffer, err := preprocess(unprocessedEvBuffer, processors...)
+			if err != nil {
 				log.WithError(err).WithFields(
 					log.Fields{
 						"process": "topic listner",
@@ -157,13 +158,16 @@ func (n *TopicListener) Accept(processors ...TopicProcessor) {
 	}
 }
 
-func preprocess(eventBuffer *bytes.Buffer, processors ...TopicProcessor) error {
+func preprocess(eventBuffer *bytes.Buffer, processors ...TopicProcessor) (*bytes.Buffer, error) {
+	var err error
+	buf := eventBuffer
 	for _, processor := range processors {
-		if err := processor.Process(eventBuffer); err != nil {
-			return err
+		buf, err = processor.Process(buf)
+		if err != nil {
+			return nil, err
 		}
 	}
-	return nil
+	return buf, nil
 }
 
 // AddTopic is a convenience function to add a specified topic at the start of

@@ -14,11 +14,21 @@ type (
 	Validator struct {
 	}
 
-	Bouncer struct {
+	Republisher struct {
 		publisher wire.EventPublisher
 		topic     string
 	}
 )
+
+func NewRepublisher(publisher wire.EventPublisher, topic string) *Republisher {
+	return &Republisher{publisher, topic}
+}
+
+func (b *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
+	bounced := eventBuffer
+	b.publisher.Publish(b.topic, eventBuffer)
+	return bounced, nil
+}
 
 // Process a buffer by validating the ED25519 Signature. It uses a io.TeeReader to preserve the original message. It returns a copy of the message
 func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
