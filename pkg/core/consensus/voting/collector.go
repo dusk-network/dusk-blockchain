@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -38,7 +37,7 @@ func newEventSigner(keys *user.Keys, committee committee.Committee) *eventSigner
 	}
 }
 
-func initCollector(eventBus *wire.EventBus, topic string,
+func initCollector(broker wire.EventBroker, topic string,
 	unmarshalFunc func(*bytes.Buffer, signer) (wire.Event, error),
 	signer signer) chan *bytes.Buffer {
 
@@ -48,7 +47,7 @@ func initCollector(eventBus *wire.EventBus, topic string,
 		unmarshalFunc: unmarshalFunc,
 		signer:        signer,
 	}
-	go wire.NewTopicListener(eventBus, collector, topic).Accept()
+	go wire.NewTopicListener(broker, collector, topic).Accept()
 	return voteChannel
 }
 

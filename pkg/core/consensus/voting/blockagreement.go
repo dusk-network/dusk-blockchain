@@ -3,17 +3,12 @@ package voting
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -25,7 +20,7 @@ type blockAgreementSigner struct {
 func newBlockAgreementSigner(keys *user.Keys, c committee.Committee) *blockAgreementSigner {
 	return &blockAgreementSigner{
 		eventSigner:           newEventSigner(keys, c),
-		AgreementUnMarshaller: events.NewAgreementUnMarshaller(msg.VerifyEd25519Signature),
+		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
 	}
 }
 
