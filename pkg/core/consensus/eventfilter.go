@@ -6,7 +6,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -31,7 +30,6 @@ type (
 		queue     *EventQueue
 		handler   EventHandler
 		state     State
-		bouncer   *Bouncer
 		processor EventProcessor
 		checkStep bool // in some cases, we do not check the step for relevancy
 	}
@@ -45,13 +43,11 @@ type (
 
 func NewEventFilter(publisher wire.EventPublisher, committee committee.Committee,
 	handler EventHandler, state State, processor EventProcessor, checkStep bool) *EventFilter {
-	bouncer := NewBouncer(publisher, handler)
 	return &EventFilter{
 		committee: committee,
 		queue:     NewEventQueue(),
 		handler:   handler,
 		state:     state,
-		bouncer:   bouncer,
 		processor: processor,
 		checkStep: checkStep,
 	}
@@ -67,7 +63,6 @@ func (c *EventFilter) Collect(buffer *bytes.Buffer) error {
 		return errors.New("sender not part of committee")
 	}
 
-	c.bouncer.repropagate(ev)
 	header := &events.Header{}
 	c.handler.ExtractHeader(ev, header)
 	roundDiff, stepDiff := c.state.Cmp(header.Round, header.Step)
