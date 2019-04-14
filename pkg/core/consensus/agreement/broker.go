@@ -29,10 +29,10 @@ func LaunchAgreement(eventBus *wire.EventBus, committee committee.Committee,
 	return broker
 }
 
-func launchFilter(eventBroker wire.EventBroker,
-	committee committee.Committee, handler consensus.EventHandler,
-	state consensus.State, accumulator *consensus.Accumulator) *consensus.EventFilter {
-	filter := consensus.NewEventFilter(eventBroker, committee, handler, state, accumulator, false)
+func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
+	handler consensus.EventHandler, state consensus.State,
+	accumulator *consensus.Accumulator) *consensus.EventFilter {
+	filter := consensus.NewEventFilter(committee, handler, state, accumulator, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Agreement))
 	go listener.Accept(republisher, &consensus.Validator{})

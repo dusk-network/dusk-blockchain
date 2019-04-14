@@ -34,10 +34,12 @@ func newReductionHandler(committee committee.Committee) *reductionHandler {
 	}
 }
 
-func (b *reductionHandler) ExtractHeader(e wire.Event, h *events.Header) {
+func (b *reductionHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(*events.Reduction)
-	h.Round = ev.Round
-	h.Step = ev.Step
+	return &events.Header{
+		Round: ev.Round,
+		Step:  ev.Step,
+	}
 }
 
 func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {

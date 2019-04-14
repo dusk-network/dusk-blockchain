@@ -42,7 +42,7 @@ func LaunchReducer(eventBroker wire.EventBroker, committee committee.Committee,
 func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 	accumulator *consensus.Accumulator) *consensus.EventFilter {
 
-	filter := consensus.NewEventFilter(eventBroker, ctx.committee, ctx.handler, ctx.state, accumulator, true)
+	filter := consensus.NewEventFilter(ctx.committee, ctx.handler, ctx.state, accumulator, true)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Reduction))
 	go listener.Accept(republisher, &consensus.Validator{})

@@ -25,10 +25,12 @@ func (a *agreementHandler) NewEvent() wire.Event {
 	return events.NewAgreement()
 }
 
-func (a *agreementHandler) ExtractHeader(e wire.Event, h *events.Header) {
+func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(*events.Agreement)
-	h.Round = ev.Round
-	h.Step = ev.Step
+	return &events.Header{
+		Round: ev.Round,
+		Step:  ev.Step,
+	}
 }
 
 func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {

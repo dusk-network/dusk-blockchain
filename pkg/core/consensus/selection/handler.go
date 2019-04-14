@@ -53,9 +53,11 @@ func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
 	p.bidList = bidList
 }
 
-func (p *scoreHandler) ExtractHeader(e wire.Event, h *events.Header) {
+func (p *scoreHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(ScoreEvent)
-	h.Round = ev.Round
+	return &events.Header{
+		Round: ev.Round,
+	}
 }
 
 // Priority returns true if the
