@@ -12,8 +12,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-func TestNotaryEventUnmarshal(t *testing.T) {
-	unmarshaller := c.NewNotaryEventUnMarshaller(validate)
+func TestAgreementEventUnmarshal(t *testing.T) {
+	unmarshaller := c.NewAgreementEventUnMarshaller(validate)
 
 	step := uint8(1)
 	round := uint64(120)
@@ -22,7 +22,7 @@ func TestNotaryEventUnmarshal(t *testing.T) {
 	buf, err := mockEventBuffer(blockHash, round, step)
 	assert.Empty(t, err)
 
-	ev := c.NewNotaryEvent()
+	ev := c.NewAgreementEvent()
 	assert.Empty(t, unmarshaller.Unmarshal(buf, ev))
 	assert.Equal(t, ev.Step, step)
 	assert.Equal(t, ev.Round, round)
@@ -47,7 +47,7 @@ func mockEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer,
 	vote := newReductionEvent(byte32, pub.Marshal(), signedVote.Compress(), step)
 
 	byte64, _ := crypto.RandEntropy(64)
-	eh := &c.NotaryEvent{
+	eh := &c.AgreementEvent{
 		EventHeader: &events.EventHeader{
 			Signature: byte64,
 			PubKeyEd:  byte32,
@@ -60,7 +60,7 @@ func mockEventBuffer(blockHash []byte, round uint64, step uint8) (*bytes.Buffer,
 		AgreedHash:    blockHash,
 	}
 
-	ehm := events.NewNotaryEventUnMarshaller(validate)
+	ehm := events.NewAgreementEventUnMarshaller(validate)
 	buf := new(bytes.Buffer)
 	ehm.Marshal(buf, eh)
 	return buf, nil

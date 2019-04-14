@@ -9,10 +9,6 @@ import (
 type (
 	// Header is an embeddable struct representing the consensus event header fields
 	Header struct {
-		// TODO: ed25519 related fields added for demo to facilitate easy
-		// re-propagation. review
-		Signature []byte
-		PubKeyEd  []byte
 		PubKeyBLS []byte
 		Round     uint64
 		Step      uint8

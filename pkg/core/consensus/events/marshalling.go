@@ -59,19 +59,6 @@ func (ehm *HeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
-func (ehm *HeaderMarshaller) MarshalEdFields(r *bytes.Buffer, ev wire.Event) error {
-	evh := ev.(*Header)
-	if err := encoding.Write512(r, evh.Signature); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, evh.PubKeyEd); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Unmarshal unmarshals the buffer into a Consensus
 func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	// if the injection is unsuccessful, panic
@@ -178,10 +165,6 @@ func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event
 	}
 
 	for _, event := range evs {
-		rev := event.(*Reduction)
-		if err := a.MarshalEdFields(r, rev.Header); err != nil {
-			return err
-		}
 		if err := a.Marshal(r, event); err != nil {
 			return err
 		}
