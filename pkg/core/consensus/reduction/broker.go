@@ -34,6 +34,7 @@ func LaunchReducer(eventBroker wire.EventBroker, committee committee.Committee,
 	timeout time.Duration) *broker {
 	handler := newReductionHandler(committee)
 	broker := newBroker(eventBroker, handler, committee, timeout)
+
 	go broker.Listen()
 	return broker
 }
@@ -42,8 +43,8 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 	accumulator *consensus.Accumulator) *consensus.EventFilter {
 
 	filter := consensus.NewEventFilter(eventBroker, ctx.committee, ctx.handler, ctx.state, accumulator, true)
-	republisher := consensus.NewRepublisher(eventBroker, topics.BlockReduction)
-	listener := wire.NewTopicListener(eventBroker, filter, string(topics.BlockReduction))
+	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
+	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Reduction))
 	go listener.Accept(republisher, &consensus.Validator{})
 	return filter
 }
