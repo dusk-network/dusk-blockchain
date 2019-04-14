@@ -49,10 +49,10 @@ func (v *sender) listen() {
 	for {
 		select {
 		case m := <-v.blockReductionChannel:
-			message, _ := wire.AddTopic(m, topics.BlockReduction)
+			message, _ := wire.AddTopic(m, topics.Reduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		case m := <-v.blockAgreementChannel:
-			message, _ := wire.AddTopic(m, topics.BlockAgreement)
+			message, _ := wire.AddTopic(m, topics.Agreement)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}
