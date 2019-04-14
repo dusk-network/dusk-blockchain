@@ -35,10 +35,6 @@ type (
 		Marshal(*bytes.Buffer, Event) error
 	}
 
-	SignatureMarshaller interface {
-		MarshalEdFields(*bytes.Buffer, Event) error
-	}
-
 	// EventUnMarshaller is a convenient interface providing both Marshalling and
 	// Unmarshalling capabilities
 	EventUnMarshaller interface {
@@ -152,11 +148,10 @@ func (n *TopicListener) Accept(processors ...TopicProcessor) {
 				}).Debugln("Channel is accumulating messages")
 			}
 			if err := n.eventCollector.Collect(eventBuffer); err != nil {
-				log.WithFields(log.Fields{
-					"id":         n.MsgChanID,
-					"topic":      n.topic,
-					"Unconsumed": len(n.msgChan),
-				}).Warnln("Channel is accumulating messages")
+				log.WithError(err).WithFields(log.Fields{
+					"id":    n.MsgChanID,
+					"topic": n.topic,
+				}).Errorln("Error in eventCollector.Collect")
 			}
 		}
 	}
