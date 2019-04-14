@@ -7,10 +7,10 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -69,9 +69,9 @@ func (c *ConsensusFactory) StartConsensus() {
 	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
 
-	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)
+	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)
 
-	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
+	reduction.LaunchReducer(c.eventBus, c.committee, c.timerLength)
 
 	round := <-c.initChannel
 	log.WithFields(log.Fields{
@@ -79,7 +79,7 @@ func (c *ConsensusFactory) StartConsensus() {
 		"round":   round,
 	}).Debug("Received initial round")
 
-	notary.LaunchBlockAgreement(c.eventBus, c.committee, round)
+	agreement.LaunchAgreement(c.eventBus, c.committee, round)
 
 	log.WithField("process", "factory").Info("Consensus Started")
 }
