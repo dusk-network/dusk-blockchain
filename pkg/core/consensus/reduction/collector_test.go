@@ -31,7 +31,7 @@ func TestReduction(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
 	timeOut := 200 * time.Millisecond
 
-	broker := LaunchBlockReducer(eventBus, committeeMock, timeOut)
+	broker := LaunchReducer(eventBus, committeeMock, timeOut)
 	// listen for outgoing votes of either kind, so we can verify they are being
 	// sent out properly.
 	outgoingReduction := make(chan *bytes.Buffer, 2)
@@ -83,7 +83,7 @@ func TestReductionTimeout(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
 	timeOut := 200 * time.Millisecond
 
-	broker := LaunchBlockReducer(eventBus, committeeMock, timeOut)
+	broker := LaunchReducer(eventBus, committeeMock, timeOut)
 
 	// listen for outgoing votes of either kind, so we can verify they are being
 	// sent out properly.

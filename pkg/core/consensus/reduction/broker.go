@@ -28,9 +28,9 @@ type (
 	}
 )
 
-// LaunchBlockReducer creates and wires a broker, initiating the components that
+// LaunchReducer creates and wires a broker, initiating the components that
 // have to do with Block Reduction
-func LaunchBlockReducer(eventBroker wire.EventBroker, committee committee.Committee,
+func LaunchReducer(eventBroker wire.EventBroker, committee committee.Committee,
 	timeout time.Duration) *broker {
 	handler := newReductionHandler(committee)
 	broker := newBroker(eventBroker, handler, committee, timeout)
