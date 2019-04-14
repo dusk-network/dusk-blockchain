@@ -66,6 +66,7 @@ func newBroker(eventBroker wire.EventBroker, handler handler,
 		accumulator:     accumulator,
 		selectionChan:   scoreChan,
 		stepChan:        stepSub.StateChan,
+		reducer:         newReducer(ctx, eventBroker),
 	}
 }
 

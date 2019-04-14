@@ -69,8 +69,7 @@ type reducer struct {
 	publisher wire.EventPublisher
 }
 
-func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
-	publisher wire.EventPublisher) *reducer {
+func newReducer(ctx *context, publisher wire.EventPublisher) *reducer {
 	return &reducer{
 		ctx:       ctx,
 		publisher: publisher,
@@ -159,8 +158,13 @@ func (r *reducer) end() {
 	r.Lock()
 	r.stale = true
 	r.Unlock()
-	r.firstStep.stop()
-	r.secondStep.stop()
+	if r.firstStep != nil {
+		r.firstStep.stop()
+	}
+	if r.secondStep != nil {
+		r.secondStep.stop()
+	}
+	r.stale = false
 }
 
 func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
