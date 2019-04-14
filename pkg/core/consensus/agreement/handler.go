@@ -1,4 +1,4 @@
-package notary
+package agreement
 
 import (
 	"bytes"

@@ -1,12 +1,10 @@
-package notary
+package agreement
 
 import (
 	"bytes"
 	"encoding/binary"
 	"testing"
 	"time"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -15,6 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func TestSimpleBlockCollection(t *testing.T) {
@@ -72,12 +71,12 @@ func TestSkipNoMember(t *testing.T) {
 	}
 }
 
-func TestBlockNotary(t *testing.T) {
+func TestBlockAgreement(t *testing.T) {
 	bus := wire.NewEventBus()
 	committee := mockCommittee(1, true, nil)
-	notary := LaunchBlockNotary(bus, committee, 1)
+	agreement := LaunchAgreement(bus, committee, 1)
 	blockHash := []byte("pippo")
-	notary.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
+	agreement.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
 
 	blockChan := make(chan *bytes.Buffer)
 	bus.Subscribe(msg.RoundUpdateTopic, blockChan)
@@ -98,7 +97,7 @@ func TestBlockNotary(t *testing.T) {
 	// we need to wait for the round update to be propagated before publishing other round related messages. This is what this timeout is about
 	<-time.After(100 * time.Millisecond)
 
-	notary.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 2)
+	agreement.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 2)
 	bus.Publish(msg.BlockAgreementTopic, bytes.NewBuffer([]byte("test")))
 
 	select {
@@ -136,7 +135,7 @@ func (m *MockBEUnmarshaller) Marshal(b *bytes.Buffer, e wire.Event) error {
 }
 
 func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnMarshaller {
-	ev := committee.NewNotaryEvent()
+	ev := committee.NewAgreementEvent()
 	ev.AgreedHash = blockHash
 	ev.Step = step
 	ev.Round = round

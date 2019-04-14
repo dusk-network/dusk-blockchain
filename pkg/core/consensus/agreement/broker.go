@@ -1,4 +1,4 @@
-package notary
+package agreement
 
 import (
 	"bytes"
@@ -19,9 +19,9 @@ type broker struct {
 	accumulator *consensus.Accumulator
 }
 
-// LaunchBlockAgreement is a helper to minimize the wiring of TopicListeners,
+// LaunchAgreement is a helper to minimize the wiring of TopicListeners,
 // collector and channels
-func LaunchBlockAgreement(eventBus *wire.EventBus, committee committee.Committee,
+func LaunchAgreement(eventBus *wire.EventBus, committee committee.Committee,
 	currentRound uint64) *broker {
 	broker := newBroker(eventBus, committee)
 	broker.updateRound(currentRound)
@@ -64,7 +64,7 @@ func (b *broker) Listen() {
 
 func (b *broker) updateRound(round uint64) {
 	log.WithFields(log.Fields{
-		"process": "notary",
+		"process": "agreement",
 		"round":   round,
 	}).Debugln("updating round")
 	b.filter.UpdateRound(round)
