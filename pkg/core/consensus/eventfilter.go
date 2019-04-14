@@ -20,7 +20,7 @@ type (
 		wire.EventUnMarshaller
 		wire.SignatureMarshaller
 		NewEvent() wire.Event
-		ExtractHeader(wire.Event, *events.Header)
+		ExtractHeader(wire.Event) *events.Header
 	}
 
 	// EventFilter is a generic filter that can be used by consensus components for
@@ -41,8 +41,8 @@ type (
 	}
 )
 
-func NewEventFilter(publisher wire.EventPublisher, committee committee.Committee,
-	handler EventHandler, state State, processor EventProcessor, checkStep bool) *EventFilter {
+func NewEventFilter(committee committee.Committee, handler EventHandler,
+	state State, processor EventProcessor, checkStep bool) *EventFilter {
 	return &EventFilter{
 		committee: committee,
 		queue:     NewEventQueue(),
@@ -63,8 +63,7 @@ func (c *EventFilter) Collect(buffer *bytes.Buffer) error {
 		return errors.New("sender not part of committee")
 	}
 
-	header := &events.Header{}
-	c.handler.ExtractHeader(ev, header)
+	header := c.handler.ExtractHeader(ev)
 	roundDiff, stepDiff := c.state.Cmp(header.Round, header.Step)
 	if c.isEarly(roundDiff, stepDiff) {
 		c.queue.PutEvent(header.Round, header.Step, ev)
@@ -96,7 +95,7 @@ func (c *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
 	return relevantRound && relevantStep
 }
 
-// ShouldSkip checks if the message is not propagated by a committee member, that is not a duplicate (and in this case should probably check if the Provisioner is malicious) and that is relevant to the current round
+// ShouldSkip checks if the message is not propagated by a committee member.
 func (c *EventFilter) shouldSkip(ev wire.Event) bool {
 	return !c.committee.IsMember(ev.Sender())
 }
