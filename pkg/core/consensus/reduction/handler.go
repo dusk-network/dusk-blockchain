@@ -34,11 +34,6 @@ func newReductionHandler(committee committee.Committee) *reductionHandler {
 	}
 }
 
-func (b *reductionHandler) MarshalEdFields(r *bytes.Buffer, ev wire.Event) error {
-	rev := ev.(*events.Reduction)
-	return b.HeaderMarshaller.MarshalEdFields(r, rev.Header)
-}
-
 func (b *reductionHandler) ExtractHeader(e wire.Event, h *events.Header) {
 	ev := e.(*events.Reduction)
 	h.Round = ev.Round

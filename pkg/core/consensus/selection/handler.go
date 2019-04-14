@@ -47,10 +47,6 @@ func (p *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return MarshalScoreEvent(r, e)
 }
 
-func (p *scoreHandler) MarshalEdFields(r *bytes.Buffer, e wire.Event) error {
-	return nil
-}
-
 func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
 	p.Lock()
 	defer p.Unlock()
