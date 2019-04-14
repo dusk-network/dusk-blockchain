@@ -16,7 +16,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func TestSimpleBlockCollection(t *testing.T) {
+func TestSimpleCollection(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
 	bc := newBlockCollector(committeeMock, 1)
 

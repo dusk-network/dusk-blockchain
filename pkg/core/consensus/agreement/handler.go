@@ -14,7 +14,7 @@ type agreementHandler struct {
 	*events.AgreementUnMarshaller
 }
 
-func newAgreementHandler(committee committee.Committee) *agreementHandler {
+func newHandler(committee committee.Committee) *agreementHandler {
 	return &agreementHandler{
 		Committee:             committee,
 		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),

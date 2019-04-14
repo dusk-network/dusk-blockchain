@@ -20,7 +20,7 @@ type broker struct {
 }
 
 // LaunchAgreement is a helper to minimize the wiring of TopicListeners,
-// collector and channels
+// collector and channels. The agreement component notarizes the new blocks after having collected a quorum of votes
 func LaunchAgreement(eventBus *wire.EventBus, committee committee.Committee,
 	currentRound uint64) *broker {
 	broker := newBroker(eventBus, committee)
@@ -29,22 +29,22 @@ func LaunchAgreement(eventBus *wire.EventBus, committee committee.Committee,
 	return broker
 }
 
-func launchAgreementFilter(eventBroker wire.EventBroker, committee committee.Committee,
+func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 	handler consensus.EventHandler, state consensus.State,
 	accumulator *consensus.Accumulator) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(eventBroker, committee, handler, state,
 		accumulator, false)
-	republisher := consensus.NewRepublisher(eventBroker, topics.BlockAgreement)
-	listener := wire.NewTopicListener(eventBroker, filter, string(topics.BlockAgreement))
+	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
+	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Agreement))
 	go listener.Accept(republisher, &consensus.Validator{})
 	return filter
 }
 
 func newBroker(eventBroker wire.EventBroker, committee committee.Committee) *broker {
-	handler := newAgreementHandler(committee)
+	handler := newHandler(committee)
 	accumulator := consensus.NewAccumulator(handler)
 	state := consensus.NewState()
-	filter := launchAgreementFilter(eventBroker, committee, handler,
+	filter := launchFilter(eventBroker, committee, handler,
 		state, accumulator)
 	return &broker{
 		publisher:   eventBroker,
