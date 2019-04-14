@@ -18,13 +18,12 @@ type (
 	EventHandler interface {
 		wire.EventVerifier
 		wire.EventUnMarshaller
-		wire.SignatureMarshaller
+		// wire.SignatureMarshaller
 		NewEvent() wire.Event
 		ExtractHeader(wire.Event, *events.Header)
 	}
 
-	// EventFilter is a generic filter that can be used by consensus components for
-	// filtering and passing down messages.
+	// EventFilter is a generic wire.Collector that can be used by consensus components for filtering and passing down messages. It coordinates an EventQueue to manage Events coming too early and delegates consensus specific logic to the handler.
 	EventFilter struct {
 		committee committee.Committee
 		queue     *EventQueue
@@ -41,8 +40,7 @@ type (
 	}
 )
 
-func NewEventFilter(publisher wire.EventPublisher, committee committee.Committee,
-	handler EventHandler, state State, processor EventProcessor, checkStep bool) *EventFilter {
+func NewEventFilter(publisher wire.EventPublisher, committee committee.Committee, handler EventHandler, state State, processor EventProcessor, checkStep bool) *EventFilter {
 	return &EventFilter{
 		committee: committee,
 		queue:     NewEventQueue(),
