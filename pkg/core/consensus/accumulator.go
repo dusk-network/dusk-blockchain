@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -35,6 +35,7 @@ func NewAccumulator(handler AccumulatorHandler) *Accumulator {
 
 func (a *Accumulator) Process(ev wire.Event) {
 	if err := a.handler.Verify(ev); err != nil {
+		log.WithError(err).Debugln("Voteset verification failed")
 		return
 	}
 	a.accumulate(ev)
