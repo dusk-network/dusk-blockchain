@@ -22,7 +22,7 @@ type (
 		// isMember can accept a BLS Public Key or an Ed25519
 		IsMember([]byte) bool
 		GetVotingCommittee(uint64, uint8) (map[string]uint8, error)
-		VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64, step uint8) *prerror.PrError
+		VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64, step uint8) error
 		Quorum() int
 	}
 
@@ -136,7 +136,7 @@ func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
 
 // VerifyVoteSet checks the signature of the set
 func (c Store) VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64,
-	step uint8) *prerror.PrError {
+	step uint8) error {
 
 	// var amountOfVotes uint8
 
