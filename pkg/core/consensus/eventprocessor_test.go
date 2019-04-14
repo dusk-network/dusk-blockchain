@@ -13,29 +13,23 @@ import (
 
 func TestValidator(t *testing.T) {
 	message := []byte("This is a test message")
-	b := make([]byte, 0)
-	tbuf := bytes.NewBuffer(b)
-	encoding.WriteVarBytes(tbuf, message)
-	testMsg := tbuf.Bytes()
 
 	keys, err := user.NewRandKeys()
 	assert.NoError(t, err)
-	signature := ed25519.Sign(*keys.EdSecretKey, testMsg)
+	signature := ed25519.Sign(*keys.EdSecretKey, message)
 	assert.Equal(t, 64, len(signature))
 
-	assert.NoError(t, msg.VerifyEd25519Signature(keys.EdPubKeyBytes(), testMsg, signature))
+	assert.NoError(t, msg.VerifyEd25519Signature(keys.EdPubKeyBytes(), message, signature))
 
-	b = make([]byte, 0)
+	b := make([]byte, 0)
 	buf := bytes.NewBuffer(b)
 	assert.NoError(t, encoding.Write512(buf, signature))
 	assert.NoError(t, encoding.Write256(buf, keys.EdPubKeyBytes()))
-	assert.NoError(t, encoding.WriteVarBytes(buf, message))
+	_, err = buf.Write(message)
+	assert.NoError(t, err)
 
 	validator := &Validator{}
 	result, err := validator.Process(buf)
 	assert.NoError(t, err)
-
-	ret := make([]byte, len(message)+1)
-	assert.NoError(t, encoding.ReadVarBytes(result, &ret))
-	assert.Equal(t, message, ret)
+	assert.Equal(t, message, result.Bytes())
 }
