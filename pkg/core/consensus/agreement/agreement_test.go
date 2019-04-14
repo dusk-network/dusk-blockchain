@@ -2,151 +2,160 @@ package agreement
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"golang.org/x/crypto/ed25519"
 )
 
-func TestSimpleCollection(t *testing.T) {
+func TestInitBroker(t *testing.T) {
 	committeeMock := mockCommittee(2, true, nil)
-	bc := newBlockCollector(committeeMock, 1)
+	bus := wire.NewEventBus()
+	roundChan := consensus.InitRoundUpdate(bus)
 
-	blockHash := []byte("pippo")
-	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
-	bc.Collect(bytes.NewBuffer([]byte{}))
-	bc.Collect(bytes.NewBuffer([]byte{}))
+	LaunchAgreement(bus, committeeMock, 1)
 
-	select {
-	case res := <-bc.RoundChan:
-		assert.Equal(t, uint64(2), res)
-		// testing that we clean after collection
-		assert.Equal(t, 0, len(bc.StepEventAccumulator.Map))
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "Collection did not complete")
-	}
+	round := <-roundChan
+	assert.Equal(t, uint64(1), round)
 }
 
-func TestNoQuorumCollection(t *testing.T) {
-	committeeMock := mockCommittee(3, true, nil)
-	bc := newBlockCollector(committeeMock, 1)
+func TestBroker(t *testing.T) {
+	committeeMock := mockCommittee(2, true, nil)
+	_, broker, roundChan := initAgreement(committeeMock)
 
-	blockHash := []byte("pippo")
-	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
-	bc.Collect(bytes.NewBuffer([]byte{}))
-	bc.Collect(bytes.NewBuffer([]byte{}))
+	hash, _ := crypto.RandEntropy(32)
+	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+
+	round := <-roundChan
+	assert.Equal(t, uint64(2), round)
+}
+
+func TestNoQuorum(t *testing.T) {
+	committeeMock := mockCommittee(3, true, nil)
+	_, broker, roundChan := initAgreement(committeeMock)
+	hash, _ := crypto.RandEntropy(32)
+	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
 
 	select {
-	case <-bc.RoundChan:
-		assert.Fail(t, "Collection was not supposed to complete since Quorum should not be reached")
+	case <-roundChan:
+		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
-		// testing that we still have collected for 1 step
-		assert.Equal(t, 1, len(bc.StepEventAccumulator.Map))
-		// testing that we collected 2 messages
-		assert.Equal(t, 2, len(bc.StepEventAccumulator.Map[string(1)]))
+		// all good
 	}
+
+	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	round := <-roundChan
+	assert.Equal(t, uint64(2), round)
 }
 
 func TestSkipNoMember(t *testing.T) {
 	committeeMock := mockCommittee(1, false, nil)
-	bc := newBlockCollector(committeeMock, 1)
-
-	blockHash := []byte("pippo")
-	bc.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
-	bc.Collect(bytes.NewBuffer([]byte{}))
+	_, broker, roundChan := initAgreement(committeeMock)
+	hash, _ := crypto.RandEntropy(32)
+	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
 
 	select {
-	case <-bc.RoundChan:
-		assert.Fail(t, "Collection was not supposed to complete since Quorum should not be reached")
-	case <-time.After(50 * time.Millisecond):
-		// test successfull
+	case <-roundChan:
+		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
+	case <-time.After(100 * time.Millisecond):
+		// all good
 	}
 }
 
-func TestBlockAgreement(t *testing.T) {
-	bus := wire.NewEventBus()
-	committee := mockCommittee(1, true, nil)
-	agreement := LaunchAgreement(bus, committee, 1)
-	blockHash := []byte("pippo")
-	agreement.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 1)
+func TestAgreement(t *testing.T) {
+	committeeMock := mockCommittee(1, true, nil)
+	bus, _, roundChan := initAgreement(committeeMock)
+	hash, _ := crypto.RandEntropy(32)
+	bus.Publish(string(topics.Agreement), marshalOutgoing(hash, 1, 1))
 
-	blockChan := make(chan *bytes.Buffer)
-	bus.Subscribe(msg.RoundUpdateTopic, blockChan)
+	round := <-roundChan
+	assert.Equal(t, uint64(2), round)
 
-	// Get round out of the channel, that was put in from initialization
-	// It should be 1
-	initRound := <-blockChan
-	initNum := binary.LittleEndian.Uint64(initRound.Bytes())
-	assert.Equal(t, uint64(1), initNum)
-
-	bus.Publish(string(topics.BlockAgreement), bytes.NewBuffer([]byte("test")))
-
-	result := <-blockChan
-	resNum := binary.LittleEndian.Uint64(result.Bytes())
-	assert.Equal(t, resNum, uint64(2))
-
-	// test that after a round update messages for previous rounds get ignored
-	// we need to wait for the round update to be propagated before publishing other round related messages. This is what this timeout is about
-	<-time.After(100 * time.Millisecond)
-
-	agreement.blockCollector.Unmarshaller = mockBEUnmarshaller(blockHash, 1, 2)
-	bus.Publish(msg.BlockAgreementTopic, bytes.NewBuffer([]byte("test")))
+	bus.Publish(string(topics.Agreement), marshalOutgoing(hash, 1, 2))
 
 	select {
-	case <-blockChan:
+	case <-roundChan:
 		assert.FailNow(t, "Previous round messages should not trigger a phase update")
 	case <-time.After(100 * time.Millisecond):
 		// all well
 		return
 	}
-
 }
 
-type MockBEUnmarshaller struct {
-	event *BlockEvent
-	err   error
+func initAgreement(c committee.Committee) (wire.EventBroker, *broker, chan uint64) {
+	bus := wire.NewEventBus()
+	roundChan := consensus.InitRoundUpdate(bus)
+	broker := LaunchAgreement(bus, c, 1)
+	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
+	<-roundChan
+	return bus, broker, roundChan
 }
 
-func (m *MockBEUnmarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
-	if m.err != nil {
-		return m.err
+func marshalOutgoing(blockhash []byte, round uint64, step uint8) *bytes.Buffer {
+	ev := events.NewAgreement()
+	ev.Header.Round = round
+	ev.Header.Step = step
+	ev.PubKeyBLS, _ = crypto.RandEntropy(32)
+	ev.AgreedHash = blockhash
+	// we leave VoteSet empty but it doesn't matter as the mocked committee will OK it anyway
+	ev.SignedVoteSet, _ = crypto.RandEntropy(33)
+	ev.VoteSet = make([]wire.Event, 0)
+
+	m := events.NewAgreementUnMarshaller()
+	b := make([]byte, 0)
+	buf := bytes.NewBuffer(b)
+	_ = m.Marshal(buf, ev)
+
+	msgBytes := buf.Bytes()
+	keys, _ := user.NewRandKeys()
+	signature := ed25519.Sign(*keys.EdSecretKey, msgBytes)
+
+	if err := msg.VerifyEd25519Signature(keys.EdPubKeyBytes(), msgBytes, signature); err != nil {
+		panic(err)
 	}
 
-	blsPub, _ := crypto.RandEntropy(32)
-	ev := e.(*BlockEvent)
-	ev.Step = m.event.Step
-	ev.Round = m.event.Round
-	ev.AgreedHash = m.event.AgreedHash
-	ev.PubKeyBLS = blsPub
-	return nil
+	b = make([]byte, 0)
+	outgoing := bytes.NewBuffer(b)
+	// outgoing, _ = wire.AddTopic(outgoing, topics.Agreement)
+	_ = encoding.Write512(outgoing, signature)
+	_ = encoding.Write256(outgoing, keys.EdPubKeyBytes())
+	_, _ = outgoing.Write(msgBytes)
+	return outgoing
 }
 
-// Marshal is not used by the mock unmarshaller.
-func (m *MockBEUnmarshaller) Marshal(b *bytes.Buffer, e wire.Event) error {
-	return nil
+func marshalMsg(blockhash []byte, round uint64, step uint8) *bytes.Buffer {
+	ev := events.NewAgreement()
+	ev.Header.Round = round
+	ev.Header.Step = step
+	ev.PubKeyBLS, _ = crypto.RandEntropy(32)
+	ev.AgreedHash = blockhash
+	// we leave VoteSet empty klbut it doesn't matter as the mocked committee will OK it anyway
+	ev.SignedVoteSet, _ = crypto.RandEntropy(33)
+	ev.VoteSet = make([]wire.Event, 0)
+
+	m := events.NewAgreementUnMarshaller()
+	b := make([]byte, 0)
+	buf := bytes.NewBuffer(b)
+	_ = m.Marshal(buf, ev)
+	return buf
 }
 
-func mockBEUnmarshaller(blockHash []byte, round uint64, step uint8) wire.EventUnMarshaller {
-	ev := committee.NewAgreementEvent()
-	ev.AgreedHash = blockHash
-	ev.Step = step
-	ev.Round = round
-
-	return &MockBEUnmarshaller{
-		event: ev,
-		err:   nil,
-	}
-}
-
-func mockCommittee(quorum int, isMember bool, verification error) committee.Committee {
+func mockCommittee(quorum int, isMember bool, verification error) *mocks.Committee {
 	committeeMock := &mocks.Committee{}
 	committeeMock.On("Quorum").Return(quorum)
 	committeeMock.On("VerifyVoteSet",

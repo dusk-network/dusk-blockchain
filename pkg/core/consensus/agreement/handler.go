@@ -38,5 +38,5 @@ func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 
 func (a *agreementHandler) Verify(e wire.Event) error {
 	ev := e.(*events.Agreement)
-	return a.VerifyVoteSet(ev.VoteSet, ev.AgreedHash, ev.Round, ev.Step)
+	return a.Committee.VerifyVoteSet(ev.VoteSet, ev.AgreedHash, ev.Round, ev.Step)
 }

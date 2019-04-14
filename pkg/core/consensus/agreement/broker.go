@@ -29,11 +29,10 @@ func LaunchAgreement(eventBus *wire.EventBus, committee committee.Committee,
 	return broker
 }
 
-func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
-	handler consensus.EventHandler, state consensus.State,
-	accumulator *consensus.Accumulator) *consensus.EventFilter {
-	filter := consensus.NewEventFilter(eventBroker, committee, handler, state,
-		accumulator, false)
+func launchFilter(eventBroker wire.EventBroker,
+	committee committee.Committee, handler consensus.EventHandler,
+	state consensus.State, accumulator *consensus.Accumulator) *consensus.EventFilter {
+	filter := consensus.NewEventFilter(eventBroker, committee, handler, state, accumulator, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Agreement))
 	go listener.Accept(republisher, &consensus.Validator{})
@@ -54,7 +53,7 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Committee) *bro
 	}
 }
 
-// Listen for results coming from the accumulator
+// Listen for results coming from the accumulator and updating the round accordingly
 func (b *broker) Listen() {
 	for {
 		<-b.accumulator.CollectedVotesChan
@@ -74,6 +73,7 @@ func (b *broker) updateRound(round uint64) {
 	b.filter.FlushQueue()
 }
 
+// publishRoundUpdate publishes the new round in the EventPublisher
 func (b *broker) publishRoundUpdate(round uint64) {
 	// Marshalling the round update
 	bs := make([]byte, 8)
