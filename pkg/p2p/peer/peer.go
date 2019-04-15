@@ -296,6 +296,10 @@ func (p *Peer) readLoop() {
 		idleTimer.Reset(idleTimeout) // reset timer on each loop
 		topic, payload, err := p.readMessage()
 		if err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error reading message")
 			p.Disconnect()
 			return
 		}
