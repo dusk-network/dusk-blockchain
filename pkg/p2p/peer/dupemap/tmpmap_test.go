@@ -1,22 +1,20 @@
-package dupemap
+package dupemap_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/hashset"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 )
 
 func TestHas(t *testing.T) {
 	testPayload := bytes.NewBufferString("This is a test")
-	tmpMap := NewTmpMap(3)
+	tmpMap := dupemap.NewTmpMap(3)
 
 	assert.False(t, tmpMap.Has(testPayload))
 
-	s := hashset.New()
-	s.Add(testPayload.Bytes())
-	tmpMap.msgSets[uint64(0)] = s
+	tmpMap.AddAt(testPayload, 0)
 
 	assert.True(t, tmpMap.Has(testPayload))
 
@@ -29,7 +27,7 @@ func TestHas(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	testPayload := bytes.NewBufferString("This is a test")
-	tmpMap := NewTmpMap(3)
+	tmpMap := dupemap.NewTmpMap(3)
 
 	assert.False(t, tmpMap.Add(testPayload))
 	assert.True(t, tmpMap.Add(testPayload))
@@ -40,7 +38,7 @@ func TestAdd(t *testing.T) {
 
 func TestClean(t *testing.T) {
 	testPayload := bytes.NewBufferString("This is a test")
-	tmpMap := NewTmpMap(3)
+	tmpMap := dupemap.NewTmpMap(3)
 
 	assert.False(t, tmpMap.Add(testPayload))
 
