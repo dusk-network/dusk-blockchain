@@ -1,10 +1,11 @@
-package selection
+package selection_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
@@ -23,9 +24,8 @@ func TestUnMarshal(t *testing.T) {
 	// 32 bytes
 	candidateHash, _ := crypto.RandEntropy(32)
 
-	se := &ScoreEvent{
+	se := &selection.ScoreEvent{
 		Round:         uint64(23),
-		Step:          uint8(2),
 		Score:         score,
 		Proof:         proof,
 		Z:             z,
@@ -33,17 +33,13 @@ func TestUnMarshal(t *testing.T) {
 		BidListSubset: bidListSubset,
 		VoteHash:      candidateHash,
 	}
-	unMarshaller := newScoreUnMarshaller()
-	unMarshaller.validateFunc = func([]byte, []byte, []byte) error {
-		return nil
-	}
 
 	bin := make([]byte, 0, 3000)
 	buf := bytes.NewBuffer(bin)
-	assert.NoError(t, unMarshaller.Marshal(buf, se))
+	assert.NoError(t, selection.MarshalScoreEvent(buf, se))
 
-	other := &ScoreEvent{}
-	assert.NoError(t, unMarshaller.Unmarshal(buf, other))
+	other := &selection.ScoreEvent{}
+	assert.NoError(t, selection.UnmarshalScoreEvent(buf, other))
 	assert.Equal(t, se, other)
 	assert.True(t, other.Equal(se))
 }
