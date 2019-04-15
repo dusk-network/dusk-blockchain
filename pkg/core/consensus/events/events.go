@@ -67,6 +67,6 @@ func (e *Reduction) Equal(ev wire.Event) bool {
 // Equal as specified in the Event interface
 func (ceh *Agreement) Equal(e wire.Event) bool {
 	other, ok := e.(*Agreement)
-	return ok && ceh.Header.Equal(other) &&
+	return ok && ceh.Header.Equal(other.Header) &&
 		bytes.Equal(other.SignedVoteSet, ceh.SignedVoteSet)
 }
