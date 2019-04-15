@@ -92,6 +92,9 @@ func (s *eventSelector) publishBestEvent() {
 	s.handler.Marshal(buf, bestEvent)
 	s.publisher.Publish(msg.BestScoreTopic, buf)
 	s.state.IncrementStep()
+	s.Lock()
+	defer s.Unlock()
+	s.bestEvent = nil
 }
 
 func (s *eventSelector) stopSelection() {

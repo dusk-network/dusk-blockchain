@@ -24,7 +24,7 @@ func TestUnMarshal(t *testing.T) {
 	// 32 bytes
 	candidateHash, _ := crypto.RandEntropy(32)
 
-	se := &selection.ScoreEvent{
+	se := selection.ScoreEvent{
 		Round:         uint64(23),
 		Score:         score,
 		Proof:         proof,
@@ -34,12 +34,10 @@ func TestUnMarshal(t *testing.T) {
 		VoteHash:      candidateHash,
 	}
 
-	bin := make([]byte, 0, 3000)
-	buf := bytes.NewBuffer(bin)
+	buf := new(bytes.Buffer)
 	assert.NoError(t, selection.MarshalScoreEvent(buf, se))
 
 	other := &selection.ScoreEvent{}
 	assert.NoError(t, selection.UnmarshalScoreEvent(buf, other))
-	assert.Equal(t, se, other)
 	assert.True(t, other.Equal(se))
 }
