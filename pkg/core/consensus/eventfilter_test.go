@@ -85,8 +85,8 @@ func TestObsoleteEvent(t *testing.T) {
 // components.
 func newEventFilter(round uint64, step uint8, isMember bool,
 	processor consensus.EventProcessor) *consensus.EventFilter {
-	return consensus.NewEventFilter(newMockCommittee(0, isMember),
-		newMockHandlerFilter(round, step), consensus.NewState(), processor, true)
+	return consensus.NewEventFilter(newMockHandlerFilter(round, step),
+		consensus.NewState(), processor, true)
 }
 
 func newMockEvent() wire.Event {
