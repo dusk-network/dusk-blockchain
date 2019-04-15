@@ -37,6 +37,7 @@ func NewAccumulator(handler AccumulatorHandler) *Accumulator {
 func (a *Accumulator) Process(ev wire.Event) {
 	if a.shouldSkip(ev) {
 		log.WithError(errors.New("sender not part of committee")).Debugln("event dropped")
+		return
 	}
 
 	if err := a.handler.Verify(ev); err != nil {
