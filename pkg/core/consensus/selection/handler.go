@@ -54,7 +54,7 @@ func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
 }
 
 func (p *scoreHandler) ExtractHeader(e wire.Event) *events.Header {
-	ev := e.(ScoreEvent)
+	ev := e.(*ScoreEvent)
 	return &events.Header{
 		Round: ev.Round,
 	}
@@ -62,13 +62,13 @@ func (p *scoreHandler) ExtractHeader(e wire.Event) *events.Header {
 
 // Priority returns true if the
 func (p *scoreHandler) Priority(first, second wire.Event) wire.Event {
-	ev1, ok := first.(ScoreEvent)
+	ev1, ok := first.(*ScoreEvent)
 	if !ok {
 		// this happens when first is nil, in which case we should return second
 		return second
 	}
 
-	ev2 := second.(ScoreEvent)
+	ev2 := second.(*ScoreEvent)
 	score1 := big.NewInt(0).SetBytes(ev1.Score).Uint64()
 	score2 := big.NewInt(0).SetBytes(ev2.Score).Uint64()
 	if score1 < score2 {
@@ -79,7 +79,7 @@ func (p *scoreHandler) Priority(first, second wire.Event) wire.Event {
 }
 
 func (p *scoreHandler) Verify(ev wire.Event) error {
-	m := ev.(ScoreEvent)
+	m := ev.(*ScoreEvent)
 
 	// Check first if the BidList contains valid bids
 	if err := p.validateBidListSubset(m.BidListSubset); err != nil {

@@ -24,7 +24,7 @@ func TestUnMarshal(t *testing.T) {
 	// 32 bytes
 	candidateHash, _ := crypto.RandEntropy(32)
 
-	se := selection.ScoreEvent{
+	se := &selection.ScoreEvent{
 		Round:         uint64(23),
 		Score:         score,
 		Proof:         proof,

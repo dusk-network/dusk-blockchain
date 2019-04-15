@@ -25,13 +25,13 @@ type (
 )
 
 // Equal as specified in the Event interface
-func (e ScoreEvent) Equal(ev wire.Event) bool {
-	other, ok := ev.(ScoreEvent)
+func (e *ScoreEvent) Equal(ev wire.Event) bool {
+	other, ok := ev.(*ScoreEvent)
 	return ok && other.Round == e.Round && bytes.Equal(other.VoteHash, e.VoteHash)
 }
 
 // Sender of a Score event is the anonymous Z
-func (e ScoreEvent) Sender() []byte {
+func (e *ScoreEvent) Sender() []byte {
 	return e.Z
 }
 
@@ -87,7 +87,7 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
 func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	// TODO: review
-	sev, ok := ev.(ScoreEvent)
+	sev, ok := ev.(*ScoreEvent)
 	if !ok {
 		// sev is nil
 		return nil

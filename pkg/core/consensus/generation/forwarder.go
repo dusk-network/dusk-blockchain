@@ -29,7 +29,7 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 		panic(err)
 	}
 
-	sev := selection.ScoreEvent{
+	sev := &selection.ScoreEvent{
 		Round:         round,
 		Score:         proof.Score,
 		Proof:         proof.Proof,
@@ -47,7 +47,7 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 	f.publisher.Publish(string(topics.Gossip), marshalledEvent)
 }
 
-func (f *forwarder) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
+func (f *forwarder) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
 	buffer := new(bytes.Buffer)
 	if err := selection.MarshalScoreEvent(buffer, sev); err != nil {
 		panic(err)
