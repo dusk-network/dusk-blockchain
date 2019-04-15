@@ -51,20 +51,22 @@ func (s *eventSelector) startSelection() {
 	for len(s.timer.TimeoutChan) > 0 {
 		<-s.timer.TimeoutChan
 	}
-	// propagating the best event after timeout,
-	// or stopping on reading from timeoutchan
-	timer := time.NewTimer(s.timer.Timeout)
-	select {
-	case <-timer.C:
-		s.publishBestEvent()
-	case <-s.timer.TimeoutChan:
+	go func() {
+		// propagating the best event after timeout,
+		// or stopping on reading from timeoutchan
+		timer := time.NewTimer(s.timer.Timeout)
+		select {
+		case <-timer.C:
+			s.publishBestEvent()
+		case <-s.timer.TimeoutChan:
+			s.Lock()
+			s.bestEvent = nil
+			s.Unlock()
+		}
 		s.Lock()
-		s.bestEvent = nil
+		s.running = false
 		s.Unlock()
-	}
-	s.Lock()
-	s.running = false
-	s.Unlock()
+	}()
 }
 
 func (s *eventSelector) Process(ev wire.Event) {

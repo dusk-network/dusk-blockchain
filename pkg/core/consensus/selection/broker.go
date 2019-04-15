@@ -73,7 +73,7 @@ func (f *scoreBroker) Listen() {
 			f.selector.stopSelection()
 			f.filter.UpdateRound(round)
 			f.filter.FlushQueue()
-			go f.selector.startSelection()
+			f.selector.startSelection()
 		case state := <-f.regenerationChan:
 			log.WithFields(log.Fields{
 				"process": "selection",
@@ -83,7 +83,9 @@ func (f *scoreBroker) Listen() {
 			if state.Round == f.selector.state.Round() {
 				f.selector.RLock()
 				if !f.selector.running {
-					go f.selector.startSelection()
+					f.selector.RUnlock()
+					f.selector.startSelection()
+					break
 				}
 				f.selector.RUnlock()
 			}
