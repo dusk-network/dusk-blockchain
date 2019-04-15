@@ -88,8 +88,8 @@ func (b *broker) Listen() {
 				"round":   b.ctx.state.Round(),
 				"hash":    hex.EncodeToString(hash),
 			}).Debug("Got selection message")
-			b.filter.FlushQueue()
 			b.reducer.startReduction(hash)
+			b.filter.FlushQueue()
 		case <-b.stepChan:
 			b.accumulator.Clear()
 			b.filter.FlushQueue()

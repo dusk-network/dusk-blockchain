@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"sync"
 	"time"
 
@@ -34,8 +35,6 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 	timer := time.NewTimer(esw.timer.Timeout)
 	select {
 	case <-timer.C:
-		esw.timer.TimeoutChan <- empty
-		timer.Stop()
 		return nil
 	case collectedVotes := <-esw.collectedVotesChan:
 		timer.Stop()
@@ -47,7 +46,9 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 }
 
 func (esw *eventStopWatch) reset() {
-	esw.stopChan = make(chan interface{}, 1)
+	for len(esw.stopChan) > 0 {
+		<-esw.stopChan
+	}
 }
 
 func (esw *eventStopWatch) stop() {
@@ -75,17 +76,14 @@ func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
 	}
 }
 
-func (r *reducer) isStale() bool {
-	r.RLock()
-	defer r.RUnlock()
-	return r.stale
-}
-
 // There is no mutex involved here, as this function is only ever called by the broker,
 // who does it synchronously. The reducer variable therefore can not be in a race
 // condition with another goroutine.
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
+	r.Lock()
+	r.stale = false
+	r.Unlock()
 	r.sendReductionVote(bytes.NewBuffer(hash))
 	r.firstStep.reset()
 	r.secondStep.reset()
@@ -97,14 +95,18 @@ func (r *reducer) begin() {
 	events := r.firstStep.fetch()
 	log.WithField("process", "reducer").Traceln("First step completed")
 	hash1 := r.extractHash(events)
-	if !r.isStale() {
+	r.RLock()
+	if !r.stale {
 		r.ctx.state.IncrementStep()
 		r.sendReductionVote(hash1)
 	}
+	r.RUnlock()
 
 	eventsSecondStep := r.secondStep.fetch()
 	log.WithField("process", "reducer").Traceln("Second step completed")
-	if !r.isStale() {
+	r.RLock()
+	defer r.RUnlock()
+	if !r.stale {
 		hash2 := r.extractHash(eventsSecondStep)
 		allEvents := append(events, eventsSecondStep...)
 		if r.isReductionSuccessful(hash1, hash2) {
@@ -148,20 +150,18 @@ func (r *reducer) publishRegeneration() {
 }
 
 func (r *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer) bool {
-	bothNotNil := hash1 != nil && hash2 != nil
+	bothNotNil := !bytes.Equal(hash1.Bytes(), make([]byte, 32)) &&
+		!bytes.Equal(hash2.Bytes(), make([]byte, 32))
 	identicalResults := bytes.Equal(hash1.Bytes(), hash2.Bytes())
 	return bothNotNil && identicalResults
 }
 
 func (r *reducer) end() {
 	r.Lock()
+	defer r.Unlock()
 	r.stale = true
-	r.Unlock()
 	r.firstStep.stop()
 	r.secondStep.stop()
-	r.Lock()
-	defer r.Unlock()
-	r.stale = false
 }
 
 func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
@@ -188,8 +188,10 @@ func (r *reducer) marshalHeader(hash *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	if _, err := buffer.Write(hash.Bytes()); err != nil {
+	n, err := buffer.Write(hash.Bytes())
+	if err != nil {
 		return nil, err
 	}
+	fmt.Println(n)
 	return buffer, nil
 }
