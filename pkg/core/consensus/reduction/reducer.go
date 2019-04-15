@@ -35,22 +35,14 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 	select {
 	case <-timer.C:
 		esw.timer.TimeoutChan <- empty
-		stop(timer)
+		timer.Stop()
 		return nil
 	case collectedVotes := <-esw.collectedVotesChan:
-		stop(timer)
+		timer.Stop()
 		return collectedVotes
 	case <-esw.stopChan:
-		stop(timer)
-		esw.collectedVotesChan = nil
+		timer.Stop()
 		return nil
-	}
-}
-
-func stop(t *time.Timer) {
-	if t != nil {
-		t.Stop()
-		t = nil
 	}
 }
 
@@ -69,10 +61,13 @@ type reducer struct {
 	publisher wire.EventPublisher
 }
 
-func newReducer(ctx *context, publisher wire.EventPublisher) *reducer {
+func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
+	publisher wire.EventPublisher) *reducer {
 	return &reducer{
-		ctx:       ctx,
-		publisher: publisher,
+		ctx:        ctx,
+		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
+		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
+		publisher:  publisher,
 	}
 }
 
@@ -85,11 +80,9 @@ func (r *reducer) isStale() bool {
 // There is no mutex involved here, as this function is only ever called by the broker,
 // who does it synchronously. The reducer variable therefore can not be in a race
 // condition with another goroutine.
-func (r *reducer) startReduction(collectedVotesChan chan []wire.Event, hash []byte) {
+func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
 	r.sendReductionVote(bytes.NewBuffer(hash))
-	r.firstStep = newEventStopWatch(collectedVotesChan, r.ctx.timer)
-	r.secondStep = newEventStopWatch(collectedVotesChan, r.ctx.timer)
 	go r.begin()
 }
 

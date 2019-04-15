@@ -66,7 +66,7 @@ func newBroker(eventBroker wire.EventBroker, handler handler,
 		accumulator:     accumulator,
 		selectionChan:   scoreChan,
 		stepChan:        stepSub.StateChan,
-		reducer:         newReducer(ctx, eventBroker),
+		reducer:         newReducer(accumulator.CollectedVotesChan, ctx, eventBroker),
 	}
 }
 
@@ -80,8 +80,8 @@ func (b *broker) Listen() {
 				"round":   round,
 			}).Debug("Got round update")
 			b.reducer.end()
-			b.filter.UpdateRound(round)
 			b.accumulator.Clear()
+			b.filter.UpdateRound(round)
 		case hash := <-b.selectionChan:
 			log.WithFields(log.Fields{
 				"process": "reduction",
@@ -89,10 +89,10 @@ func (b *broker) Listen() {
 				"hash":    hex.EncodeToString(hash),
 			}).Debug("Got selection message")
 			b.filter.FlushQueue()
-			b.reducer.startReduction(b.accumulator.CollectedVotesChan, hash)
+			b.reducer.startReduction(hash)
 		case <-b.stepChan:
-			b.filter.FlushQueue()
 			b.accumulator.Clear()
+			b.filter.FlushQueue()
 		}
 	}
 }
