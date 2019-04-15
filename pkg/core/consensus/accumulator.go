@@ -55,6 +55,7 @@ func (a *Accumulator) accumulate(ev wire.Event) {
 		if count == a.handler.Quorum() {
 			votes := a.Get(hash)
 			a.CollectedVotesChan <- votes
+			a.Clear()
 		}
 	}
 }
