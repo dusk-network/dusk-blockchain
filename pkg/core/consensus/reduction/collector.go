@@ -30,6 +30,10 @@ func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
 	if err := selection.UnmarshalScoreEvent(r, ev); err != nil {
 		return err
 	}
-	sc.bestVotedScoreHashChan <- ev.VoteHash
+	if len(ev.VoteHash) == 32 {
+		sc.bestVotedScoreHashChan <- ev.VoteHash
+	} else {
+		sc.bestVotedScoreHashChan <- make([]byte, 32)
+	}
 	return nil
 }

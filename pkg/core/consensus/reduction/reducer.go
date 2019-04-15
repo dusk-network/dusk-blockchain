@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"sync"
 	"time"
 
@@ -188,10 +187,6 @@ func (r *reducer) marshalHeader(hash *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	n, err := buffer.Write(hash.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println(n)
+	_, _ = buffer.Write(hash.Bytes())
 	return buffer, nil
 }
