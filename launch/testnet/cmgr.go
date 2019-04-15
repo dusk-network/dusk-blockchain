@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"time"
 
@@ -73,7 +72,7 @@ func (c *connmgr) Dial(addr string) (net.Conn, error) {
 	dialTimeout := 1 * time.Second
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("problem connecting to %s - %v", addr, err)
+		return nil, err
 	}
 	return conn, nil
 }
