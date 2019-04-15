@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
@@ -31,16 +29,6 @@ func TestRelevantEvent(t *testing.T) {
 	result := <-processChan
 	// Result should be nil
 	assert.Nil(t, result)
-}
-
-func TestNonCommitteeEvent(t *testing.T) {
-	round := uint64(1)
-	step := uint8(1)
-	eventFilter := newEventFilter(round, step, false, nil)
-	eventFilter.UpdateRound(1)
-
-	// Should return an error, as IsMember will return false
-	assert.NotNil(t, eventFilter.Collect(new(bytes.Buffer)))
 }
 
 func TestEarlyEvent(t *testing.T) {
@@ -107,13 +95,6 @@ func newMockHandlerFilter(round uint64, step uint8) consensus.EventHandler {
 		}
 	})
 	return mockEventHandler
-}
-
-func newMockCommittee(quorum int, isMember bool) committee.Committee {
-	mockCommittee := &mocks.Committee{}
-	mockCommittee.On("Quorum").Return(quorum)
-	mockCommittee.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
-	return mockCommittee
 }
 
 type mockEventProcessor struct {
