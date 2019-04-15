@@ -41,7 +41,7 @@ type (
 	}
 )
 
-// Marshal an Header into a Buffer
+// Marshal a Header into a Buffer
 func (ehm *HeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*Header)
 	if err := encoding.WriteVarBytes(r, consensusEv.PubKeyBLS); err != nil {

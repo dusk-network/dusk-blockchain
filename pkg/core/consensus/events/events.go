@@ -14,7 +14,8 @@ type (
 		Step      uint8
 	}
 
-	// Agreement is the message that encapsulates data relevant for components relying on committee information
+	// Agreement is the message that encapsulates data relevant for
+	// components relying on committee information
 	Agreement struct {
 		*Header
 		VoteSet       []wire.Event
@@ -30,13 +31,14 @@ type (
 	}
 )
 
+// NewReduction returns and empty Reduction event.
 func NewReduction() *Reduction {
 	return &Reduction{
 		Header: &Header{},
 	}
 }
 
-// NewAgreement creates an empty Event
+// NewAgreement returns an empty Agreement event.
 func NewAgreement() *Agreement {
 	return &Agreement{
 		Header: &Header{},
@@ -46,7 +48,8 @@ func NewAgreement() *Agreement {
 // Equal as specified in the Event interface
 func (a *Header) Equal(e wire.Event) bool {
 	other, ok := e.(*Header)
-	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) && (a.Round == other.Round) && (a.Step == other.Step)
+	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) &&
+		(a.Round == other.Round) && (a.Step == other.Step)
 }
 
 // Sender of the Event
@@ -64,5 +67,6 @@ func (e *Reduction) Equal(ev wire.Event) bool {
 // Equal as specified in the Event interface
 func (ceh *Agreement) Equal(e wire.Event) bool {
 	other, ok := e.(*Agreement)
-	return ok && ceh.Header.Equal(other) && bytes.Equal(other.SignedVoteSet, ceh.SignedVoteSet)
+	return ok && ceh.Header.Equal(other) &&
+		bytes.Equal(other.SignedVoteSet, ceh.SignedVoteSet)
 }
