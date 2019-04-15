@@ -3,7 +3,6 @@ package selection
 import (
 	"bytes"
 	"errors"
-	"math/big"
 	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -69,9 +68,7 @@ func (p *scoreHandler) Priority(first, second wire.Event) wire.Event {
 	}
 
 	ev2 := second.(*ScoreEvent)
-	score1 := big.NewInt(0).SetBytes(ev1.Score).Uint64()
-	score2 := big.NewInt(0).SetBytes(ev2.Score).Uint64()
-	if score1 < score2 {
+	if bytes.Compare(ev2.Score, ev1.Score) == 1 {
 		return ev2
 	}
 
