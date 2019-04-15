@@ -61,3 +61,9 @@ func (sec *StepEventAccumulator) Store(event wire.Event, step string) int {
 	sec.Unlock()
 	return len(eventList)
 }
+
+func (sec *StepEventAccumulator) Get(step string) []wire.Event {
+	sec.RLock()
+	defer sec.RUnlock()
+	return sec.Map[step]
+}

@@ -53,7 +53,7 @@ func (a *Accumulator) accumulate(ev wire.Event) {
 		hash := hex.EncodeToString(b.Bytes())
 		count := a.Store(ev, hash)
 		if count == a.handler.Quorum() {
-			votes := a.Map[hash]
+			votes := a.Get(hash)
 			a.CollectedVotesChan <- votes
 		}
 	}
