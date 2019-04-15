@@ -32,3 +32,9 @@ func (s *seeder) LatestSeed() []byte {
 func (s *seeder) isFresh(seed []byte) bool {
 	return bytes.Equal(s.seed, seed)
 }
+
+func (s *seeder) Round() uint64 {
+	s.RLock()
+	defer s.RUnlock()
+	return s.round
+}

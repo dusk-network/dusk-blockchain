@@ -78,12 +78,13 @@ func (f *scoreBroker) Listen() {
 				"round":   state.Round,
 				"step":    state.Step,
 			}).Debugln("received regeneration message")
-
-			f.selector.RLock()
-			if !f.selector.running {
-				go f.selector.startSelection()
+			if state.Round == f.selector.state.Round() {
+				f.selector.RLock()
+				if !f.selector.running {
+					go f.selector.startSelection()
+				}
+				f.selector.RUnlock()
 			}
-			f.selector.RUnlock()
 		case bidList := <-f.bidListChan:
 			f.selector.handler.UpdateBidList(bidList)
 		}

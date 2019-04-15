@@ -1,11 +1,8 @@
 package generation
 
 import (
-	"bytes"
-
 	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/zkproof"
@@ -24,54 +21,47 @@ type broker struct {
 	seeder         *seeder
 
 	// subscriber channels
-	roundChannel   <-chan uint64
-	bidListChannel <-chan user.BidList
+	roundChan        <-chan uint64
+	bidListChan      <-chan user.BidList
+	regenerationChan <-chan consensus.AsyncState
 }
 
 func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar) *broker {
 	proofGenerator := newProofGenerator(d, k)
-	roundChannel := consensus.InitRoundUpdate(eventBroker)
-	bidListChannel := consensus.InitBidListUpdate(eventBroker)
-	broker := &broker{
-		proofGenerator: proofGenerator,
-		roundChannel:   roundChannel,
-		bidListChannel: bidListChannel,
-		forwarder:      newForwarder(eventBroker),
-		seeder:         &seeder{},
+	roundChan := consensus.InitRoundUpdate(eventBroker)
+	bidListChan := consensus.InitBidListUpdate(eventBroker)
+	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
+	return &broker{
+		proofGenerator:   proofGenerator,
+		roundChan:        roundChan,
+		bidListChan:      bidListChan,
+		regenerationChan: regenerationChan,
+		forwarder:        newForwarder(eventBroker),
+		seeder:           &seeder{},
 	}
-
-	go wire.NewTopicListener(eventBroker, broker, msg.BlockRegenerationTopic).Accept()
-	return broker
 }
 
 func (b *broker) Listen() {
 	for {
 		select {
-		case round := <-b.roundChannel:
+		case round := <-b.roundChan:
 			seed := b.seeder.GenerateSeed(round)
 			proof := b.proofGenerator.generateProof(seed)
 			b.Forward(proof, seed)
-		case bidList := <-b.bidListChannel:
+		case bidList := <-b.bidListChan:
 			b.proofGenerator.updateBidList(bidList)
+		case state := <-b.regenerationChan:
+			if state.Round == b.seeder.Round() {
+				seed := b.seeder.LatestSeed()
+				proof := b.proofGenerator.generateProof(seed)
+				b.Forward(proof, seed)
+			}
 		}
 	}
 }
 
-func (b *broker) Collect(m *bytes.Buffer) error {
-	seed := b.seeder.LatestSeed()
-	proof := b.proofGenerator.generateProof(seed)
-	b.Forward(proof, seed)
-	return nil
-}
-
 func (b *broker) Forward(proof zkproof.ZkProof, seed []byte) {
-	b.seeder.RLock()
 	if b.seeder.isFresh(seed) {
-		round := b.seeder.round
-		b.seeder.RUnlock()
-		b.forwarder.forwardScoreEvent(proof, round, seed)
-		return
+		b.forwarder.forwardScoreEvent(proof, b.seeder.Round(), seed)
 	}
-
-	b.seeder.RUnlock()
 }
