@@ -46,6 +46,10 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 	}
 }
 
+func (esw *eventStopWatch) reset() {
+	esw.stopChan = make(chan interface{}, 1)
+}
+
 func (esw *eventStopWatch) stop() {
 	esw.stopChan <- true
 }
@@ -83,6 +87,8 @@ func (r *reducer) isStale() bool {
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
 	r.sendReductionVote(bytes.NewBuffer(hash))
+	r.firstStep.reset()
+	r.secondStep.reset()
 	go r.begin()
 }
 
@@ -151,12 +157,8 @@ func (r *reducer) end() {
 	r.Lock()
 	r.stale = true
 	r.Unlock()
-	if r.firstStep != nil {
-		r.firstStep.stop()
-	}
-	if r.secondStep != nil {
-		r.secondStep.stop()
-	}
+	r.firstStep.stop()
+	r.secondStep.stop()
 	r.Lock()
 	defer r.Unlock()
 	r.stale = false
