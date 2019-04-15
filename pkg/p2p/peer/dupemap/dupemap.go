@@ -7,7 +7,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-var obsoleteMessageRound uint64 = 10
+var obsoleteMessageRound uint64 = 3
 
 type DupeMap struct {
 	roundChan <-chan uint64 // Will get notification about new rounds in order...
