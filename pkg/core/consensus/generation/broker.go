@@ -19,7 +19,7 @@ func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scal
 }
 
 type broker struct {
-	proofGenerator *proofGenerator
+	proofGenerator generator
 	forwarder      *forwarder
 	seeder         *seeder
 

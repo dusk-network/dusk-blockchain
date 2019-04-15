@@ -12,6 +12,11 @@ import (
 
 var empty struct{}
 
+type generator interface {
+	generateProof([]byte) zkproof.ZkProof
+	updateBidList(user.BidList)
+}
+
 type proofGenerator struct {
 	d, k ristretto.Scalar
 	sync.RWMutex
