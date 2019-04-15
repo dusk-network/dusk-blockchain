@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
@@ -34,6 +35,10 @@ func NewAccumulator(handler AccumulatorHandler) *Accumulator {
 }
 
 func (a *Accumulator) Process(ev wire.Event) {
+	if a.shouldSkip(ev) {
+		log.WithError(errors.New("sender not part of committee")).Debugln("event dropped")
+	}
+
 	if err := a.handler.Verify(ev); err != nil {
 		log.WithError(err).Debugln("Voteset verification failed")
 		return
@@ -51,4 +56,9 @@ func (a *Accumulator) accumulate(ev wire.Event) {
 			a.CollectedVotesChan <- votes
 		}
 	}
+}
+
+// ShouldSkip checks if the message is propagated by a committee member.
+func (a *Accumulator) shouldSkip(ev wire.Event) bool {
+	return !a.handler.IsMember(ev.Sender())
 }

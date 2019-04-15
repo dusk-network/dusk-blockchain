@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
@@ -58,10 +57,6 @@ func (c *EventFilter) Collect(buffer *bytes.Buffer) error {
 		return err
 	}
 
-	if c.shouldSkip(ev) {
-		return errors.New("sender not part of committee")
-	}
-
 	header := c.handler.ExtractHeader(ev)
 	roundDiff, stepDiff := c.state.Cmp(header.Round, header.Step)
 	if c.isEarly(roundDiff, stepDiff) {
@@ -92,11 +87,6 @@ func (c *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
 	}
 	relevantStep := stepDiff == 0
 	return relevantRound && relevantStep
-}
-
-// ShouldSkip checks if the message is not propagated by a committee member.
-func (c *EventFilter) shouldSkip(ev wire.Event) bool {
-	return !c.committee.IsMember(ev.Sender())
 }
 
 func (c *EventFilter) UpdateRound(round uint64) {
