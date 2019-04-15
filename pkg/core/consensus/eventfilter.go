@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -17,14 +16,12 @@ type (
 	EventHandler interface {
 		wire.EventVerifier
 		wire.EventUnMarshaller
-		// wire.SignatureMarshaller
 		NewEvent() wire.Event
 		ExtractHeader(wire.Event) *events.Header
 	}
 
 	// EventFilter is a generic wire.Collector that can be used by consensus components for filtering and passing down messages. It coordinates an EventQueue to manage Events coming too early and delegates consensus specific logic to the handler.
 	EventFilter struct {
-		committee committee.Committee
 		queue     *EventQueue
 		handler   EventHandler
 		state     State
@@ -39,10 +36,9 @@ type (
 	}
 )
 
-func NewEventFilter(committee committee.Committee, handler EventHandler,
-	state State, processor EventProcessor, checkStep bool) *EventFilter {
+func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
+	checkStep bool) *EventFilter {
 	return &EventFilter{
-		committee: committee,
 		queue:     NewEventQueue(),
 		handler:   handler,
 		state:     state,
