@@ -54,6 +54,7 @@ func newScoreBroker(eventBroker wire.EventBroker, committee committee.Committee,
 		roundUpdateChan:  roundChan,
 		bidListChan:      bidListChan,
 		regenerationChan: regenerationChan,
+		selector:         selector,
 	}
 }
 
