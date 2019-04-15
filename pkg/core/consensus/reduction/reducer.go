@@ -164,6 +164,8 @@ func (r *reducer) end() {
 	if r.secondStep != nil {
 		r.secondStep.stop()
 	}
+	r.Lock()
+	defer r.Unlock()
 	r.stale = false
 }
 
