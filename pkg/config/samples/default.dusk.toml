@@ -29,19 +29,21 @@ addresses=["voucher.dusk.network:8081"]
 fixed = []
 
 [database]
-# backend used to store chain
-driverName = "heavy_v0.1.0"
+# Backend storage used to store chain
+# Supported drivers heavy_v0.1.0
+driver = "heavy_v0.1.0"
 # backend storage path
-datadir = "chain"
+dir = "chain"
 
-[rpc-server]
+# rpc service configs
+[rpc]
 # enable rpc service
 enabled=false
 user="default"
 pass="default"
 cert=""
 
-[profile]
+[prof]
 # profiling service address
 # reachable at http://localhost:5050/debug/pprof
 # address="localhost:5050"

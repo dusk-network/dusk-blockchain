@@ -20,7 +20,7 @@ var (
 	ErrBlockNotFound = errors.New("database: block not found")
 
 	// AnyTxType is used as a filter value on FetchBlockTxByHash
-	AnyTxType transactions.TxType = math.MaxUint8
+	AnyTxType = transactions.TxType(math.MaxUint8)
 )
 
 // A Driver represents an application programming interface for accessing
@@ -31,6 +31,9 @@ type Driver interface {
 	// Open returns a new connection to a blockchain database. The path is a
 	// string in a driver-specific format.
 	Open(path string, network protocol.Magic, readonly bool) (DB, error)
+
+	// Close terminates all DB connections and closes underlying storage
+	Close() error
 
 	// Name returns a unique identifier that can be used to register the driver
 	Name() string

@@ -115,7 +115,9 @@ func _TestDriver(m *testing.M, driverName string) int {
 	}
 
 	// Now run all tests which would use the provided context
-	return m.Run()
+	code := m.Run()
+	code += _TestPersistence()
+	return code
 }
 
 func TestStoreBlock(test *testing.T) {
@@ -242,6 +244,10 @@ func TestFetchBlockTxs(test *testing.T) {
 
 			if err != nil {
 				test.Fatalf(err.Error())
+			}
+
+			if len(block.Txs) != len(fblockTxs) {
+				return errors.New("wrong number of fetched txs")
 			}
 
 			// Ensure all retrieved transactions are equal to the original Block.Txs
@@ -561,6 +567,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 		test.Fatal("A read-only DB is not permitted to make storage changes")
 	}
 }
+
 func TestFetchBlockTxByHash(test *testing.T) {
 
 	test.Parallel()
@@ -645,4 +652,67 @@ func TestFetchBlockTxByHash(test *testing.T) {
 		}
 		return nil
 	})
+}
+
+// _TestPersistence tries to ensure if driver provides persistence storage.
+// The procedure is simply based on:
+// 1. Close the driver
+// 2. Rename storage folder
+// 3. Reload the driver
+// This can be called only if all tests have completed.
+// It returns result code 0 if all checks pass.
+func _TestPersistence() int {
+
+	// Closing the driver should release all allocated resources
+	drvr.Close()
+
+	// Rename the storage folder
+	newStoreDir := storeDir + "_renamed"
+
+	err := os.Rename(storeDir, newStoreDir)
+	if err != nil {
+		fmt.Printf("TestPersistence failed: %v\n", err.Error())
+		return 1
+	}
+
+	storeDir = newStoreDir
+	defer os.RemoveAll(storeDir)
+
+	// Force reload storage and fetch blocks
+	{
+		db, err := drvr.Open(newStoreDir, protocol.DevNet, true)
+		defer drvr.Close()
+
+		// For instance, `resource temporarily unavailable` would be observed if
+		// _storage.Close() is missed
+		if err != nil {
+			fmt.Printf("TestPersistence failed: %v\n", err)
+			return 1
+		}
+
+		// Blocks lookup by Height
+		err = db.View(func(t database.Transaction) error {
+			for _, block := range blocks {
+				headerHash, err := t.FetchBlockHashByHeight(block.Header.Height)
+				if err != nil {
+					return err
+				}
+
+				if !bytes.Equal(block.Header.Hash, headerHash) {
+					return fmt.Errorf("couldn't fetch block on height %d", block.Header.Height)
+				}
+			}
+			return nil
+		})
+
+		if err != nil {
+			fmt.Printf("TestPersistence failed: %v\n", err.Error())
+			return 1
+		}
+
+	}
+
+	fmt.Printf("--- PASS: TestPersistence\n")
+
+	return 0
 }

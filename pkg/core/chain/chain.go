@@ -3,12 +3,17 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"math/big"
 
 	"github.com/bwesterb/go-ristretto"
+	log "github.com/sirupsen/logrus"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -22,7 +27,7 @@ var consensusSeconds = 20
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *wire.EventBus
-	db       Database
+	db       database.DB
 
 	// TODO: exposed for demo, possibly undo later
 	PrevBlock block.Block
@@ -35,8 +40,16 @@ type Chain struct {
 
 // New returns a new chain object
 // TODO: take out demo constructions (db, collectors) and improve it after demo
-func New(eventBus *wire.EventBus, dbName string) (*Chain, error) {
-	db, err := NewDatabase(dbName, false)
+func New(eventBus *wire.EventBus) (*Chain, error) {
+
+	drvr, err := database.From(cfg.Get().Database.Driver)
+
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
+
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +155,21 @@ func (c *Chain) addBidder(tx *transactions.Bid) error {
 
 	c.eventBus.Publish(msg.BidListTopic, bytes.NewBuffer(bidListBytes))
 	return nil
+}
+
+func (c *Chain) Close() error {
+
+	log.WithFields(log.Fields{
+		"process": "chain",
+	}).Info("Close database")
+
+	drvr, err := database.From(cfg.Get().Database.Driver)
+
+	if err != nil {
+		return err
+	}
+
+	return drvr.Close()
 }
 
 func getTxTotalOutputAmount(tx transactions.Transaction) (totalAmount uint64) {

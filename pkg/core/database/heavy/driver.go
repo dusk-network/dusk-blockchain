@@ -17,6 +17,10 @@ func (d *driver) Open(path string, network protocol.Magic, readonly bool) (datab
 	return NewDatabase(path, network, readonly)
 }
 
+func (d *driver) Close() error {
+	return closeStorage()
+}
+
 func (d *driver) Name() string {
 	return DriverName
 }

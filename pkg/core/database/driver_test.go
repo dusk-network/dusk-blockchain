@@ -22,6 +22,10 @@ func (d driverA) Name() string {
 	return "driver_a"
 }
 
+func (d driverA) Close() error {
+	return nil
+}
+
 // Dummy DriverB
 type driverB struct{}
 
@@ -31,6 +35,10 @@ func (d driverB) Open(path string, network protocol.Magic, readonly bool) (DB, e
 
 func (d driverB) Name() string {
 	return "driver_b"
+}
+
+func (d driverB) Close() error {
+	return nil
 }
 
 func TestDuplicatedDriver(t *testing.T) {

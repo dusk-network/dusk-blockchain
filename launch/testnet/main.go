@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/signal"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -30,6 +31,9 @@ func initLog(file *os.File) {
 }
 
 func main() {
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
 
 	// Loading all node configurations. Fail-fast if critical error occurs
 	if err := cfg.Load(); err != nil {
@@ -66,7 +70,9 @@ func main() {
 	log.Infof("Selected network  %s", cfg.Get().General.Network)
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
-	srv := Setup("demo" + port)
+	srv := Setup()
+	defer srv.Close()
+
 	// listening to the blindbid and the stake channels
 	go srv.Listen()
 	// fetch neighbours addresses from the Seeder
@@ -87,7 +93,9 @@ func main() {
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
 	// server.
-	select {}
+	<-interrupt
+
+	log.WithField("prefix", "main").Info("Terminated")
 }
 
 func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
 )
@@ -15,7 +16,25 @@ import (
 // - It is not malformed
 // Returns nil if a tx is valid
 func (c *Chain) AcceptTx(tx transactions.Transaction) error {
-	if err := c.checkTxExists(tx); err != nil {
+
+	txID, err := tx.CalculateHash()
+
+	if err != nil {
+		return err
+	}
+
+	err = c.db.View(func(t database.Transaction) error {
+		_, _, _, err := t.FetchBlockTxByHash(txID)
+		return err
+	})
+
+	// Expect here TxNotFound error to continue
+	if err != database.ErrTxNotFound {
+
+		if err == nil {
+			err = errors.New("tx already exists")
+		}
+
 		return err
 	}
 
@@ -115,7 +134,8 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 		c.eventBus.Publish(msg.BidTopic, buffer)
-		c.db.writeTX(x)
+		// Applicable only for the demo
+		// c.db.writeTX(x)
 		return c.addBidder(x)
 	case *transactions.Coinbase:
 		return c.verifyCoinbase(txIndex, x)
@@ -131,7 +151,8 @@ func (c *Chain) checkSpecialFields(txIndex uint64, blockTime uint64, tx transact
 			return err
 		}
 		c.eventBus.Publish(msg.StakeTopic, buffer)
-		c.db.writeTX(x)
+		// Applicable only for the demo
+		// c.db.writeTX(x)
 		return c.addProvisioner(x)
 	case *transactions.Standard:
 		return c.verifyStandard(x)

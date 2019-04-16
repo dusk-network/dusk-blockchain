@@ -21,12 +21,12 @@ type seedersConfiguration struct {
 
 // pkg/core/database package configs
 type databaseConfiguration struct {
-	DriverName string
-	Path       string
+	Driver string
+	Dir    string
 }
 
 // pprof configs
-type profileConfiguration struct {
+type profConfiguration struct {
 	Address string
 
 	// enables CPU profiling for the current process.
@@ -37,6 +37,6 @@ type profileConfiguration struct {
 }
 
 // pkg/rpc package configs
-type rpcServerConfiguration struct {
+type rpcConfiguration struct {
 	Address string
 }

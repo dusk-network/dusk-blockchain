@@ -34,8 +34,8 @@ type Registry struct {
 	Database databaseConfiguration
 	Network  networkConfiguration
 	Logger   loggerConfiguration
-	Profile  profileConfiguration
-	RPC      rpcServerConfiguration
+	Profile  profConfiguration
+	RPC      rpcConfiguration
 }
 
 // Load makes an attempt to read and unmershal any configs from flag, env and
@@ -159,4 +159,18 @@ func defineENV() {
 	if err := viper.BindEnv("logger.level", "DUSK_LOGGER_LEVEL"); err != nil {
 		fmt.Printf("defineENV %v", err)
 	}
+
+	// DUSK_NETWORK_SEEDER_FIXED could be useful on setting up a local P2P
+	// network by setting a single ENV with array of addresses
+	//
+	// export DUSK_NETWORK_SEEDER_FIXED="localhost:7000, localhost:7001, localhost:7002"
+	if err := viper.BindEnv("network.seeder.fixed", "DUSK_NETWORK_SEEDER_FIXED"); err != nil {
+		fmt.Printf("defineENV %v", err)
+	}
+}
+
+// Mock should be used only in test packages in order to mock a set of
+// configurations utilized by the test itself
+func Mock(m *Registry) {
+	r = m
 }
