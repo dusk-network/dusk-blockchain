@@ -34,10 +34,12 @@ var (
 	byteOrder = binary.LittleEndian
 
 	// Key values prefixes to provide prefix-based sorting mechanism
+	// Refer to README.md for overview idea
+
 	HeaderPrefix   = []byte{0x01}
 	TxPrefix       = []byte{0x02}
 	HeightPrefix   = []byte{0x03}
-	TxIdPrefix     = []byte{0x04}
+	TxIDPrefix     = []byte{0x04}
 	KeyImagePrefix = []byte{0x05}
 )
 
@@ -126,12 +128,12 @@ func (t transaction) StoreBlock(block *block.Block) error {
 
 		// Schema
 		//
-		// Key = TxIdPrefix + txID
+		// Key = TxIDPrefix + txID
 		// Value = block.header.hash
 		//
 		// For the retrival of a single transaction by TxId
 
-		t.put(append(TxIdPrefix, txID...), block.Header.Hash)
+		t.put(append(TxIDPrefix, txID...), block.Header.Hash)
 
 		// Schema
 		//
@@ -195,7 +197,7 @@ func (t transaction) encodeBlockTx(tx transactions.Transaction, txIndex uint32) 
 // if typeFilter is database.AnyTxType then no filter is applied
 func (t transaction) decodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Transaction, uint32, error) {
 
-	var txIndex uint32 = math.MaxUint32
+	txIndex := uint32(math.MaxUint32)
 
 	var tx transactions.Transaction
 	reader := bytes.NewReader(data)
@@ -434,10 +436,10 @@ func (t transaction) put(key []byte, value []byte) {
 
 func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, uint32, []byte, error) {
 
-	var txIndex uint32 = math.MaxUint32
+	txIndex := uint32(math.MaxUint32)
 
 	// Fetch the block header hash that this Tx belongs to
-	key := append(TxIdPrefix, txID...)
+	key := append(TxIDPrefix, txID...)
 	hashHeader, err := t.snapshot.Get(key, nil)
 
 	if err != nil {
@@ -478,9 +480,9 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 
 		if err != nil {
 			return nil, txIndex, hashHeader, err
-		} else {
-			return tx, txIndex, hashHeader, nil
 		}
+
+		return tx, txIndex, hashHeader, nil
 	}
 
 	return nil, txIndex, nil, errors.New("block tx is available but fetching it fails")

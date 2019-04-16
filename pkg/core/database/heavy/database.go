@@ -57,6 +57,20 @@ func openStorage(path string) (*leveldb.DB, error) {
 	return _storage, err
 }
 
+// closeStorage should safely close the underlying storage
+func closeStorage() error {
+	_storageMu.Lock()
+	defer _storageMu.Unlock()
+
+	if _storage != nil {
+		err := _storage.Close()
+		_storage = nil
+		return err
+	}
+
+	return errors.New("invalid storage")
+}
+
 // NewDatabase create or open backend storage (goleveldb) located at the
 // specified path. Readonly option is pseudo read-only mode implemented by
 // heavy.Database. Not to be confused with read-only goleveldb mode

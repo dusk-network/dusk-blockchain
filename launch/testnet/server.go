@@ -49,7 +49,7 @@ type txCollector struct {
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
-func Setup(dbName string) *Server {
+func Setup() *Server {
 	// creating the eventbus
 	eventBus := wire.NewEventBus()
 	// generating the keys
@@ -61,7 +61,7 @@ func Setup(dbName string) *Server {
 	go committee.Listen()
 
 	// creating and firing the chain process
-	chain, err := chain.New(eventBus, dbName)
+	chain, err := chain.New(eventBus)
 	if err != nil {
 		panic(err)
 	}
@@ -240,6 +240,10 @@ func (s *Server) sendStakesAndBids(peer *peer.Peer) {
 			panic(err)
 		}
 	}
+}
+
+func (s *Server) Close() {
+	s.chain.Close()
 }
 
 func makeProvisionerBytes(keys *user.Keys, amount uint64) (*bytes.Buffer, error) {

@@ -2,9 +2,9 @@ package chain
 
 import (
 	"bytes"
-
-	"github.com/syndtr/goleveldb/leveldb/errors"
+	"errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
@@ -13,8 +13,17 @@ import (
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
+
 	// 1. Check that we have not seen this block before
-	if err := c.checkBlockExists(blk); err != nil {
+	err := c.db.View(func(t database.Transaction) error {
+		_, err := t.FetchBlockExists(blk.Header.Hash)
+		return err
+	})
+
+	if err != database.ErrBlockNotFound {
+		if err == nil {
+			err = errors.New("block already exists")
+		}
 		return err
 	}
 
@@ -24,9 +33,15 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 3. Save block in database
-	if err := c.writeBlock(blk); err != nil {
+	err = c.db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(&blk)
+	})
+
+	if err != nil {
 		return err
 	}
+
+	c.PrevBlock = blk
 
 	// 4. Gossip block
 	if err := c.propagateBlock(blk); err != nil {
