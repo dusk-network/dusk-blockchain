@@ -163,6 +163,11 @@ func (n *TopicListener) preprocess(eventBuffer *bytes.Buffer, processors ...Topi
 	for _, processor := range processors {
 		buf, err = processor.Process(buf)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"process": "topiclistener",
+				"topic":   n.topic,
+				"error":   err,
+			}).Debugln("processing error")
 			return nil, err
 		}
 	}
