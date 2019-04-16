@@ -4,12 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net"
+	"os"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
-
-const secret = "v1W0imI82rqW2hT7odpI-"
 
 func ConnectToSeeder() []string {
 	conn, err := net.Dial("tcp", *voucher)
@@ -46,7 +45,7 @@ func completeChallenge(conn net.Conn) error {
 
 	// hash it with the secret
 	hash := sha256.New()
-	if _, err := hash.Write(append([]byte(generated), []byte(secret)...)); err != nil {
+	if _, err := hash.Write(append([]byte(generated), []byte(os.Getenv("SEEDER_KEY"))...)); err != nil {
 		return err
 	}
 
