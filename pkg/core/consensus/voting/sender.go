@@ -24,23 +24,23 @@ func LaunchVotingComponent(eventBus *wire.EventBus, keys *user.Keys,
 // sender is responsible for signing and sending out consensus related
 // voting messages to the wire.
 type sender struct {
-	eventBus              *wire.EventBus
-	blockReductionChannel chan *bytes.Buffer
-	blockAgreementChannel chan *bytes.Buffer
+	eventBus      *wire.EventBus
+	reductionChan chan *bytes.Buffer
+	agreementChan chan *bytes.Buffer
 }
 
 // newSender will return an initialized sender struct. It will also spawn all
 // the needed signers, and their channels get connected to the sender.
 func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Committee) *sender {
-	blockReductionChannel := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
-		unmarshalBlockReduction, newBlockReductionSigner(keys, committee))
-	blockAgreementChannel := initCollector(eventBus, msg.OutgoingBlockAgreementTopic,
-		unmarshalBlockAgreement, newBlockAgreementSigner(keys, committee))
+	reductionChan := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
+		unmarshalReduction, newReductionSigner(keys, committee))
+	agreementChan := initCollector(eventBus, msg.OutgoingBlockAgreementTopic,
+		unmarshalAgreement, newAgreementSigner(keys, committee))
 
 	return &sender{
-		eventBus:              eventBus,
-		blockReductionChannel: blockReductionChannel,
-		blockAgreementChannel: blockAgreementChannel,
+		eventBus:      eventBus,
+		reductionChan: reductionChan,
+		agreementChan: agreementChan,
 	}
 }
 
@@ -48,11 +48,11 @@ func newSender(eventBus *wire.EventBus, keys *user.Keys, committee committee.Com
 func (v *sender) listen() {
 	for {
 		select {
-		case m := <-v.blockReductionChannel:
-			message, _ := wire.AddTopic(m, topics.BlockReduction)
+		case m := <-v.reductionChan:
+			message, _ := wire.AddTopic(m, topics.Reduction)
 			v.eventBus.Publish(string(topics.Gossip), message)
-		case m := <-v.blockAgreementChannel:
-			message, _ := wire.AddTopic(m, topics.BlockAgreement)
+		case m := <-v.agreementChan:
+			message, _ := wire.AddTopic(m, topics.Agreement)
 			v.eventBus.Publish(string(topics.Gossip), message)
 		}
 	}

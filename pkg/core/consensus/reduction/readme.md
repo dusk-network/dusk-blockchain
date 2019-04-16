@@ -12,18 +12,18 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 
 #### Block Reduction Event
 
-| Field | Type |
-|-------|------|
-| opcode | uint8 |
-| round | uint64 |
-| step | uint64 |
-| blockhash | uint256 |
+| Field           | Type    |
+| --------------- | ------- |
+| opcode          | uint8   |
+| round           | uint64  |
+| step            | uint64  |
+| blockhash       | uint256 |
 | blockhashsigBLS | uint256 |
-| prevblockhash | uint256 |
+| prevblockhash   | uint256 |
 
 ### API
 
-- LaunchBlockReducer(eventbus, committee, duration) - Launches a Block Reducer broker publishing on the `OutgoingBlockAgreementTopic` topic
+- LaunchReducer(eventbus, committee, duration) - Launches a Block Reducer broker publishing on the `OutgoingBlockAgreementTopic` topic
 
 ### Architecture
 

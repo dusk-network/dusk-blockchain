@@ -7,10 +7,10 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -41,16 +41,15 @@ type ConsensusFactory struct {
 	timerLength time.Duration
 	committee   committee.Committee
 	d, k        ristretto.Scalar
-	bidList     *user.BidList
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, timerLength time.Duration,
-	committee committee.Committee, bidList *user.BidList, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
+	committee committee.Committee, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
-	go wire.NewEventSubscriber(eventBus, initCollector, msg.InitializationTopic).Accept()
+	go wire.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()
 
 	return &ConsensusFactory{
 		eventBus:    eventBus,
@@ -60,7 +59,6 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 		committee:   committee,
 		d:           d,
 		k:           k,
-		bidList:     bidList,
 	}
 }
 
@@ -68,20 +66,20 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
+	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k)
+	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
+
+	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)
+
+	reduction.LaunchReducer(c.eventBus, c.committee, c.timerLength)
+
 	round := <-c.initChannel
 	log.WithFields(log.Fields{
 		"process": "factory",
 		"round":   round,
 	}).Debug("Received initial round")
 
-	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k, *c.bidList)
-	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
-
-	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength, *c.bidList)
-
-	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
-
-	notary.LaunchBlockNotary(c.eventBus, c.committee, round)
+	agreement.LaunchAgreement(c.eventBus, c.committee, round)
 
 	log.WithField("process", "factory").Info("Consensus Started")
 }

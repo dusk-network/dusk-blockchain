@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"math/rand"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
@@ -20,6 +21,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -31,9 +33,11 @@ var timeOut = 6 * time.Second
 
 type Server struct {
 	eventBus *wire.EventBus
-	stakes   []*bytes.Buffer
-	bids     []*bytes.Buffer
-	chain    *chain.Chain
+	sync.RWMutex
+	stakes  []*bytes.Buffer
+	bids    []*bytes.Buffer
+	chain   *chain.Chain
+	dupeMap *dupemap.DupeMap
 
 	// subscriber channels
 	stakeChannel chan *bytes.Buffer
@@ -68,14 +72,19 @@ func Setup(dbName string) *Server {
 	// wiring up the BlinBid channel to the EventBus
 	bidChannel := initBidCollector(eventBus)
 
+	dupeBlacklist := dupemap.NewDupeMap(eventBus)
+	go dupeBlacklist.CleanOnRound()
+
 	// creating the Server
 	srv := &Server{
 		eventBus:     eventBus,
+		RWMutex:      sync.RWMutex{},
 		stakes:       []*bytes.Buffer{},
 		bids:         []*bytes.Buffer{},
 		chain:        chain,
 		stakeChannel: stakeChannel,
 		bidChannel:   bidChannel,
+		dupeMap:      dupeBlacklist,
 	}
 
 	// make a stake and bid tx
@@ -90,7 +99,7 @@ func Setup(dbName string) *Server {
 	chain.AcceptTx(bid)
 
 	// start consensus factory
-	factory := factory.New(eventBus, timeOut, committee, chain.BidList, keys, d, k)
+	factory := factory.New(eventBus, timeOut, committee, keys, d, k)
 	go factory.StartConsensus()
 
 	return srv
@@ -99,14 +108,14 @@ func Setup(dbName string) *Server {
 func initStakeCollector(eventBus *wire.EventBus) chan *bytes.Buffer {
 	stakeChannel := make(chan *bytes.Buffer, 100)
 	collector := &txCollector{stakeChannel}
-	go wire.NewEventSubscriber(eventBus, collector, msg.StakeTopic).Accept()
+	go wire.NewTopicListener(eventBus, collector, msg.StakeTopic).Accept()
 	return stakeChannel
 }
 
 func initBidCollector(eventBus *wire.EventBus) chan *bytes.Buffer {
 	bidChannel := make(chan *bytes.Buffer, 100)
 	collector := &txCollector{bidChannel}
-	go wire.NewEventSubscriber(eventBus, collector, msg.BidTopic).Accept()
+	go wire.NewTopicListener(eventBus, collector, msg.BidTopic).Accept()
 	return bidChannel
 }
 
@@ -121,10 +130,14 @@ func (s *Server) Listen() {
 		select {
 		case b := <-s.stakeChannel:
 			log.WithField("process", "server").Debugln("stake received")
+			s.Lock()
 			s.stakes = append(s.stakes, b)
+			s.Unlock()
 		case b := <-s.bidChannel:
 			log.WithField("process", "server").Debugln("bid received")
+			s.Lock()
 			s.bids = append(s.bids, b)
+			s.Unlock()
 		}
 	}
 }
@@ -136,12 +149,7 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
-	log.WithFields(log.Fields{
-		"process": "server",
-		"address": conn.RemoteAddr().String(),
-	}).Debugln("attempting to accept a connection")
-
-	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus)
+	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus, s.dupeMap)
 	// send the latest block
 	buffer := new(bytes.Buffer)
 	if err := s.chain.PrevBlock.Encode(buffer); err != nil {
@@ -178,11 +186,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	log.WithFields(log.Fields{
-		"process": "server",
-		"address": conn.RemoteAddr().String(),
-	}).Debugln("attempting to make a connection")
-	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus)
+	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus, s.dupeMap)
 	// get latest block
 	buf := make([]byte, 1024)
 	if _, err := peer.Conn.Read(buf); err != nil {
@@ -223,6 +227,8 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 }
 
 func (s *Server) sendStakesAndBids(peer *peer.Peer) {
+	s.RLock()
+	defer s.RUnlock()
 	for _, stake := range s.stakes {
 		if err := peer.WriteMessage(stake, topics.Tx); err != nil {
 			panic(err)

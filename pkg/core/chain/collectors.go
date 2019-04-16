@@ -23,14 +23,14 @@ type (
 func initBlockCollector(eventBus *wire.EventBus) chan *block.Block {
 	blockChannel := make(chan *block.Block, 1)
 	collector := &blockCollector{blockChannel}
-	go wire.NewEventSubscriber(eventBus, collector, string(topics.Block)).Accept()
+	go wire.NewTopicListener(eventBus, collector, string(topics.Block)).Accept()
 	return blockChannel
 }
 
 func initTxCollector(eventBus *wire.EventBus) chan transactions.Transaction {
 	txChannel := make(chan transactions.Transaction, 10)
 	collector := &txCollector{txChannel}
-	go wire.NewEventSubscriber(eventBus, collector, string(topics.Tx)).Accept()
+	go wire.NewTopicListener(eventBus, collector, string(topics.Tx)).Accept()
 	return txChannel
 }
 

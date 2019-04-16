@@ -26,7 +26,7 @@ func (mp *MockPrioritizer) Priority(f, s wire.Event) wire.Event {
 }
 
 func TestStore(t *testing.T) {
-	sec := NewStepEventCollector()
+	sec := NewStepEventAccumulator()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}
@@ -40,7 +40,7 @@ func TestStore(t *testing.T) {
 }
 
 func TestClear(t *testing.T) {
-	sec := NewStepEventCollector()
+	sec := NewStepEventAccumulator()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"three"}
@@ -63,7 +63,7 @@ func TestClear(t *testing.T) {
 }
 
 func TestContains(t *testing.T) {
-	sec := NewStepEventCollector()
+	sec := NewStepEventAccumulator()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"three"}
@@ -80,7 +80,7 @@ func TestContains(t *testing.T) {
 }
 
 func TestSECOperations(t *testing.T) {
-	sec := NewStepEventCollector()
+	sec := NewStepEventAccumulator()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}

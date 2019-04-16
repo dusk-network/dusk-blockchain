@@ -1,9 +1,14 @@
 package consensus
 
-import "gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+import (
+	"sync"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+)
 
 // EventQueue is a Queue of Events grouped by rounds and steps. It is threadsafe through a sync.RWMutex
 type EventQueue struct {
+	sync.RWMutex
 	entries map[uint64]map[uint8][]wire.Event
 }
 
@@ -11,12 +16,15 @@ type EventQueue struct {
 func NewEventQueue() *EventQueue {
 	entries := make(map[uint64]map[uint8][]wire.Event)
 	return &EventQueue{
-		entries,
+		RWMutex: sync.RWMutex{},
+		entries: entries,
 	}
 }
 
 // GetEvents returns the events for a round and step
 func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
+	s.Lock()
+	defer s.Unlock()
 	if s.entries[round][step] != nil {
 		messages := s.entries[round][step]
 		s.entries[round][step] = nil
@@ -28,6 +36,9 @@ func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
 
 // PutEvent stores an Event at a given round and step
 func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
+	s.Lock()
+	defer s.Unlock()
+
 	// Initialise the map on this round if it was not yet created
 	if s.entries[round] == nil {
 		s.entries[round] = make(map[uint8][]wire.Event)
@@ -43,11 +54,15 @@ func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
 
 // Clear the queue
 func (s *EventQueue) Clear(round uint64) {
+	s.Lock()
+	defer s.Unlock()
 	s.entries[round] = nil
 }
 
 // ConsumeNextStepEvents retrieves the Events stored at the lowest step for a passed round and returns them. The step gets deleted
 func (s *EventQueue) ConsumeNextStepEvents(round uint64) ([]wire.Event, uint8) {
+	s.Lock()
+	defer s.Unlock()
 	steps := s.entries[round]
 	if steps == nil {
 		return nil, 0
@@ -67,6 +82,8 @@ func (s *EventQueue) ConsumeNextStepEvents(round uint64) ([]wire.Event, uint8) {
 
 // ConsumeUntil consumes Events until the round specified (excluded). It returns the map slice deleted
 func (s *EventQueue) ConsumeUntil(round uint64) map[uint64]map[uint8][]wire.Event {
+	s.Lock()
+	defer s.Unlock()
 	ret := make(map[uint64]map[uint8][]wire.Event)
 	for k := range s.entries {
 		if k < round {

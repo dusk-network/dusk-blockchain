@@ -28,7 +28,7 @@ type (
 	}
 
 	// EventMarshaller is the specular operation of an EventUnmarshaller. Following
-	// Golang's way of defining interfaces, it exposes an Unmarshal method which allows
+	// Golang's way of defining interfaces, it exposes a Marshal method which allows
 	// for flexibility and reusability across all the different components that need to
 	// read the buffer coming from the EventBus into different structs
 	EventMarshaller interface {
@@ -61,11 +61,15 @@ type (
 		Collect(*bytes.Buffer) error
 	}
 
-	// EventSubscriber accepts events from the EventBus and takes care of reacting on
+	TopicProcessor interface {
+		Process(*bytes.Buffer) (*bytes.Buffer, error)
+	}
+
+	// TopicListener accepts events from the EventBus and takes care of reacting on
 	// quit Events. It delegates the business logic to the EventCollector which is
 	// supposed to handle the incoming events
-	EventSubscriber struct {
-		eventBus       *EventBus
+	TopicListener struct {
+		subscriber     EventSubscriber
 		eventCollector EventCollector
 		msgChan        <-chan *bytes.Buffer
 		MsgChanID      uint32
@@ -73,21 +77,37 @@ type (
 		QuitChanID     uint32
 		topic          string
 	}
+
+	// EventSubscriber subscribes a channel to Event notifications on a specific topic
+	EventSubscriber interface {
+		Subscribe(string, chan<- *bytes.Buffer) uint32
+		Unsubscribe(string, uint32) bool
+	}
+
+	// EventPublisher publishes serialized messages on a specific topic
+	EventPublisher interface {
+		Publish(string, *bytes.Buffer)
+	}
+
+	// EventBroker is an EventPublisher and an EventSubscriber
+	EventBroker interface {
+		EventSubscriber
+		EventPublisher
+	}
 )
 
-// NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus.
+// NewTopicListener creates the TopicListener listening to a topic on the EventBus.
 // The EventBus, EventCollector and Topic are injected
-func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
-	topic string) *EventSubscriber {
+func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topic string) *TopicListener {
 
 	quitChan := make(chan *bytes.Buffer, 1)
 	msgChan := make(chan *bytes.Buffer, 100)
 
-	msgChanID := eventBus.Subscribe(topic, msgChan)
-	quitChanID := eventBus.Subscribe(string(QuitTopic), quitChan)
+	msgChanID := subscriber.Subscribe(topic, msgChan)
+	quitChanID := subscriber.Subscribe(string(QuitTopic), quitChan)
 
-	return &EventSubscriber{
-		eventBus:       eventBus,
+	return &TopicListener{
+		subscriber:     subscriber,
 		msgChan:        msgChan,
 		MsgChanID:      msgChanID,
 		quitChan:       quitChan,
@@ -97,9 +117,8 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 	}
 }
 
-// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the
-// EventCollector.Collect
-func (n *EventSubscriber) Accept() {
+// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect. It accepts a variadic number of TopicProcessors which pre-process the buffer before passing it to the Collector
+func (n *TopicListener) Accept(processors ...TopicProcessor) {
 	log.WithFields(log.Fields{
 		"id":    n.MsgChanID,
 		"topic": n.topic,
@@ -107,10 +126,20 @@ func (n *EventSubscriber) Accept() {
 	for {
 		select {
 		case <-n.quitChan:
-			n.eventBus.Unsubscribe(n.topic, n.MsgChanID)
-			n.eventBus.Unsubscribe(string(QuitTopic), n.QuitChanID)
+			n.subscriber.Unsubscribe(n.topic, n.MsgChanID)
+			n.subscriber.Unsubscribe(string(QuitTopic), n.QuitChanID)
 			return
-		case eventMsg := <-n.msgChan:
+		case unprocessedEvBuffer := <-n.msgChan:
+			eventBuffer, err := n.preprocess(unprocessedEvBuffer, processors...)
+			if err != nil {
+				log.WithError(err).WithFields(
+					log.Fields{
+						"process": "topic listner",
+						"topic":   n.topic,
+					}).Warnln("processor failure")
+				continue
+			}
+
 			if len(n.msgChan) > 10 {
 				log.WithFields(log.Fields{
 					"id":         n.MsgChanID,
@@ -118,15 +147,31 @@ func (n *EventSubscriber) Accept() {
 					"Unconsumed": len(n.msgChan),
 				}).Debugln("Channel is accumulating messages")
 			}
-			if err := n.eventCollector.Collect(eventMsg); err != nil {
-				log.WithFields(log.Fields{
-					"id":         n.MsgChanID,
-					"topic":      n.topic,
-					"Unconsumed": len(n.msgChan),
-				}).Warnln("Channel is accumulating messages")
+			if err := n.eventCollector.Collect(eventBuffer); err != nil {
+				log.WithError(err).WithFields(log.Fields{
+					"id":    n.MsgChanID,
+					"topic": n.topic,
+				}).Errorln("Error in eventCollector.Collect")
 			}
 		}
 	}
+}
+
+func (n *TopicListener) preprocess(eventBuffer *bytes.Buffer, processors ...TopicProcessor) (*bytes.Buffer, error) {
+	var err error
+	buf := eventBuffer
+	for _, processor := range processors {
+		buf, err = processor.Process(buf)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"process": "topiclistener",
+				"topic":   n.topic,
+				"error":   err,
+			}).Debugln("processing error")
+			return nil, err
+		}
+	}
+	return buf, nil
 }
 
 // AddTopic is a convenience function to add a specified topic at the start of

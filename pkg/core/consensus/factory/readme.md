@@ -10,7 +10,5 @@
         - `LaunchVotingComponent`
         - `LaunchScoreSelectionComponent`
         - `LaunchSignatureSelector`
-        - `LaunchBlockReducer`
-        - `LaunchSigSetReducer`
-        - `LaunchBlockNotary`
-        - `LaunchSignatureSetNotary`
+        - `LaunchReducer`
+        - `LaunchAgreement`

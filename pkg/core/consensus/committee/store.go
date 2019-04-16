@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -14,14 +15,26 @@ import (
 )
 
 // Store is the component that handles Committee formation and management
-type Store struct {
-	eventBus              *wire.EventBus
-	addProvisionerChannel <-chan *bytes.Buffer
-	addProvisionerID      uint32
+type (
+	// Committee is the interface for operations depending on the set of Provisioners extracted for a fiven step
+	Committee interface {
+		wire.EventPrioritizer
+		// isMember can accept a BLS Public Key or an Ed25519
+		IsMember([]byte) bool
+		GetVotingCommittee(uint64, uint8) (map[string]uint8, error)
+		VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64, step uint8) error
+		Quorum() int
+	}
 
-	provisioners *user.Provisioners
-	TotalWeight  uint64
-}
+	Store struct {
+		eventBus              *wire.EventBus
+		addProvisionerChannel <-chan *bytes.Buffer
+		addProvisionerID      uint32
+
+		provisioners *user.Provisioners
+		TotalWeight  uint64
+	}
+)
 
 // NewCommitteeStore creates a new Store
 func NewCommitteeStore(eventBus *wire.EventBus) *Store {
@@ -97,7 +110,7 @@ func (c Store) Quorum() int {
 
 // Priority returns true in case pubKey2 has higher stake than pubKey1
 func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
-	if _, ok := ev1.(*NotaryEvent); !ok {
+	if _, ok := ev1.(*events.Agreement); !ok {
 		return ev2
 	}
 
@@ -123,7 +136,7 @@ func (c Store) Priority(ev1, ev2 wire.Event) wire.Event {
 
 // VerifyVoteSet checks the signature of the set
 func (c Store) VerifyVoteSet(voteSet []wire.Event, hash []byte, round uint64,
-	step uint8) *prerror.PrError {
+	step uint8) error {
 
 	// var amountOfVotes uint8
 
