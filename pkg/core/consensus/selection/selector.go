@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	log "github.com/sirupsen/logrus"
@@ -80,10 +82,25 @@ func (s *eventSelector) Process(ev wire.Event) {
 			return
 		}
 
+		s.repropagate(newBestEvent)
 		s.Lock()
 		defer s.Unlock()
 		s.bestEvent = newBestEvent
 	}
+}
+
+func (s *eventSelector) repropagate(ev wire.Event) {
+	buf := new(bytes.Buffer)
+	if err := s.handler.Marshal(buf, ev); err != nil {
+		panic(err)
+	}
+
+	msg, err := wire.AddTopic(buf, topics.Score)
+	if err != nil {
+		panic(err)
+	}
+
+	s.publisher.Publish(string(topics.Gossip), msg)
 }
 
 func (s *eventSelector) publishBestEvent() {

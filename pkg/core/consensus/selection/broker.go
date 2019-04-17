@@ -34,9 +34,8 @@ func launchScoreFilter(eventBroker wire.EventBroker, committee committee.Committ
 	processor consensus.EventProcessor) *consensus.EventFilter {
 
 	filter := consensus.NewEventFilter(handler, state, processor, false)
-	republisher := consensus.NewRepublisher(eventBroker, topics.Score)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Score))
-	go listener.Accept(republisher)
+	go listener.Accept()
 	return filter
 }
 
