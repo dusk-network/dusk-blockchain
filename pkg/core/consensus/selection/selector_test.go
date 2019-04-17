@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 
@@ -34,6 +36,26 @@ func TestSelection(t *testing.T) {
 	selector.RLock()
 	defer selector.RUnlock()
 	assert.Nil(t, selector.bestEvent)
+}
+
+func TestRepropagation(t *testing.T) {
+	eb := wire.NewEventBus()
+	// subscribe to gossip topic
+	gossipChan := make(chan *bytes.Buffer, 1)
+	eb.Subscribe(string(topics.Gossip), gossipChan)
+
+	selector := newEventSelector(eb, newMockScoreHandler(), time.Millisecond*200, consensus.NewState())
+	go selector.startSelection()
+	selector.Process(newMockEvent())
+
+	// should have gotten something on the gossip channel
+	timer := time.After(200 * time.Millisecond)
+	select {
+	case <-timer:
+		assert.Fail(t, "should have gotten a buffer from gossipChan")
+	case <-gossipChan:
+		// success
+	}
 }
 
 func TestStopSelector(t *testing.T) {
