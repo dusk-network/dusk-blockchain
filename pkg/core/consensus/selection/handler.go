@@ -14,6 +14,18 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
+var (
+	// Threshold number that a score needs to be greater than in order to be considered
+	// for selection. Messages with scores lower than this threshold should not be
+	// repropagated.
+	threshold = []byte{170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170,
+		170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170, 170,
+		170, 170, 170, 170, 170, 170}
+
+	errScoreBelowThreshold     = errors.New("score below threshold")
+	errProofFailedVerification = errors.New("proof verification failed")
+)
+
 type (
 	scoreHandler struct {
 		sync.RWMutex
@@ -27,7 +39,8 @@ type (
 	}
 )
 
-// NewScoreHandler returns a ScoreHandler, which encapsulates specific operations (e.g. verification, validation, marshalling and unmarshalling)
+// NewScoreHandler returns a ScoreHandler, which encapsulates specific operations
+// (e.g. verification, validation, marshalling and unmarshalling)
 func newScoreHandler() *scoreHandler {
 	return &scoreHandler{
 		RWMutex: sync.RWMutex{},
@@ -78,7 +91,12 @@ func (p *scoreHandler) Priority(first, second wire.Event) wire.Event {
 func (p *scoreHandler) Verify(ev wire.Event) error {
 	m := ev.(*ScoreEvent)
 
-	// Check first if the BidList contains valid bids
+	// Check threshold
+	if err := p.checkThreshold(m.Score); err != nil {
+		return err
+	}
+
+	// Check if the BidList contains valid bids
 	if err := p.validateBidListSubset(m.BidListSubset); err != nil {
 		return err
 	}
@@ -95,9 +113,16 @@ func (p *scoreHandler) Verify(ev wire.Event) error {
 	}
 
 	if !proof.Verify(seedScalar) {
-		return errors.New("proof verification failed")
+		return errProofFailedVerification
 	}
 
+	return nil
+}
+
+func (p *scoreHandler) checkThreshold(score []byte) error {
+	if bytes.Compare(score, threshold) == -1 {
+		return errScoreBelowThreshold
+	}
 	return nil
 }
 
