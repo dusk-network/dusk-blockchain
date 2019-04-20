@@ -11,6 +11,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"math"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -27,14 +28,11 @@ var verifyFunc = func(tx transactions.Transaction) error {
 	return nil
 }
 
-// Simulate an peer Node listening for propagated Txs
-type mockPeer struct {
-	validTx []transactions.Transaction
-}
-
 // Collect implements wire.EventCollector.
-// Receive messages, add headers, and propagate them to the network.
-func (p *mockPeer) Collect(message *bytes.Buffer) error {
+func (c *ctx) Collect(message *bytes.Buffer) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	msg := *message
 	var topicBytes [15]byte
 
@@ -45,7 +43,7 @@ func (p *mockPeer) Collect(message *bytes.Buffer) error {
 	if topic == topics.Tx {
 		tx, _ := transactions.FromReader(reader, 1)
 		for i := range tx {
-			p.validTx = append(p.validTx, tx[i])
+			c.propagated = append(c.propagated, tx[i])
 		}
 	}
 
@@ -54,17 +52,17 @@ func (p *mockPeer) Collect(message *bytes.Buffer) error {
 
 // Helper struct around mempool asserts to shorten common code
 type ctx struct {
-	validTx []transactions.Transaction
-	p       *mockPeer
-	mu      sync.Mutex
-	m       *Mempool
-	t       *testing.T
-	bus     *wire.EventBus
+	verifiedTx []transactions.Transaction
+	propagated []transactions.Transaction
+	mu         sync.Mutex
+	m          *Mempool
+	t          *testing.T
+	bus        *wire.EventBus
 }
 
-func newCtx(t *testing.T, peer bool) *ctx {
+func newCtx(t *testing.T) *ctx {
 	c := ctx{}
-	c.validTx = make([]transactions.Transaction, 0)
+	c.verifiedTx = make([]transactions.Transaction, 0)
 
 	c.t = t
 	// config
@@ -75,12 +73,8 @@ func newCtx(t *testing.T, peer bool) *ctx {
 	// eventBus
 	c.bus = wire.NewEventBus()
 
-	// init mock peer
-	if peer {
-		c.p = &mockPeer{}
-		c.p.validTx = make([]transactions.Transaction, 0)
-		go wire.NewEventSubscriber(c.bus, c.p, string(topics.Gossip)).Accept()
-	}
+	c.propagated = make([]transactions.Transaction, 0)
+	go wire.NewEventSubscriber(c.bus, &c, string(topics.Gossip)).Accept()
 
 	// mempool
 	c.m = NewMempool(c.bus, verifyFunc)
@@ -92,24 +86,33 @@ func (c *ctx) addTx(tx transactions.Transaction) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err := verifyFunc(tx); err == nil {
-		c.validTx = append(c.validTx, tx)
+		c.verifiedTx = append(c.verifiedTx, tx)
 	}
 }
 
 func (c *ctx) assert() {
 
+	// Wait until all pending txs are fully processed
+	for {
+		if len(c.m.pending) == 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	// TODO: deep compare
 	time.Sleep(50 * time.Millisecond)
 	txs := c.m.GetVerifiedTxs()
 
-	if len(txs) != len(c.validTx) {
-		c.t.Fatalf("expecting %d accepted txs but mempool stores %d txs", len(c.validTx), len(txs))
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(txs) != len(c.verifiedTx) {
+		c.t.Fatalf("expecting %d verified txs but mempool stores %d txs", len(c.verifiedTx), len(txs))
 	}
 
-	if c.p != nil {
-		if len(txs) != len(c.p.validTx) {
-			c.t.Fatalf("expecting %d accepted txs but mempool stores %d txs", len(c.p.validTx), len(txs))
-		}
+	if len(txs) != len(c.propagated) {
+		c.t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
 	}
 
 }
@@ -117,11 +120,7 @@ func (c *ctx) assert() {
 func (c *ctx) publish(buf *bytes.Buffer) {
 
 	c.bus.Publish(string(topics.Tx), buf)
-	time.Sleep(10 * time.Millisecond)
 
-	// republish same tx to simulate duplicated txs err
-	c.bus.Publish(string(topics.Tx), buf)
-	time.Sleep(10 * time.Millisecond)
 }
 
 // Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
@@ -148,12 +147,12 @@ func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transac
 
 func TestProcessPendingTxs(t *testing.T) {
 
-	c := newCtx(t, true)
+	c := newCtx(t)
 
 	var version uint8
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 2; i++ {
 
-		txs := randomSliceOfTxs(t, 5)
+		txs := randomSliceOfTxs(t, 3)
 		// Publish valid tx
 		for _, tx := range txs {
 			buf := new(bytes.Buffer)
@@ -184,6 +183,9 @@ func TestProcessPendingTxs(t *testing.T) {
 			c.addTx(tx)
 
 			c.publish(buf)
+
+			// republish same tx to simulate duplicated txs err
+			c.publish(buf)
 		}
 
 		c.assert()
@@ -193,10 +195,10 @@ func TestProcessPendingTxs(t *testing.T) {
 
 func TestProcessPendingTxsAsync(t *testing.T) {
 
-	c := newCtx(t, true)
+	c := newCtx(t)
 
 	wg := sync.WaitGroup{}
-	var version uint8
+	var version uint64
 	for i := 0; i < 3; i++ {
 
 		wg.Add(1)
@@ -220,9 +222,9 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 			for y := 0; y <= 7; y++ {
 				buf := new(bytes.Buffer)
 
-				// set invalid version according to the validator func mock
-				version++
-				tx := transactions.NewStandard(version, 2)
+				// change version to get valid/invalid txs
+				v := atomic.AddUint64(&version, 1)
+				tx := transactions.NewStandard(uint8(v), 2)
 				_ = tx.Encode(buf)
 				c.addTx(tx)
 
@@ -239,10 +241,12 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 func TestRemoveAccepted(t *testing.T) {
 
+	t.Skip()
+
 	// Create a random block
 	b := helper.RandomBlock(t, 200, 2)
 
-	c := newCtx(t, false)
+	c := newCtx(t)
 
 	counter := 0
 
@@ -257,9 +261,9 @@ func TestRemoveAccepted(t *testing.T) {
 		}
 
 		// Publish valid tx
-		c.bus.Publish(string(topics.Tx), buf)
+		c.publish(buf)
 
-		// Simulate a situation where the block has accepted each third tx
+		// Simulate a situation where the block has accepted each 2th tx
 		counter++
 		if math.Mod(float64(counter), 2) == 0 {
 			b.AddTx(tx)
@@ -270,6 +274,8 @@ func TestRemoveAccepted(t *testing.T) {
 		}
 
 	}
+
+	time.Sleep(100 * time.Millisecond)
 
 	_ = b.SetRoot()
 	c.m.RemoveAccepted(*b)

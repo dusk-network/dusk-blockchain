@@ -200,7 +200,7 @@ func (m *Mempool) RemoveAccepted(b block.Block) {
 func (m *Mempool) onIdle() {
 
 	// stats to log
-	log.Infof("Stats: verified %d, mem %d MB", m.verified.Len(), m.verified.Size())
+	log.Infof("stats: verified %d txs, mem %d MB", m.verified.Len(), m.verified.Size())
 
 	// Cleanup stuck transactions
 	// TODO:
