@@ -29,9 +29,9 @@ func TestScoreGeneration(t *testing.T) {
 	eb.Subscribe(string(topics.Gossip), gossipChan)
 
 	// launch score component
-	broker := LaunchScoreGenerationComponent(eb, d, k, user.BidList{})
+	broker := LaunchScoreGenerationComponent(eb, d, k)
 	// use mockgenerator
-	broker.generator = &mockGenerator{}
+	broker.proofGenerator = &mockGenerator{}
 	// update the round to start generation
 	updateRound(eb, 1)
 
@@ -44,15 +44,13 @@ func TestScoreGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	// now unmarshal the event
-	unmarshaller := selection.ScoreUnMarshaller{}
 	sev := &selection.ScoreEvent{}
-	if err := unmarshaller.Unmarshal(ev, sev); err != nil {
+	if err := selection.UnmarshalScoreEvent(ev, sev); err != nil {
 		t.Fatal(err)
 	}
 
-	// round and step should be 1
+	// round should be 1
 	assert.Equal(t, uint64(1), sev.Round)
-	assert.Equal(t, uint8(1), sev.Step)
 }
 
 // mockGenerator is used to test the generation component with the absence
@@ -60,20 +58,21 @@ func TestScoreGeneration(t *testing.T) {
 type mockGenerator struct {
 }
 
-func (m *mockGenerator) generateProof(d, k ristretto.Scalar, bidList user.BidList,
-	seed []byte, proofChannel chan zkproof.ZkProof) {
+func (m *mockGenerator) generateProof(seed []byte) zkproof.ZkProof {
 	fmt.Println("generating proof")
 	proof, _ := crypto.RandEntropy(100)
 	score, _ := crypto.RandEntropy(32)
 	z, _ := crypto.RandEntropy(32)
 	bL, _ := crypto.RandEntropy(32)
-	proofChannel <- zkproof.ZkProof{
+	return zkproof.ZkProof{
 		Proof:         proof,
 		Score:         score,
 		Z:             z,
 		BinaryBidList: bL,
 	}
 }
+
+func (m *mockGenerator) updateBidList(bl user.BidList) {}
 
 func updateRound(eventBus *wire.EventBus, round uint64) {
 	roundBytes := make([]byte, 8)

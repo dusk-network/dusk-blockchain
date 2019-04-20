@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -26,7 +24,7 @@ type (
 	}
 
 	signer interface {
-		committee.ReductionUnmarshaller
+		events.ReductionUnmarshaller
 		addSignatures(wire.Event) (*bytes.Buffer, error)
 		eligibleToVote() bool
 	}
@@ -39,7 +37,7 @@ func newEventSigner(keys *user.Keys, committee committee.Committee) *eventSigner
 	}
 }
 
-func initCollector(eventBus *wire.EventBus, topic string,
+func initCollector(broker wire.EventBroker, topic string,
 	unmarshalFunc func(*bytes.Buffer, signer) (wire.Event, error),
 	signer signer) chan *bytes.Buffer {
 
@@ -49,7 +47,7 @@ func initCollector(eventBus *wire.EventBus, topic string,
 		unmarshalFunc: unmarshalFunc,
 		signer:        signer,
 	}
-	go wire.NewEventSubscriber(eventBus, collector, topic).Accept()
+	go wire.NewTopicListener(broker, collector, topic).Accept()
 	return voteChannel
 }
 
@@ -72,7 +70,7 @@ func (c *collector) Collect(r *bytes.Buffer) error {
 	return nil
 }
 
-func unmarshalBlockReduction(reductionBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
+func unmarshalReduction(reductionBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
 	var round uint64
 	if err := encoding.ReadUint64(reductionBuffer, binary.LittleEndian, &round); err != nil {
 		return nil, err
@@ -88,8 +86,8 @@ func unmarshalBlockReduction(reductionBuffer *bytes.Buffer, signer signer) (wire
 		return nil, err
 	}
 
-	return &committee.ReductionEvent{
-		EventHeader: &consensus.EventHeader{
+	return &events.Reduction{
+		Header: &events.Header{
 			Round: round,
 			Step:  step,
 		},
@@ -97,7 +95,7 @@ func unmarshalBlockReduction(reductionBuffer *bytes.Buffer, signer signer) (wire
 	}, nil
 }
 
-func unmarshalBlockAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
+func unmarshalAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire.Event, error) {
 	var round uint64
 	if err := encoding.ReadUint64(agreementBuffer, binary.LittleEndian, &round); err != nil {
 		return nil, err
@@ -118,8 +116,8 @@ func unmarshalBlockAgreement(agreementBuffer *bytes.Buffer, signer signer) (wire
 		return nil, err
 	}
 
-	return &notary.BlockEvent{
-		EventHeader: &consensus.EventHeader{
+	return &events.Agreement{
+		Header: &events.Header{
 			Round: round,
 			Step:  step,
 		},

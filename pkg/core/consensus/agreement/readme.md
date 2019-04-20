@@ -8,23 +8,23 @@ During the conduction of a technical analysis of sortition based consensus algor
 
 #### Block Agreement Event
 
-| Field | Type |
-|-------|------|
-| opcode | uint8 |
-| round | uint64 |
-| step | uint64 |
-| blockhash | uint256 |
+| Field                 | Type    |
+| --------------------- | ------- |
+| opcode                | uint8   |
+| round                 | uint64  |
+| step                  | uint64  |
+| blockhash             | uint256 |
 | blockhashaggregatesig | uint256 |
-| publickeyset | uint64 |
-| prevblockhash | uint256 |
+| publickeyset          | uint64  |
+| prevblockhash         | uint256 |
 
 ### API
 
-- LaunchBlockNotary(eventbus, committee, duration) - Launches a Block Agreement broker
+- LaunchAgreement(eventbus, committee, duration) - Launches a Block Agreement broker
 
 ### Architecture
 
-The `Block Agreement` component follows the event driven paradigm. It is connected to the node's `EventBus` through a `BlockNotary`, and it delegates event-specific operations to it's `EventHandler` implementation.
+The `Block Agreement` component follows the event driven paradigm. It is connected to the node's `EventBus` through a `BlockAgreement`, and it delegates event-specific operations to it's `EventHandler` implementation.
 
 Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to a `Collector`.
 

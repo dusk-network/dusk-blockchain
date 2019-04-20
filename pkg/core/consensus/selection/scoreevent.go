@@ -13,7 +13,6 @@ type (
 	ScoreEvent struct {
 		// Fields related to the consensus
 		Round uint64
-		Step  uint8
 
 		// Fields related to the score
 		Score         []byte
@@ -22,11 +21,6 @@ type (
 		BidListSubset []byte
 		Seed          []byte
 		VoteHash      []byte
-	}
-
-	// ScoreUnMarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
-	ScoreUnMarshaller struct {
-		validateFunc func([]byte, []byte, []byte) error
 	}
 )
 
@@ -41,16 +35,11 @@ func (e *ScoreEvent) Sender() []byte {
 	return e.Z
 }
 
-// newScoreUnMarshaller creates a new Event UnMarshaller which takes care of Decoding and Encoding operations
-func newScoreUnMarshaller() *ScoreUnMarshaller {
-	return &ScoreUnMarshaller{}
-}
-
-// Unmarshal unmarshals the buffer into a Score Event
+// UnmarshalScoreEvent unmarshals the buffer into a Score Event
 // Field order is the following:
 // * Consensus Header [Round; Step]
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash]
-func (um *ScoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	// check if the buffer has contents first
 	// if not, we did not get any messages this round
 	// TODO: review this
@@ -62,11 +51,6 @@ func (um *ScoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 
 	// Decoding Round
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &sev.Round); err != nil {
-		return err
-	}
-
-	// Decoding Step
-	if err := encoding.ReadUint8(r, &sev.Step); err != nil {
 		return err
 	}
 
@@ -97,11 +81,11 @@ func (um *ScoreUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
-// Marshal the buffer into a committee Event
+// MarshalScoreEvent the buffer into a committee Event
 // Field order is the following:
 // * Consensus Header [Round; Step]
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
-func (um *ScoreUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	// TODO: review
 	sev, ok := ev.(*ScoreEvent)
 	if !ok {
@@ -110,10 +94,6 @@ func (um *ScoreUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	if err := encoding.WriteUint64(r, binary.LittleEndian, sev.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(r, sev.Step); err != nil {
 		return err
 	}
 
