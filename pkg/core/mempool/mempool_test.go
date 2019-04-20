@@ -74,7 +74,7 @@ func newCtx(t *testing.T) *ctx {
 	c.bus = wire.NewEventBus()
 
 	c.propagated = make([]transactions.Transaction, 0)
-	go wire.NewEventSubscriber(c.bus, &c, string(topics.Gossip)).Accept()
+	go wire.NewTopicListener(c.bus, &c, string(topics.Gossip)).Accept()
 
 	// mempool
 	c.m = NewMempool(c.bus, verifyFunc)

@@ -48,7 +48,7 @@ func NewMempool(eventBus *wire.EventBus, verifyTx func(transactions.Transaction)
 
 	// topics.Tx will be emitted by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, 100)
-	go wire.NewEventSubscriber(eventBus, m, string(topics.Tx)).Accept()
+	go wire.NewTopicListener(eventBus, m, string(topics.Tx)).Accept()
 
 	// Spawn mempool lifecycle routine
 	go func() {
