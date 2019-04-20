@@ -35,6 +35,14 @@ driver = "heavy_v0.1.0"
 # backend storage path
 dir = "chain"
 
+[mempool]
+# Max size of memory of the accepted txs to keep
+maxSizeMB = 100
+# Possible values: "hashmap", "syncpool", "memcached" 
+poolType = "hashmap"
+# number of txs slots to allocate on each reseting mempool
+preallocTxs = 100
+
 # rpc service configs
 [rpc]
 # enable rpc service
@@ -52,4 +60,6 @@ cert=""
 cpuFile=""
 # mem.pprof
 memFile=""
+
+
 

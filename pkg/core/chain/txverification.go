@@ -11,46 +11,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
 )
 
-// AcceptTx will verify whether a transaction is valid by checking:
-// - It has not been double spent
-// - It is not malformed
-// Returns nil if a tx is valid
-func (c *Chain) AcceptTx(tx transactions.Transaction) error {
-
-	txID, err := tx.CalculateHash()
-
-	if err != nil {
-		return err
-	}
-
-	err = c.db.View(func(t database.Transaction) error {
-		_, _, _, err := t.FetchBlockTxByHash(txID)
-		return err
-	})
-
-	// Expect here TxNotFound error to continue
-	if err != database.ErrTxNotFound {
-
-		if err == nil {
-			err = errors.New("tx already exists")
-		}
-
-		return err
-	}
-
-	approxBlockTime := uint64(consensusSeconds) + uint64(c.PrevBlock.Header.Timestamp)
-
-	if err := c.verifyTX(0, approxBlockTime, tx); err != nil {
-		return err
-	}
-
-	if err := c.propagateTx(tx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // VerifyTX will verify whether a transaction is valid by checking:
 // - It has not been double spent
 // - It is not malformed
@@ -245,6 +205,16 @@ func checkRangeProof(p rangeproof.Proof) error {
 // returns nil if item not in database
 func (c Chain) checkTXDoubleSpent(inputs transactions.Inputs) error {
 
-	return nil
+	return c.db.View(func(t database.Transaction) error {
 
+		for _, input := range inputs {
+
+			exists, txID, _ := t.FetchKeyImageExists(input.KeyImage)
+			if exists || txID != nil {
+				return errors.New("already spent")
+			}
+		}
+
+		return nil
+	})
 }

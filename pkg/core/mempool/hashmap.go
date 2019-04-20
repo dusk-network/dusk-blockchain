@@ -46,7 +46,7 @@ func (m HashMap) Clone() []transactions.Transaction {
 	return r
 }
 
-// Contains returns true if the given key are in the pool.
+// Contains returns true if the given key is in the pool.
 func (m *HashMap) Contains(txID []byte) bool {
 	var k key
 	copy(k[:], txID)
@@ -59,11 +59,12 @@ func (m *HashMap) Size() uint32 {
 	return uint32(m.txsSize / 1e6)
 }
 
-// Len returns the number of entries in the DB.
+// Len returns the number of tx entries
 func (m *HashMap) Len() int {
 	return len(m.data)
 }
 
+// Range iterates through all tx entries
 func (m *HashMap) Range(fn func(k key, t TxDesc) error) error {
 	for k, v := range m.data {
 		err := fn(k, v)

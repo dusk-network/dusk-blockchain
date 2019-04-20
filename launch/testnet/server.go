@@ -84,10 +84,20 @@ func Setup() *Server {
 
 	//NOTE: this is solely for testnet
 	bid, d, k := makeBid()
-	// saving the stake in the chain
-	chain.AcceptTx(stake)
-	// saving the bid in the chain
-	chain.AcceptTx(bid)
+	// Publish the stake in the chain
+	buf := new(bytes.Buffer)
+	err = stake.Encode(buf)
+	if err != nil {
+		log.Error(err)
+	}
+	eventBus.Publish(string(topics.Tx), buf)
+	// Publish the bid in the chain
+	buf = new(bytes.Buffer)
+	err = bid.Encode(buf)
+	if err != nil {
+		log.Error(err)
+	}
+	eventBus.Publish(string(topics.Tx), buf)
 
 	// start consensus factory
 	factory := factory.New(eventBus, timeOut, committee, chain.BidList, keys, d, k)

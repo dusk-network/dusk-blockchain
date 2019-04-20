@@ -14,6 +14,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -33,9 +34,9 @@ type Chain struct {
 	PrevBlock block.Block
 	BidList   *user.BidList
 
-	// collector channels
 	blockChannel <-chan *block.Block
-	txChannel    <-chan transactions.Transaction
+
+	m *mempool.Mempool
 }
 
 // New returns a new chain object
@@ -72,16 +73,23 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 
 	// set up collectors
 	blockChannel := initBlockCollector(eventBus)
-	txChannel := initTxCollector(eventBus)
 
-	return &Chain{
+	c := &Chain{
 		eventBus:     eventBus,
 		db:           db,
 		BidList:      &user.BidList{},
 		PrevBlock:    *genesisBlock,
 		blockChannel: blockChannel,
-		txChannel:    txChannel,
-	}, nil
+	}
+
+	var verifyTx = func(tx transactions.Transaction) error {
+		approxBlockTime := uint64(consensusSeconds) + uint64(c.PrevBlock.Header.Timestamp)
+		return c.verifyTX(0, approxBlockTime, tx)
+	}
+
+	c.m = mempool.NewMempool(eventBus, verifyTx)
+
+	return c, nil
 }
 
 // Listen to the collectors
@@ -90,8 +98,6 @@ func (c *Chain) Listen() {
 		select {
 		case blk := <-c.blockChannel:
 			c.AcceptBlock(*blk)
-		case tx := <-c.txChannel:
-			c.AcceptTx(tx)
 		}
 	}
 }
@@ -105,22 +111,6 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 	}
 
 	if err := blk.Encode(buffer); err != nil {
-		return err
-	}
-
-	c.eventBus.Publish(string(topics.Gossip), buffer)
-	return nil
-}
-
-func (c *Chain) propagateTx(tx transactions.Transaction) error {
-	buffer := new(bytes.Buffer)
-
-	topicBytes := topics.TopicToByteArray(topics.Tx)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
-	if err := tx.Encode(buffer); err != nil {
 		return err
 	}
 

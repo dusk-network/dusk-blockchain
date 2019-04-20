@@ -40,3 +40,9 @@ type profConfiguration struct {
 type rpcConfiguration struct {
 	Address string
 }
+
+type mempoolConfiguration struct {
+	MaxSizeMB   uint32
+	PoolType    string
+	PreallocTxs uint32
+}

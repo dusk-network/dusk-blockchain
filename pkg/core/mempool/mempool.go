@@ -15,8 +15,8 @@ import (
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
-// Mempool is a storage for chain transactions that are valid according to the
-// current chain state and may be included in the next block.
+// Mempool is a storage for the chain transactions that are valid according to the
+// current chain state and can be included in the next block.
 type Mempool struct {
 
 	// transactions emitted by RPC and Peer subsystems
@@ -236,6 +236,8 @@ func (m *Mempool) newPool() Pool {
 	switch config.Get().Mempool.PoolType {
 	case "hashmap":
 		p = &HashMap{Capacity: preallocTxs}
+	case "syncpool":
+		panic("syncpool not supported")
 	default:
 		p = &HashMap{Capacity: preallocTxs}
 	}

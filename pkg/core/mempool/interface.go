@@ -9,11 +9,11 @@ import (
 type TxDesc struct {
 	tx transactions.Transaction
 
-	// the point in time tx was received in pending queue
+	// the point in time, tx was received in pending queue
 	received time.Time
-	// the point in time tx was moved into verified pool
+	// the point in time, tx was moved into verified pool
 	verified time.Time
-	// the point in time tx was accepted by this node
+	// the point in time, tx was accepted by this node
 	// accepted time.Time
 }
 
@@ -21,18 +21,18 @@ type TxDesc struct {
 type Pool interface {
 
 	// Put sets the value for the given key. It overwrites any previous value
-	// for that key; a Pool is not a multi-map.
+	// for that key;
 	Put(t TxDesc) error
-	// Contains returns true if the given key are in the pool.
+	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
 	// Clone the entire pool
 	Clone() []transactions.Transaction
 
-	// Pool sizing
+	// Pool sizing in MBs
 	Size() uint32
-	// Len returns the number of entries in the DB.
+	// Len returns the number of tx entries
 	Len() int
 
-	// To range the pool items by a closure
+	// Range iterates through all tx entries
 	Range(fn func(k key, t TxDesc) error) error
 }

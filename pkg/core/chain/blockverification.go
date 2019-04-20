@@ -43,7 +43,11 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.PrevBlock = blk
 
-	// 4. Gossip block
+	// 4. Clean up all txs from the mempool that have been already
+	// added to the chain.
+	c.m.RemoveAccepted(blk)
+
+	// 5. Gossip block
 	if err := c.propagateBlock(blk); err != nil {
 		return err
 	}
