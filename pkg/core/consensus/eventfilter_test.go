@@ -10,10 +10,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
-
-var empty struct{}
 
 func TestRelevantEvent(t *testing.T) {
 	round := uint64(1)
@@ -73,25 +72,35 @@ func TestObsoleteEvent(t *testing.T) {
 // components.
 func newEventFilter(round uint64, step uint8, isMember bool,
 	processor consensus.EventProcessor) *consensus.EventFilter {
-	return consensus.NewEventFilter(newMockHandlerFilter(round, step),
+	return consensus.NewEventFilter(newMockHandlerFilter(round, step, []byte{}),
 		consensus.NewState(), processor, true)
 }
 
 func newMockEvent() wire.Event {
+
 	mockEvent := &mocks.Event{}
 	mockEvent.On("Sender").Return([]byte{})
 	mockEvent.On("Equal", mock.Anything).Return(false)
 	return mockEvent
 }
 
-func newMockHandlerFilter(round uint64, step uint8) consensus.EventHandler {
+func newMockHandlerFilter(round uint64, step uint8, pubKeyBLS []byte) consensus.EventHandler {
+	var sender []byte
 	mockEventHandler := &mocks.EventHandler{}
 	mockEventHandler.On("NewEvent").Return(newMockEvent())
 	mockEventHandler.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)
-	mockEventHandler.On("ExtractHeader", mock.Anything).Return(func(e wire.Event) *events.Header {
+	mockEventHandler.On("ExtractHeader",
+		mock.MatchedBy(func(ev wire.Event) bool {
+			sender = ev.Sender()
+			if len(sender) == 0 {
+				sender, _ = crypto.RandEntropy(32)
+			}
+			return true
+		})).Return(func(e wire.Event) *events.Header {
 		return &events.Header{
-			Round: round,
-			Step:  step,
+			Round:     round,
+			Step:      step,
+			PubKeyBLS: sender,
 		}
 	})
 	return mockEventHandler

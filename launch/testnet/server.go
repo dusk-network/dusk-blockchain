@@ -57,8 +57,7 @@ func Setup() *Server {
 	keys, _ := user.NewRandKeys()
 
 	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
-	committee := committee.NewCommitteeStore(eventBus)
-	go committee.Listen()
+	committee := committee.LaunchCommitteeStore(eventBus)
 
 	// creating and firing the chain process
 	chain, err := chain.New(eventBus)

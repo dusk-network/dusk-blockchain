@@ -10,7 +10,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -21,7 +20,7 @@ import (
 )
 
 func TestInitBroker(t *testing.T) {
-	committeeMock := mockCommittee(2, true, nil)
+	committeeMock := mockCommittee(2, true)
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
@@ -32,23 +31,25 @@ func TestInitBroker(t *testing.T) {
 }
 
 func TestBroker(t *testing.T) {
-	committeeMock := mockCommittee(2, true, nil)
+	committeeMock := mockCommittee(2, true)
 	_, broker, roundChan := initAgreement(committeeMock)
 
 	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
-	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	e1 := mockAgreementBuf(hash, 1, 1, 2)
+	e2 := mockAgreementBuf(hash, 1, 1, 2)
+	_ = broker.filter.Collect(e1)
+	_ = broker.filter.Collect(e2)
 
 	round := <-roundChan
 	assert.Equal(t, uint64(2), round)
 }
 
 func TestNoQuorum(t *testing.T) {
-	committeeMock := mockCommittee(3, true, nil)
+	committeeMock := mockCommittee(3, true)
 	_, broker, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
-	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	_ = broker.filter.Collect(mockAgreementBuf(hash, 1, 1, 3))
+	_ = broker.filter.Collect(mockAgreementBuf(hash, 1, 1, 3))
 
 	select {
 	case <-roundChan:
@@ -57,17 +58,16 @@ func TestNoQuorum(t *testing.T) {
 		// all good
 	}
 
-	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	_ = broker.filter.Collect(mockAgreementBuf(hash, 1, 1, 3))
 	round := <-roundChan
 	assert.Equal(t, uint64(2), round)
 }
 
 func TestSkipNoMember(t *testing.T) {
-	committeeMock := mockCommittee(1, false, nil)
+	committeeMock := mockCommittee(1, false)
 	_, broker, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
-	_ = broker.filter.Collect(marshalMsg(hash, 1, 1))
+	_ = broker.filter.Collect(mockAgreementBuf(hash, 1, 1, 1))
 
 	select {
 	case <-roundChan:
@@ -78,15 +78,15 @@ func TestSkipNoMember(t *testing.T) {
 }
 
 func TestAgreement(t *testing.T) {
-	committeeMock := mockCommittee(1, true, nil)
+	committeeMock := mockCommittee(1, true)
 	bus, _, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	bus.Publish(string(topics.Agreement), marshalOutgoing(hash, 1, 1))
+	bus.Publish(string(topics.Agreement), marshalOutgoing(mockAgreementBuf(hash, 1, 1, 1)))
 
 	round := <-roundChan
 	assert.Equal(t, uint64(2), round)
 
-	bus.Publish(string(topics.Agreement), marshalOutgoing(hash, 1, 2))
+	bus.Publish(string(topics.Agreement), marshalOutgoing(mockAgreementBuf(hash, 1, 1, 1)))
 
 	select {
 	case <-roundChan:
@@ -106,21 +106,7 @@ func initAgreement(c committee.Committee) (wire.EventBroker, *broker, chan uint6
 	return bus, broker, roundChan
 }
 
-func marshalOutgoing(blockhash []byte, round uint64, step uint8) *bytes.Buffer {
-	ev := events.NewAgreement()
-	ev.Header.Round = round
-	ev.Header.Step = step
-	ev.PubKeyBLS, _ = crypto.RandEntropy(32)
-	ev.AgreedHash = blockhash
-	// we leave VoteSet empty but it doesn't matter as the mocked committee will OK it anyway
-	ev.SignedVoteSet, _ = crypto.RandEntropy(33)
-	ev.VoteSet = make([]wire.Event, 0)
-
-	m := events.NewAgreementUnMarshaller()
-	b := make([]byte, 0)
-	buf := bytes.NewBuffer(b)
-	_ = m.Marshal(buf, ev)
-
+func marshalOutgoing(buf *bytes.Buffer) *bytes.Buffer {
 	msgBytes := buf.Bytes()
 	keys, _ := user.NewRandKeys()
 	signature := ed25519.Sign(*keys.EdSecretKey, msgBytes)
@@ -129,40 +115,23 @@ func marshalOutgoing(blockhash []byte, round uint64, step uint8) *bytes.Buffer {
 		panic(err)
 	}
 
-	b = make([]byte, 0)
+	b := make([]byte, 0)
 	outgoing := bytes.NewBuffer(b)
 	// outgoing, _ = wire.AddTopic(outgoing, topics.Agreement)
 	_ = encoding.Write512(outgoing, signature)
 	_ = encoding.Write256(outgoing, keys.EdPubKeyBytes())
-	_, _ = outgoing.Write(msgBytes)
+	if _, err := outgoing.Write(msgBytes); err != nil {
+		panic(err)
+	}
 	return outgoing
 }
 
-func marshalMsg(blockhash []byte, round uint64, step uint8) *bytes.Buffer {
-	ev := events.NewAgreement()
-	ev.Header.Round = round
-	ev.Header.Step = step
-	ev.PubKeyBLS, _ = crypto.RandEntropy(32)
-	ev.AgreedHash = blockhash
-	// we leave VoteSet empty klbut it doesn't matter as the mocked committee will OK it anyway
-	ev.SignedVoteSet, _ = crypto.RandEntropy(33)
-	ev.VoteSet = make([]wire.Event, 0)
-
-	m := events.NewAgreementUnMarshaller()
-	b := make([]byte, 0)
-	buf := bytes.NewBuffer(b)
-	_ = m.Marshal(buf, ev)
-	return buf
-}
-
-func mockCommittee(quorum int, isMember bool, verification error) *mocks.Committee {
+func mockCommittee(quorum int, isMember bool) *mocks.Committee {
 	committeeMock := &mocks.Committee{}
 	committeeMock.On("Quorum").Return(quorum)
-	committeeMock.On("VerifyVoteSet",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(verification)
-	committeeMock.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
+	committeeMock.On("IsMember",
+		mock.AnythingOfType("[]uint8"),
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("uint8")).Return(isMember)
 	return committeeMock
 }

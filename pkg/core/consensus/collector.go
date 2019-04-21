@@ -24,11 +24,6 @@ type (
 	bidListCollector struct {
 		BidListChan chan<- user.BidList
 	}
-
-	state struct {
-		round uint64
-		step  uint8
-	}
 )
 
 // InitRoundUpdate initializes a Round update channel and fires up the TopicListener as well.
