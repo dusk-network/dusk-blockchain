@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 func TestAccumulation(t *testing.T) {
@@ -62,7 +62,11 @@ func TestNonCommitteeEvent(t *testing.T) {
 func newMockCommittee(quorum int, isMember bool) committee.Committee {
 	mockCommittee := &mocks.Committee{}
 	mockCommittee.On("Quorum").Return(quorum)
-	mockCommittee.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
+	mockCommittee.On("IsMember",
+		mock.AnythingOfType("[]uint8"),
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("uint8"),
+	).Return(isMember)
 	return mockCommittee
 }
 
@@ -74,10 +78,27 @@ type mockAccumulatorHandler struct {
 
 func newMockHandlerAccumulator(verifyErr error, quorum int, identifier string,
 	isMember bool) consensus.AccumulatorHandler {
-	mockHandler := &mocks.EventHandler{}
-	mockHandler.On("Verify", mock.Anything).Return(verifyErr)
+	var sender []byte
+	mockEventHandler := &mocks.EventHandler{}
+	mockEventHandler.On("Verify", mock.Anything).Return(verifyErr)
+	mockEventHandler.On("NewEvent").Return(newMockEvent())
+	mockEventHandler.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)
+	mockEventHandler.On("ExtractHeader",
+		mock.MatchedBy(func(ev wire.Event) bool {
+			sender = ev.Sender()
+			if len(sender) == 0 {
+				sender, _ = crypto.RandEntropy(32)
+			}
+			return true
+		})).Return(func(e wire.Event) *events.Header {
+		return &events.Header{
+			Round:     1,
+			Step:      1,
+			PubKeyBLS: sender,
+		}
+	})
 	return &mockAccumulatorHandler{
-		EventHandler: mockHandler,
+		EventHandler: mockEventHandler,
 		Committee:    newMockCommittee(quorum, isMember),
 		identifier:   identifier,
 	}

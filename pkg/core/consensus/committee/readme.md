@@ -22,7 +22,7 @@ Deterministic sortition is an algorithm that recursively hashes the public seed 
 
 `Committee` is an interface that exposes the following functionalities:
 
-    - `IsMember([]byte)` bool: returns whether the ID of a provisioner (basically the `BLS Public Key`) is included in the committee
+    - `IsMember([]byte, uint64, uint8)` bool: returns whether the ID of a provisioner (basically the `BLS Public Key`) is included in the committee
     - `Verify(eventHeader)` error: Verify if the `EventHeader` has been propagated by a `Committee` member and performs general validation of the event itself (i.e. checking for duplicates, verifying signatures, etc)
     - `Quorum()` int: returns the number of Committee members needed to form a _quorum_. This quantity depends on the amount of available `Provisioners` but it is constant after a certain threshold (normally 50)
 

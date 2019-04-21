@@ -15,18 +15,8 @@ func (me *MockEvent) Equal(ev wire.Event) bool       { return reflect.DeepEqual(
 func (me MockEvent) Unmarshal(b *bytes.Buffer) error { return nil }
 func (me MockEvent) Sender() []byte                  { return nil }
 
-type MockPrioritizer struct{}
-
-// Priority is a stupid function that returns always the first Event
-func (mp *MockPrioritizer) Priority(f, s wire.Event) wire.Event {
-	if f == nil {
-		return s
-	}
-	return f
-}
-
 func TestStore(t *testing.T) {
-	sec := NewStepEventAccumulator()
+	sec := NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}
@@ -40,7 +30,7 @@ func TestStore(t *testing.T) {
 }
 
 func TestClear(t *testing.T) {
-	sec := NewStepEventAccumulator()
+	sec := NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"three"}
@@ -63,7 +53,7 @@ func TestClear(t *testing.T) {
 }
 
 func TestContains(t *testing.T) {
-	sec := NewStepEventAccumulator()
+	sec := NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"three"}
@@ -80,7 +70,7 @@ func TestContains(t *testing.T) {
 }
 
 func TestSECOperations(t *testing.T) {
-	sec := NewStepEventAccumulator()
+	sec := NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}

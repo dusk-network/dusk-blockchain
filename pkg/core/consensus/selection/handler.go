@@ -72,20 +72,16 @@ func (p *scoreHandler) ExtractHeader(e wire.Event) *events.Header {
 	}
 }
 
-// Priority returns true if the
-func (p *scoreHandler) Priority(first, second wire.Event) wire.Event {
+// Priority returns true if the first element has priority over the second, false otherwise
+func (p *scoreHandler) Priority(first, second wire.Event) bool {
 	ev1, ok := first.(*ScoreEvent)
 	if !ok {
 		// this happens when first is nil, in which case we should return second
-		return second
+		return false
 	}
 
 	ev2 := second.(*ScoreEvent)
-	if bytes.Compare(ev2.Score, ev1.Score) == 1 {
-		return ev2
-	}
-
-	return ev1
+	return bytes.Compare(ev2.Score, ev1.Score) != 1
 }
 
 func (p *scoreHandler) Verify(ev wire.Event) error {

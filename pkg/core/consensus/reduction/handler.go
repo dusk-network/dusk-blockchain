@@ -59,6 +59,6 @@ func (b *reductionHandler) Verify(e wire.Event) error {
 }
 
 // Priority is not used for this handler
-func (b *reductionHandler) Priority(ev1, ev2 wire.Event) wire.Event {
-	return nil
+func (b *reductionHandler) Priority(ev1, ev2 wire.Event) bool {
+	return true
 }

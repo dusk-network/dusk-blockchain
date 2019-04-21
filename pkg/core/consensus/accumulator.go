@@ -21,16 +21,16 @@ type AccumulatorHandler interface {
 // Accumulator is a generic event accumulator, that will accumulate events until it
 // reaches a certain threshold.
 type Accumulator struct {
-	*StepEventAccumulator
+	*AccumulatorStore
 	handler            AccumulatorHandler
 	CollectedVotesChan chan []wire.Event
 }
 
 func NewAccumulator(handler AccumulatorHandler) *Accumulator {
 	return &Accumulator{
-		StepEventAccumulator: NewStepEventAccumulator(),
-		handler:              handler,
-		CollectedVotesChan:   make(chan []wire.Event, 1),
+		AccumulatorStore:   NewAccumulatorStore(),
+		handler:            handler,
+		CollectedVotesChan: make(chan []wire.Event, 1),
 	}
 }
 
@@ -62,5 +62,6 @@ func (a *Accumulator) accumulate(ev wire.Event) {
 
 // ShouldSkip checks if the message is propagated by a committee member.
 func (a *Accumulator) shouldSkip(ev wire.Event) bool {
-	return !a.handler.IsMember(ev.Sender())
+	header := a.handler.ExtractHeader(ev)
+	return !a.handler.IsMember(ev.Sender(), header.Round, header.Step)
 }

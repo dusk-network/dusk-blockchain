@@ -29,7 +29,7 @@ func TestReduction(t *testing.T) {
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 	eventBus := wire.NewEventBus()
-	committeeMock := mockCommittee(2, true, nil)
+	committeeMock := mockCommittee(2, true)
 	timeOut := 200 * time.Millisecond
 
 	broker := LaunchReducer(eventBus, committeeMock, timeOut)
@@ -81,7 +81,7 @@ func TestReduction(t *testing.T) {
 
 func TestReductionTimeout(t *testing.T) {
 	eventBus := wire.NewEventBus()
-	committeeMock := mockCommittee(2, true, nil)
+	committeeMock := mockCommittee(2, true)
 	timeOut := 200 * time.Millisecond
 
 	broker := LaunchReducer(eventBus, committeeMock, timeOut)
@@ -176,10 +176,13 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	return completeBuf
 }
 
-func mockCommittee(quorum int, isMember bool, verification error) committee.Committee {
+func mockCommittee(quorum int, isMember bool) committee.Committee {
 	committeeMock := &mocks.Committee{}
 	committeeMock.On("Quorum").Return(quorum)
-	committeeMock.On("IsMember", mock.AnythingOfType("[]uint8")).Return(isMember)
+	committeeMock.On("IsMember",
+		mock.AnythingOfType("[]uint8"),
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("uint8")).Return(isMember)
 	return committeeMock
 }
 

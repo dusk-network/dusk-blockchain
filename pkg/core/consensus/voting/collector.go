@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -20,20 +19,17 @@ type (
 
 	eventSigner struct {
 		*user.Keys
-		committee committee.Committee
 	}
 
 	signer interface {
 		events.ReductionUnmarshaller
-		addSignatures(wire.Event) (*bytes.Buffer, error)
-		eligibleToVote() bool
+		AddSignatures(wire.Event) (*bytes.Buffer, error)
 	}
 )
 
-func newEventSigner(keys *user.Keys, committee committee.Committee) *eventSigner {
+func newEventSigner(keys *user.Keys) *eventSigner {
 	return &eventSigner{
-		Keys:      keys,
-		committee: committee,
+		Keys: keys,
 	}
 }
 
@@ -52,11 +48,7 @@ func initCollector(broker wire.EventBroker, topic string,
 }
 
 func (c *collector) createVote(ev wire.Event) *bytes.Buffer {
-	if !c.signer.eligibleToVote() {
-		return nil
-	}
-
-	buffer, _ := c.signer.addSignatures(ev)
+	buffer, _ := c.signer.AddSignatures(ev)
 	return buffer
 }
 
