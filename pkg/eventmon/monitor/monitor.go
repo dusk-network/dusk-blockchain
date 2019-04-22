@@ -1,9 +1,9 @@
 package monitor
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"net"
 	"strconv"
 	"strings"
@@ -75,7 +75,7 @@ func (b *broker) monitor(bb ristretto.Scalar) {
 			b.msgChan <- blockMsg(b.blockInfo)
 			b.blockInfo = newInfo(round)
 		case bestScore := <-b.bestScoreChan:
-			b.blockInfo.score = binary.LittleEndian.Uint64(bestScore.Score)
+			b.blockInfo.score = big.NewInt(0).SetBytes(bestScore.Score).Uint64()
 			b.blockInfo.hash = bestScore.VoteHash
 			b.msgChan <- "status:selection"
 		case redEvent := <-b.reductionChan:
