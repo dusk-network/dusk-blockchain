@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -18,6 +18,7 @@ type (
 	Committee interface {
 		wire.EventPrioritizer
 		// isMember can accept a BLS Public Key or an Ed25519
+		AmMember(uint64, uint8) bool
 		IsMember([]byte, uint64, uint8) bool
 		Quorum() int
 		ReportAbsentees([]wire.Event, uint64, uint8) error
@@ -33,12 +34,15 @@ type (
 		// subscriber channels
 		newProvisionerChan    chan *provisioner
 		removeProvisionerChan chan []byte
+		// own keys (TODO: this should just be BLSPubKey)
+		keys *user.Keys
 	}
 )
 
 // LaunchCommitteeStore creates a component that listens to changes to the Provisioners
-func LaunchCommitteeStore(eventBroker wire.EventBroker) *Store {
+func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store {
 	store := &Store{
+		keys:         keys,
 		publisher:    eventBroker,
 		provisioners: &user.Provisioners{},
 		// TODO: consider adding a consensus.Validator preprocessor
@@ -54,8 +58,15 @@ func (c *Store) Listen() {
 		select {
 		case newProvisioner := <-c.newProvisionerChan:
 			c.lock.Lock()
-			c.provisioners.AddMember(newProvisioner.pubKeyEd,
-				newProvisioner.pubKeyBLS, newProvisioner.amount)
+			if err := c.provisioners.AddMember(newProvisioner.pubKeyEd,
+				newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
+				c.lock.Unlock()
+				log.WithError(err).WithFields(log.Fields{
+					"process": "committeeStore",
+					"bls_key": newProvisioner.pubKeyBLS,
+				}).Warnln("error in adding a provisioner member")
+				continue
+			}
 			c.totalWeight += newProvisioner.amount
 			c.lock.Unlock()
 		case pubKeyBLS := <-c.removeProvisionerChan:
@@ -65,11 +76,22 @@ func (c *Store) Listen() {
 			}
 
 			c.lock.Lock()
+			if err := c.provisioners.RemoveMember(pubKeyBLS); err != nil {
+				c.lock.Unlock()
+				log.WithError(err).WithFields(log.Fields{
+					"process": "committeeStore",
+					"bls_key": pubKeyBLS,
+				}).Warnln("error in removing a provisioner member")
+				continue
+			}
 			c.totalWeight -= stake
-			c.provisioners.RemoveMember(pubKeyBLS)
 			c.lock.Unlock()
 		}
 	}
+}
+
+func (c *Store) AmMember(round uint64, step uint8) bool {
+	return c.IsMember(c.keys.BLSPubKey.Marshal(), round, step)
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
@@ -139,7 +161,7 @@ func (c *Store) copyProvisioners() *user.Provisioners {
 
 func (c *Store) getTotalWeight() uint64 {
 	c.lock.RLock()
-	c.lock.RUnlock()
+	defer c.lock.RUnlock()
 	totalWeight := c.totalWeight
 	return totalWeight
 }
