@@ -31,7 +31,6 @@ func ConnectToSeeder() []string {
 	if err != nil {
 		panic(err)
 	}
-	defer conn.Close()
 	log.WithField("prefix", "main").Debugln("connected to voucher seeder")
 
 	if err := completeChallenge(conn); err != nil {

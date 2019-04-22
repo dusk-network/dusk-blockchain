@@ -24,5 +24,5 @@ func TestCreateVotingCommittee(t *testing.T) {
 	committee := p.CreateVotingCommittee(100, totalWeight, 1)
 
 	// total amount of members in the committee should be 50
-	assert.Equal(t, 50, committee.Size())
+	assert.Equal(t, 50, len(committee))
 }

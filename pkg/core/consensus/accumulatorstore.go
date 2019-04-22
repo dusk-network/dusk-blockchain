@@ -23,9 +23,7 @@ func NewAccumulatorStore() *AccumulatorStore {
 func (sec *AccumulatorStore) Clear() {
 	sec.Lock()
 	defer sec.Unlock()
-	for key := range sec.Map {
-		delete(sec.Map, key)
-	}
+	sec.Map = make(map[string][]wire.Event)
 }
 
 // Contains checks if we already collected this event

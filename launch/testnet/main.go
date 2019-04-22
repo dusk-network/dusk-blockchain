@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -100,7 +101,7 @@ func main() {
 
 func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
 	// if we are the first, initialize consensus on round 1
-	if len(ips) == 0 {
+	if strings.Contains(ips[0], "0\n") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
 		return uint64(1)
 	}

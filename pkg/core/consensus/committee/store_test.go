@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
+	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -14,27 +17,69 @@ import (
 
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	provisionerChan := make(chan *bytes.Buffer)
-	_ = bus.Subscribe(msg.ProvisionerAddedTopic, provisionerChan)
-	LaunchCommitteeStore(bus)
+	c := LaunchCommitteeStore(bus)
 
-	b := newProvisioner(10, nil)
-	bus.Publish(msg.NewProvisionerTopic, b)
+	newProvisioner(10, bus)
+	// Give the committee store some time to add the provisioner
+	time.Sleep(100 * time.Millisecond)
 
-	newP := <-provisionerChan
-	_, _, amount, err := decodeNewProvisioner(newP)
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(10), amount)
+	p := c.copyProvisioners()
+	assert.Equal(t, 1, p.VotingCommitteeSize())
 }
 
-func newProvisioner(amount uint64, k *user.Keys) *bytes.Buffer {
-	if k == nil {
-		k, _ = user.NewRandKeys()
-	}
+func TestRemoveProvisioner(t *testing.T) {
+	bus := wire.NewEventBus()
+	c := LaunchCommitteeStore(bus)
+
+	k := newProvisioner(10, bus)
+	// Give the committee store some time to add the provisioner
+	time.Sleep(100 * time.Millisecond)
+
+	bus.Publish(msg.RemoveProvisionerTopic, bytes.NewBuffer(k.BLSPubKey.Marshal()))
+	// Give the store some time to remove the provisioner
+	time.Sleep(100 * time.Millisecond)
+
+	p := c.copyProvisioners()
+	assert.Equal(t, 0, p.VotingCommitteeSize())
+}
+
+func TestReportAbsentees(t *testing.T) {
+	bus := wire.NewEventBus()
+	c := LaunchCommitteeStore(bus)
+	absenteesChan := make(chan *bytes.Buffer, 1)
+	bus.Subscribe(msg.AbsenteesTopic, absenteesChan)
+
+	k1 := newProvisioner(10, bus)
+	k2 := newProvisioner(10, bus)
+	k3 := newProvisioner(10, bus)
+	// give the committee some time to add the provisioners
+	time.Sleep(100 * time.Millisecond)
+
+	// make events
+	ev1 := newMockEvent(k1.BLSPubKey.Marshal())
+	ev2 := newMockEvent(k2.BLSPubKey.Marshal())
+
+	evs := []wire.Event{ev1, ev2}
+
+	c.ReportAbsentees(evs, 1, 1)
+	absentees := <-absenteesChan
+	// absentees should contain the bls pub key of k3
+	assert.True(t, bytes.Contains(absentees.Bytes(), k3.BLSPubKey.Marshal()))
+}
+
+func newMockEvent(sender []byte) wire.Event {
+	mockEvent := &mocks.Event{}
+	mockEvent.On("Sender").Return(sender)
+	return mockEvent
+}
+
+func newProvisioner(amount uint64, eb *wire.EventBus) *user.Keys {
+	k, _ := user.NewRandKeys()
 	buffer := bytes.NewBuffer(*k.EdPubKey)
 	_ = encoding.WriteVarBytes(buffer, k.BLSPubKey.Marshal())
 
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, amount)
 
-	return buffer
+	eb.Publish(msg.NewProvisionerTopic, buffer)
+	return k
 }

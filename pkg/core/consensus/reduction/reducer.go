@@ -55,9 +55,10 @@ func (esw *eventStopWatch) stop() {
 }
 
 type reducer struct {
-	firstStep  *eventStopWatch
-	secondStep *eventStopWatch
-	ctx        *context
+	firstStep   *eventStopWatch
+	secondStep  *eventStopWatch
+	ctx         *context
+	accumulator *consensus.Accumulator
 
 	sync.RWMutex
 	stale bool
@@ -66,18 +67,16 @@ type reducer struct {
 }
 
 func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
-	publisher wire.EventPublisher) *reducer {
+	publisher wire.EventPublisher, accumulator *consensus.Accumulator) *reducer {
 	return &reducer{
-		ctx:        ctx,
-		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
-		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
-		publisher:  publisher,
+		ctx:         ctx,
+		firstStep:   newEventStopWatch(collectedVotesChan, ctx.timer),
+		secondStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
+		publisher:   publisher,
+		accumulator: accumulator,
 	}
 }
 
-// There is no mutex involved here, as this function is only ever called by the broker,
-// who does it synchronously. The reducer variable therefore can not be in a race
-// condition with another goroutine.
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
 	r.Lock()
@@ -96,6 +95,11 @@ func (r *reducer) begin() {
 	hash1 := r.extractHash(events)
 	r.RLock()
 	if !r.stale {
+		// if there was a timeout, we should report nodes that did not vote
+		if events == nil {
+			r.ctx.committee.ReportAbsentees(r.accumulator.GetAllEvents(),
+				r.ctx.state.Round(), r.ctx.state.Step())
+		}
 		r.ctx.state.IncrementStep()
 		r.sendReductionVote(hash1)
 	}
@@ -106,6 +110,10 @@ func (r *reducer) begin() {
 	r.RLock()
 	defer r.RUnlock()
 	if !r.stale {
+		if eventsSecondStep == nil {
+			r.ctx.committee.ReportAbsentees(r.accumulator.GetAllEvents(),
+				r.ctx.state.Round(), r.ctx.state.Step())
+		}
 		hash2 := r.extractHash(eventsSecondStep)
 		allEvents := append(events, eventsSecondStep...)
 		if r.isReductionSuccessful(hash1, hash2) {
