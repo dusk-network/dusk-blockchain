@@ -65,7 +65,7 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	return completeBuf
 }
 
-func mockCommittee(quorum int, isMember bool) committee.Committee {
+func mockCommittee(quorum int, isMember bool, amMember bool) committee.Committee {
 	committeeMock := &mocks.Committee{}
 	committeeMock.On("Quorum").Return(quorum)
 	committeeMock.On("ReportAbsentees", mock.Anything,
@@ -74,5 +74,8 @@ func mockCommittee(quorum int, isMember bool) committee.Committee {
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(isMember)
+	committeeMock.On("AmMember",
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("uint8")).Return(amMember)
 	return committeeMock
 }

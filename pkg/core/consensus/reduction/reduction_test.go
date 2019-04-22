@@ -21,7 +21,7 @@ func TestReduction(t *testing.T) {
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 	eventBus := wire.NewEventBus()
-	committeeMock := mockCommittee(2, true)
+	committeeMock := mockCommittee(2, true, true)
 	timeOut := 200 * time.Millisecond
 
 	broker := LaunchReducer(eventBus, committeeMock, timeOut)
@@ -71,9 +71,62 @@ func TestReduction(t *testing.T) {
 	}
 }
 
+func TestNoPublishingIfNotInCommittee(t *testing.T) {
+	// send a hash to start reduction
+	hash, _ := crypto.RandEntropy(32)
+	eventBus := wire.NewEventBus()
+	committeeMock := mockCommittee(2, true, false)
+	timeOut := 200 * time.Millisecond
+
+	broker := LaunchReducer(eventBus, committeeMock, timeOut)
+	// listen for outgoing votes of either kind, so we can verify they are being
+	// sent out properly.
+	outgoingReduction := make(chan *bytes.Buffer, 2)
+	outgoingAgreement := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.OutgoingBlockReductionTopic, outgoingReduction)
+	eventBus.Subscribe(msg.OutgoingBlockAgreementTopic, outgoingAgreement)
+
+	// update round
+	consensus.UpdateRound(eventBus, 1)
+
+	// here we try to force the selection message to ALWAYS come after the round update
+	for {
+		if broker.ctx.state.Round() == 0 {
+			time.Sleep(3 * time.Millisecond)
+			continue
+		}
+
+		// now we can send the selection
+		bestScoreBuf := mockSelectionEventBuffer(hash)
+		eventBus.Publish(msg.BestScoreTopic, bestScoreBuf)
+		break
+	}
+
+	// send mocked events until we get a result from the outgoingAgreement channel
+	timer := time.After(1 * time.Second)
+	count := 0
+	for {
+		select {
+		case <-outgoingAgreement:
+			t.Fatal("message should not have been sent as AmMember is set to false")
+			return
+		case <-timer:
+			//All good
+			return
+		default:
+			count++
+			// the committee is never more than 50 nodes. It does not make much sense to hammer the reducer more than that
+			if count < 50 {
+				ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(), hash)
+				eventBus.Publish(string(topics.Reduction), ev)
+			}
+		}
+	}
+}
+
 func TestReductionTimeout(t *testing.T) {
 	eventBus := wire.NewEventBus()
-	committeeMock := mockCommittee(2, true)
+	committeeMock := mockCommittee(2, true, true)
 	timeOut := 200 * time.Millisecond
 
 	broker := LaunchReducer(eventBus, committeeMock, timeOut)
