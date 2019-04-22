@@ -60,8 +60,8 @@ func Setup() *Server {
 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
 	keys, _ := user.NewRandKeys()
 
-	// firing up the committee (the process in charge of calculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
-	c := committee.LaunchCommitteeStore(eventBus)
+	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
+	c := committee.LaunchCommitteeStore(eventBus, keys)
 
 	// creating and firing up the chain process
 	chain, err := chain.New(eventBus)

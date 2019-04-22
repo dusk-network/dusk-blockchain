@@ -103,9 +103,14 @@ func MarshalOutgoing(buf *bytes.Buffer) *bytes.Buffer {
 func mockCommittee(quorum int, isMember bool) *mocks.Committee {
 	committeeMock := &mocks.Committee{}
 	committeeMock.On("Quorum").Return(quorum)
+	committeeMock.On("ReportAbsentees", mock.Anything,
+		mock.Anything, mock.Anything).Return(nil)
 	committeeMock.On("IsMember",
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(isMember)
+	committeeMock.On("AmMember",
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("uint8")).Return(true)
 	return committeeMock
 }

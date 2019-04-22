@@ -94,6 +94,11 @@ func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
 	}
 }
 
+func (r *reducer) inCommittee() bool {
+	state := r.ctx.state
+	return r.ctx.committee.AmMember(state.Round(), state.Step())
+}
+
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
 	r.Lock()
@@ -152,7 +157,9 @@ func (r *reducer) sendReductionVote(hash *bytes.Buffer) {
 	if err != nil {
 		panic(err)
 	}
-	r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
+	if r.inCommittee() {
+		r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
+	}
 }
 
 func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
@@ -163,7 +170,9 @@ func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
 	if err != nil {
 		panic(err)
 	}
-	r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
+	if r.inCommittee() {
+		r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
+	}
 }
 
 func (r *reducer) publishRegeneration() {

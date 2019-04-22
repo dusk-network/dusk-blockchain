@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
-
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -17,7 +16,7 @@ import (
 
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus)
+	c := LaunchCommitteeStore(bus, nil)
 
 	newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -29,7 +28,7 @@ func TestAddProvisioner(t *testing.T) {
 
 func TestRemoveProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus)
+	c := LaunchCommitteeStore(bus, nil)
 
 	k := newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -45,7 +44,7 @@ func TestRemoveProvisioner(t *testing.T) {
 
 func TestReportAbsentees(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus)
+	c := LaunchCommitteeStore(bus, nil)
 	absenteesChan := make(chan *bytes.Buffer, 1)
 	bus.Subscribe(msg.AbsenteesTopic, absenteesChan)
 
@@ -61,7 +60,7 @@ func TestReportAbsentees(t *testing.T) {
 
 	evs := []wire.Event{ev1, ev2}
 
-	c.ReportAbsentees(evs, 1, 1)
+	_ = c.ReportAbsentees(evs, 1, 1)
 	absentees := <-absenteesChan
 	// absentees should contain the bls pub key of k3
 	assert.True(t, bytes.Contains(absentees.Bytes(), k3.BLSPubKey.Marshal()))
