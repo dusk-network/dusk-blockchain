@@ -10,6 +10,20 @@ type Committee struct {
 	mock.Mock
 }
 
+// AmMember provides a mock function with given fields: _a0, _a1
+func (_m *Committee) AmMember(_a0 uint64, _a1 uint8) bool {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(uint64, uint8) bool); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // IsMember provides a mock function with given fields: _a0, _a1, _a2
 func (_m *Committee) IsMember(_a0 []byte, _a1 uint64, _a2 uint8) bool {
 	ret := _m.Called(_a0, _a1, _a2)
