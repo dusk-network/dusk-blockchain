@@ -51,3 +51,17 @@ func (_m *Committee) Quorum() int {
 
 	return r0
 }
+
+// ReportAbsentees provides a mock function with given fields: _a0, _a1, _a2
+func (_m *Committee) ReportAbsentees(_a0 []wire.Event, _a1 uint64, _a2 uint8) error {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]wire.Event, uint64, uint8) error); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

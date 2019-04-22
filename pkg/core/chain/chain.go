@@ -3,8 +3,12 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"math/big"
+	"sync"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
@@ -29,17 +33,21 @@ type Chain struct {
 	eventBus *wire.EventBus
 	db       database.DB
 
-	// TODO: exposed for demo, possibly undo later
+	// TODO: exposed for demo, undo later
+	// We expose prevBlock here so that we can change and retrieve the
+	// current height of the chain. This makes jump-in a lot easier while
+	// we don't yet store blocks.
+	sync.RWMutex
 	PrevBlock block.Block
-	BidList   *user.BidList
+	bidList   *user.BidList
 
 	// collector channels
-	blockChannel <-chan *block.Block
-	txChannel    <-chan transactions.Transaction
+	roundChan <-chan uint64
+	blockChan <-chan *block.Block
+	txChan    <-chan transactions.Transaction
 }
 
 // New returns a new chain object
-// TODO: take out demo constructions (db, collectors) and improve it after demo
 func New(eventBus *wire.EventBus) (*Chain, error) {
 
 	drvr, err := database.From(cfg.Get().Database.Driver)
@@ -70,17 +78,14 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 		return nil, err
 	}
 
-	// set up collectors
-	blockChannel := initBlockCollector(eventBus)
-	txChannel := initTxCollector(eventBus)
-
 	return &Chain{
-		eventBus:     eventBus,
-		db:           db,
-		BidList:      &user.BidList{},
-		PrevBlock:    *genesisBlock,
-		blockChannel: blockChannel,
-		txChannel:    txChannel,
+		eventBus:  eventBus,
+		db:        db,
+		bidList:   &user.BidList{},
+		PrevBlock: *genesisBlock,
+		roundChan: consensus.InitRoundUpdate(eventBus),
+		blockChan: initBlockCollector(eventBus),
+		txChan:    initTxCollector(eventBus),
 	}, nil
 }
 
@@ -88,9 +93,18 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 func (c *Chain) Listen() {
 	for {
 		select {
-		case blk := <-c.blockChannel:
+		case round := <-c.roundChan:
+			// TODO: this is added for testnet jump-in purposes while we dont yet
+			// store blocks. remove this later
+
+			// The prevBlock height should be set to round - 1, as the round denotes the
+			// height of the block that is currently being forged.
+			c.Lock()
+			c.PrevBlock.Header.Height = round - 1
+			c.Unlock()
+		case blk := <-c.blockChan:
 			c.AcceptBlock(*blk)
-		case tx := <-c.txChannel:
+		case tx := <-c.txChan:
 			c.AcceptTx(tx)
 		}
 	}
@@ -146,15 +160,15 @@ func (c *Chain) addProvisioner(tx *transactions.Stake) error {
 func (c *Chain) addBidder(tx *transactions.Bid) error {
 	totalAmount := getTxTotalOutputAmount(tx)
 	x := calculateX(totalAmount, tx.M)
-	c.BidList.AddBid(x)
+	c.bidList.AddBid(x)
 
-	c.PropagateBidList()
+	c.propagateBidList()
 	return nil
 }
 
-func (c *Chain) PropagateBidList() {
+func (c *Chain) propagateBidList() {
 	var bidListBytes []byte
-	for _, bid := range *c.BidList {
+	for _, bid := range *c.bidList {
 		bidListBytes = append(bidListBytes, bid[:]...)
 	}
 

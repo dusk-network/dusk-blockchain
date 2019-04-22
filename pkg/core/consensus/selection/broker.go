@@ -18,6 +18,7 @@ type scoreBroker struct {
 	bidListChan      <-chan user.BidList
 	filter           *consensus.EventFilter
 	selector         *eventSelector
+	handler          scoreEventHandler
 }
 
 // LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
@@ -56,6 +57,7 @@ func newScoreBroker(eventBroker wire.EventBroker, committee committee.Committee,
 		bidListChan:      bidListChan,
 		regenerationChan: regenerationChan,
 		selector:         selector,
+		handler:          handler,
 	}
 }
 
@@ -71,6 +73,7 @@ func (f *scoreBroker) Listen() {
 
 			f.selector.stopSelection()
 			f.filter.UpdateRound(round)
+			f.handler.ResetThreshold()
 			f.filter.FlushQueue()
 			f.selector.startSelection()
 		case state := <-f.regenerationChan:
@@ -79,6 +82,7 @@ func (f *scoreBroker) Listen() {
 				"round":   state.Round,
 				"step":    state.Step,
 			}).Debugln("received regeneration message")
+			f.handler.LowerThreshold()
 			if state.Round == f.selector.state.Round() {
 				f.selector.RLock()
 				if !f.selector.running {

@@ -2,15 +2,14 @@ package committee
 
 import (
 	"bytes"
-	"encoding/binary"
-	"io"
+	"encoding/hex"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // Store is the component that handles Committee formation and management
@@ -21,56 +20,63 @@ type (
 		// isMember can accept a BLS Public Key or an Ed25519
 		IsMember([]byte, uint64, uint8) bool
 		Quorum() int
+		ReportAbsentees([]wire.Event, uint64, uint8) error
 	}
 
 	Store struct {
-		eventBus *wire.EventBus
-
+		publisher    wire.EventPublisher
 		lock         sync.RWMutex
 		provisioners *user.Provisioners
 		// TODO: should this be round dependent?
-		TotalWeight uint64
+		totalWeight uint64
+
+		// subscriber channels
+		newProvisionerChan    chan *provisioner
+		removeProvisionerChan chan []byte
 	}
 )
 
 // LaunchCommitteeStore creates a component that listens to changes to the Provisioners
-func LaunchCommitteeStore(eventBus *wire.EventBus) *Store {
+func LaunchCommitteeStore(eventBroker wire.EventBroker) *Store {
 	store := &Store{
-		eventBus:     eventBus,
+		publisher:    eventBroker,
 		provisioners: &user.Provisioners{},
+		// TODO: consider adding a consensus.Validator preprocessor
+		newProvisionerChan:    initNewProvisionerCollector(eventBroker),
+		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
 	}
-	listener := wire.NewTopicListener(eventBus, store, msg.NewProvisionerTopic)
-	// TODO: consider adding a consensus.Validator preprocessor
-	go listener.Accept()
+	go store.Listen()
 	return store
 }
 
-func (c *Store) Collect(newProvisionerBytes *bytes.Buffer) error {
-	var cpy bytes.Buffer
-	r := io.TeeReader(newProvisionerBytes, &cpy)
-	pubKeyEd, pubKeyBLS, amount, err := decodeNewProvisioner(r)
-	if err != nil {
-		// Log
-		return err
-	}
+func (c *Store) Listen() {
+	for {
+		select {
+		case newProvisioner := <-c.newProvisionerChan:
+			c.lock.Lock()
+			c.provisioners.AddMember(newProvisioner.pubKeyEd,
+				newProvisioner.pubKeyBLS, newProvisioner.amount)
+			c.totalWeight += newProvisioner.amount
+			c.lock.Unlock()
+		case pubKeyBLS := <-c.removeProvisionerChan:
+			stake, err := c.provisioners.GetStake(pubKeyBLS)
+			if err != nil {
+				panic(err)
+			}
 
-	c.lock.Lock()
-	if err := c.provisioners.AddMember(pubKeyEd, pubKeyBLS, amount); err != nil {
-		return err
+			c.lock.Lock()
+			c.totalWeight -= stake
+			c.provisioners.RemoveMember(pubKeyBLS)
+			c.lock.Unlock()
+		}
 	}
-	c.lock.Unlock()
-
-	c.TotalWeight += amount
-	c.eventBus.Publish(msg.ProvisionerAddedTopic, &cpy)
-	return nil
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
 func (c *Store) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-
 	p := c.copyProvisioners()
-	votingCommittee := p.CreateVotingCommittee(round, c.TotalWeight, step)
-	return votingCommittee.Has(pubKeyBLS)
+	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	return votingCommittee.IsMember(pubKeyBLS)
 }
 
 // Quorum returns the amount of votes to reach a quorum
@@ -79,6 +85,28 @@ func (c *Store) Quorum() int {
 	committeeSize := p.VotingCommitteeSize()
 	quorum := int(float64(committeeSize) * 0.75)
 	return quorum
+}
+
+// ReportAbsentees will send public keys of absent provisioners to the moderator
+func (c *Store) ReportAbsentees(evs []wire.Event, round uint64, step uint8) error {
+	absentees := c.extractAbsentees(evs, round, step)
+	buf := new(bytes.Buffer)
+	if err := absentees.Marshal(buf); err != nil {
+		return err
+	}
+
+	c.publisher.Publish(msg.AbsenteesTopic, buf)
+	return nil
+}
+
+func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {
+	p := c.copyProvisioners()
+	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	for _, ev := range evs {
+		senderStr := hex.EncodeToString(ev.Sender())
+		delete(votingCommittee, senderStr)
+	}
+	return votingCommittee
 }
 
 // Priority returns false in case pubKey2 has higher stake than pubKey1
@@ -109,21 +137,9 @@ func (c *Store) copyProvisioners() *user.Provisioners {
 	return provisioners
 }
 
-func decodeNewProvisioner(r io.Reader) ([]byte, []byte, uint64, error) {
-	pubKeyEd := make([]byte, 0)
-	if err := encoding.Read256(r, &pubKeyEd); err != nil {
-		return nil, nil, 0, err
-	}
-
-	pubKeyBLS := make([]byte, 0)
-	if err := encoding.ReadVarBytes(r, &pubKeyBLS); err != nil {
-		return nil, nil, 0, err
-	}
-
-	var amount uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &amount); err != nil {
-		return nil, nil, 0, err
-	}
-
-	return pubKeyEd, pubKeyBLS, amount, nil
+func (c *Store) getTotalWeight() uint64 {
+	c.lock.RLock()
+	c.lock.RUnlock()
+	totalWeight := c.totalWeight
+	return totalWeight
 }

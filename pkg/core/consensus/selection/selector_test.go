@@ -99,6 +99,8 @@ func (m *mockScoreHandler) Priority(ev1, ev2 wire.Event) bool {
 }
 
 func (m *mockScoreHandler) UpdateBidList(bL user.BidList) {}
+func (m *mockScoreHandler) LowerThreshold()               {}
+func (m *mockScoreHandler) ResetThreshold()               {}
 
 func newMockHandler() consensus.EventHandler {
 	var sender []byte

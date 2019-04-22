@@ -183,6 +183,8 @@ func mockCommittee(quorum int, isMember bool) committee.Committee {
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(isMember)
+	committeeMock.On("ReportAbsentees", mock.Anything,
+		mock.Anything, mock.Anything).Return(nil)
 	return committeeMock
 }
 

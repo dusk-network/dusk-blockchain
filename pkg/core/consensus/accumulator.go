@@ -60,6 +60,17 @@ func (a *Accumulator) accumulate(ev wire.Event) {
 	}
 }
 
+func (a *Accumulator) GetAllEvents() []wire.Event {
+	allEvents := make([]wire.Event, 0)
+	a.RLock()
+	defer a.RUnlock()
+	for _, evs := range a.Map {
+		allEvents = append(allEvents, evs...)
+	}
+
+	return allEvents
+}
+
 // ShouldSkip checks if the message is propagated by a committee member.
 func (a *Accumulator) shouldSkip(ev wire.Event) bool {
 	header := a.handler.ExtractHeader(ev)
