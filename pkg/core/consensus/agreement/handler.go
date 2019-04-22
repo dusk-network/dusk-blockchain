@@ -24,9 +24,6 @@ func newHandler(committee committee.Committee) *agreementHandler {
 	}
 }
 
-func (a *agreementHandler) NewEvent() wire.Event {
-	return events.NewAgreement()
-}
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(*events.Agreement)

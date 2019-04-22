@@ -24,7 +24,7 @@ The codebase is structured in the following way:
 |       +--merkletree
 |       +--rangeproof
 |       +--ringsig
-|   +-- eventlog
+|   +-- eventmon
 |   +-- p2p
 |   +-- rpc
 |   +-- util
@@ -32,8 +32,6 @@ The codebase is structured in the following way:
 ...
 +-- Makefile
 ```
-
-
 
 ## SBA\* Consensus
 
@@ -103,4 +101,4 @@ Additionally, several other entities are utilized within the `Collector` to help
 The consensus package exposes the function to create and initialize the most common channels reused across the whole package. These common channels are for receiving notifications about Rounds (Block height) and Phases (Block Hash).
 
 - InitRoundUpdate(eventbus) (chan uint64) returns a channel whereto round updates get published
-- InitPhaseUpdate(eventbus) (chan uint64) returns a channel whereto phase  updates get published
+- InitPhaseUpdate(eventbus) (chan uint64) returns a channel whereto phase updates get published

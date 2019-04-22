@@ -9,23 +9,40 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+// LaunchNotification is a helper function allowing node internal processes interested in reduction messages to receive Reduction events as they get produced
+func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Reduction {
+	revChan := make(chan *events.Reduction)
+	evChan := consensus.LaunchNotification(eventbus, events.NewReductionUnMarshaller(), msg.OutgoingBlockReductionTopic)
+
+	go func() {
+		for {
+			rEv := <-evChan
+			reductionEvent := rEv.(*events.Reduction)
+			revChan <- reductionEvent
+		}
+	}()
+
+	return revChan
+}
+
 var empty struct{}
 
 type eventStopWatch struct {
 	collectedVotesChan chan []wire.Event
-	stopChan           chan interface{}
+	stopChan           chan struct{}
 	timer              *consensus.Timer
 }
 
 func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Timer) *eventStopWatch {
 	return &eventStopWatch{
 		collectedVotesChan: collectedVotesChan,
-		stopChan:           make(chan interface{}, 1),
+		stopChan:           make(chan struct{}, 1),
 		timer:              timer,
 	}
 }
@@ -51,7 +68,7 @@ func (esw *eventStopWatch) reset() {
 }
 
 func (esw *eventStopWatch) stop() {
-	esw.stopChan <- true
+	esw.stopChan <- empty
 }
 
 type reducer struct {

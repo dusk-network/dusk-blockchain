@@ -15,8 +15,8 @@ type (
 	// consensus components
 	EventHandler interface {
 		wire.EventVerifier
-		wire.EventUnMarshaller
-		NewEvent() wire.Event
+		wire.EventMarshaller
+		wire.EventDeserializer
 		ExtractHeader(wire.Event) *events.Header
 	}
 
