@@ -10,7 +10,7 @@ import (
 )
 
 // MaxStrikes is the maximum allowed amount of strikes in a single round
-const maxStrikes uint8 = 2
+const maxStrikes uint8 = 3
 
 type moderator struct {
 	publisher wire.EventPublisher
