@@ -13,13 +13,13 @@ import (
 
 type reductionSigner struct {
 	*eventSigner
-	*events.ReductionUnMarshaller
+	*events.OutgoingReductionUnmarshaller
 }
 
 func NewReductionSigner(keys *user.Keys) *reductionSigner {
 	return &reductionSigner{
-		eventSigner:           newEventSigner(keys),
-		ReductionUnMarshaller: events.NewReductionUnMarshaller(),
+		eventSigner:                   newEventSigner(keys),
+		OutgoingReductionUnmarshaller: events.NewOutgoingReductionUnmarshaller(),
 	}
 }
 

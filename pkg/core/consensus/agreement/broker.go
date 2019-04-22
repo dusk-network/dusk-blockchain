@@ -17,7 +17,7 @@ import (
 func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Agreement {
 	agreementChan := make(chan *events.Agreement)
 	evChan := consensus.LaunchNotification(eventbus,
-		events.NewAgreementUnMarshaller(), msg.OutgoingBlockAgreementTopic)
+		events.NewOutgoingAgreementUnmarshaller(), msg.OutgoingBlockAgreementTopic)
 
 	go func() {
 		for {

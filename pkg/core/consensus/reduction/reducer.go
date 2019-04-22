@@ -18,7 +18,8 @@ import (
 // LaunchNotification is a helper function allowing node internal processes interested in reduction messages to receive Reduction events as they get produced
 func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Reduction {
 	revChan := make(chan *events.Reduction)
-	evChan := consensus.LaunchNotification(eventbus, events.NewReductionUnMarshaller(), msg.OutgoingBlockReductionTopic)
+	evChan := consensus.LaunchNotification(eventbus,
+		events.NewOutgoingReductionUnmarshaller(), msg.OutgoingBlockReductionTopic)
 
 	go func() {
 		for {

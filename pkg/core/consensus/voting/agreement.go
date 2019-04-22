@@ -13,13 +13,13 @@ import (
 
 type agreementSigner struct {
 	*eventSigner
-	*events.AgreementUnMarshaller
+	*events.OutgoingAgreementUnmarshaller
 }
 
 func NewAgreementSigner(keys *user.Keys) *agreementSigner {
 	return &agreementSigner{
-		eventSigner:           newEventSigner(keys),
-		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
+		eventSigner:                   newEventSigner(keys),
+		OutgoingAgreementUnmarshaller: events.NewOutgoingAgreementUnmarshaller(),
 	}
 }
 

@@ -31,9 +31,9 @@ type sender struct {
 // the needed signers, and their channels get connected to the sender.
 func newSender(eventBus *wire.EventBus, keys *user.Keys) *sender {
 	reductionChan := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
-		unmarshalReduction, NewReductionSigner(keys))
+		NewReductionSigner(keys))
 	agreementChan := initCollector(eventBus, msg.OutgoingBlockAgreementTopic,
-		unmarshalAgreement, NewAgreementSigner(keys))
+		NewAgreementSigner(keys))
 
 	return &sender{
 		eventBus:      eventBus,

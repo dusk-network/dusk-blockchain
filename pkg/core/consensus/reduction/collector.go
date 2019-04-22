@@ -26,8 +26,10 @@ func initBestScoreUpdate(subscriber wire.EventSubscriber) chan []byte {
 }
 
 func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
+	// copy shared pointer
+	copyBuf := *r
 	ev := &selection.ScoreEvent{}
-	if err := selection.UnmarshalScoreEvent(r, ev); err != nil {
+	if err := selection.UnmarshalScoreEvent(&copyBuf, ev); err != nil {
 		return err
 	}
 	if len(ev.VoteHash) == 32 {
