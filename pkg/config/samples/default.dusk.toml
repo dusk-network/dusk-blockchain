@@ -28,6 +28,9 @@ addresses=["voucher.dusk.network:8081"]
 # supported only in testnet
 fixed = []
 
+[network.monitor]
+address="monitor.dusk.network:1337"
+
 [database]
 # Backend storage used to store chain
 # Supported drivers heavy_v0.1.0

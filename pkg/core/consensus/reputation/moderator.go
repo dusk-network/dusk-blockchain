@@ -16,7 +16,7 @@ type moderator struct {
 	publisher wire.EventPublisher
 	strikes   map[string]uint8
 
-	roundChan    chan uint64
+	roundChan    <-chan uint64
 	absenteeChan chan [][]byte
 }
 

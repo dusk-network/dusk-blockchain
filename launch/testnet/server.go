@@ -60,7 +60,7 @@ func Setup() *Server {
 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
 	keys, _ := user.NewRandKeys()
 
-	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
+	// firing up the committee (the process in charge of calculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
 	c := committee.LaunchCommitteeStore(eventBus)
 
 	// creating and firing up the chain process
@@ -98,9 +98,17 @@ func Setup() *Server {
 	//NOTE: this is solely for testnet
 	bid, d, k := makeBid()
 	// saving the stake in the chain
-	chain.AcceptTx(stake)
+	if err := chain.AcceptTx(stake); err != nil {
+		panic(err)
+	}
+
 	// saving the bid in the chain
-	chain.AcceptTx(bid)
+	if err := chain.AcceptTx(bid); err != nil {
+		panic(err)
+	}
+
+	// Connecting to the general monitoring system
+	ConnectToMonitor(eventBus, d)
 
 	// start consensus factory
 	factory := factory.New(eventBus, timeOut, c, keys, d, k)

@@ -8,6 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -16,7 +17,7 @@ import (
 // This test assures proper functionality of adding strikes to a certain
 // committee member, up to the maxStrikes count.
 func TestStrikes(t *testing.T) {
-	eventBus, _, removeProvisionerChan := launchModerator()
+	eventBus, removeProvisionerChan := launchModerator()
 
 	// Send enough strikes for one person so we receive something on removeProvisionerChan
 	node, _ := crypto.RandEntropy(32)
@@ -31,7 +32,7 @@ func TestStrikes(t *testing.T) {
 
 // This test assures proper behaviour of the `offenders` map on a round update.
 func TestClean(t *testing.T) {
-	eventBus, moderator, removeProvisionerChan := launchModerator()
+	eventBus, removeProvisionerChan := launchModerator()
 
 	// Add a strike
 	node, _ := crypto.RandEntropy(32)
@@ -40,7 +41,7 @@ func TestClean(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Update round
-	moderator.roundChan <- 2
+	consensus.UpdateRound(eventBus, 2)
 	// wait a bit for the referee to update...
 	time.Sleep(time.Millisecond * 100)
 	// send maxStrikes-1 strikes
@@ -71,10 +72,10 @@ func newAbsenteeBuffer(node []byte) *bytes.Buffer {
 	return buf
 }
 
-func launchModerator() (wire.EventBroker, *moderator, chan *bytes.Buffer) {
+func launchModerator() (wire.EventBroker, chan *bytes.Buffer) {
 	eventBus := wire.NewEventBus()
-	referee := LaunchReputationComponent(eventBus)
+	LaunchReputationComponent(eventBus)
 	removeProvisionerChan := make(chan *bytes.Buffer, 1)
 	eventBus.Subscribe(msg.RemoveProvisionerTopic, removeProvisionerChan)
-	return eventBus, referee, removeProvisionerChan
+	return eventBus, removeProvisionerChan
 }
