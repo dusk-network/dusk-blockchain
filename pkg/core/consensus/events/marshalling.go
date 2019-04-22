@@ -29,7 +29,7 @@ type (
 
 	ReductionUnmarshaller interface {
 		wire.EventMarshaller
-		wire.EventUnmarshaller
+		wire.EventDeserializer
 		MarshalVoteSet(*bytes.Buffer, []wire.Event) error
 		UnmarshalVoteSet(*bytes.Buffer) ([]wire.Event, error)
 	}
@@ -93,6 +93,10 @@ func NewReductionUnMarshaller() *ReductionUnMarshaller {
 	return &ReductionUnMarshaller{NewUnMarshaller()}
 }
 
+func (r *ReductionUnMarshaller) NewEvent() wire.Event {
+	return NewReduction()
+}
+
 // NewAgreementUnMarshaller creates a new AgreementUnMarshaller. Internally it creates an HeaderUnMarshaller which takes care of Decoding and Encoding operations
 func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 
@@ -100,6 +104,10 @@ func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 		ReductionUnmarshaller: NewReductionUnMarshaller(),
 		UnMarshaller:          NewUnMarshaller(),
 	}
+}
+
+func (a *AgreementUnMarshaller) NewEvent() wire.Event {
+	return NewAgreement()
 }
 
 // Unmarshal unmarshals the buffer into a Committee
@@ -229,6 +237,5 @@ func (ceu *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 	if err := encoding.Write256(r, cev.AgreedHash); err != nil {
 		return err
 	}
-	// TODO: write the vote set to the buffer
 	return nil
 }

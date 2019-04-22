@@ -98,9 +98,17 @@ func Setup() *Server {
 	//NOTE: this is solely for testnet
 	bid, d, k := makeBid()
 	// saving the stake in the chain
-	chain.AcceptTx(stake)
+	if err := chain.AcceptTx(stake); err != nil {
+		panic(err)
+	}
+
 	// saving the bid in the chain
-	chain.AcceptTx(bid)
+	if err := chain.AcceptTx(bid); err != nil {
+		panic(err)
+	}
+
+	// Connecting to the general monitoring system
+	ConnectToMonitor(eventBus, d)
 
 	// start consensus factory
 	factory := factory.New(eventBus, timeOut, c, keys, d, k)

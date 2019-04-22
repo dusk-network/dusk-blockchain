@@ -2,23 +2,15 @@ package reduction
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"golang.org/x/crypto/ed25519"
 )
 
 // func init() {
@@ -41,7 +33,7 @@ func TestReduction(t *testing.T) {
 	eventBus.Subscribe(msg.OutgoingBlockAgreementTopic, outgoingAgreement)
 
 	// update round
-	updateRound(eventBus, 1)
+	consensus.UpdateRound(eventBus, 1)
 
 	// here we try to force the selection message to ALWAYS come after the round update
 	for {
@@ -94,7 +86,7 @@ func TestReductionTimeout(t *testing.T) {
 	eventBus.Subscribe(msg.OutgoingBlockAgreementTopic, outgoingAgreement)
 
 	// update round
-	updateRound(eventBus, 1)
+	consensus.UpdateRound(eventBus, 1)
 
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
@@ -123,73 +115,4 @@ func TestReductionTimeout(t *testing.T) {
 		// - one from the first step timeout
 		assert.Equal(t, 2, len(outgoingReduction))
 	}
-}
-
-func mockSelectionEventBuffer(hash []byte) *bytes.Buffer {
-	// 32 bytes
-	score, _ := crypto.RandEntropy(32)
-	// Var Bytes
-	proof, _ := crypto.RandEntropy(1477)
-	// 32 bytes
-	z, _ := crypto.RandEntropy(32)
-	// Var Bytes
-	bidListSubset, _ := crypto.RandEntropy(32)
-	// BLS is 33 bytes
-	seed, _ := crypto.RandEntropy(33)
-	se := &selection.ScoreEvent{
-		Round:         uint64(23),
-		Score:         score,
-		Proof:         proof,
-		Z:             z,
-		Seed:          seed,
-		BidListSubset: bidListSubset,
-		VoteHash:      hash,
-	}
-
-	b := make([]byte, 0)
-	r := bytes.NewBuffer(b)
-	_ = selection.MarshalScoreEvent(r, se)
-	return r
-}
-
-func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
-	keys, _ := user.NewRandKeys()
-	signedHash, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, hash)
-	marshaller := events.NewReductionUnMarshaller()
-
-	bev := &events.Reduction{
-		Header: &events.Header{
-			PubKeyBLS: keys.BLSPubKey.Marshal(),
-			Round:     round,
-			Step:      step,
-		},
-		VotedHash:  hash,
-		SignedHash: signedHash.Compress(),
-	}
-
-	buf := new(bytes.Buffer)
-	_ = marshaller.Marshal(buf, bev)
-	edSig := ed25519.Sign(*keys.EdSecretKey, buf.Bytes())
-	completeBuf := bytes.NewBuffer(edSig)
-	completeBuf.Write(keys.EdPubKeyBytes())
-	completeBuf.Write(buf.Bytes())
-	return completeBuf
-}
-
-func mockCommittee(quorum int, isMember bool) committee.Committee {
-	committeeMock := &mocks.Committee{}
-	committeeMock.On("Quorum").Return(quorum)
-	committeeMock.On("IsMember",
-		mock.AnythingOfType("[]uint8"),
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint8")).Return(isMember)
-	committeeMock.On("ReportAbsentees", mock.Anything,
-		mock.Anything, mock.Anything).Return(nil)
-	return committeeMock
-}
-
-func updateRound(eventBus *wire.EventBus, round uint64) {
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes[:8], round)
-	eventBus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(roundBytes))
 }

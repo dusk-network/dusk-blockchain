@@ -12,6 +12,21 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+func LaunchNotification(eventbus wire.EventSubscriber) <-chan *ScoreEvent {
+	scoreChan := make(chan *ScoreEvent)
+	evChan := consensus.LaunchNotification(eventbus,
+		newScoreHandler(), msg.BestScoreTopic)
+
+	go func() {
+		for {
+			sEv := <-evChan
+			scoreChan <- sEv.(*ScoreEvent)
+		}
+	}()
+
+	return scoreChan
+}
+
 var empty struct{}
 
 type eventSelector struct {

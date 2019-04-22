@@ -47,11 +47,6 @@ func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 	return encoding.Write256(r, ev.VotedHash)
 }
 
-// NewEvent returns a blockEvent
-func (b *reductionHandler) NewEvent() wire.Event {
-	return events.NewReduction()
-}
-
 // Verify the blockEvent
 func (b *reductionHandler) Verify(e wire.Event) error {
 	ev := e.(*events.Reduction)

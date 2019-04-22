@@ -94,6 +94,12 @@ type (
 		EventSubscriber
 		EventPublisher
 	}
+
+	// EventDeserializer is the interface for those struct that allows deserialization of an event from scratch
+	EventDeserializer interface {
+		EventUnmarshaller
+		NewEvent() Event
+	}
 )
 
 // NewTopicListener creates the TopicListener listening to a topic on the EventBus.

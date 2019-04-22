@@ -10,8 +10,13 @@ type loggerConfiguration struct {
 }
 
 type networkConfiguration struct {
-	Seeder seedersConfiguration
-	Port   string
+	Seeder  seedersConfiguration
+	Monitor monitorConfiguration
+	Port    string
+}
+
+type monitorConfiguration struct {
+	Address string
 }
 
 type seedersConfiguration struct {
