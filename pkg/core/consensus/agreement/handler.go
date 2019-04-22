@@ -6,7 +6,6 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/hashset"
@@ -23,7 +22,6 @@ func newHandler(committee committee.Committee) *agreementHandler {
 		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
 	}
 }
-
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(*events.Agreement)
@@ -69,11 +67,12 @@ func (a *agreementHandler) verify(voteSet []wire.Event, hash []byte, round uint6
 			return errors.New("voter is not eligible to vote")
 		}
 
-		if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
-			vote.SignedHash); err != nil {
+		// TODO: use BLS signature aggregation to speed up verification times
+		// if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
+		// 	vote.SignedHash); err != nil {
 
-			return errors.New("BLS verification failed")
-		}
+		// 	return errors.New("BLS verification failed")
+		// }
 
 		votes++
 		if votes >= a.Quorum() {
