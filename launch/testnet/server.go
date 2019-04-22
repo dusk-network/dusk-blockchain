@@ -29,7 +29,7 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-var timeOut = 6 * time.Second
+var timeOut = 3 * time.Second
 
 type Server struct {
 	eventBus *wire.EventBus
