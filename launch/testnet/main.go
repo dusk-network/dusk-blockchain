@@ -101,7 +101,7 @@ func main() {
 
 func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
 	// if we are the first, initialize consensus on round 1
-	if strings.Contains(ips[0], "0\n") {
+	if strings.Contains(ips[0], "noip") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
 		return uint64(1)
 	}
