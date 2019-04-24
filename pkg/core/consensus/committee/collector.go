@@ -63,7 +63,7 @@ func decodeNewProvisioner(r *bytes.Buffer) (*provisioner, error) {
 }
 
 func InitRemoveProvisionerCollector(subscriber wire.EventSubscriber) chan []byte {
-	removeProvisionerChan := make(chan []byte, 10)
+	removeProvisionerChan := make(chan []byte, 50)
 	collector := &removeProvisionerCollector{removeProvisionerChan}
 	go wire.NewTopicListener(subscriber, collector, msg.RemoveProvisionerTopic).Accept()
 	return removeProvisionerChan

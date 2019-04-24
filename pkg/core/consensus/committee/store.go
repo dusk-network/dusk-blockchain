@@ -112,12 +112,13 @@ func (c *Store) Quorum() int {
 // ReportAbsentees will send public keys of absent provisioners to the moderator
 func (c *Store) ReportAbsentees(evs []wire.Event, round uint64, step uint8) error {
 	absentees := c.extractAbsentees(evs, round, step)
-	buf := new(bytes.Buffer)
-	if err := absentees.Marshal(buf); err != nil {
-		return err
+	for absentee := range absentees {
+		absenteeBytes, err := hex.DecodeString(absentee)
+		if err != nil {
+			return err
+		}
+		c.publisher.Publish(msg.AbsenteesTopic, bytes.NewBuffer(absenteeBytes))
 	}
-
-	c.publisher.Publish(msg.AbsenteesTopic, buf)
 	return nil
 }
 

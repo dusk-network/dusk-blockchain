@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -22,12 +20,12 @@ func TestStrikes(t *testing.T) {
 	// Send enough strikes for one person so we receive something on removeProvisionerChan
 	node, _ := crypto.RandEntropy(32)
 	for i := uint8(0); i < maxStrikes; i++ {
-		eventBus.Publish(msg.AbsenteesTopic, newAbsenteeBuffer(node))
+		eventBus.Publish(msg.AbsenteesTopic, bytes.NewBuffer(node))
 	}
 
 	// We should now receive the public key of the provisioner who has exceeded maxStrikes
 	offenderBuf := <-removeProvisionerChan
-	assert.True(t, bytes.Contains(offenderBuf.Bytes(), node))
+	assert.Equal(t, offenderBuf.Bytes(), node)
 }
 
 // This test assures proper behaviour of the `offenders` map on a round update.
@@ -36,7 +34,7 @@ func TestClean(t *testing.T) {
 
 	// Add a strike
 	node, _ := crypto.RandEntropy(32)
-	eventBus.Publish(msg.AbsenteesTopic, newAbsenteeBuffer(node))
+	eventBus.Publish(msg.AbsenteesTopic, bytes.NewBuffer(node))
 	// wait a bit for the referee to strike...
 	time.Sleep(time.Millisecond * 100)
 
@@ -46,7 +44,7 @@ func TestClean(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	// send maxStrikes-1 strikes
 	for i := uint8(0); i < maxStrikes-1; i++ {
-		eventBus.Publish(msg.AbsenteesTopic, newAbsenteeBuffer(node))
+		eventBus.Publish(msg.AbsenteesTopic, bytes.NewBuffer(node))
 	}
 
 	// check if we get anything on removeProvisionerChan
@@ -57,19 +55,6 @@ func TestClean(t *testing.T) {
 	case <-timer:
 		// success
 	}
-}
-
-func newAbsenteeBuffer(node []byte) *bytes.Buffer {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteVarInt(buf, 1); err != nil {
-		panic(err)
-	}
-
-	if err := encoding.WriteVarBytes(buf, node); err != nil {
-		panic(err)
-	}
-
-	return buf
 }
 
 func launchModerator() (wire.EventBroker, chan *bytes.Buffer) {
