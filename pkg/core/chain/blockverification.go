@@ -6,6 +6,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"time"
 )
 
 // AcceptBlock will accept a block if
@@ -113,4 +114,56 @@ func (c Chain) checkBlockHeader(blk block.Block) error {
 	}
 
 	return nil
+}
+
+// ForgeCandidateBlock has the knowledge to forge the next block to propose
+func (c Chain) ForgeCandidateBlock() (*block.Block, error) {
+
+	// TODO Missing fields for forging the block
+	// - Seed
+	// - CertHash
+
+	txs := c.m.GetVerifiedTxs()
+
+	// TODO guard the prevBlock with mutex
+	nextHeight := c.PrevBlock.Header.Height + 1
+	prevHash := c.PrevBlock.Header.Hash
+
+	h := &block.Header{
+		Version:   0,
+		Timestamp: time.Now().Unix(),
+		Height:    nextHeight,
+		PrevBlock: prevHash,
+		TxRoot:    nil,
+
+		Seed:     nil,
+		CertHash: nil,
+	}
+
+	// Generate the candidate block
+	b := &block.Block{
+		Header: h,
+		Txs:    txs,
+	}
+
+	// Update TxRoot
+	err := b.SetRoot()
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate the block hash
+	err = b.SetHash()
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Ensure the forged block satisfies all chain rules
+	if err := c.verifyBlock(*b); err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }
