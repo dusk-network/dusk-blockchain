@@ -27,7 +27,7 @@ func TestStrikes(t *testing.T) {
 
 	// We should now receive the public key of the provisioner who has exceeded maxStrikes
 	offenderBuf := <-removeProvisionerChan
-	assert.Equal(t, node, offenderBuf.Bytes())
+	assert.True(t, bytes.Contains(offenderBuf.Bytes(), node))
 }
 
 // This test assures proper behaviour of the `offenders` map on a round update.

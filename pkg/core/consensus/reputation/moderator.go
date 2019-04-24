@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+
 	log "github.com/sirupsen/logrus"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -53,6 +56,7 @@ func (m *moderator) listen() {
 // Increase the strike count for the `absentees` by one. If the amount of strikes
 // exceeds `maxStrikes`, we tell the committee store to remove this provisioner.
 func (m *moderator) addStrikes(absentees ...[]byte) {
+	exceededMaxStrikes := make([][]byte, 0)
 	for _, absentee := range absentees {
 		absenteeStr := hex.EncodeToString(absentee)
 		m.strikes[absenteeStr]++
@@ -61,7 +65,25 @@ func (m *moderator) addStrikes(absentees ...[]byte) {
 				"process":     "reputation",
 				"provisioner": absenteeStr,
 			}).Debugln("removing provisioner")
-			m.publisher.Publish(msg.RemoveProvisionerTopic, bytes.NewBuffer(absentee))
+			exceededMaxStrikes = append(exceededMaxStrikes, absentee)
 		}
 	}
+
+	if len(exceededMaxStrikes) > 0 {
+		m.publisher.Publish(msg.RemoveProvisionerTopic, marshalKeys(exceededMaxStrikes...))
+	}
+}
+
+func marshalKeys(absenteeKeys ...[]byte) *bytes.Buffer {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteVarInt(buf, uint64(len(absenteeKeys))); err != nil {
+		panic(err)
+	}
+	for i := 0; i < len(absenteeKeys); i++ {
+		if err := encoding.WriteVarBytes(buf, absenteeKeys[i]); err != nil {
+			panic(err)
+		}
+	}
+
+	return buf
 }
