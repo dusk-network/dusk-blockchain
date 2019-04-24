@@ -27,7 +27,6 @@ func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(*events.Agreement)
 	return &events.Header{
 		Round: ev.Round,
-		Step:  ev.Step,
 	}
 }
 
