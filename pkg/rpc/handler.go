@@ -50,12 +50,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 	}
 
-	msg, err := json.Marshal(result)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error marshaling response: %v\n", err)
-	}
-
-	if _, err := w.Write(msg); err != nil {
+	if _, err := w.Write([]byte(result)); err != nil {
 		fmt.Fprintf(os.Stderr, "error writing reply: %v\n", err)
 		return
 	}
@@ -63,28 +58,24 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
 
 // runCmd parses and runs the specified method. Server is included as the receiver in case
 // the method needs to modify anything on the RPC server.
-func (s *Server) runCmd(r *JSONRequest, isAdmin bool) (*JSONResponse, error) {
-	var resp JSONResponse
+func (s *Server) runCmd(r *JSONRequest, isAdmin bool) (string, error) {
 
 	// Get method
 	fn, ok := rpcCmd[r.Method]
 	if !ok {
-		resp.Result = "error"
-		resp.Error = "method unrecognized"
-		return &resp, nil
+		return "", fmt.Errorf("method %s unrecognized", r.Method)
 	}
 
 	// Check if it is an admin-only method first if caller is not admin
 	if !isAdmin && rpcAdminCmd[r.Method] {
-		return nil, fmt.Errorf("unauthorized call to method %v", r.Method)
+		return "", fmt.Errorf("unauthorized call to method %v", r.Method)
 	}
 
 	// Run method and return result
 	result, err := fn(s, r.Params)
 	if err != nil {
-		resp.Error = err.Error()
+		return "", err
 	}
 
-	resp.Result = result
-	return &resp, nil
+	return result, nil
 }

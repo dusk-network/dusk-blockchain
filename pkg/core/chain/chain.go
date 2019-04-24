@@ -106,6 +106,10 @@ func (c *Chain) Listen() {
 			c.AcceptBlock(*blk)
 		case tx := <-c.txChan:
 			c.AcceptTx(tx)
+		case r := <-wire.GetLastBlockChan:
+			buf := new(bytes.Buffer)
+			_ = c.PrevBlock.Decode(buf)
+			r.Resp <- *buf
 		}
 	}
 }
