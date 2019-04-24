@@ -2,6 +2,7 @@ package agreement
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
@@ -17,9 +18,36 @@ import (
 
 // PublishMock is a mock-up method to facilitate testing of publishing of Agreement events
 func PublishMock(bus wire.EventBroker, hash []byte, round uint64, step uint8, voteNr int) {
-	buf := MockAgreementBuf(hash, round, step, voteNr)
+	buf := MockOutgoingAgreementBuf(hash, round, step, voteNr)
 	// buf = MarshalOutgoing(buf)
 	bus.Publish(msg.OutgoingBlockAgreementTopic, buf)
+}
+
+func MockOutgoingAgreementBuf(hash []byte, round uint64, step uint8, voteNr int) *bytes.Buffer {
+	votes := make([]wire.Event, 0)
+	for i := 0; i < voteNr; i++ {
+		k, _ := user.NewRandKeys()
+		_, e := MockVote(k, hash, round, step)
+		votes = append(votes, e)
+	}
+	buf := new(bytes.Buffer)
+	marshaller := events.NewReductionUnMarshaller()
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, round); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.WriteUint8(buf, step); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.Write256(buf, hash); err != nil {
+		panic(err)
+	}
+
+	if err := marshaller.MarshalVoteSet(buf, votes); err != nil {
+		panic(err)
+	}
+	return buf
 }
 
 func MockAgreement(keys *user.Keys, hash []byte, round uint64, step uint8, votes []wire.Event) *events.Agreement {
