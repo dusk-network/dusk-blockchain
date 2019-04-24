@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 
+	log "github.com/sirupsen/logrus"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -55,6 +57,10 @@ func (m *moderator) addStrikes(absentees ...[]byte) {
 		absenteeStr := hex.EncodeToString(absentee)
 		m.strikes[absenteeStr]++
 		if m.strikes[absenteeStr] >= maxStrikes {
+			log.WithFields(log.Fields{
+				"process":     "reputation",
+				"provisioner": absenteeStr,
+			}).Debugln("removing provisioner")
 			m.publisher.Publish(msg.RemoveProvisionerTopic, bytes.NewBuffer(absentee))
 		}
 	}
