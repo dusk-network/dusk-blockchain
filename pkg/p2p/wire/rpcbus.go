@@ -37,7 +37,7 @@ var (
 // "chan chan" technique.
 //
 //
-// Idiomic communication based on `chan chan` avoiding the need of a
+// Idiomatic communication based on `chan chan` avoiding the need of a
 // mutex-per-subsystem to guard the shared state.
 //
 // Producer and Consumer are decoupled to avoid cross-referencing / cyclic

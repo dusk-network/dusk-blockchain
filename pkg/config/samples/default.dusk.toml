@@ -29,7 +29,7 @@ addresses=["voucher.dusk.network:8081"]
 fixed = []
 
 [network.monitor]
-enabled = true
+enabled = false
 address="monitor.dusk.network:1337"
 
 [database]
