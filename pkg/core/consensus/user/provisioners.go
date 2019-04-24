@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"sort"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -19,7 +20,7 @@ type (
 		Stake        uint64
 	}
 
-	// Provisioners is a slice of Members, and makes up the current provisioner committee.
+	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
 	Provisioners []Member
 )
 
@@ -45,24 +46,32 @@ func (m Member) BLSString() string {
 	return hex.EncodeToString(m.PublicKeyBLS.Marshal())
 }
 
-// GetMemberBLS returns a member of the provisioners from its BLS key
-func (p *Provisioners) GetMemberBLS(pubKeyBLS []byte) *Member {
-	for _, provisioner := range *p {
-		if bytes.Equal(provisioner.PublicKeyBLS.Marshal(), pubKeyBLS) {
-			return &provisioner
-		}
-	}
-	return nil
+func (p *Provisioners) Len() int {
+	return len(*p)
 }
 
-// GetMemberEd returns a member of the provisioners from its Ed25519 key
-func (p *Provisioners) GetMemberEd(pubKeyEd []byte) *Member {
-	for _, provisioner := range *p {
-		if bytes.Equal([]byte(provisioner.PublicKeyEd), pubKeyEd) {
-			return &provisioner
-		}
+func (p *Provisioners) Swap(i, j int) {
+	m := *p
+	m[i], m[j] = m[j], m[i]
+	p = &m
+}
+
+func (p *Provisioners) Less(i, j int) bool {
+	m := *p
+	mI, mJ := &big.Int{}, &big.Int{}
+	mI.SetBytes(m[i].PublicKeyBLS.Marshal())
+	mJ.SetBytes(m[j].PublicKeyBLS.Marshal())
+	return mI.Cmp(mJ) < 0
+}
+
+// GetMemberBLS returns a member of the provisioners from its BLS key
+func (p *Provisioners) GetMemberBLS(pubKeyBLS []byte) *Member {
+	i, found := p.IndexOf(pubKeyBLS)
+	if !found {
+		return nil
 	}
-	return nil
+
+	return &(*p)[i]
 }
 
 // AddMember will add a Member to the Provisioners by using the bytes of an Ed25519  public key.
@@ -87,16 +96,15 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error
 	m.Stake = stake
 
 	// Check for duplicates
-	for _, member := range *p {
-		if m.EdEquals(member) {
-			return nil
-		}
+	i, found := p.IndexOf(pubKeyBLS)
+	if found {
+		(*p)[i].Stake = stake
+		return nil
 	}
+	list := *p
 
-	*p = append(*p, m)
-
-	// Sort the list
-	p.sort()
+	// inserting member at index i
+	*p = append(list[:i], append([]Member{m}, list[:i+1]...)...)
 	return nil
 }
 
@@ -106,53 +114,49 @@ func (p *Provisioners) RemoveMember(pubKeyBLS []byte) error {
 		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
 
-	var m Member
-	if err := m.PublicKeyBLS.Unmarshal(pubKeyBLS); err != nil {
-		return err
+	i, found := p.IndexOf(pubKeyBLS)
+	if !found {
+		return fmt.Errorf("public %v not found among provisioner set", pubKeyBLS)
 	}
 
-	for i, member := range *p {
-		if m.BLSEquals(member) {
-			list := *p
-			list = append(list[:i], list[i+1:]...)
-			*p = list
-		}
-	}
-
-	// Sort the list
-	p.sort()
+	list := *p
+	list = append(list[:i], list[i+1:]...)
+	*p = list
 	return nil
 }
 
 // GetStake will find a certain provisioner in the committee by BLS public key,
 // and return their stake.
-func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
+func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	if len(pubKeyBLS) != 129 {
 		return 0, fmt.Errorf("public key is %v bytes long instead of 128", len(pubKeyBLS))
 	}
 
-	var m Member
-	pubKey := &bls.PublicKey{}
-	if err := pubKey.Unmarshal(pubKeyBLS); err != nil {
-		return 0, err
+	i, found := p.IndexOf(pubKeyBLS)
+	if !found {
+		return 0, fmt.Errorf("public %v not found among provisioner set", pubKeyBLS)
 	}
 
-	m.PublicKeyBLS = *pubKey
-
-	for _, member := range p {
-		if m.BLSEquals(member) {
-			return member.Stake, nil
-		}
-	}
-
-	return 0, nil
+	return (*p)[i].Stake, nil
 }
 
-// Sort will sort the committee lexicographically
-func (p *Provisioners) sort() {
-	list := *p
-	sort.SliceStable(list, func(i, j int) bool {
-		return list[i].EdString() < list[j].EdString()
+// IndexOf performs a binary search of the Provisioners and returns the index where the Provisioner identified by this blsPk would be inserted at and a bool indicating whether the Provisioner is already in the array or not
+func (p *Provisioners) IndexOf(blsPk []byte) (int, bool) {
+	found := false
+	iPk := &big.Int{}
+	iPk.SetBytes(blsPk)
+
+	iRepr := &big.Int{}
+	i := sort.Search(len(*p), func(i int) bool {
+		bRepr := (*p)[i].PublicKeyBLS.Marshal()
+		iRepr.SetBytes(bRepr)
+
+		cmp := iRepr.Cmp(iPk)
+		if cmp == 0 {
+			found = true
+		}
+		return cmp >= 0
 	})
-	*p = list
+
+	return i, found
 }

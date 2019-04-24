@@ -3,6 +3,7 @@ package committee
 import (
 	"bytes"
 	"encoding/hex"
+	"sort"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -16,11 +17,13 @@ import (
 type (
 	// Committee is the interface for operations depending on the set of Provisioners extracted for a fiven step
 	Committee interface {
+		sort.Interface
 		wire.EventPrioritizer
 		// isMember can accept a BLS Public Key or an Ed25519
 		AmMember(uint64, uint8) bool
 		IsMember([]byte, uint64, uint8) bool
 		Quorum() int
+
 		ReportAbsentees([]wire.Event, uint64, uint8) error
 	}
 
