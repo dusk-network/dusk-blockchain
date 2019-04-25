@@ -3,14 +3,11 @@ package generation
 import (
 	"sync"
 
-	log "github.com/sirupsen/logrus"
-
 	ristretto "github.com/bwesterb/go-ristretto"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
-
-var empty struct{}
 
 type generator interface {
 	generateProof([]byte) zkproof.ZkProof
@@ -76,7 +73,11 @@ func convertBidListToScalars(bidList user.BidList) []ristretto.Scalar {
 	scalarList := make([]ristretto.Scalar, len(bidList))
 	for i, bid := range bidList {
 		bidScalar := ristretto.Scalar{}
-		bidScalar.UnmarshalBinary(bid[:])
+		err := bidScalar.UnmarshalBinary(bid[:])
+		if err != nil {
+			log.WithError(err).WithField("process", "proofgenerator").Errorln("Error in converting Bid List to scalar")
+			panic(err)
+		}
 		scalarList[i] = bidScalar
 	}
 

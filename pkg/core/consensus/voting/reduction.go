@@ -3,7 +3,6 @@ package voting
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -14,21 +13,17 @@ import (
 
 type reductionSigner struct {
 	*eventSigner
-	*events.ReductionUnMarshaller
+	*events.OutgoingReductionUnmarshaller
 }
 
-func newReductionSigner(keys *user.Keys, c committee.Committee) *reductionSigner {
+func NewReductionSigner(keys *user.Keys) *reductionSigner {
 	return &reductionSigner{
-		eventSigner:           newEventSigner(keys, c),
-		ReductionUnMarshaller: events.NewReductionUnMarshaller(),
+		eventSigner:                   newEventSigner(keys),
+		OutgoingReductionUnmarshaller: events.NewOutgoingReductionUnmarshaller(),
 	}
 }
 
-func (bs *reductionSigner) eligibleToVote() bool {
-	return bs.committee.IsMember(bs.Keys.BLSPubKey.Marshal())
-}
-
-func (bs *reductionSigner) addSignatures(ev wire.Event) (*bytes.Buffer, error) {
+func (bs *reductionSigner) AddSignatures(ev wire.Event) (*bytes.Buffer, error) {
 	e := ev.(*events.Reduction)
 	if err := bs.signBLS(e); err != nil {
 		return nil, err

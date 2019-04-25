@@ -3,7 +3,6 @@ package voting
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -14,21 +13,17 @@ import (
 
 type agreementSigner struct {
 	*eventSigner
-	*events.AgreementUnMarshaller
+	*events.OutgoingAgreementUnmarshaller
 }
 
-func newAgreementSigner(keys *user.Keys, c committee.Committee) *agreementSigner {
+func NewAgreementSigner(keys *user.Keys) *agreementSigner {
 	return &agreementSigner{
-		eventSigner:           newEventSigner(keys, c),
-		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
+		eventSigner:                   newEventSigner(keys),
+		OutgoingAgreementUnmarshaller: events.NewOutgoingAgreementUnmarshaller(),
 	}
 }
 
-func (as *agreementSigner) eligibleToVote() bool {
-	return as.committee.IsMember(as.Keys.BLSPubKey.Marshal())
-}
-
-func (as *agreementSigner) addSignatures(ev wire.Event) (*bytes.Buffer, error) {
+func (as *agreementSigner) AddSignatures(ev wire.Event) (*bytes.Buffer, error) {
 	e := ev.(*events.Agreement)
 	if err := as.signBLS(e); err != nil {
 		return nil, err
@@ -43,16 +38,27 @@ func (as *agreementSigner) addSignatures(ev wire.Event) (*bytes.Buffer, error) {
 	return message, nil
 }
 
-func (as *agreementSigner) signBLS(ev wire.Event) error {
-	e := ev.(*events.Agreement)
+func (as *agreementSigner) SignVotes(votes []wire.Event) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	if err := as.MarshalVoteSet(buffer, e.VoteSet); err != nil {
-		return err
+	if err := as.MarshalVoteSet(buffer, votes); err != nil {
+		return nil, err
 	}
 
 	signedVoteSet, err := bls.Sign(as.BLSSecretKey, as.BLSPubKey, buffer.Bytes())
-	e.SignedVoteSet = signedVoteSet.Compress()
+	if err != nil {
+		return nil, err
+	}
+	return signedVoteSet.Compress(), nil
+}
+
+func (as *agreementSigner) signBLS(ev wire.Event) error {
+	var err error
+	e := ev.(*events.Agreement)
 	e.Header.PubKeyBLS = as.BLSPubKey.Marshal()
+	e.SignedVoteSet, err = as.SignVotes(e.VoteSet)
+	if err != nil {
+		return err
+	}
 	return err
 }
 

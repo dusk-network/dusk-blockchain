@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"io"
 	"math"
 	"math/big"
 	"math/rand"
@@ -12,7 +14,6 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
@@ -23,25 +24,28 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-var timeOut = 6 * time.Second
+var timeOut = 3 * time.Second
 
 type Server struct {
 	eventBus *wire.EventBus
+
+	// stakes are stored in a map, with the BLS public key as the key, so that they
+	// can be properly removed when a node disconnects.
 	sync.RWMutex
-	stakes  []*bytes.Buffer
+	stakes  map[string]*bytes.Buffer
 	bids    []*bytes.Buffer
 	chain   *chain.Chain
 	dupeMap *dupemap.DupeMap
 
 	// subscriber channels
-	stakeChannel chan *bytes.Buffer
-	bidChannel   chan *bytes.Buffer
+	stakeChan             <-chan *bytes.Buffer
+	bidChan               <-chan *bytes.Buffer
+	removeProvisionerChan <-chan []byte
 }
 
 type txCollector struct {
@@ -57,10 +61,9 @@ func Setup() *Server {
 	keys, _ := user.NewRandKeys()
 
 	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
-	committee := committee.NewCommitteeStore(eventBus)
-	go committee.Listen()
+	c := committee.LaunchCommitteeStore(eventBus, keys)
 
-	// creating and firing the chain process
+	// creating and firing up the chain process
 	chain, err := chain.New(eventBus)
 	if err != nil {
 		panic(err)
@@ -68,23 +71,24 @@ func Setup() *Server {
 	go chain.Listen()
 
 	// wiring up the Stake channel to the EventBus
-	stakeChannel := initStakeCollector(eventBus)
-	// wiring up the BlinBid channel to the EventBus
-	bidChannel := initBidCollector(eventBus)
+	stakeChan := initStakeCollector(eventBus)
+	// wiring up the BlindBid channel to the EventBus
+	bidChan := initBidCollector(eventBus)
 
 	dupeBlacklist := dupemap.NewDupeMap(eventBus)
 	go dupeBlacklist.CleanOnRound()
 
 	// creating the Server
 	srv := &Server{
-		eventBus:     eventBus,
-		RWMutex:      sync.RWMutex{},
-		stakes:       []*bytes.Buffer{},
-		bids:         []*bytes.Buffer{},
-		chain:        chain,
-		stakeChannel: stakeChannel,
-		bidChannel:   bidChannel,
-		dupeMap:      dupeBlacklist,
+		eventBus:              eventBus,
+		RWMutex:               sync.RWMutex{},
+		stakes:                make(map[string]*bytes.Buffer),
+		bids:                  []*bytes.Buffer{},
+		chain:                 chain,
+		stakeChan:             stakeChan,
+		bidChan:               bidChan,
+		removeProvisionerChan: committee.InitRemoveProvisionerCollector(eventBus),
+		dupeMap:               dupeBlacklist,
 	}
 
 	// make a stake and bid tx
@@ -93,6 +97,7 @@ func Setup() *Server {
 
 	//NOTE: this is solely for testnet
 	bid, d, k := makeBid()
+<<<<<<< HEAD
 	// Publish the stake in the chain
 	buf := new(bytes.Buffer)
 	err = stake.Encode(buf)
@@ -107,9 +112,23 @@ func Setup() *Server {
 		log.Error(err)
 	}
 	eventBus.Publish(string(topics.Tx), buf)
+=======
+	// saving the stake in the chain
+	if err := chain.AcceptTx(stake); err != nil {
+		panic(err)
+	}
+
+	// saving the bid in the chain
+	if err := chain.AcceptTx(bid); err != nil {
+		panic(err)
+	}
+
+	// Connecting to the general monitoring system
+	ConnectToMonitor(eventBus, d)
+>>>>>>> 12a91f6fbbf0cfb9d994d7e5a07748a4e16f722c
 
 	// start consensus factory
-	factory := factory.New(eventBus, timeOut, committee, keys, d, k)
+	factory := factory.New(eventBus, timeOut, c, keys, d, k)
 	go factory.StartConsensus()
 
 	return srv
@@ -138,18 +157,36 @@ func (t *txCollector) Collect(r *bytes.Buffer) error {
 func (s *Server) Listen() {
 	for {
 		select {
-		case b := <-s.stakeChannel:
+		case b := <-s.stakeChan:
 			log.WithField("process", "server").Debugln("stake received")
+			buf, pubKeyBLS := extractBLSPubKey(b)
 			s.Lock()
-			s.stakes = append(s.stakes, b)
+			s.stakes[pubKeyBLS] = buf
 			s.Unlock()
-		case b := <-s.bidChannel:
+		case b := <-s.bidChan:
 			log.WithField("process", "server").Debugln("bid received")
 			s.Lock()
 			s.bids = append(s.bids, b)
 			s.Unlock()
+		case pubKeyBLS := <-s.removeProvisionerChan:
+			pubKeyStr := hex.EncodeToString(pubKeyBLS)
+			s.Lock()
+			delete(s.stakes, pubKeyStr)
+			s.Unlock()
 		}
 	}
+}
+
+// extract a provisioner's BLS public key from a staking tx buffer
+func extractBLSPubKey(r *bytes.Buffer) (*bytes.Buffer, string) {
+	buf := new(bytes.Buffer)
+	reader := io.TeeReader(r, buf)
+	stake := &transactions.Stake{}
+	if err := stake.Decode(reader); err != nil {
+		panic(err)
+	}
+
+	return buf, hex.EncodeToString(stake.PubKeyBLS)
 }
 
 func (s *Server) StartConsensus(round uint64) {
@@ -160,18 +197,12 @@ func (s *Server) StartConsensus(round uint64) {
 
 func (s *Server) OnAccept(conn net.Conn) {
 	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus, s.dupeMap)
-	// send the latest block
-	buffer := new(bytes.Buffer)
-	if err := s.chain.PrevBlock.Encode(buffer); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem encoding previous block")
-		peer.Disconnect()
-		return
-	}
-
-	if _, err := peer.Conn.Write(buffer.Bytes()); err != nil {
+	// send the latest block height
+	heightBytes := make([]byte, 8)
+	s.chain.RLock()
+	binary.LittleEndian.PutUint64(heightBytes, s.chain.PrevBlock.Header.Height)
+	s.chain.RUnlock()
+	if _, err := peer.Conn.Write(heightBytes); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -197,8 +228,8 @@ func (s *Server) OnAccept(conn net.Conn) {
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus, s.dupeMap)
-	// get latest block
-	buf := make([]byte, 1024)
+	// get latest block height
+	buf := make([]byte, 8)
 	if _, err := peer.Conn.Read(buf); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
@@ -207,19 +238,13 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		peer.Disconnect()
 		return
 	}
-	var blk block.Block
-	if err := blk.Decode(bytes.NewBuffer(buf)); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem decoding block")
-		peer.Disconnect()
-		return
-	}
 
-	if s.chain.PrevBlock.Header.Height < blk.Header.Height {
-		s.chain.PrevBlock = blk
+	height := binary.LittleEndian.Uint64(buf)
+	s.chain.Lock()
+	if s.chain.PrevBlock.Header.Height < height {
+		s.chain.PrevBlock.Header.Height = height
 	}
+	s.chain.Unlock()
 
 	if err := peer.Run(); err != nil {
 		log.WithFields(log.Fields{
@@ -254,19 +279,6 @@ func (s *Server) sendStakesAndBids(peer *peer.Peer) {
 
 func (s *Server) Close() {
 	s.chain.Close()
-}
-
-func makeProvisionerBytes(keys *user.Keys, amount uint64) (*bytes.Buffer, error) {
-	buffer := bytes.NewBuffer(*keys.EdPubKey)
-	if err := encoding.WriteVarBytes(buffer, keys.BLSPubKey.Marshal()); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, amount); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
 }
 
 func makeStake(keys *user.Keys) *transactions.Stake {

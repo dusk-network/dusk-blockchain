@@ -1,0 +1,65 @@
+# Configs marked with #live# can be modified without node restart
+
+# general node configs
+[general]
+network = "testnet"
+
+# logger configs
+[logger]
+# log levels can be any of error, warn, trace
+level = "trace"
+# 'stdout' or file name without ext
+# result filename would be $output$network.port.log
+output = "stdout"
+    
+# P2P network specific settings
+[network]
+
+# listens on all available unicast and anycast
+# IP addresses of the local system.
+
+# port for the node to bind on
+port=7000
+
+[network.seeder]
+# array of seeder servers
+addresses=["voucher.dusk.network:8081"]
+# fixed network addresses to setup local P2P network
+# supported only in testnet
+fixed = []
+
+[database]
+# Backend storage used to store chain
+# Supported drivers heavy_v0.1.0
+driver = "heavy_v0.1.0"
+# backend storage path
+dir = "chain"
+
+[mempool]
+# Max size of memory of the accepted txs to keep
+maxSizeMB = 100
+# Possible values: "hashmap", "syncpool", "memcached" 
+poolType = "hashmap"
+# number of txs slots to allocate on each reseting mempool
+preallocTxs = 100
+
+# rpc service configs
+[rpc]
+# enable rpc service
+enabled=false
+user="default"
+pass="default"
+cert=""
+
+[prof]
+# profiling service address
+# reachable at http://localhost:5050/debug/pprof
+# address="localhost:5050"
+
+# cpu.pprof
+cpuFile=""
+# mem.pprof
+memFile=""
+
+
+

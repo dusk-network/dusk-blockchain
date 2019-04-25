@@ -10,16 +10,17 @@ type Set struct {
 
 func New() *Set {
 	return &Set{
-		make(map[string]*struct{}),
+		entries: make(map[string]*struct{}),
 	}
 }
 
-// add the xxH64 hash of some data to the set. Returns false if the entry was already there
+// Has returns true if the entry is found
 func (s *Set) Has(data []byte) bool {
 	hs := repr(data)
 	return s != nil && s.has(hs)
 }
 
+// Add an entry to the current set. If the entry is already there, it returns true
 func (s *Set) Add(data []byte) bool {
 	hs := repr(data)
 	_, found := s.entries[hs]

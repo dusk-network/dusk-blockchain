@@ -17,3 +17,5 @@ const BidListTopic = "bidlistTopic"
 // TODO: demo topics, review/remove
 const StakeTopic = "stake"
 const BidTopic = "bid"
+const AbsenteesTopic = "absentees"
+const RemoveProvisionerTopic = "removeProvisioner"

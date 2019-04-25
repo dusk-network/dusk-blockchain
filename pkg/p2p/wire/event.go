@@ -43,9 +43,9 @@ type (
 	}
 
 	// EventPrioritizer is used by the EventSelector to prioritize events
-	// (normally to return the best collected after a timespan)
+	// (normally to return the best collected after a timespan). Return true if the first element has priority over the second, false otherwise
 	EventPrioritizer interface {
-		Priority(Event, Event) Event
+		Priority(Event, Event) bool
 	}
 
 	// EventVerifier is the interface to verify an Event
@@ -93,6 +93,12 @@ type (
 	EventBroker interface {
 		EventSubscriber
 		EventPublisher
+	}
+
+	// EventDeserializer is the interface for those struct that allows deserialization of an event from scratch
+	EventDeserializer interface {
+		EventUnmarshaller
+		NewEvent() Event
 	}
 )
 

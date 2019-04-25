@@ -5,14 +5,27 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
+
+func LaunchNotification(eventbus wire.EventSubscriber) <-chan *ScoreEvent {
+	scoreChan := make(chan *ScoreEvent)
+	evChan := consensus.LaunchNotification(eventbus,
+		newScoreHandler(), msg.BestScoreTopic)
+
+	go func() {
+		for {
+			sEv := <-evChan
+			scoreChan <- sEv.(*ScoreEvent)
+		}
+	}()
+
+	return scoreChan
+}
 
 var empty struct{}
 
@@ -75,17 +88,16 @@ func (s *eventSelector) Process(ev wire.Event) {
 	s.RLock()
 	bestEvent := s.bestEvent
 	s.RUnlock()
-	newBestEvent := s.handler.Priority(bestEvent, ev)
-	if newBestEvent.Equal(ev) {
+	if !s.handler.Priority(bestEvent, ev) {
 		if err := s.handler.Verify(ev); err != nil {
 			log.WithField("process", "selection").Debugln(err)
 			return
 		}
 
-		s.repropagate(newBestEvent)
+		s.repropagate(ev)
 		s.Lock()
 		defer s.Unlock()
-		s.bestEvent = newBestEvent
+		s.bestEvent = ev
 	}
 }
 
@@ -108,7 +120,13 @@ func (s *eventSelector) publishBestEvent() {
 	bestEvent := s.bestEvent
 	s.RUnlock()
 	buf := new(bytes.Buffer)
-	s.handler.Marshal(buf, bestEvent)
+	err := s.handler.Marshal(buf, bestEvent)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"process": "score selection",
+		}).Warnln("Error in marshalling score")
+		return
+	}
 	s.publisher.Publish(msg.BestScoreTopic, buf)
 	s.state.IncrementStep()
 	s.Lock()

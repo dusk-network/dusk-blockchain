@@ -24,16 +24,18 @@ type (
 	bidListCollector struct {
 		BidListChan chan<- user.BidList
 	}
-
-	state struct {
-		round uint64
-		step  uint8
-	}
 )
+
+// UpdateRound is a shortcut for propagating a round
+func UpdateRound(bus wire.EventPublisher, round uint64) {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, round)
+	bus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(b))
+}
 
 // InitRoundUpdate initializes a Round update channel and fires up the TopicListener as well.
 // Its purpose is to lighten up a bit the amount of arguments in creating the handler for the collectors. Also it removes the need to store subscribers on the consensus process
-func InitRoundUpdate(subscriber wire.EventSubscriber) chan uint64 {
+func InitRoundUpdate(subscriber wire.EventSubscriber) <-chan uint64 {
 	roundChan := make(chan uint64, 1)
 	roundCollector := &roundCollector{roundChan}
 	go wire.NewTopicListener(subscriber, roundCollector, string(msg.RoundUpdateTopic)).Accept()

@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -84,8 +85,15 @@ func main() {
 		OnConn:   srv.OnConnection,
 	})
 
-	// wait a bit for everyone to start their cmgr
-	time.Sleep(time.Second * 1)
+	// trying to connect to the peers
+	for _, ip := range ips {
+		if err := connMgr.Connect(ip); err != nil {
+			log.WithField("IP", ip).Warnln(err)
+		}
+	}
+
+	// wait a bit for everyone to start up
+	time.Sleep(time.Second * 10)
 
 	round := joinConsensus(connMgr, srv, ips)
 	srv.StartConsensus(round)
@@ -100,16 +108,9 @@ func main() {
 
 func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
 	// if we are the first, initialize consensus on round 1
-	if len(ips) == 0 {
+	if strings.Contains(ips[0], "noip") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
 		return uint64(1)
-	}
-
-	// trying to connect to the peers
-	for _, ip := range ips {
-		if err := connMgr.Connect(ip); err != nil {
-			log.WithField("IP", ip).Warnln(err)
-		}
 	}
 
 	// if height is not 0, init consensus on 2 rounds after it

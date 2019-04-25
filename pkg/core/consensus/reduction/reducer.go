@@ -9,23 +9,41 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+// LaunchNotification is a helper function allowing node internal processes interested in reduction messages to receive Reduction events as they get produced
+func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Reduction {
+	revChan := make(chan *events.Reduction)
+	evChan := consensus.LaunchNotification(eventbus,
+		events.NewOutgoingReductionUnmarshaller(), msg.OutgoingBlockReductionTopic)
+
+	go func() {
+		for {
+			rEv := <-evChan
+			reductionEvent := rEv.(*events.Reduction)
+			revChan <- reductionEvent
+		}
+	}()
+
+	return revChan
+}
+
 var empty struct{}
 
 type eventStopWatch struct {
 	collectedVotesChan chan []wire.Event
-	stopChan           chan interface{}
+	stopChan           chan struct{}
 	timer              *consensus.Timer
 }
 
 func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Timer) *eventStopWatch {
 	return &eventStopWatch{
 		collectedVotesChan: collectedVotesChan,
-		stopChan:           make(chan interface{}, 1),
+		stopChan:           make(chan struct{}),
 		timer:              timer,
 	}
 }
@@ -44,20 +62,18 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 	}
 }
 
-func (esw *eventStopWatch) reset() {
-	for len(esw.stopChan) > 0 {
-		<-esw.stopChan
+func (esw *eventStopWatch) stop() {
+	select {
+	case esw.stopChan <- empty:
+	default:
 	}
 }
 
-func (esw *eventStopWatch) stop() {
-	esw.stopChan <- true
-}
-
 type reducer struct {
-	firstStep  *eventStopWatch
-	secondStep *eventStopWatch
-	ctx        *context
+	firstStep   *eventStopWatch
+	secondStep  *eventStopWatch
+	ctx         *context
+	accumulator *consensus.Accumulator
 
 	sync.RWMutex
 	stale bool
@@ -66,26 +82,27 @@ type reducer struct {
 }
 
 func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
-	publisher wire.EventPublisher) *reducer {
+	publisher wire.EventPublisher, accumulator *consensus.Accumulator) *reducer {
 	return &reducer{
-		ctx:        ctx,
-		firstStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
-		secondStep: newEventStopWatch(collectedVotesChan, ctx.timer),
-		publisher:  publisher,
+		ctx:         ctx,
+		firstStep:   newEventStopWatch(collectedVotesChan, ctx.timer),
+		secondStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
+		publisher:   publisher,
+		accumulator: accumulator,
 	}
 }
 
-// There is no mutex involved here, as this function is only ever called by the broker,
-// who does it synchronously. The reducer variable therefore can not be in a race
-// condition with another goroutine.
+func (r *reducer) inCommittee() bool {
+	state := r.ctx.state
+	return r.ctx.committee.AmMember(state.Round(), state.Step())
+}
+
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
 	r.Lock()
 	r.stale = false
 	r.Unlock()
 	r.sendReductionVote(bytes.NewBuffer(hash))
-	r.firstStep.reset()
-	r.secondStep.reset()
 	go r.begin()
 }
 
@@ -96,6 +113,11 @@ func (r *reducer) begin() {
 	hash1 := r.extractHash(events)
 	r.RLock()
 	if !r.stale {
+		// if there was a timeout, we should report nodes that did not vote
+		if events == nil {
+			r.ctx.committee.ReportAbsentees(r.accumulator.GetAllEvents(),
+				r.ctx.state.Round(), r.ctx.state.Step())
+		}
 		r.ctx.state.IncrementStep()
 		r.sendReductionVote(hash1)
 	}
@@ -106,6 +128,10 @@ func (r *reducer) begin() {
 	r.RLock()
 	defer r.RUnlock()
 	if !r.stale {
+		if eventsSecondStep == nil {
+			r.ctx.committee.ReportAbsentees(r.accumulator.GetAllEvents(),
+				r.ctx.state.Round(), r.ctx.state.Step())
+		}
 		hash2 := r.extractHash(eventsSecondStep)
 		allEvents := append(events, eventsSecondStep...)
 		if r.isReductionSuccessful(hash1, hash2) {
@@ -127,7 +153,9 @@ func (r *reducer) sendReductionVote(hash *bytes.Buffer) {
 	if err != nil {
 		panic(err)
 	}
-	r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
+	if r.inCommittee() {
+		r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
+	}
 }
 
 func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
@@ -138,7 +166,9 @@ func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
 	if err != nil {
 		panic(err)
 	}
-	r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
+	if r.inCommittee() {
+		r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
+	}
 }
 
 func (r *reducer) publishRegeneration() {

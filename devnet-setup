@@ -1,0 +1,71 @@
+#!/bin/bash
+set -v
+
+nodes_count=$1
+node_process="testnet"
+default_port=7000
+basedir="`pwd`/deploy"
+
+##################################################
+# rebuild all
+rm -f ./$node_process
+
+go build ./launch/testnet/
+
+# check if build was successful
+if [ ! -f $node_process ]; then
+  echo -e "\033[0;31m BUILD FAILED\033[0m"
+  exit
+fi
+
+##################################################
+# set FIXED_NETWORK 
+
+counter=1
+port=$default_port
+fixed=""
+while true; do
+        fixed="localhost:$port,$fixed"
+	let counter++
+	if [[ "$counter" -gt $nodes_count ]]; then break; fi
+        let port++
+done
+
+export DUSK_NETWORK_SEEDER_FIXED=$fixed
+ 
+
+##################################################
+# cleanup
+rm -fr $basedir
+killall $node_process
+
+##################################################
+# init and spawn nodes
+counter=1
+port=$default_port
+while true; do
+	
+	nodedir="$basedir/node_$counter/"
+	mkdir -p $nodedir
+        cp -f ./$node_process ./dusk.toml  $nodedir
+
+	pushd $nodedir
+        echo $DUSK_NETWORK_SEEDER_FIXED; ./testnet --network.port=$port --logger.output=dusk &
+        popd
+
+	let counter++
+	if [[ "$counter" -gt $nodes_count ]];  then
+                break
+        fi
+        let port++
+done
+
+##################################################
+# View all running
+ps -elf | grep $node_process
+
+
+# Shortcuts
+# ./testnet | grep --line-buffered -ie "warn\|err\|event" > ./events.log 
+# ps -elf | grep testnet
+# grep -i fixed ./deploy/node_*/*.log

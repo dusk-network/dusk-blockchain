@@ -1,0 +1,592 @@
+diff --git a/go.mod b/go.mod
+index d63c1e0..ea4339f 100644
+--- a/go.mod
++++ b/go.mod
+@@ -1,6 +1,7 @@
+ module gitlab.dusk.network/dusk-core/dusk-go
+ 
+ require (
++	github.com/BurntSushi/toml v0.3.1 // indirect
+ 	github.com/OneOfOne/xxhash v1.2.5
+ 	github.com/bwesterb/go-ristretto v1.0.0
+ 	github.com/golang/protobuf v1.3.1 // indirect
+@@ -11,14 +12,17 @@ require (
+ 	github.com/onsi/gomega v1.5.0 // indirect
+ 	github.com/pkg/errors v0.8.1
+ 	github.com/sirupsen/logrus v1.4.1
++	github.com/spf13/afero v1.2.2 // indirect
++	github.com/spf13/jwalterweatherman v1.1.0 // indirect
++	github.com/spf13/pflag v1.0.3
++	github.com/spf13/viper v1.3.2
+ 	github.com/stretchr/objx v0.2.0 // indirect
+ 	github.com/stretchr/testify v1.3.0
+ 	github.com/syndtr/goleveldb v1.0.0
+ 	gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0
+ 	gitlab.dusk.network/dusk-core/zkproof v0.0.0-20190408114654-8b2e6b151856
+-	golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5
++	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
+ 	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3 // indirect
+ 	golang.org/x/sys v0.0.0-20190405154228-4b34438f7a67 // indirect
+ 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
+-	gopkg.in/yaml.v2 v2.2.2 // indirect
+ )
+diff --git a/go.sum b/go.sum
+index 27841fa..74b5e85 100644
+--- a/go.sum
++++ b/go.sum
+@@ -1,7 +1,13 @@
++github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
++github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+ github.com/OneOfOne/xxhash v1.2.5 h1:zl/OfRA6nftbBK9qTohYBJ5xvw6C/oNKizR7cZGl3cI=
+ github.com/OneOfOne/xxhash v1.2.5/go.mod h1:eZbhyaAYD41SGSSsnmcpxVoRiQ/MPUTjUdIIOT9Um7Q=
++github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
+ github.com/bwesterb/go-ristretto v1.0.0 h1:Xmim9slu7UU4b9zhS2oNcjoDzodbr1RLhSWh1mdjWWg=
+ github.com/bwesterb/go-ristretto v1.0.0/go.mod h1:N/KzfPHVf0cM6so9lbr2hamEhlH9xev3NIj+B6p+Eyc=
++github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
++github.com/coreos/go-etcd v2.0.0+incompatible/go.mod h1:Jez6KQU2B/sWsbdaef3ED8NzMklzPG4d5KIOhIy30Tk=
++github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3EedlOD2RNk=
+ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+ github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+@@ -15,6 +21,8 @@ github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db h1:woRePGFeVFfLKN/pO
+ github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
+ github.com/golang/snappy v0.0.1 h1:Qgr9rKW7uDUkrbSmQeiDsGa8SjGyCOGtuasMWwvp2P4=
+ github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
++github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
++github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
+ github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=
+ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
+ github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGiHgQ4OO8tzTaLawm8vnODuwDk=
+@@ -26,6 +34,10 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
+ github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
+ github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
+ github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
++github.com/magiconair/properties v1.8.0 h1:LLgXmsheXeRoUOBOjtwPQCWIYqM/LU1ayDtDePerRcY=
++github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
++github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQzvN1EDeE=
++github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
+ github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
+ github.com/onsi/ginkgo v1.7.0 h1:WSHQ+IS43OoUrWtD1/bbclrwK8TTH5hzp+umCiuxHgs=
+ github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
+@@ -35,12 +47,26 @@ github.com/onsi/gomega v1.4.3 h1:RE1xgDvH7imwFD45h+u2SgIfERHlS2yNG4DObb5BSKU=
+ github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
+ github.com/onsi/gomega v1.5.0 h1:izbySO9zDPmjJ8rDjLvkA2zJHIo+HkYXHnf7eN7SSyo=
+ github.com/onsi/gomega v1.5.0/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
++github.com/pelletier/go-toml v1.2.0 h1:T5zMGML61Wp+FlcbWjRDT7yAxhJNAiPPLOFECq181zc=
++github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
+ github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
+ github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+ github.com/sirupsen/logrus v1.4.1 h1:GL2rEmy6nsikmW0r8opw9JIRScdMF5hA8cOYLH7In1k=
+ github.com/sirupsen/logrus v1.4.1/go.mod h1:ni0Sbl8bgC9z8RoU9G6nDWqqs/fq4eDPysMBDgk/93Q=
++github.com/spf13/afero v1.1.2/go.mod h1:j4pytiNVoe2o6bmDsKpLACNPDBIoEAkihy7loJ1B0CQ=
++github.com/spf13/afero v1.2.2 h1:5jhuqJyZCZf2JRofRvN/nIFgIWNzPa3/Vz8mYylgbWc=
++github.com/spf13/afero v1.2.2/go.mod h1:9ZxEEn6pIJ8Rxe320qSDBk6AsU0r9pR7Q4OcevTdifk=
++github.com/spf13/cast v1.3.0 h1:oget//CVOEoFewqQxwr0Ej5yjygnqGkvggSE/gB35Q8=
++github.com/spf13/cast v1.3.0/go.mod h1:Qx5cxh0v+4UWYiBimWS+eyWzqEqokIECu5etghLkUJE=
++github.com/spf13/jwalterweatherman v1.0.0/go.mod h1:cQK4TGJAtQXfYWX+Ddv3mKDzgVb68N+wFjFa4jdeBTo=
++github.com/spf13/jwalterweatherman v1.1.0 h1:ue6voC5bR5F8YxI5S67j9i582FU4Qvo2bmqnqMYADFk=
++github.com/spf13/jwalterweatherman v1.1.0/go.mod h1:aNWZUN0dPAAO/Ljvb5BEdw96iTZ0EXowPYD95IqWIGo=
++github.com/spf13/pflag v1.0.3 h1:zPAT6CGy6wXeQ7NtTnaTerfKOsV6V6F8agHXFiazDkg=
++github.com/spf13/pflag v1.0.3/go.mod h1:DYY7MBk1bdzusC3SYhjObp+wFpr4gzcvqqNjLnInEg4=
++github.com/spf13/viper v1.3.2 h1:VUFqw5KcqRf7i70GOzW7N+Q7+gxVBkSSqiXB12+JQ4M=
++github.com/spf13/viper v1.3.2/go.mod h1:ZiWeW+zYFKm7srdB9IoDzzZXaJaI5eL9QjNiN/DMA2s=
+ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+ github.com/stretchr/objx v0.1.1 h1:2vfRuCMp5sSVIDSqO8oNnWJq7mPa6KVP3iPIwFBuy8A=
+ github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+@@ -52,13 +78,15 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
+ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
+ github.com/syndtr/goleveldb v1.0.0 h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFdE=
+ github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
++github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
++github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+ gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0 h1:q4SCg5gxqQ7/Etnpj5FKXK2ud4flxNM0JsAua5LoLI0=
+ gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0/go.mod h1:Y/mEVzzmpfBXeSoqA9Oo5Mbda09kzCpe0mg2yFYM0Bg=
+ gitlab.dusk.network/dusk-core/zkproof v0.0.0-20190408114654-8b2e6b151856 h1:IosutAAGOvqLy6AXhvmvStdqyvvTwNQIplN82fDdmdU=
+ gitlab.dusk.network/dusk-core/zkproof v0.0.0-20190408114654-8b2e6b151856/go.mod h1:lwJWKZOXYSbGtY9MCslEfuxWkt4tTfLi0uGTMNLFB2U=
++golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
++golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2 h1:VklqNMn3ovrHsnt90PveolxSbWFaJdECFbxSq0Mqo2M=
+ golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
+-golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5 h1:bselrhR0Or1vomJZC8ZIjWtbDmn9OYFLX5Ik9alpJpE=
+-golang.org/x/crypto v0.0.0-20190404164418-38d8ce5564a5/go.mod h1:WFFai1msRO1wXaEeE5yQxYXgSfI8pQAWXbQop6sCtWE=
+ golang.org/x/net v0.0.0-20180906233101-161cd47e91fd h1:nTDtHvHSdCn1m6ITfMRqtOd/9+7a3s8RBNOZ3eYZzJA=
+ golang.org/x/net v0.0.0-20180906233101-161cd47e91fd/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
+ golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3 h1:0GoQqolDA55aaLxZyTzK/Y2ePZzZTUrRacwib7cNsYQ=
+@@ -67,8 +95,8 @@ golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f h1:wMNYb4v58l5UBM7MYRLPG6Zh
+ golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+ golang.org/x/sys v0.0.0-20180905080454-ebe1bf3edb33/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+ golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
++golang.org/x/sys v0.0.0-20181205085412-a5c9d58dba9a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+ golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+-golang.org/x/sys v0.0.0-20190403152447-81d4e9dc473e/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+ golang.org/x/sys v0.0.0-20190405154228-4b34438f7a67 h1:1Fzlr8kkDLQwqMP8GxrhptBLqZG/EDpiATneiZHY998=
+ golang.org/x/sys v0.0.0-20190405154228-4b34438f7a67/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+ golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
+diff --git a/launch/testnet/main.go b/launch/testnet/main.go
+index f365c70..89c3418 100644
+--- a/launch/testnet/main.go
++++ b/launch/testnet/main.go
+@@ -1,21 +1,26 @@
+ package main
+ 
+ import (
+-	"flag"
++	"fmt"
+ 	"math/rand"
+ 	"os"
+ 	"time"
+ 
+ 	log "github.com/sirupsen/logrus"
++	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+ )
+ 
+-// Flags
+-var voucher = flag.String("voucher", "voucher.dusk.network:8081", "hostname for the voucher seeder")
+-var port = flag.String("port", "7000", "port for the node to bind on")
+-var logToFile = flag.Bool("logtofile", false, "specifies if the log should be written to a file")
+-
+ func initLog(file *os.File) {
+-	log.SetLevel(log.TraceLevel)
++
++	// apply logger level from configurations
++	level, err := log.ParseLevel(cfg.Get().Logger.Level)
++	if err == nil {
++		log.SetLevel(level)
++	} else {
++		log.SetLevel(log.TraceLevel)
++		log.Warnf("Parse logger level from config err: %v", err)
++	}
++
+ 	if file != nil {
+ 		os.Stdout = file
+ 		log.SetOutput(file)
+@@ -25,12 +30,29 @@ func initLog(file *os.File) {
+ }
+ 
+ func main() {
+-	flag.Parse()
++
++	// Loading all node configurations. Fail-fast if critical error occurs
++	if err := cfg.Load(); err != nil {
++		fmt.Printf("%v\n", err)
++		os.Exit(1)
++	}
++
++	profile, err := newProfile()
++
++	if err != nil {
++		fmt.Printf(" %v\n", err)
++		os.Exit(1)
++	}
++
++	defer profile.close()
++
++	port := cfg.Get().Network.Port
+ 	rand.Seed(time.Now().UnixNano())
+ 
+ 	// Set up logging
+-	if *logToFile {
+-		file, err := os.Create("node" + *port + ".log")
++	output := cfg.Get().Logger.Output
++	if cfg.Get().Logger.Output != "stdout" {
++		file, err := os.Create(output + port + ".log")
+ 		if err != nil {
+ 			panic(err)
+ 		}
+@@ -40,15 +62,18 @@ func main() {
+ 		initLog(nil)
+ 	}
+ 
++	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
++	log.Infof("Selected network  %s", cfg.Get().General.Network)
++
+ 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
+-	srv := Setup("demo" + *port)
++	srv := Setup("demo" + port)
+ 	// listening to the blindbid and the stake channels
+ 	go srv.Listen()
+ 	// fetch neighbours addresses from the Seeder
+ 	ips := ConnectToSeeder()
+ 	//start the connection manager
+ 	connMgr := NewConnMgr(CmgrConfig{
+-		Port:     *port,
++		Port:     port,
+ 		OnAccept: srv.OnAccept,
+ 		OnConn:   srv.OnConnection,
+ 	})
+diff --git a/launch/testnet/profile.go b/launch/testnet/profile.go
+index 7300653..ef941ba 100644
+--- a/launch/testnet/profile.go
++++ b/launch/testnet/profile.go
+@@ -15,11 +15,11 @@ type profileMngr struct {
+ 	memFile *os.File
+ }
+ 
+-func NewProfileMngr() (*profileMngr, error) {
++func newProfile() (*profileMngr, error) {
+ 
+ 	p := new(profileMngr)
+ 
+-	// Enable http profiling server if requested.
++	// Enable http profiling server if requested
+ 	if cfg.Get().Profile.Address != "" {
+ 		go func() {
+ 			listenAddr := cfg.Get().Profile.Address
+diff --git a/launch/testnet/seeder.go b/launch/testnet/seeder.go
+index 43359ee..e933571 100644
+--- a/launch/testnet/seeder.go
++++ b/launch/testnet/seeder.go
+@@ -7,12 +7,28 @@ import (
+ 	"strings"
+ 
+ 	log "github.com/sirupsen/logrus"
++	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+ )
+ 
+ const secret = "v1W0imI82rqW2hT7odpI-"
+ 
+ func ConnectToSeeder() []string {
+-	conn, err := net.Dial("tcp", *voucher)
++
++	if cfg.Get().General.Network == "testnet" {
++		fixedNetwork := cfg.Get().Network.Seeder.Fixed_Network
++		if len(fixedNetwork) > 0 {
++			log.Infof("Fixed-network config activated")
++			return fixedNetwork
++		}
++	}
++
++	seeders := cfg.Get().Network.Seeder.Addresses
++	if len(seeders) == 0 {
++		log.Errorf("Empty list of seeder addresses")
++		return nil
++	}
++
++	conn, err := net.Dial("tcp", seeders[0])
+ 	if err != nil {
+ 		panic(err)
+ 	}
+@@ -51,7 +67,7 @@ func completeChallenge(conn net.Conn) error {
+ 	}
+ 
+ 	// turn into uppercase string, add port
+-	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "," + *port + "\n"
++	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "," + cfg.Get().Network.Port + "\n"
+ 
+ 	// write response
+ 	if _, err := conn.Write([]byte(ret)); err != nil {
+diff --git a/pkg/config/README.md b/pkg/config/README.md
+index 0566442..66373ca 100644
+--- a/pkg/config/README.md
++++ b/pkg/config/README.md
+@@ -32,7 +32,7 @@ user$ ./testnet --config=./pkg/config/default.dusk.toml --logger.level=error
+ # Load config file found in $searchPaths and overwrite general.network value
+ user$ DUSK_GENERAL_NETWORK=mainnet; ./testnet
+ 
+-# Load config where a file config value is overwritten by both ENV var and CLI flag but CLI flag has highest priority
++# Load config where a file config value is overwritten by both ENV var and CLI flag but CLI flag has higher priority
+ user$ DUSK_LOGGER_LEVEL=WARN; ./testnet --logger.level=error
+ 
+ ```
+diff --git a/pkg/config/groups.go b/pkg/config/groups.go
+index 98d1613..559083c 100644
+--- a/pkg/config/groups.go
++++ b/pkg/config/groups.go
+@@ -5,11 +5,18 @@ type GeneralConfiguration struct {
+ }
+ 
+ type LoggerConfiguration struct {
+-	Level string
++	Level  string
++	Output string
+ }
+ 
+ type NetworkConfiguration struct {
+-	Address string
++	Seeder SeedersConfiguration
++	Port   string
++}
++
++type SeedersConfiguration struct {
++	Addresses     []string
++	Fixed_Network []string
+ }
+ 
+ // pkg/core/database package configs
+diff --git a/pkg/config/loader.go b/pkg/config/loader.go
+index ae5bebf..7fec11f 100644
+--- a/pkg/config/loader.go
++++ b/pkg/config/loader.go
+@@ -20,9 +20,12 @@ const (
+ 	configFileName = "dusk"
+ )
+ 
+-var parser *Parser
++var (
++	r *registry
++)
+ 
+-type Parser struct {
++// registry should be cheap to be copied by value
++type registry struct {
+ 	UsedConfigFile string
+ 
+ 	// All configuration groups
+@@ -33,7 +36,7 @@ type Parser struct {
+ 	Profile  ProfileConfiguration
+ }
+ 
+-// Parse makes an attempt to read and unmershal any configs from flag, env and
++// Load makes an attempt to read and unmershal any configs from flag, env and
+ // dusk config file.
+ //
+ // It  uses the following precedence order. Each item takes precedence over the item below it:
+@@ -45,12 +48,12 @@ type Parser struct {
+ //
+ // Dusk configuration file can be in form of TOML, JSON, YAML, HCL or Java
+ // properties config files
+-func Parse() error {
++func Load() error {
+ 
+-	parser = new(Parser)
++	r = new(registry)
+ 
+ 	// Initialization
+-	if err := parser.init(); err != nil {
++	if err := r.init(); err != nil {
+ 		return err
+ 	}
+ 
+@@ -60,13 +63,13 @@ func Parse() error {
+ 	return nil
+ }
+ 
+-// Get returns parser by value in order to avoid further modifications after
++// Get returns registry by value in order to avoid further modifications after
+ // initial configuration loading
+-func Get() Parser {
+-	return *parser
++func Get() registry {
++	return *r
+ }
+ 
+-func (parser *Parser) init() error {
++func (p *registry) init() error {
+ 
+ 	// Make an attempt to find dusk.toml/dusk.json/dusk.yaml in any of the
+ 	// provided paths below
+@@ -77,7 +80,7 @@ func (parser *Parser) init() error {
+ 	viper.AddConfigPath(searchPath2)
+ 
+ 	// Initialize and parse flags
+-	confFile, err := parser.loadFlags()
++	confFile, err := p.loadFlags()
+ 
+ 	if err != nil {
+ 		return err
+@@ -92,22 +95,22 @@ func (parser *Parser) init() error {
+ 		return fmt.Errorf("Error reading config file: %s", err)
+ 	}
+ 
+-	parser.defineENV()
++	p.defineENV()
+ 
+ 	// Uncomment on debugging only. This will list all levels of configurations
+ 	// viper.Debug()
+ 
+-	// Unmarshal all configurations from all conf levels to the parser struct
+-	if err := viper.Unmarshal(&parser); err != nil {
++	// Unmarshal all configurations from all conf levels to the registry struct
++	if err := viper.Unmarshal(&r); err != nil {
+ 		return fmt.Errorf("unable to decode into struct, %v", err)
+ 	}
+ 
+-	parser.UsedConfigFile = viper.ConfigFileUsed()
++	r.UsedConfigFile = viper.ConfigFileUsed()
+ 
+ 	return nil
+ }
+ 
+-func (parser *Parser) loadFlags() (string, error) {
++func (r *registry) loadFlags() (string, error) {
+ 
+ 	pflag.CommandLine.Init("Dusk node", pflag.ExitOnError)
+ 
+@@ -118,7 +121,7 @@ func (parser *Parser) loadFlags() (string, error) {
+ 
+ 	// Define all supported flags.
+ 	// All flags should be verified `loader_test.go/TestSupportedFlags`
+-	parser.defineFlags()
++	r.defineFlags()
+ 	configFile := pflag.String("config", "", "Set path to the config file")
+ 
+ 	// Bind all command line parameters to their corresponding file configs
+@@ -136,13 +139,15 @@ func (parser *Parser) loadFlags() (string, error) {
+ 
+ // define a set of flags as bindings to config file settings
+ // The settings that are needed to be passed frequently by CLI should be added here
+-func (parser *Parser) defineFlags() {
+-	_ = pflag.String("logger.level", "", "override logger.level settings in config file")
+-	_ = pflag.String("general.network", "testnet", "override general.network settings in config file")
++func (r *registry) defineFlags() {
++	_ = pflag.StringP("logger.level", "l", "", "override logger.level settings in config file")
++	_ = pflag.StringP("general.network", "n", "testnet", "override general.network settings in config file")
++	_ = pflag.StringP("network.port", "p", "7000", "port for the node to bind on")
++	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output")
+ }
+ 
+ // define a set of environment variables as bindings to config file settings
+-func (parser *Parser) defineENV() {
++func (r *registry) defineENV() {
+ 
+ 	// Bind config key general.network to ENV var DUSK_GENERAL_NETWORK
+ 	if err := viper.BindEnv("general.network", "DUSK_GENERAL_NETWORK"); err != nil {
+diff --git a/pkg/config/loader_test.go b/pkg/config/loader_test.go
+index 25094b5..95d8b3c 100644
+--- a/pkg/config/loader_test.go
++++ b/pkg/config/loader_test.go
+@@ -13,6 +13,7 @@ const (
+ 
+ var initialArgs = os.Args
+ 
++// Changes in default.dusk.toml might break this test
+ func TestDefaultConfigTOML(t *testing.T) {
+ 
+ 	Reset()
+@@ -21,7 +22,7 @@ func TestDefaultConfigTOML(t *testing.T) {
+ 	// Mock command line arguments
+ 	os.Args = append(os.Args, defaultDuskConfig)
+ 
+-	if err := Parse(); err != nil {
++	if err := Load(); err != nil {
+ 		t.Errorf("Failed parse: %v", err)
+ 	}
+ 
+@@ -29,7 +30,7 @@ func TestDefaultConfigTOML(t *testing.T) {
+ 		t.Error("Invalid general/network value")
+ 	}
+ 
+-	if Get().Logger.Level != "warn" {
++	if Get().Logger.Level != "trace" {
+ 		t.Error("Invalid logger level")
+ 	}
+ }
+@@ -45,9 +46,11 @@ func TestSupportedFlags(t *testing.T) {
+ 	// Ensure here to list all supported CLI flags
+ 	os.Args = append(os.Args, "--logger.level=custom")
+ 	os.Args = append(os.Args, "--general.network=mainnet")
++	os.Args = append(os.Args, "--network.port=9876")
++	os.Args = append(os.Args, "--logger.output=modified")
+ 
+ 	// This relies on default.dusk.toml
+-	if err := Parse(); err != nil {
++	if err := Load(); err != nil {
+ 		t.Errorf("Failed parse: %v", err)
+ 	}
+ 
+@@ -58,6 +61,14 @@ func TestSupportedFlags(t *testing.T) {
+ 	if Get().General.Network != "mainnet" {
+ 		t.Errorf("Invalid network value %s", Get().General.Network)
+ 	}
++
++	if Get().Logger.Output != "modified" {
++		t.Errorf("Invalid logger output %s", Get().Logger.Output)
++	}
++
++	if Get().Network.Port != "9876" {
++		t.Errorf("Invalid network port %s", Get().Network.Port)
++	}
+ }
+ 
+ // TestSupportedEnv
+@@ -78,7 +89,7 @@ func TestSupportedEnv(t *testing.T) {
+ 	viper.AutomaticEnv()
+ 
+ 	// This relies on default.dusk.toml
+-	if err := Parse(); err != nil {
++	if err := Load(); err != nil {
+ 		t.Errorf("Failed parse: %v", err)
+ 	}
+ 
+@@ -99,18 +110,18 @@ func TestReadOnly(t *testing.T) {
+ 	os.Args = append(os.Args, defaultDuskConfig)
+ 
+ 	// This relies on default.dusk.toml
+-	if err := Parse(); err != nil {
++	if err := Load(); err != nil {
+ 		t.Errorf("Failed parse: %v", err)
+ 	}
+ 
+-	if Get().Logger.Level != "warn" {
++	if Get().Logger.Level != "trace" {
+ 		t.Error("Invalid logger level")
+ 	}
+ 
+-	parser := Get()
+-	parser.Logger.Level = "MODIFIED_level"
++	r := Get()
++	r.Logger.Level = "MODIFIED_level"
+ 
+-	if Get().Logger.Level != "warn" {
++	if Get().Logger.Level != "trace" {
+ 		t.Errorf("Invalid config %s", Get().Logger.Level)
+ 	}
+ }
+diff --git a/pkg/config/samples/default.dusk.toml b/pkg/config/samples/default.dusk.toml
+index 88ff0af..8cf02fa 100644
+--- a/pkg/config/samples/default.dusk.toml
++++ b/pkg/config/samples/default.dusk.toml
+@@ -4,24 +4,29 @@
+ [general]
+ network = "testnet"
+ 
+-# log configs are #live#
++# logger configs
+ [logger]
+-# log level  TODO
+-level = "warn"
+-# stdout or file path
+-output = "dusk.log"
++# log levels can be any of error, warn, trace
++level = "trace"
++# 'stdout' or file name without ext
++# result filename would be $output$network.port.log
++output = "stdout"
+     
+-# P2P specific settings
++# P2P network specific settings
+ [network]
+-# host
+-address="localhost:7071"
++
++# listens on all available unicast and anycast
++# IP addresses of the local system.
++
++# port for the node to bind on
++port=7000
+ 
+ [network.seeder]
+ # array of seeder servers
+-addresses=["127.0.0.1:8081"]
+-# fixed network addresses in case of seeder unavailability
+-# supported only in devnet
+-fixedNetwork= ["localhost:7071","localhost:7072","localhost:7073"]
++addresses=["voucher.dusk.network:8081"]
++# fixed network addresses to setup local P2P network
++# supported only in testnet
++fixed_network= []
+ 
+ [database]
+ # backend used to store chain
+@@ -38,7 +43,9 @@ cert=""
+ 
+ [profile]
+ # profiling service address
+-address="localhost:5050"
++# reachable at http://localhost:5050/debug/pprof
++# address="localhost:5050"
++
+ # cpu.pprof
+ cpuFile=""
+ # mem.pprof

@@ -7,16 +7,26 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-type broker struct {
-	publisher   wire.EventPublisher
-	state       consensus.State
-	filter      *consensus.EventFilter
-	accumulator *consensus.Accumulator
+// LaunchNotification is a helper function to allow internal propagation of Agreement messages to those interested (for example monitoring and loggin processors)
+func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Agreement {
+	agreementChan := make(chan *events.Agreement)
+	evChan := consensus.LaunchNotification(eventbus,
+		events.NewOutgoingAgreementUnmarshaller(), msg.OutgoingBlockAgreementTopic)
+
+	go func() {
+		for {
+			aEv := <-evChan
+			agreementChan <- aEv.(*events.Agreement)
+		}
+	}()
+
+	return agreementChan
 }
 
 // LaunchAgreement is a helper to minimize the wiring of TopicListeners,
@@ -27,6 +37,13 @@ func LaunchAgreement(eventBus *wire.EventBus, committee committee.Committee,
 	broker.updateRound(currentRound)
 	go broker.Listen()
 	return broker
+}
+
+type broker struct {
+	publisher   wire.EventPublisher
+	state       consensus.State
+	filter      *consensus.EventFilter
+	accumulator *consensus.Accumulator
 }
 
 func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,

@@ -44,6 +44,7 @@ func TestReductionUnMarshal(t *testing.T) {
 	blockHash, err := crypto.RandEntropy(32)
 	assert.Nil(t, err)
 	ev, err := newReductionEvent(blockHash, 120, 4)
+	assert.NoError(t, err)
 
 	// Marshal it
 	buf := new(bytes.Buffer)

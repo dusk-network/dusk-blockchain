@@ -18,7 +18,7 @@ type connmgr struct {
 	CmgrConfig
 }
 
-//New creates a new connection manager
+//NewConnMgr creates a new connection manager
 func NewConnMgr(cfg CmgrConfig) *connmgr {
 	cnnmgr := &connmgr{
 		cfg,
@@ -61,7 +61,7 @@ func (c *connmgr) Connect(addr string) error {
 	}
 
 	if c.CmgrConfig.OnConn != nil {
-		c.CmgrConfig.OnConn(conn, addr)
+		go c.CmgrConfig.OnConn(conn, addr)
 	}
 
 	return nil
