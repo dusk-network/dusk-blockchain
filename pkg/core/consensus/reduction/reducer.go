@@ -43,7 +43,7 @@ type eventStopWatch struct {
 func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Timer) *eventStopWatch {
 	return &eventStopWatch{
 		collectedVotesChan: collectedVotesChan,
-		stopChan:           make(chan struct{}, 1),
+		stopChan:           make(chan struct{}),
 		timer:              timer,
 	}
 }
@@ -62,14 +62,11 @@ func (esw *eventStopWatch) fetch() []wire.Event {
 	}
 }
 
-func (esw *eventStopWatch) reset() {
-	for len(esw.stopChan) > 0 {
-		<-esw.stopChan
-	}
-}
-
 func (esw *eventStopWatch) stop() {
-	esw.stopChan <- empty
+	select {
+	case esw.stopChan <- empty:
+	default:
+	}
 }
 
 type reducer struct {
@@ -106,8 +103,6 @@ func (r *reducer) startReduction(hash []byte) {
 	r.stale = false
 	r.Unlock()
 	r.sendReductionVote(bytes.NewBuffer(hash))
-	r.firstStep.reset()
-	r.secondStep.reset()
 	go r.begin()
 }
 

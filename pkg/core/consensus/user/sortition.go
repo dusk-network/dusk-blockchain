@@ -3,10 +3,7 @@ package user
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"io"
 	"math/big"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
 )
@@ -21,26 +18,6 @@ type VotingCommittee map[string]struct{}
 func (v VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	_, ok := v[hex.EncodeToString(pubKeyBLS)]
 	return ok
-}
-
-// Marshal the voting committee as a sequence of public keys.
-func (v VotingCommittee) Marshal(w io.Writer) error {
-	if err := encoding.WriteVarInt(w, uint64(len(v))); err != nil {
-		return err
-	}
-
-	for member := range v {
-		pubKeyBytes, err := hex.DecodeString(member)
-		if err != nil {
-			return err
-		}
-
-		if err := encoding.WriteVarBytes(w, pubKeyBytes); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // CreateVotingCommittee will run the deterministic sortition function, which determines

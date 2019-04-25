@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
+
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
@@ -66,6 +68,7 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
+	reputation.LaunchReputationComponent(c.eventBus)
 	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k)
 	voting.LaunchVotingComponent(c.eventBus, c.Keys)
 

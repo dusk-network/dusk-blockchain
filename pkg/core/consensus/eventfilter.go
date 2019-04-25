@@ -91,7 +91,13 @@ func (c *EventFilter) UpdateRound(round uint64) {
 }
 
 func (c *EventFilter) FlushQueue() {
-	queuedEvents := c.queue.GetEvents(c.state.Round(), c.state.Step())
+	var queuedEvents []wire.Event
+	if c.checkStep {
+		queuedEvents = c.queue.GetEvents(c.state.Round(), c.state.Step())
+	} else {
+		queuedEvents = c.queue.GetEvents(c.state.Round(), 0)
+	}
+
 	for _, event := range queuedEvents {
 		c.processor.Process(event)
 	}

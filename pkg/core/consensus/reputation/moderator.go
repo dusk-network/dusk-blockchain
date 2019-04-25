@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+
+	log "github.com/sirupsen/logrus"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -17,7 +20,7 @@ type moderator struct {
 	strikes   map[string]uint8
 
 	roundChan    <-chan uint64
-	absenteeChan chan [][]byte
+	absenteeChan chan []byte
 }
 
 // LaunchReputationComponent creates a component that tallies strikes for provisioners.
@@ -42,20 +45,22 @@ func (m *moderator) listen() {
 		case <-m.roundChan:
 			// clean strikes map on round update
 			m.strikes = make(map[string]uint8)
-		case absentees := <-m.absenteeChan:
-			m.addStrikes(absentees...)
+		case absentee := <-m.absenteeChan:
+			m.addStrike(absentee)
 		}
 	}
 }
 
-// Increase the strike count for the `absentees` by one. If the amount of strikes
+// Increase the strike count for the `absentee` by one. If the amount of strikes
 // exceeds `maxStrikes`, we tell the committee store to remove this provisioner.
-func (m *moderator) addStrikes(absentees ...[]byte) {
-	for _, absentee := range absentees {
-		absenteeStr := hex.EncodeToString(absentee)
-		m.strikes[absenteeStr]++
-		if m.strikes[absenteeStr] >= maxStrikes {
-			m.publisher.Publish(msg.RemoveProvisionerTopic, bytes.NewBuffer(absentee))
-		}
+func (m *moderator) addStrike(absentee []byte) {
+	absenteeStr := hex.EncodeToString(absentee)
+	m.strikes[absenteeStr]++
+	if m.strikes[absenteeStr] >= maxStrikes {
+		log.WithFields(log.Fields{
+			"process":     "reputation",
+			"provisioner": absenteeStr,
+		}).Debugln("removing provisioner")
+		m.publisher.Publish(msg.RemoveProvisionerTopic, bytes.NewBuffer(absentee))
 	}
 }
