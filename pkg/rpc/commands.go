@@ -62,7 +62,12 @@ var getlastblock = func(s *Server, params []string) (string, error) {
 	}
 
 	b := &block.Block{}
-	b.Decode(&r)
+	err = b.Decode(&r)
+
+	if err != nil {
+		return "", err
+	}
+
 	res, err := json.Marshal(b)
 
 	return string(res), err

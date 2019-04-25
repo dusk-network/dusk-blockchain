@@ -108,7 +108,7 @@ func (c *Chain) Listen() {
 			c.AcceptTx(tx)
 		case r := <-wire.GetLastBlockChan:
 			buf := new(bytes.Buffer)
-			_ = c.PrevBlock.Decode(buf)
+			_ = c.PrevBlock.Encode(buf)
 			r.Resp <- *buf
 		}
 	}
