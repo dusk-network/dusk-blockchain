@@ -99,14 +99,14 @@ func (bus *RPCBus) Call(methodName string, req Req) (resp bytes.Buffer, err erro
 		return bytes.Buffer{}, err
 	}
 
-	// Send the request
+	// Send the request with write-timeout
 	select {
 	case method.req <- req:
-	default:
-		return bytes.Buffer{}, errors.New("no channel to process this method")
+	case <-time.After(time.Duration(req.Timeout) * time.Second):
+		return bytes.Buffer{}, ErrReqTimeout
 	}
 
-	// Wait for response from the consumer
+	// Wait for response from the consumer with read-timeout
 	select {
 	case resp = <-req.Resp:
 		// terminate the procedure if timeout-ed
@@ -145,4 +145,6 @@ func (bus *RPCBus) Close() {
 	for _, m := range bus.registry {
 		close(m.req)
 	}
+
+	bus.registry = nil
 }
