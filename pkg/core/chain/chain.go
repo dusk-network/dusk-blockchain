@@ -119,6 +119,10 @@ func (c *Chain) Listen() {
 			c.Unlock()
 		case blk := <-c.blockChan:
 			c.AcceptBlock(*blk)
+		case r := <-wire.GetLastBlockChan:
+			buf := new(bytes.Buffer)
+			_ = c.PrevBlock.Encode(buf)
+			r.Resp <- *buf
 		}
 	}
 }

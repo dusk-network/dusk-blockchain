@@ -9,7 +9,7 @@ import (
 )
 
 func ConnectToMonitor(bus wire.EventBroker, d ristretto.Scalar) {
-	if cfg.Get().General.Network == "testnet" {
+	if cfg.Get().General.Network == "testnet" && cfg.Get().Network.Monitor.Enabled {
 		monitorUrl := cfg.Get().Network.Monitor.Address
 		log.Infof("Connecting to monitoring system")
 		monitor.LaunchMonitor(bus, monitorUrl, d)

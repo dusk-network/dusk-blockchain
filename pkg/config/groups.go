@@ -17,6 +17,7 @@ type networkConfiguration struct {
 
 type monitorConfiguration struct {
 	Address string
+	Enabled bool
 }
 
 type seedersConfiguration struct {
@@ -43,7 +44,10 @@ type profConfiguration struct {
 
 // pkg/rpc package configs
 type rpcConfiguration struct {
-	Address string
+	Port    string
+	Enabled bool
+	User    string
+	Pass    string
 }
 
 type mempoolConfiguration struct {
