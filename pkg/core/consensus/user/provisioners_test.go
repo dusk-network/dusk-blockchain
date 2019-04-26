@@ -1,6 +1,7 @@
 package user_test
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,4 +26,27 @@ func TestCreateVotingCommittee(t *testing.T) {
 
 	// total amount of members in the committee should be 50
 	assert.Equal(t, 50, len(committee))
+}
+
+func TestIndexOf(t *testing.T) {
+	// Set up a committee set with a stakes map
+	tKeys := make([][]byte, 0)
+	p := user.Provisioners{}
+	for i := 0; i < 50; i++ {
+		keys, _ := user.NewRandKeys()
+		if err := p.AddMember(keys.EdPubKeyBytes(), keys.BLSPubKey.Marshal(), 500); err != nil {
+			t.Fatal(err)
+		}
+
+		if rand.Intn(100) < 30 {
+			tKeys = append(tKeys, keys.BLSPubKey.Marshal())
+		}
+	}
+
+	for _, tk := range tKeys {
+		i, found := p.IndexOf(tk)
+		assert.True(t, found)
+		assert.Equal(t, p[i].PublicKeyBLS.Marshal(), tk)
+	}
+
 }

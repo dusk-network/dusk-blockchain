@@ -2,8 +2,6 @@ package committee
 
 import (
 	"bytes"
-	"encoding/hex"
-	"sort"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -17,7 +15,6 @@ import (
 type (
 	// Committee is the interface for operations depending on the set of Provisioners extracted for a fiven step
 	Committee interface {
-		sort.Interface
 		wire.EventPrioritizer
 		// isMember can accept a BLS Public Key or an Ed25519
 		AmMember(uint64, uint8) bool
@@ -128,8 +125,7 @@ func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) use
 	p := c.copyProvisioners()
 	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
 	for _, ev := range evs {
-		senderStr := hex.EncodeToString(ev.Sender())
-		delete(votingCommittee, senderStr)
+		votingCommittee.Remove(ev.Sender())
 	}
 	return votingCommittee
 }
@@ -141,8 +137,8 @@ func (c *Store) Priority(ev1, ev2 wire.Event) bool {
 		return false
 	}
 
-	m1 := p.GetMemberBLS(ev1.Sender())
-	m2 := p.GetMemberBLS(ev2.Sender())
+	m1 := p.GetMember(ev1.Sender())
+	m2 := p.GetMember(ev2.Sender())
 
 	if m1 == nil {
 		return false

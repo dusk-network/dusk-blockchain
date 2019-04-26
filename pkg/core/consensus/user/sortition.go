@@ -2,25 +2,113 @@ package user
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"io"
 	"math/big"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"sort"
+	"strconv"
+	"strings"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-var _empty struct{}
-
 // VotingCommittee represents a set of provisioners with voting rights at a certain
-// point in the consensus.
-type VotingCommittee map[string]struct{}
+// point in the consensus. The set is sorted by the int value of the public key in increasing order (higher last)
+type VotingCommittee []*big.Int
 
-// IsMember checks if there is a map entry for `pubKeyBLS`.
+func (v VotingCommittee) Len() int           { return len(v) }
+func (v VotingCommittee) Swap(i, j int)      { v[i], v[j] = v[j], v[i] }
+func (v VotingCommittee) Less(i, j int) bool { return v[i].Cmp(v[j]) < 0 }
+
+func newCommittee() VotingCommittee {
+	return make([]*big.Int, 0)
+}
+
+func (v VotingCommittee) Equal(other VotingCommittee) bool {
+	sort.Sort(other)
+	for i := 0; i < len(v); i++ {
+		if v[i].Cmp(other[i]) != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Intersect the bit representation of a VotingCommittee subset with the whole VotingCommittee set
+func (v VotingCommittee) Intersect(committeeSet uint64) VotingCommittee {
+	elems := newCommittee()
+	for i, elem := range v {
+		// looping on all bits to see which one is set to 1
+		if ((committeeSet >> uint(i)) & 1) != 0 {
+			elems = append(elems, elem)
+		}
+	}
+	return elems
+}
+
+// Bits creates a bit representation of the subset of a VotingCommittee. It is used to make communications more efficient and avoid sending the list of signee of a committee
+func (v VotingCommittee) Bits(pks VotingCommittee) uint64 {
+	ret := uint64(0)
+	if len(pks) == 0 {
+		return ret
+	}
+
+	sort.Sort(pks)
+	var head *big.Int
+	head, pks = pks[0], pks[1:]
+	for i, elem := range v {
+		if elem.Cmp(head) == 0 {
+			ret |= (1 << uint(i)) // flip the i-th bit to 1
+			if len(pks) == 0 {
+				break
+			}
+			head, pks = pks[0], pks[1:]
+		}
+	}
+	return ret
+}
+
+func (v VotingCommittee) IndexOf(blsPk []byte) (int, bool) {
+	cmp := 0
+	found := false
+	iPk := &big.Int{}
+	iPk.SetBytes(blsPk)
+
+	i := sort.Search(len(v), func(i int) bool {
+		cmp = v[i].Cmp(iPk)
+		if cmp == 0 {
+			found = true
+		}
+		return cmp >= 0
+	})
+	return i, found
+}
+
+func (v *VotingCommittee) Remove(pubKeyBLS []byte) {
+	i, found := v.IndexOf(pubKeyBLS)
+	if found {
+		*v = append((*v)[:i], (*v)[i+1:]...)
+	}
+}
+
+func (v VotingCommittee) String() string {
+	var str strings.Builder
+	for i, bi := range v {
+		str.WriteString("idx: ")
+		str.WriteString(strconv.Itoa(i))
+		str.WriteString(" nr: ")
+		str.WriteString(shortStr(bi))
+		str.WriteString("\n")
+	}
+	return str.String()
+}
+
+// IsMember checks if `pubKeyBLS` is within the VotingCommittee.
+// Deprecated: use VotingCommittee.Bits and VotingCommittee.Intersect for transmission of VotingCommittee. Use VotingCommittee.IndexOf for member checking
 func (v VotingCommittee) IsMember(pubKeyBLS []byte) bool {
-	_, ok := v[hex.EncodeToString(pubKeyBLS)]
-	return ok
+	_, found := v.IndexOf(pubKeyBLS)
+	return found
 }
 
 // Marshal the voting committee as a sequence of public keys.
@@ -29,13 +117,8 @@ func (v VotingCommittee) Marshal(w io.Writer) error {
 		return err
 	}
 
-	for member := range v {
-		pubKeyBytes, err := hex.DecodeString(member)
-		if err != nil {
-			return err
-		}
-
-		if err := encoding.WriteVarBytes(w, pubKeyBytes); err != nil {
+	for _, iPk := range v {
+		if err := encoding.WriteVarBytes(w, iPk.Bytes()); err != nil {
 			return err
 		}
 	}
@@ -48,7 +131,7 @@ func (v VotingCommittee) Marshal(w io.Writer) error {
 func (p Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 	step uint8) VotingCommittee {
 
-	votingCommittee := make(map[string]struct{})
+	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(totalWeight)
 	size := p.VotingCommitteeSize()
 
@@ -59,8 +142,7 @@ func (p Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 		}
 
 		score := generateSortitionScore(hash, W)
-		member := p.extractCommitteeMember(score)
-		votingCommittee[member] = _empty
+		p.extractCommitteeMember(score, &votingCommittee)
 	}
 
 	return votingCommittee
@@ -93,8 +175,8 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 
 // extractCommitteeMember walks through the committee set, while deducting
 // each node's stake from the passed score until we reach zero. The public key
-// of the node that the function ends on will be returned as a hexadecimal string.
-func (p Provisioners) extractCommitteeMember(score uint64) string {
+// of the node that the function ends on will be returned as a big.Int
+func (p Provisioners) extractCommitteeMember(score uint64, v *VotingCommittee) *big.Int {
 	for i := 0; ; i++ {
 		// make sure we wrap around the provisioners array
 		if i == len(p) {
@@ -102,9 +184,30 @@ func (p Provisioners) extractCommitteeMember(score uint64) string {
 		}
 
 		if p[i].Stake >= score {
-			return p[i].BLSString()
+			bPk := p[i].PublicKeyBLS.Marshal()
+			i, found := v.IndexOf(bPk)
+			if !found {
+				return v.insert(i, bPk)
+			}
 		}
 
 		score -= p[i].Stake
 	}
+}
+
+func (v *VotingCommittee) insert(i int, blsPk []byte) *big.Int {
+	iPk := &big.Int{}
+	iPk.SetBytes(blsPk)
+
+	*v = append((*v)[:i], append([]*big.Int{iPk}, (*v)[i:]...)...)
+	return iPk
+}
+
+func shortStr(i *big.Int) string {
+	var str strings.Builder
+	iStr := i.String()
+	str.WriteString(iStr[:3])
+	str.WriteString("...")
+	str.WriteString(iStr[len(iStr)-3:])
+	return str.String()
 }

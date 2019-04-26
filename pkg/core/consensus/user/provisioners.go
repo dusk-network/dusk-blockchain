@@ -1,8 +1,6 @@
 package user
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sort"
@@ -24,48 +22,23 @@ type (
 	Provisioners []Member
 )
 
-// EdEquals will check if the two passed Members are of the same value.
-func (m Member) EdEquals(member Member) bool {
-	return bytes.Equal([]byte(m.PublicKeyEd), []byte(member.PublicKeyEd))
-}
-
-// BLSEquals will check if the two passed Members are of the same value.
-func (m Member) BLSEquals(member Member) bool {
-	return bytes.Equal(m.PublicKeyBLS.Marshal(), member.PublicKeyBLS.Marshal())
-}
-
-// EdString returns the hexadecimal string representation of a Member
-// Ed25519 public key.
-func (m Member) EdString() string {
-	return hex.EncodeToString([]byte(m.PublicKeyEd))
-}
-
-// BLSString returns the hexadecimal string representation of a Member
-// BLS public key.
-func (m Member) BLSString() string {
-	return hex.EncodeToString(m.PublicKeyBLS.Marshal())
-}
-
 func (p *Provisioners) Len() int {
 	return len(*p)
 }
 
 func (p *Provisioners) Swap(i, j int) {
-	m := *p
-	m[i], m[j] = m[j], m[i]
-	p = &m
+	(*p)[i], (*p)[j] = (*p)[j], (*p)[i]
 }
 
 func (p *Provisioners) Less(i, j int) bool {
-	m := *p
 	mI, mJ := &big.Int{}, &big.Int{}
-	mI.SetBytes(m[i].PublicKeyBLS.Marshal())
-	mJ.SetBytes(m[j].PublicKeyBLS.Marshal())
+	mI.SetBytes((*p)[i].PublicKeyBLS.Marshal())
+	mJ.SetBytes((*p)[j].PublicKeyBLS.Marshal())
 	return mI.Cmp(mJ) < 0
 }
 
 // GetMemberBLS returns a member of the provisioners from its BLS key
-func (p *Provisioners) GetMemberBLS(pubKeyBLS []byte) *Member {
+func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
 	i, found := p.IndexOf(pubKeyBLS)
 	if !found {
 		return nil
@@ -74,7 +47,7 @@ func (p *Provisioners) GetMemberBLS(pubKeyBLS []byte) *Member {
 	return &(*p)[i]
 }
 
-// AddMember will add a Member to the Provisioners by using the bytes of an Ed25519  public key.
+// AddMember will add a Member to the Provisioners by using the bytes of a BLS public key. Returns the index at which the key has been inserted. If the member alredy exists, AddMember overrides its stake with the new one
 func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error {
 	if len(pubKeyEd) != 32 {
 		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
@@ -101,10 +74,9 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error
 		(*p)[i].Stake = stake
 		return nil
 	}
-	list := *p
 
 	// inserting member at index i
-	*p = append(list[:i], append([]Member{m}, list[:i+1]...)...)
+	*p = append((*p)[:i], append([]Member{m}, (*p)[i:]...)...)
 	return nil
 }
 
@@ -119,9 +91,7 @@ func (p *Provisioners) RemoveMember(pubKeyBLS []byte) error {
 		return fmt.Errorf("public %v not found among provisioner set", pubKeyBLS)
 	}
 
-	list := *p
-	list = append(list[:i], list[i+1:]...)
-	*p = list
+	*p = append((*p)[:i], (*p)[i+1:]...)
 	return nil
 }
 
