@@ -16,6 +16,7 @@ type (
 		PublicKeyEd  ed25519.PublicKey
 		PublicKeyBLS bls.PublicKey
 		Stake        uint64
+		blsId        *big.Int
 	}
 
 	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
@@ -67,6 +68,9 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error
 
 	m.PublicKeyBLS = *pubKey
 	m.Stake = stake
+	iPk := &big.Int{}
+	iPk.SetBytes(pubKeyBLS)
+	m.blsId = iPk
 
 	// Check for duplicates
 	i, found := p.IndexOf(pubKeyBLS)
@@ -116,11 +120,8 @@ func (p *Provisioners) IndexOf(blsPk []byte) (int, bool) {
 	iPk := &big.Int{}
 	iPk.SetBytes(blsPk)
 
-	iRepr := &big.Int{}
 	i := sort.Search(len(*p), func(i int) bool {
-		bRepr := (*p)[i].PublicKeyBLS.Marshal()
-		iRepr.SetBytes(bRepr)
-
+		iRepr := (*p)[i].blsId
 		cmp := iRepr.Cmp(iPk)
 		if cmp == 0 {
 			found = true

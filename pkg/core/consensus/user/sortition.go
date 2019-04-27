@@ -2,14 +2,12 @@ package user
 
 import (
 	"encoding/binary"
-	"io"
 	"math/big"
 	"sort"
 	"strconv"
 	"strings"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
@@ -111,43 +109,6 @@ func (v VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	return found
 }
 
-// Marshal the voting committee as a sequence of public keys.
-func (v VotingCommittee) Marshal(w io.Writer) error {
-	if err := encoding.WriteVarInt(w, uint64(len(v))); err != nil {
-		return err
-	}
-
-	for _, iPk := range v {
-		if err := encoding.WriteVarBytes(w, iPk.Bytes()); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// CreateVotingCommittee will run the deterministic sortition function, which determines
-// who will be in the committee for a given step and round.
-func (p Provisioners) CreateVotingCommittee(round, totalWeight uint64,
-	step uint8) VotingCommittee {
-
-	votingCommittee := newCommittee()
-	W := new(big.Int).SetUint64(totalWeight)
-	size := p.VotingCommitteeSize()
-
-	for i := 0; len(votingCommittee) < size; i++ {
-		hash, err := createSortitionHash(round, step, i)
-		if err != nil {
-			panic(err)
-		}
-
-		score := generateSortitionScore(hash, W)
-		p.extractCommitteeMember(score, &votingCommittee)
-	}
-
-	return votingCommittee
-}
-
 // VotingCommitteeSize returns how big the voting committee should be.
 func (p Provisioners) VotingCommitteeSize() int {
 	size := len(p)
@@ -173,6 +134,70 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 	return new(big.Int).Mod(hashNum, W).Uint64()
 }
 
+// CreateVotingCommittee will run the deterministic sortition function, which determines
+// who will be in the committee for a given step and round.
+func (p Provisioners) CreateVotingCommittee(round, totalWeight uint64,
+	step uint8) VotingCommittee {
+
+	votingCommittee := newCommittee()
+	W := new(big.Int).SetUint64(totalWeight)
+	size := p.VotingCommitteeSize()
+
+	for i := 0; len(votingCommittee) < size; i++ {
+		hash, err := createSortitionHash(round, step, i)
+		if err != nil {
+			panic(err)
+		}
+
+		score := generateSortitionScore(hash, W)
+		blsPk := p.extractCommitteeMember(score)
+		votingCommittee.Insert(blsPk)
+	}
+
+	return votingCommittee
+}
+
+// extractCommitteeMember walks through the committee set, while deducting
+// each node's stake from the passed score until we reach zero. The public key
+// of the node that the function ends on will be returned as a hexadecimal string.
+func (p Provisioners) extractCommitteeMember(score uint64) *big.Int {
+	for i := 0; ; i++ {
+		// make sure we wrap around the provisioners array
+		if i == len(p) {
+			i = 0
+		}
+
+		if p[i].Stake >= score {
+			return p[i].blsId
+		}
+
+		score -= p[i].Stake
+	}
+}
+
+/*
+// CreateVotingCommittee will run the deterministic sortition function, which determines
+// who will be in the committee for a given step and round.
+func (p Provisioners) CreateVotingCommittee(round, totalWeight uint64,
+	step uint8) VotingCommittee {
+
+	votingCommittee := newCommittee()
+	W := new(big.Int).SetUint64(totalWeight)
+	size := p.VotingCommitteeSize()
+
+	for i := 0; len(votingCommittee) < size; i++ {
+		hash, err := createSortitionHash(round, step, i)
+		if err != nil {
+			panic(err)
+		}
+
+		score := generateSortitionScore(hash, W)
+		p.extractCommitteeMember(score, &votingCommittee)
+	}
+
+	return votingCommittee
+}
+
 // extractCommitteeMember walks through the committee set, while deducting
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a big.Int
@@ -185,6 +210,7 @@ func (p Provisioners) extractCommitteeMember(score uint64, v *VotingCommittee) *
 
 		if p[i].Stake >= score {
 			bPk := p[i].PublicKeyBLS.Marshal()
+
 			i, found := v.IndexOf(bPk)
 			if !found {
 				return v.insert(i, bPk)
@@ -194,13 +220,16 @@ func (p Provisioners) extractCommitteeMember(score uint64, v *VotingCommittee) *
 		score -= p[i].Stake
 	}
 }
+*/
 
-func (v *VotingCommittee) insert(i int, blsPk []byte) *big.Int {
-	iPk := &big.Int{}
-	iPk.SetBytes(blsPk)
-
-	*v = append((*v)[:i], append([]*big.Int{iPk}, (*v)[i:]...)...)
-	return iPk
+// Insert a big.Int representation of a BLS key at a proper index (respectful of the VotingCommittee order). If the element is already in the VotingCommittee does nothing and returns false
+func (v *VotingCommittee) Insert(blsPk *big.Int) bool {
+	i, found := v.IndexOf(blsPk.Bytes())
+	if !found {
+		*v = append((*v)[:i], append([]*big.Int{blsPk}, (*v)[i:]...)...)
+		return true
+	}
+	return false
 }
 
 func shortStr(i *big.Int) string {

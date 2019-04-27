@@ -18,7 +18,8 @@ func TestRelevantEvent(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)
 	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true, newMockEventProcessor(nil, processChan))
+	eventFilter := newEventFilter(round, step, true,
+		newMockEventProcessor(nil, processChan), true)
 	eventFilter.UpdateRound(1)
 
 	// Run collect with an empty buffer, as the event will be mocked
@@ -34,10 +35,10 @@ func TestEarlyEvent(t *testing.T) {
 	round := uint64(2)
 	step := uint8(1)
 	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true, newMockEventProcessor(nil, processChan))
+	eventFilter := newEventFilter(round, step, true,
+		newMockEventProcessor(nil, processChan), true)
 	eventFilter.UpdateRound(1)
 
-	// Run collect with an empty buffer, as the event will be mocked
 	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
 	// Queue should now hold an event
 	// Update the round, and flush the queue to get it
@@ -53,10 +54,10 @@ func TestObsoleteEvent(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)
 	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true, newMockEventProcessor(nil, processChan))
+	eventFilter := newEventFilter(round, step, true,
+		newMockEventProcessor(nil, processChan), true)
 	eventFilter.UpdateRound(2)
 
-	// Run collect with an empty buffer, as the event will be mocked
 	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
 
 	// We should not get anything from the processChan
@@ -68,12 +69,29 @@ func TestObsoleteEvent(t *testing.T) {
 	}
 }
 
+func TestFlushQueueNoCheckStep(t *testing.T) {
+	round := uint64(2)
+	step := uint8(0) // When checkStep is false, extracted headers have a step of 0
+	processChan := make(chan error, 1)
+	eventFilter := newEventFilter(round, step, true,
+		newMockEventProcessor(nil, processChan), false)
+	eventFilter.UpdateRound(1)
+
+	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	// Update round, and flush queue to get the event
+	eventFilter.UpdateRound(2)
+	eventFilter.FlushQueue()
+
+	result := <-processChan
+	assert.Nil(t, result)
+}
+
 // newEventFilter simplifies the creation of an EventFilter with specific mocked
 // components.
 func newEventFilter(round uint64, step uint8, isMember bool,
-	processor consensus.EventProcessor) *consensus.EventFilter {
+	processor consensus.EventProcessor, checkStep bool) *consensus.EventFilter {
 	return consensus.NewEventFilter(newMockHandlerFilter(round, step, []byte{}),
-		consensus.NewState(), processor, true)
+		consensus.NewState(), processor, checkStep)
 }
 
 func newMockEvent() wire.Event {
