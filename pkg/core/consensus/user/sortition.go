@@ -175,53 +175,6 @@ func (p Provisioners) extractCommitteeMember(score uint64) *big.Int {
 	}
 }
 
-/*
-// CreateVotingCommittee will run the deterministic sortition function, which determines
-// who will be in the committee for a given step and round.
-func (p Provisioners) CreateVotingCommittee(round, totalWeight uint64,
-	step uint8) VotingCommittee {
-
-	votingCommittee := newCommittee()
-	W := new(big.Int).SetUint64(totalWeight)
-	size := p.VotingCommitteeSize()
-
-	for i := 0; len(votingCommittee) < size; i++ {
-		hash, err := createSortitionHash(round, step, i)
-		if err != nil {
-			panic(err)
-		}
-
-		score := generateSortitionScore(hash, W)
-		p.extractCommitteeMember(score, &votingCommittee)
-	}
-
-	return votingCommittee
-}
-
-// extractCommitteeMember walks through the committee set, while deducting
-// each node's stake from the passed score until we reach zero. The public key
-// of the node that the function ends on will be returned as a big.Int
-func (p Provisioners) extractCommitteeMember(score uint64, v *VotingCommittee) *big.Int {
-	for i := 0; ; i++ {
-		// make sure we wrap around the provisioners array
-		if i == len(p) {
-			i = 0
-		}
-
-		if p[i].Stake >= score {
-			bPk := p[i].PublicKeyBLS.Marshal()
-
-			i, found := v.IndexOf(bPk)
-			if !found {
-				return v.insert(i, bPk)
-			}
-		}
-
-		score -= p[i].Stake
-	}
-}
-*/
-
 // Insert a big.Int representation of a BLS key at a proper index (respectful of the VotingCommittee order). If the element is already in the VotingCommittee does nothing and returns false
 func (v *VotingCommittee) Insert(blsPk *big.Int) bool {
 	i, found := v.IndexOf(blsPk.Bytes())

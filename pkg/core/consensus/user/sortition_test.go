@@ -64,3 +64,18 @@ func TestRemove(t *testing.T) {
 	assert.False(t, found)
 	assert.Equal(t, nr-1, i)
 }
+
+func TestInsert(t *testing.T) {
+	v := newCommittee()
+
+	assert.True(t, v.Insert(big.NewInt(45)))
+	assert.True(t, v.Insert(big.NewInt(34)))
+	assert.True(t, v.Insert(big.NewInt(63)))
+	assert.False(t, v.Insert(big.NewInt(34)))
+
+	assert.Equal(t, 0, big.NewInt(34).Cmp(v[0]))
+	assert.Equal(t, 0, big.NewInt(45).Cmp(v[1]))
+	assert.Equal(t, 0, big.NewInt(63).Cmp(v[2]))
+
+	assert.Equal(t, 3, len(v))
+}
