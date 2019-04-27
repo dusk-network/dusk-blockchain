@@ -2,10 +2,10 @@ package user
 
 import (
 	"fmt"
-	"math/big"
-	"sort"
+	"unsafe"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -16,36 +16,39 @@ type (
 		PublicKeyEd  ed25519.PublicKey
 		PublicKeyBLS bls.PublicKey
 		Stake        uint64
-		blsId        *big.Int
 	}
 
 	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
-	Provisioners []Member
+	Provisioners struct {
+		set     sortedset.Set
+		members map[string]*Member
+	}
 )
 
-func (p *Provisioners) Len() int {
-	return len(*p)
+func NewProvisioners() *Provisioners {
+	return &Provisioners{
+		set:     sortedset.New(),
+		members: make(map[string]*Member),
+	}
 }
 
-func (p *Provisioners) Swap(i, j int) {
-	(*p)[i], (*p)[j] = (*p)[j], (*p)[i]
+func (p *Provisioners) Size() int {
+	return len(p.set)
 }
 
-func (p *Provisioners) Less(i, j int) bool {
-	mI, mJ := &big.Int{}, &big.Int{}
-	mI.SetBytes((*p)[i].PublicKeyBLS.Marshal())
-	mJ.SetBytes((*p)[j].PublicKeyBLS.Marshal())
-	return mI.Cmp(mJ) < 0
+//strPk is an efficient way to turn []byte into string
+func strPk(pk []byte) string {
+	return *(*string)(unsafe.Pointer(&pk))
+}
+
+func (p *Provisioners) MemberAt(i int) *Member {
+	bigI := p.set[i]
+	return p.members[strPk(bigI.Bytes())]
 }
 
 // GetMemberBLS returns a member of the provisioners from its BLS key
 func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
-	i, found := p.IndexOf(pubKeyBLS)
-	if !found {
-		return nil
-	}
-
-	return &(*p)[i]
+	return p.members[strPk(pubKeyBLS)]
 }
 
 // AddMember will add a Member to the Provisioners by using the bytes of a BLS public key. Returns the index at which the key has been inserted. If the member alredy exists, AddMember overrides its stake with the new one
@@ -58,7 +61,7 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error
 		return fmt.Errorf("public key is %v bytes long instead of 128", len(pubKeyBLS))
 	}
 
-	var m Member
+	m := &Member{}
 	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
 
 	pubKey := &bls.PublicKey{}
@@ -68,35 +71,23 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error
 
 	m.PublicKeyBLS = *pubKey
 	m.Stake = stake
-	iPk := &big.Int{}
-	iPk.SetBytes(pubKeyBLS)
-	m.blsId = iPk
 
+	i := strPk(pubKeyBLS)
 	// Check for duplicates
-	i, found := p.IndexOf(pubKeyBLS)
-	if found {
-		(*p)[i].Stake = stake
+	inserted := p.set.Insert(pubKeyBLS)
+	if !inserted {
+		p.members[i].Stake = stake
 		return nil
 	}
 
-	// inserting member at index i
-	*p = append((*p)[:i], append([]Member{m}, (*p)[i:]...)...)
+	p.members[i] = m
 	return nil
 }
 
 // RemoveMember will iterate over the committee and remove the specified Member.
-func (p *Provisioners) RemoveMember(pubKeyBLS []byte) error {
-	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
-	}
-
-	i, found := p.IndexOf(pubKeyBLS)
-	if !found {
-		return fmt.Errorf("public %v not found among provisioner set", pubKeyBLS)
-	}
-
-	*p = append((*p)[:i], (*p)[i+1:]...)
-	return nil
+func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
+	delete(p.members, strPk(pubKeyBLS))
+	return p.set.Remove(pubKeyBLS)
 }
 
 // GetStake will find a certain provisioner in the committee by BLS public key,
@@ -106,28 +97,11 @@ func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 		return 0, fmt.Errorf("public key is %v bytes long instead of 128", len(pubKeyBLS))
 	}
 
-	i, found := p.IndexOf(pubKeyBLS)
+	i := strPk(pubKeyBLS)
+	m, found := p.members[i]
 	if !found {
 		return 0, fmt.Errorf("public %v not found among provisioner set", pubKeyBLS)
 	}
 
-	return (*p)[i].Stake, nil
-}
-
-// IndexOf performs a binary search of the Provisioners and returns the index where the Provisioner identified by this blsPk would be inserted at and a bool indicating whether the Provisioner is already in the array or not
-func (p *Provisioners) IndexOf(blsPk []byte) (int, bool) {
-	found := false
-	iPk := &big.Int{}
-	iPk.SetBytes(blsPk)
-
-	i := sort.Search(len(*p), func(i int) bool {
-		iRepr := (*p)[i].blsId
-		cmp := iRepr.Cmp(iPk)
-		if cmp == 0 {
-			found = true
-		}
-		return cmp >= 0
-	})
-
-	return i, found
+	return m.Stake, nil
 }

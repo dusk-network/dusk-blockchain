@@ -44,7 +44,7 @@ func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store 
 	store := &Store{
 		keys:         keys,
 		publisher:    eventBroker,
-		provisioners: &user.Provisioners{},
+		provisioners: user.NewProvisioners(),
 		// TODO: consider adding a consensus.Validator preprocessor
 		newProvisionerChan:    initNewProvisionerCollector(eventBroker),
 		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
@@ -76,14 +76,7 @@ func (c *Store) Listen() {
 			}
 
 			c.lock.Lock()
-			if err := c.provisioners.RemoveMember(pubKeyBLS); err != nil {
-				c.lock.Unlock()
-				log.WithError(err).WithFields(log.Fields{
-					"process": "committeeStore",
-					"bls_key": pubKeyBLS,
-				}).Warnln("error in removing a provisioner member")
-				continue
-			}
+			c.provisioners.Remove(pubKeyBLS)
 			c.totalWeight -= stake
 			c.lock.Unlock()
 		}
@@ -112,13 +105,13 @@ func (c *Store) Quorum() int {
 // ReportAbsentees will send public keys of absent provisioners to the moderator
 func (c *Store) ReportAbsentees(evs []wire.Event, round uint64, step uint8) error {
 	absentees := c.extractAbsentees(evs, round, step)
-	for _, absentee := range absentees {
-		c.publisher.Publish(msg.AbsenteesTopic, bytes.NewBuffer(absentee.Bytes()))
+	for _, absentee := range absentees.MemberKeys() {
+		c.publisher.Publish(msg.AbsenteesTopic, bytes.NewBuffer(absentee))
 	}
 	return nil
 }
 
-func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {
+func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) *user.VotingCommittee {
 	p := c.copyProvisioners()
 	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
 	for _, ev := range evs {

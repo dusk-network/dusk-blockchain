@@ -1,6 +1,7 @@
 package user
 
 import (
+	"bytes"
 	"math/big"
 	"math/rand"
 	"sort"
@@ -13,15 +14,18 @@ func TestBits(t *testing.T) {
 	committee := newCommittee()
 	subcommittee := newCommittee()
 
-	committee = append(committee, big.NewInt(0))
-	committee = append(committee, big.NewInt(10))
-	committee = append(committee, big.NewInt(20))
-	committee = append(committee, big.NewInt(30))
+	committee.set = append(committee.set, big.NewInt(0))
+	committee.set = append(committee.set, big.NewInt(10))
+	committee.set = append(committee.set, big.NewInt(20))
+	committee.set = append(committee.set, big.NewInt(30))
 
-	subcommittee = append(subcommittee, big.NewInt(30))
-	subcommittee = append(subcommittee, big.NewInt(20))
+	subcommittee.set = append(subcommittee.set, big.NewInt(30))
+	subcommittee.set = append(subcommittee.set, big.NewInt(20))
 
-	repr := committee.Bits(subcommittee)
+	sort.Sort(committee.set)
+	sort.Sort(subcommittee.set)
+
+	repr := committee.Bits(*subcommittee)
 	expected := uint64(12) // 0011
 
 	assert.Equal(t, expected, repr)
@@ -30,19 +34,20 @@ func TestBits(t *testing.T) {
 func TestBitIntersect(t *testing.T) {
 	committee := newCommittee()
 	subcommittee := newCommittee()
+
 	for i := 0; i < 50; i++ {
 		k, _ := NewRandKeys()
 		bk := (&big.Int{}).SetBytes(k.BLSPubKey.Marshal())
-		committee = append(committee, bk)
+		committee.set = append(committee.set, bk)
 		if rand.Intn(100) < 30 {
-			subcommittee = append(committee, bk)
+			subcommittee.set = append(committee.set, bk)
 		}
 	}
 
-	sort.Sort(committee)
-	sort.Sort(subcommittee)
+	sort.Sort(committee.set)
+	sort.Sort(subcommittee.set)
 
-	bRepr := committee.Bits(subcommittee)
+	bRepr := committee.Bits(*subcommittee)
 	sub := committee.Intersect(bRepr)
 
 	assert.Equal(t, subcommittee, sub)
@@ -54,28 +59,49 @@ func TestRemove(t *testing.T) {
 	for i := 0; i < nr; i++ {
 		k, _ := NewRandKeys()
 		bk := (&big.Int{}).SetBytes(k.BLSPubKey.Marshal())
-		committee = append(committee, bk)
+		committee.set = append(committee.set, bk)
 	}
-	sort.Sort(committee)
+	sort.Sort(committee.set)
 
-	lastElem := committee[nr-1].Bytes()
-	committee.Remove(lastElem)
-	i, found := committee.IndexOf(lastElem)
+	lastElem := committee.set[nr-1].Bytes()
+	committee.set.Remove(lastElem)
+	i, found := committee.set.IndexOf(lastElem)
 	assert.False(t, found)
 	assert.Equal(t, nr-1, i)
 }
 
-func TestInsert(t *testing.T) {
-	v := newCommittee()
+type sortedKeys []*Keys
 
-	assert.True(t, v.Insert(big.NewInt(45)))
-	assert.True(t, v.Insert(big.NewInt(34)))
-	assert.True(t, v.Insert(big.NewInt(63)))
-	assert.False(t, v.Insert(big.NewInt(34)))
+func (s sortedKeys) Len() int      { return len(s) }
+func (s sortedKeys) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s sortedKeys) Less(i, j int) bool {
 
-	assert.Equal(t, 0, big.NewInt(34).Cmp(v[0]))
-	assert.Equal(t, 0, big.NewInt(45).Cmp(v[1]))
-	assert.Equal(t, 0, big.NewInt(63).Cmp(v[2]))
+	return btoi(s[i]).Cmp(btoi(s[j])) < 0
+}
 
-	assert.Equal(t, 3, len(v))
+func btoi(k *Keys) *big.Int {
+	b := k.BLSPubKey.Marshal()
+	return (&big.Int{}).SetBytes(b)
+}
+
+func TestMemberKeys(t *testing.T) {
+
+	p := NewProvisioners()
+	var ks sortedKeys
+	for i := 0; i < 50; i++ {
+		keys, _ := NewRandKeys()
+		if err := p.AddMember(keys.EdPubKeyBytes(), keys.BLSPubKey.Marshal(), 500); err != nil {
+			t.Fatal(err)
+		}
+		ks = append(ks, keys)
+	}
+
+	sort.Sort(ks)
+	v := p.CreateVotingCommittee(1, 500*50, 1)
+	mk := v.MemberKeys()
+	assert.Equal(t, 50, len(mk))
+	for i := 0; i < 3; i++ {
+		assert.True(t, bytes.Equal(mk[i], v.set[i].Bytes()))
+	}
+
 }
