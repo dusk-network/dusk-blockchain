@@ -21,12 +21,11 @@ func TestStore(t *testing.T) {
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}
 
-	require.Equal(t, 1, sec.Store(ev1, "1"))
-	require.Equal(t, 1, sec.Store(ev1, "1"))
-
-	require.Equal(t, 1, sec.Store(ev1, "2"))
-	require.Equal(t, 2, sec.Store(ev2, "2"))
-	require.Equal(t, 2, sec.Store(ev3, "2"))
+	require.Equal(t, 1, sec.Insert(ev1, "1"))
+	require.Equal(t, 1, sec.Insert(ev1, "1"))
+	require.Equal(t, 1, sec.Insert(ev1, "2"))
+	require.Equal(t, 2, sec.Insert(ev2, "2"))
+	require.Equal(t, 2, sec.Insert(ev3, "2"))
 }
 
 func TestClear(t *testing.T) {
@@ -36,20 +35,20 @@ func TestClear(t *testing.T) {
 	ev3 := &MockEvent{"three"}
 
 	stepOne := "1"
-	sec.Store(ev1, stepOne)
-	sec.Store(ev2, stepOne)
-	sec.Store(ev3, stepOne)
-	require.Equal(t, 3, len(sec.Map[stepOne]))
+	sec.Insert(ev1, stepOne)
+	sec.Insert(ev2, stepOne)
+	sec.Insert(ev3, stepOne)
+	require.Equal(t, 3, len(sec.evMap[stepOne]))
 
 	stepTwo := "2"
-	sec.Store(ev1, stepTwo)
-	sec.Store(ev2, stepTwo)
-	sec.Store(ev3, stepTwo)
-	require.Equal(t, 3, len(sec.Map[stepTwo]))
+	sec.Insert(ev1, stepTwo)
+	sec.Insert(ev2, stepTwo)
+	sec.Insert(ev3, stepTwo)
+	require.Equal(t, 3, len(sec.evMap[stepTwo]))
 
 	sec.Clear()
-	require.Equal(t, 0, len(sec.Map[stepOne]))
-	require.Equal(t, 0, len(sec.Map[stepTwo]))
+	require.Equal(t, 0, len(sec.evMap[stepOne]))
+	require.Equal(t, 0, len(sec.evMap[stepTwo]))
 }
 
 func TestContains(t *testing.T) {
@@ -60,8 +59,8 @@ func TestContains(t *testing.T) {
 	ev4 := &MockEvent{"one"}
 
 	stepOne := "1"
-	sec.Store(ev1, stepOne)
-	sec.Store(ev2, stepOne)
+	sec.Insert(ev1, stepOne)
+	sec.Insert(ev2, stepOne)
 
 	require.True(t, sec.Contains(ev1, stepOne))
 	require.True(t, sec.Contains(ev2, stepOne))
@@ -76,16 +75,16 @@ func TestSECOperations(t *testing.T) {
 	ev3 := &MockEvent{"one"}
 
 	// checking if the length of the array of step is consistent
-	require.Equal(t, 1, sec.Store(ev1, "1"))
-	require.Equal(t, 1, sec.Store(ev1, "1"))
-	require.Equal(t, 1, sec.Store(ev1, "2"))
-	require.Equal(t, 2, sec.Store(ev2, "2"))
-	require.Equal(t, 2, sec.Store(ev3, "2"))
+	require.Equal(t, 1, sec.Insert(ev1, "1"))
+	require.Equal(t, 1, sec.Insert(ev1, "1"))
+	require.Equal(t, 1, sec.Insert(ev1, "2"))
+	require.Equal(t, 2, sec.Insert(ev2, "2"))
+	require.Equal(t, 2, sec.Insert(ev3, "2"))
 
 	sec.Clear()
-	require.Equal(t, 1, sec.Store(ev1, "1"))
-	require.Equal(t, 1, sec.Store(ev1, "1"))
-	require.Equal(t, 1, sec.Store(ev1, "2"))
-	require.Equal(t, 2, sec.Store(ev2, "2"))
-	require.Equal(t, 2, sec.Store(ev3, "2"))
+	require.Equal(t, 1, sec.Insert(ev1, "1"))
+	require.Equal(t, 1, sec.Insert(ev1, "1"))
+	require.Equal(t, 1, sec.Insert(ev1, "2"))
+	require.Equal(t, 2, sec.Insert(ev2, "2"))
+	require.Equal(t, 2, sec.Insert(ev3, "2"))
 }

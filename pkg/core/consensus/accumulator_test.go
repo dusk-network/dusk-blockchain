@@ -18,7 +18,7 @@ import (
 
 func TestAccumulation(t *testing.T) {
 	// Make an accumulator that has a quorum of 2
-	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(nil, 2, "foo", true))
+	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(nil, 2, "foo", true), consensus.NewAccumulatorStore())
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())
@@ -31,7 +31,7 @@ func TestAccumulation(t *testing.T) {
 func TestFailedVerification(t *testing.T) {
 	// Make an accumulator that should fail verification every time
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(
-		errors.New("verification failed"), 2, "foo", true))
+		errors.New("verification failed"), 2, "foo", true), consensus.NewAccumulatorStore())
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())
@@ -46,7 +46,7 @@ func TestFailedVerification(t *testing.T) {
 
 func TestNonCommitteeEvent(t *testing.T) {
 	// Make an accumulator that should fail verification every time
-	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(nil, 2, "foo", false))
+	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(nil, 2, "foo", false), consensus.NewAccumulatorStore())
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())

@@ -115,7 +115,7 @@ func (r *reducer) begin() {
 	if !r.stale {
 		// if there was a timeout, we should report nodes that did not vote
 		if events == nil {
-			r.ctx.committee.ReportAbsentees(r.accumulator.GetAllEvents(),
+			_ = r.ctx.committee.ReportAbsentees(r.accumulator.All(),
 				r.ctx.state.Round(), r.ctx.state.Step())
 		}
 		r.ctx.state.IncrementStep()
@@ -129,7 +129,7 @@ func (r *reducer) begin() {
 	defer r.RUnlock()
 	if !r.stale {
 		if eventsSecondStep == nil {
-			r.ctx.committee.ReportAbsentees(r.accumulator.GetAllEvents(),
+			_ = r.ctx.committee.ReportAbsentees(r.accumulator.All(),
 				r.ctx.state.Round(), r.ctx.state.Step())
 		}
 		hash2 := r.extractHash(eventsSecondStep)

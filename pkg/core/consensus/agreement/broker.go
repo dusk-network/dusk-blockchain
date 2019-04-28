@@ -58,7 +58,7 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 
 func newBroker(eventBroker wire.EventBroker, committee committee.Committee) *broker {
 	handler := newHandler(committee)
-	accumulator := consensus.NewAccumulator(handler)
+	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore())
 	state := consensus.NewState()
 	filter := launchFilter(eventBroker, committee, handler,
 		state, accumulator)
