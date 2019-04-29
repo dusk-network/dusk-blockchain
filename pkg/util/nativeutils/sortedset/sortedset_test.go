@@ -2,12 +2,56 @@ package sortedset
 
 import (
 	"math/big"
+	"math/rand"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
+
+func TestBits(t *testing.T) {
+	set := New()
+	subset := New()
+
+	set = append(set, big.NewInt(0))
+	set = append(set, big.NewInt(10))
+	set = append(set, big.NewInt(20))
+	set = append(set, big.NewInt(30))
+
+	subset = append(subset, big.NewInt(30))
+	subset = append(subset, big.NewInt(20))
+
+	sort.Sort(set)
+	sort.Sort(subset)
+
+	repr := set.Bits(subset)
+	expected := uint64(12) // 0011
+
+	assert.Equal(t, expected, repr)
+}
+
+func TestBitIntersect(t *testing.T) {
+	set := New()
+	subset := New()
+
+	for i := 0; i < 50; i++ {
+		k, _ := crypto.RandEntropy(32)
+		bk := (&big.Int{}).SetBytes(k)
+		set = append(set, bk)
+		if rand.Intn(100) < 30 {
+			subset = append(subset, bk)
+		}
+	}
+
+	sort.Sort(set)
+	sort.Sort(subset)
+
+	bRepr := set.Bits(subset)
+	sub := set.Intersect(bRepr)
+
+	assert.Equal(t, subset, sub)
+}
 
 func TestRemove(t *testing.T) {
 	nr := 5

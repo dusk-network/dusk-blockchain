@@ -3,55 +3,11 @@ package user
 import (
 	"bytes"
 	"math/big"
-	"math/rand"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestBits(t *testing.T) {
-	committee := newCommittee()
-	subcommittee := newCommittee()
-
-	committee.set = append(committee.set, big.NewInt(0))
-	committee.set = append(committee.set, big.NewInt(10))
-	committee.set = append(committee.set, big.NewInt(20))
-	committee.set = append(committee.set, big.NewInt(30))
-
-	subcommittee.set = append(subcommittee.set, big.NewInt(30))
-	subcommittee.set = append(subcommittee.set, big.NewInt(20))
-
-	sort.Sort(committee.set)
-	sort.Sort(subcommittee.set)
-
-	repr := committee.Bits(*subcommittee)
-	expected := uint64(12) // 0011
-
-	assert.Equal(t, expected, repr)
-}
-
-func TestBitIntersect(t *testing.T) {
-	committee := newCommittee()
-	subcommittee := newCommittee()
-
-	for i := 0; i < 50; i++ {
-		k, _ := NewRandKeys()
-		bk := (&big.Int{}).SetBytes(k.BLSPubKey.Marshal())
-		committee.set = append(committee.set, bk)
-		if rand.Intn(100) < 30 {
-			subcommittee.set = append(committee.set, bk)
-		}
-	}
-
-	sort.Sort(committee.set)
-	sort.Sort(subcommittee.set)
-
-	bRepr := committee.Bits(*subcommittee)
-	sub := committee.Intersect(bRepr)
-
-	assert.Equal(t, subcommittee, sub)
-}
 
 func TestRemove(t *testing.T) {
 	nr := 5

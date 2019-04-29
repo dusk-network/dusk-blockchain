@@ -42,39 +42,6 @@ func (v *VotingCommittee) Equal(other *VotingCommittee) bool {
 	return v.set.Equal(other.set)
 }
 
-// Intersect the bit representation of a VotingCommittee subset with the whole VotingCommittee set
-func (v *VotingCommittee) Intersect(committeeSet uint64) *VotingCommittee {
-	c := newCommittee()
-	for i, elem := range v.set {
-		// looping on all bits to see which one is set to 1
-		if ((committeeSet >> uint(i)) & 1) != 0 {
-			c.set = append(c.set, elem)
-		}
-	}
-	return c
-}
-
-// Bits creates a bit representation of the subset of a VotingCommittee. It is used to make communications more efficient and avoid sending the list of signee of a committee. The voting committee is passed by value
-func (v *VotingCommittee) Bits(c VotingCommittee) uint64 {
-	ret := uint64(0)
-	if c.Size() == 0 {
-		return ret
-	}
-
-	var head *big.Int
-	head, c.set = c.set[0], c.set[1:]
-	for i, elem := range v.set {
-		if elem.Cmp(head) == 0 {
-			ret |= (1 << uint(i)) // flip the i-th bit to 1
-			if len(c.set) == 0 {
-				break
-			}
-			head, c.set = c.set[0], c.set[1:]
-		}
-	}
-	return ret
-}
-
 // IsMember checks if `pubKeyBLS` is within the VotingCommittee.
 func (v *VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	_, found := v.set.IndexOf(pubKeyBLS)

@@ -58,6 +58,39 @@ func (v *Set) Remove(pubKeyBLS []byte) bool {
 	return false
 }
 
+// Intersect the bit representation of a VotingCommittee subset with the whole VotingCommittee set
+func (v Set) Intersect(committeeSet uint64) Set {
+	c := New()
+	for i, elem := range v {
+		// looping on all bits to see which one is set to 1
+		if ((committeeSet >> uint(i)) & 1) != 0 {
+			c = append(c, elem)
+		}
+	}
+	return c
+}
+
+// Bits creates a bit representation of the subset of a Set. The subset is passed by value
+func (v *Set) Bits(subset Set) uint64 {
+	ret := uint64(0)
+	if len(subset) == 0 {
+		return ret
+	}
+
+	var head *big.Int
+	head, subset = subset[0], subset[1:]
+	for i, elem := range *v {
+		if elem.Cmp(head) == 0 {
+			ret |= (1 << uint(i)) // flip the i-th bit to 1
+			if len(subset) == 0 {
+				break
+			}
+			head, subset = subset[0], subset[1:]
+		}
+	}
+	return ret
+}
+
 func (v Set) String() string {
 	var str strings.Builder
 	for i, bi := range v {
