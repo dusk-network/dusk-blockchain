@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -13,14 +12,13 @@ import (
 
 // MessageHeader defines a Dusk wire message header.
 type MessageHeader struct {
-	Magic    protocol.Magic // 4 bytes
-	Topic    topics.Topic   // 15 bytes
-	Length   uint32         // 4 bytes
-	Checksum uint32         // 4 bytes
+	Magic  protocol.Magic // 4 bytes
+	Topic  topics.Topic   // 15 bytes
+	Length uint32         // 4 bytes
 }
 
 // MessageHeaderSize defines the size of a Dusk wire message header in bytes.
-const MessageHeaderSize = 4 + topics.Size + 4 + 4
+const MessageHeaderSize = 4 + topics.Size + 4
 
 // decodeMessageHeader will decode a header from a Dusk wire message.
 func decodeMessageHeader(r io.Reader) (*MessageHeader, error) {
@@ -41,16 +39,10 @@ func decodeMessageHeader(r io.Reader) (*MessageHeader, error) {
 		return nil, err
 	}
 
-	var checksum uint32
-	if err := encoding.ReadUint32(r, binary.LittleEndian, &checksum); err != nil {
-		return nil, err
-	}
-
 	return &MessageHeader{
-		Magic:    protocol.Magic(magic),
-		Topic:    topic,
-		Length:   length,
-		Checksum: checksum,
+		Magic:  protocol.Magic(magic),
+		Topic:  topic,
+		Length: length,
 	}, nil
 }
 
@@ -66,14 +58,6 @@ func addHeader(message *bytes.Buffer, magic protocol.Magic, topic topics.Topic) 
 
 	payloadLength := uint32(message.Len())
 	if err := encoding.WriteUint32(buffer, binary.LittleEndian, payloadLength); err != nil {
-		return nil, err
-	}
-
-	checksum, err := crypto.Checksum(message.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	if err := encoding.WriteUint32(buffer, binary.LittleEndian, checksum); err != nil {
 		return nil, err
 	}
 
