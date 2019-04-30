@@ -47,7 +47,7 @@ func newEventSelector(publisher wire.EventPublisher, handler scoreEventHandler,
 		handler:   handler,
 		timer: &consensus.Timer{
 			Timeout:     timeOut,
-			TimeoutChan: make(chan struct{}, 1),
+			TimeoutChan: make(chan struct{}),
 		},
 		state: state,
 	}
@@ -62,10 +62,6 @@ func (s *eventSelector) startSelection() {
 		"process":        "selection",
 		"selector state": s.state.String(),
 	}).Debugln("starting selection")
-	// empty timeoutchan
-	for len(s.timer.TimeoutChan) > 0 {
-		<-s.timer.TimeoutChan
-	}
 	go func() {
 		// propagating the best event after timeout,
 		// or stopping on reading from timeoutchan
@@ -135,5 +131,8 @@ func (s *eventSelector) publishBestEvent() {
 }
 
 func (s *eventSelector) stopSelection() {
-	s.timer.TimeoutChan <- empty
+	select {
+	case s.timer.TimeoutChan <- empty:
+	default:
+	}
 }
