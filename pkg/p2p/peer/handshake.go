@@ -27,31 +27,18 @@ type VersionMessage struct {
 	Services    protocol.ServiceFlag
 }
 
-// Handshake either sends or receives a handshake.
-// Sending involves writing a 'version' msg to an other peer.
-// Receiving processes a received 'version' msg by sending our 'version' with a 'verack' msg.
-func (p *Peer) Handshake() error {
-	handshakeErr := make(chan error, 1)
-	go func() {
-		if p.Inbound {
-			// An other peer wants to handshake with us.
-			handshakeErr <- p.inboundHandShake()
-		} else {
-			// We want to handshake with an other peer.
-			handshakeErr <- p.outboundHandShake()
-		}
-	}()
+// Handshake performs a protocol handshake with another peer.
+func (p *Peer) Handshake(inbound bool) error {
+	// Set handshake deadline
+	p.conn.SetDeadline(time.Now().Add(handshakeTimeout))
 
-	select {
-	case err := <-handshakeErr:
-		if err != nil {
-			return fmt.Errorf(errHandShakeFromStr, err)
-		}
-	case <-time.After(handshakeTimeout):
-		return errHandShakeTimeout
+	if inbound {
+		// An other peer wants to handshake with us.
+		return p.inboundHandShake()
 	}
 
-	return nil
+	// We want to handshake with an other peer.
+	return p.outboundHandShake()
 }
 
 // We are trying to connect to another peer.
@@ -75,7 +62,7 @@ func (p *Peer) outboundHandShake() error {
 		return err
 	}
 
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+	if _, err := p.conn.Write(verAckMessage.Bytes()); err != nil {
 		return err
 	}
 
@@ -93,7 +80,9 @@ func (p *Peer) inboundHandShake() error {
 		return err
 	}
 
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+	// We skip the message queue here and write immediately on the connection,
+	// as the write loop has not been started yet.
+	if _, err := p.conn.Write(verAckMessage.Bytes()); err != nil {
 		return err
 	}
 
@@ -119,8 +108,8 @@ func (p *Peer) writeLocalMsgVersion() error {
 		Port: fromPort,
 	}
 
-	toIP := p.Conn.RemoteAddr().(*net.TCPAddr).IP
-	toPort := p.Conn.RemoteAddr().(*net.TCPAddr).Port
+	toIP := p.conn.RemoteAddr().(*net.TCPAddr).IP
+	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := wire.NewNetAddress(toIP.String(), uint16(toPort))
 
 	message, err := newVersionMessageBuffer(version, &fromAddr, toAddr, protocol.FullNode)
@@ -133,7 +122,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 		return err
 	}
 
-	_, err = p.Conn.Write(messageWithHeader.Bytes())
+	_, err = p.conn.Write(messageWithHeader.Bytes())
 	return err
 }
 
@@ -144,7 +133,8 @@ func (p *Peer) readRemoteMsgVersion() error {
 	}
 
 	if topic != topics.Version {
-		return fmt.Errorf("did not receive the expected '%s' message - got %s", topics.Version, topic)
+		return fmt.Errorf("did not receive the expected '%s' message - got %s",
+			topics.Version, topic)
 	}
 
 	version, err := decodeVersionMessage(payload)
@@ -162,11 +152,9 @@ func (p *Peer) readVerack() error {
 	}
 
 	if topic != topics.VerAck {
-		return fmt.Errorf("did not receive the expected '%s' message - got %s", topics.VerAck, topic)
+		return fmt.Errorf("did not receive the expected '%s' message - got %s",
+			topics.VerAck, topic)
 	}
-
-	// should only be accessed on one go-routine
-	p.VerackReceived = true
 
 	return nil
 }
