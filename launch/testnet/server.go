@@ -248,15 +248,19 @@ func (s *Server) sendStakesAndBids(peer *peer.Peer) {
 	s.RLock()
 	defer s.RUnlock()
 	for _, stake := range s.stakes {
-		if err := peer.WriteMessage(stake, topics.Tx); err != nil {
+		buf, err := wire.AddTopic(stake, topics.Tx)
+		if err != nil {
 			panic(err)
 		}
+		s.eventBus.Publish(string(topics.Gossip), buf)
 	}
 
 	for _, bid := range s.bids {
-		if err := peer.WriteMessage(bid, topics.Tx); err != nil {
+		buf, err := wire.AddTopic(bid, topics.Tx)
+		if err != nil {
 			panic(err)
 		}
+		s.eventBus.Publish(string(topics.Gossip), buf)
 	}
 }
 

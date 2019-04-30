@@ -122,23 +122,23 @@ func (p *Peer) Collect(message *bytes.Buffer) error {
 
 	_, _ = msg.Read(topicBytes[:])
 	topic := topics.ByteArrayToTopic(topicBytes)
-	return p.WriteMessage(&msg, topic)
+	return p.writeMessage(&msg, topic)
 }
 
 // WriteMessage will append a header with the specified topic to the passed
 // message, and put it in the outgoing message queue.
-func (p *Peer) WriteMessage(msg *bytes.Buffer, topic topics.Topic) error {
+func (p *Peer) writeMessage(msg *bytes.Buffer, topic topics.Topic) error {
 	messageWithHeader, err := addHeader(msg, p.magic, topic)
 	if err != nil {
 		return err
 	}
 
-	p.Write(messageWithHeader)
+	p.write(messageWithHeader)
 	return nil
 }
 
 // Write will put a message in the outgoing message queue.
-func (p *Peer) Write(msg *bytes.Buffer) {
+func (p *Peer) write(msg *bytes.Buffer) {
 	p.outgoingChan <- func() error {
 		_, err := p.Conn.Write(msg.Bytes())
 		return err
