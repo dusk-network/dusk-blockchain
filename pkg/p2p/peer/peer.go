@@ -11,117 +11,109 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/stall"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 const (
-	maxOutboundConnections = 100
-	handshakeTimeout       = 30 * time.Second
-	idleTimeout            = 2 * time.Minute // If no message received after idleTimeout, then peer disconnects
-
-	// nodes will have `responseTime` seconds to reply with a response
-	responseTime = 300 * time.Second
-
-	// the stall detector will check every `tickerInterval` to see if messages
-	// are overdue. Should be less than `responseTime`
-	tickerInterval = 30 * time.Second
-
-	// The input buffer size is the amount of mesages that
-	// can be buffered into the channel to receive at once before
-	// blocking, and before determinism is broken
-	inputBufferSize = 100
-
-	// The output buffer size is the amount of messages that
-	// can be buffered into the channel to send at once before
-	// blocking, and before determinism is broken.
-	outputBufferSize = 100
-
-	// pingInterval = 20 * time.Second //Not implemented in Dusk clients
+	handshakeTimeout = 30 * time.Second // Used to set handshake deadline
+	readWriteTimeout = 2 * time.Minute  // Used to set reading and writing deadlines
 )
-
-var (
-	errHandShakeTimeout    = errors.New("Handshake timed out, peers have " + handshakeTimeout.String() + " to complete the handshake")
-	errHandShakeFromStr    = "Handshake failed: %s"
-	receivedMessageFromStr = "Received a '%s' message from %s"
-)
-
-// Config holds a set of functions needed to directly work with the blockchain,
-// in case of a individual request (synchronization)
-type Config struct {
-	GetHeaders func([]byte, []byte) []*block.Header
-	GetBlock   func([]byte) *block.Block
-}
 
 // Peer holds all configuration and state to be able to communicate with other peers.
-// Every Peer has a Detector that keeps track of pending messages that require a synchronous response.
-// The peer also holds a pointer to the chain, to directly request certain information.
 type Peer struct {
-	// Unchangeable state: concurrent safe
-	Addr      string
-	ProtoVer  *protocol.Version
-	Inbound   bool
-	Services  protocol.ServiceFlag
-	CreatedAt time.Time
-	Relay     bool
+	Conn  net.Conn
+	magic protocol.Magic
+	// Services protocol.ServiceFlag - currently not implemented
 
-	Conn     net.Conn
-	eventBus *wire.EventBus
-	quitID   uint32
-	gossipID uint32
-	chain    *chain.Chain
-	magic    protocol.Magic
-
-	// Atomic vals
-	Disconnected int32
-	syncing      int32
-
-	VerackReceived bool
-	VersionKnown   bool
-
-	*stall.Detector
-
-	inch   chan func() // Will handle all inbound connections from peer
-	outch  chan func() // Will handle all outbound connections to peer
-	quitch chan struct{}
+	eventBus     *wire.EventBus
+	quitID       uint32
+	gossipID     uint32
+	outgoingChan chan func() error // outgoing message queue
 
 	dupeBlacklist *dupemap.DupeMap
 }
 
 // NewPeer is called after a connection to a peer was successful.
 // Inbound as well as Outbound.
-func NewPeer(conn net.Conn, inbound bool, magic protocol.Magic, eventBus *wire.EventBus,
+func NewPeer(conn net.Conn, magic protocol.Magic, eventBus *wire.EventBus,
 	dupeMap *dupemap.DupeMap) *Peer {
-
-	p := &Peer{
-		inch:          make(chan func(), inputBufferSize),
-		outch:         make(chan func(), outputBufferSize),
-		quitch:        make(chan struct{}, 1),
-		Inbound:       inbound,
+	return &Peer{
+		outgoingChan:  make(chan func() error, 100),
 		Conn:          conn,
 		eventBus:      eventBus,
-		Addr:          conn.RemoteAddr().String(),
-		Detector:      stall.NewDetector(responseTime, tickerInterval),
 		magic:         magic,
 		dupeBlacklist: dupeMap,
 	}
+}
 
-	return p
+// Connect will perform the protocol handshake with the peer. If successful, we start
+// a set of goroutines which are used for communication.
+func (p *Peer) Connect(inbound bool) error {
+	if err := p.Handshake(inbound); err != nil {
+		p.Disconnect()
+		return err
+	}
+
+	go p.writeLoop()
+	go p.readLoop()
+	p.subscribeToGossipEvents()
+	return nil
+}
+
+// ReadLoop will block on the read until a message is read, or until the deadline
+// is reached. Should be called in a go-routine, after a successful handshake with
+// a peer. Eventual duplicated messages are silently discarded.
+func (p *Peer) readLoop() {
+	for {
+		// Refresh the read deadline
+		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+
+		topic, payload, err := p.readMessage()
+		if err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error reading message")
+			p.Disconnect()
+			return
+		}
+
+		// check if this message is a duplicate of another we already forwarded
+		if p.dupeBlacklist.CanFwd(payload) {
+			p.eventBus.Publish(string(topic), payload)
+		}
+	}
+}
+
+// WriteLoop will write queued messages to the peer in a synchronous fashion.
+// Should be called in a go-routine, after a successful handshake with a peer.
+func (p *Peer) writeLoop() {
+	for {
+		f := <-p.outgoingChan
+
+		// Refresh the write deadline
+		p.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
+
+		if err := f(); err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error writing message")
+			p.Disconnect()
+			return
+		}
+	}
 }
 
 // Collect implements wire.EventCollector.
-// Receive messages, add headers, and propagate them to the network.
+// Receive messages from other components, add headers, and propagate them to the network.
 func (p *Peer) Collect(message *bytes.Buffer) error {
 	// copy the buffer here, as the pointer we just got is shared by
 	// all the other peers.
@@ -134,7 +126,7 @@ func (p *Peer) Collect(message *bytes.Buffer) error {
 }
 
 // WriteMessage will append a header with the specified topic to the passed
-// message, and write it to the peer.
+// message, and put it in the outgoing message queue.
 func (p *Peer) WriteMessage(msg *bytes.Buffer, topic topics.Topic) error {
 	messageWithHeader, err := addHeader(msg, p.magic, topic)
 	if err != nil {
@@ -145,10 +137,11 @@ func (p *Peer) WriteMessage(msg *bytes.Buffer, topic topics.Topic) error {
 	return nil
 }
 
-// Write to a peer
+// Write will put a message in the outgoing message queue.
 func (p *Peer) Write(msg *bytes.Buffer) {
-	p.outch <- func() {
-		_, _ = p.Conn.Write(msg.Bytes())
+	p.outgoingChan <- func() error {
+		_, err := p.Conn.Write(msg.Bytes())
+		return err
 	}
 }
 
@@ -158,20 +151,11 @@ func (p *Peer) Disconnect() {
 		"process": "peer",
 		"address": p.Conn.RemoteAddr().String(),
 	}).Warnln("peer disconnected")
-	// return if already disconnected
-	if atomic.LoadInt32(&p.Disconnected) != 0 {
-		return
-	}
 
-	atomic.AddInt32(&p.Disconnected, 1)
-
-	p.Detector.Quit()
-	close(p.quitch)
-	p.Conn.Close()
-
+	_ = p.Conn.Close()
 	if p.gossipID != 0 && p.quitID != 0 {
-		p.eventBus.Unsubscribe(string(topics.Gossip), p.gossipID)
-		p.eventBus.Unsubscribe(wire.QuitTopic, p.quitID)
+		_ = p.eventBus.Unsubscribe(string(topics.Gossip), p.gossipID)
+		_ = p.eventBus.Unsubscribe(wire.QuitTopic, p.quitID)
 	}
 }
 
@@ -190,7 +174,6 @@ func (p *Peer) readHeader() (*MessageHeader, error) {
 	}
 
 	headerBuffer := bytes.NewReader(headerBytes)
-
 	header, err := decodeMessageHeader(headerBuffer)
 	if err != nil {
 		return nil, err
@@ -221,10 +204,6 @@ func (p *Peer) headerMagicIsValid(header *MessageHeader) bool {
 	return p.magic == header.Magic
 }
 
-func payloadChecksumIsValid(payloadBuffer *bytes.Buffer, checksum uint32) bool {
-	return crypto.CompareChecksum(payloadBuffer.Bytes(), checksum)
-}
-
 func (p *Peer) readMessage() (topics.Topic, *bytes.Buffer, error) {
 	header, err := p.readHeader()
 	if err != nil {
@@ -240,26 +219,7 @@ func (p *Peer) readMessage() (topics.Topic, *bytes.Buffer, error) {
 		return "", nil, err
 	}
 
-	if !payloadChecksumIsValid(payloadBuffer, header.Checksum) {
-		return "", nil, errors.New("invalid payload checksum")
-	}
-
 	return header.Topic, payloadBuffer, nil
-}
-
-// Run is used to start communicating with the peer, completes the handshake and starts observing
-// for messages coming in and allows for queing of outgoing messages
-func (p *Peer) Run() error {
-	if err := p.Handshake(); err != nil {
-		p.Disconnect()
-		return err
-	}
-
-	go p.writeLoop()
-	go p.startProtocol()
-	go p.readLoop()
-	p.subscribeToGossipEvents()
-	return nil
 }
 
 func (p *Peer) subscribeToGossipEvents() {
@@ -267,55 +227,4 @@ func (p *Peer) subscribeToGossipEvents() {
 	p.quitID = es.QuitChanID
 	p.gossipID = es.MsgChanID
 	go es.Accept()
-}
-
-// StartProtocol is run as a go-routine, will act as our queue for messages.
-// Should be ran after handshake
-func (p *Peer) startProtocol() {
-loop:
-	for atomic.LoadInt32(&p.Disconnected) == 0 {
-		select {
-		case <-p.quitch:
-			break loop
-		case <-p.Detector.Quitch:
-			break loop
-		}
-	}
-	p.Disconnect()
-}
-
-// ReadLoop will block on the read until a message is read.
-// Should only be called after handshake is complete on a seperate go-routine.
-// Eventual duplicated messages are silently discarded
-func (p *Peer) readLoop() {
-	idleTimer := time.AfterFunc(idleTimeout, func() {
-		p.Disconnect()
-	})
-
-	for atomic.LoadInt32(&p.Disconnected) == 0 {
-		idleTimer.Reset(idleTimeout) // reset timer on each loop
-		topic, payload, err := p.readMessage()
-		if err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error reading message")
-			p.Disconnect()
-			return
-		}
-
-		// check if this message is a duplicate of another we already forwarded
-		if p.dupeBlacklist.CanFwd(payload) {
-			// TODO: handle message repropagation here instead of anywhere else
-			p.eventBus.Publish(string(topic), payload)
-		}
-	}
-}
-
-// WriteLoop will queue all messages to be written to the peer
-func (p *Peer) writeLoop() {
-	for atomic.LoadInt32(&p.Disconnected) == 0 {
-		f := <-p.outch
-		f()
-	}
 }
