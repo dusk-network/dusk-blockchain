@@ -180,19 +180,6 @@ func (s *Server) StartConsensus(round uint64) {
 
 func (s *Server) OnAccept(conn net.Conn) {
 	peer := peer.NewPeer(conn, protocol.TestNet, s.eventBus, s.dupeMap)
-	// send the latest block height
-	heightBytes := make([]byte, 8)
-	s.chain.RLock()
-	binary.LittleEndian.PutUint64(heightBytes, s.chain.PrevBlock.Header.Height)
-	s.chain.RUnlock()
-	if _, err := peer.Conn.Write(heightBytes); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem writing to peer")
-		peer.Disconnect()
-		return
-	}
 
 	if err := peer.Connect(true); err != nil {
 		log.WithFields(log.Fields{
@@ -203,7 +190,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	}
 	log.WithFields(log.Fields{
 		"process": "server",
-		"address": peer.Conn.RemoteAddr().String(),
+		"address": peer.Addr(),
 	}).Debugln("connection established")
 
 	s.sendStakesAndBids(peer)
@@ -211,23 +198,6 @@ func (s *Server) OnAccept(conn net.Conn) {
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peer := peer.NewPeer(conn, protocol.TestNet, s.eventBus, s.dupeMap)
-	// get latest block height
-	buf := make([]byte, 8)
-	if _, err := peer.Conn.Read(buf); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem reading from peer")
-		peer.Disconnect()
-		return
-	}
-
-	height := binary.LittleEndian.Uint64(buf)
-	s.chain.Lock()
-	if s.chain.PrevBlock.Header.Height < height {
-		s.chain.PrevBlock.Header.Height = height
-	}
-	s.chain.Unlock()
 
 	if err := peer.Connect(false); err != nil {
 		log.WithFields(log.Fields{
@@ -238,7 +208,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}
 	log.WithFields(log.Fields{
 		"process": "server",
-		"address": peer.Conn.RemoteAddr().String(),
+		"address": peer.Addr(),
 	}).Debugln("connection established")
 
 	s.sendStakesAndBids(peer)

@@ -30,7 +30,7 @@ type VersionMessage struct {
 // Handshake performs a protocol handshake with another peer.
 func (p *Peer) Handshake(inbound bool) error {
 	// Set handshake deadline
-	p.Conn.SetDeadline(time.Now().Add(handshakeTimeout))
+	p.conn.SetDeadline(time.Now().Add(handshakeTimeout))
 
 	if inbound {
 		// An other peer wants to handshake with us.
@@ -62,7 +62,7 @@ func (p *Peer) outboundHandShake() error {
 		return err
 	}
 
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+	if _, err := p.conn.Write(verAckMessage.Bytes()); err != nil {
 		return err
 	}
 
@@ -82,7 +82,7 @@ func (p *Peer) inboundHandShake() error {
 
 	// We skip the message queue here and write immediately on the connection,
 	// as the write loop has not been started yet.
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+	if _, err := p.conn.Write(verAckMessage.Bytes()); err != nil {
 		return err
 	}
 
@@ -108,8 +108,8 @@ func (p *Peer) writeLocalMsgVersion() error {
 		Port: fromPort,
 	}
 
-	toIP := p.Conn.RemoteAddr().(*net.TCPAddr).IP
-	toPort := p.Conn.RemoteAddr().(*net.TCPAddr).Port
+	toIP := p.conn.RemoteAddr().(*net.TCPAddr).IP
+	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := wire.NewNetAddress(toIP.String(), uint16(toPort))
 
 	message, err := newVersionMessageBuffer(version, &fromAddr, toAddr, protocol.FullNode)
@@ -122,7 +122,7 @@ func (p *Peer) writeLocalMsgVersion() error {
 		return err
 	}
 
-	_, err = p.Conn.Write(messageWithHeader.Bytes())
+	_, err = p.conn.Write(messageWithHeader.Bytes())
 	return err
 }
 

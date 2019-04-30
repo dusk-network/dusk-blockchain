@@ -28,7 +28,7 @@ const (
 
 // Peer holds all configuration and state to be able to communicate with other peers.
 type Peer struct {
-	Conn  net.Conn
+	conn  net.Conn
 	magic protocol.Magic
 	// Services protocol.ServiceFlag - currently not implemented
 
@@ -46,7 +46,7 @@ func NewPeer(conn net.Conn, magic protocol.Magic, eventBus *wire.EventBus,
 	dupeMap *dupemap.DupeMap) *Peer {
 	return &Peer{
 		outgoingChan:  make(chan func() error, 100),
-		Conn:          conn,
+		conn:          conn,
 		eventBus:      eventBus,
 		magic:         magic,
 		dupeBlacklist: dupeMap,
@@ -73,7 +73,7 @@ func (p *Peer) Connect(inbound bool) error {
 func (p *Peer) readLoop() {
 	for {
 		// Refresh the read deadline
-		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+		p.conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
 
 		topic, payload, err := p.readMessage()
 		if err != nil {
@@ -99,7 +99,7 @@ func (p *Peer) writeLoop() {
 		f := <-p.outgoingChan
 
 		// Refresh the write deadline
-		p.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
+		p.conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 
 		if err := f(); err != nil {
 			log.WithFields(log.Fields{
@@ -140,7 +140,7 @@ func (p *Peer) writeMessage(msg *bytes.Buffer, topic topics.Topic) error {
 // Write will put a message in the outgoing message queue.
 func (p *Peer) write(msg *bytes.Buffer) {
 	p.outgoingChan <- func() error {
-		_, err := p.Conn.Write(msg.Bytes())
+		_, err := p.conn.Write(msg.Bytes())
 		return err
 	}
 }
@@ -149,10 +149,10 @@ func (p *Peer) write(msg *bytes.Buffer) {
 func (p *Peer) Disconnect() {
 	log.WithFields(log.Fields{
 		"process": "peer",
-		"address": p.Conn.RemoteAddr().String(),
+		"address": p.conn.RemoteAddr().String(),
 	}).Warnln("peer disconnected")
 
-	_ = p.Conn.Close()
+	_ = p.conn.Close()
 	if p.gossipID != 0 && p.quitID != 0 {
 		_ = p.eventBus.Unsubscribe(string(topics.Gossip), p.gossipID)
 		_ = p.eventBus.Unsubscribe(wire.QuitTopic, p.quitID)
@@ -161,9 +161,14 @@ func (p *Peer) Disconnect() {
 
 // Port returns the port
 func (p *Peer) Port() uint16 {
-	s := strings.Split(p.Conn.RemoteAddr().String(), ":")
+	s := strings.Split(p.conn.RemoteAddr().String(), ":")
 	port, _ := strconv.ParseUint(s[1], 10, 16)
 	return uint16(port)
+}
+
+// Addr returns the peer's address as a string.
+func (p *Peer) Addr() string {
+	return p.conn.RemoteAddr().String()
 }
 
 // Read from a peer
@@ -184,7 +189,7 @@ func (p *Peer) readHeader() (*MessageHeader, error) {
 
 func (p *Peer) readHeaderBytes() ([]byte, error) {
 	buffer := make([]byte, MessageHeaderSize)
-	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
+	if _, err := io.ReadFull(p.conn, buffer); err != nil {
 		return nil, err
 	}
 
@@ -193,7 +198,7 @@ func (p *Peer) readHeaderBytes() ([]byte, error) {
 
 func (p *Peer) readPayload(length uint32) (*bytes.Buffer, error) {
 	buffer := make([]byte, length)
-	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
+	if _, err := io.ReadFull(p.conn, buffer); err != nil {
 		return nil, err
 	}
 
