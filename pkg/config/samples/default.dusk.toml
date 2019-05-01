@@ -29,6 +29,7 @@ addresses=["voucher.dusk.network:8081"]
 fixed = []
 
 [network.monitor]
+enabled = false
 address="monitor.dusk.network:1337"
 
 [database]
@@ -40,8 +41,11 @@ dir = "chain"
 
 # rpc service configs
 [rpc]
+
+# rpc port to listen on
+port=9000
 # enable rpc service
-enabled=false
+enabled=true
 user="default"
 pass="default"
 cert=""

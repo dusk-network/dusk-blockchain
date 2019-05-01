@@ -10,30 +10,23 @@ import (
 	"os"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"golang.org/x/crypto/sha3"
 )
-
-// Config is the configuration struct for the rpc server
-type Config struct {
-	RPCPort string
-	RPCUser string
-	RPCPass string
-}
 
 // Server defines the RPC server of the Dusk node.
 type Server struct {
 	started bool // Indicates whether or not server has started
 
 	eventBus         *wire.EventBus
+	rpcBus           *wire.RPCBus
 	chainInfoChannel <-chan *bytes.Buffer
 	chainInfoID      uint32
 
 	authSHA  []byte       // Hash of the auth credentials
-	config   Config       // Configuration struct for RPC server
 	listener net.Listener // RPC Server listener
 
 	decodedChainInfoChannel chan string
@@ -42,20 +35,22 @@ type Server struct {
 }
 
 // NewRPCServer instantiates a new RPCServer.
-func NewRPCServer(eventBus *wire.EventBus, cfg *Config) (*Server, error) {
+func NewRPCServer(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Server, error) {
 	chainInfoChannel := make(chan *bytes.Buffer, 10)
 
 	srv := Server{
 		eventBus:         eventBus,
+		rpcBus:           rpcBus,
 		chainInfoChannel: chainInfoChannel,
-		config:           *cfg,
 	}
 
 	chainInfoID := srv.eventBus.Subscribe(string(topics.ChainInfo), chainInfoChannel)
 	srv.chainInfoID = chainInfoID
 
-	if cfg.RPCUser != "" && cfg.RPCPass != "" {
-		login := cfg.RPCUser + ":" + cfg.RPCPass
+	user := cfg.Get().RPC.User
+	pass := cfg.Get().RPC.Pass
+	if user != "" && pass != "" {
+		login := user + ":" + pass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 		authSHA := sha3.Sum256([]byte(auth))
 
@@ -84,7 +79,7 @@ func (s *Server) Start() error {
 	})
 
 	// Set up listener
-	l, err := net.Listen("tcp", "localhost:"+s.config.RPCPort)
+	l, err := net.Listen("tcp", "localhost:"+cfg.Get().RPC.Port)
 	if err != nil {
 		return err
 	}
@@ -104,7 +99,7 @@ func (s *Server) Start() error {
 
 // Listen on the http server.
 func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
-	fmt.Fprintf(os.Stdout, "RPC server listening on port %v\n", s.config.RPCPort)
+	fmt.Fprintf(os.Stdout, "RPC server listening on port %v\n", cfg.Get().RPC.Port)
 	httpServer.Serve(s.listener)
 	fmt.Fprintf(os.Stdout, "RPC server stopped listening\n")
 }
