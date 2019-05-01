@@ -82,8 +82,8 @@ func (f *scoreBroker) Listen() {
 				"round":   state.Round,
 				"step":    state.Step,
 			}).Debugln("received regeneration message")
-			f.handler.LowerThreshold()
 			if state.Round == f.selector.state.Round() {
+				f.handler.LowerThreshold()
 				f.selector.RLock()
 				if !f.selector.running {
 					f.selector.RUnlock()
