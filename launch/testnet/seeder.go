@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"net"
@@ -45,7 +46,9 @@ func ConnectToSeeder() []string {
 		return nil
 	}
 
-	return strings.Split(string(buf), ",")
+	// Trim all trailing empty bytes
+	trimmedBuf := bytes.Trim(buf, "\x00")
+	return strings.Split(string(trimmedBuf), ",")
 }
 
 func completeChallenge(conn net.Conn) error {
