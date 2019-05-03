@@ -25,12 +25,18 @@ Mempool participates in the following transitions
 
 ### Mempool responsibilities:
 
-- Store all txs `received` from RPC call or P2P message ready to be verified
-- Store all txs `verified` by the chain ready to be included in next block
-- Update itself on newly accepted block
+- Store all transactions that are `received` from RPC call or P2P message ready to be verified
+- Execute transaction verification procedure 
+- Store all transactions that are `verified` by the chain and can be included in next candidate block
+- Update internal state on newly accepted block
 - Monitor and report for abnormal situations
 
-### Underlying pool
+
+### Implementation
+
+Mempool implementation tries to avoid use of mutex to protect shared state. Instead, all input/output communication is based on channels. Similarily to Unix Select(..) sementics, mempool waits on read/write (input/output/timeout) channels to trigger an event handler
+
+##### Underlying pool
 
 In addition, mempool tries to be storage-agnostic so that a verified tx can be stored in different forms of persistent and non-persistent pools. Supported and pending ideas for pools:
 
@@ -39,6 +45,3 @@ In addition, mempool tries to be storage-agnostic so that a verified tx can be s
 - distributed - distributed memory object caching system (e.g memcached).  Pending
 - persistent - persistent KV storage. Pending
 
-
-### Coding stuff
-Mempool implementation tries to avoid use of mutex to protect shared state. Instead, all input/output communication is based on channels. Similarily to Unix Select(..) sementics, mempool waits on read/write (input/output/timeout) channels to trigger an event to perform
