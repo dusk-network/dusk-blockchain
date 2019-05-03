@@ -292,8 +292,10 @@ func TestAmbiguousCompress(t *testing.T) {
 func BenchmarkSignature(b *testing.B) {
 	msg := randomMessage()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := Sign(sk, pk, msg)
+		b.StartTimer()
 		if err := Verify(NewApk(pk), msg, signature); err != nil {
 			panic(err)
 		}
@@ -303,34 +305,41 @@ func BenchmarkSignature(b *testing.B) {
 func BenchmarkUnsafeSignature(b *testing.B) {
 	msg := randomMessage()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := UnsafeSign(sk, msg)
+		b.StartTimer()
 		if err := VerifyUnsafe(pk, msg, signature); err != nil {
 			panic(err)
 		}
 	}
 }
 
-func BenchmarkCompressedSignature(b *testing.B) {
+func BenchmarkVerifyCompressedSignature(b *testing.B) {
 	msg := randomMessage()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := Sign(sk, pk, msg)
 		sigb := signature.Compress()
+		apk := NewApk(pk)
+		b.StartTimer()
 
 		signature = &Signature{}
 		_ = signature.Decompress(sigb)
-		_ = Verify(NewApk(pk), msg, signature)
+		_ = Verify(apk, msg, signature)
 	}
 }
 
 func BenchmarkCompressedUnsafeSignature(b *testing.B) {
 	msg := randomMessage()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := UnsafeSign(sk, msg)
 		sigb := signature.Compress()
-
+		b.StartTimer()
 		signature = &UnsafeSignature{}
 		_ = signature.Decompress(sigb)
 		_ = VerifyUnsafe(pk, msg, signature)
