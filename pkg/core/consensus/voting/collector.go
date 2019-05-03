@@ -3,7 +3,6 @@ package voting
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -19,8 +18,7 @@ type (
 	}
 
 	signer interface {
-		events.ReductionUnmarshaller
-		AddSignatures(wire.Event) (*bytes.Buffer, error)
+		Sign(*bytes.Buffer) error
 	}
 )
 
@@ -41,19 +39,13 @@ func initCollector(broker wire.EventBroker, topic string, signer signer) chan *b
 	return voteChannel
 }
 
-func (c *collector) createVote(ev wire.Event) *bytes.Buffer {
-	buffer, _ := c.signer.AddSignatures(ev)
-	return buffer
-}
-
 func (c *collector) Collect(r *bytes.Buffer) error {
 	// copy shared pointer
 	copyBuf := *r
-	ev := c.signer.NewEvent()
-	if err := c.signer.Unmarshal(&copyBuf, ev); err != nil {
+	if err := c.signer.Sign(&copyBuf); err != nil {
 		return err
 	}
 
-	c.voteChannel <- c.createVote(ev)
+	c.voteChannel <- &copyBuf
 	return nil
 }

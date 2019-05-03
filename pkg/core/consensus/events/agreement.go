@@ -16,23 +16,24 @@ type (
 		Apk       *bls.Apk
 		BitSet    uint64
 		Signature *bls.Signature
-		step      uint8
+		Step      uint8
 	}
 
 	// Agreement is the message that encapsulates data relevant for
 	// components relying on committee information
 	Agreement struct {
 		*Header
-		VoteSet       []wire.Event
 		SignedVoteSet []byte
+		VoteSet       []wire.Event
 		AgreedHash    []byte
 	}
 
 	// AggregatedAgreement is the BLS aggregated representation of an Agreement Event
 	AggregatedAgreement struct {
 		*Header
-		AgreedHash []byte
-		Votes      []*StepVotes
+		SignedVotes  []byte
+		VotesPerStep []*StepVotes
+		AgreedHash   []byte
 	}
 
 	// AgreementUnMarshaller implements both Marshaller and Unmarshaller interface
@@ -52,7 +53,7 @@ func NewStepVotes() *StepVotes {
 		Apk:       &bls.Apk{},
 		BitSet:    uint64(0),
 		Signature: &bls.Signature{},
-		step:      uint8(0),
+		Step:      uint8(0),
 	}
 }
 
@@ -62,11 +63,12 @@ func (sv *StepVotes) Equal(other *StepVotes) bool {
 
 func (sv *StepVotes) Add(ev *Reduction) error {
 	sender := ev.Sender()
-	if sv.step == uint8(0) {
+	if sv.Step == uint8(0) {
 		pk, err := bls.UnmarshalPk(sender)
 		if err != nil {
 			return err
 		}
+		sv.Step = ev.Step
 		sv.Apk = bls.NewApk(pk)
 		sv.Signature, err = bls.UnmarshalSignature(ev.SignedHash)
 		if err != nil {
@@ -76,8 +78,8 @@ func (sv *StepVotes) Add(ev *Reduction) error {
 		return nil
 	}
 
-	if ev.Step != sv.step {
-		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", sv.step, ev.Step)
+	if ev.Step != sv.Step {
+		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", sv.Step, ev.Step)
 	}
 
 	if err := sv.Apk.AggregateBytes(sender); err != nil {
@@ -115,6 +117,70 @@ func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 
 func (a *AgreementUnMarshaller) NewEvent() wire.Event {
 	return NewAgreement()
+}
+
+func NewAggregatedAgreement(a *Agreement) *AggregatedAgreement {
+	return &AggregatedAgreement{
+		Header:       a.Header,
+		VotesPerStep: make([]*StepVotes, 2),
+		SignedVotes:  make([]byte, 33),
+		AgreedHash:   make([]byte, 32),
+	}
+}
+
+// UnmarshalAggregatedAgreement unmarshals the buffer into an AggregatedAgreement
+// Field order is the following:
+// * Header [BLS Public Key; Round; Step]
+// * AggregatedAgreement [Signed Vote Set; Vote Set; BlockHash]
+func UnmarshalAggregatedAgreement(r *bytes.Buffer) (*AggregatedAgreement, error) {
+	aggro := NewAgreement()
+	a := NewAggregatedAgreement(aggro)
+	h := new(HeaderUnmarshaller)
+	if err := h.Unmarshal(r, a.Header); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.ReadBLS(r, &a.SignedVotes); err != nil {
+		return nil, err
+	}
+
+	votesPerStep := make([]*StepVotes, 2)
+	err := UnmarshalVotes(r, &votesPerStep)
+	if err != nil {
+		return nil, err
+	}
+	a.VotesPerStep = votesPerStep
+
+	if err := encoding.Read256(r, &a.AgreedHash); err != nil {
+		return nil, err
+	}
+
+	return a, nil
+}
+
+func MarshalAggregatedAgreement(a *AggregatedAgreement) (*bytes.Buffer, error) {
+	r := new(bytes.Buffer)
+	h := new(HeaderMarshaller)
+
+	if err := h.Marshal(r, a.Header); err != nil {
+		return nil, err
+	}
+
+	// Marshal BLS Signature of VoteSet
+	if err := encoding.WriteBLS(r, a.SignedVotes); err != nil {
+		return nil, err
+	}
+
+	// Marshal VotesPerStep
+	if err := MarshalVotes(r, a.VotesPerStep); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.Write256(r, a.AgreedHash); err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }
 
 // UnmarshalVotes unmarshals the array of StepVotes for a single Agreement
