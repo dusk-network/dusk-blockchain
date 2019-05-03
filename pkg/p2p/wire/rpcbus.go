@@ -51,7 +51,7 @@ var (
 //
 type RPCBus struct {
 	registry map[string]method
-	mu       sync.Mutex
+	mu       sync.RWMutex
 }
 
 type method struct {
@@ -152,8 +152,8 @@ func NewRequest(p bytes.Buffer, timeout int) Req {
 func (bus *RPCBus) getMethod(methodName string) (method, error) {
 
 	// Guards the bus.registry until we find and return a copy
-	bus.mu.Lock()
-	defer bus.mu.Unlock()
+	bus.mu.RLock()
+	defer bus.mu.RUnlock()
 
 	if method, ok := bus.registry[methodName]; ok {
 		return method, nil
