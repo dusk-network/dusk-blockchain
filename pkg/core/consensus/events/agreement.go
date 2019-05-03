@@ -3,6 +3,7 @@ package events
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -73,6 +74,10 @@ func (sv *StepVotes) Add(ev *Reduction) error {
 		}
 
 		return nil
+	}
+
+	if ev.Step != sv.step {
+		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", sv.step, ev.Step)
 	}
 
 	if err := sv.Apk.AggregateBytes(sender); err != nil {

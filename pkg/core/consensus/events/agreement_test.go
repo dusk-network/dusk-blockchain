@@ -50,8 +50,37 @@ func TestStepVotes(t *testing.T) {
 	assert.NoError(t, bls.Verify(result.Apk, hash, result.Signature))
 }
 
+func TestStepVotesAdd(t *testing.T) {
+	sv := NewStepVotes()
+	set := sortedset.New()
+	hash := []byte("this is a mock message")
+	assert.NoError(t, sv.Add(genReduction(hash, &set)))
+	assert.NoError(t, sv.Add(genReduction(hash, &set)))
+	assert.NoError(t, sv.Add(genReduction(hash, &set)))
+
+	assert.NoError(t, bls.Verify(sv.Apk, hash, sv.Signature))
+}
+
 func genKeys(set *sortedset.Set) (*bls.PublicKey, *bls.SecretKey) {
 	pk, sk, _ := bls.GenKeyPair(rand.Reader)
 	set.Insert(pk.Marshal())
 	return pk, sk
+}
+
+func genReduction(hash []byte, set *sortedset.Set) *Reduction {
+	pk, sk := genKeys(set)
+	s, err := bls.Sign(sk, pk, hash)
+	if err != nil {
+		panic(err)
+	}
+
+	return &Reduction{
+		Header: &Header{
+			PubKeyBLS: pk.Marshal(),
+			Round:     uint64(1),
+			Step:      uint8(1),
+		},
+		VotedHash:  hash,
+		SignedHash: s.Compress(),
+	}
 }
