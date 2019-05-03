@@ -3,17 +3,19 @@ package mempool
 import (
 	"bytes"
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"math"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // verifier func mock
@@ -51,35 +53,52 @@ func (c *ctx) Collect(message *bytes.Buffer) error {
 }
 
 // Helper struct around mempool asserts to shorten common code
+var c *ctx
+
 type ctx struct {
 	verifiedTx []transactions.Transaction
 	propagated []transactions.Transaction
 	mu         sync.Mutex
 	m          *Mempool
-	t          *testing.T
-	bus        *wire.EventBus
+
+	bus    *wire.EventBus
+	rpcBus *wire.RPCBus
 }
 
-func newCtx(t *testing.T) *ctx {
-	c := ctx{}
-	c.verifiedTx = make([]transactions.Transaction, 0)
+func initCtx(t *testing.T) *ctx {
 
-	c.t = t
-	// config
-	r := config.Registry{}
-	r.Mempool.MaxSizeMB = 1
-	r.Mempool.PoolType = "hashmap"
-	config.Mock(&r)
-	// eventBus
-	c.bus = wire.NewEventBus()
+	time.Sleep(1 * time.Second)
+	if c == nil {
+		c = &ctx{}
+		c.verifiedTx = make([]transactions.Transaction, 0)
 
-	c.propagated = make([]transactions.Transaction, 0)
-	go wire.NewTopicListener(c.bus, &c, string(topics.Gossip)).Accept()
+		// config
+		r := config.Registry{}
+		r.Mempool.MaxSizeMB = 1
+		r.Mempool.PoolType = "hashmap"
+		config.Mock(&r)
+		// eventBus
+		c.bus = wire.NewEventBus()
+		// creating the rpcbus
+		c.rpcBus = wire.NewRPCBus()
 
-	// mempool
-	c.m = NewMempool(c.bus, verifyFunc)
-	c.assert()
-	return &c
+		c.propagated = make([]transactions.Transaction, 0)
+		go wire.NewTopicListener(c.bus, c, string(topics.Gossip)).Accept()
+
+		// mempool
+		c.m = NewMempool(c.bus, verifyFunc)
+	} else {
+
+		// Reset shared context state
+		c.m.Quit()
+		c.m.verified = c.m.newPool()
+		c.verifiedTx = make([]transactions.Transaction, 0)
+		c.propagated = make([]transactions.Transaction, 0)
+	}
+
+	c.m.Run()
+
+	return c
 }
 
 func (c *ctx) addTx(tx transactions.Transaction) {
@@ -90,36 +109,49 @@ func (c *ctx) addTx(tx transactions.Transaction) {
 	}
 }
 
-func (c *ctx) assert() {
+// Wait until the EventBus chan is drained and all pending txs are fully
+// processed. This is important to synchronously compare the expected with the
+// yielded results.
+func (c *ctx) wait() {
+	time.Sleep(500 * time.Millisecond)
+}
 
-	// Wait until all pending txs are fully processed
-	for {
-		if len(c.m.pending) == 0 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+func (c *ctx) assert(t *testing.T, propagated bool) {
 
-	// TODO: deep compare
-	time.Sleep(50 * time.Millisecond)
-	txs := c.m.GetVerifiedTxs()
+	c.wait()
+
+	r, _ := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 3))
+
+	lTxs, _ := encoding.ReadVarInt(&r)
+	txs, _ := transactions.FromReader(&r, lTxs)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if len(txs) != len(c.verifiedTx) {
-		c.t.Fatalf("expecting %d verified txs but mempool stores %d txs", len(c.verifiedTx), len(txs))
+		t.Fatalf("expecting %d verified txs but mempool stores %d txs", len(c.verifiedTx), len(txs))
 	}
 
-	if len(txs) != len(c.propagated) {
-		c.t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
+	for i, tx := range c.verifiedTx {
+
+		var exists bool
+		for _, memTx := range txs {
+			if memTx.Equals(tx) {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			t.Fatalf("a verified tx not found (index %d)", i)
+		}
 	}
 
-}
-
-func (c *ctx) publish(buf *bytes.Buffer) {
-
-	c.bus.Publish(string(topics.Tx), buf)
+	if propagated {
+		if len(txs) != len(c.propagated) {
+			t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
+		}
+	}
 
 }
 
@@ -147,55 +179,48 @@ func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transac
 
 func TestProcessPendingTxs(t *testing.T) {
 
-	c := newCtx(t)
+	initCtx(t)
 
 	var version uint8
-	for i := 0; i < 2; i++ {
+	txs := randomSliceOfTxs(t, 5)
 
-		txs := randomSliceOfTxs(t, 3)
+	for _, tx := range txs {
+
 		// Publish valid tx
-		for _, tx := range txs {
-			buf := new(bytes.Buffer)
-			err := tx.Encode(buf)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			c.addTx(tx)
-
-			c.publish(buf)
+		buf := new(bytes.Buffer)
+		err := tx.Encode(buf)
+		if err != nil {
+			t.Fatal(err)
 		}
 
-		c.assert()
+		c.addTx(tx)
+		c.bus.Publish(string(topics.Tx), buf)
 
-		// Publish invalid tx
-		for y := 0; y <= 10; y++ {
-			buf := new(bytes.Buffer)
-
-			// set invalid version according to the validator func mock
-			version++
-			tx := transactions.NewStandard(version, 2)
-			err := tx.Encode(buf)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			c.addTx(tx)
-
-			c.publish(buf)
-
-			// republish same tx to simulate duplicated txs err
-			c.publish(buf)
+		// Publish invalid txs (one that does not pass verifyTx)
+		version++
+		tx := transactions.NewStandard(version, 2)
+		buf = new(bytes.Buffer)
+		err = tx.Encode(buf)
+		if err != nil {
+			t.Fatal(err)
 		}
 
-		c.assert()
+		c.addTx(tx)
+		c.bus.Publish(string(topics.Tx), buf)
+
+		// Publish a duplicated tx
+		buf = new(bytes.Buffer)
+		_ = tx.Encode(buf)
+		c.bus.Publish(string(topics.Tx), buf)
 	}
+
+	c.assert(t, true)
 
 }
 
 func TestProcessPendingTxsAsync(t *testing.T) {
 
-	c := newCtx(t)
+	initCtx(t)
 
 	wg := sync.WaitGroup{}
 	var version uint64
@@ -211,46 +236,46 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 				_ = tx.Encode(buf)
 
 				c.addTx(tx)
-
-				c.publish(buf)
+				c.bus.Publish(string(topics.Tx), buf)
 			}
+			wg.Done()
 		}()
 
 		wg.Add(1)
 		// Publish invalid txs
 		go func() {
-			for y := 0; y <= 7; y++ {
+			for y := 0; y <= 5; y++ {
 				buf := new(bytes.Buffer)
 
 				// change version to get valid/invalid txs
 				v := atomic.AddUint64(&version, 1)
 				tx := transactions.NewStandard(uint8(v), 2)
 				_ = tx.Encode(buf)
-				c.addTx(tx)
 
-				c.publish(buf)
+				c.addTx(tx)
+				c.bus.Publish(string(topics.Tx), buf)
 			}
+
+			wg.Done()
 		}()
 	}
 
-	wg.Done()
+	wg.Wait()
 
-	time.Sleep(200 * time.Millisecond)
-	c.assert()
+	c.assert(t, true)
 }
 
 func TestRemoveAccepted(t *testing.T) {
 
-	t.Skip()
+	initCtx(t)
 
 	// Create a random block
-	b := helper.RandomBlock(t, 200, 2)
-
-	c := newCtx(t)
+	b := helper.RandomBlock(t, 200, 0)
+	b.Txs = make([]transactions.Transaction, 0)
 
 	counter := 0
 
-	// generate 5*4 random txs
+	// generate 3*4 random txs
 	txs := randomSliceOfTxs(t, 3)
 
 	for _, tx := range txs {
@@ -261,27 +286,60 @@ func TestRemoveAccepted(t *testing.T) {
 		}
 
 		// Publish valid tx
-		c.publish(buf)
+		c.bus.Publish(string(topics.Tx), buf)
 
 		// Simulate a situation where the block has accepted each 2th tx
 		counter++
 		if math.Mod(float64(counter), 2) == 0 {
 			b.AddTx(tx)
-			// If tx is accepted, we expect to be removed from mempool on calling
-			// RemoveAccepted()
+			// If tx is accepted, it is expected to be removed from mempool on
+			// onAcceptBlock event
 		} else {
 			c.addTx(tx)
 		}
-
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	c.wait()
 
 	_ = b.SetRoot()
-	c.m.RemoveAccepted(*b)
+	buf := new(bytes.Buffer)
+	_ = b.Encode(buf)
 
-	c.assert()
+	c.bus.Publish(string(topics.AcceptedBlock), buf)
 
+	c.assert(t, false)
 }
 
-// TODO Coinbase ignore
+func TestCoibaseTxsNotAllowed(t *testing.T) {
+
+	initCtx(t)
+
+	// Publish a set of valid txs
+	txs := randomSliceOfTxs(t, 1)
+
+	for _, tx := range txs {
+		buf := new(bytes.Buffer)
+		err := tx.Encode(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		c.addTx(tx)
+		c.bus.Publish(string(topics.Tx), buf)
+	}
+
+	// Publish a coinbase txs
+	tx := helper.RandomCoinBaseTx(t, false)
+	buf := new(bytes.Buffer)
+	err := tx.Encode(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c.bus.Publish(string(topics.Tx), buf)
+
+	c.wait()
+
+	// Assert that all non-coinbase txs have been verified
+	c.assert(t, true)
+}

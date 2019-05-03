@@ -2,28 +2,38 @@ package wire
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 )
 
 var expectedResult string
 var consumerStarted bool
- 
+var errInvalidParams = errors.New("invalid params")
 
-func runConsumer(delay int ) {
+func runConsumer(delay int) {
 	if consumerStarted == false {
 		consumerStarted = true
 		go func(delay int) {
 			for req := range GetLastBlockChan {
 				// Simulate heavy computation
 				time.Sleep(time.Duration(delay) * time.Millisecond)
-				expectedResult = "Wrapped " + req.Params.String()
-		
-				buf := bytes.Buffer{}
-				buf.WriteString(expectedResult)
-		
-				// return result
-				req.Resp <- buf
+
+				params := req.Params.String()
+
+				if len(params) == 0 {
+					// Simulate error response
+					req.Err <- errInvalidParams
+				} else {
+					// Simulate non-error response
+					expectedResult = "Wrapped " + params
+
+					buf := bytes.Buffer{}
+					buf.WriteString(expectedResult)
+
+					// return result
+					req.Resp <- buf
+				}
 			}
 		}(delay)
 	}
@@ -51,9 +61,30 @@ func TestRPCall(t *testing.T) {
 	}
 }
 
-func TestTimeoutCalls(t *testing.T) {
+func TestRPCallWithError(t *testing.T) {
 
-	t.SkipNow()
+	bus := NewRPCBus()
+	defer bus.Close()
+
+	runConsumer(500)
+
+	// produce the call
+	buf := bytes.Buffer{}
+	buf.WriteString("")
+
+	d := NewRequest(buf, 10)
+	responseResult, err := bus.Call(GetLastBlock, d)
+
+	if err != errInvalidParams {
+		t.Errorf("expecting a specific error here %v", err)
+	}
+
+	if responseResult.String() != "" {
+		t.Errorf("expecting to empty response data")
+	}
+}
+
+func TestTimeoutCalls(t *testing.T) {
 
 	bus := NewRPCBus()
 	defer bus.Close()
@@ -68,12 +99,12 @@ func TestTimeoutCalls(t *testing.T) {
 	d := NewRequest(buf, 1)
 	responseResult, err := bus.Call(GetLastBlock, d)
 
-	if responseResult.Len() > 0 {
-		t.Error("expecting empty result")
-	}
-
 	if err != ErrReqTimeout {
 		t.Error("expecting timeout error")
+	}
+
+	if responseResult.Len() > 0 {
+		t.Error("expecting empty result")
 	}
 }
 
@@ -91,7 +122,7 @@ func TestMethodExists(t *testing.T) {
 }
 
 func TestNonExistingMethod(t *testing.T) {
- 
+
 	bus := NewRPCBus()
 	defer bus.Close()
 
@@ -104,12 +135,12 @@ func TestNonExistingMethod(t *testing.T) {
 	d := NewRequest(buf, 2)
 	responseResult, err := bus.Call("Chain/NonExistingMethod", d)
 
-	if responseResult.Len() > 0 {
-		t.Error("expecting empty result")
-	}
-
 	if err != ErrMethodNotExists {
 		t.Error("expecting methodNotExists error")
+	}
+
+	if responseResult.Len() > 0 {
+		t.Error("expecting empty result")
 	}
 }
 

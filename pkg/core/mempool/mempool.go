@@ -2,18 +2,28 @@ package mempool
 
 import (
 	"bytes"
+	"math"
+	"time"
+
 	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"sync"
-	"time"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "mempool"})
+
+const (
+	consensusSeconds = 20
+)
 
 // Mempool is a storage for the chain transactions that are valid according to the
 // current chain state and can be included in the next block.
@@ -25,73 +35,129 @@ type Mempool struct {
 
 	// verified txs to be included in next block
 	verified Pool
-	// mutex to guard the verified pool
-	mu sync.RWMutex
 
-	// the magic function that knows best what is a valid transaction
-	verifyTx func(transactions.Transaction) error
+	// the collector to listen for new accepted blocks
+	accepted Collector
+
+	// used by tx verification procedure
+	latestBlockTimestamp int64
 
 	eventBus *wire.EventBus
+	db       database.DB
+
+	// the magic function that knows best what is valid chain Tx
+	verifyTx func(tx transactions.Transaction) error
+	quitChan chan struct{}
 }
 
-func NewMempool(eventBus *wire.EventBus, verifyTx func(transactions.Transaction) error) *Mempool {
+// checkTx is responsible to determine if a tx is valid or not
+func (m *Mempool) checkTx(tx transactions.Transaction) error {
+
+	// check if external verifyTx is provided
+	if m.verifyTx != nil {
+		return m.verifyTx(tx)
+	}
+
+	// retrieve read-only connection to the blockchain database
+	if m.db == nil {
+		drvr, err := database.From(cfg.Get().Database.Driver)
+
+		if err != nil {
+			panic(err)
+		}
+
+		db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
+
+		if err != nil {
+			panic(err)
+		}
+
+		m.db = db
+	}
+
+	// run the default blockchain verifier
+	approxBlockTime := uint64(consensusSeconds) + uint64(m.latestBlockTimestamp)
+	return verifiers.CheckTx(m.db, 0, approxBlockTime, tx)
+}
+
+type Collector struct {
+	blockChan chan block.Block
+}
+
+func (c *Collector) Collect(msg *bytes.Buffer) error {
+	b := new(block.Block)
+	err := b.Decode(bytes.NewReader(msg.Bytes()))
+
+	if err != nil {
+		return err
+	}
+
+	c.blockChan <- *b
+	return nil
+}
+
+func NewMempool(eventBus *wire.EventBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
 
 	log.Infof("Create new instance")
 
-	m := &Mempool{verifyTx: verifyTx, eventBus: eventBus}
+	m := &Mempool{
+		eventBus:             eventBus,
+		latestBlockTimestamp: math.MinInt32,
+		quitChan:             make(chan struct{})}
 
-	if m.verifyTx == nil {
-		panic("invalid verifier function")
+	if verifyTx != nil {
+		m.verifyTx = verifyTx
 	}
 
 	m.verified = m.newPool()
 
-	// topics.Tx will be emitted by RPC subsystem or Peer subsystem (deserialized from gossip msg)
-	m.pending = make(chan TxDesc, 100)
-	go wire.NewTopicListener(eventBus, m, string(topics.Tx)).Accept()
-
-	// Spawn mempool lifecycle routine
-	go func() {
-		for {
-			select {
-			case tx := <-m.pending:
-				m.onPendingTx(tx)
-			case <-time.After(3 * time.Second):
-				m.onIdle()
-			}
-		}
-	}()
-
 	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
+
+	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
+	m.pending = make(chan TxDesc, 100)
+	go wire.NewTopicListener(m.eventBus, m, string(topics.Tx)).Accept()
+
+	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
+	m.accepted.blockChan = make(chan block.Block)
+	go wire.NewTopicListener(m.eventBus, &m.accepted, string(topics.AcceptedBlock)).Accept()
 
 	return m
 }
 
-// GetVerifiedTxs to be called by any subsystem that requires the latest
-// snapshot of verified txs. It's concurrent-safe. Block proposer and RPC
-// service could be the consumers for it.
-func (m *Mempool) GetVerifiedTxs() []transactions.Transaction {
+// Run spawns the mempool lifecycle routine. The whole mempool cycle is around
+// getting input from the outside world (from input channels) and provide the
+// actual list of the verified txs (onto output channel).
+//
+// All operations are always executed in a single go-routine so no
+// protection-by-mutex needed
+func (m *Mempool) Run() {
 
-	// TODO: Two more options here to spread the good news we have verified txs
-	//
-	// 1. EventBus topic to be published but that might cause inconsistency and
-	// many times duplicated mempool
-	//
-	// 2. Make it possible for any subsystem to read verifiedTxs from the blockchain DB
+	go func() {
+		for {
+			select {
+			// Mempool output channels
+			case r := <-wire.GetVerifiedTxsChan:
+				m.onGetVerifiedTxs(r)
+			// Mempool input channels
+			case b := <-m.accepted.blockChan:
+				m.onAcceptedBlock(b)
+			case tx := <-m.pending:
+				m.onPendingTx(tx)
+			case <-time.After(30 * time.Second):
+				m.onIdle()
+			// Mempool terminating
+			case <-m.quitChan:
+				return
+			}
+		}
+	}()
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	return m.verified.Clone()
 }
 
 func (m *Mempool) onPendingTx(t TxDesc) {
 
 	// stats to log
-	log.Tracef("Stats: pending %d", len(m.pending))
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	log.Tracef("Stats: pending txs count %d", len(m.pending))
 
 	txID, _ := t.tx.CalculateHash()
 
@@ -107,8 +173,8 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 		return
 	}
 
-	// delegate the verification procedure to the consumer
-	err := m.verifyTx(t.tx)
+	// execute tx verification procedure
+	err := m.checkTx(t.tx)
 
 	if err != nil {
 		log.Errorf("Tx verification error: %v", err)
@@ -140,7 +206,12 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 	m.eventBus.Publish(string(topics.Gossip), buffer)
 }
 
-// RemoveAccepted to clean up all txs from the mempool that have been already
+func (m *Mempool) onAcceptedBlock(b block.Block) {
+	m.latestBlockTimestamp = b.Header.Timestamp
+	m.removeAccepted(b)
+}
+
+// removeAccepted to clean up all txs from the mempool that have been already
 // added to the chain.
 //
 // Instead of doing a full DB scan, here we rely on the latest accepted block to
@@ -148,10 +219,7 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 //
 // The passed block is supposed to be the last one accepted. That said, it must
 // contain a valid TxRoot.
-func (m *Mempool) RemoveAccepted(b block.Block) {
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *Mempool) removeAccepted(b block.Block) {
 
 	log.Infof("New verified block with %d txs being processed", len(b.Txs))
 
@@ -178,7 +246,7 @@ func (m *Mempool) RemoveAccepted(b block.Block) {
 		// Check if mempool verified tx is part of merkle tree of this block
 		// if not, then keep it in the mempool for the next block
 		err = m.verified.Range(func(k key, t TxDesc) error {
-			if r, _ := tree.VerifyContent(t.tx); r {
+			if r, _ := tree.VerifyContent(t.tx); !r {
 				if err := s.Put(t); err != nil {
 					return err
 				}
@@ -192,44 +260,32 @@ func (m *Mempool) RemoveAccepted(b block.Block) {
 
 		m.verified = s
 	}
-
-	// TODO: Save the timing data per tx - received, verified, accepted if all
-	// available
 }
 
 func (m *Mempool) onIdle() {
 
 	// stats to log
-	log.Infof("stats: verified %d txs, mem %d MB", m.verified.Len(), m.verified.Size())
-
-	// Cleanup stuck transactions
-	// TODO:
+	log.Infof("stats: verified %d txs, mem %.5f MB", m.verified.Len(), m.verified.Size())
 
 	// trigger alarms/notifications in casae of abnormal state
 
 	// trigger alarms on too much txs memory allocated
-	if m.verified.Size() > config.Get().Mempool.MaxSizeMB {
+	if m.verified.Size() > float64(config.Get().Mempool.MaxSizeMB) {
 		log.Errorf("Mempool is full")
 	}
 
-	// Measure average time difference between recieved and verified
-	// TODO:
-
-	// Check oldest txs if somehow were accepted into the blockchain but were
-	// not removed from mempool verified. This should be
-
+	// Check periodically the oldest txs if somehow were accepted into the
+	// blockchain but were not removed from mempool verified list.
 	/*()
 	err = c.db.View(func(t database.Transaction) error {
 		_, _, _, err := t.FetchBlockTxByHash(txID)
 		return err
 	})
 	*/
-
 }
 
 func (m *Mempool) newPool() Pool {
 
-	// TODO: Measure average block txs to determine best preallocTxs dynamically
 	preallocTxs := config.Get().Mempool.PreallocTxs
 
 	var p Pool
@@ -258,4 +314,33 @@ func (m *Mempool) Collect(message *bytes.Buffer) error {
 	m.pending <- TxDesc{tx: txs[0], received: time.Now()}
 
 	return nil
+}
+
+func (m Mempool) onGetVerifiedTxs(r wire.Req) {
+
+	w := new(bytes.Buffer)
+	lTxs := uint64(m.verified.Len())
+	if err := encoding.WriteVarInt(w, lTxs); err != nil {
+		r.Err <- err
+		return
+	}
+
+	err := m.verified.Range(func(k key, t TxDesc) error {
+		if err := t.tx.Encode(w); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		r.Err <- err
+		return
+	}
+
+	r.Resp <- *w
+}
+
+// Quit makes mempool main loop to terminate
+func (m *Mempool) Quit() {
+	m.quitChan <- struct{}{}
 }

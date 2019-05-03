@@ -1,8 +1,9 @@
 package mempool
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 // TxDesc encapsulates both tx raw and meta data
@@ -28,8 +29,8 @@ type Pool interface {
 	// Clone the entire pool
 	Clone() []transactions.Transaction
 
-	// Pool sizing in MBs
-	Size() uint32
+	// Pool sizing in KBs
+	Size() float64
 	// Len returns the number of tx entries
 	Len() int
 

@@ -36,7 +36,8 @@ func TestDemoSaveFunctionality(t *testing.T) {
 	defer fn()
 
 	eb := wire.NewEventBus()
-	chain, err := New(eb)
+	rpc := wire.NewRPCBus()
+	chain, err := New(eb, rpc)
 
 	assert.Nil(t, err)
 

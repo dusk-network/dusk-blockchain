@@ -38,3 +38,7 @@ In addition, mempool tries to be storage-agnostic so that a verified tx can be s
 - syncpool - based sync.Pool. Pending
 - distributed - distributed memory object caching system (e.g memcached).  Pending
 - persistent - persistent KV storage. Pending
+
+
+### Coding stuff
+Mempool implementation tries to avoid use of mutex to protect shared state. Instead, all input/output communication is based on channels. Similarily to Unix Select(..) sementics, mempool waits on read/write (input/output/timeout) channels to trigger an event to perform

@@ -5,19 +5,22 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+
 	// Import here any supported drivers to verify if they are fully compliant
 	// to the blockchain database layer requirements
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"io/ioutil"
 	"math"
 	"os"
 	"testing"
 	"time"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 var (
@@ -186,6 +189,59 @@ func TestFetchBlockExists(test *testing.T) {
 
 		return nil
 	})
+}
+
+func TestFetchCandidateBlock(test *testing.T) {
+
+	// Generate additional blocks to store
+	candidateBlock, err := generateBlocks(test, 1)
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	err = db.Update(func(t database.Transaction) error {
+		err := t.StoreCandidateBlock(candidateBlock[0])
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	// Fetch the candidate block
+	var b *block.Block
+	err = db.View(func(t database.Transaction) error {
+		b, err = t.FetchCandidateBlock()
+		return err
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	// Get bytes of the excepcted block
+	expectedBlock := new(bytes.Buffer)
+	_ = candidateBlock[0].Encode(expectedBlock)
+
+	if len(expectedBlock.Bytes()) == 0 {
+		test.Fatal("Empty expected block fetched")
+	}
+
+	// Get bytes of the fetched block
+	fetchedBlock := new(bytes.Buffer)
+	_ = b.Encode(fetchedBlock)
+
+	if len(fetchedBlock.Bytes()) == 0 {
+		test.Fatal("Empty fetched block fetched")
+	}
+
+	if !bytes.Equal(expectedBlock.Bytes(), fetchedBlock.Bytes()) {
+		test.Fatal("candidate block not retrieved properly from storage")
+	}
 }
 func TestFetchBlockHeader(test *testing.T) {
 

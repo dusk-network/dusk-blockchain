@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math/big"
 	"sync"
+	"time"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
@@ -18,20 +19,19 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-var consensusSeconds = 20
-
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *wire.EventBus
+	rpcBus   *wire.RPCBus
 	db       database.DB
 
 	// TODO: exposed for demo, undo later
@@ -48,12 +48,10 @@ type Chain struct {
 	roundChan <-chan uint64
 	blockChan <-chan *block.Block
 	txChan    <-chan transactions.Transaction
-
-	m *mempool.Mempool
 }
 
 // New returns a new chain object
-func New(eventBus *wire.EventBus) (*Chain, error) {
+func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 
 	drvr, err := database.From(cfg.Get().Database.Driver)
 
@@ -88,18 +86,12 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 
 	c := &Chain{
 		eventBus:     eventBus,
+		rpcBus:       rpcBus,
 		db:           db,
 		bidList:      &user.BidList{},
 		PrevBlock:    *genesisBlock,
 		blockChannel: blockChannel,
 	}
-
-	var verifyTx = func(tx transactions.Transaction) error {
-		approxBlockTime := uint64(consensusSeconds) + uint64(c.PrevBlock.Header.Timestamp)
-		return c.verifyTX(0, approxBlockTime, tx)
-	}
-
-	c.m = mempool.NewMempool(eventBus, verifyTx)
 
 	return c, nil
 }
@@ -212,4 +204,119 @@ func calculateX(d uint64, m []byte) user.Bid {
 	var bid user.Bid
 	copy(bid[:], x.Bytes()[:])
 	return bid
+}
+
+// AcceptBlock will accept a block if
+// 1. We have not seen it before
+// 2. All stateless and statefull checks are true
+// Returns nil, if checks passed and block was successfully saved
+func (c *Chain) AcceptBlock(blk block.Block) error {
+
+	// 1. Check that stateless and stateful checks pass
+	if err := verifiers.CheckBlock(c.db, c.PrevBlock, blk); err != nil {
+		return err
+	}
+
+	// 2. Save block in database
+	err := c.db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(&blk)
+	})
+
+	if err != nil {
+		return err
+	}
+
+	c.PrevBlock = blk
+
+	// 3. Notify other subsystems for the accepted block
+	buf := new(bytes.Buffer)
+	if err := blk.Encode(buf); err != nil {
+		return err
+	}
+
+	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
+
+	// 4. Gossip block
+	if err := c.propagateBlock(blk); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CreateProposalBlock create a candidate block to be proposed on next round.
+func (c Chain) CreateProposalBlock() (*block.Block, error) {
+
+	// TODO Missing fields for forging the block
+	// - Seed
+	// - CertHash
+
+	// Retrieve latest verified transactions from Mempool
+	r, err := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 1))
+
+	if err != nil {
+		return nil, err
+	}
+
+	lTxs, err := encoding.ReadVarInt(&r)
+	if err != nil {
+		return nil, err
+	}
+
+	txs, err := transactions.FromReader(&r, lTxs)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: guard the prevBlock with mutex
+	nextHeight := c.PrevBlock.Header.Height + 1
+	prevHash := c.PrevBlock.Header.Hash
+
+	h := &block.Header{
+		Version:   0,
+		Timestamp: time.Now().Unix(),
+		Height:    nextHeight,
+		PrevBlock: prevHash,
+		TxRoot:    nil,
+
+		Seed:     nil,
+		CertHash: nil,
+	}
+
+	// Generate the candidate block
+	b := &block.Block{
+		Header: h,
+		Txs:    txs,
+	}
+
+	// Update TxRoot
+	if err := b.SetRoot(); err != nil {
+		return nil, err
+	}
+
+	// Generate the block hash
+	if err := b.SetHash(); err != nil {
+		return nil, err
+	}
+
+	// Ensure the forged block satisfies all chain rules
+	if err := verifiers.CheckBlock(c.db, c.PrevBlock, *b); err != nil {
+		return nil, err
+	}
+
+	// Save it into persistent storage
+	err = c.db.Update(func(t database.Transaction) error {
+		err := t.StoreCandidateBlock(b)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }

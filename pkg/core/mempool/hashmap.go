@@ -1,8 +1,9 @@
 package mempool
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"unsafe"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 type key [32]byte
@@ -55,8 +56,8 @@ func (m *HashMap) Contains(txID []byte) bool {
 }
 
 // Size of the txs
-func (m *HashMap) Size() uint32 {
-	return uint32(m.txsSize / 1e6)
+func (m *HashMap) Size() float64 {
+	return float64(m.txsSize) / (1024 * 1024)
 }
 
 // Len returns the number of tx entries
