@@ -2,6 +2,7 @@ package events
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -15,6 +16,7 @@ type (
 		SignedHash []byte
 	}
 
+	// ReductionUnMarshaller marshals and unmarshales th
 	ReductionUnMarshaller struct {
 		*UnMarshaller
 	}
@@ -24,6 +26,11 @@ type (
 		wire.EventDeserializer
 		MarshalVoteSet(*bytes.Buffer, []wire.Event) error
 		UnmarshalVoteSet(*bytes.Buffer) ([]wire.Event, error)
+	}
+
+	// OutgoingReductionUnmarshaller unmarshals a Reduction event ready to be gossipped. Its intent is to centralize the code part that has responsibility of signing it
+	OutgoingReductionUnmarshaller struct {
+		ReductionUnmarshaller
 	}
 )
 
@@ -115,6 +122,63 @@ func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event
 		if err := a.Marshal(r, event); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func MarshalSignedVote(r *bytes.Buffer, ev *Reduction) error {
+	if err := encoding.WriteUint64(r, binary.LittleEndian, ev.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(r, ev.Step); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, ev.VotedHash); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UnmarshalSignedVote(r *bytes.Buffer, ev *Reduction) error {
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &ev.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(r, &ev.Step); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, &ev.VotedHash); err != nil {
+		return err
+	}
+	return nil
+}
+
+func NewOutgoingReductionUnmarshaller() *OutgoingReductionUnmarshaller {
+	return &OutgoingReductionUnmarshaller{
+		ReductionUnmarshaller: NewReductionUnMarshaller(),
+	}
+}
+
+func (a *OutgoingReductionUnmarshaller) NewEvent() wire.Event {
+	return NewReduction()
+}
+
+func (a *OutgoingReductionUnmarshaller) Unmarshal(reductionBuffer *bytes.Buffer, ev wire.Event) error {
+	rev := ev.(*Reduction)
+	if err := encoding.ReadUint64(reductionBuffer, binary.LittleEndian, &rev.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(reductionBuffer, &rev.Step); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(reductionBuffer, &rev.VotedHash); err != nil {
+		return err
 	}
 
 	return nil

@@ -29,6 +29,10 @@ type (
 		*UnMarshaller
 		ReductionUnmarshaller
 	}
+
+	OutgoingAgreementUnmarshaller struct {
+		ReductionUnmarshaller
+	}
 )
 
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash
@@ -203,5 +207,39 @@ func (ceu *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 	if err := encoding.Write256(r, cev.AgreedHash); err != nil {
 		return err
 	}
+	return nil
+}
+
+func NewOutgoingAgreementUnmarshaller() *OutgoingAgreementUnmarshaller {
+	return &OutgoingAgreementUnmarshaller{
+		ReductionUnmarshaller: NewAgreementUnMarshaller(),
+	}
+}
+
+func (ceu *OutgoingAgreementUnmarshaller) NewEvent() wire.Event {
+	return NewAgreement()
+}
+
+func (ceu *OutgoingAgreementUnmarshaller) Unmarshal(agreementBuffer *bytes.Buffer, ev wire.Event) error {
+	aev := ev.(*Agreement)
+	if err := encoding.ReadUint64(agreementBuffer, binary.LittleEndian, &aev.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(agreementBuffer, &aev.Step); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(agreementBuffer, &aev.AgreedHash); err != nil {
+		return err
+	}
+
+	voteSet, err := ceu.UnmarshalVoteSet(agreementBuffer)
+	if err != nil {
+		return err
+	}
+
+	aev.VoteSet = voteSet
+
 	return nil
 }
