@@ -31,6 +31,14 @@ type (
 	}
 )
 
+// NewUnMarshaller instantiates a struct to Marshal and Unmarshal event Headers
+func NewUnMarshaller() *UnMarshaller {
+	return &UnMarshaller{
+		HeaderMarshaller:   new(HeaderMarshaller),
+		HeaderUnmarshaller: new(HeaderUnmarshaller),
+	}
+}
+
 // Sender of the Event
 func (a *Header) Sender() []byte {
 	return a.PubKeyBLS
@@ -82,11 +90,4 @@ func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	return nil
-}
-
-func NewUnMarshaller() *UnMarshaller {
-	return &UnMarshaller{
-		HeaderMarshaller:   new(HeaderMarshaller),
-		HeaderUnmarshaller: new(HeaderUnmarshaller),
-	}
 }

@@ -2,13 +2,11 @@ package agreement
 
 import (
 	"bytes"
-	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/hashset"
 )
 
 type agreementHandler struct {
@@ -37,55 +35,32 @@ func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 
 // Verify checks the signature of the set
 func (a *agreementHandler) Verify(e wire.Event) error {
-	ev := e.(*events.Agreement)
-	return a.verify(ev.VoteSet, ev.AgreedHash, ev.Round, ev.Step)
-}
+	/*
+		ev := e.(*events.Agreement)
+		allvoters := 0
+		for i, votes := range ev.Votes {
+			step := ev.Step + (i - 1) // the event step is the second one of the reduction cycle
+			subcommittee := a.Unpack(votes.BitSet, ev.Round, uint8(i))
+			allvoters += len(subcommittee)
 
-func (a *agreementHandler) verify(voteSet []wire.Event, hash []byte, round uint64, step uint8) error {
+			apk, err := committee.ReconstructApk(subcommittee)
+			if err != nil {
+				return err
+			}
 
-	votes := 0
-	voted := make(map[uint8]*hashset.Set)
+			signed := new(bytes.Buffer)
+			if err := events.MarshalSignedVote(signed, ev.Round, step, ev.AgreedHash); err != nil {
+				return err
+			}
 
-	for _, ev := range voteSet {
-		vote := ev.(*events.Reduction)
-		voters, found := voted[vote.Step]
-		if !found {
-			voters = hashset.New()
-		}
-		if voters.Add(vote.Sender()) {
-			// if the voter has already voted for this step, we ignore the vote but continue
-			// TODO: we should probably do something with this nodes' reputation
-			continue
-		}
-
-		if !fromValidStep(vote.Step, step) {
-			return errors.New("vote does not belong to vote set")
+			if err := bls.Verify(apk, signed.Bytes(), votes.Signature); err != nil {
+				return err
+			}
 		}
 
-		if !a.IsMember(vote.Sender(), round, vote.Step) {
-			return errors.New("voter is not eligible to vote")
+		if len(subcommittee) < a.Quorum() {
+			return errors.New("vote set too small")
 		}
-
-		// TODO: use BLS signature aggregation to speed up verification times
-		// if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
-		// 	vote.SignedHash); err != nil {
-
-		// 	return errors.New("BLS verification failed")
-		// }
-
-		votes++
-		if votes >= a.Quorum() {
-			// as soon as we see a quorum for a step we return
-			return nil
-		}
-		// if the voter never voted for the step we add her to the set
-		voted[vote.Step] = voters
-	}
-
-	// not enough votes collected
-	return errors.New("vote set too small")
-}
-
-func fromValidStep(voteStep, setStep uint8) bool {
-	return voteStep == setStep || voteStep+1 == setStep
+	*/
+	return nil
 }
