@@ -82,3 +82,22 @@ func (as *agreementSigner) signEd25519(e *events.Agreement, eventBuf *bytes.Buff
 
 	return buf
 }
+
+/*
+// CreateStepVotes creates the aggregated representation of the BLS signature and BLS PublicKeys used to sign the reduction
+func CreateStepVotes(header *events.Header, evs []wire.Event, committee committee.Committee) (*events.StepVotes, error) {
+	var apk *bls.Apk
+	provisioners := sortedset.New()
+	sigma := &bls.Signature{}
+
+	for i, ev := range evs {
+		rEv := ev.(*events.Reduction)
+		provisioners.Insert(sender)
+
+	}
+
+	bitset := committee.Pack(provisioners, header.Round, header.Step)
+	stepVotes := events.NewStepVotes(apk.Marshal(), bitset, sigma.Marshal())
+	return stepVotes, nil
+}
+*/

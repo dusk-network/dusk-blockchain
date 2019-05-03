@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -11,9 +12,10 @@ import (
 type (
 	// StepVotes represents the aggregated votes for one reduction step. Normally an Agreement event includes two of these structures. They need to be kept separated since the BitSet representation of the Signees does not admit duplicates, whereas the same provisioner may very well be included in the committee for both Reduction steps
 	StepVotes struct {
-		Apk       []byte
+		Apk       *bls.Apk
 		BitSet    uint64
-		Signature []byte
+		Signature *bls.Signature
+		step      uint8
 	}
 
 	// Agreement is the message that encapsulates data relevant for
@@ -24,6 +26,14 @@ type (
 		SignedVoteSet []byte
 		AgreedHash    []byte
 	}
+
+	// AggregatedAgreement is the BLS aggregated representation of an Agreement Event
+	AggregatedAgreement struct {
+		*Header
+		AgreedHash []byte
+		Votes      []*StepVotes
+	}
+
 	// AgreementUnMarshaller implements both Marshaller and Unmarshaller interface
 	AgreementUnMarshaller struct {
 		*UnMarshaller
@@ -36,16 +46,43 @@ type (
 )
 
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash
-func NewStepVotes(apk []byte, bitset uint64, signature []byte) *StepVotes {
+func NewStepVotes() *StepVotes {
 	return &StepVotes{
-		Apk:       apk,
-		BitSet:    bitset,
-		Signature: signature,
+		Apk:       &bls.Apk{},
+		BitSet:    uint64(0),
+		Signature: &bls.Signature{},
+		step:      uint8(0),
 	}
 }
 
 func (sv *StepVotes) Equal(other *StepVotes) bool {
-	return bytes.Equal(sv.Apk, other.Apk) && bytes.Equal(sv.Signature, other.Signature)
+	return bytes.Equal(sv.Apk.Marshal(), other.Apk.Marshal()) && bytes.Equal(sv.Signature.Marshal(), other.Signature.Marshal())
+}
+
+func (sv *StepVotes) Add(ev *Reduction) error {
+	sender := ev.Sender()
+	if sv.step == uint8(0) {
+		pk, err := bls.UnmarshalPk(sender)
+		if err != nil {
+			return err
+		}
+		sv.Apk = bls.NewApk(pk)
+		sv.Signature, err = bls.UnmarshalSignature(ev.SignedHash)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := sv.Apk.AggregateBytes(sender); err != nil {
+		return err
+	}
+	if err := sv.Signature.AggregateBytes(ev.SignedHash); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // NewAgreement returns an empty Agreement event.
@@ -96,9 +133,16 @@ func UnmarshalVotes(r *bytes.Buffer, votes *[]*StepVotes) error {
 
 // UnmarshalStepVotes unmarshals a single StepVote
 func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
+	var err error
+	sv := NewStepVotes()
 	// APK
 	apk := make([]byte, 129)
 	if err := encoding.ReadVarBytes(r, &apk); err != nil {
+		return nil, err
+	}
+
+	sv.Apk, err = bls.UnmarshalApk(apk)
+	if err != nil {
 		return nil, err
 	}
 
@@ -107,6 +151,7 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &bitset); err != nil {
 		return nil, err
 	}
+	sv.BitSet = bitset
 
 	// Signature
 	signature := make([]byte, 33)
@@ -114,7 +159,12 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 		return nil, err
 	}
 
-	return NewStepVotes(apk, bitset, signature), nil
+	sv.Signature, err = bls.UnmarshalSignature(signature)
+	if err != nil {
+		return nil, err
+	}
+
+	return sv, nil
 }
 
 // MarshalVotes marshals an array of StepVotes
@@ -135,7 +185,7 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature for an ordered set of votes
 func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	// APK
-	if err := encoding.WriteVarBytes(r, vote.Apk); err != nil {
+	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {
 		return err
 	}
 
@@ -145,7 +195,7 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	}
 
 	// Signature
-	if err := encoding.WriteBLS(r, vote.Signature); err != nil {
+	if err := encoding.WriteBLS(r, vote.Signature.Compress()); err != nil {
 		return err
 	}
 	return nil

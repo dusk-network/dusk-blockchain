@@ -34,7 +34,11 @@ func TestStepVotes(t *testing.T) {
 	s.Aggregate(s2)
 	assert.NoError(t, bls.Verify(apk, hash, s))
 
-	expectedStepVotes := NewStepVotes(apk.Marshal(), bitset, s.Compress())
+	expectedStepVotes := NewStepVotes()
+	expectedStepVotes.Apk = apk
+	expectedStepVotes.BitSet = bitset
+	expectedStepVotes.Signature = s
+
 	buf := new(bytes.Buffer)
 
 	assert.NoError(t, MarshalStepVotes(buf, expectedStepVotes))
@@ -43,13 +47,7 @@ func TestStepVotes(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, expectedStepVotes, result)
-
-	apkRes, err := bls.UnmarshalApk(result.Apk)
-	assert.NoError(t, err)
-	sigma, err := bls.UnmarshalSignature(result.Signature)
-	assert.NoError(t, err)
-
-	assert.NoError(t, bls.Verify(apkRes, hash, sigma))
+	assert.NoError(t, bls.Verify(result.Apk, hash, result.Signature))
 }
 
 func genKeys(set *sortedset.Set) (*bls.PublicKey, *bls.SecretKey) {
