@@ -242,6 +242,14 @@ func Sign(sk *SecretKey, pk *PublicKey, msg []byte) (*Signature, error) {
 	return apkSigWrap(pk, sig)
 }
 
+func UnmarshalSignature(sig []byte) (*Signature, error) {
+	sigma := &Signature{}
+	if err := sigma.Unmarshal(sig); err != nil {
+		return nil, err
+	}
+	return sigma, nil
+}
+
 // Add creates an aggregated signature from a normal BLS Signature and related public key
 func (sigma *Signature) Add(pk *PublicKey, sig *UnsafeSignature) error {
 	other, err := apkSigWrap(pk, sig)
@@ -254,7 +262,7 @@ func (sigma *Signature) Add(pk *PublicKey, sig *UnsafeSignature) error {
 }
 
 func (sigma *Signature) AggregateBytes(other []byte) error {
-	sig := &Signature{}
+	sig := &Signature{e: nil}
 	if err := sig.Unmarshal(other); err != nil {
 		return err
 	}
