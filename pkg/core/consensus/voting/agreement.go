@@ -3,6 +3,7 @@ package voting
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -14,10 +15,12 @@ import (
 type agreementSigner struct {
 	*eventSigner
 	*events.OutgoingAgreementUnmarshaller
+	committee.Committee
 }
 
-func NewAgreementSigner(keys *user.Keys) *agreementSigner {
+func NewAgreementSigner(committee committee.Committee, keys *user.Keys) *agreementSigner {
 	return &agreementSigner{
+		Committee:                     committee,
 		eventSigner:                   newEventSigner(keys),
 		OutgoingAgreementUnmarshaller: events.NewOutgoingAgreementUnmarshaller(),
 	}

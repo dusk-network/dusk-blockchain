@@ -56,7 +56,7 @@ func MockAgreement(keys *user.Keys, hash []byte, round uint64, step uint8, votes
 	ev.Round = round
 	ev.Step = step
 	ev.PubKeyBLS = keys.BLSPubKey.Marshal()
-	signer := voting.NewAgreementSigner(keys)
+	signer := voting.NewAgreementSigner(nil, keys)
 	ev.VoteSet = votes
 	ev.AgreedHash = hash
 	ev.SignedVoteSet, err = signer.SignVotes(ev.VoteSet)
@@ -101,7 +101,7 @@ func MockVoteAgreement(hash []byte, round uint64, step uint8, voteNr int) wire.E
 
 func MockAgreementBuf(hash []byte, round uint64, step uint8, voteNr int) *bytes.Buffer {
 	ev := MockVoteAgreement(hash, round, step, voteNr)
-	signer := voting.NewAgreementSigner(nil)
+	signer := voting.NewAgreementSigner(nil, nil)
 	b := make([]byte, 0)
 	buf := bytes.NewBuffer(b)
 	_ = signer.Marshal(buf, ev)

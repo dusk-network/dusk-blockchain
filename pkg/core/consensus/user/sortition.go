@@ -12,39 +12,39 @@ import (
 // VotingCommittee represents a set of provisioners with voting rights at a certain
 // point in the consensus. The set is sorted by the int value of the public key in increasing order (higher last)
 type VotingCommittee struct {
-	set sortedset.Set
+	sortedset.Set
 }
 
 func newCommittee() *VotingCommittee {
 	// return make([]*big.Int, 0)
 	return &VotingCommittee{
-		set: sortedset.New(),
+		Set: sortedset.New(),
 	}
 }
 
 func (v *VotingCommittee) Size() int {
-	return len(v.set)
+	return len(v.Set)
 }
 
 func (v *VotingCommittee) Remove(pk []byte) bool {
-	return v.set.Remove(pk)
+	return v.Set.Remove(pk)
 }
 
 func (v *VotingCommittee) MemberKeys() [][]byte {
 	pks := make([][]byte, 0)
-	for _, pk := range v.set {
+	for _, pk := range v.Set {
 		pks = append(pks, pk.Bytes())
 	}
 	return pks
 }
 
 func (v *VotingCommittee) Equal(other *VotingCommittee) bool {
-	return v.set.Equal(other.set)
+	return v.Set.Equal(other.Set)
 }
 
 // IsMember checks if `pubKeyBLS` is within the VotingCommittee.
 func (v *VotingCommittee) IsMember(pubKeyBLS []byte) bool {
-	_, found := v.set.IndexOf(pubKeyBLS)
+	_, found := v.IndexOf(pubKeyBLS)
 	return found
 }
 
@@ -82,7 +82,7 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 	W := new(big.Int).SetUint64(totalWeight)
 	size := p.VotingCommitteeSize()
 
-	for i := 0; len(votingCommittee.set) < size; i++ {
+	for i := 0; votingCommittee.Size() < size; i++ {
 		hash, err := createSortitionHash(round, step, i)
 		if err != nil {
 			panic(err)
@@ -90,7 +90,7 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 
 		score := generateSortitionScore(hash, W)
 		blsPk := p.extractCommitteeMember(score)
-		votingCommittee.set.Insert(blsPk.Marshal())
+		votingCommittee.Insert(blsPk.Marshal())
 	}
 
 	return votingCommittee

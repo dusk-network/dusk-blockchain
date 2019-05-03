@@ -22,17 +22,3 @@ func TestVoteVerification(t *testing.T) {
 
 	assert.NoError(t, handler.Verify(agreement))
 }
-
-func TestDuplicateVoteSetNotAccounted(t *testing.T) {
-	hash, _ := crypto.RandEntropy(32)
-	k, ev := MockVote(nil, hash, 1, 1)
-	_, cpy := MockVote(k, hash, 1, 1)
-	agreement := MockAgreement(k, hash, 1, 1, []wire.Event{ev, cpy})
-
-	// mocking voters
-	c := mockCommittee(2, true)
-
-	handler := newHandler(c)
-
-	assert.Error(t, handler.Verify(agreement))
-}

@@ -15,13 +15,13 @@ func TestRemove(t *testing.T) {
 	for i := 0; i < nr; i++ {
 		k, _ := NewRandKeys()
 		bk := (&big.Int{}).SetBytes(k.BLSPubKey.Marshal())
-		committee.set = append(committee.set, bk)
+		committee.Set = append(committee.Set, bk)
 	}
-	sort.Sort(committee.set)
+	sort.Sort(committee.Set)
 
-	lastElem := committee.set[nr-1].Bytes()
-	committee.set.Remove(lastElem)
-	i, found := committee.set.IndexOf(lastElem)
+	lastElem := committee.Set[nr-1].Bytes()
+	committee.Set.Remove(lastElem)
+	i, found := committee.Set.IndexOf(lastElem)
 	assert.False(t, found)
 	assert.Equal(t, nr-1, i)
 }
@@ -57,7 +57,7 @@ func TestMemberKeys(t *testing.T) {
 	mk := v.MemberKeys()
 	assert.Equal(t, 50, len(mk))
 	for i := 0; i < 3; i++ {
-		assert.True(t, bytes.Equal(mk[i], v.set[i].Bytes()))
+		assert.True(t, bytes.Equal(mk[i], v.Set[i].Bytes()))
 	}
 
 }
