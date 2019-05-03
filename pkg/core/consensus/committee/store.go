@@ -9,6 +9,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
 
 // Store is the component that handles Committee formation and management
@@ -20,8 +21,13 @@ type (
 		AmMember(uint64, uint8) bool
 		IsMember([]byte, uint64, uint8) bool
 		Quorum() int
-
 		ReportAbsentees([]wire.Event, uint64, uint8) error
+
+		// Pack creates a uint64 bit representation of a sorted sub-committee for a given round and step
+		Pack(sortedset.Set, uint64, uint8) uint64
+
+		// Unpack reconstruct a sorted sub-committee from a uint64 bitset, a round and a step
+		Unpack(uint64, uint64, uint8) sortedset.Set
 	}
 
 	Store struct {
@@ -100,6 +106,21 @@ func (c *Store) Quorum() int {
 	committeeSize := p.VotingCommitteeSize()
 	quorum := int(float64(committeeSize) * 0.75)
 	return quorum
+}
+
+// Pack creates a uint64 bitset representation of a Committee subset for a given round and step
+func (c *Store) Pack(set sortedset.Set, round uint64, step uint8) uint64 {
+	p := c.copyProvisioners()
+	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	return votingCommittee.Bits(set)
+
+}
+
+// Unpack the Committee subset from a uint64 bitset representation for a give round and step
+func (c *Store) Unpack(bitset uint64, round uint64, step uint8) sortedset.Set {
+	p := c.copyProvisioners()
+	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	return votingCommittee.Intersect(bitset)
 }
 
 // ReportAbsentees will send public keys of absent provisioners to the moderator
