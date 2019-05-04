@@ -2,10 +2,10 @@ package mempool
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"math"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -30,7 +31,7 @@ var verifyFunc = func(tx transactions.Transaction) error {
 	return nil
 }
 
-// Collect implements wire.EventCollector.
+// Collect implements wire.EventCollector to collect all propagated txs
 func (c *ctx) Collect(message *bytes.Buffer) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -55,19 +56,21 @@ func (c *ctx) Collect(message *bytes.Buffer) error {
 // Helper struct around mempool asserts to shorten common code
 var c *ctx
 
+// ctx main role is to collect the expected verified and propagated txs so that
+// it can assert that mempool has the proper set of txs after particular events
 type ctx struct {
 	verifiedTx []transactions.Transaction
 	propagated []transactions.Transaction
 	mu         sync.Mutex
-	m          *Mempool
 
+	m      *Mempool
 	bus    *wire.EventBus
 	rpcBus *wire.RPCBus
 }
 
 func initCtx(t *testing.T) *ctx {
 
-	time.Sleep(1 * time.Second)
+	// One ctx instance per a  package testing
 	if c == nil {
 		c = &ctx{}
 		c.verifiedTx = make([]transactions.Transaction, 0)
@@ -85,7 +88,7 @@ func initCtx(t *testing.T) *ctx {
 		c.propagated = make([]transactions.Transaction, 0)
 		go wire.NewTopicListener(c.bus, c, string(topics.Gossip)).Accept()
 
-		// mempool
+		// initiate a mempool with custom verification function
 		c.m = NewMempool(c.bus, verifyFunc)
 	} else {
 
@@ -101,6 +104,7 @@ func initCtx(t *testing.T) *ctx {
 	return c
 }
 
+// adding tx in ctx means mempool is expected to store it in the verified list
 func (c *ctx) addTx(tx transactions.Transaction) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -116,7 +120,7 @@ func (c *ctx) wait() {
 	time.Sleep(500 * time.Millisecond)
 }
 
-func (c *ctx) assert(t *testing.T, propagated bool) {
+func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
@@ -143,38 +147,17 @@ func (c *ctx) assert(t *testing.T, propagated bool) {
 		}
 
 		if !exists {
+			// ctx is expected to have the same list of verified txs as mempool stores
 			t.Fatalf("a verified tx not found (index %d)", i)
 		}
 	}
 
-	if propagated {
+	if checkPropagated {
 		if len(txs) != len(c.propagated) {
 			t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
 		}
 	}
 
-}
-
-// Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
-func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transaction {
-	var txs []transactions.Transaction
-
-	var i uint16
-	for ; i < txsBatchCount; i++ {
-
-		txs = append(txs, helper.RandomStandardTx(t, false))
-		txs = append(txs, helper.RandomTLockTx(t, false))
-
-		stake, err := helper.RandomStakeTx(t, false)
-		assert.Nil(t, err)
-		txs = append(txs, stake)
-
-		bid, err := helper.RandomBidTx(t, false)
-		assert.Nil(t, err)
-		txs = append(txs, bid)
-	}
-
-	return txs
 }
 
 func TestProcessPendingTxs(t *testing.T) {
@@ -222,40 +205,49 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 	initCtx(t)
 
+	batchCount := 4
+	// generate and store txs that are expected to be valid
+	for i := 0; i < batchCount; i++ {
+		txs := randomSliceOfTxs(t, 3)
+		for _, tx := range txs {
+			c.addTx(tx)
+		}
+	}
+
 	wg := sync.WaitGroup{}
-	var version uint64
-	for i := 0; i < 3; i++ {
+
+	// Publish valid txs in concurrent manner
+	for i := 0; i < batchCount; i++ {
+
+		// get a slice of all txs
+		from := 12 * i
+		to := from + 12
 
 		wg.Add(1)
-		// Publish valid txs
-		go func() {
-
-			txs := randomSliceOfTxs(t, 3)
+		go func(txs []transactions.Transaction) {
 			for _, tx := range txs {
 				buf := new(bytes.Buffer)
 				_ = tx.Encode(buf)
-
-				c.addTx(tx)
 				c.bus.Publish(string(topics.Tx), buf)
 			}
 			wg.Done()
-		}()
+		}(c.verifiedTx[from:to])
+	}
 
+	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		// Publish invalid txs
 		go func() {
 			for y := 0; y <= 5; y++ {
 				buf := new(bytes.Buffer)
 
-				// change version to get valid/invalid txs
-				v := atomic.AddUint64(&version, 1)
-				tx := transactions.NewStandard(uint8(v), 2)
+				e, _ := crypto.RandEntropy(64)
+				fee := binary.LittleEndian.Uint64(e)
+				tx := transactions.NewStandard(1, fee)
 				_ = tx.Encode(buf)
 
-				c.addTx(tx)
 				c.bus.Publish(string(topics.Tx), buf)
 			}
-
 			wg.Done()
 		}()
 	}
@@ -342,4 +334,26 @@ func TestCoibaseTxsNotAllowed(t *testing.T) {
 
 	// Assert that all non-coinbase txs have been verified
 	c.assert(t, true)
+}
+
+// Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
+func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transaction {
+	var txs []transactions.Transaction
+
+	var i uint16
+	for ; i < txsBatchCount; i++ {
+
+		txs = append(txs, helper.RandomStandardTx(t, false))
+		txs = append(txs, helper.RandomTLockTx(t, false))
+
+		stake, err := helper.RandomStakeTx(t, false)
+		assert.Nil(t, err)
+		txs = append(txs, stake)
+
+		bid, err := helper.RandomBidTx(t, false)
+		assert.Nil(t, err)
+		txs = append(txs, bid)
+	}
+
+	return txs
 }

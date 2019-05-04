@@ -23,6 +23,7 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
 const (
 	consensusSeconds = 20
+	MaxPendingLen    = 1000
 )
 
 // Mempool is a storage for the chain transactions that are valid according to the
@@ -114,7 +115,7 @@ func NewMempool(eventBus *wire.EventBus, verifyTx func(tx transactions.Transacti
 	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
-	m.pending = make(chan TxDesc, 100)
+	m.pending = make(chan TxDesc, MaxPendingLen)
 	go wire.NewTopicListener(m.eventBus, m, string(topics.Tx)).Accept()
 
 	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
@@ -267,14 +268,16 @@ func (m *Mempool) onIdle() {
 	// stats to log
 	log.Infof("stats: verified %d txs, mem %.5f MB", m.verified.Len(), m.verified.Size())
 
-	// trigger alarms/notifications in casae of abnormal state
+	// trigger alarms/notifications in case of abnormal state
 
 	// trigger alarms on too much txs memory allocated
 	if m.verified.Size() > float64(config.Get().Mempool.MaxSizeMB) {
 		log.Errorf("Mempool is full")
 	}
 
-	// Check periodically the oldest txs if somehow were accepted into the
+	// TODO: Get rid of stuck/expired transactions
+
+	// TODO: Check periodically the oldest txs if somehow were accepted into the
 	// blockchain but were not removed from mempool verified list.
 	/*()
 	err = c.db.View(func(t database.Transaction) error {
