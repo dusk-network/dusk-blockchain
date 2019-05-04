@@ -124,7 +124,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 3))
+	r, _ := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 1))
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 	txs, _ := transactions.FromReader(&r, lTxs)
@@ -205,9 +205,11 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 	initCtx(t)
 
-	batchCount := 4
+	batchCount := 3
 	// generate and store txs that are expected to be valid
-	for i := 0; i < batchCount; i++ {
+	for i := 0; i <= batchCount; i++ {
+
+		// Generate 3*4 txs
 		txs := randomSliceOfTxs(t, 3)
 		for _, tx := range txs {
 			c.addTx(tx)
@@ -217,11 +219,11 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	// Publish valid txs in concurrent manner
-	for i := 0; i < batchCount; i++ {
+	for i := 0; i <= batchCount; i++ {
 
 		// get a slice of all txs
-		from := 12 * i
-		to := from + 12
+		from := 3 * 4 * i
+		to := from + 3*4
 
 		wg.Add(1)
 		go func(txs []transactions.Transaction) {
