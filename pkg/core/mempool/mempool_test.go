@@ -255,6 +255,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	}
 
 	wg.Wait()
+	c.wait()
 
 	c.assert(t, true)
 }
