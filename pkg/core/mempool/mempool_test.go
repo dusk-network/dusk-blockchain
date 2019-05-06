@@ -304,6 +304,52 @@ func TestRemoveAccepted(t *testing.T) {
 	c.assert(t, false)
 }
 
+// TestDoubleSpent ensures mempool rejects txs with keyImages that have been
+// already spent from other transactions in the pool.
+func TestDoubleSpent(t *testing.T) {
+
+	initCtx(t)
+
+	// generate 3*4 random txs
+	txs := randomSliceOfTxs(t, 3)
+
+	for _, tx := range txs {
+		buf := new(bytes.Buffer)
+		err := tx.Encode(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Publish valid tx
+		c.bus.Publish(string(topics.Tx), buf)
+		c.addTx(tx)
+	}
+
+	// Create double-spent tx by replicating an already added txs but with
+	// differnt TxID
+	tx := transactions.NewStandard(0, txs[0].StandardTX().Fee+1)
+
+	// Inputs
+	tx.Inputs = txs[0].StandardTX().Inputs
+
+	// Outputs
+	tx.Outputs = txs[0].StandardTX().Outputs
+
+	buf := new(bytes.Buffer)
+	err := tx.Encode(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Publish valid tx
+	c.bus.Publish(string(topics.Tx), buf)
+	// c.addTx(tx) do not add it into the expected list
+
+	c.wait()
+
+	c.assert(t, false)
+}
+
 func TestCoibaseTxsNotAllowed(t *testing.T) {
 
 	initCtx(t)

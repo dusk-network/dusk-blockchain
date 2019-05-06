@@ -18,7 +18,7 @@ type TxDesc struct {
 	// accepted time.Time
 }
 
-// Limited set of accessors to force design constraints
+// Pool represents a transaction pool of the verified txs only.
 type Pool interface {
 
 	// Put sets the value for the given key. It overwrites any previous value
@@ -26,6 +26,9 @@ type Pool interface {
 	Put(t TxDesc) error
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
+	// ContainsKeyImage returns true if txpool includes a input that contains
+	// this keyImage
+	ContainsKeyImage(keyImage []byte) bool
 	// Clone the entire pool
 	Clone() []transactions.Transaction
 

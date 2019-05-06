@@ -6,15 +6,25 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
-type key [32]byte
+const (
+	keyImageSize = 32
+)
 
-// Pool implementation based on golang map. The generic solution to bench
-// against.
-type HashMap struct {
-	data     map[key]TxDesc
-	Capacity uint32
-	txsSize  uint64
-}
+type (
+	key      [32]byte
+	keyImage [keyImageSize]byte
+
+	// HashMap represents a pool implementation based on golang map. The generic
+	// solution to bench against.
+	HashMap struct {
+		// transactions pool
+		data map[key]TxDesc
+		// spent key images from the transactions in the pool
+		spentkeyImages map[keyImage]bool
+		Capacity       uint32
+		txsSize        uint64
+	}
+)
 
 // Put sets the value for the given key. It overwrites any previous value
 // for that key;
@@ -24,12 +34,27 @@ func (m *HashMap) Put(t TxDesc) error {
 		m.data = make(map[key]TxDesc, m.Capacity)
 	}
 
+	if m.spentkeyImages == nil {
+		// TODO: consider capacity value here
+		m.spentkeyImages = make(map[keyImage]bool)
+	}
+
+	// store tx
 	txID, _ := t.tx.CalculateHash()
 	var k key
 	copy(k[:], txID)
 	m.data[k] = t
 
 	m.txsSize += uint64(unsafe.Sizeof(t.tx))
+
+	// store all tx key images, if provided
+	for _, input := range t.tx.StandardTX().Inputs {
+		if len(input.KeyImage) == keyImageSize {
+			var ki keyImage
+			copy(ki[:], input.KeyImage)
+			m.spentkeyImages[ki] = true
+		}
+	}
 
 	return nil
 }
@@ -74,4 +99,13 @@ func (m *HashMap) Range(fn func(k key, t TxDesc) error) error {
 		}
 	}
 	return nil
+}
+
+// ContainsKeyImage returns true if txpool includes a input that contains
+// this keyImage
+func (m *HashMap) ContainsKeyImage(txInputKeyImage []byte) bool {
+	var ki keyImage
+	copy(ki[:], txInputKeyImage)
+	_, ok := m.spentkeyImages[ki]
+	return ok
 }

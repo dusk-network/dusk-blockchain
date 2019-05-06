@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"bytes"
+	"errors"
 	"math"
 	"time"
 
@@ -23,7 +24,7 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
 const (
 	consensusSeconds = 20
-	MaxPendingLen    = 1000
+	maxPendingLen    = 1000
 )
 
 // Mempool is a storage for the chain transactions that are valid according to the
@@ -97,6 +98,7 @@ func (c *Collector) Collect(msg *bytes.Buffer) error {
 	return nil
 }
 
+// NewMempool instantiates and initializes node mempool
 func NewMempool(eventBus *wire.EventBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
 
 	log.Infof("Create new instance")
@@ -115,7 +117,7 @@ func NewMempool(eventBus *wire.EventBus, verifyTx func(tx transactions.Transacti
 	log.Infof("Running with pool type %s", config.Get().Mempool.PoolType)
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
-	m.pending = make(chan TxDesc, MaxPendingLen)
+	m.pending = make(chan TxDesc, maxPendingLen)
 	go wire.NewTopicListener(m.eventBus, m, string(topics.Tx)).Accept()
 
 	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
@@ -155,6 +157,8 @@ func (m *Mempool) Run() {
 
 }
 
+// onPendingTx ensures all transaction rules are satisfied before adding the tx
+// into the verified pool
 func (m *Mempool) onPendingTx(t TxDesc) {
 
 	// stats to log
@@ -168,9 +172,15 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 		return
 	}
 
-	// expect it is not already accepted tx
+	// expect it is not already a verified tx
 	if m.verified.Contains(txID) {
 		log.Warnf("Duplicated tx")
+		return
+	}
+
+	// expect it is not already spent from mempool verified txs
+	if err := m.checkTXDoubleSpent(t.tx); err != nil {
+		log.Warn(err.Error())
 		return
 	}
 
@@ -328,6 +338,9 @@ func (m Mempool) onGetVerifiedTxs(r wire.Req) {
 		return
 	}
 
+	// TODO: Currently mempool returns all verified txs here. Once the limit of
+	// transaction space in a block is determined, mempool will use transaction
+	// fee to choose which txs to be returned here.
 	err := m.verified.Range(func(k key, t TxDesc) error {
 		if err := t.tx.Encode(w); err != nil {
 			return err
@@ -341,6 +354,20 @@ func (m Mempool) onGetVerifiedTxs(r wire.Req) {
 	}
 
 	r.Resp <- *w
+}
+
+// checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes
+// all checks against mempool verified txs but not blockchain db.
+func (m *Mempool) checkTXDoubleSpent(tx transactions.Transaction) error {
+
+	for _, input := range tx.StandardTX().Inputs {
+		exists := m.verified.ContainsKeyImage(input.KeyImage)
+		if exists {
+			return errors.New("tx already spent")
+		}
+	}
+
+	return nil
 }
 
 // Quit makes mempool main loop to terminate
