@@ -2,12 +2,13 @@ package agreement
 
 import (
 	"bytes"
-	"encoding/binary"
+	"crypto/rand"
 
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -18,68 +19,55 @@ import (
 
 // PublishMock is a mock-up method to facilitate testing of publishing of Agreement events
 func PublishMock(bus wire.EventBroker, hash []byte, round uint64, step uint8, voteNr int) {
-	buf := MockOutgoingAgreementBuf(hash, round, step, voteNr)
-	// buf = MarshalOutgoing(buf)
+	buf := MockAgreementBuf(hash, round, step, voteNr)
 	bus.Publish(msg.OutgoingBlockAgreementTopic, buf)
 }
 
-func MockOutgoingAgreementBuf(hash []byte, round uint64, step uint8, voteNr int) *bytes.Buffer {
-	votes := make([]wire.Event, 0)
-	for i := 0; i < voteNr; i++ {
-		k, _ := user.NewRandKeys()
-		_, e := MockVote(k, hash, round, step)
-		votes = append(votes, e)
-	}
+func MockAggregatedAgreement(hash []byte, round uint64, step uint8, voteNr int) *events.AggregatedAgreement {
+	a := events.NewAggregatedAgreement()
+	pk, sk, _ := bls.GenKeyPair(rand.Reader)
+	a.AgreedHash = hash
+	a.Round = round
+	a.Step = step
+
+	a.VotesPerStep = genVotes(hash, round, step, voteNr)
 	buf := new(bytes.Buffer)
-	marshaller := events.NewReductionUnMarshaller()
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, round); err != nil {
-		panic(err)
-	}
+	_ = events.MarshalVotes(buf, a.VotesPerStep)
+	sig, _ := bls.Sign(sk, pk, buf.Bytes())
+	a.SignedVotes = sig.Compress()
+	a.PubKeyBLS = pk.Marshal()
+	return a
+}
 
-	if err := encoding.WriteUint8(buf, step); err != nil {
-		panic(err)
+func genVotes(hash []byte, round uint64, step uint8, nr int) []*events.StepVotes {
+	if nr < 2 {
+		panic("At least two votes are required to mock an Agreement")
 	}
-
-	if err := encoding.Write256(buf, hash); err != nil {
-		panic(err)
+	votes := make([]*events.StepVotes, 2)
+	for i := 0; i < nr; i++ {
+		keys, _ := user.NewRandKeys()
+		stepCycle := i % 2
+		stepVote := votes[stepCycle]
+		if stepVote == nil {
+			stepVote = events.NewStepVotes()
+		}
+		_, rEv := reduction.MockReduction(keys, hash, round, step-uint8(stepCycle))
+		if err := stepVote.Add(rEv); err != nil {
+			panic(err)
+		}
+		votes[stepCycle] = stepVote
 	}
-
-	if err := marshaller.MarshalVoteSet(buf, votes); err != nil {
-		panic(err)
-	}
-	return buf
+	return votes
 }
 
 func MockAgreement(keys *user.Keys, hash []byte, round uint64, step uint8, votes []wire.Event) *events.Agreement {
-	var err error
 	ev := events.NewAgreement()
 	ev.Round = round
 	ev.Step = step
-	ev.PubKeyBLS = keys.BLSPubKey.Marshal()
-	signer := voting.NewAgreementSigner(nil, keys)
+	ev.PubKeyBLS = keys.BLSPubKeyBytes
 	ev.VoteSet = votes
 	ev.AgreedHash = hash
-	ev.SignedVoteSet, err = signer.SignVotes(ev.VoteSet)
-	if err != nil {
-		panic(err)
-	}
 	return ev
-}
-
-func MockVote(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, wire.Event) {
-	vote := events.NewReduction()
-	vote.Header.Round = round
-	vote.Header.Step = step
-
-	if keys == nil {
-		keys, _ = user.NewRandKeys()
-	}
-
-	vote.Header.PubKeyBLS = keys.BLSPubKey.Marshal()
-	vote.VotedHash = hash
-	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, hash)
-	vote.SignedHash = sigma.Compress()
-	return keys, vote
 }
 
 func MockVoteAgreement(hash []byte, round uint64, step uint8, voteNr int) wire.Event {
@@ -88,11 +76,11 @@ func MockVoteAgreement(hash []byte, round uint64, step uint8, voteNr int) wire.E
 	votes := make([]wire.Event, 0)
 	for i := 0; i < voteNr; i++ {
 		if i == 0 {
-			k, e = MockVote(nil, hash, round, step)
+			k, e = reduction.MockReduction(nil, hash, round, step)
 			votes = append(votes, e)
 			continue
 		}
-		_, e = MockVote(nil, hash, round, step)
+		_, e = reduction.MockReduction(nil, hash, round, step)
 		votes = append(votes, e)
 	}
 	ev := MockAgreement(k, hash, round, step, votes)

@@ -14,15 +14,15 @@ import (
 
 type agreementSigner struct {
 	*eventSigner
-	*events.OutgoingAgreementUnmarshaller
+	*events.AgreementUnMarshaller
 	committee.Committee
 }
 
 func NewAgreementSigner(committee committee.Committee, keys *user.Keys) *agreementSigner {
 	return &agreementSigner{
-		Committee:                     committee,
-		eventSigner:                   newEventSigner(keys),
-		OutgoingAgreementUnmarshaller: events.NewOutgoingAgreementUnmarshaller(),
+		Committee:             committee,
+		eventSigner:           newEventSigner(keys),
+		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
 	}
 }
 
@@ -107,7 +107,8 @@ func (as *agreementSigner) Aggregate(a *events.Agreement) (*events.AggregatedAgr
 		stepVotesMap[reduction.Step] = sv
 	}
 
-	aggregatedAgreement := events.NewAggregatedAgreement(a)
+	aggregatedAgreement := events.NewAggregatedAgreement()
+	aggregatedAgreement.Header = a.Header
 	i := 0
 	for _, stepVotes := range stepVotesMap {
 		sv, provisioners := stepVotes.StepVotes, stepVotes.Set

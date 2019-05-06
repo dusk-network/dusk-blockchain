@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"golang.org/x/crypto/ed25519"
 )
 
 type (
@@ -24,6 +27,7 @@ type (
 	ReductionUnmarshaller interface {
 		wire.EventMarshaller
 		wire.EventDeserializer
+		// HACK: why are these 2 methods here?
 		MarshalVoteSet(*bytes.Buffer, []wire.Event) error
 		UnmarshalVoteSet(*bytes.Buffer) ([]wire.Event, error)
 	}
@@ -92,6 +96,7 @@ func (a *ReductionUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
+// TODO: generalize the set/array marshalling/unmarshalling through an interface
 func (a *ReductionUnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event, error) {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
@@ -124,6 +129,58 @@ func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event
 		}
 	}
 
+	return nil
+}
+
+// SignReduction is a shortcut to BLS and ED25519 sign a reduction message
+func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
+	e := NewReduction()
+	unMarshaller := NewReductionUnMarshaller()
+	if err := unMarshaller.Unmarshal(buf, e); err != nil {
+		return err
+	}
+
+	if err := SignReductionEvent(e, keys); err != nil {
+		return err
+	}
+
+	outbuf := new(bytes.Buffer)
+	if err := unMarshaller.Marshal(outbuf, e); err != nil {
+		return err
+	}
+
+	signature := ed25519.Sign(*keys.EdSecretKey, outbuf.Bytes())
+
+	signed := new(bytes.Buffer)
+	if err := encoding.Write512(signed, signature); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(signed, signature); err != nil {
+		return err
+	}
+
+	if _, err := signed.Write(outbuf.Bytes()); err != nil {
+		return err
+	}
+
+	*buf = *signed
+	return nil
+}
+
+// SignReductionEvent is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
+func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
+	buf := new(bytes.Buffer)
+	if err := MarshalSignedVote(buf, ev); err != nil {
+		return err
+	}
+
+	signedHash, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, ev.VotedHash)
+	if err != nil {
+		return err
+	}
+	ev.SignedHash = signedHash.Compress()
+	ev.Header.PubKeyBLS = keys.BLSPubKeyBytes
 	return nil
 }
 

@@ -19,13 +19,12 @@ type (
 		Step      uint8
 	}
 
-	// Agreement is the message that encapsulates data relevant for
-	// components relying on committee information
+	// Agreement is the Event created at the end of the Reduction process. Considering that it needs to be passed to the Signer (and transform into an AggregatedAgreement there), it includes no signature
+
 	Agreement struct {
 		*Header
-		SignedVoteSet []byte
-		VoteSet       []wire.Event
-		AgreedHash    []byte
+		VoteSet    []wire.Event
+		AgreedHash []byte
 	}
 
 	// AggregatedAgreement is the BLS aggregated representation of an Agreement Event
@@ -102,8 +101,17 @@ func NewAgreement() *Agreement {
 // Equal as specified in the Event interface
 func (ceh *Agreement) Equal(e wire.Event) bool {
 	other, ok := e.(*Agreement)
-	return ok && ceh.Header.Equal(other.Header) &&
-		bytes.Equal(other.SignedVoteSet, ceh.SignedVoteSet)
+	if !(ok && ceh.Header.Equal(other.Header)) {
+		return false
+	}
+
+	for i, ev := range ceh.VoteSet {
+		if !ev.Equal(other.VoteSet[i]) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // NewAgreementUnMarshaller creates a new AgreementUnMarshaller. Internally it creates an HeaderUnMarshaller which takes care of Decoding and Encoding operations
@@ -119,9 +127,9 @@ func (a *AgreementUnMarshaller) NewEvent() wire.Event {
 	return NewAgreement()
 }
 
-func NewAggregatedAgreement(a *Agreement) *AggregatedAgreement {
+func NewAggregatedAgreement() *AggregatedAgreement {
 	return &AggregatedAgreement{
-		Header:       a.Header,
+		Header:       &Header{},
 		VotesPerStep: make([]*StepVotes, 2),
 		SignedVotes:  make([]byte, 33),
 		AgreedHash:   make([]byte, 32),
@@ -133,8 +141,7 @@ func NewAggregatedAgreement(a *Agreement) *AggregatedAgreement {
 // * Header [BLS Public Key; Round; Step]
 // * AggregatedAgreement [Signed Vote Set; Vote Set; BlockHash]
 func UnmarshalAggregatedAgreement(r *bytes.Buffer) (*AggregatedAgreement, error) {
-	aggro := NewAgreement()
-	a := NewAggregatedAgreement(aggro)
+	a := NewAggregatedAgreement()
 	h := new(HeaderUnmarshaller)
 	if err := h.Unmarshal(r, a.Header); err != nil {
 		return nil, err
@@ -282,10 +289,6 @@ func (ceu *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) erro
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &cev.SignedVoteSet); err != nil {
-		return err
-	}
-
 	voteSet, err := ceu.UnmarshalVoteSet(r)
 	if err != nil {
 		return err
@@ -315,11 +318,6 @@ func (ceu *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 		return err
 	}
 
-	// Marshal BLS Signature of VoteSet
-	if err := encoding.WriteBLS(r, cev.SignedVoteSet); err != nil {
-		return err
-	}
-
 	// Marshal VoteSet
 	if err := ceu.MarshalVoteSet(r, cev.VoteSet); err != nil {
 		return err
@@ -328,39 +326,5 @@ func (ceu *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 	if err := encoding.Write256(r, cev.AgreedHash); err != nil {
 		return err
 	}
-	return nil
-}
-
-func NewOutgoingAgreementUnmarshaller() *OutgoingAgreementUnmarshaller {
-	return &OutgoingAgreementUnmarshaller{
-		ReductionUnmarshaller: NewAgreementUnMarshaller(),
-	}
-}
-
-func (ceu *OutgoingAgreementUnmarshaller) NewEvent() wire.Event {
-	return NewAgreement()
-}
-
-func (ceu *OutgoingAgreementUnmarshaller) Unmarshal(agreementBuffer *bytes.Buffer, ev wire.Event) error {
-	aev := ev.(*Agreement)
-	if err := encoding.ReadUint64(agreementBuffer, binary.LittleEndian, &aev.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(agreementBuffer, &aev.Step); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(agreementBuffer, &aev.AgreedHash); err != nil {
-		return err
-	}
-
-	voteSet, err := ceu.UnmarshalVoteSet(agreementBuffer)
-	if err != nil {
-		return err
-	}
-
-	aev.VoteSet = voteSet
-
 	return nil
 }

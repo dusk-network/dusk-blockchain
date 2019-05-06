@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const All = uint64(0)
+
 type Set []*big.Int
 
 func (v Set) Len() int           { return len(v) }
@@ -60,6 +62,10 @@ func (v *Set) Remove(pubKeyBLS []byte) bool {
 
 // Intersect the bit representation of a VotingCommittee subset with the whole VotingCommittee set
 func (v Set) Intersect(committeeSet uint64) Set {
+	if committeeSet == All || committeeSet == v.Whole() {
+		return v[:]
+	}
+
 	c := New()
 	for i, elem := range v {
 		// looping on all bits to see which one is set to 1
@@ -113,6 +119,14 @@ func (v *Set) Insert(b []byte) bool {
 		return true
 	}
 	return false
+}
+
+func (v Set) Whole() uint64 {
+	ret := uint64(0)
+	for i := range v {
+		ret |= (1 << uint(i))
+	}
+	return ret
 }
 
 func shortStr(i *big.Int) string {
