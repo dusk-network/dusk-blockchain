@@ -171,7 +171,7 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 // SignReductionEvent is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
 func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	buf := new(bytes.Buffer)
-	if err := MarshalSignedVote(buf, ev); err != nil {
+	if err := MarshalSignableVote(buf, ev.Round, ev.Step, ev.VotedHash); err != nil {
 		return err
 	}
 
@@ -184,31 +184,16 @@ func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	return nil
 }
 
-func MarshalSignedVote(r *bytes.Buffer, ev *Reduction) error {
-	if err := encoding.WriteUint64(r, binary.LittleEndian, ev.Round); err != nil {
+func MarshalSignableVote(r *bytes.Buffer, round uint64, step uint8, votedHash []byte) error {
+	if err := encoding.WriteUint64(r, binary.LittleEndian, round); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint8(r, ev.Step); err != nil {
+	if err := encoding.WriteUint8(r, step); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(r, ev.VotedHash); err != nil {
-		return err
-	}
-	return nil
-}
-
-func UnmarshalSignedVote(r *bytes.Buffer, ev *Reduction) error {
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &ev.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &ev.Step); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &ev.VotedHash); err != nil {
+	if err := encoding.Write256(r, votedHash); err != nil {
 		return err
 	}
 	return nil

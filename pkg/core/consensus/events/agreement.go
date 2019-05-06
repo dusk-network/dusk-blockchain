@@ -117,7 +117,6 @@ func (ceh *Agreement) Equal(e wire.Event) bool {
 
 // NewAgreementUnMarshaller creates a new AgreementUnMarshaller. Internally it creates an HeaderUnMarshaller which takes care of Decoding and Encoding operations
 func NewAgreementUnMarshaller() *AgreementUnMarshaller {
-
 	return &AgreementUnMarshaller{
 		ReductionUnmarshaller: NewReductionUnMarshaller(),
 		UnMarshaller:          NewUnMarshaller(),
