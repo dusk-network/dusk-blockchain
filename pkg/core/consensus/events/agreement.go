@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -163,6 +164,22 @@ func UnmarshalAggregatedAgreement(r *bytes.Buffer) (*AggregatedAgreement, error)
 	}
 
 	return a, nil
+}
+
+func SignAgreementEvent(a *AggregatedAgreement, keys *user.Keys) error {
+	buffer := new(bytes.Buffer)
+
+	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {
+		return err
+	}
+
+	signedVoteSet, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, buffer.Bytes())
+	if err != nil {
+		return err
+	}
+
+	a.SignedVotes = signedVoteSet.Compress()
+	return nil
 }
 
 func MarshalAggregatedAgreement(a *AggregatedAgreement) (*bytes.Buffer, error) {

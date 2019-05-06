@@ -38,11 +38,9 @@ func (as *agreementSigner) Sign(buf *bytes.Buffer) error {
 		return err
 	}
 
-	sig, err := as.SignVotes(aggregatedEv.VotesPerStep)
-	if err != nil {
+	if err := events.SignAgreementEvent(aggregatedEv, as.Keys); err != nil {
 		return err
 	}
-	aggregatedEv.SignedVotes = sig
 
 	buffer, err := events.MarshalAggregatedAgreement(aggregatedEv)
 	if err != nil {
