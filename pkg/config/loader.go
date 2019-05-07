@@ -35,7 +35,7 @@ type Registry struct {
 	Database databaseConfiguration
 	Network  networkConfiguration
 	Logger   loggerConfiguration
-	Profile  profConfiguration
+	Prof     profConfiguration
 	RPC      rpcConfiguration
 }
 

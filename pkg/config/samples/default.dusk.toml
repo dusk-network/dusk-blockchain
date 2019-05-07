@@ -55,8 +55,8 @@ cert=""
 # reachable at http://localhost:5050/debug/pprof
 # address="localhost:5050"
 
-# cpu.pprof
+# cpu.prof
 cpuFile=""
-# mem.pprof
+# mem.prof
 memFile=""
 
