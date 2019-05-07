@@ -15,17 +15,24 @@ import (
 )
 
 func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *events.Reduction) {
-	reduction := events.NewReduction()
-	reduction.Round = round
-	reduction.Step = step
-
 	if keys == nil {
 		keys, _ = user.NewRandKeys()
 	}
 
+	reduction := events.NewReduction()
 	reduction.PubKeyBLS = keys.BLSPubKeyBytes
+	reduction.Round = round
+	reduction.Step = step
 	reduction.VotedHash = hash
-	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, hash)
+
+	r := new(bytes.Buffer)
+	vote := &events.Vote{
+		Round:     reduction.Round,
+		Step:      reduction.Step,
+		BlockHash: reduction.VotedHash,
+	}
+	_ = events.MarshalSignableVote(r, vote)
+	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, r.Bytes())
 	reduction.SignedHash = sigma.Compress()
 	return keys, reduction
 }

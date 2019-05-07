@@ -8,14 +8,10 @@ import (
 )
 
 func TestVoteVerification(t *testing.T) {
-	hash, _ := crypto.RandEntropy(32)
-
-	ev := MockAggregatedAgreement(hash, 1, 1, 2)
-
 	// mocking voters
-	c := mockCommittee(2, true)
-
+	c, keys := mockCommittee(2, true, 2)
+	hash, _ := crypto.RandEntropy(32)
+	ev := MockAggregatedAgreementEvent(hash, 1, 2, keys)
 	handler := newHandler(c)
-
 	assert.NoError(t, handler.Verify(ev))
 }

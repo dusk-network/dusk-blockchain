@@ -171,7 +171,14 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 // SignReductionEvent is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
 func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	buf := new(bytes.Buffer)
-	if err := MarshalSignableVote(buf, ev.Round, ev.Step, ev.VotedHash); err != nil {
+
+	//TODO: Vote is actually the Header
+	vote := &Vote{}
+	vote.Round = ev.Round
+	vote.Step = ev.Step
+	vote.BlockHash = ev.VotedHash
+
+	if err := MarshalSignableVote(buf, vote); err != nil {
 		return err
 	}
 
@@ -181,21 +188,6 @@ func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	}
 	ev.SignedHash = signedHash.Compress()
 	ev.Header.PubKeyBLS = keys.BLSPubKeyBytes
-	return nil
-}
-
-func MarshalSignableVote(r *bytes.Buffer, round uint64, step uint8, votedHash []byte) error {
-	if err := encoding.WriteUint64(r, binary.LittleEndian, round); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(r, step); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, votedHash); err != nil {
-		return err
-	}
 	return nil
 }
 

@@ -9,11 +9,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func TestInitBroker(t *testing.T) {
-	committeeMock := mockCommittee(2, true)
+	committeeMock, _ := mockCommittee(2, true, 2)
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
@@ -24,12 +23,12 @@ func TestInitBroker(t *testing.T) {
 }
 
 func TestBroker(t *testing.T) {
-	committeeMock := mockCommittee(2, true)
+	committeeMock, keys := mockCommittee(2, true, 2)
 	_, broker, roundChan := initAgreement(committeeMock)
 
 	hash, _ := crypto.RandEntropy(32)
-	e1 := MockAgreementBuf(hash, 1, 1, 2)
-	e2 := MockAgreementBuf(hash, 1, 1, 2)
+	e1 := MockAggregatedAgreement(hash, 1, 2, keys)
+	e2 := MockAggregatedAgreement(hash, 1, 2, keys)
 	_ = broker.filter.Collect(e1)
 	_ = broker.filter.Collect(e2)
 
@@ -38,11 +37,11 @@ func TestBroker(t *testing.T) {
 }
 
 func TestNoQuorum(t *testing.T) {
-	committeeMock := mockCommittee(3, true)
+	committeeMock, keys := mockCommittee(3, true, 3)
 	_, broker, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(MockAgreementBuf(hash, 1, 1, 3))
-	_ = broker.filter.Collect(MockAgreementBuf(hash, 1, 1, 3))
+	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
+	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
 
 	select {
 	case <-roundChan:
@@ -51,42 +50,22 @@ func TestNoQuorum(t *testing.T) {
 		// all good
 	}
 
-	_ = broker.filter.Collect(MockAgreementBuf(hash, 1, 1, 3))
+	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
 	round := <-roundChan
 	assert.Equal(t, uint64(2), round)
 }
 
 func TestSkipNoMember(t *testing.T) {
-	committeeMock := mockCommittee(1, false)
+	committeeMock, keys := mockCommittee(1, false, 2)
 	_, broker, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(MockAgreementBuf(hash, 1, 1, 1))
+	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
 
 	select {
 	case <-roundChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
-	}
-}
-
-func TestAgreement(t *testing.T) {
-	committeeMock := mockCommittee(1, true)
-	bus, _, roundChan := initAgreement(committeeMock)
-	hash, _ := crypto.RandEntropy(32)
-	bus.Publish(string(topics.Agreement), MarshalOutgoing(MockAgreementBuf(hash, 1, 1, 1)))
-
-	round := <-roundChan
-	assert.Equal(t, uint64(2), round)
-
-	bus.Publish(string(topics.Agreement), MarshalOutgoing(MockAgreementBuf(hash, 1, 1, 1)))
-
-	select {
-	case <-roundChan:
-		assert.FailNow(t, "Previous round messages should not trigger a phase update")
-	case <-time.After(100 * time.Millisecond):
-		// all well
-		return
 	}
 }
 
