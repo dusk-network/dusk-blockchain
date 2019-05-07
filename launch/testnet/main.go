@@ -42,19 +42,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	profile, err := newProfile()
-
-	if err != nil {
-		fmt.Printf(" %v\n", err)
-		os.Exit(1)
-	}
-
-	defer profile.close()
-
 	port := cfg.Get().Network.Port
 	rand.Seed(time.Now().UnixNano())
 
-	// Set up logging
+	// Set up logging.
+	// Any subsystem should be initialized after config and logger loading
 	output := cfg.Get().Logger.Output
 	if cfg.Get().Logger.Output != "stdout" {
 		file, err := os.Create(output + port + ".log")
@@ -69,6 +61,18 @@ func main() {
 
 	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
 	log.Infof("Selected network  %s", cfg.Get().General.Network)
+
+	// Set up profiling tools.
+	profile, err := newProfile()
+
+	if err != nil {
+		// Assume here if tools are enabled but they fail on loading then it's better
+		// to fix the error or just disable them.
+		log.Errorf("Profiling tools error: %s", err.Error())
+		return
+	}
+
+	defer profile.close()
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup()
