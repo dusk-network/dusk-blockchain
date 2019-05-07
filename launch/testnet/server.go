@@ -26,13 +26,17 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
 	"gitlab.dusk.network/dusk-core/zkproof"
+
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
 var timeOut = 3 * time.Second
 
 type Server struct {
 	eventBus *wire.EventBus
+	rpcBus   *wire.RPCBus
 
 	// stakes are stored in a map, with the BLS public key as the key, so that they
 	// can be properly removed when a node disconnects.
@@ -56,6 +60,10 @@ type txCollector struct {
 func Setup() *Server {
 	// creating the eventbus
 	eventBus := wire.NewEventBus()
+
+	// creating the rpcbus
+	rpcBus := wire.NewRPCBus()
+
 	// generating the keys
 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
 	keys, _ := user.NewRandKeys()
@@ -78,6 +86,19 @@ func Setup() *Server {
 	dupeBlacklist := dupemap.NewDupeMap(eventBus)
 	go dupeBlacklist.CleanOnRound()
 
+	if cfg.Get().RPC.Enabled {
+		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus)
+		if err != nil {
+			log.Errorf("RPC server error: %s", err.Error())
+		}
+
+		err = rpcServ.Start()
+
+		if err != nil {
+			log.Errorf("RPC server error: %s", err.Error())
+		}
+	}
+
 	// creating the Server
 	srv := &Server{
 		eventBus:              eventBus,
@@ -89,6 +110,7 @@ func Setup() *Server {
 		bidChan:               bidChan,
 		removeProvisionerChan: committee.InitRemoveProvisionerCollector(eventBus),
 		dupeMap:               dupeBlacklist,
+		rpcBus:                rpcBus,
 	}
 
 	// make a stake and bid tx
@@ -179,22 +201,9 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
-	peer := peer.NewPeer(conn, true, protocol.TestNet, s.eventBus, s.dupeMap)
-	// send the latest block height
-	heightBytes := make([]byte, 8)
-	s.chain.RLock()
-	binary.LittleEndian.PutUint64(heightBytes, s.chain.PrevBlock.Header.Height)
-	s.chain.RUnlock()
-	if _, err := peer.Conn.Write(heightBytes); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem writing to peer")
-		peer.Disconnect()
-		return
-	}
+	peer := peer.NewPeer(conn, protocol.TestNet, s.eventBus, s.dupeMap)
 
-	if err := peer.Run(); err != nil {
+	if err := peer.Connect(true); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -203,33 +212,16 @@ func (s *Server) OnAccept(conn net.Conn) {
 	}
 	log.WithFields(log.Fields{
 		"process": "server",
-		"address": peer.Conn.RemoteAddr().String(),
+		"address": peer.Addr(),
 	}).Debugln("connection established")
 
 	s.sendStakesAndBids(peer)
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	peer := peer.NewPeer(conn, false, protocol.TestNet, s.eventBus, s.dupeMap)
-	// get latest block height
-	buf := make([]byte, 8)
-	if _, err := peer.Conn.Read(buf); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem reading from peer")
-		peer.Disconnect()
-		return
-	}
+	peer := peer.NewPeer(conn, protocol.TestNet, s.eventBus, s.dupeMap)
 
-	height := binary.LittleEndian.Uint64(buf)
-	s.chain.Lock()
-	if s.chain.PrevBlock.Header.Height < height {
-		s.chain.PrevBlock.Header.Height = height
-	}
-	s.chain.Unlock()
-
-	if err := peer.Run(); err != nil {
+	if err := peer.Connect(false); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -238,7 +230,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}
 	log.WithFields(log.Fields{
 		"process": "server",
-		"address": peer.Conn.RemoteAddr().String(),
+		"address": peer.Addr(),
 	}).Debugln("connection established")
 
 	s.sendStakesAndBids(peer)
@@ -248,20 +240,25 @@ func (s *Server) sendStakesAndBids(peer *peer.Peer) {
 	s.RLock()
 	defer s.RUnlock()
 	for _, stake := range s.stakes {
-		if err := peer.WriteMessage(stake, topics.Tx); err != nil {
+		buf, err := wire.AddTopic(stake, topics.Tx)
+		if err != nil {
 			panic(err)
 		}
+		s.eventBus.Publish(string(topics.Gossip), buf)
 	}
 
 	for _, bid := range s.bids {
-		if err := peer.WriteMessage(bid, topics.Tx); err != nil {
+		buf, err := wire.AddTopic(bid, topics.Tx)
+		if err != nil {
 			panic(err)
 		}
+		s.eventBus.Publish(string(topics.Gossip), buf)
 	}
 }
 
 func (s *Server) Close() {
 	s.chain.Close()
+	s.rpcBus.Close()
 }
 
 func makeStake(keys *user.Keys) *transactions.Stake {

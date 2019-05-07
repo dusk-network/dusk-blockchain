@@ -1,9 +1,14 @@
 package rpc
 
 import (
+	"bytes"
+	"encoding/json"
+
 	"strconv"
 	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -13,10 +18,11 @@ type handler func(*Server, []string) (string, error)
 
 // rpcCmd maps method names to their actual functions.
 var rpcCmd = map[string]handler{
-	"version":   version,
-	"ping":      pong,
-	"uptime":    uptime,
-	"chaininfo": chainInfo,
+	"version":      version,
+	"ping":         pong,
+	"uptime":       uptime,
+	"chaininfo":    chainInfo,
+	"getlastblock": getlastblock,
 }
 
 // rpcAdminCmd holds all admin methods.
@@ -45,4 +51,24 @@ var chainInfo = func(s *Server, params []string) (string, error) {
 	m := <-s.decodedChainInfoChannel
 
 	return m, nil
+}
+
+var getlastblock = func(s *Server, params []string) (string, error) {
+
+	r, err := s.rpcBus.Call(wire.GetLastBlock, wire.NewRequest(bytes.Buffer{}, 1))
+
+	if err != nil {
+		return "", err
+	}
+
+	b := &block.Block{}
+	err = b.Decode(&r)
+
+	if err != nil {
+		return "", err
+	}
+
+	res, err := json.Marshal(b)
+
+	return string(res), err
 }
