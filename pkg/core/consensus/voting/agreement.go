@@ -3,44 +3,58 @@ package voting
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
 
 type agreementSigner struct {
 	*eventSigner
-	*events.OutgoingAgreementUnmarshaller
+	*events.AgreementUnMarshaller
+	committee.Committee
 }
 
-func NewAgreementSigner(keys *user.Keys) *agreementSigner {
+func NewAgreementSigner(committee committee.Committee, keys *user.Keys) *agreementSigner {
 	return &agreementSigner{
-		eventSigner:                   newEventSigner(keys),
-		OutgoingAgreementUnmarshaller: events.NewOutgoingAgreementUnmarshaller(),
+		Committee:             committee,
+		eventSigner:           newEventSigner(keys),
+		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
 	}
 }
 
-func (as *agreementSigner) AddSignatures(ev wire.Event) (*bytes.Buffer, error) {
-	e := ev.(*events.Agreement)
-	if err := as.signBLS(e); err != nil {
-		return nil, err
+func (as *agreementSigner) Sign(buf *bytes.Buffer) error {
+	a := events.NewAgreement()
+	if err := as.Unmarshal(buf, a); err != nil {
+		return err
 	}
 
-	buffer := new(bytes.Buffer)
-	if err := as.Marshal(buffer, e); err != nil {
-		return nil, err
+	a.Header.PubKeyBLS = as.BLSPubKey.Marshal()
+	aggregatedEv, err := as.Aggregate(a)
+	if err != nil {
+		return err
 	}
 
-	message := as.signEd25519(e, buffer)
-	return message, nil
+	if err := events.SignAgreementEvent(aggregatedEv, as.Keys); err != nil {
+		return err
+	}
+
+	buffer, err := events.MarshalAggregatedAgreement(aggregatedEv)
+	if err != nil {
+		return err
+	}
+
+	message := as.signEd25519(buffer)
+	*buf = *message
+	return nil
 }
 
-func (as *agreementSigner) SignVotes(votes []wire.Event) ([]byte, error) {
+func (as *agreementSigner) SignVotes(votes []*events.StepVotes) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	if err := as.MarshalVoteSet(buffer, votes); err != nil {
+	if err := events.MarshalVotes(buffer, votes); err != nil {
 		return nil, err
 	}
 
@@ -51,18 +65,7 @@ func (as *agreementSigner) SignVotes(votes []wire.Event) ([]byte, error) {
 	return signedVoteSet.Compress(), nil
 }
 
-func (as *agreementSigner) signBLS(ev wire.Event) error {
-	var err error
-	e := ev.(*events.Agreement)
-	e.Header.PubKeyBLS = as.BLSPubKey.Marshal()
-	e.SignedVoteSet, err = as.SignVotes(e.VoteSet)
-	if err != nil {
-		return err
-	}
-	return err
-}
-
-func (as *agreementSigner) signEd25519(e *events.Agreement, eventBuf *bytes.Buffer) *bytes.Buffer {
+func (as *agreementSigner) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
 	signature := ed25519.Sign(*as.EdSecretKey, eventBuf.Bytes())
 	buf := new(bytes.Buffer)
 	if err := encoding.Write512(buf, signature); err != nil {
@@ -78,4 +81,39 @@ func (as *agreementSigner) signEd25519(e *events.Agreement, eventBuf *bytes.Buff
 	}
 
 	return buf
+}
+
+// Aggregate the Agreement event into an AggregatedAgreement outgoing event
+func (as *agreementSigner) Aggregate(a *events.Agreement) (*events.AggregatedAgreement, error) {
+	stepVotesMap := make(map[uint8]struct {
+		*events.StepVotes
+		sortedset.Set
+	})
+
+	for _, ev := range a.VoteSet {
+		reduction := ev.(*events.Reduction)
+		sv, found := stepVotesMap[reduction.Step]
+		if !found {
+			sv.StepVotes = events.NewStepVotes()
+			sv.Set = sortedset.New()
+		}
+
+		if err := sv.StepVotes.Add(reduction); err != nil {
+			return nil, err
+		}
+		sv.Set.Insert(reduction.PubKeyBLS)
+		stepVotesMap[reduction.Step] = sv
+	}
+
+	aggregatedAgreement := events.NewAggregatedAgreement()
+	aggregatedAgreement.Header = a.Header
+	i := 0
+	for _, stepVotes := range stepVotesMap {
+		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
+		sv.BitSet = as.Pack(provisioners, a.Round, sv.Step)
+		aggregatedAgreement.VotesPerStep[i] = sv
+		i++
+	}
+
+	return aggregatedAgreement, nil
 }

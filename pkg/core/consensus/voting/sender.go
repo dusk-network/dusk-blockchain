@@ -3,6 +3,7 @@ package voting
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -12,9 +13,9 @@ import (
 // LaunchVotingComponent will start a sender, which initializes its own
 // signers, and will proceed to listen on the event bus for relevant
 // messages.
-func LaunchVotingComponent(eventBus *wire.EventBus, keys *user.Keys) *sender {
+func LaunchVotingComponent(eventBus *wire.EventBus, committee committee.Committee, keys *user.Keys) *sender {
 
-	sender := newSender(eventBus, keys)
+	sender := newSender(eventBus, committee, keys)
 	go sender.listen()
 	return sender
 }
@@ -29,11 +30,11 @@ type sender struct {
 
 // newSender will return an initialized sender struct. It will also spawn all
 // the needed signers, and their channels get connected to the sender.
-func newSender(eventBus *wire.EventBus, keys *user.Keys) *sender {
+func newSender(eventBus *wire.EventBus, committee committee.Committee, keys *user.Keys) *sender {
 	reductionChan := initCollector(eventBus, msg.OutgoingBlockReductionTopic,
 		NewReductionSigner(keys))
 	agreementChan := initCollector(eventBus, msg.OutgoingBlockAgreementTopic,
-		NewAgreementSigner(keys))
+		NewAgreementSigner(committee, keys))
 
 	return &sender{
 		eventBus:      eventBus,

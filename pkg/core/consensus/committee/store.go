@@ -2,7 +2,6 @@ package committee
 
 import (
 	"bytes"
-	"encoding/hex"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -10,6 +9,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
 
 // Store is the component that handles Committee formation and management
@@ -22,6 +22,12 @@ type (
 		IsMember([]byte, uint64, uint8) bool
 		Quorum() int
 		ReportAbsentees([]wire.Event, uint64, uint8) error
+
+		// Pack creates a uint64 bit representation of a sorted sub-committee for a given round and step
+		Pack(sortedset.Set, uint64, uint8) uint64
+
+		// Unpack reconstruct a sorted sub-committee from a uint64 bitset, a round and a step
+		Unpack(uint64, uint64, uint8) sortedset.Set
 	}
 
 	Store struct {
@@ -44,7 +50,7 @@ func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store 
 	store := &Store{
 		keys:         keys,
 		publisher:    eventBroker,
-		provisioners: &user.Provisioners{},
+		provisioners: user.NewProvisioners(),
 		// TODO: consider adding a consensus.Validator preprocessor
 		newProvisionerChan:    initNewProvisionerCollector(eventBroker),
 		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
@@ -76,14 +82,7 @@ func (c *Store) Listen() {
 			}
 
 			c.lock.Lock()
-			if err := c.provisioners.RemoveMember(pubKeyBLS); err != nil {
-				c.lock.Unlock()
-				log.WithError(err).WithFields(log.Fields{
-					"process": "committeeStore",
-					"bls_key": pubKeyBLS,
-				}).Warnln("error in removing a provisioner member")
-				continue
-			}
+			c.provisioners.Remove(pubKeyBLS)
 			c.totalWeight -= stake
 			c.lock.Unlock()
 		}
@@ -109,25 +108,34 @@ func (c *Store) Quorum() int {
 	return quorum
 }
 
+// Pack creates a uint64 bitset representation of a Committee subset for a given round and step
+func (c *Store) Pack(set sortedset.Set, round uint64, step uint8) uint64 {
+	p := c.copyProvisioners()
+	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	return votingCommittee.Bits(set)
+}
+
+// Unpack the Committee subset from a uint64 bitset representation for a give round and step
+func (c *Store) Unpack(bitset uint64, round uint64, step uint8) sortedset.Set {
+	p := c.copyProvisioners()
+	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	return votingCommittee.Intersect(bitset)
+}
+
 // ReportAbsentees will send public keys of absent provisioners to the moderator
 func (c *Store) ReportAbsentees(evs []wire.Event, round uint64, step uint8) error {
 	absentees := c.extractAbsentees(evs, round, step)
-	for absentee := range absentees {
-		absenteeBytes, err := hex.DecodeString(absentee)
-		if err != nil {
-			return err
-		}
-		c.publisher.Publish(msg.AbsenteesTopic, bytes.NewBuffer(absenteeBytes))
+	for _, absentee := range absentees.MemberKeys() {
+		c.publisher.Publish(msg.AbsenteesTopic, bytes.NewBuffer(absentee))
 	}
 	return nil
 }
 
-func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {
+func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) *user.VotingCommittee {
 	p := c.copyProvisioners()
 	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
 	for _, ev := range evs {
-		senderStr := hex.EncodeToString(ev.Sender())
-		delete(votingCommittee, senderStr)
+		votingCommittee.Remove(ev.Sender())
 	}
 	return votingCommittee
 }
@@ -139,8 +147,8 @@ func (c *Store) Priority(ev1, ev2 wire.Event) bool {
 		return false
 	}
 
-	m1 := p.GetMemberBLS(ev1.Sender())
-	m2 := p.GetMemberBLS(ev2.Sender())
+	m1 := p.GetMember(ev1.Sender())
+	m2 := p.GetMember(ev2.Sender())
 
 	if m1 == nil {
 		return false

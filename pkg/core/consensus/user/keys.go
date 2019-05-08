@@ -7,10 +7,11 @@ import (
 
 // Keys are the keys used during consensus
 type Keys struct {
-	BLSPubKey    *bls.PublicKey
-	BLSSecretKey *bls.SecretKey
-	EdPubKey     *ed25519.PublicKey
-	EdSecretKey  *ed25519.PrivateKey
+	BLSPubKey      *bls.PublicKey
+	BLSPubKeyBytes []byte
+	BLSSecretKey   *bls.SecretKey
+	EdPubKey       *ed25519.PublicKey
+	EdSecretKey    *ed25519.PrivateKey
 }
 
 // Clear removes the pointers to the Consensus Keys
@@ -20,6 +21,7 @@ func (k *Keys) Clear() {
 	k.BLSSecretKey = nil
 	k.EdPubKey = nil
 	k.EdSecretKey = nil
+	k.BLSPubKeyBytes = []byte{}
 }
 
 // EdPubKeyBytes returns the byte slice of the ed25519 public key of this Keys
@@ -42,9 +44,10 @@ func NewRandKeys() (*Keys, error) {
 	}
 
 	return &Keys{
-		BLSPubKey:    blsPub,
-		BLSSecretKey: blsPriv,
-		EdPubKey:     &edPub,
-		EdSecretKey:  &edPriv,
+		BLSPubKey:      blsPub,
+		BLSSecretKey:   blsPriv,
+		EdPubKey:       &edPub,
+		EdSecretKey:    &edPriv,
+		BLSPubKeyBytes: blsPub.Marshal(),
 	}, nil
 }

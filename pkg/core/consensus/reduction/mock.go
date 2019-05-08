@@ -14,6 +14,29 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
+func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *events.Reduction) {
+	if keys == nil {
+		keys, _ = user.NewRandKeys()
+	}
+
+	reduction := events.NewReduction()
+	reduction.PubKeyBLS = keys.BLSPubKeyBytes
+	reduction.Round = round
+	reduction.Step = step
+	reduction.VotedHash = hash
+
+	r := new(bytes.Buffer)
+	vote := &events.Vote{
+		Round:     reduction.Round,
+		Step:      reduction.Step,
+		BlockHash: reduction.VotedHash,
+	}
+	_ = events.MarshalSignableVote(r, vote)
+	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, r.Bytes())
+	reduction.SignedHash = sigma.Compress()
+	return keys, reduction
+}
+
 func mockSelectionEventBuffer(hash []byte) *bytes.Buffer {
 	// 32 bytes
 	score, _ := crypto.RandEntropy(32)

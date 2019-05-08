@@ -15,7 +15,7 @@ import (
 
 func randomMessage() []byte {
 	msg := make([]byte, 32)
-	rand.Read(msg)
+	_, _ = rand.Read(msg)
 	return msg
 }
 
@@ -119,7 +119,7 @@ func TestMarshalPk(t *testing.T) {
 	pkByteRepr := pub.Marshal()
 
 	g2 := newG2()
-	g2.Unmarshal(pkByteRepr)
+	_, _ = g2.Unmarshal(pkByteRepr)
 
 	g2ByteRepr := g2.Marshal()
 	require.Equal(t, pkByteRepr, g2ByteRepr)
@@ -127,6 +127,10 @@ func TestMarshalPk(t *testing.T) {
 	pkInt := new(big.Int).SetBytes(pkByteRepr)
 	g2Int := new(big.Int).SetBytes(g2ByteRepr)
 	require.Equal(t, pkInt, g2Int)
+
+	pk, err := UnmarshalPk(pkByteRepr)
+	require.NoError(t, err)
+	require.Equal(t, pub, pk)
 }
 
 func TestApkVerificationSingleKey(t *testing.T) {
@@ -141,6 +145,12 @@ func TestApkVerificationSingleKey(t *testing.T) {
 	signature, err := Sign(priv1, pub1, msg)
 	require.NoError(t, err)
 	require.NoError(t, Verify(apk, msg, signature))
+
+	// testing unmarshalling
+	bApk := apk.Marshal()
+	uApk, err := UnmarshalApk(bApk)
+	assert.NoError(t, err)
+	require.NoError(t, Verify(uApk, msg, signature))
 }
 
 func TestApkVerification(t *testing.T) {
@@ -154,7 +164,7 @@ func TestApkVerification(t *testing.T) {
 	require.NoError(t, err)
 
 	apk := NewApk(pub1)
-	apk.Add(pub2)
+	assert.NoError(t, apk.Aggregate(pub2))
 
 	signature, err := Sign(priv1, pub1, msg)
 	require.NoError(t, err)
@@ -176,7 +186,7 @@ func TestApkBatchVerification(t *testing.T) {
 	require.NoError(t, err)
 
 	apk := NewApk(pub1)
-	apk.Add(pub2)
+	assert.NoError(t, apk.Aggregate(pub2))
 
 	sigma, err := Sign(priv1, pub1, msg)
 	require.NoError(t, err)
@@ -189,10 +199,11 @@ func TestApkBatchVerification(t *testing.T) {
 	pub3, priv3, err := GenKeyPair(reader)
 	require.NoError(t, err)
 	apk2 := NewApk(pub2)
-	apk2.Add(pub3)
+	require.NoError(t, apk2.Aggregate(pub3))
 	sig2_2, err := Sign(priv2, pub2, msg2)
 	require.NoError(t, err)
 	sig3_2, err := Sign(priv3, pub3, msg2)
+	require.NoError(t, err)
 	sig2 := sig2_2.Aggregate(sig3_2)
 	require.NoError(t, Verify(apk2, msg2, sig2))
 
@@ -281,43 +292,56 @@ func TestAmbiguousCompress(t *testing.T) {
 func BenchmarkSignature(b *testing.B) {
 	msg := randomMessage()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := Sign(sk, pk, msg)
-		Verify(NewApk(pk), msg, signature)
+		b.StartTimer()
+		if err := Verify(NewApk(pk), msg, signature); err != nil {
+			panic(err)
+		}
 	}
 }
 
 func BenchmarkUnsafeSignature(b *testing.B) {
 	msg := randomMessage()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := UnsafeSign(sk, msg)
-		VerifyUnsafe(pk, msg, signature)
+		b.StartTimer()
+		if err := VerifyUnsafe(pk, msg, signature); err != nil {
+			panic(err)
+		}
 	}
 }
 
-func BenchmarkCompressedSignature(b *testing.B) {
+func BenchmarkVerifyCompressedSignature(b *testing.B) {
 	msg := randomMessage()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := Sign(sk, pk, msg)
 		sigb := signature.Compress()
+		apk := NewApk(pk)
+		b.StartTimer()
 
 		signature = &Signature{}
-		signature.Decompress(sigb)
-		Verify(NewApk(pk), msg, signature)
+		_ = signature.Decompress(sigb)
+		_ = Verify(apk, msg, signature)
 	}
 }
 
 func BenchmarkCompressedUnsafeSignature(b *testing.B) {
 	msg := randomMessage()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		pk, sk, _ := GenKeyPair(rand.Reader)
 		signature, _ := UnsafeSign(sk, msg)
 		sigb := signature.Compress()
-
+		b.StartTimer()
 		signature = &UnsafeSignature{}
-		signature.Decompress(sigb)
-		VerifyUnsafe(pk, msg, signature)
+		_ = signature.Decompress(sigb)
+		_ = VerifyUnsafe(pk, msg, signature)
 	}
 }

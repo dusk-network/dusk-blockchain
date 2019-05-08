@@ -30,7 +30,7 @@ type (
 		roundChan     <-chan uint64
 		bestScoreChan <-chan *selection.ScoreEvent
 		reductionChan <-chan *events.Reduction
-		agreementChan <-chan *events.Agreement
+		agreementChan <-chan *events.AggregatedAgreement
 		logChan       <-chan *eventmon.Event
 
 		msgChan  chan<- string
@@ -89,7 +89,6 @@ func (b *broker) monitor(bb ristretto.Scalar) {
 			if logEvent.Severity == eventmon.Warn || logEvent.Severity == eventmon.Err {
 				b.msgChan <- logEvent.Msg
 			}
-
 		}
 	}
 }

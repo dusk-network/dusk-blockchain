@@ -6,86 +6,94 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/hashset"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
 
 type agreementHandler struct {
 	committee.Committee
-	*events.AgreementUnMarshaller
+	*events.AggregatedAgreementUnMarshaller
 }
 
 func newHandler(committee committee.Committee) *agreementHandler {
 	return &agreementHandler{
-		Committee:             committee,
-		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
+		Committee:                       committee,
+		AggregatedAgreementUnMarshaller: events.NewAggregatedAgreementUnMarshaller(),
 	}
 }
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
-	ev := e.(*events.Agreement)
+	ev := e.(*events.AggregatedAgreement)
 	return &events.Header{
 		Round: ev.Round,
 	}
 }
 
 func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*events.Agreement)
+	ev := e.(*events.AggregatedAgreement)
 	return encoding.WriteUint8(r, ev.Step)
 }
 
-// Verify checks the signature of the set
+// Verify checks the signature of the set. TODO: At the moment the overall BLS signature is not checked as it is not clear if checking the ED25519 is enough (it should be in case the node links the BLS keys to the Edward keys)
 func (a *agreementHandler) Verify(e wire.Event) error {
-	ev := e.(*events.Agreement)
-	return a.verify(ev.VoteSet, ev.AgreedHash, ev.Round, ev.Step)
-}
+	ev, ok := e.(*events.AggregatedAgreement)
+	if !ok {
+		return errors.New("Cant' verify an event different than the aggregated agreement")
+	}
+	allVoters := 0
+	for i, votes := range ev.VotesPerStep {
+		step := ev.Step + uint8(i-1) // the event step is the second one of the reduction cycle
+		subcommittee := a.Unpack(votes.BitSet, ev.Round, step)
+		allVoters += len(subcommittee)
 
-func (a *agreementHandler) verify(voteSet []wire.Event, hash []byte, round uint64, step uint8) error {
-
-	votes := 0
-	voted := make(map[uint8]*hashset.Set)
-
-	for _, ev := range voteSet {
-		vote := ev.(*events.Reduction)
-		voters, found := voted[vote.Step]
-		if !found {
-			voters = hashset.New()
-		}
-		if voters.Add(vote.Sender()) {
-			// if the voter has already voted for this step, we ignore the vote but continue
-			// TODO: we should probably do something with this nodes' reputation
-			continue
+		apk, err := ReconstructApk(subcommittee)
+		if err != nil {
+			return err
 		}
 
-		if !fromValidStep(vote.Step, step) {
-			return errors.New("vote does not belong to vote set")
+		signed := new(bytes.Buffer)
+
+		vote := &events.Vote{
+			Round:     ev.Round,
+			Step:      step,
+			BlockHash: ev.AgreedHash,
 		}
 
-		if !a.IsMember(vote.Sender(), round, vote.Step) {
-			return errors.New("voter is not eligible to vote")
+		if err := events.MarshalSignableVote(signed, vote); err != nil {
+			return err
 		}
 
-		// TODO: use BLS signature aggregation to speed up verification times
-		// if err := msg.VerifyBLSSignature(vote.PubKeyBLS, vote.VotedHash,
-		// 	vote.SignedHash); err != nil {
-
-		// 	return errors.New("BLS verification failed")
-		// }
-
-		votes++
-		if votes >= a.Quorum() {
-			// as soon as we see a quorum for a step we return
-			return nil
+		if err := bls.Verify(apk, signed.Bytes(), votes.Signature); err != nil {
+			return err
 		}
-		// if the voter never voted for the step we add her to the set
-		voted[vote.Step] = voters
 	}
 
-	// not enough votes collected
-	return errors.New("vote set too small")
+	if allVoters < a.Quorum() {
+		return errors.New("vote set too small")
+	}
+	return nil
 }
 
-func fromValidStep(voteStep, setStep uint8) bool {
-	return voteStep == setStep || voteStep+1 == setStep
+func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
+	var apk *bls.Apk
+	if len(subcommittee) == 0 {
+		return nil, errors.New("Subcommittee is empty")
+	}
+	for i, ipk := range subcommittee {
+		pk, err := bls.UnmarshalPk(ipk.Bytes())
+		if err != nil {
+			return nil, err
+		}
+		if i == 0 {
+			apk = bls.NewApk(pk)
+			continue
+		}
+		if err := apk.Aggregate(pk); err != nil {
+			return nil, err
+		}
+	}
+
+	return apk, nil
 }

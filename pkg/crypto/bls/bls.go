@@ -96,7 +96,7 @@ type PublicKey struct {
 
 // Apk is the short aggregated public key struct
 type Apk struct {
-	gx *bn256.G2
+	*PublicKey
 }
 
 // Signature is the plain public key model of the BLS signature being resilient to rogue key attack
@@ -121,6 +121,14 @@ func GenKeyPair(randReader io.Reader) (*PublicKey, *SecretKey, error) {
 	}
 
 	return &PublicKey{gx}, &SecretKey{x}, nil
+}
+
+func UnmarshalPk(b []byte) (*PublicKey, error) {
+	pk := &PublicKey{nil}
+	if err := pk.Unmarshal(b); err != nil {
+		return nil, err
+	}
+	return pk, nil
 }
 
 //hashFn is the hash function used to digest a message before mapping it to a point.
@@ -169,27 +177,43 @@ func NewApk(pk *PublicKey) *Apk {
 	}
 
 	gx, _ := pkt(pk)
-	return &Apk{gx}
+	return &Apk{
+		PublicKey: &PublicKey{gx},
+	}
+}
+
+func UnmarshalApk(b []byte) (*Apk, error) {
+	apk := &Apk{
+		PublicKey: &PublicKey{gx: nil},
+	}
+
+	if err := apk.Unmarshal(b); err != nil {
+		return nil, err
+	}
+	return apk, nil
 }
 
 // AggregateApk aggregates the public key according to the following formula:
 // apk ← ∏ⁿᵢ₌₁ pk^H₁(pkᵢ)
-func AggregateApk(pks []*PublicKey) *Apk {
+func AggregateApk(pks []*PublicKey) (*Apk, error) {
 	var apk *Apk
 	for i, pk := range pks {
 		if i == 0 {
 			apk = NewApk(pk)
-		} else {
-			apk.Add(pk)
+			continue
+		}
+
+		if err := apk.Aggregate(pk); err != nil {
+			return nil, err
 		}
 	}
 
-	return apk
+	return apk, nil
 }
 
-// Add aggregates a Public Key to the Apk struct
+// Aggregate a Public Key to the Apk struct
 // according to the formula pk^H₁(pkᵢ)
-func (apk *Apk) Add(pk *PublicKey) error {
+func (apk *Apk) Aggregate(pk *PublicKey) error {
 	gxt, err := pkt(pk)
 	if err != nil {
 		return err
@@ -197,6 +221,15 @@ func (apk *Apk) Add(pk *PublicKey) error {
 
 	apk.gx.Add(apk.gx, gxt)
 	return nil
+}
+
+// AggregateBytes is a convenient method to aggregate the unmarshalled form of PublicKey directly
+func (apk *Apk) AggregateBytes(b []byte) error {
+	pk := &PublicKey{}
+	if err := pk.Unmarshal(b); err != nil {
+		return err
+	}
+	return apk.Aggregate(pk)
 }
 
 // Sign creates a signature from the private key and the public key pk
@@ -209,6 +242,14 @@ func Sign(sk *SecretKey, pk *PublicKey, msg []byte) (*Signature, error) {
 	return apkSigWrap(pk, sig)
 }
 
+func UnmarshalSignature(sig []byte) (*Signature, error) {
+	sigma := &Signature{}
+	if err := sigma.Unmarshal(sig); err != nil {
+		return nil, err
+	}
+	return sigma, nil
+}
+
 // Add creates an aggregated signature from a normal BLS Signature and related public key
 func (sigma *Signature) Add(pk *PublicKey, sig *UnsafeSignature) error {
 	other, err := apkSigWrap(pk, sig)
@@ -217,6 +258,15 @@ func (sigma *Signature) Add(pk *PublicKey, sig *UnsafeSignature) error {
 	}
 
 	sigma.Aggregate(other)
+	return nil
+}
+
+func (sigma *Signature) AggregateBytes(other []byte) error {
+	sig := &Signature{e: nil}
+	if err := sig.Unmarshal(other); err != nil {
+		return err
+	}
+	sigma.Aggregate(sig)
 	return nil
 }
 
@@ -248,7 +298,18 @@ func (sigma *Signature) Marshal() []byte {
 
 // Unmarshal a byte array into a Signature
 func (sigma *Signature) Unmarshal(msg []byte) error {
-	e := newG1()
+	var err error
+	var e *bn256.G1
+	if len(msg) == 33 {
+		e, err = bn256.Decompress(msg)
+		if err != nil {
+			return err
+		}
+		sigma.e = e
+		return nil
+	}
+
+	e = newG1()
 	if _, err := e.Unmarshal(msg); err != nil {
 		return err
 	}
@@ -426,7 +487,7 @@ func verifyBatch(pkeys []*bn256.G2, msgList [][]byte, sig *bn256.G1, allowDistin
 	return nil
 }
 
-func verifyCompressed(pks []*bn256.G2, msgList [][]byte, compressedSig []byte, allowDistinct bool) error {
+func VerifyCompressed(pks []*bn256.G2, msgList [][]byte, compressedSig []byte, allowDistinct bool) error {
 	sig, err := bn256.Decompress(compressedSig)
 	if err != nil {
 		return err
