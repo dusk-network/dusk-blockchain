@@ -21,14 +21,14 @@ type AccumulatorHandler interface {
 // Accumulator is a generic event accumulator, that will accumulate events until it
 // reaches a certain threshold.
 type Accumulator struct {
-	*AccumulatorStore
+	wire.Store
 	handler            AccumulatorHandler
 	CollectedVotesChan chan []wire.Event
 }
 
-func NewAccumulator(handler AccumulatorHandler) *Accumulator {
+func NewAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
 	return &Accumulator{
-		AccumulatorStore:   NewAccumulatorStore(),
+		Store:              store,
 		handler:            handler,
 		CollectedVotesChan: make(chan []wire.Event, 1),
 	}
@@ -51,24 +51,13 @@ func (a *Accumulator) accumulate(ev wire.Event) {
 	b := new(bytes.Buffer)
 	if err := a.handler.ExtractIdentifier(ev, b); err == nil {
 		hash := hex.EncodeToString(b.Bytes())
-		count := a.Store(ev, hash)
+		count := a.Insert(ev, hash)
 		if count == a.handler.Quorum() {
 			votes := a.Get(hash)
 			a.CollectedVotesChan <- votes
 			a.Clear()
 		}
 	}
-}
-
-func (a *Accumulator) GetAllEvents() []wire.Event {
-	allEvents := make([]wire.Event, 0)
-	a.RLock()
-	defer a.RUnlock()
-	for _, evs := range a.Map {
-		allEvents = append(allEvents, evs...)
-	}
-
-	return allEvents
 }
 
 // ShouldSkip checks if the message is propagated by a committee member.

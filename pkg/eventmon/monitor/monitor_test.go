@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -48,7 +49,12 @@ func TestInfo(t *testing.T) {
 	consensus.UpdateRound(bus, round)
 
 	<-time.After(1 * time.Second)
-	agreement.PublishMock(bus, hash, round, 1, 1)
+
+	keys := make([]*user.Keys, 2)
+	for i := 0; i < 2; i++ {
+		keys[i], _ = user.NewRandKeys()
+	}
+	agreement.PublishMock(bus, hash, round, 2, keys)
 	agreementMsg := <-resChan
 	consensus.UpdateRound(bus, round+1)
 

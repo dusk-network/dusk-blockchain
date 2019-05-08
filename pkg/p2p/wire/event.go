@@ -100,6 +100,14 @@ type (
 		EventUnmarshaller
 		NewEvent() Event
 	}
+
+	Store interface {
+		Insert(Event, string) int
+		Clear()
+		Contains(Event, string) bool
+		Get(string) []Event
+		All() []Event
+	}
 )
 
 // NewTopicListener creates the TopicListener listening to a topic on the EventBus.

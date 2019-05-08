@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -61,7 +62,7 @@ func TestReductionUnMarshal(t *testing.T) {
 // newAgreementEvent returns an Agreement event, populated with the specified fields.
 // The event can be used for marshallers to test their functionality.
 func newAgreementEvent(blockHash []byte, round uint64, step uint8) (*events.Agreement, error) {
-	pubKeyBLS, byte33, err := generateEventFields()
+	pk, _, err := bls.GenKeyPair(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -75,44 +76,30 @@ func newAgreementEvent(blockHash []byte, round uint64, step uint8) (*events.Agre
 		Header: &events.Header{
 			Round:     round,
 			Step:      step,
-			PubKeyBLS: pubKeyBLS,
+			PubKeyBLS: pk.Marshal(),
 		},
-		SignedVoteSet: byte33,
-		VoteSet:       []wire.Event{vote},
-		AgreedHash:    blockHash,
+		VoteSet:    []wire.Event{vote},
+		AgreedHash: blockHash,
 	}, nil
 }
 
 // newReductionEvent returns a Reduction event, populated with a mixture of specified
 // and default fields.
 func newReductionEvent(hash []byte, round uint64, step uint8) (*events.Reduction, error) {
-	pubKeyBLS, byte33, err := generateEventFields()
-	if err != nil {
-		return nil, err
-	}
+	keys, _ := user.NewRandKeys()
 
-	return &events.Reduction{
+	redEv := &events.Reduction{
 		Header: &events.Header{
-			PubKeyBLS: pubKeyBLS,
+			PubKeyBLS: keys.BLSPubKey.Marshal(),
 			Round:     round,
 			Step:      step,
 		},
-		VotedHash:  hash,
-		SignedHash: byte33,
-	}, nil
-}
-
-// generateEventFields will create byte slices needed to mock Events.
-func generateEventFields() ([]byte, []byte, error) {
-	pub, _, err := bls.GenKeyPair(rand.Reader)
-	if err != nil {
-		return nil, nil, err
+		VotedHash: hash,
 	}
 
-	byte33, err := crypto.RandEntropy(33)
-	if err != nil {
-		return nil, nil, err
+	if err := events.SignReductionEvent(redEv, keys); err != nil {
+		return nil, err
 	}
 
-	return pub.Marshal(), byte33, nil
+	return redEv, nil
 }
