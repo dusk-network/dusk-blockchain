@@ -100,3 +100,19 @@ func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 
 	return nil
 }
+
+// MarshalSignableVote marshals a Vote
+func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
+	if err := encoding.WriteUint64(r, binary.LittleEndian, vote.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(r, vote.Step); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, vote.BlockHash); err != nil {
+		return err
+	}
+	return nil
+}

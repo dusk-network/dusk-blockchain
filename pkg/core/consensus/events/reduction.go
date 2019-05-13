@@ -163,13 +163,7 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	buf := new(bytes.Buffer)
 
-	//TODO: Vote is actually the Header
-	vote := &Vote{}
-	vote.Round = ev.Round
-	vote.Step = ev.Step
-	vote.BlockHash = ev.BlockHash
-
-	if err := MarshalSignableVote(buf, vote); err != nil {
+	if err := MarshalSignableVote(buf, ev.Header); err != nil {
 		return err
 	}
 
