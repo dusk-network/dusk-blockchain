@@ -5,14 +5,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
+	"math"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"io"
-	"math"
 )
 
 const (
@@ -36,11 +37,12 @@ var (
 	// Key values prefixes to provide prefix-based sorting mechanism
 	// Refer to README.md for overview idea
 
-	HeaderPrefix   = []byte{0x01}
-	TxPrefix       = []byte{0x02}
-	HeightPrefix   = []byte{0x03}
-	TxIDPrefix     = []byte{0x04}
-	KeyImagePrefix = []byte{0x05}
+	HeaderPrefix         = []byte{0x01}
+	TxPrefix             = []byte{0x02}
+	HeightPrefix         = []byte{0x03}
+	TxIDPrefix           = []byte{0x04}
+	KeyImagePrefix       = []byte{0x05}
+	CandidateBlockPrefix = []byte{0x06}
 )
 
 type transaction struct {
@@ -164,6 +166,44 @@ func (t transaction) StoreBlock(block *block.Block) error {
 	t.put(key, value)
 
 	return nil
+}
+
+// StoreCandidateBlock stores a candidate block to be proposed in next consensus
+// round Always overwrites lastly stored candidate block
+func (t transaction) StoreCandidateBlock(block *block.Block) error {
+
+	// Schema Key = CandidateBlockPrefix
+	//
+	// Value = block.Encoded()
+
+	buf := new(bytes.Buffer)
+	if err := block.Encode(buf); err != nil {
+		return err
+	}
+
+	t.put(CandidateBlockPrefix, buf.Bytes())
+
+	return nil
+}
+
+// FetchCandidateBlock Fetch lastly stored candidate block
+func (t transaction) FetchCandidateBlock() (*block.Block, error) {
+
+	value, err := t.snapshot.Get(CandidateBlockPrefix, nil)
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			// overwrite error message
+			err = database.ErrBlockNotFound
+		}
+		return nil, err
+	}
+
+	b := new(block.Block)
+	if err := b.Decode(bytes.NewReader(value)); err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }
 
 // encodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction

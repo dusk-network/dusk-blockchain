@@ -19,6 +19,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
@@ -44,6 +45,7 @@ type Server struct {
 	stakes  map[string]*bytes.Buffer
 	bids    []*bytes.Buffer
 	chain   *chain.Chain
+	m       *mempool.Mempool
 	dupeMap *dupemap.DupeMap
 
 	// subscriber channels
@@ -71,8 +73,11 @@ func Setup() *Server {
 	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
 	c := committee.LaunchCommitteeStore(eventBus, keys)
 
+	m := mempool.NewMempool(eventBus, nil)
+	m.Run()
+
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus)
+	chain, err := chain.New(eventBus, rpcBus)
 	if err != nil {
 		panic(err)
 	}
@@ -92,9 +97,7 @@ func Setup() *Server {
 			log.Errorf("RPC server error: %s", err.Error())
 		}
 
-		err = rpcServ.Start()
-
-		if err != nil {
+		if err := rpcServ.Start(); err != nil {
 			log.Errorf("RPC server error: %s", err.Error())
 		}
 	}
@@ -106,6 +109,7 @@ func Setup() *Server {
 		stakes:                make(map[string]*bytes.Buffer),
 		bids:                  []*bytes.Buffer{},
 		chain:                 chain,
+		m:                     m,
 		stakeChan:             stakeChan,
 		bidChan:               bidChan,
 		removeProvisionerChan: committee.InitRemoveProvisionerCollector(eventBus),
@@ -119,15 +123,21 @@ func Setup() *Server {
 
 	//NOTE: this is solely for testnet
 	bid, d, k := makeBid()
-	// saving the stake in the chain
-	if err := chain.AcceptTx(stake); err != nil {
-		panic(err)
-	}
 
-	// saving the bid in the chain
-	if err := chain.AcceptTx(bid); err != nil {
-		panic(err)
+	// Publish the stake in the chain
+	buf := new(bytes.Buffer)
+	err = stake.Encode(buf)
+	if err != nil {
+		log.Error(err)
 	}
+	eventBus.Publish(string(topics.Tx), buf)
+	// Publish the bid in the chain
+	buf = new(bytes.Buffer)
+	err = bid.Encode(buf)
+	if err != nil {
+		log.Error(err)
+	}
+	eventBus.Publish(string(topics.Tx), buf)
 
 	// Connecting to the general monitoring system
 	ConnectToMonitor(eventBus, d)

@@ -37,6 +37,7 @@ type Registry struct {
 	Logger   loggerConfiguration
 	Prof     profConfiguration
 	RPC      rpcConfiguration
+	Mempool  mempoolConfiguration
 }
 
 // Load makes an attempt to read and unmershal any configs from flag, env and

@@ -13,10 +13,11 @@ For general concept explanation one can refer to /pkg/core/database/README.md. T
 |  0x04       | TxID               | HeaderHash               | block txs count            | FetchBlockTxByHash
 |  0x05       | KeyImage           | TxID                     | sum of block txs inputs    | FetchKeyImageExists
 |  0x03       | Height             | HeaderHash               | 1                          | FetchBlockHashByHeight
+|  0x06       | #PrefixAsKey       | Block.Encode()           | 1 per blockchain           | FetchCandidateBlock
 
 
 Table notation
 - HeaderHash - a calculated hash of block header
 - TxID - a calculated hash of transaction
-- \'+' operation - concatenation of byte arrays
+- \'+' operation - denotes concatenation of byte arrays
 - Tx.Encode() - Encoded binary form of all Tx fields without TxID

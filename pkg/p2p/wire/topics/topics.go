@@ -22,6 +22,7 @@ const (
 	GetHeaders     Topic = "getheaders"
 	Tx             Topic = "tx"
 	Block          Topic = "block"
+	AcceptedBlock  Topic = "acceptedblock"
 	Headers        Topic = "headers"
 	MemPool        Topic = "mempool"
 	Inv            Topic = "inv"

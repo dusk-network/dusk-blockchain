@@ -30,6 +30,12 @@ var (
 	// Returns block.Block marshaled
 	GetLastBlock     = "getLastBlock"
 	GetLastBlockChan chan Req
+
+	// Provide the list of verified txs ready to be included into next block
+	//
+	// Implemented by mempool
+	GetVerifiedTxs     = "getVerifiedTxs"
+	GetVerifiedTxsChan chan Req
 )
 
 // RPCBus is a request–response mechanism for internal communication between node
@@ -45,7 +51,7 @@ var (
 //
 type RPCBus struct {
 	registry map[string]method
-	mu       sync.Mutex
+	mu       sync.RWMutex
 }
 
 type method struct {
@@ -57,6 +63,7 @@ type Req struct {
 	Params  bytes.Buffer
 	Timeout int
 	Resp    chan bytes.Buffer
+	Err     chan error
 }
 
 func NewRPCBus() *RPCBus {
@@ -64,8 +71,20 @@ func NewRPCBus() *RPCBus {
 	bus.registry = make(map[string]method)
 
 	// default methods
-	GetLastBlockChan = make(chan Req)
-	_ = bus.Register(GetLastBlock, GetLastBlockChan)
+
+	if GetLastBlockChan == nil {
+		GetLastBlockChan = make(chan Req)
+		if err := bus.Register(GetLastBlock, GetLastBlockChan); err != nil {
+			panic(err)
+		}
+	}
+
+	if GetVerifiedTxsChan == nil {
+		GetVerifiedTxsChan = make(chan Req)
+		if err := bus.Register(GetVerifiedTxs, GetVerifiedTxsChan); err != nil {
+			panic(err)
+		}
+	}
 
 	return &bus
 }
@@ -91,8 +110,9 @@ func (bus *RPCBus) Register(methodName string, req chan<- Req) error {
 
 // Call runs a long-polling technique to request from the method Consumer to
 // run the corresponding procedure and return a result or timeout
-func (bus *RPCBus) Call(methodName string, req Req) (resp bytes.Buffer, err error) {
+func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
 
+	var resp bytes.Buffer
 	method, err := bus.getMethod(methodName)
 
 	if err != nil {
@@ -106,29 +126,34 @@ func (bus *RPCBus) Call(methodName string, req Req) (resp bytes.Buffer, err erro
 		return bytes.Buffer{}, ErrReqTimeout
 	}
 
-	// Wait for response from the consumer with read-timeout
+	// Wait for response or err from the consumer with read-timeout
 	select {
 	case resp = <-req.Resp:
-		// terminate the procedure if timeout-ed
+	// this case happens when the consumer cannot return a valid response but an
+	// error details instead
+	case err := <-req.Err:
+		return bytes.Buffer{}, err
+	// terminate the procedure if timeout-ed
 	case <-time.After(time.Duration(req.Timeout) * time.Second):
 		err = ErrReqTimeout
 	}
 
-	return
+	return resp, err
 }
 
 // NewRequest builds a new request with params
 func NewRequest(p bytes.Buffer, timeout int) Req {
 	d := Req{Timeout: timeout, Params: p}
 	d.Resp = make(chan bytes.Buffer)
+	d.Err = make(chan error)
 	return d
 }
 
 func (bus *RPCBus) getMethod(methodName string) (method, error) {
 
 	// Guards the bus.registry until we find and return a copy
-	bus.mu.Lock()
-	defer bus.mu.Unlock()
+	bus.mu.RLock()
+	defer bus.mu.RUnlock()
 
 	if method, ok := bus.registry[methodName]; ok {
 		return method, nil

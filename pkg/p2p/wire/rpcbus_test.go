@@ -2,36 +2,53 @@ package wire
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 )
 
-var expectedResult string
-var consumerStarted bool
- 
+var (
+	expectedResult   string
+	consumerStarted  bool
+	errInvalidParams = errors.New("invalid params")
 
-func runConsumer(delay int ) {
+	cleanup = func() {
+		GetLastBlockChan = nil
+		GetVerifiedTxsChan = nil
+	}
+)
+
+func runConsumer(delay int) {
 	if consumerStarted == false {
 		consumerStarted = true
 		go func(delay int) {
 			for req := range GetLastBlockChan {
 				// Simulate heavy computation
 				time.Sleep(time.Duration(delay) * time.Millisecond)
-				expectedResult = "Wrapped " + req.Params.String()
-		
-				buf := bytes.Buffer{}
-				buf.WriteString(expectedResult)
-		
-				// return result
-				req.Resp <- buf
+
+				params := req.Params.String()
+
+				if len(params) == 0 {
+					// Simulate error response
+					req.Err <- errInvalidParams
+				} else {
+					// Simulate non-error response
+					expectedResult = "Wrapped " + params
+
+					buf := bytes.Buffer{}
+					buf.WriteString(expectedResult)
+
+					// return result
+					req.Resp <- buf
+				}
 			}
 		}(delay)
 	}
 }
 func TestRPCall(t *testing.T) {
 
+	cleanup()
 	bus := NewRPCBus()
-	defer bus.Close()
 
 	runConsumer(500)
 
@@ -51,12 +68,34 @@ func TestRPCall(t *testing.T) {
 	}
 }
 
-func TestTimeoutCalls(t *testing.T) {
+func TestRPCallWithError(t *testing.T) {
 
 	t.SkipNow()
-
+	cleanup()
 	bus := NewRPCBus()
-	defer bus.Close()
+
+	runConsumer(500)
+
+	// produce the call
+	buf := bytes.Buffer{}
+	buf.WriteString("")
+
+	d := NewRequest(buf, 10)
+	responseResult, err := bus.Call(GetLastBlock, d)
+
+	if err != errInvalidParams {
+		t.Errorf("expecting a specific error here but get %v", err)
+	}
+
+	if responseResult.String() != "" {
+		t.Errorf("expecting to empty response data")
+	}
+}
+
+func TestTimeoutCalls(t *testing.T) {
+
+	cleanup()
+	bus := NewRPCBus()
 
 	delay := 3000
 	runConsumer(delay)
@@ -68,32 +107,30 @@ func TestTimeoutCalls(t *testing.T) {
 	d := NewRequest(buf, 1)
 	responseResult, err := bus.Call(GetLastBlock, d)
 
-	if responseResult.Len() > 0 {
-		t.Error("expecting empty result")
+	if err != ErrReqTimeout {
+		t.Errorf("expecting timeout error but get %v", err)
 	}
 
-	if err != ErrReqTimeout {
-		t.Error("expecting timeout error")
+	if responseResult.Len() > 0 {
+		t.Error("expecting empty result")
 	}
 }
 
 func TestMethodExists(t *testing.T) {
-
+	cleanup()
 	bus := NewRPCBus()
-	defer bus.Close()
 
 	reqChan2 := make(chan Req)
 	err := bus.Register(GetLastBlock, reqChan2)
 
 	if err != ErrMethodExists {
-		t.Fatalf("expecting methodExists error")
+		t.Fatalf("expecting methodExists error but get %v", err)
 	}
 }
 
 func TestNonExistingMethod(t *testing.T) {
- 
+	cleanup()
 	bus := NewRPCBus()
-	defer bus.Close()
 
 	runConsumer(500)
 
@@ -104,18 +141,18 @@ func TestNonExistingMethod(t *testing.T) {
 	d := NewRequest(buf, 2)
 	responseResult, err := bus.Call("Chain/NonExistingMethod", d)
 
-	if responseResult.Len() > 0 {
-		t.Error("expecting empty result")
-	}
-
 	if err != ErrMethodNotExists {
 		t.Error("expecting methodNotExists error")
+	}
+
+	if responseResult.Len() > 0 {
+		t.Error("expecting empty result")
 	}
 }
 
 func TestInvalidReqChan(t *testing.T) {
+	cleanup()
 	bus := NewRPCBus()
-	defer bus.Close()
 
 	err := bus.Register(GetLastBlock, nil)
 	if err != ErrInvalidReqChan {

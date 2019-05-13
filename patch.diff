@@ -1,0 +1,563 @@
+diff --git a/launch/testnet/monitor.go b/launch/testnet/monitor.go
+index f6a8daa..4ea276a 100644
+--- a/launch/testnet/monitor.go
++++ b/launch/testnet/monitor.go
+@@ -9,7 +9,7 @@ import (
+ )
+ 
+ func ConnectToMonitor(bus wire.EventBroker, d ristretto.Scalar) {
+-	if cfg.Get().General.Network == "testnet" {
++	if cfg.Get().General.Network == "testnet" && cfg.Get().Network.Monitor.Enabled {
+ 		monitorUrl := cfg.Get().Network.Monitor.Address
+ 		log.Infof("Connecting to monitoring system")
+ 		monitor.LaunchMonitor(bus, monitorUrl, d)
+diff --git a/launch/testnet/server.go b/launch/testnet/server.go
+index ed25908..d7d7669 100644
+--- a/launch/testnet/server.go
++++ b/launch/testnet/server.go
+@@ -26,13 +26,17 @@ import (
+ 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+ 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+ 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
++	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
+ 	"gitlab.dusk.network/dusk-core/zkproof"
++
++	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+ )
+ 
+ var timeOut = 3 * time.Second
+ 
+ type Server struct {
+ 	eventBus *wire.EventBus
++	rpcBus   *wire.RPCBus
+ 
+ 	// stakes are stored in a map, with the BLS public key as the key, so that they
+ 	// can be properly removed when a node disconnects.
+@@ -56,6 +60,10 @@ type txCollector struct {
+ func Setup() *Server {
+ 	// creating the eventbus
+ 	eventBus := wire.NewEventBus()
++
++	// creating the rpcbus
++	rpcBus := wire.NewRPCBus()
++
+ 	// generating the keys
+ 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
+ 	keys, _ := user.NewRandKeys()
+@@ -78,6 +86,19 @@ func Setup() *Server {
+ 	dupeBlacklist := dupemap.NewDupeMap(eventBus)
+ 	go dupeBlacklist.CleanOnRound()
+ 
++	if cfg.Get().RPC.Enabled {
++		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus)
++		if err != nil {
++			log.Errorf("RPC server error: %s", err.Error())
++		}
++
++		err = rpcServ.Start()
++
++		if err != nil {
++			log.Errorf("RPC server error: %s", err.Error())
++		}
++	}
++
+ 	// creating the Server
+ 	srv := &Server{
+ 		eventBus:              eventBus,
+@@ -89,6 +110,7 @@ func Setup() *Server {
+ 		bidChan:               bidChan,
+ 		removeProvisionerChan: committee.InitRemoveProvisionerCollector(eventBus),
+ 		dupeMap:               dupeBlacklist,
++		rpcBus:                rpcBus,
+ 	}
+ 
+ 	// make a stake and bid tx
+@@ -262,6 +284,7 @@ func (s *Server) sendStakesAndBids(peer *peer.Peer) {
+ 
+ func (s *Server) Close() {
+ 	s.chain.Close()
++	s.rpcBus.Close()
+ }
+ 
+ func makeStake(keys *user.Keys) *transactions.Stake {
+diff --git a/pkg/config/groups.go b/pkg/config/groups.go
+index f805a07..1c6d682 100644
+--- a/pkg/config/groups.go
++++ b/pkg/config/groups.go
+@@ -17,6 +17,7 @@ type networkConfiguration struct {
+ 
+ type monitorConfiguration struct {
+ 	Address string
++	Enabled bool
+ }
+ 
+ type seedersConfiguration struct {
+@@ -43,5 +44,8 @@ type profConfiguration struct {
+ 
+ // pkg/rpc package configs
+ type rpcConfiguration struct {
+-	Address string
++	Port    string
++	Enabled bool
++	User    string
++	Pass    string
+ }
+diff --git a/pkg/config/samples/default.dusk.toml b/pkg/config/samples/default.dusk.toml
+index c9c86c1..db9fa93 100644
+--- a/pkg/config/samples/default.dusk.toml
++++ b/pkg/config/samples/default.dusk.toml
+@@ -26,9 +26,10 @@ port=7000
+ addresses=["voucher.dusk.network:8081"]
+ # fixed network addresses to setup local P2P network
+ # supported only in testnet
+-fixed = []
++fixed = [""]
+ 
+ [network.monitor]
++enabled = true
+ address="monitor.dusk.network:1337"
+ 
+ [database]
+@@ -40,6 +41,9 @@ dir = "chain"
+ 
+ # rpc service configs
+ [rpc]
++
++# rpc port to listen on
++port=9000
+ # enable rpc service
+ enabled=false
+ user="default"
+diff --git a/pkg/core/chain/chain.go b/pkg/core/chain/chain.go
+index 92671ed..65cb90e 100644
+--- a/pkg/core/chain/chain.go
++++ b/pkg/core/chain/chain.go
+@@ -106,6 +106,10 @@ func (c *Chain) Listen() {
+ 			c.AcceptBlock(*blk)
+ 		case tx := <-c.txChan:
+ 			c.AcceptTx(tx)
++		case r := <-wire.GetLastBlockChan:
++			buf := new(bytes.Buffer)
++			_ = c.PrevBlock.Decode(buf)
++			r.Resp <- *buf
+ 		}
+ 	}
+ }
+diff --git a/pkg/p2p/wire/rpcbus.go b/pkg/p2p/wire/rpcbus.go
+index 1333691..2204061 100644
+--- a/pkg/p2p/wire/rpcbus.go
++++ b/pkg/p2p/wire/rpcbus.go
+@@ -21,13 +21,20 @@ var (
+ 	ErrInvalidReqChan = errors.New("invalid request channel")
+ )
+ 
+-// TODO:
++var (
++
++	// Default set of registered methods
++
++	// Provide the last/highest block from the local chain state
++	// Can be implemented by Chain pkg or Database pkg.
++	// Returns block.Block marshaled
++	GetLastBlock     = "getLastBlock"
++	GetLastBlockChan chan Req
++)
++
+ // Quit chan
+-// Copy or pointer
+-// TODO Rename RequestData
+-// TODO Rename Payload, Resp
+ 
+-// RPCBus is a request–response protocol for internal communication between node
++// RPCBus is a request–response mechanism for internal communication between node
+ // components/subsystems. Under the hood this is long-polling method based on
+ // "chan chan" technique.
+ //
+@@ -45,11 +52,11 @@ type RPCBus struct {
+ 
+ type method struct {
+ 	Name string
+-	Req  chan<- RequestData
++	req  chan<- Req
+ }
+ 
+-type RequestData struct {
+-	Payload bytes.Buffer
++type Req struct {
++	Params  bytes.Buffer
+ 	Timeout int
+ 	Resp    chan bytes.Buffer
+ }
+@@ -57,12 +64,17 @@ type RequestData struct {
+ func NewRPCBus() *RPCBus {
+ 	var bus RPCBus
+ 	bus.registry = make(map[string]method)
++
++	// default methods
++	GetLastBlockChan = make(chan Req)
++	_ = bus.Register(GetLastBlock, GetLastBlockChan)
++
+ 	return &bus
+ }
+ 
+ // Register registers a method and assigns it a handler channel. methodName must be
+ // unique per node instance. if not, returns err
+-func (bus *RPCBus) Register(methodName string, req chan RequestData) error {
++func (bus *RPCBus) Register(methodName string, req chan<- Req) error {
+ 
+ 	bus.mu.Lock()
+ 	defer bus.mu.Unlock()
+@@ -75,13 +87,13 @@ func (bus *RPCBus) Register(methodName string, req chan RequestData) error {
+ 		return ErrMethodExists
+ 	}
+ 
+-	bus.registry[methodName] = method{Name: methodName, Req: req}
++	bus.registry[methodName] = method{Name: methodName, req: req}
+ 	return nil
+ }
+ 
+ // Call spawns a long-polling technique to request from the method Consumer to
+ // run the corresponding procedure and return a result or timeout
+-func (bus *RPCBus) Call(methodName string, req RequestData) (resp bytes.Buffer, err error) {
++func (bus *RPCBus) Call(methodName string, req Req) (resp bytes.Buffer, err error) {
+ 
+ 	method, err := bus.getMethod(methodName)
+ 
+@@ -91,7 +103,7 @@ func (bus *RPCBus) Call(methodName string, req RequestData) (resp bytes.Buffer,
+ 
+ 	// Send the request
+ 	select {
+-	case method.Req <- req:
++	case method.req <- req:
+ 	default:
+ 		return bytes.Buffer{}, errors.New("no channel to process this method")
+ 	}
+@@ -107,9 +119,9 @@ func (bus *RPCBus) Call(methodName string, req RequestData) (resp bytes.Buffer,
+ 	return
+ }
+ 
+-// NewRequest builds a new request
+-func NewRequest(payload bytes.Buffer, timeout int) RequestData {
+-	d := RequestData{Timeout: timeout, Payload: payload}
++// NewRequest builds a new request with params
++func NewRequest(p bytes.Buffer, timeout int) Req {
++	d := Req{Timeout: timeout, Params: p}
+ 	d.Resp = make(chan bytes.Buffer)
+ 	return d
+ }
+@@ -126,3 +138,13 @@ func (bus *RPCBus) getMethod(methodName string) (method, error) {
+ 
+ 	return method{}, ErrMethodNotExists
+ }
++
++// Close all open channels
++func (bus *RPCBus) Close() {
++	bus.mu.Lock()
++	defer bus.mu.Unlock()
++
++	for _, m := range bus.registry {
++		close(m.req)
++	}
++}
+diff --git a/pkg/p2p/wire/rpcbus_test.go b/pkg/p2p/wire/rpcbus_test.go
+index 8d09a30..af7588f 100644
+--- a/pkg/p2p/wire/rpcbus_test.go
++++ b/pkg/p2p/wire/rpcbus_test.go
+@@ -2,7 +2,6 @@ package wire
+ 
+ import (
+ 	"bytes"
+-	"fmt"
+ 	"testing"
+ 	"time"
+ )
+@@ -10,24 +9,16 @@ import (
+ var expectedResult string
+ 
+ type consumer struct {
+-	reqChan chan RequestData
+ }
+ 
+ func (c consumer) loop(bus *RPCBus, delay int) {
+ 
+-	err := bus.Register("Chain/GetBlock", c.reqChan)
+-
+-	if err != nil {
+-		fmt.Print(err.Error())
+-		return
+-	}
+-
+ 	// wait for new requests
+-	for req := range c.reqChan {
++	for req := range GetLastBlockChan {
+ 
+ 		// Simulate heavy computation
+ 		time.Sleep(time.Duration(delay) * time.Millisecond)
+-		expectedResult = "Wrapped " + req.Payload.String()
++		expectedResult = "Wrapped " + req.Params.String()
+ 
+ 		buf := bytes.Buffer{}
+ 		buf.WriteString(expectedResult)
+@@ -41,7 +32,6 @@ func (c consumer) loop(bus *RPCBus, delay int) {
+ func newConsumer(t *testing.T, bus *RPCBus, delay int) consumer {
+ 
+ 	c := consumer{}
+-	c.reqChan = make(chan RequestData)
+ 	go c.loop(bus, delay)
+ 
+ 	time.Sleep(10 * time.Millisecond)
+@@ -50,6 +40,7 @@ func newConsumer(t *testing.T, bus *RPCBus, delay int) consumer {
+ func TestRPCall(t *testing.T) {
+ 
+ 	bus := NewRPCBus()
++	defer bus.Close()
+ 
+ 	newConsumer(t, bus, 500)
+ 
+@@ -58,7 +49,7 @@ func TestRPCall(t *testing.T) {
+ 	buf.WriteString("input params")
+ 
+ 	d := NewRequest(buf, 2)
+-	responseResult, err := bus.Call("Chain/GetBlock", d)
++	responseResult, err := bus.Call(GetLastBlock, d)
+ 
+ 	if err != nil {
+ 		t.Error(err.Error())
+@@ -81,7 +72,7 @@ func TestTimeoutCalls(t *testing.T) {
+ 	buf.WriteString("input params")
+ 
+ 	d := NewRequest(buf, 1)
+-	responseResult, err := bus.Call("Chain/GetBlock", d)
++	responseResult, err := bus.Call(GetLastBlock, d)
+ 
+ 	if responseResult.Len() > 0 {
+ 		t.Error("expecting empty result")
+@@ -95,17 +86,10 @@ func TestTimeoutCalls(t *testing.T) {
+ func TestMethodExists(t *testing.T) {
+ 
+ 	bus := NewRPCBus()
++	defer bus.Close()
+ 
+-	reqChan := make(chan RequestData)
+-	err := bus.Register("Chain/GetBlock", reqChan)
+-
+-	if err != nil {
+-		t.Fatalf(err.Error())
+-		return
+-	}
+-
+-	reqChan2 := make(chan RequestData)
+-	err = bus.Register("Chain/GetBlock", reqChan2)
++	reqChan2 := make(chan Req)
++	err := bus.Register(GetLastBlock, reqChan2)
+ 
+ 	if err != ErrMethodExists {
+ 		t.Fatalf("expecting methodExists error")
+@@ -115,6 +99,7 @@ func TestMethodExists(t *testing.T) {
+ func TestNonExistingMethod(t *testing.T) {
+ 
+ 	bus := NewRPCBus()
++	defer bus.Close()
+ 
+ 	newConsumer(t, bus, 500)
+ 
+@@ -137,8 +122,9 @@ func TestNonExistingMethod(t *testing.T) {
+ func TestInvalidReqChan(t *testing.T) {
+ 
+ 	bus := NewRPCBus()
++	defer bus.Close()
+ 
+-	err := bus.Register("Chain/GetBlock", nil)
++	err := bus.Register(GetLastBlock, nil)
+ 	if err != ErrInvalidReqChan {
+ 		t.Error("expecting ErrInvalidReqChan error")
+ 	}
+diff --git a/pkg/rpc/commands.go b/pkg/rpc/commands.go
+index d1d0b95..67634cb 100644
+--- a/pkg/rpc/commands.go
++++ b/pkg/rpc/commands.go
+@@ -1,9 +1,14 @@
+ package rpc
+ 
+ import (
++	"bytes"
++	"encoding/json"
++
+ 	"strconv"
+ 	"time"
+ 
++	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
++	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+ 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+ 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+ )
+@@ -13,10 +18,11 @@ type handler func(*Server, []string) (string, error)
+ 
+ // rpcCmd maps method names to their actual functions.
+ var rpcCmd = map[string]handler{
+-	"version":   version,
+-	"ping":      pong,
+-	"uptime":    uptime,
+-	"chaininfo": chainInfo,
++	"version":      version,
++	"ping":         pong,
++	"uptime":       uptime,
++	"chaininfo":    chainInfo,
++	"getlastblock": getlastblock,
+ }
+ 
+ // rpcAdminCmd holds all admin methods.
+@@ -46,3 +52,18 @@ var chainInfo = func(s *Server, params []string) (string, error) {
+ 
+ 	return m, nil
+ }
++
++var getlastblock = func(s *Server, params []string) (string, error) {
++
++	r, err := s.rpcBus.Call(wire.GetLastBlock, wire.NewRequest(bytes.Buffer{}, 1))
++
++	if err != nil {
++		return "", err
++	}
++
++	b := &block.Block{}
++	b.Decode(&r)
++	res, err := json.Marshal(b)
++
++	return string(res), err
++}
+diff --git a/pkg/rpc/handler.go b/pkg/rpc/handler.go
+index 056723d..3a45c18 100644
+--- a/pkg/rpc/handler.go
++++ b/pkg/rpc/handler.go
+@@ -50,12 +50,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
+ 		http.Error(w, err.Error(), http.StatusUnauthorized)
+ 	}
+ 
+-	msg, err := json.Marshal(result)
+-	if err != nil {
+-		fmt.Fprintf(os.Stderr, "error marshaling response: %v\n", err)
+-	}
+-
+-	if _, err := w.Write(msg); err != nil {
++	if _, err := w.Write([]byte(result)); err != nil {
+ 		fmt.Fprintf(os.Stderr, "error writing reply: %v\n", err)
+ 		return
+ 	}
+@@ -63,28 +58,24 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
+ 
+ // runCmd parses and runs the specified method. Server is included as the receiver in case
+ // the method needs to modify anything on the RPC server.
+-func (s *Server) runCmd(r *JSONRequest, isAdmin bool) (*JSONResponse, error) {
+-	var resp JSONResponse
++func (s *Server) runCmd(r *JSONRequest, isAdmin bool) (string, error) {
+ 
+ 	// Get method
+ 	fn, ok := rpcCmd[r.Method]
+ 	if !ok {
+-		resp.Result = "error"
+-		resp.Error = "method unrecognized"
+-		return &resp, nil
++		return "", fmt.Errorf("method %s unrecognized", r.Method)
+ 	}
+ 
+ 	// Check if it is an admin-only method first if caller is not admin
+ 	if !isAdmin && rpcAdminCmd[r.Method] {
+-		return nil, fmt.Errorf("unauthorized call to method %v", r.Method)
++		return "", fmt.Errorf("unauthorized call to method %v", r.Method)
+ 	}
+ 
+ 	// Run method and return result
+ 	result, err := fn(s, r.Params)
+ 	if err != nil {
+-		resp.Error = err.Error()
++		return "", err
+ 	}
+ 
+-	resp.Result = result
+-	return &resp, nil
++	return result, nil
+ }
+diff --git a/pkg/rpc/rpcserver.go b/pkg/rpc/rpcserver.go
+index 58a2efe..d815022 100644
+--- a/pkg/rpc/rpcserver.go
++++ b/pkg/rpc/rpcserver.go
+@@ -10,30 +10,23 @@ import (
+ 	"os"
+ 	"time"
+ 
+-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+-
+ 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
++	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+ 
++	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+ 	"golang.org/x/crypto/sha3"
+ )
+ 
+-// Config is the configuration struct for the rpc server
+-type Config struct {
+-	RPCPort string
+-	RPCUser string
+-	RPCPass string
+-}
+-
+ // Server defines the RPC server of the Dusk node.
+ type Server struct {
+ 	started bool // Indicates whether or not server has started
+ 
+ 	eventBus         *wire.EventBus
++	rpcBus           *wire.RPCBus
+ 	chainInfoChannel <-chan *bytes.Buffer
+ 	chainInfoID      uint32
+ 
+ 	authSHA  []byte       // Hash of the auth credentials
+-	config   Config       // Configuration struct for RPC server
+ 	listener net.Listener // RPC Server listener
+ 
+ 	decodedChainInfoChannel chan string
+@@ -42,20 +35,22 @@ type Server struct {
+ }
+ 
+ // NewRPCServer instantiates a new RPCServer.
+-func NewRPCServer(eventBus *wire.EventBus, cfg *Config) (*Server, error) {
++func NewRPCServer(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Server, error) {
+ 	chainInfoChannel := make(chan *bytes.Buffer, 10)
+ 
+ 	srv := Server{
+ 		eventBus:         eventBus,
++		rpcBus:           rpcBus,
+ 		chainInfoChannel: chainInfoChannel,
+-		config:           *cfg,
+ 	}
+ 
+ 	chainInfoID := srv.eventBus.Subscribe(string(topics.ChainInfo), chainInfoChannel)
+ 	srv.chainInfoID = chainInfoID
+ 
+-	if cfg.RPCUser != "" && cfg.RPCPass != "" {
+-		login := cfg.RPCUser + ":" + cfg.RPCPass
++	user := cfg.Get().RPC.User
++	pass := cfg.Get().RPC.Pass
++	if user != "" && pass != "" {
++		login := user + ":" + pass
+ 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
+ 		authSHA := sha3.Sum256([]byte(auth))
+ 
+@@ -84,7 +79,7 @@ func (s *Server) Start() error {
+ 	})
+ 
+ 	// Set up listener
+-	l, err := net.Listen("tcp", "localhost:"+s.config.RPCPort)
++	l, err := net.Listen("tcp", "localhost:"+cfg.Get().RPC.Port)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -104,7 +99,7 @@ func (s *Server) Start() error {
+ 
+ // Listen on the http server.
+ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
+-	fmt.Fprintf(os.Stdout, "RPC server listening on port %v\n", s.config.RPCPort)
++	fmt.Fprintf(os.Stdout, "RPC server listening on port %v\n", cfg.Get().RPC.Port)
+ 	httpServer.Serve(s.listener)
+ 	fmt.Fprintf(os.Stdout, "RPC server stopped listening\n")
+ }

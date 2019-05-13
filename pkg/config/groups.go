@@ -49,3 +49,9 @@ type rpcConfiguration struct {
 	User    string
 	Pass    string
 }
+
+type mempoolConfiguration struct {
+	MaxSizeMB   uint32
+	PoolType    string
+	PreallocTxs uint32
+}
