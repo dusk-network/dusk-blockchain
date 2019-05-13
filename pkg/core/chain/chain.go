@@ -244,16 +244,15 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
-// CreateProposalBlock create a candidate block to be proposed on next round.
-func (c Chain) CreateProposalBlock() (*block.Block, error) {
+// CreateProposalBlock creates a candidate block to be proposed on next round.
+func (c *Chain) CreateProposalBlock() (*block.Block, error) {
 
 	// TODO Missing fields for forging the block
 	// - Seed
 	// - CertHash
 
 	// Retrieve latest verified transactions from Mempool
-	r, err := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 1))
-
+	r, err := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
 	if err != nil {
 		return nil, err
 	}
