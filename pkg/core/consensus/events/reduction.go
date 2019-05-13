@@ -15,7 +15,6 @@ type (
 	// Reduction is a basic reduction event.
 	Reduction struct {
 		*Header
-		BlockHash  []byte
 		SignedHash []byte
 	}
 
@@ -67,10 +66,6 @@ func (a *ReductionUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error 
 		return err
 	}
 
-	if err := encoding.Read256(r, &bev.BlockHash); err != nil {
-		return err
-	}
-
 	if err := encoding.ReadBLS(r, &bev.SignedHash); err != nil {
 		return err
 	}
@@ -82,10 +77,6 @@ func (a *ReductionUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error 
 func (a *ReductionUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	bev := ev.(*Reduction)
 	if err := a.HeaderMarshaller.Marshal(r, bev.Header); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, bev.BlockHash); err != nil {
 		return err
 	}
 

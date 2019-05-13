@@ -74,8 +74,8 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 			PubKeyBLS: keys.BLSPubKeyBytes,
 			Round:     round,
 			Step:      step,
+			BlockHash: hash,
 		},
-		BlockHash:  hash,
 		SignedHash: signedHash.Compress(),
 	}
 

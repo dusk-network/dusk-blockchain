@@ -14,6 +14,7 @@ type (
 		PubKeyBLS []byte
 		Round     uint64
 		Step      uint8
+		BlockHash []byte
 	}
 
 	// HeaderMarshaller marshals a consensus Header as follows:
@@ -48,7 +49,7 @@ func (a *Header) Sender() []byte {
 func (a *Header) Equal(e wire.Event) bool {
 	other, ok := e.(*Header)
 	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) &&
-		(a.Round == other.Round) && (a.Step == other.Step)
+		(a.Round == other.Round) && (a.Step == other.Step) && (bytes.Equal(a.BlockHash, other.BlockHash))
 }
 
 // Marshal a Header into a Buffer
@@ -63,6 +64,10 @@ func (ehm *HeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	if err := encoding.WriteUint8(r, consensusEv.Step); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, consensusEv.BlockHash); err != nil {
 		return err
 	}
 
@@ -86,6 +91,10 @@ func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 
 	// Decoding Step
 	if err := encoding.ReadUint8(r, &consensusEv.Step); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, &consensusEv.BlockHash); err != nil {
 		return err
 	}
 

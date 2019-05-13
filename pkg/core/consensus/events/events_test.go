@@ -77,9 +77,9 @@ func newAgreementEvent(blockHash []byte, round uint64, step uint8) (*events.Agre
 			Round:     round,
 			Step:      step,
 			PubKeyBLS: pk.Marshal(),
+			BlockHash: blockHash,
 		},
-		VoteSet:   []wire.Event{vote},
-		BlockHash: blockHash,
+		VoteSet: []wire.Event{vote},
 	}, nil
 }
 
@@ -93,8 +93,8 @@ func newReductionEvent(hash []byte, round uint64, step uint8) (*events.Reduction
 			PubKeyBLS: keys.BLSPubKeyBytes,
 			Round:     round,
 			Step:      step,
+			BlockHash: hash,
 		},
-		BlockHash: hash,
 	}
 
 	if err := events.SignReductionEvent(redEv, keys); err != nil {

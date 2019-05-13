@@ -55,6 +55,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 
 		signed := new(bytes.Buffer)
 
+		// TODO: change into Header
 		vote := &events.Vote{
 			Round:     ev.Round,
 			Step:      step,

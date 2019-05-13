@@ -73,6 +73,7 @@ func genVotes(hash []byte, round uint64, step uint8, keys []*user.Keys) []*event
 		}
 		votes[stepCycle] = stepVote
 	}
+
 	return votes
 }
 

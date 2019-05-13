@@ -79,8 +79,8 @@ func genReduction(hash []byte, set *sortedset.Set) *Reduction {
 			PubKeyBLS: pk.Marshal(),
 			Round:     uint64(1),
 			Step:      uint8(1),
+			BlockHash:  hash,
 		},
-		BlockHash:  hash,
 		SignedHash: s.Compress(),
 	}
 }
