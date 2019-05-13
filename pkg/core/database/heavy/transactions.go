@@ -190,7 +190,6 @@ func (t transaction) StoreCandidateBlock(block *block.Block) error {
 func (t transaction) FetchCandidateBlock() (*block.Block, error) {
 
 	value, err := t.snapshot.Get(CandidateBlockPrefix, nil)
-
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			// overwrite error message
@@ -200,11 +199,10 @@ func (t transaction) FetchCandidateBlock() (*block.Block, error) {
 	}
 
 	b := new(block.Block)
-	err = b.Decode(bytes.NewReader(value))
-
-	if err != nil {
+	if err := b.Decode(bytes.NewReader(value)); err != nil {
 		return nil, err
 	}
+
 	return b, nil
 }
 

@@ -19,5 +19,5 @@ For general concept explanation one can refer to /pkg/core/database/README.md. T
 Table notation
 - HeaderHash - a calculated hash of block header
 - TxID - a calculated hash of transaction
-- \'+' operation - concatenation of byte arrays
+- \'+' operation - denotes concatenation of byte arrays
 - Tx.Encode() - Encoded binary form of all Tx fields without TxID
