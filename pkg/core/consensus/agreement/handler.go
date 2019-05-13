@@ -58,7 +58,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 		vote := &events.Vote{
 			Round:     ev.Round,
 			Step:      step,
-			BlockHash: ev.AgreedHash,
+			BlockHash: ev.BlockHash,
 		}
 
 		if err := events.MarshalSignableVote(signed, vote); err != nil {

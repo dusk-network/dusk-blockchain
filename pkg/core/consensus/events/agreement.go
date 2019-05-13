@@ -29,8 +29,8 @@ type (
 	// into an AggregatedAgreement there), it includes no signature
 	Agreement struct {
 		*Header
-		VoteSet    []wire.Event
-		AgreedHash []byte
+		VoteSet   []wire.Event
+		BlockHash []byte
 	}
 
 	// AggregatedAgreement is the BLS aggregated representation of an Agreement Event
@@ -38,7 +38,7 @@ type (
 		*Header
 		SignedVotes  []byte
 		VotesPerStep []*StepVotes
-		AgreedHash   []byte
+		BlockHash    []byte
 	}
 
 	// AgreementUnMarshaller implements both Marshaller and Unmarshaller interface
@@ -162,7 +162,7 @@ func (au *AggregatedAgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Even
 		return err
 	}
 
-	if err := encoding.Write256(r, a.AgreedHash); err != nil {
+	if err := encoding.Write256(r, a.BlockHash); err != nil {
 		return err
 	}
 
@@ -186,7 +186,7 @@ func (au *AggregatedAgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Ev
 	}
 	a.VotesPerStep = votesPerStep
 
-	if err := encoding.Read256(r, &a.AgreedHash); err != nil {
+	if err := encoding.Read256(r, &a.BlockHash); err != nil {
 		return err
 	}
 
@@ -198,7 +198,7 @@ func NewAggregatedAgreement() *AggregatedAgreement {
 		Header:       &Header{},
 		VotesPerStep: make([]*StepVotes, 2),
 		SignedVotes:  make([]byte, 33),
-		AgreedHash:   make([]byte, 32),
+		BlockHash:    make([]byte, 32),
 	}
 }
 
@@ -351,7 +351,7 @@ func (ceu *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) erro
 	}
 	cev.VoteSet = voteSet
 
-	if err := encoding.Read256(r, &cev.AgreedHash); err != nil {
+	if err := encoding.Read256(r, &cev.BlockHash); err != nil {
 		return err
 	}
 
@@ -379,7 +379,7 @@ func (ceu *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error 
 		return err
 	}
 
-	if err := encoding.Write256(r, cev.AgreedHash); err != nil {
+	if err := encoding.Write256(r, cev.BlockHash); err != nil {
 		return err
 	}
 	return nil

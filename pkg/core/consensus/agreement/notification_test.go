@@ -20,5 +20,5 @@ func TestNotification(t *testing.T) {
 	}
 	PublishMock(bus, hash, 1, 2, keys)
 	msg := <-agChan
-	assert.Equal(t, hash, msg.AgreedHash)
+	assert.Equal(t, hash, msg.BlockHash)
 }

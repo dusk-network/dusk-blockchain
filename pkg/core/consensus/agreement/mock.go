@@ -31,7 +31,7 @@ func MockAggregatedAgreementEvent(hash []byte, round uint64, step uint8, keys []
 	a.PubKeyBLS = pk.Marshal()
 	a.Round = round
 	a.Step = step
-	a.AgreedHash = hash
+	a.BlockHash = hash
 
 	// generating reduction events (votes) and signing them
 	steps := genVotes(hash, round, step, keys)
@@ -132,7 +132,7 @@ func MockAgreement(keys *user.Keys, hash []byte, round uint64, step uint8, votes
 	ev.Step = step
 	ev.PubKeyBLS = keys.BLSPubKeyBytes
 	ev.VoteSet = votes
-	ev.AgreedHash = hash
+	ev.BlockHash = hash
 	return ev
 }
 

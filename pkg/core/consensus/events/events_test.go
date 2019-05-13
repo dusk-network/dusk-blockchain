@@ -78,8 +78,8 @@ func newAgreementEvent(blockHash []byte, round uint64, step uint8) (*events.Agre
 			Step:      step,
 			PubKeyBLS: pk.Marshal(),
 		},
-		VoteSet:    []wire.Event{vote},
-		AgreedHash: blockHash,
+		VoteSet:   []wire.Event{vote},
+		BlockHash: blockHash,
 	}, nil
 }
 

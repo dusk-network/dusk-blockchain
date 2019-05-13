@@ -83,7 +83,7 @@ func (b *broker) monitor(bb ristretto.Scalar) {
 			b.msgChan <- "status:reduction"
 		case agreement := <-b.agreementChan:
 			// TODO if different hash send
-			b.blockInfo.hash = agreement.AgreedHash
+			b.blockInfo.hash = agreement.BlockHash
 			b.msgChan <- "status:agreement"
 		case logEvent := <-b.logChan:
 			if logEvent.Severity == eventmon.Warn || logEvent.Severity == eventmon.Err {
