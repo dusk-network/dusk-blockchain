@@ -63,13 +63,11 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 	// retrieve read-only connection to the blockchain database
 	if m.db == nil {
 		drvr, err := database.From(cfg.Get().Database.Driver)
-
 		if err != nil {
 			panic(err)
 		}
 
 		db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-
 		if err != nil {
 			panic(err)
 		}
@@ -88,9 +86,7 @@ type Collector struct {
 
 func (c *Collector) Collect(msg *bytes.Buffer) error {
 	b := new(block.Block)
-	err := b.Decode(bytes.NewReader(msg.Bytes()))
-
-	if err != nil {
+	if err := b.Decode(bytes.NewReader(msg.Bytes())); err != nil {
 		return err
 	}
 
@@ -164,7 +160,11 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 	// stats to log
 	log.Tracef("Stats: pending txs count %d", len(m.pending))
 
-	txID, _ := t.tx.CalculateHash()
+	txID, err := t.tx.CalculateHash()
+	if err != nil {
+		log.Tracef("Tx CalculateHash failed with error: %s", err.Error())
+		return
+	}
 
 	if t.tx.Type() == transactions.CoinbaseType {
 		// coinbase tx should be built by block generator only
@@ -185,9 +185,7 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 	}
 
 	// execute tx verification procedure
-	err := m.checkTx(t.tx)
-
-	if err != nil {
+	if err := m.checkTx(t.tx); err != nil {
 		log.Errorf("Tx verification error: %v", err)
 		return
 	}
@@ -198,6 +196,7 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 	// we've got a valid transaction pushed
 	if err := m.verified.Put(t); err != nil {
 		log.Error(err.Error())
+		return
 	}
 
 	// propagate to P2P network

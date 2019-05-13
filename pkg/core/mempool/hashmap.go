@@ -1,6 +1,7 @@
 package mempool
 
 import (
+	"fmt"
 	"unsafe"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
@@ -40,7 +41,11 @@ func (m *HashMap) Put(t TxDesc) error {
 	}
 
 	// store tx
-	txID, _ := t.tx.CalculateHash()
+	txID, err := t.tx.CalculateHash()
+	if err != nil {
+		return err
+	}
+
 	var k key
 	copy(k[:], txID)
 	m.data[k] = t
@@ -48,11 +53,13 @@ func (m *HashMap) Put(t TxDesc) error {
 	m.txsSize += uint64(unsafe.Sizeof(t.tx))
 
 	// store all tx key images, if provided
-	for _, input := range t.tx.StandardTX().Inputs {
+	for i, input := range t.tx.StandardTX().Inputs {
 		if len(input.KeyImage) == keyImageSize {
 			var ki keyImage
 			copy(ki[:], input.KeyImage)
 			m.spentkeyImages[ki] = true
+		} else {
+			return fmt.Errorf("invalid key image found at index %d", i)
 		}
 	}
 

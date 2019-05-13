@@ -205,12 +205,18 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 	initCtx(t)
 
-	batchCount := 3
+	// A batch consists of all 4 types of Dusk transactions (excluding coinbase)
+	// The number of batches is the number of concurrent routines that will be
+	// publishing the batch txs one by one. To avoid race conditions, as first
+	// step we store here all txs that are expected to be in mempool later after
+	// go-routines publishing
+	batchCount := 8
+	const numOfTxsPerBatch = 4
 	// generate and store txs that are expected to be valid
 	for i := 0; i <= batchCount; i++ {
 
-		// Generate 3*4 txs
-		txs := randomSliceOfTxs(t, 3)
+		// Generate a single batch of txs and added to the expected list of verified
+		txs := randomSliceOfTxs(t, 1)
 		for _, tx := range txs {
 			c.addTx(tx)
 		}
@@ -222,8 +228,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 	for i := 0; i <= batchCount; i++ {
 
 		// get a slice of all txs
-		from := 3 * 4 * i
-		to := from + 3*4
+		from := numOfTxsPerBatch * i
+		to := from + numOfTxsPerBatch
 
 		wg.Add(1)
 		go func(txs []transactions.Transaction) {
