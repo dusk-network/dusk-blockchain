@@ -42,19 +42,11 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	if !ok {
 		return errors.New("Cant' verify an event different than the aggregated agreement")
 	}
-<<<<<<< HEAD
-	allvoters := 0
-	for i, votes := range ev.VotesPerStep {
-		step := ev.Step + uint8(i-1) // the event step is the second one of the reduction cycle
-		subcommittee := a.Unpack(votes.BitSet, ev.Round, step)
-		allvoters += len(subcommittee)
-=======
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
 		step := ev.Step + uint8(i-1) // the event step is the second one of the reduction cycle
 		subcommittee := a.Unpack(votes.BitSet, ev.Round, step)
 		allVoters += len(subcommittee)
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 
 		apk, err := ReconstructApk(subcommittee)
 		if err != nil {
@@ -78,11 +70,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 		}
 	}
 
-<<<<<<< HEAD
-	if allvoters < a.Quorum() {
-=======
 	if allVoters < a.Quorum() {
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 		return errors.New("vote set too small")
 	}
 	return nil

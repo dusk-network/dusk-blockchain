@@ -12,15 +12,11 @@ import (
 )
 
 type (
-<<<<<<< HEAD
-	// StepVotes represents the aggregated votes for one reduction step. Normally an Agreement event includes two of these structures. They need to be kept separated since the BitSet representation of the Signees does not admit duplicates, whereas the same provisioner may very well be included in the committee for both Reduction steps
-=======
 	// StepVotes represents the aggregated votes for one reduction step.
 	// Normally an Agreement event includes two of these structures. They need to
 	// be kept separated since the BitSet representation of the Signees does not
 	// admit duplicates, whereas the same provisioner may very well be included in
 	// the committee for both Reduction steps
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 	StepVotes struct {
 		Apk       *bls.Apk
 		BitSet    uint64
@@ -28,14 +24,9 @@ type (
 		Step      uint8
 	}
 
-<<<<<<< HEAD
-	// Agreement is the Event created at the end of the Reduction process. Considering that it needs to be passed to the Signer (and transform into an AggregatedAgreement there), it includes no signature
-
-=======
 	// Agreement is the Event created at the end of the Reduction process.
 	// Considering that it needs to be passed to the Signer (and transform
 	// into an AggregatedAgreement there), it includes no signature
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 	Agreement struct {
 		*Header
 		VoteSet    []wire.Event
@@ -74,12 +65,8 @@ func NewStepVotes() *StepVotes {
 }
 
 func (sv *StepVotes) Equal(other *StepVotes) bool {
-<<<<<<< HEAD
-	return bytes.Equal(sv.Apk.Marshal(), other.Apk.Marshal()) && bytes.Equal(sv.Signature.Marshal(), other.Signature.Marshal())
-=======
 	return bytes.Equal(sv.Apk.Marshal(), other.Apk.Marshal()) &&
 		bytes.Equal(sv.Signature.Marshal(), other.Signature.Marshal())
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 }
 
 func (sv *StepVotes) Add(ev *Reduction) error {
@@ -136,12 +123,8 @@ func (ceh *Agreement) Equal(e wire.Event) bool {
 	return true
 }
 
-<<<<<<< HEAD
-// NewAgreementUnMarshaller creates a new AgreementUnMarshaller. Internally it creates an HeaderUnMarshaller which takes care of Decoding and Encoding operations
-=======
 // NewAgreementUnMarshaller creates a new AgreementUnMarshaller. Internally it
 // creates an HeaderUnMarshaller which takes care of Decoding and Encoding operations
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 	return &AgreementUnMarshaller{
 		ReductionUnmarshaller: NewReductionUnMarshaller(),
@@ -332,12 +315,8 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	return nil
 }
 
-<<<<<<< HEAD
-// MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature for an ordered set of votes
-=======
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
 // for an ordered set of votes
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	// APK
 	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {

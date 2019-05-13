@@ -113,10 +113,6 @@ func (c *Store) Pack(set sortedset.Set, round uint64, step uint8) uint64 {
 	p := c.copyProvisioners()
 	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
 	return votingCommittee.Bits(set)
-<<<<<<< HEAD
-
-=======
->>>>>>> 375a0c31dc6b1fbdd85d8ab6a91e29cc6d0a7f5f
 }
 
 // Unpack the Committee subset from a uint64 bitset representation for a give round and step
