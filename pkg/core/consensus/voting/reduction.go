@@ -5,20 +5,31 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type reductionSigner struct {
-	*eventSigner
-	*events.OutgoingReductionUnmarshaller
+	*user.Keys
+	publisher wire.EventPublisher
 }
 
-func NewReductionSigner(keys *user.Keys) *reductionSigner {
+func NewReductionSigner(keys *user.Keys, p wire.EventPublisher) *reductionSigner {
 	return &reductionSigner{
-		eventSigner:                   newEventSigner(keys),
-		OutgoingReductionUnmarshaller: events.NewOutgoingReductionUnmarshaller(),
+		publisher: p,
+		Keys:      keys,
 	}
 }
 
-func (bs *reductionSigner) Sign(buf *bytes.Buffer) error {
-	return events.SignReduction(buf, bs.Keys)
+func (bs *reductionSigner) Collect(buf *bytes.Buffer) error {
+	if err := events.SignReduction(buf, bs.Keys); err != nil {
+		return err
+	}
+
+	message, err := wire.AddTopic(buf, topics.Reduction)
+	if err != nil {
+		return err
+	}
+	bs.publisher.Publish(string(topics.Gossip), message)
+	return nil
 }

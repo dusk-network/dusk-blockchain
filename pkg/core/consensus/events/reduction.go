@@ -2,7 +2,6 @@ package events
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -126,8 +125,7 @@ func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event
 // SignReduction is a shortcut to BLS and ED25519 sign a reduction message
 func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 	e := NewReduction()
-	unMarshaller := NewReductionUnMarshaller()
-	if err := unMarshaller.Unmarshal(buf, e); err != nil {
+	if err := UnmarshalSignableVote(buf, e.Header); err != nil {
 		return err
 	}
 
@@ -136,6 +134,7 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 	}
 
 	outbuf := new(bytes.Buffer)
+	unMarshaller := NewReductionUnMarshaller()
 	if err := unMarshaller.Marshal(outbuf, e); err != nil {
 		return err
 	}
@@ -147,7 +146,8 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 		return err
 	}
 
-	if err := encoding.Write256(signed, signature); err != nil {
+	edPubKeyBuf := new(bytes.Buffer)
+	if err := encoding.Write512(edPubKeyBuf, signature); err != nil {
 		return err
 	}
 
@@ -176,10 +176,10 @@ func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	return nil
 }
 
+// NewOutgoingReductionUnmarshaller creates a new Un- Marshaller for the votes elaborated by the reducer. This is *before* the messages get signed and thus transmitted to the network. So the signature fields of the reduction message is empty (and so is the Sender)
+// HACK: this needs to go as soon as the reducer will do its own signing
 func NewOutgoingReductionUnmarshaller() *OutgoingReductionUnmarshaller {
-	return &OutgoingReductionUnmarshaller{
-		ReductionUnmarshaller: NewReductionUnMarshaller(),
-	}
+	return &OutgoingReductionUnmarshaller{}
 }
 
 func (a *OutgoingReductionUnmarshaller) NewEvent() wire.Event {
@@ -188,15 +188,7 @@ func (a *OutgoingReductionUnmarshaller) NewEvent() wire.Event {
 
 func (a *OutgoingReductionUnmarshaller) Unmarshal(reductionBuffer *bytes.Buffer, ev wire.Event) error {
 	rev := ev.(*Reduction)
-	if err := encoding.ReadUint64(reductionBuffer, binary.LittleEndian, &rev.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(reductionBuffer, &rev.Step); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(reductionBuffer, &rev.BlockHash); err != nil {
+	if err := UnmarshalSignableVote(reductionBuffer, rev.Header); err != nil {
 		return err
 	}
 

@@ -12,7 +12,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // LaunchNotification is a helper function allowing node internal processes interested in reduction messages to receive Reduction events as they get produced
@@ -207,16 +206,16 @@ func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
 
 func (r *reducer) marshalHeader(hash *bytes.Buffer) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
-	// Decoding Round
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, r.ctx.state.Round()); err != nil {
+
+	h := &events.Header{
+		Round:     r.ctx.state.Round(),
+		Step:      r.ctx.state.Step(),
+		BlockHash: hash.Bytes(),
+	}
+
+	if err := events.MarshalSignableVote(buffer, h); err != nil {
 		return nil, err
 	}
 
-	// Decoding Step
-	if err := encoding.WriteUint8(buffer, r.ctx.state.Step()); err != nil {
-		return nil, err
-	}
-
-	_, _ = buffer.Write(hash.Bytes())
 	return buffer, nil
 }

@@ -152,13 +152,14 @@ func MockVoteAgreement(hash []byte, round uint64, step uint8, voteNr int) wire.E
 		votes = append(votes, e)
 	}
 	ev := MockAgreement(k, hash, round, step, votes)
+
 	return ev
 }
 
 // TODO: move this to reduction package
 func MockAgreementBuf(hash []byte, round uint64, step uint8, voteNr int) *bytes.Buffer {
 	ev := MockVoteAgreement(hash, round, step, voteNr)
-	signer := voting.NewAgreementSigner(nil, nil)
+	signer := voting.NewAgreementSigner(nil, nil, nil)
 	b := make([]byte, 0)
 	buf := bytes.NewBuffer(b)
 	_ = signer.Marshal(buf, ev)

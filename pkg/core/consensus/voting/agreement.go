@@ -7,28 +7,32 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
 
 type agreementSigner struct {
-	*eventSigner
 	*events.AgreementUnMarshaller
+	*user.Keys
 	committee.Committee
+	publisher wire.EventPublisher
 }
 
-func NewAgreementSigner(committee committee.Committee, keys *user.Keys) *agreementSigner {
+func NewAgreementSigner(committee committee.Committee, keys *user.Keys, publisher wire.EventPublisher) *agreementSigner {
 	return &agreementSigner{
 		Committee:             committee,
-		eventSigner:           newEventSigner(keys),
 		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
+		publisher:             publisher,
+		Keys:                  keys,
 	}
 }
 
-func (as *agreementSigner) Sign(buf *bytes.Buffer) error {
+func (as *agreementSigner) Collect(r *bytes.Buffer) error {
 	a := events.NewAgreement()
-	if err := as.Unmarshal(buf, a); err != nil {
+	if err := as.Unmarshal(r, a); err != nil {
 		return err
 	}
 
@@ -47,8 +51,13 @@ func (as *agreementSigner) Sign(buf *bytes.Buffer) error {
 		return err
 	}
 
-	message := as.signEd25519(buffer)
-	*buf = *message
+	signed := as.signEd25519(buffer)
+	message, err := wire.AddTopic(signed, topics.Agreement)
+	if err != nil {
+		return err
+	}
+
+	as.publisher.Publish(string(topics.Gossip), message)
 	return nil
 }
 

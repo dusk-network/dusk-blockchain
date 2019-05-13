@@ -59,19 +59,7 @@ func (ehm *HeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, consensusEv.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(r, consensusEv.Step); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, consensusEv.BlockHash); err != nil {
-		return err
-	}
-
-	return nil
+	return MarshalSignableVote(r, consensusEv)
 }
 
 // Unmarshal unmarshals the buffer into a Consensus
@@ -84,21 +72,7 @@ func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	// Decoding Round
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &consensusEv.Round); err != nil {
-		return err
-	}
-
-	// Decoding Step
-	if err := encoding.ReadUint8(r, &consensusEv.Step); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &consensusEv.BlockHash); err != nil {
-		return err
-	}
-
-	return nil
+	return UnmarshalSignableVote(r, consensusEv)
 }
 
 // MarshalSignableVote marshals a Vote
@@ -111,8 +85,17 @@ func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
 		return err
 	}
 
-	if err := encoding.Write256(r, vote.BlockHash); err != nil {
+	return encoding.Write256(r, vote.BlockHash)
+}
+
+func UnmarshalSignableVote(r *bytes.Buffer, vote *Header) error {
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &vote.Round); err != nil {
 		return err
 	}
-	return nil
+
+	if err := encoding.ReadUint8(r, &vote.Step); err != nil {
+		return err
+	}
+
+	return encoding.Read256(r, &vote.BlockHash)
 }
