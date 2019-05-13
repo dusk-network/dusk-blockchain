@@ -48,8 +48,8 @@ func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
 }
 
 func (c *EventFilter) Collect(buffer *bytes.Buffer) error {
-	ev := c.handler.NewEvent()
-	if err := c.handler.Unmarshal(buffer, ev); err != nil {
+	ev, err := c.handler.Deserialize(buffer)
+	if err != nil {
 		return err
 	}
 

@@ -97,8 +97,7 @@ type (
 
 	// EventDeserializer is the interface for those struct that allows deserialization of an event from scratch
 	EventDeserializer interface {
-		EventUnmarshaller
-		NewEvent() Event
+		Deserialize(*bytes.Buffer) (Event, error)
 	}
 
 	Store interface {

@@ -50,8 +50,12 @@ func newScoreHandler() *scoreHandler {
 	}
 }
 
-func (p *scoreHandler) NewEvent() wire.Event {
-	return &ScoreEvent{}
+func (p *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+	ev := &ScoreEvent{}
+	if err := p.Unmarshal(r, ev); err != nil {
+		return nil, err
+	}
+	return ev, nil
 }
 
 func (p *scoreHandler) Unmarshal(r *bytes.Buffer, e wire.Event) error {

@@ -130,8 +130,14 @@ func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 	}
 }
 
-func (a *AgreementUnMarshaller) NewEvent() wire.Event {
-	return NewAgreement()
+func (a *AgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+	ev := NewAgreement()
+
+	if err := a.Unmarshal(r, ev); err != nil {
+		return nil, err
+	}
+
+	return ev, nil
 }
 
 func NewAggregatedAgreementUnMarshaller() *AggregatedAgreementUnMarshaller {
@@ -140,8 +146,13 @@ func NewAggregatedAgreementUnMarshaller() *AggregatedAgreementUnMarshaller {
 	}
 }
 
-func (au *AggregatedAgreementUnMarshaller) NewEvent() wire.Event {
-	return NewAggregatedAgreement()
+func (au *AggregatedAgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+	ev := NewAggregatedAgreement()
+	if err := au.Unmarshal(r, ev); err != nil {
+		return nil, err
+	}
+
+	return ev, nil
 }
 
 func (au *AggregatedAgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {

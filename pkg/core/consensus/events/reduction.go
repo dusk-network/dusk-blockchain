@@ -54,8 +54,13 @@ func NewReductionUnMarshaller() *ReductionUnMarshaller {
 	return &ReductionUnMarshaller{NewUnMarshaller()}
 }
 
-func (r *ReductionUnMarshaller) NewEvent() wire.Event {
-	return NewReduction()
+func (r *ReductionUnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error) {
+	ev := NewReduction()
+	if err := r.Unmarshal(b, ev); err != nil {
+		return nil, err
+	}
+
+	return ev, nil
 }
 
 // Unmarshal unmarshals the buffer into a Committee

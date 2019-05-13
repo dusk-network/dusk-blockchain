@@ -75,7 +75,7 @@ func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	return UnmarshalSignableVote(r, consensusEv)
 }
 
-// MarshalSignableVote marshals a Vote
+// MarshalSignableVote marshals the fields necessary for a Committee member to cast a Vote (namely the Round, the Step and the BlockHash)
 func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
 	if err := encoding.WriteUint64(r, binary.LittleEndian, vote.Round); err != nil {
 		return err
@@ -88,6 +88,7 @@ func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
 	return encoding.Write256(r, vote.BlockHash)
 }
 
+// UnmarshalSignableVote unmarshals the fields necessary for a Committee member to cast a Vote (namely the Round, the Step and the BlockHash)
 func UnmarshalSignableVote(r *bytes.Buffer, vote *Header) error {
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &vote.Round); err != nil {
 		return err

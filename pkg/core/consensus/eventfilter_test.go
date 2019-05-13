@@ -105,8 +105,7 @@ func newMockEvent() wire.Event {
 func newMockHandlerFilter(round uint64, step uint8, pubKeyBLS []byte) consensus.EventHandler {
 	var sender []byte
 	mockEventHandler := &mocks.EventHandler{}
-	mockEventHandler.On("NewEvent").Return(newMockEvent())
-	mockEventHandler.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)
+	mockEventHandler.On("Deserialize", mock.Anything).Return(newMockEvent(), nil)
 	mockEventHandler.On("ExtractHeader",
 		mock.MatchedBy(func(ev wire.Event) bool {
 			sender = ev.Sender()
