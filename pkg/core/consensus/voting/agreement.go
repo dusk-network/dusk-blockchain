@@ -32,7 +32,7 @@ func (as *agreementSigner) Sign(buf *bytes.Buffer) error {
 		return err
 	}
 
-	a.Header.PubKeyBLS = as.BLSPubKey.Marshal()
+	a.Header.PubKeyBLS = as.BLSPubKeyBytes
 	aggregatedEv, err := as.Aggregate(a)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (as *agreementSigner) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
 		panic(err)
 	}
 
-	if err := encoding.Write256(buf, as.EdPubKeyBytes()); err != nil {
+	if err := encoding.Write256(buf, as.EdPubKeyBytes); err != nil {
 		panic(err)
 	}
 

@@ -90,7 +90,7 @@ func (c *Store) Listen() {
 }
 
 func (c *Store) AmMember(round uint64, step uint8) bool {
-	return c.IsMember(c.keys.BLSPubKey.Marshal(), round, step)
+	return c.IsMember(c.keys.BLSPubKeyBytes, round, step)
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee

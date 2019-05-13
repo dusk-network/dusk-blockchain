@@ -90,7 +90,7 @@ func newReductionEvent(hash []byte, round uint64, step uint8) (*events.Reduction
 
 	redEv := &events.Reduction{
 		Header: &events.Header{
-			PubKeyBLS: keys.BLSPubKey.Marshal(),
+			PubKeyBLS: keys.BLSPubKeyBytes,
 			Round:     round,
 			Step:      step,
 		},

@@ -71,7 +71,7 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 
 	bev := &events.Reduction{
 		Header: &events.Header{
-			PubKeyBLS: keys.BLSPubKey.Marshal(),
+			PubKeyBLS: keys.BLSPubKeyBytes,
 			Round:     round,
 			Step:      step,
 		},
@@ -83,7 +83,7 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	_ = marshaller.Marshal(buf, bev)
 	edSig := ed25519.Sign(*keys.EdSecretKey, buf.Bytes())
 	completeBuf := bytes.NewBuffer(edSig)
-	completeBuf.Write(keys.EdPubKeyBytes())
+	completeBuf.Write(keys.EdPubKeyBytes)
 	completeBuf.Write(buf.Bytes())
 	return completeBuf
 }
