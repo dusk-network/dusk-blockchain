@@ -80,7 +80,7 @@ func genReduction(hash []byte, set *sortedset.Set) *Reduction {
 			Round:     uint64(1),
 			Step:      uint8(1),
 		},
-		VotedHash:  hash,
+		BlockHash:  hash,
 		SignedHash: s.Compress(),
 	}
 }

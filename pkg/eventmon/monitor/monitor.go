@@ -79,7 +79,7 @@ func (b *broker) monitor(bb ristretto.Scalar) {
 			b.blockInfo.hash = bestScore.VoteHash
 			b.msgChan <- "status:selection"
 		case redEvent := <-b.reductionChan:
-			b.blockInfo.hash = redEvent.VotedHash
+			b.blockInfo.hash = redEvent.BlockHash
 			b.msgChan <- "status:reduction"
 		case agreement := <-b.agreementChan:
 			// TODO if different hash send

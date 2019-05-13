@@ -94,7 +94,7 @@ func newReductionEvent(hash []byte, round uint64, step uint8) (*events.Reduction
 			Round:     round,
 			Step:      step,
 		},
-		VotedHash: hash,
+		BlockHash: hash,
 	}
 
 	if err := events.SignReductionEvent(redEv, keys); err != nil {

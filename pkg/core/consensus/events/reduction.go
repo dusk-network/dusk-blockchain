@@ -15,7 +15,7 @@ type (
 	// Reduction is a basic reduction event.
 	Reduction struct {
 		*Header
-		VotedHash  []byte
+		BlockHash  []byte
 		SignedHash []byte
 	}
 
@@ -67,7 +67,7 @@ func (a *ReductionUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error 
 		return err
 	}
 
-	if err := encoding.Read256(r, &bev.VotedHash); err != nil {
+	if err := encoding.Read256(r, &bev.BlockHash); err != nil {
 		return err
 	}
 
@@ -85,7 +85,7 @@ func (a *ReductionUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.Write256(r, bev.VotedHash); err != nil {
+	if err := encoding.Write256(r, bev.BlockHash); err != nil {
 		return err
 	}
 
@@ -176,13 +176,13 @@ func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	vote := &Vote{}
 	vote.Round = ev.Round
 	vote.Step = ev.Step
-	vote.BlockHash = ev.VotedHash
+	vote.BlockHash = ev.BlockHash
 
 	if err := MarshalSignableVote(buf, vote); err != nil {
 		return err
 	}
 
-	signedHash, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, ev.VotedHash)
+	signedHash, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, ev.BlockHash)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (a *OutgoingReductionUnmarshaller) Unmarshal(reductionBuffer *bytes.Buffer,
 		return err
 	}
 
-	if err := encoding.Read256(reductionBuffer, &rev.VotedHash); err != nil {
+	if err := encoding.Read256(reductionBuffer, &rev.BlockHash); err != nil {
 		return err
 	}
 

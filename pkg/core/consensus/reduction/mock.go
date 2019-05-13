@@ -23,13 +23,13 @@ func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*use
 	reduction.PubKeyBLS = keys.BLSPubKeyBytes
 	reduction.Round = round
 	reduction.Step = step
-	reduction.VotedHash = hash
+	reduction.BlockHash = hash
 
 	r := new(bytes.Buffer)
 	vote := &events.Vote{
 		Round:     reduction.Round,
 		Step:      reduction.Step,
-		BlockHash: reduction.VotedHash,
+		BlockHash: reduction.BlockHash,
 	}
 	_ = events.MarshalSignableVote(r, vote)
 	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, r.Bytes())
@@ -75,7 +75,7 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 			Round:     round,
 			Step:      step,
 		},
-		VotedHash:  hash,
+		BlockHash:  hash,
 		SignedHash: signedHash.Compress(),
 	}
 

@@ -44,13 +44,13 @@ func (b *reductionHandler) ExtractHeader(e wire.Event) *events.Header {
 
 func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
 	ev := e.(*events.Reduction)
-	return encoding.Write256(r, ev.VotedHash)
+	return encoding.Write256(r, ev.BlockHash)
 }
 
 // Verify the blockEvent
 func (b *reductionHandler) Verify(e wire.Event) error {
 	ev := e.(*events.Reduction)
-	return msg.VerifyBLSSignature(ev.PubKeyBLS, ev.VotedHash, ev.SignedHash)
+	return msg.VerifyBLSSignature(ev.PubKeyBLS, ev.BlockHash, ev.SignedHash)
 }
 
 // Priority is not used for this handler
