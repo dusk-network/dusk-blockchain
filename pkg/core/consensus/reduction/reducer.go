@@ -148,7 +148,7 @@ func (r *reducer) begin() {
 }
 
 func (r *reducer) sendReductionVote(hash *bytes.Buffer) {
-	vote, err := r.marshalHeader(hash)
+	vote, err := r.marshalHeader(hash.Bytes())
 	if err != nil {
 		panic(err)
 	}
@@ -158,14 +158,19 @@ func (r *reducer) sendReductionVote(hash *bytes.Buffer) {
 }
 
 func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
-	if err := r.ctx.handler.MarshalVoteSet(hash, events); err != nil {
-		panic(err)
-	}
-	agreementVote, err := r.marshalHeader(hash)
-	if err != nil {
-		panic(err)
-	}
 	if r.inCommittee() {
+		h := hash.Bytes()
+		if err := r.ctx.handler.MarshalVoteSet(hash, events); err != nil {
+			panic(err)
+		}
+
+		agreementVote, err := r.marshalHeader(h)
+		if err != nil {
+			panic(err)
+		}
+		if _, err := hash.WriteTo(agreementVote); err != nil {
+			// logErr()
+		}
 		r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
 	}
 }
@@ -204,13 +209,13 @@ func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
 	return hash
 }
 
-func (r *reducer) marshalHeader(hash *bytes.Buffer) (*bytes.Buffer, error) {
+func (r *reducer) marshalHeader(hash []byte) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 
 	h := &events.Header{
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
-		BlockHash: hash.Bytes(),
+		BlockHash: hash,
 	}
 
 	if err := events.MarshalSignableVote(buffer, h); err != nil {

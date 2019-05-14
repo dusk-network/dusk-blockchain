@@ -2,7 +2,7 @@
 PROJECT_NAME := "dusk-go"
 PKG := "gitlab.dusk.network/dusk-core/$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
-TEST_LIST := $(shell go list ${PKG}/... | grep -v /core/consensus/zkproof | grep -v /core/consensus/reduction)
+TEST_LIST := $(shell go list ${PKG}/... | grep -v /core/consensus/zkproof)
 #TEST_FLAGS := "-count=1"
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 .PHONY: all dep build clean test coverage coverhtml lint

@@ -13,10 +13,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// func init() {
-// log.SetLevel(log.DebugLevel)
-// }
-
 func TestReduction(t *testing.T) {
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
