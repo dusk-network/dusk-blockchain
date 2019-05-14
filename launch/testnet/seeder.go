@@ -7,13 +7,13 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
 func ConnectToSeeder() []string {
-
 	if cfg.Get().General.Network == "testnet" {
 		fixedNetwork := cfg.Get().Network.Seeder.Fixed
 		if len(fixedNetwork) > 0 {
@@ -45,6 +45,21 @@ func ConnectToSeeder() []string {
 		// panic(err) <- if the seeder return error == EOF,  return nil, dont panic
 		return nil
 	}
+
+	// start a goroutine with a ping loop for the seeder, so it knows when we shut down
+	go func() {
+		for {
+			time.Sleep(4 * time.Second)
+			_, err := conn.Write([]byte{1})
+			if err != nil {
+				log.WithFields(log.Fields{
+					"process": "main",
+					"error":   err,
+				}).Warnln("error pinging voucher seeder")
+				return
+			}
+		}
+	}()
 
 	// Trim all trailing empty bytes
 	trimmedBuf := bytes.Trim(buf, "\x00")

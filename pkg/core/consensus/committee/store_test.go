@@ -66,6 +66,50 @@ func TestReportAbsentees(t *testing.T) {
 	assert.True(t, bytes.Contains(absentees.Bytes(), k3.BLSPubKey.Marshal()))
 }
 
+func TestUpsertCommitteeCache(t *testing.T) {
+	bus := wire.NewEventBus()
+	c := LaunchCommitteeStore(bus, nil)
+
+	// add some provisioners
+	k1 := newProvisioner(10, bus)
+	_ = newProvisioner(10, bus)
+	_ = newProvisioner(10, bus)
+	// give the committee some time to add the provisioners
+	time.Sleep(100 * time.Millisecond)
+
+	// run IsMember, which should trigger a voting committee creation
+	_ = c.IsMember(k1.BLSPubKey.Marshal(), 1, 1)
+
+	// committeeCache should now hold one VotingCommittee
+	assert.Equal(t, 1, len(c.committeeCache))
+}
+
+func TestCleanCommitteeCache(t *testing.T) {
+	bus := wire.NewEventBus()
+	c := LaunchCommitteeStore(bus, nil)
+
+	// add some provisioners
+	k1 := newProvisioner(10, bus)
+	_ = newProvisioner(10, bus)
+	_ = newProvisioner(10, bus)
+	// give the committee some time to add the provisioners
+	time.Sleep(100 * time.Millisecond)
+
+	// run IsMember a few times
+	_ = c.IsMember(k1.BLSPubKey.Marshal(), 1, 1)
+	_ = c.IsMember(k1.BLSPubKey.Marshal(), 1, 2)
+	_ = c.IsMember(k1.BLSPubKey.Marshal(), 1, 3)
+
+	// committeeCache should now hold 3 VotingCommittees
+	assert.Equal(t, 3, len(c.committeeCache))
+
+	// now run IsMember for another round
+	_ = c.IsMember(k1.BLSPubKey.Marshal(), 2, 1)
+
+	// committeeCache should now hold 1 VotingCommittee
+	assert.Equal(t, 1, len(c.committeeCache))
+}
+
 func newMockEvent(sender []byte) wire.Event {
 	mockEvent := &mocks.Event{}
 	mockEvent.On("Sender").Return(sender)

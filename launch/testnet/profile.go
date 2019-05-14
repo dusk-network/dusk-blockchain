@@ -18,7 +18,6 @@ type profileMngr struct {
 }
 
 func newProfile() (*profileMngr, error) {
-
 	p := new(profileMngr)
 
 	// Enable http profiling server if requested
@@ -42,9 +41,8 @@ func newProfile() (*profileMngr, error) {
 		if err != nil {
 			return nil, err
 		}
-		err := pprof.StartCPUProfile(p.cpuFile)
 
-		if err != nil {
+		if err := pprof.StartCPUProfile(p.cpuFile); err != nil {
 			p.cpuFile.Close()
 			return nil, err
 		}
@@ -66,7 +64,6 @@ func newProfile() (*profileMngr, error) {
 }
 
 func (p *profileMngr) close() {
-
 	if p.cpuFile != nil {
 		pprof.StopCPUProfile()
 		p.cpuFile.Close()

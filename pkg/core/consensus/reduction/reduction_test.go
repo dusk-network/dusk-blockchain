@@ -2,10 +2,13 @@ package reduction
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -17,7 +20,26 @@ import (
 // log.SetLevel(log.DebugLevel)
 // }
 
+func mockConfig(t *testing.T) func() {
+
+	storeDir, err := ioutil.TempDir(os.TempDir(), "reduction_test")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	r := cfg.Registry{}
+	r.Performance.AccumulatorWorkers = 4
+	cfg.Mock(&r)
+
+	return func() {
+		os.RemoveAll(storeDir)
+	}
+}
+
 func TestReduction(t *testing.T) {
+	fn := mockConfig(t)
+	defer fn()
+
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 	eventBus := wire.NewEventBus()
@@ -72,6 +94,9 @@ func TestReduction(t *testing.T) {
 }
 
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
+	fn := mockConfig(t)
+	defer fn()
+
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 	eventBus := wire.NewEventBus()
@@ -125,6 +150,9 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 }
 
 func TestReductionTimeout(t *testing.T) {
+	fn := mockConfig(t)
+	defer fn()
+
 	eventBus := wire.NewEventBus()
 	committeeMock := mockCommittee(2, true, true)
 	timeOut := 200 * time.Millisecond

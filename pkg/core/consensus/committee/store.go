@@ -36,12 +36,15 @@ type (
 		provisioners *user.Provisioners
 		// TODO: should this be round dependent?
 		totalWeight uint64
+		round       uint64
 
 		// subscriber channels
 		newProvisionerChan    chan *provisioner
 		removeProvisionerChan chan []byte
 		// own keys (TODO: this should just be BLSPubKey)
 		keys *user.Keys
+
+		committeeCache map[uint8]user.VotingCommittee
 	}
 )
 
@@ -54,6 +57,7 @@ func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store 
 		// TODO: consider adding a consensus.Validator preprocessor
 		newProvisionerChan:    initNewProvisionerCollector(eventBroker),
 		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
+		committeeCache:        make(map[uint8]user.VotingCommittee),
 	}
 	go store.Listen()
 	return store
@@ -95,8 +99,7 @@ func (c *Store) AmMember(round uint64, step uint8) bool {
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
 func (c *Store) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	p := c.copyProvisioners()
-	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	votingCommittee := c.upsertCommitteeCache(round, step)
 	return votingCommittee.IsMember(pubKeyBLS)
 }
 
@@ -131,11 +134,30 @@ func (c *Store) ReportAbsentees(evs []wire.Event, round uint64, step uint8) erro
 	return nil
 }
 
-func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) *user.VotingCommittee {
-	p := c.copyProvisioners()
-	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {
+	votingCommittee := c.upsertCommitteeCache(round, step)
 	for _, ev := range evs {
 		votingCommittee.Remove(ev.Sender())
+	}
+	return votingCommittee
+}
+
+func (c *Store) upsertCommitteeCache(round uint64, step uint8) user.VotingCommittee {
+	if round > c.round {
+		c.round = round
+		c.lock.Lock()
+		c.committeeCache = make(map[uint8]user.VotingCommittee)
+		c.lock.Unlock()
+	}
+	c.lock.RLock()
+	votingCommittee, found := c.committeeCache[step]
+	c.lock.RUnlock()
+	if !found {
+		p := c.copyProvisioners()
+		votingCommittee = *p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+		c.lock.Lock()
+		c.committeeCache[step] = votingCommittee
+		c.lock.Unlock()
 	}
 	return votingCommittee
 }
