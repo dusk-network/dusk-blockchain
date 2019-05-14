@@ -73,7 +73,7 @@ func (c *ConsensusFactory) StartConsensus() {
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)
 
-	reduction.LaunchReducer(c.eventBus, c.committee, c.timerLength)
+	reduction.LaunchReducer(c.eventBus, c.committee, c.Keys, c.timerLength)
 
 	round := <-c.initChannel
 	log.WithFields(log.Fields{
