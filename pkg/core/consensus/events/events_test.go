@@ -97,7 +97,7 @@ func newReductionEvent(hash []byte, round uint64, step uint8) (*events.Reduction
 		},
 	}
 
-	if err := events.SignReductionEvent(redEv, keys); err != nil {
+	if err := events.BlsSignReductionEvent(redEv, keys); err != nil {
 		return nil, err
 	}
 

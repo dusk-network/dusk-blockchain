@@ -64,7 +64,6 @@ func (ehm *HeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 
 // Unmarshal unmarshals the buffer into a Consensus
 func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	// if the injection is unsuccessful, panic
 	consensusEv := ev.(*Header)
 
 	// Decoding PubKey BLS

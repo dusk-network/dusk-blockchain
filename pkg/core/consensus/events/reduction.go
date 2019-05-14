@@ -134,29 +134,8 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 		return err
 	}
 
-	if err := SignReductionEvent(e, keys); err != nil {
-		return err
-	}
-
-	outbuf := new(bytes.Buffer)
-	unMarshaller := NewReductionUnMarshaller()
-	if err := unMarshaller.Marshal(outbuf, e); err != nil {
-		return err
-	}
-
-	signature := ed25519.Sign(*keys.EdSecretKey, outbuf.Bytes())
-
-	signed := new(bytes.Buffer)
-	if err := encoding.Write512(signed, signature); err != nil {
-		return err
-	}
-
-	edPubKeyBuf := new(bytes.Buffer)
-	if err := encoding.Write512(edPubKeyBuf, signature); err != nil {
-		return err
-	}
-
-	if _, err := signed.Write(outbuf.Bytes()); err != nil {
+	signed, err := SignReductionEvent(e, keys)
+	if err != nil {
 		return err
 	}
 
@@ -164,20 +143,50 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 	return nil
 }
 
-// SignReductionEvent is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
-func SignReductionEvent(ev *Reduction, keys *user.Keys) error {
+func SignReductionEvent(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
+	if err := BlsSignReductionEvent(e, keys); err != nil {
+		return nil, err
+	}
+	outbuf := new(bytes.Buffer)
+
+	unMarshaller := NewReductionUnMarshaller()
+	if err := unMarshaller.Marshal(outbuf, e); err != nil {
+		return nil, err
+	}
+
+	signature := ed25519.Sign(*keys.EdSecretKey, outbuf.Bytes())
+
+	signed := new(bytes.Buffer)
+	if err := encoding.Write512(signed, signature); err != nil {
+		return nil, err
+	}
+
+	edPubKeyBuf := new(bytes.Buffer)
+	if err := encoding.Write512(edPubKeyBuf, signature); err != nil {
+		return nil, err
+	}
+
+	if _, err := signed.Write(outbuf.Bytes()); err != nil {
+		return nil, err
+	}
+
+	return signed, nil
+}
+
+// BlsSignReductionEvent is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
+func BlsSignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	buf := new(bytes.Buffer)
 
 	if err := MarshalSignableVote(buf, ev.Header); err != nil {
 		return err
 	}
 
-	signedHash, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, ev.BlockHash)
+	signedHash, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, buf.Bytes())
 	if err != nil {
 		return err
 	}
 	ev.SignedHash = signedHash.Compress()
-	ev.Header.PubKeyBLS = keys.BLSPubKeyBytes
+	ev.PubKeyBLS = keys.BLSPubKeyBytes
 	return nil
 }
 
