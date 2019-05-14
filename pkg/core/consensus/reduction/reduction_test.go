@@ -14,10 +14,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// func init() {
-// log.SetLevel(log.DebugLevel)
-// }
-
 func TestReduction(t *testing.T) {
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
@@ -139,7 +135,7 @@ func TestReductionTimeout(t *testing.T) {
 	// sent out properly.
 	outgoingReduction := make(chan *bytes.Buffer, 2)
 	outgoingAgreement := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe(msg.OutgoingBlockReductionTopic, outgoingReduction)
+	eventBus.Subscribe(string(topics.Gossip), outgoingReduction)
 	eventBus.Subscribe(msg.OutgoingBlockAgreementTopic, outgoingAgreement)
 
 	// update round

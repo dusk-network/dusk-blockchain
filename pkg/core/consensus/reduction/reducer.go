@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"io"
 	"sync"
 	"time"
 
@@ -151,26 +150,21 @@ func (r *reducer) begin() {
 }
 
 func (r *reducer) sendReduction(hash *bytes.Buffer) {
-	h := new(bytes.Buffer)
-	vote, err := r.marshalHeader(hash)
+	vote, err := r.marshalHeader(hash.Bytes())
 	if err != nil {
 		logErr(err, hash.Bytes(), "Error during marshalling of the reducer vote")
 		return
 	}
 
 	if r.inCommittee() {
-		if _, err := io.Copy(h, vote); err != nil {
-			logErr(err, vote.Bytes(), "Error while copying the vote buffer")
-		}
-
-		if err := events.SignReduction(h, r.ctx.Keys); err != nil {
-			logErr(err, h.Bytes(), "Error while signing vote")
+		if err := events.SignReduction(vote, r.ctx.Keys); err != nil {
+			logErr(err, hash.Bytes(), "Error while signing vote")
 			return
 		}
 
-		message, err := wire.AddTopic(h, topics.Reduction)
+		message, err := wire.AddTopic(vote, topics.Reduction)
 		if err != nil {
-			logErr(err, h.Bytes(), "Error while adding topic")
+			logErr(err, hash.Bytes(), "Error while adding topic")
 			return
 		}
 
@@ -187,14 +181,19 @@ func logErr(err error, hash []byte, msg string) {
 }
 
 func (r *reducer) sendAgreement(events []wire.Event, hash *bytes.Buffer) {
-	if err := r.ctx.handler.MarshalVoteSet(hash, events); err != nil {
-		panic(err)
-	}
-	agreementVote, err := r.marshalHeader(hash)
-	if err != nil {
-		panic(err)
-	}
 	if r.inCommittee() {
+		h := hash.Bytes()
+		if err := r.ctx.handler.MarshalVoteSet(hash, events); err != nil {
+			panic(err)
+		}
+
+		agreementVote, err := r.marshalHeader(h)
+		if err != nil {
+			panic(err)
+		}
+		if _, err := hash.WriteTo(agreementVote); err != nil {
+			logErr(err, hash.Bytes(), "Could not write on AgreementVote buffer")
+		}
 		r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
 	}
 }
@@ -233,13 +232,13 @@ func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
 	return hash
 }
 
-func (r *reducer) marshalHeader(hash *bytes.Buffer) (*bytes.Buffer, error) {
+func (r *reducer) marshalHeader(hash []byte) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 
 	h := &events.Header{
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
-		BlockHash: hash.Bytes(),
+		BlockHash: hash,
 	}
 
 	if err := events.MarshalSignableVote(buffer, h); err != nil {
