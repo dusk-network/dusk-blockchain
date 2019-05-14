@@ -31,13 +31,14 @@ type Registry struct {
 	UsedConfigFile string
 
 	// All configuration groups
-	General  generalConfiguration
-	Database databaseConfiguration
-	Network  networkConfiguration
-	Logger   loggerConfiguration
-	Prof     profConfiguration
-	RPC      rpcConfiguration
-	Mempool  mempoolConfiguration
+	General     generalConfiguration
+	Database    databaseConfiguration
+	Network     networkConfiguration
+	Logger      loggerConfiguration
+	Prof        profConfiguration
+	RPC         rpcConfiguration
+	Performance performanceConfiguration
+	Mempool     mempoolConfiguration
 }
 
 // Load makes an attempt to read and unmershal any configs from flag, env and

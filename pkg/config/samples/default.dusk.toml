@@ -68,5 +68,6 @@ cpuFile=""
 # mem.prof
 memFile=""
 
-
-
+[performance]
+# Number of workers to spawn on an accumulator component
+accumulatorWorkers = 4
