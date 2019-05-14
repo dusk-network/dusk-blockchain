@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -30,10 +31,9 @@ type (
 
 // LaunchReducer creates and wires a broker, initiating the components that
 // have to do with Block Reduction
-func LaunchReducer(eventBroker wire.EventBroker, committee committee.Committee,
-	timeout time.Duration) *broker {
+func LaunchReducer(eventBroker wire.EventBroker, committee committee.Committee, keys *user.Keys, timeout time.Duration) *broker {
 	handler := newReductionHandler(committee)
-	broker := newBroker(eventBroker, handler, committee, timeout)
+	broker := newBroker(eventBroker, handler, committee, keys, timeout)
 
 	go broker.Listen()
 	return broker
@@ -51,9 +51,9 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 
 // newBroker will return a reduction broker.
 func newBroker(eventBroker wire.EventBroker, handler handler,
-	committee committee.Committee, timeout time.Duration) *broker {
+	committee committee.Committee, keys *user.Keys, timeout time.Duration) *broker {
 	scoreChan := initBestScoreUpdate(eventBroker)
-	ctx := newCtx(handler, committee, timeout)
+	ctx := newCtx(handler, committee, keys, timeout)
 	accumulator := consensus.NewAccumulator(ctx.handler, consensus.NewAccumulatorStore())
 	filter := launchReductionFilter(eventBroker, ctx, accumulator)
 	roundChannel := consensus.InitRoundUpdate(eventBroker)

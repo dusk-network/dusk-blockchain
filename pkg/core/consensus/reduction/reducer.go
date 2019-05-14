@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"io"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // LaunchNotification is a helper function allowing node internal processes interested in reduction messages to receive Reduction events as they get produced
@@ -92,8 +94,9 @@ func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
 }
 
 func (r *reducer) inCommittee() bool {
-	state := r.ctx.state
-	return r.ctx.committee.AmMember(state.Round(), state.Step())
+	round := r.ctx.state.Round()
+	step := r.ctx.state.Step()
+	return r.ctx.committee.AmMember(round, step)
 }
 
 func (r *reducer) startReduction(hash []byte) {
@@ -101,7 +104,7 @@ func (r *reducer) startReduction(hash []byte) {
 	r.Lock()
 	r.stale = false
 	r.Unlock()
-	r.sendReductionVote(bytes.NewBuffer(hash))
+	r.sendReduction(bytes.NewBuffer(hash))
 	go r.begin()
 }
 
@@ -118,7 +121,7 @@ func (r *reducer) begin() {
 				r.ctx.state.Round(), r.ctx.state.Step())
 		}
 		r.ctx.state.IncrementStep()
-		r.sendReductionVote(hash1)
+		r.sendReduction(hash1)
 	}
 	r.RUnlock()
 
@@ -139,7 +142,7 @@ func (r *reducer) begin() {
 				"votes":      len(allEvents),
 				"block hash": hex.EncodeToString(hash1.Bytes()),
 			}).Debugln("Reduction successful")
-			r.sendAgreementVote(allEvents, hash2)
+			r.sendAgreement(allEvents, hash2)
 		}
 
 		r.ctx.state.IncrementStep()
@@ -147,17 +150,43 @@ func (r *reducer) begin() {
 	}
 }
 
-func (r *reducer) sendReductionVote(hash *bytes.Buffer) {
+func (r *reducer) sendReduction(hash *bytes.Buffer) {
+	h := new(bytes.Buffer)
 	vote, err := r.marshalHeader(hash)
 	if err != nil {
-		panic(err)
+		logErr(err, hash.Bytes(), "Error during marshalling of the reducer vote")
+		return
 	}
+
 	if r.inCommittee() {
-		r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
+		if _, err := io.Copy(h, vote); err != nil {
+			logErr(err, vote.Bytes(), "Error while copying the vote buffer")
+		}
+
+		if err := events.SignReduction(h, r.ctx.Keys); err != nil {
+			logErr(err, h.Bytes(), "Error while signing vote")
+			return
+		}
+
+		message, err := wire.AddTopic(h, topics.Reduction)
+		if err != nil {
+			logErr(err, h.Bytes(), "Error while adding topic")
+			return
+		}
+
+		r.publisher.Publish(string(topics.Gossip), message)
 	}
 }
 
-func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
+func logErr(err error, hash []byte, msg string) {
+	log.WithFields(
+		log.Fields{
+			"process":    "reducer",
+			"block hash": hash,
+		}).WithError(err).Errorln(msg)
+}
+
+func (r *reducer) sendAgreement(events []wire.Event, hash *bytes.Buffer) {
 	if err := r.ctx.handler.MarshalVoteSet(hash, events); err != nil {
 		panic(err)
 	}
