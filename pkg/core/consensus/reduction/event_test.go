@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -21,7 +21,7 @@ func TestReductionUnMarshal(t *testing.T) {
 	// Mock a Reduction event
 	blockHash, err := crypto.RandEntropy(32)
 	assert.NoError(t, err)
-	h := &events.Header{
+	h := &header.Header{
 		Step:      uint8(4),
 		Round:     uint64(120),
 		BlockHash: blockHash,
@@ -43,7 +43,7 @@ func TestReductionUnMarshal(t *testing.T) {
 
 // newReductionEvent returns a Reduction event, populated with a mixture of specified
 // and default fields.
-func newReductionEvent(h *events.Header) (*Reduction, error) {
+func newReductionEvent(h *header.Header) (*Reduction, error) {
 	keys, _ := user.NewRandKeys()
 
 	redEv := &Reduction{
@@ -68,7 +68,7 @@ func TestBlsSignReductionEvent(t *testing.T) {
 	assert.NoError(t, BlsSignReductionEvent(red, k))
 	assert.NotNil(t, red.SignedHash)
 	buf := new(bytes.Buffer)
-	assert.NoError(t, events.MarshalSignableVote(buf, red.Header))
+	assert.NoError(t, header.MarshalSignableVote(buf, red.Header))
 	assert.NoError(t, msg.VerifyBLSSignature(red.PubKeyBLS, buf.Bytes(), red.SignedHash))
 }
 
@@ -100,7 +100,7 @@ func TestSignReduction(t *testing.T) {
 	red.BlockHash, _ = crypto.RandEntropy(32)
 
 	b := new(bytes.Buffer)
-	assert.NoError(t, events.MarshalSignableVote(b, red.Header))
+	assert.NoError(t, header.MarshalSignableVote(b, red.Header))
 	assert.NoError(t, SignReduction(b, k))
 
 	// verifying the ED25519 signature

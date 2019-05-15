@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -113,8 +113,8 @@ func newMockHandlerFilter(round uint64, step uint8, pubKeyBLS []byte) consensus.
 				sender, _ = crypto.RandEntropy(32)
 			}
 			return true
-		})).Return(func(e wire.Event) *events.Header {
-		return &events.Header{
+		})).Return(func(e wire.Event) *header.Header {
+		return &header.Header{
 			Round:     round,
 			Step:      step,
 			PubKeyBLS: sender,

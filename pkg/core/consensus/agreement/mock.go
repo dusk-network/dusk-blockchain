@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
@@ -68,7 +68,7 @@ func genVotes(hash []byte, round uint64, step uint8, keys []*user.Keys) []*StepV
 			stepVote = NewStepVotes()
 		}
 
-		h := &events.Header{
+		h := &header.Header{
 			BlockHash: hash,
 			Round:     round,
 			Step:      thisStep,
@@ -76,7 +76,7 @@ func genVotes(hash []byte, round uint64, step uint8, keys []*user.Keys) []*StepV
 		}
 
 		r := new(bytes.Buffer)
-		_ = events.MarshalSignableVote(r, h)
+		_ = header.MarshalSignableVote(r, h)
 		sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
 
 		if err := stepVote.Add(sigma.Compress(), k.BLSPubKeyBytes, thisStep); err != nil {

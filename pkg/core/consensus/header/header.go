@@ -1,4 +1,4 @@
-package events
+package header
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ type (
 	// - Step
 	HeaderMarshaller struct{}
 
-	// HeaderUnmarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
+	// HeaderUnmarshaller unmarshals consensus header. It is a helper to be embedded in the various consensus message unmarshallers
 	HeaderUnmarshaller struct{}
 
 	UnMarshaller struct {

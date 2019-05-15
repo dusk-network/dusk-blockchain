@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -27,13 +27,13 @@ type (
 
 	// Agreement is the Event created at the end of the Reduction process. It includes the aggregated compressed signatures of all voters
 	Agreement struct {
-		*events.Header
+		*header.Header
 		SignedVotes  []byte
 		VotesPerStep []*StepVotes
 	}
 
 	AgreementUnMarshaller struct {
-		*events.UnMarshaller
+		*header.UnMarshaller
 		wire.EventMarshaller
 		wire.EventUnmarshaller
 	}
@@ -86,7 +86,7 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 
 func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 	return &AgreementUnMarshaller{
-		UnMarshaller: events.NewUnMarshaller(),
+		UnMarshaller: header.NewUnMarshaller(),
 	}
 }
 
@@ -140,7 +140,7 @@ func (au *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error
 
 func NewAgreement() *Agreement {
 	return &Agreement{
-		Header:       &events.Header{},
+		Header:       &header.Header{},
 		VotesPerStep: make([]*StepVotes, 2),
 		SignedVotes:  make([]byte, 33),
 	}

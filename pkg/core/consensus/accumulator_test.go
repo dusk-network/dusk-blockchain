@@ -11,7 +11,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -90,8 +90,8 @@ func newMockHandlerAccumulator(verifyErr error, quorum int, identifier string,
 				sender, _ = crypto.RandEntropy(32)
 			}
 			return true
-		})).Return(func(e wire.Event) *events.Header {
-		return &events.Header{
+		})).Return(func(e wire.Event) *header.Header {
+		return &header.Header{
 			Round:     1,
 			Step:      1,
 			PubKeyBLS: sender,

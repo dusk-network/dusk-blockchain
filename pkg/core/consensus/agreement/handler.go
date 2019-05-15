@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -24,9 +24,9 @@ func newHandler(committee committee.Committee) *agreementHandler {
 	}
 }
 
-func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
+func (a *agreementHandler) ExtractHeader(e wire.Event) *header.Header {
 	ev := e.(*Agreement)
-	return &events.Header{
+	return &header.Header{
 		Round: ev.Round,
 	}
 }
@@ -56,13 +56,13 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 		signed := new(bytes.Buffer)
 
 		// TODO: change into Header
-		vote := &events.Header{
+		vote := &header.Header{
 			Round:     ev.Round,
 			Step:      step,
 			BlockHash: ev.BlockHash,
 		}
 
-		if err := events.MarshalSignableVote(signed, vote); err != nil {
+		if err := header.MarshalSignableVote(signed, vote); err != nil {
 			return err
 		}
 

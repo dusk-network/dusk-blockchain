@@ -3,7 +3,7 @@ package reduction
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -14,13 +14,13 @@ import (
 type (
 	// Reduction is a basic reduction event.
 	Reduction struct {
-		*events.Header
+		*header.Header
 		SignedHash []byte
 	}
 
 	// ReductionUnMarshaller marshals and unmarshales th
 	ReductionUnMarshaller struct {
-		*events.UnMarshaller
+		*header.UnMarshaller
 	}
 
 	ReductionUnmarshaller interface {
@@ -32,7 +32,7 @@ type (
 // NewReduction returns and empty Reduction event.
 func NewReduction() *Reduction {
 	return &Reduction{
-		Header: &events.Header{},
+		Header: &header.Header{},
 	}
 }
 
@@ -44,7 +44,7 @@ func (e *Reduction) Equal(ev wire.Event) bool {
 }
 
 func NewReductionUnMarshaller() *ReductionUnMarshaller {
-	return &ReductionUnMarshaller{events.NewUnMarshaller()}
+	return &ReductionUnMarshaller{header.NewUnMarshaller()}
 }
 
 func (r *ReductionUnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error) {
@@ -94,7 +94,7 @@ func (a *ReductionUnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event,
 	evs := make([]wire.Event, length)
 	for i := uint64(0); i < length; i++ {
 		rev := &Reduction{
-			Header: &events.Header{},
+			Header: &header.Header{},
 		}
 		if err := a.Unmarshal(r, rev); err != nil {
 			return nil, err
@@ -123,7 +123,7 @@ func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event
 // SignReduction is a shortcut to BLS and ED25519 sign a reduction message
 func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 	e := NewReduction()
-	if err := events.UnmarshalSignableVote(buf, e.Header); err != nil {
+	if err := header.UnmarshalSignableVote(buf, e.Header); err != nil {
 		return err
 	}
 
@@ -170,7 +170,7 @@ func SignReductionEvent(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
 func BlsSignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	buf := new(bytes.Buffer)
 
-	if err := events.MarshalSignableVote(buf, ev.Header); err != nil {
+	if err := header.MarshalSignableVote(buf, ev.Header); err != nil {
 		return err
 	}
 

@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -141,14 +141,14 @@ func (r *reducer) begin() {
 func (r *reducer) sendReduction(hash *bytes.Buffer) {
 	vote := new(bytes.Buffer)
 
-	h := &events.Header{
+	h := &header.Header{
 		PubKeyBLS: r.ctx.Keys.BLSPubKeyBytes,
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
 		BlockHash: hash.Bytes(),
 	}
 
-	if err := events.MarshalSignableVote(vote, h); err != nil {
+	if err := header.MarshalSignableVote(vote, h); err != nil {
 		logErr(err, hash.Bytes(), "Error during marshalling of the reducer vote")
 		return
 	}
@@ -176,7 +176,7 @@ func logErr(err error, hash []byte, msg string) {
 }
 
 func (r *reducer) sendAgreement(evs []wire.Event, hash *bytes.Buffer) {
-	h := &events.Header{
+	h := &header.Header{
 		PubKeyBLS: r.ctx.BLSPubKeyBytes,
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
@@ -269,7 +269,7 @@ func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
 }
 
 // Aggregate the Agreement event into an Agreement outgoing event
-func (r *reducer) Aggregate(h *events.Header, voteSet []wire.Event) (*agreement.Agreement, error) {
+func (r *reducer) Aggregate(h *header.Header, voteSet []wire.Event) (*agreement.Agreement, error) {
 	stepVotesMap := make(map[uint8]struct {
 		*agreement.StepVotes
 		sortedset.Set

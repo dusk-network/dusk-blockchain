@@ -5,7 +5,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -34,9 +34,9 @@ func newReductionHandler(committee committee.Committee) *reductionHandler {
 	}
 }
 
-func (b *reductionHandler) ExtractHeader(e wire.Event) *events.Header {
+func (b *reductionHandler) ExtractHeader(e wire.Event) *header.Header {
 	ev := e.(*Reduction)
-	return &events.Header{
+	return &header.Header{
 		Round: ev.Round,
 		Step:  ev.Step,
 	}

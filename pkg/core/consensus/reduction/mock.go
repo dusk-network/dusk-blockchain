@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -24,7 +24,7 @@ func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*use
 	reduction.PubKeyBLS = keys.BLSPubKeyBytes
 
 	r := new(bytes.Buffer)
-	_ = events.MarshalSignableVote(r, reduction.Header)
+	_ = header.MarshalSignableVote(r, reduction.Header)
 	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, r.Bytes())
 	reduction.SignedHash = sigma.Compress()
 	return keys, reduction
@@ -41,7 +41,7 @@ func MockOutgoingReduction(hash []byte, round uint64, step uint8) *Reduction {
 func MockOutgoingReductionBuf(hash []byte, round uint64, step uint8) *bytes.Buffer {
 	reduction := MockOutgoingReduction(hash, round, step)
 	b := new(bytes.Buffer)
-	_ = events.MarshalSignableVote(b, reduction.Header)
+	_ = header.MarshalSignableVote(b, reduction.Header)
 	return b
 }
 
@@ -86,7 +86,7 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	marshaller := NewReductionUnMarshaller()
 
 	bev := &Reduction{
-		Header: &events.Header{
+		Header: &header.Header{
 			PubKeyBLS: keys.BLSPubKeyBytes,
 			Round:     round,
 			Step:      step,
