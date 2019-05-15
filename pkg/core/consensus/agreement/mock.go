@@ -10,7 +10,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
@@ -154,14 +153,4 @@ func MockVoteAgreement(hash []byte, round uint64, step uint8, voteNr int) wire.E
 	ev := MockAgreement(k, hash, round, step, votes)
 
 	return ev
-}
-
-// TODO: move this to reduction package
-func MockAgreementBuf(hash []byte, round uint64, step uint8, voteNr int) *bytes.Buffer {
-	ev := MockVoteAgreement(hash, round, step, voteNr)
-	signer := voting.NewAgreementSigner(nil, nil, nil)
-	b := make([]byte, 0)
-	buf := bytes.NewBuffer(b)
-	_ = signer.Marshal(buf, ev)
-	return buf
 }

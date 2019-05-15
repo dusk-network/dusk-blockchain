@@ -11,6 +11,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -115,5 +116,9 @@ func mockCommittee(quorum int, isMember bool, amMember bool) committee.Committee
 	committeeMock.On("AmMember",
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(amMember)
+	committeeMock.On("Pack",
+		mock.AnythingOfType("sortedset.Set"),
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("uint8")).Return(sortedset.All)
 	return committeeMock
 }

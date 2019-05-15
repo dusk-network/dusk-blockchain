@@ -2,6 +2,7 @@ package reduction
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 	"time"
 
@@ -25,10 +26,8 @@ func TestReduction(t *testing.T) {
 	broker := LaunchReducer(eventBus, committeeMock, k, timeOut)
 	// listen for outgoing votes of either kind, so we can verify they are being
 	// sent out properly.
-	outgoingReduction := make(chan *bytes.Buffer, 2)
-	outgoingAgreement := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe(string(topics.Gossip), outgoingReduction)
-	eventBus.Subscribe(msg.OutgoingBlockAgreementTopic, outgoingAgreement)
+	outgoing := make(chan *bytes.Buffer, 4)
+	eventBus.Subscribe(string(topics.Gossip), outgoing)
 
 	// update round
 	consensus.UpdateRound(eventBus, 1)
@@ -51,9 +50,11 @@ func TestReduction(t *testing.T) {
 	count := 0
 	for {
 		select {
-		case <-outgoingAgreement:
-			// should have 2 reduction votes in the outgoingReduction channel
-			assert.Equal(t, 2, len(outgoingReduction))
+		case buf := <-outgoing:
+			topic := extractTopic(buf)
+			if reflect.DeepEqual(topic, topics.TopicToByteArray(topics.Agreement)) {
+				continue
+			}
 			// test successful
 			return
 		case <-timer:
@@ -65,6 +66,7 @@ func TestReduction(t *testing.T) {
 				ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(), hash)
 				eventBus.Publish(string(topics.Reduction), ev)
 			}
+			time.Sleep(1 * time.Millisecond)
 		}
 	}
 }
@@ -170,48 +172,10 @@ func TestReductionTimeout(t *testing.T) {
 	}
 }
 
-/*
-func TestReductionSigning(t *testing.T) {
-	hash, _ := crypto.RandEntropy(32)
-	bus := wire.NewEventBus()
-	msgChan := make(chan *bytes.Buffer)
-	bus.Subscribe(string(topics.Gossip), msgChan)
-
-	k, _ := user.NewRandKeys()
-
-	buf := reduction.MockOutgoingReductionBuf(hash, 1, 1)
-	LaunchVotingComponent(bus, nil, k)
-
-	<-time.After(200 * time.Millisecond)
-	bus.Publish(msg.OutgoingBlockReductionTopic, buf)
-
-	signed := <-msgChan
-
-	//eliminating topic
-	topic := make([]byte, 15)
-	_, _ = signed.Read(topic)
-
-	// removing the ED signature
-	sig := make([]byte, 64)
-	assert.NoError(t, encoding.Read512(signed, &sig))
-	assert.True(t, ed25519.Verify(*k.EdPubKey, signed.Bytes(), sig))
-
-	ev, err := events.NewReductionUnMarshaller().Deserialize(signed)
-	assert.NoError(t, err)
-	r := ev.(*events.Reduction)
-
-	// testing that the BLS Public Key has been properly added
-	assert.Equal(t, k.BLSPubKeyBytes, r.PubKeyBLS)
-	// testing the fields of the reduction message
-	assert.Equal(t, uint64(1), r.Round)
-	assert.Equal(t, uint8(1), r.Step)
-	assert.Equal(t, hash, r.BlockHash)
-	// testing the size of the BLS compressed signature
-	assert.Equal(t, 33, len(r.SignedHash))
-
-	//testing the validity of the signature
-	b := new(bytes.Buffer)
-	assert.NoError(t, events.MarshalSignableVote(b, r.Header))
-	assert.NoError(t, msg.VerifyBLSSignature(r.PubKeyBLS, b.Bytes(), r.SignedHash))
+func extractTopic(buf *bytes.Buffer) [topics.Size]byte {
+	var bf [topics.Size]byte
+	b := make([]byte, topics.Size)
+	_, _ = buf.Read(b)
+	copy(bf[:], b[:])
+	return bf
 }
-*/
