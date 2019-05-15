@@ -213,7 +213,7 @@ func (r *reducer) sendAgreement(evs []wire.Event, hash *bytes.Buffer) {
 	}
 
 	// Marshall it for Ed25519 signature
-	buffer, err := events.MarshalAggregatedAgreement(a)
+	buffer, err := events.MarshalAgreement(a)
 	if err != nil {
 		logErr(err, hash.Bytes(), "Error in Marshalling the Agreement")
 		return
@@ -284,8 +284,8 @@ func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
 	return hash
 }
 
-// Aggregate the Agreement event into an AggregatedAgreement outgoing event
-func (r *reducer) Aggregate(h *events.Header, voteSet []wire.Event) (*events.AggregatedAgreement, error) {
+// Aggregate the Agreement event into an Agreement outgoing event
+func (r *reducer) Aggregate(h *events.Header, voteSet []wire.Event) (*events.Agreement, error) {
 	stepVotesMap := make(map[uint8]struct {
 		*events.StepVotes
 		sortedset.Set
@@ -306,15 +306,15 @@ func (r *reducer) Aggregate(h *events.Header, voteSet []wire.Event) (*events.Agg
 		stepVotesMap[reduction.Step] = sv
 	}
 
-	aggregatedAgreement := events.NewAggregatedAgreement()
-	aggregatedAgreement.Header = h
+	agreement := events.NewAgreement()
+	agreement.Header = h
 	i := 0
 	for _, stepVotes := range stepVotesMap {
 		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
 		sv.BitSet = r.ctx.committee.Pack(provisioners, h.Round, sv.Step)
-		aggregatedAgreement.VotesPerStep[i] = sv
+		agreement.VotesPerStep[i] = sv
 		i++
 	}
 
-	return aggregatedAgreement, nil
+	return agreement, nil
 }

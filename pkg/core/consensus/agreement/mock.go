@@ -17,15 +17,15 @@ import (
 
 // PublishMock is a mock-up method to facilitate testing of publishing of Agreement events
 func PublishMock(bus wire.EventBroker, hash []byte, round uint64, step uint8, keys []*user.Keys) {
-	buf := MockAggregatedAgreement(hash, round, step, keys)
+	buf := MockAgreement(hash, round, step, keys)
 	bus.Publish(msg.OutgoingBlockAgreementTopic, buf)
 }
 
-func MockAggregatedAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys) *events.AggregatedAgreement {
+func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys) *events.Agreement {
 	if step < uint8(2) {
 		panic("Need at least 2 steps to create an Agreement")
 	}
-	a := events.NewAggregatedAgreement()
+	a := events.NewAgreement()
 	pk, sk, _ := bls.GenKeyPair(rand.Reader)
 	a.PubKeyBLS = pk.Marshal()
 	a.Round = round
@@ -42,14 +42,14 @@ func MockAggregatedAgreementEvent(hash []byte, round uint64, step uint8, keys []
 	return a
 }
 
-func MockAggregatedAgreement(hash []byte, round uint64, step uint8, keys []*user.Keys) *bytes.Buffer {
+func MockAgreement(hash []byte, round uint64, step uint8, keys []*user.Keys) *bytes.Buffer {
 	if step < 2 {
 		panic("Aggregated agreement needs to span for at least two steps")
 	}
 	buf := new(bytes.Buffer)
-	ev := MockAggregatedAgreementEvent(hash, round, step, keys)
+	ev := MockAgreementEvent(hash, round, step, keys)
 
-	marshaller := events.NewAggregatedAgreementUnMarshaller()
+	marshaller := events.NewAgreementUnMarshaller()
 	_ = marshaller.Marshal(buf, ev)
 	return buf
 }

@@ -27,8 +27,8 @@ func TestBroker(t *testing.T) {
 	_, broker, roundChan := initAgreement(committeeMock)
 
 	hash, _ := crypto.RandEntropy(32)
-	e1 := MockAggregatedAgreement(hash, 1, 2, keys)
-	e2 := MockAggregatedAgreement(hash, 1, 2, keys)
+	e1 := MockAgreement(hash, 1, 2, keys)
+	e2 := MockAgreement(hash, 1, 2, keys)
 	_ = broker.filter.Collect(e1)
 	_ = broker.filter.Collect(e2)
 
@@ -40,8 +40,8 @@ func TestNoQuorum(t *testing.T) {
 	committeeMock, keys := mockCommittee(3, true, 3)
 	_, broker, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
-	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
+	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
+	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
 
 	select {
 	case <-roundChan:
@@ -50,7 +50,7 @@ func TestNoQuorum(t *testing.T) {
 		// all good
 	}
 
-	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
+	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
 	round := <-roundChan
 	assert.Equal(t, uint64(2), round)
 }
@@ -59,7 +59,7 @@ func TestSkipNoMember(t *testing.T) {
 	committeeMock, keys := mockCommittee(1, false, 2)
 	_, broker, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(MockAggregatedAgreement(hash, 1, 2, keys))
+	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
 
 	select {
 	case <-roundChan:

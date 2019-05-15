@@ -14,15 +14,15 @@ import (
 )
 
 // LaunchNotification is a helper function to allow internal propagation of Agreement messages to those interested (for example monitoring and loggin processors)
-func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.AggregatedAgreement {
-	agreementChan := make(chan *events.AggregatedAgreement)
+func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Agreement {
+	agreementChan := make(chan *events.Agreement)
 	evChan := consensus.LaunchNotification(eventbus,
-		events.NewAggregatedAgreementUnMarshaller(), msg.OutgoingBlockAgreementTopic)
+		events.NewAgreementUnMarshaller(), msg.OutgoingBlockAgreementTopic)
 
 	go func() {
 		for {
 			aEv := <-evChan
-			agreementChan <- aEv.(*events.AggregatedAgreement)
+			agreementChan <- aEv.(*events.Agreement)
 		}
 	}()
 

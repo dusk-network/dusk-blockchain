@@ -30,7 +30,7 @@ type (
 		roundChan     <-chan uint64
 		bestScoreChan <-chan *selection.ScoreEvent
 		reductionChan <-chan *events.Reduction
-		agreementChan <-chan *events.AggregatedAgreement
+		agreementChan <-chan *events.Agreement
 		logChan       <-chan *eventmon.Event
 
 		msgChan  chan<- string

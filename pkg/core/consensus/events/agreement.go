@@ -25,13 +25,13 @@ type (
 	}
 
 	// Agreement is the Event created at the end of the Reduction process. It includes the aggregated compressed signatures of all voters
-	AggregatedAgreement struct {
+	Agreement struct {
 		*Header
 		SignedVotes  []byte
 		VotesPerStep []*StepVotes
 	}
 
-	AggregatedAgreementUnMarshaller struct {
+	AgreementUnMarshaller struct {
 		*UnMarshaller
 		wire.EventMarshaller
 		wire.EventUnmarshaller
@@ -84,14 +84,14 @@ func (sv *StepVotes) Add(ev *Reduction) error {
 	return nil
 }
 
-func NewAggregatedAgreementUnMarshaller() *AggregatedAgreementUnMarshaller {
-	return &AggregatedAgreementUnMarshaller{
+func NewAgreementUnMarshaller() *AgreementUnMarshaller {
+	return &AgreementUnMarshaller{
 		UnMarshaller: NewUnMarshaller(),
 	}
 }
 
-func (au *AggregatedAgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	ev := NewAggregatedAgreement()
+func (au *AgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+	ev := NewAgreement()
 	if err := au.Unmarshal(r, ev); err != nil {
 		return nil, err
 	}
@@ -99,8 +99,8 @@ func (au *AggregatedAgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Ev
 	return ev, nil
 }
 
-func (au *AggregatedAgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	a := ev.(*AggregatedAgreement)
+func (au *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+	a := ev.(*Agreement)
 	if err := au.UnMarshaller.Marshal(r, a.Header); err != nil {
 		return err
 	}
@@ -118,8 +118,8 @@ func (au *AggregatedAgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Even
 	return nil
 }
 
-func (au *AggregatedAgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	a := ev.(*AggregatedAgreement)
+func (au *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+	a := ev.(*Agreement)
 	if err := au.UnMarshaller.Unmarshal(r, a.Header); err != nil {
 		return err
 	}
@@ -138,22 +138,22 @@ func (au *AggregatedAgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Ev
 	return nil
 }
 
-func NewAggregatedAgreement() *AggregatedAgreement {
-	return &AggregatedAgreement{
+func NewAgreement() *Agreement {
+	return &Agreement{
 		Header:       &Header{},
 		VotesPerStep: make([]*StepVotes, 2),
 		SignedVotes:  make([]byte, 33),
 	}
 }
 
-// UnmarshalAggregatedAgreement unmarshals the buffer into an AggregatedAgreement
+// UnmarshalAgreement unmarshals the buffer into an Agreement
 // Field order is the following:
 // * Header [BLS Public Key; Round; Step]
-// * AggregatedAgreement [Signed Vote Set; Vote Set; BlockHash]
-func UnmarshalAggregatedAgreement(r *bytes.Buffer) (*AggregatedAgreement, error) {
-	a := NewAggregatedAgreement()
+// * Agreement [Signed Vote Set; Vote Set; BlockHash]
+func UnmarshalAgreement(r *bytes.Buffer) (*Agreement, error) {
+	a := NewAgreement()
 
-	unmarshaller := NewAggregatedAgreementUnMarshaller()
+	unmarshaller := NewAgreementUnMarshaller()
 	if err := unmarshaller.Unmarshal(r, a); err != nil {
 		return nil, err
 	}
@@ -161,10 +161,10 @@ func UnmarshalAggregatedAgreement(r *bytes.Buffer) (*AggregatedAgreement, error)
 	return a, nil
 }
 
-func MarshalAggregatedAgreement(a *AggregatedAgreement) (*bytes.Buffer, error) {
+func MarshalAgreement(a *Agreement) (*bytes.Buffer, error) {
 	r := new(bytes.Buffer)
 
-	marshaller := NewAggregatedAgreementUnMarshaller()
+	marshaller := NewAgreementUnMarshaller()
 	if err := marshaller.Marshal(r, a); err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func MarshalAggregatedAgreement(a *AggregatedAgreement) (*bytes.Buffer, error) {
 }
 
 // SignAgreementEvent signs an aggregated agreement event
-func SignAgreementEvent(a *AggregatedAgreement, keys *user.Keys) error {
+func SignAgreementEvent(a *Agreement, keys *user.Keys) error {
 	buffer := new(bytes.Buffer)
 
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {
