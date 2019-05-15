@@ -24,25 +24,11 @@ type (
 		Step      uint8
 	}
 
-	// Agreement is the Event created at the end of the Reduction process.
-	// Considering that it needs to be passed to the Signer (and transform
-	// into an AggregatedAgreement there), it includes no signature
-	Agreement struct {
-		*Header
-		VoteSet []wire.Event
-	}
-
-	// AggregatedAgreement is the BLS aggregated representation of an Agreement Event
+	// Agreement is the Event created at the end of the Reduction process. It includes the aggregated compressed signatures of all voters
 	AggregatedAgreement struct {
 		*Header
 		SignedVotes  []byte
 		VotesPerStep []*StepVotes
-	}
-
-	// AgreementUnMarshaller implements both Marshaller and Unmarshaller interface
-	AgreementUnMarshaller struct {
-		*UnMarshaller
-		ReductionUnmarshaller
 	}
 
 	AggregatedAgreementUnMarshaller struct {
@@ -96,48 +82,6 @@ func (sv *StepVotes) Add(ev *Reduction) error {
 	}
 
 	return nil
-}
-
-// NewAgreement returns an empty Agreement event.
-func NewAgreement() *Agreement {
-	return &Agreement{
-		Header: &Header{},
-	}
-}
-
-// Equal as specified in the Event interface
-func (ceh *Agreement) Equal(e wire.Event) bool {
-	other, ok := e.(*Agreement)
-	if !(ok && ceh.Header.Equal(other.Header)) {
-		return false
-	}
-
-	for i, ev := range ceh.VoteSet {
-		if !ev.Equal(other.VoteSet[i]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// NewAgreementUnMarshaller creates a new AgreementUnMarshaller. Internally it
-// creates an HeaderUnMarshaller which takes care of Decoding and Encoding operations
-func NewAgreementUnMarshaller() *AgreementUnMarshaller {
-	return &AgreementUnMarshaller{
-		ReductionUnmarshaller: NewReductionUnMarshaller(),
-		UnMarshaller:          NewUnMarshaller(),
-	}
-}
-
-func (a *AgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	ev := NewAgreement()
-
-	if err := a.Unmarshal(r, ev); err != nil {
-		return nil, err
-	}
-
-	return ev, nil
 }
 
 func NewAggregatedAgreementUnMarshaller() *AggregatedAgreementUnMarshaller {
@@ -332,48 +276,5 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	if err := encoding.WriteBLS(r, vote.Signature.Compress()); err != nil {
 		return err
 	}
-	return nil
-}
-
-// Unmarshal unmarshals the buffer into a CommitteeHeader
-// Field order is the following:
-// * Consensus Header [BLS Public Key; Round; Step]
-// * Committee Header [Signed Vote Set; Vote Set; BlockHash]
-func (ceu *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	cev := ev.(*Agreement)
-	if err := ceu.HeaderUnmarshaller.Unmarshal(r, cev.Header); err != nil {
-		return err
-	}
-
-	voteSet, err := ceu.UnmarshalVoteSet(r)
-	if err != nil {
-		return err
-	}
-	cev.VoteSet = voteSet
-
-	return nil
-}
-
-// Marshal the buffer into a committee Event
-// Field order is the following:
-// * Consensus Header [BLS Public Key; Round; Step]
-// * Committee Header [Signed Vote Set; Vote Set; BlockHash]
-func (ceu *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	// TODO: review
-	cev, ok := ev.(*Agreement)
-	if !ok {
-		// cev is nil
-		return nil
-	}
-
-	if err := ceu.HeaderMarshaller.Marshal(r, cev.Header); err != nil {
-		return err
-	}
-
-	// Marshal VoteSet
-	if err := ceu.MarshalVoteSet(r, cev.VoteSet); err != nil {
-		return err
-	}
-
 	return nil
 }

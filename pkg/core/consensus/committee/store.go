@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -143,10 +142,6 @@ func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) *us
 // Priority returns false in case pubKey2 has higher stake than pubKey1
 func (c *Store) Priority(ev1, ev2 wire.Event) bool {
 	p := c.copyProvisioners()
-	if _, ok := ev1.(*events.Agreement); !ok {
-		return false
-	}
-
 	m1 := p.GetMember(ev1.Sender())
 	m2 := p.GetMember(ev2.Sender())
 

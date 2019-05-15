@@ -124,33 +124,3 @@ func mockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Committee, 
 		uint8(2)).Return(wholeCommittee.Bits(mockSubCommittees[1]))
 	return committeeMock, keys
 }
-
-// TODO: move this to reduction package
-func MockAgreement(keys *user.Keys, hash []byte, round uint64, step uint8, votes []wire.Event) *events.Agreement {
-	ev := events.NewAgreement()
-	ev.Round = round
-	ev.Step = step
-	ev.PubKeyBLS = keys.BLSPubKeyBytes
-	ev.VoteSet = votes
-	ev.BlockHash = hash
-	return ev
-}
-
-// TODO: move this to reduction package
-func MockVoteAgreement(hash []byte, round uint64, step uint8, voteNr int) wire.Event {
-	var k *user.Keys
-	var e wire.Event
-	votes := make([]wire.Event, 0)
-	for i := 0; i < voteNr; i++ {
-		if i == 0 {
-			k, e = reduction.MockReduction(nil, hash, round, step)
-			votes = append(votes, e)
-			continue
-		}
-		_, e = reduction.MockReduction(nil, hash, round, step)
-		votes = append(votes, e)
-	}
-	ev := MockAgreement(k, hash, round, step, votes)
-
-	return ev
-}
