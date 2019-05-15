@@ -24,7 +24,7 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys
 	if step < uint8(2) {
 		panic("Need at least 2 steps to create an Agreement")
 	}
-	a := NewAgreement()
+	a := New()
 	pk, sk, _ := bls.GenKeyPair(rand.Reader)
 	a.PubKeyBLS = pk.Marshal()
 	a.Round = round
@@ -48,7 +48,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []*user.Keys) *by
 	buf := new(bytes.Buffer)
 	ev := MockAgreementEvent(hash, round, step, keys)
 
-	marshaller := NewAgreementUnMarshaller()
+	marshaller := NewUnMarshaller()
 	_ = marshaller.Marshal(buf, ev)
 	return buf
 }

@@ -18,19 +18,14 @@ type (
 		SignedHash []byte
 	}
 
-	// ReductionUnMarshaller marshals and unmarshales th
-	ReductionUnMarshaller struct {
+	// UnMarshaller marshals and unmarshales th
+	UnMarshaller struct {
 		*header.UnMarshaller
-	}
-
-	ReductionUnmarshaller interface {
-		wire.EventMarshaller
-		wire.EventDeserializer
 	}
 )
 
-// NewReduction returns and empty Reduction event.
-func NewReduction() *Reduction {
+// New returns and empty Reduction event.
+func New() *Reduction {
 	return &Reduction{
 		Header: &header.Header{},
 	}
@@ -43,12 +38,12 @@ func (e *Reduction) Equal(ev wire.Event) bool {
 		(e.Round == other.Round) && (e.Step == other.Step)
 }
 
-func NewReductionUnMarshaller() *ReductionUnMarshaller {
-	return &ReductionUnMarshaller{header.NewUnMarshaller()}
+func NewUnMarshaller() *UnMarshaller {
+	return &UnMarshaller{header.NewUnMarshaller()}
 }
 
-func (r *ReductionUnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error) {
-	ev := NewReduction()
+func (r *UnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error) {
+	ev := New()
 	if err := r.Unmarshal(b, ev); err != nil {
 		return nil, err
 	}
@@ -57,7 +52,7 @@ func (r *ReductionUnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error)
 }
 
 // Unmarshal unmarshals the buffer into a Committee
-func (a *ReductionUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func (a *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	bev := ev.(*Reduction)
 	if err := a.HeaderUnmarshaller.Unmarshal(r, bev.Header); err != nil {
 		return err
@@ -71,7 +66,7 @@ func (a *ReductionUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error 
 }
 
 // Marshal a Reduction into a buffer.
-func (a *ReductionUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+func (a *UnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	bev := ev.(*Reduction)
 	if err := a.HeaderMarshaller.Marshal(r, bev.Header); err != nil {
 		return err
@@ -85,7 +80,7 @@ func (a *ReductionUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 }
 
 // TODO: generalize the set/array marshalling/unmarshalling through an interface
-func (a *ReductionUnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event, error) {
+func (a *UnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event, error) {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return nil, err
@@ -106,7 +101,7 @@ func (a *ReductionUnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event,
 	return evs, nil
 }
 
-func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
+func (a *UnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
 	if err := encoding.WriteVarInt(r, uint64(len(evs))); err != nil {
 		return err
 	}
@@ -120,14 +115,14 @@ func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event
 	return nil
 }
 
-// SignReduction is a shortcut to BLS and ED25519 sign a reduction message
-func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
-	e := NewReduction()
+// SignBuffer is a shortcut to BLS and ED25519 sign a reduction message
+func SignBuffer(buf *bytes.Buffer, keys *user.Keys) error {
+	e := New()
 	if err := header.UnmarshalSignableVote(buf, e.Header); err != nil {
 		return err
 	}
 
-	signed, err := SignReductionEvent(e, keys)
+	signed, err := Sign(e, keys)
 	if err != nil {
 		return err
 	}
@@ -136,13 +131,13 @@ func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 	return nil
 }
 
-func SignReductionEvent(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
-	if err := BlsSignReductionEvent(e, keys); err != nil {
+func Sign(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
+	if err := BlsSign(e, keys); err != nil {
 		return nil, err
 	}
 	outbuf := new(bytes.Buffer)
 
-	unMarshaller := NewReductionUnMarshaller()
+	unMarshaller := NewUnMarshaller()
 	if err := unMarshaller.Marshal(outbuf, e); err != nil {
 		return nil, err
 	}
@@ -166,8 +161,8 @@ func SignReductionEvent(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
 	return signed, nil
 }
 
-// BlsSignReductionEvent is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
-func BlsSignReductionEvent(ev *Reduction, keys *user.Keys) error {
+// BlsSign is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
+func BlsSign(ev *Reduction, keys *user.Keys) error {
 	buf := new(bytes.Buffer)
 
 	if err := header.MarshalSignableVote(buf, ev.Header); err != nil {

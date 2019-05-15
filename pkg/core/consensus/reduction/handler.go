@@ -16,7 +16,7 @@ type (
 	// about specific event fields.
 	reductionHandler struct {
 		committee.Committee
-		*ReductionUnMarshaller
+		*UnMarshaller
 	}
 
 	handler interface {
@@ -29,8 +29,8 @@ type (
 // and an unmarshaller which uses the injected validation function.
 func newReductionHandler(committee committee.Committee) *reductionHandler {
 	return &reductionHandler{
-		Committee:             committee,
-		ReductionUnMarshaller: NewReductionUnMarshaller(),
+		Committee:    committee,
+		UnMarshaller: NewUnMarshaller(),
 	}
 }
 

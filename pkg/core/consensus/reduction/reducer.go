@@ -153,7 +153,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	if err := SignReduction(vote, r.ctx.Keys); err != nil {
+	if err := SignBuffer(vote, r.ctx.Keys); err != nil {
 		logErr(err, hash.Bytes(), "Error while signing vote")
 		return
 	}
@@ -191,13 +191,13 @@ func (r *reducer) sendAgreement(evs []wire.Event, hash *bytes.Buffer) {
 	}
 
 	// BLS sign it
-	if err := agreement.SignAgreementEvent(a, r.ctx.Keys); err != nil {
+	if err := agreement.Sign(a, r.ctx.Keys); err != nil {
 		logErr(err, hash.Bytes(), "Error in signing the Agreement")
 		return
 	}
 
 	// Marshall it for Ed25519 signature
-	buffer, err := agreement.MarshalAgreement(a)
+	buffer, err := agreement.Marshal(a)
 	if err != nil {
 		logErr(err, hash.Bytes(), "Error in Marshalling the Agreement")
 		return
@@ -290,7 +290,7 @@ func (r *reducer) Aggregate(h *header.Header, voteSet []wire.Event) (*agreement.
 		stepVotesMap[reduction.Step] = sv
 	}
 
-	agreement := agreement.NewAgreement()
+	agreement := agreement.New()
 	agreement.Header = h
 	i := 0
 	for _, stepVotes := range stepVotesMap {

@@ -20,7 +20,7 @@ type agreementHandler struct {
 func newHandler(committee committee.Committee) *agreementHandler {
 	return &agreementHandler{
 		Committee:             committee,
-		AgreementUnMarshaller: NewAgreementUnMarshaller(),
+		AgreementUnMarshaller: NewUnMarshaller(),
 	}
 }
 

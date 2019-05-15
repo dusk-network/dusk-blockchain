@@ -84,14 +84,14 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 	return nil
 }
 
-func NewAgreementUnMarshaller() *AgreementUnMarshaller {
+func NewUnMarshaller() *AgreementUnMarshaller {
 	return &AgreementUnMarshaller{
 		UnMarshaller: header.NewUnMarshaller(),
 	}
 }
 
 func (au *AgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	ev := NewAgreement()
+	ev := New()
 	if err := au.Unmarshal(r, ev); err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (au *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error
 	return nil
 }
 
-func NewAgreement() *Agreement {
+func New() *Agreement {
 	return &Agreement{
 		Header:       &header.Header{},
 		VotesPerStep: make([]*StepVotes, 2),
@@ -146,14 +146,14 @@ func NewAgreement() *Agreement {
 	}
 }
 
-// UnmarshalAgreement unmarshals the buffer into an Agreement
+// Unmarshal unmarshals the buffer into an Agreement
 // Field order is the following:
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
-func UnmarshalAgreement(r *bytes.Buffer) (*Agreement, error) {
-	a := NewAgreement()
+func Unmarshal(r *bytes.Buffer) (*Agreement, error) {
+	a := New()
 
-	unmarshaller := NewAgreementUnMarshaller()
+	unmarshaller := NewUnMarshaller()
 	if err := unmarshaller.Unmarshal(r, a); err != nil {
 		return nil, err
 	}
@@ -161,10 +161,10 @@ func UnmarshalAgreement(r *bytes.Buffer) (*Agreement, error) {
 	return a, nil
 }
 
-func MarshalAgreement(a *Agreement) (*bytes.Buffer, error) {
+func Marshal(a *Agreement) (*bytes.Buffer, error) {
 	r := new(bytes.Buffer)
 
-	marshaller := NewAgreementUnMarshaller()
+	marshaller := NewUnMarshaller()
 	if err := marshaller.Marshal(r, a); err != nil {
 		return nil, err
 	}
@@ -172,8 +172,8 @@ func MarshalAgreement(a *Agreement) (*bytes.Buffer, error) {
 	return r, nil
 }
 
-// SignAgreementEvent signs an aggregated agreement event
-func SignAgreementEvent(a *Agreement, keys *user.Keys) error {
+// Sign signs an aggregated agreement event
+func Sign(a *Agreement, keys *user.Keys) error {
 	buffer := new(bytes.Buffer)
 
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {
