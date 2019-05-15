@@ -1,8 +1,9 @@
-package events
+package reduction
 
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -13,33 +14,25 @@ import (
 type (
 	// Reduction is a basic reduction event.
 	Reduction struct {
-		*Header
+		*events.Header
 		SignedHash []byte
 	}
 
 	// ReductionUnMarshaller marshals and unmarshales th
 	ReductionUnMarshaller struct {
-		*UnMarshaller
+		*events.UnMarshaller
 	}
 
 	ReductionUnmarshaller interface {
 		wire.EventMarshaller
 		wire.EventDeserializer
-		// HACK: why are these 2 methods here?
-		MarshalVoteSet(*bytes.Buffer, []wire.Event) error
-		UnmarshalVoteSet(*bytes.Buffer) ([]wire.Event, error)
-	}
-
-	// OutgoingReductionUnmarshaller unmarshals a Reduction event ready to be gossipped. Its intent is to centralize the code part that has responsibility of signing it
-	OutgoingReductionUnmarshaller struct {
-		ReductionUnmarshaller
 	}
 )
 
 // NewReduction returns and empty Reduction event.
 func NewReduction() *Reduction {
 	return &Reduction{
-		Header: &Header{},
+		Header: &events.Header{},
 	}
 }
 
@@ -51,7 +44,7 @@ func (e *Reduction) Equal(ev wire.Event) bool {
 }
 
 func NewReductionUnMarshaller() *ReductionUnMarshaller {
-	return &ReductionUnMarshaller{NewUnMarshaller()}
+	return &ReductionUnMarshaller{events.NewUnMarshaller()}
 }
 
 func (r *ReductionUnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error) {
@@ -101,7 +94,7 @@ func (a *ReductionUnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event,
 	evs := make([]wire.Event, length)
 	for i := uint64(0); i < length; i++ {
 		rev := &Reduction{
-			Header: &Header{},
+			Header: &events.Header{},
 		}
 		if err := a.Unmarshal(r, rev); err != nil {
 			return nil, err
@@ -130,7 +123,7 @@ func (a *ReductionUnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event
 // SignReduction is a shortcut to BLS and ED25519 sign a reduction message
 func SignReduction(buf *bytes.Buffer, keys *user.Keys) error {
 	e := NewReduction()
-	if err := UnmarshalSignableVote(buf, e.Header); err != nil {
+	if err := events.UnmarshalSignableVote(buf, e.Header); err != nil {
 		return err
 	}
 
@@ -177,7 +170,7 @@ func SignReductionEvent(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
 func BlsSignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	buf := new(bytes.Buffer)
 
-	if err := MarshalSignableVote(buf, ev.Header); err != nil {
+	if err := events.MarshalSignableVote(buf, ev.Header); err != nil {
 		return err
 	}
 
@@ -187,24 +180,5 @@ func BlsSignReductionEvent(ev *Reduction, keys *user.Keys) error {
 	}
 	ev.SignedHash = signedHash.Compress()
 	ev.PubKeyBLS = keys.BLSPubKeyBytes
-	return nil
-}
-
-// NewOutgoingReductionUnmarshaller creates a new Un- Marshaller for the votes elaborated by the reducer. This is *before* the messages get signed and thus transmitted to the network. So the signature fields of the reduction message is empty (and so is the Sender)
-// HACK: this needs to go as soon as the reducer will do its own signing
-func NewOutgoingReductionUnmarshaller() *OutgoingReductionUnmarshaller {
-	return &OutgoingReductionUnmarshaller{}
-}
-
-func (a *OutgoingReductionUnmarshaller) NewEvent() wire.Event {
-	return NewReduction()
-}
-
-func (a *OutgoingReductionUnmarshaller) Unmarshal(reductionBuffer *bytes.Buffer, ev wire.Event) error {
-	rev := ev.(*Reduction)
-	if err := UnmarshalSignableVote(reductionBuffer, rev.Header); err != nil {
-		return err
-	}
-
 	return nil
 }

@@ -7,27 +7,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
-
-// LaunchNotification is a helper function to allow internal propagation of Agreement messages to those interested (for example monitoring and loggin processors)
-func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Agreement {
-	agreementChan := make(chan *events.Agreement)
-	evChan := consensus.LaunchNotification(eventbus,
-		events.NewAgreementUnMarshaller(), msg.OutgoingBlockAgreementTopic)
-
-	go func() {
-		for {
-			aEv := <-evChan
-			agreementChan <- aEv.(*events.Agreement)
-		}
-	}()
-
-	return agreementChan
-}
 
 // LaunchAgreement is a helper to minimize the wiring of TopicListeners,
 // collector and channels. The agreement component notarizes the new blocks after having collected a quorum of votes

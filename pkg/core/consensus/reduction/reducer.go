@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -17,23 +18,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
-
-// LaunchNotification is a helper function allowing node internal processes interested in reduction messages to receive Reduction events as they get produced
-func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.Reduction {
-	revChan := make(chan *events.Reduction)
-	evChan := consensus.LaunchNotification(eventbus,
-		events.NewOutgoingReductionUnmarshaller(), msg.OutgoingBlockReductionTopic)
-
-	go func() {
-		for {
-			rEv := <-evChan
-			reductionEvent := rEv.(*events.Reduction)
-			revChan <- reductionEvent
-		}
-	}()
-
-	return revChan
-}
 
 var empty struct{}
 
@@ -169,7 +153,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	if err := events.SignReduction(vote, r.ctx.Keys); err != nil {
+	if err := SignReduction(vote, r.ctx.Keys); err != nil {
 		logErr(err, hash.Bytes(), "Error while signing vote")
 		return
 	}
@@ -207,13 +191,13 @@ func (r *reducer) sendAgreement(evs []wire.Event, hash *bytes.Buffer) {
 	}
 
 	// BLS sign it
-	if err := events.SignAgreementEvent(a, r.ctx.Keys); err != nil {
+	if err := agreement.SignAgreementEvent(a, r.ctx.Keys); err != nil {
 		logErr(err, hash.Bytes(), "Error in signing the Agreement")
 		return
 	}
 
 	// Marshall it for Ed25519 signature
-	buffer, err := events.MarshalAgreement(a)
+	buffer, err := agreement.MarshalAgreement(a)
 	if err != nil {
 		logErr(err, hash.Bytes(), "Error in Marshalling the Agreement")
 		return
@@ -285,28 +269,28 @@ func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
 }
 
 // Aggregate the Agreement event into an Agreement outgoing event
-func (r *reducer) Aggregate(h *events.Header, voteSet []wire.Event) (*events.Agreement, error) {
+func (r *reducer) Aggregate(h *events.Header, voteSet []wire.Event) (*agreement.Agreement, error) {
 	stepVotesMap := make(map[uint8]struct {
-		*events.StepVotes
+		*agreement.StepVotes
 		sortedset.Set
 	})
 
 	for _, ev := range voteSet {
-		reduction := ev.(*events.Reduction)
+		reduction := ev.(*Reduction)
 		sv, found := stepVotesMap[reduction.Step]
 		if !found {
-			sv.StepVotes = events.NewStepVotes()
+			sv.StepVotes = agreement.NewStepVotes()
 			sv.Set = sortedset.New()
 		}
 
-		if err := sv.StepVotes.Add(reduction); err != nil {
+		if err := sv.StepVotes.Add(reduction.SignedHash, reduction.Sender(), reduction.Step); err != nil {
 			return nil, err
 		}
 		sv.Set.Insert(reduction.PubKeyBLS)
 		stepVotesMap[reduction.Step] = sv
 	}
 
-	agreement := events.NewAgreement()
+	agreement := agreement.NewAgreement()
 	agreement.Header = h
 	i := 0
 	for _, stepVotes := range stepVotesMap {

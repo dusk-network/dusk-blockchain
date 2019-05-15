@@ -11,14 +11,14 @@ import (
 )
 
 func TestSignableVote(t *testing.T) {
-	red := NewReduction()
+	red := &Header{}
 	red.Round = uint64(1)
 	red.Step = uint8(2)
 	red.BlockHash, _ = crypto.RandEntropy(32)
-	test := NewReduction()
+	test := &Header{}
 	buf := new(bytes.Buffer)
-	assert.NoError(t, MarshalSignableVote(buf, red.Header))
-	assert.NoError(t, UnmarshalSignableVote(buf, test.Header))
+	assert.NoError(t, MarshalSignableVote(buf, red))
+	assert.NoError(t, UnmarshalSignableVote(buf, test))
 	assert.Equal(t, red, test)
 }
 

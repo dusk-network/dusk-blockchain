@@ -16,7 +16,7 @@ type (
 	// about specific event fields.
 	reductionHandler struct {
 		committee.Committee
-		*events.ReductionUnMarshaller
+		*ReductionUnMarshaller
 	}
 
 	handler interface {
@@ -30,12 +30,12 @@ type (
 func newReductionHandler(committee committee.Committee) *reductionHandler {
 	return &reductionHandler{
 		Committee:             committee,
-		ReductionUnMarshaller: events.NewReductionUnMarshaller(),
+		ReductionUnMarshaller: NewReductionUnMarshaller(),
 	}
 }
 
 func (b *reductionHandler) ExtractHeader(e wire.Event) *events.Header {
-	ev := e.(*events.Reduction)
+	ev := e.(*Reduction)
 	return &events.Header{
 		Round: ev.Round,
 		Step:  ev.Step,
@@ -43,13 +43,13 @@ func (b *reductionHandler) ExtractHeader(e wire.Event) *events.Header {
 }
 
 func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*events.Reduction)
+	ev := e.(*Reduction)
 	return encoding.Write256(r, ev.BlockHash)
 }
 
 // Verify the blockEvent
 func (b *reductionHandler) Verify(e wire.Event) error {
-	ev := e.(*events.Reduction)
+	ev := e.(*Reduction)
 	return msg.VerifyBLSSignature(ev.PubKeyBLS, ev.BlockHash, ev.SignedHash)
 }
 

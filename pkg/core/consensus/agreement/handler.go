@@ -14,31 +14,31 @@ import (
 
 type agreementHandler struct {
 	committee.Committee
-	*events.AgreementUnMarshaller
+	*AgreementUnMarshaller
 }
 
 func newHandler(committee committee.Committee) *agreementHandler {
 	return &agreementHandler{
 		Committee:             committee,
-		AgreementUnMarshaller: events.NewAgreementUnMarshaller(),
+		AgreementUnMarshaller: NewAgreementUnMarshaller(),
 	}
 }
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
-	ev := e.(*events.Agreement)
+	ev := e.(*Agreement)
 	return &events.Header{
 		Round: ev.Round,
 	}
 }
 
 func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*events.Agreement)
+	ev := e.(*Agreement)
 	return encoding.WriteUint8(r, ev.Step)
 }
 
 // Verify checks the signature of the set. TODO: At the moment the overall BLS signature is not checked as it is not clear if checking the ED25519 is enough (it should be in case the node links the BLS keys to the Edward keys)
 func (a *agreementHandler) Verify(e wire.Event) error {
-	ev, ok := e.(*events.Agreement)
+	ev, ok := e.(*Agreement)
 	if !ok {
 		return errors.New("Cant' verify an event different than the aggregated agreement")
 	}

@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *events.Reduction) {
+func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *Reduction) {
 	if keys == nil {
 		keys, _ = user.NewRandKeys()
 	}
@@ -30,8 +30,8 @@ func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*use
 	return keys, reduction
 }
 
-func MockOutgoingReduction(hash []byte, round uint64, step uint8) *events.Reduction {
-	reduction := events.NewReduction()
+func MockOutgoingReduction(hash []byte, round uint64, step uint8) *Reduction {
+	reduction := NewReduction()
 	reduction.Round = round
 	reduction.Step = step
 	reduction.BlockHash = hash
@@ -47,7 +47,7 @@ func MockOutgoingReductionBuf(hash []byte, round uint64, step uint8) *bytes.Buff
 
 func MockReductionBuffer(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *bytes.Buffer) {
 	k, ev := MockReduction(keys, hash, round, step)
-	marshaller := events.NewReductionUnMarshaller()
+	marshaller := NewReductionUnMarshaller()
 	buf := new(bytes.Buffer)
 	_ = marshaller.Marshal(buf, ev)
 	return k, buf
@@ -83,9 +83,9 @@ func mockSelectionEventBuffer(hash []byte) *bytes.Buffer {
 func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	keys, _ := user.NewRandKeys()
 	signedHash, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, hash)
-	marshaller := events.NewReductionUnMarshaller()
+	marshaller := NewReductionUnMarshaller()
 
-	bev := &events.Reduction{
+	bev := &Reduction{
 		Header: &events.Header{
 			PubKeyBLS: keys.BLSPubKeyBytes,
 			Round:     round,

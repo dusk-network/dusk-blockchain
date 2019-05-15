@@ -8,7 +8,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -21,11 +20,11 @@ func PublishMock(bus wire.EventBroker, hash []byte, round uint64, step uint8, ke
 	bus.Publish(msg.OutgoingBlockAgreementTopic, buf)
 }
 
-func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys) *events.Agreement {
+func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys) *Agreement {
 	if step < uint8(2) {
 		panic("Need at least 2 steps to create an Agreement")
 	}
-	a := events.NewAgreement()
+	a := NewAgreement()
 	pk, sk, _ := bls.GenKeyPair(rand.Reader)
 	a.PubKeyBLS = pk.Marshal()
 	a.Round = round
@@ -36,7 +35,7 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys
 	steps := genVotes(hash, round, step, keys)
 	a.VotesPerStep = steps
 	buf := new(bytes.Buffer)
-	_ = events.MarshalVotes(buf, a.VotesPerStep)
+	_ = MarshalVotes(buf, a.VotesPerStep)
 	sig, _ := bls.Sign(sk, pk, buf.Bytes())
 	a.SignedVotes = sig.Compress()
 	return a
@@ -49,25 +48,38 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []*user.Keys) *by
 	buf := new(bytes.Buffer)
 	ev := MockAgreementEvent(hash, round, step, keys)
 
-	marshaller := events.NewAgreementUnMarshaller()
+	marshaller := NewAgreementUnMarshaller()
 	_ = marshaller.Marshal(buf, ev)
 	return buf
 }
 
-func genVotes(hash []byte, round uint64, step uint8, keys []*user.Keys) []*events.StepVotes {
+func genVotes(hash []byte, round uint64, step uint8, keys []*user.Keys) []*StepVotes {
 	if len(keys) < 2 {
 		panic("At least two votes are required to mock an Agreement")
 	}
 
-	votes := make([]*events.StepVotes, 2)
+	votes := make([]*StepVotes, 2)
 	for i, k := range keys {
+
 		stepCycle := i % 2
+		thisStep := step - uint8((stepCycle+1)%2)
 		stepVote := votes[stepCycle]
 		if stepVote == nil {
-			stepVote = events.NewStepVotes()
+			stepVote = NewStepVotes()
 		}
-		_, rEv := reduction.MockReduction(k, hash, round, step-uint8((stepCycle+1)%2))
-		if err := stepVote.Add(rEv); err != nil {
+
+		h := &events.Header{
+			BlockHash: hash,
+			Round:     round,
+			Step:      thisStep,
+			PubKeyBLS: k.BLSPubKeyBytes,
+		}
+
+		r := new(bytes.Buffer)
+		_ = events.MarshalSignableVote(r, h)
+		sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
+
+		if err := stepVote.Add(sigma.Compress(), k.BLSPubKeyBytes, thisStep); err != nil {
 			panic(err)
 		}
 		votes[stepCycle] = stepVote

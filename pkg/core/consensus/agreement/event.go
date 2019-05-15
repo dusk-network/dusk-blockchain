@@ -1,10 +1,11 @@
-package events
+package agreement
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -26,13 +27,13 @@ type (
 
 	// Agreement is the Event created at the end of the Reduction process. It includes the aggregated compressed signatures of all voters
 	Agreement struct {
-		*Header
+		*events.Header
 		SignedVotes  []byte
 		VotesPerStep []*StepVotes
 	}
 
 	AgreementUnMarshaller struct {
-		*UnMarshaller
+		*events.UnMarshaller
 		wire.EventMarshaller
 		wire.EventUnmarshaller
 	}
@@ -53,16 +54,15 @@ func (sv *StepVotes) Equal(other *StepVotes) bool {
 		bytes.Equal(sv.Signature.Marshal(), other.Signature.Marshal())
 }
 
-func (sv *StepVotes) Add(ev *Reduction) error {
-	sender := ev.Sender()
+func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 	if sv.Step == uint8(0) {
 		pk, err := bls.UnmarshalPk(sender)
 		if err != nil {
 			return err
 		}
-		sv.Step = ev.Step
+		sv.Step = step
 		sv.Apk = bls.NewApk(pk)
-		sv.Signature, err = bls.UnmarshalSignature(ev.SignedHash)
+		sv.Signature, err = bls.UnmarshalSignature(signature)
 		if err != nil {
 			return err
 		}
@@ -70,14 +70,14 @@ func (sv *StepVotes) Add(ev *Reduction) error {
 		return nil
 	}
 
-	if ev.Step != sv.Step {
-		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", sv.Step, ev.Step)
+	if step != sv.Step {
+		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", sv.Step, step)
 	}
 
 	if err := sv.Apk.AggregateBytes(sender); err != nil {
 		return err
 	}
-	if err := sv.Signature.AggregateBytes(ev.SignedHash); err != nil {
+	if err := sv.Signature.AggregateBytes(signature); err != nil {
 		return err
 	}
 
@@ -86,7 +86,7 @@ func (sv *StepVotes) Add(ev *Reduction) error {
 
 func NewAgreementUnMarshaller() *AgreementUnMarshaller {
 	return &AgreementUnMarshaller{
-		UnMarshaller: NewUnMarshaller(),
+		UnMarshaller: events.NewUnMarshaller(),
 	}
 }
 
@@ -140,7 +140,7 @@ func (au *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error
 
 func NewAgreement() *Agreement {
 	return &Agreement{
-		Header:       &Header{},
+		Header:       &events.Header{},
 		VotesPerStep: make([]*StepVotes, 2),
 		SignedVotes:  make([]byte, 33),
 	}
