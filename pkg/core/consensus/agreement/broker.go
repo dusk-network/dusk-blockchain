@@ -73,7 +73,7 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Committee) *bro
 // Listen for results coming from the accumulator and updating the round accordingly
 func (b *broker) Listen() {
 	for {
-		<-b.accumulator.CollectedVotesChan
+		evs := <-b.accumulator.CollectedVotesChan
 		b.publishWinningHash(evs)
 		b.updateRound(b.state.Round() + 1)
 	}
