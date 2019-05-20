@@ -20,16 +20,6 @@ import (
 
 var readWriteTimeout = 2 * time.Minute // Used to set reading and writing deadlines
 
-var zeroSplit = func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if i := bytes.IndexByte(data, 0x00); i >= 0 {
-		return i + 1, data, nil
-	}
-	if atEOF {
-		return 0, nil, io.EOF
-	}
-	return 0, nil, nil
-}
-
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 type Connection struct {
 	net.Conn
