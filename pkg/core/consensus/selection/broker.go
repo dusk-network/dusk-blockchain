@@ -66,34 +66,42 @@ func (f *scoreBroker) Listen() {
 	for {
 		select {
 		case round := <-f.roundUpdateChan:
-			log.WithFields(log.Fields{
-				"process": "selection",
-				"round":   round,
-			}).Debugln("updating round")
-
-			f.selector.stopSelection()
-			f.filter.UpdateRound(round)
-			f.handler.ResetThreshold()
-			f.filter.FlushQueue()
-			f.selector.startSelection()
+			f.onRoundUpdate(round)
 		case state := <-f.regenerationChan:
-			log.WithFields(log.Fields{
-				"process": "selection",
-				"round":   state.Round,
-				"step":    state.Step,
-			}).Debugln("received regeneration message")
-			if state.Round == f.selector.state.Round() {
-				f.handler.LowerThreshold()
-				f.selector.RLock()
-				if !f.selector.running {
-					f.selector.RUnlock()
-					f.selector.startSelection()
-					break
-				}
-				f.selector.RUnlock()
-			}
+			f.onRegeneration(state)
 		case bidList := <-f.bidListChan:
 			f.selector.handler.UpdateBidList(bidList)
 		}
+	}
+}
+
+func (f *scoreBroker) onRoundUpdate(round uint64) {
+	log.WithFields(log.Fields{
+		"process": "selection",
+		"round":   round,
+	}).Debugln("updating round")
+
+	f.selector.stopSelection()
+	f.filter.UpdateRound(round)
+	f.handler.ResetThreshold()
+	f.filter.FlushQueue()
+	f.selector.startSelection()
+}
+
+func (f *scoreBroker) onRegeneration(state consensus.AsyncState) {
+	log.WithFields(log.Fields{
+		"process": "selection",
+		"round":   state.Round,
+		"step":    state.Step,
+	}).Debugln("received regeneration message")
+	if state.Round == f.selector.state.Round() {
+		f.handler.LowerThreshold()
+		f.selector.RLock()
+		if !f.selector.running {
+			f.selector.RUnlock()
+			f.selector.startSelection()
+			return
+		}
+		f.selector.RUnlock()
 	}
 }

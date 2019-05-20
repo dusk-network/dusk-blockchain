@@ -3,7 +3,6 @@ package selection
 import (
 	"bytes"
 	"errors"
-	"math/big"
 	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -15,11 +14,6 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-var (
-	errScoreBelowThreshold     = errors.New("score below threshold")
-	errProofFailedVerification = errors.New("proof verification failed")
-)
-
 type (
 	scoreHandler struct {
 		sync.RWMutex
@@ -28,7 +22,7 @@ type (
 		// Threshold number that a score needs to be greater than in order to be considered
 		// for selection. Messages with scores lower than this threshold should not be
 		// repropagated.
-		threshold *big.Int
+		threshold *consensus.Threshold
 	}
 
 	scoreEventHandler interface {
@@ -43,10 +37,9 @@ type (
 // NewScoreHandler returns a ScoreHandler, which encapsulates specific operations
 // (e.g. verification, validation, marshalling and unmarshalling)
 func newScoreHandler() *scoreHandler {
-	threshold, _ := big.NewInt(0).SetString("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 16)
 	return &scoreHandler{
 		RWMutex:   sync.RWMutex{},
-		threshold: threshold,
+		threshold: consensus.NewThreshold(),
 	}
 }
 
@@ -68,19 +61,19 @@ func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
 	p.bidList = bidList
 }
 
-func (p *scoreHandler) ResetThreshold() {
-	p.threshold, _ = big.NewInt(0).SetString("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 16)
-}
-
-func (p *scoreHandler) LowerThreshold() {
-	p.threshold.Div(p.threshold, big.NewInt(2))
-}
-
 func (p *scoreHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(*ScoreEvent)
 	return &events.Header{
 		Round: ev.Round,
 	}
+}
+
+func (p *scoreHandler) ResetThreshold() {
+	p.threshold.Reset()
+}
+
+func (p *scoreHandler) LowerThreshold() {
+	p.threshold.Lower()
 }
 
 // Priority returns true if the first element has priority over the second, false otherwise
@@ -99,8 +92,8 @@ func (p *scoreHandler) Verify(ev wire.Event) error {
 	m := ev.(*ScoreEvent)
 
 	// Check threshold
-	if err := p.checkThreshold(m.Score); err != nil {
-		return err
+	if !p.threshold.Exceeds(m.Score) {
+		return errors.New("score does not exceed threshold")
 	}
 
 	// Check if the BidList contains valid bids
@@ -120,17 +113,9 @@ func (p *scoreHandler) Verify(ev wire.Event) error {
 	}
 
 	if !proof.Verify(seedScalar) {
-		return errProofFailedVerification
+		return errors.New("proof verification failed")
 	}
 
-	return nil
-}
-
-func (p *scoreHandler) checkThreshold(score []byte) error {
-	scoreInt := big.NewInt(0).SetBytes(score)
-	if scoreInt.Cmp(p.threshold) == -1 {
-		return errScoreBelowThreshold
-	}
 	return nil
 }
 
