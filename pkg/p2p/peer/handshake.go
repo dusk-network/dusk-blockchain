@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"time"
 
@@ -27,23 +28,9 @@ type VersionMessage struct {
 	Services    protocol.ServiceFlag
 }
 
-// Handshake performs a protocol handshake with another peer.
-func (p *Peer) Handshake(inbound bool) error {
-	// Set handshake deadline
-	p.conn.SetDeadline(time.Now().Add(handshakeTimeout))
-
-	if inbound {
-		// An other peer wants to handshake with us.
-		return p.inboundHandShake()
-	}
-
-	// We want to handshake with an other peer.
-	return p.outboundHandShake()
-}
-
 // We are trying to connect to another peer.
 // We will send our Version with a MsgVerAck.
-func (p *Peer) outboundHandShake() error {
+func (p *Writer) HandShake() error {
 	if err := p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
@@ -62,14 +49,14 @@ func (p *Peer) outboundHandShake() error {
 		return err
 	}
 
-	if _, err := p.conn.Write(verAckMessage.Bytes()); err != nil {
+	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (p *Peer) inboundHandShake() error {
+func (p *Reader) HandShake() error {
 	if err := p.readRemoteMsgVersion(); err != nil {
 		return err
 	}
@@ -82,7 +69,7 @@ func (p *Peer) inboundHandShake() error {
 
 	// We skip the message queue here and write immediately on the connection,
 	// as the write loop has not been started yet.
-	if _, err := p.conn.Write(verAckMessage.Bytes()); err != nil {
+	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
 		return err
 	}
 
@@ -96,7 +83,7 @@ func (p *Peer) inboundHandShake() error {
 	return nil
 }
 
-func (p *Peer) writeLocalMsgVersion() error {
+func (p *Connection) writeLocalMsgVersion() error {
 	fromPort := uint16(p.Port())
 	version := protocol.NodeVer
 	localIP, err := util.GetOutboundIP()
@@ -108,8 +95,8 @@ func (p *Peer) writeLocalMsgVersion() error {
 		Port: fromPort,
 	}
 
-	toIP := p.conn.RemoteAddr().(*net.TCPAddr).IP
-	toPort := p.conn.RemoteAddr().(*net.TCPAddr).Port
+	toIP := p.Conn.RemoteAddr().(*net.TCPAddr).IP
+	toPort := p.Conn.RemoteAddr().(*net.TCPAddr).Port
 	toAddr := wire.NewNetAddress(toIP.String(), uint16(toPort))
 
 	message, err := newVersionMessageBuffer(version, &fromAddr, toAddr, protocol.FullNode)
@@ -122,22 +109,28 @@ func (p *Peer) writeLocalMsgVersion() error {
 		return err
 	}
 
-	_, err = p.conn.Write(messageWithHeader.Bytes())
+	_, err = p.Conn.Write(messageWithHeader.Bytes())
 	return err
 }
 
-func (p *Peer) readRemoteMsgVersion() error {
-	topic, payload, err := p.readMessage()
+func (p *Connection) readRemoteMsgVersion() error {
+	header, err := p.readHeader()
 	if err != nil {
 		return err
 	}
 
-	if topic != topics.Version {
+	if header.Topic != topics.Version {
 		return fmt.Errorf("did not receive the expected '%s' message - got %s",
-			topics.Version, topic)
+			topics.Version, header.Topic)
 	}
 
-	version, err := decodeVersionMessage(payload)
+	buffer := make([]byte, header.Length)
+	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
+		return err
+	}
+
+	version, err := decodeVersionMessage(bytes.NewBuffer(buffer))
+
 	if err != nil {
 		return err
 	}
@@ -145,15 +138,15 @@ func (p *Peer) readRemoteMsgVersion() error {
 	return verifyVersion(version.Version)
 }
 
-func (p *Peer) readVerack() error {
-	topic, _, err := p.readMessage()
+func (p *Connection) readVerack() error {
+	header, err := p.readHeader()
 	if err != nil {
 		return err
 	}
 
-	if topic != topics.VerAck {
+	if header.Topic != topics.VerAck {
 		return fmt.Errorf("did not receive the expected '%s' message - got %s",
-			topics.VerAck, topic)
+			topics.VerAck, header.Topic)
 	}
 
 	return nil
