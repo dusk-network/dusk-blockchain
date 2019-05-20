@@ -43,7 +43,7 @@ type eventStopWatch struct {
 func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Timer) *eventStopWatch {
 	return &eventStopWatch{
 		collectedVotesChan: collectedVotesChan,
-		stopChan:           make(chan struct{}),
+		stopChan:           make(chan struct{}, 1),
 		timer:              timer,
 	}
 }
@@ -99,10 +99,18 @@ func (r *reducer) inCommittee() bool {
 
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
+	// empty out stop channels
+	r.firstStep.stopChan = make(chan struct{}, 1)
+	r.secondStep.stopChan = make(chan struct{}, 1)
+
 	r.Lock()
 	r.stale = false
 	r.Unlock()
-	r.sendReductionVote(bytes.NewBuffer(hash))
+
+	if r.inCommittee() {
+		r.sendReductionVote(bytes.NewBuffer(hash))
+	}
+
 	go r.begin()
 }
 
@@ -119,7 +127,10 @@ func (r *reducer) begin() {
 				r.ctx.state.Round(), r.ctx.state.Step())
 		}
 		r.ctx.state.IncrementStep()
-		r.sendReductionVote(hash1)
+
+		if r.inCommittee() {
+			r.sendReductionVote(hash1)
+		}
 	}
 	r.RUnlock()
 
@@ -140,7 +151,10 @@ func (r *reducer) begin() {
 				"votes":      len(allEvents),
 				"block hash": hex.EncodeToString(hash1.Bytes()),
 			}).Debugln("Reduction successful")
-			r.sendAgreementVote(allEvents, hash2)
+
+			if r.inCommittee() {
+				r.sendAgreementVote(allEvents, hash2)
+			}
 		}
 
 		r.ctx.state.IncrementStep()
@@ -153,9 +167,13 @@ func (r *reducer) sendReductionVote(hash *bytes.Buffer) {
 	if err != nil {
 		panic(err)
 	}
-	if r.inCommittee() {
-		r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
-	}
+
+	log.WithFields(log.Fields{
+		"process": "reduction",
+		"round":   r.ctx.state.Round(),
+		"step":    r.ctx.state.Step(),
+	}).Debugln("sending vote")
+	r.publisher.Publish(msg.OutgoingBlockReductionTopic, vote)
 }
 
 func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
@@ -166,9 +184,8 @@ func (r *reducer) sendAgreementVote(events []wire.Event, hash *bytes.Buffer) {
 	if err != nil {
 		panic(err)
 	}
-	if r.inCommittee() {
-		r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
-	}
+
+	r.publisher.Publish(msg.OutgoingBlockAgreementTopic, agreementVote)
 }
 
 func (r *reducer) publishRegeneration() {
