@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"io"
@@ -30,4 +31,47 @@ func RandomSlice(t *testing.T, size uint32) []byte {
 	_, err := rand.Read(randSlice)
 	assert.Nil(t, err)
 	return randSlice
+}
+
+type SimpleStreamer struct {
+	*bufio.Reader
+	*bufio.Writer
+}
+
+func NewSimpleStreamer() *SimpleStreamer {
+	r, w := io.Pipe()
+	return &SimpleStreamer{
+		Reader: bufio.NewReader(r),
+		Writer: bufio.NewWriter(w),
+	}
+}
+
+func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
+	n, err = ms.Writer.Write(p)
+	if err != nil {
+		return n, err
+	}
+
+	return n, ms.Writer.Flush()
+}
+
+func (ms *SimpleStreamer) Read() ([]byte, error) {
+	// check the event
+	// discard the topic first
+	topicBuffer := make([]byte, 15)
+	if _, err := ms.Reader.Read(topicBuffer); err != nil {
+		return nil, err
+	}
+
+	// now unmarshal the event
+	buf := make([]byte, ms.Reader.Buffered())
+	if _, err := ms.Reader.Read(buf); err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+func (ms *SimpleStreamer) Close() error {
+	return nil
 }
