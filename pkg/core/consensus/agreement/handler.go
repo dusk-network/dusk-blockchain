@@ -3,6 +3,7 @@ package agreement
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
@@ -28,6 +29,7 @@ func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
 	ev := e.(*events.AggregatedAgreement)
 	return &events.Header{
 		Round: ev.Round,
+		Step:  ev.Step,
 	}
 }
 
@@ -71,7 +73,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	}
 
 	if allVoters < a.Quorum() {
-		return errors.New("vote set too small")
+		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum())
 	}
 	return nil
 }

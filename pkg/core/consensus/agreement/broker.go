@@ -51,8 +51,8 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 	accumulator *consensus.Accumulator) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(handler, state, accumulator, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
-	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Agreement))
-	go listener.Accept(republisher, &consensus.Validator{})
+	eventBroker.SubscribeCallback(string(topics.Agreement), filter.Collect)
+	eventBroker.RegisterPreprocessor(string(topics.Agreement), republisher, &consensus.Validator{})
 	return filter
 }
 
@@ -74,6 +74,7 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Committee) *bro
 func (b *broker) Listen() {
 	for {
 		<-b.accumulator.CollectedVotesChan
+		b.publishWinningHash(evs)
 		b.updateRound(b.state.Round() + 1)
 	}
 }
@@ -88,6 +89,11 @@ func (b *broker) updateRound(round uint64) {
 	b.accumulator.Clear()
 	// TODO: should consume entire round messages
 	b.filter.FlushQueue()
+}
+
+func (b *broker) publishWinningHash(evs []wire.Event) {
+	aev := evs[0].(*events.Agreement)
+	b.publisher.Publish(msg.WinningBlockTopic, bytes.NewBuffer(aev.AgreedHash))
 }
 
 // publishRoundUpdate publishes the new round in the EventPublisher
