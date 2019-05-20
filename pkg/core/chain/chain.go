@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
-	"sync"
 	"time"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -34,7 +33,6 @@ type Chain struct {
 	rpcBus   *wire.RPCBus
 	db       database.DB
 
-	sync.RWMutex
 	prevBlock block.Block
 	bidList   *user.BidList
 
