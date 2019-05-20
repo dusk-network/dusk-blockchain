@@ -16,11 +16,11 @@ import (
 
 type forwarder struct {
 	publisher      wire.EventPublisher
-	blockGenerator *blockGenerator
+	blockGenerator BlockGenerator
 	threshold      *consensus.Threshold
 }
 
-func newForwarder(publisher wire.EventPublisher, blockGenerator *blockGenerator) *forwarder {
+func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator) *forwarder {
 	return &forwarder{
 		publisher:      publisher,
 		blockGenerator: blockGenerator,
@@ -34,7 +34,7 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 		return errors.New("proof score too low")
 	}
 
-	blk, err := f.blockGenerator.generateBlock(round, seed)
+	blk, err := f.blockGenerator.GenerateBlock(round, seed)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
@@ -26,10 +27,10 @@ func TestScoreGeneration(t *testing.T) {
 
 	eb, streamer := helper.CreateGossipStreamer()
 
-	gen := &mockGenerator{}
+	gen := &mockGenerator{t}
 
 	// launch score component
-	generation.LaunchScoreGenerationComponent(eb, d, k, gen)
+	generation.LaunchScoreGenerationComponent(eb, nil, d, k, gen, gen)
 
 	// update the round to start generation
 	updateRound(eb, 1)
@@ -51,6 +52,11 @@ func TestScoreGeneration(t *testing.T) {
 // mockGenerator is used to test the generation component with the absence
 // of the rust blind bid process.
 type mockGenerator struct {
+	t *testing.T
+}
+
+func (m *mockGenerator) GenerateBlock(round uint64, seed []byte) (*block.Block, error) {
+	return helper.RandomBlock(m.t, round, 10), nil
 }
 
 func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {

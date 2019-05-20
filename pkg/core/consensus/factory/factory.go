@@ -70,7 +70,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.LaunchReputationComponent(c.eventBus)
-	generation.LaunchScoreGenerationComponent(c.eventBus, c.rpcBus, c.d, c.k, nil)
+	generation.LaunchScoreGenerationComponent(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
 	candidate.LaunchCandidateComponent(c.eventBus)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)

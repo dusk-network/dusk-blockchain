@@ -11,8 +11,8 @@ import (
 
 // LaunchScoreGenerationComponent will start the processes for score generation.
 func LaunchScoreGenerationComponent(eventBus *wire.EventBus, rpcBus *wire.RPCBus,
-	d, k ristretto.Scalar, gen Generator) *broker {
-	broker := newBroker(eventBus, rpcBus, d, k, gen)
+	d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator) *broker {
+	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen)
 	go broker.Listen()
 	return broker
 }
@@ -29,9 +29,13 @@ type broker struct {
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator) *broker {
+	gen Generator, blockGen BlockGenerator) *broker {
 	if gen == nil {
 		gen = newProofGenerator(d, k)
+	}
+
+	if blockGen == nil {
+		blockGen = newBlockGenerator(rpcBus)
 	}
 
 	roundChan := consensus.InitRoundUpdate(eventBroker)
@@ -42,7 +46,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		roundChan:        roundChan,
 		bidListChan:      bidListChan,
 		regenerationChan: regenerationChan,
-		forwarder:        newForwarder(eventBroker, newBlockGenerator(rpcBus)),
+		forwarder:        newForwarder(eventBroker, blockGen),
 		seeder:           &seeder{},
 	}
 }

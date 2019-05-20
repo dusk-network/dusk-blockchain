@@ -12,6 +12,10 @@ import (
 )
 
 type (
+	BlockGenerator interface {
+		GenerateBlock(uint64, []byte) (*block.Block, error)
+	}
+
 	blockGenerator struct {
 		rpcBus *wire.RPCBus
 	}
@@ -23,7 +27,7 @@ func newBlockGenerator(rpcBus *wire.RPCBus) *blockGenerator {
 	}
 }
 
-func (bg *blockGenerator) generateBlock(round uint64, seed []byte) (*block.Block, error) {
+func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte) (*block.Block, error) {
 	// TODO Missing fields for forging the block
 	// - CertHash
 	// - prevHash
