@@ -2,32 +2,33 @@ package dupemap
 
 import (
 	"bytes"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-var obsoleteMessageRound uint64 = 3
+var defaultTolerance uint64 = 3
 
 type DupeMap struct {
-	roundChan <-chan uint64 // Will get notification about new rounds in order...
-	tmpMap    *TmpMap       // ...to clean up the duplicate message blacklist
+	round     uint64
+	tmpMap    *TmpMap
+	tolerance uint64
 }
 
-func NewDupeMap(eventbus *wire.EventBus) *DupeMap {
-	roundChan := consensus.InitRoundUpdate(eventbus)
-	tmpMap := NewTmpMap(obsoleteMessageRound)
+func NewDupeMap(round uint64) *DupeMap {
+	tmpMap := NewTmpMap(defaultTolerance)
 	return &DupeMap{
-		roundChan,
+		round,
 		tmpMap,
+		defaultTolerance,
 	}
 }
 
-func (d *DupeMap) CleanOnRound() {
-	for {
-		round := <-d.roundChan
-		d.tmpMap.UpdateHeight(round)
-	}
+func (d *DupeMap) UpdateHeight(round uint64) {
+	d.tmpMap.UpdateHeight(round)
+}
+
+func (d *DupeMap) SetTolerance(roundNr uint64) {
+	threshold := d.tmpMap.Height() - roundNr
+	d.tmpMap.DeleteBefore(threshold)
+	d.tmpMap.SetTolerance(roundNr)
 }
 
 func (d *DupeMap) CanFwd(payload *bytes.Buffer) bool {
