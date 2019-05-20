@@ -333,7 +333,7 @@ func (m Mempool) onGetVerifiedTxs(r wire.Req) {
 	w := new(bytes.Buffer)
 	lTxs := uint64(m.verified.Len())
 	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		r.Err <- err
+		r.ErrChan <- err
 		return
 	}
 
@@ -348,11 +348,11 @@ func (m Mempool) onGetVerifiedTxs(r wire.Req) {
 	})
 
 	if err != nil {
-		r.Err <- err
+		r.ErrChan <- err
 		return
 	}
 
-	r.Resp <- *w
+	r.RespChan <- *w
 }
 
 // checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes

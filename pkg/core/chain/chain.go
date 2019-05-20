@@ -94,7 +94,7 @@ func (c *Chain) Listen() {
 		case r := <-wire.GetLastBlockChan:
 			buf := new(bytes.Buffer)
 			_ = c.prevBlock.Encode(buf)
-			r.Resp <- *buf
+			r.RespChan <- *buf
 		}
 	}
 }
