@@ -71,6 +71,17 @@ func (b BidList) Subset(amount int) []Bid {
 	return subset
 }
 
+// Contains checks if the BidList contains a specified Bid.
+func (b BidList) Contains(bid Bid) bool {
+	for _, x := range b {
+		if x.Equals(bid) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // AddBid will add a bid to the public list p.
 func (b *BidList) AddBid(bid Bid) {
 	// Check for duplicates
