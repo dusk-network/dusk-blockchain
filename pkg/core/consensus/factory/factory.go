@@ -8,6 +8,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/candidate"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -68,8 +69,9 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.LaunchReputationComponent(c.eventBus)
-	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k)
+	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k, nil)
 	voting.LaunchVotingComponent(c.eventBus, c.committee, c.Keys)
+	candidate.LaunchCandidateComponent(c.eventBus)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)
 
