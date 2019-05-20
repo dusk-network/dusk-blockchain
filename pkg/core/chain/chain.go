@@ -112,7 +112,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.Gossip), buffer)
+	c.eventBus.Stream(string(topics.Gossip), buffer)
 	return nil
 }
 
