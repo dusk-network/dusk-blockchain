@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -39,7 +38,6 @@ type (
 		round       uint64
 
 		// subscriber channels
-		newProvisionerChan    chan *provisioner
 		removeProvisionerChan chan []byte
 		// own keys (TODO: this should just be BLSPubKey)
 		keys *user.Keys
@@ -55,10 +53,10 @@ func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store 
 		publisher:    eventBroker,
 		provisioners: user.NewProvisioners(),
 		// TODO: consider adding a consensus.Validator preprocessor
-		newProvisionerChan:    initNewProvisionerCollector(eventBroker),
 		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
 		committeeCache:        make(map[uint8]user.VotingCommittee),
 	}
+	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	go store.Listen()
 	return store
 }
@@ -66,19 +64,6 @@ func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store 
 func (c *Store) Listen() {
 	for {
 		select {
-		case newProvisioner := <-c.newProvisionerChan:
-			c.lock.Lock()
-			if err := c.provisioners.AddMember(newProvisioner.pubKeyEd,
-				newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
-				c.lock.Unlock()
-				log.WithError(err).WithFields(log.Fields{
-					"process": "committeeStore",
-					"bls_key": newProvisioner.pubKeyBLS,
-				}).Warnln("error in adding a provisioner member")
-				continue
-			}
-			c.totalWeight += newProvisioner.amount
-			c.lock.Unlock()
 		case pubKeyBLS := <-c.removeProvisionerChan:
 			stake, err := c.provisioners.GetStake(pubKeyBLS)
 			if err != nil {
@@ -91,6 +76,24 @@ func (c *Store) Listen() {
 			c.lock.Unlock()
 		}
 	}
+}
+
+func (c *Store) AddProvisioner(m *bytes.Buffer) error {
+	newProvisioner, err := decodeNewProvisioner(m)
+	if err != nil {
+		return err
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if err := c.provisioners.AddMember(newProvisioner.pubKeyEd,
+		newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
+		return err
+	}
+
+	c.totalWeight += newProvisioner.amount
+	c.publisher.Publish(msg.ProvisionerAddedTopic, bytes.NewBuffer(newProvisioner.pubKeyBLS))
+	return nil
 }
 
 func (c *Store) AmMember(round uint64, step uint8) bool {
