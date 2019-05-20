@@ -29,7 +29,7 @@ func NewBuffer(length int) *Buffer {
 
 // Put an item on the ring buffer.
 func (r *Buffer) Put(item []byte) {
-	atomic.StorePointer(&r.items[r.writeIndex], unsafe.Pointer(&item))
+	atomic.StorePointer(&r.items[atomic.LoadUint32(&r.writeIndex)], unsafe.Pointer(&item))
 	incrementIndex(&r.writeIndex, len(r.items)-1)
 }
 
@@ -63,7 +63,7 @@ func (c *Consumer) Consume() ([]byte, bool) {
 }
 
 func (c *Consumer) getItem() []byte {
-	itemPtr := atomic.LoadPointer(&c.ring.items[c.readIndex])
+	itemPtr := atomic.LoadPointer(&c.ring.items[atomic.LoadUint32(&c.readIndex)])
 	if itemPtr != nil {
 		return *(*[]byte)(itemPtr)
 	}
