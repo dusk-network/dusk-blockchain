@@ -12,7 +12,6 @@ import (
 // CheckBlock will verify whether a block is valid according to the rules of the consensus
 // returns nil if a block is valid
 func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
-
 	// 1. Check that we have not seen this block before
 	err := db.View(func(t database.Transaction) error {
 		_, err := t.FetchBlockExists(blk.Header.Hash)
@@ -86,9 +85,7 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 // CheckMultiCoinbases returns an error if there is more than one coinbase transaction
 //  in the list or if there are none
 func CheckMultiCoinbases(txs []transactions.Transaction) error {
-
 	var seen bool
-
 	for _, tx := range txs {
 		if tx.Type() != transactions.CoinbaseType {
 			continue
