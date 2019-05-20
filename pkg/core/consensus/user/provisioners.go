@@ -58,7 +58,7 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error
 	}
 
 	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 128", len(pubKeyBLS))
+		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
 
 	m := &Member{}
@@ -94,7 +94,7 @@ func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
 // and return their stake.
 func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	if len(pubKeyBLS) != 129 {
-		return 0, fmt.Errorf("public key is %v bytes long instead of 128", len(pubKeyBLS))
+		return 0, fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
 
 	i := strPk(pubKeyBLS)
