@@ -2,10 +2,11 @@ package database
 
 import (
 	"errors"
+	"math"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"math"
 )
 
 var (
@@ -61,8 +62,17 @@ type Transaction interface {
 	// also txID the input belongs to
 	FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error)
 
+	// Fetch lastly stored candidate block
+	FetchCandidateBlock() (*block.Block, error)
+
 	// Read-write transactions
+	// Store the next chain block in a append-only manner
+	// Overwrites only if block with same hash already stored
 	StoreBlock(block *block.Block) error
+
+	// Store a candidate block to be proposed in next consensus round
+	// Always overwrites lastly stored candidate block
+	StoreCandidateBlock(block *block.Block) error
 
 	// Atomic storage
 	Commit() error

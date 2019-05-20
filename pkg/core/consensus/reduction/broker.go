@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -25,7 +26,7 @@ type (
 		// channels linked to subscribers
 		roundUpdateChan <-chan uint64
 		stepChan        <-chan struct{}
-		selectionChan   <-chan []byte
+		selectionChan   <-chan *selection.ScoreEvent
 	}
 )
 
@@ -44,8 +45,8 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 
 	filter := consensus.NewEventFilter(ctx.handler, ctx.state, accumulator, true)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
-	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Reduction))
-	go listener.Accept(republisher, &consensus.Validator{})
+	eventBroker.SubscribeCallback(string(topics.Reduction), filter.Collect)
+	eventBroker.RegisterPreprocessor(string(topics.Reduction), republisher, &consensus.Validator{})
 	return filter
 }
 
@@ -82,14 +83,29 @@ func (b *broker) Listen() {
 			b.reducer.end()
 			b.accumulator.Clear()
 			b.filter.UpdateRound(round)
-		case hash := <-b.selectionChan:
-			log.WithFields(log.Fields{
-				"process": "reduction",
-				"round":   b.ctx.state.Round(),
-				"hash":    hex.EncodeToString(hash),
-			}).Debug("Got selection message")
-			b.reducer.startReduction(hash)
-			b.filter.FlushQueue()
+		case ev := <-b.selectionChan:
+			if ev == nil {
+				log.WithFields(log.Fields{
+					"process": "reduction",
+				}).Debug("got empty selection message")
+				b.reducer.startReduction(make([]byte, 32))
+				b.filter.FlushQueue()
+			} else if ev.Round == b.ctx.state.Round() {
+				log.WithFields(log.Fields{
+					"process": "reduction",
+					"hash":    hex.EncodeToString(ev.VoteHash),
+				}).Debug("got selection message")
+				b.reducer.startReduction(ev.VoteHash)
+				b.filter.FlushQueue()
+			} else {
+				log.WithFields(log.Fields{
+					"process":     "reduction",
+					"event round": ev.Round,
+				}).Debug("got obsolete selection message")
+				b.reducer.startReduction(make([]byte, 32))
+				b.filter.FlushQueue()
+			}
+
 		case <-b.stepChan:
 			b.accumulator.Clear()
 			b.filter.FlushQueue()

@@ -13,6 +13,7 @@ const OutgoingBlockReductionTopic = "outgoing_block_reduction"
 const OutgoingBlockAgreementTopic = "outgoing_block_agreement"
 const QuitTopic = "quit"
 const BidListTopic = "bidlistTopic"
+const WinningBlockTopic = "winning_block"
 
 // TODO: demo topics, review/remove
 const StakeTopic = "stake"

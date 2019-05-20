@@ -12,9 +12,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func TestSelection(t *testing.T) {
@@ -38,23 +38,24 @@ func TestSelection(t *testing.T) {
 }
 
 func TestRepropagation(t *testing.T) {
-	eb := wire.NewEventBus()
-	// subscribe to gossip topic
-	gossipChan := make(chan *bytes.Buffer, 1)
-	eb.Subscribe(string(topics.Gossip), gossipChan)
+	eb, streamer := helper.CreateGossipStreamer()
 
-	selector := newEventSelector(eb, newMockScoreHandler(), time.Millisecond*200, consensus.NewState())
+	selector := newEventSelector(eb, newMockScoreHandler(), time.Millisecond*100, consensus.NewState())
 	go selector.startSelection()
 	selector.Process(newMockEvent())
 
-	// should have gotten something on the gossip channel
-	timer := time.After(200 * time.Millisecond)
-	select {
-	case <-timer:
-		assert.Fail(t, "should have gotten a buffer from gossipChan")
-	case <-gossipChan:
-		// success
+	timer := time.AfterFunc(500*time.Millisecond, func() {
+		t.Fail()
+	})
+
+	buf, err := streamer.Read()
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	assert.True(t, len(buf) > 0)
+	// Test is finished, stop the timer
+	timer.Stop()
 }
 
 func TestStopSelector(t *testing.T) {
@@ -96,6 +97,11 @@ func newMockScoreHandler() scoreEventHandler {
 
 func (m *mockScoreHandler) Priority(ev1, ev2 wire.Event) bool {
 	return false
+}
+
+func (m *mockScoreHandler) Marshal(b *bytes.Buffer, ev wire.Event) error {
+	_, err := b.Write([]byte("foo"))
+	return err
 }
 
 func (m *mockScoreHandler) UpdateBidList(bL user.BidList) {}

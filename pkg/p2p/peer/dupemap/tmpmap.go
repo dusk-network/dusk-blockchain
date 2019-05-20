@@ -10,15 +10,14 @@ import (
 type (
 	TmpMap struct {
 		lock      sync.RWMutex
-		msgSets   map[uint64]*hashset.Set
 		height    uint64
+		msgSets   map[uint64]*hashset.Set
 		tolerance uint64
 	}
 )
 
 func NewTmpMap(tolerance uint64) *TmpMap {
 	msgSets := make(map[uint64]*hashset.Set)
-
 	return &TmpMap{
 		msgSets:   msgSets,
 		height:    0,
@@ -40,12 +39,19 @@ func (t *TmpMap) UpdateHeight(round uint64) {
 	}
 }
 
+func (t *TmpMap) Height() uint64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.height
+}
+
 func (t *TmpMap) Has(b *bytes.Buffer) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	return t.has(b, t.height)
 }
 
+// HasAnywhere checks if the TmpMap contains a hash of the passed buffer at any height.
 func (t *TmpMap) HasAnywhere(b *bytes.Buffer) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -57,11 +63,39 @@ func (t *TmpMap) HasAnywhere(b *bytes.Buffer) bool {
 	return false
 }
 
+// HasAt checks if the TmpMap contains a hash of the passed buffer at a specified height.
 func (t *TmpMap) HasAt(b *bytes.Buffer, heigth uint64) bool {
-
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	return t.has(b, heigth)
+}
+
+// DeleteBefore clears a Map of
+func (t *TmpMap) DeleteBefore(height uint64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.deleteBefore(height)
+}
+
+func (t *TmpMap) deleteBefore(height uint64) {
+	currentMin := t.height - t.tolerance
+	if currentMin >= height {
+		return
+	}
+
+	for level := range t.msgSets {
+		if level < height {
+			delete(t.msgSets, level)
+		}
+	}
+}
+
+// SetTolerance adjusts how long hashes stay in the TmpMap until they are deleted.
+func (t *TmpMap) SetTolerance(tolerance uint64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	threshold := t.height - tolerance
+	t.deleteBefore(threshold)
 }
 
 func (t *TmpMap) has(b *bytes.Buffer, heigth uint64) bool {
@@ -80,6 +114,7 @@ func (t *TmpMap) Add(b *bytes.Buffer) bool {
 	return t.add(b, t.height)
 }
 
+// AddAt adds a hash of a buffer at a specific height.
 func (t *TmpMap) AddAt(b *bytes.Buffer, height uint64) bool {
 	t.lock.Lock()
 	defer t.lock.Unlock()

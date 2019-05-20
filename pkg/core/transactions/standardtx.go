@@ -47,7 +47,12 @@ func (s *Standard) AddOutput(output *Output) {
 
 // Encode a Standard transaction and write it to an io.Writer
 func (s *Standard) Encode(w io.Writer) error {
+
 	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(w, uint8(s.Version)); err != nil {
 		return err
 	}
 
@@ -85,6 +90,13 @@ func (s *Standard) Decode(r io.Reader) error {
 		return err
 	}
 	s.TxType = TxType(Type)
+
+	var ver uint8
+	if err := encoding.ReadUint8(r, &ver); err != nil {
+		return err
+	}
+
+	s.Version = ver
 
 	lInputs, err := encoding.ReadVarInt(r)
 	if err != nil {

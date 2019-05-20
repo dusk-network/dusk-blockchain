@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
-	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
@@ -19,45 +18,37 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-var consensusSeconds = 20
-
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
 	eventBus *wire.EventBus
+	rpcBus   *wire.RPCBus
 	db       database.DB
 
-	// TODO: exposed for demo, undo later
-	// We expose prevBlock here so that we can change and retrieve the
-	// current height of the chain. This makes jump-in a lot easier while
-	// we don't yet store blocks.
-	sync.RWMutex
-	PrevBlock block.Block
+	prevBlock block.Block
 	bidList   *user.BidList
 
+	blockChannel <-chan *block.Block
+
 	// collector channels
-	roundChan <-chan uint64
 	blockChan <-chan *block.Block
-	txChan    <-chan transactions.Transaction
 }
 
 // New returns a new chain object
-func New(eventBus *wire.EventBus) (*Chain, error) {
-
+func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
-
 	if err != nil {
 		return nil, err
 	}
 
 	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-
 	if err != nil {
 		return nil, err
 	}
@@ -73,43 +64,37 @@ func New(eventBus *wire.EventBus) (*Chain, error) {
 			Seed:      []byte{0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
 		},
 	}
+
 	err = genesisBlock.SetHash()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Chain{
-		eventBus:  eventBus,
-		db:        db,
-		bidList:   &user.BidList{},
-		PrevBlock: *genesisBlock,
-		roundChan: consensus.InitRoundUpdate(eventBus),
-		blockChan: initBlockCollector(eventBus),
-		txChan:    initTxCollector(eventBus),
-	}, nil
+	// set up collectors
+	blockChannel := initBlockCollector(eventBus)
+
+	c := &Chain{
+		eventBus:     eventBus,
+		rpcBus:       rpcBus,
+		db:           db,
+		bidList:      &user.BidList{},
+		prevBlock:    *genesisBlock,
+		blockChannel: blockChannel,
+	}
+
+	return c, nil
 }
 
 // Listen to the collectors
 func (c *Chain) Listen() {
 	for {
 		select {
-		case round := <-c.roundChan:
-			// TODO: this is added for testnet jump-in purposes while we dont yet
-			// store blocks. remove this later
-
-			// The prevBlock height should be set to round - 1, as the round denotes the
-			// height of the block that is currently being forged.
-			c.Lock()
-			c.PrevBlock.Header.Height = round - 1
-			c.Unlock()
 		case blk := <-c.blockChan:
 			c.AcceptBlock(*blk)
-		case tx := <-c.txChan:
-			c.AcceptTx(tx)
 		case r := <-wire.GetLastBlockChan:
 			buf := new(bytes.Buffer)
-			_ = c.PrevBlock.Encode(buf)
-			r.Resp <- *buf
+			_ = c.prevBlock.Encode(buf)
+			r.RespChan <- *buf
 		}
 	}
 }
@@ -126,23 +111,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.Gossip), buffer)
-	return nil
-}
-
-func (c *Chain) propagateTx(tx transactions.Transaction) error {
-	buffer := new(bytes.Buffer)
-
-	topicBytes := topics.TopicToByteArray(topics.Tx)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
-	if err := tx.Encode(buffer); err != nil {
-		return err
-	}
-
-	c.eventBus.Publish(string(topics.Gossip), buffer)
+	c.eventBus.Stream(string(topics.Gossip), buffer)
 	return nil
 }
 
@@ -215,4 +184,42 @@ func calculateX(d uint64, m []byte) user.Bid {
 	var bid user.Bid
 	copy(bid[:], x.Bytes()[:])
 	return bid
+}
+
+// AcceptBlock will accept a block if
+// 1. We have not seen it before
+// 2. All stateless and statefull checks are true
+// Returns nil, if checks passed and block was successfully saved
+func (c *Chain) AcceptBlock(blk block.Block) error {
+
+	// 1. Check that stateless and stateful checks pass
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
+		return err
+	}
+
+	// 2. Save block in database
+	err := c.db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(&blk)
+	})
+
+	if err != nil {
+		return err
+	}
+
+	c.prevBlock = blk
+
+	// 3. Notify other subsystems for the accepted block
+	buf := new(bytes.Buffer)
+	if err := blk.Encode(buf); err != nil {
+		return err
+	}
+
+	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
+
+	// 4. Gossip block
+	if err := c.propagateBlock(blk); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -35,12 +34,14 @@ type (
 		provisioners *user.Provisioners
 		// TODO: should this be round dependent?
 		totalWeight uint64
+		round       uint64
 
 		// subscriber channels
-		newProvisionerChan    chan *provisioner
 		removeProvisionerChan chan []byte
 		// own keys (TODO: this should just be BLSPubKey)
 		keys *user.Keys
+
+		committeeCache map[uint8]user.VotingCommittee
 	}
 )
 
@@ -51,9 +52,10 @@ func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store 
 		publisher:    eventBroker,
 		provisioners: user.NewProvisioners(),
 		// TODO: consider adding a consensus.Validator preprocessor
-		newProvisionerChan:    initNewProvisionerCollector(eventBroker),
 		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
+		committeeCache:        make(map[uint8]user.VotingCommittee),
 	}
+	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	go store.Listen()
 	return store
 }
@@ -61,19 +63,6 @@ func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store 
 func (c *Store) Listen() {
 	for {
 		select {
-		case newProvisioner := <-c.newProvisionerChan:
-			c.lock.Lock()
-			if err := c.provisioners.AddMember(newProvisioner.pubKeyEd,
-				newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
-				c.lock.Unlock()
-				log.WithError(err).WithFields(log.Fields{
-					"process": "committeeStore",
-					"bls_key": newProvisioner.pubKeyBLS,
-				}).Warnln("error in adding a provisioner member")
-				continue
-			}
-			c.totalWeight += newProvisioner.amount
-			c.lock.Unlock()
 		case pubKeyBLS := <-c.removeProvisionerChan:
 			stake, err := c.provisioners.GetStake(pubKeyBLS)
 			if err != nil {
@@ -88,14 +77,31 @@ func (c *Store) Listen() {
 	}
 }
 
+func (c *Store) AddProvisioner(m *bytes.Buffer) error {
+	newProvisioner, err := decodeNewProvisioner(m)
+	if err != nil {
+		return err
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if err := c.provisioners.AddMember(newProvisioner.pubKeyEd,
+		newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
+		return err
+	}
+
+	c.totalWeight += newProvisioner.amount
+	c.publisher.Publish(msg.ProvisionerAddedTopic, bytes.NewBuffer(newProvisioner.pubKeyBLS))
+	return nil
+}
+
 func (c *Store) AmMember(round uint64, step uint8) bool {
 	return c.IsMember(c.keys.BLSPubKeyBytes, round, step)
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
 func (c *Store) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	p := c.copyProvisioners()
-	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+	votingCommittee := c.upsertCommitteeCache(round, step)
 	return votingCommittee.IsMember(pubKeyBLS)
 }
 
@@ -130,11 +136,30 @@ func (c *Store) ReportAbsentees(evs []wire.Event, round uint64, step uint8) erro
 	return nil
 }
 
-func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) *user.VotingCommittee {
-	p := c.copyProvisioners()
-	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {
+	votingCommittee := c.upsertCommitteeCache(round, step)
 	for _, ev := range evs {
 		votingCommittee.Remove(ev.Sender())
+	}
+	return votingCommittee
+}
+
+func (c *Store) upsertCommitteeCache(round uint64, step uint8) user.VotingCommittee {
+	if round > c.round {
+		c.round = round
+		c.lock.Lock()
+		c.committeeCache = make(map[uint8]user.VotingCommittee)
+		c.lock.Unlock()
+	}
+	c.lock.RLock()
+	votingCommittee, found := c.committeeCache[step]
+	c.lock.RUnlock()
+	if !found {
+		p := c.copyProvisioners()
+		votingCommittee = *p.CreateVotingCommittee(round, c.getTotalWeight(), step)
+		c.lock.Lock()
+		c.committeeCache[step] = votingCommittee
+		c.lock.Unlock()
 	}
 	return votingCommittee
 }

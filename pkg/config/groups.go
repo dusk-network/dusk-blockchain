@@ -49,3 +49,14 @@ type rpcConfiguration struct {
 	User    string
 	Pass    string
 }
+
+// Performance parameters
+type performanceConfiguration struct {
+	AccumulatorWorkers int
+}
+
+type mempoolConfiguration struct {
+	MaxSizeMB   uint32
+	PoolType    string
+	PreallocTxs uint32
+}

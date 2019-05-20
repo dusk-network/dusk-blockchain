@@ -35,11 +35,11 @@ func TestEarlyEvent(t *testing.T) {
 	round := uint64(2)
 	step := uint8(1)
 	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true,
-		newMockEventProcessor(nil, processChan), true)
+	processor := newMockEventProcessor(nil, processChan)
+	eventFilter := newEventFilter(round, step, true, processor, true)
 	eventFilter.UpdateRound(1)
 
-	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.NoError(t, eventFilter.Collect(new(bytes.Buffer)))
 	// Queue should now hold an event
 	// Update the round, and flush the queue to get it
 	eventFilter.UpdateRound(2)

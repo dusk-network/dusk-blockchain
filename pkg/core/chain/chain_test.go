@@ -36,22 +36,22 @@ func TestDemoSaveFunctionality(t *testing.T) {
 	defer fn()
 
 	eb := wire.NewEventBus()
-	chain, err := New(eb)
+	rpc := wire.NewRPCBus()
+	chain, err := New(eb, rpc)
 
 	assert.Nil(t, err)
 
 	defer chain.Close()
 
 	for i := 1; i < 5; i++ {
-
 		nextBlock := helper.RandomBlock(t, 200, 10)
-		nextBlock.Header.PrevBlock = chain.PrevBlock.Header.Hash
+		nextBlock.Header.PrevBlock = chain.prevBlock.Header.Hash
 		nextBlock.Header.Height = uint64(i)
 		err = chain.AcceptBlock(*nextBlock)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	}
 
-	err = chain.AcceptBlock(chain.PrevBlock)
-	assert.NotNil(t, err)
+	err = chain.AcceptBlock(chain.prevBlock)
+	assert.Error(t, err)
 
 }

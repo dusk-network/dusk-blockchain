@@ -77,7 +77,8 @@ func InitBidListUpdate(subscriber wire.EventSubscriber) chan user.BidList {
 
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
 func (l *bidListCollector) Collect(r *bytes.Buffer) error {
-	bidList, err := user.ReconstructBidListSubset(r.Bytes())
+	rCopy := *r
+	bidList, err := user.ReconstructBidListSubset(rCopy.Bytes())
 	if err != nil {
 		return nil
 	}

@@ -7,7 +7,12 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
-// RandomSliceofTxs returns a random slice of transactions for testing
+const (
+	lockTime = uint64(2000000000)
+	fee      = uint64(20)
+)
+
+// RandomSliceOfTxs returns a random slice of transactions for testing
 // Each tx batch represents all 4 non-coinbase tx types
 func RandomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transaction {
 	var txs []transactions.Transaction
@@ -34,17 +39,14 @@ func RandomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transac
 
 // RandomBidTx returns a random bid transaction for testing
 func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
-
 	var numInputs, numOutputs = 23, 34
-	var lock uint64 = 20000
-	var fee uint64 = 20
 	var M = RandomSlice(t, 32)
 
 	if malformed {
 		M = RandomSlice(t, 12)
 	}
 
-	tx, err := transactions.NewBid(0, lock, fee, M)
+	tx, err := transactions.NewBid(0, lockTime, fee, M)
 	if err != nil {
 		return tx, err
 	}
@@ -60,7 +62,6 @@ func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
 
 // RandomCoinBaseTx returns a random coinbase transaction for testing
 func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
-
 	proof := RandomSlice(t, 2000)
 	key := RandomSlice(t, 32)
 	address := RandomSlice(t, 32)
@@ -72,12 +73,9 @@ func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
 
 // RandomTLockTx returns a random timelock transaction for testing
 func RandomTLockTx(t *testing.T, malformed bool) *transactions.TimeLock {
-
 	var numInputs, numOutputs = 23, 34
-	var lock uint64 = 20000
-	var fee uint64 = 20
 
-	tx := transactions.NewTimeLock(0, lock, fee)
+	tx := transactions.NewTimeLock(0, lockTime, fee)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs, malformed)
@@ -90,9 +88,7 @@ func RandomTLockTx(t *testing.T, malformed bool) *transactions.TimeLock {
 
 // RandomStandardTx returns a random standard tx for testing
 func RandomStandardTx(t *testing.T, malformed bool) *transactions.Standard {
-
 	var numInputs, numOutputs = 10, 10
-	var fee uint64 = 20
 
 	tx := transactions.NewStandard(0, fee)
 
@@ -107,15 +103,12 @@ func RandomStandardTx(t *testing.T, malformed bool) *transactions.Standard {
 
 // RandomStakeTx returns a random stake tx for testing
 func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
-
 	var numInputs, numOutputs = 23, 34
-	var lock uint64 = 20000
-	var fee uint64 = 20
 
 	edKey := RandomSlice(t, 32)
 	blsKey := RandomSlice(t, 33)
 
-	tx, err := transactions.NewStake(0, lock, fee, edKey, blsKey)
+	tx, err := transactions.NewStake(0, lockTime, fee, edKey, blsKey)
 	if err != nil {
 		return tx, err
 	}

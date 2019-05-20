@@ -30,7 +30,7 @@ type eventStopWatch struct {
 func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Timer) *eventStopWatch {
 	return &eventStopWatch{
 		collectedVotesChan: collectedVotesChan,
-		stopChan:           make(chan struct{}),
+		stopChan:           make(chan struct{}, 1),
 		timer:              timer,
 	}
 }
@@ -87,10 +87,18 @@ func (r *reducer) inCommittee() bool {
 
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
+	// empty out stop channels
+	r.firstStep.stopChan = make(chan struct{}, 1)
+	r.secondStep.stopChan = make(chan struct{}, 1)
+
 	r.Lock()
 	r.stale = false
 	r.Unlock()
-	r.sendReduction(bytes.NewBuffer(hash))
+
+	if r.inCommittee() {
+		r.sendReduction(bytes.NewBuffer(hash))
+	}
+
 	go r.begin()
 }
 
@@ -130,7 +138,10 @@ func (r *reducer) begin() {
 				"votes":      len(allEvents),
 				"block hash": hex.EncodeToString(hash1.Bytes()),
 			}).Debugln("Reduction successful")
-			r.sendAgreement(allEvents, hash2)
+
+			if r.inCommittee() {
+				r.sendAgreement(allEvents, hash2)
+			}
 		}
 
 		r.ctx.state.IncrementStep()
@@ -164,7 +175,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	r.publisher.Publish(string(topics.Gossip), message)
+	r.publisher.Stream(string(topics.Gossip), message)
 }
 
 func logErr(err error, hash []byte, msg string) {
@@ -213,7 +224,7 @@ func (r *reducer) sendAgreement(evs []wire.Event, hash *bytes.Buffer) {
 	}
 
 	//send it
-	r.publisher.Publish(string(topics.Gossip), message)
+	r.publisher.Stream(string(topics.Gossip), message)
 }
 
 func (r *reducer) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
