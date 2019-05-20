@@ -48,7 +48,7 @@ func TestScanner(t *testing.T) {
 	}
 	defer conn.Close()
 
-	peerReader := NewPeerReader(conn, protocol.TestNet)
+	peerReader := NewReader(conn, protocol.TestNet)
 	collector := &mockCollector{t}
 
 	// This should block until the connection is closed, which should happen after
@@ -237,7 +237,7 @@ func addPeer(bus *wire.EventBus) {
 		panic(err)
 	}
 
-	pw := NewPeerWriter(conn, protocol.TestNet, bus)
+	pw := NewWriter(conn, protocol.TestNet, bus)
 	pw.Subscribe()
 }
 
