@@ -9,14 +9,15 @@ import (
 )
 
 // LaunchScoreGenerationComponent will start the processes for score generation.
-func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scalar) *broker {
-	broker := newBroker(eventBus, d, k)
+func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scalar,
+	gen Generator) *broker {
+	broker := newBroker(eventBus, d, k, gen)
 	go broker.Listen()
 	return broker
 }
 
 type broker struct {
-	proofGenerator generator
+	proofGenerator Generator
 	forwarder      *forwarder
 	seeder         *seeder
 
@@ -26,17 +27,21 @@ type broker struct {
 	regenerationChan <-chan consensus.AsyncState
 }
 
-func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar) *broker {
-	proofGenerator := newProofGenerator(d, k)
+func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar,
+	gen Generator) *broker {
+	if gen == nil {
+		gen = newProofGenerator(d, k)
+	}
+
 	roundChan := consensus.InitRoundUpdate(eventBroker)
 	bidListChan := consensus.InitBidListUpdate(eventBroker)
 	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
 	return &broker{
-		proofGenerator:   proofGenerator,
+		proofGenerator:   gen,
 		roundChan:        roundChan,
 		bidListChan:      bidListChan,
 		regenerationChan: regenerationChan,
-		forwarder:        newForwarder(eventBroker),
+		forwarder:        newForwarder(eventBroker, newBlockGenerator(eventBroker)),
 		seeder:           &seeder{},
 	}
 }
@@ -46,14 +51,14 @@ func (b *broker) Listen() {
 		select {
 		case round := <-b.roundChan:
 			seed := b.seeder.GenerateSeed(round)
-			proof := b.proofGenerator.generateProof(seed)
+			proof := b.proofGenerator.GenerateProof(seed)
 			b.Forward(proof, seed)
 		case bidList := <-b.bidListChan:
-			b.proofGenerator.updateBidList(bidList)
+			b.proofGenerator.UpdateBidList(bidList)
 		case state := <-b.regenerationChan:
 			if state.Round == b.seeder.Round() {
 				seed := b.seeder.LatestSeed()
-				proof := b.proofGenerator.generateProof(seed)
+				proof := b.proofGenerator.GenerateProof(seed)
 				b.Forward(proof, seed)
 			}
 		}
