@@ -2,88 +2,94 @@ package generation
 
 import (
 	"bytes"
-	"encoding/hex"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 type (
 	blockGenerator struct {
-		stakePool map[string]*transactions.Stake
-		bidPool   map[string]*transactions.Bid
+		rpcBus *wire.RPCBus
 	}
 )
 
-func newBlockGenerator(eventBroker wire.EventBroker) *blockGenerator {
-	bg := &blockGenerator{
-		stakePool: make(map[string]*transactions.Stake),
-		bidPool:   make(map[string]*transactions.Bid),
+func newBlockGenerator(rpcBus *wire.RPCBus) *blockGenerator {
+	return &blockGenerator{
+		rpcBus: rpcBus,
 	}
-
-	eventBroker.SubscribeCallback(string(msg.StakeTopic), bg.CollectStake)
-	eventBroker.SubscribeCallback(string(msg.BidTopic), bg.CollectBid)
-	return bg
 }
 
-func (b *blockGenerator) CollectStake(message *bytes.Buffer) error {
-	copyBuf := *message
-	txs, err := transactions.FromReader(&copyBuf, 1)
+func (bg *blockGenerator) generateBlock(round uint64, seed []byte) (*block.Block, error) {
+	// TODO Missing fields for forging the block
+	// - CertHash
+	// - prevHash
+
+	// Retrieve latest verified transactions from Mempool
+	r, err := bg.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	tx := txs[0].(*transactions.Stake)
-	b.stakePool[hex.EncodeToString(tx.PubKeyBLS)] = tx
-	return nil
-}
-
-func (b *blockGenerator) CollectBid(message *bytes.Buffer) error {
-	copyBuf := *message
-	txs, err := transactions.FromReader(&copyBuf, 1)
+	lTxs, err := encoding.ReadVarInt(&r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	tx := txs[0].(*transactions.Bid)
-	b.bidPool[hex.EncodeToString(tx.M)] = tx
-	return nil
-}
-
-func (b *blockGenerator) generateBlock(round uint64, seed []byte) *block.Block {
-	cert, _ := crypto.RandEntropy(32)
-	blk := &block.Block{
-		Header: &block.Header{
-			Version:   0,
-			Timestamp: time.Now().Unix(),
-			Height:    round,
-			PrevBlock: make([]byte, 32),
-			Seed:      seed,
-			TxRoot:    make([]byte, 32),
-			CertHash:  cert,
-		},
-		Txs: make([]transactions.Transaction, 0),
+	txs, err := transactions.FromReader(&r, lTxs)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, tx := range b.stakePool {
-		blk.AddTx(tx)
+	h := &block.Header{
+		Version:   0,
+		Timestamp: time.Now().Unix(),
+		Height:    round,
+		// TODO: store previous block hash on generation component somewhere
+		PrevBlock: make([]byte, 32),
+		TxRoot:    nil,
+
+		Seed:     nil,
+		CertHash: nil,
 	}
 
-	for _, tx := range b.bidPool {
-		blk.AddTx(tx)
+	// Generate the candidate block
+	b := &block.Block{
+		Header: h,
+		Txs:    txs,
 	}
 
-	if len(blk.Txs) > 0 {
-		if err := blk.SetRoot(); err != nil {
-			panic(err)
-		}
+	// Update TxRoot
+	if err := b.SetRoot(); err != nil {
+		return nil, err
 	}
 
-	return blk
+	// Generate the block hash
+	if err := b.SetHash(); err != nil {
+		return nil, err
+	}
+
+	// Ensure the forged block satisfies all chain rules
+	// if err := verifiers.CheckBlock(c.db, c.prevBlock, *b); err != nil {
+	// 	return nil, err
+	// }
+
+	// Save it into persistent storage
+	// err = c.db.Update(func(t database.Transaction) error {
+	// 	err := t.StoreCandidateBlock(b)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	return nil
+	// })
+
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	return b, nil
 }

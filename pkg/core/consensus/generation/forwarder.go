@@ -2,6 +2,7 @@ package generation
 
 import (
 	"bytes"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 
@@ -27,16 +28,19 @@ func newForwarder(publisher wire.EventPublisher, blockGenerator *blockGenerator)
 	}
 }
 
-func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed []byte) {
+func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed []byte) error {
 	// if our score is too low, don't bother
 	if !f.threshold.Exceeds(proof.Score) {
-		return
+		return errors.New("proof score too low")
 	}
 
-	blk := f.blockGenerator.generateBlock(round, seed)
-	if err := blk.SetHash(); err != nil {
+	blk, err := f.blockGenerator.generateBlock(round, seed)
+	if err != nil {
+		return err
+	}
 
-		panic(err)
+	if err := blk.SetHash(); err != nil {
+		return err
 	}
 
 	sev := &selection.ScoreEvent{
@@ -56,6 +60,7 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 	}).Debugln("sending proof")
 	f.publisher.Stream(string(topics.Gossip), marshalledEvent)
 	f.publisher.Stream(string(topics.Gossip), f.marshalBlock(blk))
+	return nil
 }
 
 func (f *forwarder) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {

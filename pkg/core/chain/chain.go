@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
-	"time"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
@@ -223,80 +222,4 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	return nil
-}
-
-// CreateProposalBlock creates a candidate block to be proposed on next round.
-func (c *Chain) CreateProposalBlock() (*block.Block, error) {
-
-	// TODO Missing fields for forging the block
-	// - Seed
-	// - CertHash
-
-	// Retrieve latest verified transactions from Mempool
-	r, err := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
-	if err != nil {
-		return nil, err
-	}
-
-	lTxs, err := encoding.ReadVarInt(&r)
-	if err != nil {
-		return nil, err
-	}
-
-	txs, err := transactions.FromReader(&r, lTxs)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: guard the prevBlock with mutex
-	nextHeight := c.prevBlock.Header.Height + 1
-	prevHash := c.prevBlock.Header.Hash
-
-	h := &block.Header{
-		Version:   0,
-		Timestamp: time.Now().Unix(),
-		Height:    nextHeight,
-		PrevBlock: prevHash,
-		TxRoot:    nil,
-
-		Seed:     nil,
-		CertHash: nil,
-	}
-
-	// Generate the candidate block
-	b := &block.Block{
-		Header: h,
-		Txs:    txs,
-	}
-
-	// Update TxRoot
-	if err := b.SetRoot(); err != nil {
-		return nil, err
-	}
-
-	// Generate the block hash
-	if err := b.SetHash(); err != nil {
-		return nil, err
-	}
-
-	// Ensure the forged block satisfies all chain rules
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, *b); err != nil {
-		return nil, err
-	}
-
-	// Save it into persistent storage
-	err = c.db.Update(func(t database.Transaction) error {
-		err := t.StoreCandidateBlock(b)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
 }

@@ -2,6 +2,7 @@ package generation
 
 import (
 	"github.com/bwesterb/go-ristretto"
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -9,9 +10,9 @@ import (
 )
 
 // LaunchScoreGenerationComponent will start the processes for score generation.
-func LaunchScoreGenerationComponent(eventBus *wire.EventBus, d, k ristretto.Scalar,
-	gen Generator) *broker {
-	broker := newBroker(eventBus, d, k, gen)
+func LaunchScoreGenerationComponent(eventBus *wire.EventBus, rpcBus *wire.RPCBus,
+	d, k ristretto.Scalar, gen Generator) *broker {
+	broker := newBroker(eventBus, rpcBus, d, k, gen)
 	go broker.Listen()
 	return broker
 }
@@ -27,7 +28,7 @@ type broker struct {
 	regenerationChan <-chan consensus.AsyncState
 }
 
-func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar,
+func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
 	gen Generator) *broker {
 	if gen == nil {
 		gen = newProofGenerator(d, k)
@@ -41,7 +42,7 @@ func newBroker(eventBroker wire.EventBroker, d, k ristretto.Scalar,
 		roundChan:        roundChan,
 		bidListChan:      bidListChan,
 		regenerationChan: regenerationChan,
-		forwarder:        newForwarder(eventBroker, newBlockGenerator(eventBroker)),
+		forwarder:        newForwarder(eventBroker, newBlockGenerator(rpcBus)),
 		seeder:           &seeder{},
 	}
 }
@@ -67,6 +68,10 @@ func (b *broker) Listen() {
 
 func (b *broker) Forward(proof zkproof.ZkProof, seed []byte) {
 	if b.seeder.isFresh(seed) {
-		b.forwarder.forwardScoreEvent(proof, b.seeder.Round(), seed)
+		if err := b.forwarder.forwardScoreEvent(proof, b.seeder.Round(), seed); err != nil {
+			log.WithFields(log.Fields{
+				"process": "generation",
+			}).WithError(err).Errorln("error forwarding score event")
+		}
 	}
 }
