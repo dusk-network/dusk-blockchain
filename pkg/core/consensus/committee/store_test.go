@@ -55,15 +55,15 @@ func TestReportAbsentees(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// make events
-	ev1 := newMockEvent(k1.BLSPubKey.Marshal())
-	ev2 := newMockEvent(k2.BLSPubKey.Marshal())
+	ev1 := newMockEvent(k1.BLSPubKeyBytes)
+	ev2 := newMockEvent(k2.BLSPubKeyBytes)
 
 	evs := []wire.Event{ev1, ev2}
 
 	_ = c.ReportAbsentees(evs, 1, 1)
 	absentees := <-absenteesChan
 	// absentees should contain the bls pub key of k3
-	assert.True(t, bytes.Contains(absentees.Bytes(), k3.BLSPubKey.Marshal()))
+	assert.True(t, bytes.Contains(absentees.Bytes(), k3.BLSPubKeyBytes))
 }
 
 func TestUpsertCommitteeCache(t *testing.T) {
@@ -119,7 +119,7 @@ func newMockEvent(sender []byte) wire.Event {
 func newProvisioner(amount uint64, eb *wire.EventBus) *user.Keys {
 	k, _ := user.NewRandKeys()
 	buffer := bytes.NewBuffer(*k.EdPubKey)
-	_ = encoding.WriteVarBytes(buffer, k.BLSPubKey.Marshal())
+	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
 
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, amount)
 

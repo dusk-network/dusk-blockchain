@@ -34,9 +34,8 @@ func TestProcessor(t *testing.T) {
 	resultChan := make(chan *bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 
-	sub := NewTopicListener(bus, collector, topic)
-
-	go sub.Accept(&pippoAdder{}, &pippoAdder{})
+	bus.RegisterPreprocessor(topic, &pippoAdder{}, &pippoAdder{})
+	go NewTopicListener(bus, collector, topic).Accept()
 
 	expected := bytes.NewBufferString("pippopippo")
 	bus.Publish(topic, bytes.NewBufferString(""))

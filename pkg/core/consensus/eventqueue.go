@@ -59,37 +59,16 @@ func (s *EventQueue) Clear(round uint64) {
 	s.entries[round] = nil
 }
 
-// ConsumeNextStepEvents retrieves the Events stored at the lowest step for a passed round and returns them. The step gets deleted
-func (s *EventQueue) ConsumeNextStepEvents(round uint64) ([]wire.Event, uint8) {
+func (s *EventQueue) Flush(round uint64) []wire.Event {
 	s.Lock()
 	defer s.Unlock()
-	steps := s.entries[round]
-	if steps == nil {
-		return nil, 0
-	}
-
-	nextStep := uint8(0)
-	for k := range steps {
-		if k > nextStep {
-			nextStep = k
+	events := make([]wire.Event, 0)
+	if s.entries[round] != nil {
+		for step, evs := range s.entries[round] {
+			events = append(events, evs...)
+			s.entries[round][step] = nil
 		}
+		return events
 	}
-
-	events := s.entries[round][nextStep]
-	delete(s.entries[round], nextStep)
-	return events, nextStep
-}
-
-// ConsumeUntil consumes Events until the round specified (excluded). It returns the map slice deleted
-func (s *EventQueue) ConsumeUntil(round uint64) map[uint64]map[uint8][]wire.Event {
-	s.Lock()
-	defer s.Unlock()
-	ret := make(map[uint64]map[uint8][]wire.Event)
-	for k := range s.entries {
-		if k < round {
-			ret[k] = s.entries[k]
-		}
-		delete(s.entries, k)
-	}
-	return ret
+	return nil
 }

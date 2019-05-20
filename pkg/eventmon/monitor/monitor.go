@@ -12,7 +12,6 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon"
@@ -29,8 +28,8 @@ type (
 	broker struct {
 		roundChan     <-chan uint64
 		bestScoreChan <-chan *selection.ScoreEvent
-		reductionChan <-chan *events.Reduction
-		agreementChan <-chan *events.AggregatedAgreement
+		reductionChan <-chan *reduction.Reduction
+		agreementChan <-chan *agreement.Agreement
 		logChan       <-chan *eventmon.Event
 
 		msgChan  chan<- string
@@ -56,11 +55,11 @@ func newBroker(eventbus wire.EventBroker, url string) *broker {
 	return &broker{
 		roundChan:     roundChan,
 		bestScoreChan: selection.LaunchNotification(eventbus),
-		reductionChan: reduction.LaunchNotification(eventbus),
-		agreementChan: agreement.LaunchNotification(eventbus),
-		msgChan:       msgChan,
-		quitChan:      quitChan,
-		conn:          conn,
+		// reductionChan: reduction.LaunchNotification(eventbus),
+		// agreementChan: agreement.LaunchNotification(eventbus),
+		msgChan:  msgChan,
+		quitChan: quitChan,
+		conn:     conn,
 	}
 }
 
@@ -79,11 +78,11 @@ func (b *broker) monitor(bb ristretto.Scalar) {
 			b.blockInfo.hash = bestScore.VoteHash
 			b.msgChan <- "status:selection"
 		case redEvent := <-b.reductionChan:
-			b.blockInfo.hash = redEvent.VotedHash
+			b.blockInfo.hash = redEvent.BlockHash
 			b.msgChan <- "status:reduction"
 		case agreement := <-b.agreementChan:
 			// TODO if different hash send
-			b.blockInfo.hash = agreement.AgreedHash
+			b.blockInfo.hash = agreement.BlockHash
 			b.msgChan <- "status:agreement"
 		case logEvent := <-b.logChan:
 			if logEvent.Severity == eventmon.Warn || logEvent.Severity == eventmon.Err {
@@ -115,7 +114,7 @@ func blockMsg(i *info) string {
 	return str.String()
 }
 
-var _empty struct{}
+// var _empty struct{}
 
 func newClient(url string) (chan<- string, chan<- struct{}, net.Conn) {
 	payloadChan := make(chan string, 1)

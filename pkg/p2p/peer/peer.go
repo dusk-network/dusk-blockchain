@@ -1,12 +1,9 @@
-// Package peer uses channels to simulate the queue handler with the actor model.
-// A suitable number k ,should be set for channel size, because if #numOfMsg > k, we lose determinism.
-// k chosen should be large enough that when filled, it shall indicate that the peer has stopped
-// responding, since we do not have a pingMSG, we will need another way to shut down peers.
 package peer
 
 import (
+	"bufio"
 	"bytes"
-	"errors"
+	"encoding/binary"
 	"io"
 	"net"
 	"strconv"
@@ -14,165 +11,175 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-const (
-	handshakeTimeout = 30 * time.Second // Used to set handshake deadline
-	readWriteTimeout = 2 * time.Minute  // Used to set reading and writing deadlines
-)
+var readWriteTimeout = 2 * time.Minute // Used to set reading and writing deadlines
 
-// Peer holds all configuration and state to be able to communicate with other peers.
-type Peer struct {
-	conn  net.Conn
+// Connection holds the TCP connection to another node, and it's known protocol magic.
+type Connection struct {
+	net.Conn
 	magic protocol.Magic
-	// Services protocol.ServiceFlag - currently not implemented
-
-	eventBus     *wire.EventBus
-	quitID       uint32
-	gossipID     uint32
-	outgoingChan chan func() error // outgoing message queue
-
-	dupeBlacklist *dupemap.DupeMap
 }
 
-// NewPeer is called after a connection to a peer was successful.
-// Inbound as well as Outbound.
-func NewPeer(conn net.Conn, magic protocol.Magic, eventBus *wire.EventBus,
-	dupeMap *dupemap.DupeMap) *Peer {
-	return &Peer{
-		outgoingChan:  make(chan func() error, 100),
-		conn:          conn,
-		eventBus:      eventBus,
-		magic:         magic,
-		dupeBlacklist: dupeMap,
+// Writer abstracts all of the logic and fields needed to write messages to
+// other network nodes.
+type Writer struct {
+	*Connection
+	subscriber wire.EventSubscriber
+	gossipID   uint32
+	// TODO: add service flag
+}
+
+// Reader abstracts all of the logic and fields needed to receive messages from
+// other network nodes.
+type Reader struct {
+	*Connection
+	unmarshaller *messageUnmarshaller
+	// TODO: add service flag
+}
+
+// MessageCollector is responsible for handling decoded messages from the wire.
+type MessageCollector struct {
+	Publisher     wire.EventPublisher
+	DupeBlacklist *dupemap.DupeMap
+	Magic         protocol.Magic
+}
+
+// Collect a decoded message from the Reader.
+func (m *MessageCollector) Collect(b *bytes.Buffer) error {
+	// check if this message is a duplicate of another we already forwarded
+	if m.DupeBlacklist.CanFwd(b) {
+		topic := extractTopic(b)
+		m.Publisher.Publish(string(topic), b)
+	}
+
+	return nil
+}
+
+// NewWriter returns a Writer. It will still need to be initialized by
+// subscribing to the gossip topic with a stream handler.
+func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscriber) *Writer {
+	pw := &Writer{
+		Connection: &Connection{
+			Conn:  conn,
+			magic: magic,
+		},
+		subscriber: subscriber,
+	}
+
+	gossip := NewGossip(magic)
+	subscriber.RegisterPreprocessor(string(topics.Gossip), gossip)
+	return pw
+}
+
+// NewReader returns a Reader. It will still need to be initialized by
+// running ReadLoop in a goroutine.
+func NewReader(conn net.Conn, magic protocol.Magic) *Reader {
+	return &Reader{
+		Connection: &Connection{
+			Conn:  conn,
+			magic: magic,
+		},
+		unmarshaller: &messageUnmarshaller{magic},
 	}
 }
 
-// Connect will perform the protocol handshake with the peer. If successful, we start
-// a set of goroutines which are used for communication.
-func (p *Peer) Connect(inbound bool) error {
-	if err := p.Handshake(inbound); err != nil {
-		p.Disconnect()
+// Connect will perform the protocol handshake with the peer. If successful
+func (p *Writer) Connect() error {
+	if err := p.HandShake(); err != nil {
+		p.Conn.Close()
 		return err
 	}
 
-	go p.writeLoop()
-	go p.readLoop()
-	p.subscribeToGossipEvents()
+	p.Subscribe()
+	p.Conn.SetWriteDeadline(time.Time{})
+	return nil
+}
+
+// Subscribe the writer to the gossip topic, passing it's connection as the writer.
+func (p *Writer) Subscribe() {
+	id := p.subscriber.SubscribeStream(string(topics.Gossip), p.Conn)
+	p.gossipID = id
+}
+
+// Accept will perform the protocol handshake with the peer.
+func (p *Reader) Accept() error {
+	if err := p.HandShake(); err != nil {
+		p.Conn.Close()
+		return err
+	}
+
 	return nil
 }
 
 // ReadLoop will block on the read until a message is read, or until the deadline
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
-func (p *Peer) readLoop() {
-	for {
-		// Refresh the read deadline
-		p.conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+func (p *Reader) ReadLoop(c wire.EventCollector) {
+	defer func() {
+		p.Conn.Close()
+	}()
 
-		topic, payload, err := p.readMessage()
+	r := bufio.NewReader(p.Conn)
+	for {
+		b, err := r.ReadBytes(0x00)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"process": "peer",
 				"error":   err,
 			}).Warnln("error reading message")
-			p.Disconnect()
 			return
 		}
 
-		// check if this message is a duplicate of another we already forwarded
-		if p.dupeBlacklist.CanFwd(payload) {
-			p.eventBus.Publish(string(topic), payload)
-		}
-	}
-}
-
-// WriteLoop will write queued messages to the peer in a synchronous fashion.
-// Should be called in a go-routine, after a successful handshake with a peer.
-func (p *Peer) writeLoop() {
-	for {
-		f := <-p.outgoingChan
-
-		// Refresh the write deadline
-		p.conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
-
-		if err := f(); err != nil {
+		buf := new(bytes.Buffer)
+		if err := p.unmarshaller.Unmarshal(b, buf); err != nil {
 			log.WithFields(log.Fields{
 				"process": "peer",
 				"error":   err,
-			}).Warnln("error writing message")
-			p.Disconnect()
-			return
+			}).Warnln("error unmarshalling message")
+			continue
 		}
+
+		c.Collect(buf)
+
+		// Refresh the read deadline
+		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
 	}
 }
 
-// Collect implements wire.EventCollector.
-// Receive messages from other components, add headers, and propagate them to the network.
-func (p *Peer) Collect(message *bytes.Buffer) error {
-	// copy the buffer here, as the pointer we just got is shared by
-	// all the other peers.
-	msg := *message
-	var topicBytes [15]byte
-
-	_, _ = msg.Read(topicBytes[:])
-	topic := topics.ByteArrayToTopic(topicBytes)
-	return p.writeMessage(&msg, topic)
-}
-
-// WriteMessage will append a header with the specified topic to the passed
-// message, and put it in the outgoing message queue.
-func (p *Peer) writeMessage(msg *bytes.Buffer, topic topics.Topic) error {
-	messageWithHeader, err := addHeader(msg, p.magic, topic)
-	if err != nil {
-		return err
+func extractTopic(p io.Reader) topics.Topic {
+	var cmdBuf [topics.Size]byte
+	if _, err := p.Read(cmdBuf[:]); err != nil {
+		panic(err)
 	}
 
-	p.write(messageWithHeader)
-	return nil
+	return topics.ByteArrayToTopic(cmdBuf)
 }
 
 // Write will put a message in the outgoing message queue.
-func (p *Peer) write(msg *bytes.Buffer) {
-	p.outgoingChan <- func() error {
-		_, err := p.conn.Write(msg.Bytes())
-		return err
-	}
-}
-
-// Disconnect disconnects from a peer
-func (p *Peer) Disconnect() {
-	log.WithFields(log.Fields{
-		"process": "peer",
-		"address": p.conn.RemoteAddr().String(),
-	}).Warnln("peer disconnected")
-
-	_ = p.conn.Close()
-	if p.gossipID != 0 && p.quitID != 0 {
-		_ = p.eventBus.Unsubscribe(string(topics.Gossip), p.gossipID)
-		_ = p.eventBus.Unsubscribe(wire.QuitTopic, p.quitID)
-	}
+func (p *Writer) Write(b []byte) (int, error) {
+	return p.Conn.Write(b)
 }
 
 // Port returns the port
-func (p *Peer) Port() uint16 {
-	s := strings.Split(p.conn.RemoteAddr().String(), ":")
+func (p *Connection) Port() uint16 {
+	s := strings.Split(p.Conn.RemoteAddr().String(), ":")
 	port, _ := strconv.ParseUint(s[1], 10, 16)
 	return uint16(port)
 }
 
 // Addr returns the peer's address as a string.
-func (p *Peer) Addr() string {
-	return p.conn.RemoteAddr().String()
+func (p *Connection) Addr() string {
+	return p.Conn.RemoteAddr().String()
 }
 
 // Read from a peer
-func (p *Peer) readHeader() (*MessageHeader, error) {
+func (p *Connection) readHeader() (*MessageHeader, error) {
 	headerBytes, err := p.readHeaderBytes()
 	if err != nil {
 		return nil, err
@@ -187,49 +194,20 @@ func (p *Peer) readHeader() (*MessageHeader, error) {
 	return header, nil
 }
 
-func (p *Peer) readHeaderBytes() ([]byte, error) {
+func (p *Connection) readHeaderBytes() ([]byte, error) {
 	buffer := make([]byte, MessageHeaderSize)
-	if _, err := io.ReadFull(p.conn, buffer); err != nil {
+	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
 		return nil, err
 	}
 
 	return buffer, nil
 }
 
-func (p *Peer) readPayload(length uint32) (*bytes.Buffer, error) {
-	buffer := make([]byte, length)
-	if _, err := io.ReadFull(p.conn, buffer); err != nil {
-		return nil, err
+func (m *MessageCollector) magicIsValid(b *bytes.Buffer) bool {
+	var magic uint32
+	if err := encoding.ReadUint32(b, binary.LittleEndian, &magic); err != nil {
+		panic(err)
 	}
 
-	return bytes.NewBuffer(buffer), nil
-}
-
-func (p *Peer) headerMagicIsValid(header *MessageHeader) bool {
-	return p.magic == header.Magic
-}
-
-func (p *Peer) readMessage() (topics.Topic, *bytes.Buffer, error) {
-	header, err := p.readHeader()
-	if err != nil {
-		return "", nil, err
-	}
-
-	if !p.headerMagicIsValid(header) {
-		return "", nil, errors.New("invalid header magic")
-	}
-
-	payloadBuffer, err := p.readPayload(header.Length)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return header.Topic, payloadBuffer, nil
-}
-
-func (p *Peer) subscribeToGossipEvents() {
-	es := wire.NewTopicListener(p.eventBus, p, string(topics.Gossip))
-	p.quitID = es.QuitChanID
-	p.gossipID = es.MsgChanID
-	go es.Accept()
+	return m.Magic == protocol.Magic(magic)
 }

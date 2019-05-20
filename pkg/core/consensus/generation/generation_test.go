@@ -1,51 +1,47 @@
-package generation
+package generation_test
 
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 func TestScoreGeneration(t *testing.T) {
-	eb := wire.NewEventBus()
 	d := ristretto.Scalar{}
 	d.Rand()
 	k := ristretto.Scalar{}
 	k.Rand()
 
-	// subscribe to gossip topic
-	gossipChan := make(chan *bytes.Buffer, 1)
-	eb.Subscribe(string(topics.Gossip), gossipChan)
+	eb, streamer := helper.CreateGossipStreamer()
+
+	gen := &mockGenerator{t}
 
 	// launch score component
-	broker := LaunchScoreGenerationComponent(eb, d, k)
-	// use mockgenerator
-	broker.proofGenerator = &mockGenerator{}
+	generation.LaunchScoreGenerationComponent(eb, nil, d, k, gen, gen)
+
 	// update the round to start generation
 	updateRound(eb, 1)
 
-	// should get a score event out of the gossip topic
-	ev := <-gossipChan
-	// check the event
-	// discard the topic first
-	topicBuffer := make([]byte, 15)
-	if _, err := ev.Read(topicBuffer); err != nil {
+	buf, err := streamer.Read()
+	if err != nil {
 		t.Fatal(err)
 	}
-	// now unmarshal the event
+
 	sev := &selection.ScoreEvent{}
-	if err := selection.UnmarshalScoreEvent(ev, sev); err != nil {
+	if err := selection.UnmarshalScoreEvent(bytes.NewBuffer(buf), sev); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,23 +52,28 @@ func TestScoreGeneration(t *testing.T) {
 // mockGenerator is used to test the generation component with the absence
 // of the rust blind bid process.
 type mockGenerator struct {
+	t *testing.T
 }
 
-func (m *mockGenerator) generateProof(seed []byte) zkproof.ZkProof {
-	fmt.Println("generating proof")
+func (m *mockGenerator) GenerateBlock(round uint64, seed []byte) (*block.Block, error) {
+	return helper.RandomBlock(m.t, round, 10), nil
+}
+
+func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 	proof, _ := crypto.RandEntropy(100)
-	score, _ := crypto.RandEntropy(32)
+	// add a score that will always pass threshold
+	score, _ := big.NewInt(0).SetString("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", 16)
 	z, _ := crypto.RandEntropy(32)
 	bL, _ := crypto.RandEntropy(32)
 	return zkproof.ZkProof{
 		Proof:         proof,
-		Score:         score,
+		Score:         score.Bytes(),
 		Z:             z,
 		BinaryBidList: bL,
 	}
 }
 
-func (m *mockGenerator) updateBidList(bl user.BidList) {}
+func (m *mockGenerator) UpdateBidList(bl user.BidList) {}
 
 func updateRound(eventBus *wire.EventBus, round uint64) {
 	roundBytes := make([]byte, 8)

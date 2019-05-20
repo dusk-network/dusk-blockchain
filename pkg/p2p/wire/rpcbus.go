@@ -60,10 +60,10 @@ type method struct {
 }
 
 type Req struct {
-	Params  bytes.Buffer
-	Timeout int
-	Resp    chan bytes.Buffer
-	Err     chan error
+	Params   bytes.Buffer
+	Timeout  int
+	RespChan chan bytes.Buffer
+	ErrChan  chan error
 }
 
 func NewRPCBus() *RPCBus {
@@ -128,10 +128,10 @@ func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
 
 	// Wait for response or err from the consumer with read-timeout
 	select {
-	case resp = <-req.Resp:
+	case resp = <-req.RespChan:
 	// this case happens when the consumer cannot return a valid response but an
 	// error details instead
-	case err := <-req.Err:
+	case err := <-req.ErrChan:
 		return bytes.Buffer{}, err
 	// terminate the procedure if timeout-ed
 	case <-time.After(time.Duration(req.Timeout) * time.Second):
@@ -144,8 +144,8 @@ func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
 // NewRequest builds a new request with params
 func NewRequest(p bytes.Buffer, timeout int) Req {
 	d := Req{Timeout: timeout, Params: p}
-	d.Resp = make(chan bytes.Buffer)
-	d.Err = make(chan error)
+	d.RespChan = make(chan bytes.Buffer)
+	d.ErrChan = make(chan error)
 	return d
 }
 

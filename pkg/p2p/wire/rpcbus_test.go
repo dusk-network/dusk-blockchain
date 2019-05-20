@@ -30,7 +30,7 @@ func runConsumer(delay int) {
 
 				if len(params) == 0 {
 					// Simulate error response
-					req.Err <- errInvalidParams
+					req.ErrChan <- errInvalidParams
 				} else {
 					// Simulate non-error response
 					expectedResult = "Wrapped " + params
@@ -39,7 +39,7 @@ func runConsumer(delay int) {
 					buf.WriteString(expectedResult)
 
 					// return result
-					req.Resp <- buf
+					req.RespChan <- buf
 				}
 			}
 		}(delay)

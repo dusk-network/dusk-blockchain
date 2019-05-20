@@ -18,7 +18,6 @@ import (
 // If it is a solo transaction, the blockTime is calculated by using currentBlockTime+consensusSeconds
 // Returns nil if a tx is valid
 func CheckTx(db database.DB, index uint64, blockTime uint64, tx transactions.Transaction) error {
-
 	if err := CheckStandardTx(db, tx.StandardTX()); err != nil && tx.Type() != transactions.CoinbaseType {
 		return err
 	}
@@ -83,37 +82,10 @@ func CheckSpecialFields(txIndex uint64, blockTime uint64, tx transactions.Transa
 		return VerifyTimelock(txIndex, blockTime, x)
 	case *transactions.Bid:
 		return VerifyBid(txIndex, blockTime, x)
-
-		// TODO: remove this after demo
-		// add blind bidder once tx is accepted, and tell the server
-		/*
-			buffer := new(bytes.Buffer)
-			if err := x.Encode(buffer); err != nil {
-				return err
-			}
-			eventBus.Publish(msg.BidTopic, buffer)
-			// Applicable only for the demo
-			// db.writeTX(x)
-			return addBidder(x)
-		*/
-
 	case *transactions.Coinbase:
 		return VerifyCoinbase(txIndex, x)
 	case *transactions.Stake:
 		return VerifyStake(txIndex, blockTime, x)
-
-		// TODO: remove this after demo
-		// add provisioner once tx is accepted, and tell the server
-		/* TODO: Clarify this point
-		buffer := new(bytes.Buffer)
-		if err := x.Encode(buffer); err != nil {
-			return err
-		}
-		c.eventBus.Publish(msg.StakeTopic, buffer)
-		// Applicable only for the demo
-		// c.db.writeTX(x)
-		return c.addProvisioner(x)
-		*/
 	case *transactions.Standard:
 		return VerifyStandard(x)
 	default:
@@ -186,11 +158,8 @@ func checkRangeProof(p rangeproof.Proof) error {
 // checks that the transaction has not been spent by checking the database for that key image
 // returns nil if item not in database
 func checkTXDoubleSpent(db database.DB, inputs transactions.Inputs) error {
-
 	return db.View(func(t database.Transaction) error {
-
 		for _, input := range inputs {
-
 			exists, txID, _ := t.FetchKeyImageExists(input.KeyImage)
 			if exists || txID != nil {
 				return errors.New("already spent")

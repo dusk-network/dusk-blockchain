@@ -3,32 +3,21 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"io"
-	"math"
-	"math/big"
-	"math/rand"
 	"net"
-	"sync"
 	"time"
 
-	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
-	"gitlab.dusk.network/dusk-core/zkproof"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
@@ -36,26 +25,10 @@ import (
 var timeOut = 3 * time.Second
 
 type Server struct {
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
-
-	// stakes are stored in a map, with the BLS public key as the key, so that they
-	// can be properly removed when a node disconnects.
-	sync.RWMutex
-	stakes  map[string]*bytes.Buffer
-	bids    []*bytes.Buffer
-	chain   *chain.Chain
-	m       *mempool.Mempool
-	dupeMap *dupemap.DupeMap
-
-	// subscriber channels
-	stakeChan             <-chan *bytes.Buffer
-	bidChan               <-chan *bytes.Buffer
-	removeProvisionerChan <-chan []byte
-}
-
-type txCollector struct {
-	txChannel chan *bytes.Buffer
+	eventBus  *wire.EventBus
+	rpcBus    *wire.RPCBus
+	chain     *chain.Chain
+	collector *peer.MessageCollector
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
@@ -71,7 +44,7 @@ func Setup() *Server {
 	keys, _ := user.NewRandKeys()
 
 	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
-	c := committee.LaunchCommitteeStore(eventBus, keys)
+	_ = committee.LaunchCommitteeStore(eventBus, keys)
 
 	m := mempool.NewMempool(eventBus, nil)
 	m.Run()
@@ -83,13 +56,8 @@ func Setup() *Server {
 	}
 	go chain.Listen()
 
-	// wiring up the Stake channel to the EventBus
-	stakeChan := initStakeCollector(eventBus)
-	// wiring up the BlindBid channel to the EventBus
-	bidChan := initBidCollector(eventBus)
-
-	dupeBlacklist := dupemap.NewDupeMap(eventBus)
-	go dupeBlacklist.CleanOnRound()
+	// Setting up a dupemap
+	dupeBlacklist := launchDupeMap(eventBus)
 
 	if cfg.Get().RPC.Enabled {
 		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus)
@@ -104,104 +72,62 @@ func Setup() *Server {
 
 	// creating the Server
 	srv := &Server{
-		eventBus:              eventBus,
-		RWMutex:               sync.RWMutex{},
-		stakes:                make(map[string]*bytes.Buffer),
-		bids:                  []*bytes.Buffer{},
-		chain:                 chain,
-		m:                     m,
-		stakeChan:             stakeChan,
-		bidChan:               bidChan,
-		removeProvisionerChan: committee.InitRemoveProvisionerCollector(eventBus),
-		dupeMap:               dupeBlacklist,
-		rpcBus:                rpcBus,
+		eventBus: eventBus,
+		rpcBus:   rpcBus,
+		chain:    chain,
+		collector: &peer.MessageCollector{
+			Publisher:     eventBus,
+			DupeBlacklist: dupeBlacklist,
+			Magic:         protocol.TestNet,
+		},
 	}
 
 	// make a stake and bid tx
-	stake := makeStake(keys)
+	// stake := makeStake(keys)
 	// bid is the blind bid, k is the secret to be embedded in the tx and d is the amount of Dusk locked in the blindbid. This is to be changed into the Commitment to d: D
 
 	//NOTE: this is solely for testnet
-	bid, d, k := makeBid()
+	// bid, d, k := makeBid()
 
+	// TODO: bid and stake creation should be handled by using the wallet, and not
+	// directly put in the chain, but rather broadcasted.
 	// Publish the stake in the chain
-	buf := new(bytes.Buffer)
-	err = stake.Encode(buf)
-	if err != nil {
-		log.Error(err)
-	}
-	eventBus.Publish(string(topics.Tx), buf)
+	// buf := new(bytes.Buffer)
+	// err = stake.Encode(buf)
+	// if err != nil {
+	// 	log.Error(err)
+	// }
+	// eventBus.Publish(string(topics.Tx), buf)
 	// Publish the bid in the chain
-	buf = new(bytes.Buffer)
-	err = bid.Encode(buf)
-	if err != nil {
-		log.Error(err)
-	}
-	eventBus.Publish(string(topics.Tx), buf)
+	// buf = new(bytes.Buffer)
+	// err = bid.Encode(buf)
+	// if err != nil {
+	// 	log.Error(err)
+	// }
+	// eventBus.Publish(string(topics.Tx), buf)
 
 	// Connecting to the general monitoring system
-	ConnectToMonitor(eventBus, d)
+	// ConnectToMonitor(eventBus, d)
 
+	// TODO: need to get the d and k here from the previously created bid tx
 	// start consensus factory
-	factory := factory.New(eventBus, timeOut, c, keys, d, k)
-	go factory.StartConsensus()
+	// factory := factory.New(eventBus, timeOut, c, keys, d, k)
+	// go factory.StartConsensus()
 
 	return srv
 }
 
-func initStakeCollector(eventBus *wire.EventBus) chan *bytes.Buffer {
-	stakeChannel := make(chan *bytes.Buffer, 100)
-	collector := &txCollector{stakeChannel}
-	go wire.NewTopicListener(eventBus, collector, msg.StakeTopic).Accept()
-	return stakeChannel
-}
-
-func initBidCollector(eventBus *wire.EventBus) chan *bytes.Buffer {
-	bidChannel := make(chan *bytes.Buffer, 100)
-	collector := &txCollector{bidChannel}
-	go wire.NewTopicListener(eventBus, collector, msg.BidTopic).Accept()
-	return bidChannel
-}
-
-func (t *txCollector) Collect(r *bytes.Buffer) error {
-	t.txChannel <- r
-	return nil
-}
-
-// Listen to new Stake notification and Blind Bids
-func (s *Server) Listen() {
-	for {
-		select {
-		case b := <-s.stakeChan:
-			log.WithField("process", "server").Debugln("stake received")
-			buf, pubKeyBLS := extractBLSPubKey(b)
-			s.Lock()
-			s.stakes[pubKeyBLS] = buf
-			s.Unlock()
-		case b := <-s.bidChan:
-			log.WithField("process", "server").Debugln("bid received")
-			s.Lock()
-			s.bids = append(s.bids, b)
-			s.Unlock()
-		case pubKeyBLS := <-s.removeProvisionerChan:
-			pubKeyStr := hex.EncodeToString(pubKeyBLS)
-			s.Lock()
-			delete(s.stakes, pubKeyStr)
-			s.Unlock()
+func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
+	roundChan := consensus.InitRoundUpdate(eventBus)
+	dupeBlacklist := dupemap.NewDupeMap(1)
+	go func() {
+		for {
+			round := <-roundChan
+			// NOTE: do we need locking?
+			dupeBlacklist.UpdateHeight(round)
 		}
-	}
-}
-
-// extract a provisioner's BLS public key from a staking tx buffer
-func extractBLSPubKey(r *bytes.Buffer) (*bytes.Buffer, string) {
-	buf := new(bytes.Buffer)
-	reader := io.TeeReader(r, buf)
-	stake := &transactions.Stake{}
-	if err := stake.Decode(reader); err != nil {
-		panic(err)
-	}
-
-	return buf, hex.EncodeToString(stake.PubKeyBLS)
+	}()
+	return dupeBlacklist
 }
 
 func (s *Server) StartConsensus(round uint64) {
@@ -211,9 +137,9 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
-	peer := peer.NewPeer(conn, protocol.TestNet, s.eventBus, s.dupeMap)
+	peerReader := peer.NewReader(conn, protocol.TestNet)
 
-	if err := peer.Connect(true); err != nil {
+	if err := peerReader.Accept(); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -222,16 +148,18 @@ func (s *Server) OnAccept(conn net.Conn) {
 	}
 	log.WithFields(log.Fields{
 		"process": "server",
-		"address": peer.Addr(),
+		"address": peerReader.Addr(),
 	}).Debugln("connection established")
 
-	s.sendStakesAndBids(peer)
+	go peerReader.ReadLoop(s.collector)
+	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
+	peerWriter.Subscribe()
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	peer := peer.NewPeer(conn, protocol.TestNet, s.eventBus, s.dupeMap)
+	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 
-	if err := peer.Connect(false); err != nil {
+	if err := peerWriter.Connect(); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -240,77 +168,14 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}
 	log.WithFields(log.Fields{
 		"process": "server",
-		"address": peer.Addr(),
+		"address": peerWriter.Addr(),
 	}).Debugln("connection established")
 
-	s.sendStakesAndBids(peer)
-}
-
-func (s *Server) sendStakesAndBids(peer *peer.Peer) {
-	s.RLock()
-	defer s.RUnlock()
-	for _, stake := range s.stakes {
-		buf, err := wire.AddTopic(stake, topics.Tx)
-		if err != nil {
-			panic(err)
-		}
-		s.eventBus.Publish(string(topics.Gossip), buf)
-	}
-
-	for _, bid := range s.bids {
-		buf, err := wire.AddTopic(bid, topics.Tx)
-		if err != nil {
-			panic(err)
-		}
-		s.eventBus.Publish(string(topics.Gossip), buf)
-	}
+	peerReader := peer.NewReader(conn, protocol.TestNet)
+	go peerReader.ReadLoop(s.collector)
 }
 
 func (s *Server) Close() {
 	s.chain.Close()
 	s.rpcBus.Close()
-}
-
-func makeStake(keys *user.Keys) *transactions.Stake {
-	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, *keys.EdPubKey, keys.BLSPubKey.Marshal())
-	keyImage, _ := crypto.RandEntropy(32)
-	txID, _ := crypto.RandEntropy(32)
-	signature, _ := crypto.RandEntropy(32)
-	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
-	stake.Inputs = transactions.Inputs{input}
-
-	outputAmount := rand.Int63n(100000)
-	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
-	destKey, _ := crypto.RandEntropy(32)
-	rangeProof, _ := crypto.RandEntropy(32)
-	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
-	stake.Outputs = transactions.Outputs{output}
-
-	return stake
-}
-
-func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
-	k := ristretto.Scalar{}
-	k.Rand()
-	outputAmount := rand.Int63n(100000)
-	d := big.NewInt(outputAmount)
-	dScalar := ristretto.Scalar{}
-	dScalar.SetBigInt(d)
-	m := zkproof.CalculateM(k)
-	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, m.Bytes())
-	keyImage, _ := crypto.RandEntropy(32)
-	txID, _ := crypto.RandEntropy(32)
-	signature, _ := crypto.RandEntropy(32)
-	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
-	bid.Inputs = transactions.Inputs{input}
-
-	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
-	destKey, _ := crypto.RandEntropy(32)
-	rangeProof, _ := crypto.RandEntropy(32)
-	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
-	bid.Outputs = transactions.Outputs{output}
-
-	return bid, dScalar, k
 }

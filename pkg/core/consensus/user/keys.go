@@ -11,6 +11,7 @@ type Keys struct {
 	BLSPubKeyBytes []byte
 	BLSSecretKey   *bls.SecretKey
 	EdPubKey       *ed25519.PublicKey
+	EdPubKeyBytes  []byte
 	EdSecretKey    *ed25519.PrivateKey
 }
 
@@ -20,14 +21,9 @@ func (k *Keys) Clear() {
 	k.BLSPubKey = nil
 	k.BLSSecretKey = nil
 	k.EdPubKey = nil
+	k.EdPubKeyBytes = nil
 	k.EdSecretKey = nil
-	k.BLSPubKeyBytes = []byte{}
-}
-
-// EdPubKeyBytes returns the byte slice of the ed25519 public key of this Keys
-// struct.
-func (k *Keys) EdPubKeyBytes() []byte {
-	return []byte(*k.EdPubKey)
+	k.BLSPubKeyBytes = nil
 }
 
 // NewRandKeys will generate and return new bls and ed25519
@@ -47,6 +43,7 @@ func NewRandKeys() (*Keys, error) {
 		BLSPubKey:      blsPub,
 		BLSSecretKey:   blsPriv,
 		EdPubKey:       &edPub,
+		EdPubKeyBytes:  []byte(edPub),
 		EdSecretKey:    &edPriv,
 		BLSPubKeyBytes: blsPub.Marshal(),
 	}, nil

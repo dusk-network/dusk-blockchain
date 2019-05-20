@@ -13,12 +13,12 @@ import (
 // MessageHeader defines a Dusk wire message header.
 type MessageHeader struct {
 	Magic  protocol.Magic // 4 bytes
-	Topic  topics.Topic   // 15 bytes
 	Length uint32         // 4 bytes
+	Topic  topics.Topic   // 15 bytes
 }
 
 // MessageHeaderSize defines the size of a Dusk wire message header in bytes.
-const MessageHeaderSize = 4 + topics.Size + 4
+const MessageHeaderSize = 4 + 4
 
 // decodeMessageHeader will decode a header from a Dusk wire message.
 func decodeMessageHeader(r io.Reader) (*MessageHeader, error) {
@@ -27,13 +27,6 @@ func decodeMessageHeader(r io.Reader) (*MessageHeader, error) {
 		return nil, err
 	}
 
-	var cmdBuf [topics.Size]byte
-	if _, err := r.Read(cmdBuf[:]); err != nil {
-		return nil, err
-	}
-
-	topic := topics.ByteArrayToTopic(cmdBuf)
-
 	var length uint32
 	if err := encoding.ReadUint32(r, binary.LittleEndian, &length); err != nil {
 		return nil, err
@@ -41,7 +34,6 @@ func decodeMessageHeader(r io.Reader) (*MessageHeader, error) {
 
 	return &MessageHeader{
 		Magic:  protocol.Magic(magic),
-		Topic:  topic,
 		Length: length,
 	}, nil
 }
@@ -49,10 +41,6 @@ func decodeMessageHeader(r io.Reader) (*MessageHeader, error) {
 func addHeader(message *bytes.Buffer, magic protocol.Magic, topic topics.Topic) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 	if err := encoding.WriteUint32(buffer, binary.LittleEndian, uint32(magic)); err != nil {
-		return nil, err
-	}
-
-	if err := writeTopic(buffer, topic); err != nil {
 		return nil, err
 	}
 

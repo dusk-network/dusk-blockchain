@@ -6,35 +6,51 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
 
-func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *events.Reduction) {
+func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *Reduction) {
 	if keys == nil {
 		keys, _ = user.NewRandKeys()
 	}
 
-	reduction := events.NewReduction()
+	reduction := MockOutgoingReduction(hash, round, step)
 	reduction.PubKeyBLS = keys.BLSPubKeyBytes
-	reduction.Round = round
-	reduction.Step = step
-	reduction.VotedHash = hash
 
 	r := new(bytes.Buffer)
-	vote := &events.Vote{
-		Round:     reduction.Round,
-		Step:      reduction.Step,
-		BlockHash: reduction.VotedHash,
-	}
-	_ = events.MarshalSignableVote(r, vote)
+	_ = header.MarshalSignableVote(r, reduction.Header)
 	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, r.Bytes())
 	reduction.SignedHash = sigma.Compress()
 	return keys, reduction
+}
+
+func MockOutgoingReduction(hash []byte, round uint64, step uint8) *Reduction {
+	reduction := New()
+	reduction.Round = round
+	reduction.Step = step
+	reduction.BlockHash = hash
+	return reduction
+}
+
+func MockOutgoingReductionBuf(hash []byte, round uint64, step uint8) *bytes.Buffer {
+	reduction := MockOutgoingReduction(hash, round, step)
+	b := new(bytes.Buffer)
+	_ = header.MarshalSignableVote(b, reduction.Header)
+	return b
+}
+
+func MockReductionBuffer(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *bytes.Buffer) {
+	k, ev := MockReduction(keys, hash, round, step)
+	marshaller := NewUnMarshaller()
+	buf := new(bytes.Buffer)
+	_ = marshaller.Marshal(buf, ev)
+	return k, buf
 }
 
 func mockSelectionEventBuffer(hash []byte) *bytes.Buffer {
@@ -67,15 +83,15 @@ func mockSelectionEventBuffer(hash []byte) *bytes.Buffer {
 func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	keys, _ := user.NewRandKeys()
 	signedHash, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, hash)
-	marshaller := events.NewReductionUnMarshaller()
+	marshaller := NewUnMarshaller()
 
-	bev := &events.Reduction{
-		Header: &events.Header{
-			PubKeyBLS: keys.BLSPubKey.Marshal(),
+	bev := &Reduction{
+		Header: &header.Header{
+			PubKeyBLS: keys.BLSPubKeyBytes,
 			Round:     round,
 			Step:      step,
+			BlockHash: hash,
 		},
-		VotedHash:  hash,
 		SignedHash: signedHash.Compress(),
 	}
 
@@ -83,7 +99,7 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	_ = marshaller.Marshal(buf, bev)
 	edSig := ed25519.Sign(*keys.EdSecretKey, buf.Bytes())
 	completeBuf := bytes.NewBuffer(edSig)
-	completeBuf.Write(keys.EdPubKeyBytes())
+	completeBuf.Write(keys.EdPubKeyBytes)
 	completeBuf.Write(buf.Bytes())
 	return completeBuf
 }
@@ -100,5 +116,9 @@ func mockCommittee(quorum int, isMember bool, amMember bool) committee.Committee
 	committeeMock.On("AmMember",
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(amMember)
+	committeeMock.On("Pack",
+		mock.AnythingOfType("sortedset.Set"),
+		mock.AnythingOfType("uint64"),
+		mock.AnythingOfType("uint8")).Return(sortedset.All)
 	return committeeMock
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/candidate"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -15,7 +16,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -36,6 +36,7 @@ func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
 // processes it intends to start up.
 type ConsensusFactory struct {
 	eventBus    *wire.EventBus
+	rpcBus      *wire.RPCBus
 	initChannel chan uint64
 
 	*user.Keys
@@ -45,7 +46,7 @@ type ConsensusFactory struct {
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *wire.EventBus, timerLength time.Duration,
+func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration,
 	committee committee.Committee, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
@@ -54,6 +55,7 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 
 	return &ConsensusFactory{
 		eventBus:    eventBus,
+		rpcBus:      rpcBus,
 		initChannel: initChannel,
 		Keys:        keys,
 		timerLength: timerLength,
@@ -68,12 +70,12 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.LaunchReputationComponent(c.eventBus)
-	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k)
-	voting.LaunchVotingComponent(c.eventBus, c.committee, c.Keys)
+	generation.LaunchScoreGenerationComponent(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
+	candidate.LaunchCandidateComponent(c.eventBus)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)
 
-	reduction.LaunchReducer(c.eventBus, c.committee, c.timerLength)
+	reduction.LaunchReducer(c.eventBus, c.committee, c.Keys, c.timerLength)
 
 	round := <-c.initChannel
 	log.WithFields(log.Fields{

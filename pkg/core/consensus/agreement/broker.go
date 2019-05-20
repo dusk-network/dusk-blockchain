@@ -7,27 +7,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
-
-// LaunchNotification is a helper function to allow internal propagation of Agreement messages to those interested (for example monitoring and loggin processors)
-func LaunchNotification(eventbus wire.EventSubscriber) <-chan *events.AggregatedAgreement {
-	agreementChan := make(chan *events.AggregatedAgreement)
-	evChan := consensus.LaunchNotification(eventbus,
-		events.NewAggregatedAgreementUnMarshaller(), msg.OutgoingBlockAgreementTopic)
-
-	go func() {
-		for {
-			aEv := <-evChan
-			agreementChan <- aEv.(*events.AggregatedAgreement)
-		}
-	}()
-
-	return agreementChan
-}
 
 // LaunchAgreement is a helper to minimize the wiring of TopicListeners,
 // collector and channels. The agreement component notarizes the new blocks after having collected a quorum of votes
@@ -51,8 +34,8 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 	accumulator *consensus.Accumulator) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(handler, state, accumulator, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
-	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Agreement))
-	go listener.Accept(republisher, &consensus.Validator{})
+	eventBroker.SubscribeCallback(string(topics.Agreement), filter.Collect)
+	eventBroker.RegisterPreprocessor(string(topics.Agreement), republisher, &consensus.Validator{})
 	return filter
 }
 
@@ -73,7 +56,8 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Committee) *bro
 // Listen for results coming from the accumulator and updating the round accordingly
 func (b *broker) Listen() {
 	for {
-		<-b.accumulator.CollectedVotesChan
+		evs := <-b.accumulator.CollectedVotesChan
+		b.publishWinningHash(evs)
 		b.updateRound(b.state.Round() + 1)
 	}
 }
@@ -88,6 +72,11 @@ func (b *broker) updateRound(round uint64) {
 	b.accumulator.Clear()
 	// TODO: should consume entire round messages
 	b.filter.FlushQueue()
+}
+
+func (b *broker) publishWinningHash(evs []wire.Event) {
+	aev := evs[0].(*Agreement)
+	b.publisher.Publish(msg.WinningBlockTopic, bytes.NewBuffer(aev.BlockHash))
 }
 
 // publishRoundUpdate publishes the new round in the EventPublisher

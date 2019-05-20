@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -35,11 +35,11 @@ func TestEarlyEvent(t *testing.T) {
 	round := uint64(2)
 	step := uint8(1)
 	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true,
-		newMockEventProcessor(nil, processChan), true)
+	processor := newMockEventProcessor(nil, processChan)
+	eventFilter := newEventFilter(round, step, true, processor, true)
 	eventFilter.UpdateRound(1)
 
-	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.NoError(t, eventFilter.Collect(new(bytes.Buffer)))
 	// Queue should now hold an event
 	// Update the round, and flush the queue to get it
 	eventFilter.UpdateRound(2)
@@ -105,8 +105,7 @@ func newMockEvent() wire.Event {
 func newMockHandlerFilter(round uint64, step uint8, pubKeyBLS []byte) consensus.EventHandler {
 	var sender []byte
 	mockEventHandler := &mocks.EventHandler{}
-	mockEventHandler.On("NewEvent").Return(newMockEvent())
-	mockEventHandler.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)
+	mockEventHandler.On("Deserialize", mock.Anything).Return(newMockEvent(), nil)
 	mockEventHandler.On("ExtractHeader",
 		mock.MatchedBy(func(ev wire.Event) bool {
 			sender = ev.Sender()
@@ -114,8 +113,8 @@ func newMockHandlerFilter(round uint64, step uint8, pubKeyBLS []byte) consensus.
 				sender, _ = crypto.RandEntropy(32)
 			}
 			return true
-		})).Return(func(e wire.Event) *events.Header {
-		return &events.Header{
+		})).Return(func(e wire.Event) *header.Header {
+		return &header.Header{
 			Round:     round,
 			Step:      step,
 			PubKeyBLS: sender,

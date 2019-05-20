@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
-	"sync"
-	"time"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
@@ -34,33 +32,23 @@ type Chain struct {
 	rpcBus   *wire.RPCBus
 	db       database.DB
 
-	// TODO: exposed for demo, undo later
-	// We expose prevBlock here so that we can change and retrieve the
-	// current height of the chain. This makes jump-in a lot easier while
-	// we don't yet store blocks.
-	sync.RWMutex
-	PrevBlock block.Block
+	prevBlock block.Block
 	bidList   *user.BidList
 
 	blockChannel <-chan *block.Block
 
 	// collector channels
-	roundChan <-chan uint64
 	blockChan <-chan *block.Block
-	txChan    <-chan transactions.Transaction
 }
 
 // New returns a new chain object
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
-
 	drvr, err := database.From(cfg.Get().Database.Driver)
-
 	if err != nil {
 		return nil, err
 	}
 
 	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +64,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 			Seed:      []byte{0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
 		},
 	}
+
 	err = genesisBlock.SetHash()
 	if err != nil {
 		return nil, err
@@ -89,7 +78,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		rpcBus:       rpcBus,
 		db:           db,
 		bidList:      &user.BidList{},
-		PrevBlock:    *genesisBlock,
+		prevBlock:    *genesisBlock,
 		blockChannel: blockChannel,
 	}
 
@@ -100,21 +89,12 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 func (c *Chain) Listen() {
 	for {
 		select {
-		case round := <-c.roundChan:
-			// TODO: this is added for testnet jump-in purposes while we dont yet
-			// store blocks. remove this later
-
-			// The prevBlock height should be set to round - 1, as the round denotes the
-			// height of the block that is currently being forged.
-			c.Lock()
-			c.PrevBlock.Header.Height = round - 1
-			c.Unlock()
 		case blk := <-c.blockChan:
 			c.AcceptBlock(*blk)
 		case r := <-wire.GetLastBlockChan:
 			buf := new(bytes.Buffer)
-			_ = c.PrevBlock.Encode(buf)
-			r.Resp <- *buf
+			_ = c.prevBlock.Encode(buf)
+			r.RespChan <- *buf
 		}
 	}
 }
@@ -131,7 +111,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.Gossip), buffer)
+	c.eventBus.Stream(string(topics.Gossip), buffer)
 	return nil
 }
 
@@ -213,7 +193,7 @@ func calculateX(d uint64, m []byte) user.Bid {
 func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 1. Check that stateless and stateful checks pass
-	if err := verifiers.CheckBlock(c.db, c.PrevBlock, blk); err != nil {
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
 		return err
 	}
 
@@ -226,7 +206,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	c.PrevBlock = blk
+	c.prevBlock = blk
 
 	// 3. Notify other subsystems for the accepted block
 	buf := new(bytes.Buffer)
@@ -242,80 +222,4 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	return nil
-}
-
-// CreateProposalBlock creates a candidate block to be proposed on next round.
-func (c *Chain) CreateProposalBlock() (*block.Block, error) {
-
-	// TODO Missing fields for forging the block
-	// - Seed
-	// - CertHash
-
-	// Retrieve latest verified transactions from Mempool
-	r, err := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
-	if err != nil {
-		return nil, err
-	}
-
-	lTxs, err := encoding.ReadVarInt(&r)
-	if err != nil {
-		return nil, err
-	}
-
-	txs, err := transactions.FromReader(&r, lTxs)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: guard the prevBlock with mutex
-	nextHeight := c.PrevBlock.Header.Height + 1
-	prevHash := c.PrevBlock.Header.Hash
-
-	h := &block.Header{
-		Version:   0,
-		Timestamp: time.Now().Unix(),
-		Height:    nextHeight,
-		PrevBlock: prevHash,
-		TxRoot:    nil,
-
-		Seed:     nil,
-		CertHash: nil,
-	}
-
-	// Generate the candidate block
-	b := &block.Block{
-		Header: h,
-		Txs:    txs,
-	}
-
-	// Update TxRoot
-	if err := b.SetRoot(); err != nil {
-		return nil, err
-	}
-
-	// Generate the block hash
-	if err := b.SetHash(); err != nil {
-		return nil, err
-	}
-
-	// Ensure the forged block satisfies all chain rules
-	if err := verifiers.CheckBlock(c.db, c.PrevBlock, *b); err != nil {
-		return nil, err
-	}
-
-	// Save it into persistent storage
-	err = c.db.Update(func(t database.Transaction) error {
-		err := t.StoreCandidateBlock(b)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
 }

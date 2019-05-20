@@ -3,7 +3,7 @@ package consensus
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -17,10 +17,12 @@ type (
 		wire.EventVerifier
 		wire.EventMarshaller
 		wire.EventDeserializer
-		ExtractHeader(wire.Event) *events.Header
+		ExtractHeader(wire.Event) *header.Header
 	}
 
-	// EventFilter is a generic wire.Collector that can be used by consensus components for filtering and passing down messages. It coordinates an EventQueue to manage Events coming too early and delegates consensus specific logic to the handler.
+	// EventFilter is a generic wire.Collector that can be used by consensus components
+	// for filtering and passing down messages. It coordinates an EventQueue to manage
+	// Events coming too early and delegates consensus specific logic to the handler.
 	EventFilter struct {
 		queue     *EventQueue
 		handler   EventHandler
@@ -48,8 +50,8 @@ func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
 }
 
 func (c *EventFilter) Collect(buffer *bytes.Buffer) error {
-	ev := c.handler.NewEvent()
-	if err := c.handler.Unmarshal(buffer, ev); err != nil {
+	ev, err := c.handler.Deserialize(buffer)
+	if err != nil {
 		return err
 	}
 
@@ -73,7 +75,8 @@ func (c *EventFilter) isEarly(roundDiff, stepDiff int) bool {
 		return earlyRound
 	}
 	earlyStep := stepDiff < 0
-	return earlyRound || earlyStep
+	sameRound := roundDiff == 0
+	return earlyRound || (sameRound && earlyStep)
 }
 
 func (c *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
@@ -95,7 +98,7 @@ func (c *EventFilter) FlushQueue() {
 	if c.checkStep {
 		queuedEvents = c.queue.GetEvents(c.state.Round(), c.state.Step())
 	} else {
-		queuedEvents = c.queue.GetEvents(c.state.Round(), 0)
+		queuedEvents = c.queue.Flush(c.state.Round())
 	}
 
 	for _, event := range queuedEvents {

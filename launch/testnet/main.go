@@ -78,10 +78,6 @@ func main() {
 	srv := Setup()
 	defer srv.Close()
 
-	// listening to the blindbid and the stake channels
-	go srv.Listen()
-	// fetch neighbours addresses from the Seeder
-	ips := ConnectToSeeder()
 	//start the connection manager
 	connMgr := NewConnMgr(CmgrConfig{
 		Port:     port,
@@ -89,15 +85,15 @@ func main() {
 		OnConn:   srv.OnConnection,
 	})
 
+	// fetch neighbours addresses from the Seeder
+	ips := ConnectToSeeder()
+
 	// trying to connect to the peers
 	for _, ip := range ips {
 		if err := connMgr.Connect(ip); err != nil {
 			log.WithField("IP", ip).Warnln(err)
 		}
 	}
-
-	// wait a bit for everyone to start up
-	time.Sleep(time.Second * 10)
 
 	round := joinConsensus(connMgr, srv, ips)
 	srv.StartConsensus(round)
@@ -111,6 +107,7 @@ func main() {
 }
 
 func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
+	// TODO: this needs to be adjusted to happen from an accepted block, or something similar
 	// if we are the first, initialize consensus on round 1
 	if strings.Contains(ips[0], "noip") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
@@ -120,11 +117,11 @@ func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
 	// if height is not 0, init consensus on 2 rounds after it
 	// +1 because the round is always height + 1
 	// +1 because we dont want to get stuck on a round thats currently happening
-	if srv.chain.PrevBlock.Header.Height != 0 {
-		round := srv.chain.PrevBlock.Header.Height + 2
-		log.WithField("prefix", "main").Infof("Starting consensus from round %d\n", round)
-		return round
-	}
+	// if srv.chain.PrevBlock.Header.Height != 0 {
+	// 	round := srv.chain.PrevBlock.Header.Height + 2
+	// 	log.WithField("prefix", "main").Infof("Starting consensus from round %d\n", round)
+	// 	return round
+	// }
 
 	log.WithField("prefix", "main").Infoln("Starting consensus from scratch")
 	return uint64(1)

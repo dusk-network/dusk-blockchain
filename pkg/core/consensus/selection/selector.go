@@ -108,7 +108,7 @@ func (s *eventSelector) repropagate(ev wire.Event) {
 		panic(err)
 	}
 
-	s.publisher.Publish(string(topics.Gossip), msg)
+	s.publisher.Stream(string(topics.Gossip), msg)
 }
 
 func (s *eventSelector) publishBestEvent() {

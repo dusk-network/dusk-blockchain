@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"io"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -81,12 +82,16 @@ type (
 	// EventSubscriber subscribes a channel to Event notifications on a specific topic
 	EventSubscriber interface {
 		Subscribe(string, chan<- *bytes.Buffer) uint32
+		SubscribeCallback(string, func(*bytes.Buffer) error) uint32
+		SubscribeStream(string, io.WriteCloser) uint32
 		Unsubscribe(string, uint32) bool
+		RegisterPreprocessor(string, ...TopicProcessor)
 	}
 
 	// EventPublisher publishes serialized messages on a specific topic
 	EventPublisher interface {
 		Publish(string, *bytes.Buffer)
+		Stream(string, *bytes.Buffer)
 	}
 
 	// EventBroker is an EventPublisher and an EventSubscriber
@@ -97,8 +102,7 @@ type (
 
 	// EventDeserializer is the interface for those struct that allows deserialization of an event from scratch
 	EventDeserializer interface {
-		EventUnmarshaller
-		NewEvent() Event
+		Deserialize(*bytes.Buffer) (Event, error)
 	}
 
 	Store interface {
@@ -112,13 +116,17 @@ type (
 
 // NewTopicListener creates the TopicListener listening to a topic on the EventBus.
 // The EventBus, EventCollector and Topic are injected
-func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topic string) *TopicListener {
+func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topic string,
+	preprocessors ...TopicProcessor) *TopicListener {
 
-	quitChan := make(chan *bytes.Buffer, 1)
 	msgChan := make(chan *bytes.Buffer, 100)
-
+	quitChan := make(chan *bytes.Buffer, 1)
 	msgChanID := subscriber.Subscribe(topic, msgChan)
 	quitChanID := subscriber.Subscribe(string(QuitTopic), quitChan)
+
+	if len(preprocessors) > 0 {
+		subscriber.RegisterPreprocessor(topic, preprocessors...)
+	}
 
 	return &TopicListener{
 		subscriber:     subscriber,
@@ -132,7 +140,7 @@ func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topi
 }
 
 // Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect. It accepts a variadic number of TopicProcessors which pre-process the buffer before passing it to the Collector
-func (n *TopicListener) Accept(processors ...TopicProcessor) {
+func (n *TopicListener) Accept() {
 	log.WithFields(log.Fields{
 		"id":    n.MsgChanID,
 		"topic": n.topic,
@@ -143,17 +151,7 @@ func (n *TopicListener) Accept(processors ...TopicProcessor) {
 			n.subscriber.Unsubscribe(n.topic, n.MsgChanID)
 			n.subscriber.Unsubscribe(string(QuitTopic), n.QuitChanID)
 			return
-		case unprocessedEvBuffer := <-n.msgChan:
-			eventBuffer, err := n.preprocess(unprocessedEvBuffer, processors...)
-			if err != nil {
-				log.WithError(err).WithFields(
-					log.Fields{
-						"process": "topic listner",
-						"topic":   n.topic,
-					}).Warnln("processor failure")
-				continue
-			}
-
+		case eventBuffer := <-n.msgChan:
 			if len(n.msgChan) > 10 {
 				log.WithFields(log.Fields{
 					"id":         n.MsgChanID,
@@ -169,23 +167,6 @@ func (n *TopicListener) Accept(processors ...TopicProcessor) {
 			}
 		}
 	}
-}
-
-func (n *TopicListener) preprocess(eventBuffer *bytes.Buffer, processors ...TopicProcessor) (*bytes.Buffer, error) {
-	var err error
-	buf := eventBuffer
-	for _, processor := range processors {
-		buf, err = processor.Process(buf)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"process": "topiclistener",
-				"topic":   n.topic,
-				"error":   err,
-			}).Debugln("processing error")
-			return nil, err
-		}
-	}
-	return buf, nil
 }
 
 // AddTopic is a convenience function to add a specified topic at the start of

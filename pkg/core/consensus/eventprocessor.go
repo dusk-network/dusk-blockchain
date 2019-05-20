@@ -28,13 +28,12 @@ func NewRepublisher(publisher wire.EventPublisher, topic topics.Topic) *Republis
 func (b *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
 	bounced := eventBuffer
 	msg, _ := wire.AddTopic(bounced, b.topic)
-	b.publisher.Publish(string(topics.Gossip), msg)
+	b.publisher.Stream(string(topics.Gossip), msg)
 	return eventBuffer, nil
 }
 
 // Process a buffer by validating the ED25519 Signature. It uses a io.TeeReader to preserve the original message. It returns a copy of the message
 func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
-
 	sig := make([]byte, 64)
 	if err := encoding.Read512(buf, &sig); err != nil {
 		return nil, err

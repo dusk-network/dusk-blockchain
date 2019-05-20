@@ -14,7 +14,7 @@ func TestRemove(t *testing.T) {
 	committee := newCommittee()
 	for i := 0; i < nr; i++ {
 		k, _ := NewRandKeys()
-		bk := (&big.Int{}).SetBytes(k.BLSPubKey.Marshal())
+		bk := (&big.Int{}).SetBytes(k.BLSPubKeyBytes)
 		committee.Set = append(committee.Set, bk)
 	}
 	sort.Sort(committee.Set)
@@ -36,7 +36,7 @@ func (s sortedKeys) Less(i, j int) bool {
 }
 
 func btoi(k *Keys) *big.Int {
-	b := k.BLSPubKey.Marshal()
+	b := k.BLSPubKeyBytes
 	return (&big.Int{}).SetBytes(b)
 }
 
@@ -46,7 +46,7 @@ func TestMemberKeys(t *testing.T) {
 	var ks sortedKeys
 	for i := 0; i < 50; i++ {
 		keys, _ := NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes(), keys.BLSPubKey.Marshal(), 500); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500); err != nil {
 			t.Fatal(err)
 		}
 		ks = append(ks, keys)

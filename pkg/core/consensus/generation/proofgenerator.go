@@ -9,9 +9,9 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-type generator interface {
-	generateProof([]byte) zkproof.ZkProof
-	updateBidList(user.BidList)
+type Generator interface {
+	GenerateProof([]byte) zkproof.ZkProof
+	UpdateBidList(user.BidList)
 }
 
 type proofGenerator struct {
@@ -27,7 +27,7 @@ func newProofGenerator(d, k ristretto.Scalar) *proofGenerator {
 	}
 }
 
-func (g *proofGenerator) updateBidList(bidList user.BidList) {
+func (g *proofGenerator) UpdateBidList(bidList user.BidList) {
 	g.Lock()
 	defer g.Unlock()
 	g.bidList = bidList
@@ -35,7 +35,7 @@ func (g *proofGenerator) updateBidList(bidList user.BidList) {
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
 // propose a block to the voting committee.
-func (g *proofGenerator) generateProof(seed []byte) zkproof.ZkProof {
+func (g *proofGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 	log.WithField("process", "generation").Traceln("generating proof")
 	// Turn seed into scalar
 	seedScalar := ristretto.Scalar{}
