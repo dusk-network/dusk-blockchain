@@ -13,11 +13,12 @@ import (
 )
 
 // MaxStrikes is the maximum allowed amount of strikes in a single round
-const maxStrikes uint8 = 3
+const maxStrikes uint8 = 6
 
 type moderator struct {
 	publisher wire.EventPublisher
 	strikes   map[string]uint8
+	round     uint64
 
 	roundChan    <-chan uint64
 	absenteeChan chan []byte
@@ -42,10 +43,16 @@ func newModerator(eventBroker wire.EventBroker) *moderator {
 func (m *moderator) listen() {
 	for {
 		select {
-		case <-m.roundChan:
+		case round := <-m.roundChan:
 			// clean strikes map on round update
 			m.strikes = make(map[string]uint8)
+			m.round = round
 		case absentee := <-m.absenteeChan:
+			log.WithFields(log.Fields{
+				"process":     "reputation",
+				"provisioner": hex.EncodeToString(absentee),
+				"round":       m.round,
+			}).Debugln("striking absentee")
 			m.addStrike(absentee)
 		}
 	}
