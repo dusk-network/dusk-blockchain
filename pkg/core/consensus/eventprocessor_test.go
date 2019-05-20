@@ -19,12 +19,12 @@ func TestValidator(t *testing.T) {
 	signature := ed25519.Sign(*keys.EdSecretKey, message)
 	assert.Equal(t, 64, len(signature))
 
-	assert.NoError(t, msg.VerifyEd25519Signature(keys.EdPubKeyBytes(), message, signature))
+	assert.NoError(t, msg.VerifyEd25519Signature(keys.EdPubKeyBytes, message, signature))
 
 	b := make([]byte, 0)
 	buf := bytes.NewBuffer(b)
 	assert.NoError(t, encoding.Write512(buf, signature))
-	assert.NoError(t, encoding.Write256(buf, keys.EdPubKeyBytes()))
+	assert.NoError(t, encoding.Write256(buf, keys.EdPubKeyBytes))
 	_, err = buf.Write(message)
 	assert.NoError(t, err)
 

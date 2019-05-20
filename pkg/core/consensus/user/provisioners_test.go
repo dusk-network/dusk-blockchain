@@ -17,7 +17,7 @@ func TestCreateVotingCommittee(t *testing.T) {
 	var totalWeight uint64
 	for i := 0; i < 50; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes(), keys.BLSPubKey.Marshal(), 500); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500); err != nil {
 			t.Fatal(err)
 		}
 
@@ -41,7 +41,7 @@ func (s sortedKeys) Less(i, j int) bool {
 }
 
 func btoi(k *user.Keys) *big.Int {
-	b := k.BLSPubKey.Marshal()
+	b := k.BLSPubKeyBytes
 	return (&big.Int{}).SetBytes(b)
 }
 
@@ -51,7 +51,7 @@ func TestMemberAt(t *testing.T) {
 	var ks sortedKeys
 	for i := 0; i < nr; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes(), keys.BLSPubKey.Marshal(), 500); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500); err != nil {
 			t.Fatal(err)
 		}
 		ks = append(ks, keys)
@@ -61,7 +61,7 @@ func TestMemberAt(t *testing.T) {
 
 	for i := 0; i < nr; i++ {
 		m := p.MemberAt(i)
-		assert.True(t, bytes.Equal(m.PublicKeyBLS.Marshal(), ks[i].BLSPubKey.Marshal()))
+		assert.True(t, bytes.Equal(m.PublicKeyBLS.Marshal(), ks[i].BLSPubKeyBytes))
 	}
 }
 
@@ -71,12 +71,12 @@ func TestAddGetMember(t *testing.T) {
 	p := user.NewProvisioners()
 	for i := 0; i < 50; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes(), keys.BLSPubKey.Marshal(), 500); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500); err != nil {
 			t.Fatal(err)
 		}
 
 		if rand.Intn(100) < 30 {
-			tKeys = append(tKeys, keys.BLSPubKey.Marshal())
+			tKeys = append(tKeys, keys.BLSPubKeyBytes)
 		}
 	}
 	_, err := p.GetStake([]byte("Fake Public Key"))

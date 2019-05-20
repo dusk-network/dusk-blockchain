@@ -7,7 +7,7 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
@@ -43,8 +43,12 @@ func newScoreHandler() *scoreHandler {
 	}
 }
 
-func (p *scoreHandler) NewEvent() wire.Event {
-	return &ScoreEvent{}
+func (p *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+	ev := &ScoreEvent{}
+	if err := p.Unmarshal(r, ev); err != nil {
+		return nil, err
+	}
+	return ev, nil
 }
 
 func (p *scoreHandler) Unmarshal(r *bytes.Buffer, e wire.Event) error {
@@ -61,9 +65,9 @@ func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
 	p.bidList = bidList
 }
 
-func (p *scoreHandler) ExtractHeader(e wire.Event) *events.Header {
+func (p *scoreHandler) ExtractHeader(e wire.Event) *header.Header {
 	ev := e.(*ScoreEvent)
-	return &events.Header{
+	return &header.Header{
 		Round: ev.Round,
 	}
 }

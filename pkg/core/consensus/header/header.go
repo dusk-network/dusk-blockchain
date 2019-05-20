@@ -1,4 +1,4 @@
-package events
+package header
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ type (
 		PubKeyBLS []byte
 		Round     uint64
 		Step      uint8
+		BlockHash []byte
 	}
 
 	// HeaderMarshaller marshals a consensus Header as follows:
@@ -22,7 +23,7 @@ type (
 	// - Step
 	HeaderMarshaller struct{}
 
-	// HeaderUnmarshaller unmarshals consensus events. It is a helper to be embedded in the various consensus message unmarshallers
+	// HeaderUnmarshaller unmarshals consensus header. It is a helper to be embedded in the various consensus message unmarshallers
 	HeaderUnmarshaller struct{}
 
 	UnMarshaller struct {
@@ -48,7 +49,7 @@ func (a *Header) Sender() []byte {
 func (a *Header) Equal(e wire.Event) bool {
 	other, ok := e.(*Header)
 	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) &&
-		(a.Round == other.Round) && (a.Step == other.Step)
+		(a.Round == other.Round) && (a.Step == other.Step) && (bytes.Equal(a.BlockHash, other.BlockHash))
 }
 
 // Marshal a Header into a Buffer
@@ -58,20 +59,11 @@ func (ehm *HeaderMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, consensusEv.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(r, consensusEv.Step); err != nil {
-		return err
-	}
-
-	return nil
+	return MarshalSignableVote(r, consensusEv)
 }
 
 // Unmarshal unmarshals the buffer into a Consensus
 func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	// if the injection is unsuccessful, panic
 	consensusEv := ev.(*Header)
 
 	// Decoding PubKey BLS
@@ -79,15 +71,31 @@ func (a *HeaderUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	// Decoding Round
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &consensusEv.Round); err != nil {
+	return UnmarshalSignableVote(r, consensusEv)
+}
+
+// MarshalSignableVote marshals the fields necessary for a Committee member to cast a Vote (namely the Round, the Step and the BlockHash)
+func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
+	if err := encoding.WriteUint64(r, binary.LittleEndian, vote.Round); err != nil {
 		return err
 	}
 
-	// Decoding Step
-	if err := encoding.ReadUint8(r, &consensusEv.Step); err != nil {
+	if err := encoding.WriteUint8(r, vote.Step); err != nil {
 		return err
 	}
 
-	return nil
+	return encoding.Write256(r, vote.BlockHash)
+}
+
+// UnmarshalSignableVote unmarshals the fields necessary for a Committee member to cast a Vote (namely the Round, the Step and the BlockHash)
+func UnmarshalSignableVote(r *bytes.Buffer, vote *Header) error {
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &vote.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(r, &vote.Step); err != nil {
+		return err
+	}
+
+	return encoding.Read256(r, &vote.BlockHash)
 }

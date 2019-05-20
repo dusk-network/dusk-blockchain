@@ -15,21 +15,16 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 func TestScoreGeneration(t *testing.T) {
-	eb := wire.NewEventBus()
 	d := ristretto.Scalar{}
 	d.Rand()
 	k := ristretto.Scalar{}
 	k.Rand()
 
-	streamer := helper.NewSimpleStreamer()
-	// subscribe to gossip topic
-
-	eb.SubscribeStream(string(topics.Gossip), streamer)
+	eb, streamer := helper.CreateGossipStreamer()
 
 	gen := &mockGenerator{}
 

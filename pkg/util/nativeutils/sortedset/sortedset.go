@@ -1,13 +1,14 @@
 package sortedset
 
 import (
+	"math"
 	"math/big"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-const All = uint64(0)
+const All uint64 = math.MaxUint64
 
 type Set []*big.Int
 

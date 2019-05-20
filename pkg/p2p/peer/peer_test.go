@@ -7,13 +7,10 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-
 	"github.com/stretchr/testify/assert"
-
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -76,7 +73,7 @@ func TestWriter(t *testing.T) {
 		addPeer(bus)
 	}
 
-	ev := agreement.MockAgreementBuf(make([]byte, 32), 1, 2, 10)
+	ev := makeAgreementBuffer(10)
 	msg, err := wire.AddTopic(ev, topics.Agreement)
 	if err != nil {
 		panic(err)
@@ -107,7 +104,7 @@ func BenchmarkWriter(b *testing.B) {
 		addPeer(bus)
 	}
 
-	ev := agreement.MockAgreementBuf(make([]byte, 32), 1, 2, 10)
+	ev := makeAgreementBuffer(10)
 	msg, err := wire.AddTopic(ev, topics.Agreement)
 	if err != nil {
 		panic(err)
@@ -150,7 +147,7 @@ func BenchmarkFastReceiver(b *testing.B) {
 		addPeer(bus)
 	}
 
-	ev := agreement.MockAgreementBuf(make([]byte, 32), 1, 2, 10)
+	ev := makeAgreementBuffer(10)
 	msg, err := wire.AddTopic(ev, topics.Agreement)
 	if err != nil {
 		panic(err)
@@ -196,7 +193,7 @@ func BenchmarkFastEventReceiver(b *testing.B) {
 		addEventPeer(bus, b)
 	}
 
-	ev := agreement.MockAgreementBuf(make([]byte, 32), 1, 2, 10)
+	ev := makeAgreementBuffer(10)
 	msg, err := wire.AddTopic(ev, topics.Agreement)
 	if err != nil {
 		panic(err)
@@ -229,6 +226,16 @@ func startServer(f func(net.Conn, chan struct{}, chan struct{}), inboundChan cha
 		}
 	}()
 	return nil
+}
+
+func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
+	var keys []*user.Keys
+	for i := 0; i < keyAmount; i++ {
+		keyPair, _ := user.NewRandKeys()
+		keys = append(keys, keyPair)
+	}
+
+	return agreement.MockAgreement(make([]byte, 32), 1, 2, keys)
 }
 
 func addPeer(bus *wire.EventBus) {

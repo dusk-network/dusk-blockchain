@@ -5,7 +5,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -16,7 +16,7 @@ type (
 	// about specific event fields.
 	reductionHandler struct {
 		committee.Committee
-		*events.ReductionUnMarshaller
+		*UnMarshaller
 	}
 
 	handler interface {
@@ -29,28 +29,28 @@ type (
 // and an unmarshaller which uses the injected validation function.
 func newReductionHandler(committee committee.Committee) *reductionHandler {
 	return &reductionHandler{
-		Committee:             committee,
-		ReductionUnMarshaller: events.NewReductionUnMarshaller(),
+		Committee:    committee,
+		UnMarshaller: NewUnMarshaller(),
 	}
 }
 
-func (b *reductionHandler) ExtractHeader(e wire.Event) *events.Header {
-	ev := e.(*events.Reduction)
-	return &events.Header{
+func (b *reductionHandler) ExtractHeader(e wire.Event) *header.Header {
+	ev := e.(*Reduction)
+	return &header.Header{
 		Round: ev.Round,
 		Step:  ev.Step,
 	}
 }
 
 func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*events.Reduction)
-	return encoding.Write256(r, ev.VotedHash)
+	ev := e.(*Reduction)
+	return encoding.Write256(r, ev.BlockHash)
 }
 
 // Verify the blockEvent
 func (b *reductionHandler) Verify(e wire.Event) error {
-	ev := e.(*events.Reduction)
-	return msg.VerifyBLSSignature(ev.PubKeyBLS, ev.VotedHash, ev.SignedHash)
+	ev := e.(*Reduction)
+	return msg.VerifyBLSSignature(ev.PubKeyBLS, ev.BlockHash, ev.SignedHash)
 }
 
 // Priority is not used for this handler

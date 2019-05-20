@@ -9,13 +9,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func TestSelection(t *testing.T) {
@@ -39,10 +38,7 @@ func TestSelection(t *testing.T) {
 }
 
 func TestRepropagation(t *testing.T) {
-	eb := wire.NewEventBus()
-	// subscribe to gossip topic
-	streamer := helper.NewSimpleStreamer()
-	eb.SubscribeStream(string(topics.Gossip), streamer)
+	eb, streamer := helper.CreateGossipStreamer()
 
 	selector := newEventSelector(eb, newMockScoreHandler(), time.Millisecond*100, consensus.NewState())
 	go selector.startSelection()
@@ -121,8 +117,8 @@ func newMockHandler() consensus.EventHandler {
 		mock.MatchedBy(func(ev wire.Event) bool {
 			sender, _ = crypto.RandEntropy(32)
 			return true
-		})).Return(func(e wire.Event) *events.Header {
-		return &events.Header{
+		})).Return(func(e wire.Event) *header.Header {
+		return &header.Header{
 			Round:     1,
 			Step:      1,
 			PubKeyBLS: sender,

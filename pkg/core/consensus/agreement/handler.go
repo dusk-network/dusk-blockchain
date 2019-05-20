@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -15,32 +15,32 @@ import (
 
 type agreementHandler struct {
 	committee.Committee
-	*events.AggregatedAgreementUnMarshaller
+	*AgreementUnMarshaller
 }
 
 func newHandler(committee committee.Committee) *agreementHandler {
 	return &agreementHandler{
-		Committee:                       committee,
-		AggregatedAgreementUnMarshaller: events.NewAggregatedAgreementUnMarshaller(),
+		Committee:             committee,
+		AgreementUnMarshaller: NewUnMarshaller(),
 	}
 }
 
-func (a *agreementHandler) ExtractHeader(e wire.Event) *events.Header {
-	ev := e.(*events.AggregatedAgreement)
-	return &events.Header{
+func (a *agreementHandler) ExtractHeader(e wire.Event) *header.Header {
+	ev := e.(*Agreement)
+	return &header.Header{
 		Round: ev.Round,
 		Step:  ev.Step,
 	}
 }
 
 func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*events.AggregatedAgreement)
+	ev := e.(*Agreement)
 	return encoding.WriteUint8(r, ev.Step)
 }
 
 // Verify checks the signature of the set. TODO: At the moment the overall BLS signature is not checked as it is not clear if checking the ED25519 is enough (it should be in case the node links the BLS keys to the Edward keys)
 func (a *agreementHandler) Verify(e wire.Event) error {
-	ev, ok := e.(*events.AggregatedAgreement)
+	ev, ok := e.(*Agreement)
 	if !ok {
 		return errors.New("Cant' verify an event different than the aggregated agreement")
 	}
@@ -57,13 +57,14 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 
 		signed := new(bytes.Buffer)
 
-		vote := &events.Vote{
+		// TODO: change into Header
+		vote := &header.Header{
 			Round:     ev.Round,
 			Step:      step,
-			BlockHash: ev.AgreedHash,
+			BlockHash: ev.BlockHash,
 		}
 
-		if err := events.MarshalSignableVote(signed, vote); err != nil {
+		if err := header.MarshalSignableVote(signed, vote); err != nil {
 			return err
 		}
 

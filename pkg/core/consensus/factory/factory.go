@@ -16,7 +16,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -70,12 +69,11 @@ func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.LaunchReputationComponent(c.eventBus)
 	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k, nil)
-	voting.LaunchVotingComponent(c.eventBus, c.committee, c.Keys)
 	candidate.LaunchCandidateComponent(c.eventBus)
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)
 
-	reduction.LaunchReducer(c.eventBus, c.committee, c.timerLength)
+	reduction.LaunchReducer(c.eventBus, c.committee, c.Keys, c.timerLength)
 
 	round := <-c.initChannel
 	log.WithFields(log.Fields{

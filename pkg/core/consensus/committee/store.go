@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/events"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -97,7 +96,7 @@ func (c *Store) AddProvisioner(m *bytes.Buffer) error {
 }
 
 func (c *Store) AmMember(round uint64, step uint8) bool {
-	return c.IsMember(c.keys.BLSPubKey.Marshal(), round, step)
+	return c.IsMember(c.keys.BLSPubKeyBytes, round, step)
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
@@ -168,10 +167,6 @@ func (c *Store) upsertCommitteeCache(round uint64, step uint8) user.VotingCommit
 // Priority returns false in case pubKey2 has higher stake than pubKey1
 func (c *Store) Priority(ev1, ev2 wire.Event) bool {
 	p := c.copyProvisioners()
-	if _, ok := ev1.(*events.Agreement); !ok {
-		return false
-	}
-
 	m1 := p.GetMember(ev1.Sender())
 	m2 := p.GetMember(ev2.Sender())
 
