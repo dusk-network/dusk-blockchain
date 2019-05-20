@@ -12,6 +12,7 @@ import (
 )
 
 var ringBufferLength = 200
+var napTime = 10 * time.Millisecond
 var _signal struct{}
 
 // EventBus - box for handlers and callbacks.
@@ -106,8 +107,8 @@ func (s *streamHandler) Pipe(c *ring.Consumer, w io.WriteCloser) {
 			}
 			return
 		default:
-			data, found := c.Consume()
-			if !found {
+			data, duplicate := c.Consume()
+			if !duplicate {
 				if _, err := w.Write(data); err != nil {
 					log.WithFields(log.Fields{
 						"process": "eventbus",
@@ -118,7 +119,7 @@ func (s *streamHandler) Pipe(c *ring.Consumer, w io.WriteCloser) {
 				continue
 			}
 			// giving enough time to the producer to send stuff
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(napTime)
 		}
 	}
 }
