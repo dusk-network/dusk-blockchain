@@ -61,12 +61,12 @@ func (bus *EventBus) subscribe(topic string, handler *channelHandler) {
 
 // Subscribe subscribes to a topic with a channel.
 func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer) uint32 {
-	bus.busLock.Lock()
-	defer bus.busLock.Unlock()
 	id := rand.Uint32()
+	bus.busLock.Lock()
 	bus.subscribe(topic, &channelHandler{
 		id, messageChannel,
 	})
+	bus.busLock.Unlock()
 
 	return id
 }
@@ -78,9 +78,11 @@ func (bus *EventBus) subscribeCallback(topic string, handler *callbackHandler) {
 // SubscribeCallback subscribes to a topic with a callback.
 func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer) error) uint32 {
 	id := rand.Uint32()
+	bus.busLock.Lock()
 	bus.subscribeCallback(topic, &callbackHandler{
 		id, callback,
 	})
+	bus.busLock.Unlock()
 
 	return id
 }
@@ -129,7 +131,10 @@ func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
 	id := rand.Uint32()
 	c := ring.NewConsumer(bus.ringbuffer)
 	sh := newStreamHandler(id, topic)
+	bus.busLock.Lock()
 	bus.subscribeStream(topic, sh)
+	bus.busLock.Unlock()
+
 	go sh.Pipe(c, w)
 	return id
 }
@@ -184,6 +189,8 @@ func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicPr
 }
 
 func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) *bytes.Buffer {
+	bus.busLock.RLock()
+	defer bus.busLock.RUnlock()
 	if preprocessors, ok := bus.preprocessors[topic]; ok {
 		for _, preprocessor := range preprocessors {
 			messageBuffer, _ = preprocessor.Process(messageBuffer)
@@ -206,7 +213,6 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	if callbackHandlers, ok := bus.callbackHandlers[topic]; ok {
 		bus.publishCallback(callbackHandlers, processedMsg, topic)
 	}
-
 }
 
 // Stream a buffer to the subscribers for a specific topic.
