@@ -83,7 +83,7 @@ func (c *ConsensusFactory) StartConsensus() {
 		"round":   round,
 	}).Debug("Received initial round")
 
-	agreement.LaunchAgreement(c.eventBus, c.committee, round)
+	agreement.LaunchAgreement(c.eventBus, c.committee, c.Keys, round)
 
 	log.WithField("process", "factory").Info("Consensus Started")
 }

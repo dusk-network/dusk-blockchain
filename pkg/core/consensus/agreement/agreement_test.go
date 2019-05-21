@@ -38,7 +38,7 @@ func TestInitBroker(t *testing.T) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
-	LaunchAgreement(bus, committeeMock, 1)
+	LaunchAgreement(bus, committeeMock, nil, 1)
 
 	round := <-roundChan
 	assert.Equal(t, uint64(1), round)
@@ -103,7 +103,7 @@ func TestSkipNoMember(t *testing.T) {
 func initAgreement(c committee.Committee) (wire.EventBroker, *broker, <-chan uint64) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
-	broker := LaunchAgreement(bus, c, 1)
+	broker := LaunchAgreement(bus, c, nil, 1)
 	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
 	<-roundChan
 	return bus, broker, roundChan

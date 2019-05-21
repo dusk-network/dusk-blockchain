@@ -9,14 +9,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
-	"golang.org/x/crypto/ed25519"
 )
 
 var empty struct{}
@@ -132,16 +128,14 @@ func (r *reducer) begin() {
 		}
 		hash2 := r.extractHash(eventsSecondStep)
 		allEvents := append(events, eventsSecondStep...)
-		if r.isReductionSuccessful(hash1, hash2) && r.inCommittee() {
+		if r.isReductionSuccessful(hash1, hash2) {
 			log.WithFields(log.Fields{
 				"process":    "reducer",
 				"votes":      len(allEvents),
 				"block hash": hex.EncodeToString(hash1.Bytes()),
 			}).Debugln("Reduction successful")
 
-			if r.inCommittee() {
-				r.sendAgreement(allEvents, hash2)
-			}
+			r.sendResults(allEvents)
 		}
 
 		r.ctx.state.IncrementStep()
@@ -178,6 +172,15 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 	r.publisher.Stream(string(topics.Gossip), message)
 }
 
+func (r *reducer) sendResults(events []wire.Event) {
+	buf := new(bytes.Buffer)
+	if err := r.ctx.handler.MarshalVoteSet(buf, events); err != nil {
+		log.WithField("process", "reduction").WithError(err).Errorln("problem marshalling voteset")
+		return
+	}
+	r.publisher.Publish(msg.ReductionResultTopic, buf)
+}
+
 func logErr(err error, hash []byte, msg string) {
 	log.WithFields(
 		log.Fields{
@@ -186,63 +189,16 @@ func logErr(err error, hash []byte, msg string) {
 		}).WithError(err).Errorln(msg)
 }
 
-func (r *reducer) sendAgreement(evs []wire.Event, hash *bytes.Buffer) {
-	h := &header.Header{
-		PubKeyBLS: r.ctx.BLSPubKeyBytes,
-		Round:     r.ctx.state.Round(),
-		Step:      r.ctx.state.Step(),
-		BlockHash: hash.Bytes(),
+func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
+	if events == nil {
+		return bytes.NewBuffer(make([]byte, 32))
 	}
 
-	// create the Agreement event
-	a, err := r.Aggregate(h, evs)
-	if err != nil {
-		logErr(err, hash.Bytes(), "Error in creating the Agreement event")
-		return
-	}
-
-	// BLS sign it
-	if err := agreement.Sign(a, r.ctx.Keys); err != nil {
-		logErr(err, hash.Bytes(), "Error in signing the Agreement")
-		return
-	}
-
-	// Marshall it for Ed25519 signature
-	buffer, err := agreement.Marshal(a)
-	if err != nil {
-		logErr(err, hash.Bytes(), "Error in Marshalling the Agreement")
-		return
-	}
-
-	// sign the whole message
-	signed := r.signEd25519(buffer)
-	//add the topic
-	message, err := wire.AddTopic(signed, topics.Agreement)
-	if err != nil {
-		logErr(err, hash.Bytes(), "Error in adding topic to the Agreement")
-		return
-	}
-
-	//send it
-	r.publisher.Stream(string(topics.Gossip), message)
-}
-
-func (r *reducer) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
-	signature := ed25519.Sign(*r.ctx.EdSecretKey, eventBuf.Bytes())
-	buf := new(bytes.Buffer)
-	if err := encoding.Write512(buf, signature); err != nil {
+	hash := new(bytes.Buffer)
+	if err := r.ctx.handler.ExtractIdentifier(events[0], hash); err != nil {
 		panic(err)
 	}
-
-	if err := encoding.Write256(buf, r.ctx.EdPubKeyBytes); err != nil {
-		panic(err)
-	}
-
-	if _, err := buf.Write(eventBuf.Bytes()); err != nil {
-		panic(err)
-	}
-
-	return buf
+	return hash
 }
 
 func (r *reducer) publishRegeneration() {
@@ -265,51 +221,4 @@ func (r *reducer) end() {
 	r.stale = true
 	r.firstStep.stop()
 	r.secondStep.stop()
-}
-
-func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
-	if events == nil {
-		return bytes.NewBuffer(make([]byte, 32))
-	}
-
-	hash := new(bytes.Buffer)
-	if err := r.ctx.handler.ExtractIdentifier(events[0], hash); err != nil {
-		panic(err)
-	}
-	return hash
-}
-
-// Aggregate the Agreement event into an Agreement outgoing event
-func (r *reducer) Aggregate(h *header.Header, voteSet []wire.Event) (*agreement.Agreement, error) {
-	stepVotesMap := make(map[uint8]struct {
-		*agreement.StepVotes
-		sortedset.Set
-	})
-
-	for _, ev := range voteSet {
-		reduction := ev.(*Reduction)
-		sv, found := stepVotesMap[reduction.Step]
-		if !found {
-			sv.StepVotes = agreement.NewStepVotes()
-			sv.Set = sortedset.New()
-		}
-
-		if err := sv.StepVotes.Add(reduction.SignedHash, reduction.Sender(), reduction.Step); err != nil {
-			return nil, err
-		}
-		sv.Set.Insert(reduction.PubKeyBLS)
-		stepVotesMap[reduction.Step] = sv
-	}
-
-	agreement := agreement.New()
-	agreement.Header = h
-	i := 0
-	for _, stepVotes := range stepVotesMap {
-		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
-		sv.BitSet = r.ctx.committee.Pack(provisioners, h.Round, sv.Step)
-		agreement.VotesPerStep[i] = sv
-		i++
-	}
-
-	return agreement, nil
 }
