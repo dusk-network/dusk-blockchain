@@ -16,7 +16,6 @@ type VotingCommittee struct {
 }
 
 func newCommittee() *VotingCommittee {
-	// return make([]*big.Int, 0)
 	return &VotingCommittee{
 		Set: sortedset.New(),
 	}
@@ -48,16 +47,6 @@ func (v *VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	return found
 }
 
-// VotingCommitteeSize returns how big the voting committee should be.
-func (p *Provisioners) VotingCommitteeSize() int {
-	size := p.Size()
-	if size > 50 {
-		size = 50
-	}
-
-	return size
-}
-
 // createSortitionMessage will return the hash of the passed sortition information.
 func createSortitionHash(round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
@@ -76,11 +65,10 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
 func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
-	step uint8) *VotingCommittee {
+	step uint8, size int) *VotingCommittee {
 
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(totalWeight)
-	size := p.VotingCommitteeSize()
 
 	for i := 0; votingCommittee.Size() < size; i++ {
 		hash, err := createSortitionHash(round, step, i)

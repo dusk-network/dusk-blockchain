@@ -25,7 +25,7 @@ func TestCreateVotingCommittee(t *testing.T) {
 	}
 
 	// Run sortition to get 50 members (as a Set, committee cannot contain any duplicate)
-	committee := p.CreateVotingCommittee(100, totalWeight, 1)
+	committee := p.CreateVotingCommittee(100, totalWeight, 1, 50)
 
 	// total amount of members in the committee should be 50
 	assert.Equal(t, 50, committee.Size())

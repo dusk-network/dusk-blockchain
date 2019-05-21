@@ -53,7 +53,7 @@ func TestMemberKeys(t *testing.T) {
 	}
 
 	sort.Sort(ks)
-	v := p.CreateVotingCommittee(1, 500*50, 1)
+	v := p.CreateVotingCommittee(1, 500*50, 1, 50)
 	mk := v.MemberKeys()
 	assert.Equal(t, 50, len(mk))
 	for i := 0; i < 3; i++ {
