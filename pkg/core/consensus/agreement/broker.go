@@ -70,24 +70,27 @@ func (b *broker) Listen() {
 }
 
 func (b *broker) sendAgreement(m *bytes.Buffer) error {
-	if !b.handler.AmMember(b.state.Round(), b.state.Step()) {
-		return nil
+	// We always increment the step, even if we are not included in the committee.
+	// This way, we are always on the same step as everybody else.
+	defer b.state.IncrementStep()
+
+	if b.handler.AmMember(b.state.Round(), b.state.Step()) {
+		unmarshaller := reduction.NewUnMarshaller()
+		voteSet, err := unmarshaller.UnmarshalVoteSet(m)
+		if err != nil {
+			log.WithField("process", "agreement").WithError(err).Errorln("problem unmarshalling voteset")
+			return err
+		}
+
+		msg, err := b.handler.createAgreement(voteSet, b.state.Round(), b.state.Step())
+		if err != nil {
+			log.WithField("process", "agreement").WithError(err).Errorln("problem creating agreement vote")
+			return err
+		}
+
+		b.publisher.Stream(string(topics.Gossip), msg)
 	}
 
-	unmarshaller := reduction.NewUnMarshaller()
-	voteSet, err := unmarshaller.UnmarshalVoteSet(m)
-	if err != nil {
-		log.WithField("process", "agreement").WithError(err).Errorln("problem unmarshalling voteset")
-		return err
-	}
-
-	msg, err := b.handler.createAgreement(voteSet, b.state.Round(), b.state.Step())
-	if err != nil {
-		log.WithField("process", "agreement").WithError(err).Errorln("problem creating agreement vote")
-		return err
-	}
-
-	b.publisher.Stream(string(topics.Gossip), msg)
 	return nil
 }
 
