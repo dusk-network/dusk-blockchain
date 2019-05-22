@@ -40,28 +40,28 @@ type ConsensusFactory struct {
 	initChannel chan uint64
 
 	*user.Keys
-	timerLength time.Duration
-	committee   committee.Committee
-	d, k        ristretto.Scalar
+	timerLength    time.Duration
+	committeeStore *committee.Store
+	d, k           ristretto.Scalar
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration,
-	committee committee.Committee, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
+	committeeStore *committee.Store, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
 	go wire.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()
 
 	return &ConsensusFactory{
-		eventBus:    eventBus,
-		rpcBus:      rpcBus,
-		initChannel: initChannel,
-		Keys:        keys,
-		timerLength: timerLength,
-		committee:   committee,
-		d:           d,
-		k:           k,
+		eventBus:       eventBus,
+		rpcBus:         rpcBus,
+		initChannel:    initChannel,
+		Keys:           keys,
+		timerLength:    timerLength,
+		committeeStore: committeeStore,
+		d:              d,
+		k:              k,
 	}
 }
 
@@ -73,9 +73,10 @@ func (c *ConsensusFactory) StartConsensus() {
 	generation.LaunchScoreGenerationComponent(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
 	candidate.LaunchCandidateComponent(c.eventBus)
 
-	selection.LaunchScoreSelectionComponent(c.eventBus, c.committee, c.timerLength)
+	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)
 
-	reduction.LaunchReducer(c.eventBus, c.committee, c.Keys, c.timerLength)
+	reductionExtractor := committee.NewCommitteeExtractor(c.committeeStore, committee.ReductionCommitteeSize)
+	reduction.LaunchReducer(c.eventBus, reductionExtractor, c.Keys, c.timerLength)
 
 	round := <-c.initChannel
 	log.WithFields(log.Fields{
@@ -83,7 +84,8 @@ func (c *ConsensusFactory) StartConsensus() {
 		"round":   round,
 	}).Debug("Received initial round")
 
-	agreement.LaunchAgreement(c.eventBus, c.committee, c.Keys, round)
+	agreementExtractor := committee.NewCommitteeExtractor(c.committeeStore, committee.AgreementCommitteeSize)
+	agreement.LaunchAgreement(c.eventBus, agreementExtractor, c.Keys, round)
 
 	log.WithField("process", "factory").Info("Consensus Started")
 }

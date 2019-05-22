@@ -45,7 +45,7 @@ func TestRemoveProvisioner(t *testing.T) {
 func TestReportAbsentees(t *testing.T) {
 	bus := wire.NewEventBus()
 	c := LaunchCommitteeStore(bus, nil)
-	phase := NewCommittee(c, ReductionCommitteeSize)
+	phase := NewCommitteeExtractor(c, ReductionCommitteeSize)
 	absenteesChan := make(chan *bytes.Buffer, 1)
 	bus.Subscribe(msg.AbsenteesTopic, absenteesChan)
 
@@ -70,7 +70,7 @@ func TestReportAbsentees(t *testing.T) {
 func TestUpsertCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
 	c := LaunchCommitteeStore(bus, nil)
-	phase := NewCommittee(c, ReductionCommitteeSize)
+	phase := NewCommitteeExtractor(c, ReductionCommitteeSize)
 
 	// add some provisioners
 	k1 := newProvisioner(10, bus)
@@ -89,7 +89,7 @@ func TestUpsertCommitteeCache(t *testing.T) {
 func TestCleanCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
 	c := LaunchCommitteeStore(bus, nil)
-	phase := NewCommittee(c, ReductionCommitteeSize)
+	phase := NewCommitteeExtractor(c, ReductionCommitteeSize)
 
 	// add some provisioners
 	k1 := newProvisioner(10, bus)
