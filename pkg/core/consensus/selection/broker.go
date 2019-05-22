@@ -5,7 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -22,17 +21,15 @@ type scoreBroker struct {
 }
 
 // LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-func LaunchScoreSelectionComponent(eventBroker wire.EventBroker, committee committee.Committee,
-	timeout time.Duration) *scoreBroker {
+func LaunchScoreSelectionComponent(eventBroker wire.EventBroker, timeout time.Duration) *scoreBroker {
 	handler := newScoreHandler()
-	broker := newScoreBroker(eventBroker, committee, handler, timeout)
+	broker := newScoreBroker(eventBroker, handler, timeout)
 	go broker.Listen()
 	return broker
 }
 
-func launchScoreFilter(eventBroker wire.EventBroker, committee committee.Committee,
-	handler consensus.EventHandler, state consensus.State,
-	processor consensus.EventProcessor) *consensus.EventFilter {
+func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHandler,
+	state consensus.State, processor consensus.EventProcessor) *consensus.EventFilter {
 
 	filter := consensus.NewEventFilter(handler, state, processor, false)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Score))
@@ -41,15 +38,15 @@ func launchScoreFilter(eventBroker wire.EventBroker, committee committee.Committ
 }
 
 // newScoreBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func newScoreBroker(eventBroker wire.EventBroker, committee committee.Committee,
-	handler scoreEventHandler, timeOut time.Duration) *scoreBroker {
+func newScoreBroker(eventBroker wire.EventBroker, handler scoreEventHandler,
+	timeOut time.Duration) *scoreBroker {
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundUpdate(eventBroker)
 	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
 	bidListChan := consensus.InitBidListUpdate(eventBroker)
 	state := consensus.NewState()
 	selector := newEventSelector(eventBroker, handler, timeOut, state)
-	filter := launchScoreFilter(eventBroker, committee, handler, state, selector)
+	filter := launchScoreFilter(eventBroker, handler, state, selector)
 
 	return &scoreBroker{
 		filter:           filter,
