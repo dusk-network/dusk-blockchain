@@ -48,13 +48,16 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Committee, keys
 	state := consensus.NewState()
 	filter := launchFilter(eventBroker, committee, handler,
 		state, accumulator)
-	return &broker{
+	b := &broker{
 		publisher:   eventBroker,
 		handler:     handler,
 		state:       state,
 		filter:      filter,
 		accumulator: accumulator,
 	}
+
+	eventBroker.SubscribeCallback(msg.ReductionResultTopic, b.sendAgreement)
+	return b
 }
 
 // Listen for results coming from the accumulator and updating the round accordingly
