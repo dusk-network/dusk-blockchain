@@ -26,7 +26,7 @@ func TestRemove(t *testing.T) {
 	assert.Equal(t, nr-1, i)
 }
 
-type sortedKeys []*Keys
+type sortedKeys []Keys
 
 func (s sortedKeys) Len() int      { return len(s) }
 func (s sortedKeys) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
@@ -35,7 +35,7 @@ func (s sortedKeys) Less(i, j int) bool {
 	return btoi(s[i]).Cmp(btoi(s[j])) < 0
 }
 
-func btoi(k *Keys) *big.Int {
+func btoi(k Keys) *big.Int {
 	b := k.BLSPubKeyBytes
 	return (&big.Int{}).SetBytes(b)
 }

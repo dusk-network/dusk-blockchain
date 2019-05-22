@@ -43,7 +43,7 @@ func TestInitBroker(t *testing.T) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
-	LaunchAgreement(bus, committeeMock, nil, 1)
+	LaunchAgreement(bus, committeeMock, user.Keys{}, 1)
 
 	round := <-roundChan
 	assert.Equal(t, uint64(1), round)

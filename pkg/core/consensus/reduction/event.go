@@ -116,7 +116,7 @@ func (a *UnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
 }
 
 // SignBuffer is a shortcut to BLS and ED25519 sign a reduction message
-func SignBuffer(buf *bytes.Buffer, keys *user.Keys) error {
+func SignBuffer(buf *bytes.Buffer, keys user.Keys) error {
 	e := New()
 	if err := header.UnmarshalSignableVote(buf, e.Header); err != nil {
 		return err
@@ -131,7 +131,7 @@ func SignBuffer(buf *bytes.Buffer, keys *user.Keys) error {
 	return nil
 }
 
-func Sign(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
+func Sign(e *Reduction, keys user.Keys) (*bytes.Buffer, error) {
 	if err := BlsSign(e, keys); err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func Sign(e *Reduction, keys *user.Keys) (*bytes.Buffer, error) {
 }
 
 // BlsSign is a shortcut to create a BLS signature of a reduction vote and fill the proper field in Reduction struct
-func BlsSign(ev *Reduction, keys *user.Keys) error {
+func BlsSign(ev *Reduction, keys user.Keys) error {
 	buf := new(bytes.Buffer)
 
 	if err := header.MarshalSignableVote(buf, ev.Header); err != nil {

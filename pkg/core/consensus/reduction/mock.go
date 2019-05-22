@@ -41,18 +41,15 @@ func MockVoteSet(hash []byte, round uint64, step uint8, amount int) []wire.Event
 func MockVotes(hash []byte, round uint64, step uint8, amount int) []wire.Event {
 	var voteSet []wire.Event
 	for i := 0; i < amount; i++ {
-		_, r := MockReduction(nil, hash, round, step)
+		k, _ := user.NewRandKeys()
+		r := MockReduction(k, hash, round, step)
 		voteSet = append(voteSet, r)
 	}
 
 	return voteSet
 }
 
-func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *Reduction) {
-	if keys == nil {
-		keys, _ = user.NewRandKeys()
-	}
-
+func MockReduction(keys user.Keys, hash []byte, round uint64, step uint8) *Reduction {
 	reduction := MockOutgoingReduction(hash, round, step)
 	reduction.PubKeyBLS = keys.BLSPubKeyBytes
 
@@ -60,7 +57,7 @@ func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*use
 	_ = header.MarshalSignableVote(r, reduction.Header)
 	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, r.Bytes())
 	reduction.SignedHash = sigma.Compress()
-	return keys, reduction
+	return reduction
 }
 
 func MockOutgoingReduction(hash []byte, round uint64, step uint8) *Reduction {
@@ -78,12 +75,12 @@ func MockOutgoingReductionBuf(hash []byte, round uint64, step uint8) *bytes.Buff
 	return b
 }
 
-func MockReductionBuffer(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *bytes.Buffer) {
-	k, ev := MockReduction(keys, hash, round, step)
+func MockReductionBuffer(keys user.Keys, hash []byte, round uint64, step uint8) *bytes.Buffer {
+	ev := MockReduction(keys, hash, round, step)
 	marshaller := NewUnMarshaller()
 	buf := new(bytes.Buffer)
 	_ = marshaller.Marshal(buf, ev)
-	return k, buf
+	return buf
 }
 
 func mockSelectionEventBuffer(hash []byte) *bytes.Buffer {

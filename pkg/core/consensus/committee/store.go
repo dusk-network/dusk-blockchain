@@ -48,7 +48,7 @@ type (
 		removeProvisionerChan chan []byte
 
 		// own keys (TODO: this should just be BLSPubKey)
-		keys *user.Keys
+		keys user.Keys
 	}
 
 	// Extractor is a wrapper around the Store struct, and contains the phase-specific
@@ -65,7 +65,7 @@ type (
 )
 
 // LaunchCommitteeStore creates a component that listens to changes to the Provisioners
-func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store {
+func LaunchCommitteeStore(eventBroker wire.EventBroker, keys user.Keys) *Store {
 	store := &Store{
 		keys:                  keys,
 		publisher:             eventBroker,

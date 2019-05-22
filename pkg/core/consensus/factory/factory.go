@@ -39,7 +39,7 @@ type ConsensusFactory struct {
 	rpcBus      *wire.RPCBus
 	initChannel chan uint64
 
-	*user.Keys
+	user.Keys
 	timerLength    time.Duration
 	committeeStore *committee.Store
 	d, k           ristretto.Scalar
@@ -47,7 +47,7 @@ type ConsensusFactory struct {
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration,
-	committeeStore *committee.Store, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
+	committeeStore *committee.Store, keys user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}

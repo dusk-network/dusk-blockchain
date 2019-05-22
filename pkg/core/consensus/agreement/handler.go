@@ -18,12 +18,12 @@ import (
 )
 
 type agreementHandler struct {
-	*user.Keys
+	user.Keys
 	committee.Committee
 	*AgreementUnMarshaller
 }
 
-func newHandler(committee committee.Committee, keys *user.Keys) *agreementHandler {
+func newHandler(committee committee.Committee, keys user.Keys) *agreementHandler {
 	return &agreementHandler{
 		Keys:                  keys,
 		Committee:             committee,

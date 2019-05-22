@@ -16,7 +16,7 @@ import (
 
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus, nil)
+	c := LaunchCommitteeStore(bus, user.Keys{})
 
 	newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -28,7 +28,7 @@ func TestAddProvisioner(t *testing.T) {
 
 func TestRemoveProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus, nil)
+	c := LaunchCommitteeStore(bus, user.Keys{})
 
 	k := newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -44,7 +44,7 @@ func TestRemoveProvisioner(t *testing.T) {
 
 func TestReportAbsentees(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus, nil)
+	c := LaunchCommitteeStore(bus, user.Keys{})
 	e := NewCommitteeExtractor(c, ReductionCommitteeSize)
 	absenteesChan := make(chan *bytes.Buffer, 1)
 	bus.Subscribe(msg.AbsenteesTopic, absenteesChan)
@@ -69,7 +69,7 @@ func TestReportAbsentees(t *testing.T) {
 
 func TestUpsertCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus, nil)
+	c := LaunchCommitteeStore(bus, user.Keys{})
 	e := NewCommitteeExtractor(c, ReductionCommitteeSize)
 
 	// add some provisioners
@@ -88,7 +88,7 @@ func TestUpsertCommitteeCache(t *testing.T) {
 
 func TestCleanCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus, nil)
+	c := LaunchCommitteeStore(bus, user.Keys{})
 	e := NewCommitteeExtractor(c, ReductionCommitteeSize)
 
 	// add some provisioners
@@ -119,7 +119,7 @@ func newMockEvent(sender []byte) wire.Event {
 	return mockEvent
 }
 
-func newProvisioner(amount uint64, eb *wire.EventBus) *user.Keys {
+func newProvisioner(amount uint64, eb *wire.EventBus) user.Keys {
 	k, _ := user.NewRandKeys()
 	buffer := bytes.NewBuffer(*k.EdPubKey)
 	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)

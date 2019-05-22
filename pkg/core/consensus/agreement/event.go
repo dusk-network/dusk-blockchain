@@ -151,7 +151,7 @@ func New() *Agreement {
 }
 
 // Sign signs an aggregated agreement event
-func Sign(a *Agreement, keys *user.Keys) error {
+func Sign(a *Agreement, keys user.Keys) error {
 	buffer := new(bytes.Buffer)
 
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {

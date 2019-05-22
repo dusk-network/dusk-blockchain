@@ -9,14 +9,14 @@ import (
 )
 
 type context struct {
-	*user.Keys
+	user.Keys
 	handler   handler
 	committee committee.Committee
 	state     consensus.State
 	timer     *consensus.Timer
 }
 
-func newCtx(handler handler, committee committee.Committee, keys *user.Keys, timeout time.Duration) *context {
+func newCtx(handler handler, committee committee.Committee, keys user.Keys, timeout time.Duration) *context {
 	return &context{
 		handler:   handler,
 		committee: committee,
