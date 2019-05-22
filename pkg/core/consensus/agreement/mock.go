@@ -127,11 +127,11 @@ func mockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Committee, 
 		mock.AnythingOfType("uint64"),
 		uint8(2)).Return(mockSubCommittees[1])
 	committeeMock.On("Pack",
-		mock.AnythingOfType("uint64"),
+		mock.Anything,
 		mock.AnythingOfType("uint64"),
 		uint8(1)).Return(wholeCommittee.Bits(mockSubCommittees[0]))
 	committeeMock.On("Pack",
-		mock.AnythingOfType("uint64"),
+		mock.Anything,
 		mock.AnythingOfType("uint64"),
 		uint8(2)).Return(wholeCommittee.Bits(mockSubCommittees[1]))
 	return committeeMock, keys

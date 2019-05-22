@@ -11,9 +11,42 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
+
+func MockVoteSetBuffer(hash []byte, round uint64, step uint8, amount int) *bytes.Buffer {
+	voteSet := MockVoteSet(hash, round, step, amount)
+	unmarshaller := NewUnMarshaller()
+	buf := new(bytes.Buffer)
+	if err := unmarshaller.MarshalVoteSet(buf, voteSet); err != nil {
+		panic(err)
+	}
+
+	return buf
+}
+
+func MockVoteSet(hash []byte, round uint64, step uint8, amount int) []wire.Event {
+	if step < uint8(2) {
+		panic("Need at least 2 steps to create an Agreement")
+	}
+
+	votes1 := MockVotes(hash, round, step-1, amount)
+	votes2 := MockVotes(hash, round, step, amount)
+
+	return append(votes1, votes2...)
+}
+
+func MockVotes(hash []byte, round uint64, step uint8, amount int) []wire.Event {
+	var voteSet []wire.Event
+	for i := 0; i < amount; i++ {
+		_, r := MockReduction(nil, hash, round, step)
+		voteSet = append(voteSet, r)
+	}
+
+	return voteSet
+}
 
 func MockReduction(keys *user.Keys, hash []byte, round uint64, step uint8) (*user.Keys, *Reduction) {
 	if keys == nil {
