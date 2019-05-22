@@ -45,7 +45,7 @@ func TestRemoveProvisioner(t *testing.T) {
 func TestReportAbsentees(t *testing.T) {
 	bus := wire.NewEventBus()
 	c := LaunchCommitteeStore(bus, nil)
-	phase := NewCommitteeExtractor(c, ReductionCommitteeSize)
+	e := NewCommitteeExtractor(c, ReductionCommitteeSize)
 	absenteesChan := make(chan *bytes.Buffer, 1)
 	bus.Subscribe(msg.AbsenteesTopic, absenteesChan)
 
@@ -61,7 +61,7 @@ func TestReportAbsentees(t *testing.T) {
 
 	evs := []wire.Event{ev1, ev2}
 
-	_ = phase.ReportAbsentees(evs, 1, 1)
+	_ = e.ReportAbsentees(evs, 1, 1)
 	absentees := <-absenteesChan
 	// absentees should contain the bls pub key of k3
 	assert.True(t, bytes.Contains(absentees.Bytes(), k3.BLSPubKeyBytes))
@@ -70,7 +70,7 @@ func TestReportAbsentees(t *testing.T) {
 func TestUpsertCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
 	c := LaunchCommitteeStore(bus, nil)
-	phase := NewCommitteeExtractor(c, ReductionCommitteeSize)
+	e := NewCommitteeExtractor(c, ReductionCommitteeSize)
 
 	// add some provisioners
 	k1 := newProvisioner(10, bus)
@@ -80,16 +80,16 @@ func TestUpsertCommitteeCache(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// run IsMember, which should trigger a voting committee creation
-	_ = phase.IsMember(k1.BLSPubKey.Marshal(), 1, 1)
+	_ = e.IsMember(k1.BLSPubKey.Marshal(), 1, 1)
 
 	// committeeCache should now hold one VotingCommittee
-	assert.Equal(t, 1, len(phase.committeeCache))
+	assert.Equal(t, 1, len(e.committeeCache))
 }
 
 func TestCleanCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
 	c := LaunchCommitteeStore(bus, nil)
-	phase := NewCommitteeExtractor(c, ReductionCommitteeSize)
+	e := NewCommitteeExtractor(c, ReductionCommitteeSize)
 
 	// add some provisioners
 	k1 := newProvisioner(10, bus)
@@ -99,18 +99,18 @@ func TestCleanCommitteeCache(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// run IsMember a few times
-	_ = phase.IsMember(k1.BLSPubKey.Marshal(), 1, 1)
-	_ = phase.IsMember(k1.BLSPubKey.Marshal(), 1, 2)
-	_ = phase.IsMember(k1.BLSPubKey.Marshal(), 1, 3)
+	_ = e.IsMember(k1.BLSPubKey.Marshal(), 1, 1)
+	_ = e.IsMember(k1.BLSPubKey.Marshal(), 1, 2)
+	_ = e.IsMember(k1.BLSPubKey.Marshal(), 1, 3)
 
 	// committeeCache should now hold 3 VotingCommittees
-	assert.Equal(t, 3, len(phase.committeeCache))
+	assert.Equal(t, 3, len(e.committeeCache))
 
 	// now run IsMember for another round
-	_ = phase.IsMember(k1.BLSPubKey.Marshal(), 2, 1)
+	_ = e.IsMember(k1.BLSPubKey.Marshal(), 2, 1)
 
 	// committeeCache should now hold 1 VotingCommittee
-	assert.Equal(t, 1, len(phase.committeeCache))
+	assert.Equal(t, 1, len(e.committeeCache))
 }
 
 func newMockEvent(sender []byte) wire.Event {
