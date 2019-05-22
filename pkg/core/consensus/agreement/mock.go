@@ -15,12 +15,12 @@ import (
 )
 
 // PublishMock is a mock-up method to facilitate testing of publishing of Agreement events
-func PublishMock(bus wire.EventBroker, hash []byte, round uint64, step uint8, keys []*user.Keys) {
+func PublishMock(bus wire.EventBroker, hash []byte, round uint64, step uint8, keys []user.Keys) {
 	buf := MockAgreement(hash, round, step, keys)
 	bus.Publish(msg.OutgoingBlockAgreementTopic, buf)
 }
 
-func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys) *Agreement {
+func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys) *Agreement {
 	if step < uint8(2) {
 		panic("Need at least 2 steps to create an Agreement")
 	}
@@ -41,7 +41,7 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []*user.Keys
 	return a
 }
 
-func MockAgreement(hash []byte, round uint64, step uint8, keys []*user.Keys) *bytes.Buffer {
+func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys) *bytes.Buffer {
 	if step < 2 {
 		panic("Aggregated agreement needs to span for at least two steps")
 	}
@@ -53,7 +53,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []*user.Keys) *by
 	return buf
 }
 
-func genVotes(hash []byte, round uint64, step uint8, keys []*user.Keys) []*StepVotes {
+func genVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVotes {
 	if len(keys) < 2 {
 		panic("At least two votes are required to mock an Agreement")
 	}
@@ -88,8 +88,8 @@ func genVotes(hash []byte, round uint64, step uint8, keys []*user.Keys) []*StepV
 	return votes
 }
 
-func mockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Committee, []*user.Keys) {
-	keys := make([]*user.Keys, membersNr)
+func mockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, []user.Keys) {
+	keys := make([]user.Keys, membersNr)
 	mockSubCommittees := make([]sortedset.Set, 2)
 	wholeCommittee := sortedset.New()
 
@@ -107,10 +107,8 @@ func mockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Committee, 
 		mockSubCommittees[stepCycle] = sc
 	}
 
-	committeeMock := &mocks.Committee{}
+	committeeMock := &mocks.Foldable{}
 	committeeMock.On("Quorum").Return(quorum)
-	committeeMock.On("ReportAbsentees", mock.Anything,
-		mock.Anything, mock.Anything).Return(nil)
 	committeeMock.On("IsMember",
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
@@ -127,11 +125,11 @@ func mockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Committee, 
 		mock.AnythingOfType("uint64"),
 		uint8(2)).Return(mockSubCommittees[1])
 	committeeMock.On("Pack",
-		mock.AnythingOfType("uint64"),
+		mock.Anything,
 		mock.AnythingOfType("uint64"),
 		uint8(1)).Return(wholeCommittee.Bits(mockSubCommittees[0]))
 	committeeMock.On("Pack",
-		mock.AnythingOfType("uint64"),
+		mock.Anything,
 		mock.AnythingOfType("uint64"),
 		uint8(2)).Return(wholeCommittee.Bits(mockSubCommittees[1]))
 	return committeeMock, keys

@@ -118,6 +118,10 @@ func (au *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
+// Unmarshal unmarshals the buffer into an Agreement
+// Field order is the following:
+// * Header [BLS Public Key; Round; Step]
+// * Agreement [Signed Vote Set; Vote Set; BlockHash]
 func (au *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	a := ev.(*Agreement)
 	if err := au.UnMarshaller.Unmarshal(r, a.Header); err != nil {
@@ -146,34 +150,8 @@ func New() *Agreement {
 	}
 }
 
-// Unmarshal unmarshals the buffer into an Agreement
-// Field order is the following:
-// * Header [BLS Public Key; Round; Step]
-// * Agreement [Signed Vote Set; Vote Set; BlockHash]
-func Unmarshal(r *bytes.Buffer) (*Agreement, error) {
-	a := New()
-
-	unmarshaller := NewUnMarshaller()
-	if err := unmarshaller.Unmarshal(r, a); err != nil {
-		return nil, err
-	}
-
-	return a, nil
-}
-
-func Marshal(a *Agreement) (*bytes.Buffer, error) {
-	r := new(bytes.Buffer)
-
-	marshaller := NewUnMarshaller()
-	if err := marshaller.Marshal(r, a); err != nil {
-		return nil, err
-	}
-
-	return r, nil
-}
-
 // Sign signs an aggregated agreement event
-func Sign(a *Agreement, keys *user.Keys) error {
+func Sign(a *Agreement, keys user.Keys) error {
 	buffer := new(bytes.Buffer)
 
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {

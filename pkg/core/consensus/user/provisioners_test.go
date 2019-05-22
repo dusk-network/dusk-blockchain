@@ -25,13 +25,13 @@ func TestCreateVotingCommittee(t *testing.T) {
 	}
 
 	// Run sortition to get 50 members (as a Set, committee cannot contain any duplicate)
-	committee := p.CreateVotingCommittee(100, totalWeight, 1)
+	committee := p.CreateVotingCommittee(100, totalWeight, 1, 50)
 
 	// total amount of members in the committee should be 50
 	assert.Equal(t, 50, committee.Size())
 }
 
-type sortedKeys []*user.Keys
+type sortedKeys []user.Keys
 
 func (s sortedKeys) Len() int      { return len(s) }
 func (s sortedKeys) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
@@ -40,7 +40,7 @@ func (s sortedKeys) Less(i, j int) bool {
 	return btoi(s[i]).Cmp(btoi(s[j])) < 0
 }
 
-func btoi(k *user.Keys) *big.Int {
+func btoi(k user.Keys) *big.Int {
 	b := k.BLSPubKeyBytes
 	return (&big.Int{}).SetBytes(b)
 }

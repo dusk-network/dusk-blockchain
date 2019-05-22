@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 
 	log "github.com/sirupsen/logrus"
 
@@ -14,6 +15,10 @@ import (
 
 // MaxStrikes is the maximum allowed amount of strikes in a single round
 const maxStrikes uint8 = 6
+
+type Filter interface {
+	FilterAbsentees([]wire.Event, uint64, uint8) user.VotingCommittee
+}
 
 type moderator struct {
 	publisher wire.EventPublisher
