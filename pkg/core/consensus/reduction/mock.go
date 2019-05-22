@@ -5,14 +5,12 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -134,11 +132,11 @@ func mockBlockEventBuffer(round uint64, step uint8, hash []byte) *bytes.Buffer {
 	return completeBuf
 }
 
-func mockCommittee(quorum int, isMember bool, amMember bool) committee.Committee {
-	committeeMock := &mocks.Committee{}
+func mockCommittee(quorum int, isMember bool, amMember bool) Reducers {
+	committeeMock := &mocks.Reducers{}
 	committeeMock.On("Quorum").Return(quorum)
-	committeeMock.On("ReportAbsentees", mock.Anything,
-		mock.Anything, mock.Anything).Return(nil)
+	committeeMock.On("FilterAbsentees", mock.Anything,
+		mock.Anything, mock.Anything).Return(user.VotingCommittee{})
 	committeeMock.On("IsMember",
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
@@ -146,9 +144,5 @@ func mockCommittee(quorum int, isMember bool, amMember bool) committee.Committee
 	committeeMock.On("AmMember",
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(amMember)
-	committeeMock.On("Pack",
-		mock.AnythingOfType("sortedset.Set"),
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint8")).Return(sortedset.All)
 	return committeeMock
 }

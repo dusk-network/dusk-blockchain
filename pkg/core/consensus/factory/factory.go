@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/candidate"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -40,28 +39,26 @@ type ConsensusFactory struct {
 	initChannel chan uint64
 
 	user.Keys
-	timerLength    time.Duration
-	committeeStore *committee.Store
-	d, k           ristretto.Scalar
+	timerLength time.Duration
+	d, k        ristretto.Scalar
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration,
-	committeeStore *committee.Store, keys user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
+	keys user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
 	go wire.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()
 
 	return &ConsensusFactory{
-		eventBus:       eventBus,
-		rpcBus:         rpcBus,
-		initChannel:    initChannel,
-		Keys:           keys,
-		timerLength:    timerLength,
-		committeeStore: committeeStore,
-		d:              d,
-		k:              k,
+		eventBus:    eventBus,
+		rpcBus:      rpcBus,
+		initChannel: initChannel,
+		Keys:        keys,
+		timerLength: timerLength,
+		d:           d,
+		k:           k,
 	}
 }
 
@@ -75,8 +72,7 @@ func (c *ConsensusFactory) StartConsensus() {
 
 	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)
 
-	reductionExtractor := committee.NewCommitteeExtractor(c.committeeStore, committee.ReductionCommitteeSize)
-	reduction.LaunchReducer(c.eventBus, reductionExtractor, c.Keys, c.timerLength)
+	reduction.LaunchReducer(c.eventBus, nil, c.Keys, c.timerLength)
 
 	round := <-c.initChannel
 	log.WithFields(log.Fields{
@@ -84,8 +80,7 @@ func (c *ConsensusFactory) StartConsensus() {
 		"round":   round,
 	}).Debug("Received initial round")
 
-	agreementExtractor := committee.NewCommitteeExtractor(c.committeeStore, committee.AgreementCommitteeSize)
-	agreement.LaunchAgreement(c.eventBus, agreementExtractor, c.Keys, round)
+	agreement.LaunchAgreement(c.eventBus, nil, c.Keys, round)
 
 	log.WithField("process", "factory").Info("Consensus Started")
 }

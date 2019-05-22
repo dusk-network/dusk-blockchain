@@ -11,7 +11,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -78,7 +80,7 @@ func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
 func (r *reducer) inCommittee() bool {
 	round := r.ctx.state.Round()
 	step := r.ctx.state.Step()
-	return r.ctx.committee.AmMember(round, step)
+	return r.ctx.handler.AmMember(round, step)
 }
 
 func (r *reducer) startReduction(hash []byte) {
@@ -107,8 +109,7 @@ func (r *reducer) begin() {
 	if !r.stale {
 		// if there was a timeout, we should report nodes that did not vote
 		if events == nil {
-			_ = r.ctx.committee.ReportAbsentees(r.accumulator.All(),
-				r.ctx.state.Round(), r.ctx.state.Step())
+			r.propagateAbsentees()
 		}
 		r.ctx.state.IncrementStep()
 		if r.inCommittee() {
@@ -123,8 +124,7 @@ func (r *reducer) begin() {
 	defer r.RUnlock()
 	if !r.stale {
 		if eventsSecondStep == nil {
-			_ = r.ctx.committee.ReportAbsentees(r.accumulator.All(),
-				r.ctx.state.Round(), r.ctx.state.Step())
+			r.propagateAbsentees()
 		}
 		hash2 := r.extractHash(eventsSecondStep)
 		allEvents := append(events, eventsSecondStep...)
@@ -143,11 +143,37 @@ func (r *reducer) begin() {
 	}
 }
 
+func (r *reducer) propagateAbsentees() {
+	round, step := r.ctx.state.Round(), r.ctx.state.Step()
+	absentees := r.ctx.handler.FilterAbsentees(r.accumulator.All(), round, step)
+	_ = r.reportAbsentees(absentees)
+}
+
+func (r *reducer) reportAbsentees(absentees user.VotingCommittee) error {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, r.ctx.state.Round()); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarInt(buf, uint64(absentees.Len())); err != nil {
+		return err
+	}
+
+	for _, absentee := range absentees.MemberKeys() {
+		if err := encoding.WriteVarBytes(buf, absentee); err != nil {
+			return err
+		}
+	}
+
+	r.publisher.Publish(msg.AbsenteesTopic, buf)
+	return nil
+}
+
 func (r *reducer) sendReduction(hash *bytes.Buffer) {
 	vote := new(bytes.Buffer)
 
 	h := &header.Header{
-		PubKeyBLS: r.ctx.Keys.BLSPubKeyBytes,
+		PubKeyBLS: r.ctx.handler.Keys.BLSPubKeyBytes,
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
 		BlockHash: hash.Bytes(),
@@ -158,7 +184,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	if err := SignBuffer(vote, r.ctx.Keys); err != nil {
+	if err := SignBuffer(vote, r.ctx.handler.Keys); err != nil {
 		logErr(err, hash.Bytes(), "Error while signing vote")
 		return
 	}

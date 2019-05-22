@@ -135,7 +135,7 @@ func TestSendAgreement(t *testing.T) {
 	}
 }
 
-func initAgreement(c committee.Committee) (wire.EventBroker, *broker, <-chan uint64) {
+func initAgreement(c committee.Foldable) (wire.EventBroker, *broker, <-chan uint64) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 	k, _ := user.NewRandKeys()

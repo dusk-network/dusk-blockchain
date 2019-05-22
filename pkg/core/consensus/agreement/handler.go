@@ -19,16 +19,21 @@ import (
 
 type agreementHandler struct {
 	user.Keys
-	committee.Committee
+	committee.Foldable
 	*AgreementUnMarshaller
 }
 
-func newHandler(committee committee.Committee, keys user.Keys) *agreementHandler {
+func newHandler(committee committee.Foldable, keys user.Keys) *agreementHandler {
 	return &agreementHandler{
 		Keys:                  keys,
-		Committee:             committee,
+		Foldable:              committee,
 		AgreementUnMarshaller: NewUnMarshaller(),
 	}
+}
+
+// AmMember checks if we are part of the committee.
+func (p *agreementHandler) AmMember(round uint64, step uint8) bool {
+	return p.Foldable.IsMember(p.Keys.BLSPubKeyBytes, round, step)
 }
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *header.Header {
@@ -190,7 +195,7 @@ func (a *agreementHandler) Aggregate(h *header.Header, voteSet []wire.Event) (*A
 	i := 0
 	for _, stepVotes := range stepVotesMap {
 		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
-		sv.BitSet = a.Committee.Pack(provisioners, h.Round, sv.Step)
+		sv.BitSet = a.Pack(provisioners, h.Round, sv.Step)
 		aev.VotesPerStep[i] = sv
 		i++
 	}
