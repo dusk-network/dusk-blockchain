@@ -24,24 +24,22 @@ type Coinbase struct {
 	//ZkScoreProof returns true if the score was calculated correctly.
 	// Both `ZkScoreProof` and `SetInclusionProof` have been aggregated as one in our protocol and the
 	// aggregated `Proof` will return true iff both are true.
-	Proof        []byte
-	EphemeralKey []byte
+	Proof []byte
+	Score []byte
+	R     []byte
 	// Rewards indicate the provisioner rewards for the previous block
 	// The provisioner rewards for the current block, that the coinbase transaction
 	// is located in, should be in the block header
 	Rewards Outputs
-	// GeneratorAddress is the address of the block generator,
-	// who made the proposed block that this coinbase tx is situated in.
-	GeneratorAddress []byte
 }
 
 // NewCoinbase will return a Coinbase transaction
 // given the zkproof, ephemeral key and the block generators Address.
-func NewCoinbase(proof, ephemeralKey, generatorAddress []byte) *Coinbase {
+func NewCoinbase(proof, score, R []byte) *Coinbase {
 	return &Coinbase{
-		Proof:            proof,
-		EphemeralKey:     ephemeralKey,
-		GeneratorAddress: generatorAddress,
+		Proof: proof,
+		Score: score,
+		R:     R,
 	}
 }
 
