@@ -18,6 +18,8 @@ type (
 		Quorum() int
 	}
 
+	// Foldable represents a Committee which can be packed into a bitset, to drastically
+	// decrease the size needed for committee representation over the wire.
 	Foldable interface {
 		Committee
 		Pack(sortedset.Set, uint64, uint8) uint64
@@ -38,7 +40,7 @@ type (
 
 	// Extractor is a wrapper around the Store struct, and contains the phase-specific
 	// information, as well as a voting committee cache. It calls methods on the
-	// Store, passing it's own parameters to extract the desired info for a specific
+	// Store, passing its own parameters to extract the desired info for a specific
 	// phase.
 	Extractor struct {
 		*Store
@@ -48,24 +50,26 @@ type (
 	}
 )
 
-// LaunchCommitteeStore creates a component that listens to changes to the Provisioners
-func LaunchCommitteeStore(eventBroker wire.EventBroker) *Store {
+// launchStore creates a component that listens to changes to the Provisioners
+func launchStore(eventBroker wire.EventBroker) *Store {
 	store := &Store{
 		provisioners:          user.NewProvisioners(),
-		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
+		removeProvisionerChan: initRemoveProvisionerCollector(eventBroker),
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	go store.Listen()
 	return store
 }
 
+// NewExtractor returns a committee extractor which maintains its own store and cache.
 func NewExtractor(eventBroker wire.EventBroker) *Extractor {
 	return &Extractor{
-		Store:          LaunchCommitteeStore(eventBroker),
+		Store:          launchStore(eventBroker),
 		committeeCache: make(map[uint8]user.VotingCommittee),
 	}
 }
 
+// Listen for events coming from the EventBus.
 func (c *Store) Listen() {
 	for {
 		select {
@@ -83,6 +87,7 @@ func (c *Store) Listen() {
 	}
 }
 
+// AddProvisioner will add a provisioner to the Stores Provisioners object.
 func (c *Store) AddProvisioner(m *bytes.Buffer) error {
 	newProvisioner, err := decodeNewProvisioner(m)
 	if err != nil {
@@ -100,6 +105,9 @@ func (c *Store) AddProvisioner(m *bytes.Buffer) error {
 	return nil
 }
 
+// UpsertCommitteeCache will return a voting committee for a given round, step and size.
+// If the committee has not yet been produced before, it is put on the cache. If it has,
+// it is simply retrieved and returned.
 func (p *Extractor) UpsertCommitteeCache(round uint64, step uint8, size int) user.VotingCommittee {
 	if round > p.round {
 		p.round = round
@@ -121,6 +129,7 @@ func (p *Extractor) UpsertCommitteeCache(round uint64, step uint8, size int) use
 	return votingCommittee
 }
 
+// Provisioners returns a copy of the user.Provisioners object maintained by the Store.
 func (c *Store) Provisioners() *user.Provisioners {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

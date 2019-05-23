@@ -30,7 +30,7 @@ func TestScoreGeneration(t *testing.T) {
 	gen := &mockGenerator{t}
 
 	// launch score component
-	generation.LaunchScoreGenerationComponent(eb, nil, d, k, gen, gen)
+	generation.Launch(eb, nil, d, k, gen, gen)
 
 	// update the round to start generation
 	updateRound(eb, 1)

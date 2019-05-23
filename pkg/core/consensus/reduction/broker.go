@@ -29,18 +29,17 @@ type (
 	}
 )
 
-// LaunchReducer creates and wires a broker, initiating the components that
+// Launch creates and wires a broker, initiating the components that
 // have to do with Block Reduction
-func LaunchReducer(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
-	timeout time.Duration) *broker {
+func Launch(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
+	timeout time.Duration) {
 	if committee == nil {
 		committee = newReductionCommittee(eventBroker)
 	}
+
 	handler := newReductionHandler(committee, keys)
 	broker := newBroker(eventBroker, handler, timeout)
-
 	go broker.Listen()
-	return broker
 }
 
 func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,

@@ -12,19 +12,22 @@ import (
 )
 
 type (
-	Validator struct {
-	}
+	// Validator is responsible for validating the Ed25519 signature of a message.
+	Validator struct{}
 
+	// Republisher is responsible for gossiping a received event buffer.
 	Republisher struct {
 		publisher wire.EventPublisher
 		topic     topics.Topic
 	}
 )
 
+// NewRepublisher returns a Republisher containing the specified parameters.
 func NewRepublisher(publisher wire.EventPublisher, topic topics.Topic) *Republisher {
 	return &Republisher{publisher, topic}
 }
 
+// Process propagates a received event buffer to other nodes in the network.
 func (b *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
 	bounced := eventBuffer
 	msg, _ := wire.AddTopic(bounced, b.topic)
@@ -32,7 +35,8 @@ func (b *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) 
 	return eventBuffer, nil
 }
 
-// Process a buffer by validating the ED25519 Signature. It uses a io.TeeReader to preserve the original message. It returns a copy of the message
+// Process a buffer by validating the ED25519 Signature. It uses a io.TeeReader to
+// preserve the original message. It returns a copy of the message.
 func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	sig := make([]byte, 64)
 	if err := encoding.Read512(buf, &sig); err != nil {

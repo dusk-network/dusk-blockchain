@@ -27,7 +27,7 @@ func newCandidateStore(publisher wire.EventPublisher) *candidateStore {
 }
 
 func (c *candidateStore) Process(ev wire.Event) {
-	cev := ev.(*CandidateEvent)
+	cev := ev.(*Candidate)
 	cev.SetHash()
 	hashStr := hex.EncodeToString(cev.Header.Hash)
 	c.store[hashStr] = cev
@@ -42,7 +42,7 @@ func (c *candidateStore) sendWinningBlock(hash string) {
 	ev := c.store[hash]
 	if ev != nil {
 		buf := new(bytes.Buffer)
-		cev := ev.(*CandidateEvent)
+		cev := ev.(*Candidate)
 		if err := cev.Encode(buf); err != nil {
 			panic(err)
 		}

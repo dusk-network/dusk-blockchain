@@ -7,10 +7,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func LaunchCandidateComponent(eventBroker wire.EventBroker) *broker {
+// Launch will create the candidate component, and start it up.
+func Launch(eventBroker wire.EventBroker) {
 	broker := newBroker(eventBroker)
 	go broker.Listen()
-	return broker
 }
 
 type broker struct {

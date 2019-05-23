@@ -9,6 +9,8 @@ import (
 
 const committeeSize = 50
 
+// Reducers defines a committee of reducers, and provides the ability to detect those
+// who are not properly participating in this phase of the consensus.
 type Reducers interface {
 	committee.Committee
 	reputation.Filter

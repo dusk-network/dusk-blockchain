@@ -16,7 +16,7 @@ import (
 
 type (
 	scoreHandler struct {
-		sync.RWMutex
+		lock    sync.RWMutex
 		bidList user.BidList
 
 		// Threshold number that a score needs to be greater than in order to be considered
@@ -38,7 +38,6 @@ type (
 // (e.g. verification, validation, marshalling and unmarshalling)
 func newScoreHandler() *scoreHandler {
 	return &scoreHandler{
-		RWMutex:   sync.RWMutex{},
 		threshold: consensus.NewThreshold(),
 	}
 }
@@ -60,8 +59,8 @@ func (p *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 }
 
 func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	p.bidList = bidList
 }
 
@@ -129,7 +128,7 @@ func (p *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) *prerror
 		return err
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	return p.bidList.ValidateBids(bidListSubset)
 }

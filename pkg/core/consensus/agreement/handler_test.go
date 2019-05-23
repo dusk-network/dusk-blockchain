@@ -10,7 +10,7 @@ import (
 
 func TestVoteVerification(t *testing.T) {
 	// mocking voters
-	c, keys := mockCommittee(2, true, 2)
+	c, keys := MockCommittee(2, true, 2)
 	hash, _ := crypto.RandEntropy(32)
 	ev := MockAgreementEvent(hash, 1, 2, keys)
 	handler := newHandler(c, user.Keys{})

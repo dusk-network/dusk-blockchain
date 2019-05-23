@@ -9,14 +9,16 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
+// Generator defines the capability of generating proofs of blind bid, needed to
+// propose blocks in the consensus.
 type Generator interface {
 	GenerateProof([]byte) zkproof.ZkProof
 	UpdateBidList(user.BidList)
 }
 
 type proofGenerator struct {
-	d, k ristretto.Scalar
-	sync.RWMutex
+	d, k    ristretto.Scalar
+	lock    sync.RWMutex
 	bidList user.BidList
 }
 
@@ -28,8 +30,8 @@ func newProofGenerator(d, k ristretto.Scalar) *proofGenerator {
 }
 
 func (g *proofGenerator) UpdateBidList(bidList user.BidList) {
-	g.Lock()
-	defer g.Unlock()
+	g.lock.Lock()
+	defer g.lock.Unlock()
 	g.bidList = bidList
 }
 
@@ -42,9 +44,9 @@ func (g *proofGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 	seedScalar.Derive(seed)
 
 	// Create a slice of scalars with a number of random bids (up to 10)
-	g.Lock()
+	g.lock.Lock()
 	bidListSubset := createBidListSubset(g.bidList)
-	g.Unlock()
+	g.lock.Unlock()
 	bidListScalars := convertBidListToScalars(bidListSubset)
 
 	return zkproof.Prove(g.d, g.k, seedScalar, bidListScalars)

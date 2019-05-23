@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	// EventHandler encapsulate logic specific to the various EventFilters.
+	// EventHandler encapsulates logic specific to the various EventFilters.
 	// Each EventFilter needs to verify, prioritize and extract information from Events.
 	// EventHandler is the interface that abstracts these operations away.
 	// The implementors of this interface is the real differentiator of the various
@@ -38,6 +38,7 @@ type (
 	}
 )
 
+// NewEventFilter returns an initialized EventFilter.
 func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
 	checkStep bool) *EventFilter {
 	return &EventFilter{
@@ -49,6 +50,7 @@ func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
 	}
 }
 
+// Collect an event buffer, deserialize it, and then pass it to the proper component.
 func (c *EventFilter) Collect(buffer *bytes.Buffer) error {
 	ev, err := c.handler.Deserialize(buffer)
 	if err != nil {
@@ -88,11 +90,15 @@ func (c *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
 	return relevantRound && relevantStep
 }
 
+// UpdateRound updates the state for the EventFilter, and empties the queue of
+// obsolete events.
 func (c *EventFilter) UpdateRound(round uint64) {
 	c.state.Update(round)
 	c.queue.Clear(round - 1)
 }
 
+// FlushQueue will retrieve all queued events for a certain point in consensus,
+// and hand them off to the Processor.
 func (c *EventFilter) FlushQueue() {
 	var queuedEvents []wire.Event
 	if c.checkStep {

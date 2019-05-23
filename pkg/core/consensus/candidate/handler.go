@@ -15,12 +15,12 @@ func newCandidateHandler() *candidateHandler {
 }
 
 func (c *candidateHandler) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	cev := ev.(*CandidateEvent)
+	cev := ev.(*Candidate)
 	return cev.Encode(r)
 }
 
 func (c *candidateHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	cev := &CandidateEvent{}
+	cev := &Candidate{}
 	if err := cev.Decode(r); err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (c *candidateHandler) Verify(ev wire.Event) error {
 }
 
 func (c *candidateHandler) ExtractHeader(ev wire.Event) *header.Header {
-	cev := ev.(*CandidateEvent)
+	cev := ev.(*Candidate)
 	return &header.Header{
 		Round: cev.Header.Height,
 	}

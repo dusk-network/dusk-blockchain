@@ -38,13 +38,17 @@ func RandomSlice(t *testing.T, size uint32) []byte {
 	return randSlice
 }
 
+// SimpleStreamer is a test helper which can capture information that gets gossiped
+// by the node. It can read from the gossip stream, and stores the topics that it has
+// seen.
 type SimpleStreamer struct {
-	sync.RWMutex
+	lock       sync.RWMutex
 	seenTopics []topics.Topic
 	*bufio.Reader
 	*bufio.Writer
 }
 
+// NewSimpleStreamer returns an initialized SimpleStreamer.
 func NewSimpleStreamer() *SimpleStreamer {
 	r, w := io.Pipe()
 	return &SimpleStreamer{
@@ -85,23 +89,28 @@ func (ms *SimpleStreamer) Read() ([]byte, error) {
 
 	var cmd [15]byte
 	copy(cmd[:], topicBuffer)
-	ms.Lock()
+	ms.lock.Lock()
 	ms.seenTopics = append(ms.seenTopics, topics.ByteArrayToTopic(cmd))
-	ms.Unlock()
+	ms.lock.Unlock()
 
 	return decoded.Bytes(), nil
 }
 
+// SeenTopics returns a slice of all the topics the SimpleStreamer has found in its
+// stream so far.
 func (ms *SimpleStreamer) SeenTopics() []topics.Topic {
-	ms.RLock()
-	defer ms.RUnlock()
+	ms.lock.RLock()
+	defer ms.lock.RUnlock()
 	return ms.seenTopics
 }
 
+// Close implements io.WriteCloser.
 func (ms *SimpleStreamer) Close() error {
 	return nil
 }
 
+// CreateGossipStreamer sets up and event bus, subscribes a SimpleStreamer to the
+// gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 	eb := wire.NewEventBus()
 	eb.RegisterPreprocessor(string(topics.Gossip), peer.NewGossip(protocol.TestNet))

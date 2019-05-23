@@ -16,6 +16,8 @@ import (
 // MaxStrikes is the maximum allowed amount of strikes in a single round
 const maxStrikes uint8 = 6
 
+// Filter is capable of filtering out a set of absent nodes, given a set of votes,
+// a round, and a step.
 type Filter interface {
 	FilterAbsentees([]wire.Event, uint64, uint8) user.VotingCommittee
 }
@@ -29,11 +31,10 @@ type moderator struct {
 	absenteeChan chan []byte
 }
 
-// LaunchReputationComponent creates a component that tallies strikes for provisioners.
-func LaunchReputationComponent(eventBroker wire.EventBroker) *moderator {
+// Launch creates a component that tallies strikes for provisioners.
+func Launch(eventBroker wire.EventBroker) {
 	moderator := newModerator(eventBroker)
 	go moderator.listen()
-	return moderator
 }
 
 func newModerator(eventBroker wire.EventBroker) *moderator {

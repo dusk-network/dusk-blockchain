@@ -20,12 +20,13 @@ type scoreBroker struct {
 	handler          scoreEventHandler
 }
 
-// LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-func LaunchScoreSelectionComponent(eventBroker wire.EventBroker, timeout time.Duration) *scoreBroker {
+// Launch creates and launches the component which responsibility is to validate
+// and select the best score among the blind bidders. The component publishes under
+// the topic BestScoreTopic
+func Launch(eventBroker wire.EventBroker, timeout time.Duration) {
 	handler := newScoreHandler()
 	broker := newScoreBroker(eventBroker, handler, timeout)
 	go broker.Listen()
-	return broker
 }
 
 func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHandler,
@@ -93,12 +94,9 @@ func (f *scoreBroker) onRegeneration(state consensus.AsyncState) {
 	}).Debugln("received regeneration message")
 	if state.Round == f.selector.state.Round() {
 		f.handler.LowerThreshold()
-		f.selector.RLock()
-		if !f.selector.running {
-			f.selector.RUnlock()
+		if !f.selector.isRunning() {
 			f.selector.startSelection()
 			return
 		}
-		f.selector.RUnlock()
 	}
 }

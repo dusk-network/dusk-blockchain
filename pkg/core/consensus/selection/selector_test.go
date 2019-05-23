@@ -32,8 +32,8 @@ func TestSelection(t *testing.T) {
 	// we should receive something on the bestScoreChan after timeout
 	<-bestScoreChan
 	// bestEvent should have been set to nil
-	selector.RLock()
-	defer selector.RUnlock()
+	selector.lock.RLock()
+	defer selector.lock.RUnlock()
 	assert.Nil(t, selector.bestEvent)
 }
 

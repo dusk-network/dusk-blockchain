@@ -66,21 +66,19 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
-	reputation.LaunchReputationComponent(c.eventBus)
-	generation.LaunchScoreGenerationComponent(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
-	candidate.LaunchCandidateComponent(c.eventBus)
+	reputation.Launch(c.eventBus)
+	generation.Launch(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
+	candidate.Launch(c.eventBus)
+	selection.Launch(c.eventBus, c.timerLength)
+	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
 
-	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)
-
-	reduction.LaunchReducer(c.eventBus, nil, c.Keys, c.timerLength)
-
+	// Wait for the initial round to be published
 	round := <-c.initChannel
 	log.WithFields(log.Fields{
 		"process": "factory",
 		"round":   round,
 	}).Debug("Received initial round")
 
-	agreement.LaunchAgreement(c.eventBus, nil, c.Keys, round)
-
+	agreement.Launch(c.eventBus, nil, c.Keys, round)
 	log.WithField("process", "factory").Info("Consensus Started")
 }

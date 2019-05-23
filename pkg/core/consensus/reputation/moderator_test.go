@@ -59,7 +59,7 @@ func TestClean(t *testing.T) {
 
 func launchModerator() (wire.EventBroker, chan *bytes.Buffer) {
 	eventBus := wire.NewEventBus()
-	LaunchReputationComponent(eventBus)
+	Launch(eventBus)
 	removeProvisionerChan := make(chan *bytes.Buffer, 1)
 	eventBus.Subscribe(msg.RemoveProvisionerTopic, removeProvisionerChan)
 	return eventBus, removeProvisionerChan
