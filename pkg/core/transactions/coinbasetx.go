@@ -9,27 +9,15 @@ import (
 
 // Coinbase transaction is the transaction that the block generator
 // will create in order to be rewarded for their efforts.
-//
-//  For coinbase, we could embed standard and have Rewards be Outputs, with 0 inputs
-// Question(TOG): Where is the reward amount for the current block generator?
-// Question(TOG): Why is the Ephemeral Key included in the coinbase TX? What is it's size? (32Bytes)
-// Question(TOG): Why do we need to include the provisioner rewards for the previous block?
 type Coinbase struct {
 	// TxType represents the transaction type
 	TxType TxType
 	// TxID is the transaction identifier for the current transaction
 	TxID []byte
-	// SetInclusionProof is a proof that returns true
-	// if the bidder is a member of a valid set of bidders
-	//ZkScoreProof returns true if the score was calculated correctly.
-	// Both `ZkScoreProof` and `SetInclusionProof` have been aggregated as one in our protocol and the
-	// aggregated `Proof` will return true iff both are true.
-	Proof []byte
-	Score []byte
-	R     []byte
-	// Rewards indicate the provisioner rewards for the previous block
-	// The provisioner rewards for the current block, that the coinbase transaction
-	// is located in, should be in the block header
+
+	R       []byte
+	Score   []byte
+	Proof   []byte
 	Rewards Outputs
 }
 
@@ -54,11 +42,15 @@ func (c *Coinbase) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteVarBytes(w, c.Proof); err != nil {
+	if err := encoding.Write256(w, c.R); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(w, c.EphemeralKey); err != nil {
+	if err := encoding.Write256(w, c.Score); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(w, c.Proof); err != nil {
 		return err
 	}
 
@@ -72,10 +64,6 @@ func (c *Coinbase) Encode(w io.Writer) error {
 		}
 	}
 
-	if err := encoding.Write256(w, c.GeneratorAddress); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -87,11 +75,16 @@ func (c *Coinbase) Decode(r io.Reader) error {
 		return err
 	}
 	c.TxType = TxType(Type)
-	if err := encoding.ReadVarBytes(r, &c.Proof); err != nil {
+
+	if err := encoding.Read256(r, &c.R); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &c.EphemeralKey); err != nil {
+	if err := encoding.Read256(r, &c.Score); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadVarBytes(r, &c.Proof); err != nil {
 		return err
 	}
 
@@ -106,10 +99,6 @@ func (c *Coinbase) Decode(r io.Reader) error {
 		if err := c.Rewards[i].Decode(r); err != nil {
 			return err
 		}
-	}
-
-	if err := encoding.Read256(r, &c.GeneratorAddress); err != nil {
-		return err
 	}
 
 	return nil
@@ -151,11 +140,11 @@ func (c *Coinbase) Equals(t Transaction) bool {
 		return false
 	}
 
-	if !bytes.Equal(c.EphemeralKey, other.EphemeralKey) {
+	if !bytes.Equal(c.R, other.R) {
 		return false
 	}
 
-	if !bytes.Equal(c.GeneratorAddress, other.GeneratorAddress) {
+	if !bytes.Equal(c.Score, other.Score) {
 		return false
 	}
 
