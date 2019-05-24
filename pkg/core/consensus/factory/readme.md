@@ -8,7 +8,6 @@
     - `StartConsensus()` - after receiving an initialization message with the Block Height, proceed to start the consensus components by invoking:
         - `reputation.Launch`
         - `generation.Launch`
-        - `candidate.Launch`
         - `selection.Launch`
         - `reduction.Launch`
         - `agreement.Launch`

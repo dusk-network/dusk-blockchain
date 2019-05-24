@@ -8,7 +8,6 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/candidate"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -68,7 +67,6 @@ func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.Launch(c.eventBus)
 	generation.Launch(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
-	candidate.Launch(c.eventBus)
 	selection.Launch(c.eventBus, c.timerLength)
 	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
 
