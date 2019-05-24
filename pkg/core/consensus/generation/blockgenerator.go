@@ -3,9 +3,11 @@ package generation
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
@@ -22,7 +24,8 @@ import (
 
 type (
 	BlockGenerator interface {
-		GenerateBlock(uint64, []byte) (*block.Block, error)
+		GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error)
+		UpdatePrevBlock(b block.Block)
 	}
 
 	blockGenerator struct {
@@ -31,6 +34,8 @@ type (
 
 		db     database.DB
 		rpcBus *wire.RPCBus
+
+		prevBlock block.Block
 	}
 )
 
@@ -51,19 +56,24 @@ func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGene
 		rpcBus:    rpcBus,
 		db:        db,
 		genPubKey: genPubKey,
+		prevBlock: *block.NewBlock(),
 	}
 }
 
-var generatorReward uint64
+func (bg *blockGenerator) UpdatePrevBlock(b block.Block) {
+	bg.prevBlock = b
+}
 
 func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error) {
+
+	if round <= bg.prevBlock.Header.Height {
+		return nil, fmt.Errorf("target round (%d) must be higher than previous block round %d", round, bg.prevBlock.Header.Height)
+	}
 
 	// TODO Missing fields for forging the block
 	// - CertHash
 
 	certHash, _ := crypto.RandEntropy(32)
-	// TODO: store previous block hash on generation component somewhere
-	prevBlock := block.NewBlock()
 
 	txs, err := bg.ConstructBlockTxs(proof, score)
 	if err != nil {
@@ -75,7 +85,7 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 		Version:   0,
 		Timestamp: time.Now().Unix(),
 		Height:    round,
-		PrevBlock: prevBlock.Header.Hash,
+		PrevBlock: bg.prevBlock.Header.Hash,
 		TxRoot:    nil,
 
 		Seed:     seed,
@@ -99,7 +109,7 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 	}
 
 	// Ensure the forged block satisfies all chain rules
-	if err := verifiers.CheckBlock(bg.db, *prevBlock, *candidateBlock); err != nil {
+	if err := verifiers.CheckBlock(bg.db, bg.prevBlock, *candidateBlock); err != nil {
 		return nil, err
 	}
 
@@ -184,7 +194,7 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 
 	// Disclose  reward
 	rewardBytes := make([]byte, 32)
-	binary.LittleEndian.PutUint64(rewardBytes[:32], generatorReward)
+	binary.LittleEndian.PutUint64(rewardBytes[:32], config.GeneratorReward)
 
 	// Add the Block Generator reward
 	output := &transactions.Output{}

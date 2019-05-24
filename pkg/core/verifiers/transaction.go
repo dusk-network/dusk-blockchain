@@ -1,9 +1,11 @@
 package verifiers
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/pkg/errors"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
@@ -101,6 +103,16 @@ func VerifyCoinbase(txIndex uint64, tx *transactions.Coinbase) error {
 	if txIndex != 0 {
 		return errors.New("coinbase transaction is not in the first position")
 	}
+
+	if len(tx.Rewards) != 1 {
+		return fmt.Errorf("coinbase transaction must include 1 reward output")
+	}
+
+	// Ensure the reward is the fixed one
+	if binary.LittleEndian.Uint64(tx.Rewards[0].Commitment) != config.GeneratorReward {
+		return fmt.Errorf("coinbase transaction must include a fixed reward of %d", config.GeneratorReward)
+	}
+
 	return nil
 }
 

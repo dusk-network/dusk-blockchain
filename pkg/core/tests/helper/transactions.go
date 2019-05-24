@@ -63,10 +63,10 @@ func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
 // RandomCoinBaseTx returns a random coinbase transaction for testing
 func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
 	proof := RandomSlice(t, 2000)
-	key := RandomSlice(t, 32)
-	address := RandomSlice(t, 32)
+	score := RandomSlice(t, 32)
+	R := RandomSlice(t, 32)
 
-	tx := transactions.NewCoinbase(proof, key, address)
+	tx := transactions.NewCoinbase(proof, score, R)
 
 	return tx
 }

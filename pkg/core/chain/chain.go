@@ -35,8 +35,6 @@ type Chain struct {
 	prevBlock block.Block
 	bidList   *user.BidList
 
-	blockChannel <-chan *block.Block
-
 	// collector channels
 	blockChan <-chan *block.Block
 }
@@ -74,12 +72,12 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	blockChannel := initBlockCollector(eventBus)
 
 	c := &Chain{
-		eventBus:     eventBus,
-		rpcBus:       rpcBus,
-		db:           db,
-		bidList:      &user.BidList{},
-		prevBlock:    *genesisBlock,
-		blockChannel: blockChannel,
+		eventBus:  eventBus,
+		rpcBus:    rpcBus,
+		db:        db,
+		bidList:   &user.BidList{},
+		prevBlock: *genesisBlock,
+		blockChan: blockChannel,
 	}
 
 	return c, nil
@@ -209,6 +207,9 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	c.prevBlock = blk
 
 	// 3. Notify other subsystems for the accepted block
+	// Subsystems listening for this topic:
+	// mempool.Mempool
+	// consensus.generation.broker
 	buf := new(bytes.Buffer)
 	if err := blk.Encode(buf); err != nil {
 		return err
