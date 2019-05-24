@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // roundCollector is a simple wrapper over a channel to get round notifications.
@@ -23,6 +25,10 @@ type (
 
 	bidListCollector struct {
 		BidListChan chan<- user.BidList
+	}
+
+	acceptedBlockCollector struct {
+		blockChan chan<- block.Block
 	}
 )
 
@@ -83,5 +89,24 @@ func (l *bidListCollector) Collect(r *bytes.Buffer) error {
 		return nil
 	}
 	l.BidListChan <- bidList
+	return nil
+}
+
+// InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
+func InitAcceptedBlockUpdate(subscriber wire.EventSubscriber) chan block.Block {
+	acceptedBlockChan := make(chan block.Block)
+	collector := &acceptedBlockCollector{acceptedBlockChan}
+	go wire.NewTopicListener(subscriber, collector, string(topics.AcceptedBlock)).Accept()
+	return acceptedBlockChan
+}
+
+// Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
+func (c *acceptedBlockCollector) Collect(r *bytes.Buffer) error {
+	b := block.NewBlock()
+	if err := b.Decode(r); err != nil {
+		return err
+	}
+
+	c.blockChan <- *b
 	return nil
 }

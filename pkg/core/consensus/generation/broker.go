@@ -1,10 +1,14 @@
 package generation
 
 import (
+	"crypto/rand"
+
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
@@ -23,9 +27,10 @@ type broker struct {
 	seeder         *seeder
 
 	// subscriber channels
-	roundChan        <-chan uint64
-	bidListChan      <-chan user.BidList
-	regenerationChan <-chan consensus.AsyncState
+	roundChan         <-chan uint64
+	bidListChan       <-chan user.BidList
+	regenerationChan  <-chan consensus.AsyncState
+	acceptedBlockChan <-chan block.Block
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
@@ -34,20 +39,29 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		gen = newProofGenerator(d, k)
 	}
 
+	seed := make([]byte, 64)
+	_, _ = rand.Read(seed)
+
+	// TODO: Read Block Generator's PublicKey from config or dusk-wallet API
+	publicKey := key.NewKeyPair(seed).PublicKey()
+
 	if blockGen == nil {
-		blockGen = newBlockGenerator(rpcBus)
+		blockGen = newBlockGenerator(publicKey, rpcBus)
 	}
 
 	roundChan := consensus.InitRoundUpdate(eventBroker)
 	bidListChan := consensus.InitBidListUpdate(eventBroker)
 	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
+	acceptedBlockChan := consensus.InitAcceptedBlockUpdate(eventBroker)
+
 	return &broker{
-		proofGenerator:   gen,
-		roundChan:        roundChan,
-		bidListChan:      bidListChan,
-		regenerationChan: regenerationChan,
-		forwarder:        newForwarder(eventBroker, blockGen),
-		seeder:           &seeder{},
+		proofGenerator:    gen,
+		roundChan:         roundChan,
+		bidListChan:       bidListChan,
+		regenerationChan:  regenerationChan,
+		acceptedBlockChan: acceptedBlockChan,
+		forwarder:         newForwarder(eventBroker, blockGen),
+		seeder:            &seeder{},
 	}
 }
 
@@ -66,6 +80,8 @@ func (b *broker) Listen() {
 				proof := b.proofGenerator.GenerateProof(seed)
 				b.Forward(proof, seed)
 			}
+		case acceptedBlockChan := <-b.acceptedBlockChan:
+			b.forwarder.blockGenerator.UpdatePrevBlock(acceptedBlockChan)
 		}
 	}
 }
