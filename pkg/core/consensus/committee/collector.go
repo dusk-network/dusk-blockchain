@@ -17,31 +17,10 @@ type (
 		amount    uint64
 	}
 
-	newProvisionerCollector struct {
-		newProvisionerChan chan *provisioner
-	}
-
 	removeProvisionerCollector struct {
 		removeProvisionerChan chan []byte
 	}
 )
-
-func initNewProvisionerCollector(subscriber wire.EventSubscriber) chan *provisioner {
-	newProvisionerChan := make(chan *provisioner, 10)
-	collector := &newProvisionerCollector{newProvisionerChan}
-	go wire.NewTopicListener(subscriber, collector, msg.NewProvisionerTopic).Accept()
-	return newProvisionerChan
-}
-
-func (n *newProvisionerCollector) Collect(provisionerBytes *bytes.Buffer) error {
-	provisioner, err := decodeNewProvisioner(provisionerBytes)
-	if err != nil {
-		return err
-	}
-
-	n.newProvisionerChan <- provisioner
-	return nil
-}
 
 func decodeNewProvisioner(r *bytes.Buffer) (*provisioner, error) {
 	var pubKeyEd []byte

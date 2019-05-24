@@ -40,7 +40,7 @@ func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
 	return BidList, nil
 }
 
-// ValidateBids will check if pl contains valid bids.
+// ValidateBids will check if the passed BidList subset contains valid bids.
 func (b BidList) ValidateBids(bidListSubset BidList) *prerror.PrError {
 loop:
 	for _, x := range bidListSubset {
@@ -82,7 +82,7 @@ func (b BidList) Contains(bid Bid) bool {
 	return false
 }
 
-// AddBid will add a bid to the public list p.
+// AddBid will add a bid to the BidList.
 func (b *BidList) AddBid(bid Bid) {
 	// Check for duplicates
 	for _, bidFromList := range *b {
@@ -94,7 +94,7 @@ func (b *BidList) AddBid(bid Bid) {
 	*b = append(*b, bid)
 }
 
-// RemoveBid will iterate over a public list and remove a specified bid.
+// RemoveBid will iterate over a BidList and remove a specified bid.
 func (b *BidList) RemoveBid(bid Bid) {
 	for i, bidFromList := range *b {
 		if bidFromList.Equals(bid) {

@@ -32,7 +32,7 @@ func newBlockGenerator(rpcBus *wire.RPCBus) *blockGenerator {
 func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte) (*block.Block, error) {
 	// TODO Missing fields for forging the block
 	// - CertHash
-	// - prevHash
+	// - PrevBlock
 
 	// Retrieve latest verified transactions from Mempool
 	r, err := bg.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
@@ -78,24 +78,6 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte) (*block.Block
 		return nil, err
 	}
 
-	// Ensure the forged block satisfies all chain rules
-	// if err := verifiers.CheckBlock(c.db, c.prevBlock, *b); err != nil {
-	// 	return nil, err
-	// }
-
-	// Save it into persistent storage
-	// err = c.db.Update(func(t database.Transaction) error {
-	// 	err := t.StoreCandidateBlock(b)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-
-	// 	return nil
-	// })
-
-	// if err != nil {
-	// 	return nil, err
-	// }
-
+	// TODO: maybe verify the block before returning it
 	return b, nil
 }

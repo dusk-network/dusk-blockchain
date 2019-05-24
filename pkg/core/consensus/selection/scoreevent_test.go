@@ -9,6 +9,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
+// Test both the Marshal and Unmarshal functions, making sure the data is correctly
+// stored to/retrieved from a Buffer.
 func TestUnMarshal(t *testing.T) {
 
 	// 32 bytes

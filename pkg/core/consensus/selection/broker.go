@@ -17,14 +17,16 @@ type scoreBroker struct {
 	bidListChan      <-chan user.BidList
 	filter           *consensus.EventFilter
 	selector         *eventSelector
-	handler          scoreEventHandler
+	handler          ScoreEventHandler
 }
 
 // Launch creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func Launch(eventBroker wire.EventBroker, timeout time.Duration) {
-	handler := newScoreHandler()
+func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout time.Duration) {
+	if handler == nil {
+		handler = newScoreHandler()
+	}
 	broker := newScoreBroker(eventBroker, handler, timeout)
 	go broker.Listen()
 }
@@ -39,7 +41,7 @@ func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHand
 }
 
 // newScoreBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func newScoreBroker(eventBroker wire.EventBroker, handler scoreEventHandler,
+func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler,
 	timeOut time.Duration) *scoreBroker {
 	//creating the channel whereto notifications about round updates are push onto
 	roundChan := consensus.InitRoundUpdate(eventBroker)

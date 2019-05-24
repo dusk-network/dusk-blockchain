@@ -11,6 +11,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -40,6 +41,7 @@ func mockConfig(t *testing.T) func() {
 	}
 }
 
+// Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -60,7 +62,7 @@ func TestReduction(t *testing.T) {
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
 	time.Sleep(200 * time.Millisecond)
-	sendSelection(hash, eventBus)
+	sendSelection(1, hash, eventBus)
 
 	// send mocked events until we get a result from the outgoingAgreement channel
 	sendReductionBuffers(2, k, hash, 1, 1, eventBus)
@@ -79,6 +81,7 @@ func TestReduction(t *testing.T) {
 	timer.Stop()
 }
 
+// Test that the reducer does not send any messages when it is not part of the committee.
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -97,7 +100,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
 	time.Sleep(200 * time.Millisecond)
-	sendSelection(hash, eventBus)
+	sendSelection(1, hash, eventBus)
 
 	// Try to read from the stream, and see if we get any reduction messages from
 	// ourselves.
@@ -116,6 +119,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 	<-timer.C
 }
 
+// Test that timeouts in the reduction phase result in proper behavior.
 func TestReductionTimeout(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -135,7 +139,7 @@ func TestReductionTimeout(t *testing.T) {
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
 	time.Sleep(200 * time.Millisecond)
-	sendSelection(hash, eb)
+	sendSelection(1, hash, eb)
 
 	timer := time.After(1 * time.Second)
 	<-timer
@@ -155,10 +159,11 @@ func TestReductionTimeout(t *testing.T) {
 	<-stopChan
 }
 
+// Convenience function, which launches the reduction component and removes the
+// preprocessors for testing purposes (bypassing the republisher and the validator).
+// This ensures proper handling of mocked Reduction events.
 func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration) {
 	reduction.Launch(eb, committee, k, timeOut)
-	// remove the preprocessors for the reduction topic, to ensure proper deserialization
-	// of mocked events
 	eb.RegisterPreprocessor(string(topics.Reduction))
 }
 
@@ -171,8 +176,8 @@ func sendReductionBuffers(amount int, k user.Keys, hash []byte, round uint64, st
 	}
 }
 
-func sendSelection(hash []byte, eventBus *wire.EventBus) {
-	bestScoreBuf := reduction.MockSelectionEventBuffer(hash)
+func sendSelection(round uint64, hash []byte, eventBus *wire.EventBus) {
+	bestScoreBuf := selection.MockSelectionEventBuffer(round, hash)
 	eventBus.Publish(msg.BestScoreTopic, bestScoreBuf)
 }
 

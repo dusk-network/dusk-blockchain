@@ -37,6 +37,7 @@ func mockConfig(t *testing.T) func() {
 	}
 }
 
+// Test that the agreement component emits a round update on startup.
 func TestInitBroker(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -51,6 +52,8 @@ func TestInitBroker(t *testing.T) {
 	assert.Equal(t, uint64(1), round)
 }
 
+// Test the accumulation of agreement events. It should result in the agreement component
+// publishing a round update.
 func TestBroker(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -66,6 +69,8 @@ func TestBroker(t *testing.T) {
 	assert.Equal(t, uint64(2), round)
 }
 
+// Test that the agreement component does not emit a round update if it doesn't get
+// the desired amount of events.
 func TestNoQuorum(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -82,12 +87,9 @@ func TestNoQuorum(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		// all good
 	}
-
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
-	round := <-roundChan
-	assert.Equal(t, uint64(2), round)
 }
 
+// Test that events, which contain a sender that is unknown to the committee, are skipped.
 func TestSkipNoMember(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -105,6 +107,8 @@ func TestSkipNoMember(t *testing.T) {
 	}
 }
 
+// Test that the agreement component properly sends out an Agreement message, upon
+// receiving a ReductionResult event.
 func TestSendAgreement(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -133,6 +137,7 @@ func TestSendAgreement(t *testing.T) {
 	}
 }
 
+// Launch the agreement component, and consume the initial round update that gets emitted.
 func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)

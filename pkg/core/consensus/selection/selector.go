@@ -31,7 +31,7 @@ var empty struct{}
 
 type eventSelector struct {
 	publisher wire.EventPublisher
-	handler   scoreEventHandler
+	handler   ScoreEventHandler
 	lock      sync.RWMutex
 	bestEvent wire.Event
 	state     consensus.State
@@ -40,7 +40,7 @@ type eventSelector struct {
 }
 
 // newEventSelector creates the Selector and returns it.
-func newEventSelector(publisher wire.EventPublisher, handler scoreEventHandler,
+func newEventSelector(publisher wire.EventPublisher, handler ScoreEventHandler,
 	timeOut time.Duration, state consensus.State) *eventSelector {
 	return &eventSelector{
 		publisher: publisher,

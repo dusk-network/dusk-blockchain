@@ -6,9 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
@@ -80,35 +78,6 @@ func MockReductionBuffer(keys user.Keys, hash []byte, round uint64, step uint8) 
 	buf := new(bytes.Buffer)
 	_ = marshaller.Marshal(buf, ev)
 	return buf
-}
-
-// MockSelectionEventBuffer mocks a Selection event, marshals it, and returns the
-// resulting buffer.
-func MockSelectionEventBuffer(hash []byte) *bytes.Buffer {
-	// 32 bytes
-	score, _ := crypto.RandEntropy(32)
-	// Var Bytes
-	proof, _ := crypto.RandEntropy(1477)
-	// 32 bytes
-	z, _ := crypto.RandEntropy(32)
-	// Var Bytes
-	bidListSubset, _ := crypto.RandEntropy(32)
-	// BLS is 33 bytes
-	seed, _ := crypto.RandEntropy(33)
-	se := &selection.ScoreEvent{
-		Round:         uint64(23),
-		Score:         score,
-		Proof:         proof,
-		Z:             z,
-		Seed:          seed,
-		BidListSubset: bidListSubset,
-		VoteHash:      hash,
-	}
-
-	b := make([]byte, 0)
-	r := bytes.NewBuffer(b)
-	_ = selection.MarshalScoreEvent(r, se)
-	return r
 }
 
 // MockCommittee mocks a Reducers committee implementation, which can be used for

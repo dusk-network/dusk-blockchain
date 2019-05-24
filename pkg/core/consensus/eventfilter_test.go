@@ -14,6 +14,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+// Test that a relevant event gets passed down to the Processor properly.
 func TestRelevantEvent(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)
@@ -31,6 +32,8 @@ func TestRelevantEvent(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+// Test that early events get queued, and then passed down to the Processor properly
+// upon the needed state change.
 func TestEarlyEvent(t *testing.T) {
 	round := uint64(2)
 	step := uint8(1)
@@ -50,6 +53,7 @@ func TestEarlyEvent(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+// Test that obsolete events get dropped.
 func TestObsoleteEvent(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)
@@ -69,9 +73,11 @@ func TestObsoleteEvent(t *testing.T) {
 	}
 }
 
+// Test that the entire queue for a round is flushed and processed, when checkStep
+// is set to false.
 func TestFlushQueueNoCheckStep(t *testing.T) {
 	round := uint64(2)
-	step := uint8(0) // When checkStep is false, extracted headers have a step of 0
+	step := uint8(2)
 	processChan := make(chan error, 1)
 	eventFilter := newEventFilter(round, step, true,
 		newMockEventProcessor(nil, processChan), false)
@@ -123,6 +129,7 @@ func newMockHandlerFilter(round uint64, step uint8, pubKeyBLS []byte) consensus.
 	return mockEventHandler
 }
 
+// A stand-in Processor, which simply puts received events on a channel.
 type mockEventProcessor struct {
 	verifyErr   error
 	processChan chan error

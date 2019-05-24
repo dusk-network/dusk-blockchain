@@ -36,6 +36,8 @@ func mockConfig(t *testing.T) func() {
 	}
 }
 
+// Test the accumulation of events up to Quorum. The Accumulator should return the
+// events on the CollectedVotesChan once we do.
 func TestAccumulation(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -50,6 +52,7 @@ func TestAccumulation(t *testing.T) {
 	assert.Equal(t, 2, len(events))
 }
 
+// Test that events which fail verification are not stored.
 func TestFailedVerification(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -68,6 +71,7 @@ func TestFailedVerification(t *testing.T) {
 	}
 }
 
+// Test that events which come from senders which are not in the committee are ignored.
 func TestNonCommitteeEvent(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()

@@ -25,7 +25,9 @@ type (
 		threshold *consensus.Threshold
 	}
 
-	scoreEventHandler interface {
+	// ScoreEventHandler extends the consensus.EventHandler interface with methods
+	// specific to the handling of score events.
+	ScoreEventHandler interface {
 		consensus.EventHandler
 		wire.EventPrioritizer
 		UpdateBidList(user.BidList)
