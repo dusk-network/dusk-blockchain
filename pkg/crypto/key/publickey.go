@@ -6,9 +6,9 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/btcsuite/btcutil/base58"
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/base58"
 )
 
 // PublicKey represents a pair of PublicSpend and PublicView keys
@@ -26,7 +26,10 @@ func (pa PublicAddress) String() string { return string(pa) }
 func (pa PublicAddress) ToKey(netPrefix byte) (*PublicKey, error) {
 
 	// Base58 Decode
-	byt := base58.Decode(pa.String())
+	byt, err := base58.Decode(pa.String())
+	if err != nil {
+		return nil, err
+	}
 
 	var np byte
 	var checksum [4]byte
@@ -131,7 +134,10 @@ func (k *PublicKey) PublicAddress(netPrefix byte) (*PublicAddress, error) {
 	}
 
 	// TODO Replace base58 pkg
-	pubAddrStr := base58.Encode(buf.Bytes())
+	pubAddrStr, err := base58.Encode(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
 
 	pubAddr := PublicAddress(pubAddrStr)
 	return &pubAddr, nil
