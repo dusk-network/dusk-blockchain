@@ -88,7 +88,7 @@ func genVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVo
 	return votes
 }
 
-func mockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, []user.Keys) {
+func MockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, []user.Keys) {
 	keys := make([]user.Keys, membersNr)
 	mockSubCommittees := make([]sortedset.Set, 2)
 	wholeCommittee := sortedset.New()

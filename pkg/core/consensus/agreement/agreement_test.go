@@ -18,61 +18,45 @@ import (
 )
 
 func TestInitBroker(t *testing.T) {
-
-	committeeMock, _ := mockCommittee(2, true, 2)
+	committeeMock, k := MockCommittee(2, true, 2)
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
-	LaunchAgreement(bus, committeeMock, user.Keys{}, 1)
+	LaunchAgreement(bus, committeeMock, k[0], 1)
 
 	round := <-roundChan
 	assert.Equal(t, uint64(1), round)
 }
 
 func TestBroker(t *testing.T) {
-
-	committeeMock, keys := mockCommittee(2, true, 2)
-	_, broker, roundChan := initAgreement(committeeMock)
-
-	hash, _ := crypto.RandEntropy(32)
-	e1 := MockAgreement(hash, 1, 2, keys)
-	e2 := MockAgreement(hash, 1, 2, keys)
-	_ = broker.filter.Collect(e1)
-	_ = broker.filter.Collect(e2)
-
-	round := <-roundChan
-	assert.Equal(t, uint64(2), round)
+	committeeMock, keys := MockCommittee(2, true, 2)
+	tc := collectAgreements(committeeMock, keys, 2)
+	round := <-tc.roundChan
+	assert.Equal(t, tc.round+1, round)
 }
 
 func TestNoQuorum(t *testing.T) {
-
-	committeeMock, keys := mockCommittee(3, true, 3)
-	_, broker, roundChan := initAgreement(committeeMock)
-	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
-	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
+	committeeMock, keys := MockCommittee(3, true, 3)
+	tc := collectAgreements(committeeMock, keys, 2)
 
 	select {
-	case <-roundChan:
+	case <-tc.roundChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
 	}
 
-	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
-	round := <-roundChan
+	_ = tc.broker.filter.Collect(MockAgreement(tc.hash, tc.round, tc.step, keys))
+	round := <-tc.roundChan
 	assert.Equal(t, uint64(2), round)
 }
 
 func TestSkipNoMember(t *testing.T) {
-
-	committeeMock, keys := mockCommittee(1, false, 2)
-	_, broker, roundChan := initAgreement(committeeMock)
-	hash, _ := crypto.RandEntropy(32)
-	_ = broker.filter.Collect(MockAgreement(hash, 1, 2, keys))
+	committeeMock, keys := MockCommittee(1, false, 2)
+	tc := collectAgreements(committeeMock, keys, 1)
 
 	select {
-	case <-roundChan:
+	case <-tc.roundChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
@@ -81,7 +65,7 @@ func TestSkipNoMember(t *testing.T) {
 
 func TestSendAgreement(t *testing.T) {
 
-	committeeMock, _ := mockCommittee(3, true, 3)
+	committeeMock, _ := MockCommittee(3, true, 3)
 	eb, broker, _ := initAgreement(committeeMock)
 
 	streamer := helper.NewSimpleStreamer()
@@ -104,6 +88,29 @@ func TestSendAgreement(t *testing.T) {
 	seenTopics := streamer.SeenTopics()
 	if seenTopics[0] != topics.Agreement {
 		t.Fail()
+	}
+}
+
+type testComponents struct {
+	broker    *broker
+	roundChan <-chan uint64
+	hash      []byte
+	round     uint64
+	step      uint8
+}
+
+func collectAgreements(c committee.Foldable, k []user.Keys, nr int) *testComponents {
+	_, broker, roundChan := initAgreement(c)
+	hash, _ := crypto.RandEntropy(32)
+	for i := 0; i < nr; i++ {
+		_ = broker.filter.Collect(MockAgreement(hash, 1, 2, k))
+	}
+	return &testComponents{
+		broker,
+		roundChan,
+		hash,
+		uint64(1),
+		uint8(2),
 	}
 }
 
