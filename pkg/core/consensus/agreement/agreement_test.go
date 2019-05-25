@@ -1,13 +1,10 @@
 package agreement
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -20,24 +17,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func mockConfig(t *testing.T) func() {
-	storeDir, err := ioutil.TempDir(os.TempDir(), "agreement_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Performance.AccumulatorWorkers = 4
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
 func TestInitBroker(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	committeeMock, _ := mockCommittee(2, true, 2)
 	bus := wire.NewEventBus()
@@ -50,8 +30,6 @@ func TestInitBroker(t *testing.T) {
 }
 
 func TestBroker(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	committeeMock, keys := mockCommittee(2, true, 2)
 	_, broker, roundChan := initAgreement(committeeMock)
@@ -67,8 +45,6 @@ func TestBroker(t *testing.T) {
 }
 
 func TestNoQuorum(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	committeeMock, keys := mockCommittee(3, true, 3)
 	_, broker, roundChan := initAgreement(committeeMock)
@@ -89,8 +65,6 @@ func TestNoQuorum(t *testing.T) {
 }
 
 func TestSkipNoMember(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	committeeMock, keys := mockCommittee(1, false, 2)
 	_, broker, roundChan := initAgreement(committeeMock)
@@ -106,8 +80,6 @@ func TestSkipNoMember(t *testing.T) {
 }
 
 func TestSendAgreement(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	committeeMock, _ := mockCommittee(3, true, 3)
 	eb, broker, _ := initAgreement(committeeMock)
