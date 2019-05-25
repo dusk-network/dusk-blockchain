@@ -173,8 +173,14 @@ func defineENV() {
 	}
 }
 
-// Mock should be used only in test packages in order to mock a set of
-// configurations utilized by the test itself
+// Mock should be used only in test packages. It could be useful when a unit
+// test needs to be rerun with configs different from the default ones.
 func Mock(m *Registry) {
 	r = m
+}
+
+func init() {
+	// By default Registry should be empty but not nil. In that way, consumers
+	// (packages) can use their default values on unit testing
+	r = new(Registry)
 }
