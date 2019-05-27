@@ -14,24 +14,23 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 
 | Field           | Type    |
 | --------------- | ------- |
-| opcode          | uint8   |
+| pubkeyBLS       | BLS Signature |
 | round           | uint64  |
 | step            | uint64  |
 | blockhash       | uint256 |
-| blockhashsigBLS | uint256 |
-| prevblockhash   | uint256 |
+| signedblockhash | BLS Signature |
 
 ### API
 
-- LaunchReducer(eventbus, committee, duration) - Launches a Block Reducer broker publishing on the `OutgoingBlockAgreementTopic` topic
+- Launch(eventbus, committee, duration) - Launches the reduction component, which publishes on the `Reduction` and `ReductionResultTopic` topics.
 
 ### Architecture
 
-The `Block Reducer` component follows the event driven paradigm. It is connected to the node's `EventBus` through a `Broker` and it delegates event-specific operations to it's `EventHandler` implementation.
+The `Block Reducer` component follows the event driven paradigm. It is connected to the node's `EventBus` through a `broker` and it delegates event-specific operations to its `EventHandler` implementation.
 
 The `Reducer` entity is generic and spawns two `eventStopWatch` (one per step) to regulate the collection of the events and handle eventual timeout.
 
-Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to a `Collector`.
+Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to an `EventFilter`.
 
 #### Block Reducer Diagram
 

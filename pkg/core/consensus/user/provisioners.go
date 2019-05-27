@@ -9,9 +9,9 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-// Member contains the bytes of a provisioner's Ed25519 public key,
-// the bytes of his BLS public key, and how much he has staked.
 type (
+	// Member contains the bytes of a provisioner's Ed25519 public key,
+	// the bytes of his BLS public key, and how much he has staked.
 	Member struct {
 		PublicKeyEd  ed25519.PublicKey
 		PublicKeyBLS bls.PublicKey
@@ -25,6 +25,7 @@ type (
 	}
 )
 
+// NewProvisioners returns an initialized Provisioners struct.
 func NewProvisioners() *Provisioners {
 	return &Provisioners{
 		set:     sortedset.New(),
@@ -32,21 +33,23 @@ func NewProvisioners() *Provisioners {
 	}
 }
 
+// Size returns the amount of Members contained within a Provisioners struct.
 func (p *Provisioners) Size() int {
 	return len(p.set)
 }
 
-//strPk is an efficient way to turn []byte into string
+// strPk is an efficient way to turn []byte into string
 func strPk(pk []byte) string {
 	return *(*string)(unsafe.Pointer(&pk))
 }
 
+// MemberAt returns the Member at a certain index.
 func (p *Provisioners) MemberAt(i int) *Member {
 	bigI := p.set[i]
 	return p.members[strPk(bigI.Bytes())]
 }
 
-// GetMemberBLS returns a member of the provisioners from its BLS key
+// GetMember returns a member of the provisioners from its BLS public key.
 func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
 	return p.members[strPk(pubKeyBLS)]
 }
@@ -84,7 +87,7 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake uint64) error
 	return nil
 }
 
-// RemoveMember will iterate over the committee and remove the specified Member.
+// Remove a Member, designated by their BLS public key.
 func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
 	delete(p.members, strPk(pubKeyBLS))
 	return p.set.Remove(pubKeyBLS)

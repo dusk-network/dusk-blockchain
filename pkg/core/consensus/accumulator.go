@@ -29,6 +29,7 @@ type Accumulator struct {
 	CollectedVotesChan chan []wire.Event
 }
 
+// NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
 func NewAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
 	// set up worker pool
 	eventChan := make(chan wire.Event, 10)
@@ -47,6 +48,8 @@ func NewAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
 	return a
 }
 
+// Process a received Event, by passing it to a worker in the worker pool (if the event
+// sender is part of the voting committee).
 func (a *Accumulator) Process(ev wire.Event) {
 	if a.shouldSkip(ev) {
 		log.WithError(errors.New("sender not part of committee")).Debugln("event dropped")

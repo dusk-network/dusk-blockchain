@@ -1,10 +1,11 @@
-package consensus
+package consensus_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -28,7 +29,7 @@ func TestValidator(t *testing.T) {
 	_, err = buf.Write(message)
 	assert.NoError(t, err)
 
-	validator := &Validator{}
+	validator := &consensus.Validator{}
 	result, err := validator.Process(buf)
 	assert.NoError(t, err)
 	assert.Equal(t, message, result.Bytes())

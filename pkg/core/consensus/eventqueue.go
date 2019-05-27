@@ -6,67 +6,69 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-// EventQueue is a Queue of Events grouped by rounds and steps. It is threadsafe through a sync.RWMutex
+// EventQueue is a Queue of Events grouped by rounds and steps. It is threadsafe
+// through a sync.RWMutex.
 type EventQueue struct {
-	sync.RWMutex
+	lock    sync.RWMutex
 	entries map[uint64]map[uint8][]wire.Event
 }
 
-// NewEventQueue creates a new EventQueue. It is primarily used by Collectors to temporarily store messages not yet relevant to the collection process
+// NewEventQueue creates a new EventQueue. It is primarily used by Collectors to
+// temporarily store messages not yet relevant to the collection process.
 func NewEventQueue() *EventQueue {
 	entries := make(map[uint64]map[uint8][]wire.Event)
 	return &EventQueue{
-		RWMutex: sync.RWMutex{},
 		entries: entries,
 	}
 }
 
-// GetEvents returns the events for a round and step
-func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
-	s.Lock()
-	defer s.Unlock()
-	if s.entries[round][step] != nil {
-		messages := s.entries[round][step]
-		s.entries[round][step] = nil
+// GetEvents returns the events for a round and step.
+func (eq *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
+	if eq.entries[round][step] != nil {
+		messages := eq.entries[round][step]
+		eq.entries[round][step] = nil
 		return messages
 	}
 
 	return nil
 }
 
-// PutEvent stores an Event at a given round and step
-func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
-	s.Lock()
-	defer s.Unlock()
+// PutEvent stores an Event at a given round and step.
+func (eq *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
 
 	// Initialise the map on this round if it was not yet created
-	if s.entries[round] == nil {
-		s.entries[round] = make(map[uint8][]wire.Event)
+	if eq.entries[round] == nil {
+		eq.entries[round] = make(map[uint8][]wire.Event)
 	}
 
 	// Initialise the array on this step if it was not yet created
-	if s.entries[round][step] == nil {
-		s.entries[round][step] = make([]wire.Event, 0)
+	if eq.entries[round][step] == nil {
+		eq.entries[round][step] = make([]wire.Event, 0)
 	}
 
-	s.entries[round][step] = append(s.entries[round][step], m)
+	eq.entries[round][step] = append(eq.entries[round][step], m)
 }
 
-// Clear the queue
-func (s *EventQueue) Clear(round uint64) {
-	s.Lock()
-	defer s.Unlock()
-	s.entries[round] = nil
+// Clear the queue.
+func (eq *EventQueue) Clear(round uint64) {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
+	eq.entries[round] = nil
 }
 
-func (s *EventQueue) Flush(round uint64) []wire.Event {
-	s.Lock()
-	defer s.Unlock()
+// Flush all events stored for a specific round from the queue, and return them.
+func (eq *EventQueue) Flush(round uint64) []wire.Event {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
 	events := make([]wire.Event, 0)
-	if s.entries[round] != nil {
-		for step, evs := range s.entries[round] {
+	if eq.entries[round] != nil {
+		for step, evs := range eq.entries[round] {
 			events = append(events, evs...)
-			s.entries[round][step] = nil
+			eq.entries[round][step] = nil
 		}
 		return events
 	}

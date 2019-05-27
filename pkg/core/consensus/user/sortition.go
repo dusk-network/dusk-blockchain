@@ -10,7 +10,8 @@ import (
 )
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
-// point in the consensus. The set is sorted by the int value of the public key in increasing order (higher last)
+// point in the consensus. The set is sorted by the int value of the public key in
+// increasing order (higher last)
 type VotingCommittee struct {
 	sortedset.Set
 }
@@ -21,14 +22,17 @@ func newCommittee() *VotingCommittee {
 	}
 }
 
+// Size returns how many members there are in a VotingCommittee.
 func (v *VotingCommittee) Size() int {
 	return len(v.Set)
 }
 
+// Remove a member from the VotingCommittee by its BLS public key.
 func (v *VotingCommittee) Remove(pk []byte) bool {
 	return v.Set.Remove(pk)
 }
 
+// MemberKeys returns the BLS public keys of all the members in a VotingCommittee.
 func (v *VotingCommittee) MemberKeys() [][]byte {
 	pks := make([][]byte, 0)
 	for _, pk := range v.Set {
@@ -37,6 +41,7 @@ func (v *VotingCommittee) MemberKeys() [][]byte {
 	return pks
 }
 
+// Equal checks if two VotingCommittees are the same.
 func (v *VotingCommittee) Equal(other *VotingCommittee) bool {
 	return v.Set.Equal(other.Set)
 }

@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	// EventHandler encapsulate logic specific to the various EventFilters.
+	// EventHandler encapsulates logic specific to the various EventFilters.
 	// Each EventFilter needs to verify, prioritize and extract information from Events.
 	// EventHandler is the interface that abstracts these operations away.
 	// The implementors of this interface is the real differentiator of the various
@@ -38,6 +38,7 @@ type (
 	}
 )
 
+// NewEventFilter returns an initialized EventFilter.
 func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
 	checkStep bool) *EventFilter {
 	return &EventFilter{
@@ -49,29 +50,30 @@ func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
 	}
 }
 
-func (c *EventFilter) Collect(buffer *bytes.Buffer) error {
-	ev, err := c.handler.Deserialize(buffer)
+// Collect an event buffer, deserialize it, and then pass it to the proper component.
+func (ef *EventFilter) Collect(buffer *bytes.Buffer) error {
+	ev, err := ef.handler.Deserialize(buffer)
 	if err != nil {
 		return err
 	}
 
-	header := c.handler.ExtractHeader(ev)
-	roundDiff, stepDiff := c.state.Cmp(header.Round, header.Step)
-	if c.isEarly(roundDiff, stepDiff) {
-		c.queue.PutEvent(header.Round, header.Step, ev)
+	header := ef.handler.ExtractHeader(ev)
+	roundDiff, stepDiff := ef.state.Cmp(header.Round, header.Step)
+	if ef.isEarly(roundDiff, stepDiff) {
+		ef.queue.PutEvent(header.Round, header.Step, ev)
 		return nil
 	}
 
-	if c.isRelevant(roundDiff, stepDiff) {
-		c.processor.Process(ev)
+	if ef.isRelevant(roundDiff, stepDiff) {
+		ef.processor.Process(ev)
 	}
 
 	return nil
 }
 
-func (c *EventFilter) isEarly(roundDiff, stepDiff int) bool {
+func (ef *EventFilter) isEarly(roundDiff, stepDiff int) bool {
 	earlyRound := roundDiff < 0
-	if !c.checkStep {
+	if !ef.checkStep {
 		return earlyRound
 	}
 	earlyStep := stepDiff < 0
@@ -79,29 +81,33 @@ func (c *EventFilter) isEarly(roundDiff, stepDiff int) bool {
 	return earlyRound || (sameRound && earlyStep)
 }
 
-func (c *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
+func (ef *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
 	relevantRound := roundDiff == 0
-	if !c.checkStep {
+	if !ef.checkStep {
 		return relevantRound
 	}
 	relevantStep := stepDiff == 0
 	return relevantRound && relevantStep
 }
 
-func (c *EventFilter) UpdateRound(round uint64) {
-	c.state.Update(round)
-	c.queue.Clear(round - 1)
+// UpdateRound updates the state for the EventFilter, and empties the queue of
+// obsolete events.
+func (ef *EventFilter) UpdateRound(round uint64) {
+	ef.state.Update(round)
+	ef.queue.Clear(round - 1)
 }
 
-func (c *EventFilter) FlushQueue() {
+// FlushQueue will retrieve all queued events for a certain point in consensus,
+// and hand them off to the Processor.
+func (ef *EventFilter) FlushQueue() {
 	var queuedEvents []wire.Event
-	if c.checkStep {
-		queuedEvents = c.queue.GetEvents(c.state.Round(), c.state.Step())
+	if ef.checkStep {
+		queuedEvents = ef.queue.GetEvents(ef.state.Round(), ef.state.Step())
 	} else {
-		queuedEvents = c.queue.Flush(c.state.Round())
+		queuedEvents = ef.queue.Flush(ef.state.Round())
 	}
 
 	for _, event := range queuedEvents {
-		c.processor.Process(event)
+		ef.processor.Process(event)
 	}
 }
