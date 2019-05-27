@@ -21,11 +21,11 @@ import (
 
 // Test that the agreement component emits a round update on startup.
 func TestInitBroker(t *testing.T) {
-	committeeMock, k := MockCommittee(2, true, 2)
+	committeeMock, k := agreement.MockCommittee(2, true, 2)
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
-	LaunchAgreement(bus, committeeMock, k[0], 1)
+	agreement.Launch(bus, committeeMock, k[0], 1)
 
 	round := <-roundChan
 	assert.Equal(t, uint64(1), round)
@@ -55,7 +55,7 @@ func TestNoQuorum(t *testing.T) {
 	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
 
 	select {
-	case <-tc.roundChan:
+	case <-roundChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
@@ -70,7 +70,7 @@ func TestSkipNoMember(t *testing.T) {
 	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
 
 	select {
-	case <-tc.roundChan:
+	case <-roundChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good

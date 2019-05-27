@@ -40,7 +40,7 @@ func (a *absenteeCollector) Collect(m *bytes.Buffer) error {
 
 	pks := make([][]byte, lenAbsentees)
 	for i := range pks {
-		if err := encoding.Read256(m, &pks[i]); err != nil {
+		if err := encoding.ReadVarBytes(m, &pks[i]); err != nil {
 			return err
 		}
 	}

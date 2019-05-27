@@ -67,7 +67,7 @@ func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.Launch(c.eventBus)
 	generation.Launch(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
-	selection.Launch(c.eventBus, c.timerLength)
+	selection.Launch(c.eventBus, nil, c.timerLength)
 	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
 
 	// Wait for the initial round to be published
