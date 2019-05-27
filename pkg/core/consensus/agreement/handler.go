@@ -23,7 +23,7 @@ type agreementHandler struct {
 	*UnMarshaller
 }
 
-func newHandler(committee committee.Foldable, keys user.Keys) *agreementHandler {
+func NewHandler(committee committee.Foldable, keys user.Keys) *agreementHandler {
 	return &agreementHandler{
 		Keys:         keys,
 		Foldable:     committee,
