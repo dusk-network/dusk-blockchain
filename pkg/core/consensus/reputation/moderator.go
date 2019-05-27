@@ -14,7 +14,7 @@ import (
 )
 
 // MaxStrikes is the maximum allowed amount of strikes in a single round
-const maxStrikes uint8 = 6
+const MaxStrikes uint8 = 6
 
 // Filter is capable of filtering out a set of absent nodes, given a set of votes,
 // a round, and a step.
@@ -71,7 +71,7 @@ func (m *moderator) addStrikes(pks [][]byte) {
 	for _, pk := range pks {
 		absenteeStr := hex.EncodeToString(pk)
 		m.strikes[absenteeStr]++
-		if m.strikes[absenteeStr] >= maxStrikes {
+		if m.strikes[absenteeStr] >= MaxStrikes {
 			log.WithFields(log.Fields{
 				"process":     "reputation",
 				"provisioner": absenteeStr,

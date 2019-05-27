@@ -1,4 +1,4 @@
-package reputation
+package reputation_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -23,7 +24,7 @@ func TestStrikes(t *testing.T) {
 
 	// Send enough strikes for one person so we receive something on removeProvisionerChan
 	node, _ := crypto.RandEntropy(32)
-	for i := uint8(0); i < maxStrikes; i++ {
+	for i := uint8(0); i < reputation.MaxStrikes; i++ {
 		publishStrike(1, eventBus, node)
 	}
 
@@ -49,7 +50,7 @@ func TestClean(t *testing.T) {
 	// wait a bit for the referee to update...
 	time.Sleep(time.Millisecond * 100)
 	// send maxStrikes-1 strikes
-	for i := uint8(0); i < maxStrikes-1; i++ {
+	for i := uint8(0); i < reputation.MaxStrikes-1; i++ {
 		publishStrike(2, eventBus, node)
 	}
 
@@ -65,7 +66,7 @@ func TestClean(t *testing.T) {
 
 func launchModerator() (wire.EventBroker, chan *bytes.Buffer) {
 	eventBus := wire.NewEventBus()
-	Launch(eventBus)
+	reputation.Launch(eventBus)
 	removeProvisionerChan := make(chan *bytes.Buffer, 1)
 	eventBus.Subscribe(msg.RemoveProvisionerTopic, removeProvisionerChan)
 	return eventBus, removeProvisionerChan
