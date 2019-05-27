@@ -10,13 +10,11 @@ During the conduction of a technical analysis of sortition based consensus algor
 
 | Field                 | Type    |
 | --------------------- | ------- |
-| opcode                | uint8   |
 | round                 | uint64  |
 | step                  | uint64  |
 | blockhash             | uint256 |
 | blockhashaggregatesig | uint256 |
 | publickeyset          | uint64  |
-| prevblockhash         | uint256 |
 
 ### API
 

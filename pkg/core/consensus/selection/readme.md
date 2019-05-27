@@ -10,14 +10,13 @@ The `Score Selector` is the component appointed to collect the scores, verify th
 
 | Field | Type |
 |-------|------|
-| opcode | uint8 |
 | round | uint64 |
-| step | uint64 |
 | score | uint256 |
 | proof | proof |
-| candidateblockhash | uint256 |
-| prevblockhash | uint256 |
-| certificate | certificate |
+| identity hash | uint256 |
+| bid list | []byte (variable size) |
+| seed | BLS signature |
+| candidate block hash | uint256 |
 
 ### API
 

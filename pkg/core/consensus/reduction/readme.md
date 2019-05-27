@@ -14,12 +14,11 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 
 | Field           | Type    |
 | --------------- | ------- |
-| opcode          | uint8   |
+| pubkeyBLS       | BLS Signature |
 | round           | uint64  |
 | step            | uint64  |
 | blockhash       | uint256 |
-| blockhashsigBLS | uint256 |
-| prevblockhash   | uint256 |
+| signedblockhash | BLS Signature |
 
 ### API
 
