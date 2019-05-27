@@ -2,12 +2,9 @@ package reduction_test
 
 import (
 	"bytes"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -25,27 +22,8 @@ var timeOut = 200 * time.Millisecond
 // log.SetLevel(log.DebugLevel)
 // }
 
-func mockConfig(t *testing.T) func() {
-
-	storeDir, err := ioutil.TempDir(os.TempDir(), "reduction_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Performance.AccumulatorWorkers = 4
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 	committeeMock := reduction.MockCommittee(2, true)
@@ -83,9 +61,6 @@ func TestReduction(t *testing.T) {
 
 // Test that the reducer does not send any messages when it is not part of the committee.
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 	eventBus, streamer := helper.CreateGossipStreamer()
@@ -121,9 +96,6 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 
 // Test that timeouts in the reduction phase result in proper behavior.
 func TestReductionTimeout(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	eb, streamer := helper.CreateGossipStreamer()
 	committeeMock := reduction.MockCommittee(2, true)
 	k, _ := user.NewRandKeys()
