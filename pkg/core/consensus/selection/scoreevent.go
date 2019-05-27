@@ -42,7 +42,6 @@ func (e *ScoreEvent) Sender() []byte {
 func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	// check if the buffer has contents first
 	// if not, we did not get any messages this round
-	// TODO: review this
 	if r.Len() == 0 {
 		return nil
 	}
@@ -86,7 +85,6 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 // * Consensus Header [Round; Step]
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
 func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
-	// TODO: review
 	sev, ok := ev.(*ScoreEvent)
 	if !ok {
 		// sev is nil

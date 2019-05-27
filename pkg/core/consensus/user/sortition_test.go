@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Test if removing members from the VotingCommittee works properly.
 func TestRemove(t *testing.T) {
 	nr := 5
 	committee := newCommittee()
@@ -40,6 +41,7 @@ func btoi(k Keys) *big.Int {
 	return (&big.Int{}).SetBytes(b)
 }
 
+// Test if MemberKeys returns all public keys in the correct order.
 func TestMemberKeys(t *testing.T) {
 
 	p := NewProvisioners()

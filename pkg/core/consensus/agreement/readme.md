@@ -10,23 +10,21 @@ During the conduction of a technical analysis of sortition based consensus algor
 
 | Field                 | Type    |
 | --------------------- | ------- |
-| opcode                | uint8   |
 | round                 | uint64  |
 | step                  | uint64  |
 | blockhash             | uint256 |
 | blockhashaggregatesig | uint256 |
 | publickeyset          | uint64  |
-| prevblockhash         | uint256 |
 
 ### API
 
-- LaunchAgreement(eventbus, committee, duration) - Launches a Block Agreement broker
+- Launch(eventbus, committee, keys, round) - Launches a Block Agreement broker
 
 ### Architecture
 
-The `Block Agreement` component follows the event driven paradigm. It is connected to the node's `EventBus` through a `BlockAgreement`, and it delegates event-specific operations to it's `EventHandler` implementation.
+The `Block Agreement` component follows the event driven paradigm. It is connected to the node's `EventBus` through a `broker`, and it delegates event-specific operations to its `EventHandler` implementation.
 
-Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to a `Collector`.
+Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to an `EventFilter`.
 
 #### Block Agreement Diagram
 

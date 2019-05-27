@@ -9,12 +9,11 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
-// LaunchScoreGenerationComponent will start the processes for score generation.
-func LaunchScoreGenerationComponent(eventBus *wire.EventBus, rpcBus *wire.RPCBus,
-	d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator) *broker {
+// Launch will start the processes for score/block generation.
+func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus,
+	d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator) {
 	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen)
 	go broker.Listen()
-	return broker
 }
 
 type broker struct {

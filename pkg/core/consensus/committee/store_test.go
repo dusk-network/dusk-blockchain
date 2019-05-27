@@ -16,7 +16,7 @@ import (
 
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus)
+	c := launchStore(bus)
 
 	newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -28,7 +28,7 @@ func TestAddProvisioner(t *testing.T) {
 
 func TestRemoveProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := LaunchCommitteeStore(bus)
+	c := launchStore(bus)
 
 	k := newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -42,36 +42,18 @@ func TestRemoveProvisioner(t *testing.T) {
 	assert.Equal(t, 0, p.Size())
 }
 
+// Test that a committee cache keeps copies of produced voting committees.
 func TestUpsertCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
 	e := NewExtractor(bus)
 
 	// add some provisioners
-	_ = newProvisioner(10, bus)
-	_ = newProvisioner(10, bus)
-	_ = newProvisioner(10, bus)
+	newProvisioners(3, 10, bus)
 	// give the committee some time to add the provisioners
 	time.Sleep(100 * time.Millisecond)
 
-	// run IsMember, which should trigger a voting committee creation
+	// run UpsertCommitteCache 4 times, twice on the same state
 	_ = e.UpsertCommitteeCache(1, 1, 3)
-
-	// committeeCache should now hold one VotingCommittee
-	assert.Equal(t, 1, len(e.committeeCache))
-}
-
-func TestCleanCommitteeCache(t *testing.T) {
-	bus := wire.NewEventBus()
-	e := NewExtractor(bus)
-
-	// add some provisioners
-	_ = newProvisioner(10, bus)
-	_ = newProvisioner(10, bus)
-	_ = newProvisioner(10, bus)
-	// give the committee some time to add the provisioners
-	time.Sleep(100 * time.Millisecond)
-
-	// run UpsertCommitteCache 3 times
 	_ = e.UpsertCommitteeCache(1, 1, 3)
 	_ = e.UpsertCommitteeCache(1, 2, 3)
 	_ = e.UpsertCommitteeCache(1, 3, 3)
@@ -86,19 +68,49 @@ func TestCleanCommitteeCache(t *testing.T) {
 	assert.Equal(t, 1, len(e.committeeCache))
 }
 
+// Test that an Extractor clears its committee cache when asked to produce a committee
+// for a different round.
+func TestCleanCommitteeCache(t *testing.T) {
+	bus := wire.NewEventBus()
+	e := NewExtractor(bus)
+
+	// add some provisioners
+	newProvisioners(3, 10, bus)
+	// give the committee some time to add the provisioners
+	time.Sleep(100 * time.Millisecond)
+
+	// run UpsertCommitteCache once
+	_ = e.UpsertCommitteeCache(1, 1, 3)
+
+	// committeeCache should now hold 1 VotingCommittee
+	assert.Equal(t, 1, len(e.committeeCache))
+
+	// now run IsMember for another round
+	_ = e.UpsertCommitteeCache(2, 1, 3)
+
+	// committeeCache should now hold 1 VotingCommittee
+	assert.Equal(t, 1, len(e.committeeCache))
+}
+
 func newMockEvent(sender []byte) wire.Event {
 	mockEvent := &mocks.Event{}
 	mockEvent.On("Sender").Return(sender)
 	return mockEvent
 }
 
-func newProvisioner(amount uint64, eb *wire.EventBus) user.Keys {
+func newProvisioner(stake uint64, eb *wire.EventBus) user.Keys {
 	k, _ := user.NewRandKeys()
 	buffer := bytes.NewBuffer(*k.EdPubKey)
 	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
 
-	_ = encoding.WriteUint64(buffer, binary.LittleEndian, amount)
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
 
 	eb.Publish(msg.NewProvisionerTopic, buffer)
 	return k
+}
+
+func newProvisioners(amount int, stake uint64, eb *wire.EventBus) {
+	for i := 0; i < amount; i++ {
+		_ = newProvisioner(stake, eb)
+	}
 }

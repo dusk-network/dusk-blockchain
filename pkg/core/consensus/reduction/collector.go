@@ -9,13 +9,15 @@ import (
 )
 
 type (
-	//scoreCollector is a helper to obtain a score channel already wired to the EventBus and fully functioning
+	// scoreCollector is a helper to obtain a score channel already wired to the
+	// EventBus and fully functioning.
 	scoreCollector struct {
 		bestVotedScoreHashChan chan<- *selection.ScoreEvent
 	}
 )
 
-// initBestScoreUpdate is the utility function to create and wire a channel for notifications of the best ScoreEvent
+// initBestScoreUpdate is the utility function to create and wire a channel for
+// notifications of the best ScoreEvent.
 func initBestScoreUpdate(subscriber wire.EventSubscriber) chan *selection.ScoreEvent {
 	bestVotedScoreHashChan := make(chan *selection.ScoreEvent, 1)
 	collector := &scoreCollector{
@@ -37,5 +39,6 @@ func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
 	} else {
 		sc.bestVotedScoreHashChan <- nil
 	}
+
 	return nil
 }

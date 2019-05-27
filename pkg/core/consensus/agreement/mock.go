@@ -7,19 +7,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
 
-// PublishMock is a mock-up method to facilitate testing of publishing of Agreement events
-func PublishMock(bus wire.EventBroker, hash []byte, round uint64, step uint8, keys []user.Keys) {
-	buf := MockAgreement(hash, round, step, keys)
-	bus.Publish(msg.OutgoingBlockAgreementTopic, buf)
-}
-
+// MockAgreementEvent returns a mocked Agreement Event, to be used for testing purposes.
 func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys) *Agreement {
 	if step < uint8(2) {
 		panic("Need at least 2 steps to create an Agreement")
@@ -41,6 +34,8 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys)
 	return a
 }
 
+// MockAgreement mocks an Agreement event, and returns the marshalled representation
+// of it as a `*bytes.Buffer`.
 func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys) *bytes.Buffer {
 	if step < 2 {
 		panic("Aggregated agreement needs to span for at least two steps")
@@ -88,6 +83,8 @@ func genVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVo
 	return votes
 }
 
+// MockCommittee mocks a Foldable committee implementation, which can be used for
+// testing the Agreement component.
 func MockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, []user.Keys) {
 	keys := make([]user.Keys, membersNr)
 	mockSubCommittees := make([]sortedset.Set, 2)
@@ -113,9 +110,6 @@ func MockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, [
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(isMember)
-	committeeMock.On("AmMember",
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint8")).Return(true)
 	committeeMock.On("Unpack",
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint64"),

@@ -1,4 +1,4 @@
-package consensus
+package consensus_test
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -16,7 +17,7 @@ func (me MockEvent) Unmarshal(b *bytes.Buffer) error { return nil }
 func (me MockEvent) Sender() []byte                  { return nil }
 
 func TestStore(t *testing.T) {
-	sec := NewAccumulatorStore()
+	sec := consensus.NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}
@@ -29,7 +30,7 @@ func TestStore(t *testing.T) {
 }
 
 func TestClear(t *testing.T) {
-	sec := NewAccumulatorStore()
+	sec := consensus.NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"three"}
@@ -37,22 +38,22 @@ func TestClear(t *testing.T) {
 	stepOne := "1"
 	sec.Insert(ev1, stepOne)
 	sec.Insert(ev2, stepOne)
-	sec.Insert(ev3, stepOne)
-	require.Equal(t, 3, len(sec.evMap[stepOne]))
+	stepOneSize := sec.Insert(ev3, stepOne)
+	require.Equal(t, 3, stepOneSize)
 
 	stepTwo := "2"
 	sec.Insert(ev1, stepTwo)
 	sec.Insert(ev2, stepTwo)
-	sec.Insert(ev3, stepTwo)
-	require.Equal(t, 3, len(sec.evMap[stepTwo]))
+	stepTwoSize := sec.Insert(ev3, stepTwo)
+	require.Equal(t, 3, stepTwoSize)
 
 	sec.Clear()
-	require.Equal(t, 0, len(sec.evMap[stepOne]))
-	require.Equal(t, 0, len(sec.evMap[stepTwo]))
+	require.Equal(t, 0, len(sec.Get(stepOne)))
+	require.Equal(t, 0, len(sec.Get(stepTwo)))
 }
 
 func TestContains(t *testing.T) {
-	sec := NewAccumulatorStore()
+	sec := consensus.NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"three"}
@@ -69,7 +70,7 @@ func TestContains(t *testing.T) {
 }
 
 func TestSECOperations(t *testing.T) {
-	sec := NewAccumulatorStore()
+	sec := consensus.NewAccumulatorStore()
 	ev1 := &MockEvent{"one"}
 	ev2 := &MockEvent{"two"}
 	ev3 := &MockEvent{"one"}

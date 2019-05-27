@@ -31,16 +31,16 @@ var empty struct{}
 
 type eventSelector struct {
 	publisher wire.EventPublisher
-	handler   scoreEventHandler
-	sync.RWMutex
+	handler   ScoreEventHandler
+	lock      sync.RWMutex
 	bestEvent wire.Event
 	state     consensus.State
 	timer     *consensus.Timer
 	running   bool
 }
 
-//NeweventSelector creates the Selector
-func newEventSelector(publisher wire.EventPublisher, handler scoreEventHandler,
+// newEventSelector creates the Selector and returns it.
+func newEventSelector(publisher wire.EventPublisher, handler ScoreEventHandler,
 	timeOut time.Duration, state consensus.State) *eventSelector {
 	return &eventSelector{
 		publisher: publisher,
@@ -55,9 +55,9 @@ func newEventSelector(publisher wire.EventPublisher, handler scoreEventHandler,
 
 // StartSelection starts the selection of the best ScoreEvent.
 func (s *eventSelector) startSelection() {
-	s.Lock()
+	s.lock.Lock()
 	s.running = true
-	s.Unlock()
+	s.lock.Unlock()
 	log.WithFields(log.Fields{
 		"process":        "selection",
 		"selector state": s.state.String(),
@@ -70,20 +70,20 @@ func (s *eventSelector) startSelection() {
 		case <-timer.C:
 			s.publishBestEvent()
 		case <-s.timer.TimeoutChan:
-			s.Lock()
+			s.lock.Lock()
 			s.bestEvent = nil
-			s.Unlock()
+			s.lock.Unlock()
 		}
-		s.Lock()
+		s.lock.Lock()
 		s.running = false
-		s.Unlock()
+		s.lock.Unlock()
 	}()
 }
 
 func (s *eventSelector) Process(ev wire.Event) {
-	s.RLock()
+	s.lock.RLock()
 	bestEvent := s.bestEvent
-	s.RUnlock()
+	s.lock.RUnlock()
 	if !s.handler.Priority(bestEvent, ev) {
 		if err := s.handler.Verify(ev); err != nil {
 			log.WithField("process", "selection").Debugln(err)
@@ -91,8 +91,8 @@ func (s *eventSelector) Process(ev wire.Event) {
 		}
 
 		s.repropagate(ev)
-		s.Lock()
-		defer s.Unlock()
+		s.lock.Lock()
+		defer s.lock.Unlock()
 		s.bestEvent = ev
 	}
 }
@@ -112,9 +112,9 @@ func (s *eventSelector) repropagate(ev wire.Event) {
 }
 
 func (s *eventSelector) publishBestEvent() {
-	s.RLock()
+	s.lock.RLock()
 	bestEvent := s.bestEvent
-	s.RUnlock()
+	s.lock.RUnlock()
 	buf := new(bytes.Buffer)
 	err := s.handler.Marshal(buf, bestEvent)
 	if err != nil {
@@ -125,8 +125,8 @@ func (s *eventSelector) publishBestEvent() {
 	}
 	s.publisher.Publish(msg.BestScoreTopic, buf)
 	s.state.IncrementStep()
-	s.Lock()
-	defer s.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.bestEvent = nil
 }
 
@@ -135,4 +135,10 @@ func (s *eventSelector) stopSelection() {
 	case s.timer.TimeoutChan <- empty:
 	default:
 	}
+}
+
+func (s *eventSelector) isRunning() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.running
 }
