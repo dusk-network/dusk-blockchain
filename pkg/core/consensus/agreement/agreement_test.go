@@ -1,6 +1,8 @@
 package agreement
 
 import (
+	"bytes"
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -64,7 +67,6 @@ func TestSkipNoMember(t *testing.T) {
 }
 
 func TestSendAgreement(t *testing.T) {
-
 	committeeMock, _ := MockCommittee(3, true, 3)
 	eb, broker, _ := initAgreement(committeeMock)
 
@@ -74,7 +76,12 @@ func TestSendAgreement(t *testing.T) {
 
 	// Initiate the sending of an agreement message
 	hash, _ := crypto.RandEntropy(32)
-	buf := reduction.MockVoteSetBuffer(hash, 1, 2, 10)
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	buf.ReadFrom(reduction.MockVoteSetBuffer(hash, 1, 2, 10))
 	if err := broker.sendAgreement(buf); err != nil {
 		panic(err)
 	}

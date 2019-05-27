@@ -3,6 +3,7 @@ package agreement
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -11,6 +12,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -73,6 +75,15 @@ func (b *broker) Listen() {
 }
 
 func (b *broker) sendAgreement(m *bytes.Buffer) error {
+	var round uint64
+	if err := encoding.ReadUint64(m, binary.LittleEndian, &round); err != nil {
+		return err
+	}
+
+	if round != b.state.Round() {
+		return errors.New("received results message is from a different round")
+	}
+
 	// We always increment the step, even if we are not included in the committee.
 	// This way, we are always on the same step as everybody else.
 	defer b.state.IncrementStep()

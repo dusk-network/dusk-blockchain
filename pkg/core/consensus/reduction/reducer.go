@@ -127,8 +127,8 @@ func (r *reducer) begin() {
 			r.propagateAbsentees()
 		}
 		hash2 := r.extractHash(eventsSecondStep)
-		allEvents := append(events, eventsSecondStep...)
 		if r.isReductionSuccessful(hash1, hash2) {
+			allEvents := append(events, eventsSecondStep...)
 			log.WithFields(log.Fields{
 				"process":    "reducer",
 				"votes":      len(allEvents),
@@ -136,6 +136,10 @@ func (r *reducer) begin() {
 			}).Debugln("Reduction successful")
 
 			r.sendResults(allEvents)
+		} else {
+			// If we did not get a successful result, we still send a message to the
+			// agreement component so that it stays synced with everyone else.
+			r.sendResults(nil)
 		}
 
 		r.ctx.state.IncrementStep()
@@ -200,9 +204,15 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 
 func (r *reducer) sendResults(events []wire.Event) {
 	buf := new(bytes.Buffer)
-	if err := r.ctx.handler.MarshalVoteSet(buf, events); err != nil {
-		log.WithField("process", "reduction").WithError(err).Errorln("problem marshalling voteset")
-		return
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, r.ctx.state.Round()); err != nil {
+		panic(err)
+	}
+
+	if events != nil {
+		if err := r.ctx.handler.MarshalVoteSet(buf, events); err != nil {
+			log.WithField("process", "reduction").WithError(err).Errorln("problem marshalling voteset")
+			return
+		}
 	}
 	r.publisher.Publish(msg.ReductionResultTopic, buf)
 }
