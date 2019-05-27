@@ -22,7 +22,7 @@ func NewAccumulatorStore() *AccumulatorStore {
 	}
 }
 
-// Clear up the Collector
+// Clear up the AccumulatorStore.
 func (sec *AccumulatorStore) Clear() {
 	sec.lock.Lock()
 	defer sec.lock.Unlock()
@@ -73,7 +73,7 @@ func (sec *AccumulatorStore) Get(identifier string) []wire.Event {
 	return sec.evMap[identifier]
 }
 
-// All returns all of the Events currently in the Accumulator.
+// All returns all of the Events currently in the AccumulatorStore.
 func (sec *AccumulatorStore) All() []wire.Event {
 	allEvents := make([]wire.Event, 0)
 	sec.lock.RLock()
