@@ -96,7 +96,7 @@ Boolean functions use the standard template as demonstrated at the Integers sect
 
 ### 256-bit and 512-bit data structures (miscdata.go)
 
-For data that is either 256 or 512 bits long (such as hashes and signatures), seperate functions are defined.
+For data that is either 256 or 512 bits long (such as hashes and signatures), separate functions are defined.
 
 For 256-bit data:
 - `Read256(r io.Reader, b *[]byte) error` to read 256 bits of data

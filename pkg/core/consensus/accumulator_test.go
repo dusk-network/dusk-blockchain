@@ -3,12 +3,8 @@ package consensus_test
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
-
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,25 +16,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-func mockConfig(t *testing.T) func() {
-
-	storeDir, err := ioutil.TempDir(os.TempDir(), "accumulator_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Performance.AccumulatorWorkers = 4
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
+// Test the accumulation of events up to Quorum. The Accumulator should return the
+// events on the CollectedVotesChan once we do.
 func TestAccumulation(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 	// Make an accumulator that has a quorum of 2
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(nil, 2, "foo", true), consensus.NewAccumulatorStore())
 	// Send two mock events to the accumulator
@@ -50,9 +30,8 @@ func TestAccumulation(t *testing.T) {
 	assert.Equal(t, 2, len(events))
 }
 
+// Test that events which fail verification are not stored.
 func TestFailedVerification(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 	// Make an accumulator that should fail verification every time
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(
 		errors.New("verification failed"), 2, "foo", true), consensus.NewAccumulatorStore())
@@ -68,9 +47,8 @@ func TestFailedVerification(t *testing.T) {
 	}
 }
 
+// Test that events which come from senders which are not in the committee are ignored.
 func TestNonCommitteeEvent(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 	// Make an accumulator that should fail verification every time
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(nil, 2, "foo", false), consensus.NewAccumulatorStore())
 	// Send two mock events to the accumulator

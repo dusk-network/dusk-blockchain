@@ -1,4 +1,4 @@
-package reduction
+package reduction_test
 
 import (
 	"bytes"
@@ -7,8 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"golang.org/x/crypto/ed25519"
 )
@@ -16,56 +18,57 @@ import (
 // This test checks that the UnMarshaller is working properly.
 // It tests both the Marshal and Unmarshal method, and compares the events afterwards.
 func TestReductionUnMarshal(t *testing.T) {
-	unMarshaller := NewUnMarshaller()
+	unMarshaller := reduction.NewUnMarshaller()
 
 	// Mock a Reduction event
-	blockHash, err := crypto.RandEntropy(32)
-	assert.NoError(t, err)
-	h := &header.Header{
-		Step:      uint8(4),
-		Round:     uint64(120),
-		BlockHash: blockHash,
-	}
-	ev, err := newReductionEvent(h)
-	assert.NoError(t, err)
+	ev := newReductionEvent(1, 1)
 
 	// Marshal it
 	buf := new(bytes.Buffer)
-	assert.Nil(t, unMarshaller.Marshal(buf, ev))
+	assert.NoError(t, unMarshaller.Marshal(buf, ev))
 
 	// Now Unmarshal it
-	ev2 := New()
-	assert.Nil(t, unMarshaller.Unmarshal(buf, ev2))
+	ev2 := reduction.New()
+	assert.NoError(t, unMarshaller.Unmarshal(buf, ev2))
 
 	// The two events should be the exact same
 	assert.Equal(t, ev, ev2)
 }
 
-// newReductionEvent returns a Reduction event, populated with a mixture of specified
-// and default fields.
-func newReductionEvent(h *header.Header) (*Reduction, error) {
-	keys, _ := user.NewRandKeys()
+// This test ensures proper functionality of marshalling and unmarshalling slices of
+// Reduction events.
+func TestVoteSetUnMarshal(t *testing.T) {
+	unMarshaller := reduction.NewUnMarshaller()
 
-	redEv := &Reduction{
-		Header: h,
+	// Mock a slice of Reduction events
+	var evs []wire.Event
+	for i := 0; i < 5; i++ {
+		ev := newReductionEvent(1, 1)
+		evs = append(evs, ev)
 	}
 
-	if err := BlsSign(redEv, keys); err != nil {
-		return nil, err
+	// Marshal it
+	buf := new(bytes.Buffer)
+	assert.NoError(t, unMarshaller.MarshalVoteSet(buf, evs))
+
+	// Now Unmarshal it
+	evs2, err := unMarshaller.UnmarshalVoteSet(buf)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	return redEv, nil
+	assert.Equal(t, evs, evs2)
 }
 
 func TestBlsSign(t *testing.T) {
 	k, _ := user.NewRandKeys()
-	red := New()
+	red := reduction.New()
 	red.Round = uint64(1)
 	red.Step = uint8(2)
 	red.BlockHash, _ = crypto.RandEntropy(32)
 	red.PubKeyBLS = k.BLSPubKeyBytes
 
-	assert.NoError(t, BlsSign(red, k))
+	assert.NoError(t, reduction.BlsSign(red, k))
 	assert.NotNil(t, red.SignedHash)
 	buf := new(bytes.Buffer)
 	assert.NoError(t, header.MarshalSignableVote(buf, red.Header))
@@ -74,12 +77,12 @@ func TestBlsSign(t *testing.T) {
 
 func TestSign(t *testing.T) {
 	k, _ := user.NewRandKeys()
-	red := New()
+	red := reduction.New()
 	red.Round = uint64(1)
 	red.Step = uint8(2)
 	red.BlockHash, _ = crypto.RandEntropy(32)
 	red.PubKeyBLS = k.BLSPubKeyBytes
-	signed, err := Sign(red, k)
+	signed, err := reduction.Sign(red, k)
 	assert.NoError(t, err)
 	assert.NotNil(t, red.SignedHash)
 
@@ -87,34 +90,40 @@ func TestSign(t *testing.T) {
 	assert.NoError(t, encoding.Read512(signed, &sig))
 	assert.True(t, ed25519.Verify(*k.EdPubKey, signed.Bytes(), sig))
 
-	ev := New()
-	assert.NoError(t, NewUnMarshaller().Unmarshal(signed, ev))
+	ev := reduction.New()
+	assert.NoError(t, reduction.NewUnMarshaller().Unmarshal(signed, ev))
 	assert.Equal(t, red, ev)
 }
 
 func TestSignBuffer(t *testing.T) {
 	k, _ := user.NewRandKeys()
-	red := New()
+	red := reduction.New()
 	red.Round = uint64(1)
 	red.Step = uint8(2)
 	red.BlockHash, _ = crypto.RandEntropy(32)
 
 	b := new(bytes.Buffer)
 	assert.NoError(t, header.MarshalSignableVote(b, red.Header))
-	assert.NoError(t, SignBuffer(b, k))
+	assert.NoError(t, reduction.SignBuffer(b, k))
 
 	// verifying the ED25519 signature
 	sig := make([]byte, 64)
 	assert.NoError(t, encoding.Read512(b, &sig))
 	assert.True(t, ed25519.Verify(*k.EdPubKey, b.Bytes(), sig))
 
-	ev, err := NewUnMarshaller().Deserialize(b)
+	ev, err := reduction.NewUnMarshaller().Deserialize(b)
 	assert.NoError(t, err)
-	r := ev.(*Reduction)
+	r := ev.(*reduction.Reduction)
 
 	//verifying the header
 	assert.Equal(t, r.PubKeyBLS, k.BLSPubKeyBytes)
 	assert.Equal(t, uint64(1), r.Round)
 	assert.Equal(t, uint8(2), r.Step)
 	assert.Equal(t, red.BlockHash, r.BlockHash)
+}
+
+func newReductionEvent(round uint64, step uint8) *reduction.Reduction {
+	k, _ := user.NewRandKeys()
+	blockHash, _ := crypto.RandEntropy(32)
+	return reduction.MockReduction(k, blockHash, round, step)
 }

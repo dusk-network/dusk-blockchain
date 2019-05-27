@@ -20,20 +20,21 @@ import (
 type agreementHandler struct {
 	user.Keys
 	committee.Foldable
-	*AgreementUnMarshaller
+	*UnMarshaller
 }
 
-func NewHandler(committee committee.Foldable, keys user.Keys) *agreementHandler {
+// newHandler returns an initialized agreementHandler.
+func newHandler(committee committee.Foldable, keys user.Keys) *agreementHandler {
 	return &agreementHandler{
-		Keys:                  keys,
-		Foldable:              committee,
-		AgreementUnMarshaller: NewUnMarshaller(),
+		Keys:         keys,
+		Foldable:     committee,
+		UnMarshaller: NewUnMarshaller(),
 	}
 }
 
 // AmMember checks if we are part of the committee.
-func (p *agreementHandler) AmMember(round uint64, step uint8) bool {
-	return p.Foldable.IsMember(p.Keys.BLSPubKeyBytes, round, step)
+func (a *agreementHandler) AmMember(round uint64, step uint8) bool {
+	return a.Foldable.IsMember(a.Keys.BLSPubKeyBytes, round, step)
 }
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *header.Header {
@@ -49,7 +50,7 @@ func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 	return encoding.WriteUint8(r, ev.Step)
 }
 
-// Verify checks the signature of the set. TODO: At the moment the overall BLS signature is not checked as it is not clear if checking the ED25519 is enough (it should be in case the node links the BLS keys to the Edward keys)
+// Verify checks the signature of the set.
 func (a *agreementHandler) Verify(e wire.Event) error {
 	ev, ok := e.(*Agreement)
 	if !ok {
@@ -68,7 +69,6 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 
 		signed := new(bytes.Buffer)
 
-		// TODO: change into Header
 		vote := &header.Header{
 			Round:     ev.Round,
 			Step:      step,
@@ -90,6 +90,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	return nil
 }
 
+// ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
 func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	var apk *bls.Apk
 	if len(subcommittee) == 0 {

@@ -54,7 +54,7 @@ func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 	return encoding.Write256(r, ev.BlockHash)
 }
 
-// Verify the blockEvent
+// Verify the BLS signature of the Reduction event.
 func (b *reductionHandler) Verify(e wire.Event) error {
 	ev := e.(*Reduction)
 	return msg.VerifyBLSSignature(ev.PubKeyBLS, ev.BlockHash, ev.SignedHash)

@@ -60,7 +60,7 @@ type reducer struct {
 	ctx         *context
 	accumulator *consensus.Accumulator
 
-	sync.RWMutex
+	lock  sync.RWMutex
 	stale bool
 
 	publisher wire.EventPublisher
@@ -89,9 +89,9 @@ func (r *reducer) startReduction(hash []byte) {
 	r.firstStep.stopChan = make(chan struct{}, 1)
 	r.secondStep.stopChan = make(chan struct{}, 1)
 
-	r.Lock()
+	r.lock.Lock()
 	r.stale = false
-	r.Unlock()
+	r.lock.Unlock()
 
 	if r.inCommittee() {
 		r.sendReduction(bytes.NewBuffer(hash))
@@ -105,7 +105,7 @@ func (r *reducer) begin() {
 	events := r.firstStep.fetch()
 	log.WithField("process", "reducer").Traceln("First step completed")
 	hash1 := r.extractHash(events)
-	r.RLock()
+	r.lock.RLock()
 	if !r.stale {
 		// if there was a timeout, we should report nodes that did not vote
 		if events == nil {
@@ -116,12 +116,12 @@ func (r *reducer) begin() {
 			r.sendReduction(hash1)
 		}
 	}
-	r.RUnlock()
+	r.lock.RUnlock()
 
 	eventsSecondStep := r.secondStep.fetch()
 	log.WithField("process", "reducer").Traceln("Second step completed")
-	r.RLock()
-	defer r.RUnlock()
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	if !r.stale {
 		if eventsSecondStep == nil {
 			r.propagateAbsentees()
@@ -252,8 +252,8 @@ func (r *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer) bool {
 }
 
 func (r *reducer) end() {
-	r.Lock()
-	defer r.Unlock()
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	r.stale = true
 	r.firstStep.stop()
 	r.secondStep.stop()

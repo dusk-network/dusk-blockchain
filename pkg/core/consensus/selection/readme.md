@@ -10,22 +10,21 @@ The `Score Selector` is the component appointed to collect the scores, verify th
 
 | Field | Type |
 |-------|------|
-| opcode | uint8 |
 | round | uint64 |
-| step | uint64 |
 | score | uint256 |
 | proof | proof |
-| candidateblockhash | uint256 |
-| prevblockhash | uint256 |
-| certificate | certificate |
+| identity hash | uint256 |
+| bid list | []byte (variable size) |
+| seed | BLS signature |
+| candidate block hash | uint256 |
 
 ### API
 
-- LaunchScoreSelectionComponent(eventbus, duration) - creates and launches the component whose responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic, once a score is chosen.
+- Launch(eventbus, duration) - creates and launches the selection component, whose responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic `BestScoreTopic`, once a score is chosen.
 
 ### Architecture
 
-The `Score Selector` component follows the event driven paradigm. It is connected to the node's `EventBus` through a generic `Collector` and it delegates event-specific operations to it's `EventHandler`.
+The `Score Selector` component follows the event driven paradigm. It is connected to the node's `EventBus` through a generic `EventFilter` and it delegates event-specific operations to its `EventHandler`.
 
 #### Score Selection Diagram
 

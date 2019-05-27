@@ -8,7 +8,6 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/candidate"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -66,21 +65,18 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
-	reputation.LaunchReputationComponent(c.eventBus)
-	generation.LaunchScoreGenerationComponent(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
-	candidate.LaunchCandidateComponent(c.eventBus)
+	reputation.Launch(c.eventBus)
+	generation.Launch(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
+	selection.Launch(c.eventBus, nil, c.timerLength)
+	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
 
-	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength)
-
-	reduction.LaunchReducer(c.eventBus, nil, c.Keys, c.timerLength)
-
+	// Wait for the initial round to be published
 	round := <-c.initChannel
 	log.WithFields(log.Fields{
 		"process": "factory",
 		"round":   round,
 	}).Debug("Received initial round")
 
-	agreement.LaunchAgreement(c.eventBus, nil, c.Keys, round)
-
+	agreement.Launch(c.eventBus, nil, c.Keys, round)
 	log.WithField("process", "factory").Info("Consensus Started")
 }

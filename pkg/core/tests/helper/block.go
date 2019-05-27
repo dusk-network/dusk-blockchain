@@ -2,15 +2,15 @@ package helper
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"time"
 )
 
-//RandomBlock returns a random block for testing.
+// RandomBlock returns a random block for testing.
 // For `height` see also helper.RandomHeader
-// Fir txBatchCount see also helper.RandomSliceOfTxs
+// For txBatchCount see also helper.RandomSliceOfTxs
 func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block {
 	b := &block.Block{
 		Header: RandomHeader(t, height),
@@ -47,7 +47,7 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	return blk0, blk1
 }
 
-//RandomCertificate returns a random block certificate  for testing
+// RandomCertificate returns a random block certificate for testing
 func RandomCertificate(t *testing.T) *block.Certificate {
 	c := &block.Certificate{
 		BRBatchedSig: RandomSlice(t, 33),

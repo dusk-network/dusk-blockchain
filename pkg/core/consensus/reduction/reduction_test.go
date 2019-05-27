@@ -1,15 +1,14 @@
-package reduction
+package reduction_test
 
 import (
 	"bytes"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
@@ -23,57 +22,35 @@ var timeOut = 200 * time.Millisecond
 // log.SetLevel(log.DebugLevel)
 // }
 
-func mockConfig(t *testing.T) func() {
-
-	storeDir, err := ioutil.TempDir(os.TempDir(), "reduction_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Performance.AccumulatorWorkers = 4
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
+// Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
-	committeeMock := mockCommittee(2, true, true)
+	committeeMock := reduction.MockCommittee(2, true)
 	k, _ := user.NewRandKeys()
 
 	eventBus, streamer := helper.CreateGossipStreamer()
-	broker := LaunchReducer(eventBus, committeeMock, k, timeOut)
+	launchReduction(eventBus, committeeMock, k, timeOut)
 	// listen for outgoing votes of either kind, so we can verify they are being
 	// sent out properly.
 
 	// update round
 	consensus.UpdateRound(eventBus, 1)
 
-	// here we try to force the selection message to ALWAYS come after the round update
-	waitForRoundUpdate(broker)
-	sendSelection(hash, eventBus)
+	// Because round updates are asynchronous (sent through a channel), we wait
+	// for a bit to let the broker update its round.
+	time.Sleep(200 * time.Millisecond)
+	sendSelection(1, hash, eventBus)
 
 	// send mocked events until we get a result from the outgoingAgreement channel
-	go func() {
-		for count := 0; count < 50; count++ {
-			ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(), hash)
-			eventBus.Publish(string(topics.Reduction), ev)
-			time.Sleep(1 * time.Millisecond)
-		}
-	}()
+	sendReductionBuffers(2, k, hash, 1, 1, eventBus)
+	sendReductionBuffers(2, k, hash, 1, 2, eventBus)
 
 	timer := time.AfterFunc(1*time.Second, func() {
 		t.Fail()
 	})
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 2; i++ {
 		if _, err := streamer.Read(); err != nil {
 			t.Fatal(err)
 		}
@@ -82,33 +59,23 @@ func TestReduction(t *testing.T) {
 	timer.Stop()
 }
 
+// Test that the reducer does not send any messages when it is not part of the committee.
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 	eventBus, streamer := helper.CreateGossipStreamer()
-	committeeMock := mockCommittee(2, true, false)
+	committeeMock := reduction.MockCommittee(2, false)
 	k, _ := user.NewRandKeys()
 
-	broker := LaunchReducer(eventBus, committeeMock, k, timeOut)
+	launchReduction(eventBus, committeeMock, k, timeOut)
 
 	// update round
 	consensus.UpdateRound(eventBus, 1)
 
-	// here we try to force the selection message to ALWAYS come after the round update
-	waitForRoundUpdate(broker)
-	sendSelection(hash, eventBus)
-
-	// send mocked events until we get a result from the outgoingAgreement channel
-	go func() {
-		for count := 0; count < 50; count++ {
-			ev := mockBlockEventBuffer(broker.ctx.state.Round(), broker.ctx.state.Step(), hash)
-			eventBus.Publish(string(topics.Reduction), ev)
-			time.Sleep(1 * time.Millisecond)
-		}
-	}()
+	// Because round updates are asynchronous (sent through a channel), we wait
+	// for a bit to let the broker update its round.
+	time.Sleep(200 * time.Millisecond)
+	sendSelection(1, hash, eventBus)
 
 	// Try to read from the stream, and see if we get any reduction messages from
 	// ourselves.
@@ -118,11 +85,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for _, topic := range streamer.SeenTopics() {
-				if topic == topics.Agreement {
-					t.Fail()
-				}
-			}
+			t.Fail()
 		}
 	}()
 
@@ -131,15 +94,13 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 	<-timer.C
 }
 
+// Test that timeouts in the reduction phase result in proper behavior.
 func TestReductionTimeout(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	eb, streamer := helper.CreateGossipStreamer()
-	committeeMock := mockCommittee(2, true, true)
+	committeeMock := reduction.MockCommittee(2, true)
 	k, _ := user.NewRandKeys()
 
-	broker := LaunchReducer(eb, committeeMock, k, timeOut)
+	launchReduction(eb, committeeMock, k, timeOut)
 
 	// update round
 	consensus.UpdateRound(eb, 1)
@@ -147,9 +108,10 @@ func TestReductionTimeout(t *testing.T) {
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
 
-	// here we try to force the selection message to ALWAYS come after the round update
-	waitForRoundUpdate(broker)
-	sendSelection(hash, eb)
+	// Because round updates are asynchronous (sent through a channel), we wait
+	// for a bit to let the broker update its round.
+	time.Sleep(200 * time.Millisecond)
+	sendSelection(1, hash, eb)
 
 	timer := time.After(1 * time.Second)
 	<-timer
@@ -166,31 +128,28 @@ func TestReductionTimeout(t *testing.T) {
 		stopChan <- struct{}{}
 	})
 
-	go func() {
-		for {
-			if _, err := streamer.Read(); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}()
-
 	<-stopChan
-
 }
 
-func waitForRoundUpdate(broker *broker) {
-	for {
-		if broker.ctx.state.Round() == 0 {
-			time.Sleep(3 * time.Millisecond)
-			continue
-		}
+// Convenience function, which launches the reduction component and removes the
+// preprocessors for testing purposes (bypassing the republisher and the validator).
+// This ensures proper handling of mocked Reduction events.
+func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration) {
+	reduction.Launch(eb, committee, k, timeOut)
+	eb.RegisterPreprocessor(string(topics.Reduction))
+}
 
-		break
+func sendReductionBuffers(amount int, k user.Keys, hash []byte, round uint64, step uint8,
+	eventBus *wire.EventBus) {
+	for i := 0; i < amount; i++ {
+		ev := reduction.MockReductionBuffer(k, hash, round, step)
+		eventBus.Publish(string(topics.Reduction), ev)
+		time.Sleep(1 * time.Millisecond)
 	}
 }
 
-func sendSelection(hash []byte, eventBus *wire.EventBus) {
-	bestScoreBuf := mockSelectionEventBuffer(hash)
+func sendSelection(round uint64, hash []byte, eventBus *wire.EventBus) {
+	bestScoreBuf := selection.MockSelectionEventBuffer(round, hash)
 	eventBus.Publish(msg.BestScoreTopic, bestScoreBuf)
 }
 

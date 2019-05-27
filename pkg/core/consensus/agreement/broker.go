@@ -16,17 +16,17 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// LaunchAgreement is a helper to minimize the wiring of TopicListeners,
-// collector and channels. The agreement component notarizes the new blocks after having collected a quorum of votes
-func LaunchAgreement(eventBus *wire.EventBus, committee committee.Foldable,
-	keys user.Keys, currentRound uint64) *broker {
+// Launch is a helper to minimize the wiring of TopicListeners, collector and
+// channels. The agreement component notarizes the new blocks after having
+// collected a quorum of votes
+func Launch(eventBus *wire.EventBus, committee committee.Foldable,
+	keys user.Keys, currentRound uint64) {
 	if committee == nil {
 		committee = newAgreementCommittee(eventBus)
 	}
 	broker := newBroker(eventBus, committee, keys)
 	broker.updateRound(currentRound)
 	go broker.Listen()
-	return broker
 }
 
 type broker struct {
@@ -48,7 +48,7 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 }
 
 func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys user.Keys) *broker {
-	handler := NewHandler(committee, keys)
+	handler := newHandler(committee, keys)
 	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore())
 	state := consensus.NewState()
 	filter := launchFilter(eventBroker, committee, handler,
@@ -114,7 +114,7 @@ func (b *broker) updateRound(round uint64) {
 		"round":   round,
 	}).Debugln("updating round")
 	b.filter.UpdateRound(round)
-	b.publishRoundUpdate(round)
+	consensus.UpdateRound(b.publisher, round)
 	b.accumulator.Clear()
 	b.filter.FlushQueue()
 }
@@ -122,14 +122,4 @@ func (b *broker) updateRound(round uint64) {
 func (b *broker) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
 	b.publisher.Publish(msg.WinningBlockTopic, bytes.NewBuffer(aev.BlockHash))
-}
-
-// publishRoundUpdate publishes the new round in the EventPublisher
-func (b *broker) publishRoundUpdate(round uint64) {
-	// Marshalling the round update
-	bs := make([]byte, 8)
-	binary.LittleEndian.PutUint64(bs, round)
-	buf := bytes.NewBuffer(bs)
-	// publishing to the EventBus
-	b.publisher.Publish(msg.RoundUpdateTopic, buf)
 }
