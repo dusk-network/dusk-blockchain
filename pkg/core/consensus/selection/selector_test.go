@@ -19,6 +19,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+// Test the functionality of the selector, in a condition where it receives multiple
+// events, and is allowed to time out.
 func TestSelection(t *testing.T) {
 	eb := wire.NewEventBus()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
@@ -38,6 +40,7 @@ func TestSelection(t *testing.T) {
 	assert.NotNil(t, ev)
 }
 
+// Test that the selector repropagates events which pass the priority check.
 func TestRepropagation(t *testing.T) {
 	eb, streamer := helper.CreateGossipStreamer()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
@@ -59,6 +62,7 @@ func TestRepropagation(t *testing.T) {
 	timer.Stop()
 }
 
+// Test that the selector does not return any value when it is stopped before timeout.
 func TestStopSelector(t *testing.T) {
 	eb := wire.NewEventBus()
 	selection.Launch(eb, newMockScoreHandler(), time.Second*1)

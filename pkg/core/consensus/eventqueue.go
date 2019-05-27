@@ -23,12 +23,12 @@ func NewEventQueue() *EventQueue {
 }
 
 // GetEvents returns the events for a round and step.
-func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	if s.entries[round][step] != nil {
-		messages := s.entries[round][step]
-		s.entries[round][step] = nil
+func (eq *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
+	if eq.entries[round][step] != nil {
+		messages := eq.entries[round][step]
+		eq.entries[round][step] = nil
 		return messages
 	}
 
@@ -36,39 +36,39 @@ func (s *EventQueue) GetEvents(round uint64, step uint8) []wire.Event {
 }
 
 // PutEvent stores an Event at a given round and step.
-func (s *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (eq *EventQueue) PutEvent(round uint64, step uint8, m wire.Event) {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
 
 	// Initialise the map on this round if it was not yet created
-	if s.entries[round] == nil {
-		s.entries[round] = make(map[uint8][]wire.Event)
+	if eq.entries[round] == nil {
+		eq.entries[round] = make(map[uint8][]wire.Event)
 	}
 
 	// Initialise the array on this step if it was not yet created
-	if s.entries[round][step] == nil {
-		s.entries[round][step] = make([]wire.Event, 0)
+	if eq.entries[round][step] == nil {
+		eq.entries[round][step] = make([]wire.Event, 0)
 	}
 
-	s.entries[round][step] = append(s.entries[round][step], m)
+	eq.entries[round][step] = append(eq.entries[round][step], m)
 }
 
 // Clear the queue.
-func (s *EventQueue) Clear(round uint64) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.entries[round] = nil
+func (eq *EventQueue) Clear(round uint64) {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
+	eq.entries[round] = nil
 }
 
 // Flush all events stored for a specific round from the queue, and return them.
-func (s *EventQueue) Flush(round uint64) []wire.Event {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (eq *EventQueue) Flush(round uint64) []wire.Event {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
 	events := make([]wire.Event, 0)
-	if s.entries[round] != nil {
-		for step, evs := range s.entries[round] {
+	if eq.entries[round] != nil {
+		for step, evs := range eq.entries[round] {
 			events = append(events, evs...)
-			s.entries[round][step] = nil
+			eq.entries[round][step] = nil
 		}
 		return events
 	}

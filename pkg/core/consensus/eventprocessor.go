@@ -28,10 +28,10 @@ func NewRepublisher(publisher wire.EventPublisher, topic topics.Topic) *Republis
 }
 
 // Process propagates a received event buffer to other nodes in the network.
-func (b *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
+func (r *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
 	bounced := eventBuffer
-	msg, _ := wire.AddTopic(bounced, b.topic)
-	b.publisher.Stream(string(topics.Gossip), msg)
+	msg, _ := wire.AddTopic(bounced, r.topic)
+	r.publisher.Stream(string(topics.Gossip), msg)
 	return eventBuffer, nil
 }
 

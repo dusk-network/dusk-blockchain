@@ -44,21 +44,21 @@ func NewUnMarshaller() *UnMarshaller {
 
 // Sender implements wire.Event.
 // Returns the BLS public key of the event sender.
-func (a *Header) Sender() []byte {
-	return a.PubKeyBLS
+func (h *Header) Sender() []byte {
+	return h.PubKeyBLS
 }
 
 // Equal implements wire.Event.
 // Checks if two headers are the same.
-func (a *Header) Equal(e wire.Event) bool {
+func (h *Header) Equal(e wire.Event) bool {
 	other, ok := e.(*Header)
-	return ok && (bytes.Equal(a.PubKeyBLS, other.PubKeyBLS)) &&
-		(a.Round == other.Round) && (a.Step == other.Step) &&
-		(bytes.Equal(a.BlockHash, other.BlockHash))
+	return ok && (bytes.Equal(h.PubKeyBLS, other.PubKeyBLS)) &&
+		(h.Round == other.Round) && (h.Step == other.Step) &&
+		(bytes.Equal(h.BlockHash, other.BlockHash))
 }
 
 // Marshal a Header into a Buffer.
-func (ehm *headerMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+func (hm *headerMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*Header)
 	if err := encoding.WriteVarBytes(r, consensusEv.PubKeyBLS); err != nil {
 		return err
@@ -68,7 +68,7 @@ func (ehm *headerMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 }
 
 // Unmarshal unmarshals the buffer into a Header.
-func (a *headerUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func (hu *headerUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*Header)
 
 	// Decoding PubKey BLS

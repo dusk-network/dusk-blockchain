@@ -16,7 +16,7 @@ import (
 )
 
 // This test assures proper functionality of adding strikes to a certain
-// committee member, up to the maxStrikes count.
+// committee member, up to the MaxStrikes count.
 func TestStrikes(t *testing.T) {
 	eventBus, removeProvisionerChan := launchModerator()
 	// Update round
@@ -49,7 +49,7 @@ func TestClean(t *testing.T) {
 	consensus.UpdateRound(eventBus, 2)
 	// wait a bit for the referee to update...
 	time.Sleep(time.Millisecond * 100)
-	// send maxStrikes-1 strikes
+	// send MaxStrikes-1 strikes
 	for i := uint8(0); i < reputation.MaxStrikes-1; i++ {
 		publishStrike(2, eventBus, node)
 	}

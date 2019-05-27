@@ -40,22 +40,19 @@ func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHand
 	return filter
 }
 
-// newScoreBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
+// newScoreBroker creates a Broker component which responsibility is to listen to the
+// eventbus and supervise Collector operations
 func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler,
 	timeOut time.Duration) *scoreBroker {
-	//creating the channel whereto notifications about round updates are push onto
-	roundChan := consensus.InitRoundUpdate(eventBroker)
-	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
-	bidListChan := consensus.InitBidListUpdate(eventBroker)
 	state := consensus.NewState()
 	selector := newEventSelector(eventBroker, handler, timeOut, state)
 	filter := launchScoreFilter(eventBroker, handler, state, selector)
 
 	return &scoreBroker{
 		filter:           filter,
-		roundUpdateChan:  roundChan,
-		bidListChan:      bidListChan,
-		regenerationChan: regenerationChan,
+		roundUpdateChan:  consensus.InitRoundUpdate(eventBroker),
+		bidListChan:      consensus.InitBidListUpdate(eventBroker),
+		regenerationChan: consensus.InitBlockRegenerationCollector(eventBroker),
 		selector:         selector,
 		handler:          handler,
 	}

@@ -44,45 +44,45 @@ func newScoreHandler() *scoreHandler {
 	}
 }
 
-func (p *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+func (sh *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
 	ev := &ScoreEvent{}
-	if err := p.Unmarshal(r, ev); err != nil {
+	if err := sh.Unmarshal(r, ev); err != nil {
 		return nil, err
 	}
 	return ev, nil
 }
 
-func (p *scoreHandler) Unmarshal(r *bytes.Buffer, e wire.Event) error {
+func (sh *scoreHandler) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 	return UnmarshalScoreEvent(r, e)
 }
 
-func (p *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
+func (sh *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return MarshalScoreEvent(r, e)
 }
 
-func (p *scoreHandler) UpdateBidList(bidList user.BidList) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	p.bidList = bidList
+func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
+	sh.bidList = bidList
 }
 
-func (p *scoreHandler) ExtractHeader(e wire.Event) *header.Header {
+func (sh *scoreHandler) ExtractHeader(e wire.Event) *header.Header {
 	ev := e.(*ScoreEvent)
 	return &header.Header{
 		Round: ev.Round,
 	}
 }
 
-func (p *scoreHandler) ResetThreshold() {
-	p.threshold.Reset()
+func (sh *scoreHandler) ResetThreshold() {
+	sh.threshold.Reset()
 }
 
-func (p *scoreHandler) LowerThreshold() {
-	p.threshold.Lower()
+func (sh *scoreHandler) LowerThreshold() {
+	sh.threshold.Lower()
 }
 
 // Priority returns true if the first element has priority over the second, false otherwise
-func (p *scoreHandler) Priority(first, second wire.Event) bool {
+func (sh *scoreHandler) Priority(first, second wire.Event) bool {
 	ev1, ok := first.(*ScoreEvent)
 	if !ok {
 		// this happens when first is nil, in which case we should return second
@@ -93,16 +93,16 @@ func (p *scoreHandler) Priority(first, second wire.Event) bool {
 	return bytes.Compare(ev2.Score, ev1.Score) != 1
 }
 
-func (p *scoreHandler) Verify(ev wire.Event) error {
+func (sh *scoreHandler) Verify(ev wire.Event) error {
 	m := ev.(*ScoreEvent)
 
 	// Check threshold
-	if !p.threshold.Exceeds(m.Score) {
+	if !sh.threshold.Exceeds(m.Score) {
 		return errors.New("score does not exceed threshold")
 	}
 
 	// Check if the BidList contains valid bids
-	if err := p.validateBidListSubset(m.BidListSubset); err != nil {
+	if err := sh.validateBidListSubset(m.BidListSubset); err != nil {
 		return err
 	}
 
@@ -124,13 +124,13 @@ func (p *scoreHandler) Verify(ev wire.Event) error {
 	return nil
 }
 
-func (p *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) *prerror.PrError {
+func (sh *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) *prerror.PrError {
 	bidListSubset, err := user.ReconstructBidListSubset(bidListSubsetBytes)
 	if err != nil {
 		return err
 	}
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	return p.bidList.ValidateBids(bidListSubset)
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
+	return sh.bidList.ValidateBids(bidListSubset)
 }

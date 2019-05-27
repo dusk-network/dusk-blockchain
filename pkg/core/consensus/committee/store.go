@@ -70,72 +70,72 @@ func NewExtractor(eventBroker wire.EventBroker) *Extractor {
 }
 
 // Listen for events coming from the EventBus.
-func (c *Store) Listen() {
+func (s *Store) Listen() {
 	for {
 		select {
-		case pubKeyBLS := <-c.removeProvisionerChan:
-			stake, err := c.provisioners.GetStake(pubKeyBLS)
+		case pubKeyBLS := <-s.removeProvisionerChan:
+			stake, err := s.provisioners.GetStake(pubKeyBLS)
 			if err != nil {
 				panic(err)
 			}
 
-			c.lock.Lock()
-			c.provisioners.Remove(pubKeyBLS)
-			c.totalWeight -= stake
-			c.lock.Unlock()
+			s.lock.Lock()
+			s.provisioners.Remove(pubKeyBLS)
+			s.totalWeight -= stake
+			s.lock.Unlock()
 		}
 	}
 }
 
 // AddProvisioner will add a provisioner to the Stores Provisioners object.
-func (c *Store) AddProvisioner(m *bytes.Buffer) error {
+func (s *Store) AddProvisioner(m *bytes.Buffer) error {
 	newProvisioner, err := decodeNewProvisioner(m)
 	if err != nil {
 		return err
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if err := c.provisioners.AddMember(newProvisioner.pubKeyEd,
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if err := s.provisioners.AddMember(newProvisioner.pubKeyEd,
 		newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
 		return err
 	}
 
-	c.totalWeight += newProvisioner.amount
+	s.totalWeight += newProvisioner.amount
 	return nil
 }
 
 // UpsertCommitteeCache will return a voting committee for a given round, step and size.
 // If the committee has not yet been produced before, it is put on the cache. If it has,
 // it is simply retrieved and returned.
-func (p *Extractor) UpsertCommitteeCache(round uint64, step uint8, size int) user.VotingCommittee {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	if round > p.round {
-		p.round = round
-		p.committeeCache = make(map[uint8]user.VotingCommittee)
+func (e *Extractor) UpsertCommitteeCache(round uint64, step uint8, size int) user.VotingCommittee {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if round > e.round {
+		e.round = round
+		e.committeeCache = make(map[uint8]user.VotingCommittee)
 	}
-	votingCommittee, found := p.committeeCache[step]
+	votingCommittee, found := e.committeeCache[step]
 	if !found {
-		provisioners := p.Provisioners()
-		votingCommittee = *provisioners.CreateVotingCommittee(round, p.getTotalWeight(),
+		provisioners := e.Provisioners()
+		votingCommittee = *provisioners.CreateVotingCommittee(round, e.getTotalWeight(),
 			step, size)
-		p.committeeCache[step] = votingCommittee
+		e.committeeCache[step] = votingCommittee
 	}
 	return votingCommittee
 }
 
 // Provisioners returns a copy of the user.Provisioners object maintained by the Store.
-func (c *Store) Provisioners() *user.Provisioners {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	provisioners := c.provisioners
+func (s *Store) Provisioners() *user.Provisioners {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	provisioners := s.provisioners
 	return provisioners
 }
 
-func (c *Store) getTotalWeight() uint64 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	totalWeight := c.totalWeight
+func (s *Store) getTotalWeight() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	totalWeight := s.totalWeight
 	return totalWeight
 }

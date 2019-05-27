@@ -12,7 +12,8 @@ import (
 )
 
 type (
-	// Reduction is a basic reduction event.
+	// Reduction represents a provisioner vote during the Block Reduction phase of
+	// the consensus.
 	Reduction struct {
 		*header.Header
 		SignedHash []byte
@@ -53,7 +54,7 @@ func (u *UnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error) {
 	return ev, nil
 }
 
-// Unmarshal unmarshals the buffer into a Committee
+// Unmarshal unmarshals the buffer into a Reduction event.
 func (u *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	bev := ev.(*Reduction)
 	if err := u.UnMarshaller.Unmarshal(r, bev.Header); err != nil {

@@ -62,14 +62,14 @@ func InitBlockRegenerationCollector(subscriber wire.EventSubscriber) chan AsyncS
 	return regenerationChan
 }
 
-func (sc *regenerationCollector) Collect(r *bytes.Buffer) error {
+func (rg *regenerationCollector) Collect(r *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(r.Bytes()[:8])
 	step := uint8(r.Bytes()[8])
 	state := AsyncState{
 		Round: round,
 		Step:  step,
 	}
-	sc.regenerationChan <- state
+	rg.regenerationChan <- state
 	return nil
 }
 
@@ -83,12 +83,12 @@ func InitBidListUpdate(subscriber wire.EventSubscriber) chan user.BidList {
 
 // Collect implements EventCollector.
 // It reconstructs the bidList and sends it on its BidListChan
-func (l *bidListCollector) Collect(r *bytes.Buffer) error {
+func (b *bidListCollector) Collect(r *bytes.Buffer) error {
 	rCopy := *r
 	bidList, err := user.ReconstructBidListSubset(rCopy.Bytes())
 	if err != nil {
 		return nil
 	}
-	l.bidListChan <- bidList
+	b.bidListChan <- bidList
 	return nil
 }

@@ -94,7 +94,7 @@ func (b *BidList) AddBid(bid Bid) {
 	*b = append(*b, bid)
 }
 
-// RemoveBid will iterate over a BidList and remove a specified bid.
+// RemoveBid will iterate over a BidList to remove a specified bid.
 func (b *BidList) RemoveBid(bid Bid) {
 	for i, bidFromList := range *b {
 		if bidFromList.Equals(bid) {

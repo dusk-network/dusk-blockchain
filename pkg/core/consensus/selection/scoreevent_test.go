@@ -12,29 +12,8 @@ import (
 // Test both the Marshal and Unmarshal functions, making sure the data is correctly
 // stored to/retrieved from a Buffer.
 func TestUnMarshal(t *testing.T) {
-
-	// 32 bytes
-	score, _ := crypto.RandEntropy(32)
-	// Var Bytes
-	proof, _ := crypto.RandEntropy(1477)
-	// 32 bytes
-	z, _ := crypto.RandEntropy(32)
-	// Var Bytes
-	bidListSubset, _ := crypto.RandEntropy(32)
-	// BLS is 33 bytes
-	seed, _ := crypto.RandEntropy(33)
-	// 32 bytes
-	candidateHash, _ := crypto.RandEntropy(32)
-
-	se := &selection.ScoreEvent{
-		Round:         uint64(23),
-		Score:         score,
-		Proof:         proof,
-		Z:             z,
-		Seed:          seed,
-		BidListSubset: bidListSubset,
-		VoteHash:      candidateHash,
-	}
+	hash, _ := crypto.RandEntropy(32)
+	se := selection.MockSelectionEvent(26, hash)
 
 	buf := new(bytes.Buffer)
 	assert.NoError(t, selection.MarshalScoreEvent(buf, se))
