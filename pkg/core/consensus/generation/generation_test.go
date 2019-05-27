@@ -19,6 +19,9 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
+// Test that all of the functionality around score/proof generation works as intended.
+// Note that the proof generator is mocked here, so the actual validity of the data
+// is not tested.
 func TestScoreGeneration(t *testing.T) {
 	d := ristretto.Scalar{}
 	d.Rand()
