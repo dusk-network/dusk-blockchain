@@ -109,22 +109,18 @@ func (c *Store) AddProvisioner(m *bytes.Buffer) error {
 // If the committee has not yet been produced before, it is put on the cache. If it has,
 // it is simply retrieved and returned.
 func (p *Extractor) UpsertCommitteeCache(round uint64, step uint8, size int) user.VotingCommittee {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 	if round > p.round {
 		p.round = round
-		p.lock.Lock()
 		p.committeeCache = make(map[uint8]user.VotingCommittee)
-		p.lock.Unlock()
 	}
-	p.lock.RLock()
 	votingCommittee, found := p.committeeCache[step]
-	p.lock.RUnlock()
 	if !found {
 		provisioners := p.Provisioners()
 		votingCommittee = *provisioners.CreateVotingCommittee(round, p.getTotalWeight(),
 			step, size)
-		p.lock.Lock()
 		p.committeeCache[step] = votingCommittee
-		p.lock.Unlock()
 	}
 	return votingCommittee
 }
