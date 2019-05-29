@@ -55,7 +55,7 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 	}
 
 	// blk.Headerhash = prevHeaderHash
-	if !bytes.Equal(blk.Header.PrevBlock, prevBlock.Header.Hash) {
+	if !bytes.Equal(blk.Header.PrevBlockHash, prevBlock.Header.Hash) {
 		return errors.New("Previous block hash does not equal the previous hash in the current block")
 	}
 

@@ -15,9 +15,9 @@ type Header struct {
 	Timestamp int64  // Block timestamp
 	Height    uint64 // Block height
 
-	PrevBlock []byte // Hash of previous block (32 bytes)
-	Seed      []byte // Marshaled BLS signature or hash of the previous block seed (32 bytes)
-	TxRoot    []byte // Root hash of the merkle tree containing all txes (32 bytes)
+	PrevBlockHash []byte // Hash of previous block (32 bytes)
+	Seed          []byte // Marshaled BLS signature or hash of the previous block seed (32 bytes)
+	TxRoot        []byte // Root hash of the merkle tree containing all txes (32 bytes)
 
 	CertHash []byte // Hash of the block certificate (32 bytes)
 	Hash     []byte // Hash of all previous fields
@@ -55,7 +55,7 @@ func (b *Header) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, b.PrevBlock); err != nil {
+	if err := encoding.Write256(w, b.PrevBlockHash); err != nil {
 		return err
 	}
 
@@ -103,7 +103,7 @@ func (b *Header) Decode(r io.Reader) error {
 	}
 
 	b.Timestamp = int64(timestamp)
-	if err := encoding.Read256(r, &b.PrevBlock); err != nil {
+	if err := encoding.Read256(r, &b.PrevBlockHash); err != nil {
 		return err
 	}
 
@@ -148,7 +148,7 @@ func (b *Header) Equals(other *Header) bool {
 		return false
 	}
 
-	if !bytes.Equal(b.PrevBlock, other.PrevBlock) {
+	if !bytes.Equal(b.PrevBlockHash, other.PrevBlockHash) {
 		return false
 	}
 
