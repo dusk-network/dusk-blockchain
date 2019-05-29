@@ -23,6 +23,8 @@ import (
 )
 
 type (
+	// BlockGenerator defines a method which will create and return a new block,
+	// given a height and seed.
 	BlockGenerator interface {
 		GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error)
 		UpdatePrevBlock(b block.Block)
@@ -82,14 +84,13 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 
 	// Construct header
 	h := &block.Header{
-		Version:   0,
-		Timestamp: time.Now().Unix(),
-		Height:    round,
-		PrevBlock: bg.prevBlock.Header.Hash,
-		TxRoot:    nil,
-
-		Seed:     seed,
-		CertHash: certHash,
+		Version:       0,
+		Timestamp:     time.Now().Unix(),
+		Height:        round,
+		PrevBlockHash: bg.prevBlock.Header.Hash,
+		TxRoot:        nil,
+		Seed:          seed,
+		CertHash:      certHash,
 	}
 
 	// Construct the candidate block

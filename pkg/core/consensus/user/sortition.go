@@ -10,26 +10,29 @@ import (
 )
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
-// point in the consensus. The set is sorted by the int value of the public key in increasing order (higher last)
+// point in the consensus. The set is sorted by the int value of the public key in
+// increasing order (higher last)
 type VotingCommittee struct {
 	sortedset.Set
 }
 
 func newCommittee() *VotingCommittee {
-	// return make([]*big.Int, 0)
 	return &VotingCommittee{
 		Set: sortedset.New(),
 	}
 }
 
+// Size returns how many members there are in a VotingCommittee.
 func (v *VotingCommittee) Size() int {
 	return len(v.Set)
 }
 
+// Remove a member from the VotingCommittee by its BLS public key.
 func (v *VotingCommittee) Remove(pk []byte) bool {
 	return v.Set.Remove(pk)
 }
 
+// MemberKeys returns the BLS public keys of all the members in a VotingCommittee.
 func (v *VotingCommittee) MemberKeys() [][]byte {
 	pks := make([][]byte, 0)
 	for _, pk := range v.Set {
@@ -38,6 +41,7 @@ func (v *VotingCommittee) MemberKeys() [][]byte {
 	return pks
 }
 
+// Equal checks if two VotingCommittees are the same.
 func (v *VotingCommittee) Equal(other *VotingCommittee) bool {
 	return v.Set.Equal(other.Set)
 }
@@ -46,16 +50,6 @@ func (v *VotingCommittee) Equal(other *VotingCommittee) bool {
 func (v *VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	_, found := v.IndexOf(pubKeyBLS)
 	return found
-}
-
-// VotingCommitteeSize returns how big the voting committee should be.
-func (p *Provisioners) VotingCommitteeSize() int {
-	size := p.Size()
-	if size > 50 {
-		size = 50
-	}
-
-	return size
 }
 
 // createSortitionMessage will return the hash of the passed sortition information.
@@ -76,11 +70,10 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
 func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
-	step uint8) *VotingCommittee {
+	step uint8, size int) *VotingCommittee {
 
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(totalWeight)
-	size := p.VotingCommitteeSize()
 
 	for i := 0; votingCommittee.Size() < size; i++ {
 		hash, err := createSortitionHash(round, step, i)

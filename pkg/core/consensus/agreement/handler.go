@@ -7,22 +7,34 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
+	"golang.org/x/crypto/ed25519"
 )
 
 type agreementHandler struct {
-	committee.Committee
-	*AgreementUnMarshaller
+	user.Keys
+	committee.Foldable
+	*UnMarshaller
 }
 
-func newHandler(committee committee.Committee) *agreementHandler {
+// newHandler returns an initialized agreementHandler.
+func newHandler(committee committee.Foldable, keys user.Keys) *agreementHandler {
 	return &agreementHandler{
-		Committee:             committee,
-		AgreementUnMarshaller: NewUnMarshaller(),
+		Keys:         keys,
+		Foldable:     committee,
+		UnMarshaller: NewUnMarshaller(),
 	}
+}
+
+// AmMember checks if we are part of the committee.
+func (a *agreementHandler) AmMember(round uint64, step uint8) bool {
+	return a.Foldable.IsMember(a.Keys.BLSPubKeyBytes, round, step)
 }
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *header.Header {
@@ -38,7 +50,7 @@ func (a *agreementHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 	return encoding.WriteUint8(r, ev.Step)
 }
 
-// Verify checks the signature of the set. TODO: At the moment the overall BLS signature is not checked as it is not clear if checking the ED25519 is enough (it should be in case the node links the BLS keys to the Edward keys)
+// Verify checks the signature of the set.
 func (a *agreementHandler) Verify(e wire.Event) error {
 	ev, ok := e.(*Agreement)
 	if !ok {
@@ -57,7 +69,6 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 
 		signed := new(bytes.Buffer)
 
-		// TODO: change into Header
 		vote := &header.Header{
 			Round:     ev.Round,
 			Step:      step,
@@ -79,6 +90,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	return nil
 }
 
+// ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
 func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	var apk *bls.Apk
 	if len(subcommittee) == 0 {
@@ -99,4 +111,95 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	}
 
 	return apk, nil
+}
+
+func (a *agreementHandler) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
+	signature := ed25519.Sign(*a.EdSecretKey, eventBuf.Bytes())
+	buf := new(bytes.Buffer)
+	if err := encoding.Write512(buf, signature); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.Write256(buf, a.EdPubKeyBytes); err != nil {
+		panic(err)
+	}
+
+	if _, err := buf.Write(eventBuf.Bytes()); err != nil {
+		panic(err)
+	}
+
+	return buf
+}
+
+func (a *agreementHandler) createAgreement(evs []wire.Event, round uint64, step uint8) (*bytes.Buffer, error) {
+	rev := evs[0].(*reduction.Reduction)
+	h := &header.Header{
+		PubKeyBLS: a.BLSPubKeyBytes,
+		Round:     round,
+		Step:      step,
+		BlockHash: rev.BlockHash,
+	}
+
+	// create the Agreement event
+	aev, err := a.Aggregate(h, evs)
+	if err != nil {
+		return nil, err
+	}
+
+	// BLS sign it
+	if err := Sign(aev, a.Keys); err != nil {
+		return nil, err
+	}
+
+	// Marshall it for Ed25519 signature
+	buffer := new(bytes.Buffer)
+	if err := a.Marshal(buffer, aev); err != nil {
+		return nil, err
+	}
+
+	// sign the whole message
+	signed := a.signEd25519(buffer)
+	//add the topic
+	message, err := wire.AddTopic(signed, topics.Agreement)
+	if err != nil {
+		return nil, err
+	}
+
+	//send it
+	return message, nil
+}
+
+// Aggregate the Agreement event into an Agreement outgoing event
+func (a *agreementHandler) Aggregate(h *header.Header, voteSet []wire.Event) (*Agreement, error) {
+	stepVotesMap := make(map[uint8]struct {
+		*StepVotes
+		sortedset.Set
+	})
+
+	for _, ev := range voteSet {
+		reduction := ev.(*reduction.Reduction)
+		sv, found := stepVotesMap[reduction.Step]
+		if !found {
+			sv.StepVotes = NewStepVotes()
+			sv.Set = sortedset.New()
+		}
+
+		if err := sv.StepVotes.Add(reduction.SignedHash, reduction.Sender(), reduction.Step); err != nil {
+			return nil, err
+		}
+		sv.Set.Insert(reduction.PubKeyBLS)
+		stepVotesMap[reduction.Step] = sv
+	}
+
+	aev := New()
+	aev.Header = h
+	i := 0
+	for _, stepVotes := range stepVotesMap {
+		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
+		sv.BitSet = a.Pack(provisioners, h.Round, sv.Step)
+		aev.VotesPerStep[i] = sv
+		i++
+	}
+
+	return aev, nil
 }

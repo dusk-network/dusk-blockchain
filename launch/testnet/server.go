@@ -9,9 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
@@ -41,10 +39,7 @@ func Setup() *Server {
 
 	// generating the keys
 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
-	keys, _ := user.NewRandKeys()
-
-	// firing up the committee (the process in charge of ccalculating the quorum requirements and keeping track of the Provisioners eligible to vote according to the deterministic sortition)
-	_ = committee.LaunchCommitteeStore(eventBus, keys)
+	// keys, _ := user.NewRandKeys()
 
 	m := mempool.NewMempool(eventBus, nil)
 	m.Run()
@@ -82,37 +77,8 @@ func Setup() *Server {
 		},
 	}
 
-	// make a stake and bid tx
-	// stake := makeStake(keys)
-	// bid is the blind bid, k is the secret to be embedded in the tx and d is the amount of Dusk locked in the blindbid. This is to be changed into the Commitment to d: D
-
-	//NOTE: this is solely for testnet
-	// bid, d, k := makeBid()
-
-	// TODO: bid and stake creation should be handled by using the wallet, and not
-	// directly put in the chain, but rather broadcasted.
-	// Publish the stake in the chain
-	// buf := new(bytes.Buffer)
-	// err = stake.Encode(buf)
-	// if err != nil {
-	// 	log.Error(err)
-	// }
-	// eventBus.Publish(string(topics.Tx), buf)
-	// Publish the bid in the chain
-	// buf = new(bytes.Buffer)
-	// err = bid.Encode(buf)
-	// if err != nil {
-	// 	log.Error(err)
-	// }
-	// eventBus.Publish(string(topics.Tx), buf)
-
 	// Connecting to the general monitoring system
 	// ConnectToMonitor(eventBus, d)
-
-	// TODO: need to get the d and k here from the previously created bid tx
-	// start consensus factory
-	// factory := factory.New(eventBus, timeOut, c, keys, d, k)
-	// go factory.StartConsensus()
 
 	return srv
 }

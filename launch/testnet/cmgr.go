@@ -52,7 +52,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 	return cnnmgr
 }
 
-// Connect dials a connection with it's string, then on succession
+// Connect dials a connection with its string, then on succession
 // we pass the connection and the address to the OnConn method
 func (c *connmgr) Connect(addr string) error {
 	conn, err := c.Dial(addr)
@@ -67,7 +67,7 @@ func (c *connmgr) Connect(addr string) error {
 	return nil
 }
 
-// Dial dials up a connection, given it's address string
+// Dial dials up a connection, given its address string
 func (c *connmgr) Dial(addr string) (net.Conn, error) {
 	dialTimeout := 1 * time.Second
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)

@@ -10,187 +10,132 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
 
-// Store is the component that handles Committee formation and management
 type (
-	// Committee is the interface for operations depending on the set of Provisioners extracted for a fiven step
+	// Committee is the interface for operations depending on the set of Provisioners
+	// extracted for a given step
 	Committee interface {
-		wire.EventPrioritizer
-		// isMember can accept a BLS Public Key or an Ed25519
-		AmMember(uint64, uint8) bool
 		IsMember([]byte, uint64, uint8) bool
 		Quorum() int
-		ReportAbsentees([]wire.Event, uint64, uint8) error
+	}
 
-		// Pack creates a uint64 bit representation of a sorted sub-committee for a given round and step
+	// Foldable represents a Committee which can be packed into a bitset, to drastically
+	// decrease the size needed for committee representation over the wire.
+	Foldable interface {
+		Committee
 		Pack(sortedset.Set, uint64, uint8) uint64
-
-		// Unpack reconstruct a sorted sub-committee from a uint64 bitset, a round and a step
 		Unpack(uint64, uint64, uint8) sortedset.Set
 	}
 
+	// Store is the component that contains a set of provisioners, and provides
+	// access to this set, allowing clients to obtain consensus-related information.
+	// This struct is shared by Extractor structs in the node.
 	Store struct {
-		publisher    wire.EventPublisher
 		lock         sync.RWMutex
 		provisioners *user.Provisioners
 		// TODO: should this be round dependent?
 		totalWeight uint64
-		round       uint64
 
-		// subscriber channels
 		removeProvisionerChan chan []byte
-		// own keys (TODO: this should just be BLSPubKey)
-		keys *user.Keys
+	}
 
+	// Extractor is a wrapper around the Store struct, and contains the phase-specific
+	// information, as well as a voting committee cache. It calls methods on the
+	// Store, passing its own parameters to extract the desired info for a specific
+	// phase.
+	Extractor struct {
+		*Store
+		round          uint64
+		lock           sync.RWMutex
 		committeeCache map[uint8]user.VotingCommittee
 	}
 )
 
-// LaunchCommitteeStore creates a component that listens to changes to the Provisioners
-func LaunchCommitteeStore(eventBroker wire.EventBroker, keys *user.Keys) *Store {
+// launchStore creates a component that listens to changes to the Provisioners
+func launchStore(eventBroker wire.EventBroker) *Store {
 	store := &Store{
-		keys:         keys,
-		publisher:    eventBroker,
-		provisioners: user.NewProvisioners(),
-		// TODO: consider adding a consensus.Validator preprocessor
-		removeProvisionerChan: InitRemoveProvisionerCollector(eventBroker),
-		committeeCache:        make(map[uint8]user.VotingCommittee),
+		provisioners:          user.NewProvisioners(),
+		removeProvisionerChan: initRemoveProvisionerCollector(eventBroker),
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	go store.Listen()
 	return store
 }
 
-func (c *Store) Listen() {
+// NewExtractor returns a committee extractor which maintains its own store and cache.
+func NewExtractor(eventBroker wire.EventBroker) *Extractor {
+	return &Extractor{
+		Store:          launchStore(eventBroker),
+		committeeCache: make(map[uint8]user.VotingCommittee),
+	}
+}
+
+// Listen for events coming from the EventBus.
+func (s *Store) Listen() {
 	for {
 		select {
-		case pubKeyBLS := <-c.removeProvisionerChan:
-			stake, err := c.provisioners.GetStake(pubKeyBLS)
+		case pubKeyBLS := <-s.removeProvisionerChan:
+			stake, err := s.provisioners.GetStake(pubKeyBLS)
 			if err != nil {
 				panic(err)
 			}
 
-			c.lock.Lock()
-			c.provisioners.Remove(pubKeyBLS)
-			c.totalWeight -= stake
-			c.lock.Unlock()
+			s.lock.Lock()
+			s.provisioners.Remove(pubKeyBLS)
+			s.totalWeight -= stake
+			s.lock.Unlock()
 		}
 	}
 }
 
-func (c *Store) AddProvisioner(m *bytes.Buffer) error {
+// AddProvisioner will add a provisioner to the Stores Provisioners object.
+func (s *Store) AddProvisioner(m *bytes.Buffer) error {
 	newProvisioner, err := decodeNewProvisioner(m)
 	if err != nil {
 		return err
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if err := c.provisioners.AddMember(newProvisioner.pubKeyEd,
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if err := s.provisioners.AddMember(newProvisioner.pubKeyEd,
 		newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
 		return err
 	}
 
-	c.totalWeight += newProvisioner.amount
-	c.publisher.Publish(msg.ProvisionerAddedTopic, bytes.NewBuffer(newProvisioner.pubKeyBLS))
+	s.totalWeight += newProvisioner.amount
 	return nil
 }
 
-func (c *Store) AmMember(round uint64, step uint8) bool {
-	return c.IsMember(c.keys.BLSPubKeyBytes, round, step)
-}
-
-// IsMember checks if the BLS key belongs to one of the Provisioners in the committee
-func (c *Store) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	votingCommittee := c.upsertCommitteeCache(round, step)
-	return votingCommittee.IsMember(pubKeyBLS)
-}
-
-// Quorum returns the amount of votes to reach a quorum
-func (c *Store) Quorum() int {
-	p := c.copyProvisioners()
-	committeeSize := p.VotingCommitteeSize()
-	quorum := int(float64(committeeSize) * 0.75)
-	return quorum
-}
-
-// Pack creates a uint64 bitset representation of a Committee subset for a given round and step
-func (c *Store) Pack(set sortedset.Set, round uint64, step uint8) uint64 {
-	p := c.copyProvisioners()
-	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
-	return votingCommittee.Bits(set)
-}
-
-// Unpack the Committee subset from a uint64 bitset representation for a give round and step
-func (c *Store) Unpack(bitset uint64, round uint64, step uint8) sortedset.Set {
-	p := c.copyProvisioners()
-	votingCommittee := p.CreateVotingCommittee(round, c.getTotalWeight(), step)
-	return votingCommittee.Intersect(bitset)
-}
-
-// ReportAbsentees will send public keys of absent provisioners to the moderator
-func (c *Store) ReportAbsentees(evs []wire.Event, round uint64, step uint8) error {
-	absentees := c.extractAbsentees(evs, round, step)
-	for _, absentee := range absentees.MemberKeys() {
-		c.publisher.Publish(msg.AbsenteesTopic, bytes.NewBuffer(absentee))
+// UpsertCommitteeCache will return a voting committee for a given round, step and size.
+// If the committee has not yet been produced before, it is put on the cache. If it has,
+// it is simply retrieved and returned.
+func (e *Extractor) UpsertCommitteeCache(round uint64, step uint8, size int) user.VotingCommittee {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if round > e.round {
+		e.round = round
+		e.committeeCache = make(map[uint8]user.VotingCommittee)
 	}
-	return nil
-}
-
-func (c *Store) extractAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {
-	votingCommittee := c.upsertCommitteeCache(round, step)
-	for _, ev := range evs {
-		votingCommittee.Remove(ev.Sender())
-	}
-	return votingCommittee
-}
-
-func (c *Store) upsertCommitteeCache(round uint64, step uint8) user.VotingCommittee {
-	if round > c.round {
-		c.round = round
-		c.lock.Lock()
-		c.committeeCache = make(map[uint8]user.VotingCommittee)
-		c.lock.Unlock()
-	}
-	c.lock.RLock()
-	votingCommittee, found := c.committeeCache[step]
-	c.lock.RUnlock()
+	votingCommittee, found := e.committeeCache[step]
 	if !found {
-		p := c.copyProvisioners()
-		votingCommittee = *p.CreateVotingCommittee(round, c.getTotalWeight(), step)
-		c.lock.Lock()
-		c.committeeCache[step] = votingCommittee
-		c.lock.Unlock()
+		provisioners := e.Provisioners()
+		votingCommittee = *provisioners.CreateVotingCommittee(round, e.getTotalWeight(),
+			step, size)
+		e.committeeCache[step] = votingCommittee
 	}
 	return votingCommittee
 }
 
-// Priority returns false in case pubKey2 has higher stake than pubKey1
-func (c *Store) Priority(ev1, ev2 wire.Event) bool {
-	p := c.copyProvisioners()
-	m1 := p.GetMember(ev1.Sender())
-	m2 := p.GetMember(ev2.Sender())
-
-	if m1 == nil {
-		return false
-	}
-
-	if m2 == nil {
-		return true
-	}
-
-	return m1.Stake >= m2.Stake
-}
-
-func (c *Store) copyProvisioners() *user.Provisioners {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	provisioners := c.provisioners
+// Provisioners returns a copy of the user.Provisioners object maintained by the Store.
+func (s *Store) Provisioners() *user.Provisioners {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	provisioners := s.provisioners
 	return provisioners
 }
 
-func (c *Store) getTotalWeight() uint64 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	totalWeight := c.totalWeight
+func (s *Store) getTotalWeight() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	totalWeight := s.totalWeight
 	return totalWeight
 }

@@ -65,7 +65,7 @@ func NewEmptyBlock(prevHeader *Header) (*Block, error) {
 
 // SetPrevBlock will set all the previous block hash field from a header.
 func (b *Block) SetPrevBlock(prevHeader *Header) {
-	b.Header.PrevBlock = prevHeader.Hash
+	b.Header.PrevBlockHash = prevHeader.Hash
 }
 
 // SetRoot will set the block merkle root hash.

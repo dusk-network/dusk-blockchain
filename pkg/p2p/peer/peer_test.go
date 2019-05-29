@@ -229,7 +229,7 @@ func startServer(f func(net.Conn, chan struct{}, chan struct{}), inboundChan cha
 }
 
 func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
-	var keys []*user.Keys
+	var keys []user.Keys
 	for i := 0; i < keyAmount; i++ {
 		keyPair, _ := user.NewRandKeys()
 		keys = append(keys, keyPair)

@@ -8,7 +8,7 @@ import (
 )
 
 type seeder struct {
-	sync.RWMutex
+	lock  sync.RWMutex
 	round uint64
 	seed  []byte
 }
@@ -16,16 +16,16 @@ type seeder struct {
 func (s *seeder) GenerateSeed(round uint64) []byte {
 	// TODO: make an actual seed by signing the previous block seed
 	seed, _ := crypto.RandEntropy(33)
-	s.Lock()
+	s.lock.Lock()
 	s.seed = seed
 	s.round = round
-	s.Unlock()
+	s.lock.Unlock()
 	return seed
 }
 
 func (s *seeder) LatestSeed() []byte {
-	s.RLock()
-	defer s.RUnlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	return s.seed
 }
 
@@ -34,7 +34,7 @@ func (s *seeder) isFresh(seed []byte) bool {
 }
 
 func (s *seeder) Round() uint64 {
-	s.RLock()
-	defer s.RUnlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	return s.round
 }

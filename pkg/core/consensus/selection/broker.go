@@ -5,7 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -18,21 +17,22 @@ type scoreBroker struct {
 	bidListChan      <-chan user.BidList
 	filter           *consensus.EventFilter
 	selector         *eventSelector
-	handler          scoreEventHandler
+	handler          ScoreEventHandler
 }
 
-// LaunchScoreSelectionComponent creates and launches the component which responsibility is to validate and select the best score among the blind bidders. The component publishes under the topic BestScoreTopic
-func LaunchScoreSelectionComponent(eventBroker wire.EventBroker, committee committee.Committee,
-	timeout time.Duration) *scoreBroker {
-	handler := newScoreHandler()
-	broker := newScoreBroker(eventBroker, committee, handler, timeout)
+// Launch creates and launches the component which responsibility is to validate
+// and select the best score among the blind bidders. The component publishes under
+// the topic BestScoreTopic
+func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout time.Duration) {
+	if handler == nil {
+		handler = newScoreHandler()
+	}
+	broker := newScoreBroker(eventBroker, handler, timeout)
 	go broker.Listen()
-	return broker
 }
 
-func launchScoreFilter(eventBroker wire.EventBroker, committee committee.Committee,
-	handler consensus.EventHandler, state consensus.State,
-	processor consensus.EventProcessor) *consensus.EventFilter {
+func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHandler,
+	state consensus.State, processor consensus.EventProcessor) *consensus.EventFilter {
 
 	filter := consensus.NewEventFilter(handler, state, processor, false)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Score))
@@ -40,22 +40,19 @@ func launchScoreFilter(eventBroker wire.EventBroker, committee committee.Committ
 	return filter
 }
 
-// newScoreBroker creates a Broker component which responsibility is to listen to the eventbus and supervise Collector operations
-func newScoreBroker(eventBroker wire.EventBroker, committee committee.Committee,
-	handler scoreEventHandler, timeOut time.Duration) *scoreBroker {
-	//creating the channel whereto notifications about round updates are push onto
-	roundChan := consensus.InitRoundUpdate(eventBroker)
-	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
-	bidListChan := consensus.InitBidListUpdate(eventBroker)
+// newScoreBroker creates a Broker component which responsibility is to listen to the
+// eventbus and supervise Collector operations
+func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler,
+	timeOut time.Duration) *scoreBroker {
 	state := consensus.NewState()
 	selector := newEventSelector(eventBroker, handler, timeOut, state)
-	filter := launchScoreFilter(eventBroker, committee, handler, state, selector)
+	filter := launchScoreFilter(eventBroker, handler, state, selector)
 
 	return &scoreBroker{
 		filter:           filter,
-		roundUpdateChan:  roundChan,
-		bidListChan:      bidListChan,
-		regenerationChan: regenerationChan,
+		roundUpdateChan:  consensus.InitRoundUpdate(eventBroker),
+		bidListChan:      consensus.InitBidListUpdate(eventBroker),
+		regenerationChan: consensus.InitBlockRegenerationCollector(eventBroker),
 		selector:         selector,
 		handler:          handler,
 	}
@@ -96,12 +93,9 @@ func (f *scoreBroker) onRegeneration(state consensus.AsyncState) {
 	}).Debugln("received regeneration message")
 	if state.Round == f.selector.state.Round() {
 		f.handler.LowerThreshold()
-		f.selector.RLock()
-		if !f.selector.running {
-			f.selector.RUnlock()
+		if !f.selector.isRunning() {
 			f.selector.startSelection()
 			return
 		}
-		f.selector.RUnlock()
 	}
 }

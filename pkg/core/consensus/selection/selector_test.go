@@ -1,4 +1,4 @@
-package selection
+package selection_test
 
 import (
 	"bytes"
@@ -11,38 +11,42 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+// Test the functionality of the selector, in a condition where it receives multiple
+// events, and is allowed to time out.
 func TestSelection(t *testing.T) {
 	eb := wire.NewEventBus()
+	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
 	// subscribe to receive a result
 	bestScoreChan := make(chan *bytes.Buffer, 1)
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
-	selector := newEventSelector(eb, newMockScoreHandler(), time.Millisecond*200, consensus.NewState())
-	go selector.startSelection()
-	selector.Process(newMockEvent())
-	selector.Process(newMockEvent())
-	selector.Process(newMockEvent())
+	// Update round to start the selector
+	consensus.UpdateRound(eb, 1)
+
+	sendMockEvent(eb)
+	sendMockEvent(eb)
+	sendMockEvent(eb)
 
 	// we should receive something on the bestScoreChan after timeout
-	<-bestScoreChan
-	// bestEvent should have been set to nil
-	selector.RLock()
-	defer selector.RUnlock()
-	assert.Nil(t, selector.bestEvent)
+	ev := <-bestScoreChan
+	assert.NotNil(t, ev)
 }
 
+// Test that the selector repropagates events which pass the priority check.
 func TestRepropagation(t *testing.T) {
 	eb, streamer := helper.CreateGossipStreamer()
-
-	selector := newEventSelector(eb, newMockScoreHandler(), time.Millisecond*100, consensus.NewState())
-	go selector.startSelection()
-	selector.Process(newMockEvent())
+	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
+	// Update round to start the selector
+	consensus.UpdateRound(eb, 1)
+	sendMockEvent(eb)
 
 	timer := time.AfterFunc(500*time.Millisecond, func() {
 		t.Fail()
@@ -58,38 +62,41 @@ func TestRepropagation(t *testing.T) {
 	timer.Stop()
 }
 
+// Test that the selector does not return any value when it is stopped before timeout.
 func TestStopSelector(t *testing.T) {
 	eb := wire.NewEventBus()
+	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
 	// subscribe to receive a result
-	bestScoreChan := make(chan *bytes.Buffer, 1)
+	bestScoreChan := make(chan *bytes.Buffer, 2)
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
-	// run selection
-	selector := newEventSelector(eb, newMockScoreHandler(), time.Second*5, consensus.NewState())
-	go selector.startSelection()
-	selector.Process(newMockEvent())
-	selector.Process(newMockEvent())
-	selector.Process(newMockEvent())
-	selector.stopSelection()
+	// Update round to start the selector
+	consensus.UpdateRound(eb, 1)
+	sendMockEvent(eb)
+	sendMockEvent(eb)
+	sendMockEvent(eb)
+
+	// Update round again to stop the selector
+	consensus.UpdateRound(eb, 2)
 
 	timer := time.After(200 * time.Millisecond)
 	select {
 	case <-bestScoreChan:
 		assert.FailNow(t, "Selector should have not returned a value")
 	case <-timer:
-		// The test condition is satisfied if no Best Event is reported. Who cares about the ephemeral value of selector.bestEvent
-		// selector.RLock()
-		// defer selector.RUnlock()
-		// assert.Nil(t, selector.bestEvent)
 		// success :)
 	}
+}
+
+func sendMockEvent(eb *wire.EventBus) {
+	eb.Publish(string(topics.Score), bytes.NewBuffer([]byte("foo")))
 }
 
 type mockScoreHandler struct {
 	consensus.EventHandler
 }
 
-func newMockScoreHandler() scoreEventHandler {
+func newMockScoreHandler() selection.ScoreEventHandler {
 	return &mockScoreHandler{
 		EventHandler: newMockHandler(),
 	}
@@ -113,6 +120,8 @@ func newMockHandler() consensus.EventHandler {
 	mockEventHandler := &mocks.EventHandler{}
 	mockEventHandler.On("Verify", mock.Anything).Return(nil)
 	mockEventHandler.On("Marshal", mock.Anything, mock.Anything).Return(nil)
+	mockEventHandler.On("Deserialize", mock.Anything).
+		Return(selection.MockSelectionEvent(1, make([]byte, 32)), nil)
 	mockEventHandler.On("ExtractHeader",
 		mock.MatchedBy(func(ev wire.Event) bool {
 			sender, _ = crypto.RandEntropy(32)
@@ -125,11 +134,4 @@ func newMockHandler() consensus.EventHandler {
 		}
 	})
 	return mockEventHandler
-}
-
-func newMockEvent() wire.Event {
-	mockEvent := &mocks.Event{}
-	mockEvent.On("Sender").Return([]byte{})
-	mockEvent.On("Equal", mock.Anything).Return(true)
-	return mockEvent
 }

@@ -25,14 +25,16 @@ type (
 		Step      uint8
 	}
 
-	// Agreement is the Event created at the end of the Reduction process. It includes the aggregated compressed signatures of all voters
+	// Agreement is the Event created at the end of the Reduction process. It includes
+	// the aggregated compressed signatures of all voters
 	Agreement struct {
 		*header.Header
 		SignedVotes  []byte
 		VotesPerStep []*StepVotes
 	}
 
-	AgreementUnMarshaller struct {
+	// UnMarshaller marshals and unmarshals Agreement events.
+	UnMarshaller struct {
 		*header.UnMarshaller
 		wire.EventMarshaller
 		wire.EventUnmarshaller
@@ -49,11 +51,13 @@ func NewStepVotes() *StepVotes {
 	}
 }
 
+// Equal checks if two StepVotes structs are the same.
 func (sv *StepVotes) Equal(other *StepVotes) bool {
 	return bytes.Equal(sv.Apk.Marshal(), other.Apk.Marshal()) &&
 		bytes.Equal(sv.Signature.Marshal(), other.Signature.Marshal())
 }
 
+// Add a vote to the StepVotes struct.
 func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 	if sv.Step == uint8(0) {
 		pk, err := bls.UnmarshalPk(sender)
@@ -84,13 +88,15 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 	return nil
 }
 
-func NewUnMarshaller() *AgreementUnMarshaller {
-	return &AgreementUnMarshaller{
+// NewUnMarshaller returns an initialized UnMarshaller.
+func NewUnMarshaller() *UnMarshaller {
+	return &UnMarshaller{
 		UnMarshaller: header.NewUnMarshaller(),
 	}
 }
 
-func (au *AgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+// Deserialize an Agreement event from a buffer to its struct representation.
+func (au *UnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
 	ev := New()
 	if err := au.Unmarshal(r, ev); err != nil {
 		return nil, err
@@ -99,7 +105,8 @@ func (au *AgreementUnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error
 	return ev, nil
 }
 
-func (au *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+// Marshal an Agreement event into a buffer.
+func (au *UnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	a := ev.(*Agreement)
 	if err := au.UnMarshaller.Marshal(r, a.Header); err != nil {
 		return err
@@ -118,7 +125,11 @@ func (au *AgreementUnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
-func (au *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+// Unmarshal unmarshals the buffer into an Agreement
+// Field order is the following:
+// * Header [BLS Public Key; Round; Step]
+// * Agreement [Signed Vote Set; Vote Set; BlockHash]
+func (au *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	a := ev.(*Agreement)
 	if err := au.UnMarshaller.Unmarshal(r, a.Header); err != nil {
 		return err
@@ -138,6 +149,7 @@ func (au *AgreementUnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error
 	return nil
 }
 
+// New returns an empty Agreement event.
 func New() *Agreement {
 	return &Agreement{
 		Header:       &header.Header{},
@@ -146,34 +158,8 @@ func New() *Agreement {
 	}
 }
 
-// Unmarshal unmarshals the buffer into an Agreement
-// Field order is the following:
-// * Header [BLS Public Key; Round; Step]
-// * Agreement [Signed Vote Set; Vote Set; BlockHash]
-func Unmarshal(r *bytes.Buffer) (*Agreement, error) {
-	a := New()
-
-	unmarshaller := NewUnMarshaller()
-	if err := unmarshaller.Unmarshal(r, a); err != nil {
-		return nil, err
-	}
-
-	return a, nil
-}
-
-func Marshal(a *Agreement) (*bytes.Buffer, error) {
-	r := new(bytes.Buffer)
-
-	marshaller := NewUnMarshaller()
-	if err := marshaller.Marshal(r, a); err != nil {
-		return nil, err
-	}
-
-	return r, nil
-}
-
 // Sign signs an aggregated agreement event
-func Sign(a *Agreement, keys *user.Keys) error {
+func Sign(a *Agreement, keys user.Keys) error {
 	buffer := new(bytes.Buffer)
 
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {

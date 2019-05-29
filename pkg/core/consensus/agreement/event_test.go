@@ -50,6 +50,8 @@ func TestStepVotes(t *testing.T) {
 	assert.NoError(t, bls.Verify(result.Apk, hash, result.Signature))
 }
 
+// Test that adding Reduction events to a StepVotes struct results in a properly
+// aggregated public key and signature.
 func TestStepVotesAdd(t *testing.T) {
 	sv := NewStepVotes()
 	set := sortedset.New()
@@ -61,7 +63,7 @@ func TestStepVotesAdd(t *testing.T) {
 	assert.NoError(t, bls.Verify(sv.Apk, hash, sv.Signature))
 }
 
-func genKeys(set *sortedset.Set) *user.Keys {
+func genKeys(set *sortedset.Set) user.Keys {
 	k, _ := user.NewRandKeys()
 	set.Insert(k.BLSPubKeyBytes)
 	return k
