@@ -55,12 +55,3 @@ func addHeader(message *bytes.Buffer, magic protocol.Magic, topic topics.Topic) 
 
 	return buffer, nil
 }
-
-func writeTopic(r *bytes.Buffer, topic topics.Topic) error {
-	topicBytes := topics.TopicToByteArray(topic)
-	if _, err := r.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
-	return nil
-}

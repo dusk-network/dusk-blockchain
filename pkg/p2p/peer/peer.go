@@ -54,7 +54,10 @@ type MessageCollector struct {
 func (m *MessageCollector) Collect(b *bytes.Buffer) error {
 	// check if this message is a duplicate of another we already forwarded
 	if m.DupeBlacklist.CanFwd(b) {
-		topic := extractTopic(b)
+		topic, err := topics.Extract(b)
+		if err != nil {
+			return err
+		}
 		m.Publisher.Publish(string(topic), b)
 	}
 
@@ -97,7 +100,9 @@ func (p *Writer) Connect() error {
 	}
 
 	p.Subscribe()
-	p.Conn.SetWriteDeadline(time.Time{})
+	if err := p.Conn.SetWriteDeadline(time.Time{}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -145,20 +150,22 @@ func (p *Reader) ReadLoop(c wire.EventCollector) {
 			continue
 		}
 
-		c.Collect(buf)
+		if err := c.Collect(buf); err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error on message collector")
+			continue
+		}
 
 		// Refresh the read deadline
-		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+		if err := p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout)); err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error on resetting the read deadline on the connection")
+		}
 	}
-}
-
-func extractTopic(p io.Reader) topics.Topic {
-	var cmdBuf [topics.Size]byte
-	if _, err := p.Read(cmdBuf[:]); err != nil {
-		panic(err)
-	}
-
-	return topics.ByteArrayToTopic(cmdBuf)
 }
 
 // Write will put a message in the outgoing message queue.

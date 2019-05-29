@@ -1,5 +1,7 @@
 package topics
 
+import "io"
+
 // Topic defines a topic
 type Topic string
 
@@ -71,4 +73,22 @@ func ByteArrayToTopic(cmd [Size]byte) Topic {
 	}
 
 	return Topic(buf)
+}
+
+func Extract(p io.Reader) (Topic, error) {
+	var cmdBuf [Size]byte
+	if _, err := p.Read(cmdBuf[:]); err != nil {
+		return "", err
+	}
+
+	return ByteArrayToTopic(cmdBuf), nil
+}
+
+func Write(r io.Writer, topic Topic) error {
+	topicBytes := TopicToByteArray(topic)
+	if _, err := r.Write(topicBytes[:]); err != nil {
+		return err
+	}
+
+	return nil
 }
