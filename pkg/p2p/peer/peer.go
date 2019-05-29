@@ -3,7 +3,6 @@ package peer
 import (
 	"bufio"
 	"bytes"
-	"encoding/binary"
 	"io"
 	"net"
 	"strconv"
@@ -13,7 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -97,7 +95,6 @@ func (p *Writer) Connect() error {
 	}
 
 	p.Subscribe()
-	p.Conn.SetWriteDeadline(time.Time{})
 	return nil
 }
 
@@ -162,8 +159,8 @@ func extractTopic(p io.Reader) topics.Topic {
 }
 
 // Write will put a message in the outgoing message queue.
-func (p *Writer) Write(b []byte) (int, error) {
-	return p.Conn.Write(b)
+func (c *Connection) Write(b []byte) (int, error) {
+	return c.Conn.Write(b)
 }
 
 // Port returns the port
@@ -201,13 +198,4 @@ func (p *Connection) readHeaderBytes() ([]byte, error) {
 	}
 
 	return buffer, nil
-}
-
-func (m *MessageCollector) magicIsValid(b *bytes.Buffer) bool {
-	var magic uint32
-	if err := encoding.ReadUint32(b, binary.LittleEndian, &magic); err != nil {
-		panic(err)
-	}
-
-	return m.Magic == protocol.Magic(magic)
 }
