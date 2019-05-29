@@ -45,7 +45,7 @@ func TestDemoSaveFunctionality(t *testing.T) {
 
 	for i := 1; i < 5; i++ {
 		nextBlock := helper.RandomBlock(t, 200, 10)
-		nextBlock.Header.PrevBlock = chain.prevBlock.Header.Hash
+		nextBlock.Header.PrevBlockHash = chain.prevBlock.Header.Hash
 		nextBlock.Header.Height = uint64(i)
 		err = chain.AcceptBlock(*nextBlock)
 		assert.NoError(t, err)

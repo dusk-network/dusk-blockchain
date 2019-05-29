@@ -55,8 +55,8 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte) (*block.Block
 		Timestamp: time.Now().Unix(),
 		Height:    round,
 		// TODO: store/get previous block hash from somewhere
-		PrevBlock: make([]byte, 32),
-		TxRoot:    nil,
+		PrevBlockHash: make([]byte, 32),
+		TxRoot:        nil,
 
 		Seed:     nil,
 		CertHash: nil,

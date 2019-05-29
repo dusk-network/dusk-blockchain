@@ -36,7 +36,7 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 		Txs:    RandomSliceOfTxs(t, 20),
 	}
 
-	blk1.Header.PrevBlock = blk0.Header.Hash
+	blk1.Header.PrevBlockHash = blk0.Header.Hash
 	blk1.Header.Height = blk0.Header.Height + 1
 	blk1.Header.Timestamp = blk0.Header.Timestamp + 100
 	err = blk1.SetRoot()
@@ -76,9 +76,9 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 		Timestamp: time.Now().Unix(),
 		Height:    height,
 
-		PrevBlock: RandomSlice(t, 32),
-		Seed:      RandomSlice(t, 33),
-		TxRoot:    RandomSlice(t, 32),
+		PrevBlockHash: RandomSlice(t, 32),
+		Seed:          RandomSlice(t, 33),
+		TxRoot:        RandomSlice(t, 32),
 
 		CertHash: RandomSlice(t, 32),
 	}
