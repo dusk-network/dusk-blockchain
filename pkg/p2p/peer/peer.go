@@ -3,10 +3,12 @@ package peer
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"io"
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -20,6 +22,7 @@ var readWriteTimeout = 2 * time.Minute // Used to set reading and writing deadli
 
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 type Connection struct {
+	lock sync.Mutex
 	net.Conn
 	magic protocol.Magic
 }
@@ -87,9 +90,15 @@ func NewReader(conn net.Conn, magic protocol.Magic) *Reader {
 	}
 }
 
+// ReadMessage reads from the connection until encountering a zero byte.
+func (c *Connection) ReadMessage() ([]byte, error) {
+	r := bufio.NewReader(c.Conn)
+	return r.ReadBytes(0x00)
+}
+
 // Connect will perform the protocol handshake with the peer. If successful
 func (p *Writer) Connect() error {
-	if err := p.HandShake(); err != nil {
+	if err := p.Handshake(); err != nil {
 		p.Conn.Close()
 		return err
 	}
@@ -100,13 +109,13 @@ func (p *Writer) Connect() error {
 
 // Subscribe the writer to the gossip topic, passing it's connection as the writer.
 func (p *Writer) Subscribe() {
-	id := p.subscriber.SubscribeStream(string(topics.Gossip), p.Conn)
+	id := p.subscriber.SubscribeStream(string(topics.Gossip), p.Connection)
 	p.gossipID = id
 }
 
 // Accept will perform the protocol handshake with the peer.
 func (p *Reader) Accept() error {
-	if err := p.HandShake(); err != nil {
+	if err := p.Handshake(); err != nil {
 		p.Conn.Close()
 		return err
 	}
@@ -122,9 +131,8 @@ func (p *Reader) ReadLoop(c wire.EventCollector) {
 		p.Conn.Close()
 	}()
 
-	r := bufio.NewReader(p.Conn)
 	for {
-		b, err := r.ReadBytes(0x00)
+		b, err := p.ReadMessage()
 		if err != nil {
 			log.WithFields(log.Fields{
 				"process": "peer",
@@ -149,53 +157,41 @@ func (p *Reader) ReadLoop(c wire.EventCollector) {
 	}
 }
 
-func extractTopic(p io.Reader) topics.Topic {
+func extractTopic(r io.Reader) topics.Topic {
 	var cmdBuf [topics.Size]byte
-	if _, err := p.Read(cmdBuf[:]); err != nil {
+	if _, err := r.Read(cmdBuf[:]); err != nil {
 		panic(err)
 	}
 
 	return topics.ByteArrayToTopic(cmdBuf)
 }
 
-// Write will put a message in the outgoing message queue.
+func extractMagic(r io.Reader) protocol.Magic {
+	buffer := make([]byte, 4)
+	if _, err := r.Read(buffer); err != nil {
+		panic(err)
+	}
+
+	magic := binary.LittleEndian.Uint32(buffer)
+	return protocol.Magic(magic)
+}
+
+// Write a message to the connection.
 func (c *Connection) Write(b []byte) (int, error) {
-	return c.Conn.Write(b)
+	c.lock.Lock()
+	n, err := c.Conn.Write(b)
+	c.lock.Unlock()
+	return n, err
 }
 
 // Port returns the port
-func (p *Connection) Port() uint16 {
-	s := strings.Split(p.Conn.RemoteAddr().String(), ":")
+func (c *Connection) Port() uint16 {
+	s := strings.Split(c.Addr(), ":")
 	port, _ := strconv.ParseUint(s[1], 10, 16)
 	return uint16(port)
 }
 
 // Addr returns the peer's address as a string.
-func (p *Connection) Addr() string {
-	return p.Conn.RemoteAddr().String()
-}
-
-// Read from a peer
-func (p *Connection) readHeader() (*MessageHeader, error) {
-	headerBytes, err := p.readHeaderBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	headerBuffer := bytes.NewReader(headerBytes)
-	header, err := decodeMessageHeader(headerBuffer)
-	if err != nil {
-		return nil, err
-	}
-
-	return header, nil
-}
-
-func (p *Connection) readHeaderBytes() ([]byte, error) {
-	buffer := make([]byte, MessageHeaderSize)
-	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
+func (c *Connection) Addr() string {
+	return c.Conn.RemoteAddr().String()
 }
