@@ -1,6 +1,9 @@
 package topics
 
-import "io"
+import (
+	"bufio"
+	"io"
+)
 
 // Topic defines a topic
 type Topic string
@@ -55,10 +58,7 @@ const (
 // to prepare it for sending over the wire protocol.
 func TopicToByteArray(cmd Topic) [Size]byte {
 	bs := [Size]byte{}
-	for i := 0; i < len(cmd); i++ {
-		bs[i] = cmd[i]
-	}
-
+	copy(bs[:], cmd)
 	return bs
 }
 
@@ -67,20 +67,36 @@ func TopicToByteArray(cmd Topic) [Size]byte {
 func ByteArrayToTopic(cmd [Size]byte) Topic {
 	buf := []byte{}
 	for i := 0; i < Size; i++ {
-		if cmd[i] != 0 {
-			buf = append(buf, cmd[i])
+		if cmd[i] == 0 {
+			break
 		}
+		buf = append(buf, cmd[i])
 	}
-
 	return Topic(buf)
 }
 
+// Extract the topic by reading the first `topic.Size` bytes
 func Extract(p io.Reader) (Topic, error) {
 	var cmdBuf [Size]byte
 	if _, err := p.Read(cmdBuf[:]); err != nil {
 		return "", err
 	}
 
+	return ByteArrayToTopic(cmdBuf), nil
+}
+
+// Peek the topic without advancing the reader
+// Deprecated: Peek is several order of magnitude slower than Extract. Even if having to Tee read the whole buffer, Extract should be used
+func Peek(p io.Reader) (Topic, error) {
+	var cmdBuf [Size]byte
+	bf := bufio.NewReader(p)
+
+	topic, err := bf.Peek(Size)
+	if err != nil {
+		return "", err
+	}
+
+	copy(cmdBuf[:], topic)
 	return ByteArrayToTopic(cmdBuf), nil
 }
 

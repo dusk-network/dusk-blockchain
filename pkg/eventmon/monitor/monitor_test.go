@@ -1,131 +1,113 @@
 package monitor
 
-// import (
-// 	"bytes"
-// 	"fmt"
-// 	"math/big"
-// 	"net"
-// 	"testing"
-// 	"time"
+import (
+	"encoding/json"
+	"net"
+	"os"
+	"testing"
+	"time"
 
-// 	"github.com/bwesterb/go-ristretto"
-// 	"github.com/stretchr/testify/assert"
-// 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-// 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-// 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-// 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-// 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-// )
+	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
+)
 
-// const _shutdown = "__shutdown!!"
-// const _started = "__started!!"
+var _shutdown = struct{}{}
 
-// func TestClient(t *testing.T) {
-// 	endChan := make(chan struct{})
-// 	msgChan := spinSrv(endChan, ":1234")
-// 	initMsg := <-msgChan
-// 	assert.Equal(t, _started, initMsg)
-// 	inputChan, quitChan, conn := newClient(":1234")
-// 	inputChan <- "pippo"
+const unixSoc = "/tmp/dusk-socket"
 
-// 	received := <-msgChan
-// 	assert.Equal(t, "pippo\n", received)
-// 	shutdown(conn)
-// 	<-endChan
-// 	quitChan <- _empty
-// }
+func TestClient(t *testing.T) {
+	defer func() {
+		os.Remove(unixSoc)
+	}()
 
-// func TestInfo(t *testing.T) {
-// 	endChan := make(chan struct{})
-// 	round := uint64(2)
-// 	hash, _ := crypto.RandEntropy(32)
-// 	resChan := spinSrv(endChan, ":1233")
-// 	initMsg := <-resChan
-// 	assert.Equal(t, _started, initMsg)
-// 	bus := wire.NewEventBus()
-// 	d := ristretto.Scalar{}
-// 	d.SetBigInt(big.NewInt(100))
-// 	broker := LaunchMonitor(bus, ":1233", d)
-// 	consensus.UpdateRound(bus, round)
+	endChan := make(chan struct{})
+	msgChan := spinSrv(endChan, unixSoc)
+	// waiting for the server to be up and running
+	<-msgChan
 
-// 	<-time.After(1 * time.Second)
+	conn, err := net.Dial("unix", unixSoc)
+	assert.NoError(t, err)
 
-// 	keys := make([]*user.Keys, 2)
-// 	for i := 0; i < 2; i++ {
-// 		keys[i], _ = user.NewRandKeys()
-// 	}
-// 	agreement.PublishMock(bus, hash, round, 2, keys)
-// 	agreementMsg := <-resChan
-// 	consensus.UpdateRound(bus, round+1)
+	testMsg := mockAggro()
+	logProc := logger.New(conn, nil)
+	logProc.PublishRoundEvent(testMsg)
 
-// 	assert.Equal(t, "status:agreement\n", agreementMsg)
+	result := <-msgChan
 
-// 	// info := <-resChan
-// 	<-resChan
+	assert.Equal(t, "monitor", result["process"])
+	assert.Equal(t, float64(3), result["step"])
+	assert.Equal(t, float64(23), result["round"])
+	shutdown(conn)
+	<-endChan
+}
 
-// 	shutdown(broker.conn)
-// 	<-endChan
-// }
+func shutdown(conn net.Conn) {
+	if err := conn.Close(); err != nil {
+		panic(err)
+	}
+}
 
-// func shutdown(conn net.Conn) {
-// 	fmt.Fprint(conn, _shutdown)
-// 	if err := conn.Close(); err != nil {
-// 		panic(err)
-// 	}
-// }
+func mockAggro() []byte {
+	k1, _ := user.NewRandKeys()
+	k2, _ := user.NewRandKeys()
 
-// func spinSrv(endChan chan<- struct{}, addr string) <-chan string {
-// 	resChan := make(chan string)
+	blockHash, _ := crypto.RandEntropy(32)
+	aggro := agreement.MockAgreement(blockHash, uint64(23), uint8(3), []user.Keys{k1, k2})
+	return aggro.Bytes()
+}
 
-// 	server := newServer(addr)
-// 	go func() {
-// 		var err error
-// 		server.srv, err = net.Listen("tcp", server.addr)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 		resChan <- _started
-// 		conn, err := server.srv.Accept()
-// 		// notifying that the server can accept connections
-// 		for {
-// 			if err != nil {
-// 				panic(err)
-// 			}
-// 			if conn == nil {
-// 				panic("Connection is nil")
-// 			}
+func spinSrv(endChan chan<- struct{}, addr string) <-chan map[string]interface{} {
+	resChan := make(chan map[string]interface{})
 
-// 			defer conn.Close()
-// 			out := make([]byte, 1024)
-// 			if _, err := conn.Read(out); err == nil {
-// 				n := bytes.IndexByte(out, 0)
-// 				msg := string(out[:n])
-// 				if msg == _shutdown {
-// 					endChan <- _empty
-// 					return
-// 				}
-// 				resChan <- msg
+	server := newServer(addr)
+	go func() {
+		var err error
+		server.srv, err = net.Listen("unix", server.addr)
+		if err != nil {
+			panic(err)
+		}
+		resChan <- nil
+		conn, err := server.srv.Accept()
+		// notifying that the server can accept connections
+		if err != nil {
+			panic(err)
+		}
+		if conn == nil {
+			panic("Connection is nil")
+		}
 
-// 			} else {
-// 				panic("could not read from connection")
-// 			}
-// 		}
-// 	}()
-// 	return resChan
-// }
+		var msg map[string]interface{}
+		// we create a decoder that reads directly from the socket
+		d := json.NewDecoder(conn)
 
-// // server holds the structure of our TCP
-// // implementation.
-// type server struct {
-// 	addr string
-// 	srv  net.Listener
-// }
+		if err := d.Decode(&msg); err != nil {
+			panic(err)
+		}
 
-// func newServer(addr string) *server {
-// 	return &server{addr: addr}
-// }
+		resChan <- msg
+		time.AfterFunc(time.Second, func() {
+			endChan <- _shutdown
+			conn.Close()
+		})
+	}()
+	return resChan
+}
 
-// // Close shuts down the TCP Server
-// func (t *server) Close() (err error) {
-// 	return t.srv.Close()
-// }
+// server holds the structure of our TCP
+// implementation.
+type server struct {
+	addr string
+	srv  net.Listener
+}
+
+func newServer(addr string) *server {
+	return &server{addr: addr}
+}
+
+// Close shuts down the TCP Server
+func (t *server) Close() (err error) {
+	return t.srv.Close()
+}
