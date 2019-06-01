@@ -118,10 +118,12 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 		return nil, err
 	}
 
-	txs, err = transactions.FromReader2(&r, lTxs, txs)
+	mempoolTxs, err := transactions.FromReader(&r, lTxs)
 	if err != nil {
 		return nil, err
 	}
+
+	txs = append(txs, mempoolTxs...)
 
 	// TODO Append Provisioners rewards
 

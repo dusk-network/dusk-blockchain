@@ -167,7 +167,6 @@ func (c *Chain) Close() error {
 	log.Info("Close database")
 
 	drvr, err := database.From(cfg.Get().Database.Driver)
-
 	if err != nil {
 		return err
 	}

@@ -139,25 +139,10 @@ func TestGenerateBlock(t *testing.T) {
 		t.Fatalf("expecting candidate block to include all mempool txs plus the coinbase tx")
 	}
 
-	// Verify if block generator is capable of spending the constructed coinbase tx
-
 	coinbaseTx := candidateBlock.Txs[0].(*transactions.Coinbase)
 
-	var buf [32]byte
-	copy(buf[:], coinbaseTx.Rewards[0].DestKey[:])
-
-	var P ristretto.Point
-	_ = P.SetBytes(&buf)
-
-	var buf2 [32]byte
-	copy(buf2[:], coinbaseTx.R[:])
-
-	var R ristretto.Point
-	_ = R.SetBytes(&buf2)
-
-	_, canSpend := h.genWallet.DidReceiveTx(R, key.StealthAddress{P: P}, 0)
-
-	if !canSpend {
+	// Verify if block generator is capable of spending the constructed coinbase tx
+	if !canSpend(t, coinbaseTx, h) {
 		t.Fatalf("block generator cannot spend this coinbase reward output")
 	}
 
@@ -169,4 +154,22 @@ func TestGenerateBlock(t *testing.T) {
 	if !bytes.Equal(coinbaseTx.Score, score) {
 		t.Fatalf("expecting candidate block to store the proof value properly")
 	}
+}
+
+func canSpend(t *testing.T, tx *transactions.Coinbase, h *harness) bool {
+
+	var buf [32]byte
+	copy(buf[:], tx.Rewards[0].DestKey[:])
+
+	var P ristretto.Point
+	_ = P.SetBytes(&buf)
+
+	var buf2 [32]byte
+	copy(buf2[:], tx.R[:])
+
+	var R ristretto.Point
+	_ = R.SetBytes(&buf2)
+
+	_, spendable := h.genWallet.DidReceiveTx(R, key.StealthAddress{P: P}, 0)
+	return spendable
 }
