@@ -68,7 +68,7 @@ type transaction struct {
 //
 // It is assumed that StoreBlock would be called much less times than Fetch*
 // APIs. Based on that, extra indexing data is put to provide fast-read lookups
-func (t transaction) StoreBlock(block *block.Block) error {
+func (t transaction) StoreBlock(b *block.Block) error {
 
 	if t.batch == nil {
 		// t.batch is initialized only on a open, read-write transaction
@@ -76,8 +76,8 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		return errors.New("StoreBlock cannot be called on read-only transaction")
 	}
 
-	if len(block.Header.Hash) == 0 {
-		return fmt.Errorf("empty chain block hash")
+	if len(b.Header.Hash) != block.HeaderHashSize {
+		return fmt.Errorf("header hash size is %d but it must be %d", len(b.Header.Hash), block.HeaderHashSize)
 	}
 
 	// Schema Key = HeaderPrefix + block.header.hash
@@ -85,21 +85,21 @@ func (t transaction) StoreBlock(block *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := block.Header.Encode(blockHeaderFields); err != nil {
+	if err := b.Header.Encode(blockHeaderFields); err != nil {
 		return err
 	}
 
-	key := append(HeaderPrefix, block.Header.Hash...)
+	key := append(HeaderPrefix, b.Header.Hash...)
 	value := blockHeaderFields.Bytes()
 	t.put(key, value)
 
-	if len(block.Txs) > math.MaxUint32 {
+	if len(b.Txs) > math.MaxUint32 {
 		return errors.New("too many transactions")
 	}
 
 	// Put block transaction data. A KV pair per a single transaction is added
 	// into the store
-	for i, tx := range block.Txs {
+	for i, tx := range b.Txs {
 
 		txID, err := tx.CalculateHash()
 
@@ -118,7 +118,7 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		//
 		// For the retrival of transactions data by block.header.hash
 
-		key := append(TxPrefix, block.Header.Hash...)
+		key := append(TxPrefix, b.Header.Hash...)
 		key = append(key, txID...)
 		value, err := t.encodeBlockTx(tx, uint32(i))
 
@@ -135,7 +135,7 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		//
 		// For the retrival of a single transaction by TxId
 
-		t.put(append(TxIDPrefix, txID...), block.Header.Hash)
+		t.put(append(TxIDPrefix, txID...), b.Header.Hash)
 
 		// Schema
 		//
@@ -157,53 +157,15 @@ func (t transaction) StoreBlock(block *block.Block) error {
 	heightBuf := new(bytes.Buffer)
 
 	// Append height value
-	if err := t.writeUint64(heightBuf, block.Header.Height); err != nil {
+	if err := t.writeUint64(heightBuf, b.Header.Height); err != nil {
 		return err
 	}
 
 	key = append(HeightPrefix, heightBuf.Bytes()...)
-	value = block.Header.Hash
+	value = b.Header.Hash
 	t.put(key, value)
 
 	return nil
-}
-
-// StoreCandidateBlock stores a candidate block to be proposed in next consensus
-// round Always overwrites lastly stored candidate block
-func (t transaction) StoreCandidateBlock(block *block.Block) error {
-
-	// Schema Key = CandidateBlockPrefix
-	//
-	// Value = block.Encoded()
-
-	buf := new(bytes.Buffer)
-	if err := block.Encode(buf); err != nil {
-		return err
-	}
-
-	t.put(CandidateBlockPrefix, buf.Bytes())
-
-	return nil
-}
-
-// FetchCandidateBlock Fetch lastly stored candidate block
-func (t transaction) FetchCandidateBlock() (*block.Block, error) {
-
-	value, err := t.snapshot.Get(CandidateBlockPrefix, nil)
-	if err != nil {
-		if err == leveldb.ErrNotFound {
-			// overwrite error message
-			err = database.ErrBlockNotFound
-		}
-		return nil, err
-	}
-
-	b := new(block.Block)
-	if err := b.Decode(bytes.NewReader(value)); err != nil {
-		return nil, err
-	}
-
-	return b, nil
 }
 
 // encodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
@@ -547,4 +509,97 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	}
 
 	return true, txID, nil
+}
+
+// StoreCandidateBlock stores a candidate block to be proposed in next consensus
+// round. it overwrites an entry of block with same height
+func (t transaction) StoreCandidateBlock(b *block.Block) error {
+
+	// Schema Key = CandidateBlockPrefix + block.header.Hash + block.header.height
+	//
+	// Value = block.Encoded()
+
+	// Append height value
+	heightBuf := new(bytes.Buffer)
+	if err := t.writeUint64(heightBuf, b.Header.Height); err != nil {
+		return err
+	}
+
+	if heightBuf.Len() != block.HeightSize {
+		panic("invalid height buffer")
+	}
+
+	key := append(CandidateBlockPrefix, b.Header.Hash...)
+	key = append(key, heightBuf.Bytes()...)
+
+	buf := new(bytes.Buffer)
+	if err := b.Encode(buf); err != nil {
+		return err
+	}
+
+	t.put(key, buf.Bytes())
+
+	return nil
+}
+
+// FetchCandidateBlock fetches a candidate block by hash
+func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
+
+	// Fetch all stored candidate blocks
+	scanFilter := append(CandidateBlockPrefix, hash...)
+
+	// as the key is composed of CandidateBlockPrefix + blockHash + blockHeight,
+	// here it's needed to use a search by prefix
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
+	defer iterator.Release()
+
+	if iterator.First() {
+		b := block.Block{}
+		if err := b.Decode(bytes.NewReader(iterator.Value())); err != nil {
+			return nil, err
+		}
+
+		return &b, nil
+	}
+
+	return nil, database.ErrBlockNotFound
+}
+
+// DeleteCandidateBlocks deletes all candidate blocks if maxHeight is not 0, it
+// deletes only blocks with a height lower than maxHeight or equal.
+// Returns number of deleted candidate blocks
+func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
+
+	// Fetch all stored candidate blocks
+	scanFilter := append(CandidateBlockPrefix)
+
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
+	defer iterator.Release()
+
+	var count uint32
+	for iterator.Next() {
+
+		// Extract height from the key to avoid the need of block decoding
+		if maxHeight != 0 {
+			reader := bytes.NewReader(iterator.Key())
+			buf := make([]byte, block.HeightSize)
+
+			offset := int64(len(scanFilter) + block.HeaderHashSize)
+			if _, err := reader.ReadAt(buf[:], offset); err != nil {
+				return count, fmt.Errorf("malformed height data: %s", err.Error())
+			}
+
+			height := byteOrder.Uint64(buf[:])
+
+			if height <= maxHeight {
+				t.batch.Delete(iterator.Key())
+				count++
+			}
+		} else {
+			t.batch.Delete(iterator.Key())
+			count++
+		}
+	}
+
+	return count, nil
 }

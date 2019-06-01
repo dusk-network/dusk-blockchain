@@ -9,17 +9,12 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
 type (
@@ -34,29 +29,15 @@ type (
 		// generator Public Keys to sign the rewards tx
 		genPubKey *key.PublicKey
 
-		db     database.DB
-		rpcBus *wire.RPCBus
-
+		rpcBus    *wire.RPCBus
 		prevBlock block.Block
 	}
 )
 
 func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGenerator {
 
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		panic(err)
-	}
-
-	// TODO: Consider closing this db connection on-time
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-	if err != nil {
-		panic(err)
-	}
-
 	return &blockGenerator{
 		rpcBus:    rpcBus,
-		db:        db,
 		genPubKey: genPubKey,
 		prevBlock: *block.NewBlock(),
 	}
@@ -106,24 +87,6 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 
 	// Generate the block hash
 	if err := candidateBlock.SetHash(); err != nil {
-		return nil, err
-	}
-
-	// Ensure the forged block satisfies all chain rules
-	if err := verifiers.CheckBlock(bg.db, bg.prevBlock, *candidateBlock); err != nil {
-		return nil, err
-	}
-
-	// Save it into persistent storage
-	err = bg.db.Update(func(t database.Transaction) error {
-		err := t.StoreCandidateBlock(candidateBlock)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-
-	if err != nil {
 		return nil, err
 	}
 

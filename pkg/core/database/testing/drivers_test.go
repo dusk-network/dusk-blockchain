@@ -190,59 +190,6 @@ func TestFetchBlockExists(test *testing.T) {
 		return nil
 	})
 }
-
-func TestFetchCandidateBlock(test *testing.T) {
-
-	// Generate additional blocks to store
-	candidateBlock, err := generateBlocks(test, 1)
-	if err != nil {
-		test.Fatal(err.Error())
-	}
-
-	err = db.Update(func(t database.Transaction) error {
-		err := t.StoreCandidateBlock(candidateBlock[0])
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err.Error())
-	}
-
-	// Fetch the candidate block
-	var b *block.Block
-	err = db.View(func(t database.Transaction) error {
-		b, err = t.FetchCandidateBlock()
-		return err
-	})
-
-	if err != nil {
-		test.Fatal(err.Error())
-	}
-
-	// Get bytes of the excepcted block
-	expectedBlock := new(bytes.Buffer)
-	_ = candidateBlock[0].Encode(expectedBlock)
-
-	if len(expectedBlock.Bytes()) == 0 {
-		test.Fatal("Empty expected block fetched")
-	}
-
-	// Get bytes of the fetched block
-	fetchedBlock := new(bytes.Buffer)
-	_ = b.Encode(fetchedBlock)
-
-	if len(fetchedBlock.Bytes()) == 0 {
-		test.Fatal("Empty fetched block fetched")
-	}
-
-	if !bytes.Equal(expectedBlock.Bytes(), fetchedBlock.Bytes()) {
-		test.Fatal("candidate block not retrieved properly from storage")
-	}
-}
 func TestFetchBlockHeader(test *testing.T) {
 
 	test.Parallel()
@@ -771,4 +718,142 @@ func _TestPersistence() int {
 	fmt.Printf("--- PASS: TestPersistence\n")
 
 	return 0
+}
+
+func TestFetchCandidateBlock(test *testing.T) {
+
+	// Generate additional blocks to store
+	candidateBlocks, err := generateBlocks(test, 3)
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	err = db.Update(func(t database.Transaction) error {
+		for _, b := range candidateBlocks {
+			err := t.StoreCandidateBlock(b)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	// Fetch the candidate block
+	err = db.View(func(t database.Transaction) error {
+
+		for _, b := range candidateBlocks {
+			fetched, err := t.FetchCandidateBlock(b.Header.Hash)
+			if err != nil {
+				return err
+			}
+
+			// compare with the already stored blocks
+			expectedBuf := new(bytes.Buffer)
+			_ = b.Encode(expectedBuf)
+
+			if len(expectedBuf.Bytes()) == 0 {
+				test.Fatal("Empty expected buffer")
+			}
+
+			// Get bytes of the fetched block
+			fetchedBuf := new(bytes.Buffer)
+			_ = fetched.Encode(fetchedBuf)
+
+			if len(fetchedBuf.Bytes()) == 0 {
+				test.Fatal("Empty fetched buffer")
+			}
+
+			if !bytes.Equal(expectedBuf.Bytes(), fetchedBuf.Bytes()) {
+				test.Fatal("candidate block not retrieved properly from storage")
+			}
+		}
+
+		return nil
+
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+}
+
+func TestDeleteCandidateBlocks(test *testing.T) {
+
+	// Generate additional blocks to store
+	candidateBlocks, err := generateBlocks(test, 3)
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	// Tamper heights
+	var counter uint64
+	for _, b := range candidateBlocks {
+		counter++
+		b.Header.Height = counter
+	}
+
+	// Store all candidate blocks
+	err = db.Update(func(t database.Transaction) error {
+		for _, b := range candidateBlocks {
+			err := t.StoreCandidateBlock(b)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	// Delete any stored candidate block equal_to/lower than height 2
+	err = db.Update(func(t database.Transaction) error {
+		count, err := t.DeleteCandidateBlocks(2)
+		if err != nil {
+			return err
+		}
+
+		if count != 2 {
+			test.Fatal("expecting 2 candidate blocks deleted")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
+
+	// Ensure candidate blocks with heights 1 and 2 were deleted but block height 3 not
+	err = db.Update(func(t database.Transaction) error {
+
+		_, err := t.FetchCandidateBlock(candidateBlocks[0].Header.Hash)
+		if err != database.ErrBlockNotFound {
+			test.Fatal("expecting the candidate block 0 deleted")
+		}
+
+		_, err = t.FetchCandidateBlock(candidateBlocks[1].Header.Hash)
+		if err != database.ErrBlockNotFound {
+			test.Fatal("expecting the candidate block 1 deleted")
+		}
+
+		_, err = t.FetchCandidateBlock(candidateBlocks[2].Header.Hash)
+		if err != nil {
+			test.Fatal("expecting the candidate block 2 NOT deleted")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
 }

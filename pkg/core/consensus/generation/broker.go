@@ -59,7 +59,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		bidListChan:       bidListChan,
 		regenerationChan:  regenerationChan,
 		acceptedBlockChan: acceptedBlockChan,
-		forwarder:         newForwarder(eventBroker, blockGen),
+		forwarder:         newForwarder(eventBroker, blockGen, rpcBus),
 		seeder:            &seeder{},
 	}
 }

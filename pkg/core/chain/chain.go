@@ -7,10 +7,10 @@ import (
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
+	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"github.com/bwesterb/go-ristretto"
-	log "github.com/sirupsen/logrus"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -25,6 +25,8 @@ import (
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
+var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
+
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
@@ -36,7 +38,9 @@ type Chain struct {
 	bidList   *user.BidList
 
 	// collector channels
-	blockChan <-chan *block.Block
+	blockChan       <-chan *block.Block
+	candidateChan   <-chan *block.Block
+	winningHashChan <-chan []byte
 }
 
 // New returns a new chain object
@@ -69,15 +73,19 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	}
 
 	// set up collectors
-	blockChannel := initBlockCollector(eventBus)
+	blockChan := initBlockCollector(eventBus, string(topics.Block))
+	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
+	winningHashChan := initWinningHashCollector(eventBus)
 
 	c := &Chain{
-		eventBus:  eventBus,
-		rpcBus:    rpcBus,
-		db:        db,
-		bidList:   &user.BidList{},
-		prevBlock: *genesisBlock,
-		blockChan: blockChannel,
+		eventBus:        eventBus,
+		rpcBus:          rpcBus,
+		db:              db,
+		bidList:         &user.BidList{},
+		prevBlock:       *genesisBlock,
+		blockChan:       blockChan,
+		candidateChan:   candidateChan,
+		winningHashChan: winningHashChan,
 	}
 
 	return c, nil
@@ -87,8 +95,16 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 func (c *Chain) Listen() {
 	for {
 		select {
-		case blk := <-c.blockChan:
-			c.AcceptBlock(*blk)
+
+		// wire.EventBus events handlers
+		case b := <-c.blockChan:
+			_ = c.AcceptBlock(*b)
+		case b := <-c.candidateChan:
+			_ = c.handleCandidateBlock(*b)
+		case blockHash := <-c.winningHashChan:
+			_ = c.handleWinningHash(blockHash)
+
+		// wire.RPCBus requests handlers
 		case r := <-wire.GetLastBlockChan:
 			buf := new(bytes.Buffer)
 			_ = c.prevBlock.Encode(buf)
@@ -148,9 +164,7 @@ func (c *Chain) propagateBidList() {
 
 func (c *Chain) Close() error {
 
-	log.WithFields(log.Fields{
-		"process": "chain",
-	}).Info("Close database")
+	log.Info("Close database")
 
 	drvr, err := database.From(cfg.Get().Database.Driver)
 
@@ -190,17 +204,24 @@ func calculateX(d uint64, m []byte) user.Bid {
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
 
+	field := logger.Fields{"process": "accept block"}
+	l := log.WithFields(field)
+
+	l.Trace("procedure started")
+
 	// 1. Check that stateless and stateful checks pass
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
+		l.Errorf("verification failed: %s", err.Error())
 		return err
 	}
 
-	// 2. Save block in database
+	// 2. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&blk)
 	})
 
 	if err != nil {
+		l.Errorf("block storing failed: %s", err.Error())
 		return err
 	}
 
@@ -212,6 +233,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// consensus.generation.broker
 	buf := new(bytes.Buffer)
 	if err := blk.Encode(buf); err != nil {
+		l.Errorf("block encoding failed: %s", err.Error())
 		return err
 	}
 
@@ -219,8 +241,72 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 4. Gossip block
 	if err := c.propagateBlock(blk); err != nil {
+		l.Errorf("block propagating failed: %s", err.Error())
+		return err
+	}
+
+	// 5. Cleanup obsolete candidate blocks
+	var count uint32
+	err = c.db.Update(func(t database.Transaction) error {
+		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
+		return err
+	})
+
+	if err != nil {
+		// Not critical enough to abort the accepting procedure
+		log.Warnf("DeleteCandidateBlocks failed with an error: %s", err.Error())
+	} else {
+		log.Infof("%d deleted candidate blocks", count)
+	}
+
+	l.Trace("procedure ended")
+
+	return nil
+}
+
+func (c *Chain) handleCandidateBlock(candidate block.Block) error {
+
+	// Ensure the candidate block satisfies all chain rules
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
+		log.Errorf("verifying the candidate block failed: %s", err.Error())
+		return err
+	}
+
+	// Save it into persistent storage
+	err := c.db.Update(func(t database.Transaction) error {
+		err := t.StoreCandidateBlock(&candidate)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Errorf("storing the candidate block failed: %s", err.Error())
 		return err
 	}
 
 	return nil
+}
+
+func (c *Chain) handleWinningHash(blockHash []byte) error {
+
+	// Fetch the candidate block that the winningHash points at
+	var candidate *block.Block
+	err := c.db.View(func(t database.Transaction) error {
+		var err error
+		candidate, err = t.FetchCandidateBlock(blockHash)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Errorf("fetching a candidate block failed: %s", err.Error())
+		return err
+	}
+
+	// Run the general procedure of block accepting
+	return c.AcceptBlock(*candidate)
 }
