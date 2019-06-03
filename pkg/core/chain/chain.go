@@ -162,6 +162,7 @@ func (c *Chain) propagateBidList() {
 }
 
 func (c *Chain) Close() error {
+
 	log.Info("Close database")
 
 	drvr, err := database.From(cfg.Get().Database.Driver)
@@ -213,7 +214,11 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 2. Store block in database
-	if err := c.storeBlock(blk); err != nil {
+	err := c.db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(&blk)
+	})
+
+	if err != nil {
 		l.Errorf("block storing failed: %s", err.Error())
 		return err
 	}
@@ -239,13 +244,19 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 5. Cleanup obsolete candidate blocks
-	count, err := c.deleteCandidateBlocks(blk)
+	var count uint32
+	err = c.db.Update(func(t database.Transaction) error {
+		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
+		return err
+	})
+
 	if err != nil {
 		// Not critical enough to abort the accepting procedure
 		log.Warnf("DeleteCandidateBlocks failed with an error: %s", err.Error())
+	} else {
+		log.Infof("%d deleted candidate blocks", count)
 	}
 
-	log.Infof("%d deleted candidate blocks", count)
 	l.Trace("procedure ended")
 
 	return nil
@@ -259,7 +270,15 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	}
 
 	// Save it into persistent storage
-	if err := c.storeCandidateBlock(candidate); err != nil {
+	err := c.db.Update(func(t database.Transaction) error {
+		err := t.StoreCandidateBlock(&candidate)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
 		log.Errorf("storing the candidate block failed: %s", err.Error())
 		return err
 	}
@@ -269,7 +288,16 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 
 func (c *Chain) handleWinningHash(blockHash []byte) error {
 	// Fetch the candidate block that the winningHash points at
-	candidate, err := c.fetchCandidateBlock(blockHash)
+	var candidate *block.Block
+	err := c.db.View(func(t database.Transaction) error {
+		var err error
+		candidate, err = t.FetchCandidateBlock(blockHash)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
 	if err != nil {
 		log.Errorf("fetching a candidate block failed: %s", err.Error())
 		return err
@@ -277,34 +305,4 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 
 	// Run the general procedure of block accepting
 	return c.AcceptBlock(*candidate)
-}
-
-func (c *Chain) storeBlock(blk block.Block) error {
-	return c.db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(&blk)
-	})
-}
-
-func (c *Chain) storeCandidateBlock(candidate block.Block) error {
-	return c.db.Update(func(t database.Transaction) error {
-		return t.StoreCandidateBlock(&candidate)
-	})
-}
-
-func (c *Chain) deleteCandidateBlocks(blk block.Block) (count uint32, err error) {
-	err = c.db.Update(func(t database.Transaction) error {
-		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
-		return err
-	})
-
-	return
-}
-
-func (c *Chain) fetchCandidateBlock(blockHash []byte) (candidate *block.Block, err error) {
-	err = c.db.View(func(t database.Transaction) error {
-		candidate, err = t.FetchCandidateBlock(blockHash)
-		return err
-	})
-
-	return
 }
