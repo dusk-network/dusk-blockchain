@@ -56,20 +56,18 @@ func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.B
 func (s *ChainSynchronizer) listen() {
 	for {
 		blk := <-s.acceptedBlockChan
-		s.lock.Lock()
-		s.latestHeader = blk.Header
-		s.lock.Unlock()
+		s.setLatestHeader(blk.Header)
 	}
 }
 
 func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn) error {
-	msg := createGetBlocksMsg(s.getCurrentHash())
+	msg := createGetBlocksMsg(s.currentHash())
 	return s.sendGetBlocksMsg(msg, conn)
 }
 
 func (s *ChainSynchronizer) isNext(b *bytes.Buffer) bool {
 	height := peekBlockHeight(b)
-	currentHeight := s.getCurrentHeight()
+	currentHeight := s.currentHeight()
 	return height-currentHeight <= 1
 }
 
@@ -114,13 +112,19 @@ func peekBlockHeight(buf *bytes.Buffer) uint64 {
 	return binary.LittleEndian.Uint64(bytes[9:17])
 }
 
-func (s *ChainSynchronizer) getCurrentHeight() uint64 {
+func (s *ChainSynchronizer) setLatestHeader(header *block.Header) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.latestHeader = header
+}
+
+func (s *ChainSynchronizer) currentHeight() uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.latestHeader.Height
 }
 
-func (s *ChainSynchronizer) getCurrentHash() []byte {
+func (s *ChainSynchronizer) currentHash() []byte {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.latestHeader.Hash
