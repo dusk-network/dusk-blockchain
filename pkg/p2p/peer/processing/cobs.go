@@ -1,4 +1,4 @@
-package peer
+package processing
 
 import "bytes"
 

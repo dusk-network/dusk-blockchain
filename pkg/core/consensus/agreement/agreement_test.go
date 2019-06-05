@@ -15,7 +15,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -88,7 +88,7 @@ func TestSendAgreement(t *testing.T) {
 
 	streamer := helper.NewSimpleStreamer()
 	eb.SubscribeStream(string(topics.Gossip), streamer)
-	eb.RegisterPreprocessor(string(topics.Gossip), peer.NewGossip(protocol.TestNet))
+	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 
 	// Initiate the sending of an agreement message
 	hash, _ := crypto.RandEntropy(32)

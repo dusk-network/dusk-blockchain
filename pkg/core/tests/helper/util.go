@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -73,7 +73,7 @@ func (ms *SimpleStreamer) Read() ([]byte, error) {
 		return nil, err
 	}
 
-	decoded := peer.Decode(buf)
+	decoded := processing.Decode(buf)
 
 	// read and discard the magic
 	magicBuf := make([]byte, 4)
@@ -113,7 +113,7 @@ func (ms *SimpleStreamer) Close() error {
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 	eb := wire.NewEventBus()
-	eb.RegisterPreprocessor(string(topics.Gossip), peer.NewGossip(protocol.TestNet))
+	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 	// subscribe to gossip topic
 	streamer := NewSimpleStreamer()
 	eb.SubscribeStream(string(topics.Gossip), streamer)
