@@ -10,6 +10,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -43,17 +45,21 @@ func TestScanner(t *testing.T) {
 	}
 	defer conn.Close()
 
-	peerReader := peer.NewReader(conn, protocol.TestNet)
-	collector := &mockCollector{t}
+	dupeMap := dupemap.NewDupeMap(5)
+	eb := wire.NewEventBus()
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, dupeMap, eb, &mockSynchronizer{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// This should block until the connection is closed, which should happen after
 	// two and a half seconds.
-	peerReader.ReadLoop(collector)
+	peerReader.ReadLoop()
 }
 
 func TestWriter(t *testing.T) {
 	bus := wire.NewEventBus()
-	g := peer.NewGossip(protocol.TestNet)
+	g := processing.NewGossip(protocol.TestNet)
 	bus.RegisterPreprocessor(string(topics.Gossip), g)
 
 	receiveFn := func(c net.Conn, doneChan chan struct{}, outboundChan chan struct{}) {
@@ -84,7 +90,7 @@ func TestWriter(t *testing.T) {
 
 func BenchmarkWriter(b *testing.B) {
 	bus := wire.NewEventBus()
-	g := peer.NewGossip(protocol.TestNet)
+	g := processing.NewGossip(protocol.TestNet)
 	bus.RegisterPreprocessor(string(topics.Gossip), g)
 
 	receiveFn := func(c net.Conn, doneChan chan struct{}, outboundChan chan struct{}) {
@@ -151,7 +157,7 @@ func addPeer(bus *wire.EventBus) {
 	}
 
 	pw := peer.NewWriter(conn, protocol.TestNet, bus)
-	pw.Subscribe()
+	pw.Subscribe(bus)
 }
 
 type mockCollector struct {
@@ -161,4 +167,11 @@ type mockCollector struct {
 func (m *mockCollector) Collect(b *bytes.Buffer) error {
 	assert.NotEmpty(m.t, b)
 	return nil
+}
+
+type mockSynchronizer struct {
+}
+
+func (m *mockSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.Buffer) {
+	return
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 
@@ -61,7 +62,7 @@ func (p *Connection) writeLocalMsgVersion() error {
 		return err
 	}
 
-	encodedMsg := Encode(fullMsg).Bytes()
+	encodedMsg := processing.Encode(fullMsg).Bytes()
 	_, err = p.Conn.Write(encodedMsg)
 	return err
 }
@@ -72,7 +73,7 @@ func (p *Connection) readRemoteMsgVersion() error {
 		return err
 	}
 
-	decodedMsg := Decode(msgBytes)
+	decodedMsg := processing.Decode(msgBytes)
 	magic := extractMagic(decodedMsg)
 	if magic != p.magic {
 		return errors.New("magic mismatch")
@@ -116,7 +117,7 @@ func (p *Connection) readVerAck() error {
 		return err
 	}
 
-	decodedMsg := Decode(msgBytes)
+	decodedMsg := processing.Decode(msgBytes)
 	magic := extractMagic(decodedMsg)
 	if magic != p.magic {
 		return errors.New("magic mismatch")
@@ -137,7 +138,7 @@ func (p *Connection) writeVerAck() error {
 		return err
 	}
 
-	encodedMsg := Encode(verAckMsg)
+	encodedMsg := processing.Encode(verAckMsg)
 	if _, err := p.Conn.Write(encodedMsg.Bytes()); err != nil {
 		return err
 	}
