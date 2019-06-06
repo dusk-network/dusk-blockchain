@@ -8,22 +8,42 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+)
+
+// Make sure LogProcessor implements the logrus.Hook interface
+var _ log.Hook = (*LogProcessor)(nil)
+
+// Make sure LogProcessor implements the TopicProcessor interface
+var _ wire.TopicProcessor = (*LogProcessor)(nil)
+
+const MonitorTopic = "monitor_topic"
+
+const (
+	ErrWriter byte = iota
+	ErrLog
+	ErrOther
 )
 
 // LogProcessor is a TopicProcessor that intercepts messages on the gossip to create statistics and push the to the monitoring process
 // It creates a new instance of logrus and writes on a io.Writer (preferrably UNIX sockets but any kind of connection will do)
-type LogProcessor struct {
-	*log.Entry
-	lastInfo *blockInfo
-}
+type (
+	LogProcessor struct {
+		*log.Logger
+		entry    *log.Entry
+		lastInfo *blockInfo
+		p        wire.EventPublisher
+		active   bool
+	}
 
-type blockInfo struct {
-	time.Time
-	*agreement.Agreement
-}
+	blockInfo struct {
+		time.Time
+		*agreement.Agreement
+	}
+)
 
-func New(w io.Writer, formatter log.Formatter) *LogProcessor {
+func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogProcessor {
 	logger := log.New()
 	logger.Out = w
 	if formatter == nil {
@@ -32,9 +52,48 @@ func New(w io.Writer, formatter log.Formatter) *LogProcessor {
 	entry := logger.WithFields(log.Fields{
 		"process": "monitor",
 	})
-	return &LogProcessor{Entry: entry}
+	return &LogProcessor{
+		p:      p,
+		entry:  entry,
+		Logger: logger,
+		active: true,
+	}
 }
 
+func (l *LogProcessor) Wire(w io.WriteCloser) {
+	l.active = true
+	_ = l.Close()
+	l.Out = w
+}
+
+func (l *LogProcessor) Close() error {
+	l.active = false
+	return l.Out.(io.WriteCloser).Close()
+}
+
+func (l *LogProcessor) Levels() []log.Level {
+	return []log.Level{
+		// log.WarnLevel,
+		log.ErrorLevel,
+		log.FatalLevel,
+		log.PanicLevel,
+	}
+}
+
+func (l *LogProcessor) Fire(entry *log.Entry) error {
+	formatted, err := l.Formatter.Format(entry)
+	if err != nil {
+		return err
+	}
+
+	if _, err = l.Out.Write(formatted); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Process creates a copy of the message, checks the topic header
 func (l *LogProcessor) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	var newBuf bytes.Buffer
 	r := io.TeeReader(buf, &newBuf)
@@ -44,20 +103,25 @@ func (l *LogProcessor) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	if topic == topics.Agreement {
-		aggro, err := ioutil.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
+	aggro, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
 
+	if topic == topics.Agreement {
 		go l.PublishRoundEvent(aggro)
 	}
 
 	return &newBuf, nil
 }
 
+func (l *LogProcessor) ReportError(err byte) {
+	b := bytes.NewBuffer([]byte{err})
+	l.p.Publish(MonitorTopic, b)
+}
+
 func (l *LogProcessor) WithTime(fields log.Fields) *log.Entry {
-	entry := l.WithField("time", time.Now())
+	entry := l.entry.WithField("time", time.Now())
 	if fields == nil {
 		return entry
 	}
