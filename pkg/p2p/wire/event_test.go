@@ -34,7 +34,7 @@ func TestProcessor(t *testing.T) {
 	resultChan := make(chan *bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 
-	bus.RegisterPreprocessor(topic, &pippoAdder{}, &pippoAdder{})
+	ids := bus.RegisterPreprocessor(topic, &pippoAdder{}, &pippoAdder{})
 	go NewTopicListener(bus, collector, topic).Accept()
 
 	expected := bytes.NewBufferString("pippopippo")
@@ -43,8 +43,29 @@ func TestProcessor(t *testing.T) {
 
 	result1 := <-resultChan
 	result2 := <-resultChan
-	require.Equal(t, result1, expected)
-	require.Equal(t, result2, expected)
+	assert.Equal(t, expected, result1)
+	assert.Equal(t, expected, result2)
+
+	// testing RemoveProcessor
+	bus.RemovePreprocessor(topic, ids[0])
+
+	expected = bytes.NewBufferString("pippo")
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res := <-resultChan
+	assert.Equal(t, expected, res)
+
+	// removing the same preprocessor does not yield any different result
+	bus.RemovePreprocessor(topic, ids[0])
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
+
+	// removing the other one
+	bus.RemovePreprocessor(topic, ids[1])
+	expected = bytes.NewBufferString("")
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
 }
 
 func TestAddTopic(t *testing.T) {

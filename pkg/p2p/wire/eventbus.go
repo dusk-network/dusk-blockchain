@@ -11,6 +11,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/ring"
 )
 
+var _ EventBroker = (*EventBus)(nil)
+
 var ringBufferLength = 200
 var napTime = 10 * time.Millisecond
 var _signal struct{}
@@ -21,7 +23,7 @@ type EventBus struct {
 	handlers         map[string][]*channelHandler
 	callbackHandlers map[string][]*callbackHandler
 	streamHandlers   map[string][]*streamHandler
-	preprocessors    map[string][]TopicProcessor
+	preprocessors    map[string][]idTopicProcessor
 	ringbuffer       *ring.Buffer
 }
 
@@ -41,6 +43,11 @@ type channelHandler struct {
 	messageChannel chan<- *bytes.Buffer
 }
 
+type idTopicProcessor struct {
+	TopicProcessor
+	id uint32
+}
+
 // NewEventBus returns new EventBus with empty handlers.
 func NewEventBus() *EventBus {
 	return &EventBus{
@@ -48,7 +55,7 @@ func NewEventBus() *EventBus {
 		make(map[string][]*channelHandler),
 		make(map[string][]*callbackHandler),
 		make(map[string][]*streamHandler),
-		make(map[string][]TopicProcessor),
+		make(map[string][]idTopicProcessor),
 		ring.NewBuffer(ringBufferLength),
 	}
 }
@@ -182,10 +189,43 @@ func (bus *EventBus) unsubscribe(topic string, id uint32) bool {
 }
 
 // RegisterPreprocessor will add a set of preprocessors to a specified topic.
-func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicProcessor) {
+func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicProcessor) []uint32 {
+	pproc := make([]idTopicProcessor, len(preprocessors))
+	pprocIds := make([]uint32, len(preprocessors))
+	for i := 0; i < len(preprocessors); i++ {
+		id := rand.Uint32()
+		pprocIds[i] = id
+		pproc[i] = idTopicProcessor{
+			TopicProcessor: preprocessors[i],
+			id:             id,
+		}
+	}
+
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
-	bus.preprocessors[topic] = preprocessors
+	if _, ok := bus.preprocessors[topic]; ok {
+		bus.preprocessors[topic] = append(bus.preprocessors[topic], pproc...)
+		bus.busLock.Unlock()
+		return pprocIds
+	}
+
+	bus.preprocessors[topic] = pproc
+	return pprocIds
+}
+
+func (bus *EventBus) RemovePreprocessor(topic string, id uint32) {
+	bus.busLock.Lock()
+	defer bus.busLock.Unlock()
+	if pprocs, ok := bus.preprocessors[topic]; ok {
+		for idx, preproc := range pprocs {
+			if preproc.id == id {
+				// remove the item
+				pprocs = append(pprocs[:idx], pprocs[idx+1:]...)
+				bus.preprocessors[topic] = pprocs
+				return
+			}
+		}
+	}
 }
 
 func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) *bytes.Buffer {

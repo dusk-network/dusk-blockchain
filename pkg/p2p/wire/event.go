@@ -85,7 +85,8 @@ type (
 		SubscribeCallback(string, func(*bytes.Buffer) error) uint32
 		SubscribeStream(string, io.WriteCloser) uint32
 		Unsubscribe(string, uint32) bool
-		RegisterPreprocessor(string, ...TopicProcessor)
+		RegisterPreprocessor(string, ...TopicProcessor) []uint32
+		RemovePreprocessor(string, uint32)
 	}
 
 	// EventPublisher publishes serialized messages on a specific topic
