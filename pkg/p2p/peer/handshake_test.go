@@ -41,7 +41,10 @@ func TestHandshake(t *testing.T) {
 
 	eb := wire.NewEventBus()
 	go func() {
-		pr := helper.StartPeerReader(eb, &mockSynchronizer{}, port)
+		pr, err := helper.StartPeerReader(eb, &mockSynchronizer{}, port)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if err := pr.Handshake(); err != nil {
 			t.Fatal(err)
 		}

@@ -18,7 +18,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-var port = "5000"
+var port = "8000"
 
 func mockConfig(t *testing.T) func() {
 	storeDir, err := ioutil.TempDir(os.TempDir(), "chain_test")
@@ -117,7 +117,10 @@ func setUpSynchronizerTest(t *testing.T) *wire.EventBus {
 
 	// Set up a peer reader and send it a block that is a few rounds ahead
 	go func() {
-		peerReader := helper.StartPeerReader(eb, cs, port)
+		peerReader, err := helper.StartPeerReader(eb, cs, port)
+		if err != nil {
+			t.Fatal(err)
+		}
 		peerReader.ReadLoop()
 	}()
 

@@ -125,23 +125,19 @@ func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 	return eb, streamer
 }
 
-func StartPeerReader(bus *wire.EventBus, synchronizer chainsync.Synchronizer, port string) *peer.Reader {
+func StartPeerReader(bus *wire.EventBus, synchronizer chainsync.Synchronizer,
+	port string) (*peer.Reader, error) {
 	l, err := net.Listen("tcp", ":"+port)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	defer l.Close()
 
 	conn, err := l.Accept()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	dupeMap := dupemap.NewDupeMap(5)
-	pw, err := peer.NewReader(conn, protocol.TestNet, dupeMap, bus, synchronizer)
-	if err != nil {
-		panic(err)
-	}
-
-	return pw
+	return peer.NewReader(conn, protocol.TestNet, dupeMap, bus, synchronizer)
 }
