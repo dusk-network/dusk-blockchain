@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -35,9 +36,9 @@ type ChainSynchronizer struct {
 
 func newChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *ChainSynchronizer {
 	return &ChainSynchronizer{
-		publisher: eventBroker,
-		gossip:    processing.NewGossip(magic),
-		// acceptedBlockChan: consensus.InitAcceptedBlockUpdate(eventBroker),
+		publisher:         eventBroker,
+		gossip:            processing.NewGossip(magic),
+		acceptedBlockChan: consensus.InitAcceptedBlockUpdate(eventBroker),
 	}
 }
 
@@ -102,14 +103,14 @@ func (s *ChainSynchronizer) sendGetBlocksMsg(msg *peermsg.GetBlocks, conn net.Co
 func peekBlockHeight(buf *bytes.Buffer) uint64 {
 	r := bufio.NewReader(buf)
 
-	// The block height is a little-endian uint64, starting at index 9 of the buffer
-	// It is preceded by the version (1 byte) and the timestamp (8 bytes)
-	bytes, err := r.Peek(17)
+	// The block height is a little-endian uint64, starting at index 1 of the buffer
+	// It is preceded by the version (1 byte)
+	bytes, err := r.Peek(9)
 	if err != nil {
 		panic(err)
 	}
 
-	return binary.LittleEndian.Uint64(bytes[9:17])
+	return binary.LittleEndian.Uint64(bytes[1:9])
 }
 
 func (s *ChainSynchronizer) setLatestHeader(header *block.Header) {
