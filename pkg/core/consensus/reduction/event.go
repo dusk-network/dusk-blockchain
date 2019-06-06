@@ -154,8 +154,7 @@ func Sign(e *Reduction, keys user.Keys) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	edPubKeyBuf := new(bytes.Buffer)
-	if err := encoding.Write512(edPubKeyBuf, signature); err != nil {
+	if err := encoding.Write256(signed, keys.EdPubKeyBytes); err != nil {
 		return nil, err
 	}
 
