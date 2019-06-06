@@ -18,6 +18,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+var port = "5000"
+
 func mockConfig(t *testing.T) func() {
 	storeDir, err := ioutil.TempDir(os.TempDir(), "chain_test")
 	if err != nil {
@@ -47,7 +49,7 @@ func TestSynchronizeBehind(t *testing.T) {
 	encodedBlk := createEncodedBlock(t, 5, 20)
 
 	// Connect to peer and write to conn
-	conn, err := net.Dial("tcp", ":3000")
+	conn, err := net.Dial("tcp", ":"+port)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +93,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	encodedBlk := createEncodedBlock(t, 1, 20)
 
 	// Connect to peer and write to conn
-	conn, err := net.Dial("tcp", ":3000")
+	conn, err := net.Dial("tcp", ":"+port)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,9 +115,9 @@ func setUpSynchronizerTest(t *testing.T) *wire.EventBus {
 	blk := randomBlockBuffer(t, 0, 1)
 	eb.Publish(string(topics.AcceptedBlock), blk)
 
-	// Set up a peer reader and send it a block that is a few rounds ahea
+	// Set up a peer reader and send it a block that is a few rounds ahead
 	go func() {
-		peerReader := helper.StartPeerReader(eb, cs)
+		peerReader := helper.StartPeerReader(eb, cs, port)
 		peerReader.ReadLoop()
 	}()
 

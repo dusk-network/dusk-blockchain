@@ -72,9 +72,14 @@ func TestWriter(t *testing.T) {
 		}
 	}
 
-	startServer(receiveFn, nil, nil)
+	l, err := startServer(receiveFn, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
 	for i := 0; i < 100; i++ {
-		addPeer(bus)
+		p := addPeer(bus)
+		defer p.Conn.Close()
 	}
 
 	ev := makeAgreementBuffer(10)
@@ -103,9 +108,14 @@ func BenchmarkWriter(b *testing.B) {
 		}
 	}
 
-	startServer(receiveFn, nil, nil)
+	l, err := startServer(receiveFn, nil, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer l.Close()
 	for i := 0; i < 100; i++ {
-		addPeer(bus)
+		p := addPeer(bus)
+		defer p.Conn.Close()
 	}
 
 	ev := makeAgreementBuffer(10)
@@ -121,23 +131,23 @@ func BenchmarkWriter(b *testing.B) {
 }
 
 func startServer(f func(net.Conn, chan struct{}, chan struct{}), inboundChan chan struct{},
-	outboundChan chan struct{}) error {
+	outboundChan chan struct{}) (net.Listener, error) {
 	l, err := net.Listen("tcp", ":3000")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	go func() {
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				panic(err)
+				return
 			}
 
 			go f(conn, inboundChan, outboundChan)
 		}
 	}()
-	return nil
+	return l, nil
 }
 
 func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
@@ -150,7 +160,7 @@ func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 	return agreement.MockAgreement(make([]byte, 32), 1, 2, keys)
 }
 
-func addPeer(bus *wire.EventBus) {
+func addPeer(bus *wire.EventBus) *peer.Writer {
 	conn, err := net.Dial("tcp", ":3000")
 	if err != nil {
 		panic(err)
@@ -158,6 +168,7 @@ func addPeer(bus *wire.EventBus) {
 
 	pw := peer.NewWriter(conn, protocol.TestNet, bus)
 	pw.Subscribe(bus)
+	return pw
 }
 
 type mockCollector struct {

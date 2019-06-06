@@ -125,11 +125,12 @@ func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 	return eb, streamer
 }
 
-func StartPeerReader(bus *wire.EventBus, synchronizer chainsync.Synchronizer) *peer.Reader {
-	l, err := net.Listen("tcp", ":3000")
+func StartPeerReader(bus *wire.EventBus, synchronizer chainsync.Synchronizer, port string) *peer.Reader {
+	l, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		panic(err)
 	}
+	defer l.Close()
 
 	conn, err := l.Accept()
 	if err != nil {

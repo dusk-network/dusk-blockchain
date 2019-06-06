@@ -15,6 +15,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
+var port = "3000"
+
 func mockConfig(t *testing.T) func() {
 
 	storeDir, err := ioutil.TempDir(os.TempDir(), "peer_test")
@@ -39,7 +41,7 @@ func TestHandshake(t *testing.T) {
 
 	eb := wire.NewEventBus()
 	go func() {
-		pr := helper.StartPeerReader(eb, &mockSynchronizer{})
+		pr := helper.StartPeerReader(eb, &mockSynchronizer{}, port)
 		if err := pr.Handshake(); err != nil {
 			t.Fatal(err)
 		}
@@ -49,13 +51,14 @@ func TestHandshake(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	pw := startWriter(eb)
+	defer pw.Conn.Close()
 	if err := pw.Handshake(); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func startWriter(subscriber wire.EventSubscriber) *peer.Writer {
-	conn, err := net.Dial("tcp", ":3000")
+	conn, err := net.Dial("tcp", ":"+port)
 	if err != nil {
 		panic(err)
 	}
