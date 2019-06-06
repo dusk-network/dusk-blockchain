@@ -9,8 +9,8 @@ import (
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
@@ -39,7 +39,7 @@ func TestHandshake(t *testing.T) {
 
 	eb := wire.NewEventBus()
 	go func() {
-		pr := startReader(eb)
+		pr := helper.StartPeerReader(eb, &mockSynchronizer{})
 		if err := pr.Handshake(); err != nil {
 			t.Fatal(err)
 		}
@@ -52,26 +52,6 @@ func TestHandshake(t *testing.T) {
 	if err := pw.Handshake(); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func startReader(bus *wire.EventBus) *peer.Reader {
-	l, err := net.Listen("tcp", ":3000")
-	if err != nil {
-		panic(err)
-	}
-
-	conn, err := l.Accept()
-	if err != nil {
-		panic(err)
-	}
-
-	dupeMap := dupemap.NewDupeMap(5)
-	pw, err := peer.NewReader(conn, protocol.TestNet, dupeMap, bus, &mockSynchronizer{})
-	if err != nil {
-		panic(err)
-	}
-
-	return pw
 }
 
 func startWriter(subscriber wire.EventSubscriber) *peer.Writer {

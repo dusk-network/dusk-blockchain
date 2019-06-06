@@ -5,11 +5,15 @@ import (
 	"bytes"
 	"crypto/rand"
 	"io"
+	"net"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -119,4 +123,24 @@ func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 	eb.SubscribeStream(string(topics.Gossip), streamer)
 
 	return eb, streamer
+}
+
+func StartPeerReader(bus *wire.EventBus, synchronizer chainsync.Synchronizer) *peer.Reader {
+	l, err := net.Listen("tcp", ":3000")
+	if err != nil {
+		panic(err)
+	}
+
+	conn, err := l.Accept()
+	if err != nil {
+		panic(err)
+	}
+
+	dupeMap := dupemap.NewDupeMap(5)
+	pw, err := peer.NewReader(conn, protocol.TestNet, dupeMap, bus, synchronizer)
+	if err != nil {
+		panic(err)
+	}
+
+	return pw
 }
