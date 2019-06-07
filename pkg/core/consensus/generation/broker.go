@@ -74,6 +74,7 @@ func (b *broker) Listen() {
 		case bidList := <-b.bidListChan:
 			b.proofGenerator.UpdateBidList(bidList)
 		case state := <-b.regenerationChan:
+			b.forwarder.threshold.Lower()
 			if state.Round == b.seeder.Round() {
 				seed := b.seeder.LatestSeed()
 				proof := b.proofGenerator.GenerateProof(seed)
