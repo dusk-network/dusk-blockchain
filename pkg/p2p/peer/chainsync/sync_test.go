@@ -21,7 +21,7 @@ import (
 var port = "8000"
 
 func mockConfig(t *testing.T) func() {
-	storeDir, err := ioutil.TempDir(os.TempDir(), "chain_test")
+	storeDir, err := ioutil.TempDir(os.TempDir(), "chainsync_test")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
