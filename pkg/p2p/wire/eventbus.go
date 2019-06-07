@@ -227,9 +227,16 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 }
 
 func (bus *EventBus) publish(handlers []*channelHandler, messageBuffer *bytes.Buffer, topic string) {
+
+	var mCopy bytes.Buffer
+	if messageBuffer != nil {
+		// Copy the message buffer for concurrency-safety
+		mCopy = *messageBuffer
+	}
+
 	for _, handler := range handlers {
 		select {
-		case handler.messageChannel <- messageBuffer:
+		case handler.messageChannel <- &mCopy:
 		default:
 			log.WithFields(log.Fields{
 				"id":       handler.id,
