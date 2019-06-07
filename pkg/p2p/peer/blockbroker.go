@@ -44,22 +44,51 @@ func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 	}
 
 	// Fetch blocks to send to peer, going off his Locator
-	var header *block.Header
-	err := b.db.View(func(t database.Transaction) error {
-		// TODO: this needs to be replaced with a `FetchBlocks` function or something
-		// similar.
-		var err error
-		header, err = t.FetchBlockHeader([]byte{})
-		return err
-	})
-
+	blocks, err := b.fetchBlocks(msg)
 	if err != nil {
 		return err
 	}
 
-	// TODO: should be block instead of header
+	for _, blk := range blocks {
+		if err := b.sendBlock(blk); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (b *blockBroker) fetchBlocks(msg *peermsg.GetBlocks) ([]*block.Block, error) {
+	var blocks []*block.Block
+	err := b.db.View(func(t database.Transaction) error {
+		header, err := t.FetchBlockHeader(msg.Locators[0])
+		if err != nil {
+			return err
+		}
+
+		height := header.Height
+		for {
+			height++
+			blk, err := reconstructBlock(t, height)
+			if err != nil {
+				return err
+			}
+
+			if blk == nil {
+				// This means we hit the end of the chain, so we can just return.
+				return nil
+			}
+
+			blocks = append(blocks, blk)
+		}
+	})
+
+	return blocks, err
+}
+
+func (b *blockBroker) sendBlock(blk *block.Block) error {
 	buf := new(bytes.Buffer)
-	if err := header.Encode(buf); err != nil {
+	if err := blk.Encode(buf); err != nil {
 		return err
 	}
 
@@ -75,8 +104,29 @@ func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 
 	if _, err := b.conn.Write(encodedMsg.Bytes()); err != nil {
 		return err
-
 	}
 
 	return nil
+}
+
+func reconstructBlock(t database.Transaction, height uint64) (*block.Block, error) {
+	hash, err := t.FetchBlockHashByHeight(height)
+	if err != nil {
+		return nil, nil
+	}
+
+	header, err := t.FetchBlockHeader(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	txs, err := t.FetchBlockTxs(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return &block.Block{
+		Header: header,
+		Txs:    txs,
+	}, nil
 }
