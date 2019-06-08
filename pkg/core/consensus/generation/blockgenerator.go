@@ -3,6 +3,7 @@ package generation
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -36,10 +38,23 @@ type (
 
 func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGenerator {
 
+	blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
+	if err != nil {
+		panic(err)
+	}
+
+	var buf bytes.Buffer
+	buf.Write(blob)
+
+	genesisBlock := block.NewBlock()
+	if err := genesisBlock.Decode(&buf); err != nil {
+		panic(err)
+	}
+
 	return &blockGenerator{
 		rpcBus:    rpcBus,
 		genPubKey: genPubKey,
-		prevBlock: *block.NewBlock(),
+		prevBlock: *genesisBlock,
 	}
 }
 
@@ -49,8 +64,10 @@ func (bg *blockGenerator) UpdatePrevBlock(b block.Block) {
 
 func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error) {
 
-	if round <= bg.prevBlock.Header.Height {
-		return nil, fmt.Errorf("target round (%d) must be higher than previous block round %d", round, bg.prevBlock.Header.Height)
+	if round != 0 {
+		if round <= bg.prevBlock.Header.Height {
+			return nil, fmt.Errorf("target round (%d) must be higher than previous block round %d", round, bg.prevBlock.Header.Height)
+		}
 	}
 
 	// TODO Missing fields for forging the block
@@ -106,24 +123,26 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 	txs = append(txs, coinbaseTx)
 
 	// Retrieve and append the verified transactions from Mempool
-	r, err := bg.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
-	// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
-	// already accepted in the the chain.
-	if err != nil {
-		return nil, err
-	}
+	if bg.rpcBus != nil {
+		r, err := bg.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
+		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
+		// already accepted in the the chain.
+		if err != nil {
+			return nil, err
+		}
 
-	lTxs, err := encoding.ReadVarInt(&r)
-	if err != nil {
-		return nil, err
-	}
+		lTxs, err := encoding.ReadVarInt(&r)
+		if err != nil {
+			return nil, err
+		}
 
-	mempoolTxs, err := transactions.FromReader(&r, lTxs)
-	if err != nil {
-		return nil, err
-	}
+		mempoolTxs, err := transactions.FromReader(&r, lTxs)
+		if err != nil {
+			return nil, err
+		}
 
-	txs = append(txs, mempoolTxs...)
+		txs = append(txs, mempoolTxs...)
+	}
 
 	// TODO Append Provisioners rewards
 
@@ -167,6 +186,8 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	output.DestKey = P.Bytes()
 	// Commitment field in coinbase tx represents the reward
 	output.Commitment = rewardBytes
+	// blank range proof as we disclose generator reward
+	output.RangeProof = make([]byte, 1)
 
 	tx.AddReward(output)
 

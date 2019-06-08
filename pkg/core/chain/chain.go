@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -55,21 +56,21 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		return nil, err
 	}
 
-	genesisBlock := &block.Block{
-		Header: &block.Header{
-			Version:       0,
-			Height:        0,
-			Timestamp:     0,
-			PrevBlockHash: []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			TxRoot:        []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			CertHash:      []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			Seed:          []byte{0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-		},
-	}
+	// read and decode the genesis block hex
+	genesisBlock := block.NewBlock()
+	switch cfg.Get().General.Network {
+	case "testnet":
 
-	err = genesisBlock.SetHash()
-	if err != nil {
-		return nil, err
+		blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
+		if err != nil {
+			panic(err)
+		}
+
+		var buf bytes.Buffer
+		buf.Write(blob)
+		if err := genesisBlock.Decode(&buf); err != nil {
+			panic(err)
+		}
 	}
 
 	// set up collectors
