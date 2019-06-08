@@ -60,9 +60,17 @@ func TestProcessor(t *testing.T) {
 	res = <-resultChan
 	assert.Equal(t, expected, res)
 
-	// removing the other one
+	// adding a preprocessor
+	expected = bytes.NewBufferString("pippopappo")
+	otherId := bus.RegisterPreprocessor(topic, &pappoAdder{})
+	assert.Equal(t, 1, len(otherId))
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
+
+	// removing another
+	expected = bytes.NewBufferString("pappo")
 	bus.RemovePreprocessor(topic, ids[1])
-	expected = bytes.NewBufferString("")
 	bus.Publish(topic, bytes.NewBufferString(""))
 	res = <-resultChan
 	assert.Equal(t, expected, res)
@@ -91,6 +99,13 @@ type pippoAdder struct{}
 
 func (p *pippoAdder) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	buf.WriteString("pippo")
+	return buf, nil
+}
+
+type pappoAdder struct{}
+
+func (p *pappoAdder) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
+	buf.WriteString("pappo")
 	return buf, nil
 }
 

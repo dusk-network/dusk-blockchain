@@ -205,7 +205,6 @@ func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicPr
 	defer bus.busLock.Unlock()
 	if _, ok := bus.preprocessors[topic]; ok {
 		bus.preprocessors[topic] = append(bus.preprocessors[topic], pproc...)
-		bus.busLock.Unlock()
 		return pprocIds
 	}
 
