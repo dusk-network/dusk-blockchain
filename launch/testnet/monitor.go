@@ -8,10 +8,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-func ConnectToMonitor(bus wire.EventBroker, d ristretto.Scalar) {
-	if cfg.Get().General.Network == "testnet" && cfg.Get().Network.Monitor.Enabled {
-		monitorUrl := cfg.Get().Network.Monitor.Address
-		log.Infof("Connecting to monitoring system")
-		monitor.LaunchMonitor(bus, monitorUrl, d)
+func ConnectToLogMonitor(bus wire.EventBroker, d ristretto.Scalar) (monitor.Supervisor, error) {
+	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
+		monitorUrl := cfg.Get().Logger.Monitor.Target
+		log.Infof("Connecting to log reserved monitoring file on %v\n", monitorUrl)
+		return monitor.LaunchLogMonitor(bus, monitorUrl)
 	}
 }

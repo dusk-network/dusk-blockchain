@@ -13,14 +13,17 @@ func (l *LogProcessor) PublishRoundEvent(ab []byte) {
 	unmarshaller := agreement.NewUnMarshaller()
 	ev, err := unmarshaller.Deserialize(a)
 	ae := ev.(*agreement.Agreement)
-	if err != nil {
-		l.WithTime(log.Fields{
-			"code": "round",
-		}).WithError(err).Errorln("Cannot unmarshal agreement event")
-		return
-	}
+	if l.lastInfo == nil || l.lastInfo.Round < ae.Round {
+		if err != nil {
+			l.WithTime(log.Fields{
+				"code": "round",
+			}).WithError(err).Errorln("Cannot unmarshal agreement event")
+			return
+		}
 
-	l.WithAgreement(ae).Infoln("New Round Published")
+		e := l.WithAgreement(ae)
+		e.Infoln("New Round Published")
+	}
 }
 
 func (l *LogProcessor) withRoundCode(fields log.Fields) *log.Entry {
@@ -35,13 +38,14 @@ func (l *LogProcessor) WithAgreement(ae *agreement.Agreement) *log.Entry {
 	}
 	entry := l.withRoundCode(fields)
 
-	if l.lastInfo != nil {
-		blockTime := time.Since(l.lastInfo.Time)
-		entry = entry.WithField("blockTime", blockTime)
-		l.lastInfo = &blockInfo{
-			Time:      time.Now(),
-			Agreement: ae,
-		}
+	if l.lastInfo != nil && (ae.Round-l.lastInfo.Round) == 1 {
+		blockTimeMs := time.Since(l.lastInfo.t) / time.Millisecond
+		entry = entry.WithField("blockTime", blockTimeMs)
+	}
+
+	l.lastInfo = &blockInfo{
+		t:         time.Now(),
+		Agreement: ae,
 	}
 
 	return entry

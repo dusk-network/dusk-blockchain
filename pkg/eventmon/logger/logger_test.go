@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 var withTimeTest = []struct {
@@ -22,8 +23,9 @@ var withTimeTest = []struct {
 
 func TestWithTime(t *testing.T) {
 	for _, tt := range withTimeTest {
+		eb := wire.NewEventBus()
 		// setup
-		logBase, b, data := setup(nil)
+		logBase, b, data := setup(eb, nil)
 
 		// tested function
 		logBase.WithTime(tt.fields).Info(tt.msg)
@@ -39,9 +41,17 @@ func TestWithTime(t *testing.T) {
 	}
 }
 
-func setup(formatter log.Formatter) (*logger.LogBase, *bytes.Buffer, map[string]interface{}) {
+func setup(eb wire.EventBroker, formatter log.Formatter) (*logger.LogProcessor, *BufCloser, map[string]interface{}) {
 	var data map[string]interface{}
-	b := new(bytes.Buffer)
-	logBase := logger.New(b, formatter)
+	b := &BufCloser{new(bytes.Buffer)}
+	logBase := logger.New(eb, b, formatter)
 	return logBase, b, data
+}
+
+type BufCloser struct {
+	*bytes.Buffer
+}
+
+func (b *BufCloser) Close() error {
+	return nil
 }

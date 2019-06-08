@@ -31,14 +31,14 @@ const (
 type (
 	LogProcessor struct {
 		*log.Logger
-		entry    *log.Entry
 		lastInfo *blockInfo
 		p        wire.EventPublisher
 		active   bool
+		entry    *log.Entry
 	}
 
 	blockInfo struct {
-		time.Time
+		t time.Time
 		*agreement.Agreement
 	}
 )
@@ -54,9 +54,9 @@ func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogP
 	})
 	return &LogProcessor{
 		p:      p,
-		entry:  entry,
 		Logger: logger,
 		active: true,
+		entry:  entry,
 	}
 }
 
@@ -67,6 +67,10 @@ func (l *LogProcessor) Wire(w io.WriteCloser) {
 }
 
 func (l *LogProcessor) Close() error {
+	if !l.active {
+		return nil
+	}
+
 	l.active = false
 	return l.Out.(io.WriteCloser).Close()
 }
@@ -115,8 +119,8 @@ func (l *LogProcessor) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	return &newBuf, nil
 }
 
-func (l *LogProcessor) ReportError(err byte) {
-	b := bytes.NewBuffer([]byte{err})
+func (l *LogProcessor) ReportError(bErr byte, err error) {
+	b := bytes.NewBuffer([]byte{bErr})
 	l.p.Publish(MonitorTopic, b)
 }
 

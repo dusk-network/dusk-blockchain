@@ -80,6 +80,9 @@ func Setup() *Server {
 	// Connecting to the general monitoring system
 	// ConnectToMonitor(eventBus, d)
 
+	// Connecting to the log based monitoring system
+	// ConnectToLogMonitor(eventBus)
+
 	return srv
 }
 
