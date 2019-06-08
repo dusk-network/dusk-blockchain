@@ -36,6 +36,7 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys)
 
 // MockAgreement mocks an Agreement event, and returns the marshalled representation
 // of it as a `*bytes.Buffer`.
+// NOTE: it does not include the topic
 func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys) *bytes.Buffer {
 	if step < 2 {
 		panic("Aggregated agreement needs to span for at least two steps")
