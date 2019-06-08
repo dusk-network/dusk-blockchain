@@ -5,8 +5,15 @@ type generalConfiguration struct {
 }
 
 type loggerConfiguration struct {
-	Level  string
-	Output string
+	Level   string
+	Output  string
+	Monitor logMonitorConfiguration
+}
+
+// log based monitoring defined in pkg/eventmon/logger
+type logMonitorConfiguration struct {
+	Enabled bool
+	Target  string
 }
 
 type networkConfiguration struct {
