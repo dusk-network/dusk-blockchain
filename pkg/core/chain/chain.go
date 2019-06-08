@@ -116,17 +116,16 @@ func (c *Chain) Listen() {
 
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := new(bytes.Buffer)
-
-	topicBytes := topics.TopicToByteArray(topics.Block)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
 	if err := blk.Encode(buffer); err != nil {
 		return err
 	}
 
-	c.eventBus.Stream(string(topics.Gossip), buffer)
+	msg, err := wire.AddTopic(buffer, topics.Block)
+	if err != nil {
+		return err
+	}
+
+	c.eventBus.Stream(string(topics.Gossip), msg)
 	return nil
 }
 
@@ -265,7 +264,6 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 }
 
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
-
 	// Ensure the candidate block satisfies all chain rules
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
 		log.Errorf("verifying the candidate block failed: %s", err.Error())
@@ -290,7 +288,6 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 }
 
 func (c *Chain) handleWinningHash(blockHash []byte) error {
-
 	// Fetch the candidate block that the winningHash points at
 	var candidate *block.Block
 	err := c.db.View(func(t database.Transaction) error {
