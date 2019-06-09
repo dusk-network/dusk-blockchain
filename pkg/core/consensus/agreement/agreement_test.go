@@ -123,7 +123,7 @@ func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
 	agreement.Launch(bus, c, k, 1)
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
-	bus.RegisterPreprocessor(string(topics.Agreement))
+	bus.RemoveAllPreprocessors(string(topics.Agreement))
 	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
 	<-roundChan
 	return bus, roundChan
