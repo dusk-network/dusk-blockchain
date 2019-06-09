@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -115,6 +117,31 @@ func TestResumeRight(t *testing.T) {
 	assert.InDelta(t, float64(1000), round2["blockTime"], float64(100))
 
 	_ = supervisor.Stop()
+}
+
+func TestNotifyErrors(t *testing.T) {
+	endChan := make(chan struct{})
+	msgChan, _ := initTest()
+	eb := wire.NewEventBus()
+	supervisor, err := monitor.Launch(eb, unixSoc)
+	assert.NoError(t, err)
+
+	log.AddHook(supervisor)
+	log.Errorln("pippo")
+
+	// wrapped in a go routing to check that there are no race conditions
+	go func() {
+		msg := <-msgChan
+		assert.Equal(t, "error", msg["level"])
+		assert.Equal(t, "pippo", msg["msg"])
+		endChan <- struct{}{}
+	}()
+
+	testMsg := mockAggroMsg(23, topics.Agreement)
+	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	result := <-msgChan
+	assert.Equal(t, "monitor", result["process"])
+	<-endChan
 }
 
 func initTest() (<-chan map[string]interface{}, string) {

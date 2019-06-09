@@ -12,9 +12,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// Make sure LogProcessor implements the logrus.Hook interface
-var _ log.Hook = (*LogProcessor)(nil)
-
 // Make sure LogProcessor implements the TopicProcessor interface
 var _ wire.TopicProcessor = (*LogProcessor)(nil)
 
@@ -33,7 +30,6 @@ type (
 		*log.Logger
 		lastInfo *blockInfo
 		p        wire.EventPublisher
-		active   bool
 		entry    *log.Entry
 	}
 
@@ -55,36 +51,21 @@ func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogP
 	return &LogProcessor{
 		p:      p,
 		Logger: logger,
-		active: true,
 		entry:  entry,
 	}
 }
 
+// Deprecated
 func (l *LogProcessor) Wire(w io.WriteCloser) {
-	l.active = true
 	_ = l.Close()
 	l.Out = w
 }
 
 func (l *LogProcessor) Close() error {
-	if !l.active {
-		return nil
-	}
-
-	l.active = false
 	return l.Out.(io.WriteCloser).Close()
 }
 
-func (l *LogProcessor) Levels() []log.Level {
-	return []log.Level{
-		// log.WarnLevel,
-		log.ErrorLevel,
-		log.FatalLevel,
-		log.PanicLevel,
-	}
-}
-
-func (l *LogProcessor) Fire(entry *log.Entry) error {
+func (l *LogProcessor) Send(entry *log.Entry) error {
 	formatted, err := l.Formatter.Format(entry)
 	if err != nil {
 		return err

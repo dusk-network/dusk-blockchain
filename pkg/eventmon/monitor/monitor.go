@@ -15,6 +15,7 @@ import (
 )
 
 var MaxAttempts int = 3
+var lg = log.WithField("process", "monitor")
 
 type Supervisor interface {
 	wire.EventCollector
@@ -22,7 +23,12 @@ type Supervisor interface {
 	Stop() error
 }
 
-func Launch(broker wire.EventBroker, monUrl string) (Supervisor, error) {
+type LogSupervisor interface {
+	Supervisor
+	log.Hook
+}
+
+func Launch(broker wire.EventBroker, monUrl string) (LogSupervisor, error) {
 
 	uri, err := url.Parse(monUrl)
 	if err != nil {
@@ -45,9 +51,26 @@ type unixSupervisor struct {
 	uri         *url.URL
 	processorId uint32
 	attempts    int
+	activeProc  bool
 }
 
-func newUnixSupervisor(broker wire.EventBroker, uri *url.URL) (Supervisor, error) {
+func (m *unixSupervisor) Levels() []log.Level {
+	return []log.Level{
+		// log.WarnLevel,
+		log.ErrorLevel,
+		log.FatalLevel,
+		log.PanicLevel,
+	}
+}
+
+func (m *unixSupervisor) Fire(entry *log.Entry) error {
+	if m.activeProc {
+		return m.processor.Send(entry)
+	}
+	return nil
+}
+
+func newUnixSupervisor(broker wire.EventBroker, uri *url.URL) (LogSupervisor, error) {
 
 	logProc, id, err := initLogProcessor(broker, uri)
 	if err != nil {
@@ -60,21 +83,18 @@ func newUnixSupervisor(broker wire.EventBroker, uri *url.URL) (Supervisor, error
 		processor:   logProc,
 		uri:         uri,
 		processorId: id,
+		activeProc:  true,
 	}, nil
 }
 
 func (m *unixSupervisor) Collect(b *bytes.Buffer) error {
 	// TODO: maybe diversify the action depending on the errors in the future
-	var errStr string
 	var err error
 	// whatever the case, we are going to reset the supervisor
 	defer m.resetAttempts()
 
 	err = deserializeError(b)
-	log.WithFields(log.Fields{
-		"processor": "monitor",
-		"op":        "Collect",
-	}).WithError(err).Warnln("Error notified by the LogProcessor. Attempting to reconnect to the monitoring server")
+	lg.WithField("op", "Collect").WithError(err).Warnln("Error notified by the LogProcessor. Attempting to reconnect to the monitoring server")
 
 	m.attempts++
 	for ; m.attempts < MaxAttempts; m.attempts++ {
@@ -82,27 +102,17 @@ func (m *unixSupervisor) Collect(b *bytes.Buffer) error {
 		if err == nil {
 			break
 		}
-		log.WithFields(log.Fields{
-			"process": "monitor",
-			"attempt": m.attempts,
-		}).WithError(err).Warnln("Reconnecting to the monitor failed")
+		lg.WithField("attempt", m.attempts).WithError(err).Warnln("Reconnecting to the monitor failed")
 	}
 
 	if m.attempts > MaxAttempts {
 		//giving up
-		_ = m.processor.Close()
-		m.broker.RemovePreprocessor(string(topics.Gossip), m.processorId)
-		log.WithFields(log.Fields{
-			"process": "monitor",
-			"error":   errStr,
-		}).Errorln("cannot reconnect to the monitoring system. Giving up")
+		_ = m.Stop()
+		lg.WithError(err).Errorln("cannot reconnect to the monitoring system. Giving up")
 		return err
 	}
 
-	log.WithFields(log.Fields{
-		"process": "monitor",
-		"attemp":  m.attempts,
-	}).Infoln("Successfully reconnected to the monitoring server")
+	lg.WithField("attempt", m.attempts).Infoln("Successfully reconnected to the monitoring server")
 	return nil
 }
 
@@ -140,6 +150,7 @@ func (m *unixSupervisor) Reconnect() error {
 	if err != nil {
 		return err
 	}
+	m.activeProc = true
 	m.processor = proc
 	m.processorId = id
 	m.attempts = 0
@@ -153,8 +164,12 @@ func (m *unixSupervisor) Stop() error {
 }
 
 func (m *unixSupervisor) stop() error {
-	m.broker.RemovePreprocessor(string(topics.Gossip), m.processorId)
-	return m.processor.Close()
+	if m.activeProc {
+		m.activeProc = false
+		m.broker.RemovePreprocessor(string(topics.Gossip), m.processorId)
+		return m.processor.Close()
+	}
+	return nil
 }
 
 func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcessor, uint32, error) {
