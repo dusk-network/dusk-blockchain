@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
@@ -66,13 +67,15 @@ func TestSendBlocks(t *testing.T) {
 	g := processing.NewGossip(protocol.TestNet)
 
 	go func() {
-		peerReader, err := helper.StartPeerReader(eb, cs, "3000")
+		peerReader, err := helper.StartPeerReader(eb, cs, "3001")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		peerReader.ReadLoop()
 	}()
+
+	time.Sleep(2 * time.Second)
 
 	// Make a GetBlocks, with the genesis block as the locator.
 	getBlocks := &peermsg.GetBlocks{}
@@ -95,7 +98,7 @@ func TestSendBlocks(t *testing.T) {
 	}
 
 	// Connect to the peer and write the message to them
-	conn, err := net.Dial("tcp", ":3000")
+	conn, err := net.Dial("tcp", ":3001")
 	if err != nil {
 		t.Fatal(err)
 	}
