@@ -55,7 +55,7 @@ func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogP
 	}
 }
 
-// Deprecated
+// Deprecated. MIght be quite useless
 func (l *LogProcessor) Wire(w io.WriteCloser) {
 	_ = l.Close()
 	l.Out = w

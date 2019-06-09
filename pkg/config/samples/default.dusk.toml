@@ -16,6 +16,8 @@ output = "stdout"
 enabled = false
 # file whereto dumping info parsed by monitor
 target = "/var/log/dusk-monitor"
+# tell logger to stream errors and warnings to monitoring process
+streamErrors=true
     
 # P2P network specific settings
 [network]

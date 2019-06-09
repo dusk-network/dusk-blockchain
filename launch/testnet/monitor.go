@@ -11,9 +11,13 @@ func ConnectToLogMonitor(bus wire.EventBroker) error {
 	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
 		monitorUrl := cfg.Get().Logger.Monitor.Target
 		log.Infof("Connecting to log reserved monitoring file on %v\n", monitorUrl)
-		if _, err := monitor.Launch(bus, monitorUrl); err != nil {
+		supervisor, err := monitor.Launch(bus, monitorUrl)
+		if err != nil {
 			//TODO: there should maybe be something that uses the supervisor
 			return err
+		}
+		if cfg.Get().Logger.Monitor.StreamErrors {
+			log.AddHook(supervisor)
 		}
 	}
 
