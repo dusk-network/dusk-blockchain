@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"net"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
@@ -20,7 +19,7 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
-var timeOut = 3 * time.Second
+// var timeOut = 3 * time.Second
 
 type Server struct {
 	eventBus  *wire.EventBus
@@ -77,11 +76,10 @@ func Setup() *Server {
 		},
 	}
 
-	// Connecting to the general monitoring system
-	// ConnectToMonitor(eventBus, d)
-
 	// Connecting to the log based monitoring system
-	// ConnectToLogMonitor(eventBus)
+	if err := ConnectToLogMonitor(eventBus); err != nil {
+		panic(err)
+	}
 
 	return srv
 }
