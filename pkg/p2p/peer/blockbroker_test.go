@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
@@ -74,6 +75,8 @@ func TestSendBlocks(t *testing.T) {
 		peerReader.ReadLoop()
 	}()
 
+	time.Sleep(100 * time.Millisecond)
+
 	// Make a GetBlocks, with the genesis block as the locator.
 	getBlocks := &peermsg.GetBlocks{}
 	getBlocks.Locators = append(getBlocks.Locators, hashes[0])
@@ -117,9 +120,19 @@ func TestSendBlocks(t *testing.T) {
 
 		decoded := processing.Decode(bs)
 
-		// Remove magic and topic bytes
-		if _, err := decoded.Read(make([]byte, 19)); err != nil {
+		// Remove magic bytes
+		if _, err := decoded.Read(make([]byte, 4)); err != nil {
 			t.Fatal(err)
+		}
+
+		var topicBytes [15]byte
+		if _, err := decoded.Read(topicBytes[:]); err != nil {
+			t.Fatal(err)
+		}
+
+		topic := topics.ByteArrayToTopic(topicBytes)
+		if topic != topics.Block {
+			t.Fatalf("unexpected topic %s, expected Block", topic)
 		}
 
 		blk := block.NewBlock()
