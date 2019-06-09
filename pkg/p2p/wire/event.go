@@ -79,14 +79,20 @@ type (
 		topic          string
 	}
 
+	// EventPreprocessors allow registration of preprocessors to be applied to incoming Event on a specific topic
+	EventPreprocessor interface {
+		RegisterPreprocessor(string, ...TopicProcessor) []uint32
+		RemovePreprocessor(string, uint32)
+		RemoveAllPreprocessors(string)
+	}
+
 	// EventSubscriber subscribes a channel to Event notifications on a specific topic
 	EventSubscriber interface {
+		EventPreprocessor
 		Subscribe(string, chan<- *bytes.Buffer) uint32
 		SubscribeCallback(string, func(*bytes.Buffer) error) uint32
 		SubscribeStream(string, io.WriteCloser) uint32
 		Unsubscribe(string, uint32) bool
-		RegisterPreprocessor(string, ...TopicProcessor) []uint32
-		RemovePreprocessor(string, uint32)
 	}
 
 	// EventPublisher publishes serialized messages on a specific topic
