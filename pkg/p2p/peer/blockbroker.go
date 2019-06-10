@@ -44,12 +44,24 @@ func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 	}
 
 	// Fetch blocks to send to peer, going off his Locator
-	blocks, err := b.fetchBlocks(msg)
+	height, err := b.fetchLocatorHeight(msg)
 	if err != nil {
 		return err
 	}
 
-	for _, blk := range blocks {
+	for {
+		height++
+
+		blk, err := b.reconstructBlock(height)
+		if err != nil {
+			return err
+		}
+
+		if blk == nil {
+			// This means we hit the end of the chain, so we can just return.
+			return nil
+		}
+
 		if err := b.sendBlock(blk); err != nil {
 			return err
 		}
@@ -58,32 +70,19 @@ func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 	return nil
 }
 
-func (b *blockBroker) fetchBlocks(msg *peermsg.GetBlocks) ([]*block.Block, error) {
-	var blocks []*block.Block
+func (b *blockBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error) {
+	var height uint64
 	err := b.db.View(func(t database.Transaction) error {
 		header, err := t.FetchBlockHeader(msg.Locators[0])
 		if err != nil {
 			return err
 		}
 
-		height := header.Height
-		for {
-			height++
-			blk, err := reconstructBlock(t, height)
-			if err != nil {
-				return err
-			}
-
-			if blk == nil {
-				// This means we hit the end of the chain, so we can just return.
-				return nil
-			}
-
-			blocks = append(blocks, blk)
-		}
+		height = header.Height
+		return nil
 	})
 
-	return blocks, err
+	return height, err
 }
 
 func (b *blockBroker) sendBlock(blk *block.Block) error {
@@ -109,24 +108,30 @@ func (b *blockBroker) sendBlock(blk *block.Block) error {
 	return nil
 }
 
-func reconstructBlock(t database.Transaction, height uint64) (*block.Block, error) {
-	hash, err := t.FetchBlockHashByHeight(height)
-	if err != nil {
-		return nil, nil
-	}
+func (b *blockBroker) reconstructBlock(height uint64) (*block.Block, error) {
+	var blk *block.Block
+	err := b.db.View(func(t database.Transaction) error {
+		hash, err := t.FetchBlockHashByHeight(height)
+		if err != nil {
+			return nil
+		}
 
-	header, err := t.FetchBlockHeader(hash)
-	if err != nil {
-		return nil, err
-	}
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return err
+		}
 
-	txs, err := t.FetchBlockTxs(hash)
-	if err != nil {
-		return nil, err
-	}
+		txs, err := t.FetchBlockTxs(hash)
+		if err != nil {
+			return err
+		}
 
-	return &block.Block{
-		Header: header,
-		Txs:    txs,
-	}, nil
+		blk = &block.Block{
+			Header: header,
+			Txs:    txs,
+		}
+		return nil
+	})
+
+	return blk, err
 }
