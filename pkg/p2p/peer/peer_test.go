@@ -20,6 +20,7 @@ import (
 func TestScanner(t *testing.T) {
 	test := []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
 	go func() {
+		time.Sleep(500 * time.Millisecond)
 		conn, err := net.Dial("tcp", ":3000")
 		if err != nil {
 			t.Fatal(err)
