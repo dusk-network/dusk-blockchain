@@ -39,28 +39,20 @@ func mockConfig(t *testing.T) func() {
 	}
 }
 
+// Test the behaviour of the block broker
 func TestSendBlocks(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
 
+	// Set up db
+	// TODO: use a mock for this instead
 	db, err := heavy.NewDatabase(cfg.Get().Database.Dir, protocol.TestNet, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
-	var hashes [][]byte
-	for i := 0; i < 5; i++ {
-		blk := helper.RandomBlock(t, uint64(i), 2)
-		hashes = append(hashes, blk.Header.Hash)
-		err := db.Update(func(t database.Transaction) error {
-			return t.StoreBlock(blk)
-		})
-
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
+	hashes := generateBlocks(t, 5, db)
 
 	eb := wire.NewEventBus()
 	cs := chainsync.LaunchChainSynchronizer(eb, protocol.TestNet)
@@ -78,24 +70,7 @@ func TestSendBlocks(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Make a GetBlocks, with the genesis block as the locator.
-	getBlocks := &peermsg.GetBlocks{}
-	getBlocks.Locators = append(getBlocks.Locators, hashes[0])
-	getBlocks.Target = make([]byte, 32)
-
-	buf := new(bytes.Buffer)
-	if err := getBlocks.Encode(buf); err != nil {
-		t.Fatal(err)
-	}
-
-	msg, err := wire.AddTopic(buf, topics.GetBlocks)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	encoded, err := g.Process(msg)
-	if err != nil {
-		t.Fatal(err)
-	}
+	msg := createGetBlocksBuffer(hashes[0], g)
 
 	// Connect to the peer and write the message to them
 	conn, err := net.Dial("tcp", ":3001")
@@ -104,7 +79,7 @@ func TestSendBlocks(t *testing.T) {
 	}
 	defer conn.Close()
 
-	if _, err := conn.Write(encoded.Bytes()); err != nil {
+	if _, err := conn.Write(msg.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -125,6 +100,7 @@ func TestSendBlocks(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Check for correctness of topic
 		var topicBytes [15]byte
 		if _, err := decoded.Read(topicBytes[:]); err != nil {
 			t.Fatal(err)
@@ -135,6 +111,7 @@ func TestSendBlocks(t *testing.T) {
 			t.Fatalf("unexpected topic %s, expected Block", topic)
 		}
 
+		// Decode block from the stream
 		blk := block.NewBlock()
 		if err := blk.Decode(decoded); err != nil {
 			t.Fatal(err)
@@ -143,9 +120,50 @@ func TestSendBlocks(t *testing.T) {
 		blocks = append(blocks, blk)
 	}
 
+	// Check that block hashes match up with those we generated
 	for i, blk := range blocks {
 		if !bytes.Equal(hashes[i+1], blk.Header.Hash) {
 			t.Fatal("received block has mismatched hash")
 		}
 	}
+}
+
+func generateBlocks(t *testing.T, amount int, db database.DB) [][]byte {
+	var hashes [][]byte
+	for i := 0; i < amount; i++ {
+		blk := helper.RandomBlock(t, uint64(i), 2)
+		hashes = append(hashes, blk.Header.Hash)
+		err := db.Update(func(t database.Transaction) error {
+			return t.StoreBlock(blk)
+		})
+
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return hashes
+}
+
+func createGetBlocksBuffer(locator []byte, g *processing.Gossip) *bytes.Buffer {
+	getBlocks := &peermsg.GetBlocks{}
+	getBlocks.Locators = append(getBlocks.Locators, locator)
+	getBlocks.Target = make([]byte, 32)
+
+	buf := new(bytes.Buffer)
+	if err := getBlocks.Encode(buf); err != nil {
+		panic(err)
+	}
+
+	msg, err := wire.AddTopic(buf, topics.GetBlocks)
+	if err != nil {
+		panic(err)
+	}
+
+	encoded, err := g.Process(msg)
+	if err != nil {
+		panic(err)
+	}
+
+	return encoded
 }
