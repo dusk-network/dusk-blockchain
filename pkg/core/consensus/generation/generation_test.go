@@ -58,8 +58,12 @@ type mockGenerator struct {
 	t *testing.T
 }
 
-func (m *mockGenerator) GenerateBlock(round uint64, seed []byte) (*block.Block, error) {
+func (m *mockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error) {
 	return helper.RandomBlock(m.t, round, 10), nil
+}
+
+func (m *mockGenerator) UpdatePrevBlock(b block.Block) {
+
 }
 
 func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {

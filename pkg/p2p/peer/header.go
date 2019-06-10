@@ -35,6 +35,7 @@ func decodeMessageHeader(r io.Reader) (*MessageHeader, error) {
 	return &MessageHeader{
 		Magic:  protocol.Magic(magic),
 		Length: length,
+		Topic:  topics.Version,
 	}, nil
 }
 

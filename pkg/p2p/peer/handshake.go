@@ -144,6 +144,8 @@ func (p *Connection) readVerack() error {
 		return err
 	}
 
+	header.Topic = topics.VerAck
+
 	if header.Topic != topics.VerAck {
 		return fmt.Errorf("did not receive the expected '%s' message - got %s",
 			topics.VerAck, header.Topic)
