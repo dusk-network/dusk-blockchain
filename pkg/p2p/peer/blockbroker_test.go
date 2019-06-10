@@ -75,11 +75,7 @@ func TestSendBlocks(t *testing.T) {
 		peerReader.ReadLoop()
 	}()
 
-<<<<<<< HEAD
-	time.Sleep(100 * time.Millisecond)
-=======
 	time.Sleep(2 * time.Second)
->>>>>>> cb5b8c06c9cc5f01aa144543d86fc162f0d46b4a
 
 	// Make a GetBlocks, with the genesis block as the locator.
 	getBlocks := &peermsg.GetBlocks{}
