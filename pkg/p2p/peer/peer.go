@@ -20,7 +20,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-var readWriteTimeout = 2 * time.Minute // Used to set reading and writing deadlines
+var readWriteTimeout = 60 * time.Second // Max idle time for a peer
 
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 // The `net.Conn` is guarded by a mutex, to allow both multicast and one-to-one
@@ -177,6 +177,7 @@ func extractMagic(r io.Reader) protocol.Magic {
 
 // Write a message to the connection.
 func (c *Connection) Write(b []byte) (int, error) {
+	c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	c.lock.Lock()
 	n, err := c.Conn.Write(b)
 	c.lock.Unlock()
