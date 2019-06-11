@@ -1,42 +1,69 @@
 package processing
 
-import "bytes"
+import (
+	"bytes"
+)
 
-// Encode a slice of bytes to a null-terminated frame
-func Encode(p *bytes.Buffer) *bytes.Buffer {
-	buf := new(bytes.Buffer)
-	buf.Grow(p.Len())
-	writeBlock := func(p []byte) {
-		buf.WriteByte(byte(len(p) + 1))
-		buf.Write(p)
-	}
-	for _, ch := range bytes.Split(p.Bytes(), []byte{0}) {
-		for len(ch) >= 0xfe {
-			writeBlock(ch[:0xfe])
-			ch = ch[0xfe:]
-		}
-		writeBlock(ch)
-	}
-	buf.WriteByte(0)
-	return buf
+// EncodedSize calculates size of encoded message
+func EncodedSize(n int) int {
+	return n + n/256
 }
 
-// Decode a null-terminated frame to a slice of bytes
+// Encode a null-terminated slice of bytes to a cobs frame
+func Encode(b *bytes.Buffer) *bytes.Buffer {
+	p := b.Bytes()
+	if len(p) == 0 {
+		return new(bytes.Buffer)
+	}
+	// pad inital message with zero, if missing
+	if p[len(p)-1] != 0 {
+		p = append(p, 0)
+	}
+	var buf bytes.Buffer
+	for {
+		i := bytes.IndexByte(p, 0)
+		// no more zeros, we are done
+		if i < 0 {
+			buf.WriteByte(0)
+			return &buf
+		}
+		// split oversized chunks
+		for i >= 254 {
+			buf.WriteByte(255)
+			buf.Write(p[:254])
+			p = p[254:]
+			i -= 254
+		}
+		// write rest of the chunk
+		buf.WriteByte(byte(i + 1))
+		buf.Write(p[:i])
+		p = p[i+1:]
+	}
+}
+
+// Decode a cobs frame to a null-terminated slice of bytes
 func Decode(p []byte) *bytes.Buffer {
 	if len(p) == 0 {
-		return nil
+		return new(bytes.Buffer)
 	}
-	buf := new(bytes.Buffer)
-	buf.Grow(len(p))
-	for n := p[0]; n > 0; n = p[0] {
-		if int(n) >= len(p) {
+	// Cut delimiter
+	p = p[:len(p)-1]
+	var buf bytes.Buffer
+	for {
+		// nothing left, we are done
+		if len(p) == 0 {
+			return &buf
+		}
+		n, body := p[0], p[1:]
+		// invalid frame, abort
+		if int(n-1) > len(body) || n == 0 {
 			return nil
 		}
-		buf.Write(p[1:n])
-		p = p[n:]
-		if n < 0xff && p[0] > 0 {
+		buf.Write(body[:n-1])
+		// full blocks are not followed by zero
+		if n < 255 {
 			buf.WriteByte(0)
 		}
+		p = p[n:]
 	}
-	return buf
 }

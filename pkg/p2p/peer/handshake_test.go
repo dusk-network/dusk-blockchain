@@ -29,7 +29,7 @@ func TestHandshake(t *testing.T) {
 	}()
 
 	// allow some time for the reader to start listening
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 500)
 
 	pw := startWriter(eb)
 	defer pw.Conn.Close()
