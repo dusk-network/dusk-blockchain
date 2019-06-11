@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"io"
 	"net"
 	"sync"
 
@@ -32,6 +34,7 @@ type ChainSynchronizer struct {
 	latestHeader      *block.Header
 	gossip            *processing.Gossip
 	acceptedBlockChan <-chan block.Block
+	target            []byte
 }
 
 func newChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *ChainSynchronizer {
@@ -39,18 +42,25 @@ func newChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *C
 		publisher:         eventBroker,
 		gossip:            processing.NewGossip(magic),
 		acceptedBlockChan: consensus.InitAcceptedBlockUpdate(eventBroker),
+		target:            make([]byte, 32),
 	}
 }
 
 func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.Buffer) {
 	for {
 		blkBuf := <-blockChan
-		if s.isNext(blkBuf) {
+		r := bufio.NewReader(blkBuf)
+		if s.isNext(r) {
 			s.publisher.Publish(string(topics.Block), blkBuf)
 			continue
 		}
 
-		s.askForMissingBlocks(conn)
+		// Only ask for missing blocks if we don't have a current sync target
+		if s.noTarget() {
+			if err := s.askForMissingBlocks(conn, r); err != nil {
+				fmt.Println(err)
+			}
+		}
 	}
 }
 
@@ -58,25 +68,34 @@ func (s *ChainSynchronizer) listen() {
 	for {
 		blk := <-s.acceptedBlockChan
 		s.setLatestHeader(blk.Header)
+		// Empty our sync target if we receive the wanted block
+		if bytes.Equal(s.target, blk.Header.Hash) {
+			s.eraseTarget()
+		}
 	}
 }
 
-func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn) error {
-	msg := createGetBlocksMsg(s.currentHash())
+func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn, r io.Reader) error {
+	blk := block.NewBlock()
+	if err := blk.Decode(r); err != nil {
+		return err
+	}
+	s.setTarget(blk.Header.Hash)
+	msg := createGetBlocksMsg(s.currentHash(), blk.Header.Hash)
 	return s.sendGetBlocksMsg(msg, conn)
 }
 
-func (s *ChainSynchronizer) isNext(b *bytes.Buffer) bool {
-	height := peekBlockHeight(b)
+func (s *ChainSynchronizer) isNext(r *bufio.Reader) bool {
+	height := peekBlockHeight(r)
 	currentHeight := s.currentHeight()
 	return height-currentHeight <= 1
 }
 
-func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
+func createGetBlocksMsg(latestHash, target []byte) *peermsg.GetBlocks {
 	msg := &peermsg.GetBlocks{}
 	msg.Locators = append(msg.Locators, latestHash)
 	// Set the target to a zero value, so we get as many blocks as possible.
-	msg.Target = make([]byte, 32)
+	msg.Target = target
 	return msg
 }
 
@@ -100,9 +119,7 @@ func (s *ChainSynchronizer) sendGetBlocksMsg(msg *peermsg.GetBlocks, conn net.Co
 	return err
 }
 
-func peekBlockHeight(buf *bytes.Buffer) uint64 {
-	r := bufio.NewReader(buf)
-
+func peekBlockHeight(r *bufio.Reader) uint64 {
 	// The block height is a little-endian uint64, starting at index 1 of the buffer
 	// It is preceded by the version (1 byte)
 	bytes, err := r.Peek(9)
@@ -119,6 +136,17 @@ func (s *ChainSynchronizer) setLatestHeader(header *block.Header) {
 	s.latestHeader = header
 }
 
+func (s *ChainSynchronizer) setTarget(target []byte) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.target = target
+}
+
+func (s *ChainSynchronizer) eraseTarget() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.target = make([]byte, 32)
+}
 func (s *ChainSynchronizer) currentHeight() uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -129,4 +157,10 @@ func (s *ChainSynchronizer) currentHash() []byte {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.latestHeader.Hash
+}
+
+func (s *ChainSynchronizer) noTarget() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return bytes.Equal(s.target, make([]byte, 32))
 }

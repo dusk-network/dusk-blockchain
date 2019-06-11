@@ -57,17 +57,15 @@ func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 			return err
 		}
 
-		if blk == nil {
-			// This means we hit the end of the chain, so we can just return.
-			return nil
-		}
-
 		if err := b.sendBlock(blk); err != nil {
 			return err
 		}
-	}
 
-	return nil
+		// Hit target, so we can stop sending blocks.
+		if bytes.Equal(blk.Header.Hash, msg.Target) {
+			return nil
+		}
+	}
 }
 
 func (b *blockBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error) {
@@ -113,7 +111,7 @@ func (b *blockBroker) reconstructBlock(height uint64) (*block.Block, error) {
 	err := b.db.View(func(t database.Transaction) error {
 		hash, err := t.FetchBlockHashByHeight(height)
 		if err != nil {
-			return nil
+			return err
 		}
 
 		header, err := t.FetchBlockHeader(hash)

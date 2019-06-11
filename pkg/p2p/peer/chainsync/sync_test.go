@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
@@ -44,6 +45,8 @@ func TestSynchronizeBehind(t *testing.T) {
 	defer fn()
 
 	_ = setUpSynchronizerTest(t)
+
+	time.Sleep(500 * time.Millisecond)
 
 	// Create a block that is a few rounds in the future
 	encodedBlk := createEncodedBlock(t, 5, 20)

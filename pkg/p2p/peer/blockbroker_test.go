@@ -50,6 +50,7 @@ func TestSendBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db.Close()
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
 	hashes := generateBlocks(t, 5, db)
@@ -70,7 +71,7 @@ func TestSendBlocks(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Make a GetBlocks, with the genesis block as the locator.
-	msg := createGetBlocksBuffer(hashes[0], g)
+	msg := createGetBlocksBuffer(hashes[0], hashes[4], g)
 
 	// Connect to the peer and write the message to them
 	conn, err := net.Dial("tcp", ":3001")
@@ -145,10 +146,10 @@ func generateBlocks(t *testing.T, amount int, db database.DB) [][]byte {
 	return hashes
 }
 
-func createGetBlocksBuffer(locator []byte, g *processing.Gossip) *bytes.Buffer {
+func createGetBlocksBuffer(locator, target []byte, g *processing.Gossip) *bytes.Buffer {
 	getBlocks := &peermsg.GetBlocks{}
 	getBlocks.Locators = append(getBlocks.Locators, locator)
-	getBlocks.Target = make([]byte, 32)
+	getBlocks.Target = target
 
 	buf := new(bytes.Buffer)
 	if err := getBlocks.Encode(buf); err != nil {
