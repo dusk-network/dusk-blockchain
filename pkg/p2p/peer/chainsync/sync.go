@@ -69,7 +69,7 @@ func (s *ChainSynchronizer) listen() {
 		blk := <-s.acceptedBlockChan
 		s.setLatestHeader(blk.Header)
 		// Empty our sync target if we receive the wanted block
-		if bytes.Equal(s.target, blk.Header.Hash) {
+		if bytes.Equal(s.currentTarget(), blk.Header.Hash) {
 			s.eraseTarget()
 		}
 	}
@@ -157,6 +157,12 @@ func (s *ChainSynchronizer) currentHash() []byte {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.latestHeader.Hash
+}
+
+func (s *ChainSynchronizer) currentTarget() []byte {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.target
 }
 
 func (s *ChainSynchronizer) noTarget() bool {
