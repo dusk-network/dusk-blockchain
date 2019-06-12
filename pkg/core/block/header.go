@@ -9,6 +9,15 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+const (
+	// HeaderHashSize size of a block header hash in bytes
+	HeaderHashSize = 32
+	// CertHashSize is size of a certificate hash field in bytes
+	CertHashSize = 32
+	// HeightSize size of a block height field in bytes
+	HeightSize = 8
+)
+
 // Header defines a block header on a Dusk block.
 type Header struct {
 	Version   uint8  // Block version byte
