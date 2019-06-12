@@ -41,8 +41,8 @@ func TestBroker(t *testing.T) {
 	eb, roundChan := initAgreement(committeeMock)
 
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	round := <-roundChan
 	assert.Equal(t, uint64(2), round)
@@ -54,8 +54,8 @@ func TestNoQuorum(t *testing.T) {
 	committeeMock, keys := agreement.MockCommittee(3, true, 3)
 	eb, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	select {
 	case <-roundChan:
@@ -70,7 +70,7 @@ func TestSkipNoMember(t *testing.T) {
 	committeeMock, keys := agreement.MockCommittee(1, false, 2)
 	eb, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	select {
 	case <-roundChan:
