@@ -3,7 +3,6 @@ package agreement
 import (
 	"bytes"
 	"crypto/rand"
-	"fmt"
 
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
@@ -53,7 +52,6 @@ func genVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVo
 
 		stepCycle := i % 2
 		thisStep := step + uint8(stepCycle)
-		fmt.Println(thisStep)
 		stepVote := votes[stepCycle]
 		if stepVote == nil {
 			stepVote = NewStepVotes()
