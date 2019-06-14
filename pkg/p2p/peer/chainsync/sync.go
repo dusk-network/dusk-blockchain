@@ -181,7 +181,7 @@ func (s *ChainSynchronizer) eraseTarget() {
 }
 
 func (s *ChainSynchronizer) targetHeight() uint64 {
-	s.lock.Rlock()
+	s.lock.RLock()
 	defer s.lock.RUnlock()
 	if s.target != nil {
 		return s.target.Header.Height
@@ -199,12 +199,6 @@ func (s *ChainSynchronizer) currentHash() []byte {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.latestHeader.Hash
-}
-
-func (s *ChainSynchronizer) currentTarget() []byte {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.target
 }
 
 func (s *ChainSynchronizer) noTarget() bool {
