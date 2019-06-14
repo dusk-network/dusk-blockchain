@@ -57,13 +57,14 @@ func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 			return err
 		}
 
-		if err := b.sendBlock(blk); err != nil {
-			return err
-		}
-
-		// Hit target, so we can stop sending blocks.
+		// We don't send the target block, as the peer should already
+		// have this in memory.
 		if bytes.Equal(blk.Header.Hash, msg.Target) {
 			return nil
+		}
+
+		if err := b.sendBlock(blk); err != nil {
+			return err
 		}
 	}
 }
