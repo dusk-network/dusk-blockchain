@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
 	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -19,9 +17,7 @@ import (
 )
 
 func LaunchChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *ChainSynchronizer {
-	cs := newChainSynchronizer(eventBroker, magic)
-	go cs.listen()
-	return cs
+	return newChainSynchronizer(eventBroker, magic)
 }
 
 type Synchronizer interface {
@@ -29,50 +25,86 @@ type Synchronizer interface {
 }
 
 type ChainSynchronizer struct {
-	publisher         wire.EventPublisher
-	lock              sync.RWMutex
-	latestHeader      *block.Header
-	gossip            *processing.Gossip
-	acceptedBlockChan <-chan block.Block
-	target            []byte
+	publisher    wire.EventPublisher
+	lock         sync.RWMutex
+	latestHeader *block.Header
+	gossip       *processing.Gossip
+	target       *block.Block
 }
 
 func newChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *ChainSynchronizer {
-	return &ChainSynchronizer{
-		publisher:         eventBroker,
-		gossip:            processing.NewGossip(magic),
-		acceptedBlockChan: consensus.InitAcceptedBlockUpdate(eventBroker),
-		target:            make([]byte, 32),
+	cs := &ChainSynchronizer{
+		publisher: eventBroker,
+		gossip:    processing.NewGossip(magic),
 	}
+
+	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), cs.updateHeader)
+	return cs
 }
 
 func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.Buffer) {
 	for {
 		blkBuf := <-blockChan
 		r := bufio.NewReader(blkBuf)
-		if s.isNext(r) {
-			s.publisher.Publish(string(topics.Block), blkBuf)
+		height := peekBlockHeight(r)
+
+		// Only ask for missing blocks if we don't have a current sync target
+		if s.noTarget() && s.amBehind(height) {
+			if err := s.askForMissingBlocks(conn, r); err != nil {
+				log.WithFields(log.Fields{
+					"process": "synchronizer",
+					"error":   err,
+				}).Errorln("problem asking for blocks")
+			}
 			continue
 		}
 
-		// Only ask for missing blocks if we don't have a current sync target
-		if s.noTarget() {
-			if err := s.askForMissingBlocks(conn, r); err != nil {
-				fmt.Println(err)
+		if err := s.publishBlock(r); err != nil {
+			log.WithFields(log.Fields{
+				"process": "synchronizer",
+				"error":   err,
+			}).Errorln("problem publishing block")
+		}
+
+		if height == s.targetHeight()-1 {
+			if err := s.publishTarget(); err != nil {
+				log.WithFields(log.Fields{
+					"process": "synchronizer",
+					"error":   err,
+				}).Errorln("problem publishing target block")
 			}
+			s.eraseTarget()
 		}
 	}
 }
 
-func (s *ChainSynchronizer) listen() {
-	for {
-		blk := <-s.acceptedBlockChan
-		s.setLatestHeader(blk.Header)
-		// Empty our sync target if we receive the wanted block
-		if bytes.Equal(s.currentTarget(), blk.Header.Hash) {
-			s.eraseTarget()
-		}
+// TODO: concatenate this with publishTarget
+func (s *ChainSynchronizer) publishBlock(r *bufio.Reader) error {
+	buf := new(bytes.Buffer)
+	if _, err := buf.ReadFrom(r); err != nil {
+		return err
 	}
+	s.publisher.Publish(string(topics.Block), buf)
+	return nil
+}
+
+func (s *ChainSynchronizer) publishTarget() error {
+	targetBuf := new(bytes.Buffer)
+	if err := s.target.Encode(targetBuf); err != nil {
+		return err
+	}
+	s.publisher.Publish(string(topics.Block), targetBuf)
+	return nil
+}
+
+func (s *ChainSynchronizer) updateHeader(m *bytes.Buffer) error {
+	blk := block.NewBlock()
+	if err != blk.Decode(m); err != nil {
+		return eerr
+	}
+
+	s.setLatestHeader(blk.Header)
+	return nil
 }
 
 func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn, r io.Reader) error {
@@ -80,15 +112,14 @@ func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn, r io.Reader) erro
 	if err := blk.Decode(r); err != nil {
 		return err
 	}
-	s.setTarget(blk.Header.Hash)
+	s.setTarget(blk)
 	msg := createGetBlocksMsg(s.currentHash(), blk.Header.Hash)
 	return s.sendGetBlocksMsg(msg, conn)
 }
 
-func (s *ChainSynchronizer) isNext(r *bufio.Reader) bool {
-	height := peekBlockHeight(r)
+func (s *ChainSynchronizer) amBehind(height uint64) bool {
 	currentHeight := s.currentHeight()
-	return height-currentHeight <= 1
+	return int64(height)-int64(currentHeight) > 1
 }
 
 func createGetBlocksMsg(latestHash, target []byte) *peermsg.GetBlocks {
@@ -136,7 +167,7 @@ func (s *ChainSynchronizer) setLatestHeader(header *block.Header) {
 	s.latestHeader = header
 }
 
-func (s *ChainSynchronizer) setTarget(target []byte) {
+func (s *ChainSynchronizer) setTarget(target *block.Block) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.target = target
@@ -145,8 +176,18 @@ func (s *ChainSynchronizer) setTarget(target []byte) {
 func (s *ChainSynchronizer) eraseTarget() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.target = make([]byte, 32)
+	s.target = nil
 }
+
+func (s *ChainSynchronizer) targetHeight() uint64 {
+	s.lock.Rlock()
+	defer s.lock.RUnlock()
+	if s.target != nil {
+		return s.target.Header.Height
+	}
+	return 0
+}
+
 func (s *ChainSynchronizer) currentHeight() uint64 {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -168,5 +209,5 @@ func (s *ChainSynchronizer) currentTarget() []byte {
 func (s *ChainSynchronizer) noTarget() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return bytes.Equal(s.target, make([]byte, 32))
+	return s.target == nil
 }
