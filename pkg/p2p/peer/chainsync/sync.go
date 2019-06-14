@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"io"
 	"net"
 	"sync"
 
@@ -51,12 +50,12 @@ func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.B
 
 		// Only ask for missing blocks if we don't have a current sync target
 		if s.noTarget() && s.amBehind(height) {
-			if err := s.askForMissingBlocks(conn, r); err != nil {
-				log.WithFields(log.Fields{
-					"process": "synchronizer",
-					"error":   err,
-				}).Errorln("problem asking for blocks")
+			blk := block.NewBlock()
+			if err := blk.Decode(r); err != nil {
+				return err
 			}
+			s.setTarget(blk)
+			s.askForMissingBlocks(conn, blk)
 			continue
 		}
 
@@ -79,7 +78,6 @@ func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.B
 	}
 }
 
-// TODO: concatenate this with publishTarget
 func (s *ChainSynchronizer) publishBlock(r *bufio.Reader) error {
 	buf := new(bytes.Buffer)
 	if _, err := buf.ReadFrom(r); err != nil {
@@ -108,12 +106,7 @@ func (s *ChainSynchronizer) updateHeader(m *bytes.Buffer) error {
 	return nil
 }
 
-func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn, r io.Reader) error {
-	blk := block.NewBlock()
-	if err := blk.Decode(r); err != nil {
-		return err
-	}
-	s.setTarget(blk)
+func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn, blk *block.Block) {
 	msg := createGetBlocksMsg(s.currentHash(), blk.Header.Hash)
 	return s.sendGetBlocksMsg(msg, conn)
 }
