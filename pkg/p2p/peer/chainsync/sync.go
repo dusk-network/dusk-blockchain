@@ -52,10 +52,18 @@ func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.B
 		if s.noTarget() && s.amBehind(height) {
 			blk := block.NewBlock()
 			if err := blk.Decode(r); err != nil {
-				return err
+				log.WithFields(log.Fields{
+					"process": "synchronizer",
+					"error":   err,
+				}).Errorln("problem decoding block")
 			}
 			s.setTarget(blk)
-			s.askForMissingBlocks(conn, blk)
+			if err := s.askForMissingBlocks(conn, blk); err != nil {
+				log.WithFields(log.Fields{
+					"process": "synchronizer",
+					"error":   err,
+				}).Errorln("problem sending getblocks message")
+			}
 			continue
 		}
 
@@ -106,7 +114,7 @@ func (s *ChainSynchronizer) updateHeader(m *bytes.Buffer) error {
 	return nil
 }
 
-func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn, blk *block.Block) {
+func (s *ChainSynchronizer) askForMissingBlocks(conn net.Conn, blk *block.Block) error {
 	msg := createGetBlocksMsg(s.currentHash(), blk.Header.Hash)
 	return s.sendGetBlocksMsg(msg, conn)
 }
