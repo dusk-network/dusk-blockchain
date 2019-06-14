@@ -39,7 +39,6 @@ type Chain struct {
 	bidList   *user.BidList
 
 	// collector channels
-	blockChan       <-chan *block.Block
 	candidateChan   <-chan *block.Block
 	winningHashChan <-chan []byte
 }
@@ -74,7 +73,6 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	}
 
 	// set up collectors
-	blockChan := initBlockCollector(eventBus, string(topics.Block))
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
 	winningHashChan := initWinningHashCollector(eventBus)
 
@@ -84,11 +82,11 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		db:              db,
 		bidList:         &user.BidList{},
 		prevBlock:       *genesisBlock,
-		blockChan:       blockChan,
 		candidateChan:   candidateChan,
 		winningHashChan: winningHashChan,
 	}
 
+	eventBus.SubscribeCallback(string(topics.Block), c.onAcceptBlock)
 	return c, nil
 }
 
@@ -97,9 +95,6 @@ func (c *Chain) Listen() {
 	for {
 		select {
 
-		// wire.EventBus events handlers
-		case b := <-c.blockChan:
-			_ = c.AcceptBlock(*b)
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
 		case blockHash := <-c.winningHashChan:
@@ -197,12 +192,20 @@ func calculateX(d uint64, m []byte) user.Bid {
 	return bid
 }
 
+func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
+	blk := block.NewBlock()
+	if err := blk.Decode(m); err != nil {
+		return err
+	}
+
+	return c.AcceptBlock(*blk)
+}
+
 // AcceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
-
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
