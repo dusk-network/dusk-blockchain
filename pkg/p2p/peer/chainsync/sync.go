@@ -8,6 +8,7 @@ import (
 	"net"
 	"sync"
 
+	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
@@ -99,8 +100,8 @@ func (s *ChainSynchronizer) publishTarget() error {
 
 func (s *ChainSynchronizer) updateHeader(m *bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err != blk.Decode(m); err != nil {
-		return eerr
+	if err := blk.Decode(m); err != nil {
+		return err
 	}
 
 	s.setLatestHeader(blk.Header)
