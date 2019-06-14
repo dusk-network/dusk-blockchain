@@ -15,10 +15,8 @@ func Encode(b *bytes.Buffer) *bytes.Buffer {
 	if len(p) == 0 {
 		return new(bytes.Buffer)
 	}
-	// pad inital message with zero, if missing
-	if p[len(p)-1] != 0 {
-		p = append(p, 0)
-	}
+	// pad inital message with zero
+	p = append(p, 0)
 	var buf bytes.Buffer
 	for {
 		i := bytes.IndexByte(p, 0)
@@ -52,6 +50,8 @@ func Decode(p []byte) *bytes.Buffer {
 	for {
 		// nothing left, we are done
 		if len(p) == 0 {
+			// remove previously added padding
+			buf.Truncate(buf.Len() - 1)
 			return &buf
 		}
 		n, body := p[0], p[1:]
