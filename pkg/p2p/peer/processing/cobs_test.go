@@ -15,25 +15,25 @@ func TestCobs(t *testing.T) {
 		{
 			title: "fig.1/x",
 			size:  2,
-			dec:   []byte{'x', 0x00},
+			dec:   []byte{'x'},
 			enc:   []byte{0x02, 'x', 0x00},
 		},
 		{
 			title: "fig.1/xy",
 			size:  3,
-			dec:   []byte{'x', 'y', 0x00},
+			dec:   []byte{'x', 'y'},
 			enc:   []byte{0x03, 'x', 'y', 0x00},
 		},
 		{
 			title: "fig.1/Hello World",
 			size:  12,
-			dec:   []byte{'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', 0x00},
+			dec:   []byte{'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd'},
 			enc:   []byte{0x0c, 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', 0x00},
 		},
 		{
 			title: "fig.3",
 			size:  13,
-			dec:   []byte{0x45, 0x00, 0x00, 0x2C, 0x4C, 0x79, 0x00, 0x00, 0x40, 0x06, 0x4F, 0x37, 0x00},
+			dec:   []byte{0x45, 0x00, 0x00, 0x2C, 0x4C, 0x79, 0x00, 0x00, 0x40, 0x06, 0x4F, 0x37},
 			enc:   []byte{0x02, 0x45, 0x01, 0x04, 0x2C, 0x4C, 0x79, 0x01, 0x05, 0x40, 0x06, 0x4F, 0x37, 0x00},
 		},
 		{
@@ -82,7 +82,7 @@ func TestCobs(t *testing.T) {
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
-				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 0x00,
+				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 			},
 			enc: []byte{
 				0xff,
@@ -153,7 +153,7 @@ func TestCobs(t *testing.T) {
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
-				0x00, 0x00,
+				0x00,
 			},
 			enc: []byte{
 				0xfd,
@@ -196,7 +196,7 @@ func TestCobs(t *testing.T) {
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
-				0x00, 0x00,
+				0x00,
 			},
 			enc: []byte{
 				0xfe,
@@ -239,7 +239,7 @@ func TestCobs(t *testing.T) {
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
-				0x00, 0x00,
+				0x00,
 			},
 			enc: []byte{
 				0xff,
@@ -283,7 +283,7 @@ func TestCobs(t *testing.T) {
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
 				'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x',
-				0x00, 0x00,
+				0x00,
 			},
 			enc: []byte{
 				0xff,
@@ -322,12 +322,6 @@ func TestCobs(t *testing.T) {
 				t.Errorf("decoding error")
 			} else if !bytes.Equal(dec.Bytes(), tc.dec) {
 				t.Errorf("got %v, want %v", dec.Bytes(), tc.dec)
-			}
-		})
-		t.Run("size/"+tc.title, func(t *testing.T) {
-			size := EncodedSize(len(tc.dec))
-			if size != tc.size {
-				t.Errorf("got %v, want %v", size, tc.size)
 			}
 		})
 	}

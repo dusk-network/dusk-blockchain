@@ -45,7 +45,9 @@ func Decode(p []byte) *bytes.Buffer {
 		return new(bytes.Buffer)
 	}
 	// Cut delimiter
-	p = p[:len(p)-1]
+	if len(p) > 1 {
+		p = p[:len(p)-1]
+	}
 	var buf bytes.Buffer
 	for {
 		// nothing left, we are done
