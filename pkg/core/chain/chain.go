@@ -9,6 +9,7 @@ import (
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
 	logger "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"github.com/bwesterb/go-ristretto"
@@ -238,9 +239,9 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
-	// 4. Gossip block
-	if err := c.propagateBlock(blk); err != nil {
-		l.Errorf("block propagating failed: %s", err.Error())
+	// 4. Gossip advertise block Hash
+	if err := c.advertiseBlock(blk); err != nil {
+		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
@@ -356,4 +357,26 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 
 	// Run the general procedure of block accepting
 	return c.AcceptBlock(*candidate)
+}
+
+// Send Inventory message to all peers
+func (c *Chain) advertiseBlock(b block.Block) error {
+
+	msg := &peermsg.Inv{}
+	msg.InvList = make([]peermsg.InvVect, 1)
+	msg.InvList[0].Type = peermsg.InvTypeBlock
+	msg.InvList[0].Hash = b.Header.Hash
+
+	buf := new(bytes.Buffer)
+	if err := msg.Encode(buf); err != nil {
+		panic(err)
+	}
+
+	withTopic, err := wire.AddTopic(buf, topics.Inv)
+	if err != nil {
+		return err
+	}
+
+	c.eventBus.Stream(string(topics.Gossip), withTopic)
+	return nil
 }

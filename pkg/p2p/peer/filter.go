@@ -15,6 +15,8 @@ type messageFilter struct {
 
 	// 1-to-1 components
 	blockBroker *blockBroker
+	invBroker   *invBroker
+	dataBroker  *dataBroker
 	blockChan   chan<- *bytes.Buffer
 }
 
@@ -27,17 +29,25 @@ func (m *messageFilter) Collect(b *bytes.Buffer) error {
 }
 
 func (m *messageFilter) filter(topic topics.Topic, b *bytes.Buffer) {
+
+	var err error
 	switch topic {
 	case topics.GetBlocks:
-		if err := m.blockBroker.sendBlocks(b); err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Errorln("problem sending blocks")
-		}
+		err = m.blockBroker.sendBlocks(b)
 	case topics.Block:
 		m.blockChan <- b
+	case topics.GetData:
+		err = m.dataBroker.handleMsg(b)
+	case topics.Inv:
+		err = m.invBroker.handleMsg(b)
 	default:
 		m.publisher.Publish(string(topic), b)
+	}
+
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "peer",
+			"error":   err,
+		}).Errorf("problem handling message %s", string(topic))
 	}
 }
