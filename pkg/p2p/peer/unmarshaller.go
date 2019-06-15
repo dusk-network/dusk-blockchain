@@ -14,6 +14,10 @@ type messageUnmarshaller struct {
 
 func (m *messageUnmarshaller) Unmarshal(b []byte, w io.Writer) error {
 	payloadBuf := processing.Decode(b)
+	if payloadBuf == nil {
+		return errors.New("COBS decoding error")
+	}
+
 	magic := extractMagic(payloadBuf)
 
 	if !m.magicIsValid(magic) {

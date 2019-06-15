@@ -86,9 +86,9 @@ func TestSendBlocks(t *testing.T) {
 
 	r := bufio.NewReader(conn)
 
-	// We should receive 4 new blocks from the peer
+	// We should receive 3 new blocks from the peer
 	var blocks []*block.Block
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ {
 		bs, err := r.ReadBytes(0x00)
 		if err != nil {
 			t.Fatal(err)
