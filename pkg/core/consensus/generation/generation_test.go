@@ -16,6 +16,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
@@ -35,8 +36,13 @@ func TestScoreGeneration(t *testing.T) {
 	// launch score component
 	generation.Launch(eb, nil, d, k, gen, gen)
 
-	// update the round to start generation
-	updateRound(eb, 1)
+	// send an accepted block to start generation
+	blk := helper.RandomBlock(t, 0, 1)
+	blkBuf := new(bytes.Buffer)
+	if err := blk.Encode(blkBuf); err != nil {
+		t.Fatal(err)
+	}
+	eb.Publish(string(topics.AcceptedBlock), blkBuf)
 
 	buf, err := streamer.Read()
 	if err != nil {
