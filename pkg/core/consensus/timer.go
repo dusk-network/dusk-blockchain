@@ -1,25 +1,39 @@
 package consensus
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type Timer struct {
-	TimeOut     time.Duration
+	lock        sync.RWMutex
+	timeOut     time.Duration
 	baseTimeOut time.Duration
 	TimeOutChan chan struct{}
 }
 
 func NewTimer(timeOut time.Duration, timeOutChan chan struct{}) *Timer {
 	return &Timer{
-		TimeOut:     timeOut,
+		timeOut:     timeOut,
 		baseTimeOut: timeOut,
 		TimeOutChan: timeOutChan,
 	}
 }
 
 func (t *Timer) IncreaseTimeOut() {
-	t.TimeOut = t.TimeOut * 2
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.timeOut = t.timeOut * 2
 }
 
 func (t *Timer) ResetTimeOut() {
-	t.TimeOut = t.baseTimeOut
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	t.timeOut = t.baseTimeOut
+}
+
+func (t *Timer) TimeOut() time.Duration {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.timeOut
 }

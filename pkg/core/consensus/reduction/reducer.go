@@ -34,7 +34,7 @@ func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Ti
 }
 
 func (esw *eventStopWatch) fetch() []wire.Event {
-	timer := time.NewTimer(esw.timer.TimeOut)
+	timer := time.NewTimer(esw.timer.TimeOut())
 	select {
 	case <-timer.C:
 		return nil

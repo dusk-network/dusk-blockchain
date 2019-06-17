@@ -62,7 +62,7 @@ func (s *eventSelector) startSelection() {
 	go func() {
 		// propagating the best event after timeout,
 		// or stopping on reading from timeoutchan
-		timer := time.NewTimer(s.timer.TimeOut)
+		timer := time.NewTimer(s.timer.TimeOut())
 		select {
 		case <-timer.C:
 			s.publishBestEvent()
