@@ -125,7 +125,6 @@ func (s *ChainSynchronizer) amBehind(height uint64) bool {
 func createGetBlocksMsg(latestHash, target []byte) *peermsg.GetBlocks {
 	msg := &peermsg.GetBlocks{}
 	msg.Locators = append(msg.Locators, latestHash)
-	// Set the target to a zero value, so we get as many blocks as possible.
 	msg.Target = target
 	return msg
 }
