@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -49,22 +50,11 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 
 // RandomCertificate returns a random block certificate for testing
 func RandomCertificate(t *testing.T) *block.Certificate {
-	c := &block.Certificate{
-		BRBatchedSig: RandomSlice(t, 33),
-		BRStep:       20,
-
-		SRBatchedSig: RandomSlice(t, 33),
-		SRStep:       12,
+	return &block.Certificate{
+		BatchedSig: RandomSlice(t, 33),
+		Step:       20,
+		Committee:  rand.Uint64(),
 	}
-
-	for i := 0; i < 10; i++ {
-		c.BRPubKeys = append(c.BRPubKeys, RandomSlice(t, 33))
-		c.SRPubKeys = append(c.SRPubKeys, RandomSlice(t, 33))
-	}
-
-	err := c.SetHash()
-	assert.Nil(t, err)
-	return c
 }
 
 // RandomHeader returns a random header for testing. `height` randomness is up
@@ -80,7 +70,7 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 		Seed:          RandomSlice(t, 33),
 		TxRoot:        RandomSlice(t, 32),
 
-		CertHash: RandomSlice(t, 32),
+		Certificate: RandomCertificate(t),
 	}
 
 	return h
