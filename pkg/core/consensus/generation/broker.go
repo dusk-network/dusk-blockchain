@@ -15,8 +15,8 @@ import (
 
 // Launch will start the processes for score/block generation.
 func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus,
-	d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator) {
-	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen)
+	d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys) {
+	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys)
 	go broker.Listen()
 }
 
@@ -32,7 +32,7 @@ type broker struct {
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator) *broker {
+	gen Generator, blockGen BlockGenerator, keys user.Keys) *broker {
 	if gen == nil {
 		gen = newProofGenerator(d, k)
 	}
@@ -57,7 +57,9 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		regenerationChan:  regenerationChan,
 		acceptedBlockChan: acceptedBlockChan,
 		forwarder:         newForwarder(eventBroker, blockGen, rpcBus),
-		seeder:            &seeder{},
+		seeder: &seeder{
+			keys: keys,
+		},
 	}
 }
 
@@ -75,7 +77,14 @@ func (b *broker) Listen() {
 			}
 		case acceptedBlock := <-b.acceptedBlockChan:
 			b.forwarder.blockGenerator.UpdatePrevBlock(acceptedBlock)
-			seed := b.seeder.GenerateSeed(acceptedBlock.Header.Height + 1)
+			seed, err := b.seeder.GenerateSeed(acceptedBlock.Header.Seed, acceptedBlock.Header.Height+1)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"process": "generation",
+				}).WithError(err).Errorln("error generating seed")
+				continue
+			}
+
 			proof := b.proofGenerator.GenerateProof(seed)
 			b.Forward(proof, seed)
 		}

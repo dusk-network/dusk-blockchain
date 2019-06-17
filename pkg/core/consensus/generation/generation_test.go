@@ -34,7 +34,8 @@ func TestScoreGeneration(t *testing.T) {
 	gen := &mockGenerator{t}
 
 	// launch score component
-	generation.Launch(eb, nil, d, k, gen, gen)
+	keys, _ := user.NewRandKeys()
+	generation.Launch(eb, nil, d, k, gen, gen, keys)
 
 	// send an accepted block to start generation
 	blk := helper.RandomBlock(t, 0, 1)
