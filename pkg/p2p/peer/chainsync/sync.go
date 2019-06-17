@@ -18,6 +18,7 @@ import (
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "synchronizer"})
 
+// LaunchChainSynchronizer simply returns an initialized ChainSynchronizer.
 func LaunchChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *ChainSynchronizer {
 	return newChainSynchronizer(eventBroker, magic)
 }
@@ -26,6 +27,10 @@ type Synchronizer interface {
 	Synchronize(net.Conn, <-chan *bytes.Buffer)
 }
 
+// ChainSynchronizer is the component responsible for keeping the node in sync with the
+// rest of the network. It sits between the peer and the chain, as a sort of gateway for
+// incoming blocks. It keeps track of the chain tip and compares it with each incoming block
+// to make sure we stay in sync with our peers.
 type ChainSynchronizer struct {
 	publisher    wire.EventPublisher
 	lock         sync.RWMutex
@@ -46,6 +51,7 @@ func newChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *C
 
 // Synchronize our blockchain with our peers. This function should be started as a goroutine,
 // and provides an intermediary component in the message processing flow for blocks.
+// Implements Synchronizer interface.
 func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.Buffer) {
 	for {
 		blkBuf := <-blockChan
