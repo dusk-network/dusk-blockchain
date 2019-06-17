@@ -229,14 +229,9 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 func (bus *EventBus) publish(handlers []*channelHandler, messageBuffer *bytes.Buffer, topic string) {
 
 	for _, handler := range handlers {
-		var mCopy bytes.Buffer
-		if messageBuffer != nil {
-			// Copy the message buffer for concurrency-safety
-			mCopy = *messageBuffer
-		}
-
+		mCopy := copyBuffer(messageBuffer)
 		select {
-		case handler.messageChannel <- &mCopy:
+		case handler.messageChannel <- mCopy:
 		default:
 			log.WithFields(log.Fields{
 				"id":       handler.id,
@@ -250,12 +245,16 @@ func (bus *EventBus) publish(handlers []*channelHandler, messageBuffer *bytes.Bu
 
 func (bus *EventBus) publishCallback(handlers []*callbackHandler, message *bytes.Buffer, topic string) {
 	for _, handler := range handlers {
-		var mCopy bytes.Buffer
-		if message != nil {
-			// Copy the message buffer for concurrency-safety
-			mCopy = *message
-		}
-
-		_ = handler.callback(&mCopy)
+		mCopy := copyBuffer(message)
+		_ = handler.callback(mCopy)
 	}
+}
+
+func copyBuffer(m *bytes.Buffer) *bytes.Buffer {
+	var mCopy bytes.Buffer
+	if m != nil {
+		mCopy = *m
+	}
+
+	return &mCopy
 }
