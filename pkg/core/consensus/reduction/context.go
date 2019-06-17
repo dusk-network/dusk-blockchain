@@ -12,13 +12,10 @@ type context struct {
 	timer   *consensus.Timer
 }
 
-func newCtx(handler *reductionHandler, timeout time.Duration) *context {
+func newCtx(handler *reductionHandler, timeOut time.Duration) *context {
 	return &context{
 		handler: handler,
 		state:   consensus.NewState(),
-		timer: &consensus.Timer{
-			Timeout:     timeout,
-			TimeoutChan: make(chan struct{}, 1),
-		},
+		timer:   consensus.NewTimer(timeOut, make(chan struct{}, 1)),
 	}
 }
