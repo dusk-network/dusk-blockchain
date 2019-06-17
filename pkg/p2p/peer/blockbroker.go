@@ -37,6 +37,7 @@ func newBlockBroker(conn *Connection) (*blockBroker, error) {
 	}, nil
 }
 
+// Send back the set of blocks between the message locator and target.
 func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 	msg := &peermsg.GetBlocks{}
 	if err := msg.Decode(m); err != nil {

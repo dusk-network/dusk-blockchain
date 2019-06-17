@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
@@ -15,6 +15,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
+
+var log *logger.Entry = logger.WithFields(logger.Fields{"process": "synchronizer"})
 
 func LaunchChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *ChainSynchronizer {
 	return newChainSynchronizer(eventBroker, magic)
@@ -42,46 +44,42 @@ func newChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *C
 	return cs
 }
 
+// Synchronize our blockchain with our peers. This function should be started as a goroutine,
+// and provides an intermediary component in the message processing flow for blocks.
 func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.Buffer) {
 	for {
 		blkBuf := <-blockChan
 		r := bufio.NewReader(blkBuf)
 		height := peekBlockHeight(r)
 
-		// Only ask for missing blocks if we don't have a current sync target
-		if s.noTarget() && s.amBehind(height) {
+		// Only ask for missing blocks if we don't have a current sync target, to prevent
+		// asking many peers for (generally) the same blocks.
+		if !s.syncing() && s.amBehind(height) {
 			blk := block.NewBlock()
 			if err := blk.Decode(r); err != nil {
-				log.WithFields(log.Fields{
-					"process": "synchronizer",
-					"error":   err,
-				}).Errorln("problem decoding block")
+				log.WithError(err).Errorln("problem decoding block")
 			}
 			s.setTarget(blk)
 			if err := s.askForMissingBlocks(conn, blk); err != nil {
-				log.WithFields(log.Fields{
-					"process": "synchronizer",
-					"error":   err,
-				}).Errorln("problem sending getblocks message")
+				log.WithError(err).Errorln("problem sending getblocks message")
 			}
-			continue
 		}
 
-		if err := s.publishBlock(r); err != nil {
-			log.WithFields(log.Fields{
-				"process": "synchronizer",
-				"error":   err,
-			}).Errorln("problem publishing block")
-		}
-
-		if height == s.targetHeight()-1 {
-			if err := s.publishTarget(); err != nil {
-				log.WithFields(log.Fields{
-					"process": "synchronizer",
-					"error":   err,
-				}).Errorln("problem publishing target block")
+		// If this block is next in line, we publish it to the chain.
+		if !s.amBehind(height) {
+			if err := s.publishBlock(r); err != nil {
+				log.WithError(err).Errorln("problem publishing block")
 			}
-			s.eraseTarget()
+
+			// If this block is the one right before our sync target, we also publish
+			// the target block kept in memory, and clear that field, marking that
+			// we have completed synchronization.
+			if height == s.targetHeight()-1 {
+				if err := s.publishTarget(); err != nil {
+					log.WithError(err).Errorln("problem publishing target block")
+				}
+				s.eraseTarget()
+			}
 		}
 	}
 }
@@ -202,8 +200,8 @@ func (s *ChainSynchronizer) currentHash() []byte {
 	return s.latestHeader.Hash
 }
 
-func (s *ChainSynchronizer) noTarget() bool {
+func (s *ChainSynchronizer) syncing() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return s.target == nil
+	return s.target != nil
 }
