@@ -188,23 +188,34 @@ func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicPr
 	bus.preprocessors[topic] = preprocessors
 }
 
-func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) *bytes.Buffer {
+func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (*bytes.Buffer, error) {
 	bus.busLock.RLock()
 	defer bus.busLock.RUnlock()
 	if preprocessors, ok := bus.preprocessors[topic]; ok {
 		for _, preprocessor := range preprocessors {
-			messageBuffer, _ = preprocessor.Process(messageBuffer)
+			var err error
+			messageBuffer, err = preprocessor.Process(messageBuffer)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return messageBuffer
+	return messageBuffer, nil
 }
 
 // Publish executes callback defined for a topic.
 func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	bus.busLock.RLock()
 	defer bus.busLock.RUnlock()
-	processedMsg := bus.preprocess(topic, messageBuffer)
+	processedMsg, err := bus.preprocess(topic, messageBuffer)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "eventbus",
+			"error":   err,
+		}).Errorln("preprocessor error")
+		return
+	}
 
 	if handlers, ok := bus.handlers[topic]; ok {
 		bus.publish(handlers, processedMsg, topic)
@@ -219,7 +230,14 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 	bus.busLock.RLock()
 	defer bus.busLock.RUnlock()
-	processedMsg := bus.preprocess(topic, messageBuffer)
+	processedMsg, err := bus.preprocess(topic, messageBuffer)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "eventbus",
+			"error":   err,
+		}).Errorln("preprocessor error")
+		return
+	}
 
 	if _, ok := bus.streamHandlers[topic]; ok {
 		bus.ringbuffer.Put(processedMsg.Bytes())
