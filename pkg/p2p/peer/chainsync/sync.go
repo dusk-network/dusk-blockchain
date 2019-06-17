@@ -64,26 +64,38 @@ func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.B
 			blk := block.NewBlock()
 			if err := blk.Decode(r); err != nil {
 				log.WithError(err).Errorln("problem decoding block")
+				continue
 			}
-			s.setTarget(blk)
+
 			if err := s.askForMissingBlocks(conn, blk); err != nil {
 				log.WithError(err).Errorln("problem sending getblocks message")
+				continue
 			}
+
+			s.setTarget(blk)
 		}
 
 		// If this block is next in line, we publish it to the chain.
 		if !s.amBehind(height) {
 			if err := s.publishBlock(r); err != nil {
 				log.WithError(err).Errorln("problem publishing block")
+				continue
 			}
 
 			// If this block is the one right before our sync target, we also publish
 			// the target block kept in memory, and clear that field, marking that
 			// we have completed synchronization.
 			if height == s.targetHeight()-1 {
-				if err := s.publishTarget(); err != nil {
-					log.WithError(err).Errorln("problem publishing target block")
+				buf := new(bytes.Buffer)
+				if err := s.target.Encode(buf); err != nil {
+					// If we have issues encoding a block we previously decoded without
+					// modifying it, something is seriously wrong.
+					panic(err)
 				}
+
+				s.publisher.Publish(string(topics.Block), buf)
+
+				// Sync finished, we can clear our target value.
 				s.eraseTarget()
 			}
 		}
@@ -96,15 +108,6 @@ func (s *ChainSynchronizer) publishBlock(r *bufio.Reader) error {
 		return err
 	}
 	s.publisher.Publish(string(topics.Block), buf)
-	return nil
-}
-
-func (s *ChainSynchronizer) publishTarget() error {
-	targetBuf := new(bytes.Buffer)
-	if err := s.target.Encode(targetBuf); err != nil {
-		return err
-	}
-	s.publisher.Publish(string(topics.Block), targetBuf)
 	return nil
 }
 
