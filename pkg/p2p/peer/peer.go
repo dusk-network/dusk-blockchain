@@ -12,6 +12,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
@@ -72,17 +75,22 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap,
 		magic: magic,
 	}
 
-	blockBroker, err := newBlockBroker(pconn)
+	db, err := OpenDB()
 	if err != nil {
 		return nil, err
 	}
 
-	invBroker, err := newInvBroker(pconn)
+	blockBroker, err := newBlockBroker(pconn, db)
 	if err != nil {
 		return nil, err
 	}
 
-	dataBroker, err := newDataBroker(pconn)
+	invBroker, err := newInvBroker(pconn, db)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBroker, err := newDataBroker(pconn, db)
 	if err != nil {
 		return nil, err
 	}
@@ -206,4 +214,18 @@ func (c *Connection) Port() uint16 {
 // Addr returns the peer's address as a string.
 func (c *Connection) Addr() string {
 	return c.Conn.RemoteAddr().String()
+}
+
+func OpenDB() (database.DB, error) {
+	drvr, err := database.From(cfg.Get().Database.Driver)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }

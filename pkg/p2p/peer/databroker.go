@@ -3,13 +3,11 @@ package peer
 import (
 	"bytes"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -21,17 +19,7 @@ type dataBroker struct {
 
 // TODO: Consider moving this and blockBroker to a single struct
 // TODO: Consider utilizing RPCBus e.g rpcBus.Call(wire.GetMissingObjects)
-func newDataBroker(conn *Connection) (*dataBroker, error) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-	if err != nil {
-		return nil, err
-	}
-
+func newDataBroker(conn *Connection, db database.DB) (*dataBroker, error) {
 	return &dataBroker{
 		gossip: processing.NewGossip(conn.magic),
 		db:     db,
@@ -60,7 +48,7 @@ func (d *dataBroker) handleMsg(m *bytes.Buffer) error {
 		}
 
 		// Send the block data back to the initiator node as topics.Block msg
-		if err := d.PackAndSend(b); err != nil {
+		if err := d.packAndSend(b); err != nil {
 			return nil
 		}
 	}
@@ -93,7 +81,7 @@ func (d *dataBroker) fetchBlock(hash []byte) (*block.Block, error) {
 	return blk, err
 }
 
-func (d *dataBroker) PackAndSend(b *block.Block) error {
+func (d *dataBroker) packAndSend(b *block.Block) error {
 	buf := new(bytes.Buffer)
 	if err := b.Encode(buf); err != nil {
 		return err

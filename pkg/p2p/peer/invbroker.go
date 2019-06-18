@@ -3,12 +3,10 @@ package peer
 import (
 	"bytes"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -20,17 +18,7 @@ type invBroker struct {
 
 // TODO: Consider moving this and blockBroker to a single struct
 // TODO: Consider utilizing RPCBus e.g rpcBus.Call(wire.GetMissingObjects)
-func newInvBroker(conn *Connection) (*invBroker, error) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-	if err != nil {
-		return nil, err
-	}
-
+func newInvBroker(conn *Connection, db database.DB) (*invBroker, error) {
 	return &invBroker{
 		gossip: processing.NewGossip(conn.magic),
 		db:     db,
@@ -73,13 +61,13 @@ func (b *invBroker) handleMsg(m *bytes.Buffer) error {
 
 	if len(dataList) > 0 {
 		// we've got objects that are missing, then packet and request them
-		b.sendGetData(dataList)
+		b.packAndSend(dataList)
 	}
 
 	return nil
 }
 
-func (b *invBroker) sendGetData(list []peermsg.InvVect) error {
+func (b *invBroker) packAndSend(list []peermsg.InvVect) error {
 
 	// Construct and encode GetData message
 	// It reuses the peermsg.Inv payload structure

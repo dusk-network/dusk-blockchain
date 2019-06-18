@@ -85,12 +85,10 @@ func (inv *Inv) Decode(r io.Reader) error {
 }
 
 func supportedInvType(t InvType) bool {
-
 	for _, s := range supportedInvTypes {
 		if t == s {
 			return true
 		}
 	}
-
 	return false
 }
