@@ -19,8 +19,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-var port = "8000"
-
 func mockConfig(t *testing.T) func() {
 	storeDir, err := ioutil.TempDir(os.TempDir(), "chainsync_test")
 	if err != nil {
@@ -44,19 +42,12 @@ func TestSynchronizeBehind(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
 
-	_ = setUpSynchronizerTest(t)
+	_, conn := setUpSynchronizerTest(t)
 
 	time.Sleep(500 * time.Millisecond)
 
 	// Create a block that is a few rounds in the future
 	encodedBlk := createEncodedBlock(t, 5, 20)
-
-	// Connect to peer and write to conn
-	conn, err := net.Dial("tcp", ":"+port)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
 
 	if _, err := conn.Write(encodedBlk.Bytes()); err != nil {
 		t.Fatal(err)
@@ -86,7 +77,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
 
-	eb := setUpSynchronizerTest(t)
+	eb, conn := setUpSynchronizerTest(t)
 
 	// subscribe to topics.Block
 	blockChan := make(chan *bytes.Buffer, 1)
@@ -94,13 +85,6 @@ func TestSynchronizeSynced(t *testing.T) {
 
 	// Make a block which should follow our genesis block
 	encodedBlk := createEncodedBlock(t, 1, 20)
-
-	// Connect to peer and write to conn
-	conn, err := net.Dial("tcp", ":"+port)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
 
 	if _, err := conn.Write(encodedBlk.Bytes()); err != nil {
 		t.Fatal(err)
@@ -110,9 +94,10 @@ func TestSynchronizeSynced(t *testing.T) {
 	<-blockChan
 }
 
-func setUpSynchronizerTest(t *testing.T) *wire.EventBus {
+func setUpSynchronizerTest(t *testing.T) (*wire.EventBus, net.Conn) {
 	eb := wire.NewEventBus()
 	cs := chainsync.LaunchChainSynchronizer(eb, protocol.TestNet)
+	client, srv := net.Pipe()
 
 	// Accept a block at height 0
 	blk := randomBlockBuffer(t, 0, 1)
@@ -120,14 +105,14 @@ func setUpSynchronizerTest(t *testing.T) *wire.EventBus {
 
 	// Set up a peer reader and send it a block that is a few rounds ahead
 	go func() {
-		peerReader, err := helper.StartPeerReader(eb, cs, port)
+		peerReader, err := helper.StartPeerReader(srv, eb, cs)
 		if err != nil {
 			t.Fatal(err)
 		}
 		peerReader.ReadLoop()
 	}()
 
-	return eb
+	return eb, client
 }
 
 func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.Buffer {

@@ -58,9 +58,10 @@ func TestSendBlocks(t *testing.T) {
 	eb := wire.NewEventBus()
 	cs := chainsync.LaunchChainSynchronizer(eb, protocol.TestNet)
 	g := processing.NewGossip(protocol.TestNet)
+	client, srv := net.Pipe()
 
 	go func() {
-		peerReader, err := helper.StartPeerReader(eb, cs, "3001")
+		peerReader, err := helper.StartPeerReader(srv, eb, cs)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,18 +74,11 @@ func TestSendBlocks(t *testing.T) {
 	// Make a GetBlocks, with the genesis block as the locator.
 	msg := createGetBlocksBuffer(hashes[0], hashes[4], g)
 
-	// Connect to the peer and write the message to them
-	conn, err := net.Dial("tcp", ":3001")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-
-	if _, err := conn.Write(msg.Bytes()); err != nil {
+	if _, err := client.Write(msg.Bytes()); err != nil {
 		t.Fatal(err)
 	}
 
-	r := bufio.NewReader(conn)
+	r := bufio.NewReader(client)
 
 	// We should receive 3 new blocks from the peer
 	var blocks []*block.Block
