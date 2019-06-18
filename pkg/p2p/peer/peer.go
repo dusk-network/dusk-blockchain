@@ -6,8 +6,6 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -182,13 +180,6 @@ func (c *Connection) Write(b []byte) (int, error) {
 	n, err := c.Conn.Write(b)
 	c.lock.Unlock()
 	return n, err
-}
-
-// Port returns the port
-func (c *Connection) Port() uint16 {
-	s := strings.Split(c.Addr(), ":")
-	port, _ := strconv.ParseUint(s[1], 10, 16)
-	return uint16(port)
 }
 
 // Addr returns the peer's address as a string.

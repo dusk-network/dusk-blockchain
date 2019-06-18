@@ -5,16 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"net"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // Handshake with another peer.
@@ -147,22 +142,8 @@ func (p *Connection) writeVerAck() error {
 }
 
 func (p *Connection) createVersionBuffer() (*bytes.Buffer, error) {
-	fromPort := uint16(p.Port())
 	version := protocol.NodeVer
-	localIP, err := util.GetOutboundIP()
-	if err != nil {
-		return nil, err
-	}
-	fromAddr := wire.NetAddress{
-		IP:   localIP,
-		Port: fromPort,
-	}
-
-	toIP := p.Conn.RemoteAddr().(*net.TCPAddr).IP
-	toPort := p.Conn.RemoteAddr().(*net.TCPAddr).Port
-	toAddr := wire.NewNetAddress(toIP.String(), uint16(toPort))
-
-	message, err := newVersionMessageBuffer(version, &fromAddr, toAddr, protocol.FullNode)
+	message, err := newVersionMessageBuffer(version, protocol.FullNode)
 	if err != nil {
 		return nil, err
 	}
