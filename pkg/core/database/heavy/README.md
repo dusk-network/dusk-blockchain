@@ -4,7 +4,7 @@
 For general concept explanation one can refer to /pkg/core/database/README.md. This document must focus on decisions made with regard to goleveldb specifics
 
 
-### K/V storage schema to store a single `pkg/core/block.Block`
+### K/V storage schema to store a single `pkg/core/block.Block` into blockchain
 
 |    Prefix   | KEY                | VALUE                    | Count per block            |  Used by                 |
 | :-----:     | :----------------: | :---------------------:  | :----------------------:   |:----------------------:  |
@@ -13,7 +13,13 @@ For general concept explanation one can refer to /pkg/core/database/README.md. T
 |  0x04       | TxID               | HeaderHash               | block txs count            | FetchBlockTxByHash
 |  0x05       | KeyImage           | TxID                     | sum of block txs inputs    | FetchKeyImageExists
 |  0x03       | Height             | HeaderHash               | 1                          | FetchBlockHashByHeight
-|  0x06       | #PrefixAsKey       | Block.Encode()           | 1 per blockchain           | FetchCandidateBlock
+
+
+### K/V storage schema to store a candidate `pkg/core/block.Block`
+
+|    Prefix   | KEY                | VALUE                    | Count           |  Used by                 |
+| :-----:     | :----------------: | :---------------------:  | :----------------------:   |:----------------------:  |
+|  0x06       | HeaderHash + Height             | Block.Encode()           | Many per blockchain        | Store/Fetch/Delete CandidateBlock
 
 
 Table notation
