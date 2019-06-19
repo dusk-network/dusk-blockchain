@@ -36,6 +36,12 @@ var (
 	// Implemented by mempool
 	GetVerifiedTxs     = "getVerifiedTxs"
 	GetVerifiedTxsChan chan Req
+
+	// Verify a specified candidate block
+	//
+	// Used by the reduction component.
+	VerifyCandidateBlock     = "verifyCandidateBlock"
+	VerifyCandidateBlockChan chan Req
 )
 
 // RPCBus is a request–response mechanism for internal communication between node

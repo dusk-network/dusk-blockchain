@@ -110,6 +110,14 @@ func (c *Chain) Listen() {
 			buf := new(bytes.Buffer)
 			_ = c.prevBlock.Encode(buf)
 			r.RespChan <- *buf
+
+		case r := <-wire.VerifyCandidateBlockChan:
+			if err := c.verifyCandidateBlock(r.Params.Bytes()); err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
+			r.RespChan <- bytes.Buffer{}
 		}
 	}
 }
@@ -264,12 +272,6 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 }
 
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
-	// Ensure the candidate block satisfies all chain rules
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
-		log.Errorf("verifying the candidate block failed: %s", err.Error())
-		return err
-	}
-
 	// Save it into persistent storage
 	err := c.db.Update(func(t database.Transaction) error {
 		err := t.StoreCandidateBlock(&candidate)
@@ -289,16 +291,7 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 
 func (c *Chain) handleWinningHash(blockHash []byte) error {
 	// Fetch the candidate block that the winningHash points at
-	var candidate *block.Block
-	err := c.db.View(func(t database.Transaction) error {
-		var err error
-		candidate, err = t.FetchCandidateBlock(blockHash)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-
+	candidate, err := c.fetchCandidateBlock(blockHash)
 	if err != nil {
 		log.Errorf("fetching a candidate block failed: %s", err.Error())
 		return err
@@ -306,4 +299,27 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 
 	// Run the general procedure of block accepting
 	return c.AcceptBlock(*candidate)
+}
+
+func (c *Chain) fetchCandidateBlock(hash []byte) (*block.Block, error) {
+	var candidate *block.Block
+	err := c.db.View(func(t database.Transaction) error {
+		var err error
+		candidate, err = t.FetchCandidateBlock(hash)
+		return err
+	})
+
+	return candidate, err
+}
+
+func (c *Chain) verifyCandidateBlock(hash []byte) error {
+	candidate, err := c.fetchCandidateBlock(hash)
+	if err != nil {
+		log.Errorf("fetching a candidate block failed: %s", err.Error())
+		return err
+	}
+
+	// TODO: once certificate checks are added to block verification, they should
+	// be bypassed here as it will not yet contain a certificate
+	return verifiers.CheckBlock(c.db, c.prevBlock, *candidate)
 }

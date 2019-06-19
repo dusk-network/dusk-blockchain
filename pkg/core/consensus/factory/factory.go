@@ -68,7 +68,7 @@ func (c *ConsensusFactory) StartConsensus() {
 	reputation.Launch(c.eventBus)
 	generation.Launch(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
 	selection.Launch(c.eventBus, nil, c.timerLength)
-	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
+	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength, c.rpcBus)
 
 	// Wait for the initial round to be published
 	round := <-c.initChannel
