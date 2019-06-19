@@ -49,7 +49,7 @@ func (d *dataBroker) handleMsg(m *bytes.Buffer) error {
 
 		// Send the block data back to the initiator node as topics.Block msg
 		if err := d.packAndSend(b); err != nil {
-			return nil
+			return err
 		}
 	}
 

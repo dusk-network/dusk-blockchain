@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
@@ -20,14 +21,32 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func TestSendInv2(t *testing.T) {
+func TestSendInv(t *testing.T) {
+
+	fn := mockConfig(t)
+	defer fn()
 
 	// Send topics.Inv
-	// Expect topics.GetData to be received in return
 	b := helper.RandomBlock(t, 1, 1)
 	encoded, _ := sendWithInvPayload(t, b.Header.Hash, topics.Inv)
 
-	_ = assertMsg(t, encoded.Bytes(), topics.GetData)
+	// Expect topics.GetData to be received in return
+	buf := assertMsg(t, encoded.Bytes(), topics.GetData)
+
+	// Assert the output
+	invPayload := &peermsg.Inv{}
+	err := invPayload.Decode(bytes.NewBuffer(buf))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(invPayload.InvList[0].Hash, b.Header.Hash) {
+		t.Error("hash from topics.GetData is not equal to the hash from topics.Inv")
+	}
+
+	if len(invPayload.InvList) > 1 {
+		t.Error("expecting only one object")
+	}
 }
 
 func TestSendGetData(t *testing.T) {
@@ -42,15 +61,24 @@ func TestSendGetData(t *testing.T) {
 
 	// Send topics.GetData
 	// Expect topics.Block to be received in return
-	hashes := generateBlocks(t, 1, db)
+	hashes, blocks := generateBlocks(t, 1, db)
 	encoded, _ := sendWithInvPayload(t, hashes[0], topics.GetData)
 
-	_ = assertMsg(t, encoded.Bytes(), topics.Block)
+	buf := assertMsg(t, encoded.Bytes(), topics.Block)
+
+	// assert the output
+	b := &block.Block{}
+	err = b.Decode(bytes.NewBuffer(buf))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !blocks[0].Equals(b) {
+		t.Error("block from topics.Block is not equal to the block from topics.GetData")
+	}
 }
 
 func assertMsg(t *testing.T, encodedMsg []byte, expected topics.Topic) []byte {
-	fn := mockConfig(t)
-	defer fn()
 
 	eb := wire.NewEventBus()
 	cs := chainsync.LaunchChainSynchronizer(eb, protocol.TestNet)
