@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
+	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
@@ -16,6 +16,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+var log *logger.Entry = logger.WithFields(logger.Fields{"process": "synchronizer"})
+
+// LaunchChainSynchronizer simply returns an initialized ChainSynchronizer.
 func LaunchChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *ChainSynchronizer {
 	return newChainSynchronizer(eventBroker, magic)
 }
@@ -24,6 +27,10 @@ type Synchronizer interface {
 	Synchronize(net.Conn, <-chan *bytes.Buffer)
 }
 
+// ChainSynchronizer is the component responsible for keeping the node in sync with the
+// rest of the network. It sits between the peer and the chain, as a sort of gateway for
+// incoming blocks. It keeps track of the chain tip and compares it with each incoming block
+// to make sure we stay in sync with our peers.
 type ChainSynchronizer struct {
 	publisher    wire.EventPublisher
 	lock         sync.RWMutex
@@ -42,46 +49,55 @@ func newChainSynchronizer(eventBroker wire.EventBroker, magic protocol.Magic) *C
 	return cs
 }
 
+// Synchronize our blockchain with our peers. This function should be started as a goroutine,
+// and provides an intermediary component in the message processing flow for blocks.
+// Implements Synchronizer interface.
 func (s *ChainSynchronizer) Synchronize(conn net.Conn, blockChan <-chan *bytes.Buffer) {
 	for {
 		blkBuf := <-blockChan
 		r := bufio.NewReader(blkBuf)
 		height := peekBlockHeight(r)
 
-		// Only ask for missing blocks if we don't have a current sync target
-		if s.noTarget() && s.amBehind(height) {
+		// Only ask for missing blocks if we don't have a current sync target, to prevent
+		// asking many peers for (generally) the same blocks.
+		if !s.syncing() && s.amBehind(height) {
 			blk := block.NewBlock()
 			if err := blk.Decode(r); err != nil {
-				log.WithFields(log.Fields{
-					"process": "synchronizer",
-					"error":   err,
-				}).Errorln("problem decoding block")
+				log.WithError(err).Errorln("problem decoding block")
+				continue
 			}
-			s.setTarget(blk)
+
 			if err := s.askForMissingBlocks(conn, blk); err != nil {
-				log.WithFields(log.Fields{
-					"process": "synchronizer",
-					"error":   err,
-				}).Errorln("problem sending getblocks message")
+				log.WithError(err).Errorln("problem sending getblocks message")
+				continue
 			}
-			continue
+
+			s.setTarget(blk)
 		}
 
-		if err := s.publishBlock(r); err != nil {
-			log.WithFields(log.Fields{
-				"process": "synchronizer",
-				"error":   err,
-			}).Errorln("problem publishing block")
-		}
-
-		if height == s.targetHeight()-1 {
-			if err := s.publishTarget(); err != nil {
-				log.WithFields(log.Fields{
-					"process": "synchronizer",
-					"error":   err,
-				}).Errorln("problem publishing target block")
+		// If this block is next in line, we publish it to the chain.
+		if !s.amBehind(height) {
+			if err := s.publishBlock(r); err != nil {
+				log.WithError(err).Errorln("problem publishing block")
+				continue
 			}
-			s.eraseTarget()
+
+			// If this block is the one right before our sync target, we also publish
+			// the target block kept in memory, and clear that field, marking that
+			// we have completed synchronization.
+			if height == s.targetHeight()-1 {
+				buf := new(bytes.Buffer)
+				if err := s.target.Encode(buf); err != nil {
+					// If we have issues encoding a block we previously decoded without
+					// modifying it, something is seriously wrong.
+					panic(err)
+				}
+
+				s.publisher.Publish(string(topics.Block), buf)
+
+				// Sync finished, we can clear our target value.
+				s.eraseTarget()
+			}
 		}
 	}
 }
@@ -92,15 +108,6 @@ func (s *ChainSynchronizer) publishBlock(r *bufio.Reader) error {
 		return err
 	}
 	s.publisher.Publish(string(topics.Block), buf)
-	return nil
-}
-
-func (s *ChainSynchronizer) publishTarget() error {
-	targetBuf := new(bytes.Buffer)
-	if err := s.target.Encode(targetBuf); err != nil {
-		return err
-	}
-	s.publisher.Publish(string(topics.Block), targetBuf)
 	return nil
 }
 
@@ -127,7 +134,6 @@ func (s *ChainSynchronizer) amBehind(height uint64) bool {
 func createGetBlocksMsg(latestHash, target []byte) *peermsg.GetBlocks {
 	msg := &peermsg.GetBlocks{}
 	msg.Locators = append(msg.Locators, latestHash)
-	// Set the target to a zero value, so we get as many blocks as possible.
 	msg.Target = target
 	return msg
 }
@@ -202,8 +208,8 @@ func (s *ChainSynchronizer) currentHash() []byte {
 	return s.latestHeader.Hash
 }
 
-func (s *ChainSynchronizer) noTarget() bool {
+func (s *ChainSynchronizer) syncing() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return s.target == nil
+	return s.target != nil
 }

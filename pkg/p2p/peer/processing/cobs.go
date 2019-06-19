@@ -1,3 +1,5 @@
+// This source file is a slightly altered version of the COBS implementation
+// found here: https://github.com/dim13/cobs
 package processing
 
 import (

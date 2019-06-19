@@ -18,8 +18,9 @@ func TestHandshake(t *testing.T) {
 	defer fn()
 
 	eb := wire.NewEventBus()
+	client, srv := net.Pipe()
 	go func() {
-		pr, err := helper.StartPeerReader(eb, &mockSynchronizer{}, port)
+		pr, err := helper.StartPeerReader(srv, eb, &mockSynchronizer{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -31,18 +32,9 @@ func TestHandshake(t *testing.T) {
 	// allow some time for the reader to start listening
 	time.Sleep(time.Millisecond * 500)
 
-	pw := startWriter(eb)
+	pw := peer.NewWriter(client, protocol.TestNet, eb)
 	defer pw.Conn.Close()
 	if err := pw.Handshake(); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func startWriter(subscriber wire.EventSubscriber) *peer.Writer {
-	conn, err := net.Dial("tcp", ":"+port)
-	if err != nil {
-		panic(err)
-	}
-
-	return peer.NewWriter(conn, protocol.TestNet, subscriber)
 }
