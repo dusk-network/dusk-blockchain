@@ -18,12 +18,12 @@ type invBroker struct {
 
 // TODO: Consider moving this and blockBroker to a single struct
 // TODO: Consider utilizing RPCBus e.g rpcBus.Call(wire.GetMissingObjects)
-func newInvBroker(conn *Connection, db database.DB) (*invBroker, error) {
+func newInvBroker(conn *Connection, db database.DB) *invBroker {
 	return &invBroker{
 		gossip: processing.NewGossip(conn.magic),
 		db:     db,
 		conn:   conn,
-	}, nil
+	}
 }
 
 func (b *invBroker) handleMsg(m *bytes.Buffer) error {
