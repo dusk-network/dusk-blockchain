@@ -3,13 +3,11 @@ package peer
 import (
 	"bytes"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -19,17 +17,7 @@ type blockBroker struct {
 	conn   *Connection
 }
 
-func newBlockBroker(conn *Connection) (*blockBroker, error) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-	if err != nil {
-		return nil, err
-	}
-
+func newBlockBroker(conn *Connection, db database.DB) (*blockBroker, error) {
 	return &blockBroker{
 		gossip: processing.NewGossip(conn.magic),
 		db:     db,

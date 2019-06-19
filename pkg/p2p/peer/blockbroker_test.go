@@ -53,7 +53,7 @@ func TestSendBlocks(t *testing.T) {
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
-	hashes := generateBlocks(t, 5, db)
+	hashes, _ := generateBlocks(t, 5, db)
 
 	eb := wire.NewEventBus()
 	cs := chainsync.LaunchChainSynchronizer(eb, protocol.TestNet)
@@ -123,21 +123,23 @@ func TestSendBlocks(t *testing.T) {
 	}
 }
 
-func generateBlocks(t *testing.T, amount int, db database.DB) [][]byte {
+func generateBlocks(t *testing.T, amount int, db database.DB) ([][]byte, []*block.Block) {
 	var hashes [][]byte
+	var blocks []*block.Block
 	for i := 0; i < amount; i++ {
 		blk := helper.RandomBlock(t, uint64(i), 2)
 		hashes = append(hashes, blk.Header.Hash)
+		blocks = append(blocks, blk)
 		err := db.Update(func(t database.Transaction) error {
 			return t.StoreBlock(blk)
 		})
 
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 	}
 
-	return hashes
+	return hashes, blocks
 }
 
 func createGetBlocksBuffer(locator, target []byte, g *processing.Gossip) *bytes.Buffer {
