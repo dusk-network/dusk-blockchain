@@ -3,7 +3,6 @@ package peer
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
@@ -17,15 +16,15 @@ type blockBroker struct {
 	conn   *Connection
 }
 
-func newBlockBroker(conn *Connection, db database.DB) (*blockBroker, error) {
+func newBlockBroker(conn *Connection, db database.DB) *blockBroker {
 	return &blockBroker{
 		gossip: processing.NewGossip(conn.magic),
 		db:     db,
 		conn:   conn,
-	}, nil
+	}
 }
 
-// Send back the set of blocks between the message locator and target.
+// Send back the set of block hashes between the message locator and target.
 func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 	msg := &peermsg.GetBlocks{}
 	if err := msg.Decode(m); err != nil {
@@ -38,24 +37,32 @@ func (b *blockBroker) sendBlocks(m *bytes.Buffer) error {
 		return err
 	}
 
+	// Fill an inv message with all block hashes between the locator
+	// and the chain tip.
+	inv := &peermsg.Inv{}
 	for {
 		height++
 
-		blk, err := b.reconstructBlock(height)
+		var hash []byte
+		err := b.db.View(func(t database.Transaction) error {
+			hash, err = t.FetchBlockHashByHeight(height)
+			return err
+		})
+
 		if err != nil {
 			return err
 		}
 
 		// We don't send the target block, as the peer should already
 		// have this in memory.
-		if bytes.Equal(blk.Header.Hash, msg.Target) {
-			return nil
+		if bytes.Equal(hash, msg.Target) {
+			break
 		}
 
-		if err := b.sendBlock(blk); err != nil {
-			return err
-		}
+		inv.AddItem(peermsg.InvTypeBlock, hash)
 	}
+
+	return b.sendInv(inv)
 }
 
 func (b *blockBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error) {
@@ -73,13 +80,13 @@ func (b *blockBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error)
 	return height, err
 }
 
-func (b *blockBroker) sendBlock(blk *block.Block) error {
+func (b *blockBroker) sendInv(msg *peermsg.Inv) error {
 	buf := new(bytes.Buffer)
-	if err := blk.Encode(buf); err != nil {
+	if err := msg.Encode(buf); err != nil {
 		return err
 	}
 
-	bufWithTopic, err := wire.AddTopic(buf, topics.Block)
+	bufWithTopic, err := wire.AddTopic(buf, topics.Inv)
 	if err != nil {
 		return err
 	}
@@ -94,32 +101,4 @@ func (b *blockBroker) sendBlock(blk *block.Block) error {
 	}
 
 	return nil
-}
-
-func (b *blockBroker) reconstructBlock(height uint64) (*block.Block, error) {
-	var blk *block.Block
-	err := b.db.View(func(t database.Transaction) error {
-		hash, err := t.FetchBlockHashByHeight(height)
-		if err != nil {
-			return err
-		}
-
-		header, err := t.FetchBlockHeader(hash)
-		if err != nil {
-			return err
-		}
-
-		txs, err := t.FetchBlockTxs(hash)
-		if err != nil {
-			return err
-		}
-
-		blk = &block.Block{
-			Header: header,
-			Txs:    txs,
-		}
-		return nil
-	})
-
-	return blk, err
 }

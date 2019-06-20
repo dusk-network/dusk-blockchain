@@ -9,7 +9,7 @@ import (
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
@@ -53,7 +53,13 @@ func TestSendGetData(t *testing.T) {
 
 	fn := mockConfig(t)
 	defer fn()
-	db, err := heavy.NewDatabase(cfg.Get().Database.Dir, protocol.TestNet, false)
+	drvr, err := database.From(cfg.Get().Database.Driver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer drvr.Close()
+
+	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.TestNet, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,6 +68,16 @@ func TestSendGetData(t *testing.T) {
 	// Send topics.GetData
 	// Expect topics.Block to be received in return
 	hashes, blocks := generateBlocks(t, 1, db)
+	for _, blk := range blocks {
+		err := db.Update(func(t database.Transaction) error {
+			return t.StoreBlock(blk)
+		})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	encoded, _ := sendWithInvPayload(t, hashes[0], topics.GetData)
 
 	buf := assertMsg(t, encoded.Bytes(), topics.Block)

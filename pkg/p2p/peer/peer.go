@@ -78,20 +78,9 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap,
 		return nil, err
 	}
 
-	blockBroker, err := newBlockBroker(pconn, db)
-	if err != nil {
-		return nil, err
-	}
-
-	invBroker, err := newInvBroker(pconn, db)
-	if err != nil {
-		return nil, err
-	}
-
-	dataBroker, err := newDataBroker(pconn, db)
-	if err != nil {
-		return nil, err
-	}
+	blockBroker := newBlockBroker(pconn, db)
+	invBroker := newInvBroker(pconn, db)
+	dataBroker := newDataBroker(pconn, db)
 
 	blockChan := make(chan *bytes.Buffer, 1)
 	go synchronizer.Synchronize(pconn, blockChan)

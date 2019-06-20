@@ -19,12 +19,12 @@ type dataBroker struct {
 
 // TODO: Consider moving this and blockBroker to a single struct
 // TODO: Consider utilizing RPCBus e.g rpcBus.Call(wire.GetMissingObjects)
-func newDataBroker(conn *Connection, db database.DB) (*dataBroker, error) {
+func newDataBroker(conn *Connection, db database.DB) *dataBroker {
 	return &dataBroker{
 		gossip: processing.NewGossip(conn.magic),
 		db:     db,
 		conn:   conn,
-	}, nil
+	}
 }
 
 func (d *dataBroker) handleMsg(m *bytes.Buffer) error {
