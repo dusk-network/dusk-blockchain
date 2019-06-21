@@ -19,7 +19,7 @@ type messageRouter struct {
 
 	// 1-to-1 components
 	blockHashBroker *processing.BlockHashBroker
-	invBroker       *processing.InvBroker
+	dataRequestor   *processing.DataRequestor
 	dataBroker      *processing.DataBroker
 	synchronizer    *chainsync.ChainSynchronizer
 }
@@ -40,7 +40,7 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	case topics.GetData:
 		err = m.dataBroker.SendItems(b)
 	case topics.Inv:
-		err = m.invBroker.AskForMissingItems(b)
+		err = m.dataRequestor.RequestMissingItems(b)
 	case topics.Block:
 		err = m.synchronizer.Synchronize(b)
 	default:

@@ -9,17 +9,17 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// InvBroker is a processing unit which handles inventory messages received from peers
+// DataRequestor is a processing unit which handles inventory messages received from peers
 // on the Dusk wire protocol. It maintains a connection to the outgoing message queue
 // of an individual peer.
-type InvBroker struct {
+type DataRequestor struct {
 	db           database.DB
 	responseChan chan<- *bytes.Buffer
 }
 
-// NewInvBroker returns an initialized InvBroker.
-func NewInvBroker(db database.DB, responseChan chan<- *bytes.Buffer) *InvBroker {
-	return &InvBroker{
+// NewDataRequestor returns an initialized DataRequestor.
+func NewDataRequestor(db database.DB, responseChan chan<- *bytes.Buffer) *DataRequestor {
+	return &DataRequestor{
 		db:           db,
 		responseChan: responseChan,
 	}
@@ -28,7 +28,7 @@ func NewInvBroker(db database.DB, responseChan chan<- *bytes.Buffer) *InvBroker 
 // AskForMissingItems takes an inventory message, checks it for any items that the node
 // is missing, puts these items in a GetData wire message, and sends it off to the peer's
 // outgoing message queue, requesting the items in full.
-func (b *InvBroker) AskForMissingItems(m *bytes.Buffer) error {
+func (d *DataRequestor) RequestMissingItems(m *bytes.Buffer) error {
 	msg := &peermsg.Inv{}
 	if err := msg.Decode(m); err != nil {
 		return err
@@ -42,7 +42,7 @@ func (b *InvBroker) AskForMissingItems(m *bytes.Buffer) error {
 		}
 
 		// Check if local blockchain state does include this block hash ...
-		err := b.db.View(func(t database.Transaction) error {
+		err := d.db.View(func(t database.Transaction) error {
 			_, err := t.FetchBlockExists(obj.Hash)
 			if err == database.ErrBlockNotFound {
 				// .. if not, let's request the full block data from the InvMsg initiator node
@@ -67,7 +67,7 @@ func (b *InvBroker) AskForMissingItems(m *bytes.Buffer) error {
 			return err
 		}
 
-		b.responseChan <- buf
+		d.responseChan <- buf
 	}
 
 	return nil

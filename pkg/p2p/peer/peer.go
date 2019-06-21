@@ -80,7 +80,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 	}
 
 	blockHashBroker := processing.NewBlockHashBroker(db, responseChan)
-	invBroker := processing.NewInvBroker(db, responseChan)
+	dataRequestor := processing.NewDataRequestor(db, responseChan)
 	dataBroker := processing.NewDataBroker(db, responseChan)
 	synchronizer := chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter)
 	return &Reader{
@@ -91,7 +91,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 			dupeMap:         dupeMap,
 			blockHashBroker: blockHashBroker,
 			synchronizer:    synchronizer,
-			invBroker:       invBroker,
+			dataRequestor:   dataRequestor,
 			dataBroker:      dataBroker,
 		},
 	}, nil

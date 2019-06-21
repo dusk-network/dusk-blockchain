@@ -11,7 +11,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func TestSendInv(t *testing.T) {
+func TestRequestData(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
 
@@ -20,7 +20,7 @@ func TestSendInv(t *testing.T) {
 	defer db.Close()
 
 	responseChan := make(chan *bytes.Buffer, 100)
-	invBroker := processing.NewInvBroker(db, responseChan)
+	dataRequestor := processing.NewDataRequestor(db, responseChan)
 
 	// Send topics.Inv
 	hash, buf, err := createInvBuffer()
@@ -28,7 +28,7 @@ func TestSendInv(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := invBroker.AskForMissingItems(buf); err != nil {
+	if err := dataRequestor.RequestMissingItems(buf); err != nil {
 		t.Fatal(err)
 	}
 
