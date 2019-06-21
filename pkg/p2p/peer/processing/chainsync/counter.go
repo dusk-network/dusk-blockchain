@@ -8,11 +8,14 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+// Counter is a simple guarded counter, which can be used to figure out if we are currently
+// syncing with another peer. It is used to orchestrate requests for blocks.
 type Counter struct {
 	lock            sync.RWMutex
 	blocksRemaining uint64
 }
 
+// NewCounter returns an initialized counter. It will decrement each time we accept a new block.
 func NewCounter(subscriber wire.EventSubscriber) *Counter {
 	sc := &Counter{}
 	subscriber.SubscribeCallback(string(topics.AcceptedBlock), sc.decrement)
