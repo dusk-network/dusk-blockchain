@@ -24,7 +24,7 @@ func TestSynchronizeBehind(t *testing.T) {
 
 	msg := <-responseChan
 
-	// Check topic, which should start at index 4 (magic preceding it)
+	// Check topic
 	var topicBytes [15]byte
 	copy(topicBytes[:], msg.Bytes()[0:15])
 	topic := topics.ByteArrayToTopic(topicBytes)
