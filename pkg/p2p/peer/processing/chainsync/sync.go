@@ -37,9 +37,7 @@ func NewChainSynchronizer(publisher wire.EventPublisher, rpcBus *wire.RPCBus, re
 	}
 }
 
-// Synchronize our blockchain with our peers. This function should be started as a goroutine,
-// and provides an intermediary component in the message processing flow for blocks.
-// Implements Synchronizer interface.
+// Synchronize our blockchain with our peers.
 func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
 	r := bufio.NewReader(blkBuf)
 	height, err := peekBlockHeight(r)
