@@ -87,6 +87,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 		Connection:   pconn,
 		unmarshaller: &messageUnmarshaller{magic},
 		router: &messageRouter{
+			publisher:       publisher,
 			dupeMap:         dupeMap,
 			blockHashBroker: blockHashBroker,
 			synchronizer:    synchronizer,
