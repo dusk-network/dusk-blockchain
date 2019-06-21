@@ -12,6 +12,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -41,7 +42,8 @@ func TestReader(t *testing.T) {
 	}()
 
 	eb := wire.NewEventBus()
-	peerReader, err := helper.StartPeerReader(srv, eb, &mockSynchronizer{})
+	rpcBus := wire.NewRPCBus()
+	peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, chainsync.NewCounter(eb), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

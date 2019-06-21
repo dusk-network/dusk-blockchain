@@ -1,29 +1,25 @@
-package peer_test
+package processing_test
 
 import (
-	"bufio"
 	"bytes"
+	"io"
 	"io/ioutil"
-	"net"
 	"os"
 	"testing"
-	"time"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func mockConfig(t *testing.T) func() {
-	storeDir, err := ioutil.TempDir(os.TempDir(), "peer_test")
+	storeDir, err := ioutil.TempDir(os.TempDir(), "processing_test")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -39,6 +35,20 @@ func mockConfig(t *testing.T) func() {
 	}
 }
 
+func setupDatabase() (database.Driver, database.DB) {
+	drvr, err := database.From(cfg.Get().Database.Driver)
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.TestNet, false)
+	if err != nil {
+		panic(err)
+	}
+
+	return drvr, db
+}
+
 // Test the behaviour of the block broker
 func TestSendBlocks(t *testing.T) {
 	fn := mockConfig(t)
@@ -46,82 +56,37 @@ func TestSendBlocks(t *testing.T) {
 
 	// Set up db
 	// TODO: use a mock for this instead
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		t.Fatal(err)
-	}
+	drvr, db := setupDatabase()
 	defer drvr.Close()
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.TestNet, false)
-	if err != nil {
-		t.Fatal(err)
-	}
 	defer db.Close()
 
-	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
+	// Generate 5 blocks and store them in the db. Save the hashes for later checking.
 	hashes, blocks := generateBlocks(t, 5, db)
-	for _, blk := range blocks {
-		err := db.Update(func(t database.Transaction) error {
-			return t.StoreBlock(blk)
-		})
-
-		if err != nil {
-			t.Fatal(err)
-		}
+	if err := storeBlocks(db, blocks); err != nil {
+		t.Fatal(err)
 	}
 
-	eb := wire.NewEventBus()
-	cs := chainsync.LaunchChainSynchronizer(eb, protocol.TestNet)
-	g := processing.NewGossip(protocol.TestNet)
-	client, srv := net.Pipe()
-
-	go func() {
-		peerReader, err := helper.StartPeerReader(srv, eb, cs)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		peerReader.ReadLoop()
-	}()
-
-	time.Sleep(500 * time.Millisecond)
+	responseChan := make(chan *bytes.Buffer, 100)
+	blockBroker := processing.NewBlockBroker(db, responseChan)
 
 	// Make a GetBlocks, with the genesis block as the locator.
-	msg := createGetBlocksBuffer(hashes[0], hashes[4], g)
+	msg := createGetBlocksBuffer(hashes[0])
 
-	if _, err := client.Write(msg.Bytes()); err != nil {
+	if err := blockBroker.AdvertiseMissingBlocks(msg); err != nil {
 		t.Fatal(err)
 	}
 
-	r := bufio.NewReader(client)
-
-	// We should receive an inv message from the peer
-	bs, err := r.ReadBytes(0x00)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	decoded := processing.Decode(bs)
-
-	// Remove magic bytes
-	if _, err := decoded.Read(make([]byte, 4)); err != nil {
-		t.Fatal(err)
-	}
+	response := <-responseChan
 
 	// Check for correctness of topic
-	var topicBytes [15]byte
-	if _, err := decoded.Read(topicBytes[:]); err != nil {
-		t.Fatal(err)
-	}
-
-	topic := topics.ByteArrayToTopic(topicBytes)
+	topic := extractTopic(response)
 	if topic != topics.Inv {
 		t.Fatalf("unexpected topic %s, expected Inv", topic)
 	}
 
-	// Decode block from the stream
+	// Decode inv
 	inv := &peermsg.Inv{}
-	if err := inv.Decode(decoded); err != nil {
+	if err := inv.Decode(response); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,25 +110,37 @@ func generateBlocks(t *testing.T, amount int, db database.DB) ([][]byte, []*bloc
 	return hashes, blocks
 }
 
-func createGetBlocksBuffer(locator, target []byte, g *processing.Gossip) *bytes.Buffer {
+func createGetBlocksBuffer(locator []byte) *bytes.Buffer {
 	getBlocks := &peermsg.GetBlocks{}
 	getBlocks.Locators = append(getBlocks.Locators, locator)
-	getBlocks.Target = target
 
 	buf := new(bytes.Buffer)
 	if err := getBlocks.Encode(buf); err != nil {
 		panic(err)
 	}
 
-	msg, err := wire.AddTopic(buf, topics.GetBlocks)
-	if err != nil {
+	return buf
+}
+
+func extractTopic(r io.Reader) topics.Topic {
+	var topicBytes [15]byte
+	if _, err := r.Read(topicBytes[:]); err != nil {
 		panic(err)
 	}
 
-	encoded, err := g.Process(msg)
-	if err != nil {
-		panic(err)
+	return topics.ByteArrayToTopic(topicBytes)
+}
+
+func storeBlocks(db database.DB, blocks []*block.Block) error {
+	for _, blk := range blocks {
+		err := db.Update(func(t database.Transaction) error {
+			return t.StoreBlock(blk)
+		})
+
+		if err != nil {
+			return err
+		}
 	}
 
-	return encoded
+	return nil
 }
