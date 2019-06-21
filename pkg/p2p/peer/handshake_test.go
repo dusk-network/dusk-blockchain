@@ -16,8 +16,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-var port = "3000"
-
 func mockConfig(t *testing.T) func() {
 	storeDir, err := ioutil.TempDir(os.TempDir(), "peer_test")
 	if err != nil {
