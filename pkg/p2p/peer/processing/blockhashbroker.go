@@ -9,26 +9,32 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-type BlockBroker struct {
+// BlockHashBroker is a processing unit which handles GetBlocks messages.
+// It has a database connection, and a channel pointing to the outgoing message queue
+// of the requesting peer.
+type BlockHashBroker struct {
 	db           database.DB
 	responseChan chan<- *bytes.Buffer
 }
 
-func NewBlockBroker(db database.DB, responseChan chan<- *bytes.Buffer) *BlockBroker {
-	return &BlockBroker{
+// NewBlockHashBroker will return an initialized BlockHashBroker.
+func NewBlockHashBroker(db database.DB, responseChan chan<- *bytes.Buffer) *BlockHashBroker {
+	return &BlockHashBroker{
 		db:           db,
 		responseChan: responseChan,
 	}
 }
 
-// Send back the set of block hashes between the message locator and target.
-func (b *BlockBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
+// AdvertiseMissingBlocks takes a GetBlocks wire message, finds the requesting peer's
+// height, and returns an inventory message of up to 500 blocks which follow the
+// provided locator.
+func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 	msg := &peermsg.GetBlocks{}
 	if err := msg.Decode(m); err != nil {
 		return err
 	}
 
-	// Fetch blocks to send to peer, going off his Locator
+	// Determine from where we need to start fetching blocks, going off his Locator
 	height, err := b.fetchLocatorHeight(msg)
 	if err != nil {
 		return err
@@ -47,6 +53,7 @@ func (b *BlockBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 		})
 
 		// This means we passed the tip of the chain, so we can exit the loop
+		// TODO: does it really, or do we need a more sophisticated way to go about it?
 		if err != nil {
 			break
 		}
@@ -57,6 +64,8 @@ func (b *BlockBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 		}
 	}
 
+	// If we retrieved any items, we should marshal the inventory message, and send it
+	// to the requesting peer.
 	if inv.InvList != nil {
 		buf, err := marshalInv(inv)
 		if err != nil {
@@ -69,7 +78,8 @@ func (b *BlockBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 	return nil
 }
 
-func (b *BlockBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error) {
+// Determine a peer's height from his locator hash.
+func (b *BlockHashBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error) {
 	var height uint64
 	err := b.db.View(func(t database.Transaction) error {
 		header, err := t.FetchBlockHeader(msg.Locators[0])

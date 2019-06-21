@@ -53,6 +53,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	<-blockChan
 }
 
+// Returns an encoded representation of a `helper.RandomBlock`.
 func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, txBatchCount)
 	buf := new(bytes.Buffer)
@@ -73,6 +74,8 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *wire.EventB
 	return cs, eb, responseChan
 }
 
+// Dummy goroutine which simply sends a random block back when the ChainSynchronizer
+// requests the last block.
 func respond(t *testing.T, rpcBus *wire.RPCBus) {
 	r := <-wire.GetLastBlockChan
 	r.RespChan <- *randomBlockBuffer(t, 0, 1)

@@ -10,7 +10,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// Test the behaviour of the data broker
+// Test the behaviour of the data broker, when it receives a GetData message.
 func TestSendData(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
@@ -22,11 +22,12 @@ func TestSendData(t *testing.T) {
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
-	hashes, blocks := generateBlocks(t, 5, db)
+	hashes, blocks := generateBlocks(t, 5)
 	if err := storeBlocks(db, blocks); err != nil {
 		t.Fatal(err)
 	}
 
+	// Set up DataBroker
 	responseChan := make(chan *bytes.Buffer, 100)
 	dataBroker := processing.NewDataBroker(db, responseChan)
 

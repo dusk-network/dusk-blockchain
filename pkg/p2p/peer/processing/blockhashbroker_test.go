@@ -49,8 +49,8 @@ func setupDatabase() (database.Driver, database.DB) {
 	return drvr, db
 }
 
-// Test the behaviour of the block broker
-func TestSendBlocks(t *testing.T) {
+// Test the behaviour of the block hash broker, upon receiving a GetBlocks message.
+func TestAdvertiseBlocks(t *testing.T) {
 	fn := mockConfig(t)
 	defer fn()
 
@@ -61,21 +61,22 @@ func TestSendBlocks(t *testing.T) {
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db. Save the hashes for later checking.
-	hashes, blocks := generateBlocks(t, 5, db)
+	hashes, blocks := generateBlocks(t, 5)
 	if err := storeBlocks(db, blocks); err != nil {
 		t.Fatal(err)
 	}
 
+	// Set up the BlockHashBroker
 	responseChan := make(chan *bytes.Buffer, 100)
-	blockBroker := processing.NewBlockBroker(db, responseChan)
+	blockHashBroker := processing.NewBlockHashBroker(db, responseChan)
 
 	// Make a GetBlocks, with the genesis block as the locator.
 	msg := createGetBlocksBuffer(hashes[0])
-
-	if err := blockBroker.AdvertiseMissingBlocks(msg); err != nil {
+	if err := blockHashBroker.AdvertiseMissingBlocks(msg); err != nil {
 		t.Fatal(err)
 	}
 
+	// The BlockHashBroker's response should be put on the responseChan.
 	response := <-responseChan
 
 	// Check for correctness of topic
@@ -98,7 +99,8 @@ func TestSendBlocks(t *testing.T) {
 	}
 }
 
-func generateBlocks(t *testing.T, amount int, db database.DB) ([][]byte, []*block.Block) {
+// Generate a set of random blocks, which follow each other up in the chain.
+func generateBlocks(t *testing.T, amount int) ([][]byte, []*block.Block) {
 	var hashes [][]byte
 	var blocks []*block.Block
 	for i := 0; i < amount; i++ {

@@ -25,6 +25,9 @@ type ChainSynchronizer struct {
 	responseChan chan<- *bytes.Buffer
 }
 
+// NewChainSynchronizer returns an initialized ChainSynchronizer. The passed responseChan
+// should point to an individual peer's outgoing message queue, and the passed Counter
+// should be shared between all instances of the ChainSynchronizer.
 func NewChainSynchronizer(publisher wire.EventPublisher, rpcBus *wire.RPCBus, responseChan chan<- *bytes.Buffer, counter *Counter) *ChainSynchronizer {
 	return &ChainSynchronizer{
 		publisher:    publisher,
@@ -44,7 +47,6 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
 		return err
 	}
 
-	// Get our most recent block
 	blk, err := s.getLastBlock()
 	if err != nil {
 		return err

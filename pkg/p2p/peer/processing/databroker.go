@@ -10,11 +10,15 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+// DataBroker is a processing unit responsible for handling GetData messages. It
+// maintains a connection to the outgoing message queue of the peer it receives this
+// message from.
 type DataBroker struct {
 	db           database.DB
 	responseChan chan<- *bytes.Buffer
 }
 
+// NewDataBroker returns an initialized DataBroker.
 func NewDataBroker(db database.DB, responseChan chan<- *bytes.Buffer) *DataBroker {
 	return &DataBroker{
 		db:           db,
@@ -22,6 +26,8 @@ func NewDataBroker(db database.DB, responseChan chan<- *bytes.Buffer) *DataBroke
 	}
 }
 
+// SendItems takes a GetData message from the wire, and iterates through the list,
+// sending back each item's complete data to the requesting peer.
 func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 	msg := &peermsg.Inv{}
 	if err := msg.Decode(m); err != nil {
@@ -30,6 +36,7 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 
 	for _, obj := range msg.InvList {
 		// support only InvTypeBlock for now
+		// TODO: Add functionality for InvTypeTX
 		if obj.Type != peermsg.InvTypeBlock {
 			continue
 		}
