@@ -19,7 +19,6 @@ func (m *messageUnmarshaller) Unmarshal(b []byte, w io.Writer) error {
 	}
 
 	magic := extractMagic(payloadBuf)
-
 	if !m.magicIsValid(magic) {
 		return errors.New("received message header magic is mismatched")
 	}
