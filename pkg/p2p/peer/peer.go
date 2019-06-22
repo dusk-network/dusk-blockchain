@@ -140,12 +140,18 @@ func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer) {
 		buf := <-responseChan
 		processed, err := w.gossip.Process(buf)
 		if err != nil {
-			// log
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error processing outgoing message")
 			continue
 		}
 
 		if _, err := w.Conn.Write(processed.Bytes()); err != nil {
-			// log
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error writing message")
 			return
 		}
 	}
