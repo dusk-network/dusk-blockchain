@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -125,7 +125,7 @@ func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 	return eb, streamer
 }
 
-func StartPeerReader(conn net.Conn, bus *wire.EventBus, synchronizer chainsync.Synchronizer) (*peer.Reader, error) {
+func StartPeerReader(conn net.Conn, bus *wire.EventBus, rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*peer.Reader, error) {
 	dupeMap := dupemap.NewDupeMap(5)
-	return peer.NewReader(conn, protocol.TestNet, dupeMap, bus, synchronizer)
+	return peer.NewReader(conn, protocol.TestNet, dupeMap, bus, rpcBus, counter, responseChan)
 }
