@@ -3,14 +3,11 @@ package processing_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
-	"os"
 	"testing"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
@@ -18,30 +15,13 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func mockConfig(t *testing.T) func() {
-	storeDir, err := ioutil.TempDir(os.TempDir(), "processing_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Database.Dir = storeDir
-	r.Database.Driver = heavy.DriverName
-	r.General.Network = "testnet"
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
 func setupDatabase() (database.Driver, database.DB) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
+	drvr, err := database.From(lite.DriverName)
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.TestNet, false)
+	db, err := drvr.Open("", protocol.TestNet, false)
 	if err != nil {
 		panic(err)
 	}
@@ -51,13 +31,10 @@ func setupDatabase() (database.Driver, database.DB) {
 
 // Test the behaviour of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	// Set up db
 	// TODO: use a mock for this instead
-	drvr, db := setupDatabase()
-	defer drvr.Close()
+	_, db := setupDatabase()
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db. Save the hashes for later checking.

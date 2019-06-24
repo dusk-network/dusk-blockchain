@@ -116,6 +116,17 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 }
 
 func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
+	// TODO: This can be another table
+	for _, data := range t.db.storage[blocksInd] {
+		b := block.Block{}
+		if err := b.Decode(bytes.NewReader(data)); err != nil {
+			return nil, err
+		}
+
+		if b.Header.Height == height {
+			return b.Header.Hash, nil
+		}
+	}
 	return nil, database.ErrBlockNotFound
 }
 
@@ -136,11 +147,6 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 	return tx, txIndex, nil, err
 }
 
-// FetchKeyImageExists checks if the KeyImage exists. If so, it also returns the
-// hash of its corresponding tx.
-//
-// Due to performance concerns, the found tx is not verified. By explicitly
-// calling FetchBlockTxByHash, a consumer can check if the tx is real
 func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
 
 	// TODO: Map keyImage to txID
@@ -153,8 +159,6 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	return true, txID, nil
 }
 
-// StoreCandidateBlock stores a candidate block to be proposed in next consensus
-// round. it overwrites an entry of block with same height
 func (t *transaction) StoreCandidateBlock(b *block.Block) error {
 	buf := new(bytes.Buffer)
 	if err := b.Encode(buf); err != nil {
