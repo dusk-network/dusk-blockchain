@@ -3,20 +3,32 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"math"
+	"math/big"
+	"math/rand"
 	"net"
 	"time"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
+	"gitlab.dusk.network/dusk-core/zkproof"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
@@ -29,6 +41,11 @@ type Server struct {
 	chain    *chain.Chain
 	dupeMap  *dupemap.DupeMap
 	counter  *chainsync.Counter
+	keys     *user.Keys
+
+	MyBid   *transactions.Bid
+	d, k    ristretto.Scalar
+	MyStake *transactions.Stake
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
@@ -41,7 +58,7 @@ func Setup() *Server {
 
 	// generating the keys
 	// TODO: this should probably lookup the keys on a local storage before recreating new ones
-	// keys, _ := user.NewRandKeys()
+	keys, _ := user.NewRandKeys()
 
 	m := mempool.NewMempool(eventBus, nil)
 	m.Run()
@@ -74,12 +91,47 @@ func Setup() *Server {
 		chain:    chain,
 		dupeMap:  dupeBlacklist,
 		counter:  chainsync.NewCounter(eventBus),
+		keys:     &keys,
 	}
 
 	// Connecting to the general monitoring system
 	// ConnectToMonitor(eventBus, d)
 
+	// Setting up the consensus factory
+	f := factory.New(srv.eventBus, srv.rpcBus, 3*time.Second, keys)
+	go f.StartConsensus()
+
+	// Creating stake and bid
+	stake := makeStake(srv.keys)
+	srv.MyStake = stake
+
+	bid, d, k := makeBid()
+	srv.MyBid = bid
+	srv.d = d
+	srv.k = k
+
+	// Setting up generation component
+	go srv.launchGeneration()
+
 	return srv
+}
+
+func (s *Server) launchGeneration() {
+	blockChan := make(chan *bytes.Buffer, 1)
+	s.eventBus.Subscribe(string(topics.AcceptedBlock), blockChan)
+	for {
+		blkBuf := <-blockChan
+		blk := block.NewBlock()
+		if err := blk.Decode(blkBuf); err != nil {
+			panic(err)
+		}
+
+		for _, tx := range blk.Txs {
+			if tx.Equals(s.MyBid) {
+				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil)
+			}
+		}
+	}
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
@@ -154,4 +206,60 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 func (s *Server) Close() {
 	s.chain.Close()
 	s.rpcBus.Close()
+}
+
+func (s *Server) sendStake() {
+	buf := new(bytes.Buffer)
+	s.MyStake.Encode(buf)
+	s.eventBus.Publish(string(topics.Tx), buf)
+}
+
+func (s *Server) sendBid() {
+	buf := new(bytes.Buffer)
+	s.MyBid.Encode(buf)
+	s.eventBus.Publish(string(topics.Tx), buf)
+}
+
+func makeStake(keys *user.Keys) *transactions.Stake {
+	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, *keys.EdPubKey, keys.BLSPubKey.Marshal())
+	keyImage, _ := crypto.RandEntropy(32)
+	txID, _ := crypto.RandEntropy(32)
+	signature, _ := crypto.RandEntropy(32)
+	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
+	stake.Inputs = transactions.Inputs{input}
+
+	outputAmount := rand.Int63n(100000)
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
+	destKey, _ := crypto.RandEntropy(32)
+	rangeProof, _ := crypto.RandEntropy(32)
+	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
+	stake.Outputs = transactions.Outputs{output}
+
+	return stake
+}
+
+func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
+	k := ristretto.Scalar{}
+	k.Rand()
+	outputAmount := rand.Int63n(100000)
+	d := big.NewInt(outputAmount)
+	dScalar := ristretto.Scalar{}
+	dScalar.SetBigInt(d)
+	m := zkproof.CalculateM(k)
+	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, m.Bytes())
+	keyImage, _ := crypto.RandEntropy(32)
+	txID, _ := crypto.RandEntropy(32)
+	signature, _ := crypto.RandEntropy(32)
+	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
+	bid.Inputs = transactions.Inputs{input}
+
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
+	destKey, _ := crypto.RandEntropy(32)
+	rangeProof, _ := crypto.RandEntropy(32)
+	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
+	bid.Outputs = transactions.Outputs{output}
+
+	return bid, dScalar, k
 }
