@@ -33,7 +33,7 @@ func (s *Counter) decrement(b *bytes.Buffer) error {
 	if s.blocksRemaining > 0 {
 		s.blocksRemaining--
 		// Refresh the timer whenever we get a new block during sync
-		s.timer.Reset()
+		s.timer.Reset(syncTime)
 	}
 
 	return nil
