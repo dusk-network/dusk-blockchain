@@ -5,10 +5,8 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
@@ -39,12 +37,11 @@ type ConsensusFactory struct {
 
 	user.Keys
 	timerLength time.Duration
-	d, k        ristretto.Scalar
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration,
-	keys user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
+	keys user.Keys) *ConsensusFactory {
 	initChannel := make(chan uint64, 1)
 
 	initCollector := &initCollector{initChannel}
@@ -56,8 +53,6 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration
 		initChannel: initChannel,
 		Keys:        keys,
 		timerLength: timerLength,
-		d:           d,
-		k:           k,
 	}
 }
 
@@ -66,7 +61,6 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.Launch(c.eventBus)
-	generation.Launch(c.eventBus, c.rpcBus, c.d, c.k, nil, nil)
 	selection.Launch(c.eventBus, nil, c.timerLength)
 	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
 
