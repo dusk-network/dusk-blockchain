@@ -3,16 +3,13 @@ package peer_test
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
 	"net"
-	"os"
 	"testing"
 	"time"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
@@ -22,31 +19,11 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func mockConfig(t *testing.T) func() {
-	storeDir, err := ioutil.TempDir(os.TempDir(), "peer_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Database.Dir = storeDir
-	r.Database.Driver = heavy.DriverName
-	r.General.Network = "testnet"
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
 // Test the behaviour of the block broker
 func TestSendBlocks(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	// Set up db
 	// TODO: use a mock for this instead
-	db, err := heavy.NewDatabase(cfg.Get().Database.Dir, protocol.TestNet, false)
+	db, err := lite.NewDatabase("", protocol.TestNet, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,9 +7,9 @@ import (
 	"net"
 	"testing"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
@@ -22,9 +22,6 @@ import (
 )
 
 func TestSendInv(t *testing.T) {
-
-	fn := mockConfig(t)
-	defer fn()
 
 	// Send topics.Inv
 	b := helper.RandomBlock(t, 1, 1)
@@ -50,13 +47,16 @@ func TestSendInv(t *testing.T) {
 }
 
 func TestSendGetData(t *testing.T) {
-
-	fn := mockConfig(t)
-	defer fn()
-	db, err := heavy.NewDatabase(cfg.Get().Database.Dir, protocol.TestNet, false)
+	drvr, err := database.From(lite.DriverName)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	db, err := drvr.Open("", protocol.TestNet, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	defer db.Close()
 
 	// Send topics.GetData

@@ -14,8 +14,6 @@ import (
 var port = "3000"
 
 func TestHandshake(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	eb := wire.NewEventBus()
 	client, srv := net.Pipe()

@@ -3,14 +3,11 @@ package chainsync_test
 import (
 	"bufio"
 	"bytes"
-	"io/ioutil"
 	"net"
-	"os"
 	"testing"
 	"time"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
@@ -19,29 +16,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func mockConfig(t *testing.T) func() {
-	storeDir, err := ioutil.TempDir(os.TempDir(), "chainsync_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Database.Dir = storeDir
-	r.Database.Driver = heavy.DriverName
-	r.General.Network = "testnet"
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
 // are sufficiently behind the chain tip.
 func TestSynchronizeBehind(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	_, conn := setUpSynchronizerTest(t)
 
 	time.Sleep(500 * time.Millisecond)
@@ -74,9 +51,6 @@ func TestSynchronizeBehind(t *testing.T) {
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
 // are synced with other peers.
 func TestSynchronizeSynced(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
 	eb, conn := setUpSynchronizerTest(t)
 
 	// subscribe to topics.Block
