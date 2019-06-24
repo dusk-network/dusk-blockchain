@@ -29,7 +29,8 @@ var readWriteTimeout = 60 * time.Second // Max idle time for a peer
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	magic protocol.Magic
+	reader *bufio.Reader
+	magic  protocol.Magic
 }
 
 // Writer abstracts all of the logic and fields needed to write messages to
@@ -56,8 +57,9 @@ type Reader struct {
 func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscriber) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
-			Conn:  conn,
-			magic: magic,
+			Conn:   conn,
+			reader: bufio.NewReader(conn),
+			magic:  magic,
 		},
 		gossip: processing.NewGossip(magic),
 	}
@@ -71,8 +73,9 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher wire.EventPublisher,
 	rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*Reader, error) {
 	pconn := &Connection{
-		Conn:  conn,
-		magic: magic,
+		Conn:   conn,
+		reader: bufio.NewReader(conn),
+		magic:  magic,
 	}
 
 	db, err := OpenDB()
@@ -96,8 +99,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 
 // ReadMessage reads from the connection until encountering a zero byte.
 func (c *Connection) ReadMessage() ([]byte, error) {
-	r := bufio.NewReader(c.Conn)
-	return r.ReadBytes(0x00)
+	return c.reader.ReadBytes(0x00)
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
