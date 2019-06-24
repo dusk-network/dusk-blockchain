@@ -213,7 +213,7 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 		return
 	}
 
-	m.eventBus.Publish(string(topics.Gossip), buffer)
+	m.eventBus.Stream(string(topics.Gossip), buffer)
 }
 
 func (m *Mempool) onAcceptedBlock(b block.Block) {
