@@ -51,7 +51,8 @@ type Reader struct {
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
-// subscribing to the gossip topic with a stream handler.
+// subscribing to the gossip topic with a stream handler, and by running the WriteLoop
+// in a goroutine..
 func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscriber) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
@@ -79,20 +80,16 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 		return nil, err
 	}
 
-	blockHashBroker := processing.NewBlockHashBroker(db, responseChan)
-	dataRequestor := processing.NewDataRequestor(db, responseChan)
-	dataBroker := processing.NewDataBroker(db, responseChan)
-	synchronizer := chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter)
 	return &Reader{
 		Connection:   pconn,
 		unmarshaller: &messageUnmarshaller{magic},
 		router: &messageRouter{
 			publisher:       publisher,
 			dupeMap:         dupeMap,
-			blockHashBroker: blockHashBroker,
-			synchronizer:    synchronizer,
-			dataRequestor:   dataRequestor,
-			dataBroker:      dataBroker,
+			blockHashBroker: processing.NewBlockHashBroker(db, responseChan),
+			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
+			dataRequestor:   processing.NewDataRequestor(db, responseChan),
+			dataBroker:      processing.NewDataBroker(db, responseChan),
 		},
 	}, nil
 }
@@ -189,6 +186,7 @@ func (p *Reader) ReadLoop() {
 	}
 }
 
+// Read the topic bytes off r, and return them as a topics.Topic.
 func extractTopic(r io.Reader) topics.Topic {
 	var cmdBuf [topics.Size]byte
 	if _, err := r.Read(cmdBuf[:]); err != nil {
@@ -198,6 +196,7 @@ func extractTopic(r io.Reader) topics.Topic {
 	return topics.ByteArrayToTopic(cmdBuf)
 }
 
+// Read the magic bytes off r, and return them as a protocol.Magic.
 func extractMagic(r io.Reader) protocol.Magic {
 	buffer := make([]byte, 4)
 	if _, err := r.Read(buffer); err != nil {
@@ -209,6 +208,8 @@ func extractMagic(r io.Reader) protocol.Magic {
 }
 
 // Write a message to the connection.
+// Conn needs to be locked, as this function can be called both by the WriteLoop,
+// and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
 	c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	c.lock.Lock()
