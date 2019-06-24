@@ -13,6 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
+// TODO: This source file should be deleted when getting ready for testnet
 func mockBlockOne(bid *transactions.Bid, stake *transactions.Stake) *block.Block {
 	blk := block.NewBlock()
 	blk.Header.Height = 1
