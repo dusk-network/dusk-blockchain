@@ -218,7 +218,23 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 2. Store block in database
+	// 2. Add provisioners and block generators
+	for _, tx := range blk.Txs {
+		switch tx.Type() {
+		case transactions.StakeType:
+			stake := tx.(*transactions.Stake)
+			if err := c.addProvisioner(stake); err != nil {
+				l.Errorf("adding provisioner failed: %s", err.Error())
+			}
+		case transactions.BidType:
+			bid := tx.(*transactions.Bid)
+			if err := c.addBidder(bid); err != nil {
+				l.Errorf("adding provisioner failed: %s", err.Error())
+			}
+		}
+	}
+
+	// 3. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&blk)
 	})
@@ -230,7 +246,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 3. Notify other subsystems for the accepted block
+	// 4. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
@@ -242,13 +258,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
-	// 4. Gossip advertise block Hash
+	// 5. Gossip advertise block Hash
 	if err := c.advertiseBlock(blk); err != nil {
 		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
-	// 5. Cleanup obsolete candidate blocks
+	// 6. Cleanup obsolete candidate blocks
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
 		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
