@@ -66,7 +66,7 @@ func (a *Accumulator) accumulate() {
 		if err := a.handler.ExtractIdentifier(ev, b); err == nil {
 			hash := hex.EncodeToString(b.Bytes())
 			count := a.Insert(ev, hash)
-			if count == a.handler.Quorum() {
+			if count >= a.handler.Quorum() {
 				votes := a.Get(hash)
 				a.CollectedVotesChan <- votes
 				a.Clear()
