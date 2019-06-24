@@ -366,9 +366,7 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 func (c *Chain) advertiseBlock(b block.Block) error {
 
 	msg := &peermsg.Inv{}
-	msg.InvList = make([]peermsg.InvVect, 1)
-	msg.InvList[0].Type = peermsg.InvTypeBlock
-	msg.InvList[0].Hash = b.Header.Hash
+	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {

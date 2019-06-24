@@ -84,6 +84,14 @@ func (inv *Inv) Decode(r io.Reader) error {
 	return nil
 }
 
+func (inv *Inv) AddItem(t InvType, hash []byte) {
+	item := InvVect{
+		Type: t,
+		Hash: hash,
+	}
+	inv.InvList = append(inv.InvList, item)
+}
+
 func supportedInvType(t InvType) bool {
 	for _, s := range supportedInvTypes {
 		if t == s {

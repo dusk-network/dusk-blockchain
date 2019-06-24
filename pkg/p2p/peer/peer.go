@@ -13,9 +13,9 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -36,6 +36,7 @@ type Connection struct {
 // other network nodes.
 type Writer struct {
 	*Connection
+	gossip   *processing.Gossip
 	gossipID uint32
 	// TODO: add service flag
 }
@@ -45,7 +46,7 @@ type Writer struct {
 type Reader struct {
 	*Connection
 	unmarshaller *messageUnmarshaller
-	filter       *messageFilter
+	router       *messageRouter
 	// TODO: add service flag
 }
 
@@ -57,17 +58,17 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 			Conn:  conn,
 			magic: magic,
 		},
+		gossip: processing.NewGossip(magic),
 	}
 
-	gossip := processing.NewGossip(magic)
-	subscriber.RegisterPreprocessor(string(topics.Gossip), gossip)
+	subscriber.RegisterPreprocessor(string(topics.Gossip), pw.gossip)
 	return pw
 }
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap,
-	publisher wire.EventPublisher, synchronizer chainsync.Synchronizer) (*Reader, error) {
+func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher wire.EventPublisher,
+	rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*Reader, error) {
 	pconn := &Connection{
 		Conn:  conn,
 		magic: magic,
@@ -78,33 +79,20 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap,
 		return nil, err
 	}
 
-	blockBroker, err := newBlockBroker(pconn, db)
-	if err != nil {
-		return nil, err
-	}
-
-	invBroker, err := newInvBroker(pconn, db)
-	if err != nil {
-		return nil, err
-	}
-
-	dataBroker, err := newDataBroker(pconn, db)
-	if err != nil {
-		return nil, err
-	}
-
-	blockChan := make(chan *bytes.Buffer, 1)
-	go synchronizer.Synchronize(pconn, blockChan)
+	blockHashBroker := processing.NewBlockHashBroker(db, responseChan)
+	dataRequestor := processing.NewDataRequestor(db, responseChan)
+	dataBroker := processing.NewDataBroker(db, responseChan)
+	synchronizer := chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter)
 	return &Reader{
 		Connection:   pconn,
 		unmarshaller: &messageUnmarshaller{magic},
-		filter: &messageFilter{
-			publisher:   publisher,
-			dupeMap:     dupeMap,
-			blockBroker: blockBroker,
-			blockChan:   blockChan,
-			invBroker:   invBroker,
-			dataBroker:  dataBroker,
+		router: &messageRouter{
+			publisher:       publisher,
+			dupeMap:         dupeMap,
+			blockHashBroker: blockHashBroker,
+			synchronizer:    synchronizer,
+			dataRequestor:   dataRequestor,
+			dataBroker:      dataBroker,
 		},
 	}, nil
 }
@@ -142,6 +130,33 @@ func (p *Reader) Accept() error {
 	return nil
 }
 
+// WriteLoop waits for messages to arrive on the `responseChan`, which are intended
+// only for this specific peer. The messages get prepended with a magic, and then
+// are COBS encoded before being sent over the wire.
+func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer) {
+	defer w.Conn.Close()
+
+	for {
+		buf := <-responseChan
+		processed, err := w.gossip.Process(buf)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error processing outgoing message")
+			continue
+		}
+
+		if _, err := w.Conn.Write(processed.Bytes()); err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error writing message")
+			return
+		}
+	}
+}
+
 // ReadLoop will block on the read until a message is read, or until the deadline
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
@@ -167,7 +182,7 @@ func (p *Reader) ReadLoop() {
 			continue
 		}
 
-		p.filter.Collect(buf)
+		p.router.Collect(buf)
 
 		// Refresh the read deadline
 		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))

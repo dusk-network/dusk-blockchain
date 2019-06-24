@@ -71,19 +71,14 @@ func NewRPCBus() *RPCBus {
 	bus.registry = make(map[string]method)
 
 	// default methods
-
-	if GetLastBlockChan == nil {
-		GetLastBlockChan = make(chan Req)
-		if err := bus.Register(GetLastBlock, GetLastBlockChan); err != nil {
-			panic(err)
-		}
+	GetLastBlockChan = make(chan Req)
+	if err := bus.Register(GetLastBlock, GetLastBlockChan); err != nil {
+		panic(err)
 	}
 
-	if GetVerifiedTxsChan == nil {
-		GetVerifiedTxsChan = make(chan Req)
-		if err := bus.Register(GetVerifiedTxs, GetVerifiedTxsChan); err != nil {
-			panic(err)
-		}
+	GetVerifiedTxsChan = make(chan Req)
+	if err := bus.Register(GetVerifiedTxs, GetVerifiedTxsChan); err != nil {
+		panic(err)
 	}
 
 	return &bus
