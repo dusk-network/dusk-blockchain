@@ -7,7 +7,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-type key [32]byte
+type key [64]byte
 type table map[key][]byte
 type memdb [5]table
 
@@ -64,7 +64,7 @@ func NewDatabase(path string, network protocol.Magic, readonly bool) (database.D
 func (db *DB) Begin(writable bool) (database.Transaction, error) {
 
 	var batch memdb
-	if writable {
+	if writable && !db.readOnly {
 		for i := range batch {
 			batch[i] = make(table)
 		}

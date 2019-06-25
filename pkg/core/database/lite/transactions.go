@@ -2,19 +2,14 @@ package lite
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/utils"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-)
-
-var (
-	byteOrder = binary.LittleEndian
 )
 
 type transaction struct {
@@ -23,18 +18,29 @@ type transaction struct {
 	batch    memdb
 }
 
+// NB: More optimal data structure can be used to speed up fetching. E.g instead
+// map lookup operation on block per height, one can utilize a height as index
+// in a slice.
+// NB: A single slice of all blocks to be used to avoid all duplications
 func (t *transaction) StoreBlock(b *block.Block) error {
+
+	if !t.writable {
+		return errors.New("read-only transaction")
+	}
+
+	if len(t.batch) == 0 {
+		return errors.New("empty batch")
+	}
 
 	// Map header.Hash to block.Block
 	buf := new(bytes.Buffer)
 	if err := b.Encode(buf); err != nil {
 		return err
 	}
-	t.batch[blocksInd][toKey(b.Header.Hash)] = buf.Bytes()
 
-	// Map Height to block.Block
-	// TODO: use slice
-	// t.batch[heightInd][toKey(b.Header.Height)] = buf.Bytes()
+	blockBytes := buf.Bytes()
+
+	t.batch[blocksInd][toKey(b.Header.Hash)] = blockBytes
 
 	// Map txId to transactions.Transaction
 	for i, tx := range b.Txs {
@@ -48,13 +54,27 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 			return fmt.Errorf("empty chain tx id")
 		}
 
-		data, err := t.encodeBlockTx(tx, uint32(i))
+		data, err := utils.EncodeBlockTx(tx, uint32(i))
 		if err != nil {
 			return err
 		}
 
 		t.batch[txsInd][toKey(txID)] = data
+
+		// Map KeyImage to Transaction
+		for _, input := range tx.StandardTX().Inputs {
+			t.batch[keyImagesInd][toKey(input.KeyImage)] = txID
+		}
 	}
+
+	// Map height to buffer bytes
+	buf = new(bytes.Buffer)
+
+	// Append height value
+	if err := utils.WriteUint64(buf, b.Header.Height); err != nil {
+		return err
+	}
+	t.batch[heightInd][toKey(buf.Bytes())] = blockBytes
 
 	return nil
 }
@@ -116,18 +136,26 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 }
 
 func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
-	// TODO: This can be another table
-	for _, data := range t.db.storage[blocksInd] {
-		b := block.Block{}
-		if err := b.Decode(bytes.NewReader(data)); err != nil {
-			return nil, err
-		}
 
-		if b.Header.Height == height {
-			return b.Header.Hash, nil
-		}
+	heightBuf := new(bytes.Buffer)
+
+	// Append height value
+	if err := utils.WriteUint64(heightBuf, height); err != nil {
+		return nil, err
 	}
-	return nil, database.ErrBlockNotFound
+
+	var data []byte
+	var exists bool
+	if data, exists = t.db.storage[heightInd][toKey(heightBuf.Bytes())]; !exists {
+		return nil, database.ErrBlockNotFound
+	}
+
+	b := block.Block{}
+	if err := b.Decode(bytes.NewReader(data)); err != nil {
+		return nil, err
+	}
+
+	return b.Header.Hash, nil
 }
 
 func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, uint32, []byte, error) {
@@ -135,12 +163,12 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 	var data []byte
 	var exists bool
 	if data, exists = t.db.storage[txsInd][toKey(txID)]; !exists {
-		return nil, 0, nil, database.ErrTxNotFound
+		return nil, math.MaxUint32, nil, database.ErrTxNotFound
 	}
 
-	tx, txIndex, err := t.decodeBlockTx(data, database.AnyTxType)
+	tx, txIndex, err := utils.DecodeBlockTx(data, database.AnyTxType)
 	if err != nil {
-		return nil, 0, nil, database.ErrTxNotFound
+		return nil, math.MaxUint32, nil, database.ErrTxNotFound
 	}
 
 	// TODO: hashHeader the tx belongs to
@@ -149,7 +177,6 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 
 func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {
 
-	// TODO: Map keyImage to txID
 	var txID []byte
 	var exists bool
 	if txID, exists = t.db.storage[keyImagesInd][toKey(keyImage)]; !exists {
@@ -160,6 +187,11 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 }
 
 func (t *transaction) StoreCandidateBlock(b *block.Block) error {
+
+	if !t.writable {
+		return errors.New("read-only transaction")
+	}
+
 	buf := new(bytes.Buffer)
 	if err := b.Encode(buf); err != nil {
 		return err
@@ -188,8 +220,26 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 
 func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 
-	// TODO: delete(t.db.storage[candidatesTableIndex])
-	return 0, nil
+	var count uint32
+	for key, data := range t.db.storage[candidatesTableIndex] {
+
+		b := &block.Block{}
+		if err := b.Decode(bytes.NewReader(data)); err != nil {
+			return count, err
+		}
+
+		if maxHeight != 0 {
+			if b.Header.Height <= maxHeight {
+				delete(t.db.storage[candidatesTableIndex], key)
+				count++
+			}
+		} else {
+			delete(t.db.storage[candidatesTableIndex], key)
+			count++
+		}
+	}
+
+	return count, nil
 }
 
 func toKey(d []byte) key {
@@ -204,118 +254,4 @@ func (t transaction) Rollback() error {
 }
 
 func (t *transaction) Close() {
-}
-
-// TODO: duplicated code
-
-// encodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
-func (t transaction) encodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) {
-
-	buf := new(bytes.Buffer)
-
-	// Write tx type as first field
-	if err := buf.WriteByte(byte(tx.Type())); err != nil {
-		return nil, err
-	}
-
-	// Write index value as second field.
-
-	// golevedb is ordering keys lexicographically. That said, the order of the
-	// stored KV is not the order of inserting
-	if err := t.writeUint32(buf, txIndex); err != nil {
-		return nil, err
-	}
-
-	// Write transactions.Transaction bytes
-	err := tx.Encode(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-func (t transaction) decodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Transaction, uint32, error) {
-
-	txIndex := uint32(math.MaxUint32)
-
-	var tx transactions.Transaction
-	reader := bytes.NewReader(data)
-
-	// Peak the type from the first byte
-	typeBytes, err := reader.ReadByte()
-	if err != nil {
-		return nil, txIndex, err
-	}
-	txReadType := transactions.TxType(typeBytes)
-
-	if typeFilter != database.AnyTxType {
-		// Do not read and decode the rest of the bytes if the transaction type
-		// is not same as typeFilter
-		if typeFilter != txReadType {
-			return nil, txIndex, fmt.Errorf("tx of type %d not found", typeFilter)
-		}
-	}
-
-	// Read tx index field
-	if err := t.readUint32(reader, &txIndex); err != nil {
-		return nil, txIndex, err
-	}
-
-	switch txReadType {
-	case transactions.StandardType:
-		tx = &transactions.Standard{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.TimelockType:
-		tx = &transactions.TimeLock{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.BidType:
-		tx = &transactions.Bid{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.StakeType:
-		tx = &transactions.Stake{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.CoinbaseType:
-		tx = &transactions.Coinbase{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	default:
-		return nil, txIndex, fmt.Errorf("unknown transaction type: %d", txReadType)
-	}
-
-	return tx, txIndex, nil
-}
-
-// writeUint32 Tx utility to use a Tx byteOrder on internal encoding
-func (t transaction) writeUint32(w io.Writer, value uint32) error {
-	var b [4]byte
-	byteOrder.PutUint32(b[:], value)
-	_, err := w.Write(b[:])
-	return err
-}
-
-// ReadUint32 will read four bytes and convert them to a uint32 from the Tx
-// byteOrder. The result is put into v.
-func (t transaction) readUint32(r io.Reader, v *uint32) error {
-	var b [4]byte
-	n, err := r.Read(b[:])
-	if err != nil || n != len(b) {
-		return err
-	}
-	*v = byteOrder.Uint32(b[:])
-	return nil
 }
