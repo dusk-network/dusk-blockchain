@@ -12,11 +12,7 @@ import (
 )
 
 func TestRequestData(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
-
-	drvr, db := setupDatabase()
-	defer drvr.Close()
+	_, db := setupDatabase()
 	defer db.Close()
 
 	responseChan := make(chan *bytes.Buffer, 100)

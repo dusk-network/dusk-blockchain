@@ -12,13 +12,10 @@ import (
 
 // Test the behaviour of the data broker, when it receives a GetData message.
 func TestSendData(t *testing.T) {
-	fn := mockConfig(t)
-	defer fn()
 
 	// Set up db
 	// TODO: use a mock for this instead
-	drvr, db := setupDatabase()
-	defer drvr.Close()
+	_, db := setupDatabase()
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
