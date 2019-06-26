@@ -94,11 +94,15 @@ func main() {
 		}
 	}
 
+	// Accept genesis so we can use it as locator
+	genesisBlk := getGenesisBlock()
+	srv.chain.AcceptBlock(*genesisBlk)
+
 	// TODO: this should be adjusted before testnet release, it is simply a way
 	// to bootstrap the network in an unsophisticated manner
 	if strings.Contains(ips[0], "noip") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
-		// Create mock block on height 1 with proper stake and bid
+		// Create mock block on height 1 with our stake and bid
 		blk := mockBlockOne(srv.MyBid, srv.MyStake)
 		buf := new(bytes.Buffer)
 		if err := blk.Encode(buf); err != nil {
@@ -106,6 +110,8 @@ func main() {
 		}
 
 		srv.eventBus.Publish(string(topics.Block), buf)
+		// Wait a little for it to be accepted and to start the generation component
+		time.Sleep(3 * time.Second)
 		srv.StartConsensus(2)
 	} else {
 		// Propagate bid and stake out to the network
