@@ -98,7 +98,7 @@ func Setup() *Server {
 	// ConnectToMonitor(eventBus, d)
 
 	// Setting up the consensus factory
-	f := factory.New(srv.eventBus, srv.rpcBus, 3*time.Second, keys)
+	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
 	go f.StartConsensus()
 
 	// Creating stake and bid
