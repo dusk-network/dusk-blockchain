@@ -73,7 +73,9 @@ func initCtx(t *testing.T) *ctx {
 					t.Fatal(err)
 				}
 
+				c.mu.Lock()
 				c.propagated = append(c.propagated, tx)
+				c.mu.Unlock()
 			}
 		}(streamer, c)
 
