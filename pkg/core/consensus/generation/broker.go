@@ -5,7 +5,6 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
@@ -26,10 +25,9 @@ type broker struct {
 	seeder         *seeder
 
 	// subscriber channels
-	roundChan         <-chan uint64
-	bidListChan       <-chan user.BidList
-	regenerationChan  <-chan consensus.AsyncState
-	acceptedBlockChan <-chan block.Block
+	roundChan        <-chan uint64
+	bidListChan      <-chan user.BidList
+	regenerationChan <-chan consensus.AsyncState
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
@@ -51,16 +49,14 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	roundChan := consensus.InitRoundUpdate(eventBroker)
 	bidListChan := consensus.InitBidListUpdate(eventBroker)
 	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
-	acceptedBlockChan := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	return &broker{
-		proofGenerator:    gen,
-		roundChan:         roundChan,
-		bidListChan:       bidListChan,
-		regenerationChan:  regenerationChan,
-		acceptedBlockChan: acceptedBlockChan,
-		forwarder:         newForwarder(eventBroker, blockGen, rpcBus),
-		seeder:            &seeder{},
+		proofGenerator:   gen,
+		roundChan:        roundChan,
+		bidListChan:      bidListChan,
+		regenerationChan: regenerationChan,
+		forwarder:        newForwarder(eventBroker, blockGen, rpcBus),
+		seeder:           &seeder{},
 	}
 }
 
@@ -80,8 +76,6 @@ func (b *broker) Listen() {
 				proof := b.proofGenerator.GenerateProof(seed)
 				b.Forward(proof, seed)
 			}
-		case acceptedBlockChan := <-b.acceptedBlockChan:
-			b.forwarder.blockGenerator.UpdatePrevBlock(acceptedBlockChan)
 		}
 	}
 }

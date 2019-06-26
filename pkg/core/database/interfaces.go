@@ -19,6 +19,8 @@ var (
 	ErrTxNotFound = errors.New("database: transaction not found")
 	// ErrBlockNotFound returned on a block lookup by hash or height
 	ErrBlockNotFound = errors.New("database: block not found")
+	// ErrStateNotFound returned on missing state db entry
+	ErrStateNotFound = errors.New("database: state not found")
 
 	// AnyTxType is used as a filter value on FetchBlockTxByHash
 	AnyTxType = transactions.TxType(math.MaxUint8)
@@ -57,6 +59,7 @@ type Transaction interface {
 	FetchBlockTxByHash(txID []byte) (tx transactions.Transaction, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
+	FetchState() (*State, error)
 
 	// Check if an input keyImage is already stored. If succeeds, it returns
 	// also txID the input belongs to
@@ -101,4 +104,10 @@ type DB interface {
 	Update(fn func(t Transaction) error) error
 
 	Close() error
+}
+
+// State represents a single db entry that provides chain metadata. This
+// includes currently only chain tip hash but could be extended at later stage
+type State struct {
+	TipHash []byte
 }

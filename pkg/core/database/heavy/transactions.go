@@ -43,6 +43,7 @@ var (
 	TxIDPrefix           = []byte{0x04}
 	KeyImagePrefix       = []byte{0x05}
 	CandidateBlockPrefix = []byte{0x06}
+	StatePrefix          = []byte{0x07}
 )
 
 type transaction struct {
@@ -162,6 +163,14 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	}
 
 	key = append(HeightPrefix, heightBuf.Bytes()...)
+	value = b.Header.Hash
+	t.put(key, value)
+
+	// Key = StatePrefix
+	// Value = Hash(chain tip)
+	//
+	// To support fetching  blockchain tip
+	key = StatePrefix
 	value = b.Header.Hash
 	t.put(key, value)
 
@@ -480,4 +489,26 @@ func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 	}
 
 	return count, nil
+}
+
+func (t transaction) FetchState() (*database.State, error) {
+
+	key := StatePrefix
+	value, err := t.snapshot.Get(key, nil)
+
+	if err == leveldb.ErrNotFound || len(value) == 0 {
+		// overwrite error message
+		err = database.ErrStateNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	s := &database.State{}
+	s.TipHash = value
+
+	return s, nil
+
+	return nil, nil
 }

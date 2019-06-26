@@ -3,7 +3,8 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
+	"fmt"
+
 	"math/big"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -56,21 +57,9 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		return nil, err
 	}
 
-	// read and decode the genesis block hex
-	genesisBlock := block.NewBlock()
-	switch cfg.Get().General.Network {
-	case "testnet":
-
-		blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
-		if err != nil {
-			panic(err)
-		}
-
-		var buf bytes.Buffer
-		buf.Write(blob)
-		if err := genesisBlock.Decode(&buf); err != nil {
-			panic(err)
-		}
+	l, err := newLoader(db)
+	if err != nil {
+		return nil, fmt.Errorf("error %s on loading chain '%s'", err.Error(), cfg.Get().Database.Dir)
 	}
 
 	// set up collectors
@@ -82,7 +71,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		rpcBus:          rpcBus,
 		db:              db,
 		bidList:         &user.BidList{},
-		prevBlock:       *genesisBlock,
+		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
 		winningHashChan: winningHashChan,
 	}

@@ -24,15 +24,13 @@ type (
 	// given a height and seed.
 	BlockGenerator interface {
 		GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error)
-		UpdatePrevBlock(b block.Block)
 	}
 
 	blockGenerator struct {
 		// generator Public Keys to sign the rewards tx
 		genPubKey *key.PublicKey
 
-		rpcBus    *wire.RPCBus
-		prevBlock block.Block
+		rpcBus *wire.RPCBus
 	}
 )
 
@@ -54,19 +52,19 @@ func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGene
 	return &blockGenerator{
 		rpcBus:    rpcBus,
 		genPubKey: genPubKey,
-		prevBlock: *genesisBlock,
 	}
-}
-
-func (bg *blockGenerator) UpdatePrevBlock(b block.Block) {
-	bg.prevBlock = b
 }
 
 func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error) {
 
+	prevBlock, err := bg.getLastBlock()
+	if err != nil {
+		return nil, err
+	}
+
 	if round != 0 {
-		if round <= bg.prevBlock.Header.Height {
-			return nil, fmt.Errorf("target round (%d) must be higher than previous block round %d", round, bg.prevBlock.Header.Height)
+		if round <= prevBlock.Header.Height {
+			return nil, fmt.Errorf("target round (%d) must be higher than previous block round %d", round, prevBlock.Header.Height)
 		}
 	}
 
@@ -85,7 +83,7 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 		Version:       0,
 		Timestamp:     time.Now().Unix(),
 		Height:        round,
-		PrevBlockHash: bg.prevBlock.Header.Hash,
+		PrevBlockHash: prevBlock.Header.Hash,
 		TxRoot:        nil,
 		Seed:          seed,
 		CertHash:      certHash,
@@ -195,4 +193,26 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	// This could be achieved with a request to dusk-wallet
 
 	return tx, nil
+}
+
+func (s *blockGenerator) getLastBlock() (*block.Block, error) {
+
+	if s.rpcBus == nil {
+		blank := block.NewBlock()
+		blank.Header.Hash = make([]byte, 32)
+		return blank, nil
+	}
+
+	req := wire.NewRequest(bytes.Buffer{}, 2)
+	blkBuf, err := s.rpcBus.Call(wire.GetLastBlock, req)
+	if err != nil {
+		return nil, err
+	}
+
+	blk := block.NewBlock()
+	if err := blk.Decode(&blkBuf); err != nil {
+		return nil, err
+	}
+
+	return blk, nil
 }
