@@ -33,7 +33,7 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
-var timeOut = 3 * time.Second
+var timeOut = 5 * time.Second
 
 type Server struct {
 	eventBus *wire.EventBus
