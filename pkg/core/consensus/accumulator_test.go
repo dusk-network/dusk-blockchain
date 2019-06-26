@@ -12,7 +12,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -82,23 +81,18 @@ type mockAccumulatorHandler struct {
 
 func newMockHandlerAccumulator(verifyErr error, quorum int, identifier string,
 	isMember bool) consensus.AccumulatorHandler {
-	var sender []byte
 	mockEventHandler := &mocks.EventHandler{}
 	mockEventHandler.On("Verify", mock.Anything).Return(verifyErr)
 	mockEventHandler.On("NewEvent").Return(newMockEvent())
 	mockEventHandler.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)
 	mockEventHandler.On("ExtractHeader",
 		mock.MatchedBy(func(ev wire.Event) bool {
-			sender = ev.Sender()
-			if len(sender) == 0 {
-				sender, _ = crypto.RandEntropy(32)
-			}
 			return true
 		})).Return(func(e wire.Event) *header.Header {
 		return &header.Header{
 			Round:     1,
 			Step:      1,
-			PubKeyBLS: sender,
+			PubKeyBLS: e.Sender(),
 		}
 	})
 	return &mockAccumulatorHandler{
