@@ -25,10 +25,8 @@ type messageRouter struct {
 }
 
 func (m *messageRouter) Collect(b *bytes.Buffer) error {
-	if m.dupeMap.CanFwd(b) {
-		topic := extractTopic(b)
-		m.route(topic, b)
-	}
+	topic := extractTopic(b)
+	m.route(topic, b)
 	return nil
 }
 
@@ -40,11 +38,16 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	case topics.GetData:
 		err = m.dataBroker.SendItems(b)
 	case topics.Inv:
-		err = m.dataRequestor.RequestMissingItems(b)
+		// We only accept an advertisement once
+		if m.dupeMap.CanFwd(b) {
+			err = m.dataRequestor.RequestMissingItems(b)
+		}
 	case topics.Block:
 		err = m.synchronizer.Synchronize(b)
 	default:
-		m.publisher.Publish(string(topic), b)
+		if m.dupeMap.CanFwd(b) {
+			m.publisher.Publish(string(topic), b)
+		}
 	}
 
 	if err != nil {
