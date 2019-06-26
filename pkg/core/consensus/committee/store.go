@@ -76,7 +76,9 @@ func (s *Store) Listen() {
 		case pubKeyBLS := <-s.removeProvisionerChan:
 			stake, err := s.provisioners.GetStake(pubKeyBLS)
 			if err != nil {
-				panic(err)
+				log.WithField("process", "committee store").
+					WithError(err).Errorln("could not fetch provisioner stake")
+				continue
 			}
 
 			s.lock.Lock()
