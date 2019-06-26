@@ -117,8 +117,8 @@ func Setup() *Server {
 }
 
 func (s *Server) launchGeneration() {
-	blockChan := make(chan *bytes.Buffer, 1)
-	s.eventBus.Subscribe(string(topics.AcceptedBlock), blockChan)
+	blockChan := make(chan *bytes.Buffer, 10)
+	id := s.eventBus.Subscribe(string(topics.AcceptedBlock), blockChan)
 	for {
 		blkBuf := <-blockChan
 		blk := block.NewBlock()
@@ -128,20 +128,22 @@ func (s *Server) launchGeneration() {
 
 		for _, tx := range blk.Txs {
 			if tx.Equals(s.MyBid) {
+				s.eventBus.Unsubscribe(string(topics.AcceptedBlock), id)
 				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil)
+				return
 			}
 		}
 	}
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
-	roundChan := consensus.InitRoundUpdate(eventBus)
+	roundChan := consensus.InitAcceptedBlockUpdate(eventBus)
 	dupeBlacklist := dupemap.NewDupeMap(1)
 	go func() {
 		for {
-			round := <-roundChan
+			blk := <-roundChan
 			// NOTE: do we need locking?
-			dupeBlacklist.UpdateHeight(round)
+			dupeBlacklist.UpdateHeight(blk.Header.Height)
 		}
 	}()
 	return dupeBlacklist

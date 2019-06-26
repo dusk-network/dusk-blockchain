@@ -73,8 +73,8 @@ func getGenesisBlock() *block.Block {
 }
 
 func waitForStake(bus *wire.EventBus, myStake *transactions.Stake) uint64 {
-	blockChan := make(chan *bytes.Buffer, 1)
-	bus.Subscribe(string(topics.AcceptedBlock), blockChan)
+	blockChan := make(chan *bytes.Buffer, 10)
+	id := bus.Subscribe(string(topics.AcceptedBlock), blockChan)
 	for {
 		blkBuf := <-blockChan
 		blk := block.NewBlock()
@@ -84,6 +84,7 @@ func waitForStake(bus *wire.EventBus, myStake *transactions.Stake) uint64 {
 
 		for _, tx := range blk.Txs {
 			if tx.Equals(myStake) {
+				bus.Unsubscribe(string(topics.AcceptedBlock), id)
 				return blk.Header.Height
 			}
 		}
