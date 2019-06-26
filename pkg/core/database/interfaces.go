@@ -59,6 +59,7 @@ type Transaction interface {
 	FetchBlockTxByHash(txID []byte) (tx transactions.Transaction, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
+	// Fetch chain state information (chain tip hash)
 	FetchState() (*State, error)
 
 	// Check if an input keyImage is already stored. If succeeds, it returns

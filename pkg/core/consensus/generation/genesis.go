@@ -20,6 +20,7 @@ func GenerateGensisBlock(generatorPubKey *key.PublicKey) (string, error) {
 	g := &blockGenerator{
 		rpcBus:    nil,
 		genPubKey: generatorPubKey,
+		prevBlock: *blank,
 	}
 
 	// TODO: do we need to generate correct proof and score

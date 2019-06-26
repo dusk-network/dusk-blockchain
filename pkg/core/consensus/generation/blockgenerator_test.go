@@ -50,8 +50,7 @@ func TestGenerateBlock(t *testing.T) {
 	score, _ := crypto.RandEntropy(32)
 
 	var prevBlockRound uint64 = 2
-	go respond(h.rpc, *helper.RandomBlock(t, prevBlockRound, 1))
-	time.Sleep(100 * time.Millisecond)
+	gen.UpdatePrevBlock(*helper.RandomBlock(t, prevBlockRound, 1))
 
 	round := prevBlockRound + 1
 

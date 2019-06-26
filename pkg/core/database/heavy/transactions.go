@@ -505,10 +505,5 @@ func (t transaction) FetchState() (*database.State, error) {
 		return nil, err
 	}
 
-	s := &database.State{}
-	s.TipHash = value
-
-	return s, nil
-
-	return nil, nil
+	return &database.State{TipHash: value}, nil
 }
