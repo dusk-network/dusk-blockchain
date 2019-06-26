@@ -99,6 +99,7 @@ func verify(verificationChan <-chan wire.Event, eventChan chan<- wire.Event, ver
 	for {
 		ev := <-verificationChan
 		if err := verifyFunc(ev); err != nil {
+			log.WithError(err).Errorln("event verification failed")
 			continue
 		}
 
