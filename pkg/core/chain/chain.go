@@ -125,7 +125,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) addProvisioner(tx *transactions.Stake) error {
+func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error {
 	buffer := bytes.NewBuffer(tx.PubKeyEd)
 	if err := encoding.WriteVarBytes(buffer, tx.PubKeyBLS); err != nil {
 		return err
@@ -133,6 +133,10 @@ func (c *Chain) addProvisioner(tx *transactions.Stake) error {
 
 	totalAmount := getTxTotalOutputAmount(tx)
 	if err := encoding.WriteUint64(buffer, binary.LittleEndian, totalAmount); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, startHeight); err != nil {
 		return err
 	}
 
@@ -223,7 +227,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		switch tx.Type() {
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake); err != nil {
+			if err := c.addProvisioner(stake, blk.Header.Height+1); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
 		case transactions.BidType:

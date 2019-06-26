@@ -15,7 +15,7 @@ type (
 	// extracted for a given step
 	Committee interface {
 		IsMember([]byte, uint64, uint8) bool
-		Quorum() int
+		Quorum(uint64) int
 	}
 
 	// Foldable represents a Committee which can be packed into a bitset, to drastically
@@ -97,7 +97,7 @@ func (s *Store) AddProvisioner(m *bytes.Buffer) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if err := s.provisioners.AddMember(newProvisioner.pubKeyEd,
-		newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
+		newProvisioner.pubKeyBLS, newProvisioner.amount, newProvisioner.startHeight); err != nil {
 		return err
 	}
 

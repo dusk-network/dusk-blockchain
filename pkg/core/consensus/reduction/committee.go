@@ -28,25 +28,25 @@ func newReductionCommittee(eventBroker wire.EventBroker) *reductionCommittee {
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
 func (r *reductionCommittee) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	votingCommittee := r.UpsertCommitteeCache(round, step, r.size())
+	votingCommittee := r.UpsertCommitteeCache(round, step, r.size(round))
 	return votingCommittee.IsMember(pubKeyBLS)
 }
 
 // Quorum returns the amount of votes to reach a quorum
-func (r *reductionCommittee) Quorum() int {
-	return int(float64(r.size()) * 0.75)
+func (r *reductionCommittee) Quorum(round uint64) int {
+	return int(float64(r.size(round)) * 0.75)
 }
 
-func (r *reductionCommittee) size() int {
+func (r *reductionCommittee) size(round uint64) int {
 	provisioners := r.Provisioners()
-	if provisioners.Size() > committeeSize {
+	if provisioners.Size(round) > committeeSize {
 		return committeeSize
 	}
-	return provisioners.Size()
+	return provisioners.Size(round)
 }
 
 func (r *reductionCommittee) FilterAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {
-	votingCommittee := r.UpsertCommitteeCache(round, step, r.size())
+	votingCommittee := r.UpsertCommitteeCache(round, step, r.size(round))
 	for _, ev := range evs {
 		votingCommittee.Remove(ev.Sender())
 	}

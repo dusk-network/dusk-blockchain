@@ -82,7 +82,7 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 		}
 
 		score := generateSortitionScore(hash, W)
-		blsPk := p.extractCommitteeMember(score)
+		blsPk := p.extractCommitteeMember(score, round)
 		votingCommittee.Insert(blsPk.Marshal())
 	}
 
@@ -92,10 +92,10 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 // extractCommitteeMember walks through the committee set, while deducting
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a hexadecimal string.
-func (p *Provisioners) extractCommitteeMember(score uint64) bls.PublicKey {
+func (p *Provisioners) extractCommitteeMember(score, round uint64) bls.PublicKey {
 	for i := 0; ; i++ {
 		// make sure we wrap around the provisioners array
-		if i == p.Size() {
+		if i == p.Size(round) {
 			i = 0
 		}
 

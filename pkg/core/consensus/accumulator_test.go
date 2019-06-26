@@ -65,7 +65,7 @@ func TestNonCommitteeEvent(t *testing.T) {
 
 func newMockCommittee(quorum int, isMember bool) committee.Committee {
 	mockCommittee := &mocks.Committee{}
-	mockCommittee.On("Quorum").Return(quorum)
+	mockCommittee.On("Quorum", mock.Anything).Return(quorum)
 	mockCommittee.On("IsMember",
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
