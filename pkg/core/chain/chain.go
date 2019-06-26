@@ -229,7 +229,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		case transactions.BidType:
 			bid := tx.(*transactions.Bid)
 			if err := c.addBidder(bid); err != nil {
-				l.Errorf("adding provisioner failed: %s", err.Error())
+				l.Errorf("adding bidder failed: %s", err.Error())
 			}
 		}
 	}
@@ -363,10 +363,7 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
 		candidate, err = t.FetchCandidateBlock(blockHash)
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	})
 
 	if err != nil {
