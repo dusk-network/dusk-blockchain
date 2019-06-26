@@ -128,6 +128,9 @@ func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	delete(p.members, strPk(pubKeyBLS))
+
+	// Reset size cache, as it might change after removing provisioners.
+	p.sizeCache = make(map[uint64]int)
 	return p.set.Remove(pubKeyBLS)
 }
 
