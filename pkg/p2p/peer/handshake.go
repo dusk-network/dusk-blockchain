@@ -5,37 +5,20 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
-	"net"
-	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// VersionMessage is a version message on the dusk wire protocol.
-type VersionMessage struct {
-	Version     *protocol.Version
-	Timestamp   int64
-	FromAddress *wire.NetAddress
-	ToAddress   *wire.NetAddress
-	Services    protocol.ServiceFlag
-}
-
-// We are trying to connect to another peer.
-// We will send our Version with a MsgVerAck.
-func (p *Writer) HandShake() error {
+// Handshake with another peer.
+func (p *Writer) Handshake() error {
 	if err := p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
 
-	if err := p.readVerack(); err != nil {
+	if err := p.readVerAck(); err != nil {
 		return err
 	}
 
@@ -43,33 +26,16 @@ func (p *Writer) HandShake() error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	verAckMessage, err := addHeader(buf, p.magic, topics.VerAck)
-	if err != nil {
-		return err
-	}
-
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
-		return err
-	}
-
-	return nil
+	return p.writeVerAck()
 }
 
-func (p *Reader) HandShake() error {
+// Handshake with another peer.
+func (p *Reader) Handshake() error {
 	if err := p.readRemoteMsgVersion(); err != nil {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	verAckMessage, err := addHeader(buf, p.magic, topics.VerAck)
-	if err != nil {
-		return err
-	}
-
-	// We skip the message queue here and write immediately on the connection,
-	// as the write loop has not been started yet.
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+	if err := p.writeVerAck(); err != nil {
 		return err
 	}
 
@@ -77,60 +43,44 @@ func (p *Reader) HandShake() error {
 		return err
 	}
 
-	if err := p.readVerack(); err != nil {
-		return err
-	}
-	return nil
+	return p.readVerAck()
 }
 
 func (p *Connection) writeLocalMsgVersion() error {
-	fromPort := uint16(p.Port())
-	version := protocol.NodeVer
-	localIP, err := util.GetOutboundIP()
-	if err != nil {
-		return err
-	}
-	fromAddr := wire.NetAddress{
-		IP:   localIP,
-		Port: fromPort,
-	}
-
-	toIP := p.Conn.RemoteAddr().(*net.TCPAddr).IP
-	toPort := p.Conn.RemoteAddr().(*net.TCPAddr).Port
-	toAddr := wire.NewNetAddress(toIP.String(), uint16(toPort))
-
-	message, err := newVersionMessageBuffer(version, &fromAddr, toAddr, protocol.FullNode)
+	message, err := p.createVersionBuffer()
 	if err != nil {
 		return err
 	}
 
-	messageWithHeader, err := addHeader(message, p.magic, topics.Version)
+	fullMsg, err := p.addHeader(message, topics.Version)
 	if err != nil {
 		return err
 	}
 
-	_, err = p.Conn.Write(messageWithHeader.Bytes())
+	encodedMsg := processing.Encode(fullMsg).Bytes()
+	_, err = p.Conn.Write(encodedMsg)
 	return err
 }
 
 func (p *Connection) readRemoteMsgVersion() error {
-	header, err := p.readHeader()
+	msgBytes, err := p.ReadMessage()
 	if err != nil {
 		return err
 	}
 
-	if header.Topic != topics.Version {
+	decodedMsg := processing.Decode(msgBytes)
+	magic := extractMagic(decodedMsg)
+	if magic != p.magic {
+		return errors.New("magic mismatch")
+	}
+
+	topic := extractTopic(decodedMsg)
+	if topic != topics.Version {
 		return fmt.Errorf("did not receive the expected '%s' message - got %s",
-			topics.Version, header.Topic)
+			topics.Version, topic)
 	}
 
-	buffer := make([]byte, header.Length)
-	if _, err := io.ReadFull(p.Conn, buffer); err != nil {
-		return err
-	}
-
-	version, err := decodeVersionMessage(bytes.NewBuffer(buffer))
-
+	version, err := decodeVersionMessage(decodedMsg)
 	if err != nil {
 		return err
 	}
@@ -138,81 +88,67 @@ func (p *Connection) readRemoteMsgVersion() error {
 	return verifyVersion(version.Version)
 }
 
-func (p *Connection) readVerack() error {
-	header, err := p.readHeader()
+func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint32(buf, binary.LittleEndian, uint32(p.magic)); err != nil {
+		return nil, err
+	}
+
+	topicBytes := topics.TopicToByteArray(topic)
+	if _, err := buf.Write(topicBytes[:]); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.ReadFrom(m); err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+func (p *Connection) readVerAck() error {
+	msgBytes, err := p.ReadMessage()
 	if err != nil {
 		return err
 	}
 
-	header.Topic = topics.VerAck
+	decodedMsg := processing.Decode(msgBytes)
+	magic := extractMagic(decodedMsg)
+	if magic != p.magic {
+		return errors.New("magic mismatch")
+	}
 
-	if header.Topic != topics.VerAck {
+	topic := extractTopic(decodedMsg)
+	if topic != topics.VerAck {
 		return fmt.Errorf("did not receive the expected '%s' message - got %s",
-			topics.VerAck, header.Topic)
+			topics.VerAck, topic)
 	}
 
 	return nil
 }
 
-func newVersionMessageBuffer(v *protocol.Version, from, to *wire.NetAddress,
-	services protocol.ServiceFlag) (*bytes.Buffer, error) {
-
-	buffer := new(bytes.Buffer)
-	if err := v.Encode(buffer); err != nil {
-		return nil, err
+func (p *Connection) writeVerAck() error {
+	verAckMsg, err := p.addHeader(new(bytes.Buffer), topics.VerAck)
+	if err != nil {
+		return err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian,
-		uint64(time.Now().Unix())); err != nil {
-		return nil, err
+	encodedMsg := processing.Encode(verAckMsg)
+	if _, err := p.Conn.Write(encodedMsg.Bytes()); err != nil {
+		return err
 	}
 
-	if err := from.Encode(buffer); err != nil {
-		return nil, err
-	}
-
-	if err := to.Encode(buffer); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, uint64(services)); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
+	return nil
 }
-func decodeVersionMessage(r *bytes.Buffer) (*VersionMessage, error) {
-	versionMessage := &VersionMessage{
-		Version:     &protocol.Version{},
-		FromAddress: &wire.NetAddress{},
-		ToAddress:   &wire.NetAddress{},
-	}
-	if err := versionMessage.Version.Decode(r); err != nil {
+
+func (p *Connection) createVersionBuffer() (*bytes.Buffer, error) {
+	version := protocol.NodeVer
+	message, err := newVersionMessageBuffer(version, protocol.FullNode)
+	if err != nil {
 		return nil, err
 	}
 
-	var time uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &time); err != nil {
-		return nil, err
-	}
-
-	versionMessage.Timestamp = int64(time)
-
-	if err := versionMessage.FromAddress.Decode(r); err != nil {
-		return nil, err
-	}
-
-	if err := versionMessage.ToAddress.Decode(r); err != nil {
-		return nil, err
-	}
-
-	var services uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &services); err != nil {
-		return nil, err
-	}
-
-	versionMessage.Services = protocol.ServiceFlag(services)
-	return versionMessage, nil
+	return message, nil
 }
 
 func verifyVersion(v *protocol.Version) error {

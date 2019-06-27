@@ -58,7 +58,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	}
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
-		step := ev.Step + uint8(i-1) // the event step is the second one of the reduction cycle
+		step := (ev.Step * 2) + uint8(i-1) // the event step is the second one of the reduction cycle
 		subcommittee := a.Unpack(votes.BitSet, ev.Round, step)
 		allVoters += len(subcommittee)
 
@@ -159,14 +159,15 @@ func (a *agreementHandler) createAgreement(evs []wire.Event, round uint64, step 
 
 	// sign the whole message
 	signed := a.signEd25519(buffer)
-	//add the topic
-	message, err := wire.AddTopic(signed, topics.Agreement)
+
+	// add the topic
+	msg, err := wire.AddTopic(signed, topics.Agreement)
 	if err != nil {
 		return nil, err
 	}
 
 	//send it
-	return message, nil
+	return msg, nil
 }
 
 // Aggregate the Agreement event into an Agreement outgoing event

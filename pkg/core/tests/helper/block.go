@@ -73,8 +73,8 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 
 	h := &block.Header{
 		Version:   0,
-		Timestamp: time.Now().Unix(),
 		Height:    height,
+		Timestamp: time.Now().Unix(),
 
 		PrevBlockHash: RandomSlice(t, 32),
 		Seed:          RandomSlice(t, 33),

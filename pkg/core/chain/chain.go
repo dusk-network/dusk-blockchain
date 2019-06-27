@@ -9,6 +9,7 @@ import (
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
 	logger "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	"github.com/bwesterb/go-ristretto"
@@ -39,7 +40,6 @@ type Chain struct {
 	bidList   *user.BidList
 
 	// collector channels
-	blockChan       <-chan *block.Block
 	candidateChan   <-chan *block.Block
 	winningHashChan <-chan []byte
 }
@@ -74,7 +74,6 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	}
 
 	// set up collectors
-	blockChan := initBlockCollector(eventBus, string(topics.Block))
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
 	winningHashChan := initWinningHashCollector(eventBus)
 
@@ -84,11 +83,11 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		db:              db,
 		bidList:         &user.BidList{},
 		prevBlock:       *genesisBlock,
-		blockChan:       blockChan,
 		candidateChan:   candidateChan,
 		winningHashChan: winningHashChan,
 	}
 
+	eventBus.SubscribeCallback(string(topics.Block), c.onAcceptBlock)
 	return c, nil
 }
 
@@ -97,9 +96,6 @@ func (c *Chain) Listen() {
 	for {
 		select {
 
-		// wire.EventBus events handlers
-		case b := <-c.blockChan:
-			_ = c.AcceptBlock(*b)
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
 		case blockHash := <-c.winningHashChan:
@@ -197,12 +193,20 @@ func calculateX(d uint64, m []byte) user.Bid {
 	return bid
 }
 
+func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
+	blk := block.NewBlock()
+	if err := blk.Decode(m); err != nil {
+		return err
+	}
+
+	return c.AcceptBlock(*blk)
+}
+
 // AcceptBlock will accept a block if
 // 1. We have not seen it before
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
-
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
@@ -238,9 +242,9 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
-	// 4. Gossip block
-	if err := c.propagateBlock(blk); err != nil {
-		l.Errorf("block propagating failed: %s", err.Error())
+	// 4. Gossip advertise block Hash
+	if err := c.advertiseBlock(blk); err != nil {
+		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
@@ -259,6 +263,56 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	l.Trace("procedure ended")
+
+	return nil
+}
+
+func (c *Chain) AcceptGenesisBlock() error {
+
+	field := logger.Fields{"process": "accept genesis block"}
+	l := log.WithFields(field)
+
+	genesisBlock := &block.Block{
+		Header: &block.Header{
+			Version:       0,
+			Height:        0,
+			Timestamp:     0,
+			PrevBlockHash: []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+			TxRoot:        []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+			CertHash:      []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+			Seed:          []byte{0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+		},
+	}
+
+	err := genesisBlock.SetHash()
+	if err != nil {
+		l.Errorf("hash calculating failed: %s", err.Error())
+		return err
+	}
+
+	// 1. Store block in database
+	err = c.db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(genesisBlock)
+	})
+
+	if err != nil {
+		l.Errorf("storing failed: %s", err.Error())
+		return err
+	}
+
+	c.prevBlock = *genesisBlock
+
+	// 2. Notify other subsystems for the accepted block
+	// Subsystems listening for this topic:
+	// mempool.Mempool
+	// consensus.generation.broker
+	buf := new(bytes.Buffer)
+	if err := genesisBlock.Encode(buf); err != nil {
+		l.Errorf("encoding failed: %s", err.Error())
+		return err
+	}
+
+	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
 	return nil
 }
@@ -306,4 +360,24 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 
 	// Run the general procedure of block accepting
 	return c.AcceptBlock(*candidate)
+}
+
+// Send Inventory message to all peers
+func (c *Chain) advertiseBlock(b block.Block) error {
+
+	msg := &peermsg.Inv{}
+	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
+
+	buf := new(bytes.Buffer)
+	if err := msg.Encode(buf); err != nil {
+		panic(err)
+	}
+
+	withTopic, err := wire.AddTopic(buf, topics.Inv)
+	if err != nil {
+		return err
+	}
+
+	c.eventBus.Stream(string(topics.Gossip), withTopic)
+	return nil
 }

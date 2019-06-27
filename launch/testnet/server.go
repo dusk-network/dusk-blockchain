@@ -13,6 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
@@ -23,10 +24,11 @@ import (
 var timeOut = 3 * time.Second
 
 type Server struct {
-	eventBus  *wire.EventBus
-	rpcBus    *wire.RPCBus
-	chain     *chain.Chain
-	collector *peer.MessageCollector
+	eventBus *wire.EventBus
+	rpcBus   *wire.RPCBus
+	chain    *chain.Chain
+	dupeMap  *dupemap.DupeMap
+	counter  *chainsync.Counter
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
@@ -70,11 +72,8 @@ func Setup() *Server {
 		eventBus: eventBus,
 		rpcBus:   rpcBus,
 		chain:    chain,
-		collector: &peer.MessageCollector{
-			Publisher:     eventBus,
-			DupeBlacklist: dupeBlacklist,
-			Magic:         protocol.TestNet,
-		},
+		dupeMap:  dupeBlacklist,
+		counter:  chainsync.NewCounter(eventBus),
 	}
 
 	// Connecting to the general monitoring system
@@ -103,7 +102,11 @@ func (s *Server) StartConsensus(round uint64) {
 }
 
 func (s *Server) OnAccept(conn net.Conn) {
-	peerReader := peer.NewReader(conn, protocol.TestNet)
+	responseChan := make(chan *bytes.Buffer, 100)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan)
+	if err != nil {
+		panic(err)
+	}
 
 	if err := peerReader.Accept(); err != nil {
 		log.WithFields(log.Fields{
@@ -117,15 +120,17 @@ func (s *Server) OnAccept(conn net.Conn) {
 		"address": peerReader.Addr(),
 	}).Debugln("connection established")
 
-	go peerReader.ReadLoop(s.collector)
+	go peerReader.ReadLoop()
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
-	peerWriter.Subscribe()
+	peerWriter.Subscribe(s.eventBus)
+	go peerWriter.WriteLoop(responseChan)
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
+	responseChan := make(chan *bytes.Buffer, 100)
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 
-	if err := peerWriter.Connect(); err != nil {
+	if err := peerWriter.Connect(s.eventBus); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -137,8 +142,13 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		"address": peerWriter.Addr(),
 	}).Debugln("connection established")
 
-	peerReader := peer.NewReader(conn, protocol.TestNet)
-	go peerReader.ReadLoop(s.collector)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan)
+	if err != nil {
+		panic(err)
+	}
+
+	go peerReader.ReadLoop()
+	go peerWriter.WriteLoop(responseChan)
 }
 
 func (s *Server) Close() {

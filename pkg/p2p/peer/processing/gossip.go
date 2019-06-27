@@ -1,11 +1,10 @@
-package peer
+package processing
 
 import (
 	"bytes"
 	"encoding/binary"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
@@ -42,6 +41,8 @@ func NewGossip(magic protocol.Magic) *Gossip {
 	}
 }
 
+// Process a message that is passing through, by prepending the network magic to the
+// buffer, and then COBS encoding it.
 func (g *Gossip) Process(m *bytes.Buffer) (*bytes.Buffer, error) {
 	buf, err := g.headerWriter.Write(m)
 	if err != nil {
