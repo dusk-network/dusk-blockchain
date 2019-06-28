@@ -304,56 +304,6 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 	}
 }
 
-func (c *Chain) AcceptGenesisBlock() error {
-
-	field := logger.Fields{"process": "accept genesis block"}
-	l := log.WithFields(field)
-
-	genesisBlock := &block.Block{
-		Header: &block.Header{
-			Version:       0,
-			Height:        0,
-			Timestamp:     0,
-			PrevBlockHash: []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			TxRoot:        []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			CertHash:      []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			Seed:          []byte{0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-		},
-	}
-
-	err := genesisBlock.SetHash()
-	if err != nil {
-		l.Errorf("hash calculating failed: %s", err.Error())
-		return err
-	}
-
-	// 1. Store block in database
-	err = c.db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(genesisBlock)
-	})
-
-	if err != nil {
-		l.Errorf("storing failed: %s", err.Error())
-		return err
-	}
-
-	c.prevBlock = *genesisBlock
-
-	// 2. Notify other subsystems for the accepted block
-	// Subsystems listening for this topic:
-	// mempool.Mempool
-	// consensus.generation.broker
-	buf := new(bytes.Buffer)
-	if err := genesisBlock.Encode(buf); err != nil {
-		l.Errorf("encoding failed: %s", err.Error())
-		return err
-	}
-
-	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
-
-	return nil
-}
-
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	// Ensure the candidate block satisfies all chain rules
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
