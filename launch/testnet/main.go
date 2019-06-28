@@ -94,10 +94,6 @@ func main() {
 		}
 	}
 
-	// Accept genesis so we can use it as locator
-	genesisBlk := getGenesisBlock()
-	srv.chain.AcceptBlock(*genesisBlk)
-
 	// TODO: this should be adjusted before testnet release, it is simply a way
 	// to bootstrap the network in an unsophisticated manner
 	if strings.Contains(ips[0], "noip") {

@@ -73,6 +73,16 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		}
 	}
 
+	// TODO: remove this in favor of chain loader
+	// store block
+	err = db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(genesisBlock)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	// set up collectors
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
 	winningHashChan := initWinningHashCollector(eventBus)
@@ -223,20 +233,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 2. Add provisioners and block generators
-	for _, tx := range blk.Txs {
-		switch tx.Type() {
-		case transactions.StakeType:
-			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake, blk.Header.Height+1); err != nil {
-				l.Errorf("adding provisioner failed: %s", err.Error())
-			}
-		case transactions.BidType:
-			bid := tx.(*transactions.Bid)
-			if err := c.addBidder(bid); err != nil {
-				l.Errorf("adding bidder failed: %s", err.Error())
-			}
-		}
-	}
+	c.addConsensusNodes(blk.Txs, blk.Header.Height+1)
 
 	// 3. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
@@ -285,6 +282,26 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	l.Trace("procedure ended")
 
 	return nil
+}
+
+func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerStartHeight uint64) {
+	field := logger.Fields{"process": "accept block"}
+	l := log.WithFields(field)
+
+	for _, tx := range txs {
+		switch tx.Type() {
+		case transactions.StakeType:
+			stake := tx.(*transactions.Stake)
+			if err := c.addProvisioner(stake, provisionerStartHeight); err != nil {
+				l.Errorf("adding provisioner failed: %s", err.Error())
+			}
+		case transactions.BidType:
+			bid := tx.(*transactions.Bid)
+			if err := c.addBidder(bid); err != nil {
+				l.Errorf("adding bidder failed: %s", err.Error())
+			}
+		}
+	}
 }
 
 func (c *Chain) AcceptGenesisBlock() error {
