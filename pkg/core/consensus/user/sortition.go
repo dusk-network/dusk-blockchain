@@ -95,7 +95,7 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 func (p *Provisioners) extractCommitteeMember(score, round uint64) bls.PublicKey {
 	for i := 0; ; i++ {
 		// make sure we wrap around the provisioners array
-		if i == p.Size(round) {
+		if i >= p.Size(round) {
 			i = 0
 		}
 

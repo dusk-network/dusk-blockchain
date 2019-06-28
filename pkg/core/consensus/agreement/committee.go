@@ -31,10 +31,11 @@ func (a *agreementCommittee) Quorum(round uint64) int {
 
 func (a *agreementCommittee) size(round uint64) int {
 	provisioners := a.Provisioners()
-	if provisioners.Size(round) > committeeSize {
+	size := provisioners.Size(round)
+	if size > committeeSize {
 		return committeeSize
 	}
-	return provisioners.Size(round)
+	return size
 }
 
 // Pack creates a uint64 bitset representation of a Committee subset for a given round and step

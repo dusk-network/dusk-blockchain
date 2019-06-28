@@ -39,10 +39,11 @@ func (r *reductionCommittee) Quorum(round uint64) int {
 
 func (r *reductionCommittee) size(round uint64) int {
 	provisioners := r.Provisioners()
-	if provisioners.Size(round) > committeeSize {
+	size := provisioners.Size(round)
+	if size > committeeSize {
 		return committeeSize
 	}
-	return provisioners.Size(round)
+	return size
 }
 
 func (r *reductionCommittee) FilterAbsentees(evs []wire.Event, round uint64, step uint8) user.VotingCommittee {

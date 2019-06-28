@@ -67,7 +67,7 @@ func (p *Provisioners) MemberAt(i int) *Member {
 	return p.members[strPk(bigI.Bytes())]
 }
 
-// Calculate how many members were active on a given round.
+// Calculate how many members are active on a given round.
 func (p *Provisioners) membersAt(round uint64) int {
 	size := 0
 	for _, member := range p.members {
@@ -147,7 +147,7 @@ func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	i := strPk(pubKeyBLS)
 	m, found := p.members[i]
 	if !found {
-		return 0, fmt.Errorf("public %v not found among provisioner set", pubKeyBLS)
+		return 0, fmt.Errorf("public key %v not found among provisioner set", pubKeyBLS)
 	}
 
 	return m.Stake, nil
