@@ -239,7 +239,14 @@ func (bus *EventBus) publish(handlers []*channelHandler, messageBuffer *bytes.Bu
 func (bus *EventBus) publishCallback(handlers []*callbackHandler, message *bytes.Buffer, topic string) {
 	for _, handler := range handlers {
 		mCopy := copyBuffer(message)
-		_ = handler.callback(mCopy)
+		if err := handler.callback(mCopy); err != nil {
+			log.WithFields(log.Fields{
+				"id":      handler.id,
+				"topic":   topic,
+				"process": "event bus",
+				"error":   err,
+			}).Errorln("error when triggering callback")
+		}
 	}
 }
 
