@@ -146,7 +146,7 @@ func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer) {
 			continue
 		}
 
-		if _, err := w.Conn.Write(processed.Bytes()); err != nil {
+		if _, err := w.Connection.Write(processed.Bytes()); err != nil {
 			log.WithFields(log.Fields{
 				"process": "peer",
 				"error":   err,
