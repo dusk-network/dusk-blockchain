@@ -73,7 +73,7 @@ func getGenesisBlock() *block.Block {
 }
 
 func waitForStake(bus *wire.EventBus, myStake *transactions.Stake) uint64 {
-	blockChan := make(chan *bytes.Buffer, 10)
+	blockChan := make(chan *bytes.Buffer, 100)
 	id := bus.Subscribe(string(topics.AcceptedBlock), blockChan)
 	for {
 		blkBuf := <-blockChan

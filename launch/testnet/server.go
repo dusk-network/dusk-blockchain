@@ -117,7 +117,7 @@ func Setup() *Server {
 }
 
 func (s *Server) launchGeneration() {
-	blockChan := make(chan *bytes.Buffer, 10)
+	blockChan := make(chan *bytes.Buffer, 100)
 	id := s.eventBus.Subscribe(string(topics.AcceptedBlock), blockChan)
 	for {
 		blkBuf := <-blockChan
