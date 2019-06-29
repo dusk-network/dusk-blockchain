@@ -127,7 +127,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	responseChan := make(chan *bytes.Buffer, 100)
+	messageQueueChan := make(chan *bytes.Buffer, 100)
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 
 	if err := peerWriter.Connect(s.eventBus); err != nil {
@@ -142,13 +142,13 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		"address": peerWriter.Addr(),
 	}).Debugln("connection established")
 
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, messageQueueChan)
 	if err != nil {
 		panic(err)
 	}
 
 	go peerReader.ReadLoop()
-	go peerWriter.WriteLoop(responseChan)
+	go peerWriter.WriteLoop(messageQueueChan)
 }
 
 func (s *Server) Close() {

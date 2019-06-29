@@ -39,6 +39,8 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		err = m.blockHashBroker.AdvertiseMissingBlocks(b)
 	case topics.GetData:
 		err = m.dataBroker.SendItems(b)
+	case topics.MemPool:
+		err = m.dataBroker.SendTxsItems()
 	case topics.Inv:
 		err = m.dataRequestor.RequestMissingItems(b)
 	case topics.Block:

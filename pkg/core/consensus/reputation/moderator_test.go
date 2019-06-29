@@ -22,6 +22,8 @@ func TestStrikes(t *testing.T) {
 	// Update round
 	consensus.UpdateRound(eventBus, 1)
 
+	time.Sleep(1 * time.Second)
+
 	// Send enough strikes for one person so we receive something on removeProvisionerChan
 	node, _ := crypto.RandEntropy(32)
 	for i := uint8(0); i < reputation.MaxStrikes; i++ {

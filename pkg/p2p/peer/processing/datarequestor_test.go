@@ -16,7 +16,7 @@ func TestRequestData(t *testing.T) {
 	defer db.Close()
 
 	responseChan := make(chan *bytes.Buffer, 100)
-	dataRequestor := processing.NewDataRequestor(db, responseChan)
+	dataRequestor := processing.NewDataRequestor(db, nil, responseChan)
 
 	// Send topics.Inv
 	hash, buf, err := createInvBuffer()

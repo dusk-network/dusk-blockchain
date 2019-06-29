@@ -14,6 +14,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -134,9 +135,8 @@ func (m *Mempool) Run() {
 	go func() {
 		for {
 			select {
-			// Mempool output channels
-			case r := <-wire.GetVerifiedTxsChan:
-				m.onGetVerifiedTxs(r)
+			case r := <-wire.GetMempoolTxsChan:
+				m.onGetMempoolTxs(r)
 			// Mempool input channels
 			case b := <-m.accepted.blockChan:
 				m.onAcceptedBlock(b)
@@ -199,21 +199,11 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 		return
 	}
 
-	// propagate to P2P network
-	buffer := new(bytes.Buffer)
-
-	topicBytes := topics.TopicToByteArray(topics.Tx)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		log.Errorf("%v", err)
+	// advertise the hash of the verified Tx to the P2P network
+	if err := m.advertiseTx(txID); err != nil {
+		log.Error(err.Error())
 		return
 	}
-
-	if err := t.tx.Encode(buffer); err != nil {
-		log.Errorf("%v", err)
-		return
-	}
-
-	m.eventBus.Publish(string(topics.Gossip), buffer)
 }
 
 func (m *Mempool) onAcceptedBlock(b block.Block) {
@@ -328,28 +318,60 @@ func (m *Mempool) Collect(message *bytes.Buffer) error {
 	return nil
 }
 
-func (m Mempool) onGetVerifiedTxs(r wire.Req) {
+// onGetMempoolTxs retrieves current state of the mempool of the verified but
+// still unaccepted txs
+func (m Mempool) onGetMempoolTxs(r wire.Req) {
 
-	w := new(bytes.Buffer)
-	lTxs := uint64(m.verified.Len())
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
+	// Read inputs
+	var filterTxID []byte
+	_, err := r.Params.Read(filterTxID)
+	if err != nil {
 		r.ErrChan <- err
 		return
 	}
 
-	// TODO: Currently mempool returns all verified txs here. Once the limit of
-	// transaction space in a block is determined, mempool will use transaction
-	// fee to choose which txs to be returned here.
-	err := m.verified.Range(func(k key, t TxDesc) error {
-		if err := t.tx.Encode(w); err != nil {
-			return err
+	outputTxs := make([]transactions.Transaction, 0)
+
+	// TODO: When filterTxID is empty, mempool returns the available verified
+	// txs. Once the limit of transactions space in a block is determined,
+	// mempool should prioritize transactions by fee
+	err = m.verified.Range(func(k key, t TxDesc) error {
+
+		txID, err := t.tx.CalculateHash()
+		if err != nil {
+			return nil
 		}
+
+		// Apply TxID Filter
+		if len(filterTxID) > 0 {
+			if !bytes.Equal(filterTxID, txID) {
+				return nil
+			}
+		}
+
+		outputTxs = append(outputTxs, t.tx)
+
 		return nil
 	})
 
 	if err != nil {
 		r.ErrChan <- err
 		return
+	}
+
+	// marshal Txs
+	w := new(bytes.Buffer)
+	lTxs := uint64(len(outputTxs))
+	if err := encoding.WriteVarInt(w, lTxs); err != nil {
+		r.ErrChan <- err
+		return
+	}
+
+	for _, tx := range outputTxs {
+		if err := tx.Encode(w); err != nil {
+			r.ErrChan <- err
+			return
+		}
 	}
 
 	r.RespChan <- *w
@@ -372,4 +394,24 @@ func (m *Mempool) checkTXDoubleSpent(tx transactions.Transaction) error {
 // Quit makes mempool main loop to terminate
 func (m *Mempool) Quit() {
 	m.quitChan <- struct{}{}
+}
+
+// Send Inventory message to all peers
+func (m *Mempool) advertiseTx(txID []byte) error {
+
+	msg := &peermsg.Inv{}
+	msg.AddItem(peermsg.InvTypeMempoolTx, txID)
+
+	buf := new(bytes.Buffer)
+	if err := msg.Encode(buf); err != nil {
+		panic(err)
+	}
+
+	withTopic, err := wire.AddTopic(buf, topics.Inv)
+	if err != nil {
+		return err
+	}
+
+	m.eventBus.Publish(string(topics.Gossip), withTopic)
+	return nil
 }
