@@ -137,11 +137,11 @@ func (s *Server) launchGeneration() {
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
-	roundChan := consensus.InitAcceptedBlockUpdate(eventBus)
+	acceptedBlockChan := consensus.InitAcceptedBlockUpdate(eventBus)
 	dupeBlacklist := dupemap.NewDupeMap(1)
 	go func() {
 		for {
-			blk := <-roundChan
+			blk := <-acceptedBlockChan
 			// NOTE: do we need locking?
 			dupeBlacklist.UpdateHeight(blk.Header.Height)
 		}
