@@ -3,9 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
-	"math/big"
-	"math/rand"
 	"net"
 	"time"
 
@@ -20,7 +17,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
@@ -28,7 +24,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
-	"gitlab.dusk.network/dusk-core/zkproof"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
@@ -220,48 +215,4 @@ func (s *Server) sendBid() {
 	buf := new(bytes.Buffer)
 	s.MyBid.Encode(buf)
 	s.eventBus.Publish(string(topics.Tx), buf)
-}
-
-func makeStake(keys *user.Keys) *transactions.Stake {
-	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, *keys.EdPubKey, keys.BLSPubKey.Marshal())
-	keyImage, _ := crypto.RandEntropy(32)
-	txID, _ := crypto.RandEntropy(32)
-	signature, _ := crypto.RandEntropy(32)
-	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
-	stake.Inputs = transactions.Inputs{input}
-
-	outputAmount := rand.Int63n(100000)
-	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
-	destKey, _ := crypto.RandEntropy(32)
-	rangeProof, _ := crypto.RandEntropy(32)
-	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
-	stake.Outputs = transactions.Outputs{output}
-
-	return stake
-}
-
-func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
-	k := ristretto.Scalar{}
-	k.Rand()
-	outputAmount := rand.Int63n(100000)
-	d := big.NewInt(outputAmount)
-	dScalar := ristretto.Scalar{}
-	dScalar.SetBigInt(d)
-	m := zkproof.CalculateM(k)
-	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, m.Bytes())
-	keyImage, _ := crypto.RandEntropy(32)
-	txID, _ := crypto.RandEntropy(32)
-	signature, _ := crypto.RandEntropy(32)
-	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
-	bid.Inputs = transactions.Inputs{input}
-
-	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
-	destKey, _ := crypto.RandEntropy(32)
-	rangeProof, _ := crypto.RandEntropy(32)
-	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
-	bid.Outputs = transactions.Outputs{output}
-
-	return bid, dScalar, k
 }

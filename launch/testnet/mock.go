@@ -2,15 +2,22 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
+	"math"
+	"math/big"
+	"math/rand"
 	"time"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 // TODO: This source file should be deleted when getting ready for testnet
@@ -89,4 +96,48 @@ func waitForStake(bus *wire.EventBus, myStake *transactions.Stake) uint64 {
 			}
 		}
 	}
+}
+
+func makeStake(keys *user.Keys) *transactions.Stake {
+	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, *keys.EdPubKey, keys.BLSPubKey.Marshal())
+	keyImage, _ := crypto.RandEntropy(32)
+	txID, _ := crypto.RandEntropy(32)
+	signature, _ := crypto.RandEntropy(32)
+	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
+	stake.Inputs = transactions.Inputs{input}
+
+	outputAmount := rand.Int63n(100000)
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
+	destKey, _ := crypto.RandEntropy(32)
+	rangeProof, _ := crypto.RandEntropy(32)
+	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
+	stake.Outputs = transactions.Outputs{output}
+
+	return stake
+}
+
+func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
+	k := ristretto.Scalar{}
+	k.Rand()
+	outputAmount := rand.Int63n(100000)
+	d := big.NewInt(outputAmount)
+	dScalar := ristretto.Scalar{}
+	dScalar.SetBigInt(d)
+	m := zkproof.CalculateM(k)
+	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, m.Bytes())
+	keyImage, _ := crypto.RandEntropy(32)
+	txID, _ := crypto.RandEntropy(32)
+	signature, _ := crypto.RandEntropy(32)
+	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
+	bid.Inputs = transactions.Inputs{input}
+
+	commitment := make([]byte, 32)
+	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
+	destKey, _ := crypto.RandEntropy(32)
+	rangeProof, _ := crypto.RandEntropy(32)
+	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
+	bid.Outputs = transactions.Outputs{output}
+
+	return bid, dScalar, k
 }
