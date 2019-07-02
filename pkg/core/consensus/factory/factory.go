@@ -42,6 +42,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.Launch(c.eventBus)
+	generation.Launch(c.eventBus, c.rpcBus, c.d, c.k, nil, nil, c.Keys)
 	selection.Launch(c.eventBus, nil, c.timerLength)
 	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
 	agreement.Launch(c.eventBus, nil, c.Keys)

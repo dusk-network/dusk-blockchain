@@ -15,7 +15,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
@@ -33,10 +35,19 @@ func TestScoreGeneration(t *testing.T) {
 	gen := &mockGenerator{t}
 
 	// launch score component
-	generation.Launch(eb, nil, d, k, gen, gen)
+	keys, _ := user.NewRandKeys()
+	generation.Launch(eb, nil, d, k, gen, gen, keys)
 
-	// update the round to start generation
-	updateRound(eb, 1)
+	// send an accepted block to start generation
+	blk := helper.RandomBlock(t, 0, 1)
+	// save the seed to check it later
+	seed := blk.Header.Seed
+
+	blkBuf := new(bytes.Buffer)
+	if err := blk.Encode(blkBuf); err != nil {
+		t.Fatal(err)
+	}
+	eb.Publish(string(topics.AcceptedBlock), blkBuf)
 
 	buf, err := streamer.Read()
 	if err != nil {
@@ -50,6 +61,13 @@ func TestScoreGeneration(t *testing.T) {
 
 	// round should be 1
 	assert.Equal(t, uint64(1), sev.Round)
+
+	signedSeed, err := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, sev.Seed, signedSeed.Compress())
 }
 
 // mockGenerator is used to test the generation component with the absence
