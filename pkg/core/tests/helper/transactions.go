@@ -46,7 +46,9 @@ func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
 		M = RandomSlice(t, 12)
 	}
 
-	tx, err := transactions.NewBid(0, lockTime, fee, M)
+	R := RandomSlice(t, 32)
+
+	tx, err := transactions.NewBid(0, lockTime, fee, M, R)
 	if err != nil {
 		return tx, err
 	}
@@ -75,7 +77,9 @@ func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
 func RandomTLockTx(t *testing.T, malformed bool) *transactions.TimeLock {
 	var numInputs, numOutputs = 23, 34
 
-	tx := transactions.NewTimeLock(0, lockTime, fee)
+	R := RandomSlice(t, 32)
+
+	tx := transactions.NewTimeLock(0, lockTime, fee, R)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs, malformed)
@@ -90,7 +94,11 @@ func RandomTLockTx(t *testing.T, malformed bool) *transactions.TimeLock {
 func RandomStandardTx(t *testing.T, malformed bool) *transactions.Standard {
 	var numInputs, numOutputs = 10, 10
 
-	tx := transactions.NewStandard(0, fee)
+	R := RandomSlice(t, 32)
+
+	tx := transactions.NewStandard(0, fee, R)
+
+	tx.R = RandomSlice(t, 32)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs, malformed)
@@ -107,8 +115,9 @@ func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
 
 	edKey := RandomSlice(t, 32)
 	blsKey := RandomSlice(t, 33)
+	R := RandomSlice(t, 32)
 
-	tx, err := transactions.NewStake(0, lockTime, fee, edKey, blsKey)
+	tx, err := transactions.NewStake(0, lockTime, fee, edKey, blsKey, R)
 	if err != nil {
 		return tx, err
 	}

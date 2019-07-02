@@ -13,8 +13,7 @@ type Coinbase struct {
 	// TxType represents the transaction type
 	TxType TxType
 	// TxID is the transaction identifier for the current transaction
-	TxID []byte
-
+	TxID    []byte
 	R       []byte
 	Score   []byte
 	Proof   []byte

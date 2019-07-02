@@ -33,8 +33,9 @@ type Standard struct {
 
 // NewStandard will return a Standard transaction
 // given the tx version and the fee atached
-func NewStandard(ver uint8, fee uint64) *Standard {
+func NewStandard(ver uint8, fee uint64, R []byte) *Standard {
 	return &Standard{
+		R:       R,
 		Version: ver,
 		Fee:     fee,
 		TxType:  StandardType,
@@ -193,7 +194,7 @@ func (s *Standard) Equals(t Transaction) bool {
 		return false
 	}
 
-	if bytes.Equal(s.R, other.R) {
+	if !bytes.Equal(s.R, other.R) {
 		return false
 	}
 
