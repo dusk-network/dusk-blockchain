@@ -481,3 +481,20 @@ func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 
 	return count, nil
 }
+
+func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
+	header, err := t.FetchBlockHeader(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	txs, err := t.FetchBlockTxs(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return &block.Block{
+		Header: header,
+		Txs:    txs,
+	}, nil
+}
