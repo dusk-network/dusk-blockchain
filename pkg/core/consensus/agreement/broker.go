@@ -19,12 +19,12 @@ import (
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func Launch(eventBus *wire.EventBus, committee committee.Foldable,
-	keys user.Keys, currentRound uint64) {
+func Launch(eventBus *wire.EventBus, committee committee.Foldable, keys user.Keys) {
 	if committee == nil {
 		committee = newAgreementCommittee(eventBus)
 	}
 	broker := newBroker(eventBus, committee, keys)
+	currentRound := getInitialRound(eventBus)
 	broker.updateRound(currentRound)
 	go broker.Listen()
 }
@@ -51,8 +51,7 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 	handler := newHandler(committee, keys)
 	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore())
 	state := consensus.NewState()
-	filter := launchFilter(eventBroker, committee, handler,
-		state, accumulator)
+	filter := launchFilter(eventBroker, committee, handler, state, accumulator)
 	b := &broker{
 		publisher:   eventBroker,
 		handler:     handler,

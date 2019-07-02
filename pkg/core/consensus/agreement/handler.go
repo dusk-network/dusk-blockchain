@@ -58,7 +58,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	}
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
-		step := (ev.Step * 2) + uint8(i-1) // the event step is the second one of the reduction cycle
+		step := uint8(int(ev.Step*2) + (i - 1)) // the event step is the second one of the reduction cycle
 		subcommittee := a.Unpack(votes.BitSet, ev.Round, step)
 		allVoters += len(subcommittee)
 
@@ -84,8 +84,8 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 		}
 	}
 
-	if allVoters < a.Quorum() {
-		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum())
+	if allVoters < a.Quorum(ev.Round) {
+		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(ev.Round))
 	}
 	return nil
 }
@@ -194,12 +194,14 @@ func (a *agreementHandler) Aggregate(h *header.Header, voteSet []wire.Event) (*A
 
 	aev := New()
 	aev.Header = h
-	i := 0
-	for _, stepVotes := range stepVotesMap {
+	for step, stepVotes := range stepVotesMap {
 		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
 		sv.BitSet = a.Pack(provisioners, h.Round, sv.Step)
-		aev.VotesPerStep[i] = sv
-		i++
+		if step%2 == 0 {
+			aev.VotesPerStep[1] = sv
+		} else {
+			aev.VotesPerStep[0] = sv
+		}
 	}
 
 	return aev, nil

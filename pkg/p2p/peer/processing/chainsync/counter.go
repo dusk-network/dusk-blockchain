@@ -48,6 +48,8 @@ func (s *Counter) isSyncing() bool {
 func (s *Counter) startSyncing(heightDiff uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
+	// We can only receive up to 500 blocks at a time
 	if heightDiff > 500 {
 		heightDiff = 500
 	}

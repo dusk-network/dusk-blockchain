@@ -2,17 +2,15 @@ package protocol
 
 import (
 	"fmt"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"strings"
+
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
 // ServiceFlag indicates the services provided by the Node.
 type ServiceFlag uint64
 
 const (
-	// UserAgent is a basic user agent token in the following format: /Name:Version/Name:Version/.../
-	UserAgent = "/Dusk:1.0/GO:1.11/" //TODO: Think of a better token name
-
 	// FullNode indicates that a user is running the full node implementation of Dusk
 	FullNode ServiceFlag = 1
 

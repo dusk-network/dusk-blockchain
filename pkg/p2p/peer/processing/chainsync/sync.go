@@ -50,6 +50,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
 		return err
 	}
 
+	log.WithField("our height", blk.Header.Height).WithField("their height", height).Traceln("block received")
 	// Only ask for missing blocks if we are not currently syncing, to prevent
 	// asking many peers for (generally) the same blocks.
 	diff := compareHeights(blk.Header.Height, height)
@@ -65,13 +66,16 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
 		return nil
 	}
 
-	// Write bufio.Reader into a bytes.Buffer so we can send it over the event bus.
-	buf := new(bytes.Buffer)
-	if _, err := buf.ReadFrom(r); err != nil {
-		return err
+	if diff == 1 {
+		// Write bufio.Reader into a bytes.Buffer so we can send it over the event bus.
+		buf := new(bytes.Buffer)
+		if _, err := buf.ReadFrom(r); err != nil {
+			return err
+		}
+
+		s.publisher.Publish(string(topics.Block), buf)
 	}
 
-	s.publisher.Publish(string(topics.Block), buf)
 	return nil
 }
 
