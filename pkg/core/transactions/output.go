@@ -17,7 +17,8 @@ type Output struct {
 	Commitment []byte // Variable size
 	// DestKey is the one-time public key of the address that
 	// the funds should be sent to.
-	DestKey []byte // 32 bytes
+	DestKey                        []byte // 32 bytes
+	EncryptedAmount, EncryptedMask []byte
 }
 
 // NewOutput constructs a new Output from the passed parameters.
@@ -43,6 +44,12 @@ func (o *Output) Encode(w io.Writer) error {
 	if err := encoding.Write256(w, o.DestKey); err != nil {
 		return err
 	}
+	if err := encoding.Write256(w, o.EncryptedAmount); err != nil {
+		return err
+	}
+	if err := encoding.Write256(w, o.EncryptedMask); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -53,6 +60,14 @@ func (o *Output) Decode(r io.Reader) error {
 	}
 
 	if err := encoding.Read256(r, &o.DestKey); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, &o.EncryptedAmount); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, &o.EncryptedMask); err != nil {
 		return err
 	}
 	return nil
@@ -68,5 +83,13 @@ func (o *Output) Equals(out *Output) bool {
 		return false
 	}
 
-	return bytes.Equal(o.DestKey, out.DestKey)
+	if !bytes.Equal(o.DestKey, out.DestKey) {
+		return false
+	}
+
+	if !bytes.Equal(o.EncryptedAmount, out.EncryptedAmount) {
+		return false
+	}
+
+	return bytes.Equal(o.EncryptedMask, out.EncryptedMask)
 }
