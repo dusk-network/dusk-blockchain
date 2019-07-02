@@ -84,7 +84,7 @@ type (
 		Subscribe(string, chan<- *bytes.Buffer) uint32
 		SubscribeCallback(string, func(*bytes.Buffer) error) uint32
 		SubscribeStream(string, io.WriteCloser) uint32
-		Unsubscribe(string, uint32) bool
+		Unsubscribe(string, uint32)
 		RegisterPreprocessor(string, ...TopicProcessor)
 	}
 
