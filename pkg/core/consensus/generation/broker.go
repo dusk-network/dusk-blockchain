@@ -15,8 +15,8 @@ import (
 
 // Launch will start the processes for score/block generation.
 func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus,
-	d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys) {
-	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys)
+	d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator) {
+	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen)
 	go broker.Listen()
 }
 
@@ -26,13 +26,14 @@ type broker struct {
 	seeder         *seeder
 
 	// subscriber channels
+	roundChan         <-chan uint64
 	bidListChan       <-chan user.BidList
 	regenerationChan  <-chan consensus.AsyncState
 	acceptedBlockChan <-chan block.Block
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator, keys user.Keys) *broker {
+	gen Generator, blockGen BlockGenerator) *broker {
 	if gen == nil {
 		gen = newProofGenerator(d, k)
 	}
@@ -47,25 +48,29 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		blockGen = newBlockGenerator(publicKey, rpcBus)
 	}
 
+	roundChan := consensus.InitRoundUpdate(eventBroker)
 	bidListChan := consensus.InitBidListUpdate(eventBroker)
 	regenerationChan := consensus.InitBlockRegenerationCollector(eventBroker)
 	acceptedBlockChan := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	return &broker{
 		proofGenerator:    gen,
+		roundChan:         roundChan,
 		bidListChan:       bidListChan,
 		regenerationChan:  regenerationChan,
 		acceptedBlockChan: acceptedBlockChan,
 		forwarder:         newForwarder(eventBroker, blockGen, rpcBus),
-		seeder: &seeder{
-			keys: keys,
-		},
+		seeder:            &seeder{},
 	}
 }
 
 func (b *broker) Listen() {
 	for {
 		select {
+		case round := <-b.roundChan:
+			seed := b.seeder.GenerateSeed(round)
+			proof := b.proofGenerator.GenerateProof(seed)
+			b.Forward(proof, seed)
 		case bidList := <-b.bidListChan:
 			b.proofGenerator.UpdateBidList(bidList)
 		case state := <-b.regenerationChan:
@@ -75,18 +80,8 @@ func (b *broker) Listen() {
 				proof := b.proofGenerator.GenerateProof(seed)
 				b.Forward(proof, seed)
 			}
-		case acceptedBlock := <-b.acceptedBlockChan:
-			b.forwarder.blockGenerator.UpdatePrevBlock(acceptedBlock)
-			seed, err := b.seeder.GenerateSeed(acceptedBlock.Header.Seed, acceptedBlock.Header.Height+1)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"process": "generation",
-				}).WithError(err).Errorln("error generating seed")
-				continue
-			}
-
-			proof := b.proofGenerator.GenerateProof(seed)
-			b.Forward(proof, seed)
+		case acceptedBlockChan := <-b.acceptedBlockChan:
+			b.forwarder.blockGenerator.UpdatePrevBlock(acceptedBlockChan)
 		}
 	}
 }
