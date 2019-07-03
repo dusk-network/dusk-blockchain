@@ -22,7 +22,8 @@ func TestStrikes(t *testing.T) {
 	// Update round
 	consensus.UpdateRound(eventBus, 1)
 
-	time.Sleep(1 * time.Second)
+	// Wait for the round to update...
+	time.Sleep(500 * time.Millisecond)
 
 	// Send enough strikes for one person so we receive something on removeProvisionerChan
 	node, _ := crypto.RandEntropy(32)
@@ -31,8 +32,12 @@ func TestStrikes(t *testing.T) {
 	}
 
 	// We should now receive the public key of the provisioner who has exceeded maxStrikes
-	offenderBuf := <-removeProvisionerChan
-	assert.Equal(t, offenderBuf.Bytes(), node)
+	select {
+	case offenderBuf := <-removeProvisionerChan:
+		assert.Equal(t, offenderBuf.Bytes(), node)
+	case <-time.After(2 * time.Second):
+		assert.Fail(t, "too long")
+	}
 }
 
 // This test assures proper behaviour of the `offenders` map on a round update.
@@ -40,6 +45,9 @@ func TestClean(t *testing.T) {
 	eventBus, removeProvisionerChan := launchModerator()
 	// Update round
 	consensus.UpdateRound(eventBus, 1)
+
+	// Wait for the round to update...
+	time.Sleep(500 * time.Millisecond)
 
 	// Add a strike
 	node, _ := crypto.RandEntropy(32)
@@ -49,8 +57,8 @@ func TestClean(t *testing.T) {
 
 	// Update round
 	consensus.UpdateRound(eventBus, 2)
-	// wait a bit for the referee to update...
-	time.Sleep(time.Millisecond * 100)
+	// Wait for the round to update...
+	time.Sleep(500 * time.Millisecond)
 	// send MaxStrikes-1 strikes
 	for i := uint8(0); i < reputation.MaxStrikes-1; i++ {
 		publishStrike(2, eventBus, node)

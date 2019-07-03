@@ -29,13 +29,11 @@ type Inv struct {
 }
 
 func (i *Inv) Encode(w io.Writer) error {
-
 	if err := encoding.WriteVarInt(w, uint64(len(i.InvList))); err != nil {
 		return err
 	}
 
 	for _, vect := range i.InvList {
-
 		if !supportedInvType(vect.Type) {
 			return fmt.Errorf("not supported inventory data type %d", vect.Type)
 		}

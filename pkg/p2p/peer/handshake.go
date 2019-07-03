@@ -58,7 +58,7 @@ func (p *Connection) writeLocalMsgVersion() error {
 	}
 
 	encodedMsg := processing.Encode(fullMsg).Bytes()
-	_, err = p.Conn.Write(encodedMsg)
+	_, err = p.Write(encodedMsg)
 	return err
 }
 
@@ -134,7 +134,7 @@ func (p *Connection) writeVerAck() error {
 	}
 
 	encodedMsg := processing.Encode(verAckMsg)
-	if _, err := p.Conn.Write(encodedMsg.Bytes()); err != nil {
+	if _, err := p.Write(encodedMsg.Bytes()); err != nil {
 		return err
 	}
 

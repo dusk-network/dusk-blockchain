@@ -41,12 +41,12 @@ func (_m *Reducers) IsMember(_a0 []byte, _a1 uint64, _a2 uint8) bool {
 }
 
 // Quorum provides a mock function with given fields:
-func (_m *Reducers) Quorum() int {
-	ret := _m.Called()
+func (_m *Reducers) Quorum(_a0 uint64) int {
+	ret := _m.Called(_a0)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(uint64) int); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(int)
 	}

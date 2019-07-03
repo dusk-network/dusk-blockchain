@@ -14,11 +14,142 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
+
+// verifier func mock
+var verifyFunc = func(tx transactions.Transaction) error {
+
+	// some dummy check to distinguish between valid and non-valid txs for
+	// this test
+	val := float64(tx.StandardTX().Version)
+	if math.Mod(val, 2) != 0 {
+		return errors.New("invalid tx version")
+	}
+	return nil
+}
+
+// Helper struct around mempool asserts to shorten common code
+var c *ctx
+
+// ctx main role is to collect the expected verified and propagated txs so that
+// it can assert that mempool has the proper set of txs after particular events
+type ctx struct {
+	verifiedTx []transactions.Transaction
+	propagated [][]byte
+	mu         sync.Mutex
+
+	m      *Mempool
+	bus    *wire.EventBus
+	rpcBus *wire.RPCBus
+}
+
+func initCtx(t *testing.T) *ctx {
+
+	// One ctx instance per a  package testing
+	if c == nil {
+		c = &ctx{}
+		c.verifiedTx = make([]transactions.Transaction, 0)
+
+		// config
+		r := config.Registry{}
+		r.Mempool.MaxSizeMB = 1
+		r.Mempool.PoolType = "hashmap"
+		config.Mock(&r)
+		// eventBus
+		var streamer *helper.SimpleStreamer
+		c.bus, streamer = helper.CreateGossipStreamer()
+		// creating the rpcbus
+		c.rpcBus = wire.NewRPCBus()
+
+		c.propagated = make([][]byte, 0)
+
+		go func(streamer *helper.SimpleStreamer, c *ctx) {
+			for {
+				tx, err := streamer.Read()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				c.mu.Lock()
+				c.propagated = append(c.propagated, tx)
+				c.mu.Unlock()
+			}
+		}(streamer, c)
+
+		// initiate a mempool with custom verification function
+		c.m = NewMempool(c.bus, verifyFunc)
+	} else {
+
+		// Reset shared context state
+		c.m.Quit()
+		c.m.verified = c.m.newPool()
+		c.verifiedTx = make([]transactions.Transaction, 0)
+		c.propagated = make([][]byte, 0)
+	}
+
+	c.m.Run()
+
+	return c
+}
+
+// adding tx in ctx means mempool is expected to store it in the verified list
+func (c *ctx) addTx(tx transactions.Transaction) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := verifyFunc(tx); err == nil {
+		c.verifiedTx = append(c.verifiedTx, tx)
+	}
+}
+
+// Wait until the EventBus chan is drained and all pending txs are fully
+// processed. This is important to synchronously compare the expected with the
+// yielded results.
+func (c *ctx) wait() {
+	time.Sleep(500 * time.Millisecond)
+}
+
+func (c *ctx) assert(t *testing.T, checkPropagated bool) {
+
+	c.wait()
+
+	r, _ := c.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
+
+	lTxs, _ := encoding.ReadVarInt(&r)
+	txs, _ := transactions.FromReader(&r, lTxs)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(txs) != len(c.verifiedTx) {
+		t.Fatalf("expecting %d verified txs but mempool stores %d txs", len(c.verifiedTx), len(txs))
+	}
+
+	for i, tx := range c.verifiedTx {
+
+		var exists bool
+		for _, memTx := range txs {
+			if memTx.Equals(tx) {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			// ctx is expected to have the same list of verified txs as mempool stores
+			t.Fatalf("a verified tx not found (index %d)", i)
+		}
+	}
+
+	if checkPropagated {
+		if len(txs) != len(c.propagated) {
+			t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
+		}
+	}
+
+}
 
 func TestProcessPendingTxs(t *testing.T) {
 
@@ -217,7 +348,7 @@ func TestDoubleSpent(t *testing.T) {
 	c.assert(t, false)
 }
 
-func TestCoibaseTxsNotAllowed(t *testing.T) {
+func TestCoinbaseTxsNotAllowed(t *testing.T) {
 
 	initCtx(t)
 
@@ -271,151 +402,4 @@ func randomSliceOfTxs(t *testing.T, txsBatchCount uint16) []transactions.Transac
 	}
 
 	return txs
-}
-
-// verifier func mock
-var verifyFunc = func(tx transactions.Transaction) error {
-
-	// some dummy check to distinguish between valid and non-valid txs for
-	// this test
-	val := float64(tx.StandardTX().Version)
-	if math.Mod(val, 2) != 0 {
-		return errors.New("invalid tx version")
-	}
-	return nil
-}
-
-// Collect implements wire.EventCollector to collect all propagated txs
-func (c *ctx) Collect(message *bytes.Buffer) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	msg := *message
-	var topicBytes [15]byte
-
-	reader := bytes.NewReader(msg.Bytes())
-	_, _ = reader.Read(topicBytes[:])
-	topic := topics.ByteArrayToTopic(topicBytes)
-
-	if topic == topics.Inv {
-		msgInv := &peermsg.Inv{}
-		if err := msgInv.Decode(reader); err != nil {
-			return err
-		}
-
-		for _, obj := range msgInv.InvList {
-			if obj.Type == peermsg.InvTypeMempoolTx {
-				c.propagated = append(c.propagated, obj.Hash)
-			}
-		}
-	}
-
-	return nil
-}
-
-// Helper struct around mempool asserts to shorten common code
-var c *ctx
-
-// ctx main role is to collect the expected verified and propagated txs so that
-// it can assert that mempool has the proper set of txs after particular events
-type ctx struct {
-	verifiedTx []transactions.Transaction
-	propagated [][]byte
-	mu         sync.Mutex
-
-	m      *Mempool
-	bus    *wire.EventBus
-	rpcBus *wire.RPCBus
-}
-
-func initCtx(t *testing.T) *ctx {
-
-	// One ctx instance per a  package testing
-	if c == nil {
-		c = &ctx{}
-		c.verifiedTx = make([]transactions.Transaction, 0)
-
-		// config
-		r := config.Registry{}
-		r.Mempool.MaxSizeMB = 1
-		r.Mempool.PoolType = "hashmap"
-		config.Mock(&r)
-		// eventBus
-		c.bus = wire.NewEventBus()
-		// creating the rpcbus
-		c.rpcBus = wire.NewRPCBus()
-
-		c.propagated = make([][]byte, 0)
-		go wire.NewTopicListener(c.bus, c, string(topics.Gossip)).Accept()
-
-		// initiate a mempool with custom verification function
-		c.m = NewMempool(c.bus, verifyFunc)
-	} else {
-
-		// Reset shared context state
-		c.m.Quit()
-		c.m.verified = c.m.newPool()
-		c.verifiedTx = make([]transactions.Transaction, 0)
-		c.propagated = make([][]byte, 0)
-	}
-
-	c.m.Run()
-
-	return c
-}
-
-// adding tx in ctx means mempool is expected to store it in the verified list
-func (c *ctx) addTx(tx transactions.Transaction) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if err := verifyFunc(tx); err == nil {
-		c.verifiedTx = append(c.verifiedTx, tx)
-	}
-}
-
-// Wait until the EventBus chan is drained and all pending txs are fully
-// processed. This is important to synchronously compare the expected with the
-// yielded results.
-func (c *ctx) wait() {
-	time.Sleep(500 * time.Millisecond)
-}
-
-func (c *ctx) assert(t *testing.T, checkPropagated bool) {
-
-	c.wait()
-
-	r, _ := c.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
-
-	lTxs, _ := encoding.ReadVarInt(&r)
-	txs, _ := transactions.FromReader(&r, lTxs)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if len(txs) != len(c.verifiedTx) {
-		t.Fatalf("expecting %d verified txs but mempool stores %d txs", len(c.verifiedTx), len(txs))
-	}
-
-	for i, tx := range c.verifiedTx {
-
-		var exists bool
-		for _, memTx := range txs {
-			if memTx.Equals(tx) {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
-			// ctx is expected to have the same list of verified txs as mempool stores
-			t.Fatalf("a verified tx not found (index %d)", i)
-		}
-	}
-
-	if checkPropagated {
-		if len(txs) != len(c.propagated) {
-			t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
-		}
-	}
-
 }

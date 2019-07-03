@@ -29,7 +29,8 @@ var readWriteTimeout = 60 * time.Second // Max idle time for a peer
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	magic protocol.Magic
+	reader *bufio.Reader
+	magic  protocol.Magic
 }
 
 // Writer abstracts all of the logic and fields needed to write messages to
@@ -51,12 +52,14 @@ type Reader struct {
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
-// subscribing to the gossip topic with a stream handler.
+// subscribing to the gossip topic with a stream handler, and by running the WriteLoop
+// in a goroutine..
 func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscriber) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
-			Conn:  conn,
-			magic: magic,
+			Conn:   conn,
+			reader: bufio.NewReader(conn),
+			magic:  magic,
 		},
 		gossip: processing.NewGossip(magic),
 	}
@@ -70,8 +73,9 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher wire.EventPublisher,
 	rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*Reader, error) {
 	pconn := &Connection{
-		Conn:  conn,
-		magic: magic,
+		Conn:   conn,
+		reader: bufio.NewReader(conn),
+		magic:  magic,
 	}
 
 	db, err := OpenDB()
@@ -79,20 +83,18 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 		return nil, err
 	}
 
-	blockHashBroker := processing.NewBlockHashBroker(db, responseChan)
 	dataRequestor := processing.NewDataRequestor(db, rpcBus, responseChan)
-	dataBroker := processing.NewDataBroker(db, rpcBus, responseChan)
-	synchronizer := chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter)
+
 	reader := &Reader{
 		Connection:   pconn,
 		unmarshaller: &messageUnmarshaller{magic},
 		router: &messageRouter{
 			publisher:       publisher,
 			dupeMap:         dupeMap,
-			blockHashBroker: blockHashBroker,
-			synchronizer:    synchronizer,
+			blockHashBroker: processing.NewBlockHashBroker(db, responseChan),
+			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
 			dataRequestor:   dataRequestor,
-			dataBroker:      dataBroker,
+			dataBroker:      processing.NewDataBroker(db, rpcBus, responseChan),
 		},
 	}
 
@@ -112,8 +114,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 
 // ReadMessage reads from the connection until encountering a zero byte.
 func (c *Connection) ReadMessage() ([]byte, error) {
-	r := bufio.NewReader(c.Conn)
-	return r.ReadBytes(0x00)
+	return c.reader.ReadBytes(0x00)
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
@@ -160,7 +161,7 @@ func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer) {
 			continue
 		}
 
-		if _, err := w.Conn.Write(processed.Bytes()); err != nil {
+		if _, err := w.Connection.Write(processed.Bytes()); err != nil {
 			log.WithFields(log.Fields{
 				"process": "peer",
 				"error":   err,
@@ -202,6 +203,7 @@ func (p *Reader) ReadLoop() {
 	}
 }
 
+// Read the topic bytes off r, and return them as a topics.Topic.
 func extractTopic(r io.Reader) topics.Topic {
 	var cmdBuf [topics.Size]byte
 	if _, err := r.Read(cmdBuf[:]); err != nil {
@@ -211,6 +213,7 @@ func extractTopic(r io.Reader) topics.Topic {
 	return topics.ByteArrayToTopic(cmdBuf)
 }
 
+// Read the magic bytes off r, and return them as a protocol.Magic.
 func extractMagic(r io.Reader) protocol.Magic {
 	buffer := make([]byte, 4)
 	if _, err := r.Read(buffer); err != nil {
@@ -222,6 +225,8 @@ func extractMagic(r io.Reader) protocol.Magic {
 }
 
 // Write a message to the connection.
+// Conn needs to be locked, as this function can be called both by the WriteLoop,
+// and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
 	c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	c.lock.Lock()

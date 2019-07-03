@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func initLog(file *os.File) {
@@ -32,7 +34,6 @@ func initLog(file *os.File) {
 }
 
 func main() {
-
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
@@ -64,14 +65,12 @@ func main() {
 
 	// Set up profiling tools.
 	profile, err := newProfile()
-
 	if err != nil {
 		// Assume here if tools are enabled but they fail on loading then it's better
 		// to fix the error or just disable them.
 		log.Errorf("Profiling tools error: %s", err.Error())
 		return
 	}
-
 	defer profile.close()
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
@@ -95,8 +94,29 @@ func main() {
 		}
 	}
 
-	round := joinConsensus(connMgr, srv, ips)
-	srv.StartConsensus(round)
+	// TODO: this should be adjusted before testnet release, it is simply a way
+	// to bootstrap the network in an unsophisticated manner
+	if strings.Contains(ips[0], "noip") {
+		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
+		// Create mock block on height 1 with our stake and bid
+		blk := mockBlockOne(srv.MyBid, srv.MyStake)
+		buf := new(bytes.Buffer)
+		if err := blk.Encode(buf); err != nil {
+			panic(err)
+		}
+
+		srv.eventBus.Publish(string(topics.Block), buf)
+		// Wait a little for it to be accepted and to start the generation component
+		time.Sleep(3 * time.Second)
+		srv.StartConsensus(2)
+	} else {
+		// Propagate bid and stake out to the network
+		srv.sendStake()
+		srv.sendBid()
+		// wait for stake to appear in an incoming accepted block
+		height := waitForStake(srv.eventBus, srv.MyStake)
+		srv.StartConsensus(height + 1)
+	}
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
@@ -104,25 +124,4 @@ func main() {
 	<-interrupt
 
 	log.WithField("prefix", "main").Info("Terminated")
-}
-
-func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
-	// TODO: this needs to be adjusted to happen from an accepted block, or something similar
-	// if we are the first, initialize consensus on round 1
-	if strings.Contains(ips[0], "noip") {
-		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
-		return uint64(1)
-	}
-
-	// if height is not 0, init consensus on 2 rounds after it
-	// +1 because the round is always height + 1
-	// +1 because we dont want to get stuck on a round thats currently happening
-	// if srv.chain.PrevBlock.Header.Height != 0 {
-	// 	round := srv.chain.PrevBlock.Header.Height + 2
-	// 	log.WithField("prefix", "main").Infof("Starting consensus from round %d\n", round)
-	// 	return round
-	// }
-
-	log.WithField("prefix", "main").Infoln("Starting consensus from scratch")
-	return uint64(1)
 }
