@@ -10,6 +10,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -26,7 +27,6 @@ func initLog(file *os.File) {
 	}
 
 	if file != nil {
-		os.Stdout = file
 		log.SetOutput(file)
 	} else {
 		log.SetOutput(os.Stdout)
@@ -37,6 +37,8 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
+	// TODO: use logging for this?
+	fmt.Fprintln(os.Stdout, "initializing node...")
 	// Loading all node configurations. Fail-fast if critical error occurs
 	if err := cfg.Load(); err != nil {
 		fmt.Printf("%v\n", err)
@@ -117,6 +119,11 @@ func main() {
 		height := waitForStake(srv.eventBus, srv.MyStake)
 		srv.StartConsensus(height + 1)
 	}
+
+	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
+
+	// Start interactive shell
+	go cli.Start(srv.eventBus)
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
