@@ -59,5 +59,5 @@ type mempoolConfiguration struct {
 	MaxSizeMB   uint32
 	PoolType    string
 	PreallocTxs uint32
-	MaxInvTxs   uint32
+	MaxInvItems uint32
 }

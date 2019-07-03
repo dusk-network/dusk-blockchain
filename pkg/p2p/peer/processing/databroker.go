@@ -87,7 +87,7 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 
 func (d *DataBroker) SendTxsItems() error {
 
-	var maxItemsSent = config.Get().Mempool.MaxInvTxs
+	var maxItemsSent = config.Get().Mempool.MaxInvItems
 	if maxItemsSent == 0 {
 		// responding to wire.Mempool disabled
 		return nil
