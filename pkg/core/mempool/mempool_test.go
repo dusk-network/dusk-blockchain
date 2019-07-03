@@ -115,7 +115,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 1))
+	r, _ := c.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 	txs, _ := transactions.FromReader(&r, lTxs)
