@@ -30,10 +30,11 @@ const (
 	Certificate    Topic = "certificate"
 
 	// Consensus topics
-	Candidate Topic = "candidate"
-	Score     Topic = "score"
-	Reduction Topic = "blockreduction"
-	Agreement Topic = "blockagreement"
+	Candidate      Topic = "candidate"
+	Score          Topic = "score"
+	Reduction      Topic = "blockreduction"
+	Agreement      Topic = "blockagreement"
+	StartConsensus Topic = "startconsensus"
 
 	// Peer topics
 	Gossip Topic = "gossip"

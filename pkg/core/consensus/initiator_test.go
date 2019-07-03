@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -24,13 +25,18 @@ import (
 func TestInitiate(t *testing.T) {
 	bus := wire.NewEventBus()
 	keys, _ := user.NewRandKeys()
-	_, db := setupDatabase()
-	defer db.Close()
+	rpcBus := wire.NewRPCBus()
 
 	initChan := make(chan *bytes.Buffer, 1)
 	bus.Subscribe(msg.InitializationTopic, initChan)
 
-	go consensus.Initiate(bus, keys, db, 0)
+	if err := consensus.LaunchInitiator(bus, rpcBus); err != nil {
+		t.Fatal(err)
+	}
+
+	bus.Publish(string(topics.StartConsensus), new(bytes.Buffer))
+	// wait a bit for the initiator to receive the message
+	time.Sleep(1 * time.Second)
 
 	blk := helper.RandomBlock(t, 1, 2)
 	stake := makeStake(keys)

@@ -11,6 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -122,6 +123,9 @@ func main() {
 	// shutdown is requested through one of the subsystems such as the RPC
 	// server.
 	<-interrupt
+
+	// Graceful shutdown of listening components
+	srv.eventBus.Publish(msg.QuitTopic, new(bytes.Buffer))
 
 	log.WithField("prefix", "main").Info("Terminated")
 }

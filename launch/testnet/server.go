@@ -96,14 +96,10 @@ func Setup() *Server {
 	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
 	go f.StartConsensus()
 
-	// Creating stake and bid
-	stake := makeStake(srv.keys)
-	srv.MyStake = stake
-
-	bid, d, k := makeBid()
-	srv.MyBid = bid
-	srv.d = d
-	srv.k = k
+	// Setting up the initiator
+	if err := consensus.LaunchInitiator(srv.eventBus, srv.rpcBus); err != nil {
+		panic(err)
+	}
 
 	// Setting up generation component
 	go srv.launchGeneration()
