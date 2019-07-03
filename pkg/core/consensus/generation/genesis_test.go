@@ -9,7 +9,7 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
+	"gitlab.dusk.network/dusk-core/dusk-wallet/key"
 )
 
 func TestGenerateGenesis(t *testing.T) {
