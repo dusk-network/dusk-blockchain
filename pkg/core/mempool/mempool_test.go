@@ -31,28 +31,6 @@ var verifyFunc = func(tx transactions.Transaction) error {
 	return nil
 }
 
-// Collect implements wire.EventCollector to collect all propagated txs
-func (c *ctx) Collect(message *bytes.Buffer) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	msg := *message
-	var topicBytes [15]byte
-
-	reader := bytes.NewReader(msg.Bytes())
-	_, _ = reader.Read(topicBytes[:])
-	topic := topics.ByteArrayToTopic(topicBytes)
-
-	if topic == topics.Tx {
-		tx, _ := transactions.FromReader(reader, 1)
-		for i := range tx {
-			c.propagated = append(c.propagated, tx[i])
-		}
-	}
-
-	return nil
-}
-
 // Helper struct around mempool asserts to shorten common code
 var c *ctx
 
@@ -60,7 +38,7 @@ var c *ctx
 // it can assert that mempool has the proper set of txs after particular events
 type ctx struct {
 	verifiedTx []transactions.Transaction
-	propagated []transactions.Transaction
+	propagated [][]byte
 	mu         sync.Mutex
 
 	m      *Mempool
@@ -81,12 +59,25 @@ func initCtx(t *testing.T) *ctx {
 		r.Mempool.PoolType = "hashmap"
 		config.Mock(&r)
 		// eventBus
-		c.bus = wire.NewEventBus()
+		var streamer *helper.SimpleStreamer
+		c.bus, streamer = helper.CreateGossipStreamer()
 		// creating the rpcbus
 		c.rpcBus = wire.NewRPCBus()
 
-		c.propagated = make([]transactions.Transaction, 0)
-		go wire.NewTopicListener(c.bus, c, string(topics.Gossip)).Accept()
+		c.propagated = make([][]byte, 0)
+
+		go func(streamer *helper.SimpleStreamer, c *ctx) {
+			for {
+				tx, err := streamer.Read()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				c.mu.Lock()
+				c.propagated = append(c.propagated, tx)
+				c.mu.Unlock()
+			}
+		}(streamer, c)
 
 		// initiate a mempool with custom verification function
 		c.m = NewMempool(c.bus, verifyFunc)
@@ -96,7 +87,7 @@ func initCtx(t *testing.T) *ctx {
 		c.m.Quit()
 		c.m.verified = c.m.newPool()
 		c.verifiedTx = make([]transactions.Transaction, 0)
-		c.propagated = make([]transactions.Transaction, 0)
+		c.propagated = make([][]byte, 0)
 	}
 
 	c.m.Run()
@@ -124,7 +115,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 1))
+	r, _ := c.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 	txs, _ := transactions.FromReader(&r, lTxs)
@@ -357,7 +348,7 @@ func TestDoubleSpent(t *testing.T) {
 	c.assert(t, false)
 }
 
-func TestCoibaseTxsNotAllowed(t *testing.T) {
+func TestCoinbaseTxsNotAllowed(t *testing.T) {
 
 	initCtx(t)
 
