@@ -21,11 +21,11 @@ func RandomOutput(t *testing.T, malformed bool) (*transactions.Output, error) {
 	comm := RandomSlice(t, commSize)
 	key := RandomSlice(t, keySize)
 	output, err := transactions.NewOutput(comm, key)
-	assert.Nil(t, err)
-
+	if err != nil {
+		return output, err
+	}
 	output.EncryptedAmount = RandomSlice(t, keySize)
 	output.EncryptedMask = RandomSlice(t, keySize)
-
 	return output, err
 }
 

@@ -48,7 +48,7 @@ func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
 
 	R := RandomSlice(t, 32)
 
-	tx, err := transactions.NewBid(0, lockTime, fee, M, R)
+	tx, err := transactions.NewBid(0, lockTime, fee, R, M)
 	if err != nil {
 		return tx, err
 	}
@@ -117,7 +117,7 @@ func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
 	blsKey := RandomSlice(t, 33)
 	R := RandomSlice(t, 32)
 
-	tx, err := transactions.NewStake(0, lockTime, fee, edKey, blsKey, R)
+	tx, err := transactions.NewStake(0, lockTime, fee, R, edKey, blsKey)
 	if err != nil {
 		return tx, err
 	}
