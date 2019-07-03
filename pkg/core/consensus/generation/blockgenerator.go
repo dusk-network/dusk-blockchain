@@ -9,14 +9,13 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
-
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"gitlab.dusk.network/dusk-core/dusk-wallet/key"
 )
 
 type (
