@@ -52,6 +52,7 @@ func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
 	if err != nil {
 		return tx, err
 	}
+	tx.RangeProof = RandomSlice(t, 200)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs, malformed)
@@ -80,6 +81,7 @@ func RandomTLockTx(t *testing.T, malformed bool) *transactions.TimeLock {
 	R := RandomSlice(t, 32)
 
 	tx := transactions.NewTimeLock(0, lockTime, fee, R)
+	tx.RangeProof = RandomSlice(t, 200)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs, malformed)
@@ -97,8 +99,7 @@ func RandomStandardTx(t *testing.T, malformed bool) *transactions.Standard {
 	R := RandomSlice(t, 32)
 
 	tx := transactions.NewStandard(0, fee, R)
-
-	tx.R = RandomSlice(t, 32)
+	tx.RangeProof = RandomSlice(t, 200)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs, malformed)
@@ -121,6 +122,7 @@ func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
 	if err != nil {
 		return tx, err
 	}
+	tx.RangeProof = RandomSlice(t, 200)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs, malformed)
