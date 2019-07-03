@@ -62,6 +62,16 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		return nil, fmt.Errorf("error %s on loading chain '%s'", err.Error(), cfg.Get().Database.Dir)
 	}
 
+	// TODO: remove this in favor of chain loader
+	// store block
+	err = db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(genesisBlock)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	// set up collectors
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
 	winningHashChan := initWinningHashCollector(eventBus)
@@ -114,7 +124,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) addProvisioner(tx *transactions.Stake) error {
+func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error {
 	buffer := bytes.NewBuffer(tx.PubKeyEd)
 	if err := encoding.WriteVarBytes(buffer, tx.PubKeyBLS); err != nil {
 		return err
@@ -122,6 +132,10 @@ func (c *Chain) addProvisioner(tx *transactions.Stake) error {
 
 	totalAmount := getTxTotalOutputAmount(tx)
 	if err := encoding.WriteUint64(buffer, binary.LittleEndian, totalAmount); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, startHeight); err != nil {
 		return err
 	}
 
@@ -207,7 +221,10 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 2. Store block in database
+	// 2. Add provisioners and block generators
+	c.addConsensusNodes(blk.Txs, blk.Header.Height+1)
+
+	// 3. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&blk)
 	})
@@ -219,7 +236,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 3. Notify other subsystems for the accepted block
+	// 4. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
@@ -231,13 +248,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
-	// 4. Gossip advertise block Hash
+	// 5. Gossip advertise block Hash
 	if err := c.advertiseBlock(blk); err != nil {
 		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
-	// 5. Cleanup obsolete candidate blocks
+	// 6. Cleanup obsolete candidate blocks
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
 		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
@@ -256,54 +273,24 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) AcceptGenesisBlock() error {
-
-	field := logger.Fields{"process": "accept genesis block"}
+func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerStartHeight uint64) {
+	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
-	genesisBlock := &block.Block{
-		Header: &block.Header{
-			Version:       0,
-			Height:        0,
-			Timestamp:     0,
-			PrevBlockHash: []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			TxRoot:        []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			CertHash:      []byte{0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			Seed:          []byte{0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-		},
+	for _, tx := range txs {
+		switch tx.Type() {
+		case transactions.StakeType:
+			stake := tx.(*transactions.Stake)
+			if err := c.addProvisioner(stake, provisionerStartHeight); err != nil {
+				l.Errorf("adding provisioner failed: %s", err.Error())
+			}
+		case transactions.BidType:
+			bid := tx.(*transactions.Bid)
+			if err := c.addBidder(bid); err != nil {
+				l.Errorf("adding bidder failed: %s", err.Error())
+			}
+		}
 	}
-
-	err := genesisBlock.SetHash()
-	if err != nil {
-		l.Errorf("hash calculating failed: %s", err.Error())
-		return err
-	}
-
-	// 1. Store block in database
-	err = c.db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(genesisBlock)
-	})
-
-	if err != nil {
-		l.Errorf("storing failed: %s", err.Error())
-		return err
-	}
-
-	c.prevBlock = *genesisBlock
-
-	// 2. Notify other subsystems for the accepted block
-	// Subsystems listening for this topic:
-	// mempool.Mempool
-	// consensus.generation.broker
-	buf := new(bytes.Buffer)
-	if err := genesisBlock.Encode(buf); err != nil {
-		l.Errorf("encoding failed: %s", err.Error())
-		return err
-	}
-
-	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
-
-	return nil
 }
 
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
@@ -336,10 +323,7 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
 		candidate, err = t.FetchCandidateBlock(blockHash)
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	})
 
 	if err != nil {

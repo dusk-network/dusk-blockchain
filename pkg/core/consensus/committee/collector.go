@@ -12,9 +12,10 @@ import (
 
 type (
 	provisioner struct {
-		pubKeyEd  []byte
-		pubKeyBLS []byte
-		amount    uint64
+		pubKeyEd    []byte
+		pubKeyBLS   []byte
+		amount      uint64
+		startHeight uint64
 	}
 
 	removeProvisionerCollector struct {
@@ -38,7 +39,12 @@ func decodeNewProvisioner(r *bytes.Buffer) (*provisioner, error) {
 		return nil, err
 	}
 
-	return &provisioner{pubKeyEd, pubKeyBLS, amount}, nil
+	var startHeight uint64
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &startHeight); err != nil {
+		return nil, err
+	}
+
+	return &provisioner{pubKeyEd, pubKeyBLS, amount, startHeight}, nil
 }
 
 func initRemoveProvisionerCollector(subscriber wire.EventSubscriber) chan []byte {

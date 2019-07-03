@@ -28,7 +28,11 @@ func TestInitBroker(t *testing.T) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
-	agreement.Launch(bus, committeeMock, k[0], 1)
+	go agreement.Launch(bus, committeeMock, k[0])
+	time.Sleep(200 * time.Millisecond)
+	init := make([]byte, 8)
+	binary.LittleEndian.PutUint64(init, 1)
+	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
 
 	round := <-roundChan
 	assert.Equal(t, uint64(1), round)
@@ -117,7 +121,12 @@ func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 	k, _ := user.NewRandKeys()
-	agreement.Launch(bus, c, k, 1)
+	go agreement.Launch(bus, c, k)
+	time.Sleep(200 * time.Millisecond)
+	init := make([]byte, 8)
+	binary.LittleEndian.PutUint64(init, 1)
+	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
+
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
 	bus.RegisterPreprocessor(string(topics.Agreement))
