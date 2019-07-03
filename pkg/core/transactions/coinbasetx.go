@@ -58,6 +58,8 @@ func (c *Coinbase) Encode(w io.Writer) error {
 	}
 
 	for _, output := range c.Rewards {
+		output.EncryptedAmount = make([]byte, 1)
+		output.EncryptedMask = make([]byte, 1)
 		if err := output.Encode(w); err != nil {
 			return err
 		}

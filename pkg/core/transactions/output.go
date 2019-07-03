@@ -44,10 +44,10 @@ func (o *Output) Encode(w io.Writer) error {
 	if err := encoding.Write256(w, o.DestKey); err != nil {
 		return err
 	}
-	if err := encoding.Write256(w, o.EncryptedAmount); err != nil {
+	if err := encoding.WriteVarBytes(w, o.EncryptedAmount); err != nil {
 		return err
 	}
-	if err := encoding.Write256(w, o.EncryptedMask); err != nil {
+	if err := encoding.WriteVarBytes(w, o.EncryptedMask); err != nil {
 		return err
 	}
 	return nil
@@ -63,11 +63,14 @@ func (o *Output) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &o.EncryptedAmount); err != nil {
+	o.EncryptedAmount = make([]byte, 32)
+
+	if err := encoding.ReadVarBytes(r, &o.EncryptedAmount); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &o.EncryptedMask); err != nil {
+	o.EncryptedMask = make([]byte, 32)
+	if err := encoding.ReadVarBytes(r, &o.EncryptedMask); err != nil {
 		return err
 	}
 	return nil
