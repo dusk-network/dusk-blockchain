@@ -23,7 +23,7 @@ func TestAddProvisioner(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	p := c.Provisioners()
-	assert.Equal(t, 1, p.Size())
+	assert.Equal(t, 1, p.Size(1))
 }
 
 func TestRemoveProvisioner(t *testing.T) {
@@ -39,7 +39,7 @@ func TestRemoveProvisioner(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	p := c.Provisioners()
-	assert.Equal(t, 0, p.Size())
+	assert.Equal(t, 0, p.Size(1))
 }
 
 // Test that a committee cache keeps copies of produced voting committees.
@@ -104,6 +104,7 @@ func newProvisioner(stake uint64, eb *wire.EventBus) user.Keys {
 	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
 
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, 0)
 
 	eb.Publish(msg.NewProvisionerTopic, buffer)
 	return k

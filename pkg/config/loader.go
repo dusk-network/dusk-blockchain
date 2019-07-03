@@ -183,4 +183,6 @@ func init() {
 	// By default Registry should be empty but not nil. In that way, consumers
 	// (packages) can use their default values on unit testing
 	r = new(Registry)
+	r.Database.Driver = "lite_v0.1.0"
+	r.General.Network = "testnet"
 }
