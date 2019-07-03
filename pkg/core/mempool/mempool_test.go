@@ -155,7 +155,7 @@ func TestProcessPendingTxs(t *testing.T) {
 
 	initCtx(t)
 
-	var version uint8
+	var incorrectVersion uint8 = 3
 	txs := randomSliceOfTxs(t, 5)
 
 	for _, tx := range txs {
@@ -171,12 +171,11 @@ func TestProcessPendingTxs(t *testing.T) {
 		c.bus.Publish(string(topics.Tx), buf)
 
 		// Publish invalid txs (one that does not pass verifyTx)
-		version++
 		R, err := crypto.RandEntropy(32)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx := transactions.NewStandard(version, 2, R)
+		tx := transactions.NewStandard(incorrectVersion, 2, R)
 		buf = new(bytes.Buffer)
 		err = tx.Encode(buf)
 		if err != nil {
