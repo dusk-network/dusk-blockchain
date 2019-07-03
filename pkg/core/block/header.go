@@ -21,8 +21,8 @@ const (
 // Header defines a block header on a Dusk block.
 type Header struct {
 	Version   uint8  // Block version byte
-	Timestamp int64  // Block timestamp
 	Height    uint64 // Block height
+	Timestamp int64  // Block timestamp
 
 	PrevBlockHash []byte // Hash of previous block (32 bytes)
 	Seed          []byte // Marshaled BLS signature or hash of the previous block seed (32 bytes)

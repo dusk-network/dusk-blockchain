@@ -15,7 +15,7 @@ type (
 	// extracted for a given step
 	Committee interface {
 		IsMember([]byte, uint64, uint8) bool
-		Quorum() int
+		Quorum(uint64) int
 	}
 
 	// Foldable represents a Committee which can be packed into a bitset, to drastically
@@ -34,8 +34,6 @@ type (
 		provisioners *user.Provisioners
 		// TODO: should this be round dependent?
 		totalWeight uint64
-
-		removeProvisionerChan chan []byte
 	}
 
 	// Extractor is a wrapper around the Store struct, and contains the phase-specific
@@ -53,11 +51,10 @@ type (
 // launchStore creates a component that listens to changes to the Provisioners
 func launchStore(eventBroker wire.EventBroker) *Store {
 	store := &Store{
-		provisioners:          user.NewProvisioners(),
-		removeProvisionerChan: initRemoveProvisionerCollector(eventBroker),
+		provisioners: user.NewProvisioners(),
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
-	go store.Listen()
+	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)
 	return store
 }
 
@@ -69,38 +66,34 @@ func NewExtractor(eventBroker wire.EventBroker) *Extractor {
 	}
 }
 
-// Listen for events coming from the EventBus.
-func (s *Store) Listen() {
-	for {
-		select {
-		case pubKeyBLS := <-s.removeProvisionerChan:
-			stake, err := s.provisioners.GetStake(pubKeyBLS)
-			if err != nil {
-				panic(err)
-			}
-
-			s.lock.Lock()
-			s.provisioners.Remove(pubKeyBLS)
-			s.totalWeight -= stake
-			s.lock.Unlock()
-		}
-	}
-}
-
-// AddProvisioner will add a provisioner to the Stores Provisioners object.
-func (s *Store) AddProvisioner(m *bytes.Buffer) error {
-	newProvisioner, err := decodeNewProvisioner(m)
+// RemoveProvisioner will remove a provisioner from the Store's Provisioners objects.
+func (s *Store) RemoveProvisioner(m *bytes.Buffer) error {
+	stake, err := s.provisioners.GetStake(m.Bytes())
 	if err != nil {
 		return err
 	}
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if err := s.provisioners.AddMember(newProvisioner.pubKeyEd,
-		newProvisioner.pubKeyBLS, newProvisioner.amount); err != nil {
+	s.provisioners.Remove(m.Bytes())
+	s.totalWeight -= stake
+	return nil
+}
+
+// AddProvisioner will add a provisioner to the Store's Provisioners object.
+func (s *Store) AddProvisioner(m *bytes.Buffer) error {
+	newProvisioner, err := decodeNewProvisioner(m)
+	if err != nil {
 		return err
 	}
 
+	if err := s.provisioners.AddMember(newProvisioner.pubKeyEd,
+		newProvisioner.pubKeyBLS, newProvisioner.amount, newProvisioner.startHeight); err != nil {
+		return err
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.totalWeight += newProvisioner.amount
 	return nil
 }
