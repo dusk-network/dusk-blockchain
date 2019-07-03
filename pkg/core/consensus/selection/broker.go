@@ -78,8 +78,8 @@ func (f *scoreBroker) onRoundUpdate(round uint64) {
 		"round":   round,
 	}).Debugln("updating round")
 
-	f.selector.stopSelection()
 	f.filter.UpdateRound(round)
+	f.selector.stopSelection()
 	f.handler.ResetThreshold()
 	f.filter.FlushQueue()
 	f.selector.startSelection()
