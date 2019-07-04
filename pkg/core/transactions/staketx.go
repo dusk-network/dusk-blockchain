@@ -22,13 +22,13 @@ type Stake struct {
 
 // NewStake will return a Stake transaction
 // Given the tx version, the locktime,the fee and M
-func NewStake(ver uint8, lock, fee uint64, pubKeyEd, pubKeyBLS []byte) (*Stake, error) {
+func NewStake(ver uint8, lock, fee uint64, R, pubKeyEd, pubKeyBLS []byte) (*Stake, error) {
 	if len(pubKeyEd) != 32 {
 		return nil, errors.New("edwards public key is not 32 bytes")
 	}
 
 	s := &Stake{
-		TimeLock:  *NewTimeLock(ver, lock, fee),
+		TimeLock:  *NewTimeLock(ver, lock, fee, R),
 		PubKeyEd:  pubKeyEd,
 		PubKeyBLS: pubKeyBLS,
 	}
