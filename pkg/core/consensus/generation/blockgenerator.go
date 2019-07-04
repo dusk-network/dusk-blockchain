@@ -56,7 +56,6 @@ func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGene
 		prevBlock: *genesisBlock,
 	}
 }
-
 func (bg *blockGenerator) UpdatePrevBlock(b block.Block) {
 	bg.prevBlock = b
 }

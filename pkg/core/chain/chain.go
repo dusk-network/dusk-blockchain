@@ -3,7 +3,9 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
+	"fmt"
+	"sync"
+
 	"math/big"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -37,7 +39,10 @@ type Chain struct {
 	db       database.DB
 
 	prevBlock block.Block
-	bidList   *user.BidList
+	// protect prevBlock with mutex as it's touched out of the main chain loop
+	// by SubscribeCallback.
+	// TODO: Consider if mutex can be removed
+	mu sync.RWMutex
 
 	// collector channels
 	candidateChan   <-chan *block.Block
@@ -56,31 +61,9 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		return nil, err
 	}
 
-	// read and decode the genesis block hex
-	genesisBlock := block.NewBlock()
-	switch cfg.Get().General.Network {
-	case "testnet":
-
-		blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
-		if err != nil {
-			panic(err)
-		}
-
-		var buf bytes.Buffer
-		buf.Write(blob)
-		if err := genesisBlock.Decode(&buf); err != nil {
-			panic(err)
-		}
-	}
-
-	// TODO: remove this in favor of chain loader
-	// store block
-	err = db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(genesisBlock)
-	})
-
+	l, err := newLoader(db)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failure %s on loading chain '%s'", err.Error(), cfg.Get().Database.Dir)
 	}
 
 	// set up collectors
@@ -91,8 +74,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		eventBus:        eventBus,
 		rpcBus:          rpcBus,
 		db:              db,
-		bidList:         &user.BidList{},
-		prevBlock:       *genesisBlock,
+		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
 		winningHashChan: winningHashChan,
 	}
@@ -113,8 +95,13 @@ func (c *Chain) Listen() {
 
 		// wire.RPCBus requests handlers
 		case r := <-wire.GetLastBlockChan:
+
 			buf := new(bytes.Buffer)
+
+			c.mu.RLock()
 			_ = c.prevBlock.Encode(buf)
+			c.mu.RUnlock()
+
 			r.RespChan <- *buf
 		}
 	}
@@ -157,15 +144,16 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 func (c *Chain) addBidder(tx *transactions.Bid) error {
 	totalAmount := getTxTotalOutputAmount(tx)
 	x := calculateX(totalAmount, tx.M)
-	c.bidList.AddBid(x)
+	bids := &user.BidList{}
+	bids.AddBid(x)
 
-	c.propagateBidList()
+	c.propagateBidList(bids)
 	return nil
 }
 
-func (c *Chain) propagateBidList() {
+func (c *Chain) propagateBidList(bids *user.BidList) {
 	var bidListBytes []byte
-	for _, bid := range *c.bidList {
+	for _, bid := range *bids {
 		bidListBytes = append(bidListBytes, bid[:]...)
 	}
 
@@ -221,6 +209,10 @@ func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
@@ -306,10 +298,14 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	// Ensure the candidate block satisfies all chain rules
+
+	c.mu.RLock()
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
 		log.Errorf("verifying the candidate block failed: %s", err.Error())
+		c.mu.RUnlock()
 		return err
 	}
+	c.mu.RUnlock()
 
 	// Save it into persistent storage
 	err := c.db.Update(func(t database.Transaction) error {

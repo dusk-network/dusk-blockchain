@@ -76,6 +76,9 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 	}
 	t.batch[heightInd][toKey(buf.Bytes())] = blockBytes
 
+	// Map stateKey to chain state (tip)
+	t.batch[stateInd][toKey(stateKey)] = b.Header.Hash
+
 	return nil
 }
 
@@ -196,7 +199,7 @@ func (t *transaction) StoreCandidateBlock(b *block.Block) error {
 	if err := b.Encode(buf); err != nil {
 		return err
 	}
-	t.batch[candidatesTableIndex][toKey(b.Header.Hash)] = buf.Bytes()
+	t.batch[candidatesTableInd][toKey(b.Header.Hash)] = buf.Bytes()
 
 	return nil
 }
@@ -206,7 +209,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 
 	var data []byte
 	var exists bool
-	if data, exists = t.db.storage[candidatesTableIndex][toKey(hash)]; !exists {
+	if data, exists = t.db.storage[candidatesTableInd][toKey(hash)]; !exists {
 		return nil, database.ErrBlockNotFound
 	}
 
@@ -221,7 +224,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 
 	var count uint32
-	for key, data := range t.db.storage[candidatesTableIndex] {
+	for key, data := range t.db.storage[candidatesTableInd] {
 
 		b := &block.Block{}
 		if err := b.Decode(bytes.NewReader(data)); err != nil {
@@ -230,16 +233,34 @@ func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 
 		if maxHeight != 0 {
 			if b.Header.Height <= maxHeight {
-				delete(t.db.storage[candidatesTableIndex], key)
+				delete(t.db.storage[candidatesTableInd], key)
 				count++
 			}
 		} else {
-			delete(t.db.storage[candidatesTableIndex], key)
+			delete(t.db.storage[candidatesTableInd], key)
 			count++
 		}
 	}
 
 	return count, nil
+}
+
+func (t transaction) FetchState() (*database.State, error) {
+
+	var hash []byte
+	var exists bool
+	if hash, exists = t.db.storage[stateInd][toKey(stateKey)]; !exists {
+		return nil, database.ErrStateNotFound
+	}
+
+	if len(hash) == 0 {
+		return nil, database.ErrStateNotFound
+	}
+
+	s := &database.State{}
+	s.TipHash = hash
+
+	return s, nil
 }
 
 func toKey(d []byte) key {
