@@ -159,6 +159,23 @@ func TestStoreBlock(test *testing.T) {
 	if !done {
 		test.Fatal("No work done by the transaction")
 	}
+
+	// Ensure chain tip is updated too
+	err = db.View(func(t database.Transaction) error {
+		s, err := t.FetchState()
+		if err != nil {
+			return err
+		}
+
+		if !bytes.Equal(genBlocks[len(genBlocks)-1].Header.Hash, s.TipHash) {
+			return fmt.Errorf("invalid chain tip")
+		}
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
+	}
 }
 func TestFetchBlockExists(test *testing.T) {
 

@@ -41,7 +41,6 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 		return errors.New("proof score too low")
 	}
 
-	// Collect AcceptedBlocks
 	blk, err := f.blockGenerator.GenerateBlock(round, seed, proof.Proof, proof.Score, f.prevBlock.Header.Hash)
 	if err != nil {
 		return err

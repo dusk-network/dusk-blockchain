@@ -8,6 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -52,4 +53,24 @@ func createMockedCertificate(hash []byte, round uint64, keys []user.Keys) *block
 		StepOneCommittee:  votes[0].BitSet,
 		StepTwoCommittee:  votes[1].BitSet,
 	}
+}
+
+func TestFetchTip(t *testing.T) {
+	eb := wire.NewEventBus()
+	rpc := wire.NewRPCBus()
+	chain, err := New(eb, rpc)
+
+	assert.Nil(t, err)
+	defer chain.Close()
+
+	// on a modern chain, state(tip) must point at genesis
+	var s *database.State
+	err = chain.db.View(func(t database.Transaction) error {
+		s, err = t.FetchState()
+		return err
+	})
+
+	assert.Nil(t, err)
+
+	assert.Equal(t, chain.prevBlock.Header.Hash, s.TipHash)
 }

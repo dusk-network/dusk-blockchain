@@ -148,8 +148,6 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	output.DestKey = P.Bytes()
 	// Commitment field in coinbase tx represents the reward
 	output.Commitment = rewardBytes
-	// blank range proof as we disclose generator reward
-	output.RangeProof = make([]byte, 1)
 
 	tx.AddReward(output)
 

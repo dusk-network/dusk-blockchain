@@ -56,7 +56,7 @@ maxInvItems = 10000
 # rpc port to listen on
 port=9000
 # enable rpc service
-enabled=false
+enabled=true
 user="default"
 pass="default"
 cert=""
