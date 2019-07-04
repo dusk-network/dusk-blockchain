@@ -92,10 +92,8 @@ func (u *UnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event, error) {
 
 	evs := make([]wire.Event, length)
 	for i := uint64(0); i < length; i++ {
-		rev := &Reduction{
-			Header: &header.Header{},
-		}
-		if err := u.Unmarshal(r, rev); err != nil {
+		rev, err := u.Deserialize(r)
+		if err != nil {
 			return nil, err
 		}
 
