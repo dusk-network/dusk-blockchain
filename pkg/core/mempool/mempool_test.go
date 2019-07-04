@@ -177,6 +177,7 @@ func TestProcessPendingTxs(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx := transactions.NewStandard(version, 2, R)
+		tx.RangeProof = R
 		buf = new(bytes.Buffer)
 		err = tx.Encode(buf)
 		if err != nil {
