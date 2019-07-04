@@ -85,7 +85,7 @@ func (b *broker) Listen() {
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
 		case acceptedBlock := <-b.acceptedBlockChan:
-			if err := b.seeder.GenerateSeed(acceptedBlock.Header.Height, acceptedBlock.Header.Seed); err != nil {
+			if err := b.seeder.GenerateSeed(acceptedBlock.Header.Height+1, acceptedBlock.Header.Seed); err != nil {
 				log.WithField("process", "generation").WithError(err).Errorln("problem generating seed")
 			}
 

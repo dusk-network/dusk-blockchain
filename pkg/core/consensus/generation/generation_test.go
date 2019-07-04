@@ -2,7 +2,6 @@ package generation_test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"math/big"
 	"testing"
 
@@ -10,12 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
@@ -36,15 +34,20 @@ func TestScoreGeneration(t *testing.T) {
 	// launch score component
 	generation.Launch(eb, nil, d, k, gen, gen, keys)
 
-	// update the round to start generation
-	updateRound(eb, 1)
+	// send a block to start generation
+	blk := helper.RandomBlock(t, 0, 1)
+	b := new(bytes.Buffer)
+	if err := blk.Encode(b); err != nil {
+		t.Fatal(err)
+	}
+	eb.Publish(string(topics.AcceptedBlock), b)
 
 	buf, err := streamer.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sev := &selection.ScoreEvent{}
+	sev := &selection.ScoreEvent{Certificate: block.EmptyCertificate()}
 	if err := selection.UnmarshalScoreEvent(bytes.NewBuffer(buf), sev); err != nil {
 		t.Fatal(err)
 	}
@@ -78,9 +81,3 @@ func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 }
 
 func (m *mockGenerator) UpdateBidList(bl user.BidList) {}
-
-func updateRound(eventBus *wire.EventBus, round uint64) {
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, round)
-	eventBus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(roundBytes))
-}

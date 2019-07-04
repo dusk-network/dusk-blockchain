@@ -17,8 +17,9 @@ func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block 
 		Txs:    RandomSliceOfTxs(t, txBatchCount),
 	}
 	err := b.SetHash()
-
-	assert.Nil(t, err)
+	assert.NoError(t, err)
+	err = b.SetRoot()
+	assert.NoError(t, err)
 	return b
 }
 
