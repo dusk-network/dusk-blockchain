@@ -188,19 +188,30 @@ func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicPr
 	bus.preprocessors[topic] = preprocessors
 }
 
-func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) *bytes.Buffer {
+func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (*bytes.Buffer, error) {
 	if preprocessors := bus.getPreprocessors(topic); len(preprocessors) > 0 {
 		for _, preprocessor := range preprocessors {
-			messageBuffer, _ = preprocessor.Process(messageBuffer)
+			var err error
+			messageBuffer, err = preprocessor.Process(messageBuffer)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return messageBuffer
+	return messageBuffer, nil
 }
 
 // Publish executes callback defined for a topic.
 func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
-	processedMsg := bus.preprocess(topic, messageBuffer)
+	processedMsg, err := bus.preprocess(topic, messageBuffer)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "eventbus",
+			"error":   err,
+		}).Errorln("preprocessor error")
+		return
+	}
 
 	if handlers := bus.getChannelHandlers(topic); len(handlers) > 0 {
 		bus.publish(handlers, processedMsg, topic)
@@ -213,7 +224,14 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 
 // Stream a buffer to the subscribers for a specific topic.
 func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
-	processedMsg := bus.preprocess(topic, messageBuffer)
+	processedMsg, err := bus.preprocess(topic, messageBuffer)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "eventbus",
+			"error":   err,
+		}).Errorln("preprocessor error")
+		return
+	}
 
 	if handlers := bus.getStreamHandlers(topic); len(handlers) > 0 {
 		bus.ringbuffer.Put(processedMsg.Bytes())
