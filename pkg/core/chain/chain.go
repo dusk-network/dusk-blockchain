@@ -82,7 +82,6 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*C
 		rpcBus:          rpcBus,
 		db:              db,
 		committee:       c,
-		bidList:         &user.BidList{},
 		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
 		certificateChan: certificateChan,

@@ -39,11 +39,7 @@ func mockBlockOne(bid *transactions.Bid, stake *transactions.Stake) *block.Block
 		panic(err)
 	}
 
-	blk.Header.Certificate = &block.Certificate{
-		BatchedSig: make([]byte, 33),
-		Step:       1,
-		Committee:  0,
-	}
+	blk.Header.Certificate = block.EmptyCertificate()
 
 	if err := blk.SetHash(); err != nil {
 		panic(err)
