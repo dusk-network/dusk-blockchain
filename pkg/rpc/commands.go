@@ -76,7 +76,7 @@ var getlastblock = func(s *Server, params []string) (string, error) {
 
 var getmempooltxs = func(s *Server, params []string) (string, error) {
 
-	r, err := s.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 1))
+	r, err := s.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
 
 	if err != nil {
 		return "", err

@@ -432,12 +432,12 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 	defer iterator.Release()
 
 	if iterator.First() {
-		b := block.Block{}
+		b := block.NewBlock()
 		if err := b.Decode(bytes.NewReader(iterator.Value())); err != nil {
 			return nil, err
 		}
 
-		return &b, nil
+		return b, nil
 	}
 
 	return nil, database.ErrBlockNotFound

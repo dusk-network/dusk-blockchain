@@ -83,7 +83,9 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 		return nil, err
 	}
 
-	return &Reader{
+	dataRequestor := processing.NewDataRequestor(db, rpcBus, responseChan)
+
+	reader := &Reader{
 		Connection:   pconn,
 		unmarshaller: &messageUnmarshaller{magic},
 		router: &messageRouter{
@@ -91,10 +93,23 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 			dupeMap:         dupeMap,
 			blockHashBroker: processing.NewBlockHashBroker(db, responseChan),
 			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:   processing.NewDataRequestor(db, responseChan),
-			dataBroker:      processing.NewDataBroker(db, responseChan),
+			dataRequestor:   dataRequestor,
+			dataBroker:      processing.NewDataBroker(db, rpcBus, responseChan),
 		},
-	}, nil
+	}
+
+	// On each new connection the node sends topics.Mempool to retrieve mempool
+	// txs from the new peer
+	go func() {
+		if err := dataRequestor.RequestMempoolItems(); err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error sending topics.Mempool message")
+		}
+	}()
+
+	return reader, nil
 }
 
 // ReadMessage reads from the connection until encountering a zero byte.
