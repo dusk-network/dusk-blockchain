@@ -155,7 +155,7 @@ func TestProcessPendingTxs(t *testing.T) {
 
 	initCtx(t)
 
-	var version uint8
+	var incorrectVersion uint8 = 3
 	txs := randomSliceOfTxs(t, 5)
 
 	for _, tx := range txs {
@@ -171,8 +171,11 @@ func TestProcessPendingTxs(t *testing.T) {
 		c.bus.Publish(string(topics.Tx), buf)
 
 		// Publish invalid txs (one that does not pass verifyTx)
-		version++
-		tx := transactions.NewStandard(version, 2)
+		R, err := crypto.RandEntropy(32)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx := transactions.NewStandard(incorrectVersion, 2, R)
 		buf = new(bytes.Buffer)
 		err = tx.Encode(buf)
 		if err != nil {
@@ -241,8 +244,9 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 				buf := new(bytes.Buffer)
 
 				e, _ := crypto.RandEntropy(64)
+				R, _ := crypto.RandEntropy(32)
 				fee := binary.LittleEndian.Uint64(e)
-				tx := transactions.NewStandard(1, fee)
+				tx := transactions.NewStandard(1, fee, R)
 				_ = tx.Encode(buf)
 
 				c.bus.Publish(string(topics.Tx), buf)
@@ -325,7 +329,8 @@ func TestDoubleSpent(t *testing.T) {
 
 	// Create double-spent tx by replicating an already added txs but with
 	// differnt TxID
-	tx := transactions.NewStandard(0, txs[0].StandardTX().Fee+1)
+	R, _ := crypto.RandEntropy(32)
+	tx := transactions.NewStandard(0, txs[0].StandardTX().Fee+1, R)
 
 	// Inputs
 	tx.Inputs = txs[0].StandardTX().Inputs

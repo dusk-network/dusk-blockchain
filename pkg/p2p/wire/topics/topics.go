@@ -15,21 +15,17 @@ const (
 	Pong    Topic = "pong"
 
 	// Data exchange topics
-	Addr       Topic = "addr"
-	GetAddr    Topic = "getaddr"
-	GetData    Topic = "getdata"
-	GetBlocks  Topic = "getblocks"
-	GetHeaders Topic = "getheaders"
-	Tx         Topic = "tx"
-	Block      Topic = "block"
-	// AccecptedBlock topic is published by chain after accepting a verified
-	// block. For chain tip retrieval, rpcBus GetLastBlock can be used instead.
-	AcceptedBlock  Topic = "acceptedblock"
-	Headers        Topic = "headers"
-	MemPool        Topic = "mempool"
-	Inv            Topic = "inv"
-	CertificateReq Topic = "certificatereq"
-	Certificate    Topic = "certificate"
+	Addr          Topic = "addr"
+	GetAddr       Topic = "getaddr"
+	GetData       Topic = "getdata"
+	GetBlocks     Topic = "getblocks"
+	GetHeaders    Topic = "getheaders"
+	Tx            Topic = "tx"
+	Block         Topic = "block"
+	AcceptedBlock Topic = "acceptedblock"
+	Headers       Topic = "headers"
+	MemPool       Topic = "mempool"
+	Inv           Topic = "inv"
 
 	// Consensus topics
 	Candidate Topic = "candidate"

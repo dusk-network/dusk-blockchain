@@ -13,8 +13,7 @@ type Coinbase struct {
 	// TxType represents the transaction type
 	TxType TxType
 	// TxID is the transaction identifier for the current transaction
-	TxID []byte
-
+	TxID    []byte
 	R       []byte
 	Score   []byte
 	Proof   []byte
@@ -59,6 +58,8 @@ func (c *Coinbase) Encode(w io.Writer) error {
 	}
 
 	for _, output := range c.Rewards {
+		output.EncryptedAmount = make([]byte, 1)
+		output.EncryptedMask = make([]byte, 1)
 		if err := output.Encode(w); err != nil {
 			return err
 		}

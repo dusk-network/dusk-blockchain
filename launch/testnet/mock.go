@@ -49,12 +49,13 @@ func mockBlockOne(bid *transactions.Bid, stake *transactions.Stake) *block.Block
 func mockCoinbaseTx() *transactions.Coinbase {
 	proof, _ := crypto.RandEntropy(2000)
 	score, _ := crypto.RandEntropy(32)
-	r, _ := crypto.RandEntropy(32)
-	coinbase := transactions.NewCoinbase(proof, score, r)
+	destKey, _ := crypto.RandEntropy(32)
+	R, _ := crypto.RandEntropy(32)
+	coinbase := transactions.NewCoinbase(proof, score, R)
 
 	commitment := make([]byte, 32)
 	commitment[0] = 100
-	output, err := transactions.NewOutput(commitment, r, proof)
+	output, err := transactions.NewOutput(commitment, destKey)
 	if err != nil {
 		panic(err)
 	}
@@ -99,19 +100,23 @@ func waitForStake(bus *wire.EventBus, myStake *transactions.Stake) uint64 {
 }
 
 func makeStake(keys *user.Keys) *transactions.Stake {
-	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, *keys.EdPubKey, keys.BLSPubKey.Marshal())
+	R, _ := crypto.RandEntropy(32)
+
+	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, R, *keys.EdPubKey, keys.BLSPubKey.Marshal())
+	rangeProof, _ := crypto.RandEntropy(32)
+	stake.RangeProof = rangeProof
 	keyImage, _ := crypto.RandEntropy(32)
-	txID, _ := crypto.RandEntropy(32)
+	pubkey, _ := crypto.RandEntropy(32)
+	pseudoComm, _ := crypto.RandEntropy(32)
 	signature, _ := crypto.RandEntropy(32)
-	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
+	input, _ := transactions.NewInput(keyImage, pubkey, pseudoComm, signature)
 	stake.Inputs = transactions.Inputs{input}
 
 	outputAmount := rand.Int63n(100000)
 	commitment := make([]byte, 32)
 	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
-	rangeProof, _ := crypto.RandEntropy(32)
-	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
+	output, _ := transactions.NewOutput(commitment, destKey)
 	stake.Outputs = transactions.Outputs{output}
 
 	return stake
@@ -125,18 +130,22 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	dScalar := ristretto.Scalar{}
 	dScalar.SetBigInt(d)
 	m := zkproof.CalculateM(k)
-	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, m.Bytes())
+	R, _ := crypto.RandEntropy(32)
+	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, m.Bytes(), R)
+	rangeProof, _ := crypto.RandEntropy(32)
+	bid.RangeProof = rangeProof
+
 	keyImage, _ := crypto.RandEntropy(32)
-	txID, _ := crypto.RandEntropy(32)
+	pubkey, _ := crypto.RandEntropy(32)
+	pseudoComm, _ := crypto.RandEntropy(32)
 	signature, _ := crypto.RandEntropy(32)
-	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
+	input, _ := transactions.NewInput(keyImage, pubkey, pseudoComm, signature)
 	bid.Inputs = transactions.Inputs{input}
 
 	commitment := make([]byte, 32)
 	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
-	rangeProof, _ := crypto.RandEntropy(32)
-	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
+	output, _ := transactions.NewOutput(commitment, destKey)
 	bid.Outputs = transactions.Outputs{output}
 
 	return bid, dScalar, k
