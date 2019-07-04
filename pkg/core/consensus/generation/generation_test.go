@@ -28,12 +28,13 @@ func TestScoreGeneration(t *testing.T) {
 	k := ristretto.Scalar{}
 	k.Rand()
 
+	keys, _ := user.NewRandKeys()
 	eb, streamer := helper.CreateGossipStreamer()
 
 	gen := &mockGenerator{t}
 
 	// launch score component
-	generation.Launch(eb, nil, d, k, gen, gen)
+	generation.Launch(eb, nil, d, k, gen, gen, keys)
 
 	// update the round to start generation
 	updateRound(eb, 1)
@@ -58,12 +59,8 @@ type mockGenerator struct {
 	t *testing.T
 }
 
-func (m *mockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error) {
+func (m *mockGenerator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error) {
 	return helper.RandomBlock(m.t, round, 10), nil
-}
-
-func (m *mockGenerator) UpdatePrevBlock(b block.Block) {
-
 }
 
 func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {

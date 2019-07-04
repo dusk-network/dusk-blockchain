@@ -59,7 +59,7 @@ func Setup() *Server {
 	m.Run()
 
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus, rpcBus)
+	chain, err := chain.New(eventBus, rpcBus, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -124,7 +124,7 @@ func (s *Server) launchGeneration() {
 		for _, tx := range blk.Txs {
 			if tx.Equals(s.MyBid) {
 				s.eventBus.Unsubscribe(string(topics.AcceptedBlock), id)
-				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil)
+				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil, *s.keys)
 				return
 			}
 		}
