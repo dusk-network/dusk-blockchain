@@ -15,6 +15,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -32,20 +33,21 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
-	db       database.DB
+	eventBus  *wire.EventBus
+	rpcBus    *wire.RPCBus
+	db        database.DB
+	committee committee.Foldable
 
 	prevBlock block.Block
 	bidList   *user.BidList
 
 	// collector channels
 	candidateChan   <-chan *block.Block
-	winningHashChan <-chan []byte
+	certificateChan <-chan certMsg
 }
 
 // New returns a new chain object
-func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
+func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
 	if err != nil {
 		return nil, err
@@ -85,20 +87,26 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 
 	// set up collectors
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
-	winningHashChan := initWinningHashCollector(eventBus)
+	certificateChan := initCertificateCollector(eventBus)
 
-	c := &Chain{
+	// set up committee
+	if c == nil {
+		c = committee.NewAgreement(eventBus)
+	}
+
+	chain := &Chain{
 		eventBus:        eventBus,
 		rpcBus:          rpcBus,
 		db:              db,
+		committee:       c,
 		bidList:         &user.BidList{},
 		prevBlock:       *genesisBlock,
 		candidateChan:   candidateChan,
-		winningHashChan: winningHashChan,
+		certificateChan: certificateChan,
 	}
 
-	eventBus.SubscribeCallback(string(topics.Block), c.onAcceptBlock)
-	return c, nil
+	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
+	return chain, nil
 }
 
 // Listen to the collectors
@@ -108,8 +116,8 @@ func (c *Chain) Listen() {
 
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
-		case blockHash := <-c.winningHashChan:
-			_ = c.handleWinningHash(blockHash)
+		case cMsg := <-c.certificateChan:
+			c.addCertificate(cMsg.hash, cMsg.cert)
 
 		// wire.RPCBus requests handlers
 		case r := <-wire.GetLastBlockChan:
@@ -227,7 +235,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	l.Trace("procedure started")
 
 	// 1. Check that stateless and stateful checks pass
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, c.committee, blk); err != nil {
 		l.Errorf("verification failed: %s", err.Error())
 		return err
 	}
@@ -306,18 +314,14 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	// Ensure the candidate block satisfies all chain rules
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, c.committee, candidate); err != nil {
 		log.Errorf("verifying the candidate block failed: %s", err.Error())
 		return err
 	}
 
 	// Save it into persistent storage
 	err := c.db.Update(func(t database.Transaction) error {
-		err := t.StoreCandidateBlock(&candidate)
-		if err != nil {
-			return err
-		}
-		return nil
+		return t.StoreCandidateBlock(&candidate)
 	})
 
 	if err != nil {
@@ -328,8 +332,7 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	return nil
 }
 
-func (c *Chain) handleWinningHash(blockHash []byte) error {
-	// Fetch the candidate block that the winningHash points at
+func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
 	var candidate *block.Block
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
@@ -338,17 +341,16 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 	})
 
 	if err != nil {
-		log.Errorf("fetching a candidate block failed: %s", err.Error())
-		return err
+		log.Errorf("error fetching candidate block: %s", err.Error())
+		return
 	}
 
-	// Run the general procedure of block accepting
-	return c.AcceptBlock(*candidate)
+	candidate.Header.Certificate = cert
+	c.AcceptBlock(*candidate)
 }
 
 // Send Inventory message to all peers
 func (c *Chain) advertiseBlock(b block.Block) error {
-
 	msg := &peermsg.Inv{}
 	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
 

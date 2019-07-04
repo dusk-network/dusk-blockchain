@@ -13,7 +13,7 @@ func TestDemoSaveFunctionality(t *testing.T) {
 
 	eb := wire.NewEventBus()
 	rpc := wire.NewRPCBus()
-	chain, err := New(eb, rpc)
+	chain, err := New(eb, rpc, nil)
 
 	assert.Nil(t, err)
 

@@ -5,13 +5,16 @@ import (
 	"errors"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 )
 
 // CheckBlock will verify whether a block is valid according to the rules of the consensus
 // returns nil if a block is valid
-func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
+func CheckBlock(db database.DB, prevBlock block.Block, committee committee.Foldable, blk block.Block) error {
 	// 1. Check that we have not seen this block before
 	err := db.View(func(t database.Transaction) error {
 		_, err := t.FetchBlockExists(blk.Header.Hash)
@@ -25,8 +28,12 @@ func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
 		return err
 	}
 
+	if err := CheckBlockCertificate(committee, blk); err != nil {
+		return err
+	}
+
 	if err := CheckBlockHeader(prevBlock, blk); err != nil {
-		return nil
+		return err
 	}
 
 	if err := CheckMultiCoinbases(blk.Txs); err != nil {
@@ -43,6 +50,42 @@ func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
 		}
 	}
 	return nil
+}
+
+// CheckBlockCertificate ensures that the block certificate is valid.
+func CheckBlockCertificate(committee committee.Foldable, blk block.Block) error {
+	// First, lets get the actual reduction steps
+	// This would be the certificate step * 2 - 1, and certificate step * 2
+	stepOne := (blk.Header.Certificate.Step * 2) - 1
+	stepTwo := blk.Header.Certificate.Step * 2
+
+	// Reconstruct signatures
+	stepOneBatchedSig, err := bls.UnmarshalSignature(blk.Header.Certificate.StepOneBatchedSig)
+	if err != nil {
+		return err
+	}
+
+	stepTwoBatchedSig, err := bls.UnmarshalSignature(blk.Header.Certificate.StepTwoBatchedSig)
+	if err != nil {
+		return err
+	}
+
+	// Now, check the certificate's correctness for both reduction steps
+	if err := checkBlockCertificateForStep(stepOneBatchedSig, blk.Header.Certificate.StepOneCommittee, blk.Header.Height, stepOne, committee, blk.Header.Hash); err != nil {
+		return err
+	}
+
+	return checkBlockCertificateForStep(stepTwoBatchedSig, blk.Header.Certificate.StepTwoCommittee, blk.Header.Height, stepTwo, committee, blk.Header.Hash)
+}
+
+func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, round uint64, step uint8, committee committee.Foldable, blockHash []byte) error {
+	subcommittee := committee.Unpack(bitSet, round, step)
+	apk, err := agreement.ReconstructApk(subcommittee)
+	if err != nil {
+		return err
+	}
+
+	return agreement.VerifySignatures(round, step, blockHash, apk, batchedSig)
 }
 
 // CheckBlockHeader checks whether a block header is malformed,
@@ -74,6 +117,9 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 	if err := blk.SetRoot(); err != nil {
 		return errors.New("could not calculate the merkle tree root for this header")
 	}
+
+	// Certificate check -- see if consensus was reached on this block properly
+	//
 
 	if !bytes.Equal(tR, blk.Header.TxRoot) {
 		return errors.New("merkle root mismatch")
