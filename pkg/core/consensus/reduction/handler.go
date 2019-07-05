@@ -3,7 +3,6 @@ package reduction
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -18,11 +17,6 @@ type (
 		user.Keys
 		Reducers
 		*UnMarshaller
-	}
-
-	handler interface {
-		consensus.AccumulatorHandler
-		MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error
 	}
 )
 
@@ -57,5 +51,9 @@ func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 // Verify the BLS signature of the Reduction event.
 func (b *reductionHandler) Verify(e wire.Event) error {
 	ev := e.(*Reduction)
-	return msg.VerifyBLSSignature(ev.PubKeyBLS, ev.BlockHash, ev.SignedHash)
+	info := new(bytes.Buffer)
+	if err := header.MarshalSignableVote(info, ev.Header); err != nil {
+		return err
+	}
+	return msg.VerifyBLSSignature(ev.PubKeyBLS, info.Bytes(), ev.SignedHash)
 }

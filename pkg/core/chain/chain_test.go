@@ -1,39 +1,16 @@
 package chain
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-func mockConfig(t *testing.T) func() {
-
-	storeDir, err := ioutil.TempDir(os.TempDir(), "chain_test")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	r := cfg.Registry{}
-	r.Database.Dir = storeDir
-	r.Database.Driver = heavy.DriverName
-	r.General.Network = "testnet"
-	cfg.Mock(&r)
-
-	return func() {
-		os.RemoveAll(storeDir)
-	}
-}
-
 func TestDemoSaveFunctionality(t *testing.T) {
-
-	fn := mockConfig(t)
-	defer fn()
 
 	eb := wire.NewEventBus()
 	rpc := wire.NewRPCBus()
@@ -54,4 +31,25 @@ func TestDemoSaveFunctionality(t *testing.T) {
 	err = chain.AcceptBlock(chain.prevBlock)
 	assert.Error(t, err)
 
+}
+
+func TestFetchTip(t *testing.T) {
+
+	eb := wire.NewEventBus()
+	rpc := wire.NewRPCBus()
+	chain, err := New(eb, rpc)
+
+	assert.Nil(t, err)
+	defer chain.Close()
+
+	// on a modern chain, state(tip) must point at genesis
+	var s *database.State
+	err = chain.db.View(func(t database.Transaction) error {
+		s, err = t.FetchState()
+		return err
+	})
+
+	assert.Nil(t, err)
+
+	assert.Equal(t, chain.prevBlock.Header.Hash, s.TipHash)
 }

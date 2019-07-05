@@ -14,9 +14,6 @@ import (
 
 // MockAgreementEvent returns a mocked Agreement Event, to be used for testing purposes.
 func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys) *Agreement {
-	if step < uint8(2) {
-		panic("Need at least 2 steps to create an Agreement")
-	}
 	a := New()
 	pk, sk, _ := bls.GenKeyPair(rand.Reader)
 	a.PubKeyBLS = pk.Marshal()
@@ -36,10 +33,8 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys)
 
 // MockAgreement mocks an Agreement event, and returns the marshalled representation
 // of it as a `*bytes.Buffer`.
+// NOTE: it does not include the topic
 func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys) *bytes.Buffer {
-	if step < 2 {
-		panic("Aggregated agreement needs to span for at least two steps")
-	}
 	buf := new(bytes.Buffer)
 	ev := MockAgreementEvent(hash, round, step, keys)
 
@@ -57,7 +52,7 @@ func genVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVo
 	for i, k := range keys {
 
 		stepCycle := i % 2
-		thisStep := step - uint8((stepCycle+1)%2)
+		thisStep := step + uint8(stepCycle)
 		stepVote := votes[stepCycle]
 		if stepVote == nil {
 			stepVote = NewStepVotes()
@@ -105,7 +100,7 @@ func MockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, [
 	}
 
 	committeeMock := &mocks.Foldable{}
-	committeeMock.On("Quorum").Return(quorum)
+	committeeMock.On("Quorum", mock.Anything).Return(quorum)
 	committeeMock.On("IsMember",
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),

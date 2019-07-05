@@ -23,7 +23,7 @@ func TestEncodeDecodeBlock(t *testing.T) {
 	assert.Nil(err)
 
 	// Decode buffer into a block struct
-	decBlk := &block.Block{}
+	decBlk := block.NewBlock()
 	err = decBlk.Decode(buf)
 	assert.Nil(err)
 

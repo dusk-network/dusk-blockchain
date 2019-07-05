@@ -29,9 +29,9 @@ const TimeLockBlockZero = 0x8000000000000000
 
 // NewTimeLock will return a TimeLock transaction
 // Given the tx version, the locktime and the fee
-func NewTimeLock(ver uint8, lock, fee uint64) *TimeLock {
+func NewTimeLock(ver uint8, lock, fee uint64, R []byte) *TimeLock {
 	t := &TimeLock{
-		Standard: *NewStandard(ver, fee),
+		Standard: *NewStandard(ver, fee, R),
 		Lock:     lock,
 	}
 	t.TxType = TimelockType

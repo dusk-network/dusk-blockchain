@@ -15,7 +15,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -28,7 +28,11 @@ func TestInitBroker(t *testing.T) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 
-	agreement.Launch(bus, committeeMock, k[0], 1)
+	go agreement.Launch(bus, committeeMock, k[0])
+	time.Sleep(200 * time.Millisecond)
+	init := make([]byte, 8)
+	binary.LittleEndian.PutUint64(init, 1)
+	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
 
 	round := <-roundChan
 	assert.Equal(t, uint64(1), round)
@@ -41,8 +45,8 @@ func TestBroker(t *testing.T) {
 	eb, roundChan := initAgreement(committeeMock)
 
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	round := <-roundChan
 	assert.Equal(t, uint64(2), round)
@@ -54,8 +58,8 @@ func TestNoQuorum(t *testing.T) {
 	committeeMock, keys := agreement.MockCommittee(3, true, 3)
 	eb, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	select {
 	case <-roundChan:
@@ -70,7 +74,7 @@ func TestSkipNoMember(t *testing.T) {
 	committeeMock, keys := agreement.MockCommittee(1, false, 2)
 	eb, roundChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 2, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	select {
 	case <-roundChan:
@@ -88,7 +92,7 @@ func TestSendAgreement(t *testing.T) {
 
 	streamer := helper.NewSimpleStreamer()
 	eb.SubscribeStream(string(topics.Gossip), streamer)
-	eb.RegisterPreprocessor(string(topics.Gossip), peer.NewGossip(protocol.TestNet))
+	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 
 	// Initiate the sending of an agreement message
 	hash, _ := crypto.RandEntropy(32)
@@ -97,7 +101,10 @@ func TestSendAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf.ReadFrom(reduction.MockVoteSetBuffer(hash, 1, 2, 10))
+	if _, err := buf.ReadFrom(reduction.MockVoteSetBuffer(hash, 1, 2, 10)); err != nil {
+		t.Fatal(err)
+	}
+
 	eb.Publish(msg.ReductionResultTopic, buf)
 
 	// There should now be an agreement message in the streamer
@@ -117,10 +124,15 @@ func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 	k, _ := user.NewRandKeys()
-	agreement.Launch(bus, c, k, 1)
+	go agreement.Launch(bus, c, k)
+	time.Sleep(200 * time.Millisecond)
+	init := make([]byte, 8)
+	binary.LittleEndian.PutUint64(init, 1)
+	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
+
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
-	bus.RegisterPreprocessor(string(topics.Agreement))
+	bus.RemoveAllPreprocessors(string(topics.Agreement))
 	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
 	<-roundChan
 	return bus, roundChan

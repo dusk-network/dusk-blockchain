@@ -10,6 +10,7 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
@@ -19,6 +20,15 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
+
+func respond(rpcBus *wire.RPCBus, b block.Block) {
+	r := <-wire.GetLastBlockChan
+	buf := new(bytes.Buffer)
+	if err := b.Encode(buf); err != nil {
+		panic(err)
+	}
+	r.RespChan <- *buf
+}
 
 func TestGenerateBlock(t *testing.T) {
 	h := newTestHarness(t)
