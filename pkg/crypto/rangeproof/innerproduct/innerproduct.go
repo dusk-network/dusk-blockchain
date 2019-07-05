@@ -417,7 +417,7 @@ func (p *Proof) Encode(w io.Writer) error {
 
 func (p *Proof) Decode(r io.Reader) error {
 	if p == nil {
-		return errors.New("satruct is nil")
+		return errors.New("struct is nil")
 	}
 
 	var ABytes, BBytes [32]byte
