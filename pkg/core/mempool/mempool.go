@@ -143,7 +143,7 @@ func (m *Mempool) Run() {
 				m.onAcceptedBlock(b)
 			case tx := <-m.pending:
 				m.onPendingTx(tx)
-			case <-time.After(2 * time.Second):
+			case <-time.After(10 * time.Second):
 				m.onIdle()
 			// Mempool terminating
 			case <-m.quitChan:
