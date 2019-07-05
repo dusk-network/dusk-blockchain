@@ -14,7 +14,7 @@ import (
 
 // CheckBlock will verify whether a block is valid according to the rules of the consensus
 // returns nil if a block is valid
-func CheckBlock(db database.DB, prevBlock block.Block, committee committee.Foldable, blk block.Block) error {
+func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
 	// 1. Check that we have not seen this block before
 	err := db.View(func(t database.Transaction) error {
 		_, err := t.FetchBlockExists(blk.Header.Hash)
@@ -25,10 +25,6 @@ func CheckBlock(db database.DB, prevBlock block.Block, committee committee.Folda
 		if err == nil {
 			err = errors.New("block already exists")
 		}
-		return err
-	}
-
-	if err := CheckBlockCertificate(committee, blk); err != nil {
 		return err
 	}
 
@@ -54,6 +50,11 @@ func CheckBlock(db database.DB, prevBlock block.Block, committee committee.Folda
 
 // CheckBlockCertificate ensures that the block certificate is valid.
 func CheckBlockCertificate(committee committee.Foldable, blk block.Block) error {
+	// TODO: remove this for testnet
+	if blk.Header.Height < 2 {
+		return nil
+	}
+
 	// First, lets get the actual reduction steps
 	// This would be the certificate step * 2 - 1, and certificate step * 2
 	stepOne := (blk.Header.Certificate.Step * 2) - 1

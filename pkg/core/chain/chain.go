@@ -227,15 +227,21 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	l.Trace("procedure started")
 
 	// 1. Check that stateless and stateful checks pass
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, c.committee, blk); err != nil {
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
 		l.Errorf("verification failed: %s", err.Error())
 		return err
 	}
 
-	// 2. Add provisioners and block generators
+	// 2. Check the certificate
+	if err := verifiers.CheckBlockCertificate(c.committee, blk); err != nil {
+		l.Errorf("verifying the certificate failed: %s", err.Error())
+		return err
+	}
+
+	// 3. Add provisioners and block generators
 	c.addConsensusNodes(blk.Txs, blk.Header.Height+1)
 
-	// 3. Store block in database
+	// 4. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&blk)
 	})
@@ -247,7 +253,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 4. Notify other subsystems for the accepted block
+	// 5. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
@@ -259,13 +265,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
-	// 5. Gossip advertise block Hash
+	// 6. Gossip advertise block Hash
 	if err := c.advertiseBlock(blk); err != nil {
 		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
-	// 6. Cleanup obsolete candidate blocks
+	// 7. Cleanup obsolete candidate blocks
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
 		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
@@ -307,7 +313,7 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	// Ensure the candidate block satisfies all chain rules
 	c.mu.RLock()
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, c.committee, candidate); err != nil {
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
 		log.Errorf("verifying the candidate block failed: %s", err.Error())
 		c.mu.RUnlock()
 		return err
