@@ -121,7 +121,7 @@ func (b *broker) updateRound(round uint64) {
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
-	b.publisher.Publish(msg.WinningBlockTopic, bytes.NewBuffer(aev.BlockHash))
+	b.publisher.Publish(msg.WinningBlockHashTopic, bytes.NewBuffer(aev.BlockHash))
 }
 
 func (b *broker) publishEvent(evs []wire.Event) {
