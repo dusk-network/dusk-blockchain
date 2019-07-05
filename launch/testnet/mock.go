@@ -24,7 +24,7 @@ import (
 func mockBlockOne(bid *transactions.Bid, stake *transactions.Stake) *block.Block {
 	blk := block.NewBlock()
 	blk.Header.Height = 1
-	blk.Header.Timestamp = time.Now().Unix()
+	blk.Header.Timestamp = time.Now().Unix() - 10
 	coinbase := mockCoinbaseTx()
 	blk.AddTx(coinbase)
 	blk.AddTx(bid)
