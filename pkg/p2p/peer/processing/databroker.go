@@ -3,8 +3,10 @@ package processing
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -16,13 +18,15 @@ import (
 type DataBroker struct {
 	db           database.DB
 	responseChan chan<- *bytes.Buffer
+	rpcBus       *wire.RPCBus
 }
 
 // NewDataBroker returns an initialized DataBroker.
-func NewDataBroker(db database.DB, responseChan chan<- *bytes.Buffer) *DataBroker {
+func NewDataBroker(db database.DB, rpcBus *wire.RPCBus, responseChan chan<- *bytes.Buffer) *DataBroker {
 	return &DataBroker{
 		db:           db,
 		responseChan: responseChan,
+		rpcBus:       rpcBus,
 	}
 }
 
@@ -35,20 +39,85 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 	}
 
 	for _, obj := range msg.InvList {
-		// support only InvTypeBlock for now
-		// TODO: Add functionality for InvTypeTX
-		if obj.Type != peermsg.InvTypeBlock {
-			continue
+
+		var buf *bytes.Buffer
+		switch obj.Type {
+		case peermsg.InvTypeBlock:
+			// Fetch block from local state. It must be available
+			b, err := d.fetchBlock(obj.Hash)
+			if err != nil {
+				return err
+			}
+
+			// Send the block data back to the initiator node as topics.Block msg
+			buf, err = marshalBlock(b)
+			if err != nil {
+				return err
+			}
+		case peermsg.InvTypeMempoolTx:
+			// Try to retireve tx from local mempool state. It might not be
+			// available
+			txs, err := GetMempoolTxs(d.rpcBus, obj.Hash)
+			if err != nil {
+				return err
+			}
+
+			if len(txs) != 0 {
+				// Send topics.Tx with the tx data back to the initiator
+				buf, err = marshalTx(txs[0])
+				if err != nil {
+					return err
+				}
+			}
+
+			// A txID will not be found in a few situations:
+			//
+			// - The node has restarted and lost this Tx
+			// - The node has recently accepted a block that includes this Tx
+			// No action to run in these cases.
 		}
 
-		// Fetch block from local state. It must be available
-		b, err := d.fetchBlock(obj.Hash)
-		if err != nil {
-			return err
+		if buf != nil {
+			d.responseChan <- buf
+		}
+	}
+
+	return nil
+}
+
+func (d *DataBroker) SendTxsItems() error {
+
+	var maxItemsSent = config.Get().Mempool.MaxInvItems
+	if maxItemsSent == 0 {
+		// responding to wire.Mempool disabled
+		return nil
+	}
+
+	// TODO: Limit the returned txs slice size based on MaxInvTxs
+	txs, err := GetMempoolTxs(d.rpcBus, nil)
+	if err != nil {
+		return err
+	}
+
+	if len(txs) != 0 {
+		// Send topics.Inv with the tx data back to the initiator
+		msg := &peermsg.Inv{}
+
+		for _, tx := range txs {
+			txID, err := tx.CalculateHash()
+			if err != nil {
+				return err
+			}
+
+			msg.AddItem(peermsg.InvTypeMempoolTx, txID)
+
+			maxItemsSent--
+			if maxItemsSent == 0 {
+				break
+			}
 		}
 
-		// Send the block data back to the initiator node as topics.Block msg
-		buf, err := marshalBlock(b)
+		buf, err := marshalInv(msg)
 		if err != nil {
 			return err
 		}
@@ -90,4 +159,13 @@ func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 	}
 
 	return wire.AddTopic(buf, topics.Block)
+}
+
+func marshalTx(tx transactions.Transaction) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	if err := tx.Encode(buf); err != nil {
+		return nil, err
+	}
+
+	return wire.AddTopic(buf, topics.Tx)
 }

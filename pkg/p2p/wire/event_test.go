@@ -34,7 +34,7 @@ func TestProcessor(t *testing.T) {
 	resultChan := make(chan *bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 
-	bus.RegisterPreprocessor(topic, &pippoAdder{}, &pippoAdder{})
+	ids := bus.RegisterPreprocessor(topic, &pippoAdder{}, &pippoAdder{})
 	go NewTopicListener(bus, collector, topic).Accept()
 
 	expected := bytes.NewBufferString("pippopippo")
@@ -43,8 +43,37 @@ func TestProcessor(t *testing.T) {
 
 	result1 := <-resultChan
 	result2 := <-resultChan
-	require.Equal(t, result1, expected)
-	require.Equal(t, result2, expected)
+	assert.Equal(t, expected, result1)
+	assert.Equal(t, expected, result2)
+
+	// testing RemoveProcessor
+	bus.RemovePreprocessor(topic, ids[0])
+
+	expected = bytes.NewBufferString("pippo")
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res := <-resultChan
+	assert.Equal(t, expected, res)
+
+	// removing the same preprocessor does not yield any different result
+	bus.RemovePreprocessor(topic, ids[0])
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
+
+	// adding a preprocessor
+	expected = bytes.NewBufferString("pippopappo")
+	otherId := bus.RegisterPreprocessor(topic, &pappoAdder{})
+	assert.Equal(t, 1, len(otherId))
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
+
+	// removing another
+	expected = bytes.NewBufferString("pappo")
+	bus.RemovePreprocessor(topic, ids[1])
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
 }
 
 func TestAddTopic(t *testing.T) {
@@ -70,6 +99,13 @@ type pippoAdder struct{}
 
 func (p *pippoAdder) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	buf.WriteString("pippo")
+	return buf, nil
+}
+
+type pappoAdder struct{}
+
+func (p *pappoAdder) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
+	buf.WriteString("pappo")
 	return buf, nil
 }
 
