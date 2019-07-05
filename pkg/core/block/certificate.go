@@ -14,7 +14,7 @@ type Certificate struct {
 	StepTwoBatchedSig []byte
 	Step              uint8  // Step the agreement terminated at (1 byte)
 	StepOneCommittee  uint64 // Binary representation of the committee members who voted in favor of this block (8 bytes)
-	StepTwoCommittee  uint64 // Binary representation of the committee members who voted in favor of this block (8 bytes)
+	StepTwoCommittee  uint64
 }
 
 func EmptyCertificate() *Certificate {
