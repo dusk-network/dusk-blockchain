@@ -119,9 +119,6 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 		return errors.New("could not calculate the merkle tree root for this header")
 	}
 
-	// Certificate check -- see if consensus was reached on this block properly
-	//
-
 	if !bytes.Equal(tR, blk.Header.TxRoot) {
 		return errors.New("merkle root mismatch")
 	}
