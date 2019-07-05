@@ -123,6 +123,10 @@ func makeStake(keys *user.Keys) *transactions.Stake {
 	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey)
+	encryptedAmount, _ := crypto.RandEntropy(32)
+	encryptedMask, _ := crypto.RandEntropy(32)
+	output.EncryptedAmount = encryptedAmount
+	output.EncryptedMask = encryptedMask
 	stake.Outputs = transactions.Outputs{output}
 
 	return stake
@@ -137,7 +141,7 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	dScalar.SetBigInt(d)
 	m := zkproof.CalculateM(k)
 	R, _ := crypto.RandEntropy(32)
-	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, m.Bytes(), R)
+	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, R, m.Bytes())
 	rangeProof, _ := crypto.RandEntropy(32)
 	bid.RangeProof = rangeProof
 
@@ -152,6 +156,10 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey)
+	encryptedAmount, _ := crypto.RandEntropy(32)
+	encryptedMask, _ := crypto.RandEntropy(32)
+	output.EncryptedAmount = encryptedAmount
+	output.EncryptedMask = encryptedMask
 	bid.Outputs = transactions.Outputs{output}
 
 	return bid, dScalar, k
