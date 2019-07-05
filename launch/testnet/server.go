@@ -8,7 +8,6 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
@@ -105,30 +104,11 @@ func Setup() *Server {
 	srv.d = d
 	srv.k = k
 
-	// Setting up generation component
-	go srv.launchGeneration()
+	// Launching generation component
+	// TODO: this should be more properly structured
+	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil)
 
 	return srv
-}
-
-func (s *Server) launchGeneration() {
-	blockChan := make(chan *bytes.Buffer, 100)
-	id := s.eventBus.Subscribe(string(topics.AcceptedBlock), blockChan)
-	for {
-		blkBuf := <-blockChan
-		blk := block.NewBlock()
-		if err := blk.Decode(blkBuf); err != nil {
-			panic(err)
-		}
-
-		for _, tx := range blk.Txs {
-			if tx.Equals(s.MyBid) {
-				s.eventBus.Unsubscribe(string(topics.AcceptedBlock), id)
-				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil, *s.keys, blk)
-				return
-			}
-		}
-	}
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
