@@ -35,7 +35,6 @@ type broker struct {
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
 	acceptedBlockChan    <-chan block.Block
-	agreementEventChan   <-chan wire.Event
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
@@ -65,7 +64,6 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
 		acceptedBlockChan:    consensus.InitAcceptedBlockUpdate(eventBroker),
-		agreementEventChan:   initAgreementEventCollector(eventBroker),
 		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
 		seeder:               &seeder{keys: keys},
 	}
