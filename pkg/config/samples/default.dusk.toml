@@ -11,6 +11,13 @@ level = "trace"
 # 'stdout' or file name without ext
 # result filename would be $output$network.port.log
 output = "stdout"
+[logger.monitor]
+# enabling log based monitoring
+enabled = false
+# file whereto dumping info parsed by monitor
+target = "/var/log/dusk-monitor"
+# tell logger to stream errors and warnings to monitoring process
+streamErrors=true
     
 # P2P network specific settings
 [network]

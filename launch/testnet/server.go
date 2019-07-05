@@ -88,8 +88,10 @@ func Setup() *Server {
 		keys:     &keys,
 	}
 
-	// Connecting to the general monitoring system
-	// ConnectToMonitor(eventBus, d)
+	// Connecting to the log based monitoring system
+	if err := ConnectToLogMonitor(eventBus); err != nil {
+		panic(err)
+	}
 
 	// Setting up the consensus factory
 	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
