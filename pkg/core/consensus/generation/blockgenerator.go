@@ -14,7 +14,6 @@ import (
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -57,7 +56,6 @@ func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGene
 		prevBlock: *genesisBlock,
 	}
 }
-
 func (bg *blockGenerator) UpdatePrevBlock(b block.Block) {
 	bg.prevBlock = b
 }
@@ -71,9 +69,7 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 	}
 
 	// TODO Missing fields for forging the block
-	// - CertHash
-
-	certHash, _ := crypto.RandEntropy(32)
+	// - Certificate
 
 	txs, err := bg.ConstructBlockTxs(proof, score)
 	if err != nil {
@@ -88,7 +84,11 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 		PrevBlockHash: bg.prevBlock.Header.Hash,
 		TxRoot:        nil,
 		Seed:          seed,
-		CertHash:      certHash,
+		Certificate: &block.Certificate{
+			BatchedSig: make([]byte, 33),
+			Step:       1,
+			Committee:  0,
+		},
 	}
 
 	// Construct the candidate block
@@ -186,8 +186,6 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	output.DestKey = P.Bytes()
 	// Commitment field in coinbase tx represents the reward
 	output.Commitment = rewardBytes
-	// blank range proof as we disclose generator reward
-	output.RangeProof = make([]byte, 1)
 
 	tx.AddReward(output)
 

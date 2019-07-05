@@ -17,15 +17,13 @@ type Output struct {
 	Commitment []byte // Variable size
 	// DestKey is the one-time public key of the address that
 	// the funds should be sent to.
-	DestKey []byte // 32 bytes
-	// RangeProof is the bulletproof rangeproof that proves that the hidden amount
-	// is between 0 and 2^64
-	RangeProof []byte // Variable size
+	DestKey                        []byte // 32 bytes
+	EncryptedAmount, EncryptedMask []byte
 }
 
 // NewOutput constructs a new Output from the passed parameters.
 // This function is placed here for consistency with the rest of the API.
-func NewOutput(comm []byte, dest []byte, proof []byte) (*Output, error) {
+func NewOutput(comm []byte, dest []byte) (*Output, error) {
 
 	if len(dest) != 32 {
 		return nil, errors.New("destination key is not 32 bytes")
@@ -34,7 +32,6 @@ func NewOutput(comm []byte, dest []byte, proof []byte) (*Output, error) {
 	return &Output{
 		Commitment: comm,
 		DestKey:    dest,
-		RangeProof: proof,
 	}, nil
 }
 
@@ -47,11 +44,12 @@ func (o *Output) Encode(w io.Writer) error {
 	if err := encoding.Write256(w, o.DestKey); err != nil {
 		return err
 	}
-
-	if err := encoding.WriteVarBytes(w, o.RangeProof); err != nil {
+	if err := encoding.WriteVarBytes(w, o.EncryptedAmount); err != nil {
 		return err
 	}
-
+	if err := encoding.WriteVarBytes(w, o.EncryptedMask); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -65,10 +63,16 @@ func (o *Output) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &o.RangeProof); err != nil {
+	o.EncryptedAmount = make([]byte, 32)
+
+	if err := encoding.ReadVarBytes(r, &o.EncryptedAmount); err != nil {
 		return err
 	}
 
+	o.EncryptedMask = make([]byte, 32)
+	if err := encoding.ReadVarBytes(r, &o.EncryptedMask); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -86,9 +90,9 @@ func (o *Output) Equals(out *Output) bool {
 		return false
 	}
 
-	if !bytes.Equal(o.RangeProof, out.RangeProof) {
+	if !bytes.Equal(o.EncryptedAmount, out.EncryptedAmount) {
 		return false
 	}
 
-	return true
+	return bytes.Equal(o.EncryptedMask, out.EncryptedMask)
 }

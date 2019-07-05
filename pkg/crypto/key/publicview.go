@@ -22,11 +22,6 @@ func (pv PublicView) point() *ristretto.Point {
 	return &p
 }
 
-func (pv PublicView) Point() *ristretto.Point {
-	p := (ristretto.Point)(pv)
-	return &p
-}
-
 func (pv PublicView) ScalarMult(s ristretto.Scalar) PublicView {
 	var p ristretto.Point
 	p.ScalarMult(pv.point(), &s)

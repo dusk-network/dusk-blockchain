@@ -1,7 +1,6 @@
 package key
 
 import (
-	"fmt"
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -38,7 +37,4 @@ func TestDidReceive(t *testing.T) {
 
 	assert.True(t, expectedPubKey0.Equals(&pubKey0.P))
 	assert.True(t, expectedPubKey1.Equals(&pubKey1.P))
-
-	fmt.Println(expectedPubKey0, pubKey0.P)
-	fmt.Println(expectedPubKey1, pubKey1.P)
 }

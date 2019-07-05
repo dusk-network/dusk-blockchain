@@ -106,8 +106,6 @@ func main() {
 		}
 
 		srv.eventBus.Publish(string(topics.Block), buf)
-		// Wait a little for it to be accepted and to start the generation component
-		time.Sleep(3 * time.Second)
 		srv.StartConsensus(2)
 	} else {
 		// Propagate bid and stake out to the network

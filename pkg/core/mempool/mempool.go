@@ -87,7 +87,7 @@ type Collector struct {
 }
 
 func (c *Collector) Collect(msg *bytes.Buffer) error {
-	b := new(block.Block)
+	b := block.NewBlock()
 	if err := b.Decode(msg); err != nil {
 		return err
 	}
