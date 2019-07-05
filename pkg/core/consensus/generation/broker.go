@@ -18,8 +18,8 @@ import (
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys, blk *block.Block) {
-	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, blk)
+func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys) {
+	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys)
 	go broker.Listen()
 }
 
@@ -39,7 +39,7 @@ type broker struct {
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator, keys user.Keys, blk *block.Block) *broker {
+	gen Generator, blockGen BlockGenerator, keys user.Keys) *broker {
 	if gen == nil {
 		gen = newProofGenerator(d, k)
 	}
@@ -57,7 +57,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
 
-	b := &broker{
+	return &broker{
 		publisher:            eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
@@ -69,9 +69,6 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
 		seeder:               &seeder{keys: keys},
 	}
-
-	b.onBlock(*blk)
-	return b
 }
 
 func (b *broker) Listen() {

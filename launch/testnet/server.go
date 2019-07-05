@@ -106,7 +106,7 @@ func Setup() *Server {
 
 	// Launching generation component
 	// TODO: this should be more properly structured
-	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil)
+	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil, *srv.keys)
 
 	return srv
 }
