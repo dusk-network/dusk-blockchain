@@ -1,6 +1,10 @@
 package key
 
-import ristretto "github.com/bwesterb/go-ristretto"
+import (
+	"errors"
+
+	ristretto "github.com/bwesterb/go-ristretto"
+)
 
 // Key represents the private/public spend/view key pairs
 type Key struct {
@@ -31,6 +35,25 @@ func (k Key) PublicKey() *PublicKey {
 	}
 
 	return k.pubKey
+}
+
+// PrivateView returns the private view key
+// Used when decrypting amounts and masks
+func (k Key) PrivateView() (*PrivateView, error) {
+
+	if k.privKey.privView == nil {
+		return nil, errors.New("private view key is nil")
+	}
+	return k.privKey.privView, nil
+}
+
+// PrivateSpend returns the private spend key
+func (k Key) PrivateSpend() (*PrivateSpend, error) {
+
+	if k.privKey.privSpend == nil {
+		return nil, errors.New("private spend key is nil")
+	}
+	return k.privKey.privSpend, nil
 }
 
 // DidReceiveTx takes P the stealthAddress/ one time pubkey
