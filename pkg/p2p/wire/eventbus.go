@@ -228,6 +228,8 @@ func (bus *EventBus) RemovePreprocessor(topic string, id uint32) {
 }
 
 func (bus *EventBus) RemoveAllPreprocessors(topic string) {
+	bus.busLock.Lock()
+	defer bus.busLock.Unlock()
 	delete(bus.preprocessors, topic)
 }
 
