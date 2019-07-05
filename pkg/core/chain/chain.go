@@ -17,6 +17,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -88,6 +89,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*C
 	}
 
 	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
+	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
 	return chain, nil
 }
 
@@ -342,7 +344,7 @@ func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
 	})
 
 	if err != nil {
-		log.Errorf("error fetching candidate block: %s", err.Error())
+		log.Errorf("error fetching candidate block to add certificate: %s", err.Error())
 		return
 	}
 
