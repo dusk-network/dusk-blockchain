@@ -55,7 +55,7 @@ func (c *certificateCollector) Collect(m *bytes.Buffer) error {
 		return err
 	}
 
-	var cert *block.Certificate
+	cert := block.EmptyCertificate()
 	if err := cert.Decode(m); err != nil {
 		return err
 	}
