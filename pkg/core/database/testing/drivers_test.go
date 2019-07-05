@@ -132,8 +132,6 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 func TestStoreBlock(test *testing.T) {
 
-	test.Parallel()
-
 	// Generate additional blocks to store
 	genBlocks, err := generateBlocks(test, 2)
 	if err != nil {
@@ -179,8 +177,6 @@ func TestStoreBlock(test *testing.T) {
 }
 func TestFetchBlockExists(test *testing.T) {
 
-	test.Parallel()
-
 	// Verify all blocks can be found by Header.Hash
 	_ = db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
@@ -215,8 +211,6 @@ func TestFetchBlockExists(test *testing.T) {
 	})
 }
 func TestFetchBlockHeader(test *testing.T) {
-
-	test.Parallel()
 
 	// Verify all blocks headers can be fetched by Header.Hash
 	err := db.View(func(t database.Transaction) error {
@@ -259,8 +253,6 @@ func TestFetchBlockHeader(test *testing.T) {
 	})
 }
 func TestFetchBlockTxs(test *testing.T) {
-
-	test.Parallel()
 
 	// Verify all blocks transactions can be fetched by Header.Hash
 	err := db.View(func(t database.Transaction) error {
@@ -312,8 +304,6 @@ func TestFetchBlockTxs(test *testing.T) {
 }
 func TestFetchBlockHashByHeight(test *testing.T) {
 
-	test.Parallel()
-
 	// Blocks lookup by Height
 	_ = db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
@@ -347,8 +337,6 @@ func TestFetchBlockHashByHeight(test *testing.T) {
 }
 
 func TestFetchKeyImageExists(test *testing.T) {
-
-	test.Parallel()
 
 	// Ensure all KeyImages have been stored to the KeyImage "table"
 	err := db.View(func(t database.Transaction) error {
@@ -414,8 +402,6 @@ func TestAtomicUpdates(test *testing.T) {
 
 	// This test ensures that the underlying storage state does not change.
 	// That said, no parallelism should be applied.
-	// test.Parallel()
-
 	genBlocks, err := generateBlocks(test, 2)
 
 	if err != nil {
@@ -471,8 +457,6 @@ func TestAtomicUpdates(test *testing.T) {
 // TestReadOnlyTx ensures that a read-only DB tx cannot touch the storage state
 func TestReadOnlyTx(test *testing.T) {
 
-	test.Parallel()
-
 	// Save current storage state to compare later
 	// Supported only in heavy.DB for now
 	var snapshotBefore interface{}
@@ -518,8 +502,6 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	if drvrName == lite.DriverName {
 		test.Skip()
 	}
-
-	test.Parallel()
 
 	// Create database in read-write mode
 	readonly := false
@@ -602,8 +584,6 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 }
 
 func TestFetchBlockTxByHash(test *testing.T) {
-
-	test.Parallel()
 
 	var maxTxToFetch uint16 = 30
 
