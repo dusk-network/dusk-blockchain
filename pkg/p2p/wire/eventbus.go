@@ -70,10 +70,10 @@ func (bus *EventBus) subscribe(topic string, handler *channelHandler) {
 func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer) uint32 {
 	id := rand.Uint32()
 	bus.busLock.Lock()
+	defer bus.busLock.Unlock()
 	bus.subscribe(topic, &channelHandler{
 		id, messageChannel,
 	})
-	bus.busLock.Unlock()
 
 	return id
 }
@@ -86,10 +86,10 @@ func (bus *EventBus) subscribeCallback(topic string, handler *callbackHandler) {
 func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer) error) uint32 {
 	id := rand.Uint32()
 	bus.busLock.Lock()
+	defer bus.busLock.Unlock()
 	bus.subscribeCallback(topic, &callbackHandler{
 		id, callback,
 	})
-	bus.busLock.Unlock()
 
 	return id
 }
@@ -139,8 +139,8 @@ func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
 	c := ring.NewConsumer(bus.ringbuffer)
 	sh := newStreamHandler(id, topic)
 	bus.busLock.Lock()
+	defer bus.busLock.Unlock()
 	bus.subscribeStream(topic, sh)
-	bus.busLock.Unlock()
 
 	go sh.Pipe(c, w)
 	return id
@@ -231,48 +231,61 @@ func (bus *EventBus) RemoveAllPreprocessors(topic string) {
 	delete(bus.preprocessors, topic)
 }
 
-func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) *bytes.Buffer {
-	bus.busLock.RLock()
-	defer bus.busLock.RUnlock()
-	if preprocessors, ok := bus.preprocessors[topic]; ok {
+func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (*bytes.Buffer, error) {
+	if preprocessors := bus.getPreprocessors(topic); len(preprocessors) > 0 {
 		for _, preprocessor := range preprocessors {
-			messageBuffer, _ = preprocessor.Process(messageBuffer)
+			var err error
+			messageBuffer, err = preprocessor.Process(messageBuffer)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return messageBuffer
+	return messageBuffer, nil
 }
 
 // Publish executes callback defined for a topic.
 func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
-	bus.busLock.RLock()
-	defer bus.busLock.RUnlock()
-	processedMsg := bus.preprocess(topic, messageBuffer)
+	processedMsg, err := bus.preprocess(topic, messageBuffer)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "eventbus",
+			"error":   err,
+		}).Errorln("preprocessor error")
+		return
+	}
 
-	if handlers, ok := bus.handlers[topic]; ok {
+	if handlers := bus.getChannelHandlers(topic); len(handlers) > 0 {
 		bus.publish(handlers, processedMsg, topic)
 	}
 
-	if callbackHandlers, ok := bus.callbackHandlers[topic]; ok {
+	if callbackHandlers := bus.getCallbackHandlers(topic); len(callbackHandlers) > 0 {
 		bus.publishCallback(callbackHandlers, processedMsg, topic)
 	}
 }
 
 // Stream a buffer to the subscribers for a specific topic.
 func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
-	bus.busLock.RLock()
-	defer bus.busLock.RUnlock()
-	processedMsg := bus.preprocess(topic, messageBuffer)
+	processedMsg, err := bus.preprocess(topic, messageBuffer)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "eventbus",
+			"error":   err,
+		}).Errorln("preprocessor error")
+		return
+	}
 
-	if _, ok := bus.streamHandlers[topic]; ok {
+	if handlers := bus.getStreamHandlers(topic); len(handlers) > 0 {
 		bus.ringbuffer.Put(processedMsg.Bytes())
 	}
 }
 
 func (bus *EventBus) publish(handlers []*channelHandler, messageBuffer *bytes.Buffer, topic string) {
 	for _, handler := range handlers {
+		mCopy := copyBuffer(messageBuffer)
 		select {
-		case handler.messageChannel <- messageBuffer:
+		case handler.messageChannel <- mCopy:
 		default:
 			log.WithFields(log.Fields{
 				"id":       handler.id,
@@ -286,6 +299,67 @@ func (bus *EventBus) publish(handlers []*channelHandler, messageBuffer *bytes.Bu
 
 func (bus *EventBus) publishCallback(handlers []*callbackHandler, message *bytes.Buffer, topic string) {
 	for _, handler := range handlers {
-		_ = handler.callback(message)
+		mCopy := copyBuffer(message)
+		if err := handler.callback(mCopy); err != nil {
+			log.WithFields(log.Fields{
+				"id":      handler.id,
+				"topic":   topic,
+				"process": "event bus",
+				"error":   err,
+			}).Errorln("error when triggering callback")
+		}
 	}
+}
+
+func copyBuffer(m *bytes.Buffer) *bytes.Buffer {
+	var mCopy bytes.Buffer
+	if m != nil {
+		mCopy = *m
+	}
+
+	return &mCopy
+}
+
+func (bus *EventBus) getChannelHandlers(topic string) []*channelHandler {
+	bus.busLock.RLock()
+	defer bus.busLock.RUnlock()
+	handlers := make([]*channelHandler, 0)
+	if busHandlers, ok := bus.handlers[topic]; ok {
+		handlers = append(handlers, busHandlers...)
+	}
+
+	return handlers
+}
+
+func (bus *EventBus) getCallbackHandlers(topic string) []*callbackHandler {
+	bus.busLock.RLock()
+	defer bus.busLock.RUnlock()
+	handlers := make([]*callbackHandler, 0)
+	if busHandlers, ok := bus.callbackHandlers[topic]; ok {
+		handlers = append(handlers, busHandlers...)
+	}
+
+	return handlers
+}
+
+func (bus *EventBus) getStreamHandlers(topic string) []*streamHandler {
+	bus.busLock.RLock()
+	defer bus.busLock.RUnlock()
+	handlers := make([]*streamHandler, 0)
+	if busHandlers, ok := bus.streamHandlers[topic]; ok {
+		handlers = append(handlers, busHandlers...)
+	}
+
+	return handlers
+}
+
+func (bus *EventBus) getPreprocessors(topic string) []TopicProcessor {
+	bus.busLock.RLock()
+	defer bus.busLock.RUnlock()
+	processors := make([]TopicProcessor, 0)
+	if busProcessors, ok := bus.preprocessors[topic]; ok {
+		processors = append(processors, busProcessors...)
+	}
+
+	return processors
 }

@@ -16,6 +16,7 @@ Config package is here to provide a prioritized configuration registry for all s
     - current working directory
     - $HOME/.dusk/
 - Remote Key/Value Store (not yet in-use)
+- List of general constants defined in config/consts.go 
 
 Example usage:
 

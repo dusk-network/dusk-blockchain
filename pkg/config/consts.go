@@ -1,0 +1,14 @@
+package config
+
+// A signle point of constants definition
+const (
+	// GeneratorReward is the amount of Block generator default reward
+	// TODO: TBD
+	GeneratorReward = 100
+
+	// GenesisBlockBlob represents the genesis block bytes in hexadecimal format
+	// It's recommended to be regenerated with generation.GenerateGensisBlock() API
+	//
+	// TODO: to be replaced later with the approved one for testnet
+	TestNetGenesisBlob = "000000000000000000acc41d5d000000000000000000000000000000000000000000000000000000000000000000000000a4e80313b0d2b219e4ef2e9890d27ba5727ec18b69ba4226078adb08c0bbca24551f3a8162fdbefa6ce4646c75edc79bf5d16a0a344603bd08cecd29e04cec83c4000000000000000000000000000000000000000000000000000000000000000000010000000000000000e4d8edcda48822578605acae62e8accb4acf27b0f7b4107f4d193cc3fc8d1c7d0100ccdd07335767023a0e382c2b803fefd3a911ee0f17c8ab5ef01930c9e47ff23864ffd6eeca61b9ef1b28737a6fe3e4aaefc477c3c2cda54187ead827d43b400520314090147f3739a5e0c167c007b6a48bf0bc40a21e46be1d6ffce2e2532878e9016400000000000000000000000000000000000000000000000000000000000000fa179d6bb3fd10fed21e095687a89c7a0171cbcb60f74166963daf9d47fc677c01000100"
+)

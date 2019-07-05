@@ -16,15 +16,17 @@ import (
 
 type forwarder struct {
 	publisher      wire.EventPublisher
+	rpcBus         *wire.RPCBus
 	blockGenerator BlockGenerator
 	threshold      *consensus.Threshold
 }
 
-func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator) *forwarder {
+func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator, rpcBus *wire.RPCBus) *forwarder {
 	return &forwarder{
 		publisher:      publisher,
 		blockGenerator: blockGenerator,
 		threshold:      consensus.NewThreshold(),
+		rpcBus:         rpcBus,
 	}
 }
 
@@ -34,12 +36,14 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 		return errors.New("proof score too low")
 	}
 
-	blk, err := f.blockGenerator.GenerateBlock(round, seed)
+	blk, err := f.blockGenerator.GenerateBlock(round, seed, proof.Proof, proof.Score)
 	if err != nil {
 		return err
 	}
 
-	if err := blk.SetHash(); err != nil {
+	// Retrieve and append the verified transactions from Mempool
+	blockBytes := new(bytes.Buffer)
+	if err = blk.Encode(blockBytes); err != nil {
 		return err
 	}
 

@@ -1,76 +1,73 @@
-package peer
+package peer_test
 
 import (
+	"bufio"
 	"bytes"
 	"net"
 	"testing"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-var empty struct{}
+var receiveFn = func(c net.Conn) {
+	for {
+		c.SetReadDeadline(time.Now().Add(2 * time.Second))
+		buf := make([]byte, 1024)
+		if _, err := c.Read(buf); err != nil {
+			break
+		}
+	}
+}
 
-func TestScanner(t *testing.T) {
-	test := []byte{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+// Test the functionality of the peer.Reader through the ReadLoop.
+func TestReader(t *testing.T) {
+	g := processing.NewGossip(protocol.TestNet)
+	client, srv := net.Pipe()
 	go func() {
-		conn, err := net.Dial("tcp", ":3000")
+		buf := makeAgreementBuffer(10)
+		processed, err := g.Process(buf)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer conn.Close()
-
-		for i := 0; i < 10000; i++ {
-			conn.Write(test)
-		}
-
-		conn.Write([]byte{0})
+		client.Write(processed.Bytes())
 	}()
 
-	l, err := net.Listen("tcp", ":3000")
+	eb := wire.NewEventBus()
+	rpcBus := wire.NewRPCBus()
+	peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, chainsync.NewCounter(eb), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
 
-	conn, err := l.Accept()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
+	// Our message should come in on the agreement topic
+	agreementChan := make(chan *bytes.Buffer, 1)
+	eb.Subscribe(string(topics.Agreement), agreementChan)
 
-	peerReader := NewReader(conn, protocol.TestNet)
-	collector := &mockCollector{t}
+	go peerReader.ReadLoop()
 
-	// This should block until the connection is closed, which should happen after
-	// two and a half seconds.
-	peerReader.ReadLoop(collector)
+	// We should get the message through this channel
+	<-agreementChan
 }
 
-func TestWriter(t *testing.T) {
+// Test the functionality of the peer.Writer through the use of the ring buffer.
+func TestWriteRingBuffer(t *testing.T) {
 	bus := wire.NewEventBus()
-	g := NewGossip(protocol.TestNet)
+	g := processing.NewGossip(protocol.TestNet)
 	bus.RegisterPreprocessor(string(topics.Gossip), g)
 
-	receiveFn := func(c net.Conn, doneChan chan struct{}, outboundChan chan struct{}) {
-		for {
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
-			buf := make([]byte, 1024)
-			if _, err := c.Read(buf); err != nil {
-				break
-			}
-		}
-	}
-
-	startServer(receiveFn, nil, nil)
 	for i := 0; i < 100; i++ {
-		addPeer(bus)
+		p := addPeer(bus, receiveFn)
+		defer p.Conn.Close()
 	}
 
 	ev := makeAgreementBuffer(10)
@@ -84,24 +81,41 @@ func TestWriter(t *testing.T) {
 	}
 }
 
-func BenchmarkWriter(b *testing.B) {
+// Test the functionality of the peer.Writer through the use of the outgoing message queue.
+func TestWriteLoop(t *testing.T) {
 	bus := wire.NewEventBus()
-	g := NewGossip(protocol.TestNet)
-	bus.RegisterPreprocessor(string(topics.Gossip), g)
+	client, srv := net.Pipe()
 
-	receiveFn := func(c net.Conn, doneChan chan struct{}, outboundChan chan struct{}) {
-		for {
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
-			buf := make([]byte, 1024)
-			if _, err := c.Read(buf); err != nil {
-				break
-			}
-		}
+	buf := makeAgreementBuffer(10)
+	go func() {
+		responseChan := make(chan *bytes.Buffer)
+		writer := peer.NewWriter(client, protocol.TestNet, bus)
+		go writer.WriteLoop(responseChan)
+
+		bufCopy := *buf
+		responseChan <- &bufCopy
+	}()
+
+	r := bufio.NewReader(srv)
+	bs, err := r.ReadBytes(0x00)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	startServer(receiveFn, nil, nil)
+	// Decode and remove magic
+	decoded := processing.Decode(bs)
+
+	assert.Equal(t, decoded.Bytes()[4:], buf.Bytes())
+}
+
+func BenchmarkWriter(b *testing.B) {
+	bus := wire.NewEventBus()
+	g := processing.NewGossip(protocol.TestNet)
+	bus.RegisterPreprocessor(string(topics.Gossip), g)
+
 	for i := 0; i < 100; i++ {
-		addPeer(bus)
+		p := addPeer(bus, receiveFn)
+		defer p.Conn.Close()
 	}
 
 	ev := makeAgreementBuffer(10)
@@ -114,118 +128,6 @@ func BenchmarkWriter(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		bus.Stream(string(topics.Gossip), msg)
 	}
-	b.StopTimer()
-}
-
-func BenchmarkFastReceiver(b *testing.B) {
-	log.SetLevel(log.ErrorLevel)
-	// cpuFile, err := os.Create("cpu.prof")
-	// if err != nil {
-	// 	b.Fatal(err)
-	// }
-	// defer cpuFile.Close()
-
-	// if err := pprof.StartCPUProfile(cpuFile); err != nil {
-	// 	b.Fatal(err)
-	// }
-
-	bus := wire.NewEventBus()
-
-	receiveFn := func(c net.Conn, doneChan chan struct{}, outboundChan chan struct{}) {
-		for {
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
-			buf := make([]byte, 1024)
-			if _, err := c.Read(buf); err != nil {
-				break
-			}
-		}
-
-	}
-
-	startServer(receiveFn, nil, nil)
-	for i := 0; i < 8; i++ {
-		addPeer(bus)
-	}
-
-	ev := makeAgreementBuffer(10)
-	msg, err := wire.AddTopic(ev, topics.Agreement)
-	if err != nil {
-		panic(err)
-	}
-	// b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		// b.StartTimer()
-		copy := *msg
-		bus.Stream(string(topics.Gossip), &copy)
-		// b.StopTimer()
-	}
-	// pprof.StopCPUProfile()
-}
-
-func BenchmarkFastEventReceiver(b *testing.B) {
-	log.SetLevel(log.ErrorLevel)
-	// cpuFile, err := os.Create("cpu.prof")
-	// if err != nil {
-	// 	b.Fatal(err)
-	// }
-	// defer cpuFile.Close()
-
-	// if err := pprof.StartCPUProfile(cpuFile); err != nil {
-	// 	b.Fatal(err)
-	// }
-
-	bus := wire.NewEventBus()
-
-	receiveFn := func(c net.Conn, inboundChan chan struct{}, outboundChan chan struct{}) {
-		for {
-			c.SetReadDeadline(time.Now().Add(2 * time.Second))
-			buf := make([]byte, 1024)
-			if _, err := c.Read(buf); err != nil {
-				outboundChan <- empty
-				break
-			}
-		}
-	}
-
-	inboundChan := make(chan struct{}, 10)
-	go startServer(receiveFn, nil, inboundChan)
-	for i := 0; i < 100; i++ {
-		addEventPeer(bus, b)
-	}
-
-	ev := makeAgreementBuffer(10)
-	msg, err := wire.AddTopic(ev, topics.Agreement)
-	if err != nil {
-		panic(err)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		copy := msg
-		bus.Stream(string(topics.Gossip), copy)
-	}
-	<-inboundChan
-	// pprof.StopCPUProfile()
-}
-
-func startServer(f func(net.Conn, chan struct{}, chan struct{}), inboundChan chan struct{},
-	outboundChan chan struct{}) error {
-	l, err := net.Listen("tcp", ":3000")
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			conn, err := l.Accept()
-			if err != nil {
-				panic(err)
-			}
-
-			go f(conn, inboundChan, outboundChan)
-		}
-	}()
-	return nil
 }
 
 func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
@@ -235,52 +137,19 @@ func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 		keys = append(keys, keyPair)
 	}
 
-	return agreement.MockAgreement(make([]byte, 32), 1, 2, keys)
-}
-
-func addPeer(bus *wire.EventBus) {
-	conn, err := net.Dial("tcp", ":3000")
+	buf := agreement.MockAgreement(make([]byte, 32), 1, 2, keys)
+	withTopic, err := wire.AddTopic(buf, topics.Agreement)
 	if err != nil {
 		panic(err)
 	}
 
-	pw := NewWriter(conn, protocol.TestNet, bus)
-	pw.Subscribe()
+	return withTopic
 }
 
-func addEventPeer(bus *wire.EventBus, b *testing.B) {
-	conn, err := net.Dial("tcp", ":3000")
-	if err != nil {
-		panic(err)
-	}
-
-	newPeerEventWriter(conn, bus)
-}
-
-type peerEventWriter struct {
-	net.Conn
-	gossipChan <-chan *bytes.Buffer
-}
-
-func newPeerEventWriter(conn net.Conn, bus *wire.EventBus) {
-	gossipChan := make(chan *bytes.Buffer, 100)
-	bus.Subscribe(string(topics.Gossip), gossipChan)
-	pew := &peerEventWriter{conn, gossipChan}
-	go pew.writeLoop()
-}
-
-func (p *peerEventWriter) writeLoop() {
-	for {
-		buf := <-p.gossipChan
-		p.Write(buf.Bytes())
-	}
-}
-
-type mockCollector struct {
-	t *testing.T
-}
-
-func (m *mockCollector) Collect(b *bytes.Buffer) error {
-	assert.NotEmpty(m.t, b)
-	return nil
+func addPeer(bus *wire.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
+	client, srv := net.Pipe()
+	pw := peer.NewWriter(client, protocol.TestNet, bus)
+	pw.Subscribe(bus)
+	go receiveFunc(srv)
+	return pw
 }
