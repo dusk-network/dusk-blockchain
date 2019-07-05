@@ -3,7 +3,7 @@ module gitlab.dusk.network/dusk-core/dusk-go
 require (
 	github.com/OneOfOne/xxhash v1.2.5
 	github.com/bwesterb/go-ristretto v1.0.0
-	github.com/onsi/ginkgo v1.8.0
+	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/pelletier/go-toml v1.3.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.1
