@@ -15,7 +15,6 @@ require (
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
 	gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0
-	gitlab.dusk.network/dusk-core/dusk-wallet v0.0.0-20190704154129-39a558a43327
 	gitlab.dusk.network/dusk-core/zkproof v0.0.0-20190430120851-89181b9b685d
 	golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734
 	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6 // indirect
