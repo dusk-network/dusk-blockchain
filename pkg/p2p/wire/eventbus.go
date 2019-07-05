@@ -353,10 +353,10 @@ func (bus *EventBus) getStreamHandlers(topic string) []*streamHandler {
 	return handlers
 }
 
-func (bus *EventBus) getPreprocessors(topic string) []TopicProcessor {
+func (bus *EventBus) getPreprocessors(topic string) []idTopicProcessor {
 	bus.busLock.RLock()
 	defer bus.busLock.RUnlock()
-	processors := make([]TopicProcessor, 0)
+	processors := make([]idTopicProcessor, 0)
 	if busProcessors, ok := bus.preprocessors[topic]; ok {
 		processors = append(processors, busProcessors...)
 	}
