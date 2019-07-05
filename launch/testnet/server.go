@@ -124,7 +124,7 @@ func (s *Server) launchGeneration() {
 		for _, tx := range blk.Txs {
 			if tx.Equals(s.MyBid) {
 				s.eventBus.Unsubscribe(string(topics.AcceptedBlock), id)
-				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil, *s.keys)
+				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil, *s.keys, blk)
 				return
 			}
 		}

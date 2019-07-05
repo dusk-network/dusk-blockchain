@@ -18,8 +18,8 @@ import (
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys) {
-	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys)
+func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys, blk *block.Block) {
+	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, blk)
 	go broker.Listen()
 }
 
@@ -39,7 +39,7 @@ type broker struct {
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator, keys user.Keys) *broker {
+	gen Generator, blockGen BlockGenerator, keys user.Keys, blk *block.Block) *broker {
 	if gen == nil {
 		gen = newProofGenerator(d, k)
 	}
@@ -57,7 +57,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
 
-	return &broker{
+	b := &broker{
 		publisher:            eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
@@ -69,6 +69,9 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
 		seeder:               &seeder{keys: keys},
 	}
+
+	b.onBlock(*blk)
+	return b
 }
 
 func (b *broker) Listen() {
@@ -85,14 +88,18 @@ func (b *broker) Listen() {
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
 		case acceptedBlock := <-b.acceptedBlockChan:
-			if err := b.seeder.GenerateSeed(acceptedBlock.Header.Height+1, acceptedBlock.Header.Seed); err != nil {
-				log.WithField("process", "generation").WithError(err).Errorln("problem generating seed")
-			}
-
-			b.forwarder.setPrevBlock(acceptedBlock)
-			b.generateProofAndBlock()
+			b.onBlock(acceptedBlock)
 		}
 	}
+}
+
+func (b *broker) onBlock(blk block.Block) {
+	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
+		log.WithField("process", "generation").WithError(err).Errorln("problem generating seed")
+	}
+
+	b.forwarder.setPrevBlock(blk)
+	b.generateProofAndBlock()
 }
 
 func (b *broker) generateProofAndBlock() {
