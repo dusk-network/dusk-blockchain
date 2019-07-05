@@ -63,7 +63,9 @@ func (sh *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
 	sh.lock.Lock()
 	defer sh.lock.Unlock()
-	sh.bidList = bidList
+	for _, bid := range bidList {
+		sh.bidList.AddBid(bid)
+	}
 }
 
 func (sh *scoreHandler) ExtractHeader(e wire.Event) *header.Header {

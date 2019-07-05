@@ -32,7 +32,9 @@ func newProofGenerator(d, k ristretto.Scalar) *proofGenerator {
 func (g *proofGenerator) UpdateBidList(bidList user.BidList) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	g.bidList = bidList
+	for _, bid := range bidList {
+		g.bidList.AddBid(bid)
+	}
 }
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
