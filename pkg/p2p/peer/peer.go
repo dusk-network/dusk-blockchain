@@ -209,6 +209,7 @@ func extractTopic(r io.Reader) topics.Topic {
 	if _, err := r.Read(cmdBuf[:]); err != nil {
 		panic(err)
 	}
+	return topics.ByteArrayToTopic(cmdBuf)
 }
 
 // Read the magic bytes off r, and return them as a protocol.Magic.
