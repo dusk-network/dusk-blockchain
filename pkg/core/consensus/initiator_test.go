@@ -6,11 +6,9 @@ import (
 	"math"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
@@ -25,21 +23,15 @@ import (
 func TestInitiate(t *testing.T) {
 	bus := wire.NewEventBus()
 	keys, _ := user.NewRandKeys()
-	rpcBus := wire.NewRPCBus()
+	_, db := setupDatabase()
 
-	initChan := make(chan *bytes.Buffer, 1)
-	bus.Subscribe(msg.InitializationTopic, initChan)
-
-	if err := consensus.LaunchInitiator(bus, rpcBus); err != nil {
-		t.Fatal(err)
-	}
-
-	bus.Publish(string(topics.StartConsensus), new(bytes.Buffer))
-	// wait a bit for the initiator to receive the message
-	time.Sleep(1 * time.Second)
+	go func() {
+		round := consensus.GetStartingRound(bus, db, keys)
+		assert.Equal(t, uint64(2), round)
+	}()
 
 	blk := helper.RandomBlock(t, 1, 2)
-	stake := makeStake(keys)
+	stake := makeStake(&keys)
 	blk.AddTx(stake)
 
 	buf := new(bytes.Buffer)
@@ -48,11 +40,6 @@ func TestInitiate(t *testing.T) {
 	}
 
 	bus.Publish(string(topics.AcceptedBlock), buf)
-
-	roundBuf := <-initChan
-	round := binary.LittleEndian.Uint64(roundBuf.Bytes())
-
-	assert.Equal(t, uint64(2), round)
 }
 
 func setupDatabase() (database.Driver, database.DB) {
@@ -69,20 +56,28 @@ func setupDatabase() (database.Driver, database.DB) {
 	return drvr, db
 }
 
-func makeStake(keys user.Keys) *transactions.Stake {
-	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, *keys.EdPubKey, keys.BLSPubKeyBytes)
+func makeStake(keys *user.Keys) *transactions.Stake {
+	R, _ := crypto.RandEntropy(32)
+
+	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, R, *keys.EdPubKey, keys.BLSPubKey.Marshal())
+	rangeProof, _ := crypto.RandEntropy(32)
+	stake.RangeProof = rangeProof
 	keyImage, _ := crypto.RandEntropy(32)
-	txID, _ := crypto.RandEntropy(32)
+	pubkey, _ := crypto.RandEntropy(32)
+	pseudoComm, _ := crypto.RandEntropy(32)
 	signature, _ := crypto.RandEntropy(32)
-	input, _ := transactions.NewInput(keyImage, txID, 0, signature)
+	input, _ := transactions.NewInput(keyImage, pubkey, pseudoComm, signature)
 	stake.Inputs = transactions.Inputs{input}
 
 	outputAmount := rand.Int63n(100000)
 	commitment := make([]byte, 32)
 	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
 	destKey, _ := crypto.RandEntropy(32)
-	rangeProof, _ := crypto.RandEntropy(32)
-	output, _ := transactions.NewOutput(commitment, destKey, rangeProof)
+	output, _ := transactions.NewOutput(commitment, destKey)
+	encryptedAmount, _ := crypto.RandEntropy(32)
+	encryptedMask, _ := crypto.RandEntropy(32)
+	output.EncryptedAmount = encryptedAmount
+	output.EncryptedMask = encryptedMask
 	stake.Outputs = transactions.Outputs{output}
 
 	return stake

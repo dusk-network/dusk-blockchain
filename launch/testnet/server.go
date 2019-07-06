@@ -98,11 +98,6 @@ func Setup() *Server {
 	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
 	go f.StartConsensus()
 
-	// Setting up the initiator
-	if err := consensus.LaunchInitiator(srv.eventBus, srv.rpcBus); err != nil {
-		panic(err)
-	}
-
 	// Launching generation component
 	// TODO: this should be more properly structured
 	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil, *srv.keys)
@@ -114,7 +109,7 @@ func Setup() *Server {
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
-	acceptedBlockChan := consensus.InitAcceptedBlockUpdate(eventBus)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 	dupeBlacklist := dupemap.NewDupeMap(1)
 	go func() {
 		for {
