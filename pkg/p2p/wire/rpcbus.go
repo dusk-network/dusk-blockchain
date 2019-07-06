@@ -87,6 +87,11 @@ func NewRPCBus() *RPCBus {
 		panic(err)
 	}
 
+	VerifyCandidateBlockChan = make(chan Req)
+	if err := bus.Register(VerifyCandidateBlock, VerifyCandidateBlockChan); err != nil {
+		panic(err)
+	}
+
 	return &bus
 }
 
