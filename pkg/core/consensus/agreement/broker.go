@@ -49,10 +49,8 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 
 func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys user.Keys) *broker {
 	handler := newHandler(committee, keys)
-	// this accumulator should not care about the step, so we give it an independent state that is never
-	// incremented
-	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore(), consensus.NewState())
 	state := consensus.NewState()
+	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore(), state, false)
 	filter := launchFilter(eventBroker, committee, handler, state, accumulator)
 	b := &broker{
 		publisher:   eventBroker,
