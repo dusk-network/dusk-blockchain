@@ -23,6 +23,7 @@ type AccumulatorHandler interface {
 // reaches a certain threshold.
 type Accumulator struct {
 	wire.Store
+	state              State
 	handler            AccumulatorHandler
 	verificationChan   chan<- wire.Event
 	eventChan          <-chan wire.Event
@@ -30,7 +31,7 @@ type Accumulator struct {
 }
 
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
-func NewAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
+func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State) *Accumulator {
 	// set up worker pool
 	eventChan := make(chan wire.Event, 10)
 	verificationChan := createWorkers(eventChan, handler.Verify)
@@ -38,6 +39,7 @@ func NewAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
 	// create accumulator
 	a := &Accumulator{
 		Store:              store,
+		state:              state,
 		handler:            handler,
 		verificationChan:   verificationChan,
 		eventChan:          eventChan,
@@ -62,6 +64,11 @@ func (a *Accumulator) Process(ev wire.Event) {
 func (a *Accumulator) accumulate() {
 	for {
 		ev := <-a.eventChan
+		// Make sure we didn't just get a message that became obsolete while getting verified
+		if a.isObsolete(ev) {
+			continue
+		}
+
 		b := new(bytes.Buffer)
 		if err := a.handler.ExtractIdentifier(ev, b); err == nil {
 			hash := hex.EncodeToString(b.Bytes())
@@ -74,6 +81,11 @@ func (a *Accumulator) accumulate() {
 			}
 		}
 	}
+}
+
+func (a *Accumulator) isObsolete(ev wire.Event) bool {
+	header := a.handler.ExtractHeader(ev)
+	return header.Step < a.state.Step()
 }
 
 // ShouldSkip checks if the message is propagated by a committee member.

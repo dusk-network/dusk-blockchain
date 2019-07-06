@@ -3,7 +3,6 @@ package reduction
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -18,11 +17,6 @@ type (
 		user.Keys
 		Reducers
 		*UnMarshaller
-	}
-
-	handler interface {
-		consensus.AccumulatorHandler
-		MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error
 	}
 )
 
