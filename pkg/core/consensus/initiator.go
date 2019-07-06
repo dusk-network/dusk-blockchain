@@ -3,17 +3,32 @@ package consensus
 import (
 	"bytes"
 
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 // TODO: define a proper maxlocktime somewhere in the transactions package
 const maxLockTime = 100000
 
-func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) uint64 {
+func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) (uint64, error) {
+	// Get a db connection
+	if db == nil {
+		drvr, err := database.From(cfg.Get().Database.Driver)
+		if err != nil {
+			return 0, err
+		}
+
+		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	found := findActiveStakes(keys, getCurrentHeight(db), db)
 
 	// Start listening for accepted blocks, regardless of if we found stakes or not
@@ -25,7 +40,7 @@ func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Ke
 	for {
 		blk := <-acceptedBlockChan
 		if found || keyFound(keys, blk.Txs) {
-			return blk.Header.Height + 1
+			return blk.Header.Height + 1, nil
 		}
 	}
 }

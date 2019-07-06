@@ -26,7 +26,11 @@ func TestInitiate(t *testing.T) {
 	_, db := setupDatabase()
 
 	go func() {
-		round := consensus.GetStartingRound(bus, db, keys)
+		round, err := consensus.GetStartingRound(bus, db, keys)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		assert.Equal(t, uint64(2), round)
 	}()
 
