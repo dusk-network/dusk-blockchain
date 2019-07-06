@@ -134,6 +134,10 @@ func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 		if !bytes.Equal(hash.Bytes(), make([]byte, 32)) {
 			req := wire.NewRequest(*hash, 5)
 			if _, err := r.rpcBus.Call(wire.VerifyCandidateBlock, req); err != nil {
+				log.WithFields(log.Fields{
+					"process": "reduction",
+					"error":   err,
+				}).Errorln("verifying the candidate block failed")
 				r.sendReduction(bytes.NewBuffer(make([]byte, 32)))
 				return hash
 			}
