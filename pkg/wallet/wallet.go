@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -15,6 +16,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
+	"gitlab.dusk.network/dusk-core/zkproof"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/bwesterb/go-ristretto"
@@ -90,6 +92,45 @@ func Load(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fIn
 
 func (w *Wallet) NewStandardTx(fee int64) (*transactions.StandardTx, error) {
 	tx, err := transactions.NewStandard(w.netPrefix, fee)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
+func (w *Wallet) NewStakeTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.StakeTx, error) {
+	edPubBytes := w.consensusKeys.EdPubKeyBytes
+	blsPubBytes := w.consensusKeys.BLSPubKeyBytes
+	tx, err := transactions.NewStakeTx(w.netPrefix, fee, lockTime, edPubBytes, blsPubBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send locked stake amount to self
+	walletAddr, err := w.keyPair.PublicKey().PublicAddress(w.netPrefix)
+	err = tx.AddOutput(*walletAddr, amount)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
+func (w *Wallet) NewBidTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.BidTx, error) {
+	privateSpend, err := w.keyPair.PrivateSpend()
+	privateSpend.Bytes()
+
+	// TODO: index is currently set to be zero.
+	// To avoid any privacy implications, the wallet should increment
+	// the index by how many bidding txs are seen
+	mBytes := generateM(privateSpend.Bytes(), 0)
+	tx, err := transactions.NewBidTx(w.netPrefix, fee, lockTime, mBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send bid amount to self
+	walletAddr, err := w.keyPair.PublicKey().PublicAddress(w.netPrefix)
+	err = tx.AddOutput(*walletAddr, amount)
 	if err != nil {
 		return nil, err
 	}
@@ -337,4 +378,25 @@ func generateConsensusKeys(seed []byte) (user.Keys, error) {
 	reader := bytes.NewReader(consensusSeed)
 
 	return user.NewKeysFromSeed(reader)
+}
+
+func generateM(PrivateSpend []byte, index uint32) []byte {
+
+	// To make K deterministic
+	// We will calculate K = PrivateSpend || Index
+	// Index is the number of Bidding transactions that has
+	// been initiated. This information should be available to the wallet
+	// M = H(K)
+
+	numBidTxsSeen := make([]byte, 4)
+	binary.BigEndian.PutUint32(numBidTxsSeen, index)
+
+	KBytes := append(PrivateSpend, numBidTxsSeen...)
+
+	// Encode K as a ristretto Scalar
+	var k ristretto.Scalar
+	k.Derive(KBytes)
+
+	m := zkproof.CalculateM(k)
+	return m.Bytes()
 }
