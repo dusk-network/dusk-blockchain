@@ -101,7 +101,10 @@ func TestSendAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf.ReadFrom(reduction.MockVoteSetBuffer(hash, 1, 2, 10))
+	if _, err := buf.ReadFrom(reduction.MockVoteSetBuffer(hash, 1, 2, 10)); err != nil {
+		t.Fatal(err)
+	}
+
 	eb.Publish(msg.ReductionResultTopic, buf)
 
 	// There should now be an agreement message in the streamer
@@ -129,7 +132,7 @@ func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
 
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
-	bus.RegisterPreprocessor(string(topics.Agreement))
+	bus.RemoveAllPreprocessors(string(topics.Agreement))
 	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
 	<-roundChan
 	return bus, roundChan

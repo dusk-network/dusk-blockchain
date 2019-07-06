@@ -64,7 +64,6 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 		gossip: processing.NewGossip(magic),
 	}
 
-	subscriber.RegisterPreprocessor(string(topics.Gossip), pw.gossip)
 	return pw
 }
 
@@ -209,7 +208,6 @@ func extractTopic(r io.Reader) topics.Topic {
 	if _, err := r.Read(cmdBuf[:]); err != nil {
 		panic(err)
 	}
-
 	return topics.ByteArrayToTopic(cmdBuf)
 }
 

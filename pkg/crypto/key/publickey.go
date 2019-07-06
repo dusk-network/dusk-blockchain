@@ -133,7 +133,6 @@ func (k *PublicKey) PublicAddress(netPrefix byte) (*PublicAddress, error) {
 		return nil, err
 	}
 
-	// TODO Replace base58 pkg
 	pubAddrStr, err := base58.Encode(buf.Bytes())
 	if err != nil {
 		return nil, err
