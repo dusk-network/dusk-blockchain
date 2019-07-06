@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -19,6 +20,8 @@ type (
 		Proof         []byte
 		Z             []byte
 		BidListSubset []byte
+		PrevHash      []byte
+		Certificate   *block.Certificate
 		Seed          []byte
 		VoteHash      []byte
 	}
@@ -69,6 +72,14 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
+	if err := encoding.Read256(r, &sev.PrevHash); err != nil {
+		return err
+	}
+
+	if err := sev.Certificate.Decode(r); err != nil {
+		return err
+	}
+
 	if err := encoding.ReadBLS(r, &sev.Seed); err != nil {
 		return err
 	}
@@ -112,6 +123,14 @@ func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 
 	// BidList
 	if err := encoding.WriteVarBytes(r, sev.BidListSubset); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, sev.PrevHash); err != nil {
+		return err
+	}
+
+	if err := sev.Certificate.Encode(r); err != nil {
 		return err
 	}
 

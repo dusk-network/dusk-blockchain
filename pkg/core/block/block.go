@@ -19,7 +19,7 @@ func NewBlock() *Block {
 	return &Block{
 		Header: &Header{
 			Version:     0x00,
-			Certificate: &Certificate{},
+			Certificate: EmptyCertificate(),
 		},
 	}
 }
