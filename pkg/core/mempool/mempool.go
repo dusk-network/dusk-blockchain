@@ -132,7 +132,6 @@ func NewMempool(eventBus *wire.EventBus, verifyTx func(tx transactions.Transacti
 // All operations are always executed in a single go-routine so no
 // protection-by-mutex needed
 func (m *Mempool) Run() {
-
 	go func() {
 		for {
 			select {
@@ -143,7 +142,7 @@ func (m *Mempool) Run() {
 				m.onAcceptedBlock(b)
 			case tx := <-m.pending:
 				m.onPendingTx(tx)
-			case <-time.After(2 * time.Second):
+			case <-time.After(20 * time.Second):
 				m.onIdle()
 			// Mempool terminating
 			case <-m.quitChan:
@@ -151,13 +150,11 @@ func (m *Mempool) Run() {
 			}
 		}
 	}()
-
 }
 
 // onPendingTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool
 func (m *Mempool) onPendingTx(t TxDesc) {
-
 	// stats to log
 	log.Tracef("pending txs count %d", len(m.pending))
 
