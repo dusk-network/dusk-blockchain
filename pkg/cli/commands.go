@@ -11,9 +11,6 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/dusk-wallet/database"
-	"gitlab.dusk.network/dusk-core/dusk-wallet/key"
-	wallet "gitlab.dusk.network/dusk-core/dusk-wallet/wallet/v3"
 )
 
 // CLICommands holds all of the wallet commands that the user can call through
@@ -52,97 +49,6 @@ func showHelp(args []string, publisher wire.EventPublisher) {
 	}
 }
 
-func createWallet(args []string, publisher wire.EventPublisher) {
-	// TODO: add proper path
-	db, err := database.New("")
-	if err != nil {
-		// TODO: use logger over fmt.Print
-		fmt.Fprintf(os.Stdout, "error opening database: %v\n", err)
-		return
-	}
-
-	// TODO: add functions
-	w, err := wallet.New(2, db, nil, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
-		return
-	}
-
-	if err := w.Save(); err != nil {
-		fmt.Fprintf(os.Stdout, "error saving wallet: %v\n", err)
-	}
-}
-
-func transfer(args []string, publisher wire.EventPublisher) {
-	if args == nil || len(args) < 2 {
-		fmt.Fprintf(os.Stdout, commandInfo["transfer"])
-		return
-	}
-
-	w, err := wallet.LoadWallet()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error opening wallet: %v\n", err)
-		return
-	}
-
-	// TODO: decide on fee in a proper way
-	fee := 100
-	if len(args) == 3 {
-		fee, err = strconv.Atoi(args[2])
-		if err != nil {
-			fmt.Fprintf(os.Stdout, "fee should be specified as a number\n")
-			return
-		}
-	}
-
-	tx, err := w.NewStandardTx(int64(fee))
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
-		return
-	}
-
-	amount, err := strconv.Atoi(args[0])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "amount should be a number\n")
-		return
-	}
-
-	tx.AddOutput(key.PublicAddress(args[1]), intToScalar(int64(amount)))
-	buf := new(bytes.Buffer)
-	if err := tx.Encode(buf); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
-		return
-	}
-
-	publisher.Publish(string(topics.Tx), buf)
-}
-
-func sendStake(args []string, publisher wire.EventPublisher) {
-	if args == nil || len(args) < 1 {
-		fmt.Fprintf(os.Stdout, commandInfo["stake"])
-		return
-	}
-
-	_, err := wallet.LoadWallet()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error opening wallet: %v\n", err)
-		return
-	}
-}
-
-func sendBid(args []string, publisher wire.EventPublisher) {
-	if args == nil || len(args) < 1 {
-		fmt.Fprintf(os.Stdout, commandInfo["bid"])
-		return
-	}
-
-	_, err := wallet.LoadWallet()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error opening wallet: %v\n", err)
-		return
-	}
-}
-
 func startConsensus(args []string, publisher wire.EventPublisher) {
 	publisher.Publish(string(topics.StartConsensus), new(bytes.Buffer))
 }
@@ -167,4 +73,28 @@ func intToScalar(amount int64) ristretto.Scalar {
 	var x ristretto.Scalar
 	x.SetBigInt(big.NewInt(amount))
 	return x
+}
+
+func stringToScalar(s string) (ristretto.Scalar, error) {
+	sInt, err := strconv.Atoi(s)
+	if err != nil {
+		return ristretto.Scalar{}, err
+	}
+	return intToScalar(int64(sInt)), nil
+}
+
+func stringToInt64(s string) (int64, error) {
+	sInt, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	return (int64(sInt)), nil
+}
+
+func stringToUint64(s string) (uint64, error) {
+	sInt, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	return (uint64(sInt)), nil
 }
