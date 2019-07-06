@@ -121,7 +121,6 @@ func launchReductionTest(inCommittee bool) (*wire.EventBus, *helper.SimpleStream
 	k, _ := user.NewRandKeys()
 	rpcBus := wire.NewRPCBus()
 	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
-	go launchCandidateVerifier(false)
 	// update round
 	consensus.UpdateRound(eb, 1)
 
