@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -45,7 +46,7 @@ func newScoreHandler() *scoreHandler {
 }
 
 func (sh *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	ev := &ScoreEvent{}
+	ev := &ScoreEvent{Certificate: block.EmptyCertificate()}
 	if err := sh.Unmarshal(r, ev); err != nil {
 		return nil, err
 	}
@@ -63,7 +64,9 @@ func (sh *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
 	sh.lock.Lock()
 	defer sh.lock.Unlock()
-	sh.bidList = bidList
+	for _, bid := range bidList {
+		sh.bidList.AddBid(bid)
+	}
 }
 
 func (sh *scoreHandler) ExtractHeader(e wire.Event) *header.Header {

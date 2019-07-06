@@ -9,15 +9,22 @@ import (
 
 type key [64]byte
 type table map[key][]byte
-type memdb [5]table
+type memdb [maxInd]table
 
 const (
+
 	// block table index
 	blocksInd = iota
 	txsInd
 	keyImagesInd
-	candidatesTableIndex
+	candidatesTableInd
 	heightInd
+	stateInd
+	maxInd
+)
+
+var (
+	stateKey = []byte{1}
 )
 
 type DB struct {
@@ -48,7 +55,7 @@ func NewDatabase(path string, network protocol.Magic, readonly bool) (database.D
 	var db *DB
 	if db, exists = pool[path]; !exists {
 
-		var tables [5]table
+		var tables [maxInd]table
 		for i := 0; i < len(tables); i++ {
 			tables[i] = make(table)
 		}

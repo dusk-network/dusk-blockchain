@@ -19,11 +19,11 @@ import (
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func Launch(eventBus *wire.EventBus, committee committee.Foldable, keys user.Keys) {
-	if committee == nil {
-		committee = newAgreementCommittee(eventBus)
+func Launch(eventBus *wire.EventBus, c committee.Foldable, keys user.Keys) {
+	if c == nil {
+		c = committee.NewAgreement(eventBus)
 	}
-	broker := newBroker(eventBus, committee, keys)
+	broker := newBroker(eventBus, c, keys)
 	currentRound := getInitialRound(eventBus)
 	broker.updateRound(currentRound)
 	go broker.Listen()
@@ -49,8 +49,8 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 
 func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys user.Keys) *broker {
 	handler := newHandler(committee, keys)
-	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore())
 	state := consensus.NewState()
+	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore(), state, false)
 	filter := launchFilter(eventBroker, committee, handler, state, accumulator)
 	b := &broker{
 		publisher:   eventBroker,
@@ -68,6 +68,7 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 func (b *broker) Listen() {
 	for {
 		evs := <-b.accumulator.CollectedVotesChan
+		b.publishEvent(evs)
 		b.publishWinningHash(evs)
 		b.updateRound(b.state.Round() + 1)
 	}
@@ -120,5 +121,19 @@ func (b *broker) updateRound(round uint64) {
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
-	b.publisher.Publish(msg.WinningBlockTopic, bytes.NewBuffer(aev.BlockHash))
+	b.publisher.Publish(msg.WinningBlockHashTopic, bytes.NewBuffer(aev.BlockHash))
+}
+
+func (b *broker) publishEvent(evs []wire.Event) {
+	marshaller := NewUnMarshaller()
+	buf := new(bytes.Buffer)
+	if err := marshaller.Marshal(buf, evs[0]); err != nil {
+		log.WithFields(log.Fields{
+			"process": "agreement",
+			"error":   err,
+		}).Errorln("could not marshal agreement event")
+		return
+	}
+
+	b.publisher.Publish(msg.AgreementEventTopic, buf)
 }

@@ -26,7 +26,7 @@ func TestSendData(t *testing.T) {
 
 	// Set up DataBroker
 	responseChan := make(chan *bytes.Buffer, 100)
-	dataBroker := processing.NewDataBroker(db, responseChan)
+	dataBroker := processing.NewDataBroker(db, nil, responseChan)
 
 	// Make a GetData and give it to the dataBroker
 	msg := createGetDataBuffer(hashes...)

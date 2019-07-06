@@ -17,8 +17,9 @@ func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block 
 		Txs:    RandomSliceOfTxs(t, txBatchCount),
 	}
 	err := b.SetHash()
-
-	assert.Nil(t, err)
+	assert.NoError(t, err)
+	err = b.SetRoot()
+	assert.NoError(t, err)
 	return b
 }
 
@@ -49,22 +50,7 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 
 // RandomCertificate returns a random block certificate for testing
 func RandomCertificate(t *testing.T) *block.Certificate {
-	c := &block.Certificate{
-		BRBatchedSig: RandomSlice(t, 33),
-		BRStep:       20,
-
-		SRBatchedSig: RandomSlice(t, 33),
-		SRStep:       12,
-	}
-
-	for i := 0; i < 10; i++ {
-		c.BRPubKeys = append(c.BRPubKeys, RandomSlice(t, 33))
-		c.SRPubKeys = append(c.SRPubKeys, RandomSlice(t, 33))
-	}
-
-	err := c.SetHash()
-	assert.Nil(t, err)
-	return c
+	return block.EmptyCertificate()
 }
 
 // RandomHeader returns a random header for testing. `height` randomness is up
@@ -80,7 +66,7 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 		Seed:          RandomSlice(t, 33),
 		TxRoot:        RandomSlice(t, 32),
 
-		CertHash: RandomSlice(t, 32),
+		Certificate: RandomCertificate(t),
 	}
 
 	return h

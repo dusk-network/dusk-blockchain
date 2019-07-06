@@ -150,6 +150,7 @@ func defineFlags() {
 	_ = pflag.StringP("network.port", "p", "7000", "port for the node to bind on")
 	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output")
 	_ = pflag.StringP("database.dir", "d", "chain", "sets the database directory")
+	_ = pflag.StringP("rpc.port", "r", "9000", "sets rpc server port")
 }
 
 // define a set of environment variables as bindings to config file settings

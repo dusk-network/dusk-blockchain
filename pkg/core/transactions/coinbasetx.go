@@ -13,8 +13,7 @@ type Coinbase struct {
 	// TxType represents the transaction type
 	TxType TxType
 	// TxID is the transaction identifier for the current transaction
-	TxID []byte
-
+	TxID    []byte
 	R       []byte
 	Score   []byte
 	Proof   []byte
@@ -33,6 +32,8 @@ func NewCoinbase(proof, score, R []byte) *Coinbase {
 
 // AddReward will add an Output to the Coinbase struct Rewards array.
 func (c *Coinbase) AddReward(output *Output) {
+	output.EncryptedAmount = make([]byte, 1)
+	output.EncryptedMask = make([]byte, 1)
 	c.Rewards = append(c.Rewards, output)
 }
 

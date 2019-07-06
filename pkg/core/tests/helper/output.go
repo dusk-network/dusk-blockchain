@@ -10,7 +10,7 @@ import (
 // RandomOutput returns a random output for testing
 func RandomOutput(t *testing.T, malformed bool) (*transactions.Output, error) {
 
-	var commSize, keySize, proofSize uint32 = 32, 32, 4500
+	var commSize, keySize uint32 = 32, 32
 
 	if malformed {
 		commSize = 45 // This does not have an effect, while Bidding transaction can have clear text
@@ -20,9 +20,13 @@ func RandomOutput(t *testing.T, malformed bool) (*transactions.Output, error) {
 
 	comm := RandomSlice(t, commSize)
 	key := RandomSlice(t, keySize)
-	proof := RandomSlice(t, proofSize)
-
-	return transactions.NewOutput(comm, key, proof)
+	output, err := transactions.NewOutput(comm, key)
+	if err != nil {
+		return output, err
+	}
+	output.EncryptedAmount = RandomSlice(t, keySize)
+	output.EncryptedMask = RandomSlice(t, keySize)
+	return output, err
 }
 
 // RandomOutputs returns a slice of random outputs for testing

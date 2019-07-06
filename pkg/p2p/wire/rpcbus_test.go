@@ -14,7 +14,7 @@ var (
 
 	cleanup = func() {
 		GetLastBlockChan = nil
-		GetVerifiedTxsChan = nil
+		GetMempoolTxsChan = nil
 	}
 )
 

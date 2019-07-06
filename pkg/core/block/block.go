@@ -18,10 +18,8 @@ type Block struct {
 func NewBlock() *Block {
 	return &Block{
 		Header: &Header{
-			Version: 0x00,
-			// CertImage should take up space from creation to
-			// ensure proper decoding during block collection.
-			CertHash: make([]byte, 32),
+			Version:     0x00,
+			Certificate: EmptyCertificate(),
 		},
 	}
 }
@@ -52,19 +50,6 @@ func (b *Block) SetRoot() error {
 // AddTx will add a transaction to the block.
 func (b *Block) AddTx(tx transactions.Transaction) {
 	b.Txs = append(b.Txs, tx)
-}
-
-// AddCertHash will take a hash from a Certificate and put
-// it in the block's CertHash field.
-func (b *Block) AddCertHash(cert *Certificate) error {
-	if cert.Hash == nil {
-		if err := cert.SetHash(); err != nil {
-			return err
-		}
-	}
-
-	b.Header.CertHash = cert.Hash
-	return nil
 }
 
 // Clear will empty out all the block's fields.

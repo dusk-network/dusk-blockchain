@@ -1,9 +1,10 @@
 package reduction_test
 
 import (
-	"bytes"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -81,11 +82,10 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 	// ourselves.
 	go func() {
 		for {
-			if _, err := streamer.Read(); err != nil {
-				t.Fatal(err)
-			}
-
-			t.Fail()
+			_, err := streamer.Read()
+			assert.NoError(t, err)
+			// HACK: what's the point?
+			assert.Fail(t, "")
 		}
 	}()
 
@@ -136,7 +136,7 @@ func TestReductionTimeout(t *testing.T) {
 // This ensures proper handling of mocked Reduction events.
 func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration) {
 	reduction.Launch(eb, committee, k, timeOut)
-	eb.RegisterPreprocessor(string(topics.Reduction))
+	eb.RemoveAllPreprocessors(string(topics.Reduction))
 }
 
 func sendReductionBuffers(amount int, k user.Keys, hash []byte, round uint64, step uint8,
@@ -151,12 +151,4 @@ func sendReductionBuffers(amount int, k user.Keys, hash []byte, round uint64, st
 func sendSelection(round uint64, hash []byte, eventBus *wire.EventBus) {
 	bestScoreBuf := selection.MockSelectionEventBuffer(round, hash)
 	eventBus.Publish(msg.BestScoreTopic, bestScoreBuf)
-}
-
-func extractTopic(buf *bytes.Buffer) [topics.Size]byte {
-	var bf [topics.Size]byte
-	b := make([]byte, topics.Size)
-	_, _ = buf.Read(b)
-	copy(bf[:], b[:])
-	return bf
 }

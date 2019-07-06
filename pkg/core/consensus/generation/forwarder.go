@@ -19,6 +19,7 @@ type forwarder struct {
 	rpcBus         *wire.RPCBus
 	blockGenerator BlockGenerator
 	threshold      *consensus.Threshold
+	prevBlock      block.Block
 }
 
 func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator, rpcBus *wire.RPCBus) *forwarder {
@@ -30,14 +31,17 @@ func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator, 
 	}
 }
 
+func (f *forwarder) setPrevBlock(blk block.Block) {
+	f.prevBlock = blk
+}
+
 func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed []byte) error {
 	// if our score is too low, don't bother
 	if !f.threshold.Exceeds(proof.Score) {
 		return errors.New("proof score too low")
 	}
 
-	// Collect AcceptedBlocks
-	blk, err := f.blockGenerator.GenerateBlock(round, seed, proof.Proof, proof.Score)
+	blk, err := f.blockGenerator.GenerateBlock(round, seed, proof.Proof, proof.Score, f.prevBlock.Header.Hash)
 	if err != nil {
 		return err
 	}
@@ -54,6 +58,8 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 		Proof:         proof.Proof,
 		Z:             proof.Z,
 		BidListSubset: proof.BinaryBidList,
+		PrevHash:      f.prevBlock.Header.Hash,
+		Certificate:   f.prevBlock.Header.Certificate,
 		Seed:          seed,
 		VoteHash:      blk.Header.Hash,
 	}

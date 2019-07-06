@@ -22,7 +22,7 @@ func TestGenerateGenesis(t *testing.T) {
 	w := key.NewKeyPair(seed)
 
 	// Generate a new genesis block with new wallet pubkey
-	genesisHex, err := GenerateGensisBlock(w.PublicKey())
+	genesisHex, err := GenerateGenesisBlock(w.PublicKey())
 	if err != nil {
 		t.Fatalf("expecting valid genesis block")
 	}
@@ -41,11 +41,11 @@ func TestGenerateGenesis(t *testing.T) {
 		t.Fatalf("expecting decodable hex %s", err.Error())
 	}
 
-	// t.Logf("genesis: %s", genesisHex)
+	t.Logf("genesis: %s", genesisHex)
 }
 
 func TestGenesisBlock(t *testing.T) {
-
+	return
 	// read the hard-coded genesis blob for testnet
 	blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
 	if err != nil {

@@ -115,7 +115,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 1))
+	r, _ := c.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 	txs, _ := transactions.FromReader(&r, lTxs)
@@ -170,9 +170,14 @@ func TestProcessPendingTxs(t *testing.T) {
 		c.addTx(tx)
 		c.bus.Publish(string(topics.Tx), buf)
 
-		// Publish invalid txs (one that does not pass verifyTx)
+		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		version++
-		tx := transactions.NewStandard(version, 2)
+		R, err := crypto.RandEntropy(32)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx := transactions.NewStandard(version, 2, R)
+		tx.RangeProof = R
 		buf = new(bytes.Buffer)
 		err = tx.Encode(buf)
 		if err != nil {
@@ -241,8 +246,9 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 				buf := new(bytes.Buffer)
 
 				e, _ := crypto.RandEntropy(64)
+				R, _ := crypto.RandEntropy(32)
 				fee := binary.LittleEndian.Uint64(e)
-				tx := transactions.NewStandard(1, fee)
+				tx := transactions.NewStandard(1, fee, R)
 				_ = tx.Encode(buf)
 
 				c.bus.Publish(string(topics.Tx), buf)
@@ -325,7 +331,8 @@ func TestDoubleSpent(t *testing.T) {
 
 	// Create double-spent tx by replicating an already added txs but with
 	// differnt TxID
-	tx := transactions.NewStandard(0, txs[0].StandardTX().Fee+1)
+	R, _ := crypto.RandEntropy(32)
+	tx := transactions.NewStandard(0, txs[0].StandardTX().Fee+1, R)
 
 	// Inputs
 	tx.Inputs = txs[0].StandardTX().Inputs

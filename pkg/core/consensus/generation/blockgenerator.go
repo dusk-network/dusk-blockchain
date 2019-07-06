@@ -3,8 +3,6 @@ package generation
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
@@ -12,9 +10,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -23,58 +19,24 @@ type (
 	// BlockGenerator defines a method which will create and return a new block,
 	// given a height and seed.
 	BlockGenerator interface {
-		GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error)
-		UpdatePrevBlock(b block.Block)
+		GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error)
 	}
 
 	blockGenerator struct {
 		// generator Public Keys to sign the rewards tx
 		genPubKey *key.PublicKey
-
 		rpcBus    *wire.RPCBus
-		prevBlock block.Block
 	}
 )
 
 func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGenerator {
-
-	blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
-	if err != nil {
-		panic(err)
-	}
-
-	var buf bytes.Buffer
-	buf.Write(blob)
-
-	genesisBlock := block.NewBlock()
-	if err := genesisBlock.Decode(&buf); err != nil {
-		panic(err)
-	}
-
 	return &blockGenerator{
 		rpcBus:    rpcBus,
 		genPubKey: genPubKey,
-		prevBlock: *genesisBlock,
 	}
 }
 
-func (bg *blockGenerator) UpdatePrevBlock(b block.Block) {
-	bg.prevBlock = b
-}
-
-func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte, score []byte) (*block.Block, error) {
-
-	if round != 0 {
-		if round <= bg.prevBlock.Header.Height {
-			return nil, fmt.Errorf("target round (%d) must be higher than previous block round %d", round, bg.prevBlock.Header.Height)
-		}
-	}
-
-	// TODO Missing fields for forging the block
-	// - CertHash
-
-	certHash, _ := crypto.RandEntropy(32)
-
+func (bg *blockGenerator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error) {
 	txs, err := bg.ConstructBlockTxs(proof, score)
 	if err != nil {
 		return nil, err
@@ -85,10 +47,10 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 		Version:       0,
 		Timestamp:     time.Now().Unix(),
 		Height:        round,
-		PrevBlockHash: bg.prevBlock.Header.Hash,
+		PrevBlockHash: prevBlockHash,
 		TxRoot:        nil,
 		Seed:          seed,
-		CertHash:      certHash,
+		Certificate:   block.EmptyCertificate(),
 	}
 
 	// Construct the candidate block
@@ -124,7 +86,7 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
+		r, err := bg.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 10))
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the the chain.
 		if err != nil {
@@ -186,8 +148,6 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	output.DestKey = P.Bytes()
 	// Commitment field in coinbase tx represents the reward
 	output.Commitment = rewardBytes
-	// blank range proof as we disclose generator reward
-	output.RangeProof = make([]byte, 1)
 
 	tx.AddReward(output)
 

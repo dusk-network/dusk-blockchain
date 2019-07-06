@@ -5,26 +5,28 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 )
 
 // JSONRequest defines a JSON-RPC request.
 type JSONRequest struct {
 	Method string   `json:"method"`
 	Params []string `json:"params,omitempty"`
+	Id     int      `json:"id"`
 }
 
 // JSONResponse defines a JSON-RPC response to a method call.
 type JSONResponse struct {
-	Result string `json:"result"`
-	Error  string `json:"error"`
+	Result *json.RawMessage `json:"result"`
+	Error  string           `json:"error"`
+	Id     int              `json:"id"`
 }
 
 // handleRequest takes a JSON-RPC request and parses it, then returns the result to the
 // message sender.
-func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, isAdmin bool) {
+func (s *Server) handleRequest(w http.ResponseWriter, r http.Request, isAdmin bool) {
 	// Only handle requests if server is started
 	if !s.started {
+		log.Warn("json-rpc service is not running")
 		return
 	}
 
@@ -32,26 +34,42 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request, isAdmin b
 	body, err := ioutil.ReadAll(r.Body)
 	r.Body.Close()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("%d error reading JSON: %v", http.StatusBadRequest, err),
+		msg := fmt.Sprintf("%d error reading JSON: %v", http.StatusBadRequest, err)
+		log.Error(msg)
+
+		http.Error(w, msg,
 			http.StatusBadRequest)
 		return
 	}
 
+	log.Tracef("Request: %s", string(body))
+
 	var req JSONRequest
 	if err := json.Unmarshal(body, &req); err != nil {
+		log.Errorf("json.unmarshal request: %v", err)
 		return
 	}
 
 	// Parse and run passed method
 	result, err := s.runCmd(&req, isAdmin)
+	errorDesc := "null"
 	if err != nil {
+		log.Errorf("%v", err)
 		// Request was unauthorized, so return a http.Error
 		w.Header().Add("WWW-Authenticate", `Basic realm="duskd admin RPC"`)
 		http.Error(w, err.Error(), http.StatusUnauthorized)
+		errorDesc = err.Error()
 	}
 
-	if _, err := w.Write([]byte(result)); err != nil {
-		fmt.Fprintf(os.Stderr, "error writing reply: %v\n", err)
+	rawMessage := json.RawMessage([]byte(result))
+	resp := JSONResponse{Result: &rawMessage, Error: errorDesc, Id: req.Id}
+	resultData, err := json.MarshalIndent(resp, "", "\t")
+	if err != nil {
+		log.Errorf("marshal response: %v", err)
+	}
+
+	if _, err := w.Write([]byte(resultData)); err != nil {
+		log.Errorf("write response: %v", err)
 		return
 	}
 }

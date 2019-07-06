@@ -18,10 +18,11 @@ func RandomInput(t *testing.T, malformed bool) (*transactions.Input, error) {
 	}
 
 	keyImage := RandomSlice(t, kiSize)
-	txid := RandomSlice(t, txidSize)
+	pubkey := RandomSlice(t, txidSize)
+	pseudoComm := RandomSlice(t, txidSize)
 	sig := RandomSlice(t, sigSize)
 
-	return transactions.NewInput(keyImage, txid, 2, sig)
+	return transactions.NewInput(keyImage, pubkey, pseudoComm, sig)
 }
 
 // RandomInputs returns a slice of inputs of size `size` for testing

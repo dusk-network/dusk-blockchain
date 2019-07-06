@@ -9,6 +9,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -91,6 +92,8 @@ func (s *eventSelector) Process(ev wire.Event) {
 		}
 
 		s.repropagate(ev)
+		s.propagateCertificate(ev)
+
 		s.lock.Lock()
 		defer s.lock.Unlock()
 		s.bestEvent = ev
@@ -109,6 +112,20 @@ func (s *eventSelector) repropagate(ev wire.Event) {
 	}
 
 	s.publisher.Stream(string(topics.Gossip), msg)
+}
+
+func (s *eventSelector) propagateCertificate(ev wire.Event) {
+	sev := ev.(*ScoreEvent)
+	buf := new(bytes.Buffer)
+	if err := encoding.Write256(buf, sev.PrevHash); err != nil {
+		panic(err)
+	}
+
+	if err := sev.Certificate.Encode(buf); err != nil {
+		panic(err)
+	}
+
+	s.publisher.Publish(string(topics.Certificate), buf)
 }
 
 func (s *eventSelector) publishBestEvent() {

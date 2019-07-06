@@ -3,7 +3,9 @@ package chain
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
+	"fmt"
+	"sync"
+
 	"math/big"
 
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -15,6 +17,8 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -32,20 +36,24 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
-	db       database.DB
+	eventBus  *wire.EventBus
+	rpcBus    *wire.RPCBus
+	db        database.DB
+	committee committee.Foldable
 
 	prevBlock block.Block
-	bidList   *user.BidList
+	// protect prevBlock with mutex as it's touched out of the main chain loop
+	// by SubscribeCallback.
+	// TODO: Consider if mutex can be removed
+	mu sync.RWMutex
 
 	// collector channels
 	candidateChan   <-chan *block.Block
-	winningHashChan <-chan []byte
+	certificateChan <-chan certMsg
 }
 
 // New returns a new chain object
-func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
+func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
 	if err != nil {
 		return nil, err
@@ -56,49 +64,33 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		return nil, err
 	}
 
-	// read and decode the genesis block hex
-	genesisBlock := block.NewBlock()
-	switch cfg.Get().General.Network {
-	case "testnet":
-
-		blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
-		if err != nil {
-			panic(err)
-		}
-
-		var buf bytes.Buffer
-		buf.Write(blob)
-		if err := genesisBlock.Decode(&buf); err != nil {
-			panic(err)
-		}
-	}
-
-	// TODO: remove this in favor of chain loader
-	// store block
-	err = db.Update(func(t database.Transaction) error {
-		return t.StoreBlock(genesisBlock)
-	})
-
+	l, err := newLoader(db)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failure %s on loading chain '%s'", err.Error(), cfg.Get().Database.Dir)
 	}
 
 	// set up collectors
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
-	winningHashChan := initWinningHashCollector(eventBus)
+	certificateChan := initCertificateCollector(eventBus)
 
-	c := &Chain{
+	// set up committee
+	if c == nil {
+		c = committee.NewAgreement(eventBus)
+	}
+
+	chain := &Chain{
 		eventBus:        eventBus,
 		rpcBus:          rpcBus,
 		db:              db,
-		bidList:         &user.BidList{},
-		prevBlock:       *genesisBlock,
+		committee:       c,
+		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
-		winningHashChan: winningHashChan,
+		certificateChan: certificateChan,
 	}
 
-	eventBus.SubscribeCallback(string(topics.Block), c.onAcceptBlock)
-	return c, nil
+	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
+	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
+	return chain, nil
 }
 
 // Listen to the collectors
@@ -108,13 +100,18 @@ func (c *Chain) Listen() {
 
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
-		case blockHash := <-c.winningHashChan:
-			_ = c.handleWinningHash(blockHash)
+		case cMsg := <-c.certificateChan:
+			c.addCertificate(cMsg.hash, cMsg.cert)
 
 		// wire.RPCBus requests handlers
 		case r := <-wire.GetLastBlockChan:
+
 			buf := new(bytes.Buffer)
+
+			c.mu.RLock()
 			_ = c.prevBlock.Encode(buf)
+			c.mu.RUnlock()
+
 			r.RespChan <- *buf
 		}
 	}
@@ -157,15 +154,16 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 func (c *Chain) addBidder(tx *transactions.Bid) error {
 	totalAmount := getTxTotalOutputAmount(tx)
 	x := calculateX(totalAmount, tx.M)
-	c.bidList.AddBid(x)
+	bids := &user.BidList{}
+	bids.AddBid(x)
 
-	c.propagateBidList()
+	c.propagateBidList(bids)
 	return nil
 }
 
-func (c *Chain) propagateBidList() {
+func (c *Chain) propagateBidList(bids *user.BidList) {
 	var bidListBytes []byte
-	for _, bid := range *c.bidList {
+	for _, bid := range *bids {
 		bidListBytes = append(bidListBytes, bid[:]...)
 	}
 
@@ -221,6 +219,10 @@ func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
@@ -232,10 +234,16 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 2. Add provisioners and block generators
+	// 2. Check the certificate
+	if err := verifiers.CheckBlockCertificate(c.committee, blk); err != nil {
+		l.Errorf("verifying the certificate failed: %s", err.Error())
+		return err
+	}
+
+	// 3. Add provisioners and block generators
 	c.addConsensusNodes(blk.Txs, blk.Header.Height+1)
 
-	// 3. Store block in database
+	// 4. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&blk)
 	})
@@ -247,7 +255,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 4. Notify other subsystems for the accepted block
+	// 5. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
@@ -259,13 +267,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
-	// 5. Gossip advertise block Hash
+	// 6. Gossip advertise block Hash
 	if err := c.advertiseBlock(blk); err != nil {
 		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
-	// 6. Cleanup obsolete candidate blocks
+	// 7. Cleanup obsolete candidate blocks
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
 		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
@@ -306,18 +314,17 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	// Ensure the candidate block satisfies all chain rules
+	c.mu.RLock()
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
 		log.Errorf("verifying the candidate block failed: %s", err.Error())
+		c.mu.RUnlock()
 		return err
 	}
+	c.mu.RUnlock()
 
 	// Save it into persistent storage
 	err := c.db.Update(func(t database.Transaction) error {
-		err := t.StoreCandidateBlock(&candidate)
-		if err != nil {
-			return err
-		}
-		return nil
+		return t.StoreCandidateBlock(&candidate)
 	})
 
 	if err != nil {
@@ -328,8 +335,7 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	return nil
 }
 
-func (c *Chain) handleWinningHash(blockHash []byte) error {
-	// Fetch the candidate block that the winningHash points at
+func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
 	var candidate *block.Block
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
@@ -338,17 +344,16 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 	})
 
 	if err != nil {
-		log.Errorf("fetching a candidate block failed: %s", err.Error())
-		return err
+		log.Errorf("error fetching candidate block to add certificate: %s", err.Error())
+		return
 	}
 
-	// Run the general procedure of block accepting
-	return c.AcceptBlock(*candidate)
+	candidate.Header.Certificate = cert
+	c.AcceptBlock(*candidate)
 }
 
 // Send Inventory message to all peers
 func (c *Chain) advertiseBlock(b block.Block) error {
-
 	msg := &peermsg.Inv{}
 	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
 
