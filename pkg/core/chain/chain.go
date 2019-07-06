@@ -17,6 +17,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -80,6 +81,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	}
 
 	eventBus.SubscribeCallback(string(topics.Block), c.onAcceptBlock)
+	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
 	return c, nil
 }
 
@@ -352,8 +354,6 @@ func (c *Chain) verifyCandidateBlock(hash []byte) error {
 		return err
 	}
 
-	// TODO: once certificate checks are added to block verification, they should
-	// be bypassed here as it will not yet contain a certificate
 	return verifiers.CheckBlock(c.db, c.prevBlock, *candidate)
 }
 
