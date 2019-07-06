@@ -62,7 +62,7 @@ func loadWallet(password string) *wallet.Wallet {
 	}
 
 	// Then load the wallet
-	w, err := wallet.Load(testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.LoadFromFile(testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
 		return nil
