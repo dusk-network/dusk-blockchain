@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -25,6 +26,8 @@ import (
 
 // Number of mixins per ring. ringsize = mixin + 1
 const numMixins = 7
+
+const walletName = "wallet.dat"
 
 // FetchInputs returns a slice of inputs such that Sum(Inputs)- Sum(Outputs) >= 0
 // If > 0, then a change address is created for the remaining amount
@@ -47,8 +50,14 @@ func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInp
 	if err != nil {
 		return nil, err
 	}
+	return LoadFromSeed(seed, netPrefix, db, fDecoys, fInputs, password)
+}
 
-	err = saveSeed(seed, password)
+func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
+	if len(seed) < 64 {
+		return nil, errors.New("seed must be atleast 64 bytes in size")
+	}
+	err := saveSeed(seed, password)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +77,7 @@ func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInp
 	}, nil
 }
 
-func Load(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
+func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
 
 	seed, err := fetchSeed(password)
 	if err != nil {
@@ -337,7 +346,7 @@ func saveSeed(seed []byte, password string) error {
 		return err
 	}
 
-	return ioutil.WriteFile("wallet.dat", gcm.Seal(nonce, nonce, seed, nil), 0777)
+	return ioutil.WriteFile(walletName, gcm.Seal(nonce, nonce, seed, nil), 0777)
 }
 
 //Modified from https://tutorialedge.net/golang/go-encrypt-decrypt-aes-tutorial/
@@ -345,7 +354,7 @@ func fetchSeed(password string) ([]byte, error) {
 
 	digest := sha3.Sum256([]byte(password))
 
-	ciphertext, err := ioutil.ReadFile("wallet.dat")
+	ciphertext, err := ioutil.ReadFile(walletName)
 	if err != nil {
 		return nil, err
 	}
