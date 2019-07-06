@@ -309,6 +309,14 @@ func (w *Wallet) PublicKey() key.PublicKey {
 	return *w.keyPair.PublicKey()
 }
 
+func (w *Wallet) PublicAddress() (string, error) {
+	pubAddr, err := w.keyPair.PublicKey().PublicAddress(w.netPrefix)
+	if err != nil {
+		return "", err
+	}
+	return pubAddr.String(), nil
+}
+
 // Save saves the seed to a dat file
 func saveSeed(seed []byte, password string) error {
 
