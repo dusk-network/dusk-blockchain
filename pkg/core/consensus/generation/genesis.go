@@ -6,7 +6,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-wallet/key"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 )
 
 // GenerateGensisBlock is a developer utility for regenerating the genesis block
