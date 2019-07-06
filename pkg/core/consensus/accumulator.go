@@ -24,6 +24,7 @@ type AccumulatorHandler interface {
 type Accumulator struct {
 	wire.Store
 	state              State
+	checkStep          bool
 	handler            AccumulatorHandler
 	verificationChan   chan<- wire.Event
 	eventChan          <-chan wire.Event
@@ -31,7 +32,7 @@ type Accumulator struct {
 }
 
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
-func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State) *Accumulator {
+func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State, checkStep bool) *Accumulator {
 	// set up worker pool
 	eventChan := make(chan wire.Event, 10)
 	verificationChan := createWorkers(eventChan, handler.Verify)
@@ -40,6 +41,7 @@ func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State) *
 	a := &Accumulator{
 		Store:              store,
 		state:              state,
+		checkStep:          checkStep,
 		handler:            handler,
 		verificationChan:   verificationChan,
 		eventChan:          eventChan,
@@ -85,7 +87,10 @@ func (a *Accumulator) accumulate() {
 
 func (a *Accumulator) isObsolete(ev wire.Event) bool {
 	header := a.handler.ExtractHeader(ev)
-	return header.Step < a.state.Step()
+	if !a.checkStep {
+		return header.Round < a.state.Round()
+	}
+	return header.Step < a.state.Step() || header.Round < a.state.Round()
 }
 
 // ShouldSkip checks if the message is propagated by a committee member.

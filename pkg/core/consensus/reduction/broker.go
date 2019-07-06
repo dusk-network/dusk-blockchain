@@ -56,7 +56,7 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout time.Duration) *broker {
 	scoreChan := initBestScoreUpdate(eventBroker)
 	ctx := newCtx(handler, timeout)
-	accumulator := consensus.NewAccumulator(ctx.handler, consensus.NewAccumulatorStore(), ctx.state)
+	accumulator := consensus.NewAccumulator(ctx.handler, consensus.NewAccumulatorStore(), ctx.state, true)
 	filter := launchReductionFilter(eventBroker, ctx, accumulator)
 	roundChannel := consensus.InitRoundUpdate(eventBroker)
 	stepSub := ctx.state.SubscribeStep()
