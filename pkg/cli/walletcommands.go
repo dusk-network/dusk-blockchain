@@ -5,18 +5,25 @@ import (
 	"fmt"
 	"os"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	wallet "gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
 )
 
+var testnet = byte(2)
 var dbName = "walletDb"
 
 func createWallet(args []string, publisher wire.EventPublisher) {
-
-	password := args[1]
+	if args == nil || len(args) < 1 {
+		fmt.Fprintf(os.Stdout, commandInfo["createwallet"]+"\n")
+		return
+	}
+	password := args[0]
 
 	// TODO: add proper path
 	db, err := database.New(dbName)
@@ -28,11 +35,19 @@ func createWallet(args []string, publisher wire.EventPublisher) {
 	}
 
 	// TODO: add functions
-	_, err = wallet.New(2, db, nil, nil, password)
+	w, err := wallet.New(testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
 		return
 	}
+	pubAddr, err := w.PublicAddress()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to get your public address: %v\n", err)
+		return
+	}
+
+	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
+	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 }
 
 func loadWallet(password string) *wallet.Wallet {
@@ -47,8 +62,7 @@ func loadWallet(password string) *wallet.Wallet {
 	}
 
 	// Then load the wallet
-	// TODO: add functions
-	w, err := wallet.Load(2, db, nil, nil, password)
+	w, err := wallet.Load(testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
 		return nil
@@ -59,24 +73,24 @@ func loadWallet(password string) *wallet.Wallet {
 }
 
 func transfer(args []string, publisher wire.EventPublisher) {
-	if args == nil || len(args) < 5 {
-		fmt.Fprintf(os.Stdout, commandInfo["transfer"])
+	if args == nil || len(args) < 4 {
+		fmt.Fprintf(os.Stdout, commandInfo["transfer"]+"\n")
 		return
 	}
 
-	amount, err := stringToScalar(args[1])
+	amount, err := stringToScalar(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
 	}
 
-	address := args[2]
+	address := args[1]
 
-	fee, err := stringToInt64(args[3])
+	fee, err := stringToInt64(args[2])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
 	}
 
-	password := args[4]
+	password := args[3]
 
 	// Load wallet using password
 	w := loadWallet(password)
@@ -91,10 +105,17 @@ func transfer(args []string, publisher wire.EventPublisher) {
 	// Send amount to address
 	tx.AddOutput(key.PublicAddress(address), amount)
 
+	// Sign tx
+	err = w.Sign(tx)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
+	}
+
 	// Convert wallet-tx to wireTx and encode into buffer
 	wireTx, err := tx.WireStandardTx()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
 	buf := new(bytes.Buffer)
@@ -107,27 +128,27 @@ func transfer(args []string, publisher wire.EventPublisher) {
 }
 
 func sendStake(args []string, publisher wire.EventPublisher) {
-	if args == nil || len(args) < 5 {
-		fmt.Fprintf(os.Stdout, commandInfo["stake"])
+	if args == nil || len(args) < 4 {
+		fmt.Fprintf(os.Stdout, commandInfo["stake"]+"\n")
 		return
 	}
 
-	amount, err := stringToScalar(args[1])
+	amount, err := stringToScalar(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 	}
 
-	lockTime, err := stringToUint64(args[2])
+	lockTime, err := stringToUint64(args[1])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 	}
 
-	fee, err := stringToInt64(args[3])
+	fee, err := stringToInt64(args[2])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 	}
 
-	password := args[4]
+	password := args[3]
 
 	// Load wallet using password
 	w := loadWallet(password)
@@ -142,7 +163,7 @@ func sendStake(args []string, publisher wire.EventPublisher) {
 	// Convert wallet-tx to wireTx and encode into buffer
 	wireTx, err := tx.WireStake()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
 	buf := new(bytes.Buffer)
@@ -155,27 +176,27 @@ func sendStake(args []string, publisher wire.EventPublisher) {
 }
 
 func sendBid(args []string, publisher wire.EventPublisher) {
-	if args == nil || len(args) < 5 {
-		fmt.Fprintf(os.Stdout, commandInfo["bid"])
+	if args == nil || len(args) < 4 {
+		fmt.Fprintf(os.Stdout, commandInfo["bid"]+"\n")
 		return
 	}
 
-	amount, err := stringToScalar(args[1])
+	amount, err := stringToScalar(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 	}
 
-	lockTime, err := stringToUint64(args[2])
+	lockTime, err := stringToUint64(args[1])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 	}
 
-	fee, err := stringToInt64(args[3])
+	fee, err := stringToInt64(args[2])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 	}
 
-	password := args[4]
+	password := args[3]
 
 	// Load wallet using password
 	w := loadWallet(password)
@@ -190,7 +211,7 @@ func sendBid(args []string, publisher wire.EventPublisher) {
 	// Convert wallet-tx to wireTx and encode into buffer
 	wireTx, err := tx.WireBid()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
 	buf := new(bytes.Buffer)
@@ -200,4 +221,37 @@ func sendBid(args []string, publisher wire.EventPublisher) {
 	}
 
 	publisher.Publish(string(topics.Tx), buf)
+}
+
+func fetchDecoys(numMixins int) []mlsag.PubKeys {
+	var pubKeys []mlsag.PubKeys
+	for i := 0; i < numMixins; i++ {
+		pubKeyVector := generateDualKey()
+		pubKeys = append(pubKeys, pubKeyVector)
+	}
+	return pubKeys
+}
+
+func generateDualKey() mlsag.PubKeys {
+	pubkeys := mlsag.PubKeys{}
+
+	var primaryKey ristretto.Point
+	primaryKey.Rand()
+	pubkeys.AddPubKey(primaryKey)
+
+	var secondaryKey ristretto.Point
+	secondaryKey.Rand()
+	pubkeys.AddPubKey(secondaryKey)
+
+	return pubkeys
+}
+
+func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
+	// Fetch all inputs from database that are >= totalAmount
+	// returns error if inputs do not add up to total amount
+	privSpend, err := key.PrivateSpend()
+	if err != nil {
+		return nil, 0, err
+	}
+	return db.FetchInputs(privSpend.Bytes(), totalAmount)
 }
