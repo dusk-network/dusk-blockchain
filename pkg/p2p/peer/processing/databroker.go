@@ -44,7 +44,13 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 		switch obj.Type {
 		case peermsg.InvTypeBlock:
 			// Fetch block from local state. It must be available
-			b, err := d.fetchBlock(obj.Hash)
+			var b *block.Block
+			err := d.db.View(func(t database.Transaction) error {
+				var err error
+				b, err = t.FetchBlock(obj.Hash)
+				return err
+			})
+
 			if err != nil {
 				return err
 			}
