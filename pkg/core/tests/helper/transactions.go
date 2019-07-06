@@ -1,9 +1,11 @@
 package helper
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
@@ -70,6 +72,13 @@ func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
 	R := RandomSlice(t, 32)
 
 	tx := transactions.NewCoinbase(proof, score, R)
+	tx.Rewards = RandomOutputs(t, 1, malformed)
+
+	// Do this to pass verification on the chain
+	// TODO: this currently doesn't make much sense, fix before release
+	bs := make([]byte, 32)
+	binary.LittleEndian.PutUint64(bs, config.GeneratorReward)
+	tx.Rewards[0].Commitment = bs
 
 	return tx
 }

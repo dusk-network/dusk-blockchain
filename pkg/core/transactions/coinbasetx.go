@@ -32,6 +32,8 @@ func NewCoinbase(proof, score, R []byte) *Coinbase {
 
 // AddReward will add an Output to the Coinbase struct Rewards array.
 func (c *Coinbase) AddReward(output *Output) {
+	output.EncryptedAmount = make([]byte, 1)
+	output.EncryptedMask = make([]byte, 1)
 	c.Rewards = append(c.Rewards, output)
 }
 
@@ -58,8 +60,6 @@ func (c *Coinbase) Encode(w io.Writer) error {
 	}
 
 	for _, output := range c.Rewards {
-		output.EncryptedAmount = make([]byte, 1)
-		output.EncryptedMask = make([]byte, 1)
 		if err := output.Encode(w); err != nil {
 			return err
 		}

@@ -22,7 +22,7 @@ func TestGenerateGenesis(t *testing.T) {
 	w := key.NewKeyPair(seed)
 
 	// Generate a new genesis block with new wallet pubkey
-	genesisHex, err := GenerateGensisBlock(w.PublicKey())
+	genesisHex, err := GenerateGenesisBlock(w.PublicKey())
 	if err != nil {
 		t.Fatalf("expecting valid genesis block")
 	}

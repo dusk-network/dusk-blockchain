@@ -3,6 +3,7 @@ package selection
 import (
 	"bytes"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
@@ -34,6 +35,8 @@ func MockSelectionEvent(round uint64, hash []byte) *ScoreEvent {
 		Z:             z,
 		Seed:          seed,
 		BidListSubset: bidListSubset,
+		PrevHash:      hash,
+		Certificate:   block.EmptyCertificate(),
 		VoteHash:      hash,
 	}
 

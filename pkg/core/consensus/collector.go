@@ -100,7 +100,7 @@ func (b *bidListCollector) Collect(r *bytes.Buffer) error {
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
-func InitAcceptedBlockUpdate(subscriber wire.EventSubscriber) chan block.Block {
+func InitAcceptedBlockUpdate(subscriber wire.EventSubscriber) <-chan block.Block {
 	acceptedBlockChan := make(chan block.Block)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
 	go wire.NewTopicListener(subscriber, collector, string(topics.AcceptedBlock)).Accept()
