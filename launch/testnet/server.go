@@ -18,6 +18,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -109,6 +110,9 @@ func Setup() *Server {
 	// Launching generation component
 	// TODO: this should be more properly structured
 	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil)
+
+	gossip := processing.NewGossip(protocol.TestNet)
+	eventBus.RegisterPreprocessor(string(topics.Gossip), gossip)
 
 	return srv
 }
