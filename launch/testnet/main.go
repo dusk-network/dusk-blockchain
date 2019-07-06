@@ -11,6 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
@@ -107,15 +108,18 @@ func main() {
 		}
 
 		srv.eventBus.Publish(string(topics.Block), buf)
-		srv.StartConsensus(2)
 	} else {
 		// Propagate bid and stake out to the network
 		srv.sendStake()
 		srv.sendBid()
-		// wait for stake to appear in an incoming accepted block
-		height := waitForStake(srv.eventBus, srv.MyStake)
-		srv.StartConsensus(height + 1)
 	}
+
+	startingRound, err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys)
+	if err != nil {
+		panic(err)
+	}
+
+	srv.StartConsensus(startingRound)
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
