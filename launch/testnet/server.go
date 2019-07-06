@@ -8,7 +8,6 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
@@ -19,6 +18,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -89,8 +89,10 @@ func Setup() *Server {
 		keys:     &keys,
 	}
 
-	// Connecting to the general monitoring system
-	// ConnectToMonitor(eventBus, d)
+	// Connecting to the log based monitoring system
+	if err := ConnectToLogMonitor(eventBus); err != nil {
+		panic(err)
+	}
 
 	// Setting up the consensus factory
 	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
@@ -105,30 +107,14 @@ func Setup() *Server {
 	srv.d = d
 	srv.k = k
 
-	// Setting up generation component
-	go srv.launchGeneration()
+	// Launching generation component
+	// TODO: this should be more properly structured
+	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil)
+
+	gossip := processing.NewGossip(protocol.TestNet)
+	eventBus.RegisterPreprocessor(string(topics.Gossip), gossip)
 
 	return srv
-}
-
-func (s *Server) launchGeneration() {
-	blockChan := make(chan *bytes.Buffer, 100)
-	id := s.eventBus.Subscribe(string(topics.AcceptedBlock), blockChan)
-	for {
-		blkBuf := <-blockChan
-		blk := block.NewBlock()
-		if err := blk.Decode(blkBuf); err != nil {
-			panic(err)
-		}
-
-		for _, tx := range blk.Txs {
-			if tx.Equals(s.MyBid) {
-				s.eventBus.Unsubscribe(string(topics.AcceptedBlock), id)
-				generation.Launch(s.eventBus, s.rpcBus, s.d, s.k, nil, nil)
-				return
-			}
-		}
-	}
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
@@ -176,7 +162,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 }
 
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	responseChan := make(chan *bytes.Buffer, 100)
+	messageQueueChan := make(chan *bytes.Buffer, 100)
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 
 	if err := peerWriter.Connect(s.eventBus); err != nil {
@@ -191,13 +177,13 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		"address": peerWriter.Addr(),
 	}).Debugln("connection established")
 
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, messageQueueChan)
 	if err != nil {
 		panic(err)
 	}
 
 	go peerReader.ReadLoop()
-	go peerWriter.WriteLoop(responseChan)
+	go peerWriter.WriteLoop(messageQueueChan)
 }
 
 func (s *Server) Close() {

@@ -32,10 +32,10 @@ var (
 	GetLastBlockChan chan Req
 
 	// Provide the list of verified txs ready to be included into next block
-	//
+	// Param 1: list of TxIDs to request. If empty, returns all available txs
 	// Implemented by mempool
-	GetVerifiedTxs     = "getVerifiedTxs"
-	GetVerifiedTxsChan chan Req
+	GetMempoolTxs     = "getMempoolTxs"
+	GetMempoolTxsChan chan Req
 )
 
 // RPCBus is a request–response mechanism for internal communication between node
@@ -76,8 +76,8 @@ func NewRPCBus() *RPCBus {
 		panic(err)
 	}
 
-	GetVerifiedTxsChan = make(chan Req)
-	if err := bus.Register(GetVerifiedTxs, GetVerifiedTxsChan); err != nil {
+	GetMempoolTxsChan = make(chan Req)
+	if err := bus.Register(GetMempoolTxs, GetMempoolTxsChan); err != nil {
 		panic(err)
 	}
 

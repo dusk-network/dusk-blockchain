@@ -12,7 +12,6 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-wallet/key"
@@ -56,7 +55,6 @@ func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGene
 		prevBlock: *genesisBlock,
 	}
 }
-
 func (bg *blockGenerator) UpdatePrevBlock(b block.Block) {
 	bg.prevBlock = b
 }
@@ -70,9 +68,7 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 	}
 
 	// TODO Missing fields for forging the block
-	// - CertHash
-
-	certHash, _ := crypto.RandEntropy(32)
+	// - Certificate
 
 	txs, err := bg.ConstructBlockTxs(proof, score)
 	if err != nil {
@@ -87,7 +83,11 @@ func (bg *blockGenerator) GenerateBlock(round uint64, seed []byte, proof []byte,
 		PrevBlockHash: bg.prevBlock.Header.Hash,
 		TxRoot:        nil,
 		Seed:          seed,
-		CertHash:      certHash,
+		Certificate: &block.Certificate{
+			BatchedSig: make([]byte, 33),
+			Step:       1,
+			Committee:  0,
+		},
 	}
 
 	// Construct the candidate block
@@ -123,7 +123,7 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(wire.GetVerifiedTxs, wire.NewRequest(bytes.Buffer{}, 10))
+		r, err := bg.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 10))
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the the chain.
 		if err != nil {
@@ -185,8 +185,6 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	output.DestKey = P.Bytes()
 	// Commitment field in coinbase tx represents the reward
 	output.Commitment = rewardBytes
-	// blank range proof as we disclose generator reward
-	output.RangeProof = make([]byte, 1)
 
 	tx.AddReward(output)
 

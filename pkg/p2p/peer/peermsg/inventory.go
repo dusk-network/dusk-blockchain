@@ -10,11 +10,11 @@ import (
 type InvType uint8
 
 var (
-	InvTypeTx    InvType = 0
-	InvTypeBlock InvType = 1
+	InvTypeMempoolTx InvType = 0
+	InvTypeBlock     InvType = 1
 
 	supportedInvTypes = [2]InvType{
-		InvTypeTx,
+		InvTypeMempoolTx,
 		InvTypeBlock,
 	}
 )

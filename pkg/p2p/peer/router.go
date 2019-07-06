@@ -37,6 +37,8 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		err = m.blockHashBroker.AdvertiseMissingBlocks(b)
 	case topics.GetData:
 		err = m.dataBroker.SendItems(b)
+	case topics.MemPool:
+		err = m.dataBroker.SendTxsItems()
 	case topics.Inv:
 		// We only accept an advertisement once
 		if m.dupeMap.CanFwd(b) {

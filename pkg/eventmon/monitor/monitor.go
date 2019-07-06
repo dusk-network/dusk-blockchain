@@ -1,139 +1,194 @@
 package monitor
 
 import (
-	"encoding/hex"
-	"fmt"
-	"math/big"
+	"bytes"
+	"errors"
+	"io"
 	"net"
-	"strconv"
-	"strings"
-	"time"
+	"net/url"
+	"sync"
 
-	"github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon"
+	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-func LaunchMonitor(eventbus wire.EventBroker, srvUrl string, bid ristretto.Scalar) *broker {
-	broker := newBroker(eventbus, srvUrl)
-	go broker.monitor(bid)
-	return broker
+var MaxAttempts int = 3
+var lg = log.WithField("process", "monitor")
+
+type Supervisor interface {
+	wire.EventCollector
+	Reconnect() error
+	Stop() error
 }
 
-type (
-	broker struct {
-		roundChan     <-chan uint64
-		bestScoreChan <-chan *selection.ScoreEvent
-		reductionChan <-chan *reduction.Reduction
-		agreementChan <-chan *agreement.Agreement
-		logChan       <-chan *eventmon.Event
-
-		msgChan  chan<- string
-		quitChan chan<- struct{}
-		conn     net.Conn
-
-		blockInfo *info
-	}
-
-	info struct {
-		round     uint64
-		timestamp time.Time
-		blockTime time.Duration
-		hash      []byte
-		score     uint64
-	}
-)
-
-func newBroker(eventbus wire.EventBroker, url string) *broker {
-	msgChan, quitChan, conn := newClient(url)
-	roundChan := consensus.InitRoundUpdate(eventbus)
-
-	return &broker{
-		roundChan:     roundChan,
-		bestScoreChan: selection.LaunchNotification(eventbus),
-		// reductionChan: reduction.LaunchNotification(eventbus),
-		// agreementChan: agreement.LaunchNotification(eventbus),
-		msgChan:  msgChan,
-		quitChan: quitChan,
-		conn:     conn,
-	}
+type LogSupervisor interface {
+	Supervisor
+	log.Hook
 }
 
-func (b *broker) monitor(bb ristretto.Scalar) {
-	// b.msgChan <- "bid:" + bb.String()
-	firstRound := <-b.roundChan
-	b.blockInfo = newInfo(firstRound)
-	for {
-		select {
-		case round := <-b.roundChan:
-			b.blockInfo.blockTime = time.Since(b.blockInfo.timestamp)
-			b.msgChan <- blockMsg(b.blockInfo)
-			b.blockInfo = newInfo(round)
-		case bestScore := <-b.bestScoreChan:
-			b.blockInfo.score = big.NewInt(0).SetBytes(bestScore.Score).Uint64()
-			b.blockInfo.hash = bestScore.VoteHash
-			b.msgChan <- "status:selection"
-		case redEvent := <-b.reductionChan:
-			b.blockInfo.hash = redEvent.BlockHash
-			b.msgChan <- "status:reduction"
-		case agreement := <-b.agreementChan:
-			// TODO if different hash send
-			b.blockInfo.hash = agreement.BlockHash
-			b.msgChan <- "status:agreement"
-		case logEvent := <-b.logChan:
-			if logEvent.Severity == eventmon.Warn || logEvent.Severity == eventmon.Err {
-				b.msgChan <- logEvent.Msg
-			}
-		}
-	}
-}
+func Launch(broker wire.EventBroker, monUrl string) (LogSupervisor, error) {
 
-func newInfo(round uint64) *info {
-	return &info{
-		round:     round,
-		timestamp: time.Now(),
-	}
-}
-
-func blockMsg(i *info) string {
-	var str strings.Builder
-	str.WriteString("type:block,round:")
-	str.WriteString(strconv.FormatUint(i.round, 10))
-	str.WriteString(",hash:")
-	str.WriteString(hex.EncodeToString(i.hash))
-	str.WriteString(",block_time:")
-	str.WriteString(fmt.Sprintf("%f", i.blockTime.Seconds()))
-	str.WriteString(",timestamp:")
-	str.WriteString(i.timestamp.Format(time.RFC3339))
-	str.WriteString(",score:")
-	str.WriteString(strconv.FormatUint(i.score, 10))
-	return str.String()
-}
-
-// var _empty struct{}
-
-func newClient(url string) (chan<- string, chan<- struct{}, net.Conn) {
-	payloadChan := make(chan string, 1)
-	quitChan := make(chan struct{}, 1)
-
-	conn, err := net.Dial("tcp", url)
+	uri, err := url.Parse(monUrl)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	go func() {
-		for {
-			select {
-			case payload := <-payloadChan:
-				fmt.Fprintf(conn, payload+"\n")
-			case <-quitChan:
-				_ = conn.Close()
-				return
-			}
+	switch uri.Scheme {
+	case "file":
+		return nil, errors.New("file dumping on the logger is not implemented right now")
+	case "unix":
+		return newUnixSupervisor(broker, uri)
+	default:
+		return nil, errors.New("unsupported connection type")
+	}
+}
+
+type unixSupervisor struct {
+	broker      wire.EventBroker
+	lock        sync.Mutex
+	processor   *logger.LogProcessor
+	uri         *url.URL
+	processorId uint32
+	attempts    int
+	activeProc  bool
+}
+
+func (m *unixSupervisor) Levels() []log.Level {
+	return []log.Level{
+		// log.WarnLevel,
+		log.ErrorLevel,
+		log.FatalLevel,
+		log.PanicLevel,
+	}
+}
+
+func (m *unixSupervisor) Fire(entry *log.Entry) error {
+	if m.activeProc {
+		return m.processor.Send(entry)
+	}
+	return nil
+}
+
+func newUnixSupervisor(broker wire.EventBroker, uri *url.URL) (LogSupervisor, error) {
+
+	logProc, id, err := initLogProcessor(broker, uri)
+	if err != nil {
+		return nil, err
+	}
+
+	return &unixSupervisor{
+		broker:      broker,
+		lock:        sync.Mutex{},
+		processor:   logProc,
+		uri:         uri,
+		processorId: id,
+		activeProc:  true,
+	}, nil
+}
+
+func (m *unixSupervisor) Collect(b *bytes.Buffer) error {
+	// TODO: maybe diversify the action depending on the errors in the future
+	var err error
+	// whatever the case, we are going to reset the supervisor
+	defer m.resetAttempts()
+
+	err = deserializeError(b)
+	lg.WithField("op", "Collect").WithError(err).Warnln("Error notified by the LogProcessor. Attempting to reconnect to the monitoring server")
+
+	m.attempts++
+	for ; m.attempts < MaxAttempts; m.attempts++ {
+		err = m.Reconnect()
+		if err == nil {
+			break
 		}
-	}()
-	return payloadChan, quitChan, conn
+		lg.WithField("attempt", m.attempts).WithError(err).Warnln("Reconnecting to the monitor failed")
+	}
+
+	if m.attempts > MaxAttempts {
+		//giving up
+		_ = m.Stop()
+		lg.WithError(err).Errorln("cannot reconnect to the monitoring system. Giving up")
+		return err
+	}
+
+	lg.WithField("attempt", m.attempts).Infoln("Successfully reconnected to the monitoring server")
+	return nil
+}
+
+func (m *unixSupervisor) resetAttempts() {
+	m.attempts = 0
+}
+
+func deserializeError(b *bytes.Buffer) error {
+	bErr := make([]byte, 1)
+	if _, err := b.Read(bErr); err != nil {
+		return err
+	}
+
+	switch bErr[0] {
+	case logger.ErrWriter:
+		return errors.New("Connection error")
+	case logger.ErrLog:
+		return errors.New("Log/monitoring error")
+	case logger.ErrOther:
+	default:
+		return errors.New("Unspecified error")
+	}
+	return nil
+}
+
+func (m *unixSupervisor) Reconnect() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if err := m.stop(); err != nil {
+		return err
+	}
+
+	proc, id, err := initLogProcessor(m.broker, m.uri)
+	if err != nil {
+		return err
+	}
+	m.activeProc = true
+	m.processor = proc
+	m.processorId = id
+	m.attempts = 0
+	return nil
+}
+
+func (m *unixSupervisor) Stop() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.stop()
+}
+
+func (m *unixSupervisor) stop() error {
+	if m.activeProc {
+		m.activeProc = false
+		m.broker.RemovePreprocessor(string(topics.Gossip), m.processorId)
+		return m.processor.Close()
+	}
+	return nil
+}
+
+func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcessor, uint32, error) {
+	wc, err := start(uri)
+	if err != nil {
+		return nil, uint32(0), err
+	}
+
+	logProcessor := logger.New(broker, wc, nil)
+	ids := broker.RegisterPreprocessor(string(topics.Gossip), logProcessor)
+
+	return logProcessor, ids[0], nil
+}
+
+func start(uri *url.URL) (io.WriteCloser, error) {
+	conn, err := net.Dial(uri.Scheme, uri.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
 }

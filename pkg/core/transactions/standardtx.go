@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 
@@ -12,10 +13,12 @@ import (
 type Standard struct {
 	// TxType represents the transaction type
 	TxType TxType
+	// R is the Transaction Public Key
+	R []byte
 	// Version is the transaction version. It does not use semver.
 	// A new transaction version denotes a modification of the previous structure
 	Version uint8 // 1 byte
-	// TxID is the identifier for the transaction and is the hash of the transaction fields.
+	// TxID is the hash of the transaction fields.
 	TxID []byte // TxID (32 bytes)
 	// Inputs represent a list of inputs to the transaction.
 	Inputs Inputs
@@ -23,12 +26,16 @@ type Standard struct {
 	Outputs Outputs
 	// Fee is the assosciated fee attached to the transaction. This is in cleartext.
 	Fee uint64
+	// RangeProof is the bulletproof rangeproof that proves that the hidden amount
+	// is between 0 and 2^64
+	RangeProof []byte // Variable size
 }
 
 // NewStandard will return a Standard transaction
 // given the tx version and the fee atached
-func NewStandard(ver uint8, fee uint64) *Standard {
+func NewStandard(ver uint8, fee uint64, R []byte) *Standard {
 	return &Standard{
+		R:       R,
 		Version: ver,
 		Fee:     fee,
 		TxType:  StandardType,
@@ -49,6 +56,10 @@ func (s *Standard) AddOutput(output *Output) {
 func (s *Standard) Encode(w io.Writer) error {
 
 	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(w, s.R); err != nil {
 		return err
 	}
 
@@ -79,6 +90,10 @@ func (s *Standard) Encode(w io.Writer) error {
 		return err
 	}
 
+	if err := encoding.WriteVarBytes(w, s.RangeProof); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -90,6 +105,10 @@ func (s *Standard) Decode(r io.Reader) error {
 		return err
 	}
 	s.TxType = TxType(Type)
+
+	if err := encoding.Read256(r, &s.R); err != nil {
+		return err
+	}
 
 	var ver uint8
 	if err := encoding.ReadUint8(r, &ver); err != nil {
@@ -125,6 +144,10 @@ func (s *Standard) Decode(r io.Reader) error {
 	}
 
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &s.Fee); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadVarBytes(r, &s.RangeProof); err != nil {
 		return err
 	}
 	return nil
@@ -171,6 +194,10 @@ func (s *Standard) Equals(t Transaction) bool {
 		return false
 	}
 
+	if !bytes.Equal(s.R, other.R) {
+		return false
+	}
+
 	if !s.Inputs.Equals(other.Inputs) {
 		return false
 	}
@@ -188,5 +215,5 @@ func (s *Standard) Equals(t Transaction) bool {
 	// the txid is not updated, if a modification is made after
 	// calculating the hash. What we can do, is state this edge case and analyse our use-cases.
 
-	return true
+	return bytes.Equal(s.RangeProof, other.RangeProof)
 }
