@@ -59,7 +59,7 @@ func Setup() *Server {
 	m.Run()
 
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus, rpcBus)
+	chain, err := chain.New(eventBus, rpcBus, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -109,7 +109,7 @@ func Setup() *Server {
 
 	// Launching generation component
 	// TODO: this should be more properly structured
-	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil)
+	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil, *srv.keys)
 
 	gossip := processing.NewGossip(protocol.TestNet)
 	eventBus.RegisterPreprocessor(string(topics.Gossip), gossip)

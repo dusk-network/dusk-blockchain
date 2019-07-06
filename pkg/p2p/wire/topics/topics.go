@@ -31,6 +31,7 @@ const (
 	Headers       Topic = "headers"
 	MemPool       Topic = "mempool"
 	Inv           Topic = "inv"
+	Certificate   Topic = "certificate"
 
 	// Consensus topics
 	Candidate Topic = "candidate"

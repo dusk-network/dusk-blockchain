@@ -18,6 +18,7 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -35,9 +36,10 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
-	db       database.DB
+	eventBus  *wire.EventBus
+	rpcBus    *wire.RPCBus
+	db        database.DB
+	committee committee.Foldable
 
 	prevBlock block.Block
 	// protect prevBlock with mutex as it's touched out of the main chain loop
@@ -47,11 +49,11 @@ type Chain struct {
 
 	// collector channels
 	candidateChan   <-chan *block.Block
-	winningHashChan <-chan []byte
+	certificateChan <-chan certMsg
 }
 
 // New returns a new chain object
-func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
+func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
 	if err != nil {
 		return nil, err
@@ -69,20 +71,26 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 
 	// set up collectors
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
-	winningHashChan := initWinningHashCollector(eventBus)
+	certificateChan := initCertificateCollector(eventBus)
 
-	c := &Chain{
+	// set up committee
+	if c == nil {
+		c = committee.NewAgreement(eventBus)
+	}
+
+	chain := &Chain{
 		eventBus:        eventBus,
 		rpcBus:          rpcBus,
 		db:              db,
+		committee:       c,
 		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
-		winningHashChan: winningHashChan,
+		certificateChan: certificateChan,
 	}
 
-	eventBus.SubscribeCallback(string(topics.Block), c.onAcceptBlock)
+	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
 	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
-	return c, nil
+	return chain, nil
 }
 
 // Listen to the collectors
@@ -92,8 +100,8 @@ func (c *Chain) Listen() {
 
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
-		case blockHash := <-c.winningHashChan:
-			_ = c.handleWinningHash(blockHash)
+		case cMsg := <-c.certificateChan:
+			c.addCertificate(cMsg.hash, cMsg.cert)
 
 		// wire.RPCBus requests handlers
 		case r := <-wire.GetLastBlockChan:
@@ -234,10 +242,16 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	// 2. Add provisioners and block generators
+	// 2. Check the certificate
+	if err := verifiers.CheckBlockCertificate(c.committee, blk); err != nil {
+		l.Errorf("verifying the certificate failed: %s", err.Error())
+		return err
+	}
+
+	// 3. Add provisioners and block generators
 	c.addConsensusNodes(blk.Txs, blk.Header.Height+1)
 
-	// 3. Store block in database
+	// 4. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&blk)
 	})
@@ -249,7 +263,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 4. Notify other subsystems for the accepted block
+	// 5. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
@@ -261,13 +275,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
-	// 5. Gossip advertise block Hash
+	// 6. Gossip advertise block Hash
 	if err := c.advertiseBlock(blk); err != nil {
 		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
-	// 6. Cleanup obsolete candidate blocks
+	// 7. Cleanup obsolete candidate blocks
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
 		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
@@ -309,11 +323,7 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	// Save it into persistent storage
 	err := c.db.Update(func(t database.Transaction) error {
-		err := t.StoreCandidateBlock(&candidate)
-		if err != nil {
-			return err
-		}
-		return nil
+		return t.StoreCandidateBlock(&candidate)
 	})
 
 	if err != nil {
@@ -350,16 +360,25 @@ func (c *Chain) fetchCandidateBlock(hash []byte) (*block.Block, error) {
 func (c *Chain) verifyCandidateBlock(hash []byte) error {
 	candidate, err := c.fetchCandidateBlock(hash)
 	if err != nil {
-		log.Errorf("fetching a candidate block failed: %s", err.Error())
 		return err
 	}
 
 	return verifiers.CheckBlock(c.db, c.prevBlock, *candidate)
 }
 
+func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
+	candidate, err := c.fetchCandidateBlock(blockHash)
+	if err != nil {
+		log.Errorf("error fetching candidate block to add certificate: %s", err.Error())
+		return
+	}
+
+	candidate.Header.Certificate = cert
+	c.AcceptBlock(*candidate)
+}
+
 // Send Inventory message to all peers
 func (c *Chain) advertiseBlock(b block.Block) error {
-
 	msg := &peermsg.Inv{}
 	msg.AddItem(peermsg.InvTypeBlock, b.Header.Hash)
 

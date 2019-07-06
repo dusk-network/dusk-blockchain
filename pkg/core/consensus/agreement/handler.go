@@ -61,25 +61,12 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 		step := uint8(int(ev.Step*2) + (i - 1)) // the event step is the second one of the reduction cycle
 		subcommittee := a.Unpack(votes.BitSet, ev.Round, step)
 		allVoters += len(subcommittee)
-
 		apk, err := ReconstructApk(subcommittee)
 		if err != nil {
 			return err
 		}
 
-		signed := new(bytes.Buffer)
-
-		vote := &header.Header{
-			Round:     ev.Round,
-			Step:      step,
-			BlockHash: ev.BlockHash,
-		}
-
-		if err := header.MarshalSignableVote(signed, vote); err != nil {
-			return err
-		}
-
-		if err := bls.Verify(apk, signed.Bytes(), votes.Signature); err != nil {
+		if err := VerifySignatures(ev.Round, step, ev.BlockHash, apk, votes.Signature); err != nil {
 			return err
 		}
 	}
@@ -111,6 +98,21 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	}
 
 	return apk, nil
+}
+
+func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
+	signed := new(bytes.Buffer)
+	vote := &header.Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: blockHash,
+	}
+
+	if err := header.MarshalSignableVote(signed, vote); err != nil {
+		return err
+	}
+
+	return bls.Verify(apk, signed.Bytes(), sig)
 }
 
 func (a *agreementHandler) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
