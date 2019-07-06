@@ -64,7 +64,6 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 		gossip: processing.NewGossip(magic),
 	}
 
-	subscriber.RegisterPreprocessor(string(topics.Gossip), pw.gossip)
 	return pw
 }
 
