@@ -14,6 +14,7 @@ import (
 type Generator interface {
 	GenerateProof([]byte) zkproof.ZkProof
 	UpdateBidList(user.BidList)
+	RemoveExpiredBids(uint64)
 }
 
 type proofGenerator struct {
@@ -42,6 +43,12 @@ func (g *proofGenerator) UpdateBidList(bidList user.BidList) {
 	for _, bid := range bidList {
 		g.bidList.AddBid(bid)
 	}
+}
+
+func (g *proofGenerator) RemoveExpiredBids(round uint64) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.bidList.RemoveExpired(round)
 }
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
@@ -84,7 +91,7 @@ func convertBidListToScalars(bidList user.BidList) []ristretto.Scalar {
 	scalarList := make([]ristretto.Scalar, len(bidList))
 	for i, bid := range bidList {
 		bidScalar := ristretto.Scalar{}
-		err := bidScalar.UnmarshalBinary(bid[:])
+		err := bidScalar.UnmarshalBinary(bid.X[:])
 		if err != nil {
 			log.WithError(err).WithField("process", "proofgenerator").Errorln("Error in converting Bid List to scalar")
 			panic(err)

@@ -32,6 +32,7 @@ type (
 		consensus.EventHandler
 		wire.EventPrioritizer
 		UpdateBidList(user.BidList)
+		RemoveExpiredBids(uint64)
 		ResetThreshold()
 		LowerThreshold()
 	}
@@ -74,6 +75,12 @@ func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
 	for _, bid := range bidList {
 		sh.bidList.AddBid(bid)
 	}
+}
+
+func (sh *scoreHandler) RemoveExpiredBids(round uint64) {
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
+	sh.bidList.RemoveExpired(round)
 }
 
 func (sh *scoreHandler) ExtractHeader(e wire.Event) *header.Header {
