@@ -161,7 +161,7 @@ func sendStake(args []string, publisher wire.EventPublisher) {
 	}
 
 	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireStake()
+	wireTx, err := tx.WireStakeTx()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
