@@ -81,6 +81,7 @@ func (f *scoreBroker) onRoundUpdate(round uint64) {
 	f.selector.stopSelection()
 	f.filter.UpdateRound(round)
 	f.handler.ResetThreshold()
+	f.handler.RemoveExpiredBids(round)
 	f.filter.FlushQueue()
 	f.selector.startSelection()
 }

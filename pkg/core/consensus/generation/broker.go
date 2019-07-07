@@ -89,6 +89,9 @@ func (b *broker) Listen() {
 }
 
 func (b *broker) onBlock(blk block.Block) {
+	// Remove old bids before generating a new score
+	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
+
 	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
 		log.WithField("process", "generation").WithError(err).Errorln("problem generating seed")
 	}
