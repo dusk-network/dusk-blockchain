@@ -12,9 +12,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-// TODO: define a proper maxlocktime somewhere in the transactions package
-const maxLockTime = 100000
-
 func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) (uint64, error) {
 	// Get a db connection
 	if db == nil {
@@ -70,8 +67,8 @@ func getCurrentHeight(db database.DB) uint64 {
 }
 
 func findActiveStakes(keys user.Keys, currentHeight uint64, db database.DB) bool {
-	searchingHeight := currentHeight - maxLockTime
-	if currentHeight < maxLockTime {
+	searchingHeight := currentHeight - transactions.MaxLockTime
+	if currentHeight < transactions.MaxLockTime {
 		searchingHeight = 0
 	}
 
