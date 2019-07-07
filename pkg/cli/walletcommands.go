@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -320,11 +321,13 @@ func syncWalletCMD(args []string, publisher wire.EventBroker) {
 			return
 		}
 		// call wallet.CheckBlock
-		_, _, err = cliWallet.CheckWireBlock(*blk)
+		spentCount, receivedCount, err := cliWallet.CheckWireBlock(*blk)
 		if err != nil {
 			fmt.Fprintf(os.Stdout, "error fetching block: %v\n", err)
 			return
 		}
+		fmt.Fprintf(os.Stdout, "Found %d spends and %d receives in block %d\n", spentCount, receivedCount, blk.Header.Height)
+		fmt.Fprintf(os.Stdout, "tipHash: %s \nblockHash: %s\n", hex.EncodeToString(tipHash), hex.EncodeToString(blk.Header.Hash))
 		// check if state is equal to the block that we fetched
 		if bytes.Equal(tipHash, blk.Header.Hash) {
 			break
