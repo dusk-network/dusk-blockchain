@@ -52,7 +52,6 @@ func loadWallet(password string) *wallet.Wallet {
 
 	// First load the database
 	db, err := database.New(dbName)
-	defer db.Close()
 	if err != nil {
 		// TODO: use logger over fmt.Print
 		fmt.Fprintf(os.Stdout, "error opening database: %v\n", err)
@@ -158,6 +157,13 @@ func sendStake(args []string, publisher wire.EventPublisher) {
 		return
 	}
 
+	// Sign tx
+	err = w.Sign(tx)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
+	}
+
 	// Convert wallet-tx to wireTx and encode into buffer
 	wireTx, err := tx.WireStakeTx()
 	if err != nil {
@@ -203,6 +209,13 @@ func sendBid(args []string, publisher wire.EventPublisher) {
 	tx, err := w.NewBidTx(int64(fee), lockTime, amount)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
+		return
+	}
+
+	// Sign tx
+	err = w.Sign(tx)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
 

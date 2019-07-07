@@ -41,6 +41,12 @@ type Wallet struct {
 	fetchInputs   FetchInputs
 }
 
+type SignableTx interface {
+	AddDecoys(numMixins int, f transactions.FetchDecoys) error
+	Prove() error
+	Standard() (*transactions.StandardTx, error)
+}
+
 func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
 
 	// random seed
@@ -294,18 +300,23 @@ func (w *Wallet) AddInputs(tx *transactions.StandardTx) error {
 	return tx.AddOutput(*changeAddr, x)
 }
 
-func (w *Wallet) Sign(tx *transactions.StandardTx) error {
+func (w *Wallet) Sign(tx SignableTx) error {
 
 	// Assuming user has added all of the outputs
 
+	standardTx, err := tx.Standard()
+	if err != nil {
+		return err
+	}
+
 	// Fetch Inputs
-	err := w.AddInputs(tx)
+	err = w.AddInputs(standardTx)
 	if err != nil {
 		return err
 	}
 
 	// Fetch decoys
-	err = tx.AddDecoys(numMixins, w.fetchDecoys)
+	err = standardTx.AddDecoys(numMixins, w.fetchDecoys)
 	if err != nil {
 		return err
 	}
