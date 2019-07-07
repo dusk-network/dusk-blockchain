@@ -12,7 +12,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
-	"github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -26,7 +25,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
@@ -157,7 +155,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 }
 
 func (c *Chain) addBidder(tx *transactions.Bid) error {
-	x := calculateX(tx.Outputs[0].EncryptedAmount, tx.M)
+	x := user.CalculateX(tx.Outputs[0].EncryptedAmount, tx.M)
 	bids := &user.BidList{}
 	bids.AddBid(x)
 
@@ -184,20 +182,6 @@ func (c *Chain) Close() error {
 	}
 
 	return drvr.Close()
-}
-
-func calculateX(d []byte, m []byte) user.Bid {
-	dScalar := ristretto.Scalar{}
-	dScalar.UnmarshalBinary(d)
-
-	mScalar := ristretto.Scalar{}
-	mScalar.UnmarshalBinary(m)
-
-	x := zkproof.CalculateX(dScalar, mScalar)
-
-	var bid user.Bid
-	copy(bid[:], x.Bytes()[:])
-	return bid
 }
 
 func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
