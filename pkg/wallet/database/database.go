@@ -2,10 +2,11 @@ package database
 
 import (
 	"bytes"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
 	"encoding/binary"
 	"errors"
 	"fmt"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -17,7 +18,8 @@ type DB struct {
 }
 
 var (
-	inputPrefix = []byte("input")
+	inputPrefix        = []byte("input")
+	walletHeightPrefix = []byte("syncedHeight")
 )
 
 func New(path string) (*DB, error) {
@@ -119,6 +121,22 @@ func (db DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.In
 	}
 
 	return tInputs, changeAmount, nil
+}
+
+func (db DB) GetWalletHeight() (uint64, error) {
+	heightBytes, err := db.storage.Get(walletHeightPrefix, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	height := binary.LittleEndian.Uint64(heightBytes)
+	return height, nil
+}
+
+func (db DB) UpdateWalletHeight(newHeight uint64) error {
+	heightBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(heightBytes, newHeight)
+	return db.Put(walletHeightPrefix, heightBytes)
 }
 
 func (db DB) Get(key []byte) ([]byte, error) {

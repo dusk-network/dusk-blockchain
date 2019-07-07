@@ -33,12 +33,14 @@ const walletName = "wallet.dat"
 type FetchInputs func(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error)
 
 type Wallet struct {
-	db            *database.DB
-	netPrefix     byte
+	db        *database.DB
+	netPrefix byte
+
 	keyPair       *key.Key
 	consensusKeys *user.Keys
-	fetchDecoys   transactions.FetchDecoys
-	fetchInputs   FetchInputs
+
+	fetchDecoys transactions.FetchDecoys
+	fetchInputs FetchInputs
 }
 
 type SignableTx interface {
@@ -72,14 +74,32 @@ func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transact
 		return nil, err
 	}
 
-	return &Wallet{
+	w := &Wallet{
 		db:            db,
 		netPrefix:     netPrefix,
 		keyPair:       key.NewKeyPair(seed),
 		consensusKeys: &consensusKeys,
 		fetchDecoys:   fDecoys,
 		fetchInputs:   fInputs,
-	}, nil
+	}
+
+	// Check if this is a new wallet
+	_, err = w.db.GetWalletHeight()
+	if err == nil {
+		return w, nil
+	}
+
+	if err != leveldb.ErrNotFound {
+		return nil, err
+	}
+
+	// Add height of zero into database
+	err = w.UpdateWalletHeight(0)
+	if err != nil {
+		return nil, err
+	}
+
+	return w, nil
 }
 
 func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
@@ -154,6 +174,25 @@ func (w *Wallet) NewBidTx(fee int64, lockTime uint64, amount ristretto.Scalar) (
 func (w *Wallet) NewCoinbaseTx() *transactions.CoinbaseTx {
 	tx := transactions.NewCoinBaseTx(w.netPrefix)
 	return tx
+}
+
+func (w *Wallet) CheckWireBlock(blk block.Block) (uint64, uint64, error) {
+
+	spentCount, err := w.CheckWireBlockSpent(blk)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	receivedCount, err := w.CheckWireBlockReceived(blk)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	err = w.UpdateWalletHeight(blk.Header.Height)
+	if err != nil {
+		return 0, 0, err
+	}
+	return spentCount, receivedCount, nil
 }
 
 // CheckWireBlockSpent checks if the block has any outputs spent by this wallet
@@ -322,6 +361,14 @@ func (w *Wallet) Sign(tx SignableTx) error {
 	}
 
 	return tx.Prove()
+}
+
+func (w *Wallet) GetSavedHeight() (uint64, error) {
+	return w.db.GetWalletHeight()
+}
+
+func (w *Wallet) UpdateWalletHeight(newHeight uint64) error {
+	return w.db.UpdateWalletHeight(newHeight)
 }
 
 func (w *Wallet) PublicKey() key.PublicKey {
