@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
@@ -11,9 +12,9 @@ type Agreement struct {
 	*Extractor
 }
 
-func NewAgreement(eventBroker wire.EventBroker) *Agreement {
+func NewAgreement(eventBroker wire.EventBroker, db database.DB) *Agreement {
 	return &Agreement{
-		Extractor: NewExtractor(eventBroker),
+		Extractor: NewExtractor(eventBroker, db),
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
@@ -49,9 +50,16 @@ type (
 )
 
 // launchStore creates a component that listens to changes to the Provisioners
-func launchStore(eventBroker wire.EventBroker) *Store {
+func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
+	p, err := user.NewProvisioners(db)
+	if err != nil {
+		// If we can not repopulate our committee, we can not properly verify blocks
+		// or run consensus. Thus, it's best to panic.
+		panic(err)
+	}
+
 	store := &Store{
-		provisioners: user.NewProvisioners(nil),
+		provisioners: p,
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)
@@ -59,9 +67,9 @@ func launchStore(eventBroker wire.EventBroker) *Store {
 }
 
 // NewExtractor returns a committee extractor which maintains its own store and cache.
-func NewExtractor(eventBroker wire.EventBroker) *Extractor {
+func NewExtractor(eventBroker wire.EventBroker, db database.DB) *Extractor {
 	return &Extractor{
-		Store:          launchStore(eventBroker),
+		Store:          launchStore(eventBroker, db),
 		committeeCache: make(map[uint8]user.VotingCommittee),
 	}
 }

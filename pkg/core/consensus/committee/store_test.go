@@ -10,13 +10,15 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := launchStore(bus)
+	_, db := lite.SetupDatabase()
+	c := launchStore(bus, db)
 
 	newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -28,7 +30,8 @@ func TestAddProvisioner(t *testing.T) {
 
 func TestRemoveProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := launchStore(bus)
+	_, db := lite.SetupDatabase()
+	c := launchStore(bus, db)
 
 	k := newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -45,7 +48,8 @@ func TestRemoveProvisioner(t *testing.T) {
 // Test that a committee cache keeps copies of produced voting committees.
 func TestUpsertCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	e := NewExtractor(bus)
+	_, db := lite.SetupDatabase()
+	e := NewExtractor(bus, db)
 
 	// add some provisioners
 	newProvisioners(3, 10, bus)
@@ -72,7 +76,8 @@ func TestUpsertCommitteeCache(t *testing.T) {
 // for a different round.
 func TestCleanCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	e := NewExtractor(bus)
+	_, db := lite.SetupDatabase()
+	e := NewExtractor(bus, db)
 
 	// add some provisioners
 	newProvisioners(3, 10, bus)

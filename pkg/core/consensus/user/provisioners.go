@@ -5,8 +5,10 @@ import (
 	"sync"
 	"unsafe"
 
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
@@ -33,7 +35,7 @@ type (
 )
 
 // NewProvisioners returns an initialized Provisioners struct.
-func NewProvisioners(db database.DB) *Provisioners {
+func NewProvisioners(db database.DB) (*Provisioners, error) {
 	p := &Provisioners{
 		set:       sortedset.New(),
 		members:   make(map[string]*Member),
@@ -53,27 +55,22 @@ func NewProvisioners(db database.DB) *Provisioners {
 	}
 
 	p.repopulate(db)
-	return p
+	return p, nil
 }
 
 func (p *Provisioners) repopulate(db database.DB) {
 	var currentHeight uint64
 	err := db.View(func(t database.Transaction) error {
-		state, err := t.FetchState()
-		if err != nil {
-			return err
-		}
-
-		header, err := t.FetchBlockHeader(state.TipHash)
-		if err != nil {
-			return err
-		}
-
-		currentHeight = header.Height
-		return nil
+		var err error
+		currentHeight, err = t.FetchCurrentHeight()
+		return err
 	})
 
-	searchingHeight := 0
+	if err != nil {
+		currentHeight = 0
+	}
+
+	searchingHeight := uint64(0)
 	if currentHeight > transactions.MaxLockTime {
 		searchingHeight = currentHeight - transactions.MaxLockTime
 	}

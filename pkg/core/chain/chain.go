@@ -73,7 +73,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*C
 
 	// set up committee
 	if c == nil {
-		c = committee.NewAgreement(eventBus)
+		c = committee.NewAgreement(eventBus, db)
 	}
 
 	chain := &Chain{
