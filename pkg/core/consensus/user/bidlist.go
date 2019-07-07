@@ -110,6 +110,8 @@ func (b *BidList) RemoveBid(bid Bid) {
 func (b *BidList) RemoveExpired(round uint64) {
 	for _, bid := range *b {
 		if bid.EndHeight < round {
+			// We need to call RemoveBid here and loop twice, as the index
+			// could be off if more than one bid is removed.
 			b.RemoveBid(bid)
 		}
 	}
