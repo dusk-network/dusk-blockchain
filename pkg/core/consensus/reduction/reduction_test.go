@@ -1,11 +1,11 @@
 package reduction_test
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -18,10 +18,6 @@ import (
 )
 
 var timeOut = 200 * time.Millisecond
-
-// func init() {
-// log.SetLevel(log.DebugLevel)
-// }
 
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
@@ -129,6 +125,58 @@ func TestReductionTimeout(t *testing.T) {
 	})
 
 	<-stopChan
+}
+
+func TestTimeOutVariance(t *testing.T) {
+	eb, _ := helper.CreateGossipStreamer()
+	committeeMock := reduction.MockCommittee(2, true)
+	k, _ := user.NewRandKeys()
+
+	// subscribe to reduction results
+	resultChan := make(chan *bytes.Buffer, 1)
+	eb.Subscribe(msg.ReductionResultTopic, resultChan)
+
+	launchReduction(eb, committeeMock, k, timeOut)
+
+	// update round
+	consensus.UpdateRound(eb, 1)
+
+	hash, _ := crypto.RandEntropy(32)
+
+	time.Sleep(200 * time.Millisecond)
+
+	// measure the time it takes for reduction to time out
+	start := time.Now()
+	// send a hash to start reduction
+	sendSelection(1, hash, eb)
+
+	// wait for reduction to finish
+	<-resultChan
+	elapsed1 := time.Now().Sub(start)
+
+	// timer should now have doubled
+	start = time.Now()
+	sendSelection(1, hash, eb)
+
+	// wait for reduction to finish
+	<-resultChan
+	elapsed2 := time.Now().Sub(start)
+
+	// elapsed1 * 2 should be roughly the same as elapsed2
+	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.1)
+
+	// update round
+	consensus.UpdateRound(eb, 2)
+	start = time.Now()
+	// send a hash to start reduction
+	sendSelection(2, hash, eb)
+
+	// wait for reduction to finish
+	<-resultChan
+	elapsed3 := time.Now().Sub(start)
+
+	// elapsed1 and elapsed3 should be roughly the same
+	assert.InDelta(t, elapsed1.Seconds(), elapsed3.Seconds(), 0.05)
 }
 
 // Convenience function, which launches the reduction component and removes the
