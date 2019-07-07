@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
@@ -30,6 +31,19 @@ func (m *messageRouter) Collect(b *bytes.Buffer) error {
 	return nil
 }
 
+func (m *messageRouter) CanRoute(topic topics.Topic) bool {
+	switch topic {
+	case topics.Tx,
+		topics.Candidate,
+		topics.Score,
+		topics.Reduction,
+		topics.Agreement:
+		return true
+	}
+
+	return false
+}
+
 func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	var err error
 	switch topic {
@@ -47,8 +61,12 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	case topics.Block:
 		err = m.synchronizer.Synchronize(b)
 	default:
-		if m.dupeMap.CanFwd(b) {
-			m.publisher.Publish(string(topic), b)
+		if m.CanRoute(topic) {
+			if m.dupeMap.CanFwd(b) {
+				m.publisher.Publish(string(topic), b)
+			}
+		} else {
+			err = fmt.Errorf("%s topic not routable", string(topic))
 		}
 	}
 

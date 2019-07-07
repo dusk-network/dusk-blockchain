@@ -84,6 +84,7 @@ func (b *broker) Listen() {
 			b.reducer.end()
 			b.accumulator.Clear()
 			b.filter.UpdateRound(round)
+			b.ctx.timer.ResetTimeOut()
 		case ev := <-b.selectionChan:
 			if ev == nil {
 				log.WithFields(log.Fields{

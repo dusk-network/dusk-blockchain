@@ -20,27 +20,11 @@ var _signal struct{}
 // EventBus - box for handlers and callbacks.
 type EventBus struct {
 	busLock          sync.RWMutex
-	handlers         map[string][]*channelHandler
-	callbackHandlers map[string][]*callbackHandler
-	streamHandlers   map[string][]*streamHandler
+	handlers         *handlerMap
+	callbackHandlers *handlerMap
+	streamHandlers   *handlerMap
 	preprocessors    map[string][]idTopicProcessor
 	ringbuffer       *ring.Buffer
-}
-
-type callbackHandler struct {
-	id       uint32
-	callback func(*bytes.Buffer) error
-}
-
-type streamHandler struct {
-	id       uint32
-	exitChan chan struct{}
-	topic    string
-}
-
-type channelHandler struct {
-	id             uint32
-	messageChannel chan<- *bytes.Buffer
 }
 
 type idTopicProcessor struct {
@@ -52,9 +36,9 @@ type idTopicProcessor struct {
 func NewEventBus() *EventBus {
 	return &EventBus{
 		sync.RWMutex{},
-		make(map[string][]*channelHandler),
-		make(map[string][]*callbackHandler),
-		make(map[string][]*streamHandler),
+		newHandlerMap(),
+		newHandlerMap(),
+		newHandlerMap(),
 		make(map[string][]idTopicProcessor),
 		ring.NewBuffer(ringBufferLength),
 	}
@@ -63,14 +47,12 @@ func NewEventBus() *EventBus {
 // subscribe handles the subscription logic and is utilized by the public
 // Subscribe functions
 func (bus *EventBus) subscribe(topic string, handler *channelHandler) {
-	bus.handlers[topic] = append(bus.handlers[topic], handler)
+	bus.handlers.Store(topic, handler)
 }
 
 // Subscribe subscribes to a topic with a channel.
 func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer) uint32 {
 	id := rand.Uint32()
-	bus.busLock.Lock()
-	defer bus.busLock.Unlock()
 	bus.subscribe(topic, &channelHandler{
 		id, messageChannel,
 	})
@@ -79,14 +61,12 @@ func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer
 }
 
 func (bus *EventBus) subscribeCallback(topic string, handler *callbackHandler) {
-	bus.callbackHandlers[topic] = append(bus.callbackHandlers[topic], handler)
+	bus.callbackHandlers.Store(topic, handler)
 }
 
 // SubscribeCallback subscribes to a topic with a callback.
 func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer) error) uint32 {
 	id := rand.Uint32()
-	bus.busLock.Lock()
-	defer bus.busLock.Unlock()
 	bus.subscribeCallback(topic, &callbackHandler{
 		id, callback,
 	})
@@ -95,7 +75,7 @@ func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer
 }
 
 func (bus *EventBus) subscribeStream(topic string, handler *streamHandler) {
-	bus.streamHandlers[topic] = append(bus.streamHandlers[topic], handler)
+	bus.streamHandlers.Store(topic, handler)
 }
 
 func newStreamHandler(id uint32, topic string) *streamHandler {
@@ -148,44 +128,10 @@ func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
 
 // Unsubscribe removes a handler defined for a topic.
 // Returns true if a handler is found with the id and the topic specified
-func (bus *EventBus) Unsubscribe(topic string, id uint32) bool {
-	bus.busLock.Lock()
-	defer bus.busLock.Unlock()
-	return bus.unsubscribe(topic, id)
-}
-
-func (bus *EventBus) unsubscribe(topic string, id uint32) bool {
-	if _, ok := bus.handlers[topic]; ok {
-		for i, handler := range bus.handlers[topic] {
-			if handler.id == id {
-				bus.handlers[topic] = append(bus.handlers[topic][:i],
-					bus.handlers[topic][i+1:]...)
-				return true
-			}
-		}
-	}
-
-	if _, ok := bus.callbackHandlers[topic]; ok {
-		for i, handler := range bus.callbackHandlers[topic] {
-			if handler.id == id {
-				bus.callbackHandlers[topic] = append(bus.callbackHandlers[topic][:i],
-					bus.callbackHandlers[topic][i+1:]...)
-				return true
-			}
-		}
-	}
-
-	if _, ok := bus.streamHandlers[topic]; ok {
-		for i, handler := range bus.streamHandlers[topic] {
-			if handler.id == id {
-				bus.streamHandlers[topic] = append(bus.streamHandlers[topic][:i],
-					bus.streamHandlers[topic][i+1:]...)
-				return true
-			}
-		}
-	}
-
-	return false
+func (bus *EventBus) Unsubscribe(topic string, id uint32) {
+	bus.handlers.Delete(topic, id)
+	bus.callbackHandlers.Delete(topic, id)
+	bus.streamHandlers.Delete(topic, id)
 }
 
 // RegisterPreprocessor will add a set of preprocessors to a specified topic.
@@ -258,12 +204,27 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 		return
 	}
 
-	if handlers := bus.getChannelHandlers(topic); len(handlers) > 0 {
-		bus.publish(handlers, processedMsg, topic)
+	if handlers := bus.handlers.Load(topic); handlers != nil {
+		for _, handler := range handlers {
+			if err := handler.Publish(processedMsg); err != nil {
+				log.WithFields(log.Fields{
+					"topic":   topic,
+					"process": "eventbus",
+				}).Warnln("handler.messageChannel buffer failed")
+			}
+		}
 	}
 
-	if callbackHandlers := bus.getCallbackHandlers(topic); len(callbackHandlers) > 0 {
-		bus.publishCallback(callbackHandlers, processedMsg, topic)
+	if callbackHandlers := bus.callbackHandlers.Load(topic); callbackHandlers != nil {
+		for _, handler := range callbackHandlers {
+			if err := handler.Publish(processedMsg); err != nil {
+				log.WithFields(log.Fields{
+					"topic":   topic,
+					"process": "event bus",
+					"error":   err,
+				}).Errorln("error when triggering callback")
+			}
+		}
 	}
 }
 
@@ -278,38 +239,8 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 		return
 	}
 
-	if handlers := bus.getStreamHandlers(topic); len(handlers) > 0 {
+	if handlers := bus.streamHandlers.Load(topic); handlers != nil {
 		bus.ringbuffer.Put(processedMsg.Bytes())
-	}
-}
-
-func (bus *EventBus) publish(handlers []*channelHandler, messageBuffer *bytes.Buffer, topic string) {
-	for _, handler := range handlers {
-		mCopy := copyBuffer(messageBuffer)
-		select {
-		case handler.messageChannel <- mCopy:
-		default:
-			log.WithFields(log.Fields{
-				"id":       handler.id,
-				"topic":    topic,
-				"process":  "eventbus",
-				"capacity": len(handler.messageChannel),
-			}).Warnln("handler.messageChannel buffer failed")
-		}
-	}
-}
-
-func (bus *EventBus) publishCallback(handlers []*callbackHandler, message *bytes.Buffer, topic string) {
-	for _, handler := range handlers {
-		mCopy := copyBuffer(message)
-		if err := handler.callback(mCopy); err != nil {
-			log.WithFields(log.Fields{
-				"id":      handler.id,
-				"topic":   topic,
-				"process": "event bus",
-				"error":   err,
-			}).Errorln("error when triggering callback")
-		}
 	}
 }
 
@@ -320,39 +251,6 @@ func copyBuffer(m *bytes.Buffer) *bytes.Buffer {
 	}
 
 	return &mCopy
-}
-
-func (bus *EventBus) getChannelHandlers(topic string) []*channelHandler {
-	bus.busLock.RLock()
-	defer bus.busLock.RUnlock()
-	handlers := make([]*channelHandler, 0)
-	if busHandlers, ok := bus.handlers[topic]; ok {
-		handlers = append(handlers, busHandlers...)
-	}
-
-	return handlers
-}
-
-func (bus *EventBus) getCallbackHandlers(topic string) []*callbackHandler {
-	bus.busLock.RLock()
-	defer bus.busLock.RUnlock()
-	handlers := make([]*callbackHandler, 0)
-	if busHandlers, ok := bus.callbackHandlers[topic]; ok {
-		handlers = append(handlers, busHandlers...)
-	}
-
-	return handlers
-}
-
-func (bus *EventBus) getStreamHandlers(topic string) []*streamHandler {
-	bus.busLock.RLock()
-	defer bus.busLock.RUnlock()
-	handlers := make([]*streamHandler, 0)
-	if busHandlers, ok := bus.streamHandlers[topic]; ok {
-		handlers = append(handlers, busHandlers...)
-	}
-
-	return handlers
 }
 
 func (bus *EventBus) getPreprocessors(topic string) []idTopicProcessor {

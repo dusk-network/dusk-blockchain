@@ -34,7 +34,7 @@ func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Ti
 }
 
 func (esw *eventStopWatch) fetch() []wire.Event {
-	timer := time.NewTimer(esw.timer.Timeout)
+	timer := time.NewTimer(esw.timer.TimeOut())
 	select {
 	case <-timer.C:
 		return nil
@@ -171,11 +171,13 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 			}).Debugln("Reduction successful")
 
 			r.sendResults(allEvents)
+			return
 		}
 
 		// If we did not get a successful result, we still send a message to the
 		// agreement component so that it stays synced with everyone else.
 		r.sendResults(nil)
+		r.ctx.timer.IncreaseTimeOut()
 	}
 }
 

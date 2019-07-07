@@ -1,7 +1,6 @@
 package user
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,15 +8,13 @@ import (
 )
 
 func TestDeterministicKeyGen(t *testing.T) {
-	seed, _ := crypto.RandEntropy(128)
-
-	r := bytes.NewReader(seed)
-
-	firstKeyPair, err := NewKeysFromSeed(r)
+	seed, err := crypto.RandEntropy(128)
 	assert.Nil(t, err)
 
-	r = bytes.NewReader(seed)
-	secondKeyPair, err := NewKeysFromSeed(r)
+	firstKeyPair, err := NewKeysFromBytes(seed)
+	assert.Nil(t, err)
+
+	secondKeyPair, err := NewKeysFromBytes(seed)
 	assert.Nil(t, err)
 
 	assert.Equal(t, firstKeyPair.BLSPubKeyBytes, secondKeyPair.BLSPubKeyBytes)

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
@@ -125,6 +124,52 @@ func launchReductionTest(inCommittee bool) (*wire.EventBus, *helper.SimpleStream
 	consensus.UpdateRound(eb, 1)
 
 	return eb, streamer, k
+}
+
+func TestTimeOutVariance(t *testing.T) {
+	eb, _, _ := launchReductionTest(true)
+
+	// subscribe to reduction results
+	resultChan := make(chan *bytes.Buffer, 1)
+	eb.Subscribe(msg.ReductionResultTopic, resultChan)
+
+	// update round
+	consensus.UpdateRound(eb, 1)
+
+	time.Sleep(200 * time.Millisecond)
+
+	// measure the time it takes for reduction to time out
+	start := time.Now()
+	// send a hash to start reduction
+	eb.Publish(msg.BestScoreTopic, nil)
+
+	// wait for reduction to finish
+	<-resultChan
+	elapsed1 := time.Now().Sub(start)
+
+	// timer should now have doubled
+	start = time.Now()
+	eb.Publish(msg.BestScoreTopic, nil)
+
+	// wait for reduction to finish
+	<-resultChan
+	elapsed2 := time.Now().Sub(start)
+
+	// elapsed1 * 2 should be roughly the same as elapsed2
+	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.1)
+
+	// update round
+	consensus.UpdateRound(eb, 2)
+	start = time.Now()
+	// send a hash to start reduction
+	eb.Publish(msg.BestScoreTopic, nil)
+
+	// wait for reduction to finish
+	<-resultChan
+	elapsed3 := time.Now().Sub(start)
+
+	// elapsed1 and elapsed3 should be roughly the same
+	assert.InDelta(t, elapsed1.Seconds(), elapsed3.Seconds(), 0.05)
 }
 
 // Convenience function, which launches the reduction component and removes the

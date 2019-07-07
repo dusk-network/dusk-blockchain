@@ -9,6 +9,7 @@ import (
 	"math/big"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
@@ -27,11 +28,12 @@ const numMixins = 7
 type FetchInputs func(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error)
 
 type Wallet struct {
-	db          *database.DB
-	netPrefix   byte
-	keyPair     *key.Key
-	fetchDecoys transactions.FetchDecoys
-	fetchInputs FetchInputs
+	db            *database.DB
+	netPrefix     byte
+	keyPair       *key.Key
+	consensusKeys *user.Keys
+	fetchDecoys   transactions.FetchDecoys
+	fetchInputs   FetchInputs
 }
 
 func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
@@ -47,12 +49,19 @@ func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInp
 	if err != nil {
 		return nil, err
 	}
+
+	consensusKeys, err := generateConsensusKeys(seed)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Wallet{
-		db:          db,
-		netPrefix:   netPrefix,
-		keyPair:     key.NewKeyPair(seed),
-		fetchDecoys: fDecoys,
-		fetchInputs: fInputs,
+		db:            db,
+		netPrefix:     netPrefix,
+		keyPair:       key.NewKeyPair(seed),
+		consensusKeys: &consensusKeys,
+		fetchDecoys:   fDecoys,
+		fetchInputs:   fInputs,
 	}, nil
 }
 
@@ -63,12 +72,18 @@ func Load(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fIn
 		return nil, err
 	}
 
+	consensusKeys, err := generateConsensusKeys(seed)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Wallet{
-		db:          db,
-		netPrefix:   netPrefix,
-		keyPair:     key.NewKeyPair(seed),
-		fetchDecoys: fDecoys,
-		fetchInputs: fInputs,
+		db:            db,
+		netPrefix:     netPrefix,
+		keyPair:       key.NewKeyPair(seed),
+		consensusKeys: &consensusKeys,
+		fetchDecoys:   fDecoys,
+		fetchInputs:   fInputs,
 	}, nil
 }
 
@@ -307,4 +322,16 @@ func fetchSeed(password string) ([]byte, error) {
 	}
 
 	return seed, nil
+}
+
+func generateConsensusKeys(seed []byte) (user.Keys, error) {
+	// Consensus keys require >80 bytes of seed, so we will hash seed twice and concatenate
+	// both hashes to get 128 bytes
+
+	seedHash := sha3.Sum512(seed)
+	secondSeedHash := sha3.Sum512(seedHash[:])
+
+	consensusSeed := append(seedHash[:], secondSeedHash[:]...)
+
+	return user.NewKeysFromBytes(consensusSeed)
 }

@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"strconv"
 	"sync"
-	"time"
 )
 
 var empty struct{}
@@ -42,12 +41,6 @@ type (
 	StepSubscriber struct {
 		StateChan chan struct{}
 		id        uint32
-	}
-
-	// Timer is used to regulate the consensus components which work with a timeout.
-	Timer struct {
-		Timeout     time.Duration
-		TimeoutChan chan struct{}
 	}
 )
 
