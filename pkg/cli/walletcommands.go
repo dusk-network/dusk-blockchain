@@ -34,7 +34,6 @@ func createWallet(args []string, publisher wire.EventPublisher) {
 		return
 	}
 
-	// TODO: add functions
 	w, err := wallet.New(testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
