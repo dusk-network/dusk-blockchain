@@ -108,15 +108,19 @@ func (b *BidList) RemoveBid(bid Bid) {
 
 // RemoveExpired iterates over a BidList to remove expired bids.
 func (b *BidList) RemoveExpired(round uint64) {
-	for i, bid := range *b {
+	for _, bid := range *b {
 		if bid.EndHeight < round {
-			b.remove(bid, i)
+			b.RemoveBid(bid)
 		}
 	}
 }
 
 func (b *BidList) remove(bid Bid, idx int) {
 	list := *b
-	list = append(list[:idx], list[idx+1:]...)
+	if idx == len(list)-1 || idx == 0 {
+		list = list[:idx]
+	} else {
+		list = append(list[:idx], list[idx+1:]...)
+	}
 	*b = list
 }

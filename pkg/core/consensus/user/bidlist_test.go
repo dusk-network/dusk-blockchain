@@ -53,7 +53,18 @@ func TestReconstructBidListSubset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, *bidList, reconstructed)
+	for i := range *bidList {
+		assert.True(t, bidList.Contains(reconstructed[i]))
+	}
+}
+
+func TestRemoveExpired(t *testing.T) {
+	bidList := createBidList(10)
+
+	// All bids have their end height at 1000 - so let's remove them all
+	bidList.RemoveExpired(1001)
+
+	assert.Equal(t, 0, len(*bidList))
 }
 
 func createBidList(amount int) *user.BidList {
@@ -70,5 +81,6 @@ func createBid() user.Bid {
 	var bid user.Bid
 	bidSlice, _ := crypto.RandEntropy(32)
 	copy(bid.X[:], bidSlice)
+	bid.EndHeight = 1000
 	return bid
 }
