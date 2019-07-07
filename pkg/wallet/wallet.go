@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -392,9 +391,7 @@ func generateConsensusKeys(seed []byte) (user.Keys, error) {
 
 	consensusSeed := append(seedHash[:], secondSeedHash[:]...)
 
-	reader := bytes.NewReader(consensusSeed)
-
-	return user.NewKeysFromSeed(reader)
+	return user.NewKeysFromBytes(consensusSeed)
 }
 
 func generateM(PrivateSpend []byte, index uint32) []byte {
