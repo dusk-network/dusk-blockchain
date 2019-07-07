@@ -99,7 +99,8 @@ func TestCleanCommitteeCache(t *testing.T) {
 
 func TestRemoveExpired(t *testing.T) {
 	bus := wire.NewEventBus()
-	e := NewExtractor(bus)
+	_, db := lite.SetupDatabase()
+	e := NewExtractor(bus, db)
 
 	// add some provisioners
 	newProvisioners(3, 10, bus)

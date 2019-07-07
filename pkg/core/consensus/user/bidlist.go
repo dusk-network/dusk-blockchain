@@ -200,7 +200,7 @@ func CalculateX(d []byte, m []byte) Bid {
 	x := zkproof.CalculateX(dScalar, mScalar)
 
 	var bid Bid
-	copy(bid[:], x.Bytes()[:])
+	copy(bid.X[:], x.Bytes()[:])
 	return bid
 }
 

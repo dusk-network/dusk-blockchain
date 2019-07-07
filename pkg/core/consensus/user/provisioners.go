@@ -98,7 +98,7 @@ func (p *Provisioners) repopulate(db database.DB) {
 				continue
 			}
 
-			p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), stake.Lock)
+			p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
 		}
 
 		searchingHeight++
