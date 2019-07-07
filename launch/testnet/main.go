@@ -12,6 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -96,6 +98,15 @@ func main() {
 		}
 	}
 
+	go func() {
+		startingRound, err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys)
+		if err != nil {
+			panic(err)
+		}
+
+		srv.StartConsensus(startingRound)
+	}()
+
 	// TODO: this should be adjusted before testnet release, it is simply a way
 	// to bootstrap the network in an unsophisticated manner
 	if strings.Contains(ips[0], "noip") {
@@ -108,14 +119,10 @@ func main() {
 		}
 
 		srv.eventBus.Publish(string(topics.Block), buf)
-		srv.StartConsensus(2)
 	} else {
 		// Propagate bid and stake out to the network
 		srv.sendStake()
 		srv.sendBid()
-		// wait for stake to appear in an incoming accepted block
-		height := waitForStake(srv.eventBus, srv.MyStake)
-		srv.StartConsensus(height + 1)
 	}
 
 	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
@@ -127,6 +134,9 @@ func main() {
 	// shutdown is requested through one of the subsystems such as the RPC
 	// server.
 	<-interrupt
+
+	// Graceful shutdown of listening components
+	srv.eventBus.Publish(msg.QuitTopic, new(bytes.Buffer))
 
 	log.WithField("prefix", "main").Info("Terminated")
 }

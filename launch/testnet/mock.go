@@ -15,8 +15,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
@@ -80,25 +78,6 @@ func getGenesisBlock() *block.Block {
 	}
 
 	return genesisBlock
-}
-
-func waitForStake(bus *wire.EventBus, myStake *transactions.Stake) uint64 {
-	blockChan := make(chan *bytes.Buffer, 100)
-	id := bus.Subscribe(string(topics.AcceptedBlock), blockChan)
-	for {
-		blkBuf := <-blockChan
-		blk := block.NewBlock()
-		if err := blk.Decode(blkBuf); err != nil {
-			panic(err)
-		}
-
-		for _, tx := range blk.Txs {
-			if tx.Equals(myStake) {
-				bus.Unsubscribe(string(topics.AcceptedBlock), id)
-				return blk.Header.Height
-			}
-		}
-	}
 }
 
 func makeStake(keys *user.Keys) *transactions.Stake {

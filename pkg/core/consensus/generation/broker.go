@@ -55,6 +55,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	return &broker{
 		publisher:            eventBroker,
@@ -63,7 +64,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		bidListChan:          consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		acceptedBlockChan:    consensus.InitAcceptedBlockUpdate(eventBroker),
+		acceptedBlockChan:    acceptedBlockChan,
 		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
 		seeder:               &seeder{keys: keys},
 	}
