@@ -5,28 +5,46 @@ import (
 	"fmt"
 	"os"
 
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+
 	ristretto "github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	wallet "gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
+	walletdb "gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
+
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
 )
 
 var testnet = byte(2)
 var dbName = "walletDb"
 
-func createWallet(args []string, publisher wire.EventPublisher) {
+// cliWallet will be used to scan blocks in the background
+// when we received a topic.AcceptedBlock
+var cliWallet *wallet.Wallet
+
+// DBInstance will be used to close any open connections to
+// the database
+var DBInstance *walletdb.DB
+
+func createWalletCMD(args []string, publisher wire.EventBroker) {
+
+	if DBInstance != nil {
+		DBInstance.Close()
+	}
+
 	if args == nil || len(args) < 1 {
 		fmt.Fprintf(os.Stdout, commandInfo["createwallet"]+"\n")
 		return
 	}
 	password := args[0]
 
-	db, err := database.New(dbName)
-	defer db.Close()
+	db, err := walletdb.New(dbName)
 	if err != nil {
 		// TODO: use logger over fmt.Print
 		fmt.Fprintf(os.Stdout, "error opening database: %v\n", err)
@@ -46,30 +64,64 @@ func createWallet(args []string, publisher wire.EventPublisher) {
 
 	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
+
+	cliWallet = w
+	DBInstance = db
 }
 
-func loadWallet(password string) *wallet.Wallet {
+func loadWalletCMD(args []string, publisher wire.EventBroker) {
+	if args == nil || len(args) < 1 {
+		fmt.Fprintf(os.Stdout, commandInfo["loadwallet"]+"\n")
+		return
+	}
+	password := args[0]
+
+	w, err := loadWallet(password)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
+		return
+	}
+
+	pubAddr, err := w.PublicAddress()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to get your public address: %v\n", err)
+		return
+	}
+
+	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
+	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
+
+	cliWallet = w
+}
+
+func loadWallet(password string) (*wallet.Wallet, error) {
+
+	if DBInstance != nil {
+		DBInstance.Close()
+	}
 
 	// First load the database
-	db, err := database.New(dbName)
+	db, err := walletdb.New(dbName)
 	if err != nil {
-		// TODO: use logger over fmt.Print
-		fmt.Fprintf(os.Stdout, "error opening database: %v\n", err)
-		return nil
+		db.Close()
+		return nil, err
 	}
 
 	// Then load the wallet
 	w, err := wallet.LoadFromFile(testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
-		return nil
+		db.Close()
+		return nil, err
 	}
 
-	return w
+	cliWallet = w
+	DBInstance = db
+
+	return w, nil
 
 }
 
-func transfer(args []string, publisher wire.EventPublisher) {
+func transferCMD(args []string, publisher wire.EventBroker) {
 	if args == nil || len(args) < 4 {
 		fmt.Fprintf(os.Stdout, commandInfo["transfer"]+"\n")
 		return
@@ -90,7 +142,11 @@ func transfer(args []string, publisher wire.EventPublisher) {
 	password := args[3]
 
 	// Load wallet using password
-	w := loadWallet(password)
+	w, err := loadWallet(password)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
+		return
+	}
 
 	// Create a new standard tx
 	tx, err := w.NewStandardTx(int64(fee))
@@ -124,7 +180,7 @@ func transfer(args []string, publisher wire.EventPublisher) {
 	publisher.Publish(string(topics.Tx), buf)
 }
 
-func sendStake(args []string, publisher wire.EventPublisher) {
+func sendStakeCMD(args []string, publisher wire.EventBroker) {
 	if args == nil || len(args) < 4 {
 		fmt.Fprintf(os.Stdout, commandInfo["stake"]+"\n")
 		return
@@ -148,7 +204,11 @@ func sendStake(args []string, publisher wire.EventPublisher) {
 	password := args[3]
 
 	// Load wallet using password
-	w := loadWallet(password)
+	w, err := loadWallet(password)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
+		return
+	}
 
 	// Create a new stake tx
 	tx, err := w.NewStakeTx(int64(fee), lockTime, amount)
@@ -179,7 +239,7 @@ func sendStake(args []string, publisher wire.EventPublisher) {
 	publisher.Publish(string(topics.Tx), buf)
 }
 
-func sendBid(args []string, publisher wire.EventPublisher) {
+func sendBidCMD(args []string, publisher wire.EventBroker) {
 	if args == nil || len(args) < 4 {
 		fmt.Fprintf(os.Stdout, commandInfo["bid"]+"\n")
 		return
@@ -203,7 +263,11 @@ func sendBid(args []string, publisher wire.EventPublisher) {
 	password := args[3]
 
 	// Load wallet using password
-	w := loadWallet(password)
+	w, err := loadWallet(password)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
+		return
+	}
 
 	// Create a new bid tx
 	tx, err := w.NewBidTx(int64(fee), lockTime, amount)
@@ -234,6 +298,95 @@ func sendBid(args []string, publisher wire.EventPublisher) {
 	publisher.Publish(string(topics.Tx), buf)
 }
 
+func syncWalletCMD(args []string, publisher wire.EventBroker) {
+
+	if cliWallet == nil {
+		fmt.Fprintf(os.Stdout, "please load a wallet before trying to sync\n")
+		return
+	}
+
+	// keep looping until tipHash = currentBlockHash
+	for {
+		// Get Wallet height
+		walletHeight, err := cliWallet.GetSavedHeight()
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error fetching wallet height: %v\n", err)
+			return
+		}
+		// Get next block using walletHeight and tipHash of the node
+		blk, tipHash, err := fetchBlockHeightAndState(walletHeight)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error fetching block from node db: %v\n", err)
+			return
+		}
+		// call wallet.CheckBlock
+		_, _, err = cliWallet.CheckWireBlock(*blk)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error fetching block: %v\n", err)
+			return
+		}
+		// check if state is equal to the block that we fetched
+		if bytes.Equal(tipHash, blk.Header.Hash) {
+			break
+		}
+	}
+
+	// listen to bus for blocks
+	go waitForBlock(publisher)
+}
+
+func waitForBlock(bus wire.EventBroker) {
+	blockChan := make(chan *bytes.Buffer, 100)
+	bus.Subscribe(string(topics.AcceptedBlock), blockChan)
+	for {
+		blkBuf := <-blockChan
+		blk := block.NewBlock()
+		if err := blk.Decode(blkBuf); err != nil {
+			fmt.Fprintf(os.Stdout, "error decoding block: %v\n", err)
+			return
+		}
+
+		_, _, err := cliWallet.CheckWireBlock(*blk)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error checking block: %v\n", err)
+			return
+		}
+	}
+}
+
+func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
+	drvr, err := database.From(cfg.Get().Database.Driver)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var blk *block.Block
+	var state *database.State
+	err = db.View(func(t database.Transaction) error {
+		hash, err := t.FetchBlockHashByHeight(0)
+		if err != nil {
+			return err
+		}
+		state, err = t.FetchState()
+		if err != nil {
+			return err
+		}
+
+		blk, err = t.FetchBlock(hash)
+		return err
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blk, state.TipHash, nil
+}
+
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
 	var pubKeys []mlsag.PubKeys
 	for i := 0; i < numMixins; i++ {
@@ -257,7 +410,7 @@ func generateDualKey() mlsag.PubKeys {
 	return pubkeys
 }
 
-func fetchInputs(netPrefix byte, db *database.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
+func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
 	// Fetch all inputs from database that are >= totalAmount
 	// returns error if inputs do not add up to total amount
 	privSpend, err := key.PrivateSpend()
