@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"math/big"
-
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
 	logger "github.com/sirupsen/logrus"
@@ -138,8 +136,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 		return err
 	}
 
-	totalAmount := getTxTotalOutputAmount(tx)
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, totalAmount); err != nil {
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, tx.GetOutputAmount()); err != nil {
 		return err
 	}
 
@@ -152,8 +149,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 }
 
 func (c *Chain) addBidder(tx *transactions.Bid) error {
-	totalAmount := getTxTotalOutputAmount(tx)
-	x := calculateX(totalAmount, tx.M)
+	x := calculateX(tx.Outputs[0].EncryptedAmount, tx.M)
 	bids := &user.BidList{}
 	bids.AddBid(x)
 
@@ -182,18 +178,9 @@ func (c *Chain) Close() error {
 	return drvr.Close()
 }
 
-func getTxTotalOutputAmount(tx transactions.Transaction) (totalAmount uint64) {
-	for _, output := range tx.StandardTX().Outputs {
-		amount := big.NewInt(0).SetBytes(output.Commitment).Uint64()
-		totalAmount += amount
-	}
-
-	return
-}
-
-func calculateX(d uint64, m []byte) user.Bid {
+func calculateX(d []byte, m []byte) user.Bid {
 	dScalar := ristretto.Scalar{}
-	dScalar.SetBigInt(big.NewInt(0).SetUint64(d))
+	dScalar.UnmarshalBinary(d)
 
 	mScalar := ristretto.Scalar{}
 	mScalar.UnmarshalBinary(m)
