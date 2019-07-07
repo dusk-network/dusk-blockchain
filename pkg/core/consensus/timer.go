@@ -23,7 +23,9 @@ func NewTimer(timeOut time.Duration, timeOutChan chan struct{}) *Timer {
 func (t *Timer) IncreaseTimeOut() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.timeOut = t.timeOut * 2
+	if t.timeOut < t.baseTimeOut*2^10 {
+		t.timeOut = t.timeOut * 2
+	}
 }
 
 func (t *Timer) ResetTimeOut() {
