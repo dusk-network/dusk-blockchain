@@ -371,7 +371,7 @@ func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
 	var blk *block.Block
 	var state *database.State
 	err = db.View(func(t database.Transaction) error {
-		hash, err := t.FetchBlockHashByHeight(0)
+		hash, err := t.FetchBlockHashByHeight(height)
 		if err != nil {
 			return err
 		}
