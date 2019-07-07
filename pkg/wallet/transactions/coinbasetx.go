@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	wiretx "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 
 	"github.com/bwesterb/go-ristretto"
@@ -15,6 +16,8 @@ type CoinbaseTx struct {
 	netPrefix byte
 	r         ristretto.Scalar
 	R         ristretto.Point
+	Score     []byte
+	Proof     []byte
 	Rewards   []*Output
 }
 
@@ -113,4 +116,24 @@ func (c *CoinbaseTx) Decode(r io.Reader) error {
 func (s *CoinbaseTx) setTxPubKey(r ristretto.Scalar) {
 	s.r = r
 	s.R.ScalarMultBase(&r)
+}
+
+func (s *CoinbaseTx) WireCoinbaseTx() (*wiretx.Coinbase, error) {
+	c := &wiretx.Coinbase{}
+
+	c.Proof = s.Proof
+	c.Score = s.Score
+	c.R = s.R.Bytes()
+
+	for _, reward := range s.Rewards {
+		wireOut, err := wiretx.NewOutput([]byte{}, reward.PubKey.P.Bytes())
+		if err != nil {
+			return nil, err
+		}
+		wireOut.EncryptedAmount = reward.amount.Bytes()
+		wireOut.EncryptedMask = []byte{}
+
+		c.AddReward(wireOut)
+	}
+	return c, nil
 }

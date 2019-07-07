@@ -31,11 +31,11 @@ func TestNewWallet(t *testing.T) {
 	assert.Nil(t, err)
 
 	// wrong wallet password
-	loadedWallet, err := Load(netPrefix, db, generateDecoys, fetchInputs, "wrongPass")
+	loadedWallet, err := LoadFromFile(netPrefix, db, generateDecoys, fetchInputs, "wrongPass")
 	assert.NotNil(t, err)
 
 	// correct wallet password
-	loadedWallet, err = Load(netPrefix, db, generateDecoys, fetchInputs, "pass")
+	loadedWallet, err = LoadFromFile(netPrefix, db, generateDecoys, fetchInputs, "pass")
 	assert.Nil(t, err)
 
 	assert.Equal(t, w.PublicKey(), loadedWallet.PublicKey())
