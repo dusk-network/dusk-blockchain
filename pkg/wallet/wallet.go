@@ -188,7 +188,7 @@ func (w *Wallet) CheckWireBlock(blk block.Block) (uint64, uint64, error) {
 		return 0, 0, err
 	}
 
-	err = w.UpdateWalletHeight(blk.Header.Height)
+	err = w.UpdateWalletHeight(blk.Header.Height + 1)
 	if err != nil {
 		return 0, 0, err
 	}
