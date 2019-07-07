@@ -83,6 +83,7 @@ func (f *scoreBroker) onRoundUpdate(round uint64) {
 	f.handler.ResetThreshold()
 	f.filter.FlushQueue()
 	f.selector.startSelection()
+	f.selector.timer.ResetTimeOut()
 }
 
 func (f *scoreBroker) onRegeneration(state consensus.AsyncState) {
@@ -93,6 +94,7 @@ func (f *scoreBroker) onRegeneration(state consensus.AsyncState) {
 	}).Debugln("received regeneration message")
 	if state.Round == f.selector.state.Round() {
 		f.handler.LowerThreshold()
+		f.selector.timer.IncreaseTimeOut()
 		if !f.selector.isRunning() {
 			f.selector.startSelection()
 			return
