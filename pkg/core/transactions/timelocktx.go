@@ -26,6 +26,7 @@ type TimeLock struct {
 // TimeLockBlockZero is the integer that represents the blockHeight of zero for
 // a timelock transaction
 const TimeLockBlockZero = 0x8000000000000000
+const MaxLockTime = 250000
 
 // NewTimeLock will return a TimeLock transaction
 // Given the tx version, the locktime and the fee

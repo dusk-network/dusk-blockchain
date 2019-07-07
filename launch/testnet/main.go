@@ -10,7 +10,10 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -26,7 +29,6 @@ func initLog(file *os.File) {
 	}
 
 	if file != nil {
-		os.Stdout = file
 		log.SetOutput(file)
 	} else {
 		log.SetOutput(os.Stdout)
@@ -37,6 +39,8 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
+	// TODO: use logging for this?
+	fmt.Fprintln(os.Stdout, "initializing node...")
 	// Loading all node configurations. Fail-fast if critical error occurs
 	if err := cfg.Load(); err != nil {
 		fmt.Printf("%v\n", err)
@@ -94,6 +98,15 @@ func main() {
 		}
 	}
 
+	go func() {
+		startingRound, err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys)
+		if err != nil {
+			panic(err)
+		}
+
+		srv.StartConsensus(startingRound)
+	}()
+
 	// TODO: this should be adjusted before testnet release, it is simply a way
 	// to bootstrap the network in an unsophisticated manner
 	if strings.Contains(ips[0], "noip") {
@@ -106,20 +119,24 @@ func main() {
 		}
 
 		srv.eventBus.Publish(string(topics.Block), buf)
-		srv.StartConsensus(2)
 	} else {
 		// Propagate bid and stake out to the network
 		srv.sendStake()
 		srv.sendBid()
-		// wait for stake to appear in an incoming accepted block
-		height := waitForStake(srv.eventBus, srv.MyStake)
-		srv.StartConsensus(height + 1)
 	}
+
+	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
+
+	// Start interactive shell
+	go cli.Start(srv.eventBus)
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
 	// server.
 	<-interrupt
+
+	// Graceful shutdown of listening components
+	srv.eventBus.Publish(msg.QuitTopic, new(bytes.Buffer))
 
 	log.WithField("prefix", "main").Info("Terminated")
 }

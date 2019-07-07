@@ -32,13 +32,13 @@ type (
 // Launch creates and wires a broker, initiating the components that
 // have to do with Block Reduction
 func Launch(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
-	timeout time.Duration) {
+	timeout time.Duration, rpcBus *wire.RPCBus) {
 	if committee == nil {
 		committee = newReductionCommittee(eventBroker)
 	}
 
 	handler := newReductionHandler(committee, keys)
-	broker := newBroker(eventBroker, handler, timeout)
+	broker := newBroker(eventBroker, handler, timeout, rpcBus)
 	go broker.Listen()
 }
 
@@ -53,7 +53,7 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 }
 
 // newBroker will return a reduction broker.
-func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout time.Duration) *broker {
+func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout time.Duration, rpcBus *wire.RPCBus) *broker {
 	scoreChan := initBestScoreUpdate(eventBroker)
 	ctx := newCtx(handler, timeout)
 	accumulator := consensus.NewAccumulator(ctx.handler, consensus.NewAccumulatorStore(), ctx.state, true)
@@ -68,7 +68,7 @@ func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout 
 		accumulator:     accumulator,
 		selectionChan:   scoreChan,
 		stepChan:        stepSub.StateChan,
-		reducer:         newReducer(accumulator.CollectedVotesChan, ctx, eventBroker, accumulator),
+		reducer:         newReducer(accumulator.CollectedVotesChan, ctx, eventBroker, accumulator, rpcBus),
 	}
 }
 

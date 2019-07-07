@@ -111,6 +111,14 @@ func (c *Chain) Listen() {
 			c.mu.RUnlock()
 
 			r.RespChan <- *buf
+
+		case r := <-wire.VerifyCandidateBlockChan:
+			if err := c.verifyCandidateBlock(r.Params.Bytes()); err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
+			r.RespChan <- bytes.Buffer{}
 		}
 	}
 }
@@ -300,15 +308,6 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 }
 
 func (c *Chain) handleCandidateBlock(candidate block.Block) error {
-	// Ensure the candidate block satisfies all chain rules
-	c.mu.RLock()
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, candidate); err != nil {
-		log.Errorf("verifying the candidate block failed: %s", err.Error())
-		c.mu.RUnlock()
-		return err
-	}
-	c.mu.RUnlock()
-
 	// Save it into persistent storage
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreCandidateBlock(&candidate)
@@ -322,14 +321,40 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	return nil
 }
 
-func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
+func (c *Chain) handleWinningHash(blockHash []byte) error {
+	// Fetch the candidate block that the winningHash points at
+	candidate, err := c.fetchCandidateBlock(blockHash)
+	if err != nil {
+		log.Errorf("fetching a candidate block failed: %s", err.Error())
+		return err
+	}
+
+	// Run the general procedure of block accepting
+	return c.AcceptBlock(*candidate)
+}
+
+func (c *Chain) fetchCandidateBlock(hash []byte) (*block.Block, error) {
 	var candidate *block.Block
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
-		candidate, err = t.FetchCandidateBlock(blockHash)
+		candidate, err = t.FetchCandidateBlock(hash)
 		return err
 	})
 
+	return candidate, err
+}
+
+func (c *Chain) verifyCandidateBlock(hash []byte) error {
+	candidate, err := c.fetchCandidateBlock(hash)
+	if err != nil {
+		return err
+	}
+
+	return verifiers.CheckBlock(c.db, c.prevBlock, *candidate)
+}
+
+func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
+	candidate, err := c.fetchCandidateBlock(blockHash)
 	if err != nil {
 		log.Errorf("error fetching candidate block to add certificate: %s", err.Error())
 		return

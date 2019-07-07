@@ -73,9 +73,9 @@ type (
 		subscriber     EventSubscriber
 		eventCollector EventCollector
 		msgChan        <-chan *bytes.Buffer
-		MsgChanID      uint32
-		quitChan       <-chan *bytes.Buffer
-		QuitChanID     uint32
+		msgChanID      uint32
+		quitChan       chan *bytes.Buffer
+		quitChanID     uint32
 		topic          string
 	}
 
@@ -139,42 +139,47 @@ func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topi
 	return &TopicListener{
 		subscriber:     subscriber,
 		msgChan:        msgChan,
-		MsgChanID:      msgChanID,
+		msgChanID:      msgChanID,
 		quitChan:       quitChan,
-		QuitChanID:     quitChanID,
+		quitChanID:     quitChanID,
 		topic:          topic,
 		eventCollector: collector,
 	}
 }
 
-// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect. It accepts a variadic number of TopicProcessors which pre-process the buffer before passing it to the Collector
+// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect.
 func (n *TopicListener) Accept() {
 	log.WithFields(log.Fields{
-		"id":    n.MsgChanID,
+		"id":    n.msgChanID,
 		"topic": n.topic,
 	}).Debugln("Accepting messages")
 	for {
 		select {
 		case <-n.quitChan:
-			n.subscriber.Unsubscribe(n.topic, n.MsgChanID)
-			n.subscriber.Unsubscribe(string(QuitTopic), n.QuitChanID)
+			n.subscriber.Unsubscribe(n.topic, n.msgChanID)
+			n.subscriber.Unsubscribe(string(QuitTopic), n.quitChanID)
 			return
 		case eventBuffer := <-n.msgChan:
 			if len(n.msgChan) > 10 {
 				log.WithFields(log.Fields{
-					"id":         n.MsgChanID,
+					"id":         n.msgChanID,
 					"topic":      n.topic,
 					"Unconsumed": len(n.msgChan),
 				}).Debugln("Channel is accumulating messages")
 			}
 			if err := n.eventCollector.Collect(eventBuffer); err != nil {
 				log.WithError(err).WithFields(log.Fields{
-					"id":    n.MsgChanID,
+					"id":    n.msgChanID,
 					"topic": n.topic,
 				}).Errorln("Error in eventCollector.Collect")
 			}
 		}
 	}
+}
+
+// Quit will kill the goroutine spawned by Accept, and unsubscribe from it's subscribed topics.
+func (n *TopicListener) Quit() {
+	n.quitChan <- new(bytes.Buffer)
 }
 
 // AddTopic is a convenience function to add a specified topic at the start of

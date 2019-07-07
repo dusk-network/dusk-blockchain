@@ -98,7 +98,6 @@ func Setup() *Server {
 	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
 	go f.StartConsensus()
 
-	// Creating stake and bid
 	stake := makeStake(srv.keys)
 	srv.MyStake = stake
 
@@ -106,7 +105,6 @@ func Setup() *Server {
 	srv.MyBid = bid
 	srv.d = d
 	srv.k = k
-
 	// Launching generation component
 	// TODO: this should be more properly structured
 	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil, *srv.keys)
@@ -118,7 +116,7 @@ func Setup() *Server {
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
-	acceptedBlockChan := consensus.InitAcceptedBlockUpdate(eventBus)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 	dupeBlacklist := dupemap.NewDupeMap(1)
 	go func() {
 		for {

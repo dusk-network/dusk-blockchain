@@ -84,7 +84,7 @@ func (s *StakeTx) Decode(r io.Reader) error {
 	return binary.Read(r, binary.BigEndian, &s.PubKeyBLS)
 }
 
-func (s *StakeTx) WireStake() (*wiretx.Stake, error) {
+func (s *StakeTx) WireStakeTx() (*wiretx.Stake, error) {
 
 	tl, err := s.WireTimeLockTx()
 	if err != nil {

@@ -43,7 +43,7 @@ func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	reputation.Launch(c.eventBus)
 	selection.Launch(c.eventBus, nil, c.timerLength)
-	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength)
+	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength, c.rpcBus)
 	agreement.Launch(c.eventBus, nil, c.Keys)
 	log.WithField("process", "factory").Info("Consensus Started")
 }
