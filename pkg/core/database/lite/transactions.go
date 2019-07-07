@@ -293,3 +293,17 @@ func (t *transaction) FetchBlock(hash []byte) (*block.Block, error) {
 		Txs:    txs,
 	}, nil
 }
+
+func (t *transaction) FetchCurrentHeight() (uint64, error) {
+	state, err := t.FetchState()
+	if err != nil {
+		return 0, err
+	}
+
+	header, err := t.FetchBlockHeader(state.TipHash)
+	if err != nil {
+		return 0, err
+	}
+
+	return header.Height, nil
+}
