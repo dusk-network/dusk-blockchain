@@ -105,6 +105,7 @@ func newProvisioner(stake uint64, eb *wire.EventBus) user.Keys {
 
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, 0)
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, 1000)
 
 	eb.Publish(msg.NewProvisionerTopic, buffer)
 	return k
