@@ -25,7 +25,6 @@ func createWallet(args []string, publisher wire.EventPublisher) {
 	}
 	password := args[0]
 
-	// TODO: add proper path
 	db, err := database.New(dbName)
 	defer db.Close()
 	if err != nil {
