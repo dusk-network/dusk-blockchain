@@ -4,6 +4,8 @@ var commandInfo = map[string]string{
 	"help": `Show this menu`,
 	"createwallet": `Usage: createwallet [password]
 		Create an encrypted wallet file.`,
+	"loadwallet": `Usage: loadwallet [password]
+		Loads the encrypted wallet file.`,
 	"transfer": `Usage: transfer [amount] [address] [fee] [password]
 		Send DUSK to a given address. Fee is optional, will use standard value if not specified.`,
 	"stake": `Usage: stake [amount] [locktime] [fee] [password]
