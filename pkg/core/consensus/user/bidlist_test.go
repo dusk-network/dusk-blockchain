@@ -44,7 +44,7 @@ func TestReconstructBidListSubset(t *testing.T) {
 	// Turn it into a straight slice of bytes
 	bidListBytes := make([]byte, 0)
 	for _, bid := range *bidList {
-		bidListBytes = append(bidListBytes, bid[:]...)
+		bidListBytes = append(bidListBytes, bid.X[:]...)
 	}
 
 	// Now reconstruct it, and check if it is equal to the initial bidList
@@ -69,6 +69,6 @@ func createBidList(amount int) *user.BidList {
 func createBid() user.Bid {
 	var bid user.Bid
 	bidSlice, _ := crypto.RandEntropy(32)
-	copy(bid[:], bidSlice)
+	copy(bid.X[:], bidSlice)
 	return bid
 }
