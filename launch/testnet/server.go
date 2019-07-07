@@ -98,6 +98,13 @@ func Setup() *Server {
 	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
 	go f.StartConsensus()
 
+	stake := makeStake(srv.keys)
+	srv.MyStake = stake
+
+	bid, d, k := makeBid()
+	srv.MyBid = bid
+	srv.d = d
+	srv.k = k
 	// Launching generation component
 	// TODO: this should be more properly structured
 	generation.Launch(eventBus, rpcBus, srv.d, srv.k, nil, nil, *srv.keys)

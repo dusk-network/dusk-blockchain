@@ -96,6 +96,15 @@ func main() {
 		}
 	}
 
+	go func() {
+		startingRound, err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys)
+		if err != nil {
+			panic(err)
+		}
+
+		srv.StartConsensus(startingRound)
+	}()
+
 	// TODO: this should be adjusted before testnet release, it is simply a way
 	// to bootstrap the network in an unsophisticated manner
 	if strings.Contains(ips[0], "noip") {
@@ -113,13 +122,6 @@ func main() {
 		srv.sendStake()
 		srv.sendBid()
 	}
-
-	startingRound, err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys)
-	if err != nil {
-		panic(err)
-	}
-
-	srv.StartConsensus(startingRound)
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
