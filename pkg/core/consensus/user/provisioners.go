@@ -5,7 +5,10 @@ import (
 	"sync"
 	"unsafe"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
@@ -30,11 +33,77 @@ type (
 )
 
 // NewProvisioners returns an initialized Provisioners struct.
-func NewProvisioners() *Provisioners {
-	return &Provisioners{
+func NewProvisioners(db database.DB) *Provisioners {
+	p := &Provisioners{
 		set:       sortedset.New(),
 		members:   make(map[string]*Member),
 		sizeCache: make(map[uint64]int),
+	}
+
+	if db == nil {
+		drvr, err := database.From(cfg.Get().Database.Driver)
+		if err != nil {
+			return nil, err
+		}
+
+		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.repopulate(db)
+	return p
+}
+
+func (p *Provisioners) repopulate(db database.DB) {
+	var currentHeight uint64
+	err := db.View(func(t database.Transaction) error {
+		state, err := t.FetchState()
+		if err != nil {
+			return err
+		}
+
+		header, err := t.FetchBlockHeader(state.TipHash)
+		if err != nil {
+			return err
+		}
+
+		currentHeight = header.Height
+		return nil
+	})
+
+	searchingHeight := 0
+	if currentHeight > transactions.MaxLockTime {
+		searchingHeight = currentHeight - transactions.MaxLockTime
+	}
+
+	for {
+		var blk *block.Block
+		err := db.View(func(t database.Transaction) error {
+			hash, err := t.FetchBlockHashByHeight(searchingHeight)
+			if err != nil {
+				return err
+			}
+
+			blk, err = t.FetchBlock(hash)
+			return err
+		})
+
+		if err != nil {
+			break
+		}
+
+		for _, tx := range blk.Txs {
+			stake, ok := tx.(*transactions.Stake)
+			if !ok {
+				continue
+			}
+
+			p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), stake.Lock)
+		}
+
+		searchingHeight++
 	}
 }
 

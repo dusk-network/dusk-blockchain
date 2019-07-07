@@ -51,7 +51,7 @@ type (
 // launchStore creates a component that listens to changes to the Provisioners
 func launchStore(eventBroker wire.EventBroker) *Store {
 	store := &Store{
-		provisioners: user.NewProvisioners(),
+		provisioners: user.NewProvisioners(nil),
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)
