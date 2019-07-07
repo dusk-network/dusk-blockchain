@@ -33,8 +33,7 @@ func (m *messageRouter) Collect(b *bytes.Buffer) error {
 
 func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	switch topic {
-	case topics.Block,
-		topics.Tx,
+	case topics.Tx,
 		topics.Candidate,
 		topics.Score,
 		topics.Reduction,
