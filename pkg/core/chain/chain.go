@@ -6,15 +6,12 @@ import (
 	"fmt"
 	"sync"
 
-	"math/big"
-
 	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 
 	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
-	"github.com/bwesterb/go-ristretto"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
@@ -28,7 +25,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
@@ -75,7 +71,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*C
 
 	// set up committee
 	if c == nil {
-		c = committee.NewAgreement(eventBus)
+		c = committee.NewAgreement(eventBus, db)
 	}
 
 	chain := &Chain{
@@ -146,8 +142,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 		return err
 	}
 
-	totalAmount := getTxTotalOutputAmount(tx)
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, totalAmount); err != nil {
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, tx.GetOutputAmount()); err != nil {
 		return err
 	}
 
@@ -164,8 +159,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 }
 
 func (c *Chain) addBidder(tx *transactions.Bid) error {
-	totalAmount := getTxTotalOutputAmount(tx)
-	x := calculateX(totalAmount, tx.M)
+	x := user.CalculateX(tx.Outputs[0].EncryptedAmount, tx.M)
 	x.EndHeight = tx.Lock
 	bids := &user.BidList{}
 	bids.AddBid(x)
@@ -193,29 +187,6 @@ func (c *Chain) Close() error {
 	}
 
 	return drvr.Close()
-}
-
-func getTxTotalOutputAmount(tx transactions.Transaction) (totalAmount uint64) {
-	for _, output := range tx.StandardTX().Outputs {
-		amount := big.NewInt(0).SetBytes(output.Commitment).Uint64()
-		totalAmount += amount
-	}
-
-	return
-}
-
-func calculateX(d uint64, m []byte) user.Bid {
-	dScalar := ristretto.Scalar{}
-	dScalar.SetBigInt(big.NewInt(0).SetUint64(d))
-
-	mScalar := ristretto.Scalar{}
-	mScalar.UnmarshalBinary(m)
-
-	x := zkproof.CalculateX(dScalar, mScalar)
-
-	var bid user.Bid
-	copy(bid.X[:], x.Bytes()[:])
-	return bid
 }
 
 func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {

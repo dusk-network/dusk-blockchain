@@ -21,7 +21,7 @@ import (
 // collected a quorum of votes
 func Launch(eventBus *wire.EventBus, c committee.Foldable, keys user.Keys) {
 	if c == nil {
-		c = committee.NewAgreement(eventBus)
+		c = committee.NewAgreement(eventBus, nil)
 	}
 	broker := newBroker(eventBus, c, keys)
 	currentRound := getInitialRound(eventBus)

@@ -18,7 +18,7 @@ import (
 type (
 	scoreHandler struct {
 		lock    sync.RWMutex
-		bidList user.BidList
+		bidList *user.BidList
 
 		// Threshold number that a score needs to be greater than in order to be considered
 		// for selection. Messages with scores lower than this threshold should not be
@@ -41,7 +41,14 @@ type (
 // NewScoreHandler returns a ScoreHandler, which encapsulates specific operations
 // (e.g. verification, validation, marshalling and unmarshalling)
 func newScoreHandler() *scoreHandler {
+	bidList, err := user.NewBidList(nil)
+	if err != nil {
+		// If we can't repopulate the bidlist, panic
+		panic(err)
+	}
+
 	return &scoreHandler{
+		bidList:   bidList,
 		threshold: consensus.NewThreshold(),
 	}
 }

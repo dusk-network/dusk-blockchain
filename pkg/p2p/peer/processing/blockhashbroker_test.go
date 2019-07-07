@@ -11,30 +11,15 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
-
-func setupDatabase() (database.Driver, database.DB) {
-	drvr, err := database.From(lite.DriverName)
-	if err != nil {
-		panic(err)
-	}
-
-	db, err := drvr.Open("", protocol.TestNet, false)
-	if err != nil {
-		panic(err)
-	}
-
-	return drvr, db
-}
 
 // Test the behaviour of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
 
 	// Set up db
 	// TODO: use a mock for this instead
-	_, db := setupDatabase()
+	_, db := lite.SetupDatabase()
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db. Save the hashes for later checking.

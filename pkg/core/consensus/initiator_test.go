@@ -10,20 +10,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func TestInitiate(t *testing.T) {
 	bus := wire.NewEventBus()
 	keys, _ := user.NewRandKeys()
-	_, db := setupDatabase()
+	_, db := lite.SetupDatabase()
 
 	go func() {
 		round, err := consensus.GetStartingRound(bus, db, keys)
@@ -44,20 +42,6 @@ func TestInitiate(t *testing.T) {
 	}
 
 	bus.Publish(string(topics.AcceptedBlock), buf)
-}
-
-func setupDatabase() (database.Driver, database.DB) {
-	drvr, err := database.From(lite.DriverName)
-	if err != nil {
-		panic(err)
-	}
-
-	db, err := drvr.Open("", protocol.TestNet, false)
-	if err != nil {
-		panic(err)
-	}
-
-	return drvr, db
 }
 
 func makeStake(keys *user.Keys) *transactions.Stake {

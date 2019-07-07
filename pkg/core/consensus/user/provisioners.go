@@ -5,7 +5,12 @@ import (
 	"sync"
 	"unsafe"
 
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
@@ -31,11 +36,72 @@ type (
 )
 
 // NewProvisioners returns an initialized Provisioners struct.
-func NewProvisioners() *Provisioners {
-	return &Provisioners{
+func NewProvisioners(db database.DB) (*Provisioners, error) {
+	p := &Provisioners{
 		set:       sortedset.New(),
 		members:   make(map[string]*Member),
 		sizeCache: make(map[uint64]int),
+	}
+
+	if db == nil {
+		drvr, err := database.From(cfg.Get().Database.Driver)
+		if err != nil {
+			return nil, err
+		}
+
+		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.repopulate(db)
+	return p, nil
+}
+
+func (p *Provisioners) repopulate(db database.DB) {
+	var currentHeight uint64
+	err := db.View(func(t database.Transaction) error {
+		var err error
+		currentHeight, err = t.FetchCurrentHeight()
+		return err
+	})
+
+	if err != nil {
+		currentHeight = 0
+	}
+
+	searchingHeight := uint64(0)
+	if currentHeight > transactions.MaxLockTime {
+		searchingHeight = currentHeight - transactions.MaxLockTime
+	}
+
+	for {
+		var blk *block.Block
+		err := db.View(func(t database.Transaction) error {
+			hash, err := t.FetchBlockHashByHeight(searchingHeight)
+			if err != nil {
+				return err
+			}
+
+			blk, err = t.FetchBlock(hash)
+			return err
+		})
+
+		if err != nil {
+			break
+		}
+
+		for _, tx := range blk.Txs {
+			stake, ok := tx.(*transactions.Stake)
+			if !ok {
+				continue
+			}
+
+			p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
+		}
+
+		searchingHeight++
 	}
 }
 
