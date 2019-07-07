@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"math/big"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
@@ -112,4 +113,9 @@ func (s *Stake) Equals(t Transaction) bool {
 	}
 
 	return true
+}
+
+func (s *Stake) GetOutputAmount() uint64 {
+	amount := big.NewInt(0).SetBytes(s.Outputs[0].Commitment).Uint64()
+	return amount
 }

@@ -20,13 +20,20 @@ type Generator interface {
 type proofGenerator struct {
 	d, k    ristretto.Scalar
 	lock    sync.RWMutex
-	bidList user.BidList
+	bidList *user.BidList
 }
 
 func newProofGenerator(d, k ristretto.Scalar) *proofGenerator {
+	bidList, err := user.NewBidList(nil)
+	if err != nil {
+		// If we can't repopulate the bidlist, panic
+		panic(err)
+	}
+
 	return &proofGenerator{
-		d: d,
-		k: k,
+		d:       d,
+		k:       k,
+		bidList: bidList,
 	}
 }
 
@@ -63,15 +70,15 @@ func (g *proofGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 
 // bidsToScalars will take a global public list, take a subset from it, and then
 // return it as a slice of scalars.
-func createBidListSubset(bidList user.BidList) user.BidList {
+func createBidListSubset(bidList *user.BidList) user.BidList {
 	numBids := getNumBids(bidList)
 	return bidList.Subset(numBids)
 }
 
 // getNumBids will return how many bids to include in the bid list subset
 // for the proof.
-func getNumBids(bidList user.BidList) int {
-	numBids := len(bidList)
+func getNumBids(bidList *user.BidList) int {
+	numBids := len(*bidList)
 	if numBids > 10 {
 		numBids = 10
 	}

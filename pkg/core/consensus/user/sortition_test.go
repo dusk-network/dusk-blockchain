@@ -44,7 +44,11 @@ func btoi(k Keys) *big.Int {
 // Test if MemberKeys returns all public keys in the correct order.
 func TestMemberKeys(t *testing.T) {
 
-	p := NewProvisioners()
+	p, err := NewProvisioners(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var ks sortedKeys
 	for i := 0; i < 50; i++ {
 		keys, _ := NewRandKeys()

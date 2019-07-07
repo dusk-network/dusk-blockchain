@@ -85,6 +85,8 @@ type Transaction interface {
 
 	FetchBlock(hash []byte) (*block.Block, error)
 
+	FetchCurrentHeight() (uint64, error)
+
 	// Atomic storage
 	Commit() error
 	Rollback() error

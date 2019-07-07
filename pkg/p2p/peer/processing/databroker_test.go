@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -12,10 +13,7 @@ import (
 
 // Test the behaviour of the data broker, when it receives a GetData message.
 func TestSendData(t *testing.T) {
-
-	// Set up db
-	// TODO: use a mock for this instead
-	_, db := setupDatabase()
+	_, db := lite.SetupDatabase()
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.

@@ -34,7 +34,7 @@ type (
 func Launch(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
 	timeout time.Duration, rpcBus *wire.RPCBus) {
 	if committee == nil {
-		committee = newReductionCommittee(eventBroker)
+		committee = newReductionCommittee(eventBroker, nil)
 	}
 
 	handler := newReductionHandler(committee, keys)

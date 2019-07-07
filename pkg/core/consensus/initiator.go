@@ -26,7 +26,18 @@ func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Ke
 		}
 	}
 
-	found := findActiveStakes(keys, getCurrentHeight(db), db)
+	var currentHeight uint64
+	err := db.View(func(t database.Transaction) error {
+		var err error
+		currentHeight, err = t.FetchCurrentHeight()
+		return err
+	})
+
+	if err != nil {
+		currentHeight = 0
+	}
+
+	found := findActiveStakes(keys, currentHeight, db)
 
 	// Start listening for accepted blocks, regardless of if we found stakes or not
 	acceptedBlockChan, listener := InitAcceptedBlockUpdate(eventBroker)
@@ -40,30 +51,6 @@ func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Ke
 			return blk.Header.Height + 1, nil
 		}
 	}
-}
-
-func getCurrentHeight(db database.DB) uint64 {
-	var height uint64
-	err := db.View(func(t database.Transaction) error {
-		state, err := t.FetchState()
-		if err != nil {
-			return err
-		}
-
-		header, err := t.FetchBlockHeader(state.TipHash)
-		if err != nil {
-			return err
-		}
-
-		height = header.Height
-		return nil
-	})
-
-	if err != nil {
-		return 0
-	}
-
-	return height
 }
 
 func findActiveStakes(keys user.Keys, currentHeight uint64, db database.DB) bool {
