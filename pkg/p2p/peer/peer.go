@@ -111,9 +111,10 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 	return reader, nil
 }
 
-// ReadMessage reads from the connection until encountering a zero byte.
+// ReadMessage reads from the connection
 func (c *Connection) ReadMessage() ([]byte, error) {
-	return c.reader.ReadBytes(0x00)
+	// COBS  c.reader.ReadBytes(0x00)
+	return processing.ReadFrame(c.reader)
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
