@@ -64,16 +64,18 @@ type reducer struct {
 	stale bool
 
 	publisher wire.EventPublisher
+	rpcBus    *wire.RPCBus
 }
 
 func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
-	publisher wire.EventPublisher, accumulator *consensus.Accumulator) *reducer {
+	publisher wire.EventPublisher, accumulator *consensus.Accumulator, rpcBus *wire.RPCBus) *reducer {
 	return &reducer{
 		ctx:         ctx,
 		firstStep:   newEventStopWatch(collectedVotesChan, ctx.timer),
 		secondStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
 		publisher:   publisher,
 		accumulator: accumulator,
+		rpcBus:      rpcBus,
 	}
 }
 
@@ -104,28 +106,61 @@ func (r *reducer) begin() {
 	log.WithField("process", "reducer").Traceln("Beginning Reduction")
 	events := r.firstStep.fetch()
 	log.WithField("process", "reducer").Traceln("First step completed")
-	hash1 := r.extractHash(events)
+	hash := r.handleFirstResult(events)
+
+	eventsSecondStep := r.secondStep.fetch()
+	log.WithField("process", "reducer").Traceln("Second step completed")
+	r.handleSecondResult(events, eventsSecondStep, hash)
+}
+
+func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 	r.lock.RLock()
+	defer r.lock.RUnlock()
 	if !r.stale {
+		r.ctx.state.IncrementStep()
+
 		// if there was a timeout, we should report nodes that did not vote
 		if events == nil {
 			r.propagateAbsentees()
 		}
-		r.ctx.state.IncrementStep()
-		if r.inCommittee() {
-			r.sendReduction(hash1)
-		}
-	}
-	r.lock.RUnlock()
 
-	eventsSecondStep := r.secondStep.fetch()
-	log.WithField("process", "reducer").Traceln("Second step completed")
+		hash := r.extractHash(events)
+		if !r.inCommittee() {
+			return hash
+		}
+
+		// If our result was not a zero value hash, we should first verify it
+		// before voting on it again
+		if !bytes.Equal(hash.Bytes(), make([]byte, 32)) {
+			req := wire.NewRequest(*hash, 5)
+			if _, err := r.rpcBus.Call(wire.VerifyCandidateBlock, req); err != nil {
+				log.WithFields(log.Fields{
+					"process": "reduction",
+					"error":   err,
+				}).Errorln("verifying the candidate block failed")
+				r.sendReduction(bytes.NewBuffer(make([]byte, 32)))
+				return hash
+			}
+		}
+
+		r.sendReduction(hash)
+		return hash
+	}
+
+	return nil
+}
+
+func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash1 *bytes.Buffer) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
+		defer r.ctx.state.IncrementStep()
+		defer r.publishRegeneration()
+
 		if eventsSecondStep == nil {
 			r.propagateAbsentees()
 		}
+
 		hash2 := r.extractHash(eventsSecondStep)
 		if r.isReductionSuccessful(hash1, hash2) {
 			allEvents := append(events, eventsSecondStep...)
@@ -136,15 +171,13 @@ func (r *reducer) begin() {
 			}).Debugln("Reduction successful")
 
 			r.sendResults(allEvents)
-		} else {
-			// If we did not get a successful result, we still send a message to the
-			// agreement component so that it stays synced with everyone else.
-			r.sendResults(nil)
-			r.ctx.timer.IncreaseTimeOut()
+			return
 		}
 
-		r.ctx.state.IncrementStep()
-		r.publishRegeneration()
+		// If we did not get a successful result, we still send a message to the
+		// agreement component so that it stays synced with everyone else.
+		r.sendResults(nil)
+		r.ctx.timer.IncreaseTimeOut()
 	}
 }
 
