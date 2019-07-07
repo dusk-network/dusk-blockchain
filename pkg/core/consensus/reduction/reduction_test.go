@@ -120,6 +120,7 @@ func launchReductionTest(inCommittee bool) (*wire.EventBus, *helper.SimpleStream
 	k, _ := user.NewRandKeys()
 	rpcBus := wire.NewRPCBus()
 	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
+	go launchCandidateVerifier(false)
 	// update round
 	consensus.UpdateRound(eb, 1)
 
@@ -150,6 +151,8 @@ func TestTimeOutVariance(t *testing.T) {
 	// timer should now have doubled
 	start = time.Now()
 	eb.Publish(msg.BestScoreTopic, nil)
+	// set up another goroutine for verification
+	go launchCandidateVerifier(false)
 
 	// wait for reduction to finish
 	<-resultChan
@@ -163,6 +166,8 @@ func TestTimeOutVariance(t *testing.T) {
 	start = time.Now()
 	// send a hash to start reduction
 	eb.Publish(msg.BestScoreTopic, nil)
+	// set up another goroutine for verification
+	go launchCandidateVerifier(false)
 
 	// wait for reduction to finish
 	<-resultChan
