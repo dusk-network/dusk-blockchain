@@ -522,3 +522,17 @@ func (t transaction) FetchState() (*database.State, error) {
 
 	return &database.State{TipHash: value}, nil
 }
+
+func (t transaction) FetchCurrentHeight() (uint64, error) {
+	state, err := t.FetchState()
+	if err != nil {
+		return 0, err
+	}
+
+	header, err := t.FetchBlockHeader(state.TipHash)
+	if err != nil {
+		return 0, err
+	}
+
+	return header.Height, nil
+}
