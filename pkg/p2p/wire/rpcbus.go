@@ -36,6 +36,12 @@ var (
 	// Implemented by mempool
 	GetMempoolTxs     = "getMempoolTxs"
 	GetMempoolTxsChan chan Req
+
+	// Verify a specified candidate block
+	//
+	// Used by the reduction component.
+	VerifyCandidateBlock     = "verifyCandidateBlock"
+	VerifyCandidateBlockChan chan Req
 )
 
 // RPCBus is a request–response mechanism for internal communication between node
@@ -78,6 +84,11 @@ func NewRPCBus() *RPCBus {
 
 	GetMempoolTxsChan = make(chan Req)
 	if err := bus.Register(GetMempoolTxs, GetMempoolTxsChan); err != nil {
+		panic(err)
+	}
+
+	VerifyCandidateBlockChan = make(chan Req)
+	if err := bus.Register(VerifyCandidateBlock, VerifyCandidateBlockChan); err != nil {
 		panic(err)
 	}
 

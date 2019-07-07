@@ -2,6 +2,7 @@ package reduction_test
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -21,22 +22,13 @@ var timeOut = 200 * time.Millisecond
 
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
-	// send a hash to start reduction
-	hash, _ := crypto.RandEntropy(32)
-	committeeMock := reduction.MockCommittee(2, true)
-	k, _ := user.NewRandKeys()
-
-	eventBus, streamer := helper.CreateGossipStreamer()
-	launchReduction(eventBus, committeeMock, k, timeOut)
-	// listen for outgoing votes of either kind, so we can verify they are being
-	// sent out properly.
-
-	// update round
-	consensus.UpdateRound(eventBus, 1)
+	eventBus, streamer, k := launchReductionTest(true)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
 	time.Sleep(200 * time.Millisecond)
+	// send a hash to start reduction
+	hash, _ := crypto.RandEntropy(32)
 	sendSelection(1, hash, eventBus)
 
 	// send mocked events until we get a result from the outgoingAgreement channel
@@ -58,20 +50,13 @@ func TestReduction(t *testing.T) {
 
 // Test that the reducer does not send any messages when it is not part of the committee.
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
-	// send a hash to start reduction
-	hash, _ := crypto.RandEntropy(32)
-	eventBus, streamer := helper.CreateGossipStreamer()
-	committeeMock := reduction.MockCommittee(2, false)
-	k, _ := user.NewRandKeys()
-
-	launchReduction(eventBus, committeeMock, k, timeOut)
-
-	// update round
-	consensus.UpdateRound(eventBus, 1)
+	eventBus, streamer, _ := launchReductionTest(false)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
 	time.Sleep(200 * time.Millisecond)
+	// send a hash to start reduction
+	hash, _ := crypto.RandEntropy(32)
 	sendSelection(1, hash, eventBus)
 
 	// Try to read from the stream, and see if we get any reduction messages from
@@ -92,14 +77,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 
 // Test that timeouts in the reduction phase result in proper behavior.
 func TestReductionTimeout(t *testing.T) {
-	eb, streamer := helper.CreateGossipStreamer()
-	committeeMock := reduction.MockCommittee(2, true)
-	k, _ := user.NewRandKeys()
-
-	launchReduction(eb, committeeMock, k, timeOut)
-
-	// update round
-	consensus.UpdateRound(eb, 1)
+	eb, streamer, _ := launchReductionTest(true)
 
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
@@ -127,28 +105,44 @@ func TestReductionTimeout(t *testing.T) {
 	<-stopChan
 }
 
-func TestTimeOutVariance(t *testing.T) {
-	eb, _ := helper.CreateGossipStreamer()
-	committeeMock := reduction.MockCommittee(2, true)
+func launchCandidateVerifier(failVerification bool) {
+	r := <-wire.VerifyCandidateBlockChan
+	if failVerification {
+		r.ErrChan <- errors.New("verification failed")
+	} else {
+		r.RespChan <- bytes.Buffer{}
+	}
+}
+
+func launchReductionTest(inCommittee bool) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
+	eb, streamer := helper.CreateGossipStreamer()
+	committeeMock := reduction.MockCommittee(2, inCommittee)
 	k, _ := user.NewRandKeys()
+	rpcBus := wire.NewRPCBus()
+	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
+	// update round
+	consensus.UpdateRound(eb, 1)
+
+	return eb, streamer, k
+}
+
+func TestTimeOutVariance(t *testing.T) {
+	eb, _, _ := launchReductionTest(true)
 
 	// subscribe to reduction results
 	resultChan := make(chan *bytes.Buffer, 1)
 	eb.Subscribe(msg.ReductionResultTopic, resultChan)
 
-	launchReduction(eb, committeeMock, k, timeOut)
-
 	// update round
 	consensus.UpdateRound(eb, 1)
-
-	hash, _ := crypto.RandEntropy(32)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// measure the time it takes for reduction to time out
 	start := time.Now()
 	// send a hash to start reduction
-	sendSelection(1, hash, eb)
+	eb.Publish(msg.BestScoreTopic, nil)
+	go launchCandidateVerifier(false)
 
 	// wait for reduction to finish
 	<-resultChan
@@ -156,7 +150,9 @@ func TestTimeOutVariance(t *testing.T) {
 
 	// timer should now have doubled
 	start = time.Now()
-	sendSelection(1, hash, eb)
+	eb.Publish(msg.BestScoreTopic, nil)
+	// set up another goroutine for verification
+	go launchCandidateVerifier(false)
 
 	// wait for reduction to finish
 	<-resultChan
@@ -169,7 +165,9 @@ func TestTimeOutVariance(t *testing.T) {
 	consensus.UpdateRound(eb, 2)
 	start = time.Now()
 	// send a hash to start reduction
-	sendSelection(2, hash, eb)
+	eb.Publish(msg.BestScoreTopic, nil)
+	// set up another goroutine for verification
+	go launchCandidateVerifier(false)
 
 	// wait for reduction to finish
 	<-resultChan
@@ -182,8 +180,8 @@ func TestTimeOutVariance(t *testing.T) {
 // Convenience function, which launches the reduction component and removes the
 // preprocessors for testing purposes (bypassing the republisher and the validator).
 // This ensures proper handling of mocked Reduction events.
-func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration) {
-	reduction.Launch(eb, committee, k, timeOut)
+func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration, rpcBus *wire.RPCBus) {
+	reduction.Launch(eb, committee, k, timeOut, rpcBus)
 	eb.RemoveAllPreprocessors(string(topics.Reduction))
 }
 
