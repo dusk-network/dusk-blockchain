@@ -18,6 +18,7 @@ type (
 		PublicKeyBLS bls.PublicKey
 		Stake        uint64
 		StartHeight  uint64
+		EndHeight    uint64
 	}
 
 	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
@@ -87,7 +88,7 @@ func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
 }
 
 // AddMember will add a Member to the Provisioners by using the bytes of a BLS public key. Returns the index at which the key has been inserted. If the member alredy exists, AddMember overrides its stake with the new one
-func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight uint64) error {
+func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight, endHeight uint64) error {
 	if len(pubKeyEd) != 32 {
 		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
 	}
@@ -107,6 +108,7 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight 
 	m.PublicKeyBLS = *pubKey
 	m.Stake = stake
 	m.StartHeight = startHeight
+	m.EndHeight = endHeight
 
 	i := strPk(pubKeyBLS)
 
@@ -134,6 +136,15 @@ func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
 	return p.set.Remove(pubKeyBLS)
 }
 
+func (p *Provisioners) RemoveExpired(round uint64) {
+	members := p.getMembers()
+	for pk, member := range members {
+		if member.EndHeight < round {
+			p.Remove([]byte(pk))
+		}
+	}
+}
+
 // GetStake will find a certain provisioner in the committee by BLS public key,
 // and return their stake.
 func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
@@ -151,4 +162,11 @@ func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	}
 
 	return m.Stake, nil
+}
+
+func (p *Provisioners) getMembers() map[string]*Member {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	members := p.members
+	return members
 }

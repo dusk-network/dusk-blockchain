@@ -18,7 +18,7 @@ func TestCreateVotingCommittee(t *testing.T) {
 	var totalWeight uint64
 	for i := 0; i < 50; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -53,7 +53,7 @@ func TestMemberAt(t *testing.T) {
 	var ks sortedKeys
 	for i := 0; i < nr; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 		ks = append(ks, keys)
@@ -74,7 +74,7 @@ func TestAddGetMember(t *testing.T) {
 	p := user.NewProvisioners()
 	for i := 0; i < 50; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -96,7 +96,7 @@ func TestAddGetMember(t *testing.T) {
 func TestRemove(t *testing.T) {
 	p := user.NewProvisioners()
 	keys, _ := user.NewRandKeys()
-	if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+	if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 		t.Fatal(err)
 	}
 

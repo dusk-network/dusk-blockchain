@@ -9,11 +9,14 @@ import (
 )
 
 // Bid is the 32 byte X value, created from a bidding transaction amount and M.
-type Bid [32]byte
+type Bid struct {
+	X         [32]byte
+	EndHeight uint64
+}
 
 // Equals will return whether or not the two bids are the same.
 func (b Bid) Equals(bid Bid) bool {
-	return bytes.Equal(b[:], bid[:])
+	return bytes.Equal(b.X[:], bid.X[:])
 }
 
 // BidList is a list of bid X values.
@@ -30,7 +33,7 @@ func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
 	BidList := make(BidList, numBids)
 	for i := 0; i < numBids; i++ {
 		var bid Bid
-		if _, err := r.Read(bid[:]); err != nil {
+		if _, err := r.Read(bid.X[:]); err != nil {
 			return nil, prerror.New(prerror.High, err)
 		}
 
@@ -98,9 +101,28 @@ func (b *BidList) AddBid(bid Bid) {
 func (b *BidList) RemoveBid(bid Bid) {
 	for i, bidFromList := range *b {
 		if bidFromList.Equals(bid) {
-			list := *b
-			list = append(list[:i], list[i+1:]...)
-			*b = list
+			b.remove(bid, i)
 		}
 	}
+}
+
+// RemoveExpired iterates over a BidList to remove expired bids.
+func (b *BidList) RemoveExpired(round uint64) {
+	for _, bid := range *b {
+		if bid.EndHeight < round {
+			// We need to call RemoveBid here and loop twice, as the index
+			// could be off if more than one bid is removed.
+			b.RemoveBid(bid)
+		}
+	}
+}
+
+func (b *BidList) remove(bid Bid, idx int) {
+	list := *b
+	if idx == len(list)-1 || idx == 0 {
+		list = list[:idx]
+	} else {
+		list = append(list[:idx], list[idx+1:]...)
+	}
+	*b = list
 }

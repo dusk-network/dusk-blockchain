@@ -92,6 +92,24 @@ func TestCleanCommitteeCache(t *testing.T) {
 	assert.Equal(t, 1, len(e.committeeCache))
 }
 
+func TestRemoveExpired(t *testing.T) {
+	bus := wire.NewEventBus()
+	e := NewExtractor(bus)
+
+	// add some provisioners
+	newProvisioners(3, 10, bus)
+	// give the committee some time to add the provisioners
+	time.Sleep(100 * time.Millisecond)
+
+	// These stakes all expire at height 1000 - so let's remove them
+	bs := make([]byte, 8)
+	binary.LittleEndian.PutUint64(bs, 1001)
+	e.RemoveExpiredProvisioners(bytes.NewBuffer(bs))
+
+	p := e.Store.Provisioners()
+	assert.Equal(t, 0, p.Size(1001))
+}
+
 func newMockEvent(sender []byte) wire.Event {
 	mockEvent := &mocks.Event{}
 	mockEvent.On("Sender").Return(sender)
@@ -105,6 +123,7 @@ func newProvisioner(stake uint64, eb *wire.EventBus) user.Keys {
 
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, 0)
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, 1000)
 
 	eb.Publish(msg.NewProvisionerTopic, buffer)
 	return k

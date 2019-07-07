@@ -155,6 +155,10 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 		return err
 	}
 
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, startHeight+tx.Lock); err != nil {
+		return err
+	}
+
 	c.eventBus.Publish(msg.NewProvisionerTopic, buffer)
 	return nil
 }
@@ -162,6 +166,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 func (c *Chain) addBidder(tx *transactions.Bid) error {
 	totalAmount := getTxTotalOutputAmount(tx)
 	x := calculateX(totalAmount, tx.M)
+	x.EndHeight = tx.Lock
 	bids := &user.BidList{}
 	bids.AddBid(x)
 
@@ -172,7 +177,7 @@ func (c *Chain) addBidder(tx *transactions.Bid) error {
 func (c *Chain) propagateBidList(bids *user.BidList) {
 	var bidListBytes []byte
 	for _, bid := range *bids {
-		bidListBytes = append(bidListBytes, bid[:]...)
+		bidListBytes = append(bidListBytes, bid.X[:]...)
 	}
 
 	c.eventBus.Publish(msg.BidListTopic, bytes.NewBuffer(bidListBytes))
@@ -209,7 +214,7 @@ func calculateX(d uint64, m []byte) user.Bid {
 	x := zkproof.CalculateX(dScalar, mScalar)
 
 	var bid user.Bid
-	copy(bid[:], x.Bytes()[:])
+	copy(bid.X[:], x.Bytes()[:])
 	return bid
 }
 

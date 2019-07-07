@@ -2,6 +2,7 @@ package committee
 
 import (
 	"bytes"
+	"encoding/binary"
 	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -55,6 +56,7 @@ func launchStore(eventBroker wire.EventBroker) *Store {
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)
+	eventBroker.SubscribeCallback(msg.RoundUpdateTopic, store.RemoveExpiredProvisioners)
 	return store
 }
 
@@ -80,6 +82,14 @@ func (s *Store) RemoveProvisioner(m *bytes.Buffer) error {
 	return nil
 }
 
+func (s *Store) RemoveExpiredProvisioners(m *bytes.Buffer) error {
+	round := binary.LittleEndian.Uint64(m.Bytes())
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.provisioners.RemoveExpired(round)
+	return nil
+}
+
 // AddProvisioner will add a provisioner to the Store's Provisioners object.
 func (s *Store) AddProvisioner(m *bytes.Buffer) error {
 	newProvisioner, err := decodeNewProvisioner(m)
@@ -88,7 +98,7 @@ func (s *Store) AddProvisioner(m *bytes.Buffer) error {
 	}
 
 	if err := s.provisioners.AddMember(newProvisioner.pubKeyEd,
-		newProvisioner.pubKeyBLS, newProvisioner.amount, newProvisioner.startHeight); err != nil {
+		newProvisioner.pubKeyBLS, newProvisioner.amount, newProvisioner.startHeight, newProvisioner.endHeight); err != nil {
 		return err
 	}
 
