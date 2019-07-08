@@ -10,13 +10,15 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := launchStore(bus)
+	_, db := lite.SetupDatabase()
+	c := launchStore(bus, db)
 
 	newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -28,7 +30,8 @@ func TestAddProvisioner(t *testing.T) {
 
 func TestRemoveProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	c := launchStore(bus)
+	_, db := lite.SetupDatabase()
+	c := launchStore(bus, db)
 
 	k := newProvisioner(10, bus)
 	// Give the committee store some time to add the provisioner
@@ -45,7 +48,8 @@ func TestRemoveProvisioner(t *testing.T) {
 // Test that a committee cache keeps copies of produced voting committees.
 func TestUpsertCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	e := NewExtractor(bus)
+	_, db := lite.SetupDatabase()
+	e := NewExtractor(bus, db)
 
 	// add some provisioners
 	newProvisioners(3, 10, bus)
@@ -72,7 +76,8 @@ func TestUpsertCommitteeCache(t *testing.T) {
 // for a different round.
 func TestCleanCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	e := NewExtractor(bus)
+	_, db := lite.SetupDatabase()
+	e := NewExtractor(bus, db)
 
 	// add some provisioners
 	newProvisioners(3, 10, bus)
@@ -92,6 +97,25 @@ func TestCleanCommitteeCache(t *testing.T) {
 	assert.Equal(t, 1, len(e.committeeCache))
 }
 
+func TestRemoveExpired(t *testing.T) {
+	bus := wire.NewEventBus()
+	_, db := lite.SetupDatabase()
+	e := NewExtractor(bus, db)
+
+	// add some provisioners
+	newProvisioners(3, 10, bus)
+	// give the committee some time to add the provisioners
+	time.Sleep(100 * time.Millisecond)
+
+	// These stakes all expire at height 1000 - so let's remove them
+	bs := make([]byte, 8)
+	binary.LittleEndian.PutUint64(bs, 1001)
+	e.RemoveExpiredProvisioners(bytes.NewBuffer(bs))
+
+	p := e.Store.Provisioners()
+	assert.Equal(t, 0, p.Size(1001))
+}
+
 func newMockEvent(sender []byte) wire.Event {
 	mockEvent := &mocks.Event{}
 	mockEvent.On("Sender").Return(sender)
@@ -105,6 +129,7 @@ func newProvisioner(stake uint64, eb *wire.EventBus) user.Keys {
 
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
 	_ = encoding.WriteUint64(buffer, binary.LittleEndian, 0)
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, 1000)
 
 	eb.Publish(msg.NewProvisionerTopic, buffer)
 	return k

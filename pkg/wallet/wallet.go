@@ -4,6 +4,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
+	"errors"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -14,6 +16,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
+	"gitlab.dusk.network/dusk-core/zkproof"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/bwesterb/go-ristretto"
@@ -22,6 +25,8 @@ import (
 
 // Number of mixins per ring. ringsize = mixin + 1
 const numMixins = 7
+
+const walletName = "wallet.dat"
 
 // FetchInputs returns a slice of inputs such that Sum(Inputs)- Sum(Outputs) >= 0
 // If > 0, then a change address is created for the remaining amount
@@ -36,6 +41,12 @@ type Wallet struct {
 	fetchInputs   FetchInputs
 }
 
+type SignableTx interface {
+	AddDecoys(numMixins int, f transactions.FetchDecoys) error
+	Prove() error
+	Standard() (*transactions.StandardTx, error)
+}
+
 func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
 
 	// random seed
@@ -44,8 +55,14 @@ func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInp
 	if err != nil {
 		return nil, err
 	}
+	return LoadFromSeed(seed, netPrefix, db, fDecoys, fInputs, password)
+}
 
-	err = saveSeed(seed, password)
+func LoadFromSeed(seed []byte, netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
+	if len(seed) < 64 {
+		return nil, errors.New("seed must be atleast 64 bytes in size")
+	}
+	err := saveSeed(seed, password)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +82,7 @@ func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInp
 	}, nil
 }
 
-func Load(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
+func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
 
 	seed, err := fetchSeed(password)
 	if err != nil {
@@ -89,6 +106,45 @@ func Load(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fIn
 
 func (w *Wallet) NewStandardTx(fee int64) (*transactions.StandardTx, error) {
 	tx, err := transactions.NewStandard(w.netPrefix, fee)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
+func (w *Wallet) NewStakeTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.StakeTx, error) {
+	edPubBytes := w.consensusKeys.EdPubKeyBytes
+	blsPubBytes := w.consensusKeys.BLSPubKeyBytes
+	tx, err := transactions.NewStakeTx(w.netPrefix, fee, lockTime, edPubBytes, blsPubBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send locked stake amount to self
+	walletAddr, err := w.keyPair.PublicKey().PublicAddress(w.netPrefix)
+	err = tx.AddOutput(*walletAddr, amount)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
+func (w *Wallet) NewBidTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.BidTx, error) {
+	privateSpend, err := w.keyPair.PrivateSpend()
+	privateSpend.Bytes()
+
+	// TODO: index is currently set to be zero.
+	// To avoid any privacy implications, the wallet should increment
+	// the index by how many bidding txs are seen
+	mBytes := generateM(privateSpend.Bytes(), 0)
+	tx, err := transactions.NewBidTx(w.netPrefix, fee, lockTime, mBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send bid amount to self
+	walletAddr, err := w.keyPair.PublicKey().PublicAddress(w.netPrefix)
+	err = tx.AddOutput(*walletAddr, amount)
 	if err != nil {
 		return nil, err
 	}
@@ -244,18 +300,23 @@ func (w *Wallet) AddInputs(tx *transactions.StandardTx) error {
 	return tx.AddOutput(*changeAddr, x)
 }
 
-func (w *Wallet) Sign(tx *transactions.StandardTx) error {
+func (w *Wallet) Sign(tx SignableTx) error {
 
 	// Assuming user has added all of the outputs
 
+	standardTx, err := tx.Standard()
+	if err != nil {
+		return err
+	}
+
 	// Fetch Inputs
-	err := w.AddInputs(tx)
+	err = w.AddInputs(standardTx)
 	if err != nil {
 		return err
 	}
 
 	// Fetch decoys
-	err = tx.AddDecoys(numMixins, w.fetchDecoys)
+	err = standardTx.AddDecoys(numMixins, w.fetchDecoys)
 	if err != nil {
 		return err
 	}
@@ -265,6 +326,14 @@ func (w *Wallet) Sign(tx *transactions.StandardTx) error {
 
 func (w *Wallet) PublicKey() key.PublicKey {
 	return *w.keyPair.PublicKey()
+}
+
+func (w *Wallet) PublicAddress() (string, error) {
+	pubAddr, err := w.keyPair.PublicKey().PublicAddress(w.netPrefix)
+	if err != nil {
+		return "", err
+	}
+	return pubAddr.String(), nil
 }
 
 // Save saves the seed to a dat file
@@ -287,7 +356,7 @@ func saveSeed(seed []byte, password string) error {
 		return err
 	}
 
-	return ioutil.WriteFile("wallet.dat", gcm.Seal(nonce, nonce, seed, nil), 0777)
+	return ioutil.WriteFile(walletName, gcm.Seal(nonce, nonce, seed, nil), 0777)
 }
 
 //Modified from https://tutorialedge.net/golang/go-encrypt-decrypt-aes-tutorial/
@@ -295,7 +364,7 @@ func fetchSeed(password string) ([]byte, error) {
 
 	digest := sha3.Sum256([]byte(password))
 
-	ciphertext, err := ioutil.ReadFile("wallet.dat")
+	ciphertext, err := ioutil.ReadFile(walletName)
 	if err != nil {
 		return nil, err
 	}
@@ -334,4 +403,25 @@ func generateConsensusKeys(seed []byte) (user.Keys, error) {
 	consensusSeed := append(seedHash[:], secondSeedHash[:]...)
 
 	return user.NewKeysFromBytes(consensusSeed)
+}
+
+func generateM(PrivateSpend []byte, index uint32) []byte {
+
+	// To make K deterministic
+	// We will calculate K = PrivateSpend || Index
+	// Index is the number of Bidding transactions that has
+	// been initiated. This information should be available to the wallet
+	// M = H(K)
+
+	numBidTxsSeen := make([]byte, 4)
+	binary.BigEndian.PutUint32(numBidTxsSeen, index)
+
+	KBytes := append(PrivateSpend, numBidTxsSeen...)
+
+	// Encode K as a ristretto Scalar
+	var k ristretto.Scalar
+	k.Derive(KBytes)
+
+	m := zkproof.CalculateM(k)
+	return m.Bytes()
 }

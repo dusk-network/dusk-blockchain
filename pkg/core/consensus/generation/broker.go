@@ -31,7 +31,7 @@ type broker struct {
 	certificateGenerator *certificateGenerator
 
 	// subscriber channels
-	bidListChan          <-chan user.BidList
+	bidChan              <-chan user.Bid
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
 	acceptedBlockChan    <-chan block.Block
@@ -55,15 +55,16 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	return &broker{
 		publisher:            eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
-		bidListChan:          consensus.InitBidListUpdate(eventBroker),
+		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		acceptedBlockChan:    consensus.InitAcceptedBlockUpdate(eventBroker),
+		acceptedBlockChan:    acceptedBlockChan,
 		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
 		seeder:               &seeder{keys: keys},
 	}
@@ -72,8 +73,8 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 func (b *broker) Listen() {
 	for {
 		select {
-		case bidList := <-b.bidListChan:
-			b.proofGenerator.UpdateBidList(bidList)
+		case bid := <-b.bidChan:
+			b.proofGenerator.UpdateBidList(bid)
 		case state := <-b.regenerationChan:
 			if state.Round == b.seeder.Round() {
 				b.forwarder.threshold.Lower()
@@ -89,6 +90,9 @@ func (b *broker) Listen() {
 }
 
 func (b *broker) onBlock(blk block.Block) {
+	// Remove old bids before generating a new score
+	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
+
 	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
 		log.WithField("process", "generation").WithError(err).Errorln("problem generating seed")
 	}

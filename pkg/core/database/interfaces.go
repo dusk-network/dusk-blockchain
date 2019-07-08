@@ -83,6 +83,10 @@ type Transaction interface {
 	// returns number of deleted candidate blocks
 	DeleteCandidateBlocks(maxHeight uint64) (uint32, error)
 
+	FetchBlock(hash []byte) (*block.Block, error)
+
+	FetchCurrentHeight() (uint64, error)
+
 	// Atomic storage
 	Commit() error
 	Rollback() error

@@ -5,7 +5,12 @@ import (
 	"sync"
 	"unsafe"
 
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
@@ -18,6 +23,7 @@ type (
 		PublicKeyBLS bls.PublicKey
 		Stake        uint64
 		StartHeight  uint64
+		EndHeight    uint64
 	}
 
 	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
@@ -30,11 +36,72 @@ type (
 )
 
 // NewProvisioners returns an initialized Provisioners struct.
-func NewProvisioners() *Provisioners {
-	return &Provisioners{
+func NewProvisioners(db database.DB) (*Provisioners, error) {
+	p := &Provisioners{
 		set:       sortedset.New(),
 		members:   make(map[string]*Member),
 		sizeCache: make(map[uint64]int),
+	}
+
+	if db == nil {
+		drvr, err := database.From(cfg.Get().Database.Driver)
+		if err != nil {
+			return nil, err
+		}
+
+		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	p.repopulate(db)
+	return p, nil
+}
+
+func (p *Provisioners) repopulate(db database.DB) {
+	var currentHeight uint64
+	err := db.View(func(t database.Transaction) error {
+		var err error
+		currentHeight, err = t.FetchCurrentHeight()
+		return err
+	})
+
+	if err != nil {
+		currentHeight = 0
+	}
+
+	searchingHeight := uint64(0)
+	if currentHeight > transactions.MaxLockTime {
+		searchingHeight = currentHeight - transactions.MaxLockTime
+	}
+
+	for {
+		var blk *block.Block
+		err := db.View(func(t database.Transaction) error {
+			hash, err := t.FetchBlockHashByHeight(searchingHeight)
+			if err != nil {
+				return err
+			}
+
+			blk, err = t.FetchBlock(hash)
+			return err
+		})
+
+		if err != nil {
+			break
+		}
+
+		for _, tx := range blk.Txs {
+			stake, ok := tx.(*transactions.Stake)
+			if !ok {
+				continue
+			}
+
+			p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
+		}
+
+		searchingHeight++
 	}
 }
 
@@ -87,7 +154,7 @@ func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
 }
 
 // AddMember will add a Member to the Provisioners by using the bytes of a BLS public key. Returns the index at which the key has been inserted. If the member alredy exists, AddMember overrides its stake with the new one
-func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight uint64) error {
+func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight, endHeight uint64) error {
 	if len(pubKeyEd) != 32 {
 		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
 	}
@@ -107,6 +174,7 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight 
 	m.PublicKeyBLS = *pubKey
 	m.Stake = stake
 	m.StartHeight = startHeight
+	m.EndHeight = endHeight
 
 	i := strPk(pubKeyBLS)
 
@@ -134,6 +202,15 @@ func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
 	return p.set.Remove(pubKeyBLS)
 }
 
+func (p *Provisioners) RemoveExpired(round uint64) {
+	members := p.getMembers()
+	for pk, member := range members {
+		if member.EndHeight < round {
+			p.Remove([]byte(pk))
+		}
+	}
+}
+
 // GetStake will find a certain provisioner in the committee by BLS public key,
 // and return their stake.
 func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
@@ -151,4 +228,11 @@ func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	}
 
 	return m.Stake, nil
+}
+
+func (p *Provisioners) getMembers() map[string]*Member {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	members := p.members
+	return members
 }

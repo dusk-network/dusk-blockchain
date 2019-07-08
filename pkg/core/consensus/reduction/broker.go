@@ -34,7 +34,7 @@ type (
 func Launch(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
 	timeout time.Duration, rpcBus *wire.RPCBus) {
 	if committee == nil {
-		committee = newReductionCommittee(eventBroker)
+		committee = newReductionCommittee(eventBroker, nil)
 	}
 
 	handler := newReductionHandler(committee, keys)
@@ -82,9 +82,11 @@ func (b *broker) Listen() {
 				"round":   round,
 			}).Debug("Got round update")
 			b.reducer.end()
+			b.reducer.lock.Lock()
 			b.accumulator.Clear()
 			b.filter.UpdateRound(round)
 			b.ctx.timer.ResetTimeOut()
+			b.reducer.lock.Unlock()
 		case ev := <-b.selectionChan:
 			if ev == nil {
 				log.WithFields(log.Fields{

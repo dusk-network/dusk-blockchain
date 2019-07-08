@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"math"
 	"math/big"
 	"math/rand"
 	"time"
@@ -15,8 +14,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
@@ -82,29 +79,10 @@ func getGenesisBlock() *block.Block {
 	return genesisBlock
 }
 
-func waitForStake(bus *wire.EventBus, myStake *transactions.Stake) uint64 {
-	blockChan := make(chan *bytes.Buffer, 100)
-	id := bus.Subscribe(string(topics.AcceptedBlock), blockChan)
-	for {
-		blkBuf := <-blockChan
-		blk := block.NewBlock()
-		if err := blk.Decode(blkBuf); err != nil {
-			panic(err)
-		}
-
-		for _, tx := range blk.Txs {
-			if tx.Equals(myStake) {
-				bus.Unsubscribe(string(topics.AcceptedBlock), id)
-				return blk.Header.Height
-			}
-		}
-	}
-}
-
 func makeStake(keys *user.Keys) *transactions.Stake {
 	R, _ := crypto.RandEntropy(32)
 
-	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, R, *keys.EdPubKey, keys.BLSPubKey.Marshal())
+	stake, _ := transactions.NewStake(0, 250000, 100, R, *keys.EdPubKey, keys.BLSPubKey.Marshal())
 	rangeProof, _ := crypto.RandEntropy(32)
 	stake.RangeProof = rangeProof
 	keyImage, _ := crypto.RandEntropy(32)
@@ -137,7 +115,7 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	dScalar.SetBigInt(d)
 	m := zkproof.CalculateM(k)
 	R, _ := crypto.RandEntropy(32)
-	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, R, m.Bytes())
+	bid, _ := transactions.NewBid(0, 250000, 100, R, m.Bytes())
 	rangeProof, _ := crypto.RandEntropy(32)
 	bid.RangeProof = rangeProof
 
@@ -148,8 +126,7 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	input, _ := transactions.NewInput(keyImage, pubkey, pseudoComm, signature)
 	bid.Inputs = transactions.Inputs{input}
 
-	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
+	commitment := dScalar.Bytes()
 	destKey, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey)
 	encryptedAmount, _ := crypto.RandEntropy(32)

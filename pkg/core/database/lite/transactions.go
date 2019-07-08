@@ -276,3 +276,34 @@ func (t transaction) Rollback() error {
 
 func (t *transaction) Close() {
 }
+
+func (t *transaction) FetchBlock(hash []byte) (*block.Block, error) {
+	header, err := t.FetchBlockHeader(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	txs, err := t.FetchBlockTxs(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return &block.Block{
+		Header: header,
+		Txs:    txs,
+	}, nil
+}
+
+func (t *transaction) FetchCurrentHeight() (uint64, error) {
+	state, err := t.FetchState()
+	if err != nil {
+		return 0, err
+	}
+
+	header, err := t.FetchBlockHeader(state.TipHash)
+	if err != nil {
+		return 0, err
+	}
+
+	return header.Height, nil
+}

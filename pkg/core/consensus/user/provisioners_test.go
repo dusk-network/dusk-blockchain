@@ -9,16 +9,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 )
 
 // Test that creation of a voting committee from a set of Provisioners works as intended.
 func TestCreateVotingCommittee(t *testing.T) {
 	// Set up a committee set with a stakes map
-	p := user.NewProvisioners()
+	_, db := lite.SetupDatabase()
+	p, err := user.NewProvisioners(db)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var totalWeight uint64
 	for i := 0; i < 50; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -49,11 +54,15 @@ func btoi(k user.Keys) *big.Int {
 // Test that provisioners are sorted properly.
 func TestMemberAt(t *testing.T) {
 	nr := 50
-	p := user.NewProvisioners()
+	_, db := lite.SetupDatabase()
+	p, err := user.NewProvisioners(db)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var ks sortedKeys
 	for i := 0; i < nr; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 		ks = append(ks, keys)
@@ -71,10 +80,14 @@ func TestMemberAt(t *testing.T) {
 func TestAddGetMember(t *testing.T) {
 	// Set up a committee set with a stakes map
 	tKeys := make([][]byte, 0)
-	p := user.NewProvisioners()
+	_, db := lite.SetupDatabase()
+	p, err := user.NewProvisioners(db)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 50; i++ {
 		keys, _ := user.NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 
@@ -82,7 +95,7 @@ func TestAddGetMember(t *testing.T) {
 			tKeys = append(tKeys, keys.BLSPubKeyBytes)
 		}
 	}
-	_, err := p.GetStake([]byte("Fake Public Key"))
+	_, err = p.GetStake([]byte("Fake Public Key"))
 	assert.Error(t, err)
 	for _, tk := range tKeys {
 		m := p.GetMember(tk)
@@ -94,9 +107,13 @@ func TestAddGetMember(t *testing.T) {
 
 // Add and then a remove a provisioner, to check if removal works properly.
 func TestRemove(t *testing.T) {
-	p := user.NewProvisioners()
+	_, db := lite.SetupDatabase()
+	p, err := user.NewProvisioners(db)
+	if err != nil {
+		t.Fatal(err)
+	}
 	keys, _ := user.NewRandKeys()
-	if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0); err != nil {
+	if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 		t.Fatal(err)
 	}
 

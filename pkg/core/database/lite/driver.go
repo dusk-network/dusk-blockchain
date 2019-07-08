@@ -32,3 +32,17 @@ func init() {
 		panic(err)
 	}
 }
+
+func SetupDatabase() (database.Driver, database.DB) {
+	drvr, err := database.From(DriverName)
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := drvr.Open("", protocol.TestNet, false)
+	if err != nil {
+		panic(err)
+	}
+
+	return drvr, db
+}

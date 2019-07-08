@@ -491,11 +491,26 @@ func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 	return count, nil
 }
 
-func (t transaction) FetchState() (*database.State, error) {
+func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
+	header, err := t.FetchBlockHeader(hash)
+	if err != nil {
+		return nil, err
+	}
 
+	txs, err := t.FetchBlockTxs(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return &block.Block{
+		Header: header,
+		Txs:    txs,
+	}, nil
+}
+
+func (t transaction) FetchState() (*database.State, error) {
 	key := StatePrefix
 	value, err := t.snapshot.Get(key, nil)
-
 	if err == leveldb.ErrNotFound || len(value) == 0 {
 		// overwrite error message
 		err = database.ErrStateNotFound
@@ -506,4 +521,18 @@ func (t transaction) FetchState() (*database.State, error) {
 	}
 
 	return &database.State{TipHash: value}, nil
+}
+
+func (t transaction) FetchCurrentHeight() (uint64, error) {
+	state, err := t.FetchState()
+	if err != nil {
+		return 0, err
+	}
+
+	header, err := t.FetchBlockHeader(state.TipHash)
+	if err != nil {
+		return 0, err
+	}
+
+	return header.Height, nil
 }

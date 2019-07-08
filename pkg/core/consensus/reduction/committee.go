@@ -4,6 +4,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -20,9 +21,9 @@ type reductionCommittee struct {
 	*committee.Extractor
 }
 
-func newReductionCommittee(eventBroker wire.EventBroker) *reductionCommittee {
+func newReductionCommittee(eventBroker wire.EventBroker, db database.DB) *reductionCommittee {
 	return &reductionCommittee{
-		Extractor: committee.NewExtractor(eventBroker),
+		Extractor: committee.NewExtractor(eventBroker, db),
 	}
 }
 

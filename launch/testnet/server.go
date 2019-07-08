@@ -98,7 +98,6 @@ func Setup() *Server {
 	f := factory.New(srv.eventBus, srv.rpcBus, timeOut, keys)
 	go f.StartConsensus()
 
-	// Creating stake and bid
 	stake := makeStake(srv.keys)
 	srv.MyStake = stake
 
@@ -118,7 +117,7 @@ func Setup() *Server {
 }
 
 func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
-	acceptedBlockChan := consensus.InitAcceptedBlockUpdate(eventBus)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 	dupeBlacklist := dupemap.NewDupeMap(1)
 	go func() {
 		for {

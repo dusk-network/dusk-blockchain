@@ -370,7 +370,7 @@ func (s *StandardTx) WireStandardTx() (*wiretx.Standard, error) {
 
 	fee := s.Fee.BigInt().Uint64()
 
-	wireTx := wiretx.NewStandard(1, fee, s.R.Bytes())
+	wireTx := wiretx.NewStandard(0, fee, s.R.Bytes())
 
 	// Serialise rangeproof
 	buf := &bytes.Buffer{}
@@ -422,6 +422,10 @@ func (s *StandardTx) WireStandardTx() (*wiretx.Standard, error) {
 		wireTx.AddOutput(wireOutput)
 	}
 	return wireTx, nil
+}
+
+func (s *StandardTx) Standard() (*StandardTx, error) {
+	return s, nil
 }
 
 func generateScalars(n int) []ristretto.Scalar {

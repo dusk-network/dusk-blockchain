@@ -2,10 +2,12 @@ package committee
 
 import (
 	"bytes"
+	"encoding/binary"
 	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
@@ -49,19 +51,27 @@ type (
 )
 
 // launchStore creates a component that listens to changes to the Provisioners
-func launchStore(eventBroker wire.EventBroker) *Store {
+func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
+	p, err := user.NewProvisioners(db)
+	if err != nil {
+		// If we can not repopulate our committee, we can not properly verify blocks
+		// or run consensus. Thus, it's best to panic.
+		panic(err)
+	}
+
 	store := &Store{
-		provisioners: user.NewProvisioners(),
+		provisioners: p,
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)
+	eventBroker.SubscribeCallback(msg.RoundUpdateTopic, store.RemoveExpiredProvisioners)
 	return store
 }
 
 // NewExtractor returns a committee extractor which maintains its own store and cache.
-func NewExtractor(eventBroker wire.EventBroker) *Extractor {
+func NewExtractor(eventBroker wire.EventBroker, db database.DB) *Extractor {
 	return &Extractor{
-		Store:          launchStore(eventBroker),
+		Store:          launchStore(eventBroker, db),
 		committeeCache: make(map[uint8]user.VotingCommittee),
 	}
 }
@@ -80,6 +90,14 @@ func (s *Store) RemoveProvisioner(m *bytes.Buffer) error {
 	return nil
 }
 
+func (s *Store) RemoveExpiredProvisioners(m *bytes.Buffer) error {
+	round := binary.LittleEndian.Uint64(m.Bytes())
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.provisioners.RemoveExpired(round)
+	return nil
+}
+
 // AddProvisioner will add a provisioner to the Store's Provisioners object.
 func (s *Store) AddProvisioner(m *bytes.Buffer) error {
 	newProvisioner, err := decodeNewProvisioner(m)
@@ -88,7 +106,7 @@ func (s *Store) AddProvisioner(m *bytes.Buffer) error {
 	}
 
 	if err := s.provisioners.AddMember(newProvisioner.pubKeyEd,
-		newProvisioner.pubKeyBLS, newProvisioner.amount, newProvisioner.startHeight); err != nil {
+		newProvisioner.pubKeyBLS, newProvisioner.amount, newProvisioner.startHeight, newProvisioner.endHeight); err != nil {
 		return err
 	}
 
