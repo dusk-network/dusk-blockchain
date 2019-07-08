@@ -131,6 +131,7 @@ func transferCMD(args []string, publisher wire.EventBroker) {
 	amount, err := stringToScalar(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		return
 	}
 
 	address := args[1]
@@ -138,6 +139,7 @@ func transferCMD(args []string, publisher wire.EventBroker) {
 	fee, err := stringToInt64(args[2])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
+		return
 	}
 
 	password := args[3]
@@ -181,6 +183,65 @@ func transferCMD(args []string, publisher wire.EventBroker) {
 	publisher.Publish(string(topics.Tx), buf)
 }
 
+func createFromSeedCMD(args []string, publisher wire.EventBroker) {
+	if args == nil || len(args) < 2 {
+		fmt.Fprintf(os.Stdout, commandInfo["createfromseed"]+"\n")
+		return
+	}
+
+	seed := args[0]
+
+	password := args[1]
+
+	seedBytes, err := hex.DecodeString(seed)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to decode seed: %v\n", err)
+		return
+	}
+
+	// Then load the wallet
+	w, err := createFromSeed(seedBytes, password)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to create wallet from seed: %v\n", err)
+		return
+	}
+
+	pubAddr, err := w.PublicAddress()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to get your public address: %v\n", err)
+		return
+	}
+
+	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
+	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
+
+}
+
+func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
+
+	if DBInstance != nil {
+		DBInstance.Close()
+	}
+
+	// First load the database
+	db, err := walletdb.New(dbName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Then load the wallet
+	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, fetchDecoys, fetchInputs, password)
+	if err != nil {
+		return nil, err
+	}
+
+	cliWallet = w
+	DBInstance = db
+
+	return w, nil
+
+}
+
 func sendStakeCMD(args []string, publisher wire.EventBroker) {
 	if args == nil || len(args) < 4 {
 		fmt.Fprintf(os.Stdout, commandInfo["stake"]+"\n")
@@ -190,16 +251,19 @@ func sendStakeCMD(args []string, publisher wire.EventBroker) {
 	amount, err := stringToScalar(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
 	}
 
 	lockTime, err := stringToUint64(args[1])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
 	}
 
 	fee, err := stringToInt64(args[2])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
 	}
 
 	password := args[3]
@@ -249,16 +313,19 @@ func sendBidCMD(args []string, publisher wire.EventBroker) {
 	amount, err := stringToScalar(args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
 	}
 
 	lockTime, err := stringToUint64(args[1])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
 	}
 
 	fee, err := stringToInt64(args[2])
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
 	}
 
 	password := args[3]
@@ -331,28 +398,6 @@ func syncWalletCMD(args []string, publisher wire.EventBroker) {
 		// check if state is equal to the block that we fetched
 		if bytes.Equal(tipHash, blk.Header.Hash) {
 			break
-		}
-	}
-
-	// listen to bus for blocks
-	go waitForBlock(publisher)
-}
-
-func waitForBlock(bus wire.EventBroker) {
-	blockChan := make(chan *bytes.Buffer, 100)
-	bus.Subscribe(string(topics.AcceptedBlock), blockChan)
-	for {
-		blkBuf := <-blockChan
-		blk := block.NewBlock()
-		if err := blk.Decode(blkBuf); err != nil {
-			fmt.Fprintf(os.Stdout, "error decoding block: %v\n", err)
-			return
-		}
-
-		_, _, err := cliWallet.CheckWireBlock(*blk)
-		if err != nil {
-			fmt.Fprintf(os.Stdout, "error checking block: %v\n", err)
-			return
 		}
 	}
 }
