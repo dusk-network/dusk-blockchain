@@ -32,7 +32,6 @@ func NewCoinbase(proof, score, R []byte) *Coinbase {
 
 // AddReward will add an Output to the Coinbase struct Rewards array.
 func (c *Coinbase) AddReward(output *Output) {
-	output.EncryptedAmount = make([]byte, 1)
 	output.EncryptedMask = make([]byte, 1)
 	c.Rewards = append(c.Rewards, output)
 }
@@ -130,7 +129,10 @@ func (c *Coinbase) Type() TxType {
 
 // StandardTX implements the transaction interface
 func (c *Coinbase) StandardTX() Standard {
-	return Standard{}
+	return Standard{
+		Outputs: c.Rewards,
+		R:       c.R,
+	}
 }
 
 // Equals returns true, if two coinbase tx's are equal

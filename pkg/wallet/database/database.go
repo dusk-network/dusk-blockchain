@@ -2,10 +2,11 @@ package database
 
 import (
 	"bytes"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
 	"encoding/binary"
 	"errors"
 	"fmt"
+
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -17,7 +18,8 @@ type DB struct {
 }
 
 var (
-	inputPrefix = []byte("input")
+	inputPrefix        = []byte("input")
+	walletHeightPrefix = []byte("syncedHeight")
 )
 
 func New(path string) (*DB, error) {
@@ -119,6 +121,59 @@ func (db DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.In
 	}
 
 	return tInputs, changeAmount, nil
+}
+
+func (db DB) FetchBalance(decryptionKey []byte) (uint64, error) {
+
+	var balance ristretto.Scalar
+	balance.SetZero()
+
+	iter := db.storage.NewIterator(util.BytesPrefix(inputPrefix), nil)
+	for iter.Next() {
+		val := iter.Value()
+
+		encryptedBytes := make([]byte, len(val))
+		copy(encryptedBytes[:], val)
+
+		decryptedBytes, err := decrypt(encryptedBytes, decryptionKey)
+		if err != nil {
+			return 0, err
+		}
+		idb := &inputDB{}
+
+		buf := bytes.NewBuffer(decryptedBytes)
+		err = idb.Decode(buf)
+		if err != nil {
+			return 0, err
+		}
+
+		balance.Add(&balance, &idb.amount)
+
+	}
+
+	iter.Release()
+	err := iter.Error()
+	if err != nil {
+		return 0, err
+	}
+
+	return balance.BigInt().Uint64(), nil
+}
+
+func (db DB) GetWalletHeight() (uint64, error) {
+	heightBytes, err := db.storage.Get(walletHeightPrefix, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	height := binary.LittleEndian.Uint64(heightBytes)
+	return height, nil
+}
+
+func (db DB) UpdateWalletHeight(newHeight uint64) error {
+	heightBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(heightBytes, newHeight)
+	return db.Put(walletHeightPrefix, heightBytes)
 }
 
 func (db DB) Get(key []byte) ([]byte, error) {

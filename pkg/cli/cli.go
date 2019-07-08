@@ -11,7 +11,7 @@ import (
 )
 
 // Start the interactive shell.
-func Start(publisher wire.EventPublisher) {
+func Start(publisher wire.EventBroker) {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")
 	for scanner.Scan() {

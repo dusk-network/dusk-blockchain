@@ -15,18 +15,22 @@ import (
 
 // CLICommands holds all of the wallet commands that the user can call through
 // the interactive shell.
-var CLICommands = map[string]func([]string, wire.EventPublisher){
+var CLICommands = map[string]func([]string, wire.EventBroker){
 	"help":           showHelp,
-	"createwallet":   createWallet,
-	"transfer":       transfer,
-	"stake":          sendStake,
-	"bid":            sendBid,
+	"createwallet":   createWalletCMD,
+	"loadwallet":     loadWalletCMD,
+	"createfromseed": createFromSeedCMD,
+	"balance":        balanceCMD,
+	"transfer":       transferCMD,
+	"stake":          sendStakeCMD,
+	"bid":            sendBidCMD,
+	"sync":           syncWalletCMD,
 	"startconsensus": startConsensus,
 	"exit":           stopNode,
 	"quit":           stopNode,
 }
 
-func showHelp(args []string, publisher wire.EventPublisher) {
+func showHelp(args []string, publisher wire.EventBroker) {
 	if args != nil && len(args) > 0 {
 		helpStr, ok := commandInfo[args[0]]
 		if !ok {
@@ -49,11 +53,11 @@ func showHelp(args []string, publisher wire.EventPublisher) {
 	}
 }
 
-func startConsensus(args []string, publisher wire.EventPublisher) {
+func startConsensus(args []string, publisher wire.EventBroker) {
 	publisher.Publish(string(topics.StartConsensus), new(bytes.Buffer))
 }
 
-func stopNode(args []string, publisher wire.EventPublisher) {
+func stopNode(args []string, publisher wire.EventBroker) {
 	fmt.Fprintln(os.Stdout, "stopping node")
 
 	// Send an interrupt signal to the running process
