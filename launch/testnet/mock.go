@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -58,6 +59,9 @@ func mockCoinbaseTx() *transactions.Coinbase {
 	if err != nil {
 		panic(err)
 	}
+	rewardScalar := ristretto.Scalar{}
+	rewardScalar.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
+	output.EncryptedAmount = rewardScalar.Bytes()
 
 	coinbase.AddReward(output)
 	return coinbase
