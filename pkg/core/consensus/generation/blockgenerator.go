@@ -2,7 +2,7 @@ package generation
 
 import (
 	"bytes"
-	"encoding/binary"
+	"math/big"
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
@@ -140,14 +140,14 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	P := rewardReceiver.StealthAddress(r, coinbaseIndex).P
 
 	// Disclose  reward
-	rewardBytes := make([]byte, 32)
-	binary.LittleEndian.PutUint64(rewardBytes[:32], config.GeneratorReward)
+	var reward ristretto.Scalar
+	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 
-	// Add the Block Generator reward
-	output := &transactions.Output{}
-	output.DestKey = P.Bytes()
-	// Commitment field in coinbase tx represents the reward
-	output.Commitment = rewardBytes
+	output := &transactions.Output{
+		EncryptedAmount: reward.Bytes(),
+		// EncryptedAmount field in coinbase tx represents the reward
+		DestKey: P.Bytes(),
+	}
 
 	tx.AddReward(output)
 
