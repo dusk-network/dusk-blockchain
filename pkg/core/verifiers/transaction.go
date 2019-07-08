@@ -1,9 +1,9 @@
 package verifiers
 
 import (
-	"encoding/binary"
 	"fmt"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/pkg/errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
@@ -109,7 +109,9 @@ func VerifyCoinbase(txIndex uint64, tx *transactions.Coinbase) error {
 	}
 
 	// Ensure the reward is the fixed one
-	if binary.LittleEndian.Uint64(tx.Rewards[0].Commitment) != config.GeneratorReward {
+	rewardScalar := ristretto.Scalar{}
+	rewardScalar.UnmarshalBinary(tx.Rewards[0].EncryptedAmount)
+	if rewardScalar.BigInt().Uint64() != config.GeneratorReward {
 		return fmt.Errorf("coinbase transaction must include a fixed reward of %d", config.GeneratorReward)
 	}
 
