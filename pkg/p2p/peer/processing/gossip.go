@@ -49,5 +49,5 @@ func (g *Gossip) Process(m *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	return Encode(buf), nil
+	return WriteFrame(buf)
 }

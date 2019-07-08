@@ -97,13 +97,13 @@ func TestWriteLoop(t *testing.T) {
 	}()
 
 	r := bufio.NewReader(srv)
-	bs, err := r.ReadBytes(0x00)
+	bs, err := processing.ReadFrame(r)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Decode and remove magic
-	decoded := processing.Decode(bs)
+	decoded := bytes.NewBuffer(bs)
 
 	assert.Equal(t, decoded.Bytes()[4:], buf.Bytes())
 }
