@@ -2,8 +2,10 @@ package helper
 
 import (
 	"encoding/binary"
+	"math/big"
 	"testing"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
@@ -73,6 +75,9 @@ func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
 
 	tx := transactions.NewCoinbase(proof, score, R)
 	tx.Rewards = RandomOutputs(t, 1, malformed)
+	reward := ristretto.Scalar{}
+	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
+	tx.Rewards[0].EncryptedAmount = reward.Bytes()
 
 	// Do this to pass verification on the chain
 	// TODO: this currently doesn't make much sense, fix before release
