@@ -14,6 +14,7 @@ import (
 
 // Handshake with another peer.
 func (p *Writer) Handshake() error {
+
 	if err := p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
@@ -57,8 +58,12 @@ func (p *Connection) writeLocalMsgVersion() error {
 		return err
 	}
 
-	encodedMsg := processing.Encode(fullMsg).Bytes()
-	_, err = p.Write(encodedMsg)
+	frame, err := processing.WriteFrame(fullMsg)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Write(frame.Bytes())
 	return err
 }
 
@@ -68,7 +73,9 @@ func (p *Connection) readRemoteMsgVersion() error {
 		return err
 	}
 
-	decodedMsg := processing.Decode(msgBytes)
+	decodedMsg := new(bytes.Buffer)
+	decodedMsg.Write(msgBytes)
+
 	magic := extractMagic(decodedMsg)
 	if magic != p.magic {
 		return errors.New("magic mismatch")
@@ -107,12 +114,15 @@ func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) (*bytes.Buff
 }
 
 func (p *Connection) readVerAck() error {
+
 	msgBytes, err := p.ReadMessage()
 	if err != nil {
 		return err
 	}
 
-	decodedMsg := processing.Decode(msgBytes)
+	decodedMsg := new(bytes.Buffer)
+	decodedMsg.Write(msgBytes)
+
 	magic := extractMagic(decodedMsg)
 	if magic != p.magic {
 		return errors.New("magic mismatch")
@@ -133,8 +143,12 @@ func (p *Connection) writeVerAck() error {
 		return err
 	}
 
-	encodedMsg := processing.Encode(verAckMsg)
-	if _, err := p.Write(encodedMsg.Bytes()); err != nil {
+	frame, err := processing.WriteFrame(verAckMsg)
+	if err != nil {
+		return err
+	}
+
+	if _, err := p.Write(frame.Bytes()); err != nil {
 		return err
 	}
 
