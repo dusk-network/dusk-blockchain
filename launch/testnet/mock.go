@@ -126,8 +126,7 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	input, _ := transactions.NewInput(keyImage, pubkey, pseudoComm, signature)
 	bid.Inputs = transactions.Inputs{input}
 
-	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
+	commitment := dScalar.Bytes()
 	destKey, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey)
 	encryptedAmount, _ := crypto.RandEntropy(32)
