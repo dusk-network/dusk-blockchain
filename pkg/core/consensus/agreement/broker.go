@@ -68,10 +68,17 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 func (b *broker) Listen() {
 	for {
 		evs := <-b.accumulator.CollectedVotesChan
-		b.publishEvent(evs)
-		b.publishWinningHash(evs)
-		b.updateRound(b.state.Round() + 1)
+		if !b.obsolete(evs[0]) {
+			b.publishEvent(evs)
+			b.publishWinningHash(evs)
+			b.updateRound(b.state.Round() + 1)
+		}
 	}
+}
+
+func (b *broker) obsolete(ev wire.Event) bool {
+	aev := ev.(*Agreement)
+	return b.state.Round() != aev.Round
 }
 
 func (b *broker) sendAgreement(m *bytes.Buffer) error {
