@@ -20,6 +20,7 @@ var CLICommands = map[string]func([]string, wire.EventBroker){
 	"createwallet":   createWalletCMD,
 	"loadwallet":     loadWalletCMD,
 	"createfromseed": createFromSeedCMD,
+	"balance":        balanceCMD,
 	"transfer":       transferCMD,
 	"stake":          sendStakeCMD,
 	"bid":            sendBidCMD,

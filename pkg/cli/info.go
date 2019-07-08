@@ -8,6 +8,8 @@ var commandInfo = map[string]string{
 		Loads the encrypted wallet file.`,
 	"createfromseed": `Usage: createfromseed [seed] [password]
 		Loads the encrypted wallet file from a hex seed.`,
+	"balance": `Usage: balance
+		Prints the balance of the loaded wallet.`,
 	"transfer": `Usage: transfer [amount] [address] [fee] [password]
 		Send DUSK to a given address. Fee is optional, will use standard value if not specified.`,
 	"stake": `Usage: stake [amount] [locktime] [fee] [password]

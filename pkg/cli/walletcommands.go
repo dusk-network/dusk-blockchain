@@ -401,6 +401,20 @@ func syncWalletCMD(args []string, publisher wire.EventBroker) {
 		}
 	}
 }
+func balanceCMD(args []string, publisher wire.EventBroker) {
+
+	if cliWallet == nil {
+		fmt.Fprintf(os.Stdout, "please load a wallet before trying to check balance\n")
+		return
+	}
+
+	balance, err := cliWallet.Balance()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error fetching balance: %v\n", err)
+		return
+	}
+	fmt.Fprintf(os.Stdout, "Balance: %d\n", balance)
+}
 
 func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
