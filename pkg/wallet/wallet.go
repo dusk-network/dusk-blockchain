@@ -363,6 +363,14 @@ func (w *Wallet) Sign(tx SignableTx) error {
 	return tx.Prove()
 }
 
+func (w *Wallet) Balance() (uint64, error) {
+	privSpend, err := w.keyPair.PrivateSpend()
+	if err != nil {
+		return 0, err
+	}
+	return w.db.FetchBalance(privSpend.Bytes())
+}
+
 func (w *Wallet) GetSavedHeight() (uint64, error) {
 	return w.db.GetWalletHeight()
 }

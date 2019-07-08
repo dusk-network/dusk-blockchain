@@ -123,6 +123,43 @@ func (db DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.In
 	return tInputs, changeAmount, nil
 }
 
+func (db DB) FetchBalance(decryptionKey []byte) (uint64, error) {
+
+	var balance ristretto.Scalar
+	balance.SetZero()
+
+	iter := db.storage.NewIterator(util.BytesPrefix(inputPrefix), nil)
+	for iter.Next() {
+		val := iter.Value()
+
+		encryptedBytes := make([]byte, len(val))
+		copy(encryptedBytes[:], val)
+
+		decryptedBytes, err := decrypt(encryptedBytes, decryptionKey)
+		if err != nil {
+			return 0, err
+		}
+		idb := &inputDB{}
+
+		buf := bytes.NewBuffer(decryptedBytes)
+		err = idb.Decode(buf)
+		if err != nil {
+			return 0, err
+		}
+
+		balance.Add(&balance, &idb.amount)
+
+	}
+
+	iter.Release()
+	err := iter.Error()
+	if err != nil {
+		return 0, err
+	}
+
+	return balance.BigInt().Uint64(), nil
+}
+
 func (db DB) GetWalletHeight() (uint64, error) {
 	heightBytes, err := db.storage.Get(walletHeightPrefix, nil)
 	if err != nil {
