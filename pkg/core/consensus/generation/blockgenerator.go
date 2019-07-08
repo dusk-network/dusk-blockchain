@@ -144,9 +144,11 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 
 	output := &transactions.Output{
-		EncryptedAmount: reward.Bytes(),
 		// EncryptedAmount field in coinbase tx represents the reward
-		DestKey: P.Bytes(),
+		EncryptedAmount: reward.Bytes(),
+		EncryptedMask:   make([]byte, 1),
+		Commitment:      make([]byte, 32),
+		DestKey:         P.Bytes(),
 	}
 
 	tx.AddReward(output)
