@@ -150,7 +150,7 @@ func (m *mockScoreHandler) Marshal(b *bytes.Buffer, ev wire.Event) error {
 	return err
 }
 
-func (m *mockScoreHandler) UpdateBidList(bL user.BidList)  {}
+func (m *mockScoreHandler) UpdateBidList(bL user.Bid)      {}
 func (m *mockScoreHandler) RemoveExpiredBids(round uint64) {}
 func (m *mockScoreHandler) LowerThreshold()                {}
 func (m *mockScoreHandler) ResetThreshold()                {}

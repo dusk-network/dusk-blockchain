@@ -13,7 +13,7 @@ import (
 // propose blocks in the consensus.
 type Generator interface {
 	GenerateProof([]byte) zkproof.ZkProof
-	UpdateBidList(user.BidList)
+	UpdateBidList(user.Bid)
 	RemoveExpiredBids(uint64)
 }
 
@@ -37,12 +37,10 @@ func newProofGenerator(d, k ristretto.Scalar) *proofGenerator {
 	}
 }
 
-func (g *proofGenerator) UpdateBidList(bidList user.BidList) {
+func (g *proofGenerator) UpdateBidList(bid user.Bid) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
-	for _, bid := range bidList {
-		g.bidList.AddBid(bid)
-	}
+	g.bidList.AddBid(bid)
 }
 
 func (g *proofGenerator) RemoveExpiredBids(round uint64) {

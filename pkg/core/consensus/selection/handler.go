@@ -31,7 +31,7 @@ type (
 	ScoreEventHandler interface {
 		consensus.EventHandler
 		wire.EventPrioritizer
-		UpdateBidList(user.BidList)
+		UpdateBidList(user.Bid)
 		RemoveExpiredBids(uint64)
 		ResetThreshold()
 		LowerThreshold()
@@ -69,12 +69,10 @@ func (sh *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return MarshalScoreEvent(r, e)
 }
 
-func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
+func (sh *scoreHandler) UpdateBidList(bid user.Bid) {
 	sh.lock.Lock()
 	defer sh.lock.Unlock()
-	for _, bid := range bidList {
-		sh.bidList.AddBid(bid)
-	}
+	sh.bidList.AddBid(bid)
 }
 
 func (sh *scoreHandler) RemoveExpiredBids(round uint64) {

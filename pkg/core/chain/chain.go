@@ -159,22 +159,24 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 }
 
 func (c *Chain) addBidder(tx *transactions.Bid) error {
-	x := user.CalculateX(tx.Outputs[0].EncryptedAmount, tx.M)
+	x := user.CalculateX(tx.Outputs[0].Commitment, tx.M)
 	x.EndHeight = tx.Lock
-	bids := &user.BidList{}
-	bids.AddBid(x)
 
-	c.propagateBidList(bids)
+	c.propagateBid(x)
 	return nil
 }
 
-func (c *Chain) propagateBidList(bids *user.BidList) {
-	var bidListBytes []byte
-	for _, bid := range *bids {
-		bidListBytes = append(bidListBytes, bid.X[:]...)
+func (c *Chain) propagateBid(bid user.Bid) {
+	buf := new(bytes.Buffer)
+	if err := encoding.Write256(buf, bid.X[:]); err != nil {
+		panic(err)
 	}
 
-	c.eventBus.Publish(msg.BidListTopic, bytes.NewBuffer(bidListBytes))
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, bid.EndHeight); err != nil {
+		panic(err)
+	}
+
+	c.eventBus.Publish(msg.BidListTopic, buf)
 }
 
 func (c *Chain) Close() error {
