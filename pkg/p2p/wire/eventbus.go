@@ -14,7 +14,7 @@ import (
 var _ EventBroker = (*EventBus)(nil)
 
 var ringBufferLength = 200
-var napTime = 10 * time.Millisecond
+var napTime = 100 * time.Millisecond
 var _signal struct{}
 
 // EventBus - box for handlers and callbacks.
@@ -255,11 +255,11 @@ func copyBuffer(m *bytes.Buffer) *bytes.Buffer {
 
 func (bus *EventBus) getPreprocessors(topic string) []idTopicProcessor {
 	bus.busLock.RLock()
-	defer bus.busLock.RUnlock()
 	processors := make([]idTopicProcessor, 0)
 	if busProcessors, ok := bus.preprocessors[topic]; ok {
 		processors = append(processors, busProcessors...)
 	}
 
+	bus.busLock.RUnlock()
 	return processors
 }
