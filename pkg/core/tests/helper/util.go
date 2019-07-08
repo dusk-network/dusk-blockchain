@@ -72,12 +72,12 @@ func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
 }
 
 func (ms *SimpleStreamer) Read() ([]byte, error) {
-	buf, err := ms.Reader.ReadBytes(0x00)
+	bs, err := processing.ReadFrame(ms.Reader)
 	if err != nil {
 		return nil, err
 	}
 
-	decoded := processing.Decode(buf)
+	decoded := bytes.NewBuffer(bs)
 
 	// read and discard the magic
 	magicBuf := make([]byte, 4)
