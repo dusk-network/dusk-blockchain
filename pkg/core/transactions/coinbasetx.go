@@ -130,7 +130,10 @@ func (c *Coinbase) Type() TxType {
 
 // StandardTX implements the transaction interface
 func (c *Coinbase) StandardTX() Standard {
-	return Standard{}
+	return Standard{
+		Outputs: c.Rewards,
+		R:       c.R,
+	}
 }
 
 // Equals returns true, if two coinbase tx's are equal
