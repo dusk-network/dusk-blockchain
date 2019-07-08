@@ -31,7 +31,7 @@ type broker struct {
 	certificateGenerator *certificateGenerator
 
 	// subscriber channels
-	bidListChan          <-chan user.BidList
+	bidChan              <-chan user.Bid
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
 	acceptedBlockChan    <-chan block.Block
@@ -61,7 +61,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		publisher:            eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
-		bidListChan:          consensus.InitBidListUpdate(eventBroker),
+		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
 		acceptedBlockChan:    acceptedBlockChan,
@@ -73,8 +73,8 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 func (b *broker) Listen() {
 	for {
 		select {
-		case bidList := <-b.bidListChan:
-			b.proofGenerator.UpdateBidList(bidList)
+		case bid := <-b.bidChan:
+			b.proofGenerator.UpdateBidList(bid)
 		case state := <-b.regenerationChan:
 			if state.Round == b.seeder.Round() {
 				b.forwarder.threshold.Lower()

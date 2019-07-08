@@ -80,5 +80,5 @@ func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 	}
 }
 
-func (m *mockGenerator) UpdateBidList(bl user.BidList)  {}
+func (m *mockGenerator) UpdateBidList(bl user.Bid)      {}
 func (m *mockGenerator) RemoveExpiredBids(round uint64) {}
