@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"math"
 	"math/big"
 	"math/rand"
 	"time"
@@ -83,7 +82,7 @@ func getGenesisBlock() *block.Block {
 func makeStake(keys *user.Keys) *transactions.Stake {
 	R, _ := crypto.RandEntropy(32)
 
-	stake, _ := transactions.NewStake(0, math.MaxUint64, 100, R, *keys.EdPubKey, keys.BLSPubKey.Marshal())
+	stake, _ := transactions.NewStake(0, 250000, 100, R, *keys.EdPubKey, keys.BLSPubKey.Marshal())
 	rangeProof, _ := crypto.RandEntropy(32)
 	stake.RangeProof = rangeProof
 	keyImage, _ := crypto.RandEntropy(32)
@@ -116,7 +115,7 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	dScalar.SetBigInt(d)
 	m := zkproof.CalculateM(k)
 	R, _ := crypto.RandEntropy(32)
-	bid, _ := transactions.NewBid(0, math.MaxUint64, 100, R, m.Bytes())
+	bid, _ := transactions.NewBid(0, 250000, 100, R, m.Bytes())
 	rangeProof, _ := crypto.RandEntropy(32)
 	bid.RangeProof = rangeProof
 
@@ -127,8 +126,7 @@ func makeBid() (*transactions.Bid, ristretto.Scalar, ristretto.Scalar) {
 	input, _ := transactions.NewInput(keyImage, pubkey, pseudoComm, signature)
 	bid.Inputs = transactions.Inputs{input}
 
-	commitment := make([]byte, 32)
-	binary.BigEndian.PutUint64(commitment[24:32], uint64(outputAmount))
+	commitment := dScalar.Bytes()
 	destKey, _ := crypto.RandEntropy(32)
 	output, _ := transactions.NewOutput(commitment, destKey)
 	encryptedAmount, _ := crypto.RandEntropy(32)

@@ -8,6 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -24,7 +25,7 @@ type (
 	}
 
 	bidListCollector struct {
-		bidListChan chan<- user.BidList
+		bidListChan chan<- user.Bid
 	}
 
 	acceptedBlockCollector struct {
@@ -80,8 +81,8 @@ func (rg *regenerationCollector) Collect(r *bytes.Buffer) error {
 }
 
 // InitBidListUpdate creates and initiates a channel for the updates in the BidList
-func InitBidListUpdate(subscriber wire.EventSubscriber) chan user.BidList {
-	bidListChan := make(chan user.BidList)
+func InitBidListUpdate(subscriber wire.EventSubscriber) chan user.Bid {
+	bidListChan := make(chan user.Bid)
 	collector := &bidListCollector{bidListChan}
 	go wire.NewTopicListener(subscriber, collector, string(msg.BidListTopic)).Accept()
 	return bidListChan
@@ -90,13 +91,24 @@ func InitBidListUpdate(subscriber wire.EventSubscriber) chan user.BidList {
 // Collect implements EventCollector.
 // It reconstructs the bidList and sends it on its BidListChan
 func (b *bidListCollector) Collect(r *bytes.Buffer) error {
-	rCopy := *r
-	bidList, err := user.ReconstructBidListSubset(rCopy.Bytes())
-	if err != nil {
-		return nil
-	}
-	b.bidListChan <- bidList
+	b.bidListChan <- decodeBid(r)
 	return nil
+}
+
+func decodeBid(r *bytes.Buffer) user.Bid {
+	var xSlice []byte
+	if err := encoding.Read256(r, &xSlice); err != nil {
+		panic(err)
+	}
+
+	var endHeight uint64
+	if err := encoding.ReadUint64(r, binary.LittleEndian, &endHeight); err != nil {
+		panic(err)
+	}
+
+	var x [32]byte
+	copy(x[:], xSlice)
+	return user.Bid{x, endHeight}
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain

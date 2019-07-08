@@ -14,7 +14,7 @@ import (
 type scoreBroker struct {
 	roundUpdateChan  <-chan uint64
 	regenerationChan <-chan consensus.AsyncState
-	bidListChan      <-chan user.BidList
+	bidChan          <-chan user.Bid
 	filter           *consensus.EventFilter
 	selector         *eventSelector
 	handler          ScoreEventHandler
@@ -51,7 +51,7 @@ func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler,
 	return &scoreBroker{
 		filter:           filter,
 		roundUpdateChan:  consensus.InitRoundUpdate(eventBroker),
-		bidListChan:      consensus.InitBidListUpdate(eventBroker),
+		bidChan:          consensus.InitBidListUpdate(eventBroker),
 		regenerationChan: consensus.InitBlockRegenerationCollector(eventBroker),
 		selector:         selector,
 		handler:          handler,
@@ -66,8 +66,8 @@ func (f *scoreBroker) Listen() {
 			f.onRoundUpdate(round)
 		case state := <-f.regenerationChan:
 			f.onRegeneration(state)
-		case bidList := <-f.bidListChan:
-			f.selector.handler.UpdateBidList(bidList)
+		case bid := <-f.bidChan:
+			f.selector.handler.UpdateBidList(bid)
 		}
 	}
 }

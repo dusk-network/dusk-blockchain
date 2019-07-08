@@ -157,6 +157,7 @@ func checkLockValidHeight(lockHeight uint64) error {
 }
 
 func checkLockValidTime(lockTime, nextBlockTime uint64) error {
+	return nil
 	if lockTime < nextBlockTime {
 		return fmt.Errorf("invalid lock time, lock expired at time %d , block time is approx. now %d", lockTime, nextBlockTime)
 	}
