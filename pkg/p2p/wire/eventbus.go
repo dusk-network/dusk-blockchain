@@ -105,10 +105,7 @@ func (s *streamHandler) Pipe(c *ring.Consumer, w io.WriteCloser) {
 					}).WithError(err).Warnln("error in writing to WriteCloser")
 					s.exitChan <- _signal
 				}
-				continue
 			}
-			// giving enough time to the producer to send stuff
-			time.Sleep(napTime)
 		}
 	}
 }
