@@ -193,6 +193,9 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	return nil
 }
 
+func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
+	return false, nil
+}
 func (t *transaction) StoreCandidateBlock(b *block.Block) error {
 
 	if !t.writable {

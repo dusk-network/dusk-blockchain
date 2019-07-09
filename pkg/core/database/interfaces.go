@@ -90,6 +90,8 @@ type Transaction interface {
 
 	FetchDecoys(numDecoys int) []ristretto.Point
 
+	FetchOutputExists(destkey []byte) (bool, error)
+
 	// Atomic storage
 	Commit() error
 	Rollback() error
