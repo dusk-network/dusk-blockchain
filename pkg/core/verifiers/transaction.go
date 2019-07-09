@@ -1,6 +1,7 @@
 package verifiers
 
 import (
+	"bytes"
 	"fmt"
 
 	ristretto "github.com/bwesterb/go-ristretto"
@@ -8,6 +9,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
 )
 
@@ -173,6 +175,37 @@ func checkRangeProof(p rangeproof.Proof) error {
 // checks that the transaction has not been spent by checking the database for that key image
 // returns nil if item not in database
 func checkTXDoubleSpent(db database.DB, inputs transactions.Inputs) error {
+
+	err := db.View(func(t database.Transaction) error {
+		for _, input := range inputs {
+			// Decode signature
+			var sig mlsag.Signature
+			buf := bytes.NewReader(input.Signature)
+			err := sig.Decode(buf, true)
+			if err != nil {
+				return err
+			}
+
+			// Check First key in verification is valid
+			for _, keyV := range sig.PubKeys {
+				key := keyV.OutputKey()
+				exists, err := t.FetchOutputExists(key.Bytes())
+				if err != nil {
+					return err
+				}
+				if !exists {
+					return errors.New("This key is not a previous output ")
+				}
+			}
+
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
 	return db.View(func(t database.Transaction) error {
 		for _, input := range inputs {
 			exists, txID, _ := t.FetchKeyImageExists(input.KeyImage)
