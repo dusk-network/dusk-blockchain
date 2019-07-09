@@ -6,10 +6,13 @@ import "time"
 const (
 	// GeneratorReward is the amount of Block generator default reward
 	// TODO: TBD
-	GeneratorReward = uint64(100)
+	GeneratorReward = 50 * DUSK
 
 	// ConsensusTimeOut is the time out for consensus step timers.
 	ConsensusTimeOut = 5 * time.Second
+
+	// DUSK is one whole unit of DUSK.
+	DUSK = uint64(100000000)
 
 	// GenesisBlockBlob represents the genesis block bytes in hexadecimal format
 	// It's recommended to be regenerated with generation.GenerateGensisBlock() API

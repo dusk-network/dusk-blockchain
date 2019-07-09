@@ -22,6 +22,7 @@ import (
 
 var testnet = byte(2)
 var dbName = "walletDb"
+var fee = int64(100)
 
 // cliWallet will be used to scan blocks in the background
 // when we received a topic.AcceptedBlock
@@ -121,7 +122,7 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 }
 
 func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 4 {
+	if args == nil || len(args) < 3 {
 		fmt.Fprintf(os.Stdout, commandInfo["transfer"]+"\n")
 		return
 	}
@@ -133,14 +134,7 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 	}
 
 	address := args[1]
-
-	fee, err := stringToInt64(args[2])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
-		return
-	}
-
-	password := args[3]
+	password := args[2]
 
 	// Load wallet using password
 	w, err := loadWallet(password)
@@ -248,7 +242,7 @@ func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
 }
 
 func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 4 {
+	if args == nil || len(args) < 3 {
 		fmt.Fprintf(os.Stdout, commandInfo["stake"]+"\n")
 		return
 	}
@@ -265,13 +259,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 		return
 	}
 
-	fee, err := stringToInt64(args[2])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	password := args[3]
+	password := args[2]
 
 	// Load wallet using password
 	w, err := loadWallet(password)
@@ -317,7 +305,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 }
 
 func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 4 {
+	if args == nil || len(args) < 3 {
 		fmt.Fprintf(os.Stdout, commandInfo["bid"]+"\n")
 		return
 	}
@@ -334,13 +322,7 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		return
 	}
 
-	fee, err := stringToInt64(args[2])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	password := args[3]
+	password := args[2]
 
 	// Load wallet using password
 	w, err := loadWallet(password)
@@ -432,7 +414,7 @@ func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		fmt.Fprintf(os.Stdout, "error fetching balance: %v\n", err)
 		return
 	}
-	fmt.Fprintf(os.Stdout, "Balance: %d\n", balance)
+	fmt.Fprintf(os.Stdout, "Balance: %.8f\n", balance)
 }
 
 func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
