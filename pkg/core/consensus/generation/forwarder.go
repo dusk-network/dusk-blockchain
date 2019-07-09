@@ -25,6 +25,7 @@ func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator) 
 	return &forwarder{
 		publisher:      publisher,
 		blockGenerator: blockGenerator,
+		threshold:      consensus.NewThreshold(),
 	}
 }
 
