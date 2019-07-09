@@ -34,7 +34,6 @@ type broker struct {
 	bidChan              <-chan user.Bid
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
-	acceptedBlockChan    <-chan block.Block
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
@@ -55,19 +54,19 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
-	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 
-	return &broker{
+	b := &broker{
 		publisher:            eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
 		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		acceptedBlockChan:    acceptedBlockChan,
 		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
 		seeder:               &seeder{keys: keys},
 	}
+	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), b.onBlock)
+	return b
 }
 
 func (b *broker) Listen() {
@@ -83,22 +82,26 @@ func (b *broker) Listen() {
 		case winningBlockHash := <-b.winningBlockHashChan:
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
-		case acceptedBlock := <-b.acceptedBlockChan:
-			b.onBlock(acceptedBlock)
 		}
 	}
 }
 
-func (b *broker) onBlock(blk block.Block) {
+func (b *broker) onBlock(m *bytes.Buffer) error {
+	blk := block.NewBlock()
+	if err := blk.Decode(m); err != nil {
+		return err
+	}
+
 	// Remove old bids before generating a new score
 	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
 
 	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
-		log.WithField("process", "generation").WithError(err).Errorln("problem generating seed")
+		return err
 	}
 
-	b.forwarder.setPrevBlock(blk)
+	b.forwarder.setPrevBlock(*blk)
 	b.generateProofAndBlock()
+	return nil
 }
 
 func (b *broker) generateProofAndBlock() {

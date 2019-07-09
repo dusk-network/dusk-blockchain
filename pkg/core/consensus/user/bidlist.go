@@ -86,7 +86,8 @@ func (b *BidList) repopulate(db database.DB) {
 				continue
 			}
 
-			x := CalculateX(bid.Outputs[0].EncryptedAmount, bid.M)
+			x := CalculateX(bid.Outputs[0].Commitment, bid.M)
+			x.EndHeight = searchingHeight + bid.Lock
 			b.AddBid(x)
 		}
 
