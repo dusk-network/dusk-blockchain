@@ -147,7 +147,8 @@ func checkLockTimeValid(lockTime, blockTime uint64) error {
 }
 
 func checkRangeProof(p rangeproof.Proof) error {
-	return nil
+	_, err := rangeproof.Verify(p)
+	return err
 }
 
 // checks that the transaction has not been spent by checking the database for that key image
