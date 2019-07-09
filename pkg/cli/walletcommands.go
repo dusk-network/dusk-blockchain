@@ -178,12 +178,11 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 		return
 	}
 
-	hash, err := tx.Hash()
+	_, err = wireTx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	wireTx.TxID = hash
 	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
@@ -307,12 +306,11 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 		return
 	}
 
-	hash, err := tx.Hash()
+	_, err = wireTx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	wireTx.TxID = hash
 	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
@@ -377,12 +375,11 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		return
 	}
 
-	hash, err := tx.Hash()
+	_, err = wireTx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	wireTx.TxID = hash
 	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
