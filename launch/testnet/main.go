@@ -98,17 +98,10 @@ func main() {
 		}
 	}
 
-	go func() {
-		startingRound, err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys)
-		if err != nil {
-			panic(err)
-		}
+	if err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys); err != nil {
+		panic(err)
+	}
 
-		srv.StartConsensus(startingRound)
-	}()
-
-	// TODO: this should be adjusted before testnet release, it is simply a way
-	// to bootstrap the network in an unsophisticated manner
 	if strings.Contains(ips[0], "noip") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
 		// Create mock block on height 1 with our stake and bid

@@ -2,7 +2,6 @@ package chain
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
@@ -10,10 +9,10 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+/*
 func TestDemoSaveFunctionality(t *testing.T) {
 
 	eb := wire.NewEventBus()
@@ -43,6 +42,7 @@ func TestDemoSaveFunctionality(t *testing.T) {
 	assert.Error(t, err)
 
 }
+*/
 
 func createMockedCertificate(hash []byte, round uint64, keys []user.Keys) *block.Certificate {
 	votes := agreement.GenVotes(hash, round, 1, keys)

@@ -158,9 +158,9 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 	return nil
 }
 
-func (c *Chain) addBidder(tx *transactions.Bid) error {
+func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) error {
 	x := user.CalculateX(tx.Outputs[0].Commitment, tx.M)
-	x.EndHeight = tx.Lock
+	x.EndHeight = startHeight + tx.Lock
 
 	c.propagateBid(x)
 	return nil
@@ -278,7 +278,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerStartHeight uint64) {
+func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) {
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
@@ -286,12 +286,12 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 		switch tx.Type() {
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake, provisionerStartHeight); err != nil {
+			if err := c.addProvisioner(stake, startHeight); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
 		case transactions.BidType:
 			bid := tx.(*transactions.Bid)
-			if err := c.addBidder(bid); err != nil {
+			if err := c.addBidder(bid, startHeight); err != nil {
 				l.Errorf("adding bidder failed: %s", err.Error())
 			}
 		}

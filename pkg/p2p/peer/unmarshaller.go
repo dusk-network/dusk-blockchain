@@ -17,7 +17,11 @@ func (m *messageUnmarshaller) Unmarshal(b []byte, w io.Writer) error {
 	payloadBuf := new(bytes.Buffer)
 	payloadBuf.Write(b)
 
-	magic := extractMagic(payloadBuf)
+	magic, err := extractMagic(payloadBuf)
+	if err != nil {
+		return err
+	}
+
 	if !m.magicIsValid(magic) {
 		return errors.New("received message header magic is mismatched")
 	}

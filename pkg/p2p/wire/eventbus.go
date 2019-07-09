@@ -14,7 +14,7 @@ import (
 var _ EventBroker = (*EventBus)(nil)
 
 var ringBufferLength = 200
-var napTime = 10 * time.Millisecond
+var napTime = 1 * time.Millisecond
 var _signal struct{}
 
 // EventBus - box for handlers and callbacks.
@@ -107,7 +107,6 @@ func (s *streamHandler) Pipe(c *ring.Consumer, w io.WriteCloser) {
 				}
 				continue
 			}
-			// giving enough time to the producer to send stuff
 			time.Sleep(napTime)
 		}
 	}
