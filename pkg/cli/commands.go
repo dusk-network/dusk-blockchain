@@ -134,7 +134,8 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 	d.UnmarshalBinary(bid.Outputs[0].Commitment)
 
 	// launch generation component
-	generation.Launch(publisher, rpcBus, d, k, nil, nil, keys)
+	publicKey := cliWallet.PublicKey()
+	generation.Launch(publisher, rpcBus, d, k, nil, nil, keys, &publicKey)
 
 	fmt.Fprintf(os.Stdout, "block generator module started\n")
 }

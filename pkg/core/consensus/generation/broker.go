@@ -18,8 +18,8 @@ import (
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys) {
-	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys)
+func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) {
+	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, publicKey)
 	go broker.Listen()
 }
 
@@ -37,16 +37,13 @@ type broker struct {
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator, keys user.Keys) *broker {
+	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) *broker {
 	if gen == nil {
 		gen = newProofGenerator(d, k)
 	}
 
 	seed := make([]byte, 64)
 	_, _ = rand.Read(seed)
-
-	// TODO: Read Block Generator's PublicKey from config or dusk-wallet API
-	publicKey := key.NewKeyPair(seed).PublicKey()
 
 	if blockGen == nil {
 		blockGen = newBlockGenerator(publicKey, rpcBus)

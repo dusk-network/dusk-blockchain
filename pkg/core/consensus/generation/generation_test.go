@@ -13,6 +13,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
@@ -27,12 +28,13 @@ func TestScoreGeneration(t *testing.T) {
 	k.Rand()
 
 	keys, _ := user.NewRandKeys()
+	publicKey := key.NewKeyPair(nil).PublicKey()
 	eb, streamer := helper.CreateGossipStreamer()
 
 	gen := &mockGenerator{t}
 
 	// launch score component
-	generation.Launch(eb, nil, d, k, gen, gen, keys)
+	generation.Launch(eb, nil, d, k, gen, gen, keys, publicKey)
 
 	// send a block to start generation
 	blk := helper.RandomBlock(t, 0, 1)
