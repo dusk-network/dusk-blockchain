@@ -15,7 +15,6 @@ const (
 
 //BuildFrame builds a length-prefixing wire message frame
 func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
-
 	if uint64(buf.Len()) > MaxFrameSize {
 		return nil, fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
 	}
@@ -38,13 +37,14 @@ func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 }
 
 func ReadFrame(r io.Reader) ([]byte, error) {
-	var size uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &size); err != nil {
+	sizeBytes := make([]byte, 8)
+	if _, err := io.ReadFull(r, sizeBytes); err != nil {
 		return nil, err
 	}
 
+	size := binary.LittleEndian.Uint64(sizeBytes)
 	if size > MaxFrameSize {
-		return nil, fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
+		return nil, fmt.Errorf("message size exceeds MaxFrameSize (%d), %d", MaxFrameSize, size)
 	}
 
 	buf := make([]byte, int(size))
