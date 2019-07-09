@@ -11,13 +11,13 @@ import (
 )
 
 // Start the interactive shell.
-func Start(publisher wire.EventBroker) {
+func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")
 	for scanner.Scan() {
 		args := strings.Split(scanner.Text(), " ")
 		if fn := CLICommands[args[0]]; fn != nil {
-			fn(args[1:], publisher)
+			fn(args[1:], eventBroker, rpcBus)
 		} else {
 			fmt.Printf("%v is not a supported command\n", args[0])
 		}
