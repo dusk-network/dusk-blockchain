@@ -62,7 +62,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
+		forwarder:            newForwarder(eventBroker, blockGen),
 		seeder:               &seeder{keys: keys},
 	}
 	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), b.onBlock)
