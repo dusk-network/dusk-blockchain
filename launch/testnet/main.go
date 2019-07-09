@@ -105,17 +105,13 @@ func main() {
 	if strings.Contains(ips[0], "noip") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
 		// Create mock block on height 1 with our stake and bid
-		blk := mockBlockOne(srv.MyBid, srv.MyStake)
+		blk := mockBlockOne()
 		buf := new(bytes.Buffer)
 		if err := blk.Encode(buf); err != nil {
 			panic(err)
 		}
 
 		srv.eventBus.Publish(string(topics.Block), buf)
-	} else {
-		// Propagate bid and stake out to the network
-		srv.sendStake()
-		srv.sendBid()
 	}
 
 	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
