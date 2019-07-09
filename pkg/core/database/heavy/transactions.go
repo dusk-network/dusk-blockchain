@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/bwesterb/go-ristretto"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -44,6 +45,7 @@ var (
 	KeyImagePrefix       = []byte{0x05}
 	CandidateBlockPrefix = []byte{0x06}
 	StatePrefix          = []byte{0x07}
+	OutputKeyPrefix      = []byte{0x08}
 )
 
 type transaction struct {
@@ -148,6 +150,16 @@ func (t transaction) StoreBlock(b *block.Block) error {
 			t.put(append(KeyImagePrefix, input.KeyImage...), txID)
 		}
 
+		// Schema
+		//
+		// Key = OutputKeyPrefix + tx.output.PublicKey
+		// Value = tx.output.PublicKey
+		//
+		// To make FetchOutputKey functioning
+		for _, output := range tx.StandardTX().Outputs {
+			t.put(append(OutputKeyPrefix, output.DestKey...), output.DestKey)
+		}
+
 	}
 
 	// Key = HeightPrefix + block.header.height
@@ -218,6 +230,50 @@ func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
 	}
 
 	return exists, err
+}
+
+// FetchOutputExists checks if an output exists in the db
+func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
+	key := append(OutputKeyPrefix, destkey...)
+	exists, err := t.snapshot.Has(key, nil)
+
+	// goleveldb returns nilIfNotFound
+	// see also nilIfNotFound in leveldb/db.go
+	if !exists && err == nil {
+		// overwrite error message
+		err = database.ErrBlockNotFound
+	}
+
+	return exists, err
+}
+
+// FetchDecoys iterates over the outputs and fetches `numDecoys` amount
+// of output public keys
+func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
+	scanFilter := OutputKeyPrefix
+
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
+	defer iterator.Release()
+
+	decoysPubKeys := make([]ristretto.Point, numDecoys)
+	var i int
+
+	for iterator.Next() {
+		value := iterator.Value()
+
+		var p ristretto.Point
+		var pBytes [32]byte
+		copy(pBytes[:], value)
+		p.SetBytes(&pBytes)
+
+		decoysPubKeys[i] = p
+		if i == numDecoys {
+			break
+		}
+		i++
+	}
+
+	return decoysPubKeys
 }
 
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
