@@ -52,7 +52,7 @@ type (
 
 // launchStore creates a component that listens to changes to the Provisioners
 func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
-	p, err := user.NewProvisioners(db)
+	p, totalWeight, err := user.NewProvisioners(db)
 	if err != nil {
 		// If we can not repopulate our committee, we can not properly verify blocks
 		// or run consensus. Thus, it's best to panic.
@@ -61,6 +61,7 @@ func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
 
 	store := &Store{
 		provisioners: p,
+		totalWeight:  totalWeight,
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)

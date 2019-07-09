@@ -19,7 +19,7 @@ func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
 	return nil
 }
 
-func getInitialRound(eventBus *wire.EventBus) uint64 {
+func getInitialRound(eventBus wire.EventBroker) uint64 {
 	initChannel := make(chan uint64, 1)
 	initCollector := &initCollector{initChannel}
 	go wire.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()

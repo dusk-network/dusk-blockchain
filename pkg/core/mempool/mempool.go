@@ -9,16 +9,15 @@ import (
 
 	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
@@ -64,17 +63,7 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 
 	// retrieve read-only connection to the blockchain database
 	if m.db == nil {
-		drvr, err := database.From(cfg.Get().Database.Driver)
-		if err != nil {
-			panic(err)
-		}
-
-		db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-		if err != nil {
-			panic(err)
-		}
-
-		m.db = db
+		_, m.db = heavy.SetupDatabase()
 	}
 
 	// run the default blockchain verifier

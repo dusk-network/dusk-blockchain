@@ -6,15 +6,12 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func initLog(file *os.File) {
@@ -98,37 +95,10 @@ func main() {
 		}
 	}
 
-	go func() {
-		startingRound, err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys)
-		if err != nil {
-			panic(err)
-		}
-
-		srv.StartConsensus(startingRound)
-	}()
-
-	// TODO: this should be adjusted before testnet release, it is simply a way
-	// to bootstrap the network in an unsophisticated manner
-	if strings.Contains(ips[0], "noip") {
-		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
-		// Create mock block on height 1 with our stake and bid
-		blk := mockBlockOne(srv.MyBid, srv.MyStake)
-		buf := new(bytes.Buffer)
-		if err := blk.Encode(buf); err != nil {
-			panic(err)
-		}
-
-		srv.eventBus.Publish(string(topics.Block), buf)
-	} else {
-		// Propagate bid and stake out to the network
-		srv.sendStake()
-		srv.sendBid()
-	}
-
 	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
 
 	// Start interactive shell
-	go cli.Start(srv.eventBus)
+	go cli.Start(srv.eventBus, srv.rpcBus)
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC

@@ -391,6 +391,19 @@ func (w *Wallet) PublicAddress() (string, error) {
 	return pubAddr.String(), nil
 }
 
+func (w *Wallet) ConsensusKeys() user.Keys {
+	return *w.consensusKeys
+}
+
+func (w *Wallet) PrivateSpend() ([]byte, error) {
+	privateSpend, err := w.keyPair.PrivateSpend()
+	if err != nil {
+		return nil, err
+	}
+
+	return privateSpend.Bytes(), nil
+}
+
 // Save saves the seed to a dat file
 func saveSeed(seed []byte, password string) error {
 

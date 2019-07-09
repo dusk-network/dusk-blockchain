@@ -1,7 +1,6 @@
 package peer
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"io"
@@ -10,9 +9,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
@@ -29,8 +27,7 @@ var readWriteTimeout = 60 * time.Second // Max idle time for a peer
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	reader *bufio.Reader
-	magic  protocol.Magic
+	magic protocol.Magic
 }
 
 // Writer abstracts all of the logic and fields needed to write messages to
@@ -57,9 +54,8 @@ type Reader struct {
 func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscriber) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
-			Conn:   conn,
-			reader: bufio.NewReader(conn),
-			magic:  magic,
+			Conn:  conn,
+			magic: magic,
 		},
 		gossip: processing.NewGossip(magic),
 	}
@@ -72,15 +68,11 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher wire.EventPublisher,
 	rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*Reader, error) {
 	pconn := &Connection{
-		Conn:   conn,
-		reader: bufio.NewReader(conn),
-		magic:  magic,
+		Conn:  conn,
+		magic: magic,
 	}
 
-	db, err := OpenDB()
-	if err != nil {
-		return nil, err
-	}
+	_, db := heavy.SetupDatabase()
 
 	dataRequestor := processing.NewDataRequestor(db, rpcBus, responseChan)
 
@@ -114,7 +106,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 // ReadMessage reads from the connection
 func (c *Connection) ReadMessage() ([]byte, error) {
 	// COBS  c.reader.ReadBytes(0x00)
-	return processing.ReadFrame(c.reader)
+	return processing.ReadFrame(c.Conn)
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
@@ -204,23 +196,23 @@ func (p *Reader) ReadLoop() {
 }
 
 // Read the topic bytes off r, and return them as a topics.Topic.
-func extractTopic(r io.Reader) topics.Topic {
+func extractTopic(r io.Reader) (topics.Topic, error) {
 	var cmdBuf [topics.Size]byte
 	if _, err := r.Read(cmdBuf[:]); err != nil {
-		panic(err)
+		return topics.Topic(""), err
 	}
-	return topics.ByteArrayToTopic(cmdBuf)
+	return topics.ByteArrayToTopic(cmdBuf), nil
 }
 
 // Read the magic bytes off r, and return them as a protocol.Magic.
-func extractMagic(r io.Reader) protocol.Magic {
+func extractMagic(r io.Reader) (protocol.Magic, error) {
 	buffer := make([]byte, 4)
 	if _, err := r.Read(buffer); err != nil {
-		panic(err)
+		return protocol.Magic(0), err
 	}
 
 	magic := binary.LittleEndian.Uint32(buffer)
-	return protocol.Magic(magic)
+	return protocol.Magic(magic), nil
 }
 
 // Write a message to the connection.
@@ -237,18 +229,4 @@ func (c *Connection) Write(b []byte) (int, error) {
 // Addr returns the peer's address as a string.
 func (c *Connection) Addr() string {
 	return c.Conn.RemoteAddr().String()
-}
-
-func OpenDB() (database.DB, error) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
 }

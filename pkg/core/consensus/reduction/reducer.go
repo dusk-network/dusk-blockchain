@@ -117,12 +117,12 @@ func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
-		r.ctx.state.IncrementStep()
-
 		// if there was a timeout, we should report nodes that did not vote
 		if events == nil {
 			r.propagateAbsentees()
 		}
+
+		r.ctx.state.IncrementStep()
 
 		hash := r.extractHash(events)
 		if !r.inCommittee() {

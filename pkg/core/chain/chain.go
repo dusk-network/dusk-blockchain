@@ -10,7 +10,6 @@ import (
 
 	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
@@ -19,6 +18,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
@@ -50,15 +50,7 @@ type Chain struct {
 
 // New returns a new chain object
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-	if err != nil {
-		return nil, err
-	}
+	_, db := heavy.SetupDatabase()
 
 	l, err := newLoader(db)
 	if err != nil {
@@ -158,9 +150,9 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 	return nil
 }
 
-func (c *Chain) addBidder(tx *transactions.Bid) error {
+func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) error {
 	x := user.CalculateX(tx.Outputs[0].Commitment, tx.M)
-	x.EndHeight = tx.Lock
+	x.EndHeight = startHeight + tx.Lock
 
 	c.propagateBid(x)
 	return nil
@@ -278,7 +270,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerStartHeight uint64) {
+func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) {
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
@@ -286,12 +278,12 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, provisionerSta
 		switch tx.Type() {
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake, provisionerStartHeight); err != nil {
+			if err := c.addProvisioner(stake, startHeight); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
 		case transactions.BidType:
 			bid := tx.(*transactions.Bid)
-			if err := c.addBidder(bid); err != nil {
+			if err := c.addBidder(bid, startHeight); err != nil {
 				l.Errorf("adding bidder failed: %s", err.Error())
 			}
 		}

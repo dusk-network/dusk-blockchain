@@ -6,15 +6,13 @@ import (
 	"fmt"
 	"os"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-
 	ristretto "github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 	wallet "gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet"
 	walletdb "gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
@@ -33,7 +31,7 @@ var cliWallet *wallet.Wallet
 // the database
 var DBInstance *walletdb.DB
 
-func createWalletCMD(args []string, publisher wire.EventBroker) {
+func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 
 	if DBInstance != nil {
 		DBInstance.Close()
@@ -70,7 +68,7 @@ func createWalletCMD(args []string, publisher wire.EventBroker) {
 	DBInstance = db
 }
 
-func loadWalletCMD(args []string, publisher wire.EventBroker) {
+func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	if args == nil || len(args) < 1 {
 		fmt.Fprintf(os.Stdout, commandInfo["loadwallet"]+"\n")
 		return
@@ -122,7 +120,7 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 
 }
 
-func transferCMD(args []string, publisher wire.EventBroker) {
+func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	if args == nil || len(args) < 4 {
 		fmt.Fprintf(os.Stdout, commandInfo["transfer"]+"\n")
 		return
@@ -180,10 +178,18 @@ func transferCMD(args []string, publisher wire.EventBroker) {
 		return
 	}
 
+	hash, err := tx.Hash()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
+	}
+	wireTx.TxID = hash
+	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+
 	publisher.Publish(string(topics.Tx), buf)
 }
 
-func createFromSeedCMD(args []string, publisher wire.EventBroker) {
+func createFromSeedCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	if args == nil || len(args) < 2 {
 		fmt.Fprintf(os.Stdout, commandInfo["createfromseed"]+"\n")
 		return
@@ -242,7 +248,7 @@ func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
 
 }
 
-func sendStakeCMD(args []string, publisher wire.EventBroker) {
+func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	if args == nil || len(args) < 4 {
 		fmt.Fprintf(os.Stdout, commandInfo["stake"]+"\n")
 		return
@@ -301,10 +307,18 @@ func sendStakeCMD(args []string, publisher wire.EventBroker) {
 		return
 	}
 
+	hash, err := tx.Hash()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
+	}
+	wireTx.TxID = hash
+	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+
 	publisher.Publish(string(topics.Tx), buf)
 }
 
-func sendBidCMD(args []string, publisher wire.EventBroker) {
+func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	if args == nil || len(args) < 4 {
 		fmt.Fprintf(os.Stdout, commandInfo["bid"]+"\n")
 		return
@@ -363,10 +377,18 @@ func sendBidCMD(args []string, publisher wire.EventBroker) {
 		return
 	}
 
+	hash, err := tx.Hash()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		return
+	}
+	wireTx.TxID = hash
+	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+
 	publisher.Publish(string(topics.Tx), buf)
 }
 
-func syncWalletCMD(args []string, publisher wire.EventBroker) {
+func syncWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 
 	if cliWallet == nil {
 		fmt.Fprintf(os.Stdout, "please load a wallet before trying to sync\n")
@@ -401,7 +423,7 @@ func syncWalletCMD(args []string, publisher wire.EventBroker) {
 		}
 	}
 }
-func balanceCMD(args []string, publisher wire.EventBroker) {
+func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 
 	if cliWallet == nil {
 		fmt.Fprintf(os.Stdout, "please load a wallet before trying to check balance\n")
@@ -417,19 +439,11 @@ func balanceCMD(args []string, publisher wire.EventBroker) {
 }
 
 func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-	if err != nil {
-		return nil, nil, err
-	}
+	_, db := heavy.SetupDatabase()
 
 	var blk *block.Block
 	var state *database.State
-	err = db.View(func(t database.Transaction) error {
+	err := db.View(func(t database.Transaction) error {
 		hash, err := t.FetchBlockHashByHeight(height)
 		if err != nil {
 			return err

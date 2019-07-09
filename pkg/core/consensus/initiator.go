@@ -2,28 +2,21 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/binary"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
-func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) (uint64, error) {
+func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) error {
 	// Get a db connection
 	if db == nil {
-		drvr, err := database.From(cfg.Get().Database.Driver)
-		if err != nil {
-			return 0, err
-		}
-
-		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-		if err != nil {
-			return 0, err
-		}
+		_, db = heavy.SetupDatabase()
 	}
 
 	var currentHeight uint64
@@ -42,15 +35,20 @@ func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Ke
 	// Start listening for accepted blocks, regardless of if we found stakes or not
 	acceptedBlockChan, listener := InitAcceptedBlockUpdate(eventBroker)
 
-	// Unsubscribe from AcceptedBlock once we're done
-	defer listener.Quit()
+	go func(listener *wire.TopicListener) {
+		// Unsubscribe from AcceptedBlock once we're done
+		defer listener.Quit()
 
-	for {
-		blk := <-acceptedBlockChan
-		if found || keyFound(keys, blk.Txs) {
-			return blk.Header.Height + 1, nil
+		for {
+			blk := <-acceptedBlockChan
+			if found || keyFound(keys, blk.Txs) {
+				roundBytes := make([]byte, 8)
+				binary.LittleEndian.PutUint64(roundBytes, blk.Header.Height+1)
+				eventBroker.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+			}
 		}
-	}
+	}(listener)
+	return nil
 }
 
 func findActiveStakes(keys user.Keys, currentHeight uint64, db database.DB) bool {

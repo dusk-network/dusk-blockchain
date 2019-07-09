@@ -1,10 +1,15 @@
 package config
 
+import "time"
+
 // A signle point of constants definition
 const (
 	// GeneratorReward is the amount of Block generator default reward
 	// TODO: TBD
 	GeneratorReward = uint64(100)
+
+	// ConsensusTimeOut is the time out for consensus step timers.
+	ConsensusTimeOut = 5 * time.Second
 
 	// GenesisBlockBlob represents the genesis block bytes in hexadecimal format
 	// It's recommended to be regenerated with generation.GenerateGensisBlock() API

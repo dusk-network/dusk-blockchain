@@ -6,11 +6,10 @@ import (
 	"math/rand"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
 	"gitlab.dusk.network/dusk-core/zkproof"
 )
@@ -32,15 +31,7 @@ type BidList []Bid
 func NewBidList(db database.DB) (*BidList, error) {
 	bl := &BidList{}
 	if db == nil {
-		drvr, err := database.From(cfg.Get().Database.Driver)
-		if err != nil {
-			return nil, err
-		}
-
-		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-		if err != nil {
-			return nil, err
-		}
+		_, db = heavy.SetupDatabase()
 	}
 
 	bl.repopulate(db)
@@ -86,7 +77,8 @@ func (b *BidList) repopulate(db database.DB) {
 				continue
 			}
 
-			x := CalculateX(bid.Outputs[0].EncryptedAmount, bid.M)
+			x := CalculateX(bid.Outputs[0].Commitment, bid.M)
+			x.EndHeight = searchingHeight + bid.Lock
 			b.AddBid(x)
 		}
 

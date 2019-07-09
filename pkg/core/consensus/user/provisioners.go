@@ -5,12 +5,11 @@ import (
 	"sync"
 	"unsafe"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
@@ -36,7 +35,7 @@ type (
 )
 
 // NewProvisioners returns an initialized Provisioners struct.
-func NewProvisioners(db database.DB) (*Provisioners, error) {
+func NewProvisioners(db database.DB) (*Provisioners, uint64, error) {
 	p := &Provisioners{
 		set:       sortedset.New(),
 		members:   make(map[string]*Member),
@@ -44,22 +43,14 @@ func NewProvisioners(db database.DB) (*Provisioners, error) {
 	}
 
 	if db == nil {
-		drvr, err := database.From(cfg.Get().Database.Driver)
-		if err != nil {
-			return nil, err
-		}
-
-		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-		if err != nil {
-			return nil, err
-		}
+		_, db = heavy.SetupDatabase()
 	}
 
-	p.repopulate(db)
-	return p, nil
+	totalWeight := p.repopulate(db)
+	return p, totalWeight, nil
 }
 
-func (p *Provisioners) repopulate(db database.DB) {
+func (p *Provisioners) repopulate(db database.DB) uint64 {
 	var currentHeight uint64
 	err := db.View(func(t database.Transaction) error {
 		var err error
@@ -76,6 +67,7 @@ func (p *Provisioners) repopulate(db database.DB) {
 		searchingHeight = currentHeight - transactions.MaxLockTime
 	}
 
+	var totalWeight uint64
 	for {
 		var blk *block.Block
 		err := db.View(func(t database.Transaction) error {
@@ -99,10 +91,12 @@ func (p *Provisioners) repopulate(db database.DB) {
 			}
 
 			p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
+			totalWeight += stake.GetOutputAmount()
 		}
 
 		searchingHeight++
 	}
+	return totalWeight
 }
 
 // Size returns the amount of Members contained within a Provisioners struct.
