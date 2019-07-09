@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
@@ -22,15 +23,12 @@ func TestInitiate(t *testing.T) {
 	bus := wire.NewEventBus()
 	keys, _ := user.NewRandKeys()
 	_, db := lite.SetupDatabase()
+	initChan := make(chan *bytes.Buffer, 1)
+	bus.Subscribe(msg.InitializationTopic, initChan)
 
-	go func() {
-		round, err := consensus.GetStartingRound(bus, db, keys)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assert.Equal(t, uint64(2), round)
-	}()
+	if err := consensus.GetStartingRound(bus, db, keys); err != nil {
+		t.Fatal(err)
+	}
 
 	blk := helper.RandomBlock(t, 1, 2)
 	stake := makeStake(&keys)
@@ -42,6 +40,8 @@ func TestInitiate(t *testing.T) {
 	}
 
 	bus.Publish(string(topics.AcceptedBlock), buf)
+	round := <-initChan
+	assert.Equal(t, uint64(2), binary.LittleEndian.Uint64(round.Bytes()))
 }
 
 func makeStake(keys *user.Keys) *transactions.Stake {
