@@ -363,7 +363,7 @@ func (s *StandardTx) Decode(r io.Reader) error {
 		s.Outputs = append(s.Outputs, output)
 	}
 
-	return s.RangeProof.Decode(r, false)
+	return s.RangeProof.Decode(r, true)
 }
 
 func (s *StandardTx) WireStandardTx() (*wiretx.Standard, error) {
@@ -374,7 +374,7 @@ func (s *StandardTx) WireStandardTx() (*wiretx.Standard, error) {
 
 	// Serialise rangeproof
 	buf := &bytes.Buffer{}
-	err := s.RangeProof.Encode(buf, false)
+	err := s.RangeProof.Encode(buf, true)
 	if err != nil {
 		return nil, err
 	}

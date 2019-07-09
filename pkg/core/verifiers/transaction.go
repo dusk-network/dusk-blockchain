@@ -67,10 +67,28 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 	}
 
 	// Rangeproof - should be valid
-	if err := checkRangeProof(rangeproof.Proof{}); err != nil {
+	rp := rangeproof.Proof{}
+	buf := bytes.NewReader(tx.RangeProof)
+	err := rp.Decode(buf, true)
+	if err != nil {
 		return err
 	}
 
+	// var commitments []pedersen.Commitment
+	// for _, output := range tx.Outputs {
+	// 	var comm pedersen.Commitment
+
+	// 	commBuff := bytes.NewReader(output.Commitment)
+	// 	err = comm.Decode(commBuff)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	commitments = append(commitments, comm)
+	// }
+
+	if err := checkRangeProof(rp); err != nil {
+		return err
+	}
 	// KeyImage - should not be present in the database
 	if err := checkTXDoubleSpent(db, tx.Inputs); err != nil {
 		return err
