@@ -255,7 +255,7 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
 	defer iterator.Release()
 
-	decoysPubKeys := make([]ristretto.Point, numDecoys)
+	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
 	var i int
 
 	for iterator.Next() {
@@ -266,7 +266,7 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 		copy(pBytes[:], value)
 		p.SetBytes(&pBytes)
 
-		decoysPubKeys[i] = p
+		decoysPubKeys = append(decoysPubKeys, p)
 		if i == numDecoys {
 			break
 		}
