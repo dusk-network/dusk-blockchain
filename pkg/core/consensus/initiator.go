@@ -4,28 +4,19 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 )
 
 func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) error {
 	// Get a db connection
 	if db == nil {
-		drvr, err := database.From(cfg.Get().Database.Driver)
-		if err != nil {
-			return err
-		}
-
-		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-		if err != nil {
-			return err
-		}
+		_, db = heavy.SetupDatabase()
 	}
 
 	var currentHeight uint64
