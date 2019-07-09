@@ -76,12 +76,20 @@ func (p *Connection) readRemoteMsgVersion() error {
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
 
-	magic := extractMagic(decodedMsg)
+	magic, err := extractMagic(decodedMsg)
+	if err != nil {
+		return err
+	}
+
 	if magic != p.magic {
 		return errors.New("magic mismatch")
 	}
 
-	topic := extractTopic(decodedMsg)
+	topic, err := extractTopic(decodedMsg)
+	if err != nil {
+		return err
+	}
+
 	if topic != topics.Version {
 		return fmt.Errorf("did not receive the expected '%s' message - got %s",
 			topics.Version, topic)
@@ -123,12 +131,20 @@ func (p *Connection) readVerAck() error {
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
 
-	magic := extractMagic(decodedMsg)
+	magic, err := extractMagic(decodedMsg)
+	if err != nil {
+		return err
+	}
+
 	if magic != p.magic {
 		return errors.New("magic mismatch")
 	}
 
-	topic := extractTopic(decodedMsg)
+	topic, err := extractTopic(decodedMsg)
+	if err != nil {
+		return err
+	}
+
 	if topic != topics.VerAck {
 		return fmt.Errorf("did not receive the expected '%s' message - got %s",
 			topics.VerAck, topic)
