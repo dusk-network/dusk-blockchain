@@ -12,9 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 func initLog(file *os.File) {
@@ -98,26 +96,24 @@ func main() {
 		}
 	}
 
-	if err := consensus.GetStartingRound(srv.eventBus, nil, *srv.keys); err != nil {
-		panic(err)
-	}
-
 	if strings.Contains(ips[0], "noip") {
 		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
 		// Create mock block on height 1 with our stake and bid
-		blk := mockBlockOne()
-		buf := new(bytes.Buffer)
-		if err := blk.Encode(buf); err != nil {
-			panic(err)
-		}
+		/*
+			blk := mockBlockOne()
+			buf := new(bytes.Buffer)
+			if err := blk.Encode(buf); err != nil {
+				panic(err)
+			}
 
-		srv.eventBus.Publish(string(topics.Block), buf)
+			srv.eventBus.Publish(string(topics.Block), buf)
+		*/
 	}
 
 	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
 
 	// Start interactive shell
-	go cli.Start(srv.eventBus)
+	go cli.Start(srv.eventBus, srv.rpcBus)
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
