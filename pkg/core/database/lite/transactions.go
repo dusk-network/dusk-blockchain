@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/utils"
@@ -187,6 +188,9 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	}
 
 	return true, txID, nil
+}
+func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
+	return nil
 }
 
 func (t *transaction) StoreCandidateBlock(b *block.Block) error {
