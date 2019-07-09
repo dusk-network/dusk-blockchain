@@ -465,19 +465,11 @@ func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
 
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-	if err != nil {
-		return nil
-	}
+	_, db := heavy.SetupDatabase()
 
 	var pubKeys []mlsag.PubKeys
 	var decoys []ristretto.Point
-	err = db.View(func(t database.Transaction) error {
+	db.View(func(t database.Transaction) error {
 		decoys = t.FetchDecoys(numMixins)
 		return nil
 	})
