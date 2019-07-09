@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 
+	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -86,6 +87,10 @@ type Transaction interface {
 	FetchBlock(hash []byte) (*block.Block, error)
 
 	FetchCurrentHeight() (uint64, error)
+
+	FetchDecoys(numDecoys int) []ristretto.Point
+
+	FetchOutputExists(destkey []byte) (bool, error)
 
 	// Atomic storage
 	Commit() error

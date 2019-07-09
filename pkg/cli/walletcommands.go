@@ -178,12 +178,11 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 		return
 	}
 
-	hash, err := tx.Hash()
+	_, err = wireTx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	wireTx.TxID = hash
 	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
@@ -307,12 +306,11 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 		return
 	}
 
-	hash, err := tx.Hash()
+	_, err = wireTx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	wireTx.TxID = hash
 	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
@@ -377,12 +375,11 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		return
 	}
 
-	hash, err := tx.Hash()
+	_, err = wireTx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	wireTx.TxID = hash
 	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
@@ -464,10 +461,27 @@ func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
 }
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
+
+	_, db := heavy.SetupDatabase()
+
 	var pubKeys []mlsag.PubKeys
+	var decoys []ristretto.Point
+	db.View(func(t database.Transaction) error {
+		decoys = t.FetchDecoys(numMixins)
+		return nil
+	})
+
+	// Potential panic if the database does not have enough decoys
 	for i := 0; i < numMixins; i++ {
-		pubKeyVector := generateDualKey()
-		pubKeys = append(pubKeys, pubKeyVector)
+
+		var keyVector mlsag.PubKeys
+		keyVector.AddPubKey(decoys[i])
+
+		var secondaryKey ristretto.Point
+		secondaryKey.Rand()
+		keyVector.AddPubKey(secondaryKey)
+
+		pubKeys = append(pubKeys, keyVector)
 	}
 	return pubKeys
 }
