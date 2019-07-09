@@ -450,10 +450,35 @@ func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
 }
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
+
+	drvr, err := database.From(cfg.Get().Database.Driver)
+	if err != nil {
+		return nil
+	}
+
+	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
+	if err != nil {
+		return nil
+	}
+
 	var pubKeys []mlsag.PubKeys
+	var decoys []ristretto.Point
+	err = db.View(func(t database.Transaction) error {
+		decoys = t.FetchDecoys(numMixins)
+		return nil
+	})
+
+	// Potential panic if the database does not have enough decoys
 	for i := 0; i < numMixins; i++ {
-		pubKeyVector := generateDualKey()
-		pubKeys = append(pubKeys, pubKeyVector)
+
+		var keyVector mlsag.PubKeys
+		keyVector.AddPubKey(decoys[i])
+
+		var secondaryKey ristretto.Point
+		secondaryKey.Rand()
+		keyVector.AddPubKey(secondaryKey)
+
+		pubKeys = append(pubKeys, keyVector)
 	}
 	return pubKeys
 }
