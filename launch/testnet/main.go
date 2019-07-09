@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -94,20 +93,6 @@ func main() {
 		if err := connMgr.Connect(ip); err != nil {
 			log.WithField("IP", ip).Warnln(err)
 		}
-	}
-
-	if strings.Contains(ips[0], "noip") {
-		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
-		// Create mock block on height 1 with our stake and bid
-		/*
-			blk := mockBlockOne()
-			buf := new(bytes.Buffer)
-			if err := blk.Encode(buf); err != nil {
-				panic(err)
-			}
-
-			srv.eventBus.Publish(string(topics.Block), buf)
-		*/
 	}
 
 	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
