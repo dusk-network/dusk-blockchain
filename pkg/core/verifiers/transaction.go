@@ -140,28 +140,8 @@ func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.TimeLock) e
 }
 
 func checkLockTimeValid(lockTime, blockTime uint64) error {
-	if lockTime >= transactions.TimeLockBlockZero {
-		return checkLockValidHeight(lockTime - transactions.TimeLockBlockZero)
-	}
-	return checkLockValidTime(lockTime, blockTime)
-}
-
-func checkLockValidHeight(lockHeight uint64) error {
-	return nil
-
-	// TODO: @Kev Seems lockHeight is expected here but checkLockTimeValid accepts UnixTime not height
-	// nextBlockHeight := PrevBlock.Header.Height + 1
-	var nextBlockHeight uint64 = 0
-	if lockHeight < nextBlockHeight {
-		return fmt.Errorf("invalid lock height, lock expired at height %d , it is now height %d", lockHeight, nextBlockHeight)
-	}
-	return nil
-}
-
-func checkLockValidTime(lockTime, nextBlockTime uint64) error {
-	return nil
-	if lockTime < nextBlockTime {
-		return fmt.Errorf("invalid lock time, lock expired at time %d , block time is approx. now %d", lockTime, nextBlockTime)
+	if lockTime >= transactions.MaxLockTime {
+		return errors.New("timelock greater than MaxTimeLock")
 	}
 	return nil
 }
