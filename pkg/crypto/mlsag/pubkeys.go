@@ -69,3 +69,7 @@ func (p *PubKeys) AddPubKey(key ristretto.Point) {
 func (p *PubKeys) Len() int {
 	return len(p.keys)
 }
+
+func (p *PubKeys) OutputKey() ristretto.Point {
+	return p.keys[0]
+}
