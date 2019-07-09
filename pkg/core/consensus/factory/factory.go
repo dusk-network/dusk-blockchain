@@ -18,7 +18,7 @@ import (
 // consensus. It should also contain all the relevant information for the
 // processes it intends to start up.
 type ConsensusFactory struct {
-	eventBus *wire.EventBus
+	eventBus wire.EventBroker
 	rpcBus   *wire.RPCBus
 
 	user.Keys
@@ -26,7 +26,7 @@ type ConsensusFactory struct {
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, timerLength time.Duration,
+func New(eventBus wire.EventBroker, rpcBus *wire.RPCBus, timerLength time.Duration,
 	keys user.Keys) *ConsensusFactory {
 
 	return &ConsensusFactory{

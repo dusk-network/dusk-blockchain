@@ -12,6 +12,7 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -130,15 +131,7 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 var exportData = func(s *Server, params []string) (string, error) {
 
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return "", err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), true)
-	if err != nil {
-		return "", err
-	}
+	_, db := heavy.SetupDatabase()
 
 	optionTransactions := false
 	if len(params) > 0 {
@@ -148,7 +141,7 @@ var exportData = func(s *Server, params []string) (string, error) {
 	}
 
 	var chain []block.Block
-	err = db.View(func(t database.Transaction) error {
+	err := db.View(func(t database.Transaction) error {
 		var height uint64
 		for {
 

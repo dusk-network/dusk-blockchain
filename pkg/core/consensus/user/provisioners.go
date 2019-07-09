@@ -5,12 +5,11 @@ import (
 	"sync"
 	"unsafe"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
@@ -44,15 +43,7 @@ func NewProvisioners(db database.DB) (*Provisioners, uint64, error) {
 	}
 
 	if db == nil {
-		drvr, err := database.From(cfg.Get().Database.Driver)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		db, err = drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-		if err != nil {
-			return nil, 0, err
-		}
+		_, db = heavy.SetupDatabase()
 	}
 
 	totalWeight := p.repopulate(db)

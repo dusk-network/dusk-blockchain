@@ -16,18 +16,16 @@ import (
 
 type forwarder struct {
 	publisher      wire.EventPublisher
-	rpcBus         *wire.RPCBus
 	blockGenerator BlockGenerator
 	threshold      *consensus.Threshold
 	prevBlock      block.Block
 }
 
-func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator, rpcBus *wire.RPCBus) *forwarder {
+func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator) *forwarder {
 	return &forwarder{
 		publisher:      publisher,
 		blockGenerator: blockGenerator,
 		threshold:      consensus.NewThreshold(),
-		rpcBus:         rpcBus,
 	}
 }
 

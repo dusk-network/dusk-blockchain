@@ -10,7 +10,6 @@ import (
 
 	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
@@ -19,6 +18,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
@@ -50,15 +50,7 @@ type Chain struct {
 
 // New returns a new chain object
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
-	drvr, err := database.From(cfg.Get().Database.Driver)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
-	if err != nil {
-		return nil, err
-	}
+	_, db := heavy.SetupDatabase()
 
 	l, err := newLoader(db)
 	if err != nil {

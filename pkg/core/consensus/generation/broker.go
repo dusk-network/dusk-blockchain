@@ -18,7 +18,7 @@ import (
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus *wire.EventBus, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys) {
+func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys) {
 	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys)
 	go broker.Listen()
 }
@@ -62,7 +62,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		forwarder:            newForwarder(eventBroker, blockGen, rpcBus),
+		forwarder:            newForwarder(eventBroker, blockGen),
 		seeder:               &seeder{keys: keys},
 	}
 	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), b.onBlock)
