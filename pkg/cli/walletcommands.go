@@ -22,7 +22,6 @@ import (
 
 var testnet = byte(2)
 var dbName = "walletDb"
-var fee = int64(100)
 
 // cliWallet will be used to scan blocks in the background
 // when we received a topic.AcceptedBlock
@@ -144,7 +143,7 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 	}
 
 	// Create a new standard tx
-	tx, err := w.NewStandardTx(int64(fee))
+	tx, err := w.NewStandardTx(config.MinFee)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
@@ -269,7 +268,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 	}
 
 	// Create a new stake tx
-	tx, err := w.NewStakeTx(int64(fee), lockTime, amount)
+	tx, err := w.NewStakeTx(config.MinFee, lockTime, amount)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
@@ -332,7 +331,7 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 	}
 
 	// Create a new bid tx
-	tx, err := w.NewBidTx(int64(fee), lockTime, amount)
+	tx, err := w.NewBidTx(config.MinFee, lockTime, amount)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
