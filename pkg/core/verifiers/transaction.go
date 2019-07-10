@@ -46,7 +46,7 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 		return errors.New("invalid transaction type")
 	}
 
-	if tx.Fee < config.MinFee {
+	if tx.Fee < uint64(config.MinFee) {
 		return errors.New("fee too low")
 	}
 
