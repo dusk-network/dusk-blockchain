@@ -60,6 +60,6 @@ func (tl *TimelockTx) WireTimeLockTx() (*wiretx.TimeLock, error) {
 		*standardTx,
 		tl.Lock,
 	}
-	tx.TxType = wiretx.TimeLockType
+	tx.TxType = wiretx.TimelockType
 	return tx, nil
 }
