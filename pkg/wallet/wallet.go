@@ -369,7 +369,7 @@ func (w *Wallet) Balance() (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return float64(w.db.FetchBalance(privSpend.Bytes()) / config.DUSK)
+	return float64(w.db.FetchBalance(privSpend.Bytes()) / config.DUSK), nil
 }
 
 func (w *Wallet) GetSavedHeight() (uint64, error) {
