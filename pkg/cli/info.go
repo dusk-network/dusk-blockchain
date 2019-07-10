@@ -16,7 +16,8 @@ var commandInfo = map[string]string{
 		Stake a given amount of DUSK, to allow participation as a provisioner in consensus.`,
 	"bid": `Usage: bid [amount] [locktime] [password]
 		Bid a given amount of DUSK, to allow participation as a block generator in consensus.`,
-	"startprovisioner":    `Send a signal to the connected DUSK node to start participating in consensus as a provisioner.`,
-	"startblockgenerator": `Sennd a signal to the connected DUSK node to start participating in consensus as a block generator`,
-	"exit/quit":           `Shut down the node and close the console`,
+	"startprovisioner": `Send a signal to the connected DUSK node to start participating in consensus as a provisioner.`,
+	"startblockgenerator": `Usage: startblockgenerator [bidtxhash]
+		Send a signal to the connected DUSK node to start participating in consensus as a block generator`,
+	"exit/quit": `Shut down the node and close the console`,
 }
