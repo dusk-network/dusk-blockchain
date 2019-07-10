@@ -14,6 +14,8 @@ const (
 	// DUSK is one whole unit of DUSK.
 	DUSK = uint64(100000000)
 
+	MinFee = int64(100)
+
 	// GenesisBlockBlob represents the genesis block bytes in hexadecimal format
 	// It's recommended to be regenerated with generation.GenerateGensisBlock() API
 	//

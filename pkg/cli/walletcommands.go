@@ -7,6 +7,7 @@ import (
 	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
