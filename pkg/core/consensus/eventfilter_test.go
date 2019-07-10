@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
@@ -18,18 +16,17 @@ import (
 func TestRelevantEvent(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)
-	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true,
-		newMockEventProcessor(nil, processChan), true)
+	eventFilter := newEventFilter(round, step, true, true)
 	eventFilter.UpdateRound(1)
 
 	// Run collect with an empty buffer, as the event will be mocked
-	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.NoError(t, eventFilter.Collect(new(bytes.Buffer)))
+	time.Sleep(200 * time.Millisecond)
 
-	// We should get something from the processChan
-	result := <-processChan
-	// Result should be nil
-	assert.Nil(t, result)
+	// We should get an event if we call accumulator.All
+	evs := eventFilter.Accumulator.All()
+	// Len should be 1
+	assert.Equal(t, 1, len(evs))
 }
 
 // Test that early events get queued, and then passed down to the Processor properly
@@ -37,40 +34,39 @@ func TestRelevantEvent(t *testing.T) {
 func TestEarlyEvent(t *testing.T) {
 	round := uint64(2)
 	step := uint8(1)
-	processChan := make(chan error, 1)
-	processor := newMockEventProcessor(nil, processChan)
-	eventFilter := newEventFilter(round, step, true, processor, true)
+	eventFilter := newEventFilter(round, step, true, true)
 	eventFilter.UpdateRound(1)
 
 	assert.NoError(t, eventFilter.Collect(new(bytes.Buffer)))
+	time.Sleep(200 * time.Millisecond)
 	// Queue should now hold an event
 	// Update the round, and flush the queue to get it
 	eventFilter.UpdateRound(2)
 	eventFilter.FlushQueue()
-	// We should get something from the processChan
-	result := <-processChan
-	// Result should be nil
-	assert.Nil(t, result)
+	time.Sleep(200 * time.Millisecond)
+	// We should get an event if we call accumulator.All
+	evs := eventFilter.Accumulator.All()
+	// Len should be 1
+	assert.Equal(t, 1, len(evs))
 }
 
 // Test that obsolete events get dropped.
 func TestObsoleteEvent(t *testing.T) {
 	round := uint64(1)
 	step := uint8(1)
-	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true,
-		newMockEventProcessor(nil, processChan), true)
+	eventFilter := newEventFilter(round, step, true, true)
 	eventFilter.UpdateRound(2)
 
 	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	time.Sleep(200 * time.Millisecond)
 
 	// We should not get anything from the processChan
 	timer := time.After(100 * time.Millisecond)
-	select {
-	case <-processChan:
-		t.Fatal("processor received an obsolete event")
-	case <-timer:
-	}
+	<-timer
+	// We should get no events if we call accumulator.All
+	evs := eventFilter.Accumulator.All()
+	// Len should be 0
+	assert.Equal(t, 0, len(evs))
 }
 
 // Test that the entire queue for a round is flushed and processed, when checkStep
@@ -78,70 +74,32 @@ func TestObsoleteEvent(t *testing.T) {
 func TestFlushQueueNoCheckStep(t *testing.T) {
 	round := uint64(2)
 	step := uint8(2)
-	processChan := make(chan error, 1)
-	eventFilter := newEventFilter(round, step, true,
-		newMockEventProcessor(nil, processChan), false)
+	eventFilter := newEventFilter(round, step, true, false)
 	eventFilter.UpdateRound(1)
 
 	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	time.Sleep(200 * time.Millisecond)
 	// Update round, and flush queue to get the event
 	eventFilter.UpdateRound(2)
 	eventFilter.FlushQueue()
+	time.Sleep(200 * time.Millisecond)
 
-	result := <-processChan
-	assert.Nil(t, result)
+	// We should get an event if we call accumulator.All
+	evs := eventFilter.Accumulator.All()
+	// Len should be 1
+	assert.Equal(t, 1, len(evs))
 }
 
 // newEventFilter simplifies the creation of an EventFilter with specific mocked
 // components.
-func newEventFilter(round uint64, step uint8, isMember bool,
-	processor consensus.EventProcessor, checkStep bool) *consensus.EventFilter {
-	return consensus.NewEventFilter(newMockHandlerFilter(round, step, []byte{}),
-		consensus.NewState(), processor, checkStep)
+func newEventFilter(round uint64, step uint8, isMember bool, checkStep bool) *consensus.EventFilter {
+	return consensus.NewEventFilter(newMockHandlerAccumulator(round, step, nil, []byte{}, 2, "1", isMember),
+		consensus.NewState(), checkStep)
 }
 
 func newMockEvent() wire.Event {
-
 	mockEvent := &mocks.Event{}
 	mockEvent.On("Sender").Return([]byte{})
 	mockEvent.On("Equal", mock.Anything).Return(false)
 	return mockEvent
-}
-
-func newMockHandlerFilter(round uint64, step uint8, pubKeyBLS []byte) consensus.EventHandler {
-	var sender []byte
-	mockEventHandler := &mocks.EventHandler{}
-	mockEventHandler.On("Deserialize", mock.Anything).Return(newMockEvent(), nil)
-	mockEventHandler.On("ExtractHeader",
-		mock.MatchedBy(func(ev wire.Event) bool {
-			sender = ev.Sender()
-			if len(sender) == 0 {
-				sender, _ = crypto.RandEntropy(32)
-			}
-			return true
-		})).Return(func(e wire.Event) *header.Header {
-		return &header.Header{
-			Round:     round,
-			Step:      step,
-			PubKeyBLS: sender,
-		}
-	})
-	return mockEventHandler
-}
-
-// A stand-in Processor, which simply puts received events on a channel.
-type mockEventProcessor struct {
-	verifyErr   error
-	processChan chan error
-}
-
-func newMockEventProcessor(verifyErr error, processChan chan error) consensus.EventProcessor {
-	return &mockEventProcessor{
-		verifyErr:   verifyErr,
-		processChan: processChan,
-	}
-}
-
-func (m *mockEventProcessor) Process(ev wire.Event) {
-	m.processChan <- m.verifyErr
 }

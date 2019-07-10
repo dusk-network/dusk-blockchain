@@ -6,10 +6,13 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
@@ -49,6 +52,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		blockGen = newBlockGenerator(publicKey, rpcBus)
 	}
 
+	blk := getLatestBlock()
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
 
@@ -63,7 +67,33 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		seeder:               &seeder{keys: keys},
 	}
 	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), b.onBlock)
+	b.handleBlock(blk)
 	return b
+}
+
+func getLatestBlock() *block.Block {
+	_, db := heavy.SetupDatabase()
+	var blk *block.Block
+	err := db.View(func(t database.Transaction) error {
+		currentHeight, err := t.FetchCurrentHeight()
+		if err != nil {
+			return err
+		}
+
+		hash, err := t.FetchBlockHashByHeight(currentHeight)
+		if err != nil {
+			return err
+		}
+
+		blk, err = t.FetchBlock(hash)
+		return err
+	})
+
+	if err != nil {
+		return config.DecodeGenesis()
+	}
+
+	return blk
 }
 
 func (b *broker) Listen() {
@@ -84,6 +114,8 @@ func (b *broker) Listen() {
 }
 
 func (b *broker) onBlock(m *bytes.Buffer) error {
+	b.forwarder.threshold.Reset()
+
 	blk := block.NewBlock()
 	if err := blk.Decode(m); err != nil {
 		return err
@@ -92,6 +124,10 @@ func (b *broker) onBlock(m *bytes.Buffer) error {
 	// Remove old bids before generating a new score
 	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
 
+	return b.handleBlock(blk)
+}
+
+func (b *broker) handleBlock(blk *block.Block) error {
 	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
 		return err
 	}

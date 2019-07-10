@@ -2,7 +2,6 @@ package chain
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
@@ -55,7 +54,7 @@ func (l *loader) sanityCheck() error {
 
 	var height uint64
 	// Verify first N blocks
-	prevBlock := l.decodeGenesis()
+	prevBlock := cfg.DecodeGenesis()
 	prevHeader := prevBlock.Header
 	err := l.db.View(func(t database.Transaction) error {
 
@@ -114,7 +113,7 @@ func (l *loader) prefetchChainTip() error {
 		if err != nil {
 
 			// Store Genesis Block, if a modern node runs
-			b := l.decodeGenesis()
+			b := cfg.DecodeGenesis()
 			err := t.StoreBlock(b)
 			if err != nil {
 				return err
@@ -138,24 +137,4 @@ func (l *loader) prefetchChainTip() error {
 	})
 
 	return err
-}
-
-func (l *loader) decodeGenesis() *block.Block {
-
-	b := block.NewBlock()
-	switch cfg.Get().General.Network {
-	case "testnet":
-
-		blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
-		if err != nil {
-			panic(err)
-		}
-
-		var buf bytes.Buffer
-		buf.Write(blob)
-		if err := b.Decode(&buf); err != nil {
-			panic(err)
-		}
-	}
-	return b
 }

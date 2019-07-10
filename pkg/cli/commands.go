@@ -70,7 +70,7 @@ func startProvisioner(args []string, publisher wire.EventBroker, rpcBus *wire.RP
 
 	// Setting up the consensus factory
 	f := factory.New(publisher, rpcBus, config.ConsensusTimeOut, cliWallet.ConsensusKeys())
-	go f.StartConsensus()
+	f.StartConsensus()
 
 	if err := consensus.GetStartingRound(publisher, nil, cliWallet.ConsensusKeys()); err != nil {
 		fmt.Fprintf(os.Stdout, "error starting consensus: %v\n", err)
@@ -169,7 +169,7 @@ func stringToScalar(s string) (ristretto.Scalar, error) {
 		return ristretto.Scalar{}, err
 	}
 
-	sInt := int64(math.Floor(sFloat))
+	sInt := int64(math.Floor(sFloat * float64(config.DUSK)))
 	return intToScalar(sInt), nil
 }
 

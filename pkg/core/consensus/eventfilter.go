@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -24,36 +25,31 @@ type (
 	// for filtering and passing down messages. It coordinates an EventQueue to manage
 	// Events coming too early and delegates consensus specific logic to the handler.
 	EventFilter struct {
-		queue     *EventQueue
-		handler   EventHandler
-		state     State
-		processor EventProcessor
-		checkStep bool // in some cases, we do not check the step for relevancy
-	}
-
-	// EventProcessor is an abstraction over a process that receives events
-	// from an EventFilter.
-	EventProcessor interface {
-		Process(wire.Event)
+		queue       *EventQueue
+		handler     AccumulatorHandler
+		state       State
+		lock        sync.Mutex
+		Accumulator *Accumulator
+		checkStep   bool // in some cases, we do not check the step for relevancy
 	}
 )
 
 // NewEventFilter returns an initialized EventFilter.
-func NewEventFilter(handler EventHandler, state State, processor EventProcessor,
-	checkStep bool) *EventFilter {
+func NewEventFilter(handler AccumulatorHandler, state State, checkStep bool) *EventFilter {
 	return &EventFilter{
 		queue:     NewEventQueue(),
 		handler:   handler,
 		state:     state,
-		processor: processor,
 		checkStep: checkStep,
 	}
 }
 
 // Collect an event buffer, deserialize it, and then pass it to the proper component.
 func (ef *EventFilter) Collect(buffer *bytes.Buffer) error {
+	ef.lock.Lock()
 	ev, err := ef.handler.Deserialize(buffer)
 	if err != nil {
+		ef.lock.Unlock()
 		return err
 	}
 
@@ -61,13 +57,15 @@ func (ef *EventFilter) Collect(buffer *bytes.Buffer) error {
 	roundDiff, stepDiff := ef.state.Cmp(header.Round, header.Step)
 	if ef.isEarly(roundDiff, stepDiff) {
 		ef.queue.PutEvent(header.Round, header.Step, ev)
+		ef.lock.Unlock()
 		return nil
 	}
 
 	if ef.isRelevant(roundDiff, stepDiff) {
-		ef.processor.Process(ev)
+		ef.Accumulator.Process(ev)
 	}
 
+	ef.lock.Unlock()
 	return nil
 }
 
@@ -93,8 +91,17 @@ func (ef *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
 // UpdateRound updates the state for the EventFilter, and empties the queue of
 // obsolete events.
 func (ef *EventFilter) UpdateRound(round uint64) {
+	ef.lock.Lock()
+	defer ef.lock.Unlock()
 	ef.state.Update(round)
+	ef.Accumulator = NewAccumulator(ef.handler, NewAccumulatorStore(), ef.state, ef.checkStep)
 	ef.queue.Clear(round - 1)
+}
+
+func (ef *EventFilter) ResetAccumulator() {
+	ef.lock.Lock()
+	defer ef.lock.Unlock()
+	ef.Accumulator = NewAccumulator(ef.handler, NewAccumulatorStore(), ef.state, ef.checkStep)
 }
 
 // FlushQueue will retrieve all queued events for a certain point in consensus,
@@ -107,7 +114,9 @@ func (ef *EventFilter) FlushQueue() {
 		queuedEvents = ef.queue.Flush(ef.state.Round())
 	}
 
+	ef.lock.Lock()
+	defer ef.lock.Unlock()
 	for _, event := range queuedEvents {
-		ef.processor.Process(event)
+		ef.Accumulator.Process(event)
 	}
 }

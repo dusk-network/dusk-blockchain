@@ -15,9 +15,8 @@ import (
 type (
 	// Broker is the message broker for the reduction process.
 	broker struct {
-		filter      *consensus.EventFilter
-		accumulator *consensus.Accumulator
-		reducer     *reducer
+		filter  *consensus.EventFilter
+		reducer *reducer
 
 		// utility context to group interfaces and channels to be passed around
 		ctx *context
@@ -42,10 +41,9 @@ func Launch(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
 	go broker.Listen()
 }
 
-func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
-	accumulator *consensus.Accumulator) *consensus.EventFilter {
+func launchReductionFilter(eventBroker wire.EventBroker, ctx *context) *consensus.EventFilter {
 
-	filter := consensus.NewEventFilter(ctx.handler, ctx.state, accumulator, true)
+	filter := consensus.NewEventFilter(ctx.handler, ctx.state, true)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
 	eventBroker.SubscribeCallback(string(topics.Reduction), filter.Collect)
 	eventBroker.RegisterPreprocessor(string(topics.Reduction), republisher, &consensus.Validator{})
@@ -56,19 +54,15 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout time.Duration, rpcBus *wire.RPCBus) *broker {
 	scoreChan := initBestScoreUpdate(eventBroker)
 	ctx := newCtx(handler, timeout)
-	accumulator := consensus.NewAccumulator(ctx.handler, consensus.NewAccumulatorStore(), ctx.state, true)
-	filter := launchReductionFilter(eventBroker, ctx, accumulator)
+	filter := launchReductionFilter(eventBroker, ctx)
 	roundChannel := consensus.InitRoundUpdate(eventBroker)
-	stepSub := ctx.state.SubscribeStep()
 
 	return &broker{
 		roundUpdateChan: roundChannel,
 		ctx:             ctx,
 		filter:          filter,
-		accumulator:     accumulator,
 		selectionChan:   scoreChan,
-		stepChan:        stepSub.StateChan,
-		reducer:         newReducer(accumulator.CollectedVotesChan, ctx, eventBroker, accumulator, rpcBus),
+		reducer:         newReducer(ctx, eventBroker, filter, rpcBus),
 	}
 }
 
@@ -83,7 +77,6 @@ func (b *broker) Listen() {
 			}).Debug("Got round update")
 			b.reducer.end()
 			b.reducer.lock.Lock()
-			b.accumulator.Clear()
 			b.filter.UpdateRound(round)
 			b.ctx.timer.ResetTimeOut()
 			b.reducer.lock.Unlock()
@@ -109,9 +102,6 @@ func (b *broker) Listen() {
 				b.reducer.startReduction(make([]byte, 32))
 				b.filter.FlushQueue()
 			}
-		case <-b.stepChan:
-			b.accumulator.Clear()
-			b.filter.FlushQueue()
 		}
 	}
 }

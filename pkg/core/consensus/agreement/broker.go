@@ -26,21 +26,18 @@ func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) 
 	broker := newBroker(eventBroker, c, keys)
 	currentRound := getInitialRound(eventBroker)
 	broker.updateRound(currentRound)
-	go broker.Listen()
 }
 
 type broker struct {
-	publisher   wire.EventPublisher
-	handler     *agreementHandler
-	state       consensus.State
-	filter      *consensus.EventFilter
-	accumulator *consensus.Accumulator
+	publisher wire.EventPublisher
+	handler   *agreementHandler
+	state     consensus.State
+	filter    *consensus.EventFilter
 }
 
 func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
-	handler consensus.EventHandler, state consensus.State,
-	accumulator *consensus.Accumulator) *consensus.EventFilter {
-	filter := consensus.NewEventFilter(handler, state, accumulator, false)
+	handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
+	filter := consensus.NewEventFilter(handler, state, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
 	eventBroker.SubscribeCallback(string(topics.Agreement), filter.Collect)
 	eventBroker.RegisterPreprocessor(string(topics.Agreement), republisher, &consensus.Validator{})
@@ -50,14 +47,12 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys user.Keys) *broker {
 	handler := newHandler(committee, keys)
 	state := consensus.NewState()
-	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore(), state, false)
-	filter := launchFilter(eventBroker, committee, handler, state, accumulator)
+	filter := launchFilter(eventBroker, committee, handler, state)
 	b := &broker{
-		publisher:   eventBroker,
-		handler:     handler,
-		state:       state,
-		filter:      filter,
-		accumulator: accumulator,
+		publisher: eventBroker,
+		handler:   handler,
+		state:     state,
+		filter:    filter,
 	}
 
 	eventBroker.SubscribeCallback(msg.ReductionResultTopic, b.sendAgreement)
@@ -66,19 +61,10 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 
 // Listen for results coming from the accumulator and updating the round accordingly
 func (b *broker) Listen() {
-	for {
-		evs := <-b.accumulator.CollectedVotesChan
-		if !b.obsolete(evs[0]) {
-			b.publishEvent(evs)
-			b.publishWinningHash(evs)
-			b.updateRound(b.state.Round() + 1)
-		}
-	}
-}
-
-func (b *broker) obsolete(ev wire.Event) bool {
-	aev := ev.(*Agreement)
-	return b.state.Round() != aev.Round
+	evs := <-b.filter.Accumulator.CollectedVotesChan
+	b.publishEvent(evs)
+	b.publishWinningHash(evs)
+	b.updateRound(b.state.Round() + 1)
 }
 
 func (b *broker) sendAgreement(m *bytes.Buffer) error {
@@ -122,8 +108,8 @@ func (b *broker) updateRound(round uint64) {
 	}).Debugln("updating round")
 	b.filter.UpdateRound(round)
 	consensus.UpdateRound(b.publisher, round)
-	b.accumulator.Clear()
 	b.filter.FlushQueue()
+	go b.Listen()
 }
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
