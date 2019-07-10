@@ -96,6 +96,7 @@ func (s *StakeTx) WireStakeTx() (*wiretx.Stake, error) {
 		s.PubKeyEd,
 		s.PubKeyBLS,
 	}
+	tx.TxType = wiretx.StakeType
 
 	return tx, nil
 }
