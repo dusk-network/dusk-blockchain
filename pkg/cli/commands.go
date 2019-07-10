@@ -169,7 +169,7 @@ func stringToScalar(s string) (ristretto.Scalar, error) {
 		return ristretto.Scalar{}, err
 	}
 
-	sInt := int64(math.Floor(sFloat))
+	sInt := int64(math.Floor(sFloat * float64(config.DUSK)))
 	return intToScalar(sInt), nil
 }
 
