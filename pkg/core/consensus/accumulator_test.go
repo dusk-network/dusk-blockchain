@@ -86,7 +86,6 @@ func newMockHandlerAccumulator(round uint64, step uint8, verifyErr error, sender
 	mockEventHandler.On("Deserialize", mock.Anything).Return(newMockEvent(), nil)
 	mockEventHandler.On("ExtractHeader",
 		mock.MatchedBy(func(ev wire.Event) bool {
-			sender = ev.Sender()
 			if len(sender) == 0 {
 				sender, _ = crypto.RandEntropy(32)
 			}
