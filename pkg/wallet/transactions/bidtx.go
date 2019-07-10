@@ -71,6 +71,7 @@ func (b *BidTx) WireBid() (*wiretx.Bid, error) {
 		*tl,
 		b.M,
 	}
+	tx.TxType = wiretx.BidType
 
 	return tx, nil
 }
