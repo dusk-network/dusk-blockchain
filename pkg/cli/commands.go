@@ -70,7 +70,7 @@ func startProvisioner(args []string, publisher wire.EventBroker, rpcBus *wire.RP
 
 	// Setting up the consensus factory
 	f := factory.New(publisher, rpcBus, config.ConsensusTimeOut, cliWallet.ConsensusKeys())
-	go f.StartConsensus()
+	f.StartConsensus()
 
 	if err := consensus.GetStartingRound(publisher, nil, cliWallet.ConsensusKeys()); err != nil {
 		fmt.Fprintf(os.Stdout, "error starting consensus: %v\n", err)

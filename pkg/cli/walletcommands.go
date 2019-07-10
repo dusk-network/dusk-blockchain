@@ -402,6 +402,7 @@ func syncWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 		}
 	}
 }
+
 func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 
 	if cliWallet == nil {
