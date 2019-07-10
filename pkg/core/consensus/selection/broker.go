@@ -15,7 +15,7 @@ type scoreBroker struct {
 	roundUpdateChan  <-chan uint64
 	regenerationChan <-chan consensus.AsyncState
 	bidChan          <-chan user.Bid
-	filter           *consensus.EventFilter
+	filter           *filter
 	selector         *eventSelector
 	handler          ScoreEventHandler
 }
@@ -31,10 +31,10 @@ func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout tim
 	go broker.Listen()
 }
 
-func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHandler,
-	state consensus.State, processor consensus.EventProcessor) *consensus.EventFilter {
+func launchScoreFilter(eventBroker wire.EventBroker, handler ScoreEventHandler,
+	state consensus.State, selector *eventSelector) *filter {
 
-	filter := consensus.NewEventFilter(handler, state, processor, false)
+	filter := newFilter(handler, state, selector)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Score))
 	go listener.Accept()
 	return filter
@@ -42,8 +42,7 @@ func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHand
 
 // newScoreBroker creates a Broker component which responsibility is to listen to the
 // eventbus and supervise Collector operations
-func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler,
-	timeOut time.Duration) *scoreBroker {
+func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler, timeOut time.Duration) *scoreBroker {
 	state := consensus.NewState()
 	selector := newEventSelector(eventBroker, handler, timeOut, state)
 	filter := launchScoreFilter(eventBroker, handler, state, selector)

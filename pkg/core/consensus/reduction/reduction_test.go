@@ -36,7 +36,7 @@ func TestReduction(t *testing.T) {
 	sendReductionBuffers(2, k, hash, 1, 2, eventBus)
 
 	timer := time.AfterFunc(1*time.Second, func() {
-		t.Fail()
+		t.Fatal("")
 	})
 
 	for i := 0; i < 2; i++ {
@@ -66,7 +66,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 			_, err := streamer.Read()
 			assert.NoError(t, err)
 			// HACK: what's the point?
-			assert.Fail(t, "")
+			t.Fatal("")
 		}
 	}()
 
@@ -95,7 +95,7 @@ func TestReductionTimeout(t *testing.T) {
 		seenTopics := streamer.SeenTopics()
 		for _, topic := range seenTopics {
 			if topic == topics.Agreement {
-				t.Fail()
+				t.Fatal("")
 			}
 		}
 

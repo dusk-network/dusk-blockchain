@@ -20,25 +20,23 @@ import (
 var empty struct{}
 
 type eventStopWatch struct {
-	collectedVotesChan chan []wire.Event
-	stopChan           chan struct{}
-	timer              *consensus.Timer
+	stopChan chan struct{}
+	timer    *consensus.Timer
 }
 
-func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Timer) *eventStopWatch {
+func newEventStopWatch(timer *consensus.Timer) *eventStopWatch {
 	return &eventStopWatch{
-		collectedVotesChan: collectedVotesChan,
-		stopChan:           make(chan struct{}, 1),
-		timer:              timer,
+		stopChan: make(chan struct{}, 1),
+		timer:    timer,
 	}
 }
 
-func (esw *eventStopWatch) fetch() []wire.Event {
+func (esw *eventStopWatch) fetch(collectedVotesChan chan []wire.Event) []wire.Event {
 	timer := time.NewTimer(esw.timer.TimeOut())
 	select {
 	case <-timer.C:
 		return nil
-	case collectedVotes := <-esw.collectedVotesChan:
+	case collectedVotes := <-collectedVotesChan:
 		timer.Stop()
 		return collectedVotes
 	case <-esw.stopChan:
@@ -55,10 +53,10 @@ func (esw *eventStopWatch) stop() {
 }
 
 type reducer struct {
-	firstStep   *eventStopWatch
-	secondStep  *eventStopWatch
-	ctx         *context
-	accumulator *consensus.Accumulator
+	firstStep  *eventStopWatch
+	secondStep *eventStopWatch
+	ctx        *context
+	filter     *consensus.EventFilter
 
 	lock  sync.RWMutex
 	stale bool
@@ -67,15 +65,14 @@ type reducer struct {
 	rpcBus    *wire.RPCBus
 }
 
-func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
-	publisher wire.EventPublisher, accumulator *consensus.Accumulator, rpcBus *wire.RPCBus) *reducer {
+func newReducer(ctx *context, publisher wire.EventPublisher, filter *consensus.EventFilter, rpcBus *wire.RPCBus) *reducer {
 	return &reducer{
-		ctx:         ctx,
-		firstStep:   newEventStopWatch(collectedVotesChan, ctx.timer),
-		secondStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
-		publisher:   publisher,
-		accumulator: accumulator,
-		rpcBus:      rpcBus,
+		ctx:        ctx,
+		publisher:  publisher,
+		firstStep:  newEventStopWatch(ctx.timer),
+		secondStep: newEventStopWatch(ctx.timer),
+		filter:     filter,
+		rpcBus:     rpcBus,
 	}
 }
 
@@ -99,16 +96,17 @@ func (r *reducer) startReduction(hash []byte) {
 		r.sendReduction(bytes.NewBuffer(hash))
 	}
 
+	r.filter.FlushQueue()
 	go r.begin()
 }
 
 func (r *reducer) begin() {
 	log.WithField("process", "reducer").Traceln("Beginning Reduction")
-	events := r.firstStep.fetch()
+	events := r.firstStep.fetch(r.filter.Accumulator.CollectedVotesChan)
 	log.WithField("process", "reducer").Traceln("First step completed")
 	hash := r.handleFirstResult(events)
 
-	eventsSecondStep := r.secondStep.fetch()
+	eventsSecondStep := r.secondStep.fetch(r.filter.Accumulator.CollectedVotesChan)
 	log.WithField("process", "reducer").Traceln("Second step completed")
 	r.handleSecondResult(events, eventsSecondStep, hash)
 }
@@ -123,6 +121,8 @@ func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 		}
 
 		r.ctx.state.IncrementStep()
+		r.filter.ResetAccumulator()
+		r.filter.FlushQueue()
 
 		hash := r.extractHash(events)
 		if !r.inCommittee() {
@@ -154,6 +154,7 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
+		defer r.filter.ResetAccumulator()
 		defer r.ctx.state.IncrementStep()
 		defer r.publishRegeneration()
 
@@ -183,7 +184,7 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 
 func (r *reducer) propagateAbsentees() {
 	round, step := r.ctx.state.Round(), r.ctx.state.Step()
-	absentees := r.ctx.handler.FilterAbsentees(r.accumulator.All(), round, step)
+	absentees := r.ctx.handler.FilterAbsentees(r.filter.Accumulator.All(), round, step)
 	_ = r.reportAbsentees(absentees)
 }
 
