@@ -71,12 +71,12 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 	}
 
 	// Rangeproof - should be valid
-	rp := rangeproof.Proof{}
-	buf := bytes.NewReader(tx.RangeProof)
-	err := rp.Decode(buf, true)
-	if err != nil {
-		return err
-	}
+	// rp := rangeproof.Proof{}
+	// buf := bytes.NewReader(tx.RangeProof)
+	// err := rp.Decode(buf, true)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// var commitments []pedersen.Commitment
 	// for _, output := range tx.Outputs {
@@ -90,9 +90,9 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 	// 	commitments = append(commitments, comm)
 	// }
 
-	if err := checkRangeProof(rp); err != nil {
-		return err
-	}
+	// if err := checkRangeProof(rp); err != nil {
+	// 	return err
+	// }
 	// KeyImage - should not be present in the database
 	if err := checkTXDoubleSpent(db, tx.Inputs); err != nil {
 		return err
@@ -164,7 +164,7 @@ func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.TimeLock) e
 }
 
 func checkLockTimeValid(lockTime, blockTime uint64) error {
-	if lockTime >= transactions.MaxLockTime {
+	if lockTime > transactions.MaxLockTime {
 		return errors.New("timelock greater than MaxTimeLock")
 	}
 	return nil
