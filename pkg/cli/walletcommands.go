@@ -7,6 +7,7 @@ import (
 	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
@@ -121,7 +122,7 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 }
 
 func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 4 {
+	if args == nil || len(args) < 3 {
 		fmt.Fprintf(os.Stdout, commandInfo["transfer"]+"\n")
 		return
 	}
@@ -133,14 +134,7 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 	}
 
 	address := args[1]
-
-	fee, err := stringToInt64(args[2])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
-		return
-	}
-
-	password := args[3]
+	password := args[2]
 
 	// Load wallet using password
 	w, err := loadWallet(password)
@@ -150,7 +144,7 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 	}
 
 	// Create a new standard tx
-	tx, err := w.NewStandardTx(int64(fee))
+	tx, err := w.NewStandardTx(config.MinFee)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
@@ -248,7 +242,7 @@ func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
 }
 
 func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 4 {
+	if args == nil || len(args) < 3 {
 		fmt.Fprintf(os.Stdout, commandInfo["stake"]+"\n")
 		return
 	}
@@ -265,13 +259,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 		return
 	}
 
-	fee, err := stringToInt64(args[2])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	password := args[3]
+	password := args[2]
 
 	// Load wallet using password
 	w, err := loadWallet(password)
@@ -281,7 +269,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 	}
 
 	// Create a new stake tx
-	tx, err := w.NewStakeTx(int64(fee), lockTime, amount)
+	tx, err := w.NewStakeTx(config.MinFee, lockTime, amount)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
@@ -317,7 +305,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 }
 
 func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 4 {
+	if args == nil || len(args) < 3 {
 		fmt.Fprintf(os.Stdout, commandInfo["bid"]+"\n")
 		return
 	}
@@ -334,13 +322,7 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		return
 	}
 
-	fee, err := stringToInt64(args[2])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	password := args[3]
+	password := args[2]
 
 	// Load wallet using password
 	w, err := loadWallet(password)
@@ -350,7 +332,7 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 	}
 
 	// Create a new bid tx
-	tx, err := w.NewBidTx(int64(fee), lockTime, amount)
+	tx, err := w.NewBidTx(config.MinFee, lockTime, amount)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
@@ -432,7 +414,7 @@ func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		fmt.Fprintf(os.Stdout, "error fetching balance: %v\n", err)
 		return
 	}
-	fmt.Fprintf(os.Stdout, "Balance: %d\n", balance)
+	fmt.Fprintf(os.Stdout, "Balance: %.8f\n", balance)
 }
 
 func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {

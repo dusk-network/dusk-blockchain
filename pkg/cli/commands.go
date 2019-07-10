@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"sort"
@@ -163,11 +164,13 @@ func intToScalar(amount int64) ristretto.Scalar {
 }
 
 func stringToScalar(s string) (ristretto.Scalar, error) {
-	sInt, err := strconv.Atoi(s)
+	sFloat, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return ristretto.Scalar{}, err
 	}
-	return intToScalar(int64(sInt)), nil
+
+	sInt := int64(math.Floor(sFloat))
+	return intToScalar(sInt), nil
 }
 
 func stringToInt64(s string) (int64, error) {

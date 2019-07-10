@@ -46,6 +46,10 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 		return errors.New("invalid transaction type")
 	}
 
+	if tx.Fee < uint64(config.MinFee) {
+		return errors.New("fee too low")
+	}
+
 	// Inputs - must contain at least one
 	if len(tx.Inputs) == 0 {
 		return errors.New("transaction must contain atleast one input")
