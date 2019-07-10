@@ -379,8 +379,7 @@ func syncWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 		// Get Wallet height
 		walletHeight, err := cliWallet.GetSavedHeight()
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "error fetching wallet height: %v\n", err)
-			return
+			cliWallet.UpdateWalletHeight(0)
 		}
 		// Get next block using walletHeight and tipHash of the node
 		blk, tipHash, err := fetchBlockHeightAndState(walletHeight)
