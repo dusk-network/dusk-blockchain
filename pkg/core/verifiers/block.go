@@ -50,7 +50,6 @@ func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
 
 // CheckBlockCertificate ensures that the block certificate is valid.
 func CheckBlockCertificate(committee committee.Foldable, blk block.Block) error {
-	// TODO: remove this for testnet
 	if blk.Header.Height < 2 {
 		return nil
 	}

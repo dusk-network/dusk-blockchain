@@ -16,9 +16,7 @@ import (
 
 // Test the behaviour of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
-
 	// Set up db
-	// TODO: use a mock for this instead
 	_, db := lite.SetupDatabase()
 	defer db.Close()
 
