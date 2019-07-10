@@ -6,6 +6,7 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
@@ -51,11 +52,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		blockGen = newBlockGenerator(publicKey, rpcBus)
 	}
 
-	blk, err := getLatestBlock()
-	if err != nil {
-		panic(err)
-	}
-
+	blk := getLatestBlock()
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
 
@@ -74,7 +71,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	return b
 }
 
-func getLatestBlock() (*block.Block, error) {
+func getLatestBlock() *block.Block {
 	_, db := heavy.SetupDatabase()
 	var blk *block.Block
 	err := db.View(func(t database.Transaction) error {
@@ -92,7 +89,11 @@ func getLatestBlock() (*block.Block, error) {
 		return err
 	})
 
-	return blk, err
+	if err != nil {
+		return config.DecodeGenesis()
+	}
+
+	return blk
 }
 
 func (b *broker) Listen() {
