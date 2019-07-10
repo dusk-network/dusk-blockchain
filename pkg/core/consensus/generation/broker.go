@@ -113,6 +113,8 @@ func (b *broker) Listen() {
 }
 
 func (b *broker) onBlock(m *bytes.Buffer) error {
+	b.forwarder.threshold.Reset()
+
 	blk := block.NewBlock()
 	if err := blk.Decode(m); err != nil {
 		return err
