@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/big"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
@@ -363,12 +364,13 @@ func (w *Wallet) Sign(tx SignableTx) error {
 	return tx.Prove()
 }
 
-func (w *Wallet) Balance() (uint64, error) {
+func (w *Wallet) Balance() (float64, error) {
 	privSpend, err := w.keyPair.PrivateSpend()
 	if err != nil {
 		return 0, err
 	}
-	return w.db.FetchBalance(privSpend.Bytes())
+	balanceInt, err := w.db.FetchBalance(privSpend.Bytes())
+	return float64(balanceInt / config.DUSK), nil
 }
 
 func (w *Wallet) GetSavedHeight() (uint64, error) {
