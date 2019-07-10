@@ -96,7 +96,6 @@ func (r *reducer) startReduction(hash []byte) {
 		r.sendReduction(bytes.NewBuffer(hash))
 	}
 
-	r.filter.FlushQueue()
 	go r.begin()
 }
 
