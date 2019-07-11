@@ -12,14 +12,15 @@ func (l *LogProcessor) PublishRoundEvent(ab []byte) {
 	a := bytes.NewBuffer(ab)
 	unmarshaller := agreement.NewUnMarshaller()
 	ev, err := unmarshaller.Deserialize(a)
+	if err != nil {
+		l.WithTime(log.Fields{
+			"code": "round",
+		}).WithError(err).Errorln("Cannot unmarshal agreement event")
+		return
+	}
+
 	ae := ev.(*agreement.Agreement)
 	if l.lastInfo == nil || l.lastInfo.Round < ae.Round {
-		if err != nil {
-			l.WithTime(log.Fields{
-				"code": "round",
-			}).WithError(err).Errorln("Cannot unmarshal agreement event")
-			return
-		}
 
 		e := l.WithAgreement(ae)
 		e.Infoln("New Round Published")
