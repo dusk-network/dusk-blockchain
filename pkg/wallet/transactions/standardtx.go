@@ -205,9 +205,17 @@ func calculateCommToZero(inputs []*Input, outputs []*Output) {
 	}
 }
 
-func (s *StandardTx) encryptOutputValues() {
+func (s *StandardTx) encryptOutputValues(encryptValues bool) {
+	var zero ristretto.Scalar
+	zero.SetZero()
 	for i := range s.Outputs {
 		output := s.Outputs[i]
+
+		if !encryptValues {
+			output.setEncryptedAmount(output.amount)
+			output.setEncryptedMask(zero)
+			continue
+		}
 
 		encryptedAmount := EncryptAmount(output.amount, s.r, output.Index, output.viewKey)
 		output.setEncryptedAmount(encryptedAmount)
@@ -220,10 +228,10 @@ func (s *StandardTx) encryptOutputValues() {
 // Prove creates the rangeproof for output values and creates the mlsag balance and ownership proof
 // Prove assumes that all inputs, outputs and decoys have been added to the transaction
 func (s *StandardTx) Prove() error {
-	return s.prove(s.Hash)
+	return s.prove(s.Hash, true)
 }
 
-func (s *StandardTx) prove(hasher func() ([]byte, error)) error {
+func (s *StandardTx) prove(hasher func() ([]byte, error), encryptValues bool) error {
 	// Prove rangeproof, creating the commitments for each output
 	err := s.ProveRangeProof()
 	if err != nil {
@@ -231,7 +239,7 @@ func (s *StandardTx) prove(hasher func() ([]byte, error)) error {
 	}
 
 	// Encrypt mask and amount values
-	s.encryptOutputValues()
+	s.encryptOutputValues(encryptValues)
 
 	// Check that each input has the minimum amount of decoys
 	for i := range s.Inputs {

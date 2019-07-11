@@ -36,7 +36,7 @@ func (b *BidTx) encode(w io.Writer, encodeSig bool) error {
 }
 
 func (b *BidTx) Prove() error {
-	return b.prove(b.Hash)
+	return b.prove(b.Hash, false)
 }
 
 func (b *BidTx) Encode(w io.Writer) error {
