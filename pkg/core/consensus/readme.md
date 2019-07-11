@@ -46,24 +46,25 @@ According to the _Broker Topology Strategy_, each component is organized as a li
 
 In our implementation of the broker topology, there are three main types of recurring architectural components:
 
-    - `Broker`: a federated struct that contains all the event channels used within the flow and which responsibility includes the creation and coordination of a `Collector`
-    - `Collector`: an entity receiving the _events_ and appointed to their validation, aggregation and processing
+    - `Broker`: a federated struct that contains all the event channels used within the flow and which responsibility includes the creation and coordination of an `EventFilter`
+    - `EventFilter`: an entity receiving the _events_ and appointed to their validation, aggregation and processing
     - one or more `channels` whereto the result of the processing get published
 
-Additionally, several other entities are utilized within the `Collector` to help with code reuse and interface programming:
+Additionally, several other entities are utilized within the `EventFilter` to help with code reuse and interface programming:
 
     - `EventHandler`: This entity contains the logic specific to the components and that cannot be shared
     - `EventQueue`: A temporary storage unit to collect messages referring to a future stage. This is possible given the asynchrony of the network which could result in nodes falling a bit behind in the event processing.
-    - `StepEventCollector`: A map that stores consensus messages. This can be used to track message accumulation for specific keys, such as a step, or a particular block hash.
+    - `Processor`: An interface component which receives filtered messages from the `EventFilter`. It conducts additional checks, and stores the received event. The `Processor` only exposes one function, `Process`, which makes it simple to create multiple implementations which fit into the `EventFilter`.
+
+Within the codebase, two implementations of the `Processor` currently exist:
+
+    - `Accumulator`: This component conducts additional checks on the received event, and then stores it in an `AccumulatorStore`, under an identifier which is extracted by the `EventHandler`. Once a set of events under one single identifier grows large enough, it is sent over a channel, and the `Accumulator` will clear itself for re-use.
+    - `Selector`: A component which verifies an incoming event, and only stores the 'best' event it has seen. The selector can return its current 'best' event at any point, after which it is cleared.
 
 ### Common structures and interfaces
 
-The consensus package exposes the function to create and initialize the most common channel reused across the whole package. This common channel is for receiving notifications about Rounds.
+The consensus package exposes the function to create and initialize the most common channels reused across the whole package. The functions are defined as follows:
 
     - InitRoundUpdate(eventbus) (chan uint64) returns a channel whereto round updates get published
-
-Additionally, the consensus package exposes a marshaller and unmarshaller for consensus message headers, as well as the `EventHeader` struct itself. These data structures and methods are common part of nearly all other consensus sub-packages, and help to reduce code duplication.
-
-    - `EventHeader`: This struct contains all the common fields included in all consensus messages, except for the `Score` message.
-    - `EventHeaderMarshaller`: A struct which contains the logic to turn an `EventHeader` into a byte stream representation of itself.
-    - `EventHeaderUnmarshaller`: A struct which contains the logic to turn the byte stream representation of an `EventHeader` into it's struct form.
+    - InitBlockRegeneratorCollector(eventbus) (chan AsyncState) returns a channel whose messages are interpreted as the `BLOCK_REGENERATION` signal, as outlined in the SBA* documentation.
+    - InitBidListUpdate(eventBus) (chan user.BidList) returns a channel on which BidLists are sent. They contain a collection of all X values, belonging to the blind bidders in the network. Any time this BidList is updated, it is propagated to all components which use it.

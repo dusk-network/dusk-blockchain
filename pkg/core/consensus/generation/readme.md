@@ -4,7 +4,7 @@
 
 ### Blind Bid Algorithm
 
-The block generation makes use of `bulletproof`-based _zero-knowledge cryptography_ in order to prove the correct computation of a _score_ associated with a `block candidate` which gets validated and selected by Provisioners during the _score selection_ phase carried out by the `ScoreSelector` component.
+The block generation makes use of `bulletproof`-based _zero-knowledge cryptography_ in order to prove the correct computation of a _score_ associated with a `block candidate` which gets validated and selected by Provisioners during the _score selection_ phase carried out by the `selection` package.
 
 #### Procedure
 

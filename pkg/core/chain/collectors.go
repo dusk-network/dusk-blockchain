@@ -3,35 +3,33 @@ package chain
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 type (
 	blockCollector struct {
-		blockChannel chan<- *block.Block
+		blockChan chan<- *block.Block
 	}
 
-	txCollector struct {
-		txChannel chan<- transactions.Transaction
+	certificateCollector struct {
+		certificateChan chan<- certMsg
+	}
+
+	certMsg struct {
+		hash []byte
+		cert *block.Certificate
 	}
 )
 
-func initBlockCollector(eventBus *wire.EventBus) chan *block.Block {
-	blockChannel := make(chan *block.Block, 1)
-	collector := &blockCollector{blockChannel}
-	go wire.NewEventSubscriber(eventBus, collector, string(topics.Block)).Accept()
-	return blockChannel
-}
-
-func initTxCollector(eventBus *wire.EventBus) chan transactions.Transaction {
-	txChannel := make(chan transactions.Transaction, 10)
-	collector := &txCollector{txChannel}
-	go wire.NewEventSubscriber(eventBus, collector, string(topics.Tx)).Accept()
-	return txChannel
+// Init a block collector compatible with topics.Block and topics.Candidate
+func initBlockCollector(eventBus *wire.EventBus, topic string) chan *block.Block {
+	blockChan := make(chan *block.Block, 1)
+	collector := &blockCollector{blockChan}
+	go wire.NewTopicListener(eventBus, collector, topic).Accept()
+	return blockChan
 }
 
 func (b *blockCollector) Collect(message *bytes.Buffer) error {
@@ -40,16 +38,28 @@ func (b *blockCollector) Collect(message *bytes.Buffer) error {
 		return err
 	}
 
-	b.blockChannel <- blk
+	b.blockChan <- blk
 	return nil
 }
 
-func (t *txCollector) Collect(message *bytes.Buffer) error {
-	txs, err := transactions.FromReader(message, 1)
-	if err != nil {
+func initCertificateCollector(subscriber wire.EventSubscriber) <-chan certMsg {
+	certificateChan := make(chan certMsg, 10)
+	collector := &certificateCollector{certificateChan}
+	go wire.NewTopicListener(subscriber, collector, string(topics.Certificate)).Accept()
+	return certificateChan
+}
+
+func (c *certificateCollector) Collect(m *bytes.Buffer) error {
+	var hash []byte
+	if err := encoding.Read256(m, &hash); err != nil {
 		return err
 	}
 
-	t.txChannel <- txs[0]
+	cert := block.EmptyCertificate()
+	if err := cert.Decode(m); err != nil {
+		return err
+	}
+
+	c.certificateChan <- certMsg{hash, cert}
 	return nil
 }

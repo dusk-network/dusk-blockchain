@@ -1,32 +1,16 @@
 package factory
 
 import (
-	"bytes"
-	"encoding/binary"
 	"time"
 
-	"github.com/bwesterb/go-ristretto"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/notary"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/voting"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
-
-type initCollector struct {
-	initChannel chan uint64
-}
-
-func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-	i.initChannel <- round
-	return nil
-}
 
 // ConsensusFactory is responsible for initializing the consensus processes
 // with the proper parameters. It subscribes to the initialization topic and,
@@ -34,33 +18,22 @@ func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
 // consensus. It should also contain all the relevant information for the
 // processes it intends to start up.
 type ConsensusFactory struct {
-	eventBus    *wire.EventBus
-	initChannel chan uint64
+	eventBus wire.EventBroker
+	rpcBus   *wire.RPCBus
 
-	*user.Keys
+	user.Keys
 	timerLength time.Duration
-	committee   committee.Committee
-	d, k        ristretto.Scalar
-	bidList     *user.BidList
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *wire.EventBus, timerLength time.Duration,
-	committee committee.Committee, bidList *user.BidList, keys *user.Keys, d, k ristretto.Scalar) *ConsensusFactory {
-	initChannel := make(chan uint64, 1)
-
-	initCollector := &initCollector{initChannel}
-	go wire.NewEventSubscriber(eventBus, initCollector, msg.InitializationTopic).Accept()
+func New(eventBus wire.EventBroker, rpcBus *wire.RPCBus, timerLength time.Duration,
+	keys user.Keys) *ConsensusFactory {
 
 	return &ConsensusFactory{
 		eventBus:    eventBus,
-		initChannel: initChannel,
+		rpcBus:      rpcBus,
 		Keys:        keys,
 		timerLength: timerLength,
-		committee:   committee,
-		d:           d,
-		k:           k,
-		bidList:     bidList,
 	}
 }
 
@@ -68,20 +41,9 @@ func New(eventBus *wire.EventBus, timerLength time.Duration,
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
-	round := <-c.initChannel
-	log.WithFields(log.Fields{
-		"process": "factory",
-		"round":   round,
-	}).Debug("Received initial round")
-
-	generation.LaunchScoreGenerationComponent(c.eventBus, c.d, c.k, *c.bidList)
-	voting.LaunchVotingComponent(c.eventBus, c.Keys, c.committee)
-
-	selection.LaunchScoreSelectionComponent(c.eventBus, c.timerLength, *c.bidList)
-
-	reduction.LaunchBlockReducer(c.eventBus, c.committee, c.timerLength)
-
-	notary.LaunchBlockNotary(c.eventBus, c.committee, round)
-
+	reputation.Launch(c.eventBus)
+	selection.Launch(c.eventBus, nil, c.timerLength)
+	reduction.Launch(c.eventBus, nil, c.Keys, c.timerLength, c.rpcBus)
+	go agreement.Launch(c.eventBus, nil, c.Keys)
 	log.WithField("process", "factory").Info("Consensus Started")
 }

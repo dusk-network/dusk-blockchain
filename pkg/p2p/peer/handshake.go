@@ -5,63 +5,21 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"net"
-	"time"
 
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/util"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-// VersionMessage is a version message on the dusk wire protocol.
-type VersionMessage struct {
-	Version     *protocol.Version
-	Timestamp   int64
-	FromAddress *wire.NetAddress
-	ToAddress   *wire.NetAddress
-	Services    protocol.ServiceFlag
-}
+// Handshake with another peer.
+func (p *Writer) Handshake() error {
 
-// Handshake either sends or receives a handshake.
-// Sending involves writing a 'version' msg to an other peer.
-// Receiving processes a received 'version' msg by sending our 'version' with a 'verack' msg.
-func (p *Peer) Handshake() error {
-	handshakeErr := make(chan error, 1)
-	go func() {
-		if p.Inbound {
-			// An other peer wants to handshake with us.
-			handshakeErr <- p.inboundHandShake()
-		} else {
-			// We want to handshake with an other peer.
-			handshakeErr <- p.outboundHandShake()
-		}
-	}()
-
-	select {
-	case err := <-handshakeErr:
-		if err != nil {
-			return fmt.Errorf(errHandShakeFromStr, err)
-		}
-	case <-time.After(handshakeTimeout):
-		return errHandShakeTimeout
-	}
-
-	return nil
-}
-
-// We are trying to connect to another peer.
-// We will send our Version with a MsgVerAck.
-func (p *Peer) outboundHandShake() error {
 	if err := p.writeLocalMsgVersion(); err != nil {
 		return err
 	}
 
-	if err := p.readVerack(); err != nil {
+	if err := p.readVerAck(); err != nil {
 		return err
 	}
 
@@ -69,31 +27,16 @@ func (p *Peer) outboundHandShake() error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	verAckMessage, err := addHeader(buf, p.magic, topics.VerAck)
-	if err != nil {
-		return err
-	}
-
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
-		return err
-	}
-
-	return nil
+	return p.writeVerAck()
 }
 
-func (p *Peer) inboundHandShake() error {
+// Handshake with another peer.
+func (p *Reader) Handshake() error {
 	if err := p.readRemoteMsgVersion(); err != nil {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	verAckMessage, err := addHeader(buf, p.magic, topics.VerAck)
-	if err != nil {
-		return err
-	}
-
-	if _, err := p.Conn.Write(verAckMessage.Bytes()); err != nil {
+	if err := p.writeVerAck(); err != nil {
 		return err
 	}
 
@@ -101,53 +44,58 @@ func (p *Peer) inboundHandShake() error {
 		return err
 	}
 
-	if err := p.readVerack(); err != nil {
-		return err
-	}
-	return nil
+	return p.readVerAck()
 }
 
-func (p *Peer) writeLocalMsgVersion() error {
-	fromPort := uint16(p.Port())
-	version := protocol.NodeVer
-	localIP, err := util.GetOutboundIP()
-	if err != nil {
-		return err
-	}
-	fromAddr := wire.NetAddress{
-		IP:   localIP,
-		Port: fromPort,
-	}
-
-	toIP := p.Conn.RemoteAddr().(*net.TCPAddr).IP
-	toPort := p.Conn.RemoteAddr().(*net.TCPAddr).Port
-	toAddr := wire.NewNetAddress(toIP.String(), uint16(toPort))
-
-	message, err := newVersionMessageBuffer(version, &fromAddr, toAddr, protocol.FullNode)
+func (p *Connection) writeLocalMsgVersion() error {
+	message, err := p.createVersionBuffer()
 	if err != nil {
 		return err
 	}
 
-	messageWithHeader, err := addHeader(message, p.magic, topics.Version)
+	fullMsg, err := p.addHeader(message, topics.Version)
 	if err != nil {
 		return err
 	}
 
-	_, err = p.Conn.Write(messageWithHeader.Bytes())
+	frame, err := processing.WriteFrame(fullMsg)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.Write(frame.Bytes())
 	return err
 }
 
-func (p *Peer) readRemoteMsgVersion() error {
-	topic, payload, err := p.readMessage()
+func (p *Connection) readRemoteMsgVersion() error {
+	msgBytes, err := p.ReadMessage()
+	if err != nil {
+		return err
+	}
+
+	decodedMsg := new(bytes.Buffer)
+	decodedMsg.Write(msgBytes)
+
+	magic, err := extractMagic(decodedMsg)
+	if err != nil {
+		return err
+	}
+
+	if magic != p.magic {
+		return errors.New("magic mismatch")
+	}
+
+	topic, err := extractTopic(decodedMsg)
 	if err != nil {
 		return err
 	}
 
 	if topic != topics.Version {
-		return fmt.Errorf("did not receive the expected '%s' message - got %s", topics.Version, topic)
+		return fmt.Errorf("did not receive the expected '%s' message - got %s",
+			topics.Version, topic)
 	}
 
-	version, err := decodeVersionMessage(payload)
+	version, err := decodeVersionMessage(decodedMsg)
 	if err != nil {
 		return err
 	}
@@ -155,81 +103,82 @@ func (p *Peer) readRemoteMsgVersion() error {
 	return verifyVersion(version.Version)
 }
 
-func (p *Peer) readVerack() error {
-	topic, _, err := p.readMessage()
+func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint32(buf, binary.LittleEndian, uint32(p.magic)); err != nil {
+		return nil, err
+	}
+
+	topicBytes := topics.TopicToByteArray(topic)
+	if _, err := buf.Write(topicBytes[:]); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.ReadFrom(m); err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+func (p *Connection) readVerAck() error {
+
+	msgBytes, err := p.ReadMessage()
+	if err != nil {
+		return err
+	}
+
+	decodedMsg := new(bytes.Buffer)
+	decodedMsg.Write(msgBytes)
+
+	magic, err := extractMagic(decodedMsg)
+	if err != nil {
+		return err
+	}
+
+	if magic != p.magic {
+		return errors.New("magic mismatch")
+	}
+
+	topic, err := extractTopic(decodedMsg)
 	if err != nil {
 		return err
 	}
 
 	if topic != topics.VerAck {
-		return fmt.Errorf("did not receive the expected '%s' message - got %s", topics.VerAck, topic)
+		return fmt.Errorf("did not receive the expected '%s' message - got %s",
+			topics.VerAck, topic)
 	}
-
-	// should only be accessed on one go-routine
-	p.VerackReceived = true
 
 	return nil
 }
 
-func newVersionMessageBuffer(v *protocol.Version, from, to *wire.NetAddress,
-	services protocol.ServiceFlag) (*bytes.Buffer, error) {
-
-	buffer := new(bytes.Buffer)
-	if err := v.Encode(buffer); err != nil {
-		return nil, err
+func (p *Connection) writeVerAck() error {
+	verAckMsg, err := p.addHeader(new(bytes.Buffer), topics.VerAck)
+	if err != nil {
+		return err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian,
-		uint64(time.Now().Unix())); err != nil {
-		return nil, err
+	frame, err := processing.WriteFrame(verAckMsg)
+	if err != nil {
+		return err
 	}
 
-	if err := from.Encode(buffer); err != nil {
-		return nil, err
+	if _, err := p.Write(frame.Bytes()); err != nil {
+		return err
 	}
 
-	if err := to.Encode(buffer); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, uint64(services)); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
+	return nil
 }
-func decodeVersionMessage(r *bytes.Buffer) (*VersionMessage, error) {
-	versionMessage := &VersionMessage{
-		Version:     &protocol.Version{},
-		FromAddress: &wire.NetAddress{},
-		ToAddress:   &wire.NetAddress{},
-	}
-	if err := versionMessage.Version.Decode(r); err != nil {
+
+func (p *Connection) createVersionBuffer() (*bytes.Buffer, error) {
+	version := protocol.NodeVer
+	message, err := newVersionMessageBuffer(version, protocol.FullNode)
+	if err != nil {
 		return nil, err
 	}
 
-	var time uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &time); err != nil {
-		return nil, err
-	}
-
-	versionMessage.Timestamp = int64(time)
-
-	if err := versionMessage.FromAddress.Decode(r); err != nil {
-		return nil, err
-	}
-
-	if err := versionMessage.ToAddress.Decode(r); err != nil {
-		return nil, err
-	}
-
-	var services uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &services); err != nil {
-		return nil, err
-	}
-
-	versionMessage.Services = protocol.ServiceFlag(services)
-	return versionMessage, nil
+	return message, nil
 }
 
 func verifyVersion(v *protocol.Version) error {

@@ -4,13 +4,10 @@
 
 ### API
 
-    - `New(eventBus, timeOut, committee, keys, d, k)` - creates a `ConsensusFactory` by accepting an `EventBus`, a `Committee` interface, and the `timerLength` being the duration of all the phases. It also initializes the channel for listening to the initial _block height_ necessary to begin the consensus.
+    - `New(eventBus, rpcBus, timeOut, keys, d, k)` - creates a `ConsensusFactory` by accepting an `EventBus`, an `RPCBus`, and the `timerLength` being the duration of all the phases. It also initializes the channel for listening to the initial _block height_ necessary to begin the consensus.
     - `StartConsensus()` - after receiving an initialization message with the Block Height, proceed to start the consensus components by invoking:
-        - `LaunchScoreGenerationComponent`
-        - `LaunchVotingComponent`
-        - `LaunchScoreSelectionComponent`
-        - `LaunchSignatureSelector`
-        - `LaunchBlockReducer`
-        - `LaunchSigSetReducer`
-        - `LaunchBlockNotary`
-        - `LaunchSignatureSetNotary`
+        - `reputation.Launch`
+        - `generation.Launch`
+        - `selection.Launch`
+        - `reduction.Launch`
+        - `agreement.Launch`

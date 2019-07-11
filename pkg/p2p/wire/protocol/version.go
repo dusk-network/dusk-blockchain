@@ -8,7 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
-// Version is a struct that seperates version fields.
+// Version is a struct that separates version fields.
 type Version struct {
 	Major uint8
 	Minor uint8

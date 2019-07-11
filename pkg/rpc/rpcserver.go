@@ -1,61 +1,46 @@
 package rpc
 
 import (
-	"bytes"
 	"crypto/subtle"
 	"encoding/base64"
-	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-
+	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"golang.org/x/crypto/sha3"
 )
 
-// Config is the configuration struct for the rpc server
-type Config struct {
-	RPCPort string
-	RPCUser string
-	RPCPass string
-}
+var log *logger.Entry = logger.WithFields(logger.Fields{"process": "rpc"})
 
 // Server defines the RPC server of the Dusk node.
 type Server struct {
 	started bool // Indicates whether or not server has started
 
-	eventBus         *wire.EventBus
-	chainInfoChannel <-chan *bytes.Buffer
-	chainInfoID      uint32
+	eventBus *wire.EventBus
+	rpcBus   *wire.RPCBus
 
 	authSHA  []byte       // Hash of the auth credentials
-	config   Config       // Configuration struct for RPC server
 	listener net.Listener // RPC Server listener
-
-	decodedChainInfoChannel chan string
 
 	startTime int64
 }
 
 // NewRPCServer instantiates a new RPCServer.
-func NewRPCServer(eventBus *wire.EventBus, cfg *Config) (*Server, error) {
-	chainInfoChannel := make(chan *bytes.Buffer, 10)
+func NewRPCServer(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Server, error) {
 
 	srv := Server{
-		eventBus:         eventBus,
-		chainInfoChannel: chainInfoChannel,
-		config:           *cfg,
+		eventBus: eventBus,
+		rpcBus:   rpcBus,
 	}
 
-	chainInfoID := srv.eventBus.Subscribe(string(topics.ChainInfo), chainInfoChannel)
-	srv.chainInfoID = chainInfoID
-
-	if cfg.RPCUser != "" && cfg.RPCPass != "" {
-		login := cfg.RPCUser + ":" + cfg.RPCPass
+	user := cfg.Get().RPC.User
+	pass := cfg.Get().RPC.Pass
+	if user != "" && pass != "" {
+		login := user + ":" + pass
 		auth := "Basic " + base64.StdEncoding.EncodeToString([]byte(login))
 		authSHA := sha3.Sum256([]byte(auth))
 
@@ -80,11 +65,11 @@ func (s *Server) Start() error {
 		r.Close = true
 
 		isAdmin := s.checkAuth(r)
-		s.handleRequest(w, r, isAdmin)
+		s.handleRequest(w, *r, isAdmin)
 	})
 
 	// Set up listener
-	l, err := net.Listen("tcp", "localhost:"+s.config.RPCPort)
+	l, err := net.Listen("tcp", "localhost:"+cfg.Get().RPC.Port)
 	if err != nil {
 		return err
 	}
@@ -97,28 +82,14 @@ func (s *Server) Start() error {
 	s.started = true
 	s.startTime = time.Now().Unix()
 
-	go s.listenOnEventBus()
-
 	return nil
 }
 
 // Listen on the http server.
 func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
-	fmt.Fprintf(os.Stdout, "RPC server listening on port %v\n", s.config.RPCPort)
+	log.Infof("RPC server listening on port %v", cfg.Get().RPC.Port)
 	httpServer.Serve(s.listener)
-	fmt.Fprintf(os.Stdout, "RPC server stopped listening\n")
-}
-
-// Listen on the event bus for relevant topics.
-func (s *Server) listenOnEventBus() {
-	for {
-		messageBytes := <-s.chainInfoChannel
-
-		// TODO: decode and marshal to JSON
-		// implement once chaininfo is implemented into blockchain.
-
-		s.decodedChainInfoChannel <- string(messageBytes.Bytes())
-	}
+	log.Info("RPC server stopped listening")
 }
 
 // checkAuth checks whether supplied credentials match the server credentials.
@@ -140,7 +111,7 @@ func (s *Server) checkAuth(r *http.Request) bool {
 func (s *Server) Stop() error {
 	s.started = false
 	if err := s.listener.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "error shutting down RPC, %v\n", err)
+		log.Errorf("error shutting down RPC, %v\n", err)
 		return err
 	}
 

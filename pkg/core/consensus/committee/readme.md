@@ -22,14 +22,13 @@ Deterministic sortition is an algorithm that recursively hashes the public seed 
 
 `Committee` is an interface that exposes the following functionalities:
 
-    - `IsMember([]byte)` bool: returns whether the ID of a provisioner (basically the `BLS Public Key`) is included in the committee
-    - `Verify(eventHeader)` error: Verify if the `EventHeader` has been propagated by a `Committee` member and performs general validation of the event itself (i.e. checking for duplicates, verifying signatures, etc)
-    - `Quorum()` int: returns the number of Committee members needed to form a _quorum_. This quantity depends on the amount of available `Provisioners` but it is constant after a certain threshold (normally 50)
+    - `IsMember([]byte, uint64, uint8)` bool: returns whether the ID of a provisioner (basically the `BLS Public Key`) is included in the committee
+    - `Quorum()` int: returns the number of Committee members needed to form a _quorum_. This quantity depends on the amount of available `Provisioners` but it is constant after a certain threshold
 
-The `committee` package also exposes the following function: - `NewCommitteeStore(eventbus)` - creates a new `CommitteeStore` subscribed to the `NewProvisionerTopic` topic
+Additionally, the `committee` package exposes the `NewExtractor` function. It returns the basis for an implementation of the `Committee` interface, made up of a `Store`, and an `Extractor`.
 
 ### Architecture
 
 ![](docs/Committee.jpg)
 
-The package includes a `CommitteeStore`, a `Committee` interface implementation that is wired to the `EventBus` and follows the _event-driven_ approach of the general Provisioner's architecture. The `CommitteeStore` listens to the `NewProvisionerTopic` topic and keeps track of the known `Provisioners` and their stake.
+The `Store` is responsible for maintaining an up-to-date set of provisioners. The `Extractor` wraps around the `Store`, exposing functionality needed to create voting committees from this `Store` for any point in the consensus. The combination of the two provides a basis for other packages to create their own specific implementations of the `Committee` interface, so that the `committee` package may be re-used across the codebase.

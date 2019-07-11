@@ -9,7 +9,6 @@ import (
 )
 
 func TestNewEventBus(t *testing.T) {
-
 	eb := NewEventBus()
 	assert.NotNil(t, eb)
 }
@@ -35,23 +34,6 @@ func TestUnsubscribe(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 		// success
 	}
-}
-
-func TestUnsubscribeAll(t *testing.T) {
-	eb, myChan, id := newEB(t)
-	eb.UnsubscribeAll(id)
-	eb.Publish("whateverTopic", bytes.NewBufferString("whatever2"))
-	select {
-	case <-myChan:
-		assert.FailNow(t, "We should have not received message")
-	case <-time.After(20 * time.Millisecond):
-		// success
-	}
-}
-
-func TestHasHandler(t *testing.T) {
-	eb, _, _ := newEB(t)
-	assert.True(t, eb.HasHandler("whateverTopic"))
 }
 
 func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {

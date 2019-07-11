@@ -1,23 +1,31 @@
 package main
 
 import (
-	"flag"
+	"bytes"
+	"fmt"
 	"math/rand"
 	"os"
+	"os/signal"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 )
 
-// Flags
-var voucher = flag.String("voucher", "voucher.dusk.network:8081", "hostname for the voucher seeder")
-var port = flag.String("port", "7000", "port for the node to bind on")
-var logToFile = flag.Bool("logtofile", false, "specifies if the log should be written to a file")
-
 func initLog(file *os.File) {
-	log.SetLevel(log.TraceLevel)
+
+	// apply logger level from configurations
+	level, err := log.ParseLevel(cfg.Get().Logger.Level)
+	if err == nil {
+		log.SetLevel(level)
+	} else {
+		log.SetLevel(log.TraceLevel)
+		log.Warnf("Parse logger level from config err: %v", err)
+	}
+
 	if file != nil {
-		os.Stdout = file
 		log.SetOutput(file)
 	} else {
 		log.SetOutput(os.Stdout)
@@ -25,12 +33,25 @@ func initLog(file *os.File) {
 }
 
 func main() {
-	flag.Parse()
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+
+	// TODO: use logging for this?
+	fmt.Fprintln(os.Stdout, "initializing node...")
+	// Loading all node configurations. Fail-fast if critical error occurs
+	if err := cfg.Load(); err != nil {
+		fmt.Printf("%v\n", err)
+		os.Exit(1)
+	}
+
+	port := cfg.Get().Network.Port
 	rand.Seed(time.Now().UnixNano())
 
-	// Set up logging
-	if *logToFile {
-		file, err := os.Create("log" + *port + ".txt")
+	// Set up logging.
+	// Any subsystem should be initialized after config and logger loading
+	output := cfg.Get().Logger.Output
+	if cfg.Get().Logger.Output != "stdout" {
+		file, err := os.Create(output + port + ".log")
 		if err != nil {
 			panic(err)
 		}
@@ -40,37 +61,32 @@ func main() {
 		initLog(nil)
 	}
 
+	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
+	log.Infof("Selected network  %s", cfg.Get().General.Network)
+
+	// Set up profiling tools.
+	profile, err := newProfile()
+	if err != nil {
+		// Assume here if tools are enabled but they fail on loading then it's better
+		// to fix the error or just disable them.
+		log.Errorf("Profiling tools error: %s", err.Error())
+		return
+	}
+	defer profile.close()
+
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
-	srv := Setup("demo" + *port)
-	// listening to the blindbid and the stake channels
-	go srv.Listen()
-	// fetch neighbours addresses from the Seeder
-	ips := ConnectToSeeder()
+	srv := Setup()
+	defer srv.Close()
+
 	//start the connection manager
 	connMgr := NewConnMgr(CmgrConfig{
-		Port:     *port,
+		Port:     port,
 		OnAccept: srv.OnAccept,
 		OnConn:   srv.OnConnection,
 	})
 
-	// wait a bit for everyone to start their cmgr
-	time.Sleep(time.Second * 1)
-
-	round := joinConsensus(connMgr, srv, ips)
-	srv.StartConsensus(round)
-
-	// Wait until the interrupt signal is received from an OS signal or
-	// shutdown is requested through one of the subsystems such as the RPC
-	// server.
-	select {}
-}
-
-func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
-	// if we are the first, initialize consensus on round 1
-	if len(ips) == 0 {
-		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
-		return uint64(1)
-	}
+	// fetch neighbours addresses from the Seeder
+	ips := ConnectToSeeder()
 
 	// trying to connect to the peers
 	for _, ip := range ips {
@@ -79,15 +95,18 @@ func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
 		}
 	}
 
-	// if height is not 0, init consensus on 2 rounds after it
-	// +1 because the round is always height + 1
-	// +1 because we dont want to get stuck on a round thats currently happening
-	if srv.chain.PrevBlock.Header.Height != 0 {
-		round := srv.chain.PrevBlock.Header.Height + 2
-		log.WithField("prefix", "main").Infof("Starting consensus from round %d\n", round)
-		return round
-	}
+	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
 
-	log.WithField("prefix", "main").Infoln("Starting consensus from scratch")
-	return uint64(1)
+	// Start interactive shell
+	go cli.Start(srv.eventBus, srv.rpcBus)
+
+	// Wait until the interrupt signal is received from an OS signal or
+	// shutdown is requested through one of the subsystems such as the RPC
+	// server.
+	<-interrupt
+
+	// Graceful shutdown of listening components
+	srv.eventBus.Publish(msg.QuitTopic, new(bytes.Buffer))
+
+	log.WithField("prefix", "main").Info("Terminated")
 }

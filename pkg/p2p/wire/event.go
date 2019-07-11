@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"io"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -28,7 +29,7 @@ type (
 	}
 
 	// EventMarshaller is the specular operation of an EventUnmarshaller. Following
-	// Golang's way of defining interfaces, it exposes an Unmarshal method which allows
+	// Golang's way of defining interfaces, it exposes a Marshal method which allows
 	// for flexibility and reusability across all the different components that need to
 	// read the buffer coming from the EventBus into different structs
 	EventMarshaller interface {
@@ -43,9 +44,9 @@ type (
 	}
 
 	// EventPrioritizer is used by the EventSelector to prioritize events
-	// (normally to return the best collected after a timespan)
+	// (normally to return the best collected after a timespan). Return true if the first element has priority over the second, false otherwise
 	EventPrioritizer interface {
-		Priority(Event, Event) Event
+		Priority(Event, Event) bool
 	}
 
 	// EventVerifier is the interface to verify an Event
@@ -61,33 +62,82 @@ type (
 		Collect(*bytes.Buffer) error
 	}
 
-	// EventSubscriber accepts events from the EventBus and takes care of reacting on
+	TopicProcessor interface {
+		Process(*bytes.Buffer) (*bytes.Buffer, error)
+	}
+
+	// TopicListener accepts events from the EventBus and takes care of reacting on
 	// quit Events. It delegates the business logic to the EventCollector which is
 	// supposed to handle the incoming events
-	EventSubscriber struct {
-		eventBus       *EventBus
+	TopicListener struct {
+		subscriber     EventSubscriber
 		eventCollector EventCollector
 		msgChan        <-chan *bytes.Buffer
 		msgChanID      uint32
-		quitChan       <-chan *bytes.Buffer
+		quitChan       chan *bytes.Buffer
 		quitChanID     uint32
 		topic          string
 	}
+
+	// EventPreprocessors allow registration of preprocessors to be applied to incoming Event on a specific topic
+	EventPreprocessor interface {
+		RegisterPreprocessor(string, ...TopicProcessor) []uint32
+		RemovePreprocessor(string, uint32)
+		RemoveAllPreprocessors(string)
+	}
+
+	// EventSubscriber subscribes a channel to Event notifications on a specific topic
+	EventSubscriber interface {
+		EventPreprocessor
+		Subscribe(string, chan<- *bytes.Buffer) uint32
+		SubscribeCallback(string, func(*bytes.Buffer) error) uint32
+		SubscribeStream(string, io.WriteCloser) uint32
+		Unsubscribe(string, uint32)
+		// RegisterPreprocessor(string, ...TopicProcessor)
+	}
+
+	// EventPublisher publishes serialized messages on a specific topic
+	EventPublisher interface {
+		Publish(string, *bytes.Buffer)
+		Stream(string, *bytes.Buffer)
+	}
+
+	// EventBroker is an EventPublisher and an EventSubscriber
+	EventBroker interface {
+		EventSubscriber
+		EventPublisher
+	}
+
+	// EventDeserializer is the interface for those struct that allows deserialization of an event from scratch
+	EventDeserializer interface {
+		Deserialize(*bytes.Buffer) (Event, error)
+	}
+
+	Store interface {
+		Insert(Event, string) int
+		Clear()
+		Contains(Event, string) bool
+		Get(string) []Event
+		All() []Event
+	}
 )
 
-// NewEventSubscriber creates the EventSubscriber listening to a topic on the EventBus.
+// NewTopicListener creates the TopicListener listening to a topic on the EventBus.
 // The EventBus, EventCollector and Topic are injected
-func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
-	topic string) *EventSubscriber {
+func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topic string,
+	preprocessors ...TopicProcessor) *TopicListener {
 
-	quitChan := make(chan *bytes.Buffer, 1)
 	msgChan := make(chan *bytes.Buffer, 100)
+	quitChan := make(chan *bytes.Buffer, 1)
+	msgChanID := subscriber.Subscribe(topic, msgChan)
+	quitChanID := subscriber.Subscribe(string(QuitTopic), quitChan)
 
-	msgChanID := eventBus.Subscribe(topic, msgChan)
-	quitChanID := eventBus.Subscribe(string(QuitTopic), quitChan)
+	if len(preprocessors) > 0 {
+		subscriber.RegisterPreprocessor(topic, preprocessors...)
+	}
 
-	return &EventSubscriber{
-		eventBus:       eventBus,
+	return &TopicListener{
+		subscriber:     subscriber,
 		msgChan:        msgChan,
 		msgChanID:      msgChanID,
 		quitChan:       quitChan,
@@ -97,9 +147,8 @@ func NewEventSubscriber(eventBus *EventBus, collector EventCollector,
 	}
 }
 
-// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the
-// EventCollector.Collect
-func (n *EventSubscriber) Accept() {
+// Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect.
+func (n *TopicListener) Accept() {
 	log.WithFields(log.Fields{
 		"id":    n.msgChanID,
 		"topic": n.topic,
@@ -107,10 +156,10 @@ func (n *EventSubscriber) Accept() {
 	for {
 		select {
 		case <-n.quitChan:
-			n.eventBus.Unsubscribe(n.topic, n.msgChanID)
-			n.eventBus.Unsubscribe(string(QuitTopic), n.quitChanID)
+			n.subscriber.Unsubscribe(n.topic, n.msgChanID)
+			n.subscriber.Unsubscribe(string(QuitTopic), n.quitChanID)
 			return
-		case eventMsg := <-n.msgChan:
+		case eventBuffer := <-n.msgChan:
 			if len(n.msgChan) > 10 {
 				log.WithFields(log.Fields{
 					"id":         n.msgChanID,
@@ -118,15 +167,19 @@ func (n *EventSubscriber) Accept() {
 					"Unconsumed": len(n.msgChan),
 				}).Debugln("Channel is accumulating messages")
 			}
-			if err := n.eventCollector.Collect(eventMsg); err != nil {
-				log.WithFields(log.Fields{
-					"id":         n.msgChanID,
-					"topic":      n.topic,
-					"Unconsumed": len(n.msgChan),
-				}).Warnln("Channel is accumulating messages")
+			if err := n.eventCollector.Collect(eventBuffer); err != nil {
+				log.WithError(err).WithFields(log.Fields{
+					"id":    n.msgChanID,
+					"topic": n.topic,
+				}).Errorln("Error in eventCollector.Collect")
 			}
 		}
 	}
+}
+
+// Quit will kill the goroutine spawned by Accept, and unsubscribe from it's subscribed topics.
+func (n *TopicListener) Quit() {
+	n.quitChan <- new(bytes.Buffer)
 }
 
 // AddTopic is a convenience function to add a specified topic at the start of

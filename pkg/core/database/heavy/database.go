@@ -1,12 +1,13 @@
 package heavy
 
 import (
+	"os"
+	"sync"
+
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"os"
-	"sync"
 )
 
 var (
@@ -55,6 +56,20 @@ func openStorage(path string) (*leveldb.DB, error) {
 		}
 	}
 	return _storage, err
+}
+
+// closeStorage should safely close the underlying storage
+func closeStorage() error {
+	_storageMu.Lock()
+	defer _storageMu.Unlock()
+
+	if _storage != nil {
+		err := _storage.Close()
+		_storage = nil
+		return err
+	}
+
+	return errors.New("invalid storage")
 }
 
 // NewDatabase create or open backend storage (goleveldb) located at the

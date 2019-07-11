@@ -1,0 +1,83 @@
+# Configs marked with #live# can be modified without node restart
+
+# general node configs
+[general]
+network = "testnet"
+
+# logger configs
+[logger]
+# log levels can be any of error, warn, trace
+level = "trace"
+# 'stdout' or file name without ext
+# result filename would be $output$network.port.log
+output = "stdout"
+[logger.monitor]
+# enabling log based monitoring
+enabled = false
+# file whereto dumping info parsed by monitor
+target = "/var/log/dusk-monitor"
+# tell logger to stream errors and warnings to monitoring process
+streamErrors=true
+    
+# P2P network specific settings
+[network]
+
+# listens on all available unicast and anycast
+# IP addresses of the local system.
+
+# port for the node to bind on
+port=7000
+
+[network.seeder]
+# array of seeder servers
+addresses=["voucher.dusk.network:8081"]
+# fixed network addresses to setup local P2P network
+# supported only in testnet
+fixed = []
+
+[network.monitor]
+enabled = false
+address="monitor.dusk.network:1337"
+
+[database]
+# Backend storage used to store chain
+# Supported drivers heavy_v0.1.0
+driver = "heavy_v0.1.0"
+# backend storage path
+dir = "chain"
+
+[mempool]
+# Max size of memory of the accepted txs to keep
+maxSizeMB = 100
+# Possible values: "hashmap", "syncpool", "memcached" 
+poolType = "hashmap"
+# number of txs slots to allocate on each reseting mempool
+preallocTxs = 100
+# Max number of items to respond with on topics.Mempool request
+# To disable topics.Mempool handling, set it to 0
+maxInvItems = 10000
+
+# rpc service configs
+[rpc]
+
+# rpc port to listen on
+port=9000
+# enable rpc service
+enabled=true
+user="default"
+pass="default"
+cert=""
+
+[prof]
+# profiling service address
+# reachable at http://localhost:5050/debug/pprof
+# address="localhost:5050"
+
+# cpu.prof
+cpuFile=""
+# mem.prof
+memFile=""
+
+[performance]
+# Number of workers to spawn on an accumulator component
+accumulatorWorkers = 4

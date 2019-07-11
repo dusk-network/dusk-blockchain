@@ -9,18 +9,25 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
+const (
+	// HeaderHashSize size of a block header hash in bytes
+	HeaderHashSize = 32
+	// HeightSize size of a block height field in bytes
+	HeightSize = 8
+)
+
 // Header defines a block header on a Dusk block.
 type Header struct {
 	Version   uint8  // Block version byte
-	Timestamp int64  // Block timestamp
 	Height    uint64 // Block height
+	Timestamp int64  // Block timestamp
 
-	PrevBlock []byte // Hash of previous block (32 bytes)
-	Seed      []byte // Marshaled BLS signature or hash of the previous block seed (32 bytes)
-	TxRoot    []byte // Root hash of the merkle tree containing all txes (32 bytes)
+	PrevBlockHash []byte // Hash of previous block (32 bytes)
+	Seed          []byte // Marshaled BLS signature or hash of the previous block seed (32 bytes)
+	TxRoot        []byte // Root hash of the merkle tree containing all txes (32 bytes)
 
-	CertHash []byte // Hash of the block certificate (32 bytes)
-	Hash     []byte // Hash of all previous fields
+	*Certificate        // Block certificate
+	Hash         []byte // Hash of all previous fields
 }
 
 // SetHash will set this block header's hash by encoding all the relevant
@@ -55,7 +62,7 @@ func (b *Header) EncodeHashable(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, b.PrevBlock); err != nil {
+	if err := encoding.Write256(w, b.PrevBlockHash); err != nil {
 		return err
 	}
 
@@ -76,7 +83,7 @@ func (b *Header) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, b.CertHash); err != nil {
+	if err := b.Certificate.Encode(w); err != nil {
 		return err
 	}
 
@@ -103,7 +110,7 @@ func (b *Header) Decode(r io.Reader) error {
 	}
 
 	b.Timestamp = int64(timestamp)
-	if err := encoding.Read256(r, &b.PrevBlock); err != nil {
+	if err := encoding.Read256(r, &b.PrevBlockHash); err != nil {
 		return err
 	}
 
@@ -115,7 +122,8 @@ func (b *Header) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &b.CertHash); err != nil {
+	b.Certificate = &Certificate{}
+	if err := b.Certificate.Decode(r); err != nil {
 		return err
 	}
 
@@ -148,7 +156,7 @@ func (b *Header) Equals(other *Header) bool {
 		return false
 	}
 
-	if !bytes.Equal(b.PrevBlock, other.PrevBlock) {
+	if !bytes.Equal(b.PrevBlockHash, other.PrevBlockHash) {
 		return false
 	}
 
@@ -160,7 +168,7 @@ func (b *Header) Equals(other *Header) bool {
 		return false
 	}
 
-	if !bytes.Equal(b.CertHash, other.CertHash) {
+	if !b.Certificate.Equals(other.Certificate) {
 		return false
 	}
 

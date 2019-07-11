@@ -1,106 +1,95 @@
-# Dusk Node
+# Dusk Network Testnet 
+## Shin (殉星) Release
+|Table of Contents|
+|---|
+|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-a-dusk-network-testnet-v1-shin)|
+|[Why should one participate in the Dusk Network Testnet Shin (殉星)?](#why-should-one-participate-in-the-dusk-network-testnet-v1-shin)|
+|[Specification Requirements](#specification-requirements)|
+|[Intallation Guide](#intallation-guide)|
+|[Features](#features)|
+|[Upcoming Features](#upcoming-features)|
+|[How to create a wallet?](#how-to-create-a-wallet)|
+|[How to create a wallet from a seed?](#how-to-create-a-wallet-from-a-seed)|
+|[How to load a wallet?](#how-to-load-a-wallet)|
+|[How to check the balance of the address?](#how-to-check-the-balance-of-the-address)|
+|[How to claim Testnet DUSK?](#how-to-claim-testnet-dusk)|
+|[How to transfer tDUSK?](#how-to-transfer-tdusk)|
+|[How to become a Provisioner?](#how-to-become-a-provisioner)|
+|[How to become a Block Generator?](#how-to-become-a-block-generator)|
+## What is a Dusk Network Testnet Shin (殉星) ?
+Dusk Network Testnet Shin (殉星) is the first publicly-available implementation of the Dusk Network protocol. Dusk Network is a privacy-oriented blockchain protocol, that anyone can use to create zero-knowledge dApps. The Dusk Network protocol is secured via Segregated Byzantine Agreement consensus protocol. Segregated Byzantine Agreement is a permission-less consensus protocol with statistical block finality. Segregated Byzantine Agreement also includes Proof of Blind Bid, a novel Private Proof-of-Stake implementation, that enables Block Generators to stake anonymously.
+## Why should one participate in the Dusk Network Testnet Shin (殉星) ?
+## Specification Requirements
+### Minimum Specifications
+| CPU | RAM | Storage | Network Connection |
+|---|---|---|---|
+|2 cores; 2 GHz| 1 GB | 60 GB | 1 Mbps |
+### Recommended Specifications
+| CPU | RAM | Storage | Network Connection |
+|---|---|---|---|
+|4 cores; 2 GHz| 4 GB | 250 GB | 10 Mbps |
+## Intallation Guide
+This guide is for building the node from source. If you would like to just download the compiled program, head over to the releases tab.
 
-This is the `golang` reference implementation of the `Dusk Network Protocol`.
-The codebase is structured in the following way:
+### Requirements
+[Go](https://golang.org/) 1.11 or newer.
 
+Optional - if you wish to participate in consensus: [Rust](https://www.rust-lang.org/tools/install)
+
+### Installation 
+#### DUSK node
+First, download the codebase and it's dependencies into your $GOPATH by running:
+```bash
+go get github.com/dusk-network/dusk-go
 ```
-.
-+-- docs
-+-- launch
-|   +-- testnet
-+-- mocks
-+-- pkg
-|   +-- core
-|       +--block
-|       +--chain
-|       +--consensus
-|       +--database
-|       +--tests
-|       +--transactions
-|   +-- crypto
-|       +--base58
-|       +--bls
-|       +--hash
-|       +--merkletree
-|       +--rangeproof
-|       +--ringsig
-|   +-- eventlog
-|   +-- p2p
-|   +-- rpc
-|   +-- util
-+-- test
-...
-+-- Makefile
+Then, navigate to the testnet folder, like so:
+```bash
+cd $GOPATH/src/github.com/dusk-network/dusk-blockchain/launch/testnet
+```
+Then, to build the binary, simply run:
+```bash
+go build
 ```
 
+And finally, to start your node, type:
+```bash
+./testnet
+```
 
+If you wish to participate in consensus, it is necessary that you also build and run the `blindbid` executable, explained below. If not, feel free to skip that section.
+#### Blind bid 
+Instructions for building the `blindbid` module can be found [here](https://github.com/dusk-network/dusk-blindbidproof/blob/master/Readme.md#how-to-build).
+## Features
+1. Cryptography Module - Includes an implementation of SHA-3 and LongsightL hash functions, Ristretto and BN-256 elliptic curves, Ed25519, BLS, bLSAG and MLSAG signature schemes, Bulletproofs zero-knowledge proof scheme.
+2. Consensus Module - Includes a complete implementation of the latest version of Segregated Byzantine Agreement (v2.1) consensus protocol, which contains three phases - Block Generation, Block Reduction and Block Agreement as well as the Blind Bid proof protocol utilized in the Block Generation phase.
+3. Networking and Database Module - Includes the blockchain storage and related logic, as well as the implementation of P2P gossip protocol utilized by the Dusk Network protocol.
+4. CLI Wallet - Includes an functionality enabling the user to create/load a wallet, transfer/bid/stake DUSK tokens. The instructions on each of the aforementioned functionalities will be listed below. 
+## Upcoming Features
+These features will be introduced in the later iterations of the Testnet (starting from v2).
+1. Virtual Machine Module - Will include the implementation of the WebAssembly-based (WASM) Turing-complete Virtual Machine with zero-knowledge proof verification capabilities, as well as an account-based state-layer confidential transaction model and the implementation of XSC standard.
+2. Guru Module - Will include the reputation module incorporated to aid the consensus combat malicious behaviour.
+3. Cryptoeconomics Model - Will include an optimized reward mechanism for the consensus alongside the slashing conditions as well as introducing the lower and upper thresholds for the bids and stakes. The cryptoeconomics model will also include the rolling transaction fee model.
+4. Poseidon Hash Function - Will include the Poseidon hash function which will supersede LongsightL as the new zero-knowledge proof-friendly hash function.
+5. Anonymous Networking Layer - Will include the anonymous P2P communication model based on onion routing.
+## How to create a wallet?
+Open the Command Line Interface (CLI) and type `createwallet [password]`, where `[password]` stands for the secret combination of user-choice.
+## How to create a wallet from a seed?
+Open the Command Line Interface (CLI) and type `createfromseed [seed] [password]`, where `[seed]` stands for a hex seed and `[password]` stands for the secret combination of user-choice.
+## How to load a wallet?
+Open the Command Line Interface (CLI) and type `loadwallet [password]`, where `[password]` stands for the secret combination previously selected by the user.
+## How to sync the wallet with the blockchain?
+Open the Command Line Interface (CLI) and type `sync`. The wallet will download blocks and check for UTXOs that belong to it.
+## How to check the balance of the address?
+Open the Command Line Interface (CLI) and type `balance`. Make sure to `sync` the wallet first.
+## How to claim Testnet DUSK?
+To claim Testnet DUSK (tDUSK), the user is required to make a Twitter post containing his/her wallet address ([example](https://twitter.com/ellie12496641/status/1147604746280361984)). Following the post on Twitter, the user should go to the faucet [webpage](https://faucet.dusk.network/) and paste the Twitter post link into the empty box and click the `Send Dusk!` button. The tDUSK will be deposited onto the aforementioned address within a minute. The user can claim tDUSK for the same address once per 24 hours.
+## How to transfer tDUSK?
+Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+## How to become a Provisioner?
+Open the Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks until which the bid is locked (`block_height < locktime < 2^64`) (max is 250000), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
 
-## SBA\* Consensus
+After completion, type `startprovisioner` into the CLI to join the consensus.
+## How to become a Block Generator?
+Open a Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks until which the stake is locked (`block_height < locktime < 2^64`) (max is 250000), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
 
-### Intro
-
-SBA is the first implementation of a novel consensus algorithm called Proof-Of-Blind-Bid, a privacy oriented, hybrid Proof-of-Stake like protocol with instant, statistical finality guarantees. The protocol is based on an Honest Majority of Money (an Adversary can corrupt nodes controlling up to `f` percent of the total stake value `≥ 3f + 1`) and weak network synchrony assumptions.
-
-The roles in the protocol are split between two different types: Block Generators and Provisioners. Block Generators retain their privacy, with the proofs of stake computed in zero-knowledge to preserve the anonymity of the Block Generator. On the other hand, Provisioners are required to deanonymize their stakes and remain transparent about their activities in the consensus while their stake remains valid.
-
-Both bids and stakes have a registration period of `t`, which begins when a Bid or Stake transaction is included in a final block and is required to elapse before the full-node is eligible to participate in the consensus.
-
-SBA protocol can be conceptually defined with two inner loops (`Block Loop` and `Sigset Loop`), with execution of the `Sigset Loop` dependent on the successful termination of the `Block Loop`. `Block Loop` is responsible for forming a consensus on a uniform block and `Sigset Loop` is responsible for forming a uniform signature set of the `Provisioners` which attested the winning candidate block during the `Block Reduction` phase and is required to form a certificate to notarize the block.
-
-#### Security Model
-
-The security model of SBA is based on _Snow White_, a provably secure Proof-of-Stake protocol. SBA is secure under a `∆-delayed` mildly adaptive adversary (an adversary who is required to choose the nodes controlling a maximum of f percent of the total stake he/she is willing to corrupt ∆ rounds before the actual corruption) and in a weakly synchronous network with a propagation delay of up to `δ` seconds.
-
-##### TODO
-
-- Remove the `SigSet Loop`. There is a strong possibility that we could retain the same security assumptions by ditching the `SigSet Loop` and keeping the sole `Block Loop`. This needs further research though
-
-#### Block Generator
-
-Block Generator is the first of the two full-node types eligible to participate in the consensus. To become a Block Generator, a full-node has to submit a `Bid Transaction`.
-The Block Generator is eligible to participate in one phase
-
-- Block Generation
-
-In the aforementioned phase, Block Generators participate in a non-interactive lottery to be able to forge a candidate block.
-
-#### Provisioner
-
-Provisioner is the second of the two full-node types eligible to participate in the consensus.
-
-Unlike a Block Generator, a Provisioner node is required to deanonymize the value of the stake to be able to participate in the consensus. While it is technically possible to obfuscate the stake value, the team has de- cided against the latter as the addition of stake value obfuscation would have slowed down the consensus and simultaneously increased the block size.
-
-The Provisioner is eligible to participate in five phases
-
-- `Sigset Generation`
-- `Block Reduction`
-- `Sigset Reduction`
-- `Block Agreement`
-- `Sigset Agreement`
-
-### Event Driven Architecture
-
-The consensus architecture is _event-driven_, chosen for its characteristics of allowing highly scalable applications while keeping the various architectural components highly decoupled and single purposed. The various phases of the consensus are processed independently by single _components_, each _subscribing_ to and _publishing_ a variety of different _events_ and payloads through multiple _Topic Channels_, implemented through the `EventBus` struct.
-
-#### Broker Topology
-
-According to the _Broker Topology Strategy_, each component is organized as a lightweight `broker`, where the event flow gets distributed across various sub-components in a chain-like fashion. This topology was chosen in order to keep the event processing flow relatively simple and to promote reusability of the different data structures and interfaces. The broker topology has the added benefit of preventing central event orchestration.
-
-In our implementation of the broker topology, there are three main types of recurring architectural components:
-
-- `Broker`: a federated struct that contains all the event channels used within the flow and which responsibility includes the creation and coordination of a `Collector`
-- `Collector`: an entity receiving the _events_ and appointed to their validation, aggregation and processing
-- one or more `channels` whereto the result of the processing get published
-
-Additionally, several other entities are utilized within the `Collector` to help with code reuse and interface programming:
-
-- `EventHandler`: This entity contains the logic specific to the components and that cannot be shared
-- `EventQueue`: A temporary storage unit to collect messages referring to a future stage. This is possible given the asynchrony of the network which could result in nodes falling a bit behind in the event processing.
-- `Selector`: A selector accumulates messages until a condition is met (i.e. a timeout), and selects and returns one of the accumulated messages according to a certain priority
-
-### Common struct and interfaces
-
-The consensus package exposes the function to create and initialize the most common channels reused across the whole package. These common channels are for receiving notifications about Rounds (Block height) and Phases (Block Hash).
-
-- InitRoundUpdate(eventbus) (chan uint64) returns a channel whereto round updates get published
-- InitPhaseUpdate(eventbus) (chan uint64) returns a channel whereto phase  updates get published
+After completion, type `startblockgenerator` into the CLI to join the consensus.

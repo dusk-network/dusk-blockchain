@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"time"
 
@@ -19,7 +18,7 @@ type connmgr struct {
 	CmgrConfig
 }
 
-//New creates a new connection manager
+//NewConnMgr creates a new connection manager
 func NewConnMgr(cfg CmgrConfig) *connmgr {
 	cnnmgr := &connmgr{
 		cfg,
@@ -53,7 +52,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 	return cnnmgr
 }
 
-// Connect dials a connection with it's string, then on succession
+// Connect dials a connection with its string, then on succession
 // we pass the connection and the address to the OnConn method
 func (c *connmgr) Connect(addr string) error {
 	conn, err := c.Dial(addr)
@@ -62,18 +61,18 @@ func (c *connmgr) Connect(addr string) error {
 	}
 
 	if c.CmgrConfig.OnConn != nil {
-		c.CmgrConfig.OnConn(conn, addr)
+		go c.CmgrConfig.OnConn(conn, addr)
 	}
 
 	return nil
 }
 
-// Dial dials up a connection, given it's address string
+// Dial dials up a connection, given its address string
 func (c *connmgr) Dial(addr string) (net.Conn, error) {
 	dialTimeout := 1 * time.Second
 	conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("problem connecting to %s - %v", addr, err)
+		return nil, err
 	}
 	return conn, nil
 }

@@ -2,23 +2,24 @@ package helper
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"time"
 )
 
-//RandomBlock returns a random block for testing.
+// RandomBlock returns a random block for testing.
 // For `height` see also helper.RandomHeader
-// Fir txBatchCount see also helper.RandomSliceOfTxs
+// For txBatchCount see also helper.RandomSliceOfTxs
 func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block {
 	b := &block.Block{
 		Header: RandomHeader(t, height),
 		Txs:    RandomSliceOfTxs(t, txBatchCount),
 	}
 	err := b.SetHash()
-
-	assert.Nil(t, err)
+	assert.NoError(t, err)
+	err = b.SetRoot()
+	assert.NoError(t, err)
 	return b
 }
 
@@ -36,7 +37,7 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 		Txs:    RandomSliceOfTxs(t, 20),
 	}
 
-	blk1.Header.PrevBlock = blk0.Header.Hash
+	blk1.Header.PrevBlockHash = blk0.Header.Hash
 	blk1.Header.Height = blk0.Header.Height + 1
 	blk1.Header.Timestamp = blk0.Header.Timestamp + 100
 	err = blk1.SetRoot()
@@ -47,24 +48,9 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	return blk0, blk1
 }
 
-//RandomCertificate returns a random block certificate  for testing
+// RandomCertificate returns a random block certificate for testing
 func RandomCertificate(t *testing.T) *block.Certificate {
-	c := &block.Certificate{
-		BRBatchedSig: RandomSlice(t, 33),
-		BRStep:       20,
-
-		SRBatchedSig: RandomSlice(t, 33),
-		SRStep:       12,
-	}
-
-	for i := 0; i < 10; i++ {
-		c.BRPubKeys = append(c.BRPubKeys, RandomSlice(t, 33))
-		c.SRPubKeys = append(c.SRPubKeys, RandomSlice(t, 33))
-	}
-
-	err := c.SetHash()
-	assert.Nil(t, err)
-	return c
+	return block.EmptyCertificate()
 }
 
 // RandomHeader returns a random header for testing. `height` randomness is up
@@ -73,14 +59,14 @@ func RandomHeader(t *testing.T, height uint64) *block.Header {
 
 	h := &block.Header{
 		Version:   0,
-		Timestamp: time.Now().Unix(),
 		Height:    height,
+		Timestamp: time.Now().Unix(),
 
-		PrevBlock: RandomSlice(t, 32),
-		Seed:      RandomSlice(t, 33),
-		TxRoot:    RandomSlice(t, 32),
+		PrevBlockHash: RandomSlice(t, 32),
+		Seed:          RandomSlice(t, 33),
+		TxRoot:        RandomSlice(t, 32),
 
-		CertHash: RandomSlice(t, 32),
+		Certificate: RandomCertificate(t),
 	}
 
 	return h
