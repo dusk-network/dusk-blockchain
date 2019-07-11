@@ -18,8 +18,6 @@ Interfaces exposed to upper layers:
 
 - `/database/heavy` driver is designed to provide efficient, robust and persistent DUSK block chain DB on top of syndtr/goleveldb/leveldb store (unofficial LevelDB porting). It must be Mainnet-complient.
 
-- `/database/lite` driver is designed to provide human-readable Dusk blockchain DB for DevNet needs only. As is based on SQLite3, any SQL browser can be used as blockchain explorer. (Not included in current branch)
-
 ### Testing Drivers
 - `/database/testing` implements a boilerplate method to verify if a registered driver does satisfy minimum database requirements. The package defines a set of unit tests that are executed only on registered drivers. It can serve also as a detailed and working database guideline.
 

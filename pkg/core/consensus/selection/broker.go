@@ -14,8 +14,8 @@ import (
 type scoreBroker struct {
 	roundUpdateChan  <-chan uint64
 	regenerationChan <-chan consensus.AsyncState
-	bidListChan      <-chan user.BidList
-	filter           *consensus.EventFilter
+	bidChan          <-chan user.Bid
+	filter           *filter
 	selector         *eventSelector
 	handler          ScoreEventHandler
 }
@@ -31,10 +31,10 @@ func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout tim
 	go broker.Listen()
 }
 
-func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHandler,
-	state consensus.State, processor consensus.EventProcessor) *consensus.EventFilter {
+func launchScoreFilter(eventBroker wire.EventBroker, handler ScoreEventHandler,
+	state consensus.State, selector *eventSelector) *filter {
 
-	filter := consensus.NewEventFilter(handler, state, processor, false)
+	filter := newFilter(handler, state, selector)
 	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Score))
 	go listener.Accept()
 	return filter
@@ -42,8 +42,7 @@ func launchScoreFilter(eventBroker wire.EventBroker, handler consensus.EventHand
 
 // newScoreBroker creates a Broker component which responsibility is to listen to the
 // eventbus and supervise Collector operations
-func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler,
-	timeOut time.Duration) *scoreBroker {
+func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler, timeOut time.Duration) *scoreBroker {
 	state := consensus.NewState()
 	selector := newEventSelector(eventBroker, handler, timeOut, state)
 	filter := launchScoreFilter(eventBroker, handler, state, selector)
@@ -51,7 +50,7 @@ func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler,
 	return &scoreBroker{
 		filter:           filter,
 		roundUpdateChan:  consensus.InitRoundUpdate(eventBroker),
-		bidListChan:      consensus.InitBidListUpdate(eventBroker),
+		bidChan:          consensus.InitBidListUpdate(eventBroker),
 		regenerationChan: consensus.InitBlockRegenerationCollector(eventBroker),
 		selector:         selector,
 		handler:          handler,
@@ -66,8 +65,8 @@ func (f *scoreBroker) Listen() {
 			f.onRoundUpdate(round)
 		case state := <-f.regenerationChan:
 			f.onRegeneration(state)
-		case bidList := <-f.bidListChan:
-			f.selector.handler.UpdateBidList(bidList)
+		case bid := <-f.bidChan:
+			f.selector.handler.UpdateBidList(bid)
 		}
 	}
 }
@@ -78,11 +77,13 @@ func (f *scoreBroker) onRoundUpdate(round uint64) {
 		"round":   round,
 	}).Debugln("updating round")
 
-	f.selector.stopSelection()
 	f.filter.UpdateRound(round)
+	f.selector.stopSelection()
 	f.handler.ResetThreshold()
+	f.handler.RemoveExpiredBids(round)
 	f.filter.FlushQueue()
 	f.selector.startSelection()
+	f.selector.timer.ResetTimeOut()
 }
 
 func (f *scoreBroker) onRegeneration(state consensus.AsyncState) {
@@ -93,6 +94,7 @@ func (f *scoreBroker) onRegeneration(state consensus.AsyncState) {
 	}).Debugln("received regeneration message")
 	if state.Round == f.selector.state.Round() {
 		f.handler.LowerThreshold()
+		f.selector.timer.IncreaseTimeOut()
 		if !f.selector.isRunning() {
 			f.selector.startSelection()
 			return

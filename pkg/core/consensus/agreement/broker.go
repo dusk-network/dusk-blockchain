@@ -19,28 +19,25 @@ import (
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func Launch(eventBus *wire.EventBus, committee committee.Foldable,
-	keys user.Keys, currentRound uint64) {
-	if committee == nil {
-		committee = newAgreementCommittee(eventBus)
+func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) {
+	if c == nil {
+		c = committee.NewAgreement(eventBroker, nil)
 	}
-	broker := newBroker(eventBus, committee, keys)
+	broker := newBroker(eventBroker, c, keys)
+	currentRound := getInitialRound(eventBroker)
 	broker.updateRound(currentRound)
-	go broker.Listen()
 }
 
 type broker struct {
-	publisher   wire.EventPublisher
-	handler     *agreementHandler
-	state       consensus.State
-	filter      *consensus.EventFilter
-	accumulator *consensus.Accumulator
+	publisher wire.EventPublisher
+	handler   *agreementHandler
+	state     consensus.State
+	filter    *consensus.EventFilter
 }
 
 func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
-	handler consensus.EventHandler, state consensus.State,
-	accumulator *consensus.Accumulator) *consensus.EventFilter {
-	filter := consensus.NewEventFilter(handler, state, accumulator, false)
+	handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
+	filter := consensus.NewEventFilter(handler, state, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
 	eventBroker.SubscribeCallback(string(topics.Agreement), filter.Collect)
 	eventBroker.RegisterPreprocessor(string(topics.Agreement), republisher, &consensus.Validator{})
@@ -49,16 +46,13 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 
 func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys user.Keys) *broker {
 	handler := newHandler(committee, keys)
-	accumulator := consensus.NewAccumulator(handler, consensus.NewAccumulatorStore())
 	state := consensus.NewState()
-	filter := launchFilter(eventBroker, committee, handler,
-		state, accumulator)
+	filter := launchFilter(eventBroker, committee, handler, state)
 	b := &broker{
-		publisher:   eventBroker,
-		handler:     handler,
-		state:       state,
-		filter:      filter,
-		accumulator: accumulator,
+		publisher: eventBroker,
+		handler:   handler,
+		state:     state,
+		filter:    filter,
 	}
 
 	eventBroker.SubscribeCallback(msg.ReductionResultTopic, b.sendAgreement)
@@ -67,11 +61,10 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 
 // Listen for results coming from the accumulator and updating the round accordingly
 func (b *broker) Listen() {
-	for {
-		evs := <-b.accumulator.CollectedVotesChan
-		b.publishWinningHash(evs)
-		b.updateRound(b.state.Round() + 1)
-	}
+	evs := <-b.filter.Accumulator.CollectedVotesChan
+	b.publishEvent(evs)
+	b.publishWinningHash(evs)
+	b.updateRound(b.state.Round() + 1)
 }
 
 func (b *broker) sendAgreement(m *bytes.Buffer) error {
@@ -115,11 +108,25 @@ func (b *broker) updateRound(round uint64) {
 	}).Debugln("updating round")
 	b.filter.UpdateRound(round)
 	consensus.UpdateRound(b.publisher, round)
-	b.accumulator.Clear()
 	b.filter.FlushQueue()
+	go b.Listen()
 }
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
-	b.publisher.Publish(msg.WinningBlockTopic, bytes.NewBuffer(aev.BlockHash))
+	b.publisher.Publish(msg.WinningBlockHashTopic, bytes.NewBuffer(aev.BlockHash))
+}
+
+func (b *broker) publishEvent(evs []wire.Event) {
+	marshaller := NewUnMarshaller()
+	buf := new(bytes.Buffer)
+	if err := marshaller.Marshal(buf, evs[0]); err != nil {
+		log.WithFields(log.Fields{
+			"process": "agreement",
+			"error":   err,
+		}).Errorln("could not marshal agreement event")
+		return
+	}
+
+	b.publisher.Publish(msg.AgreementEventTopic, buf)
 }

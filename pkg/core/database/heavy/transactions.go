@@ -5,14 +5,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 
+	"github.com/bwesterb/go-ristretto"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/utils"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
@@ -43,6 +44,8 @@ var (
 	TxIDPrefix           = []byte{0x04}
 	KeyImagePrefix       = []byte{0x05}
 	CandidateBlockPrefix = []byte{0x06}
+	StatePrefix          = []byte{0x07}
+	OutputKeyPrefix      = []byte{0x08}
 )
 
 type transaction struct {
@@ -68,7 +71,7 @@ type transaction struct {
 //
 // It is assumed that StoreBlock would be called much less times than Fetch*
 // APIs. Based on that, extra indexing data is put to provide fast-read lookups
-func (t transaction) StoreBlock(block *block.Block) error {
+func (t transaction) StoreBlock(b *block.Block) error {
 
 	if t.batch == nil {
 		// t.batch is initialized only on a open, read-write transaction
@@ -76,8 +79,8 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		return errors.New("StoreBlock cannot be called on read-only transaction")
 	}
 
-	if len(block.Header.Hash) == 0 {
-		return fmt.Errorf("empty chain block hash")
+	if len(b.Header.Hash) != block.HeaderHashSize {
+		return fmt.Errorf("header hash size is %d but it must be %d", len(b.Header.Hash), block.HeaderHashSize)
 	}
 
 	// Schema Key = HeaderPrefix + block.header.hash
@@ -85,21 +88,21 @@ func (t transaction) StoreBlock(block *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := block.Header.Encode(blockHeaderFields); err != nil {
+	if err := b.Header.Encode(blockHeaderFields); err != nil {
 		return err
 	}
 
-	key := append(HeaderPrefix, block.Header.Hash...)
+	key := append(HeaderPrefix, b.Header.Hash...)
 	value := blockHeaderFields.Bytes()
 	t.put(key, value)
 
-	if len(block.Txs) > math.MaxUint32 {
+	if len(b.Txs) > math.MaxUint32 {
 		return errors.New("too many transactions")
 	}
 
 	// Put block transaction data. A KV pair per a single transaction is added
 	// into the store
-	for i, tx := range block.Txs {
+	for i, tx := range b.Txs {
 
 		txID, err := tx.CalculateHash()
 
@@ -118,9 +121,9 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		//
 		// For the retrival of transactions data by block.header.hash
 
-		key := append(TxPrefix, block.Header.Hash...)
+		key := append(TxPrefix, b.Header.Hash...)
 		key = append(key, txID...)
-		value, err := t.encodeBlockTx(tx, uint32(i))
+		value, err := utils.EncodeBlockTx(tx, uint32(i))
 
 		if err != nil {
 			return err
@@ -135,7 +138,7 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		//
 		// For the retrival of a single transaction by TxId
 
-		t.put(append(TxIDPrefix, txID...), block.Header.Hash)
+		t.put(append(TxIDPrefix, txID...), b.Header.Hash)
 
 		// Schema
 		//
@@ -145,6 +148,16 @@ func (t transaction) StoreBlock(block *block.Block) error {
 		// To make FetchKeyImageExists functioning
 		for _, input := range tx.StandardTX().Inputs {
 			t.put(append(KeyImagePrefix, input.KeyImage...), txID)
+		}
+
+		// Schema
+		//
+		// Key = OutputKeyPrefix + tx.output.PublicKey
+		// Value = tx.output.PublicKey
+		//
+		// To make FetchOutputKey functioning
+		for _, output := range tx.StandardTX().Outputs {
+			t.put(append(OutputKeyPrefix, output.DestKey...), output.DestKey)
 		}
 
 	}
@@ -157,175 +170,23 @@ func (t transaction) StoreBlock(block *block.Block) error {
 	heightBuf := new(bytes.Buffer)
 
 	// Append height value
-	if err := t.writeUint64(heightBuf, block.Header.Height); err != nil {
+	if err := utils.WriteUint64(heightBuf, b.Header.Height); err != nil {
 		return err
 	}
 
 	key = append(HeightPrefix, heightBuf.Bytes()...)
-	value = block.Header.Hash
+	value = b.Header.Hash
+	t.put(key, value)
+
+	// Key = StatePrefix
+	// Value = Hash(chain tip)
+	//
+	// To support fetching  blockchain tip
+	key = StatePrefix
+	value = b.Header.Hash
 	t.put(key, value)
 
 	return nil
-}
-
-// StoreCandidateBlock stores a candidate block to be proposed in next consensus
-// round Always overwrites lastly stored candidate block
-func (t transaction) StoreCandidateBlock(block *block.Block) error {
-
-	// Schema Key = CandidateBlockPrefix
-	//
-	// Value = block.Encoded()
-
-	buf := new(bytes.Buffer)
-	if err := block.Encode(buf); err != nil {
-		return err
-	}
-
-	t.put(CandidateBlockPrefix, buf.Bytes())
-
-	return nil
-}
-
-// FetchCandidateBlock Fetch lastly stored candidate block
-func (t transaction) FetchCandidateBlock() (*block.Block, error) {
-
-	value, err := t.snapshot.Get(CandidateBlockPrefix, nil)
-	if err != nil {
-		if err == leveldb.ErrNotFound {
-			// overwrite error message
-			err = database.ErrBlockNotFound
-		}
-		return nil, err
-	}
-
-	b := new(block.Block)
-	if err := b.Decode(bytes.NewReader(value)); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// encodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
-func (t transaction) encodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) {
-
-	buf := new(bytes.Buffer)
-
-	// Write tx type as first field
-	if err := buf.WriteByte(byte(tx.Type())); err != nil {
-		return nil, err
-	}
-
-	// Write index value as second field.
-
-	// golevedb is ordering keys lexicographically. That said, the order of the
-	// stored KV is not the order of inserting
-	if err := t.writeUint32(buf, txIndex); err != nil {
-		return nil, err
-	}
-
-	// Write transactions.Transaction bytes
-	err := tx.Encode(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-// decodeBlockTx tries to decode a transactions.Transaction of `typeFilter` type from `data`
-// if typeFilter is database.AnyTxType then no filter is applied
-func (t transaction) decodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Transaction, uint32, error) {
-
-	txIndex := uint32(math.MaxUint32)
-
-	var tx transactions.Transaction
-	reader := bytes.NewReader(data)
-
-	// Peak the type from the first byte
-	typeBytes, err := reader.ReadByte()
-	if err != nil {
-		return nil, txIndex, err
-	}
-	txReadType := transactions.TxType(typeBytes)
-
-	if typeFilter != database.AnyTxType {
-		// Do not read and decode the rest of the bytes if the transaction type
-		// is not same as typeFilter
-		if typeFilter != txReadType {
-			return nil, txIndex, fmt.Errorf("tx of type %d not found", typeFilter)
-		}
-	}
-
-	// Read tx index field
-	if err := t.readUint32(reader, &txIndex); err != nil {
-		return nil, txIndex, err
-	}
-
-	switch txReadType {
-	case transactions.StandardType:
-		tx = &transactions.Standard{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.TimelockType:
-		tx = &transactions.TimeLock{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.BidType:
-		tx = &transactions.Bid{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.StakeType:
-		tx = &transactions.Stake{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.CoinbaseType:
-		tx = &transactions.Coinbase{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	default:
-		return nil, txIndex, fmt.Errorf("unknown transaction type: %d", txReadType)
-	}
-
-	return tx, txIndex, nil
-}
-
-// writeUint32 Tx utility to use a Tx byteOrder on internal encoding
-func (t transaction) writeUint32(w io.Writer, value uint32) error {
-	var b [4]byte
-	byteOrder.PutUint32(b[:], value)
-	_, err := w.Write(b[:])
-	return err
-}
-
-// ReadUint32 will read four bytes and convert them to a uint32 from the Tx
-// byteOrder. The result is put into v.
-func (t transaction) readUint32(r io.Reader, v *uint32) error {
-	var b [4]byte
-	n, err := r.Read(b[:])
-	if err != nil || n != len(b) {
-		return err
-	}
-	*v = byteOrder.Uint32(b[:])
-	return nil
-}
-
-// writeUint64 Tx utility to use a common byteOrder on internal encoding
-func (t transaction) writeUint64(w io.Writer, value uint64) error {
-	var b [8]byte
-	byteOrder.PutUint64(b[:], value)
-	_, err := w.Write(b[:])
-	return err
 }
 
 // Commit writes a batch to LevelDB storage. See also fsyncEnabled variable
@@ -371,6 +232,50 @@ func (t transaction) FetchBlockExists(hash []byte) (bool, error) {
 	return exists, err
 }
 
+// FetchOutputExists checks if an output exists in the db
+func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
+	key := append(OutputKeyPrefix, destkey...)
+	exists, err := t.snapshot.Has(key, nil)
+
+	// goleveldb returns nilIfNotFound
+	// see also nilIfNotFound in leveldb/db.go
+	if !exists && err == nil {
+		// overwrite error message
+		err = database.ErrBlockNotFound
+	}
+
+	return exists, err
+}
+
+// FetchDecoys iterates over the outputs and fetches `numDecoys` amount
+// of output public keys
+func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
+	scanFilter := OutputKeyPrefix
+
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
+	defer iterator.Release()
+
+	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
+	var i int
+
+	for iterator.Next() {
+		value := iterator.Value()
+
+		var p ristretto.Point
+		var pBytes [32]byte
+		copy(pBytes[:], value)
+		p.SetBytes(&pBytes)
+
+		decoysPubKeys = append(decoysPubKeys, p)
+		if i == numDecoys {
+			break
+		}
+		i++
+	}
+
+	return decoysPubKeys
+}
+
 func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 
 	key := append(HeaderPrefix, hash...)
@@ -407,7 +312,7 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 
 	for iterator.Next() {
 		value := iterator.Value()
-		tx, txIndex, err := t.decodeBlockTx(value, database.AnyTxType)
+		tx, txIndex, err := utils.DecodeBlockTx(value, database.AnyTxType)
 
 		if err != nil {
 			return nil, err
@@ -442,7 +347,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 
 	// Get height bytes
 	heightBuf := new(bytes.Buffer)
-	if err := t.writeUint64(heightBuf, height); err != nil {
+	if err := utils.WriteUint64(heightBuf, height); err != nil {
 		return nil, err
 	}
 
@@ -516,7 +421,7 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 
 		// TxID matched. Decode the Tx data
 		value := iterator.Value()
-		tx, txIndex, err := t.decodeBlockTx(value, database.AnyTxType)
+		tx, txIndex, err := utils.DecodeBlockTx(value, database.AnyTxType)
 
 		if err != nil {
 			return nil, txIndex, hashHeader, err
@@ -547,4 +452,143 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	}
 
 	return true, txID, nil
+}
+
+// StoreCandidateBlock stores a candidate block to be proposed in next consensus
+// round. it overwrites an entry of block with same height
+func (t transaction) StoreCandidateBlock(b *block.Block) error {
+
+	// Schema Key = CandidateBlockPrefix + block.header.Hash + block.header.height
+	//
+	// Value = block.Encoded()
+
+	// Append height value
+	heightBuf := new(bytes.Buffer)
+	if err := utils.WriteUint64(heightBuf, b.Header.Height); err != nil {
+		return err
+	}
+
+	if heightBuf.Len() != block.HeightSize {
+		panic("invalid height buffer")
+	}
+
+	key := append(CandidateBlockPrefix, b.Header.Hash...)
+	key = append(key, heightBuf.Bytes()...)
+
+	buf := new(bytes.Buffer)
+	if err := b.Encode(buf); err != nil {
+		return err
+	}
+
+	t.put(key, buf.Bytes())
+
+	return nil
+}
+
+// FetchCandidateBlock fetches a candidate block by hash
+func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
+
+	// Fetch all stored candidate blocks
+	scanFilter := append(CandidateBlockPrefix, hash...)
+
+	// as the key is composed of CandidateBlockPrefix + blockHash + blockHeight,
+	// here it's needed to use a search by prefix
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
+	defer iterator.Release()
+
+	if iterator.First() {
+		b := block.NewBlock()
+		if err := b.Decode(bytes.NewReader(iterator.Value())); err != nil {
+			return nil, err
+		}
+
+		return b, nil
+	}
+
+	return nil, database.ErrBlockNotFound
+}
+
+// DeleteCandidateBlocks deletes all candidate blocks if maxHeight is not 0, it
+// deletes only blocks with a height lower than maxHeight or equal.
+// Returns number of deleted candidate blocks
+func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
+
+	// Fetch all stored candidate blocks
+	scanFilter := append(CandidateBlockPrefix)
+
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
+	defer iterator.Release()
+
+	var count uint32
+	for iterator.Next() {
+
+		// Extract height from the key to avoid the need of block decoding
+		if maxHeight != 0 {
+			reader := bytes.NewReader(iterator.Key())
+			buf := make([]byte, block.HeightSize)
+
+			offset := int64(len(scanFilter) + block.HeaderHashSize)
+			if _, err := reader.ReadAt(buf[:], offset); err != nil {
+				return count, fmt.Errorf("malformed height data: %s", err.Error())
+			}
+
+			height := byteOrder.Uint64(buf[:])
+
+			if height <= maxHeight {
+				t.batch.Delete(iterator.Key())
+				count++
+			}
+		} else {
+			t.batch.Delete(iterator.Key())
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
+	header, err := t.FetchBlockHeader(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	txs, err := t.FetchBlockTxs(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return &block.Block{
+		Header: header,
+		Txs:    txs,
+	}, nil
+}
+
+func (t transaction) FetchState() (*database.State, error) {
+	key := StatePrefix
+	value, err := t.snapshot.Get(key, nil)
+	if err == leveldb.ErrNotFound || len(value) == 0 {
+		// overwrite error message
+		err = database.ErrStateNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &database.State{TipHash: value}, nil
+}
+
+func (t transaction) FetchCurrentHeight() (uint64, error) {
+	state, err := t.FetchState()
+	if err != nil {
+		return 0, err
+	}
+
+	header, err := t.FetchBlockHeader(state.TipHash)
+	if err != nil {
+		return 0, err
+	}
+
+	return header.Height, nil
 }

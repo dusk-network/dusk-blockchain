@@ -38,6 +38,7 @@ func incrementIndex(index *uint32, length int) {
 	if !atomic.CompareAndSwapUint32(index, uint32(length), 0) {
 		atomic.AddUint32(index, 1)
 	}
+	runtime.Gosched()
 }
 
 // NewConsumer returns a Consumer, which can read from the passed Buffer.
@@ -54,11 +55,11 @@ func (c *Consumer) Consume() ([]byte, bool) {
 			found = false
 		}
 
-		runtime.Gosched()
 		incrementIndex(&c.readIndex, len(c.ring.items)-1)
 		return b, found
 	}
 
+	runtime.Gosched()
 	return nil, true
 }
 

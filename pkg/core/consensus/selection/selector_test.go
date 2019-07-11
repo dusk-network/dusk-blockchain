@@ -2,6 +2,7 @@ package selection_test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -88,6 +89,44 @@ func TestStopSelector(t *testing.T) {
 	}
 }
 
+func TestTimeOutVariance(t *testing.T) {
+	eb := wire.NewEventBus()
+	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
+	// subscribe to receive a result
+	bestScoreChan := make(chan *bytes.Buffer, 2)
+	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
+
+	// Update round to start the selector
+	consensus.UpdateRound(eb, 1)
+	// measure time it takes for timer to run out
+	start := time.Now()
+	sendMockEvent(eb)
+
+	// wait for result
+	<-bestScoreChan
+	elapsed1 := time.Now().Sub(start)
+
+	// publish a regeneration message, which should double the timer
+	publishRegeneration(eb)
+	start = time.Now()
+
+	sendMockEvent(eb)
+
+	// wait for result again
+	<-bestScoreChan
+	elapsed2 := time.Now().Sub(start)
+
+	// compare
+	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.05)
+}
+
+func publishRegeneration(eb *wire.EventBus) {
+	state := make([]byte, 9)
+	binary.LittleEndian.PutUint64(state[0:8], 1)
+	state[8] = byte(2)
+	eb.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(state))
+}
+
 func sendMockEvent(eb *wire.EventBus) {
 	eb.Publish(string(topics.Score), bytes.NewBuffer([]byte("foo")))
 }
@@ -111,9 +150,10 @@ func (m *mockScoreHandler) Marshal(b *bytes.Buffer, ev wire.Event) error {
 	return err
 }
 
-func (m *mockScoreHandler) UpdateBidList(bL user.BidList) {}
-func (m *mockScoreHandler) LowerThreshold()               {}
-func (m *mockScoreHandler) ResetThreshold()               {}
+func (m *mockScoreHandler) UpdateBidList(bL user.Bid)      {}
+func (m *mockScoreHandler) RemoveExpiredBids(round uint64) {}
+func (m *mockScoreHandler) LowerThreshold()                {}
+func (m *mockScoreHandler) ResetThreshold()                {}
 
 func newMockHandler() consensus.EventHandler {
 	var sender []byte

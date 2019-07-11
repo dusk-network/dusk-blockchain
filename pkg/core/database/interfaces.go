@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 
+	"github.com/bwesterb/go-ristretto"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
@@ -19,6 +20,8 @@ var (
 	ErrTxNotFound = errors.New("database: transaction not found")
 	// ErrBlockNotFound returned on a block lookup by hash or height
 	ErrBlockNotFound = errors.New("database: block not found")
+	// ErrStateNotFound returned on missing state db entry
+	ErrStateNotFound = errors.New("database: state not found")
 
 	// AnyTxType is used as a filter value on FetchBlockTxByHash
 	AnyTxType = transactions.TxType(math.MaxUint8)
@@ -57,22 +60,37 @@ type Transaction interface {
 	FetchBlockTxByHash(txID []byte) (tx transactions.Transaction, txIndex uint32, blockHeaderHash []byte, err error)
 	FetchBlockHashByHeight(height uint64) ([]byte, error)
 	FetchBlockExists(hash []byte) (bool, error)
+	// Fetch chain state information (chain tip hash)
+	FetchState() (*State, error)
 
 	// Check if an input keyImage is already stored. If succeeds, it returns
 	// also txID the input belongs to
 	FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error)
 
-	// Fetch lastly stored candidate block
-	FetchCandidateBlock() (*block.Block, error)
+	// Fetch a candidate block by hash
+	FetchCandidateBlock(hash []byte) (*block.Block, error)
 
 	// Read-write transactions
 	// Store the next chain block in a append-only manner
 	// Overwrites only if block with same hash already stored
 	StoreBlock(block *block.Block) error
 
-	// Store a candidate block to be proposed in next consensus round
-	// Always overwrites lastly stored candidate block
+	// StoreCandidateBlock stores a candidate block to be proposed in next
+	// consensus round.
 	StoreCandidateBlock(block *block.Block) error
+
+	// DeleteCandidateBlocks deletes all candidate blocks. If maxHeight is not
+	// 0, it deletes only blocks with a height lower than maxHeight or equal. It
+	// returns number of deleted candidate blocks
+	DeleteCandidateBlocks(maxHeight uint64) (uint32, error)
+
+	FetchBlock(hash []byte) (*block.Block, error)
+
+	FetchCurrentHeight() (uint64, error)
+
+	FetchDecoys(numDecoys int) []ristretto.Point
+
+	FetchOutputExists(destkey []byte) (bool, error)
 
 	// Atomic storage
 	Commit() error
@@ -96,4 +114,10 @@ type DB interface {
 	Update(fn func(t Transaction) error) error
 
 	Close() error
+}
+
+// State represents a single db entry that provides chain metadata. This
+// includes currently only chain tip hash but could be extended at later stage
+type State struct {
+	TipHash []byte
 }

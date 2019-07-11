@@ -1,11 +1,15 @@
 package verifiers
 
 import (
+	"bytes"
 	"fmt"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/pkg/errors"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
 )
 
@@ -42,6 +46,10 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 		return errors.New("invalid transaction type")
 	}
 
+	if tx.Fee < uint64(config.MinFee) {
+		return errors.New("fee too low")
+	}
+
 	// Inputs - must contain at least one
 	if len(tx.Inputs) == 0 {
 		return errors.New("transaction must contain atleast one input")
@@ -63,10 +71,28 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 	}
 
 	// Rangeproof - should be valid
-	if err := checkRangeProof(rangeproof.Proof{}); err != nil {
-		return err
-	}
+	// rp := rangeproof.Proof{}
+	// buf := bytes.NewReader(tx.RangeProof)
+	// err := rp.Decode(buf, true)
+	// if err != nil {
+	// 	return err
+	// }
 
+	// var commitments []pedersen.Commitment
+	// for _, output := range tx.Outputs {
+	// 	var comm pedersen.Commitment
+
+	// 	commBuff := bytes.NewReader(output.Commitment)
+	// 	err = comm.Decode(commBuff)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	commitments = append(commitments, comm)
+	// }
+
+	// if err := checkRangeProof(rp); err != nil {
+	// 	return err
+	// }
 	// KeyImage - should not be present in the database
 	if err := checkTXDoubleSpent(db, tx.Inputs); err != nil {
 		return err
@@ -101,6 +127,18 @@ func VerifyCoinbase(txIndex uint64, tx *transactions.Coinbase) error {
 	if txIndex != 0 {
 		return errors.New("coinbase transaction is not in the first position")
 	}
+
+	if len(tx.Rewards) != 1 {
+		return fmt.Errorf("coinbase transaction must include 1 reward output")
+	}
+
+	// Ensure the reward is the fixed one
+	rewardScalar := ristretto.Scalar{}
+	rewardScalar.UnmarshalBinary(tx.Rewards[0].EncryptedAmount)
+	if rewardScalar.BigInt().Uint64() != config.GeneratorReward {
+		return fmt.Errorf("coinbase transaction must include a fixed reward of %d", config.GeneratorReward)
+	}
+
 	return nil
 }
 
@@ -126,38 +164,51 @@ func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.TimeLock) e
 }
 
 func checkLockTimeValid(lockTime, blockTime uint64) error {
-	if lockTime >= transactions.TimeLockBlockZero {
-		return checkLockValidHeight(lockTime - transactions.TimeLockBlockZero)
-	}
-	return checkLockValidTime(lockTime, blockTime)
-}
-
-func checkLockValidHeight(lockHeight uint64) error {
-	return nil
-
-	// TODO: @Kev Seems lockHeight is expected here but checkLockTimeValid accepts UnixTime not height
-	// nextBlockHeight := PrevBlock.Header.Height + 1
-	var nextBlockHeight uint64 = 0
-	if lockHeight < nextBlockHeight {
-		return fmt.Errorf("invalid lock height, lock expired at height %d , it is now height %d", lockHeight, nextBlockHeight)
-	}
-	return nil
-}
-
-func checkLockValidTime(lockTime, nextBlockTime uint64) error {
-	if lockTime < nextBlockTime {
-		return fmt.Errorf("invalid lock time, lock expired at time %d , block time is approx. now %d", lockTime, nextBlockTime)
+	if lockTime > transactions.MaxLockTime {
+		return errors.New("timelock greater than MaxTimeLock")
 	}
 	return nil
 }
 
 func checkRangeProof(p rangeproof.Proof) error {
-	return nil
+	_, err := rangeproof.Verify(p)
+	return err
 }
 
 // checks that the transaction has not been spent by checking the database for that key image
 // returns nil if item not in database
 func checkTXDoubleSpent(db database.DB, inputs transactions.Inputs) error {
+
+	err := db.View(func(t database.Transaction) error {
+		for _, input := range inputs {
+			// Decode signature
+			var sig mlsag.Signature
+			buf := bytes.NewReader(input.Signature)
+			err := sig.Decode(buf, true)
+			if err != nil {
+				return err
+			}
+
+			// Check First key in verification is valid
+			for _, keyV := range sig.PubKeys {
+				key := keyV.OutputKey()
+				exists, err := t.FetchOutputExists(key.Bytes())
+				if err != nil {
+					return err
+				}
+				if !exists {
+					return errors.New("This key is not a previous output ")
+				}
+			}
+
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
 	return db.View(func(t database.Transaction) error {
 		for _, input := range inputs {
 			exists, txID, _ := t.FetchKeyImageExists(input.KeyImage)

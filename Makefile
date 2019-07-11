@@ -2,7 +2,7 @@
 PROJECT_NAME := "dusk-go"
 PKG := "gitlab.dusk.network/dusk-core/$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
-TEST_LIST := $(shell go list ${PKG}/... | grep -v /eventmon/monitor/)
+TEST_LIST := $(shell go list ${PKG}/...)
 #TEST_FLAGS := "-count=1"
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 .PHONY: all dep build clean test coverage coverhtml lint
@@ -10,7 +10,7 @@ all: build
 lint: ## Lint the files
 	@golint -set_exit_status ${PKG_LIST}
 test: ## Run unittests
-	@go test  -short ${TEST_LIST}
+	@go test  -p 1 -short ${TEST_LIST}
 race: dep ## Run data race detector
 	@go test ${TEST_FLAGS} -race -v ${TEST_LIST}
 coverage: ## Generate global code coverage report

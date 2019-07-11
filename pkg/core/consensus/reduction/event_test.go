@@ -87,7 +87,9 @@ func TestSign(t *testing.T) {
 	assert.NotNil(t, red.SignedHash)
 
 	sig := make([]byte, 64)
+	pk := make([]byte, 32)
 	assert.NoError(t, encoding.Read512(signed, &sig))
+	assert.NoError(t, encoding.Read256(signed, &pk))
 	assert.True(t, ed25519.Verify(*k.EdPubKey, signed.Bytes(), sig))
 
 	ev := reduction.New()
@@ -108,7 +110,9 @@ func TestSignBuffer(t *testing.T) {
 
 	// verifying the ED25519 signature
 	sig := make([]byte, 64)
+	pk := make([]byte, 32)
 	assert.NoError(t, encoding.Read512(b, &sig))
+	assert.NoError(t, encoding.Read256(b, &pk))
 	assert.True(t, ed25519.Verify(*k.EdPubKey, b.Bytes(), sig))
 
 	ev, err := reduction.NewUnMarshaller().Deserialize(b)

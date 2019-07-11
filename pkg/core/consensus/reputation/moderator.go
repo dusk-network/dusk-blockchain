@@ -3,6 +3,7 @@ package reputation
 import (
 	"bytes"
 	"encoding/hex"
+	"sync"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
@@ -24,45 +25,59 @@ type Filter interface {
 
 type moderator struct {
 	publisher wire.EventPublisher
+	lock      sync.RWMutex
 	strikes   map[string]uint8
 	round     uint64
 
-	roundChan    <-chan uint64
-	absenteeChan <-chan absentees
+	roundChan <-chan uint64
 }
 
 // Launch creates a component that tallies strikes for provisioners.
 func Launch(eventBroker wire.EventBroker) {
 	moderator := newModerator(eventBroker)
+	eventBroker.SubscribeCallback(msg.AbsenteesTopic, moderator.strikeAbsentees)
 	go moderator.listen()
 }
 
 func newModerator(eventBroker wire.EventBroker) *moderator {
 	return &moderator{
-		publisher:    eventBroker,
-		strikes:      make(map[string]uint8),
-		roundChan:    consensus.InitRoundUpdate(eventBroker),
-		absenteeChan: initAbsenteeCollector(eventBroker),
+		publisher: eventBroker,
+		strikes:   make(map[string]uint8),
+		roundChan: consensus.InitRoundUpdate(eventBroker),
 	}
 }
 
+// Listen for round updates.
 func (m *moderator) listen() {
 	for {
 		select {
 		case round := <-m.roundChan:
 			// clean strikes map on round update
+			m.lock.Lock()
 			m.strikes = make(map[string]uint8)
 			m.round = round
-		case absentees := <-m.absenteeChan:
-			if absentees.round == m.round {
-				log.WithFields(log.Fields{
-					"process": "reputation",
-					"round":   m.round,
-				}).Debugln("striking absentees")
-				m.addStrikes(absentees.pks)
-			}
+			m.lock.Unlock()
 		}
 	}
+}
+
+func (m *moderator) strikeAbsentees(b *bytes.Buffer) error {
+	absentees, err := decodeAbsentees(b)
+	if err != nil {
+		return err
+	}
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if absentees.round == m.round {
+		log.WithFields(log.Fields{
+			"process": "reputation",
+			"round":   m.round,
+		}).Debugln("striking absentees")
+		m.addStrikes(absentees.pks)
+	}
+
+	return nil
 }
 
 // Increase the strike count for the `absentee` by one. If the amount of strikes

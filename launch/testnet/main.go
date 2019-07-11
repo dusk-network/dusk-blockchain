@@ -1,15 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 )
 
 func initLog(file *os.File) {
@@ -24,7 +26,6 @@ func initLog(file *os.File) {
 	}
 
 	if file != nil {
-		os.Stdout = file
 		log.SetOutput(file)
 	} else {
 		log.SetOutput(os.Stdout)
@@ -32,10 +33,11 @@ func initLog(file *os.File) {
 }
 
 func main() {
-
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
+	// TODO: use logging for this?
+	fmt.Fprintln(os.Stdout, "initializing node...")
 	// Loading all node configurations. Fail-fast if critical error occurs
 	if err := cfg.Load(); err != nil {
 		fmt.Printf("%v\n", err)
@@ -64,14 +66,12 @@ func main() {
 
 	// Set up profiling tools.
 	profile, err := newProfile()
-
 	if err != nil {
 		// Assume here if tools are enabled but they fail on loading then it's better
 		// to fix the error or just disable them.
 		log.Errorf("Profiling tools error: %s", err.Error())
 		return
 	}
-
 	defer profile.close()
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
@@ -95,34 +95,18 @@ func main() {
 		}
 	}
 
-	round := joinConsensus(connMgr, srv, ips)
-	srv.StartConsensus(round)
+	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
+
+	// Start interactive shell
+	go cli.Start(srv.eventBus, srv.rpcBus)
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
 	// server.
 	<-interrupt
 
+	// Graceful shutdown of listening components
+	srv.eventBus.Publish(msg.QuitTopic, new(bytes.Buffer))
+
 	log.WithField("prefix", "main").Info("Terminated")
-}
-
-func joinConsensus(connMgr *connmgr, srv *Server, ips []string) uint64 {
-	// TODO: this needs to be adjusted to happen from an accepted block, or something similar
-	// if we are the first, initialize consensus on round 1
-	if strings.Contains(ips[0], "noip") {
-		log.WithField("Process", "main").Infoln("Starting consensus from scratch")
-		return uint64(1)
-	}
-
-	// if height is not 0, init consensus on 2 rounds after it
-	// +1 because the round is always height + 1
-	// +1 because we dont want to get stuck on a round thats currently happening
-	// if srv.chain.PrevBlock.Header.Height != 0 {
-	// 	round := srv.chain.PrevBlock.Header.Height + 2
-	// 	log.WithField("prefix", "main").Infof("Starting consensus from round %d\n", round)
-	// 	return round
-	// }
-
-	log.WithField("prefix", "main").Infoln("Starting consensus from scratch")
-	return uint64(1)
 }

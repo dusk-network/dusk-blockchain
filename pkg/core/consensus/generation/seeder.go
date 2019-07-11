@@ -4,23 +4,29 @@ import (
 	"bytes"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
 )
 
 type seeder struct {
 	lock  sync.RWMutex
 	round uint64
 	seed  []byte
+	keys  user.Keys
 }
 
-func (s *seeder) GenerateSeed(round uint64) []byte {
+func (s *seeder) GenerateSeed(round uint64, prevSeed []byte) error {
 	// TODO: make an actual seed by signing the previous block seed
-	seed, _ := crypto.RandEntropy(33)
 	s.lock.Lock()
-	s.seed = seed
+	seed, err := bls.Sign(s.keys.BLSSecretKey, s.keys.BLSPubKey, prevSeed)
+	if err != nil {
+		return err
+	}
+	compSeed := seed.Compress()
+	s.seed = compSeed
 	s.round = round
 	s.lock.Unlock()
-	return seed
+	return nil
 }
 
 func (s *seeder) LatestSeed() []byte {

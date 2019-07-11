@@ -13,33 +13,37 @@ type Input struct {
 	// KeyImage is the image of the key that is being used to
 	// sign the transaction
 	KeyImage []byte // 32 bytes
-	// TxID is the transaction identifier of the transaction
-	// to which this input was an output.
-	TxID []byte // 32 bytes
-	// Index is the position in the current transaction
-	// that this input is placed at. Index 0 signifies the coinbase transaction.
-	Index uint8 // 1 byte
+	// PubKey is the one-time public key that this output was created with.
+	// It acts as a output identifer because they can only be used once
+	PubKey []byte // 32 bytes
+	// PseudoCommitment acts as the dummy commitment used to construct the
+	// intermediate ring signatures
+	PseudoCommitment []byte // 32 bytes
 	// Signature is the ring signature that is used
 	// to sign the transaction
 	Signature []byte // ~2500 bytes
 }
 
 // NewInput constructs a new Input from the passed parameters.
-func NewInput(keyImage []byte, txID []byte, index uint8, sig []byte) (*Input, error) {
+func NewInput(keyImage []byte, pubKey, pseudoComm, sig []byte) (*Input, error) {
 
 	if len(keyImage) != 32 {
 		return nil, errors.New("key image does not equal 32 bytes")
 	}
 
-	if len(txID) != 32 {
-		return nil, errors.New("txID does not equal 32 bytes")
+	if len(pubKey) != 32 {
+		return nil, errors.New("pubKey does not equal 32 bytes")
+	}
+
+	if len(pseudoComm) != 32 {
+		return nil, errors.New("Pseudo Commitment  does not equal 32 bytes")
 	}
 
 	return &Input{
-		KeyImage:  keyImage,
-		TxID:      txID,
-		Index:     index,
-		Signature: sig,
+		KeyImage:         keyImage,
+		PubKey:           pubKey,
+		PseudoCommitment: pseudoComm,
+		Signature:        sig,
 	}, nil
 }
 
@@ -49,11 +53,11 @@ func (i *Input) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.Write256(w, i.TxID); err != nil {
+	if err := encoding.Write256(w, i.PubKey); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint8(w, i.Index); err != nil {
+	if err := encoding.Write256(w, i.PseudoCommitment); err != nil {
 		return err
 	}
 
@@ -70,11 +74,11 @@ func (i *Input) Decode(r io.Reader) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &i.TxID); err != nil {
+	if err := encoding.Read256(r, &i.PubKey); err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint8(r, &i.Index); err != nil {
+	if err := encoding.Read256(r, &i.PseudoCommitment); err != nil {
 		return err
 	}
 
@@ -95,16 +99,13 @@ func (i *Input) Equals(in *Input) bool {
 		return false
 	}
 
-	if !bytes.Equal(i.TxID, in.TxID) {
+	if !bytes.Equal(i.PubKey, in.PubKey) {
 		return false
 	}
 
-	if !bytes.Equal(i.Signature, in.Signature) {
+	if !bytes.Equal(i.PseudoCommitment, in.PseudoCommitment) {
 		return false
 	}
 
-	// Omit Index equality; same input could be at two different
-	// places in a tx
-
-	return true
+	return bytes.Equal(i.Signature, in.Signature)
 }

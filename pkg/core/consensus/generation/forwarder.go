@@ -18,6 +18,7 @@ type forwarder struct {
 	publisher      wire.EventPublisher
 	blockGenerator BlockGenerator
 	threshold      *consensus.Threshold
+	prevBlock      block.Block
 }
 
 func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator) *forwarder {
@@ -28,18 +29,24 @@ func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator) 
 	}
 }
 
+func (f *forwarder) setPrevBlock(blk block.Block) {
+	f.prevBlock = blk
+}
+
 func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed []byte) error {
 	// if our score is too low, don't bother
 	if !f.threshold.Exceeds(proof.Score) {
 		return errors.New("proof score too low")
 	}
 
-	blk, err := f.blockGenerator.GenerateBlock(round, seed)
+	blk, err := f.blockGenerator.GenerateBlock(round, seed, proof.Proof, proof.Score, f.prevBlock.Header.Hash)
 	if err != nil {
 		return err
 	}
 
-	if err := blk.SetHash(); err != nil {
+	// Retrieve and append the verified transactions from Mempool
+	blockBytes := new(bytes.Buffer)
+	if err = blk.Encode(blockBytes); err != nil {
 		return err
 	}
 
@@ -49,6 +56,8 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 		Proof:         proof.Proof,
 		Z:             proof.Z,
 		BidListSubset: proof.BinaryBidList,
+		PrevHash:      f.prevBlock.Header.Hash,
+		Certificate:   f.prevBlock.Header.Certificate,
 		Seed:          seed,
 		VoteHash:      blk.Header.Hash,
 	}

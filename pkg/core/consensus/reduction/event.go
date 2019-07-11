@@ -92,10 +92,8 @@ func (u *UnMarshaller) UnmarshalVoteSet(r *bytes.Buffer) ([]wire.Event, error) {
 
 	evs := make([]wire.Event, length)
 	for i := uint64(0); i < length; i++ {
-		rev := &Reduction{
-			Header: &header.Header{},
-		}
-		if err := u.Unmarshal(r, rev); err != nil {
+		rev, err := u.Deserialize(r)
+		if err != nil {
 			return nil, err
 		}
 
@@ -154,8 +152,7 @@ func Sign(e *Reduction, keys user.Keys) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	edPubKeyBuf := new(bytes.Buffer)
-	if err := encoding.Write512(edPubKeyBuf, signature); err != nil {
+	if err := encoding.Write256(signed, keys.EdPubKeyBytes); err != nil {
 		return nil, err
 	}
 

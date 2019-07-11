@@ -20,13 +20,13 @@ type Bid struct {
 
 // NewBid will return a Bid transaction
 // Given the tx version, the locktime,the fee and M
-func NewBid(ver uint8, lock, fee uint64, M []byte) (*Bid, error) {
+func NewBid(ver uint8, lock, fee uint64, R, M []byte) (*Bid, error) {
 	if len(M) != 32 {
 		return nil, errors.New("m is not 32 bytes")
 	}
 
 	b := &Bid{
-		TimeLock: *NewTimeLock(ver, lock, fee),
+		TimeLock: *NewTimeLock(ver, lock, fee, R),
 		M:        M,
 	}
 	b.TxType = BidType

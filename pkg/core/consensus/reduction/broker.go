@@ -15,9 +15,8 @@ import (
 type (
 	// Broker is the message broker for the reduction process.
 	broker struct {
-		filter      *consensus.EventFilter
-		accumulator *consensus.Accumulator
-		reducer     *reducer
+		filter  *consensus.EventFilter
+		reducer *reducer
 
 		// utility context to group interfaces and channels to be passed around
 		ctx *context
@@ -32,20 +31,19 @@ type (
 // Launch creates and wires a broker, initiating the components that
 // have to do with Block Reduction
 func Launch(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
-	timeout time.Duration) {
+	timeout time.Duration, rpcBus *wire.RPCBus) {
 	if committee == nil {
-		committee = newReductionCommittee(eventBroker)
+		committee = newReductionCommittee(eventBroker, nil)
 	}
 
 	handler := newReductionHandler(committee, keys)
-	broker := newBroker(eventBroker, handler, timeout)
+	broker := newBroker(eventBroker, handler, timeout, rpcBus)
 	go broker.Listen()
 }
 
-func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
-	accumulator *consensus.Accumulator) *consensus.EventFilter {
+func launchReductionFilter(eventBroker wire.EventBroker, ctx *context) *consensus.EventFilter {
 
-	filter := consensus.NewEventFilter(ctx.handler, ctx.state, accumulator, true)
+	filter := consensus.NewEventFilter(ctx.handler, ctx.state, true)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
 	eventBroker.SubscribeCallback(string(topics.Reduction), filter.Collect)
 	eventBroker.RegisterPreprocessor(string(topics.Reduction), republisher, &consensus.Validator{})
@@ -53,22 +51,18 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context,
 }
 
 // newBroker will return a reduction broker.
-func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout time.Duration) *broker {
+func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout time.Duration, rpcBus *wire.RPCBus) *broker {
 	scoreChan := initBestScoreUpdate(eventBroker)
 	ctx := newCtx(handler, timeout)
-	accumulator := consensus.NewAccumulator(ctx.handler, consensus.NewAccumulatorStore())
-	filter := launchReductionFilter(eventBroker, ctx, accumulator)
+	filter := launchReductionFilter(eventBroker, ctx)
 	roundChannel := consensus.InitRoundUpdate(eventBroker)
-	stepSub := ctx.state.SubscribeStep()
 
 	return &broker{
 		roundUpdateChan: roundChannel,
 		ctx:             ctx,
 		filter:          filter,
-		accumulator:     accumulator,
 		selectionChan:   scoreChan,
-		stepChan:        stepSub.StateChan,
-		reducer:         newReducer(accumulator.CollectedVotesChan, ctx, eventBroker, accumulator),
+		reducer:         newReducer(ctx, eventBroker, filter, rpcBus),
 	}
 }
 
@@ -82,8 +76,10 @@ func (b *broker) Listen() {
 				"round":   round,
 			}).Debug("Got round update")
 			b.reducer.end()
-			b.accumulator.Clear()
+			b.reducer.lock.Lock()
 			b.filter.UpdateRound(round)
+			b.ctx.timer.ResetTimeOut()
+			b.reducer.lock.Unlock()
 		case ev := <-b.selectionChan:
 			if ev == nil {
 				log.WithFields(log.Fields{
@@ -106,10 +102,6 @@ func (b *broker) Listen() {
 				b.reducer.startReduction(make([]byte, 32))
 				b.filter.FlushQueue()
 			}
-
-		case <-b.stepChan:
-			b.accumulator.Clear()
-			b.filter.FlushQueue()
 		}
 	}
 }

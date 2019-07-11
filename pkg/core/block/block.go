@@ -2,14 +2,10 @@ package block
 
 import (
 	"io"
-	"time"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
-
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 )
 
 // Block defines a block on the Dusk blockchain.
@@ -22,45 +18,10 @@ type Block struct {
 func NewBlock() *Block {
 	return &Block{
 		Header: &Header{
-			Version: 0x00,
-			// CertImage should take up space from creation to
-			// ensure proper decoding during block collection.
-			CertHash: make([]byte, 32),
+			Version:     0x00,
+			Certificate: EmptyCertificate(),
 		},
 	}
-}
-
-// NewEmptyBlock will return a fully populated empty block, to be used
-// for consensus purposes. Use NewBlock in any other circumstance.
-func NewEmptyBlock(prevHeader *Header) (*Block, error) {
-	block := &Block{
-		Header: &Header{
-			Height: prevHeader.Height + 1,
-			// CertImage and TxRoot should take up space from creation to
-			// ensure proper decoding during block collection.
-			CertHash: make([]byte, 32),
-			TxRoot:   make([]byte, 32),
-		},
-	}
-
-	block.SetPrevBlock(prevHeader)
-
-	// Set seed to hash of previous seed
-	seedHash, err := hash.Sha3256(prevHeader.Seed)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add one empty byte for encoding purposes
-	seedHash = append(seedHash, byte(0))
-
-	block.Header.Seed = seedHash
-	block.Header.Timestamp = (time.Now().Unix())
-	if err := block.SetHash(); err != nil {
-		return nil, err
-	}
-
-	return block, nil
 }
 
 // SetPrevBlock will set all the previous block hash field from a header.
@@ -89,19 +50,6 @@ func (b *Block) SetRoot() error {
 // AddTx will add a transaction to the block.
 func (b *Block) AddTx(tx transactions.Transaction) {
 	b.Txs = append(b.Txs, tx)
-}
-
-// AddCertHash will take a hash from a Certificate and put
-// it in the block's CertHash field.
-func (b *Block) AddCertHash(cert *Certificate) error {
-	if cert.Hash == nil {
-		if err := cert.SetHash(); err != nil {
-			return err
-		}
-	}
-
-	b.Header.CertHash = cert.Hash
-	return nil
 }
 
 // Clear will empty out all the block's fields.

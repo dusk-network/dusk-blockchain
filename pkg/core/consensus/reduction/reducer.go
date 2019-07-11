@@ -11,7 +11,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -20,25 +19,23 @@ import (
 var empty struct{}
 
 type eventStopWatch struct {
-	collectedVotesChan chan []wire.Event
-	stopChan           chan struct{}
-	timer              *consensus.Timer
+	stopChan chan struct{}
+	timer    *consensus.Timer
 }
 
-func newEventStopWatch(collectedVotesChan chan []wire.Event, timer *consensus.Timer) *eventStopWatch {
+func newEventStopWatch(timer *consensus.Timer) *eventStopWatch {
 	return &eventStopWatch{
-		collectedVotesChan: collectedVotesChan,
-		stopChan:           make(chan struct{}, 1),
-		timer:              timer,
+		stopChan: make(chan struct{}, 1),
+		timer:    timer,
 	}
 }
 
-func (esw *eventStopWatch) fetch() []wire.Event {
-	timer := time.NewTimer(esw.timer.Timeout)
+func (esw *eventStopWatch) fetch(collectedVotesChan chan []wire.Event) []wire.Event {
+	timer := time.NewTimer(esw.timer.TimeOut())
 	select {
 	case <-timer.C:
 		return nil
-	case collectedVotes := <-esw.collectedVotesChan:
+	case collectedVotes := <-collectedVotesChan:
 		timer.Stop()
 		return collectedVotes
 	case <-esw.stopChan:
@@ -55,25 +52,26 @@ func (esw *eventStopWatch) stop() {
 }
 
 type reducer struct {
-	firstStep   *eventStopWatch
-	secondStep  *eventStopWatch
-	ctx         *context
-	accumulator *consensus.Accumulator
+	firstStep  *eventStopWatch
+	secondStep *eventStopWatch
+	ctx        *context
+	filter     *consensus.EventFilter
 
 	lock  sync.RWMutex
 	stale bool
 
 	publisher wire.EventPublisher
+	rpcBus    *wire.RPCBus
 }
 
-func newReducer(collectedVotesChan chan []wire.Event, ctx *context,
-	publisher wire.EventPublisher, accumulator *consensus.Accumulator) *reducer {
+func newReducer(ctx *context, publisher wire.EventPublisher, filter *consensus.EventFilter, rpcBus *wire.RPCBus) *reducer {
 	return &reducer{
-		ctx:         ctx,
-		firstStep:   newEventStopWatch(collectedVotesChan, ctx.timer),
-		secondStep:  newEventStopWatch(collectedVotesChan, ctx.timer),
-		publisher:   publisher,
-		accumulator: accumulator,
+		ctx:        ctx,
+		publisher:  publisher,
+		firstStep:  newEventStopWatch(ctx.timer),
+		secondStep: newEventStopWatch(ctx.timer),
+		filter:     filter,
+		rpcBus:     rpcBus,
 	}
 }
 
@@ -102,30 +100,57 @@ func (r *reducer) startReduction(hash []byte) {
 
 func (r *reducer) begin() {
 	log.WithField("process", "reducer").Traceln("Beginning Reduction")
-	events := r.firstStep.fetch()
+	events := r.firstStep.fetch(r.filter.Accumulator.CollectedVotesChan)
 	log.WithField("process", "reducer").Traceln("First step completed")
-	hash1 := r.extractHash(events)
-	r.lock.RLock()
-	if !r.stale {
-		// if there was a timeout, we should report nodes that did not vote
-		if events == nil {
-			r.propagateAbsentees()
-		}
-		r.ctx.state.IncrementStep()
-		if r.inCommittee() {
-			r.sendReduction(hash1)
-		}
-	}
-	r.lock.RUnlock()
+	hash := r.handleFirstResult(events)
 
-	eventsSecondStep := r.secondStep.fetch()
+	eventsSecondStep := r.secondStep.fetch(r.filter.Accumulator.CollectedVotesChan)
 	log.WithField("process", "reducer").Traceln("Second step completed")
+	r.handleSecondResult(events, eventsSecondStep, hash)
+}
+
+func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
-		if eventsSecondStep == nil {
-			r.propagateAbsentees()
+		r.ctx.state.IncrementStep()
+		r.filter.ResetAccumulator()
+		r.filter.FlushQueue()
+
+		hash := r.extractHash(events)
+		if !r.inCommittee() {
+			return hash
 		}
+
+		// If our result was not a zero value hash, we should first verify it
+		// before voting on it again
+		if !bytes.Equal(hash.Bytes(), make([]byte, 32)) {
+			req := wire.NewRequest(*hash, 5)
+			if _, err := r.rpcBus.Call(wire.VerifyCandidateBlock, req); err != nil {
+				log.WithFields(log.Fields{
+					"process": "reduction",
+					"error":   err,
+				}).Errorln("verifying the candidate block failed")
+				r.sendReduction(bytes.NewBuffer(make([]byte, 32)))
+				return hash
+			}
+		}
+
+		r.sendReduction(hash)
+		return hash
+	}
+
+	return nil
+}
+
+func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash1 *bytes.Buffer) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	if !r.stale {
+		defer r.filter.ResetAccumulator()
+		defer r.ctx.state.IncrementStep()
+		defer r.publishRegeneration()
+
 		hash2 := r.extractHash(eventsSecondStep)
 		if r.isReductionSuccessful(hash1, hash2) {
 			allEvents := append(events, eventsSecondStep...)
@@ -136,41 +161,14 @@ func (r *reducer) begin() {
 			}).Debugln("Reduction successful")
 
 			r.sendResults(allEvents)
-		} else {
-			// If we did not get a successful result, we still send a message to the
-			// agreement component so that it stays synced with everyone else.
-			r.sendResults(nil)
+			return
 		}
 
-		r.ctx.state.IncrementStep()
-		r.publishRegeneration()
+		// If we did not get a successful result, we still send a message to the
+		// agreement component so that it stays synced with everyone else.
+		r.sendResults(nil)
+		r.ctx.timer.IncreaseTimeOut()
 	}
-}
-
-func (r *reducer) propagateAbsentees() {
-	round, step := r.ctx.state.Round(), r.ctx.state.Step()
-	absentees := r.ctx.handler.FilterAbsentees(r.accumulator.All(), round, step)
-	_ = r.reportAbsentees(absentees)
-}
-
-func (r *reducer) reportAbsentees(absentees user.VotingCommittee) error {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, r.ctx.state.Round()); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarInt(buf, uint64(absentees.Len())); err != nil {
-		return err
-	}
-
-	for _, absentee := range absentees.MemberKeys() {
-		if err := encoding.WriteVarBytes(buf, absentee); err != nil {
-			return err
-		}
-	}
-
-	r.publisher.Publish(msg.AbsenteesTopic, buf)
-	return nil
 }
 
 func (r *reducer) sendReduction(hash *bytes.Buffer) {

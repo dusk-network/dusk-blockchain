@@ -43,6 +43,10 @@ func ConnectToSeeder() []string {
 	buf := make([]byte, 2048)
 	if _, err := conn.Read(buf); err != nil {
 		// panic(err) <- if the seeder return error == EOF,  return nil, dont panic
+		log.WithFields(log.Fields{
+			"process": "main",
+			"error":   err,
+		}).Errorln("error reading IPs from voucher seeder")
 		return nil
 	}
 
