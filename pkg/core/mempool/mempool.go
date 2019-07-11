@@ -339,8 +339,10 @@ func (m Mempool) onGetMempoolTxs(r wire.Req) {
 				outputTxs = append(outputTxs, t.tx)
 				return nil
 			}
-		} else {
-			// Non-filter scan
+		} else if len(outputTxs) < 50 {
+			// Non-filter scan for max 50 transactions.
+			// TODO: this should be properly determined ASAP (maybe by adding size checks that determine
+			// the amount of kB a transaction takes up)
 			outputTxs = append(outputTxs, t.tx)
 		}
 
