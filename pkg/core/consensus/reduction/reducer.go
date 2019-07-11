@@ -11,7 +11,6 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
@@ -114,11 +113,6 @@ func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
-		// if there was a timeout, we should report nodes that did not vote
-		if events == nil {
-			r.propagateAbsentees()
-		}
-
 		r.ctx.state.IncrementStep()
 		r.filter.ResetAccumulator()
 		r.filter.FlushQueue()
@@ -157,10 +151,6 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 		defer r.ctx.state.IncrementStep()
 		defer r.publishRegeneration()
 
-		if eventsSecondStep == nil {
-			r.propagateAbsentees()
-		}
-
 		hash2 := r.extractHash(eventsSecondStep)
 		if r.isReductionSuccessful(hash1, hash2) {
 			allEvents := append(events, eventsSecondStep...)
@@ -179,32 +169,6 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 		r.sendResults(nil)
 		r.ctx.timer.IncreaseTimeOut()
 	}
-}
-
-func (r *reducer) propagateAbsentees() {
-	round, step := r.ctx.state.Round(), r.ctx.state.Step()
-	absentees := r.ctx.handler.FilterAbsentees(r.filter.Accumulator.All(), round, step)
-	_ = r.reportAbsentees(absentees)
-}
-
-func (r *reducer) reportAbsentees(absentees user.VotingCommittee) error {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, r.ctx.state.Round()); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarInt(buf, uint64(absentees.Len())); err != nil {
-		return err
-	}
-
-	for _, absentee := range absentees.MemberKeys() {
-		if err := encoding.WriteVarBytes(buf, absentee); err != nil {
-			return err
-		}
-	}
-
-	r.publisher.Publish(msg.AbsenteesTopic, buf)
-	return nil
 }
 
 func (r *reducer) sendReduction(hash *bytes.Buffer) {
