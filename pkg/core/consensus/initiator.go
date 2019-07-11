@@ -45,6 +45,7 @@ func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Ke
 				roundBytes := make([]byte, 8)
 				binary.LittleEndian.PutUint64(roundBytes, blk.Header.Height+1)
 				eventBroker.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+				return
 			}
 		}
 	}(listener)
