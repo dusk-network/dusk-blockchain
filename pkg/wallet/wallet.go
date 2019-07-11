@@ -243,17 +243,8 @@ func (w *Wallet) CheckWireBlockReceived(blk block.Block) (uint64, error) {
 	var totalReceivedCount uint64
 
 	txCheckers := NewTxOutChecker(blk)
-	for i, txchecker := range txCheckers {
-		if i == 0 {
-			// coinbase tx
-			receivedCount, err := w.scanOutputs(false, txchecker)
-			if err != nil {
-				return receivedCount, err
-			}
-			totalReceivedCount += receivedCount
-			continue
-		}
-		receivedCount, err := w.scanOutputs(true, txchecker)
+	for _, txchecker := range txCheckers {
+		receivedCount, err := w.scanOutputs(txchecker)
 		if err != nil {
 			return receivedCount, err
 		}
@@ -263,7 +254,7 @@ func (w *Wallet) CheckWireBlockReceived(blk block.Block) (uint64, error) {
 	return totalReceivedCount, nil
 }
 
-func (w *Wallet) scanOutputs(valuesEncrypted bool, txchecker TxOutChecker) (uint64, error) {
+func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 
 	privView, err := w.keyPair.PrivateView()
 	if err != nil {
@@ -288,7 +279,7 @@ func (w *Wallet) scanOutputs(valuesEncrypted bool, txchecker TxOutChecker) (uint
 		amount.Set(&output.EncryptedAmount)
 		mask.Set(&output.EncryptedMask)
 
-		if valuesEncrypted {
+		if txchecker.encryptedValues {
 			amount = transactions.DecryptAmount(output.EncryptedAmount, txchecker.R, uint32(i), *privView)
 			mask = transactions.DecryptMask(output.EncryptedMask, txchecker.R, uint32(i), *privView)
 		}

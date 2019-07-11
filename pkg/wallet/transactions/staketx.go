@@ -52,7 +52,7 @@ func (s *StakeTx) encode(w io.Writer, encodeSig bool) error {
 }
 
 func (s *StakeTx) Prove() error {
-	return s.prove(s.Hash)
+	return s.prove(s.Hash, false)
 }
 
 func (s *StakeTx) Encode(w io.Writer) error {

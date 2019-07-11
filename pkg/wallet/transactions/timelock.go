@@ -35,7 +35,7 @@ func (tl *TimelockTx) encode(w io.Writer, encodeSig bool) error {
 }
 
 func (tl *TimelockTx) Prove() error {
-	return tl.prove(tl.Hash)
+	return tl.prove(tl.Hash, true)
 }
 
 func (tl *TimelockTx) Encode(w io.Writer) error {
