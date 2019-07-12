@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"runtime"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -55,12 +56,16 @@ func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogP
 	}
 }
 
-// Deprecated. MIght be quite useless
-func (l *LogProcessor) Wire(w io.WriteCloser) {
-	_ = l.Close()
-	l.Out = w
+func (l *LogProcessor) LogNumGoroutine() {
+	for {
+		num := runtime.NumGoroutine()
+		l.entry.WithFields(log.Fields{
+			"code": "goroutine",
+			"nr":   num - 1,
+		}).Infoln("New goroutine count")
+		time.Sleep(5 * time.Second)
+	}
 }
-
 func (l *LogProcessor) Close() error {
 	return l.Out.(io.WriteCloser).Close()
 }
