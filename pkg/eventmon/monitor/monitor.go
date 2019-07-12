@@ -11,7 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 var MaxAttempts int = 3
@@ -45,13 +44,12 @@ func Launch(broker wire.EventBroker, monUrl string) (LogSupervisor, error) {
 }
 
 type unixSupervisor struct {
-	broker      wire.EventBroker
-	lock        sync.Mutex
-	processor   *logger.LogProcessor
-	uri         *url.URL
-	processorId uint32
-	attempts    int
-	activeProc  bool
+	broker     wire.EventBroker
+	lock       sync.Mutex
+	processor  *logger.LogProcessor
+	uri        *url.URL
+	attempts   int
+	activeProc bool
 }
 
 func (m *unixSupervisor) Levels() []log.Level {
@@ -72,18 +70,17 @@ func (m *unixSupervisor) Fire(entry *log.Entry) error {
 
 func newUnixSupervisor(broker wire.EventBroker, uri *url.URL) (LogSupervisor, error) {
 
-	logProc, id, err := initLogProcessor(broker, uri)
+	logProc, err := initLogProcessor(broker, uri)
 	if err != nil {
 		return nil, err
 	}
 
 	return &unixSupervisor{
-		broker:      broker,
-		lock:        sync.Mutex{},
-		processor:   logProc,
-		uri:         uri,
-		processorId: id,
-		activeProc:  true,
+		broker:     broker,
+		lock:       sync.Mutex{},
+		processor:  logProc,
+		uri:        uri,
+		activeProc: true,
 	}, nil
 }
 
@@ -146,13 +143,12 @@ func (m *unixSupervisor) Reconnect() error {
 		return err
 	}
 
-	proc, id, err := initLogProcessor(m.broker, m.uri)
+	proc, err := initLogProcessor(m.broker, m.uri)
 	if err != nil {
 		return err
 	}
 	m.activeProc = true
 	m.processor = proc
-	m.processorId = id
 	m.attempts = 0
 	return nil
 }
@@ -166,23 +162,22 @@ func (m *unixSupervisor) Stop() error {
 func (m *unixSupervisor) stop() error {
 	if m.activeProc {
 		m.activeProc = false
-		m.broker.RemovePreprocessor(string(topics.Gossip), m.processorId)
 		return m.processor.Close()
 	}
 	return nil
 }
 
-func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcessor, uint32, error) {
+func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcessor, error) {
 	wc, err := start(uri)
 	if err != nil {
-		return nil, uint32(0), err
+		return nil, err
 	}
 
 	logProcessor := logger.New(broker, wc, nil)
-	ids := broker.RegisterPreprocessor(string(topics.Gossip), logProcessor)
 	go logProcessor.LogNumGoroutine()
+	go logProcessor.ListenForNewBlocks()
 
-	return logProcessor, ids[0], nil
+	return logProcessor, nil
 }
 
 func start(uri *url.URL) (io.WriteCloser, error) {

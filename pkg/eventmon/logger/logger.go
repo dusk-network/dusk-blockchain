@@ -3,18 +3,14 @@ package logger
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"runtime"
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
-
-// Make sure LogProcessor implements the TopicProcessor interface
-var _ wire.TopicProcessor = (*LogProcessor)(nil)
 
 const MonitorTopic = "monitor_topic"
 
@@ -29,18 +25,15 @@ const (
 type (
 	LogProcessor struct {
 		*log.Logger
-		lastInfo *blockInfo
-		p        wire.EventPublisher
-		entry    *log.Entry
-	}
-
-	blockInfo struct {
-		t time.Time
-		*agreement.Agreement
+		lastBlock         *block.Block
+		p                 wire.EventPublisher
+		entry             *log.Entry
+		acceptedBlockChan <-chan block.Block
+		listener          *wire.TopicListener
 	}
 )
 
-func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogProcessor {
+func New(p wire.EventBroker, w io.WriteCloser, formatter log.Formatter) *LogProcessor {
 	logger := log.New()
 	logger.Out = w
 	if formatter == nil {
@@ -49,10 +42,20 @@ func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogP
 	entry := logger.WithFields(log.Fields{
 		"process": "monitor",
 	})
+	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(p)
 	return &LogProcessor{
-		p:      p,
-		Logger: logger,
-		entry:  entry,
+		p:                 p,
+		Logger:            logger,
+		entry:             entry,
+		acceptedBlockChan: acceptedBlockChan,
+		listener:          listener,
+	}
+}
+
+func (l *LogProcessor) ListenForNewBlocks() {
+	for {
+		blk := <-l.acceptedBlockChan
+		l.PublishBlockEvent(&blk)
 	}
 }
 
@@ -67,6 +70,7 @@ func (l *LogProcessor) LogNumGoroutine() {
 	}
 }
 func (l *LogProcessor) Close() error {
+	l.listener.Quit()
 	return l.Out.(io.WriteCloser).Close()
 }
 
@@ -81,28 +85,6 @@ func (l *LogProcessor) Send(entry *log.Entry) error {
 	}
 
 	return nil
-}
-
-// Process creates a copy of the message, checks the topic header
-func (l *LogProcessor) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
-	var newBuf bytes.Buffer
-	r := io.TeeReader(buf, &newBuf)
-
-	topic, err := topics.Extract(r)
-	if err != nil {
-		return nil, err
-	}
-
-	aggro, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	if topic == topics.Agreement {
-		go l.PublishRoundEvent(aggro)
-	}
-
-	return &newBuf, nil
 }
 
 func (l *LogProcessor) ReportError(bErr byte, err error) {
