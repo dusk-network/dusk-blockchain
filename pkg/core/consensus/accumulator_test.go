@@ -27,6 +27,7 @@ func TestAccumulatorGoroutines(t *testing.T) {
 		accumulator.WorkerTimeOut = 100 * time.Millisecond
 		// Create workers
 		accumulator.CreateWorkers()
+		go accumulator.Accumulate()
 	}
 
 	time.Sleep(3 * time.Second)
@@ -43,6 +44,7 @@ func TestAccumulation(t *testing.T) {
 	// Make an accumulator that has a quorum of 2
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1, nil, []byte{}, 2, "foo", true), consensus.NewAccumulatorStore(), consensus.NewState(), true)
 	accumulator.CreateWorkers()
+	go accumulator.Accumulate()
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())
@@ -58,6 +60,7 @@ func TestFailedVerification(t *testing.T) {
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1,
 		errors.New("verification failed"), []byte{}, 2, "foo", true), consensus.NewAccumulatorStore(), consensus.NewState(), false)
 	accumulator.CreateWorkers()
+	go accumulator.Accumulate()
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())
@@ -75,6 +78,7 @@ func TestNonCommitteeEvent(t *testing.T) {
 	// Make an accumulator that should fail verification every time
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1, nil, []byte{}, 2, "foo", false), consensus.NewAccumulatorStore(), consensus.NewState(), false)
 	accumulator.CreateWorkers()
+	go accumulator.Accumulate()
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())

@@ -40,7 +40,7 @@ func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State, c
 	verificationChan := make(chan wire.Event, 100)
 
 	// create accumulator
-	a := &Accumulator{
+	return &Accumulator{
 		WorkerTimeOut:      10 * time.Second,
 		Store:              store,
 		state:              state,
@@ -50,9 +50,6 @@ func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State, c
 		eventChan:          eventChan,
 		CollectedVotesChan: make(chan []wire.Event, 1),
 	}
-
-	go a.accumulate()
-	return a
 }
 
 // Process a received Event, by passing it to a worker in the worker pool (if the event
@@ -66,7 +63,7 @@ func (a *Accumulator) Process(ev wire.Event) {
 	a.verificationChan <- ev
 }
 
-func (a *Accumulator) accumulate() {
+func (a *Accumulator) Accumulate() {
 	round := a.state.Round()
 	ticker := time.NewTicker(a.WorkerTimeOut)
 	for {
