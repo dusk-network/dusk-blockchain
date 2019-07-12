@@ -95,6 +95,7 @@ func (ef *EventFilter) UpdateRound(round uint64) {
 	defer ef.lock.Unlock()
 	ef.state.Update(round)
 	ef.Accumulator = NewAccumulator(ef.handler, NewAccumulatorStore(), ef.state, ef.checkStep)
+	ef.Accumulator.CreateWorkers()
 	ef.queue.Clear(round - 1)
 }
 
@@ -102,6 +103,7 @@ func (ef *EventFilter) ResetAccumulator() {
 	ef.lock.Lock()
 	defer ef.lock.Unlock()
 	ef.Accumulator = NewAccumulator(ef.handler, NewAccumulatorStore(), ef.state, ef.checkStep)
+	ef.Accumulator.CreateWorkers()
 }
 
 // FlushQueue will retrieve all queued events for a certain point in consensus,

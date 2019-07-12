@@ -3,6 +3,7 @@ package consensus_test
 import (
 	"bytes"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -16,11 +17,32 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
+func TestAccumulatorGoroutines(t *testing.T) {
+	state := consensus.NewState()
+	// Let's spawn 100 accumulators
+	for i := 0; i < 100; i++ {
+		// Make an accumulator that has a quorum of 2
+		accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1, nil, []byte{}, 2, "foo", true), consensus.NewAccumulatorStore(), state, false)
+		// Set WorkerTimeOut to 1 ms
+		accumulator.WorkerTimeOut = 100 * time.Millisecond
+		// Create workers
+		accumulator.CreateWorkers()
+	}
+
+	time.Sleep(3 * time.Second)
+	state.Update(2)
+	time.Sleep(1 * time.Second)
+	// We spawned 500 goroutines, so if there is only a fraction of that left,
+	// it means we are successful (concurrent tests can take up goroutines too)
+	assert.True(t, runtime.NumGoroutine() <= 15)
+}
+
 // Test the accumulation of events up to Quorum. The Accumulator should return the
 // events on the CollectedVotesChan once we do.
 func TestAccumulation(t *testing.T) {
 	// Make an accumulator that has a quorum of 2
-	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1, nil, []byte{}, 2, "foo", true), consensus.NewAccumulatorStore(), consensus.NewState(), false)
+	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1, nil, []byte{}, 2, "foo", true), consensus.NewAccumulatorStore(), consensus.NewState(), true)
+	accumulator.CreateWorkers()
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())
@@ -35,6 +57,7 @@ func TestFailedVerification(t *testing.T) {
 	// Make an accumulator that should fail verification every time
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1,
 		errors.New("verification failed"), []byte{}, 2, "foo", true), consensus.NewAccumulatorStore(), consensus.NewState(), false)
+	accumulator.CreateWorkers()
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())
@@ -51,6 +74,7 @@ func TestFailedVerification(t *testing.T) {
 func TestNonCommitteeEvent(t *testing.T) {
 	// Make an accumulator that should fail verification every time
 	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1, nil, []byte{}, 2, "foo", false), consensus.NewAccumulatorStore(), consensus.NewState(), false)
+	accumulator.CreateWorkers()
 	// Send two mock events to the accumulator
 	accumulator.Process(newMockEvent())
 	accumulator.Process(newMockEvent())
