@@ -2,11 +2,14 @@
 
 const path = require("path");
 const { spawn } = require("child_process");
-const { mkdir } = require("fs").promises;
+const { mkdir, unlink, stat } = require("fs").promises;
 
 const basepath = require("os").tmpdir();
 
 var isLinux = process.platform === "linux";
+
+const whenComplete = async (proc) =>
+  new Promise(resolve => proc.on("close", resolve))
 
 async function* lines(chunks) {
   let previous = "";
@@ -31,12 +34,15 @@ async function main(nodes = 1, ...flags) {
 
   blindBid = isLinux ? "./blindbid-avx2" : "./blindbid-mac"
 
+
   for (let i = 0; i < +nodes; i++) {
-    const port = 7000 + i;
-    const rpcport = 9000 + i;
+    const port = 7001 + i;
+    const rpcport = 9001 + i;
 
     process.env["TMPDIR"] = path.join(basepath, "nodes", String(port));
     await mkdir(process.env["TMPDIR"], { recursive: true });
+
+    await whenComplete(spawn("rm",[ "-rf", "walletDb", "demo"+port]))
 
     const node = spawn(
       "./testnet",
@@ -52,7 +58,7 @@ async function main(nodes = 1, ...flags) {
     });
     stdout(`bid ${port}`, bid.stdout);
     stdout(`bid ${port}`, bid.stderr);
-    
+
   }
 }
 main(process.argv.slice(2));
