@@ -173,7 +173,7 @@ func mockAggro(round uint64) []byte {
 	blockHash, _ := crypto.RandEntropy(32)
 
 	aggro := agreement.MockAgreement(blockHash, round, uint8(3), ks)
-	return aggro.Bytes()
+	return append(make([]byte, 96), aggro.Bytes()...)
 }
 
 func mockAggroMsg(round uint64, tpc topics.Topic) []byte {

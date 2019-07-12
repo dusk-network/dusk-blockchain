@@ -2,6 +2,7 @@ package logger
 
 import (
 	"bytes"
+	"encoding/hex"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -9,7 +10,7 @@ import (
 )
 
 func (l *LogProcessor) PublishRoundEvent(ab []byte) {
-	a := bytes.NewBuffer(ab)
+	a := bytes.NewBuffer(ab[96:])
 	unmarshaller := agreement.NewUnMarshaller()
 	ev, err := unmarshaller.Deserialize(a)
 	if err != nil {
@@ -35,7 +36,7 @@ func (l *LogProcessor) WithAgreement(ae *agreement.Agreement) *log.Entry {
 	fields := log.Fields{
 		"round":     ae.Round,
 		"step":      ae.Step,
-		"blockHash": string(ae.BlockHash),
+		"blockHash": hex.EncodeToString(ae.BlockHash),
 	}
 	entry := l.withRoundCode(fields)
 
