@@ -109,7 +109,7 @@ func TestResumeRight(t *testing.T) {
 	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	round2 := <-msgChan
 
-	assert.InDelta(t, float64(1000), round2["blockTime"], float64(100))
+	assert.InDelta(t, float64(1), round2["blockTime"], float64(0.1))
 
 	_ = supervisor.Stop()
 }

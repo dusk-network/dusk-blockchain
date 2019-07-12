@@ -26,8 +26,8 @@ func (l *LogProcessor) WithBlock(blk *block.Block) *log.Entry {
 	entry := l.withRoundCode(fields)
 
 	if l.lastBlock != nil && (blk.Header.Height-l.lastBlock.Header.Height) == 1 {
-		blockTimeMs := getDiffInMs(blk.Header.Timestamp, l.lastBlock.Header.Timestamp)
-		entry = entry.WithField("blockTime", blockTimeMs)
+		blockTimeSeconds := getDiffInSeconds(blk.Header.Timestamp, l.lastBlock.Header.Timestamp)
+		entry = entry.WithField("blockTime", blockTimeSeconds)
 	}
 
 	l.lastBlock = blk
@@ -35,11 +35,8 @@ func (l *LogProcessor) WithBlock(blk *block.Block) *log.Entry {
 	return entry
 }
 
-func getDiffInMs(currentTimeStamp int64, lastTimeStamp int64) int {
+func getDiffInSeconds(currentTimeStamp int64, lastTimeStamp int64) float64 {
 	lastTime := time.Unix(lastTimeStamp, 0)
 	currentTime := time.Unix(currentTimeStamp, 0)
-	diffSeconds := currentTime.Sub(lastTime).Seconds()
-
-	// Return float64 seconds value as integer millisecond value
-	return int(diffSeconds * 1000)
+	return currentTime.Sub(lastTime).Seconds()
 }
