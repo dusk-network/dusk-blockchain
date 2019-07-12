@@ -58,12 +58,12 @@ func New(p wire.EventPublisher, w io.WriteCloser, formatter log.Formatter) *LogP
 
 func (l *LogProcessor) LogNumGoroutine() {
 	for {
+		time.Sleep(5 * time.Second)
 		num := runtime.NumGoroutine()
 		l.entry.WithFields(log.Fields{
 			"code": "goroutine",
 			"nr":   num - 1,
 		}).Infoln("New goroutine count")
-		time.Sleep(5 * time.Second)
 	}
 }
 func (l *LogProcessor) Close() error {
