@@ -13,9 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/monitor"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
@@ -30,14 +28,13 @@ func TestLogger(t *testing.T) {
 	conn, err := net.Dial("unix", addr)
 	assert.NoError(t, err)
 
-	testMsg := mockAggro(23)
+	testBlk := helper.RandomBlock(t, 23, 4)
 	logProc := logger.New(eb, conn, nil)
-	logProc.PublishRoundEvent(testMsg)
+	logProc.PublishBlockEvent(testBlk)
 
 	result := <-msgChan
 
 	assert.Equal(t, "monitor", result["process"])
-	assert.Equal(t, float64(3), result["step"])
 	assert.Equal(t, float64(23), result["round"])
 
 	_ = conn.Close()
@@ -49,13 +46,12 @@ func TestSupervisor(t *testing.T) {
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
-	testMsg := mockAggroMsg(23, topics.Agreement)
+	testBuf := mockBlockBuf(t, 23)
 	// testing that we can receive messages
-	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	result := <-msgChan
 
 	assert.Equal(t, "monitor", result["process"])
-	assert.Equal(t, float64(3), result["step"])
 	assert.Equal(t, float64(23), result["round"])
 	_ = supervisor.Stop()
 }
@@ -66,15 +62,15 @@ func TestSupervisorReconnect(t *testing.T) {
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
-	testMsg := mockAggroMsg(23, topics.Agreement)
+	testBuf := mockBlockBuf(t, 23)
 	// testing that we can receive messages
-	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	<-msgChan
 
 	assert.NoError(t, supervisor.Stop())
 
-	testMsg = mockAggroMsg(24, topics.Agreement)
-	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	testBuf = mockBlockBuf(t, 24)
+	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	select {
 	case <-msgChan:
 		assert.FailNow(t, "Expected the supervised LogProcessor to be closed")
@@ -87,10 +83,9 @@ func TestSupervisorReconnect(t *testing.T) {
 	// reconnecting the supervised process
 	assert.NoError(t, supervisor.Reconnect())
 	// messages streamed when the process is down are lost, so we need to send another message
-	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
-	assert.Equal(t, float64(3), result["step"])
 	assert.Equal(t, float64(24), result["round"])
 
 	_ = supervisor.Stop()
@@ -102,19 +97,19 @@ func TestResumeRight(t *testing.T) {
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
-	testMsg := mockAggroMsg(23, topics.Agreement)
-	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	testBuf := mockBlockBuf(t, 23)
+	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	round1 := <-msgChan
 	if _, ok := round1["blockTime"]; ok {
 		assert.FailNow(t, "First round should not really have a block time. Instead found %d", round1["blockTime"])
 	}
 
 	time.Sleep(time.Second)
-	testMsg = mockAggroMsg(24, topics.Agreement)
-	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	testBuf = mockBlockBuf(t, 24)
+	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	round2 := <-msgChan
 
-	assert.InDelta(t, float64(1000), round2["blockTime"], float64(100))
+	assert.InDelta(t, float64(1), round2["blockTime"], float64(0.1))
 
 	_ = supervisor.Stop()
 }
@@ -137,11 +132,21 @@ func TestNotifyErrors(t *testing.T) {
 		endChan <- struct{}{}
 	}()
 
-	testMsg := mockAggroMsg(23, topics.Agreement)
-	eb.Stream(string(topics.Gossip), bytes.NewBuffer(testMsg))
+	testBuf := mockBlockBuf(t, 23)
+	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
 	<-endChan
+}
+
+func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
+	blk := helper.RandomBlock(t, height, 4)
+	buf := new(bytes.Buffer)
+	if err := blk.Encode(buf); err != nil {
+		panic(err)
+	}
+
+	return buf
 }
 
 func initTest() (<-chan map[string]interface{}, string) {
@@ -164,22 +169,6 @@ func unixSocPath() string {
 		panic(err)
 	}
 	return uri.Path
-}
-
-func mockAggro(round uint64) []byte {
-	k1, _ := user.NewRandKeys()
-	k2, _ := user.NewRandKeys()
-	ks := []user.Keys{k1, k2}
-	blockHash, _ := crypto.RandEntropy(32)
-
-	aggro := agreement.MockAgreement(blockHash, round, uint8(3), ks)
-	return append(make([]byte, 96), aggro.Bytes()...)
-}
-
-func mockAggroMsg(round uint64, tpc topics.Topic) []byte {
-	b := mockAggro(round)
-	buf, _ := wire.AddTopic(bytes.NewBuffer(b), tpc)
-	return buf.Bytes()
 }
 
 func spinSrv(addr string) <-chan map[string]interface{} {
