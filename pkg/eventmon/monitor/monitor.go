@@ -180,6 +180,7 @@ func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcess
 
 	logProcessor := logger.New(broker, wc, nil)
 	ids := broker.RegisterPreprocessor(string(topics.Gossip), logProcessor)
+	go logProcessor.LogNumGoroutine()
 
 	return logProcessor, ids[0], nil
 }
