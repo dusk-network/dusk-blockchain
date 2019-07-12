@@ -87,6 +87,7 @@ func (a *Accumulator) Accumulate() {
 			}
 		case <-ticker.C:
 			if round < a.state.Round() {
+				ticker.Stop()
 				return
 			}
 		}
@@ -132,6 +133,7 @@ func verify(verificationChan <-chan wire.Event, eventChan chan<- wire.Event, ver
 			eventChan <- ev
 		case <-ticker.C:
 			if round < state.Round() {
+				ticker.Stop()
 				return
 			}
 		}
