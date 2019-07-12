@@ -40,7 +40,7 @@ Optional - if you wish to participate in consensus: [Rust](https://www.rust-lang
 #### DUSK node
 First, download the codebase and it's dependencies into your $GOPATH by running:
 ```bash
-go get github.com/dusk-network/dusk-go
+go get github.com/dusk-network/dusk-blockchain
 ```
 Then, navigate to the testnet folder, like so:
 ```bash
