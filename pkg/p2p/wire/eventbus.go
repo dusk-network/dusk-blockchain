@@ -238,6 +238,7 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 		return
 	}
 
+	// The handlers are simply a means to avoid memory leaks.
 	if handlers := bus.streamHandlers.Load(topic); handlers != nil {
 		bus.ringbuffer.Put(processedMsg.Bytes())
 	}
