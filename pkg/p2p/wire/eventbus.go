@@ -79,7 +79,7 @@ func (bus *EventBus) subscribeStream(topic string, handler *streamHandler) {
 }
 
 func newStreamHandler(id uint32, topic string) *streamHandler {
-	exitChan := make(chan struct{})
+	exitChan := make(chan struct{}, 1)
 	return &streamHandler{id, exitChan, topic}
 }
 
