@@ -72,7 +72,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 		magic: magic,
 	}
 
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 
 	dataRequestor := processing.NewDataRequestor(db, rpcBus, responseChan)
 

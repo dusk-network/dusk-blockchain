@@ -50,7 +50,7 @@ type Chain struct {
 
 // New returns a new chain object
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 
 	l, err := newLoader(db)
 	if err != nil {

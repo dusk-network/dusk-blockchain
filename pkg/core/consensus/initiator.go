@@ -16,7 +16,7 @@ import (
 func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) error {
 	// Get a db connection
 	if db == nil {
-		_, db = heavy.SetupDatabase()
+		_, db = heavy.CreateDBConnection()
 	}
 
 	var currentHeight uint64

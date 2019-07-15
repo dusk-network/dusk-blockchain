@@ -17,7 +17,7 @@ import (
 // Test the behaviour of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
 	// Set up db
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db. Save the hashes for later checking.

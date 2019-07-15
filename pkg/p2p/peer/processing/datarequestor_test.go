@@ -13,7 +13,7 @@ import (
 )
 
 func TestRequestData(t *testing.T) {
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	defer db.Close()
 
 	responseChan := make(chan *bytes.Buffer, 100)

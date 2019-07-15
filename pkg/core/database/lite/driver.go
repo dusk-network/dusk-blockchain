@@ -33,7 +33,7 @@ func init() {
 	}
 }
 
-func SetupDatabase() (database.Driver, database.DB) {
+func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(DriverName)
 	if err != nil {
 		panic(err)

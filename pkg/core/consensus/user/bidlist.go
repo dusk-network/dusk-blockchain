@@ -31,7 +31,7 @@ type BidList []Bid
 func NewBidList(db database.DB) (*BidList, error) {
 	bl := &BidList{}
 	if db == nil {
-		_, db = heavy.SetupDatabase()
+		_, db = heavy.CreateDBConnection()
 	}
 
 	bl.repopulate(db)

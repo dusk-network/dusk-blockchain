@@ -22,7 +22,7 @@ import (
 func TestInitiate(t *testing.T) {
 	bus := wire.NewEventBus()
 	keys, _ := user.NewRandKeys()
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	initChan := make(chan *bytes.Buffer, 1)
 	bus.Subscribe(msg.InitializationTopic, initChan)
 

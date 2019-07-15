@@ -17,7 +17,7 @@ import (
 
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	c := launchStore(bus, db)
 
 	newProvisioner(10, bus)
@@ -30,7 +30,7 @@ func TestAddProvisioner(t *testing.T) {
 
 func TestRemoveProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	c := launchStore(bus, db)
 
 	k := newProvisioner(10, bus)
@@ -48,7 +48,7 @@ func TestRemoveProvisioner(t *testing.T) {
 // Test that a committee cache keeps copies of produced voting committees.
 func TestUpsertCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	e := NewExtractor(bus, db)
 
 	// add some provisioners
@@ -76,7 +76,7 @@ func TestUpsertCommitteeCache(t *testing.T) {
 // for a different round.
 func TestCleanCommitteeCache(t *testing.T) {
 	bus := wire.NewEventBus()
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	e := NewExtractor(bus, db)
 
 	// add some provisioners
@@ -99,7 +99,7 @@ func TestCleanCommitteeCache(t *testing.T) {
 
 func TestRemoveExpired(t *testing.T) {
 	bus := wire.NewEventBus()
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	e := NewExtractor(bus, db)
 
 	// add some provisioners

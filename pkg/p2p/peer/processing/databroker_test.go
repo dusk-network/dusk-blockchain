@@ -13,7 +13,7 @@ import (
 
 // Test the behaviour of the data broker, when it receives a GetData message.
 func TestSendData(t *testing.T) {
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	defer db.Close()
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
