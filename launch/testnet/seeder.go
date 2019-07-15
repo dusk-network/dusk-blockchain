@@ -13,6 +13,7 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
+// ConnectToSeeder initializes the connection with the Voucher Seeder
 func ConnectToSeeder() []string {
 	if cfg.Get().General.Network == "testnet" {
 		fixedNetwork := cfg.Get().Network.Seeder.Fixed

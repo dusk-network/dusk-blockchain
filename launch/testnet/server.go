@@ -20,6 +20,7 @@ import (
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
+// Server is the main process of the node
 type Server struct {
 	eventBus *wire.EventBus
 	rpcBus   *wire.RPCBus
@@ -93,6 +94,7 @@ func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
 	return dupeBlacklist
 }
 
+// OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
 	responseChan := make(chan *bytes.Buffer, 100)
 	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan)
@@ -118,6 +120,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	go peerWriter.WriteLoop(responseChan)
 }
 
+// OnConnection is the callback for writing to the peers
 func (s *Server) OnConnection(conn net.Conn, addr string) {
 	messageQueueChan := make(chan *bytes.Buffer, 100)
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
@@ -143,6 +146,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	go peerWriter.WriteLoop(messageQueueChan)
 }
 
+// Close the chain and the connections created through the RPC bus
 func (s *Server) Close() {
 	s.chain.Close()
 	s.rpcBus.Close()
