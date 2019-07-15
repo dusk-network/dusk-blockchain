@@ -197,6 +197,7 @@ func (w *Wallet) CheckWireBlock(blk block.Block) (uint64, uint64, error) {
 }
 
 // CheckWireBlockSpent checks if the block has any outputs spent by this wallet
+// Returns the number of txs that the sender spent funds in
 func (w *Wallet) CheckWireBlockSpent(blk block.Block) (uint64, error) {
 
 	var totalSpentCount uint64
@@ -216,7 +217,7 @@ func (w *Wallet) CheckWireBlockSpent(blk block.Block) (uint64, error) {
 
 func (w *Wallet) scanInputs(txChecker TxInChecker) (uint64, error) {
 
-	var spentCount uint64
+	var didSpendFunds uint64
 
 	for _, keyImage := range txChecker.keyImages {
 		pubKey, err := w.db.Get(keyImage)
@@ -224,20 +225,19 @@ func (w *Wallet) scanInputs(txChecker TxInChecker) (uint64, error) {
 			continue
 		}
 		if err != nil {
-			return spentCount, err
+			return didSpendFunds, err
 		}
-
-		spentCount++
 
 		err = w.db.RemoveInput(pubKey)
 		if err != nil {
-			return spentCount, err
+			return didSpendFunds, err
 		}
 	}
-	return spentCount, nil
+	return didSpendFunds, nil
 }
 
 // CheckWireBlockReceived checks if the wire block has transactions for this wallet
+// Returns the number of tx's that the reciever recieved funds in
 func (w *Wallet) CheckWireBlockReceived(blk block.Block) (uint64, error) {
 
 	var totalReceivedCount uint64
@@ -254,6 +254,7 @@ func (w *Wallet) CheckWireBlockReceived(blk block.Block) (uint64, error) {
 	return totalReceivedCount, nil
 }
 
+// scans the outputs of one transaction
 func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 
 	privView, err := w.keyPair.PrivateView()
@@ -265,7 +266,7 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 		return 0, err
 	}
 
-	var receiveCount uint64
+	var didReceiveFunds uint64
 
 	for i, output := range txchecker.Outputs {
 		privKey, ok := w.keyPair.DidReceiveTx(txchecker.R, output.PubKey, uint32(i))
@@ -273,7 +274,7 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 			continue
 		}
 
-		receiveCount++
+		didReceiveFunds = 1
 
 		var amount, mask ristretto.Scalar
 		amount.Set(&output.EncryptedAmount)
@@ -286,7 +287,7 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 
 		err := w.db.PutInput(privSpend.Bytes(), output.PubKey.P, amount, mask, *privKey)
 		if err != nil {
-			return receiveCount, err
+			return didReceiveFunds, err
 		}
 
 		// cache the keyImage, so we can quickly check whether our input was spent
@@ -296,11 +297,11 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 
 		err = w.db.Put(keyImage.Bytes(), output.PubKey.P.Bytes())
 		if err != nil {
-			return receiveCount, err
+			return didReceiveFunds, err
 		}
 	}
 
-	return receiveCount, nil
+	return didReceiveFunds, nil
 }
 
 // AddInputs adds up the total outputs and fee then fetches inputs to consolidate this
