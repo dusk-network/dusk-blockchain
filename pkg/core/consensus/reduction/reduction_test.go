@@ -133,9 +133,7 @@ func TestTimeOutVariance(t *testing.T) {
 	resultChan := make(chan *bytes.Buffer, 1)
 	eb.Subscribe(msg.ReductionResultTopic, resultChan)
 
-	// update round
-	consensus.UpdateRound(eb, 1)
-
+	// Wait a bit for the round update to go through
 	time.Sleep(200 * time.Millisecond)
 
 	// measure the time it takes for reduction to time out
@@ -163,6 +161,10 @@ func TestTimeOutVariance(t *testing.T) {
 
 	// update round
 	consensus.UpdateRound(eb, 2)
+
+	// Wait a bit for the round update to go through
+	time.Sleep(200 * time.Millisecond)
+
 	start = time.Now()
 	// send a hash to start reduction
 	eb.Publish(msg.BestScoreTopic, nil)
