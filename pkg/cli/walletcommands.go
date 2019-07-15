@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -51,7 +52,7 @@ func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPC
 		return
 	}
 
-	w, err := wallet.New(testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.New(rand.Read, testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
 		return

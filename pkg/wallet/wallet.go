@@ -50,11 +50,11 @@ type SignableTx interface {
 	Standard() (*transactions.StandardTx, error)
 }
 
-func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
+func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
 
 	// random seed
 	seed := make([]byte, 64)
-	_, err := rand.Read(seed)
+	_, err := Read(seed)
 	if err != nil {
 		return nil, err
 	}
