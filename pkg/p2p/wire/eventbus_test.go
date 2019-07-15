@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -52,4 +53,29 @@ func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
 	}
 
 	return eb, myChan, id
+}
+
+// Test that a streaming goroutine is killed when the exit signal is sent
+func TestExitChan(t *testing.T) {
+	eb := NewEventBus()
+	closeChan := make(chan struct{}, 1)
+	_ = eb.SubscribeStream("foo", &mockWriteCloser{closeChan})
+	// Put something on ring buffer
+	eb.ringbuffer.Put([]byte{1})
+	// Wait for something to appear on closeChan
+	<-closeChan
+}
+
+type mockWriteCloser struct {
+	closeChan chan struct{}
+}
+
+func (m *mockWriteCloser) Write(data []byte) (int, error) {
+	return 0, errors.New("failed")
+}
+
+func (m *mockWriteCloser) Close() error {
+	// Signal that the mockWriteCloser has closed
+	m.closeChan <- struct{}{}
+	return nil
 }
