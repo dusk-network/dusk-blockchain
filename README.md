@@ -86,10 +86,10 @@ To claim Testnet DUSK (tDUSK), the user is required to make a Twitter post conta
 ## How to transfer tDUSK?
 Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
 ## How to become a Provisioner?
-Open the Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks until which the bid is locked (`block_height < locktime < 2^64`) (max is 250000), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+Open the Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the bid is locked (`block_height < locktime < 250000`), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
 
 After completion, type `startprovisioner` into the CLI to join the consensus.
 ## How to become a Block Generator?
-Open a Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks until which the stake is locked (`block_height < locktime < 2^64`) (max is 250000), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+Open a Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the stake is locked (`block_height < locktime < 250000`), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
 
-After completion, type `startblockgenerator` into the CLI to join the consensus.
+After completion, you should note down the tx hash that the wallet prints out. Then, type `startblockgenerator [txid]` into the CLI to join the consensus.
