@@ -127,5 +127,6 @@ func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 
 func StartPeerReader(conn net.Conn, bus *wire.EventBus, rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*peer.Reader, error) {
 	dupeMap := dupemap.NewDupeMap(5)
-	return peer.NewReader(conn, protocol.TestNet, dupeMap, bus, rpcBus, counter, responseChan)
+	exitChan := make(chan struct{}, 1)
+	return peer.NewReader(conn, protocol.TestNet, dupeMap, bus, rpcBus, counter, responseChan, exitChan)
 }

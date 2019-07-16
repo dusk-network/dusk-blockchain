@@ -45,6 +45,7 @@ type Reader struct {
 	*Connection
 	unmarshaller *messageUnmarshaller
 	router       *messageRouter
+	exitChan     chan<- struct{} // Way to kill the WriteLoop
 	// TODO: add service flag
 }
 
@@ -65,8 +66,7 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher wire.EventPublisher,
-	rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*Reader, error) {
+func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher wire.EventPublisher, rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
 	pconn := &Connection{
 		Conn:  conn,
 		magic: magic,
@@ -79,6 +79,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 	reader := &Reader{
 		Connection:   pconn,
 		unmarshaller: &messageUnmarshaller{magic},
+		exitChan:     exitChan,
 		router: &messageRouter{
 			publisher:       publisher,
 			dupeMap:         dupeMap,
@@ -139,25 +140,29 @@ func (p *Reader) Accept() error {
 // WriteLoop waits for messages to arrive on the `responseChan`, which are intended
 // only for this specific peer. The messages get prepended with a magic, and then
 // are COBS encoded before being sent over the wire.
-func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer) {
+func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer, exitChan chan struct{}) {
 	defer w.Conn.Close()
 
 	for {
-		buf := <-responseChan
-		processed, err := w.gossip.Process(buf)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error processing outgoing message")
-			continue
-		}
+		select {
+		case buf := <-responseChan:
+			processed, err := w.gossip.Process(buf)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"process": "peer",
+					"error":   err,
+				}).Warnln("error processing outgoing message")
+				continue
+			}
 
-		if _, err := w.Connection.Write(processed.Bytes()); err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error writing message")
+			if _, err := w.Connection.Write(processed.Bytes()); err != nil {
+				log.WithFields(log.Fields{
+					"process": "peer",
+					"error":   err,
+				}).Warnln("error writing message")
+				exitChan <- struct{}{}
+			}
+		case <-exitChan:
 			return
 		}
 	}
@@ -168,8 +173,14 @@ func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer) {
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
 	defer p.Conn.Close()
+	defer func() {
+		p.exitChan <- struct{}{}
+	}()
 
 	for {
+		// Refresh the read deadline
+		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+
 		b, err := p.ReadMessage()
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -189,9 +200,6 @@ func (p *Reader) ReadLoop() {
 		}
 
 		p.router.Collect(buf)
-
-		// Refresh the read deadline
-		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
 	}
 }
 

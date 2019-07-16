@@ -90,7 +90,7 @@ func TestWriteLoop(t *testing.T) {
 	go func() {
 		responseChan := make(chan *bytes.Buffer)
 		writer := peer.NewWriter(client, protocol.TestNet, bus)
-		go writer.WriteLoop(responseChan)
+		go writer.WriteLoop(responseChan, make(chan struct{}, 1))
 
 		bufCopy := *buf
 		responseChan <- &bufCopy

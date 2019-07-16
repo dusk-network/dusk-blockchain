@@ -97,7 +97,8 @@ func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
 // OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
 	responseChan := make(chan *bytes.Buffer, 100)
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan)
+	exitChan := make(chan struct{}, 1)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
@@ -117,7 +118,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	go peerReader.ReadLoop()
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 	peerWriter.Subscribe(s.eventBus)
-	go peerWriter.WriteLoop(responseChan)
+	go peerWriter.WriteLoop(responseChan, exitChan)
 }
 
 // OnConnection is the callback for writing to the peers
@@ -137,13 +138,14 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		"address": peerWriter.Addr(),
 	}).Debugln("connection established")
 
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, messageQueueChan)
+	exitChan := make(chan struct{}, 1)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, messageQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
 
 	go peerReader.ReadLoop()
-	go peerWriter.WriteLoop(messageQueueChan)
+	go peerWriter.WriteLoop(messageQueueChan, exitChan)
 }
 
 // Close the chain and the connections created through the RPC bus
