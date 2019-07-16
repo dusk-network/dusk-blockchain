@@ -32,6 +32,20 @@ func pollData(b *Buffer, done chan struct{}) *bytes.Buffer {
 	return buf
 }
 
+// Try to force a panic regarding index being out of range. If `Put` is not synchronized,
+// this test should cause an `index out of range` error
+func TestRingBufferRace(t *testing.T) {
+	b := NewBuffer(10)
+
+	for i := 0; i < 1000; i++ {
+		go func() {
+			for i := 0; i < 1000; i++ {
+				b.Put([]byte{0, 1, 2, 3, 4})
+			}
+		}()
+	}
+}
+
 func TestRingBuffer(t *testing.T) {
 	consumers := 3
 	bufs := make([]*bytes.Buffer, consumers)

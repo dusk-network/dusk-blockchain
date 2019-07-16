@@ -2,6 +2,7 @@ package ring
 
 import (
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
@@ -9,6 +10,7 @@ import (
 // Buffer represents a circular array of pointers.
 type Buffer struct {
 	items      []unsafe.Pointer
+	lock       sync.Mutex
 	writeIndex uint32
 }
 
@@ -29,8 +31,11 @@ func NewBuffer(length int) *Buffer {
 
 // Put an item on the ring buffer.
 func (r *Buffer) Put(item []byte) {
+	r.lock.Lock()
 	atomic.StorePointer(&r.items[atomic.LoadUint32(&r.writeIndex)], unsafe.Pointer(&item))
 	incrementIndex(&r.writeIndex, len(r.items)-1)
+	// No deferring here, we need performance
+	r.lock.Unlock()
 }
 
 // increment index. if index is at the end of the slice, set to 0
