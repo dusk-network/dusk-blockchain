@@ -43,7 +43,7 @@ func NewProvisioners(db database.DB) (*Provisioners, uint64, error) {
 	}
 
 	if db == nil {
-		_, db = heavy.SetupDatabase()
+		_, db = heavy.CreateDBConnection()
 	}
 
 	totalWeight := p.repopulate(db)

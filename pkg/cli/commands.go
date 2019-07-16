@@ -112,7 +112,7 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 
 	// fetch d
 	txID := []byte(args[0])
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 	var tx transactions.Transaction
 	err = db.View(func(t database.Transaction) error {
 		var err error

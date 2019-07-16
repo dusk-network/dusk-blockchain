@@ -419,7 +419,7 @@ func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 }
 
 func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 
 	var blk *block.Block
 	var state *database.State
@@ -445,7 +445,7 @@ func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, error) {
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
 
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 
 	var pubKeys []mlsag.PubKeys
 	var decoys []ristretto.Point

@@ -63,7 +63,7 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 
 	// retrieve read-only connection to the blockchain database
 	if m.db == nil {
-		_, m.db = heavy.SetupDatabase()
+		_, m.db = heavy.CreateDBConnection()
 	}
 
 	// run the default blockchain verifier

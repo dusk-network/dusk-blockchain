@@ -72,7 +72,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 }
 
 func getLatestBlock() *block.Block {
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 	var blk *block.Block
 	err := db.View(func(t database.Transaction) error {
 		currentHeight, err := t.FetchCurrentHeight()

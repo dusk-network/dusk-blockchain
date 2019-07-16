@@ -131,7 +131,7 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 var exportData = func(s *Server, params []string) (string, error) {
 
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 
 	optionTransactions := false
 	if len(params) > 0 {
