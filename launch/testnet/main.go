@@ -14,8 +14,9 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 )
 
-func initLog(file *os.File) {
+var logFile *os.File
 
+func initLog(file *os.File) {
 	// apply logger level from configurations
 	level, err := log.ParseLevel(cfg.Get().Logger.Level)
 	if err == nil {
@@ -28,6 +29,7 @@ func initLog(file *os.File) {
 	if file != nil {
 		log.SetOutput(file)
 	} else {
+		logFile = os.Stdout
 		log.SetOutput(os.Stdout)
 	}
 }
@@ -36,7 +38,6 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	// TODO: use logging for this?
 	fmt.Fprintln(os.Stdout, "initializing node...")
 	// Loading all node configurations. Fail-fast if critical error occurs
 	if err := cfg.Load(); err != nil {
@@ -51,7 +52,7 @@ func main() {
 	// Any subsystem should be initialized after config and logger loading
 	output := cfg.Get().Logger.Output
 	if cfg.Get().Logger.Output != "stdout" {
-		file, err := os.Create(output + port + ".log")
+		logFile, err = os.Create(output + port + ".log")
 		if err != nil {
 			panic(err)
 		}
@@ -98,7 +99,9 @@ func main() {
 	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
 
 	// Start interactive shell
-	go cli.Start(srv.eventBus, srv.rpcBus)
+	if cfg.Get().Logger.Output != "stdout" {
+		go cli.Start(srv.eventBus, srv.rpcBus)
+	}
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC

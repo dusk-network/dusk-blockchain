@@ -1,7 +1,8 @@
 package cli
 
 var commandInfo = map[string]string{
-	"help": `Show this menu`,
+	"help": `Usage: help [command] 
+		Show this menu. When adding a command, shows info about that command.`,
 	"createwallet": `Usage: createwallet [password]
 		Create an encrypted wallet file.`,
 	"loadwallet": `Usage: loadwallet [password]

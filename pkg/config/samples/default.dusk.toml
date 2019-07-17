@@ -10,7 +10,7 @@ network = "testnet"
 level = "trace"
 # 'stdout' or file name without ext
 # result filename would be $output$network.port.log
-output = "stdout"
+output = "debug.log"
 [logger.monitor]
 # enabling log based monitoring
 enabled = false
