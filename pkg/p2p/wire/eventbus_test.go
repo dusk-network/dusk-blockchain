@@ -57,17 +57,29 @@ func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
 
 // Test that a streaming goroutine is killed when the exit signal is sent
 func TestExitChan(t *testing.T) {
+
 	eb := NewEventBus()
-	closeChan := make(chan struct{}, 1)
-	_ = eb.SubscribeStream("foo", &mockWriteCloser{closeChan})
+	topic := "foo"
+	_ = eb.SubscribeStream(topic, &mockWriteCloser{})
 	// Put something on ring buffer
-	eb.ringbuffer.Put([]byte{1})
-	// Wait for something to appear on closeChan
-	<-closeChan
+	val := new(bytes.Buffer)
+	val.Write([]byte{0})
+	eb.Stream(topic, val)
+	// Wait for event to be handled
+	// NB: 'Writer' must return error to force consumer termination
+	time.Sleep(100 * time.Millisecond)
+
+	var closed bool
+	handlers := eb.streamHandlers.Load(topic)
+	for _, handler := range handlers {
+		ringBuffer := handler.GetBuffer()
+		closed = ringBuffer.Closed()
+	}
+
+	assert.True(t, closed)
 }
 
 type mockWriteCloser struct {
-	closeChan chan struct{}
 }
 
 func (m *mockWriteCloser) Write(data []byte) (int, error) {
@@ -75,7 +87,5 @@ func (m *mockWriteCloser) Write(data []byte) (int, error) {
 }
 
 func (m *mockWriteCloser) Close() error {
-	// Signal that the mockWriteCloser has closed
-	m.closeChan <- struct{}{}
 	return nil
 }

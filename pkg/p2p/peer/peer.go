@@ -138,8 +138,7 @@ func (p *Reader) Accept() error {
 }
 
 // WriteLoop waits for messages to arrive on the `responseChan`, which are intended
-// only for this specific peer. The messages get prepended with a magic, and then
-// are COBS encoded before being sent over the wire.
+// only for this specific peer.
 func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer, exitChan chan struct{}) {
 	defer w.Conn.Close()
 

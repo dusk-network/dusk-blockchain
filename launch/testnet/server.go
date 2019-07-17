@@ -118,6 +118,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	go peerReader.ReadLoop()
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 	peerWriter.Subscribe(s.eventBus)
+	// TODO: Unsubscribe on disconnect
 	go peerWriter.WriteLoop(responseChan, exitChan)
 }
 
