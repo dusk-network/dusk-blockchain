@@ -221,7 +221,7 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 					"topic":   topic,
 					"process": "event bus",
 					"error":   err,
-				}).Errorln("error when triggering callback")
+				}).Warnln("error when triggering callback")
 			}
 		}
 	}

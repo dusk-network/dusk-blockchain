@@ -147,7 +147,7 @@ func (b *broker) Forward(proof zkproof.ZkProof, seed []byte) {
 		if err := b.forwarder.forwardScoreEvent(proof, b.seeder.Round(), seed); err != nil {
 			log.WithFields(log.Fields{
 				"process": "generation",
-			}).WithError(err).Errorln("error forwarding score event")
+			}).WithError(err).Warnln("error forwarding score event")
 		}
 	}
 }

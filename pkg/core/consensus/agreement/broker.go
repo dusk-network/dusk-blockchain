@@ -85,7 +85,7 @@ func (b *broker) sendAgreement(m *bytes.Buffer) error {
 		unmarshaller := reduction.NewUnMarshaller()
 		voteSet, err := unmarshaller.UnmarshalVoteSet(m)
 		if err != nil {
-			log.WithField("process", "agreement").WithError(err).Errorln("problem unmarshalling voteset")
+			log.WithField("process", "agreement").WithError(err).Warnln("problem unmarshalling voteset")
 			return err
 		}
 

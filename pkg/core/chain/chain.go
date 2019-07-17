@@ -308,7 +308,7 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 	// Fetch the candidate block that the winningHash points at
 	candidate, err := c.fetchCandidateBlock(blockHash)
 	if err != nil {
-		log.Errorf("fetching a candidate block failed: %s", err.Error())
+		log.Warnf("fetching a candidate block failed: %s", err.Error())
 		return err
 	}
 
@@ -339,7 +339,7 @@ func (c *Chain) verifyCandidateBlock(hash []byte) error {
 func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
 	candidate, err := c.fetchCandidateBlock(blockHash)
 	if err != nil {
-		log.Errorf("error fetching candidate block to add certificate: %s", err.Error())
+		log.Warnf("could not fetch candidate block to add certificate: %s", err.Error())
 		return
 	}
 
