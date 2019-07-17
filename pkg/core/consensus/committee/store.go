@@ -95,7 +95,8 @@ func (s *Store) RemoveExpiredProvisioners(m *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(m.Bytes())
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.provisioners.RemoveExpired(round)
+	removedStakesAmount := s.provisioners.RemoveExpired(round)
+	s.totalWeight -= removedStakesAmount
 	return nil
 }
 
