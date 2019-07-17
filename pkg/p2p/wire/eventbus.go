@@ -8,12 +8,12 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/ring"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/container/ring"
 )
 
 var _ EventBroker = (*EventBus)(nil)
 
-var ringBufferLength = 200
+var ringBufferLength = 2000
 var napTime = 1 * time.Millisecond
 var _signal struct{}
 
@@ -24,7 +24,6 @@ type EventBus struct {
 	callbackHandlers *handlerMap
 	streamHandlers   *handlerMap
 	preprocessors    map[string][]idTopicProcessor
-	ringbuffer       *ring.Buffer
 }
 
 type idTopicProcessor struct {
@@ -40,7 +39,6 @@ func NewEventBus() *EventBus {
 		newHandlerMap(),
 		newHandlerMap(),
 		make(map[string][]idTopicProcessor),
-		ring.NewBuffer(ringBufferLength),
 	}
 }
 
@@ -78,50 +76,39 @@ func (bus *EventBus) subscribeStream(topic string, handler *streamHandler) {
 	bus.streamHandlers.Store(topic, handler)
 }
 
-func newStreamHandler(id uint32, topic string) *streamHandler {
+func newStreamHandler(id uint32, topic string, ringbuffer *ring.Buffer) *streamHandler {
 	exitChan := make(chan struct{}, 1)
-	return &streamHandler{id, exitChan, topic}
+	return &streamHandler{id, exitChan, topic, ringbuffer}
 }
 
-// Pipe to a WriteCloser. If all messages are consumed, the process stops to give the producer a chance to produce more messages
-func (s *streamHandler) Pipe(c *ring.Consumer, w io.WriteCloser) {
-	for {
-		select {
-		case <-s.exitChan:
-			if err := w.Close(); err != nil {
-				log.WithFields(log.Fields{
-					"process": "eventbus",
-					"topic":   s.topic,
-				}).WithError(err).Warnln("error in closing the WriteCloser")
-			}
-			return
-		default:
-			data, duplicate := c.Consume()
-			if !duplicate {
-				if _, err := w.Write(data); err != nil {
-					log.WithFields(log.Fields{
-						"process": "eventbus",
-						"topic":   s.topic,
-					}).WithError(err).Warnln("error in writing to WriteCloser")
-					s.exitChan <- _signal
-				}
-				continue
-			}
-			time.Sleep(napTime)
+func Consume(items [][]byte, w io.WriteCloser) bool {
+	for _, data := range items {
+		if _, err := w.Write(data); err != nil {
+			log.WithFields(log.Fields{
+				"process": "eventbus",
+			}).WithError(err).Warnln("error in writing to WriteCloser")
+			return false
 		}
 	}
+
+	return true
 }
 
 // SubscribeStream subscribes to a topic with a stream.
 func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
 	id := rand.Uint32()
-	c := ring.NewConsumer(bus.ringbuffer)
-	sh := newStreamHandler(id, topic)
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
-	bus.subscribeStream(topic, sh)
 
-	go sh.Pipe(c, w)
+	// Each streamHandler uses its own ringBuffer to collect topic events
+	// Multiple-producers single-consumer approach utilizing a ringBuffer
+	ringBuf := ring.NewBuffer(ringBufferLength)
+	sh := newStreamHandler(id, topic, ringBuf)
+
+	// single-consumer
+	_ = ring.NewConsumer(ringBuf, Consume, w)
+
+	bus.subscribeStream(topic, sh)
 	return id
 }
 
@@ -239,8 +226,12 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 	}
 
 	// The handlers are simply a means to avoid memory leaks.
-	if handlers := bus.streamHandlers.Load(topic); handlers != nil {
-		bus.ringbuffer.Put(processedMsg.Bytes())
+	handlers := bus.streamHandlers.Load(topic)
+	for _, handler := range handlers {
+		ringBuffer := handler.GetBuffer()
+		if ringBuffer != nil {
+			ringBuffer.Put(processedMsg.Bytes())
+		}
 	}
 }
 
