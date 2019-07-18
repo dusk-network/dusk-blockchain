@@ -90,7 +90,7 @@ func TestWriteLoop(t *testing.T) {
 	go func() {
 		responseChan := make(chan *bytes.Buffer)
 		writer := peer.NewWriter(client, protocol.TestNet, bus)
-		go writer.WriteLoop(responseChan, make(chan struct{}, 1))
+		go writer.Serve(responseChan, make(chan struct{}, 1))
 
 		bufCopy := *buf
 		responseChan <- &bufCopy
@@ -149,7 +149,6 @@ func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 func addPeer(bus *wire.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
 	client, srv := net.Pipe()
 	pw := peer.NewWriter(client, protocol.TestNet, bus)
-	pw.Subscribe(bus)
 	go receiveFunc(srv)
 	return pw
 }

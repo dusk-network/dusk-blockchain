@@ -86,6 +86,7 @@ func Consume(items [][]byte, w io.WriteCloser) bool {
 		if _, err := w.Write(data); err != nil {
 			log.WithFields(log.Fields{
 				"process": "eventbus",
+				"queue":   "ringbuffer",
 			}).WithError(err).Warnln("error in writing to WriteCloser")
 			return false
 		}
