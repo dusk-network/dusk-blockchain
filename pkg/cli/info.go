@@ -20,7 +20,7 @@ var commandInfo = map[string]string{
 		Bid a given amount of DUSK, to allow participation as a block generator in consensus. Make sure to use the sync command first.`,
 	"startprovisioner": `Send a signal to the connected DUSK node to start participating in consensus as a provisioner.`,
 	"startblockgenerator": `Usage: startblockgenerator [bidtxhash]
-		Send a signal to the connected DUSK node to start participating in consensus as a block generator`,
+		Send a signal to the connected DUSK node to start participating in consensus as a block generator. Specified bid tx must be included in a block before trying to start the block generation component.`,
 	"showlogs":  "Close the shell and show the internal logs on the terminal. Press enter to return to the shell.",
 	"exit/quit": `Shut down the node and close the console`,
 }
