@@ -68,9 +68,6 @@ func (s *eventSelector) startSelection() {
 		case <-timer.C:
 			s.publishBestEvent()
 		case <-s.timer.TimeOutChan:
-			s.lock.Lock()
-			s.bestEvent = nil
-			s.lock.Unlock()
 		}
 		s.lock.Lock()
 		s.running = false
@@ -90,10 +87,7 @@ func (s *eventSelector) Process(ev wire.Event) {
 
 		s.repropagate(ev)
 		s.propagateCertificate(ev)
-
-		s.lock.Lock()
-		defer s.lock.Unlock()
-		s.bestEvent = ev
+		s.setBestEvent(ev)
 	}
 }
 
@@ -139,16 +133,21 @@ func (s *eventSelector) publishBestEvent() {
 	}
 	s.publisher.Publish(msg.BestScoreTopic, buf)
 	s.state.IncrementStep()
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.bestEvent = nil
+	s.setBestEvent(nil)
 }
 
 func (s *eventSelector) stopSelection() {
+	s.setBestEvent(nil)
 	select {
 	case s.timer.TimeOutChan <- empty:
 	default:
 	}
+}
+
+func (s *eventSelector) setBestEvent(ev wire.Event) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.bestEvent = ev
 }
 
 func (s *eventSelector) isRunning() bool {

@@ -120,6 +120,31 @@ func TestTimeOutVariance(t *testing.T) {
 	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.05)
 }
 
+// This test should make sure that obsolete selection messages do not stay in the selector after updating the round
+func TestObsoleteSelection(t *testing.T) {
+	eb := wire.NewEventBus()
+	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*100)
+	// subscribe to receive a result
+	bestScoreChan := make(chan *bytes.Buffer, 2)
+	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
+
+	// Start selection and let it run out
+	consensus.UpdateRound(eb, 1)
+	<-bestScoreChan
+
+	// Now send an event to the selector
+	sendMockEvent(eb)
+	time.Sleep(200 * time.Millisecond)
+
+	// Start selection on round 2
+	// This should clear the bestEvent, and let no others through
+	consensus.UpdateRound(eb, 2)
+
+	// Result should be nil
+	result := <-bestScoreChan
+	assert.Equal(t, 0, result.Len())
+}
+
 func publishRegeneration(eb *wire.EventBus) {
 	state := make([]byte, 9)
 	binary.LittleEndian.PutUint64(state[0:8], 1)
@@ -135,7 +160,7 @@ type mockScoreHandler struct {
 	consensus.EventHandler
 }
 
-func newMockScoreHandler() selection.ScoreEventHandler {
+func newMockScoreHandler() *mockScoreHandler {
 	return &mockScoreHandler{
 		EventHandler: newMockHandler(),
 	}
@@ -146,8 +171,11 @@ func (m *mockScoreHandler) Priority(ev1, ev2 wire.Event) bool {
 }
 
 func (m *mockScoreHandler) Marshal(b *bytes.Buffer, ev wire.Event) error {
-	_, err := b.Write([]byte("foo"))
-	return err
+	if ev != nil {
+		_, err := b.Write([]byte("foo"))
+		return err
+	}
+	return nil
 }
 
 func (m *mockScoreHandler) UpdateBidList(bL user.Bid)      {}
