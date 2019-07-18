@@ -12,34 +12,17 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/logging"
 )
-
-func initLog(file *os.File) {
-
-	// apply logger level from configurations
-	level, err := log.ParseLevel(cfg.Get().Logger.Level)
-	if err == nil {
-		log.SetLevel(level)
-	} else {
-		log.SetLevel(log.TraceLevel)
-		log.Warnf("Parse logger level from config err: %v", err)
-	}
-
-	if file != nil {
-		log.SetOutput(file)
-	} else {
-		log.SetOutput(os.Stdout)
-	}
-}
 
 func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	// TODO: use logging for this?
 	fmt.Fprintln(os.Stdout, "initializing node...")
 	// Loading all node configurations. Fail-fast if critical error occurs
-	if err := cfg.Load(); err != nil {
+	err := cfg.Load()
+	if err != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}
@@ -50,16 +33,18 @@ func main() {
 	// Set up logging.
 	// Any subsystem should be initialized after config and logger loading
 	output := cfg.Get().Logger.Output
+	var logFile *os.File
 	if cfg.Get().Logger.Output != "stdout" {
-		file, err := os.Create(output + port + ".log")
+		logFile, err = os.Create(output + port + ".log")
 		if err != nil {
 			panic(err)
 		}
-		defer file.Close()
-		initLog(file)
+		defer logFile.Close()
 	} else {
-		initLog(nil)
+		logFile = os.Stdout
 	}
+
+	logging.InitLog(logFile)
 
 	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
 	log.Infof("Selected network  %s", cfg.Get().General.Network)
@@ -98,7 +83,9 @@ func main() {
 	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
 
 	// Start interactive shell
-	go cli.Start(srv.eventBus, srv.rpcBus)
+	if cfg.Get().Logger.Output != "stdout" {
+		go cli.Start(srv.eventBus, srv.rpcBus, logFile)
+	}
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
