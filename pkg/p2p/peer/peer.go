@@ -34,8 +34,9 @@ type Connection struct {
 // other network nodes.
 type Writer struct {
 	*Connection
-	gossip   *processing.Gossip
-	gossipID uint32
+	gossip     *processing.Gossip
+	gossipID   uint32
+	subscriber wire.EventSubscriber
 	// TODO: add service flag
 }
 
@@ -58,7 +59,8 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 			Conn:  conn,
 			magic: magic,
 		},
-		gossip: processing.NewGossip(magic),
+		gossip:     processing.NewGossip(magic),
+		subscriber: subscriber,
 	}
 
 	return pw
@@ -111,20 +113,13 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
-func (p *Writer) Connect(subscriber wire.EventSubscriber) error {
+func (p *Writer) Connect() error {
 	if err := p.Handshake(); err != nil {
 		p.Conn.Close()
 		return err
 	}
 
-	p.Subscribe(subscriber)
 	return nil
-}
-
-// Subscribe the writer to the gossip topic, passing it's connection as the writer.
-func (p *Writer) Subscribe(subscriber wire.EventSubscriber) {
-	id := subscriber.SubscribeStream(string(topics.Gossip), p.Connection)
-	p.gossipID = id
 }
 
 // Accept will perform the protocol handshake with the peer.
@@ -137,15 +132,31 @@ func (p *Reader) Accept() error {
 	return nil
 }
 
-// WriteLoop waits for messages to arrive on the `responseChan`, which are intended
-// only for this specific peer. The messages get prepended with a magic, and then
-// are COBS encoded before being sent over the wire.
-func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-	defer w.Conn.Close()
+// Serve utilizes two different methods for writing to the open connection
+func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
+
+	defer w.onDisconnect()
+
+	// Any gossip topics are written into interrupt-driven ringBuffer
+	// Single-consumer pushes messages to the socket
+	w.gossipID = w.subscriber.SubscribeStream(string(topics.Gossip), w.Connection)
+
+	// writeQueue - FIFO queue
+	// writeLoop pushes first-in message to the socket
+	w.writeLoop(writeQueueChan, exitChan)
+}
+
+func (w *Writer) onDisconnect() {
+	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
+	w.Conn.Close()
+	w.subscriber.Unsubscribe(string(topics.Gossip), w.gossipID)
+}
+
+func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
 
 	for {
 		select {
-		case buf := <-responseChan:
+		case buf := <-writeQueueChan:
 			processed, err := w.gossip.Process(buf)
 			if err != nil {
 				log.WithFields(log.Fields{
@@ -158,6 +169,7 @@ func (w *Writer) WriteLoop(responseChan <-chan *bytes.Buffer, exitChan chan stru
 			if _, err := w.Connection.Write(processed.Bytes()); err != nil {
 				log.WithFields(log.Fields{
 					"process": "peer",
+					"queue":   "writequeue",
 					"error":   err,
 				}).Warnln("error writing message")
 				exitChan <- struct{}{}

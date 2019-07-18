@@ -111,10 +111,18 @@ func (p *Provisioners) extractCommitteeMember(score, round uint64) (int, bls.Pub
 		}
 
 		m := p.MemberAt(i)
-		if m.Stake >= score {
+		stake, err := p.GetStake(m.PublicKeyBLS.Marshal())
+		if err != nil {
+			// If we get an error from GetStake, it means we either got a public key of a
+			// provisioner who is no longer in the set, or we got a malformed public key.
+			// We can't repair our committee on the fly, so we have to panic.
+			panic(err)
+		}
+
+		if stake >= score {
 			return i, m.PublicKeyBLS
 		}
 
-		score -= m.Stake
+		score -= stake
 	}
 }

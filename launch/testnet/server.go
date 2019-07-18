@@ -96,9 +96,9 @@ func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
 
 // OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
-	responseChan := make(chan *bytes.Buffer, 100)
+	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan, exitChan)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
@@ -116,17 +116,17 @@ func (s *Server) OnAccept(conn net.Conn) {
 	}).Debugln("connection established")
 
 	go peerReader.ReadLoop()
+
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
-	peerWriter.Subscribe(s.eventBus)
-	go peerWriter.WriteLoop(responseChan, exitChan)
+	go peerWriter.Serve(writeQueueChan, exitChan)
 }
 
 // OnConnection is the callback for writing to the peers
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	messageQueueChan := make(chan *bytes.Buffer, 100)
+	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 
-	if err := peerWriter.Connect(s.eventBus); err != nil {
+	if err := peerWriter.Connect(); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -139,17 +139,18 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}).Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, messageQueueChan, exitChan)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
 
 	go peerReader.ReadLoop()
-	go peerWriter.WriteLoop(messageQueueChan, exitChan)
+	go peerWriter.Serve(writeQueueChan, exitChan)
 }
 
 // Close the chain and the connections created through the RPC bus
 func (s *Server) Close() {
+	// TODO: disconnect peers
 	s.chain.Close()
 	s.rpcBus.Close()
 }

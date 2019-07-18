@@ -50,7 +50,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
 		return err
 	}
 
-	log.WithField("our height", blk.Header.Height).WithField("their height", height).Traceln("block received")
+	log.WithField("our height", blk.Header.Height).WithField("received block height", height).Debugln("block received")
 	// Only ask for missing blocks if we are not currently syncing, to prevent
 	// asking many peers for (generally) the same blocks.
 	diff := compareHeights(blk.Header.Height, height)
