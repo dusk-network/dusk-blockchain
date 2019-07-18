@@ -162,7 +162,7 @@ func showLogs(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	// Set output back to log file established at startup
 	log.SetOutput(logFile)
 
-	fmt.Fprintln(os.Stdout, "restarting shell...")
+	fmt.Fprintln(os.Stdout, "\nrestarting shell...")
 }
 
 func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
