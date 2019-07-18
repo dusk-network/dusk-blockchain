@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/logging"
 )
 
 // Start the interactive shell.
@@ -20,7 +21,7 @@ func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File) 
 		if fn := CLICommands[args[0]]; fn != nil {
 			fn(args[1:], eventBroker, rpcBus)
 		} else if args[0] == "showlogs" {
-			showLogs(logFile)
+			showLogs(args[1:], logFile)
 		} else {
 			fmt.Printf("%v is not a supported command\n", args[0])
 		}
@@ -36,7 +37,11 @@ func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File) 
 	}
 }
 
-func showLogs(logFile *os.File) {
+func showLogs(args []string, logFile *os.File) {
+	if len(args) > 0 {
+		logging.SetToLevel(args[0])
+	}
+
 	fmt.Fprintln(os.Stdout, "Logging to the terminal - press enter to stop and restart the shell")
 
 	// Swap logrus output to a multiwriter, writing both to the file and to os.Stdout
@@ -49,8 +54,8 @@ func showLogs(logFile *os.File) {
 		break
 	}
 
-	// Set output back to log file established at startup
-	log.SetOutput(logFile)
+	// Set output and level back to defaults
+	logging.InitLog(logFile)
 
 	fmt.Fprintln(os.Stdout, "\nrestarting shell...")
 }

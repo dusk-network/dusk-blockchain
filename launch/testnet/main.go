@@ -12,20 +12,8 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/cli"
 	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/logging"
 )
-
-func initLog(logFile *os.File) {
-	// apply logger level from configurations
-	level, err := log.ParseLevel(cfg.Get().Logger.Level)
-	if err == nil {
-		log.SetLevel(level)
-	} else {
-		log.SetLevel(log.TraceLevel)
-		log.Warnf("Parse logger level from config err: %v", err)
-	}
-
-	log.SetOutput(logFile)
-}
 
 func main() {
 	interrupt := make(chan os.Signal, 1)
@@ -55,7 +43,8 @@ func main() {
 	} else {
 		logFile = os.Stdout
 	}
-	initLog(logFile)
+
+	logging.InitLog(logFile)
 
 	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
 	log.Infof("Selected network  %s", cfg.Get().General.Network)
