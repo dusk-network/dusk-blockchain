@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"math"
 	"math/big"
 	"os"
@@ -11,7 +9,6 @@ import (
 	"strconv"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	log "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
@@ -37,7 +34,6 @@ var CLICommands = map[string]func([]string, wire.EventBroker, *wire.RPCBus){
 	"sync":                syncWalletCMD,
 	"startprovisioner":    startProvisioner,
 	"startblockgenerator": startBlockGenerator,
-	"showlogs":            showLogs,
 	"exit":                stopNode,
 	"quit":                stopNode,
 }
@@ -143,26 +139,6 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 	generation.Launch(publisher, rpcBus, d, k, nil, nil, keys, &publicKey)
 
 	fmt.Fprintf(os.Stdout, "block generator module started\nto more accurately follow the progression of consensus, use the showlogs command")
-}
-
-func showLogs(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	fmt.Fprintln(os.Stdout, "Logging to the terminal - press any key to stop and restart the shell")
-
-	// Swap logrus output to a multiwriter, writing both to the file and to os.Stdout
-	mw := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(mw)
-
-	// Hacky way to capture keystrokes
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Split(bufio.ScanBytes)
-	for scanner.Scan() {
-		break
-	}
-
-	// Set output back to log file established at startup
-	log.SetOutput(logFile)
-
-	fmt.Fprintln(os.Stdout, "\nrestarting shell...")
 }
 
 func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {

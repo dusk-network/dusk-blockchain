@@ -14,9 +14,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
 )
 
-var logFile *os.File
-
-func initLog(file *os.File) {
+func initLog(logFile *os.File) {
 	// apply logger level from configurations
 	level, err := log.ParseLevel(cfg.Get().Logger.Level)
 	if err == nil {
@@ -26,12 +24,7 @@ func initLog(file *os.File) {
 		log.Warnf("Parse logger level from config err: %v", err)
 	}
 
-	if file != nil {
-		log.SetOutput(file)
-	} else {
-		logFile = os.Stdout
-		log.SetOutput(os.Stdout)
-	}
+	log.SetOutput(logFile)
 }
 
 func main() {
@@ -40,7 +33,8 @@ func main() {
 
 	fmt.Fprintln(os.Stdout, "initializing node...")
 	// Loading all node configurations. Fail-fast if critical error occurs
-	if err := cfg.Load(); err != nil {
+	err := cfg.Load()
+	if err != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
 	}
@@ -51,16 +45,17 @@ func main() {
 	// Set up logging.
 	// Any subsystem should be initialized after config and logger loading
 	output := cfg.Get().Logger.Output
+	var logFile *os.File
 	if cfg.Get().Logger.Output != "stdout" {
 		logFile, err = os.Create(output + port + ".log")
 		if err != nil {
 			panic(err)
 		}
-		defer file.Close()
-		initLog(file)
+		defer logFile.Close()
 	} else {
-		initLog(nil)
+		logFile = os.Stdout
 	}
+	initLog(logFile)
 
 	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
 	log.Infof("Selected network  %s", cfg.Get().General.Network)
@@ -100,7 +95,7 @@ func main() {
 
 	// Start interactive shell
 	if cfg.Get().Logger.Output != "stdout" {
-		go cli.Start(srv.eventBus, srv.rpcBus)
+		go cli.Start(srv.eventBus, srv.rpcBus, logFile)
 	}
 
 	// Wait until the interrupt signal is received from an OS signal or

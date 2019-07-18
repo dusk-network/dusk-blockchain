@@ -21,6 +21,6 @@ var commandInfo = map[string]string{
 	"startprovisioner": `Send a signal to the connected DUSK node to start participating in consensus as a provisioner.`,
 	"startblockgenerator": `Usage: startblockgenerator [bidtxhash]
 		Send a signal to the connected DUSK node to start participating in consensus as a block generator`,
-	"showlogs":  "Close the shell and show the internal logs on the terminal. Press any key to return to the shell.",
+	"showlogs":  "Close the shell and show the internal logs on the terminal. Press enter to return to the shell.",
 	"exit/quit": `Shut down the node and close the console`,
 }
