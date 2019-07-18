@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -110,8 +111,13 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 	var k ristretto.Scalar
 	k.Derive(kBytes)
 
-	// fetch d
-	txID := []byte(args[0])
+	txID, err := hex.DecodeString(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error attempting to decode tx: %v\n", err)
+		return
+	}
+
+	// fetch bid tx
 	_, db := heavy.CreateDBConnection()
 	var tx transactions.Transaction
 	err = db.View(func(t database.Transaction) error {
