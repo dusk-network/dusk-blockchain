@@ -3,7 +3,6 @@
 |Table of Contents|
 |---|
 |[What is the Dusk Network Testnet Shin (殉星)?](#what-is-a-dusk-network-testnet-v1-shin)|
-|[Why should one participate in the Dusk Network Testnet Shin (殉星)?](#why-should-one-participate-in-the-dusk-network-testnet-v1-shin)|
 |[Specification Requirements](#specification-requirements)|
 |[Intallation Guide](#intallation-guide)|
 |[Features](#features)|
@@ -18,7 +17,6 @@
 |[How to become a Block Generator?](#how-to-become-a-block-generator)|
 ## What is a Dusk Network Testnet Shin (殉星) ?
 Dusk Network Testnet Shin (殉星) is the first publicly-available implementation of the Dusk Network protocol. Dusk Network is a privacy-oriented blockchain protocol, that anyone can use to create zero-knowledge dApps. The Dusk Network protocol is secured via Segregated Byzantine Agreement consensus protocol. Segregated Byzantine Agreement is a permission-less consensus protocol with statistical block finality. Segregated Byzantine Agreement also includes Proof of Blind Bid, a novel Private Proof-of-Stake implementation, that enables Block Generators to stake anonymously.
-## Why should one participate in the Dusk Network Testnet Shin (殉星) ?
 ## Specification Requirements
 ### Minimum Specifications
 | CPU | RAM | Storage | Network Connection |
