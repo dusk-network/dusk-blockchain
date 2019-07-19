@@ -47,7 +47,6 @@ func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPC
 
 	db, err := walletdb.New(dbName)
 	if err != nil {
-		// TODO: use logger over fmt.Print
 		fmt.Fprintf(os.Stdout, "error opening database: %v\n", err)
 		return
 	}
