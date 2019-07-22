@@ -150,8 +150,8 @@ func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
 // NewRequest builds a new request with params
 func NewRequest(p bytes.Buffer, timeout int) Req {
 	d := Req{Timeout: timeout, Params: p}
-	d.RespChan = make(chan bytes.Buffer)
-	d.ErrChan = make(chan error)
+	d.RespChan = make(chan bytes.Buffer, 1)
+	d.ErrChan = make(chan error, 1)
 	return d
 }
 
