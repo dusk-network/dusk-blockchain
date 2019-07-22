@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -37,7 +36,7 @@ func TestLogger(t *testing.T) {
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(23), result["round"])
 
-	_ = conn.Close()
+	_ = logProc.Close()
 }
 
 func TestSupervisor(t *testing.T) {
@@ -151,7 +150,6 @@ func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 
 func initTest() (<-chan map[string]interface{}, string) {
 	addr := unixSocPath()
-	_ = os.Remove(addr)
 	msgChan := startSrv(addr)
 	return msgChan, addr
 }
@@ -192,6 +190,9 @@ func spinSrv(addr string) <-chan map[string]interface{} {
 			panic("Connection is nil")
 		}
 
+		// Close the listener once we have one connection
+		srv.Close()
+
 		// we create a decoder that reads directly from the socket
 		d := json.NewDecoder(conn)
 		for {
@@ -205,7 +206,6 @@ func spinSrv(addr string) <-chan map[string]interface{} {
 			resChan <- msg
 		}
 		_ = conn.Close()
-		srv.Close()
 	}()
 
 	return resChan
