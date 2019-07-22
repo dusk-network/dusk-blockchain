@@ -33,6 +33,7 @@ type Registry struct {
 	// All configuration groups
 	General     generalConfiguration
 	Database    databaseConfiguration
+	Wallet      walletConfiguration
 	Network     networkConfiguration
 	Logger      loggerConfiguration
 	Prof        profConfiguration
@@ -149,7 +150,9 @@ func defineFlags() {
 	_ = pflag.StringP("general.network", "n", "testnet", "override general.network settings in config file")
 	_ = pflag.StringP("network.port", "p", "7000", "port for the node to bind on")
 	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output")
-	_ = pflag.StringP("database.dir", "d", "chain", "sets the database directory")
+	_ = pflag.StringP("database.dir", "b", "chain", "sets the blockchain database directory")
+	_ = pflag.StringP("wallet.file", "w", "wallet.dat", "sets the wallet file to use")
+	_ = pflag.StringP("wallet.store", "d", "walletDB", "sets the wallet database directory")
 	_ = pflag.StringP("rpc.port", "r", "9000", "sets rpc server port")
 }
 
@@ -186,4 +189,6 @@ func init() {
 	r = new(Registry)
 	r.Database.Driver = "lite_v0.1.0"
 	r.General.Network = "testnet"
+	r.Wallet.File = "wallet.dat"
+	r.Wallet.Store = "walletDB"
 }
