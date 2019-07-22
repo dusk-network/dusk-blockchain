@@ -39,6 +39,12 @@ type databaseConfiguration struct {
 	Dir    string
 }
 
+// wallet configs
+type walletConfiguration struct {
+	File  string
+	Store string
+}
+
 // pprof configs
 type profConfiguration struct {
 	Address string

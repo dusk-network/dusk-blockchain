@@ -8,7 +8,7 @@ import (
 	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
@@ -23,7 +23,6 @@ import (
 )
 
 var testnet = byte(2)
-var dbName = "walletDb"
 
 // cliWallet will be used to scan blocks in the background
 // when we received a topic.AcceptedBlock
@@ -45,7 +44,7 @@ func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPC
 	}
 	password := args[0]
 
-	db, err := walletdb.New(dbName)
+	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error opening database: %v\n", err)
 		return
@@ -101,7 +100,7 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 	}
 
 	// First load the database
-	db, err := walletdb.New(dbName)
+	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -144,7 +143,7 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 	}
 
 	// Create a new standard tx
-	tx, err := w.NewStandardTx(config.MinFee)
+	tx, err := w.NewStandardTx(cfg.MinFee)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
@@ -221,7 +220,7 @@ func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
 	}
 
 	// First load the database
-	db, err := walletdb.New(dbName)
+	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +266,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 	}
 
 	// Create a new stake tx
-	tx, err := w.NewStakeTx(config.MinFee, lockTime, amount)
+	tx, err := w.NewStakeTx(cfg.MinFee, lockTime, amount)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
@@ -330,7 +329,7 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 	}
 
 	// Create a new bid tx
-	tx, err := w.NewBidTx(config.MinFee, lockTime, amount)
+	tx, err := w.NewBidTx(cfg.MinFee, lockTime, amount)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
 		return
