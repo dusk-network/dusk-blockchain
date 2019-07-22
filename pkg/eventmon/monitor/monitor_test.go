@@ -37,6 +37,8 @@ func TestLogger(t *testing.T) {
 	assert.Equal(t, float64(23), result["round"])
 
 	_ = logProc.Close()
+	// Make sure server is shut down
+	<-msgChan
 }
 
 func TestSupervisor(t *testing.T) {
@@ -53,6 +55,8 @@ func TestSupervisor(t *testing.T) {
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(23), result["round"])
 	_ = supervisor.Stop()
+	// Make sure server is shut down
+	<-msgChan
 }
 
 func TestSupervisorReconnect(t *testing.T) {
@@ -67,6 +71,8 @@ func TestSupervisorReconnect(t *testing.T) {
 	<-msgChan
 
 	assert.NoError(t, supervisor.Stop())
+	// Make sure server is shut down
+	<-msgChan
 
 	testBuf = mockBlockBuf(t, 24)
 	eb.Publish(string(topics.AcceptedBlock), testBuf)
@@ -88,6 +94,8 @@ func TestSupervisorReconnect(t *testing.T) {
 	assert.Equal(t, float64(24), result["round"])
 
 	_ = supervisor.Stop()
+	// Make sure server is shut down
+	<-msgChan
 }
 
 func TestResumeRight(t *testing.T) {
@@ -111,6 +119,8 @@ func TestResumeRight(t *testing.T) {
 	assert.InDelta(t, float64(1), round2["blockTime"], float64(0.1))
 
 	_ = supervisor.Stop()
+	// Make sure server is shut down
+	<-msgChan
 }
 
 func TestNotifyErrors(t *testing.T) {
@@ -136,6 +146,9 @@ func TestNotifyErrors(t *testing.T) {
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
 	<-endChan
+	_ = supervisor.Stop()
+	// Make sure server is shut down
+	<-msgChan
 }
 
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
@@ -190,9 +203,6 @@ func spinSrv(addr string) <-chan map[string]interface{} {
 			panic("Connection is nil")
 		}
 
-		// Close the listener once we have one connection
-		srv.Close()
-
 		// we create a decoder that reads directly from the socket
 		d := json.NewDecoder(conn)
 		for {
@@ -206,6 +216,8 @@ func spinSrv(addr string) <-chan map[string]interface{} {
 			resChan <- msg
 		}
 		_ = conn.Close()
+		srv.Close()
+		resChan <- nil
 	}()
 
 	return resChan
