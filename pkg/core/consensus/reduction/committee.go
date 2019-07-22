@@ -8,7 +8,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
-const committeeSize = 50
+const committeeSize = 64
 
 // Reducers defines a committee of reducers, and provides the ability to detect those
 // who are not properly participating in this phase of the consensus.
