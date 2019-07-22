@@ -6,7 +6,7 @@ import (
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
 )
 
-const committeeSize = 100
+const committeeSize = 64
 
 type Agreement struct {
 	*Extractor
