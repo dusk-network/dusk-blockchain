@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -163,6 +164,7 @@ func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 
 func initTest() (<-chan map[string]interface{}, string) {
 	addr := unixSocPath()
+	_ = os.Remove(addr)
 	msgChan := startSrv(addr)
 	return msgChan, addr
 }
