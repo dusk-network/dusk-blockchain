@@ -2,7 +2,7 @@
 ## Shin (殉星) Release
 |Table of Contents|
 |---|
-|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-the-dusk-network-testnet-v1-shin)|
+|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-the-dusk-network-testnet-shin)|
 |[Specification Requirements](#specification-requirements)|
 |[Intallation Guide](#intallation-guide)|
 |[Features](#features)|
@@ -10,6 +10,7 @@
 |[How to create a wallet?](#how-to-create-a-wallet)|
 |[How to create a wallet from a seed?](#how-to-create-a-wallet-from-a-seed)|
 |[How to load a wallet?](#how-to-load-a-wallet)|
+|[How to sync the wallet with the blockchain?](#how-to-sync-the-wallet-with-the-blockchain)|
 |[How to check the balance of the address?](#how-to-check-the-balance-of-the-address)|
 |[How to claim Testnet DUSK?](#how-to-claim-testnet-dusk)|
 |[How to transfer tDUSK?](#how-to-transfer-tdusk)|
