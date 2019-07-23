@@ -78,7 +78,7 @@ func startProvisioner(args []string, publisher wire.EventBroker, rpcBus *wire.RP
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, "provisioner module started\nto more accurately follow the progression of consensus, use the showlogs command")
+	fmt.Fprintf(os.Stdout, "provisioner module started\nto more accurately follow the progression of consensus, use the showlogs command\n")
 }
 
 func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
@@ -144,7 +144,7 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 	publicKey := cliWallet.PublicKey()
 	generation.Launch(publisher, rpcBus, d, k, nil, nil, keys, &publicKey)
 
-	fmt.Fprintf(os.Stdout, "block generator module started\nto more accurately follow the progression of consensus, use the showlogs command")
+	fmt.Fprintf(os.Stdout, "block generator module started\nto more accurately follow the progression of consensus, use the showlogs command\n")
 }
 
 func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
