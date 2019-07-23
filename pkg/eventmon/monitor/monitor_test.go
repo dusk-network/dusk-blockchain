@@ -109,12 +109,17 @@ func TestResumeRight(t *testing.T) {
 		assert.FailNow(t, "First round should not really have a block time. Instead found %d", round1["blockTime"])
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(3 * time.Second)
+	// If we got any messages, discard (it could happen that we get a goroutine message for instance)
+	for len(msgChan) > 0 {
+		<-msgChan
+	}
+
 	testBuf = mockBlockBuf(t, 24)
 	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	round2 := <-msgChan
 
-	assert.InDelta(t, float64(1), round2["blockTime"], float64(0.1))
+	assert.InDelta(t, float64(3), round2["blockTime"], float64(1))
 
 	_ = supervisor.Stop()
 	wg.Wait()
@@ -180,7 +185,7 @@ func unixSocPath() string {
 }
 
 func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
-	resChan := make(chan map[string]interface{})
+	resChan := make(chan map[string]interface{}, 5)
 	wg := &sync.WaitGroup{}
 
 	go func() {
