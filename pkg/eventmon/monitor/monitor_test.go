@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 const unixSoc = "unix:///tmp/dusk-socket"
 
 func TestLogger(t *testing.T) {
-	msgChan, addr := initTest()
+	msgChan, addr, wg := initTest()
 	eb := wire.NewEventBus()
 	conn, err := net.Dial("unix", addr)
 	assert.NoError(t, err)
@@ -38,12 +39,11 @@ func TestLogger(t *testing.T) {
 	assert.Equal(t, float64(23), result["round"])
 
 	_ = logProc.Close()
-	// Make sure server is shut down
-	<-msgChan
+	wg.Wait()
 }
 
 func TestSupervisor(t *testing.T) {
-	msgChan, _ := initTest()
+	msgChan, _, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -56,12 +56,11 @@ func TestSupervisor(t *testing.T) {
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(23), result["round"])
 	_ = supervisor.Stop()
-	// Make sure server is shut down
-	<-msgChan
+	wg.Wait()
 }
 
 func TestSupervisorReconnect(t *testing.T) {
-	msgChan, addr := initTest()
+	msgChan, addr, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -72,8 +71,7 @@ func TestSupervisorReconnect(t *testing.T) {
 	<-msgChan
 
 	assert.NoError(t, supervisor.Stop())
-	// Make sure server is shut down
-	<-msgChan
+	wg.Wait()
 
 	testBuf = mockBlockBuf(t, 24)
 	eb.Publish(string(topics.AcceptedBlock), testBuf)
@@ -85,7 +83,7 @@ func TestSupervisorReconnect(t *testing.T) {
 	}
 
 	// restarting the server as the Stop has likely killed it
-	msgChan = startSrv(addr)
+	msgChan, wg = startSrv(addr)
 	// reconnecting the supervised process
 	assert.NoError(t, supervisor.Reconnect())
 	// messages streamed when the process is down are lost, so we need to send another message
@@ -95,12 +93,11 @@ func TestSupervisorReconnect(t *testing.T) {
 	assert.Equal(t, float64(24), result["round"])
 
 	_ = supervisor.Stop()
-	// Make sure server is shut down
-	<-msgChan
+	wg.Wait()
 }
 
 func TestResumeRight(t *testing.T) {
-	msgChan, _ := initTest()
+	msgChan, _, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -120,13 +117,12 @@ func TestResumeRight(t *testing.T) {
 	assert.InDelta(t, float64(1), round2["blockTime"], float64(0.1))
 
 	_ = supervisor.Stop()
-	// Make sure server is shut down
-	<-msgChan
+	wg.Wait()
 }
 
 func TestNotifyErrors(t *testing.T) {
 	endChan := make(chan struct{})
-	msgChan, _ := initTest()
+	msgChan, _, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -148,8 +144,7 @@ func TestNotifyErrors(t *testing.T) {
 	assert.Equal(t, "monitor", result["process"])
 	<-endChan
 	_ = supervisor.Stop()
-	// Make sure server is shut down
-	<-msgChan
+	wg.Wait()
 }
 
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
@@ -162,18 +157,18 @@ func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 	return buf
 }
 
-func initTest() (<-chan map[string]interface{}, string) {
+func initTest() (<-chan map[string]interface{}, string, *sync.WaitGroup) {
 	addr := unixSocPath()
 	_ = os.Remove(addr)
-	msgChan := startSrv(addr)
-	return msgChan, addr
+	msgChan, wg := startSrv(addr)
+	return msgChan, addr, wg
 }
 
-func startSrv(addr string) <-chan map[string]interface{} {
-	msgChan := spinSrv(addr)
+func startSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
+	msgChan, wg := spinSrv(addr)
 	// waiting for the server to be up and running
 	<-msgChan
-	return msgChan
+	return msgChan, wg
 }
 
 func unixSocPath() string {
@@ -184,10 +179,12 @@ func unixSocPath() string {
 	return uri.Path
 }
 
-func spinSrv(addr string) <-chan map[string]interface{} {
+func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
 	resChan := make(chan map[string]interface{})
+	wg := &sync.WaitGroup{}
 
 	go func() {
+		wg.Add(1)
 		var conn net.Conn
 		srv, err := net.Listen("unix", addr)
 		if err != nil {
@@ -219,8 +216,8 @@ func spinSrv(addr string) <-chan map[string]interface{} {
 		}
 		_ = conn.Close()
 		srv.Close()
-		resChan <- nil
+		wg.Done()
 	}()
 
-	return resChan
+	return resChan, wg
 }
