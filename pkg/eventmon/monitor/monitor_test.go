@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 const unixSoc = "unix:///tmp/dusk-socket"
 
 func TestLogger(t *testing.T) {
-	msgChan, addr := initTest()
+	msgChan, addr, wg := initTest()
 	eb := wire.NewEventBus()
 	conn, err := net.Dial("unix", addr)
 	assert.NoError(t, err)
@@ -37,11 +38,12 @@ func TestLogger(t *testing.T) {
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(23), result["round"])
 
-	_ = conn.Close()
+	_ = logProc.Close()
+	wg.Wait()
 }
 
 func TestSupervisor(t *testing.T) {
-	msgChan, _ := initTest()
+	msgChan, _, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -54,10 +56,11 @@ func TestSupervisor(t *testing.T) {
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(23), result["round"])
 	_ = supervisor.Stop()
+	wg.Wait()
 }
 
 func TestSupervisorReconnect(t *testing.T) {
-	msgChan, addr := initTest()
+	msgChan, addr, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -68,6 +71,7 @@ func TestSupervisorReconnect(t *testing.T) {
 	<-msgChan
 
 	assert.NoError(t, supervisor.Stop())
+	wg.Wait()
 
 	testBuf = mockBlockBuf(t, 24)
 	eb.Publish(string(topics.AcceptedBlock), testBuf)
@@ -79,7 +83,7 @@ func TestSupervisorReconnect(t *testing.T) {
 	}
 
 	// restarting the server as the Stop has likely killed it
-	msgChan = startSrv(addr)
+	msgChan, wg = startSrv(addr)
 	// reconnecting the supervised process
 	assert.NoError(t, supervisor.Reconnect())
 	// messages streamed when the process is down are lost, so we need to send another message
@@ -89,10 +93,11 @@ func TestSupervisorReconnect(t *testing.T) {
 	assert.Equal(t, float64(24), result["round"])
 
 	_ = supervisor.Stop()
+	wg.Wait()
 }
 
 func TestResumeRight(t *testing.T) {
-	msgChan, _ := initTest()
+	msgChan, _, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -104,19 +109,25 @@ func TestResumeRight(t *testing.T) {
 		assert.FailNow(t, "First round should not really have a block time. Instead found %d", round1["blockTime"])
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(3 * time.Second)
+	// If we got any messages, discard (it could happen that we get a goroutine message for instance)
+	for len(msgChan) > 0 {
+		<-msgChan
+	}
+
 	testBuf = mockBlockBuf(t, 24)
 	eb.Publish(string(topics.AcceptedBlock), testBuf)
 	round2 := <-msgChan
 
-	assert.InDelta(t, float64(1), round2["blockTime"], float64(0.1))
+	assert.InDelta(t, float64(3), round2["blockTime"], float64(1))
 
 	_ = supervisor.Stop()
+	wg.Wait()
 }
 
 func TestNotifyErrors(t *testing.T) {
 	endChan := make(chan struct{})
-	msgChan, _ := initTest()
+	msgChan, _, wg := initTest()
 	eb := wire.NewEventBus()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
@@ -137,6 +148,8 @@ func TestNotifyErrors(t *testing.T) {
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
 	<-endChan
+	_ = supervisor.Stop()
+	wg.Wait()
 }
 
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
@@ -149,18 +162,18 @@ func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 	return buf
 }
 
-func initTest() (<-chan map[string]interface{}, string) {
+func initTest() (<-chan map[string]interface{}, string, *sync.WaitGroup) {
 	addr := unixSocPath()
 	_ = os.Remove(addr)
-	msgChan := startSrv(addr)
-	return msgChan, addr
+	msgChan, wg := startSrv(addr)
+	return msgChan, addr, wg
 }
 
-func startSrv(addr string) <-chan map[string]interface{} {
-	msgChan := spinSrv(addr)
+func startSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
+	msgChan, wg := spinSrv(addr)
 	// waiting for the server to be up and running
 	<-msgChan
-	return msgChan
+	return msgChan, wg
 }
 
 func unixSocPath() string {
@@ -171,10 +184,12 @@ func unixSocPath() string {
 	return uri.Path
 }
 
-func spinSrv(addr string) <-chan map[string]interface{} {
-	resChan := make(chan map[string]interface{})
+func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
+	resChan := make(chan map[string]interface{}, 5)
+	wg := &sync.WaitGroup{}
 
 	go func() {
+		wg.Add(1)
 		var conn net.Conn
 		srv, err := net.Listen("unix", addr)
 		if err != nil {
@@ -206,7 +221,8 @@ func spinSrv(addr string) <-chan map[string]interface{} {
 		}
 		_ = conn.Close()
 		srv.Close()
+		wg.Done()
 	}()
 
-	return resChan
+	return resChan, wg
 }
