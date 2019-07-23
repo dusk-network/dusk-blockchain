@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-
 	logger "github.com/sirupsen/logrus"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 
