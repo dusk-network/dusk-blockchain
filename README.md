@@ -2,7 +2,7 @@
 ## Shin (殉星) Release
 |Table of Contents|
 |---|
-|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-a-dusk-network-testnet-v1-shin)|
+|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-the-dusk-network-testnet-v1-shin)|
 |[Specification Requirements](#specification-requirements)|
 |[Intallation Guide](#intallation-guide)|
 |[Features](#features)|
@@ -15,7 +15,7 @@
 |[How to transfer tDUSK?](#how-to-transfer-tdusk)|
 |[How to become a Provisioner?](#how-to-become-a-provisioner)|
 |[How to become a Block Generator?](#how-to-become-a-block-generator)|
-## What is Dusk Network Testnet Shin (殉星) ?
+## What is the Dusk Network Testnet Shin (殉星) ?
 Dusk Network Testnet Shin (殉星) is the first publicly-available implementation of the Dusk Network protocol. Dusk Network is a privacy-oriented blockchain protocol, that anyone can use to create zero-knowledge dApps. The Dusk Network protocol is secured via Segregated Byzantine Agreement consensus protocol. Segregated Byzantine Agreement is a permission-less consensus protocol with statistical block finality. Segregated Byzantine Agreement also includes Proof of Blind Bid, a novel Private Proof-of-Stake implementation, that enables Block Generators to stake anonymously.
 ## Specification Requirements
 ### Minimum Specifications
@@ -27,7 +27,7 @@ Dusk Network Testnet Shin (殉星) is the first publicly-available implementatio
 |---|---|---|---|
 |4 cores; 2 GHz| 4 GB | 250 GB | 10 Mbps |
 ## Intallation Guide
-This guide is for building the node from source. If you would like to just download the compiled program, head over to the releases tab.
+This guide is for building the node from source. If you would like to just download the compiled program, head over to the releases tab. 
 
 ### Requirements
 [Go](https://golang.org/) 1.11 or newer.
