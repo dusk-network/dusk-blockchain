@@ -45,8 +45,6 @@ func (l *loader) prefetch() error {
 		return err
 	}
 
-	// TODO: prefetch active stakes and bids
-
 	return nil
 }
 

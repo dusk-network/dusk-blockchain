@@ -43,8 +43,14 @@ address="monitor.dusk.network:1337"
 # Backend storage used to store chain
 # Supported drivers heavy_v0.1.0
 driver = "heavy_v0.1.0"
-# backend storage path
+# backend storage path -- should be different from wallet db dir
 dir = "chain"
+
+[wallet]
+# wallet file path 
+file = "wallet.dat"
+# wallet database path -- should be different from blockchain db dir
+store = "walletDB"
 
 [mempool]
 # Max size of memory of the accepted txs to keep

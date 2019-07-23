@@ -16,7 +16,6 @@ type seeder struct {
 }
 
 func (s *seeder) GenerateSeed(round uint64, prevSeed []byte) error {
-	// TODO: make an actual seed by signing the previous block seed
 	s.lock.Lock()
 	seed, err := bls.Sign(s.keys.BLSSecretKey, s.keys.BLSPubKey, prevSeed)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"math/big"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
 	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
@@ -26,8 +26,6 @@ import (
 
 // Number of mixins per ring. ringsize = mixin + 1
 const numMixins = 7
-
-const walletName = "wallet.dat"
 
 // FetchInputs returns a slice of inputs such that Sum(Inputs)- Sum(Outputs) >= 0
 // If > 0, then a change address is created for the remaining amount
@@ -362,7 +360,7 @@ func (w *Wallet) Balance() (float64, error) {
 		return 0, err
 	}
 	balanceInt, err := w.db.FetchBalance(privSpend.Bytes())
-	return float64(balanceInt / config.DUSK), nil
+	return float64(balanceInt / cfg.DUSK), nil
 }
 
 func (w *Wallet) GetSavedHeight() (uint64, error) {
@@ -418,7 +416,7 @@ func saveSeed(seed []byte, password string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(walletName, gcm.Seal(nonce, nonce, seed, nil), 0777)
+	return ioutil.WriteFile(cfg.Get().Wallet.File, gcm.Seal(nonce, nonce, seed, nil), 0777)
 }
 
 //Modified from https://tutorialedge.net/golang/go-encrypt-decrypt-aes-tutorial/
@@ -426,7 +424,7 @@ func fetchSeed(password string) ([]byte, error) {
 
 	digest := sha3.Sum256([]byte(password))
 
-	ciphertext, err := ioutil.ReadFile(walletName)
+	ciphertext, err := ioutil.ReadFile(cfg.Get().Wallet.File)
 	if err != nil {
 		return nil, err
 	}

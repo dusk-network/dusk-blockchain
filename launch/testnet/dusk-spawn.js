@@ -46,7 +46,7 @@ async function main(nodes = 1, ...flags) {
 
     const node = spawn(
       "./testnet",
-      ["-p=" + port, "-d=demo" + port, "-r=" + rpcport,],
+      ["-p=" + port, "-b=demo" + port, "-r=" + rpcport,],
       { stdio: ["ignore", "pipe", "pipe" ]}
     );
 

@@ -96,9 +96,11 @@ func (c *Chain) Listen() {
 
 			buf := new(bytes.Buffer)
 
-			c.mu.RLock()
-			_ = c.prevBlock.Encode(buf)
-			c.mu.RUnlock()
+			prevBlock := c.getPrevBlock()
+			if err := prevBlock.Encode(buf); err != nil {
+				r.ErrChan <- err
+				continue
+			}
 
 			r.RespChan <- *buf
 
@@ -197,22 +199,21 @@ func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
 	l.Trace("procedure started")
 
 	// 1. Check that stateless and stateful checks pass
-	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
+	if err := verifiers.CheckBlock(c.db, c.getPrevBlock(), blk); err != nil {
 		l.Errorf("verification failed: %s", err.Error())
 		return err
 	}
 
 	// 2. Check the certificate
+	// This check should avoid a possible race condition between accepting two blocks
+	// at the same height, as the probability of the committee creating two valid certificates
+	// for the same round is negligible.
 	if err := verifiers.CheckBlockCertificate(c.committee, blk); err != nil {
 		l.Errorf("verifying the certificate failed: %s", err.Error())
 		return err
@@ -231,7 +232,9 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
+	c.mu.Lock()
 	c.prevBlock = blk
+	c.mu.Unlock()
 
 	// 5. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
@@ -364,4 +367,10 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 
 	c.eventBus.Stream(string(topics.Gossip), withTopic)
 	return nil
+}
+
+func (c *Chain) getPrevBlock() block.Block {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.prevBlock
 }
