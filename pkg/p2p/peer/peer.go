@@ -240,8 +240,8 @@ func extractMagic(r io.Reader) (protocol.Magic, error) {
 // Conn needs to be locked, as this function can be called both by the WriteLoop,
 // and by the writer on the ring buffer.
 func (c *Connection) Write(b []byte) (int, error) {
-	c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	c.lock.Lock()
+	c.Conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
 	n, err := c.Conn.Write(b)
 	c.lock.Unlock()
 	return n, err
