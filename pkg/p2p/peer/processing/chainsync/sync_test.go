@@ -18,7 +18,7 @@ func TestSynchronizeBehind(t *testing.T) {
 	// Create a block that is a few rounds in the future
 	blk := randomBlockBuffer(t, 5, 20)
 
-	if err := cs.Synchronize(blk); err != nil {
+	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -45,7 +45,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	// Make a block which should follow our genesis block
 	blk := randomBlockBuffer(t, 1, 20)
 
-	if err := cs.Synchronize(blk); err != nil {
+	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
 	}
 

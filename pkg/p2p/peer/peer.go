@@ -89,6 +89,7 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
 			dataRequestor:   dataRequestor,
 			dataBroker:      processing.NewDataBroker(db, rpcBus, responseChan),
+			peerInfo:        conn.RemoteAddr().String(),
 		},
 	}
 

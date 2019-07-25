@@ -3,6 +3,7 @@ package chainsync
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 
 	logger "github.com/sirupsen/logrus"
@@ -38,7 +39,7 @@ func NewChainSynchronizer(publisher wire.EventPublisher, rpcBus *wire.RPCBus, re
 }
 
 // Synchronize our blockchain with our peers.
-func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
+func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) error {
 	r := bufio.NewReader(blkBuf)
 	height, err := peekBlockHeight(r)
 	if err != nil {
@@ -55,6 +56,11 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
 	// asking many peers for (generally) the same blocks.
 	diff := compareHeights(blk.Header.Height, height)
 	if !s.isSyncing() && diff > 1 {
+
+		hash := base64.StdEncoding.EncodeToString(blk.Header.Hash)
+		log.Debugf("Start syncing from %s", peerInfo)
+		log.Debugf("Local tip: height %d [%s]", blk.Header.Height, hash)
+
 		msg := createGetBlocksMsg(blk.Header.Hash)
 		buf, err := marshalGetBlocks(msg)
 		if err != nil {

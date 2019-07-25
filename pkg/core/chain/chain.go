@@ -52,7 +52,7 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*C
 
 	l, err := newLoader(db)
 	if err != nil {
-		return nil, fmt.Errorf("failure %s on loading chain '%s'", err.Error(), cfg.Get().Database.Dir)
+		return nil, fmt.Errorf("%s on loading chain db '%s'", err.Error(), cfg.Get().Database.Dir)
 	}
 
 	// set up collectors
@@ -94,7 +94,10 @@ func (c *Chain) Listen() {
 
 			buf := new(bytes.Buffer)
 
-			prevBlock := c.getPrevBlock()
+			c.mu.RLock()
+			prevBlock := c.prevBlock
+			c.mu.RUnlock()
+
 			if err := prevBlock.Encode(buf); err != nil {
 				r.ErrChan <- err
 				continue
@@ -197,13 +200,17 @@ func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
 // 2. All stateless and statefull checks are true
 // Returns nil, if checks passed and block was successfully saved
 func (c *Chain) AcceptBlock(blk block.Block) error {
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
 	l.Trace("procedure started")
 
 	// 1. Check that stateless and stateful checks pass
-	if err := verifiers.CheckBlock(c.db, c.getPrevBlock(), blk); err != nil {
+	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
 		l.Errorf("verification failed: %s", err.Error())
 		return err
 	}
@@ -230,9 +237,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	c.mu.Lock()
 	c.prevBlock = blk
-	c.mu.Unlock()
 
 	// 5. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
@@ -365,10 +370,4 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 
 	c.eventBus.Stream(string(topics.Gossip), withTopic)
 	return nil
-}
-
-func (c *Chain) getPrevBlock() block.Block {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.prevBlock
 }
