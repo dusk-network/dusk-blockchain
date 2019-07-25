@@ -23,6 +23,8 @@ type messageRouter struct {
 	dataRequestor   *processing.DataRequestor
 	dataBroker      *processing.DataBroker
 	synchronizer    *chainsync.ChainSynchronizer
+
+	peerInfo string
 }
 
 func (m *messageRouter) Collect(b *bytes.Buffer) error {
@@ -62,7 +64,7 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 			err = m.dataRequestor.RequestMissingItems(b)
 		}
 	case topics.Block:
-		err = m.synchronizer.Synchronize(b)
+		err = m.synchronizer.Synchronize(b, m.peerInfo)
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {
