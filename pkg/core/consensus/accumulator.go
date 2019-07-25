@@ -36,7 +36,7 @@ type Accumulator struct {
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
 func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State, checkStep bool) *Accumulator {
 	// set up worker pool
-	eventChan := make(chan wire.Event, 10)
+	eventChan := make(chan wire.Event, 100)
 	verificationChan := make(chan wire.Event, 100)
 
 	// create accumulator
@@ -130,7 +130,11 @@ func verify(verificationChan <-chan wire.Event, eventChan chan<- wire.Event, ver
 				continue
 			}
 
-			eventChan <- ev
+			select {
+			case eventChan <- ev:
+			default:
+				log.WithField("process", "accumulator worker").Debugln("skipped sending event")
+			}
 		case <-ticker.C:
 			if round < state.Round() {
 				ticker.Stop()
