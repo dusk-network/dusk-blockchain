@@ -4,7 +4,7 @@
 |---|
 |[What is the Dusk Network Testnet Shin (殉星)?](#what-is-the-dusk-network-testnet-shin)|
 |[Specification Requirements](#specification-requirements)|
-|[Intallation Guide](#intallation-guide)|
+|[Installation Guide](#installation-guide)|
 |[Features](#features)|
 |[Upcoming Features](#upcoming-features)|
 |[How to use the wallet?](#how-to-use-the-wallet)|
@@ -19,8 +19,10 @@ Dusk Network Testnet Shin (殉星) is the first publicly-available implementatio
 | CPU | RAM | Storage | Network Connection |
 |---|---|---|---|
 |4 cores; 2 GHz| 4 GB | 250 GB | 10 Mbps |
-## Intallation Guide
+## Installation Guide
 This guide is for building the node from source. If you would like to just download the compiled program, head over to the releases tab. 
+
+NOTE: This guide assumes you are building and running from a UNIX-like operating system. The node is not tested on Windows.
 
 ### Requirements
 [Go](https://golang.org/) 1.11 or newer.
