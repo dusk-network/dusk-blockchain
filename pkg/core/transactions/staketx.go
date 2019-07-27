@@ -6,7 +6,7 @@ import (
 	"io"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Stake transactions are time lock transactions that are used by nodes

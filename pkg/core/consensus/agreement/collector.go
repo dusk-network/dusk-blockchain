@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 type initCollector struct {

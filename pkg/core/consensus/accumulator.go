@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	log "github.com/sirupsen/logrus"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 // AccumulatorHandler is a generic event handler with some added functionality, that is

@@ -10,13 +10,13 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer

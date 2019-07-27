@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
 // Test that the MarshalSignableVote and UnmarshalSignableVote functions store/retrieve

@@ -8,8 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
 var withTimeTest = []struct {

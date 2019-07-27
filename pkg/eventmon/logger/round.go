@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
 )
 
 func (l *LogProcessor) PublishBlockEvent(blk *block.Block) {

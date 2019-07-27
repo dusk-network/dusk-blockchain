@@ -7,9 +7,9 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 )
 
 // Test that creation of a voting committee from a set of Provisioners works as intended.

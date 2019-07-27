@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 type (

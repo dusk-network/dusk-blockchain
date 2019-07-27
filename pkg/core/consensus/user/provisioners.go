@@ -5,12 +5,12 @@ import (
 	"sync"
 	"unsafe"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"golang.org/x/crypto/ed25519"
 )
 

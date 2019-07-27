@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"io"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // QuitTopic is the topic to make all components quit

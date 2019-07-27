@@ -2,9 +2,9 @@ package wallet
 
 import (
 	"github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	wiretx "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 // TxOutChecker holds all of the necessary data

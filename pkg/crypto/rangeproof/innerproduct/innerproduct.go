@@ -8,8 +8,8 @@ import (
 	"math/bits"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/fiatshamir"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/fiatshamir"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/vector"
 )
 
 // This is a reference of the innerProduct implementation at rust

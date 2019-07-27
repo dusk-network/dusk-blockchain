@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/hash"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain

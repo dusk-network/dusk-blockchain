@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 // Handshake with another peer.

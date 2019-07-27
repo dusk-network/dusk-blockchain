@@ -5,11 +5,11 @@ import (
 
 	"testing"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 func TestRequestData(t *testing.T) {

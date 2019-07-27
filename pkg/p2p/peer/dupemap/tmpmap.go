@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/hashset"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
 )
 
 type (

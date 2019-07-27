@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/stretchr/testify/require"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 type MockEvent struct{ field string }

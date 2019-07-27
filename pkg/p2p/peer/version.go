@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 // VersionMessage is a version message on the dusk wire protocol.

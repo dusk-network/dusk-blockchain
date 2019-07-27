@@ -11,6 +11,10 @@ github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3Ee
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/dusk-network/bn256 v0.0.0-20190123110933-f166bf1226b0 h1:gbJaLVN42ahIwwmnVoVLlg2Z81LLgn9LmpFtkM5X9RU=
+github.com/dusk-network/bn256 v0.0.0-20190123110933-f166bf1226b0/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
+github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
+github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee/go.mod h1:PpPxJzdlQ023fALM5AGWeFrIaIU2igVmxr3QiRaf+ks=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/golang/protobuf v1.2.0 h1:P3YflyNX/ehuJFLhxviNdFxQPkGK5cDcApsge1SqnvM=
@@ -78,10 +82,6 @@ github.com/syndtr/goleveldb v1.0.0 h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFd
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
-gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0 h1:q4SCg5gxqQ7/Etnpj5FKXK2ud4flxNM0JsAua5LoLI0=
-gitlab.dusk.network/dusk-core/bn256 v0.0.0-20190123110933-f166bf1226b0/go.mod h1:Y/mEVzzmpfBXeSoqA9Oo5Mbda09kzCpe0mg2yFYM0Bg=
-gitlab.dusk.network/dusk-core/zkproof v0.0.0-20190430120851-89181b9b685d h1:SdOLsRexiXctD70ui0wKgavxTvyW7VYzG8SoYLk63fc=
-gitlab.dusk.network/dusk-core/zkproof v0.0.0-20190430120851-89181b9b685d/go.mod h1:lwJWKZOXYSbGtY9MCslEfuxWkt4tTfLi0uGTMNLFB2U=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734 h1:p/H982KKEjUnLJkM3tt/LemDnOc1GiZL5FCVlORJ5zo=

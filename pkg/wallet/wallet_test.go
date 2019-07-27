@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/mlsag"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 
 	"math/rand"
 

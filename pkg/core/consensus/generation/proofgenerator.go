@@ -4,9 +4,9 @@ import (
 	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 // Generator defines the capability of generating proofs of blind bid, needed to

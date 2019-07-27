@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	log "github.com/sirupsen/logrus"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
 // ConnectToSeeder initializes the connection with the Voucher Seeder

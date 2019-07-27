@@ -8,18 +8,18 @@ import (
 	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	wallet "gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet"
-	walletdb "gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/mlsag"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 var testnet = byte(2)

@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/pedersen"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/vector"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/pedersen"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
 )
 
 func TestProofCreation(t *testing.T) {

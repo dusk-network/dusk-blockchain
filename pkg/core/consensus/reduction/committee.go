@@ -1,11 +1,11 @@
 package reduction
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reputation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
 const committeeSize = 64

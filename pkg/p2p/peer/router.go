@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // The messageRouter is connected to all of the processing units that are tied to the peer.

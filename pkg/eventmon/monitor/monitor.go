@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 var MaxAttempts int = 3

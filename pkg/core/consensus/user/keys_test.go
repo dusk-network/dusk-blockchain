@@ -3,8 +3,8 @@ package user
 import (
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
 func TestDeterministicKeyGen(t *testing.T) {

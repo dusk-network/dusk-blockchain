@@ -7,8 +7,8 @@ import (
 	"errors"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/base58"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/base58"
 )
 
 // PublicKey represents a pair of PublicSpend and PublicView keys

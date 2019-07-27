@@ -8,9 +8,9 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/dusk-network/bn256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.dusk.network/dusk-core/bn256"
 )
 
 func randomMessage() []byte {

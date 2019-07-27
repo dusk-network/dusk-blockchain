@@ -4,8 +4,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
 )
 
 func TestBitCommitToValue(t *testing.T) {

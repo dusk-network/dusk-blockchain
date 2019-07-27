@@ -9,10 +9,10 @@ import (
 	"github.com/pkg/errors"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/fiatshamir"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/innerproduct"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/pedersen"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof/vector"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/fiatshamir"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/innerproduct"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/pedersen"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/rangeproof/vector"
 )
 
 // N is number of bits in range

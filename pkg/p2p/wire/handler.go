@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/container/ring"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
 
 type Handler interface {

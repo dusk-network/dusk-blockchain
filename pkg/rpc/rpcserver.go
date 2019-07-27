@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	logger "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"golang.org/x/crypto/sha3"
 )
 

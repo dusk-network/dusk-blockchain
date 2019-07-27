@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 
-	wiretx "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
+	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/key"
 
 	"github.com/bwesterb/go-ristretto"
 )

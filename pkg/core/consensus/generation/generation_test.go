@@ -6,16 +6,16 @@ import (
 	"testing"
 
 	"github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/zkproof"
 )
 
 // Test that all of the functionality around score/proof generation works as intended.

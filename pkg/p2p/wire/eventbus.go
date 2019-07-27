@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/container/ring"
 )
 
 var _ EventBroker = (*EventBus)(nil)

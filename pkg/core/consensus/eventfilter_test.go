@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/mocks"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 // Test that a relevant event gets passed down to the Processor properly.

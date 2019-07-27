@@ -7,10 +7,10 @@ import (
 	"math"
 
 	"github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/utils"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 )
 
 type transaction struct {

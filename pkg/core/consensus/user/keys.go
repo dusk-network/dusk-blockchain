@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
 	"golang.org/x/crypto/ed25519"
 )
 

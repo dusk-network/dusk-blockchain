@@ -4,20 +4,20 @@ import (
 	"bytes"
 	"net"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
 // Server is the main process of the node

@@ -3,8 +3,8 @@ package logging
 import (
 	"os"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	log "github.com/sirupsen/logrus"
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
 )
 
 func InitLog(logFile *os.File) {

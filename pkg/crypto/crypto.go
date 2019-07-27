@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strconv"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+	"github.com/dusk-network/dusk-blockchain/pkg/crypto/hash"
 )
 
 // RandEntropy takes an argument n and populates a byte slice of

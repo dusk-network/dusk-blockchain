@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	helper "github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/stretchr/testify/assert"
-	helper "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 func TestEncodeDecodeInput(t *testing.T) {
