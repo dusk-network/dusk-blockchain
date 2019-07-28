@@ -225,7 +225,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 3. Add provisioners and block generators
-	c.addConsensusNodes(blk.Txs, blk.Header.Height+1)
+	c.addConsensusNodes(blk.Txs, blk.Header.Height)
 
 	// 4. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
