@@ -2,6 +2,7 @@ package reduction
 
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reputation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -22,9 +23,12 @@ type reductionCommittee struct {
 }
 
 func newReductionCommittee(eventBroker wire.EventBroker, db database.DB) *reductionCommittee {
-	return &reductionCommittee{
+	r := &reductionCommittee{
 		Extractor: committee.NewExtractor(eventBroker, db),
 	}
+
+	eventBroker.SubscribeCallback(msg.RoundUpdateTopic, r.RemoveExpiredProvisioners)
+	return r
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee

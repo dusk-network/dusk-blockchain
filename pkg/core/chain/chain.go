@@ -271,6 +271,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		log.Infof("%d deleted candidate blocks", count)
 	}
 
+	// 8. Remove expired provisioners
+	// We remove provisioners from accepted block height + 1,
+	// to set up our committee correctly for the next block.
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, blk.Header.Height+1)
+	c.committee.RemoveExpiredProvisioners(bytes.NewBuffer(roundBytes))
+
 	l.Trace("procedure ended")
 
 	return nil
