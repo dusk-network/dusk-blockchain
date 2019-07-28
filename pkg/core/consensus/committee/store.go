@@ -18,6 +18,7 @@ type (
 	Committee interface {
 		IsMember([]byte, uint64, uint8) bool
 		Quorum(uint64) int
+		RemoveExpiredProvisioners(*bytes.Buffer) error
 	}
 
 	// Foldable represents a Committee which can be packed into a bitset, to drastically
@@ -65,7 +66,6 @@ func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)
-	eventBroker.SubscribeCallback(msg.RoundUpdateTopic, store.RemoveExpiredProvisioners)
 	return store
 }
 

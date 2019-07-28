@@ -22,6 +22,7 @@ import (
 func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) {
 	if c == nil {
 		c = committee.NewAgreement(eventBroker, nil)
+		eventBroker.SubscribeCallback(msg.RoundUpdateTopic, c.RemoveExpiredProvisioners)
 	}
 	broker := newBroker(eventBroker, c, keys)
 	currentRound := getInitialRound(eventBroker)
