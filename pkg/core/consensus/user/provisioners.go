@@ -104,7 +104,7 @@ func (p *Provisioners) repopulate(db database.DB) uint64 {
 			}
 
 			// Only add them if their stake is still valid
-			if searchingHeight+stake.Lock >= currentHeight {
+			if searchingHeight+stake.Lock > currentHeight {
 				p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
 				totalWeight += stake.GetOutputAmount()
 			}
