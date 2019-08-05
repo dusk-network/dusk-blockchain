@@ -3,6 +3,7 @@ package logger
 import (
 	"bytes"
 	"io"
+	"net"
 	"runtime"
 	"time"
 
@@ -78,6 +79,11 @@ func (l *LogProcessor) Send(entry *log.Entry) error {
 	formatted, err := l.Formatter.Format(entry)
 	if err != nil {
 		return err
+	}
+
+	// Set a write deadline in case we are writing to a connection, to avoid hangs
+	if conn, ok := l.Out.(net.Conn); ok {
+		conn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
 	}
 
 	if _, err = l.Out.Write(formatted); err != nil {
