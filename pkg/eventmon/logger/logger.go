@@ -83,7 +83,7 @@ func (l *LogProcessor) Send(entry *log.Entry) error {
 
 	// Set a write deadline in case we are writing to a connection, to avoid hangs
 	if conn, ok := l.Out.(net.Conn); ok {
-		conn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
+		conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	}
 
 	if _, err = l.Out.Write(formatted); err != nil {
