@@ -151,6 +151,7 @@ func (m *unixSupervisor) Reconnect() error {
 	if err != nil {
 		return err
 	}
+	go proc.Listen()
 	m.activeProc = true
 	m.processor = proc
 	m.attempts = 0
