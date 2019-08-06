@@ -63,11 +63,10 @@ func (m *unixSupervisor) Levels() []log.Level {
 
 func (m *unixSupervisor) Fire(entry *log.Entry) error {
 	if m.activeProc {
-		if err := m.processor.Send(entry); err != nil {
-			// Stop firing the hook if we get a timeout error
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				_ = m.Stop()
-			}
+		// Drop events if the queue is filled up, to avoid extended lockups
+		select {
+		case m.processor.EntryChan <- entry:
+		default:
 		}
 	}
 	return nil
@@ -179,8 +178,7 @@ func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcess
 	}
 
 	logProcessor := logger.New(broker, wc, nil)
-	go logProcessor.LogNumGoroutine()
-	go logProcessor.ListenForNewBlocks()
+	go logProcessor.Launch()
 
 	return logProcessor, nil
 }
