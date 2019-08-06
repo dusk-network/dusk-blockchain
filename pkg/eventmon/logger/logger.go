@@ -30,6 +30,7 @@ type (
 		p                 wire.EventPublisher
 		entry             *log.Entry
 		acceptedBlockChan <-chan block.Block
+		EntryChan         chan *log.Entry
 		listener          *wire.TopicListener
 	}
 )
@@ -49,18 +50,32 @@ func New(p wire.EventBroker, w io.WriteCloser, formatter log.Formatter) *LogProc
 		Logger:            logger,
 		entry:             entry,
 		acceptedBlockChan: acceptedBlockChan,
+		EntryChan:         make(chan *log.Entry, 100),
 		listener:          listener,
 	}
 }
 
-func (l *LogProcessor) ListenForNewBlocks() {
+func (l *LogProcessor) Launch() {
+	go l.listenForEntries()
+	go l.listenForNewBlocks()
+	go l.logNumGoroutine()
+}
+
+func (l *LogProcessor) listenForEntries() {
+	for {
+		entry := <-l.EntryChan
+		l.Send(entry)
+	}
+}
+
+func (l *LogProcessor) listenForNewBlocks() {
 	for {
 		blk := <-l.acceptedBlockChan
 		l.PublishBlockEvent(&blk)
 	}
 }
 
-func (l *LogProcessor) LogNumGoroutine() {
+func (l *LogProcessor) logNumGoroutine() {
 	for {
 		time.Sleep(5 * time.Second)
 		num := runtime.NumGoroutine()
