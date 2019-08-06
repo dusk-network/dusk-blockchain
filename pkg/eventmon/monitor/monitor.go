@@ -63,7 +63,12 @@ func (m *unixSupervisor) Levels() []log.Level {
 
 func (m *unixSupervisor) Fire(entry *log.Entry) error {
 	if m.activeProc {
-		return m.processor.Send(entry)
+		if err := m.processor.Send(entry); err != nil {
+			// Stop firing the hook if we get a timeout error
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				_ = m.Stop()
+			}
+		}
 	}
 	return nil
 }
