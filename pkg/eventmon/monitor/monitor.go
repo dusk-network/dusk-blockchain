@@ -178,7 +178,7 @@ func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcess
 	}
 
 	logProcessor := logger.New(broker, wc, nil)
-	go logProcessor.Launch()
+	go logProcessor.Listen()
 
 	return logProcessor, nil
 }

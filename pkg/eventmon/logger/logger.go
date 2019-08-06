@@ -31,6 +31,7 @@ type (
 		entry             *log.Entry
 		acceptedBlockChan <-chan block.Block
 		EntryChan         chan *log.Entry
+		quitChan          chan struct{}
 		listener          *wire.TopicListener
 	}
 )
@@ -51,42 +52,40 @@ func New(p wire.EventBroker, w io.WriteCloser, formatter log.Formatter) *LogProc
 		entry:             entry,
 		acceptedBlockChan: acceptedBlockChan,
 		EntryChan:         make(chan *log.Entry, 100),
+		quitChan:          make(chan struct{}, 1),
 		listener:          listener,
 	}
 }
 
-func (l *LogProcessor) Launch() {
-	go l.listenForEntries()
-	go l.listenForNewBlocks()
-	go l.logNumGoroutine()
-}
-
-func (l *LogProcessor) listenForEntries() {
+func (l *LogProcessor) Listen() {
+	// Log number of goroutines every 5 seconds
+	ticker := time.NewTicker(5 * time.Second)
 	for {
-		entry := <-l.EntryChan
-		l.Send(entry)
-	}
-}
-
-func (l *LogProcessor) listenForNewBlocks() {
-	for {
-		blk := <-l.acceptedBlockChan
-		l.PublishBlockEvent(&blk)
+		select {
+		case entry := <-l.EntryChan:
+			l.Send(entry)
+		case blk := <-l.acceptedBlockChan:
+			l.PublishBlockEvent(&blk)
+		case <-ticker.C:
+			l.logNumGoroutine()
+		case <-l.quitChan:
+			ticker.Stop()
+			return
+		}
 	}
 }
 
 func (l *LogProcessor) logNumGoroutine() {
-	for {
-		time.Sleep(5 * time.Second)
-		num := runtime.NumGoroutine()
-		l.entry.WithFields(log.Fields{
-			"code": "goroutine",
-			"nr":   num - 1,
-		}).Infoln("New goroutine count")
-	}
+	num := runtime.NumGoroutine()
+	l.entry.WithFields(log.Fields{
+		"code": "goroutine",
+		"nr":   num - 1,
+	}).Infoln("New goroutine count")
 }
+
 func (l *LogProcessor) Close() error {
 	l.listener.Quit()
+	l.quitChan <- struct{}{}
 	return l.Out.(io.WriteCloser).Close()
 }
 
