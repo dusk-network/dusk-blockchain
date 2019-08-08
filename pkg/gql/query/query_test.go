@@ -1,13 +1,14 @@
 package query
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
+	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/graphql-go/graphql"
 	"os"
 	"reflect"
@@ -30,9 +31,6 @@ func TestMain(m *testing.M) {
 		graphql.SchemaConfig{Query: rootQuery.Query},
 	)
 
-	// Setup mempool
-	// TODO:
-
 	os.Exit(m.Run())
 }
 
@@ -41,20 +39,29 @@ func initializeDB(db database.DB) {
 	// Generate a dummy chain with a few blocks to test against
 	chain := make([]*block.Block, 0)
 
+	// Even random func is used, particular fields are hard-coded to make
+	// comparision easier
+
 	// block height 0
 	t := &testing.T{}
 	b1 := helper.RandomBlock(t, 0, 1)
-	b1.Header.Hash, _ = crypto.RandEntropy(32)
+	b1.Header.Hash, _ = base64.StdEncoding.DecodeString("GU3RPuimCsAXqCxBwOLAJJjXX0h1Q1EHLzkqCF1GliA=")
+	b1.Txs = make([]core.Transaction, 0)
+	b1.Txs = append(b1.Txs, fixedTransaction(t, 0))
 	chain = append(chain, b1)
 
 	// block height 1
 	b2 := helper.RandomBlock(t, 1, 1)
-	b2.Header.Hash, _ = crypto.RandEntropy(32)
+	b2.Header.Hash, _ = base64.StdEncoding.DecodeString("m/UOOUu4E0b4uNtCvd0oWsNEJgwCSg34CLr3YBQX10g=")
+	b2.Txs = make([]core.Transaction, 0)
+	b2.Txs = append(b2.Txs, fixedTransaction(t, 1))
 	chain = append(chain, b2)
 
 	// block height 2
 	b3 := helper.RandomBlock(t, 2, 1)
-	b3.Header.Hash, _ = crypto.RandEntropy(32)
+	b3.Header.Hash, _ = base64.StdEncoding.DecodeString("lGfF53TrG0gl0IwFmaCwgV/KXawW2WkAJoVO2NHyKck=")
+	b3.Txs = make([]core.Transaction, 0)
+	b3.Txs = append(b3.Txs, fixedTransaction(t, 22))
 	chain = append(chain, b3)
 
 	_ = db.Update(func(t database.Transaction) error {
@@ -80,7 +87,8 @@ func assertQuery(t *testing.T, query, response string) {
 	if err != nil {
 		t.Error(err)
 	}
-	// t.Logf("Result:\n%s", result)
+
+	//t.Logf("Result:\n%s", result)
 	if !equal {
 		t.Error("expecting other response from this query")
 	}
@@ -101,4 +109,10 @@ func assertJSONs(result, expected []byte) (bool, error) {
 	}
 
 	return reflect.DeepEqual(r, e), nil
+}
+
+func fixedTransaction(t *testing.T, fee int) core.Transaction {
+	tx := core.NewStandard(0, uint64(fee), make([]byte, 32))
+	tx.RangeProof = make([]byte, 32)
+	return tx
 }
