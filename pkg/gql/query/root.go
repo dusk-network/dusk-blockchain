@@ -1,6 +1,7 @@
 package query
 
 import (
+	"fmt"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/graphql-go/graphql"
@@ -29,4 +30,18 @@ func NewRoot(rpcBus *wire.RPCBus, db database.DB) *Root {
 		),
 	}
 	return &root
+}
+
+func Execute(query string, schema graphql.Schema) *graphql.Result {
+	result := graphql.Do(graphql.Params{
+		Schema:        schema,
+		RequestString: query,
+	})
+
+	// Error check
+	if len(result.Errors) > 0 {
+		fmt.Printf("Unexpected errors inside ExecuteQuery: %v", result.Errors)
+	}
+
+	return result
 }

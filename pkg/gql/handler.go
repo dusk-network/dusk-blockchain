@@ -1,7 +1,7 @@
 package gql
 
 import (
-	"fmt"
+	"github.com/dusk-network/dusk-blockchain/pkg/gql/query"
 	"io/ioutil"
 	"net/http"
 
@@ -28,25 +28,7 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r http.Request) 
 	}
 
 	// Execute graphql query
-	result := executeQuery(string(decBody), *schema)
-
-	// render.JSON comes from the chi/render package and handles
-	// marshalling to json, automatically escaping HTML and setting
-	// the Content-Type as application/json.
+	result := query.Execute(string(decBody), *schema)
+	//TODO: Do we need render
 	render.JSON(w, &r, result)
-}
-
-// ExecuteQuery runs our graphql queries
-func executeQuery(query string, schema graphql.Schema) *graphql.Result {
-	result := graphql.Do(graphql.Params{
-		Schema:        schema,
-		RequestString: query,
-	})
-
-	// Error check
-	if len(result.Errors) > 0 {
-		fmt.Printf("Unexpected errors inside ExecuteQuery: %v", result.Errors)
-	}
-
-	return result
 }
