@@ -5,7 +5,10 @@ import (
 	"errors"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/graphql-go/graphql"
+
+	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 )
 
 // File purpose is to define all arguments and resolvers relevant to "blocks" query only
@@ -78,10 +81,39 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 
 	offset, ok := p.Args["last"].(int)
 	if ok {
+		if offset <= 0 {
+			return nil, errors.New("invalid offset")
+		}
 		return b.fetchBlocksByHeights(int64(offset)*-1, -1)
 	}
 
 	return nil, nil
+}
+
+func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
+
+	var txs []core.Standard
+	b, ok := p.Source.(*block.Block)
+	if ok {
+		// TODO: use the one from the context
+		_, db := heavy.CreateDBConnection()
+		err := db.View(func(t database.Transaction) error {
+			fetched, err := t.FetchBlockTxs(b.Header.Hash)
+			if err != nil {
+				return err
+			}
+
+			for _, tx := range fetched {
+				sTx := tx.StandardTX()
+				sTx.TxID, _ = tx.CalculateHash()
+				txs = append(txs, sTx)
+			}
+			return nil
+		})
+
+		return txs, err
+	}
+	return nil, errors.New("invalid source block")
 }
 
 // Fetch block headers by a list of hashes

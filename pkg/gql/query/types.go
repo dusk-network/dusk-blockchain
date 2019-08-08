@@ -2,19 +2,12 @@ package query
 
 import (
 	"encoding/base64"
-	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"time"
 
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/graphql/language/ast"
-
-	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 )
 
-// The file defines all related to a blocks query (relevant types,queries and resolvers)
 var Block = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Block",
@@ -23,32 +16,8 @@ var Block = graphql.NewObject(
 				Type: Header,
 			},
 			"transactions": &graphql.Field{
-				Type: graphql.NewList(Transaction),
-				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-					var txs []core.Standard
-
-					b, ok := p.Source.(*block.Block)
-					if ok {
-						// TODO use the one from the context
-						_, db := heavy.CreateDBConnection()
-						err := db.View(func(t database.Transaction) error {
-							fetched, err := t.FetchBlockTxs(b.Header.Hash)
-							if err != nil {
-								return err
-							}
-
-							for _, tx := range fetched {
-								sTx := tx.StandardTX()
-								sTx.TxID, _ = tx.CalculateHash()
-								txs = append(txs, sTx)
-							}
-							return nil
-						})
-
-						return txs, err
-					}
-					return nil, errors.New("invalid block")
-				},
+				Type:    graphql.NewList(Transaction),
+				Resolve: resolveTxs,
 			},
 		},
 	},
