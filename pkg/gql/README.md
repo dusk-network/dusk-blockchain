@@ -15,7 +15,7 @@ Scenarios where it's supposed to be useful:
 - Test Harness ensuring chain state after a set of actions executed
 - User retrieving data in curl-request manner
 
-Package should not be used for any data mutations or node commanding. Usually these
+Package should not be used for any data mutations or node commanding.
 
 ##### Transport
 
@@ -25,6 +25,8 @@ Currently, it's over HTTP but later WebSocket support could be added to enable d
 ##### Pending development
 - Queries schema is pending to be modified/enriched accordingly.
 - Subscriptions for particular chain/consensus updates (block accepted, reward received etc)
+- Support unix domain socket as transport for messaging with the monitor component
+- 
 
 #### Configuration
 ```toml
@@ -34,7 +36,7 @@ enabled=true
 port=9001
 ```
 
-##### Example queries
+##### Example queries that can be sent as message body of a HTTP POST request
 -  Fetch block by hash with full set of supported fields
 
 ```graphql
@@ -106,6 +108,7 @@ port=9001
       txtype
     }
   }
+}
 ```
 - Fetch data of a single (accepted) transaction
 
@@ -145,6 +148,38 @@ port=9001
     header {
        height
        timestamp 
+    }
+  }
+}
+```
+
+- Fetch last 10 blocks accepted
+
+```graphql
+{
+   blocks(last: 10) {
+    header {
+       height
+       timestamp 
+    }
+    transactions{
+      txid
+    }
+  }
+}
+```
+
+- Fetch a slice of blocks by their hashes
+```graphql
+{
+  blocks(hashes: ["GU3RPuimCsAXqCxBwOLAJJjXX0h1Q1EHLzkqCF1GliA=","uofO7J8xzPzKvJ0r6fdTZm4O1Vl0T1nT9L0q/TIPewM="]) {
+    header {
+       height
+       hash
+    }
+    transactions{
+      txid
+      txtype
     }
   }
 }
