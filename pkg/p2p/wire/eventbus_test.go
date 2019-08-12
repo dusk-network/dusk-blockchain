@@ -72,8 +72,8 @@ func TestExitChan(t *testing.T) {
 	var closed bool
 	handlers := eb.streamHandlers.Load(topic)
 	for _, handler := range handlers {
-		ringBuffer := handler.GetBuffer()
-		closed = ringBuffer.Closed()
+		sh := handler.(*streamHandler)
+		closed = sh.ringbuffer.Closed()
 	}
 
 	assert.True(t, closed)
