@@ -164,9 +164,20 @@ func TestHook(t *testing.T) {
 
 	log.AddHook(supervisor)
 
-	// Log 1000 events
-	for i := 0; i < 1000; i++ {
-		log.Errorln("pippo")
+	// Log 1000 events, and notify when done
+	doneChan := make(chan struct{}, 1)
+	go func() {
+		for i := 0; i < 1000; i++ {
+			log.Errorln("pippo")
+		}
+		doneChan <- struct{}{}
+	}()
+
+	// Fail fast if we get stuck
+	select {
+	case <-doneChan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("logging events took too long")
 	}
 
 	_ = supervisor.Stop()
@@ -215,10 +226,10 @@ func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
 		if err != nil {
 			panic(err)
 		}
-		resChan <- nil
 
-		conn, err = srv.Accept()
 		// notifying that the server can accept connections
+		resChan <- nil
+		conn, err = srv.Accept()
 		if err != nil {
 			panic(err)
 		}
@@ -231,6 +242,7 @@ func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
 		d := json.NewDecoder(conn)
 		for {
 			var msg map[string]interface{}
+
 			if err := d.Decode(&msg); err == io.EOF {
 				break
 			} else if err != nil {
