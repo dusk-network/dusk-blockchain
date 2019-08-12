@@ -152,6 +152,37 @@ func TestNotifyErrors(t *testing.T) {
 	wg.Wait()
 }
 
+// Test that we properly drop log entries instead of hanging when the buffer is full
+func TestHook(t *testing.T) {
+	// We do not need the msgChan, as we are simulating a frozen monitoring process
+	// Neither do we need the waitgroup, since waiting for this server to stop will
+	// block indefinitely.
+	_, _, _ = initTest()
+	eb := wire.NewEventBus()
+	supervisor, err := monitor.Launch(eb, unixSoc)
+	assert.NoError(t, err)
+
+	log.AddHook(supervisor)
+
+	// Log 1000 events, and notify when done
+	doneChan := make(chan struct{}, 1)
+	go func() {
+		for i := 0; i < 1000; i++ {
+			log.Errorln("pippo")
+		}
+		doneChan <- struct{}{}
+	}()
+
+	// Fail fast if we get stuck
+	select {
+	case <-doneChan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("logging events took too long")
+	}
+
+	_ = supervisor.Stop()
+}
+
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, 4)
 	buf := new(bytes.Buffer)
@@ -195,10 +226,10 @@ func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
 		if err != nil {
 			panic(err)
 		}
-		resChan <- nil
 
-		conn, err = srv.Accept()
 		// notifying that the server can accept connections
+		resChan <- nil
+		conn, err = srv.Accept()
 		if err != nil {
 			panic(err)
 		}
@@ -211,6 +242,7 @@ func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
 		d := json.NewDecoder(conn)
 		for {
 			var msg map[string]interface{}
+
 			if err := d.Decode(&msg); err == io.EOF {
 				break
 			} else if err != nil {
