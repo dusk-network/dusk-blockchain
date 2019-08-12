@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
-	log "github.com/sirupsen/logrus"
+	lg "github.com/sirupsen/logrus"
 )
 
 var _ EventBroker = (*EventBus)(nil)
@@ -16,6 +16,7 @@ var _ EventBroker = (*EventBus)(nil)
 var ringBufferLength = 2000
 var napTime = 1 * time.Millisecond
 var _signal struct{}
+var logEB = lg.WithField("process", "eventbus")
 
 // EventBus - box for handlers and callbacks.
 type EventBus struct {
@@ -77,17 +78,14 @@ func (bus *EventBus) subscribeStream(topic string, handler *streamHandler) {
 }
 
 func newStreamHandler(id uint32, topic string, ringbuffer *ring.Buffer) *streamHandler {
-	exitChan := make(chan struct{}, 1)
-	return &streamHandler{id, exitChan, topic, ringbuffer}
+	return &streamHandler{id, topic, ringbuffer}
 }
 
+// Consume an item by writing it to the specified WriteCloser
 func Consume(items [][]byte, w io.WriteCloser) bool {
 	for _, data := range items {
 		if _, err := w.Write(data); err != nil {
-			log.WithFields(log.Fields{
-				"process": "eventbus",
-				"queue":   "ringbuffer",
-			}).WithError(err).Warnln("error in writing to WriteCloser")
+			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("error in writing to WriteCloser")
 			return false
 		}
 	}
@@ -121,7 +119,7 @@ func (bus *EventBus) Unsubscribe(topic string, id uint32) {
 	bus.streamHandlers.Delete(topic, id)
 }
 
-// RegisterPreprocessor will add a set of preprocessors to a specified topic.
+// RegisterPreprocessor will add a set of TopicProcessor to a specified topic.
 func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicProcessor) []uint32 {
 	pproc := make([]idTopicProcessor, len(preprocessors))
 	pprocIds := make([]uint32, len(preprocessors))
@@ -145,6 +143,7 @@ func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicPr
 	return pprocIds
 }
 
+// RemovePreprocessor removes all TopicProcessor previously registered on a given topic using its ID
 func (bus *EventBus) RemovePreprocessor(topic string, id uint32) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
@@ -160,6 +159,7 @@ func (bus *EventBus) RemovePreprocessor(topic string, id uint32) {
 	}
 }
 
+// RemoveAllPreprocessors removes all TopicProcessor from a topic
 func (bus *EventBus) RemoveAllPreprocessors(topic string) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
@@ -184,20 +184,14 @@ func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (*byt
 func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	processedMsg, err := bus.preprocess(topic, messageBuffer)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "eventbus",
-			"error":   err,
-		}).Errorln("preprocessor error")
+		logEB.WithError(err).Errorln("preprocessor error")
 		return
 	}
 
 	if handlers := bus.handlers.Load(topic); handlers != nil {
 		for _, handler := range handlers {
 			if err := handler.Publish(processedMsg); err != nil {
-				log.WithFields(log.Fields{
-					"topic":   topic,
-					"process": "eventbus",
-				}).Warnln("handler.messageChannel buffer failed")
+				logEB.WithField("topic", topic).Warnln("handler.messageChannel buffer failed")
 			}
 		}
 	}
@@ -205,11 +199,7 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	if callbackHandlers := bus.callbackHandlers.Load(topic); callbackHandlers != nil {
 		for _, handler := range callbackHandlers {
 			if err := handler.Publish(processedMsg); err != nil {
-				log.WithFields(log.Fields{
-					"topic":   topic,
-					"process": "event bus",
-					"error":   err,
-				}).Warnln("error when triggering callback")
+				logEB.WithError(err).WithField("topic", topic).Warnln("error when triggering callback")
 			}
 		}
 	}
@@ -219,19 +209,16 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 	processedMsg, err := bus.preprocess(topic, messageBuffer)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "eventbus",
-			"error":   err,
-		}).Errorln("preprocessor error")
+		logEB.WithError(err).WithField("topic", topic).Errorln("preprocessor error")
 		return
 	}
 
 	// The handlers are simply a means to avoid memory leaks.
 	handlers := bus.streamHandlers.Load(topic)
 	for _, handler := range handlers {
-		ringBuffer := handler.GetBuffer()
-		if ringBuffer != nil {
-			ringBuffer.Put(processedMsg.Bytes())
+		if err := handler.Publish(processedMsg); err != nil {
+			logEB.WithError(err).WithField("topic", topic).Debugln("cannot publish event on stringhandler")
+			continue
 		}
 	}
 }

@@ -32,8 +32,10 @@ func (h *handlerMap) Delete(key string, id uint32) {
 	for i, handler := range handlers {
 		if handler.ID() == id {
 			handler.Close()
-			h.handlers[key] = append(h.handlers[key][:i],
-				h.handlers[key][i+1:]...)
+			h.handlers[key] = append(
+				h.handlers[key][:i],
+				h.handlers[key][i+1:]...,
+			)
 		}
 	}
 	h.lock.Unlock()
