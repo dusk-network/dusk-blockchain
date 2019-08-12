@@ -43,42 +43,30 @@ func NewEventBus() *EventBus {
 	}
 }
 
-// subscribe handles the subscription logic and is utilized by the public
-// Subscribe functions
-func (bus *EventBus) subscribe(topic string, handler *channelHandler) {
-	bus.handlers.Store(topic, handler)
-}
-
 // Subscribe subscribes to a topic with a channel.
 func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer) uint32 {
-	id := rand.Uint32()
-	bus.subscribe(topic, &channelHandler{
-		id, messageChannel,
-	})
-
-	return id
-}
-
-func (bus *EventBus) subscribeCallback(topic string, handler *callbackHandler) {
-	bus.callbackHandlers.Store(topic, handler)
+	return bus.handlers.Store(topic, &channelHandler{messageChannel})
 }
 
 // SubscribeCallback subscribes to a topic with a callback.
 func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer) error) uint32 {
-	id := rand.Uint32()
-	bus.subscribeCallback(topic, &callbackHandler{
-		id, callback,
-	})
-
-	return id
+	return bus.callbackHandlers.Store(topic, &callbackHandler{callback})
 }
 
-func (bus *EventBus) subscribeStream(topic string, handler *streamHandler) {
-	bus.streamHandlers.Store(topic, handler)
-}
+// SubscribeStream subscribes to a topic with a stream.
+func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
+	bus.busLock.Lock()
+	defer bus.busLock.Unlock()
 
-func newStreamHandler(id uint32, topic string, ringbuffer *ring.Buffer) *streamHandler {
-	return &streamHandler{id, topic, ringbuffer}
+	// Each streamHandler uses its own ringBuffer to collect topic events
+	// Multiple-producers single-consumer approach utilizing a ringBuffer
+	ringBuf := ring.NewBuffer(ringBufferLength)
+	sh := &streamHandler{topic, ringBuf}
+
+	// single-consumer
+	_ = ring.NewConsumer(ringBuf, Consume, w)
+
+	return bus.streamHandlers.Store(topic, sh)
 }
 
 // Consume an item by writing it to the specified WriteCloser
@@ -93,30 +81,16 @@ func Consume(items [][]byte, w io.WriteCloser) bool {
 	return true
 }
 
-// SubscribeStream subscribes to a topic with a stream.
-func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
-	id := rand.Uint32()
-	bus.busLock.Lock()
-	defer bus.busLock.Unlock()
-
-	// Each streamHandler uses its own ringBuffer to collect topic events
-	// Multiple-producers single-consumer approach utilizing a ringBuffer
-	ringBuf := ring.NewBuffer(ringBufferLength)
-	sh := newStreamHandler(id, topic, ringBuf)
-
-	// single-consumer
-	_ = ring.NewConsumer(ringBuf, Consume, w)
-
-	bus.subscribeStream(topic, sh)
-	return id
-}
-
 // Unsubscribe removes a handler defined for a topic.
-// Returns true if a handler is found with the id and the topic specified
 func (bus *EventBus) Unsubscribe(topic string, id uint32) {
-	bus.handlers.Delete(topic, id)
-	bus.callbackHandlers.Delete(topic, id)
-	bus.streamHandlers.Delete(topic, id)
+	found := bus.handlers.Delete(topic, id) ||
+		bus.callbackHandlers.Delete(topic, id) ||
+		bus.streamHandlers.Delete(topic, id)
+
+	logEB.WithFields(lg.Fields{
+		"found": found,
+		"topic": topic,
+	}).Traceln("unsubscribing")
 }
 
 // RegisterPreprocessor will add a set of TopicProcessor to a specified topic.
