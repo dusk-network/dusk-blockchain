@@ -3,6 +3,7 @@ package logger
 import (
 	"bytes"
 	"io"
+	"net"
 	"runtime"
 	"time"
 
@@ -33,6 +34,8 @@ type (
 		p                 wire.EventPublisher
 		entry             *log.Entry
 		acceptedBlockChan <-chan block.Block
+		EntryChan         chan *log.Entry
+		quitChan          chan struct{}
 		listener          *wire.TopicListener
 	}
 )
@@ -53,33 +56,44 @@ func New(p wire.EventBroker, w io.WriteCloser, formatter log.Formatter) *LogProc
 		Logger:            logger,
 		entry:             entry,
 		acceptedBlockChan: acceptedBlockChan,
+		EntryChan:         make(chan *log.Entry, 100),
+		quitChan:          make(chan struct{}, 1),
 		listener:          listener,
 	}
 }
 
-// ListenForNewBlocks in order to send a notification to the node-monitor
-func (l *LogProcessor) ListenForNewBlocks() {
+// Listen as specified in the TopicListener interface
+func (l *LogProcessor) Listen() {
+	// Log number of goroutines every 5 seconds
+	ticker := time.NewTicker(5 * time.Second)
 	for {
-		blk := <-l.acceptedBlockChan
-		l.PublishBlockEvent(&blk)
+		select {
+		case entry := <-l.EntryChan:
+			l.Send(entry)
+		case blk := <-l.acceptedBlockChan:
+			l.PublishBlockEvent(&blk)
+		case <-ticker.C:
+			l.logNumGoroutine()
+		case <-l.quitChan:
+			ticker.Stop()
+			return
+		}
 	}
 }
 
 // LogNumGoroutine notifies the monitor of the current known number of goroutines
-func (l *LogProcessor) LogNumGoroutine() {
-	for {
-		time.Sleep(5 * time.Second)
-		num := runtime.NumGoroutine()
-		l.entry.WithFields(log.Fields{
-			"code": "goroutine",
-			"nr":   num - 1,
-		}).Infoln("New goroutine count")
-	}
+func (l *LogProcessor) logNumGoroutine() {
+	num := runtime.NumGoroutine()
+	l.entry.WithFields(log.Fields{
+		"code": "goroutine",
+		"nr":   num - 1,
+	}).Infoln("New goroutine count")
 }
 
 // Close the listener and the Writer
 func (l *LogProcessor) Close() error {
 	l.listener.Quit()
+	l.quitChan <- struct{}{}
 	return l.Out.(io.WriteCloser).Close()
 }
 
@@ -88,6 +102,11 @@ func (l *LogProcessor) Send(entry *log.Entry) error {
 	formatted, err := l.Formatter.Format(entry)
 	if err != nil {
 		return err
+	}
+
+	// Set a write deadline in case we are writing to a connection, to avoid hangs
+	if conn, ok := l.Out.(net.Conn); ok {
+		conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	}
 
 	if _, err = l.Out.Write(formatted); err != nil {

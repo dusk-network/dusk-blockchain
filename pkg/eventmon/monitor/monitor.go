@@ -62,7 +62,11 @@ func (m *unixSupervisor) Levels() []log.Level {
 
 func (m *unixSupervisor) Fire(entry *log.Entry) error {
 	if m.activeProc {
-		return m.processor.Send(entry)
+		// Drop events if the queue is filled up, to avoid extended lockups
+		select {
+		case m.processor.EntryChan <- entry:
+		default:
+		}
 	}
 	return nil
 }
@@ -146,6 +150,7 @@ func (m *unixSupervisor) Reconnect() error {
 	if err != nil {
 		return err
 	}
+	go proc.Listen()
 	m.activeProc = true
 	m.processor = proc
 	m.attempts = 0
@@ -173,8 +178,7 @@ func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcess
 	}
 
 	logProcessor := logger.New(broker, wc, nil)
-	go logProcessor.LogNumGoroutine()
-	go logProcessor.ListenForNewBlocks()
+	go logProcessor.Listen()
 
 	return logProcessor, nil
 }
