@@ -10,9 +10,9 @@ var commandInfo = map[string]string{
 	"createfromseed": `Usage: createfromseed [seed] [password]
 		Loads the encrypted wallet file from a hex seed.`,
 	"balance": `Usage: balance
-		Prints the balance of the loaded wallet. Make sure to use the sync command first.`,
+		Prints the balance of the loaded wallet.`,
 	"transfer": `Usage: transfer [amount] [address] [password]
-		Send DUSK to a given address. Make sure to use the sync command first.`,
+		Send DUSK to a given address.`,
 	"stake": `Usage: stake [amount] [locktime] [password]
 		Stake a given amount of DUSK, to enter the provisioner committee. If you wish to participate in consensus, make sure to use the startprovisioner command afterwards.`,
 	"bid": `Usage: bid [amount] [locktime] [password]
