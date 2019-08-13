@@ -9,7 +9,6 @@ var commandInfo = map[string]string{
 		Loads the encrypted wallet file.`,
 	"createfromseed": `Usage: createfromseed [seed] [password]
 		Loads the encrypted wallet file from a hex seed.`,
-	"sync": "Sync the wallet with the attached node blockchain.",
 	"balance": `Usage: balance
 		Prints the balance of the loaded wallet. Make sure to use the sync command first.`,
 	"transfer": `Usage: transfer [amount] [address] [password]
