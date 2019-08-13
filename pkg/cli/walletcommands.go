@@ -94,7 +94,6 @@ func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 }
 
 func loadWallet(password string) (*wallet.Wallet, error) {
-
 	if DBInstance != nil {
 		DBInstance.Close()
 	}
@@ -139,6 +138,12 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 	w, err := loadWallet(password)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
+		return
+	}
+
+	// Sync wallet
+	if err := syncWallet(); err != nil {
+		fmt.Fprintf(os.Stdout, "%v", err)
 		return
 	}
 
@@ -265,6 +270,12 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 		return
 	}
 
+	// Sync wallet
+	if err := syncWallet(); err != nil {
+		fmt.Fprintf(os.Stdout, "%v", err)
+		return
+	}
+
 	// Create a new stake tx
 	tx, err := w.NewStakeTx(cfg.MinFee, lockTime, amount)
 	if err != nil {
@@ -328,6 +339,12 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		return
 	}
 
+	// Sync wallet
+	if err := syncWallet(); err != nil {
+		fmt.Fprintf(os.Stdout, "%v", err)
+		return
+	}
+
 	// Create a new bid tx
 	tx, err := w.NewBidTx(cfg.MinFee, lockTime, amount)
 	if err != nil {
@@ -364,13 +381,7 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 	publisher.Publish(string(topics.Tx), buf)
 }
 
-func syncWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-
-	if cliWallet == nil {
-		fmt.Fprintf(os.Stdout, "please load a wallet before trying to sync\n")
-		return
-	}
-
+func syncWallet() error {
 	var totalSpent, totalReceived uint64
 	// keep looping until tipHash = currentBlockHash
 	for {
@@ -379,18 +390,18 @@ func syncWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 		if err != nil {
 			cliWallet.UpdateWalletHeight(0)
 		}
+
 		// Get next block using walletHeight and tipHash of the node
 		blk, tipHash, tipHeight, err := fetchBlockHeightAndState(walletHeight)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "\nerror fetching block from node db: %v\n", err)
-			return
+			return fmt.Errorf("\nerror fetching block from node db: %v\n", err)
 		}
+
 		fmt.Fprintf(os.Stdout, "\rSyncing wallet... (%v/%v)", blk.Header.Height, tipHeight)
 		// call wallet.CheckBlock
 		spentCount, receivedCount, err := cliWallet.CheckWireBlock(*blk)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "\nerror fetching block: %v\n", err)
-			return
+			return fmt.Errorf("\nerror fetching block: %v\n", err)
 		}
 
 		totalSpent += spentCount
@@ -403,11 +414,17 @@ func syncWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 	}
 
 	fmt.Fprintf(os.Stdout, "\nFound %d spends and %d receives\n", totalSpent, totalReceived)
+	return nil
 }
 
 func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	if cliWallet == nil {
 		fmt.Fprintf(os.Stdout, "please load a wallet before trying to check balance\n")
+		return
+	}
+
+	if err := syncWallet(); err != nil {
+		fmt.Fprintf(os.Stdout, "%v", err)
 		return
 	}
 

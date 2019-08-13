@@ -72,19 +72,17 @@ Open the Command Line Interface (CLI) and type `createwallet [password]`, where 
 Open the Command Line Interface (CLI) and type `createfromseed [seed] [password]`, where `[seed]` stands for a hex seed and `[password]` stands for the secret combination of user-choice.
 ### How to load a wallet?
 Open the Command Line Interface (CLI) and type `loadwallet [password]`, where `[password]` stands for the secret combination previously selected by the user.
-### How to sync the wallet with the blockchain?
-Open the Command Line Interface (CLI) and type `sync`. The wallet will download blocks and check for UTXOs that belong to it.
 ### How to check the balance of the address?
-Open the Command Line Interface (CLI) and type `balance`. Make sure to `sync` the wallet first.
+Open the Command Line Interface (CLI) and type `balance`. 
 ### How to claim Testnet DUSK?
 To claim Testnet DUSK (tDUSK), the user is required to make a Twitter post containing his/her wallet address ([example](https://twitter.com/ellie12496641/status/1147604746280361984)). Following the post on Twitter, the user should go to the faucet [webpage](https://faucet.dusk.network/) and paste the Twitter post link into the empty box and click the `Send Dusk!` button. The tDUSK will be deposited onto the aforementioned address within a minute. The user can claim tDUSK for the same address once per 24 hours.
 ### How to transfer tDUSK?
-Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. 
 ### How to become a Provisioner?
-Open the Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the stake is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+Open the Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the stake is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
 
 After completion, type `startprovisioner` into the CLI to join the consensus.
 ### How to become a Block Generator?
-Open a Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the bid is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+Open a Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the bid is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
 
 After completion, you should note down the tx hash that the wallet prints out. Wait a minute or two for the transaction to be included in a block, and then type `startblockgenerator [txid]` into the CLI to join the consensus.
