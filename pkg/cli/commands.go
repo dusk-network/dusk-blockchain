@@ -32,7 +32,6 @@ var CLICommands = map[string]func([]string, wire.EventBroker, *wire.RPCBus){
 	"transfer":            transferCMD,
 	"stake":               sendStakeCMD,
 	"bid":                 sendBidCMD,
-	"sync":                syncWalletCMD,
 	"startprovisioner":    startProvisioner,
 	"startblockgenerator": startBlockGenerator,
 	"exit":                stopNode,
