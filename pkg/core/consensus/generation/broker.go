@@ -21,9 +21,14 @@ import (
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) {
-	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, publicKey)
+func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) error {
+	broker, err := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, publicKey)
+	if err != nil {
+		return err
+	}
+
 	go broker.Listen()
+	return nil
 }
 
 type broker struct {
@@ -40,9 +45,13 @@ type broker struct {
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) *broker {
+	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
-		gen = newProofGenerator(d, k)
+		var err error
+		gen, err = newProofGenerator(d, k)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	seed := make([]byte, 64)
@@ -68,7 +77,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	}
 	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), b.onBlock)
 	b.handleBlock(blk)
-	return b
+	return b, nil
 }
 
 func getLatestBlock() *block.Block {

@@ -23,18 +23,17 @@ type proofGenerator struct {
 	bidList *user.BidList
 }
 
-func newProofGenerator(d, k ristretto.Scalar) *proofGenerator {
+func newProofGenerator(d, k ristretto.Scalar) (*proofGenerator, error) {
 	bidList, err := user.NewBidList(nil)
 	if err != nil {
-		// If we can't repopulate the bidlist, panic
-		panic(err)
+		return nil, err
 	}
 
 	return &proofGenerator{
 		d:       d,
 		k:       k,
 		bidList: bidList,
-	}
+	}, nil
 }
 
 func (g *proofGenerator) UpdateBidList(bid user.Bid) {
