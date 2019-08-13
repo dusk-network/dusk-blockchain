@@ -54,7 +54,6 @@ type unixSupervisor struct {
 
 func (m *unixSupervisor) Levels() []log.Level {
 	return []log.Level{
-		// log.WarnLevel,
 		log.ErrorLevel,
 		log.FatalLevel,
 		log.PanicLevel,

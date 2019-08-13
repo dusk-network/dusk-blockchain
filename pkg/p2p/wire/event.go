@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	log "github.com/sirupsen/logrus"
+	lg "github.com/sirupsen/logrus"
 )
 
 // QuitTopic is the topic to make all components quit
@@ -62,6 +62,7 @@ type (
 		Collect(*bytes.Buffer) error
 	}
 
+	// TopicProcessor is the interface for preprocessing events belonging to a specific topic
 	TopicProcessor interface {
 		Process(*bytes.Buffer) (*bytes.Buffer, error)
 	}
@@ -79,7 +80,7 @@ type (
 		topic          string
 	}
 
-	// EventPreprocessors allow registration of preprocessors to be applied to incoming Event on a specific topic
+	// EventPreprocessor allows registration of preprocessors to be applied to incoming Event on a specific topic
 	EventPreprocessor interface {
 		RegisterPreprocessor(string, ...TopicProcessor) []uint32
 		RemovePreprocessor(string, uint32)
@@ -113,6 +114,7 @@ type (
 		Deserialize(*bytes.Buffer) (Event, error)
 	}
 
+	// Store abstract retrieval of Events
 	Store interface {
 		Insert(Event, string) int
 		Clear()
@@ -147,12 +149,17 @@ func NewTopicListener(subscriber EventSubscriber, collector EventCollector, topi
 	}
 }
 
+func (n *TopicListener) log() *lg.Entry {
+	return lg.WithFields(lg.Fields{
+		"topic":   n.topic,
+		"process": "TopicListener",
+	})
+}
+
 // Accept incoming (mashalled) Events on the topic of interest and dispatch them to the EventCollector.Collect.
 func (n *TopicListener) Accept() {
-	log.WithFields(log.Fields{
-		"id":    n.msgChanID,
-		"topic": n.topic,
-	}).Debugln("Accepting messages")
+	log := n.log().WithField("id", n.msgChanID)
+	log.Debugln("Accepting messages")
 	for {
 		select {
 		case <-n.quitChan:
@@ -161,17 +168,10 @@ func (n *TopicListener) Accept() {
 			return
 		case eventBuffer := <-n.msgChan:
 			if len(n.msgChan) > 10 {
-				log.WithFields(log.Fields{
-					"id":         n.msgChanID,
-					"topic":      n.topic,
-					"Unconsumed": len(n.msgChan),
-				}).Debugln("Channel is accumulating messages")
+				log.WithField("Unconsumed", len(n.msgChan)).Debugln("Channel is accumulating messages")
 			}
 			if err := n.eventCollector.Collect(eventBuffer); err != nil {
-				log.WithError(err).WithFields(log.Fields{
-					"id":    n.msgChanID,
-					"topic": n.topic,
-				}).Errorln("Error in eventCollector.Collect")
+				log.WithError(err).Errorln("Error in eventCollector.Collect")
 			}
 		}
 	}
