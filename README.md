@@ -79,10 +79,10 @@ To claim Testnet DUSK (tDUSK), the user is required to make a Twitter post conta
 ### How to transfer tDUSK?
 Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. 
 ### How to become a Provisioner?
-Open the Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the stake is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
+Open the Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the stake is locked (`0 < locktime <= 250000`), and `[password]` stands for the wallet password. 
 
-After completion, type `startprovisioner` into the CLI to join the consensus.
+After completion, you should be added to the provisioner committee. To participate, type `startprovisioner` into the CLI to join the consensus. Note that you can also run `startprovisioner` without staking - in this case, `startprovisioner` serves only to relay consensus messages to your immediate peers.
 ### How to become a Block Generator?
-Open a Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the bid is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
+Open a Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the bid is locked (`0 < locktime <= 250000`), and `[password]` stands for the wallet password. 
 
-After completion, you should note down the tx hash that the wallet prints out. Wait a minute or two for the transaction to be included in a block, and then type `startblockgenerator [txid]` into the CLI to join the consensus.
+After completion, you should note down the tx hash that the wallet prints out. Wait a minute or two for the transaction to be included in a block, and then type `startblockgenerator [txid]` into the CLI to join the consensus. Note that it is not possible to run `startblockgenerator` without a valid bid, that is included in a block.
