@@ -307,7 +307,7 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+	fmt.Fprintf(os.Stdout, "hash: %s\nMake sure to use the `startprovisioner` command to begin participating in consensus.\nMake sure as well that your blindbid process is running, before doing so.\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
 }
@@ -376,7 +376,7 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+	fmt.Fprintf(os.Stdout, "hash: %s\nMake sure to wait a minute for the transaction to be included in a block, and then run `startblockgenerator` with the hash above, to start generating blocks.\nMake sure as well that your blindbid process is running, before doing so.\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
 }
