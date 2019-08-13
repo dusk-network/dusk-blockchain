@@ -419,7 +419,7 @@ func syncWallet() error {
 
 func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	if cliWallet == nil {
-		fmt.Fprintf(os.Stdout, "please load a wallet before trying to use it\n")
+		fmt.Fprintf(os.Stdout, "please load a wallet before trying to check balance\n")
 		return
 	}
 
