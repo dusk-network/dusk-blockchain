@@ -10,6 +10,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
 	"github.com/dusk-network/dusk-blockchain/pkg/crypto/key"
@@ -33,11 +35,30 @@ func TestScoreGeneration(t *testing.T) {
 
 	gen := &mockGenerator{t}
 
+	// create lite db
+	_, db := lite.CreateDBConnection()
+	// Add a genesis block so we don't run into any panics
+	blk := helper.RandomBlock(t, 0, 2)
+	bid, err := helper.RandomBidTx(t, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bid.Outputs[0].Commitment = d.Bytes()
+	m := zkproof.CalculateM(k)
+	bid.M = m.Bytes()
+
+	blk.AddTx(bid)
+	err = db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(blk)
+	})
+	assert.NoError(t, err)
+
 	// launch score component
-	generation.Launch(eb, nil, d, k, gen, gen, keys, publicKey)
+	generation.Launch(eb, nil, k, keys, publicKey, gen, gen, db)
 
 	// send a block to start generation
-	blk := helper.RandomBlock(t, 0, 1)
+	blk = helper.RandomBlock(t, 0, 1)
 	b := new(bytes.Buffer)
 	if err := blk.Encode(b); err != nil {
 		t.Fatal(err)

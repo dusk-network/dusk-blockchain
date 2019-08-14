@@ -21,7 +21,8 @@ import (
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) error {
+func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
+	d := getLatestBid(k, eventBus, db)
 	broker, err := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, publicKey)
 	if err != nil {
 		return err

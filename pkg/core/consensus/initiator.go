@@ -2,99 +2,32 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
+	"errors"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
-func GetStartingRound(eventBroker wire.EventBroker, db database.DB, keys user.Keys) error {
-	// Get a db connection
-	if db == nil {
-		_, db = heavy.CreateDBConnection()
-	}
-
-	var currentHeight uint64
-	err := db.View(func(t database.Transaction) error {
-		var err error
-		currentHeight, err = t.FetchCurrentHeight()
-		return err
-	})
-
-	if err != nil {
-		currentHeight = 0
-	}
-
-	found := findActiveStakes(keys, currentHeight, db)
-
-	// Start listening for accepted blocks, regardless of if we found stakes or not
-	acceptedBlockChan, listener := InitAcceptedBlockUpdate(eventBroker)
-
-	go func(listener *wire.TopicListener) {
-		// Unsubscribe from AcceptedBlock once we're done
-		defer listener.Quit()
-
-		for {
-			blk := <-acceptedBlockChan
-			if found || keyFound(keys, blk.Txs) {
-				roundBytes := make([]byte, 8)
-				binary.LittleEndian.PutUint64(roundBytes, blk.Header.Height+1)
-				eventBroker.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
-				return
-			}
-		}
-	}(listener)
-	return nil
+// InCommittee will query the blockchain for any non-expired stakes that belong to the supplied public key.
+func InCommittee(blsPubKey []byte) bool {
+	initiator := initiation.NewInitiator(nil, blsPubKey, FindStake)
+	_, err := initiator.SearchForValue()
+	return err != nil
 }
 
-func findActiveStakes(keys user.Keys, currentHeight uint64, db database.DB) bool {
-	searchingHeight := currentHeight - transactions.MaxLockTime
-	if currentHeight < transactions.MaxLockTime {
-		searchingHeight = 0
-	}
-
-	for {
-		var b *block.Block
-		err := db.View(func(t database.Transaction) error {
-			hash, err := t.FetchBlockHashByHeight(searchingHeight)
-			if err != nil {
-				return err
-			}
-
-			b, err = t.FetchBlock(hash)
-			return err
-		})
-
-		if err != nil {
-			break
-		}
-
-		if keyFound(keys, b.Txs) {
-			return true
-		}
-
-		searchingHeight++
-	}
-
-	return false
-}
-
-func keyFound(keys user.Keys, txs []transactions.Transaction) bool {
+func FindStake(txs []transactions.Transaction, item []byte) ([]byte, error) {
 	for _, tx := range txs {
 		stake, ok := tx.(*transactions.Stake)
 		if !ok {
 			continue
 		}
 
-		if bytes.Equal(keys.BLSPubKeyBytes, stake.PubKeyBLS) {
-			return true
+		if bytes.Equal(item, stake.PubKeyBLS) {
+			// When searching for stakes, we dont really need any value, we just need to know that the stake exists.
+			// So, we don't return anything here.
+			return nil, nil
 		}
 	}
 
-	return false
+	return nil, errors.New("could not find corresponding stake")
 }
