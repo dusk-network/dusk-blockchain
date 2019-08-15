@@ -14,6 +14,8 @@ func InCommittee(blsPubKey []byte) bool {
 	return err != nil
 }
 
+// FindStake is a TxRetriever comparison function. If given a set of transactions and a BLS public key, it will
+// return a stake transaction corresponding to that BLS public key.
 func FindStake(txs []transactions.Transaction, item []byte) (transactions.Transaction, error) {
 	for _, tx := range txs {
 		stake, ok := tx.(*transactions.Stake)

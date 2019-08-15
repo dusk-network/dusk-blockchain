@@ -28,7 +28,8 @@ func getLatestBid(k ristretto.Scalar, subscriber wire.EventSubscriber, db databa
 	return d
 }
 
-// TODO: find a way to keep this unexported, as it is currently only public for a test.
+// FindD is a TxRetriever comparison function. If given a set of transactions and an M value, it will return a bid
+// transaction corresponding to that M value.
 func FindD(txs []transactions.Transaction, item []byte) (transactions.Transaction, error) {
 	for _, tx := range txs {
 		bid, ok := tx.(*transactions.Bid)
