@@ -30,7 +30,7 @@ func newProofGenerator(d, k ristretto.Scalar) (*proofGenerator, error) {
 		return nil, err
 	}
 
-	x := zkproof.CalculateX(k, zkproof.CalculateM(k))
+	x := zkproof.CalculateX(d, zkproof.CalculateM(k))
 	return &proofGenerator{
 		d:       d,
 		k:       k,

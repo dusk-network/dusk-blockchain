@@ -1,13 +1,11 @@
-package initiation_test
+package consensus_test
 
 import (
-	"encoding/hex"
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -18,7 +16,7 @@ import (
 )
 
 // Test that the initiator functions properly when searching for a stake
-func TestSearchForValueStake(t *testing.T) {
+func TestSearchForStake(t *testing.T) {
 	keys, _ := user.NewRandKeys()
 	db, err := initTest(t)
 	assert.NoError(t, err)
@@ -27,21 +25,24 @@ func TestSearchForValueStake(t *testing.T) {
 	assert.NoError(t, err)
 
 	stake.PubKeyBLS = keys.BLSPubKeyBytes
-	initiator := initiation.NewInitiator(db, stake.PubKeyBLS, consensus.FindStake)
+	retriever := consensus.NewTxRetriever(db, consensus.FindStake)
 
 	// We shouldn't get anything back yet, as the stake is not included in a block in the db
-	_, err = initiator.SearchForValue()
+	retrieved, err := retriever.SearchForTx(stake.PubKeyBLS)
 	assert.Error(t, err)
+	assert.Nil(t, retrieved)
 
 	// Now, add the stake to the db
 	storeTx(t, db, stake)
 
 	// This time, we shouldn't get an error
-	_, err = initiator.SearchForValue()
+	retrieved, err = retriever.SearchForTx(stake.PubKeyBLS)
 	assert.NoError(t, err)
+	assert.NotNil(t, retrieved)
+	assert.True(t, retrieved.Equals(stake))
 }
 
-func TestSearchForValueBid(t *testing.T) {
+func TestSearchForBid(t *testing.T) {
 	k := ristretto.Scalar{}
 	k.Rand()
 
@@ -57,18 +58,20 @@ func TestSearchForValueBid(t *testing.T) {
 	m := zkproof.CalculateM(k)
 	bid.M = m.Bytes()
 
-	initiator := initiation.NewInitiator(db, m.Bytes(), generation.FindD)
+	retriever := consensus.NewTxRetriever(db, generation.FindD)
 	// We shouldn't get anything back yet, as the bid is not included in a block in the db
-	dBytes, err := initiator.SearchForValue()
-	assert.Error(t, err, "was not supposed to get value back - got %s", hex.EncodeToString(dBytes))
+	retrieved, err := retriever.SearchForTx(m.Bytes())
+	assert.Error(t, err)
+	assert.Nil(t, retrieved)
 
 	// Now, add the bid to the db
 	storeTx(t, db, bid)
 
 	// This time, we shouldn't get an error, and an actual value returned
-	dBytes, err = initiator.SearchForValue()
+	retrieved, err = retriever.SearchForTx(m.Bytes())
 	assert.NoError(t, err)
-	assert.Equal(t, d.Bytes(), dBytes)
+	assert.NotNil(t, retrieved)
+	assert.Equal(t, d.Bytes(), retrieved.(*transactions.Bid).Outputs[0].Commitment)
 }
 
 func initTest(t *testing.T) (database.DB, error) {

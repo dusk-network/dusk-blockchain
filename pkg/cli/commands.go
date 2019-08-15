@@ -168,7 +168,7 @@ func stringToUint64(s string) (uint64, error) {
 	return (uint64(sInt)), nil
 }
 
-func getStartingRound(found bool, blsPubKey []byte, eventBroker wire.EventBroker, compareFunc func([]transactions.Transaction, []byte) ([]byte, error)) uint64 {
+func getStartingRound(found bool, blsPubKey []byte, eventBroker wire.EventBroker, compareFunc func([]transactions.Transaction, []byte) (transactions.Transaction, error)) uint64 {
 	// Start listening for accepted blocks, regardless of if we found stakes or not
 	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(eventBroker)
 	// Unsubscribe from AcceptedBlock once we're done
