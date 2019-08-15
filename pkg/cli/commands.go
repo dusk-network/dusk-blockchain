@@ -111,10 +111,11 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 
 	// launch generation component
 	publicKey := cliWallet.PublicKey()
-	err = generation.Launch(publisher, rpcBus, k, keys, &publicKey, nil, nil, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
-	}
+	go func() {
+		if err := generation.Launch(publisher, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
+			fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
+		}
+	}()
 
 	fmt.Fprintf(os.Stdout, "block generation component started\nto more accurately follow the progression of consensus, use the showlogs command\n")
 }
