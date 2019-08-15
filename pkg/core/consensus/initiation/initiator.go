@@ -18,7 +18,7 @@ type Initiator struct {
 }
 
 func NewInitiator(db database.DB, item []byte, compareFunc func([]transactions.Transaction, []byte) ([]byte, error)) *Initiator {
-	// Get a db connection, if none was passed.
+	// Get a db connection, if none was given.
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}

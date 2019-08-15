@@ -33,7 +33,8 @@ func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, 
 }
 
 type broker struct {
-	publisher            wire.EventPublisher
+	k                    ristretto.Scalar
+	eventBroker          wire.EventBroker
 	proofGenerator       Generator
 	forwarder            *forwarder
 	seeder               *seeder
@@ -69,7 +70,8 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	b := &broker{
-		publisher:            eventBroker,
+		k:                    k,
+		eventBroker:          eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
 		bidChan:              consensus.InitBidListUpdate(eventBroker),
@@ -122,7 +124,9 @@ func (b *broker) Listen() {
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
 		case blk := <-b.acceptedBlockChan:
-			b.onBlock(blk)
+			if b.proofGenerator != nil {
+				b.onBlock(blk)
+			}
 		}
 	}
 }
@@ -142,7 +146,20 @@ func (b *broker) handleBlock(blk block.Block) error {
 	}
 
 	b.forwarder.setPrevBlock(blk)
-	b.generateProofAndBlock()
+
+	// Only generate if we are allowed to
+	if b.proofGenerator.InBidList() {
+		b.generateProofAndBlock()
+	} else {
+		// Otherwise, we will wait till a new bid belonging to us is found
+		go func() {
+			b.updateProofValues()
+		}()
+
+		// We will also remove the old proofgenerator, to avoid starting this goroutine more than once
+		b.proofGenerator = nil
+	}
+
 	return nil
 }
 
@@ -171,6 +188,17 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 		return err
 	}
 
-	b.publisher.Publish(string(topics.Certificate), buf)
+	b.eventBroker.Publish(string(topics.Certificate), buf)
 	return nil
+}
+
+func (b *broker) updateProofValues() {
+	d := getLatestBid(b.k, b.eventBroker, nil)
+	var err error
+	b.proofGenerator, err = newProofGenerator(b.k, d)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "generation",
+		}).WithError(err).Errorln("could not repopulate bidlist")
+	}
 }

@@ -103,5 +103,6 @@ func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 	}
 }
 
+func (m *mockGenerator) InBidList() bool                { return true }
 func (m *mockGenerator) UpdateBidList(bl user.Bid)      {}
 func (m *mockGenerator) RemoveExpiredBids(round uint64) {}
