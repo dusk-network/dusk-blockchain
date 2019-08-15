@@ -29,6 +29,7 @@ func getLatestBid(k ristretto.Scalar, subscriber wire.EventSubscriber, db databa
 	return d
 }
 
+// TODO: find a way to keep this unexported, as it is currently only public for a test.
 func FindD(txs []transactions.Transaction, item []byte) ([]byte, error) {
 	for _, tx := range txs {
 		bid, ok := tx.(*transactions.Bid)

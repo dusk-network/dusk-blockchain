@@ -156,7 +156,8 @@ func (b *broker) handleBlock(blk block.Block) error {
 			b.updateProofValues()
 		}()
 
-		// We will also remove the old proofgenerator, to avoid starting this goroutine more than once
+		// We will also remove the old proofgenerator, to avoid creation of obsolete proofs
+		// until we get new proof values
 		b.proofGenerator = nil
 	}
 

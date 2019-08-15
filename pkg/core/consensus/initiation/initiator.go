@@ -11,6 +11,7 @@ import (
 
 // Initiator is a simple searcher which takes in a byte item, and a callback to run comparisons with this item,
 // against block transactions. It's purpose is to find a corresponding value given an item, and return it to the caller.
+// TODO: find a better name
 type Initiator struct {
 	db          database.DB
 	item        []byte
