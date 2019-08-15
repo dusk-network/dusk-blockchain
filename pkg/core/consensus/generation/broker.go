@@ -43,6 +43,7 @@ type broker struct {
 	bidChan              <-chan user.Bid
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
+	acceptedBlockChan    <-chan block.Block
 }
 
 func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
@@ -65,6 +66,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	blk := getLatestBlock()
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	b := &broker{
 		publisher:            eventBroker,
@@ -73,11 +75,11 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
+		acceptedBlockChan:    acceptedBlockChan,
 		forwarder:            newForwarder(eventBroker, blockGen),
 		seeder:               &seeder{keys: keys},
 	}
-	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), b.onBlock)
-	b.handleBlock(blk)
+	b.handleBlock(*blk)
 	return b, nil
 }
 
@@ -119,17 +121,14 @@ func (b *broker) Listen() {
 		case winningBlockHash := <-b.winningBlockHashChan:
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
+		case blk := <-b.acceptedBlockChan:
+			b.onBlock(blk)
 		}
 	}
 }
 
-func (b *broker) onBlock(m *bytes.Buffer) error {
+func (b *broker) onBlock(blk block.Block) error {
 	b.forwarder.threshold.Reset()
-
-	blk := block.NewBlock()
-	if err := blk.Decode(m); err != nil {
-		return err
-	}
 
 	// Remove old bids before generating a new score
 	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
@@ -137,12 +136,12 @@ func (b *broker) onBlock(m *bytes.Buffer) error {
 	return b.handleBlock(blk)
 }
 
-func (b *broker) handleBlock(blk *block.Block) error {
+func (b *broker) handleBlock(blk block.Block) error {
 	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
 		return err
 	}
 
-	b.forwarder.setPrevBlock(*blk)
+	b.forwarder.setPrevBlock(blk)
 	b.generateProofAndBlock()
 	return nil
 }
