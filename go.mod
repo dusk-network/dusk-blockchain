@@ -4,7 +4,7 @@ require (
 	github.com/OneOfOne/xxhash v1.2.5
 	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/dusk-network/bn256 v0.0.0-20190123110933-f166bf1226b0
-	github.com/dusk-network/dusk-crypto v0.0.0-20190816204105-3c4db220a69d
+	github.com/dusk-network/dusk-crypto v0.0.0-20190817112903-1c3dd1667bee
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
