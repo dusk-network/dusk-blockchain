@@ -7,8 +7,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/mocks"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -43,6 +43,8 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys) *byt
 	return buf
 }
 
+// GenVotes randomly generates a slice of StepVotes with the indicated lenght.
+// Albeit random, the generation is consistent with the rules of Votes
 func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVotes {
 	if len(keys) < 2 {
 		panic("At least two votes are required to mock an Agreement")
