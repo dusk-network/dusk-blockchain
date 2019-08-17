@@ -3,7 +3,7 @@ package transactions
 import (
 	"io"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/merkletree"
+	"github.com/dusk-network/dusk-crypto/merkletree"
 )
 
 // Encoder encodes a given struct into an io.writer

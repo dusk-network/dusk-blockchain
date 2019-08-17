@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 func TestAddAndRemoveBid(t *testing.T) {
