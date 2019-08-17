@@ -394,14 +394,14 @@ func syncWallet() error {
 		// Get next block using walletHeight and tipHash of the node
 		blk, tipHash, tipHeight, err := fetchBlockHeightAndState(walletHeight)
 		if err != nil {
-			return fmt.Errorf("\nerror fetching block from node db: %v\n", err)
+			return fmt.Errorf("\nerror fetching block from node db: %v", err)
 		}
 
 		fmt.Fprintf(os.Stdout, "\rSyncing wallet... (%v/%v)", blk.Header.Height, tipHeight)
 		// call wallet.CheckBlock
 		spentCount, receivedCount, err := cliWallet.CheckWireBlock(*blk)
 		if err != nil {
-			return fmt.Errorf("\nerror fetching block: %v\n", err)
+			return fmt.Errorf("\nerror fetching block: %v", err)
 		}
 
 		totalSpent += spentCount
