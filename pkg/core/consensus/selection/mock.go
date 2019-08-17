@@ -4,7 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 // MockSelectionEventBuffer mocks a Selection event, marshals it, and returns the

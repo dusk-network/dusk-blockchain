@@ -3,7 +3,7 @@ package key
 import (
 	"encoding/binary"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/hash"
+	"github.com/dusk-network/dusk-crypto/hash"
 )
 
 // Checksum hashes the data with Sha3256

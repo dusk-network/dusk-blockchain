@@ -9,11 +9,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -100,6 +100,8 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	return apk, nil
 }
 
+// VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
+// The signed message needs to carry information about the round and the step
 func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
 	signed := new(bytes.Buffer)
 	vote := &header.Header{
