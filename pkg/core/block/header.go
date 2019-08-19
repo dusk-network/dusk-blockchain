@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-crypto/hash"
 )
 
 const (

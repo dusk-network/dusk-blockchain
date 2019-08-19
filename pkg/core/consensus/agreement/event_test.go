@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/stretchr/testify/assert"
 )
 

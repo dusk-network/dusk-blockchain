@@ -9,8 +9,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -217,6 +217,7 @@ func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
 	return p.set.Remove(pubKeyBLS)
 }
 
+// RemoveExpired removes Provisioners which stake expired
 func (p *Provisioners) RemoveExpired(round uint64) uint64 {
 	var totalRemoved uint64
 	for pk, member := range p.members {

@@ -13,15 +13,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/merkletree"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-crypto/merkletree"
 	logger "github.com/sirupsen/logrus"
 )
 
-var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "mempool"})
+var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
 const (
 	consensusSeconds = 20
@@ -71,10 +71,12 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 	return verifiers.CheckTx(m.db, 0, approxBlockTime, tx)
 }
 
+// Collector implements the wire.EventCollector interface
 type Collector struct {
 	blockChan chan block.Block
 }
 
+// Collect as specified by the wire.EventCollector interface
 func (c *Collector) Collect(msg *bytes.Buffer) error {
 	b := block.NewBlock()
 	if err := b.Decode(msg); err != nil {

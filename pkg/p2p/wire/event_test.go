@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

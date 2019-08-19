@@ -9,7 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/bls"
+	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 // CheckBlock will verify whether a block is valid according to the rules of the consensus
