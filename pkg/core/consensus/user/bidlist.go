@@ -200,7 +200,7 @@ func CalculateX(d []byte, m []byte) Bid {
 
 func (b *BidList) remove(bid Bid, idx int) {
 	list := *b
-	if idx == len(list)-1 || idx == 0 {
+	if idx == len(list)-1 {
 		list = list[:idx]
 	} else {
 		list = append(list[:idx], list[idx+1:]...)
