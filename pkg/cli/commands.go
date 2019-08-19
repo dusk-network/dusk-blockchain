@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
@@ -13,28 +11,24 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
 // CLICommands holds all of the wallet commands that the user can call through
 // the interactive shell.
 var CLICommands = map[string]func([]string, wire.EventBroker, *wire.RPCBus){
-	"help":                showHelp,
-	"createwallet":        createWalletCMD,
-	"loadwallet":          loadWalletCMD,
-	"createfromseed":      createFromSeedCMD,
-	"balance":             balanceCMD,
-	"transfer":            transferCMD,
-	"stake":               sendStakeCMD,
-	"bid":                 sendBidCMD,
-	"startprovisioner":    startProvisioner,
-	"startblockgenerator": startBlockGenerator,
-	"exit":                stopNode,
-	"quit":                stopNode,
+	"help":               showHelp,
+	"createwallet":       createWalletCMD,
+	"loadwallet":         loadWalletCMD,
+	"createfromseed":     createFromSeedCMD,
+	"balance":            balanceCMD,
+	"transfer":           transferCMD,
+	"stake":              sendStakeCMD,
+	"bid":                sendBidCMD,
+	"setdefaultlocktime": setLocktimeCMD,
+	"setdefaultvalue":    setDefaultValueCMD,
+	"exit":               stopNode,
+	"quit":               stopNode,
 }
 
 func showHelp(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
@@ -60,69 +54,6 @@ func showHelp(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	}
 }
 
-func startProvisioner(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	// load consensus info, get keys, D and K
-	if cliWallet == nil {
-		fmt.Fprintf(os.Stdout, "please load a wallet before trying to participate in consensus\n")
-		return
-	}
-
-	// Setting up the consensus factory
-	f := factory.New(publisher, rpcBus, config.ConsensusTimeOut, cliWallet.ConsensusKeys())
-	f.StartConsensus()
-
-	blsPubKey := cliWallet.ConsensusKeys().BLSPubKeyBytes
-
-	go func() {
-		startingRound := getStartingRound(blsPubKey, publisher)
-
-		// Notify consensus components
-		roundBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(roundBytes, startingRound)
-		publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
-	}()
-
-	fmt.Fprintf(os.Stdout, "provisioner module started\nto more accurately follow the progression of consensus, use the showlogs command\n")
-}
-
-func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if cliWallet == nil {
-		fmt.Fprintf(os.Stdout, "please load a wallet before trying to participate in consensus\n")
-		return
-	}
-
-	// make some random keys to sign the seed with
-	keys, err := user.NewRandKeys()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "could not generate keys: %v\n", err)
-		return
-	}
-
-	// reconstruct k
-	zeroPadding := make([]byte, 4)
-	privSpend, err := cliWallet.PrivateSpend()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "could not get private spend: %v\n", err)
-		return
-	}
-
-	kBytes := append(privSpend, zeroPadding...)
-	var k ristretto.Scalar
-	k.Derive(kBytes)
-
-	// get public key that the rewards should go to
-	publicKey := cliWallet.PublicKey()
-
-	// launch generation component
-	go func() {
-		if err := generation.Launch(publisher, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
-			fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
-		}
-	}()
-
-	fmt.Fprintf(os.Stdout, "block generation component started\nto more accurately follow the progression of consensus, use the showlogs command\n")
-}
-
 func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	fmt.Fprintln(os.Stdout, "stopping node")
 
@@ -137,6 +68,42 @@ func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 		// Neither should this
 		panic(err)
 	}
+}
+
+func setLocktimeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+	if args == nil || len(args) < 1 {
+		fmt.Fprintln(os.Stdout, "please specify a default locktime")
+		return
+	}
+
+	locktime, err := strconv.Atoi(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stdout, err)
+		return
+	}
+
+	if locktime > 250000 {
+		fmt.Fprintln(os.Stdout, "locktime can not be higher than 250000")
+	}
+
+	// Send value to tx sender
+	fmt.Println(locktime)
+}
+
+func setDefaultValueCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+	if args == nil || len(args) < 1 {
+		fmt.Fprintln(os.Stdout, "please specify a default value")
+		return
+	}
+
+	value, err := strconv.Atoi(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stdout, err)
+		return
+	}
+
+	// Send value to tx sender
+	fmt.Println(value)
 }
 
 func intToScalar(amount int64) ristretto.Scalar {

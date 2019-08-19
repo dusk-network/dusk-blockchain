@@ -3,13 +3,19 @@ package cli
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/crypto/key"
@@ -66,6 +72,11 @@ func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPC
 
 	cliWallet = w
 	DBInstance = db
+
+	if !cfg.Get().General.WalletOnly {
+		go startProvisioner(publisher, rpcBus)
+		go startBlockGenerator(publisher, rpcBus)
+	}
 }
 
 func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
@@ -90,7 +101,10 @@ func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
-	cliWallet = w
+	if !cfg.Get().General.WalletOnly {
+		go startProvisioner(publisher, rpcBus)
+		go startBlockGenerator(publisher, rpcBus)
+	}
 }
 
 func loadWallet(password string) (*wallet.Wallet, error) {
@@ -116,7 +130,6 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 	DBInstance = db
 
 	return w, nil
-
 }
 
 func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
@@ -216,6 +229,11 @@ func createFromSeedCMD(args []string, publisher wire.EventBroker, rpcBus *wire.R
 	}
 
 	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\nPublic Address: %s\n", pubAddr)
+
+	if !cfg.Get().General.WalletOnly {
+		go startProvisioner(publisher, rpcBus)
+		go startBlockGenerator(publisher, rpcBus)
+	}
 }
 
 func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
@@ -434,6 +452,52 @@ func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		return
 	}
 	fmt.Fprintf(os.Stdout, "Balance: %.8f\n", balance)
+}
+
+func startProvisioner(publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+	// Setting up the consensus factory
+	f := factory.New(publisher, rpcBus, config.ConsensusTimeOut, cliWallet.ConsensusKeys())
+	f.StartConsensus()
+
+	blsPubKey := cliWallet.ConsensusKeys().BLSPubKeyBytes
+
+	startingRound := getStartingRound(blsPubKey, publisher)
+
+	// Notify consensus components
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, startingRound)
+	publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+}
+
+func startBlockGenerator(publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+	// make some random keys to sign the seed with
+	keys, err := user.NewRandKeys()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error starting block generation component - could not generate keys: %v\n", err)
+		return
+	}
+
+	// reconstruct k
+	zeroPadding := make([]byte, 4)
+	privSpend, err := cliWallet.PrivateSpend()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error starting block generation component - could not get private spend: %v\n", err)
+		return
+	}
+
+	kBytes := append(privSpend, zeroPadding...)
+	var k ristretto.Scalar
+	k.Derive(kBytes)
+
+	// get public key that the rewards should go to
+	publicKey := cliWallet.PublicKey()
+
+	// launch generation component
+	go func() {
+		if err := generation.Launch(publisher, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
+			fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
+		}
+	}()
 }
 
 func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, uint64, error) {
