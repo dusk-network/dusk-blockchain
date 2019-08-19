@@ -1,4 +1,4 @@
-# use the latest ubuntu environment (18.04) available on travis
+# Use Ubuntu 18.04
 dist: xenial
 
 language: go
@@ -8,8 +8,6 @@ language: go
 env:
   - GO111MODULE=on
 
-# You don't need to test on very old versions of the Go compiler. It's the user's
-# responsibility to keep their compiler up to date.
 go:
   - 1.12.x
 
@@ -17,24 +15,21 @@ go:
 git:
   depth: 1
 
-# Skip the install step. Don't `go get` dependencies. Only build with the code
-# in vendor/
-# install: true
-
-# Don't email me the results of the test runs.
+# Remove once the telegram bot is configured  
 notifications:
   email: fulvio@dusk.network
 
-# Anything in before_script that returns a nonzero exit code will flunk the
-# build and immediately stop. It's sorta like having set -e enabled in bash.
-# Make sure golangci-lint is vendored.
 before_script:
   - go get ./...
-  - go install github.com/golangci/golangci-lint/cmd/golangci-lint
+#  - go install github.com/golangci/golangci-lint/cmd/golangci-lint
+  -  go get -u golang.org/x/lint/golint
 
-# script always runs to completion (set +e). If we have linter issues AND a
-# failing test, we want to see both. Configure golangci-lint with a
-# .golangci.yml file at the top level of your repo.
+# Send a notification to the Telegram channel once the CI build completes
+after_script:
+#  - bash ./telegram_notification.sh
+
+# TODO: configure a .golangci.yml
 script:
-  - golangci-lint run       # run a bunch of code checkers/linters in parallel
+#  - golangci-lint run       # run a bunch of code checkers/linters in parallel
+  - golint ./...
   - go test -v -race ./...  # Run all the tests with the race detector enabled
