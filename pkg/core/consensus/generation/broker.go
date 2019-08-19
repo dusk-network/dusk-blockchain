@@ -22,7 +22,7 @@ import (
 
 // Launch will start the processes for score/block generation.
 func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
-	d := getLatestBid(k, eventBus, db)
+	d := getD(k, eventBus, db)
 	broker, err := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, publicKey)
 	if err != nil {
 		return err
@@ -151,14 +151,15 @@ func (b *broker) handleBlock(blk block.Block) error {
 	if b.proofGenerator.InBidList() {
 		b.generateProofAndBlock()
 	} else {
-		// Otherwise, we will wait till a new bid belonging to us is found
+		// We will remove the old proofgenerator, to avoid creation of obsolete proofs
+		// until we get new proof values
+		b.proofGenerator = nil
+
+		// Then, we will wait till a new bid belonging to us is found
 		go func() {
 			b.updateProofValues()
 		}()
 
-		// We will also remove the old proofgenerator, to avoid creation of obsolete proofs
-		// until we get new proof values
-		b.proofGenerator = nil
 	}
 
 	return nil
@@ -194,7 +195,7 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 }
 
 func (b *broker) updateProofValues() {
-	d := getLatestBid(b.k, b.eventBroker, nil)
+	d := getD(b.k, b.eventBroker, nil)
 	var err error
 	b.proofGenerator, err = newProofGenerator(b.k, d)
 	if err != nil {

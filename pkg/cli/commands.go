@@ -17,7 +17,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
@@ -73,13 +72,15 @@ func startProvisioner(args []string, publisher wire.EventBroker, rpcBus *wire.RP
 	f.StartConsensus()
 
 	blsPubKey := cliWallet.ConsensusKeys().BLSPubKeyBytes
-	stakeFound := consensus.InCommittee(blsPubKey)
-	startingRound := getStartingRound(stakeFound, blsPubKey, publisher, consensus.FindStake)
 
-	// Notify consensus components
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, startingRound)
-	publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+	go func() {
+		startingRound := getStartingRound(blsPubKey, publisher)
+
+		// Notify consensus components
+		roundBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(roundBytes, startingRound)
+		publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+	}()
 
 	fmt.Fprintf(os.Stdout, "provisioner module started\nto more accurately follow the progression of consensus, use the showlogs command\n")
 }
@@ -109,8 +110,10 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 	var k ristretto.Scalar
 	k.Derive(kBytes)
 
-	// launch generation component
+	// get public key that the rewards should go to
 	publicKey := cliWallet.PublicKey()
+
+	// launch generation component
 	go func() {
 		if err := generation.Launch(publisher, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
 			fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
@@ -168,7 +171,7 @@ func stringToUint64(s string) (uint64, error) {
 	return (uint64(sInt)), nil
 }
 
-func getStartingRound(found bool, blsPubKey []byte, eventBroker wire.EventBroker, compareFunc func([]transactions.Transaction, []byte) (transactions.Transaction, error)) uint64 {
+func getStartingRound(blsPubKey []byte, eventBroker wire.EventBroker) uint64 {
 	// Start listening for accepted blocks, regardless of if we found stakes or not
 	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(eventBroker)
 	// Unsubscribe from AcceptedBlock once we're done
@@ -176,12 +179,6 @@ func getStartingRound(found bool, blsPubKey []byte, eventBroker wire.EventBroker
 
 	for {
 		blk := <-acceptedBlockChan
-		if found {
-			return blk.Header.Height + 1
-		}
-
-		if _, err := compareFunc(blk.Txs, blsPubKey); err != nil {
-			return blk.Header.Height + 1
-		}
+		return blk.Header.Height + 1
 	}
 }

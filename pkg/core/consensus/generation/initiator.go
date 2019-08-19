@@ -1,9 +1,6 @@
 package generation
 
 import (
-	"bytes"
-	"errors"
-
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -12,12 +9,13 @@ import (
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
-func getLatestBid(k ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) ristretto.Scalar {
+// Use the TxRetriever to get a valid bid transaction that belongs to us, and return the D value from that bid.
+func getD(k ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) ristretto.Scalar {
 	// Get our M value to compare
 	m := zkproof.CalculateM(k)
 
-	retriever := consensus.NewTxRetriever(db, FindD)
-	bid, err := retriever.SearchForTx(m.Bytes())
+	retriever := newBidRetriever(db)
+	bid, err := retriever.SearchForBid(m.Bytes())
 	if err != nil {
 		// If we did not get any values from scanning the chain, we will wait to get a valid one from incoming blocks
 		bid = waitForBid(subscriber, m.Bytes())
@@ -28,30 +26,13 @@ func getLatestBid(k ristretto.Scalar, subscriber wire.EventSubscriber, db databa
 	return d
 }
 
-// FindD is a TxRetriever comparison function. If given a set of transactions and an M value, it will return a bid
-// transaction corresponding to that M value.
-func FindD(txs []transactions.Transaction, item []byte) (transactions.Transaction, error) {
-	for _, tx := range txs {
-		bid, ok := tx.(*transactions.Bid)
-		if !ok {
-			continue
-		}
-
-		if bytes.Equal(item, bid.M) {
-			return bid, nil
-		}
-	}
-
-	return nil, errors.New("could not find a corresponding d value")
-}
-
 func waitForBid(subscriber wire.EventSubscriber, m []byte) transactions.Transaction {
 	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(subscriber)
 	defer listener.Quit()
 
 	for {
 		blk := <-acceptedBlockChan
-		bid, err := FindD(blk.Txs, m)
+		bid, err := findCorrespondingBid(blk.Txs, m, 0, 0)
 		if err != nil {
 			continue
 		}
