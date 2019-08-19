@@ -77,9 +77,11 @@ func (b *BidList) repopulate(db database.DB) {
 				continue
 			}
 
-			x := CalculateX(bid.Outputs[0].Commitment, bid.M)
-			x.EndHeight = searchingHeight + bid.Lock
-			b.AddBid(x)
+			if searchingHeight+bid.Lock > currentHeight {
+				x := CalculateX(bid.Outputs[0].Commitment, bid.M)
+				x.EndHeight = searchingHeight + bid.Lock
+				b.AddBid(x)
+			}
 		}
 
 		searchingHeight++
