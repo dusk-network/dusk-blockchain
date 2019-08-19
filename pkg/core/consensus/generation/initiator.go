@@ -6,14 +6,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 // Use the TxRetriever to get a valid bid transaction that belongs to us, and return the D value from that bid.
-func getD(k ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) ristretto.Scalar {
-	// Get our M value to compare
-	m := zkproof.CalculateM(k)
-
+func getD(m ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) ristretto.Scalar {
 	retriever := newBidRetriever(db)
 	bid, err := retriever.SearchForBid(m.Bytes())
 	if err != nil {

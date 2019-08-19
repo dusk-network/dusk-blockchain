@@ -24,13 +24,13 @@ type proofGenerator struct {
 	bidList *user.BidList
 }
 
-func newProofGenerator(d, k ristretto.Scalar) (*proofGenerator, error) {
+func newProofGenerator(d, k, m ristretto.Scalar) (*proofGenerator, error) {
 	bidList, err := user.NewBidList(nil)
 	if err != nil {
 		return nil, err
 	}
 
-	x := zkproof.CalculateX(d, zkproof.CalculateM(k))
+	x := zkproof.CalculateX(d, m)
 	return &proofGenerator{
 		d:       d,
 		k:       k,

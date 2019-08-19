@@ -22,8 +22,9 @@ import (
 
 // Launch will start the processes for score/block generation.
 func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
-	d := getD(k, eventBus, db)
-	broker, err := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, publicKey)
+	m := zkproof.CalculateM(k)
+	d := getD(m, eventBus, db)
+	broker, err := newBroker(eventBus, rpcBus, d, k, m, gen, blockGen, keys, publicKey)
 	if err != nil {
 		return err
 	}
@@ -34,6 +35,7 @@ func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, 
 
 type broker struct {
 	k                    ristretto.Scalar
+	m                    ristretto.Scalar
 	eventBroker          wire.EventBroker
 	proofGenerator       Generator
 	forwarder            *forwarder
@@ -47,11 +49,11 @@ type broker struct {
 	acceptedBlockChan    <-chan block.Block
 }
 
-func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
+func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k, m ristretto.Scalar,
 	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
 		var err error
-		gen, err = newProofGenerator(d, k)
+		gen, err = newProofGenerator(d, k, m)
 		if err != nil {
 			return nil, err
 		}
@@ -71,6 +73,7 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 
 	b := &broker{
 		k:                    k,
+		m:                    m,
 		eventBroker:          eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
@@ -116,7 +119,7 @@ func (b *broker) Listen() {
 		case bid := <-b.bidChan:
 			b.proofGenerator.UpdateBidList(bid)
 		case state := <-b.regenerationChan:
-			if state.Round == b.seeder.Round() {
+			if state.Round == b.seeder.Round() && b.proofGenerator != nil {
 				b.forwarder.threshold.Lower()
 				b.generateProofAndBlock()
 			}
@@ -159,7 +162,6 @@ func (b *broker) handleBlock(blk block.Block) error {
 		go func() {
 			b.updateProofValues()
 		}()
-
 	}
 
 	return nil
@@ -195,9 +197,12 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 }
 
 func (b *broker) updateProofValues() {
-	d := getD(b.k, b.eventBroker, nil)
+	d := getD(b.m, b.eventBroker, nil)
+	log.WithFields(log.Fields{
+		"process": "generation",
+	}).Debugln("changing d value")
 	var err error
-	b.proofGenerator, err = newProofGenerator(b.k, d)
+	b.proofGenerator, err = newProofGenerator(d, b.k, b.m)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"process": "generation",
