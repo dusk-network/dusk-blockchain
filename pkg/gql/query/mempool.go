@@ -1,0 +1,72 @@
+package query
+
+import (
+	"bytes"
+	"encoding/hex"
+	"errors"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/graphql-go/graphql"
+
+	rawtxs "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+)
+
+type mempool struct {
+	rpcBus *wire.RPCBus
+}
+
+func (t mempool) getQuery() *graphql.Field {
+	return &graphql.Field{
+		Type: graphql.NewList(Transaction),
+		Args: graphql.FieldConfigArgument{
+			"txid": &graphql.ArgumentConfig{
+				Type: graphql.String,
+			},
+		},
+		Resolve: t.resolve,
+	}
+}
+
+func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
+
+	txid, ok := p.Args["txid"].(string)
+	if ok {
+
+		payload := bytes.Buffer{}
+		if txid != "" {
+			txidBytes, err := hex.DecodeString(txid)
+			if err != nil {
+				return nil, errors.New("invalid txid")
+			}
+			payload.Write(txidBytes)
+		}
+
+		r, err := t.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(payload, 5))
+		if err != nil {
+			return "", err
+		}
+
+		lTxs, err := encoding.ReadVarInt(&r)
+		if err != nil {
+			return "", err
+		}
+
+		fetched, err := rawtxs.FromReader(&r, lTxs)
+		if err != nil {
+			return "", err
+		}
+
+		txs := make([]rawtxs.Standard, 0)
+		for _, tx := range fetched {
+			sTx := tx.StandardTX()
+			sTx.TxID, err = tx.CalculateHash()
+			if err == nil {
+				txs = append(txs, sTx)
+			}
+		}
+
+		return txs, nil
+	}
+
+	return nil, nil
+}
