@@ -1,11 +1,10 @@
 package query
 
 import (
-	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/graphql-go/graphql"
 
 	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
@@ -14,7 +13,6 @@ import (
 // File purpose is to define all arguments and resolvers relevant to "blocks" query only
 
 type blocks struct {
-	db database.DB
 }
 
 func (b blocks) getQuery() *graphql.Field {
@@ -40,27 +38,33 @@ func (b blocks) getQuery() *graphql.Field {
 		Resolve: b.resolve,
 	}
 }
-
 func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
+
+	// Retrieve DB conn from context
+	db, ok := p.Context.Value("database").(database.DB)
+	if !ok {
+		return nil, errors.New("context does not store database conn")
+	}
 
 	// resolve argument hash (single block)
 	hash, ok := p.Args["hash"].(interface{})
 	if ok {
 		hashes := make([]interface{}, 0)
 		hashes = append(hashes, hash)
-		return b.fetchBlocksByHashes(hashes)
+		return b.fetchBlocksByHashes(db, hashes)
 	}
 
 	// resolve argument hashes (multiple blocks)
 	hashes, ok := p.Args["hashes"].([]interface{})
 	if ok {
-		return b.fetchBlocksByHashes(hashes)
+		return b.fetchBlocksByHashes(db, hashes)
 	}
 
 	// resolve argument height (single block)
+	// Chain height type is uint64 whereas `resolve` can handle height values up to MaxUInt
 	height, ok := p.Args["height"].(int)
 	if ok {
-		return b.fetchBlocksByHeights(int64(height), int64(height))
+		return b.fetchBlocksByHeights(db, int64(height), int64(height))
 	}
 
 	// resolve argument range (range of blocks)
@@ -76,7 +80,7 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 			return nil, errors.New("range `to` value not int64")
 		}
 
-		return b.fetchBlocksByHeights(int64(from), int64(to))
+		return b.fetchBlocksByHeights(db, int64(from), int64(to))
 	}
 
 	offset, ok := p.Args["last"].(int)
@@ -84,7 +88,7 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 		if offset <= 0 {
 			return nil, errors.New("invalid offset")
 		}
-		return b.fetchBlocksByHeights(int64(offset)*-1, -1)
+		return b.fetchBlocksByHeights(db, int64(offset)*-1, -1)
 	}
 
 	return nil, nil
@@ -95,8 +99,13 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 	var txs []core.Standard
 	b, ok := p.Source.(*block.Block)
 	if ok {
-		// TODO: use the one from the context
-		_, db := heavy.CreateDBConnection()
+
+		// Retrieve DB conn from context
+		db, ok := p.Context.Value("database").(database.DB)
+		if !ok {
+			return nil, errors.New("context does not store database conn")
+		}
+
 		err := db.View(func(t database.Transaction) error {
 			fetched, err := t.FetchBlockTxs(b.Header.Hash)
 			if err != nil {
@@ -117,17 +126,17 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 }
 
 // Fetch block headers by a list of hashes
-func (b blocks) fetchBlocksByHashes(hashes []interface{}) ([]*block.Block, error) {
+func (b blocks) fetchBlocksByHashes(db database.DB, hashes []interface{}) ([]*block.Block, error) {
 
 	blocks := make([]*block.Block, 0)
-	err := b.db.View(func(t database.Transaction) error {
+	err := db.View(func(t database.Transaction) error {
 		for _, v := range hashes {
 			encodedHash, ok := v.(string)
 			if !ok {
 				continue
 			}
 
-			hash, err := base64.StdEncoding.DecodeString(encodedHash)
+			hash, err := hex.DecodeString(encodedHash)
 			if err != nil {
 				continue
 			}
@@ -152,10 +161,10 @@ func (b blocks) fetchBlocksByHashes(hashes []interface{}) ([]*block.Block, error
 }
 
 // Fetch block headers by a range of heights
-func (b blocks) fetchBlocksByHeights(from, to int64) ([]*block.Block, error) {
+func (b blocks) fetchBlocksByHeights(db database.DB, from, to int64) ([]*block.Block, error) {
 
 	blocks := make([]*block.Block, 0)
-	err := b.db.View(func(t database.Transaction) error {
+	err := db.View(func(t database.Transaction) error {
 
 		var tip uint64
 		if from < 0 || to < 0 {

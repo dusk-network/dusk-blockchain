@@ -1,15 +1,22 @@
 package query
 
 import (
-	"encoding/base64"
+	"encoding/hex"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
+	"github.com/pkg/errors"
 
 	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 )
 
+
 type transactions struct {
-	db database.DB
+}
+
+type output struct {
+	BlockHash []byte
+	TxID      []byte
+	TxType    core.TxType
 }
 
 func (t transactions) getQuery() *graphql.Field {
@@ -29,38 +36,38 @@ func (t transactions) getQuery() *graphql.Field {
 
 func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
 
+	// Retrieve DB conn from context
+	db, ok := p.Context.Value("database").(database.DB)
+	if !ok {
+		return nil, errors.New("context does not store database conn")
+	}
+
 	txid, ok := p.Args["txid"].(interface{})
 	if ok {
 		ids := make([]interface{}, 0)
 		ids = append(ids, txid)
-		return t.fetchTxsByHash(ids)
+		return t.fetchTxsByHash(db, ids)
 	}
 
 	ids, ok := p.Args["txids"].([]interface{})
 	if ok {
-		return t.fetchTxsByHash(ids)
+		return t.fetchTxsByHash(db, ids)
 	}
 
 	return nil, nil
 }
 
-type output struct {
-	BlockHash []byte
-	TxID      []byte
-	TxType    core.TxType
-}
-
-func (t transactions) fetchTxsByHash(txids []interface{}) ([]output, error) {
+func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]output, error) {
 
 	txs := make([]output, 0)
-	err := t.db.View(func(t database.Transaction) error {
+	err := db.View(func(t database.Transaction) error {
 
 		for _, v := range txids {
 			encVal, ok := v.(string)
 			if !ok {
 				continue
 			}
-			decVal, err := base64.StdEncoding.DecodeString(encVal)
+			decVal, err := hex.DecodeString(encVal)
 			if err != nil {
 				return err
 			}
