@@ -55,11 +55,11 @@ func Setup() *Server {
 	if cfg.Get().RPC.Enabled {
 		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus)
 		if err != nil {
-			log.Errorf("RPC server error: %s", err.Error())
+			log.Errorf("RPC http server error: %s", err.Error())
 		}
 
 		if err := rpcServ.Start(); err != nil {
-			log.Errorf("RPC server error: %s", err.Error())
+			log.Errorf("RPC failed to start: %s", err.Error())
 		}
 	}
 
@@ -67,11 +67,11 @@ func Setup() *Server {
 	if cfg.Get().Gql.Enabled {
 		gqlServer, err := gql.NewHTTPServer(eventBus, rpcBus)
 		if err != nil {
-			log.Errorf("graphQL server error: %s", err.Error())
+			log.Errorf("GraphQL http server error: %s", err.Error())
 		}
 
 		if err := gqlServer.Start(); err != nil {
-			log.Errorf("graphQL server error: %s", err.Error())
+			log.Errorf("GraphQL failed to start: %s", err.Error())
 		}
 	}
 
