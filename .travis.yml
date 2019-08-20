@@ -17,7 +17,6 @@ git:
 
 before_script:
   - go get ./...
-  #  - go install github.com/golangci/golangci-lint/cmd/golangci-lint
   - go get -u golang.org/x/lint/golint
 
 # Send a notification to the Dusk build Status Telegram channel once the CI build completes
@@ -26,4 +25,7 @@ after_script:
 
 script:
   - golint ./...
-  - go test -v -race ./... # Run all the tests with the race detector enabled
+  - go test -race -coverprofile=coverage.txt -covermode=atomic ./... # Run all the tests with the race detector enabled
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
