@@ -61,10 +61,18 @@ func (m *unixSupervisor) Levels() []log.Level {
 }
 
 func (m *unixSupervisor) Fire(entry *log.Entry) error {
+	// Format the entry first. Since the logger still uses this entry after the hook has fired,
+	// race conditions can occur if the `Logger` formats the entry after receiving it through the channel.
+	// So, we format it here and send the bytes over instead.
+	formatted, err := m.processor.Logger.Formatter.Format(entry)
+	if err != nil {
+		return err
+	}
+
 	if m.activeProc {
 		// Drop events if the queue is filled up, to avoid extended lockups
 		select {
-		case m.processor.EntryChan <- entry:
+		case m.processor.EntryChan <- formatted:
 		default:
 		}
 	}
