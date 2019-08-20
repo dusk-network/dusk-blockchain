@@ -117,7 +117,9 @@ func (b *broker) Listen() {
 	for {
 		select {
 		case bid := <-b.bidChan:
-			b.proofGenerator.UpdateBidList(bid)
+			if b.proofGenerator != nil {
+				b.proofGenerator.UpdateBidList(bid)
+			}
 		case state := <-b.regenerationChan:
 			if state.Round == b.seeder.Round() && b.proofGenerator != nil {
 				b.forwarder.threshold.Lower()
