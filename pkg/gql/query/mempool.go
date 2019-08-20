@@ -2,6 +2,8 @@ package query
 
 import (
 	"bytes"
+	"encoding/hex"
+	"errors"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/graphql-go/graphql"
@@ -28,12 +30,16 @@ func (t mempool) getQuery() *graphql.Field {
 
 func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 
-	txid, ok := p.Args["txid"].(interface{})
+	txid, ok := p.Args["txid"].(string)
 	if ok {
 
 		payload := bytes.Buffer{}
 		if txid != "" {
-			// TODO: Handle case where txid is passed
+			txidBytes, err := hex.DecodeString(txid)
+			if err != nil {
+				return nil, errors.New("invalid txid")
+			}
+			payload.Write(txidBytes)
 		}
 
 		r, err := t.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(payload, 5))
