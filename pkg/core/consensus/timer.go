@@ -12,6 +12,9 @@ type Timer struct {
 	TimeOutChan chan struct{}
 }
 
+// The timer can double a maximum amount of 10 times.
+const maxDouble = 1024 // 2^10
+
 func NewTimer(timeOut time.Duration, timeOutChan chan struct{}) *Timer {
 	return &Timer{
 		timeOut:     timeOut,
@@ -23,7 +26,7 @@ func NewTimer(timeOut time.Duration, timeOutChan chan struct{}) *Timer {
 func (t *Timer) IncreaseTimeOut() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	if t.timeOut < t.baseTimeOut*2^10 {
+	if t.timeOut < t.baseTimeOut*maxDouble {
 		t.timeOut = t.timeOut * 2
 	}
 }
