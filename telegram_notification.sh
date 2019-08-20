@@ -23,9 +23,12 @@ Travis build *${build_status}!*
 \`Repository:  ${TRAVIS_REPO_SLUG}\`
 \`Branch:      ${TRAVIS_BRANCH}\`
 \`Commit:      ${TRAVIS_COMMIT}\`
+
 *Commit Msg:*
 ${TRAVIS_COMMIT_MESSAGE}
+
 [Job Log here](${TRAVIS_JOB_WEB_URL})
+[Code Coverage Report](https://codecov.io/gh/${TRAVIS_REPO_SLUG}/list/${TRAVIS_COMMIT}/)
 --------------------------------------
 "
 
