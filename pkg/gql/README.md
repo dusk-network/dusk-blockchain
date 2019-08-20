@@ -22,12 +22,6 @@ Package should not be used for any data mutations or node commanding.
 Currently, it's over HTTP but later WebSocket support could be added to enable data fetching in publish-subscribe manner.
 (e.g graphql service capable of sending updates on newly accepted block)
 
-##### Pending development
-- Queries schema is pending to be modified/enriched accordingly.
-- Subscriptions for particular chain/consensus updates (block accepted, reward received etc)
-- Support unix domain socket as transport for messaging with the monitor component
-- 
-
 #### Configuration
 ```toml
 [gql]
@@ -41,7 +35,7 @@ port=9001
 
 ```graphql
 {
-  blocks(hash: "GU3RPuimCsAXqCxBwOLAJJjXX0h1Q1EHLzkqCF1GliA=" ) {
+  blocks(hash: "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620" ) {
     header {
        height
        hash
@@ -114,7 +108,7 @@ port=9001
 
 ```graphql
 {
-   transactions(txid: "f+u3gwnz5T7OlL+1NGW5q3zyPwg/djxrzsWfA/ysJ04=") {
+   transactions(txid: "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620") {
       txid
       txtype
       blockhash
@@ -126,7 +120,7 @@ port=9001
 
 ```graphql
 {
-  transactions(txids: ["3JTSG9tFTwfuYedolRZdc3p1jF/tOGjVjBiadDbeZPc=","WuXkPSuf/D741vKSpl3C8bvyh8cdXCZON1vh7hcBHsw="]) {
+  transactions(txids: ["dc94d21bdb454f07ee61e76895165d737a758c5fed3868d58c189a7436de64f7","5ae5e43d2b9ffc3ef8d6f292a65dc2f1bbf287c71d5c264e375be1ee17011ecc"]) {
       txid
       txtype
       blockhash
@@ -172,7 +166,7 @@ port=9001
 - Fetch a slice of blocks by their hashes
 ```graphql
 {
-  blocks(hashes: ["GU3RPuimCsAXqCxBwOLAJJjXX0h1Q1EHLzkqCF1GliA=","uofO7J8xzPzKvJ0r6fdTZm4O1Vl0T1nT9L0q/TIPewM="]) {
+  blocks(hashes: ["194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620","ba87ceec9f31ccfccabc9d2be9f753666e0ed559744f59d3f4bd2afd320f7b03"]) {
     header {
        height
        hash

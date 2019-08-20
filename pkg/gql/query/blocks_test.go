@@ -45,7 +45,7 @@ func TestBlocksByHeight(t *testing.T) {
 func TestBlocksByHash(t *testing.T) {
 	query := `
 		{
-		  blocks(hash: "GU3RPuimCsAXqCxBwOLAJJjXX0h1Q1EHLzkqCF1GliA=") {
+		  blocks(hash: "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620") {
 			header {
                hash
 			   height
@@ -59,7 +59,7 @@ func TestBlocksByHash(t *testing.T) {
         		"blocks": [
         			{
         				"header": {
-        					"hash": "GU3RPuimCsAXqCxBwOLAJJjXX0h1Q1EHLzkqCF1GliA=",
+        					"hash": "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620",
         					"height": 0
         				}
         			}
@@ -73,7 +73,8 @@ func TestBlocksByHash(t *testing.T) {
 func TestBlocksByHashes(t *testing.T) {
 	query := `
 		{
-		  blocks(hashes: ["m/UOOUu4E0b4uNtCvd0oWsNEJgwCSg34CLr3YBQX10g=", "lGfF53TrG0gl0IwFmaCwgV/KXawW2WkAJoVO2NHyKck="] ) {
+		  blocks(hashes: ["9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748", 
+                          "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9"] ) {
 			header {
                hash
 			   height
@@ -87,13 +88,13 @@ func TestBlocksByHashes(t *testing.T) {
         		"blocks": [
         			{
         				"header": {
-        					"hash": "m/UOOUu4E0b4uNtCvd0oWsNEJgwCSg34CLr3YBQX10g=",
+        					"hash": "9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748",
         					"height": 1
         				}
         			},
         			{
         				"header": {
-        					"hash": "lGfF53TrG0gl0IwFmaCwgV/KXawW2WkAJoVO2NHyKck=",
+        					"hash": "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9",
         					"height": 2
         				}
         			}
@@ -141,7 +142,7 @@ func TestBlocksTxs(t *testing.T) {
         				},
         				"transactions": [
         					{
-        						"txid": "Ts4G1WI0BRutCsW5m5UaAqWdVyTrib3bhVHz1q47JnU=",
+        						"txid": "4ece06d56234051bad0ac5b99b951a02a59d5724eb89bddb8551f3d6ae3b2675",
         						"txtype": "3"
         					}
         				]

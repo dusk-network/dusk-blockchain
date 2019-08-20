@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -11,10 +12,8 @@ type Root struct {
 	Query *graphql.Object
 }
 
-func NewRoot(rpcBus *wire.RPCBus, db database.DB) *Root {
+func NewRoot(rpcBus *wire.RPCBus) *Root {
 
-	b := blocks{db}
-	t := transactions{db}
 	m := mempool{rpcBus: rpcBus}
 
 	root := Root{
@@ -22,8 +21,8 @@ func NewRoot(rpcBus *wire.RPCBus, db database.DB) *Root {
 			graphql.ObjectConfig{
 				Name: "Query",
 				Fields: graphql.Fields{
-					"blocks":       b.getQuery(),
-					"transactions": t.getQuery(),
+					"blocks":       blocks{}.getQuery(),
+					"transactions": transactions{}.getQuery(),
 					"mempool":      m.getQuery(),
 				},
 			},
@@ -32,10 +31,11 @@ func NewRoot(rpcBus *wire.RPCBus, db database.DB) *Root {
 	return &root
 }
 
-func Execute(query string, schema graphql.Schema) *graphql.Result {
+func Execute(query string, schema graphql.Schema, db database.DB) *graphql.Result {
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
 		RequestString: query,
+		Context:       context.WithValue(context.Background(), "database", db),
 	})
 
 	// Error check

@@ -16,17 +16,18 @@ import (
 )
 
 var sc graphql.Schema
+var db database.DB
 
 func TestMain(m *testing.M) {
 
 	// Setup lite DB
-	_, db := lite.CreateDBConnection()
+	_, db = lite.CreateDBConnection()
 	defer db.Close()
 
 	initializeDB(db)
 
 	// Setup graphql Schema
-	rootQuery := NewRoot(nil, db)
+	rootQuery := NewRoot(nil)
 	sc, _ = graphql.NewSchema(
 		graphql.SchemaConfig{Query: rootQuery.Query},
 	)
@@ -78,7 +79,7 @@ func initializeDB(db database.DB) {
 }
 
 func assertQuery(t *testing.T, query, response string) {
-	result, err := json.MarshalIndent(Execute(query, sc), "", "\t")
+	result, err := json.MarshalIndent(Execute(query, sc, db), "", "\t")
 	if err != nil {
 		t.Errorf("marshal response: %v", err)
 	}
@@ -88,23 +89,21 @@ func assertQuery(t *testing.T, query, response string) {
 		t.Error(err)
 	}
 
-	//t.Logf("Result:\n%s", result)
+	// t.Logf("Result:\n%s", result)
 	if !equal {
 		t.Error("expecting other response from this query")
 	}
 }
 
 func assertJSONs(result, expected []byte) (bool, error) {
-	var r interface{}
-	var e interface{}
 
-	var err error
-	err = json.Unmarshal(result, &r)
-	if err != nil {
+	var r interface{}
+	if err := json.Unmarshal(result, &r); err != nil {
 		return false, fmt.Errorf("mashalling error result val: %v", err)
 	}
-	err = json.Unmarshal(expected, &e)
-	if err != nil {
+
+	var e interface{}
+	if err := json.Unmarshal(expected, &e); err != nil {
 		return false, fmt.Errorf("mashalling error expected val: %v", err)
 	}
 

@@ -1,7 +1,7 @@
 package query
 
 import (
-	"encoding/base64"
+	"encoding/hex"
 	"time"
 
 	"github.com/graphql-go/graphql"
@@ -27,24 +27,23 @@ var Header = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Header",
 		Fields: graphql.Fields{
-			// TODO: write our own Scalar to handle uint64
 			"height": &graphql.Field{
 				Type: graphql.Int,
 			},
 			"hash": &graphql.Field{
-				Type: Base64,
+				Type: Hex,
 			},
 			"version": &graphql.Field{
-				Type: graphql.Int,
+				Type: graphql.String,
 			},
 			"prevblockhash": &graphql.Field{
-				Type: Base64,
+				Type: Hex,
 			},
 			"seed": &graphql.Field{
-				Type: Base64,
+				Type: Hex,
 			},
 			"txroot": &graphql.Field{
-				Type: Base64,
+				Type: Hex,
 			},
 			"timestamp": &graphql.Field{
 				Type: UnixTimestamp,
@@ -58,26 +57,26 @@ var Transaction = graphql.NewObject(
 		Name: "Transaction",
 		Fields: graphql.Fields{
 			"txid": &graphql.Field{
-				Type: Base64,
+				Type: Hex,
 			},
 			"txtype": &graphql.Field{
 				Type: graphql.String,
 			},
 			"blockhash": &graphql.Field{
-				Type: Base64,
+				Type: Hex,
 			},
 		},
 	},
 )
 
-var Base64 = graphql.NewScalar(graphql.ScalarConfig{
-	Name:        "Base64",
-	Description: "Base64 scalar type represents a byte array",
+var Hex = graphql.NewScalar(graphql.ScalarConfig{
+	Name:        "Hex",
+	Description: "Hex scalar type represents a byte array",
 	// Serialize serializes `CustomID` to string.
 	Serialize: func(value interface{}) interface{} {
 		switch value := value.(type) {
 		case []byte:
-			return base64.StdEncoding.EncodeToString(value)
+			return hex.EncodeToString(value)
 		default:
 			return nil
 		}
@@ -86,7 +85,7 @@ var Base64 = graphql.NewScalar(graphql.ScalarConfig{
 	ParseValue: func(value interface{}) interface{} {
 		switch value := value.(type) {
 		case string:
-			bytes, _ := base64.StdEncoding.DecodeString(value)
+			bytes, _ := hex.DecodeString(value)
 			return bytes
 		default:
 			return nil

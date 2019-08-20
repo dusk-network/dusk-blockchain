@@ -1,6 +1,7 @@
 package gql
 
 import (
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql/query"
 	"io/ioutil"
 	"net/http"
@@ -9,12 +10,8 @@ import (
 	"github.com/graphql-go/graphql"
 )
 
-type reqBody struct {
-	Query string `json:"query"`
-}
-
 // handleQuery to process graphQL query
-func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r http.Request) {
+func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r http.Request, db database.DB) {
 
 	if r.Body == nil {
 		http.Error(w, "Must provide graphql query in request body", 400)
@@ -28,7 +25,6 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r http.Request) 
 	}
 
 	// Execute graphql query
-	result := query.Execute(string(decBody), *schema)
-	//TODO: Do we need render
+	result := query.Execute(string(decBody), *schema, db)
 	render.JSON(w, &r, result)
 }

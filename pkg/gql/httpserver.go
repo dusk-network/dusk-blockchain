@@ -2,6 +2,7 @@ package gql
 
 import (
 	"encoding/base64"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql/query"
 	"github.com/graphql-go/graphql"
@@ -23,6 +24,7 @@ type Server struct {
 	started   bool // Indicates whether or not server has started
 	eventBus  *wire.EventBus
 	rpcBus    *wire.RPCBus
+	db        database.DB
 	authSHA   []byte
 	listener  net.Listener
 	startTime int64
@@ -67,15 +69,14 @@ func (s *Server) Start() error {
 		r.Close = true
 
 		if s.started {
-			handleQuery(s.schema, w, *r)
+			handleQuery(s.schema, w, *r, s.db)
 		} else {
 			log.Warn("HTTP service is not running")
 		}
 	})
 
 	//  Setup graphQL
-	_, db := heavy.CreateDBConnection()
-	rootQuery := query.NewRoot(s.rpcBus, db)
+	rootQuery := query.NewRoot(s.rpcBus)
 	sc, err := graphql.NewSchema(
 		graphql.SchemaConfig{Query: rootQuery.Query},
 	)
@@ -85,6 +86,7 @@ func (s *Server) Start() error {
 	}
 
 	s.schema = &sc
+	_, s.db = heavy.CreateDBConnection()
 
 	// Set up listener
 	l, err := net.Listen("tcp", "localhost:"+cfg.Get().Gql.Port)
@@ -105,9 +107,14 @@ func (s *Server) Start() error {
 
 // Listen on the http server.
 func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
+
 	log.Infof("HTTP server listening on port %v", cfg.Get().Gql.Port)
-	httpServer.Serve(s.listener)
-	log.Info("HTTP server stopped listening")
+
+	if err := httpServer.Serve(s.listener); err != http.ErrServerClosed {
+		log.Errorf("HTTP server stopped with error %v", err)
+	} else {
+		log.Info("HTTP server stopped listening")
+	}
 }
 
 // Stop the server
