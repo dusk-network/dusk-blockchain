@@ -153,3 +153,44 @@ func TestBlocksTxs(t *testing.T) {
 	`
 	assertQuery(t, query, response)
 }
+
+
+func TestLastBlocks(t *testing.T) {
+	query := `
+		{
+		  blocks(last: 3) {
+			header {
+			   height
+				hash
+			}
+		  }
+		}
+		`
+	response := `
+		 {
+        	"data": {
+        		"blocks": [
+        			{
+        				"header": {
+        					"hash": "194dd13ee8a60ac017a82c41c0e2c02498d75f48754351072f392a085d469620",
+        					"height": 0
+        				}
+        			},
+        			{
+        				"header": {
+        					"hash": "9bf50e394bb81346f8b8db42bddd285ac344260c024a0df808baf7601417d748",
+        					"height": 1
+        				}
+        			},
+        			{
+        				"header": {
+        					"hash": "9467c5e774eb1b4825d08c0599a0b0815fca5dac16d9690026854ed8d1f229c9",
+        					"height": 2
+        				}
+        			}
+        		]
+        	}
+        }
+	`
+	assertQuery(t, query, response)
+}

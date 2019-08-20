@@ -17,7 +17,6 @@ type mempool struct {
 
 func (t mempool) getQuery() *graphql.Field {
 	return &graphql.Field{
-		// Slice of Block type which can be found in types.go
 		Type: graphql.NewList(Transaction),
 		Args: graphql.FieldConfigArgument{
 			"txid": &graphql.ArgumentConfig{
