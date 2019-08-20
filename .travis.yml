@@ -1,0 +1,29 @@
+# Use Ubuntu 18.04
+dist: xenial
+
+language: go
+
+# Force-enable Go modules. Also force go to use the code in vendor/
+# These will both be unnecessary when Go 1.13 lands.
+env:
+  - GO111MODULE=on
+
+go:
+  - 1.12.x
+
+# Only clone the most recent commit.
+git:
+  depth: 1
+
+before_script:
+  - go get ./...
+  #  - go install github.com/golangci/golangci-lint/cmd/golangci-lint
+  - go get -u golang.org/x/lint/golint
+
+# Send a notification to the Dusk build Status Telegram channel once the CI build completes
+after_script:
+  - bash ./telegram_notification.sh
+
+script:
+  - golint ./...
+  - go test -v -race ./... # Run all the tests with the race detector enabled
