@@ -4,8 +4,10 @@ require (
 	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/dusk-network/dusk-crypto v0.0.0-20190817112903-1c3dd1667bee
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
+	github.com/go-chi/render v1.0.1
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
+	github.com/graphql-go/graphql v0.7.8
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
