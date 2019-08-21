@@ -24,10 +24,10 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
-github.com/dusk-network/bn256 v0.0.0-20190821091231-8b9f40cd54a8 h1:Tf0dEhv9PdEBbwUSaU7qdf97hnudcMMcycyrr1LPnww=
-github.com/dusk-network/bn256 v0.0.0-20190821091231-8b9f40cd54a8/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
-github.com/dusk-network/dusk-crypto v0.0.0-20190821092913-5665f7b28ba1 h1:ZC5tckE5O/vOS57RE2yMelE1gkPqd08QOVv7WHs27G4=
-github.com/dusk-network/dusk-crypto v0.0.0-20190821092913-5665f7b28ba1/go.mod h1:eiQh6hGdoNEAJkZHsoxpc9zuahgNdjrkNpLI6FEanGc=
+github.com/dusk-network/bn256 v0.5.0-lattices h1:3PWpy5mxJI7UNPdfjHzI3Mw2MhbZbHtk+31Agl3NCTg=
+github.com/dusk-network/bn256 v0.5.0-lattices/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
+github.com/dusk-network/dusk-crypto v0.1.0 h1:HUwtbA00D2WH8xBd1xvKSIUlJtu4ulBSte+yyKO8tZg=
+github.com/dusk-network/dusk-crypto v0.1.0/go.mod h1:Hgr/7jihizg4T/om70iCt4p0uon2asf/9AAzeegu9CU=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee/go.mod h1:PpPxJzdlQ023fALM5AGWeFrIaIU2igVmxr3QiRaf+ks=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=

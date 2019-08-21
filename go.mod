@@ -2,7 +2,7 @@ module github.com/dusk-network/dusk-blockchain
 
 require (
 	github.com/bwesterb/go-ristretto v1.1.0
-	github.com/dusk-network/dusk-crypto v0.0.0-20190821092913-5665f7b28ba1
+	github.com/dusk-network/dusk-crypto v0.1.0
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
