@@ -13,11 +13,10 @@ github.com/coreos/go-semver v0.2.0/go.mod h1:nnelYz7RCh+5ahJtPPxZlU+153eP4D4r3Ee
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dusk-network/bn256 v0.0.0-20190820080919-adcd329b847a/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
-github.com/dusk-network/bn256 v0.0.0-20190820081542-693bb91dcae6 h1:VhKqqmSbiwPAdbR5guXVSB0KhPVzIuGDUNYASeZacSg=
-github.com/dusk-network/bn256 v0.0.0-20190820081542-693bb91dcae6/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
-github.com/dusk-network/dusk-crypto v0.0.0-20190820125032-cc1ba192739a h1:jz9Iw9OD3fGx/rTY5JjhlxNUp3+SqYMWqWKDD3lXhGw=
-github.com/dusk-network/dusk-crypto v0.0.0-20190820125032-cc1ba192739a/go.mod h1:1iC42r1VkMXFETwq0bV9hXxOl4fNc35b5sWBY1UeZbc=
+github.com/dusk-network/bn256 v0.0.0-20190123110933-f166bf1226b0 h1:gbJaLVN42ahIwwmnVoVLlg2Z81LLgn9LmpFtkM5X9RU=
+github.com/dusk-network/bn256 v0.0.0-20190123110933-f166bf1226b0/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
+github.com/dusk-network/dusk-crypto v0.0.0-20190817112903-1c3dd1667bee h1:uEt6hQtBHcBKiJmY4Ry0IniCSycXEL+KHwSSs0W7jVs=
+github.com/dusk-network/dusk-crypto v0.0.0-20190817112903-1c3dd1667bee/go.mod h1:zsJE85fAkQISRunkv83ywclmJ1bSS6OVDppsQ0n77Tc=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee/go.mod h1:PpPxJzdlQ023fALM5AGWeFrIaIU2igVmxr3QiRaf+ks=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=

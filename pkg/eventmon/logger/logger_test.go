@@ -68,7 +68,7 @@ func TestSendDeadlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure the buffer fills up after one message
+	// Make sure the connection buffer fills up after one message
 	if unixConn, ok := conn.(*net.UnixConn); ok {
 		unixConn.SetWriteBuffer(1)
 	}
@@ -76,14 +76,17 @@ func TestSendDeadlock(t *testing.T) {
 	// setup
 	logBase, _ := setup(bus, nil, conn)
 
-	// log enough to fill up the buffer
-	for i := 0; i < 4; i++ {
-		for _, tt := range withTimeTest {
-			entry := logBase.WithTime(tt.fields)
-			err = logBase.Send(entry)
-			if err != nil {
-				fmt.Println(err)
-			}
+	// now fill the connection buffer
+	for _, tt := range withTimeTest {
+		entry := logBase.WithTime(tt.fields)
+		formatted, err := logBase.Logger.Formatter.Format(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = logBase.Send(formatted)
+		if err != nil {
+			fmt.Println(err)
 		}
 	}
 
