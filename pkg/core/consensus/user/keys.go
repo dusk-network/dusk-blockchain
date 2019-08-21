@@ -21,7 +21,12 @@ type Keys struct {
 // NewRandKeys will generate and return new bls and ed25519
 // keys to be used in consensus
 func NewRandKeys() (Keys, error) {
-	return NewKeysFromReader(nil)
+	keys, err := NewKeysFromReader(nil)
+	if err == io.EOF {
+		return NewRandKeys()
+	}
+
+	return keys, err
 }
 
 // NewKeysFromReader takes a reader and uses it as a seed for generating random user.Keys
