@@ -21,7 +21,7 @@ before_script:
 
 # Send a notification to the Dusk build Status Telegram channel once the CI build completes
 after_script:
-  - bash ./telegram_notification.sh
+  - bash <(curl -s https://raw.githubusercontent.com/dusk-network/tools/master/bash/telegram_ci_notifications.sh)
 
 script:
   - golint ./...
