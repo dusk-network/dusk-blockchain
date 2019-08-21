@@ -3,9 +3,9 @@ module github.com/dusk-network/dusk-blockchain
 require (
 	github.com/bwesterb/go-ristretto v1.1.0
 	github.com/dusk-network/dusk-crypto v0.1.0
+	github.com/dusk-network/dusk-wallet v0.0.0-20190821143707-c0ccce099e3a
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/golang/protobuf v1.3.2 // indirect
-	github.com/golang/snappy v0.0.1 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/onsi/ginkgo v1.9.0 // indirect
@@ -21,6 +21,4 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
-	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7 // indirect
-	golang.org/x/text v0.3.2 // indirect
 )
