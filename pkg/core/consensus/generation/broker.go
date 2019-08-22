@@ -21,13 +21,22 @@ import (
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar, gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) {
-	broker := newBroker(eventBus, rpcBus, d, k, gen, blockGen, keys, publicKey)
+func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
+	m := zkproof.CalculateM(k)
+	d := getD(m, eventBus, db)
+	broker, err := newBroker(eventBus, rpcBus, d, k, m, gen, blockGen, keys, publicKey)
+	if err != nil {
+		return err
+	}
+
 	go broker.Listen()
+	return nil
 }
 
 type broker struct {
-	publisher            wire.EventPublisher
+	k                    ristretto.Scalar
+	m                    ristretto.Scalar
+	eventBroker          wire.EventBroker
 	proofGenerator       Generator
 	forwarder            *forwarder
 	seeder               *seeder
@@ -37,12 +46,17 @@ type broker struct {
 	bidChan              <-chan user.Bid
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
+	acceptedBlockChan    <-chan block.Block
 }
 
-func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) *broker {
+func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k, m ristretto.Scalar,
+	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
-		gen = newProofGenerator(d, k)
+		var err error
+		gen, err = newProofGenerator(d, k, m)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	seed := make([]byte, 64)
@@ -55,20 +69,23 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k ristretto
 	blk := getLatestBlock()
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	b := &broker{
-		publisher:            eventBroker,
+		k:                    k,
+		m:                    m,
+		eventBroker:          eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
 		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
+		acceptedBlockChan:    acceptedBlockChan,
 		forwarder:            newForwarder(eventBroker, blockGen),
 		seeder:               &seeder{keys: keys},
 	}
-	eventBroker.SubscribeCallback(string(topics.AcceptedBlock), b.onBlock)
-	b.handleBlock(blk)
-	return b
+	b.handleBlock(*blk)
+	return b, nil
 }
 
 func getLatestBlock() *block.Block {
@@ -100,26 +117,27 @@ func (b *broker) Listen() {
 	for {
 		select {
 		case bid := <-b.bidChan:
-			b.proofGenerator.UpdateBidList(bid)
+			if b.proofGenerator != nil {
+				b.proofGenerator.UpdateBidList(bid)
+			}
 		case state := <-b.regenerationChan:
-			if state.Round == b.seeder.Round() {
+			if state.Round == b.seeder.Round() && b.proofGenerator != nil {
 				b.forwarder.threshold.Lower()
 				b.generateProofAndBlock()
 			}
 		case winningBlockHash := <-b.winningBlockHashChan:
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
+		case blk := <-b.acceptedBlockChan:
+			if b.proofGenerator != nil {
+				b.onBlock(blk)
+			}
 		}
 	}
 }
 
-func (b *broker) onBlock(m *bytes.Buffer) error {
+func (b *broker) onBlock(blk block.Block) error {
 	b.forwarder.threshold.Reset()
-
-	blk := block.NewBlock()
-	if err := blk.Decode(m); err != nil {
-		return err
-	}
 
 	// Remove old bids before generating a new score
 	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
@@ -127,13 +145,27 @@ func (b *broker) onBlock(m *bytes.Buffer) error {
 	return b.handleBlock(blk)
 }
 
-func (b *broker) handleBlock(blk *block.Block) error {
+func (b *broker) handleBlock(blk block.Block) error {
 	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
 		return err
 	}
 
-	b.forwarder.setPrevBlock(*blk)
-	b.generateProofAndBlock()
+	b.forwarder.setPrevBlock(blk)
+
+	// Only generate if we are allowed to
+	if b.proofGenerator.InBidList() {
+		b.generateProofAndBlock()
+	} else {
+		// We will remove the old proofgenerator, to avoid creation of obsolete proofs
+		// until we get new proof values
+		b.proofGenerator = nil
+
+		// Then, we will wait till a new bid belonging to us is found
+		go func() {
+			b.updateProofValues()
+		}()
+	}
+
 	return nil
 }
 
@@ -162,6 +194,20 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 		return err
 	}
 
-	b.publisher.Publish(string(topics.Certificate), buf)
+	b.eventBroker.Publish(string(topics.Certificate), buf)
 	return nil
+}
+
+func (b *broker) updateProofValues() {
+	d := getD(b.m, b.eventBroker, nil)
+	log.WithFields(log.Fields{
+		"process": "generation",
+	}).Debugln("changing d value")
+	var err error
+	b.proofGenerator, err = newProofGenerator(d, b.k, b.m)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "generation",
+		}).WithError(err).Errorln("could not repopulate bidlist")
+	}
 }
