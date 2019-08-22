@@ -3,10 +3,8 @@ package transactions
 import (
 	"bytes"
 	"errors"
-	"io"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Stake transactions are time lock transactions that are used by nodes
@@ -38,38 +36,6 @@ func NewStake(ver uint8, lock, fee uint64, R, pubKeyEd, pubKeyBLS []byte) (*Stak
 	return s, nil
 }
 
-// Encode implements the Encoder interface
-func (s *Stake) Encode(w io.Writer) error {
-	if err := s.TimeLock.Encode(w); err != nil {
-		return err
-	}
-	if err := encoding.Write256(w, s.PubKeyEd); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarBytes(w, s.PubKeyBLS); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Decode implements the Decoder interface
-func (s *Stake) Decode(r io.Reader) error {
-
-	if err := s.TimeLock.Decode(r); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &s.PubKeyEd); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &s.PubKeyBLS); err != nil {
-		return err
-	}
-	return nil
-}
-
 // StandardTX returns the embedded standard tx
 // Implements Transaction interface.
 func (s Stake) StandardTX() Standard {
@@ -84,7 +50,12 @@ func (s *Stake) CalculateHash() ([]byte, error) {
 		return s.TxID, nil
 	}
 
-	txid, err := hashBytes(s.Encode)
+	buf := new(bytes.Buffer)
+	if err := MarshalStake(buf, s); err != nil {
+		return nil, err
+	}
+
+	txid, err := hashBytes(buf)
 	if err != nil {
 		return nil, err
 	}

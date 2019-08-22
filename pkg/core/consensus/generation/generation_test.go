@@ -11,9 +11,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,7 +39,7 @@ func TestScoreGeneration(t *testing.T) {
 	// send a block to start generation
 	blk := helper.RandomBlock(t, 0, 1)
 	b := new(bytes.Buffer)
-	if err := blk.Encode(b); err != nil {
+	if err := block.Marshal(b, blk); err != nil {
 		t.Fatal(err)
 	}
 	eb.Publish(string(topics.AcceptedBlock), b)

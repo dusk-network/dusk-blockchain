@@ -79,7 +79,7 @@ type Collector struct {
 // Collect as specified by the wire.EventCollector interface
 func (c *Collector) Collect(msg *bytes.Buffer) error {
 	b := block.NewBlock()
-	if err := b.Decode(msg); err != nil {
+	if err := block.Unmarshal(msg, b); err != nil {
 		return err
 	}
 
@@ -312,12 +312,12 @@ func (m *Mempool) newPool() Pool {
 // NB This is always run in a different than main mempool routine
 func (m *Mempool) Collect(message *bytes.Buffer) error {
 
-	txs, err := transactions.FromReader(message, 1)
+	tx, err := transactions.Unmarshal(message)
 	if err != nil {
 		return err
 	}
 
-	m.pending <- TxDesc{tx: txs[0], received: time.Now()}
+	m.pending <- TxDesc{tx: tx, received: time.Now()}
 
 	return nil
 }
@@ -365,7 +365,7 @@ func (m Mempool) onGetMempoolTxs(r wire.Req) {
 	}
 
 	for _, tx := range outputTxs {
-		if err := tx.Encode(w); err != nil {
+		if err := transactions.Marshal(w, tx); err != nil {
 			r.ErrChan <- err
 			return
 		}

@@ -7,15 +7,16 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +36,7 @@ func TestInitiate(t *testing.T) {
 	blk.AddTx(stake)
 
 	buf := new(bytes.Buffer)
-	if err := blk.Encode(buf); err != nil {
+	if err := block.Marshal(buf, blk); err != nil {
 		t.Fatal(err)
 	}
 

@@ -18,12 +18,12 @@ func TestEncodeDecodeOutput(t *testing.T) {
 
 	// Encode random output into buffer
 	buf := new(bytes.Buffer)
-	err = out.Encode(buf)
+	err = transactions.MarshalOutput(buf, out)
 	assert.Nil(err)
 
 	// Decode buffer into a new output struct
 	decOut := &transactions.Output{}
-	err = decOut.Decode(buf)
+	err = transactions.UnmarshalOutput(buf, decOut)
 	assert.Nil(err)
 
 	// Decoded output should equal original

@@ -70,8 +70,8 @@ var getlastblock = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	b := &block.Block{}
-	err = b.Decode(&r)
+	b := block.NewBlock()
+	err = block.Unmarshal(&r, b)
 	if err != nil {
 		return "", err
 	}
@@ -92,9 +92,13 @@ var getmempooltxs = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	txs, err := transactions.FromReader(&r, lTxs)
-	if err != nil {
-		return "", err
+	txs := make([]transactions.Transaction, lTxs)
+	for i := uint64(0); i < lTxs; i++ {
+		tx, err := transactions.Unmarshal(&r)
+		if err != nil {
+			return "", err
+		}
+		txs[i] = tx
 	}
 
 	res, err := json.MarshalIndent(txs, "", "\t")

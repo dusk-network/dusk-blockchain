@@ -98,7 +98,7 @@ func (c *Chain) Listen() {
 			prevBlock := c.prevBlock
 			c.mu.RUnlock()
 
-			if err := prevBlock.Encode(buf); err != nil {
+			if err := block.Marshal(buf, &prevBlock); err != nil {
 				r.ErrChan <- err
 				continue
 			}
@@ -118,7 +118,7 @@ func (c *Chain) Listen() {
 
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := new(bytes.Buffer)
-	if err := blk.Encode(buffer); err != nil {
+	if err := block.Marshal(buffer, &blk); err != nil {
 		return err
 	}
 
@@ -188,7 +188,7 @@ func (c *Chain) Close() error {
 
 func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := blk.Decode(m); err != nil {
+	if err := block.Unmarshal(m, blk); err != nil {
 		return err
 	}
 
@@ -244,7 +244,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// mempool.Mempool
 	// consensus.generation.broker
 	buf := new(bytes.Buffer)
-	if err := blk.Encode(buf); err != nil {
+	if err := block.Marshal(buf, &blk); err != nil {
 		l.Errorf("block encoding failed: %s", err.Error())
 		return err
 	}

@@ -15,16 +15,16 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 func respond(rpcBus *wire.RPCBus, b block.Block) {
 	r := <-wire.GetLastBlockChan
 	buf := new(bytes.Buffer)
-	if err := b.Encode(buf); err != nil {
+	if err := block.Marshal(buf, &b); err != nil {
 		panic(err)
 	}
 	r.RespChan <- *buf
@@ -103,7 +103,7 @@ func publishRandomTxs(t *testing.T, h *harness) (int, error) {
 
 		// Publish non-coinbase tx
 		buf := new(bytes.Buffer)
-		err := tx.Encode(buf)
+		err := transactions.Marshal(buf, tx)
 		if err != nil {
 			return 0, err
 		}

@@ -45,7 +45,7 @@ func TestSendData(t *testing.T) {
 
 		// Decode block
 		blk := block.NewBlock()
-		if err := blk.Decode(buf); err != nil {
+		if err := block.Unmarshal(buf, blk); err != nil {
 			t.Fatal(err)
 		}
 

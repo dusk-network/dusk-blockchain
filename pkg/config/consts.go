@@ -39,7 +39,7 @@ func DecodeGenesis() *block.Block {
 
 		var buf bytes.Buffer
 		buf.Write(blob)
-		if err := b.Decode(&buf); err != nil {
+		if err := block.Unmarshal(&buf, b); err != nil {
 			panic(err)
 		}
 	}

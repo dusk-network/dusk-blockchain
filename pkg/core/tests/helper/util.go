@@ -25,7 +25,7 @@ func TxsToReader(t *testing.T, txs []transactions.Transaction) io.Reader {
 	buf := new(bytes.Buffer)
 
 	for _, tx := range txs {
-		err := tx.Encode(buf)
+		err := transactions.Marshal(buf, tx)
 		if err != nil {
 			assert.Nil(t, err)
 		}

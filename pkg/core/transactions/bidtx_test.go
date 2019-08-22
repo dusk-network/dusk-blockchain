@@ -18,12 +18,11 @@ func TestEncodeDecodeBid(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err = tx.Encode(buf)
+	err = transactions.Marshal(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a bid TX struct
-	decTX := &transactions.Bid{}
-	err = decTX.Decode(buf)
+	decTX, err := transactions.Unmarshal(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -39,7 +38,7 @@ func TestEncodeDecodeBid(t *testing.T) {
 	assert.True(bytes.Equal(txid, decTxid))
 
 	// Check that type is correct
-	assert.Equal(transactions.BidType, decTX.TxType)
+	assert.Equal(transactions.BidType, decTX.(*transactions.Bid).TxType)
 }
 
 func TestMalformedBid(t *testing.T) {

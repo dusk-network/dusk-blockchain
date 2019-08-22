@@ -36,8 +36,8 @@ func TestGenerateGenesis(t *testing.T) {
 	var buf bytes.Buffer
 	buf.Write(blob)
 
-	b := block.Block{}
-	if err := b.Decode(&buf); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(&buf, b); err != nil {
 		t.Fatalf("expecting decodable hex %s", err.Error())
 	}
 
@@ -56,8 +56,8 @@ func TestGenesisBlock(t *testing.T) {
 	var buf bytes.Buffer
 	buf.Write(blob)
 
-	b := block.Block{}
-	if err := b.Decode(&buf); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(&buf, b); err != nil {
 		t.Fatalf("expecting decodable cfg.TestNetGenesisBlob %s", err.Error())
 	}
 

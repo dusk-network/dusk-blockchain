@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant
@@ -20,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 var (
@@ -220,19 +221,19 @@ func TestFetchBlockHeader(test *testing.T) {
 
 	// Verify all blocks headers can be fetched by Header.Hash
 	err := db.View(func(t database.Transaction) error {
-		for _, block := range blocks {
-			fheader, err := t.FetchBlockHeader(block.Header.Hash)
+		for _, b := range blocks {
+			fheader, err := t.FetchBlockHeader(b.Header.Hash)
 			if err != nil {
 				return err
 			}
 
 			// Get bytes of the fetched block.Header
 			fetchedBuf := new(bytes.Buffer)
-			_ = fheader.Encode(fetchedBuf)
+			_ = block.MarshalHeader(fetchedBuf, fheader)
 
 			// Get bytes of the origin block.Header
 			originBuf := new(bytes.Buffer)
-			_ = block.Header.Encode(originBuf)
+			_ = block.MarshalHeader(originBuf, b.Header)
 
 			// Ensure the fetched header is what the original header bytes are
 			if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
@@ -288,7 +289,7 @@ func TestFetchBlockTxs(test *testing.T) {
 				// Get bytes of the fetched transactions.Transaction
 				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
-				_ = fblockTx.Encode(fetchedBuf)
+				_ = transactions.Marshal(fetchedBuf, fblockTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
@@ -296,7 +297,7 @@ func TestFetchBlockTxs(test *testing.T) {
 
 				// Get bytes of the origin transactions.Transaction to compare with
 				originBuf := new(bytes.Buffer)
-				_ = oBlockTx.Encode(originBuf)
+				_ = transactions.Marshal(originBuf, oBlockTx)
 
 				if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
 					return errors.New("transactions.Transaction not retrieved properly from storage")
@@ -608,6 +609,7 @@ func TestFetchBlockTxByHash(test *testing.T) {
 	var maxTxToFetch uint16 = 30
 
 	done := false
+
 	// Ensure we can fetch one by one each transaction by its TxID without
 	// providing block.header.hash
 	err := db.View(func(t database.Transaction) error {
@@ -633,14 +635,14 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 
 				fetchedBuf := new(bytes.Buffer)
-				_ = fetchedTx.Encode(fetchedBuf)
+				_ = transactions.Marshal(fetchedBuf, fetchedTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
 				}
 
 				originBuf := new(bytes.Buffer)
-				_ = originTx.Encode(originBuf)
+				_ = transactions.Marshal(originBuf, originTx)
 
 				if !bytes.Equal(fetchedBuf.Bytes(), originBuf.Bytes()) {
 					test.Fatal("Invalid tx fetched")
@@ -786,7 +788,7 @@ func TestFetchCandidateBlock(test *testing.T) {
 
 			// compare with the already stored blocks
 			expectedBuf := new(bytes.Buffer)
-			_ = b.Encode(expectedBuf)
+			_ = block.Marshal(expectedBuf, b)
 
 			if len(expectedBuf.Bytes()) == 0 {
 				test.Fatal("Empty expected buffer")
@@ -794,7 +796,7 @@ func TestFetchCandidateBlock(test *testing.T) {
 
 			// Get bytes of the fetched block
 			fetchedBuf := new(bytes.Buffer)
-			_ = fetched.Encode(fetchedBuf)
+			_ = block.Marshal(fetchedBuf, fetched)
 
 			if len(fetchedBuf.Bytes()) == 0 {
 				test.Fatal("Empty fetched buffer")

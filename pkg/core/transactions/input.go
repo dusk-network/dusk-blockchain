@@ -47,8 +47,8 @@ func NewInput(keyImage []byte, pubKey, pseudoComm, sig []byte) (*Input, error) {
 	}, nil
 }
 
-// Encode an Input object into an io.Writer.
-func (i *Input) Encode(w io.Writer) error {
+// MarshalInput marshals an Input object into an io.Writer.
+func MarshalInput(w io.Writer, i *Input) error {
 	if err := encoding.Write256(w, i.KeyImage); err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (i *Input) Encode(w io.Writer) error {
 }
 
 // Decode an Input object from a io.reader.
-func (i *Input) Decode(r io.Reader) error {
+func UnmarshalInput(r io.Reader, i *Input) error {
 	if err := encoding.Read256(r, &i.KeyImage); err != nil {
 		return err
 	}

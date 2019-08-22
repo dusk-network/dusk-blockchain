@@ -128,9 +128,13 @@ func GetMempoolTxs(bus *wire.RPCBus, txID []byte) ([]transactions.Transaction, e
 		return nil, err
 	}
 
-	mempoolTxs, err := transactions.FromReader(&r, lTxs)
-	if err != nil {
-		return nil, err
+	mempoolTxs := make([]transactions.Transaction, lTxs)
+	for i := uint64(0); i < lTxs; i++ {
+		tx, err := transactions.Unmarshal(&r)
+		if err != nil {
+			return nil, err
+		}
+		mempoolTxs[i] = tx
 	}
 
 	return mempoolTxs, nil

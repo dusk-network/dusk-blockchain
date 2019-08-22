@@ -476,7 +476,7 @@ func (t transaction) StoreCandidateBlock(b *block.Block) error {
 	key = append(key, heightBuf.Bytes()...)
 
 	buf := new(bytes.Buffer)
-	if err := b.Encode(buf); err != nil {
+	if err := block.Marshal(buf, b); err != nil {
 		return err
 	}
 
@@ -498,7 +498,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 
 	if iterator.First() {
 		b := block.NewBlock()
-		if err := b.Decode(bytes.NewReader(iterator.Value())); err != nil {
+		if err := block.Unmarshal(bytes.NewReader(iterator.Value()), b); err != nil {
 			return nil, err
 		}
 

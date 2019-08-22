@@ -13,6 +13,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
@@ -186,7 +187,7 @@ func TestHook(t *testing.T) {
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, 4)
 	buf := new(bytes.Buffer)
-	if err := blk.Encode(buf); err != nil {
+	if err := block.Marshal(buf, blk); err != nil {
 		panic(err)
 	}
 

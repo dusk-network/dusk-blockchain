@@ -36,7 +36,7 @@ func NewOutput(comm []byte, dest []byte) (*Output, error) {
 }
 
 // Encode an Output struct and write to w.
-func (o *Output) Encode(w io.Writer) error {
+func MarshalOutput(w io.Writer, o *Output) error {
 	if err := encoding.Write256(w, o.Commitment); err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (o *Output) Encode(w io.Writer) error {
 }
 
 // Decode an Output object from r into an output struct.
-func (o *Output) Decode(r io.Reader) error {
+func UnmarshalOutput(r io.Reader, o *Output) error {
 	if err := encoding.Read256(r, &o.Commitment); err != nil {
 		return err
 	}

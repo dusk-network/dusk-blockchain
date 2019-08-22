@@ -46,7 +46,7 @@ func (f *forwarder) forwardScoreEvent(proof zkproof.ZkProof, round uint64, seed 
 
 	// Retrieve and append the verified transactions from Mempool
 	blockBytes := new(bytes.Buffer)
-	if err = blk.Encode(blockBytes); err != nil {
+	if err = block.Marshal(blockBytes, blk); err != nil {
 		return err
 	}
 
@@ -90,7 +90,7 @@ func (f *forwarder) marshalScore(sev *selection.ScoreEvent) *bytes.Buffer {
 
 func (f *forwarder) marshalBlock(blk *block.Block) *bytes.Buffer {
 	buffer := new(bytes.Buffer)
-	if err := blk.Encode(buffer); err != nil {
+	if err := block.Marshal(buffer, blk); err != nil {
 		panic(err)
 	}
 

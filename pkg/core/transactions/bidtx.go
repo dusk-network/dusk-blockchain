@@ -1,10 +1,8 @@
 package transactions
 
 import (
+	"bytes"
 	"errors"
-	"io"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Bid represents the bidding transaction
@@ -34,30 +32,6 @@ func NewBid(ver uint8, lock, fee uint64, R, M []byte) (*Bid, error) {
 	return b, nil
 }
 
-// Encode implements the Encoder interface
-func (b *Bid) Encode(w io.Writer) error {
-	if err := b.TimeLock.Encode(w); err != nil {
-		return err
-	}
-	if err := encoding.Write256(w, b.M); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Decode implements the Decoder interface
-func (b *Bid) Decode(r io.Reader) error {
-
-	if err := b.TimeLock.Decode(r); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &b.M); err != nil {
-		return err
-	}
-	return nil
-}
-
 // StandardTX returns the embedded standard tx
 // Implements Transaction interface.
 func (b Bid) StandardTX() Standard {
@@ -72,7 +46,12 @@ func (b *Bid) CalculateHash() ([]byte, error) {
 		return b.TxID, nil
 	}
 
-	txid, err := hashBytes(b.Encode)
+	buf := new(bytes.Buffer)
+	if err := MarshalBid(buf, b); err != nil {
+		return nil, err
+	}
+
+	txid, err := hashBytes(buf)
 	if err != nil {
 		return nil, err
 	}

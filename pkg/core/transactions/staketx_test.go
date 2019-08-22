@@ -19,12 +19,11 @@ func TestEncodeDecodeStake(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err = tx.Encode(buf)
+	err = transactions.Marshal(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a Stake TX struct
-	decTX := &transactions.Stake{}
-	err = decTX.Decode(buf)
+	decTX, err := transactions.Unmarshal(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -40,7 +39,7 @@ func TestEncodeDecodeStake(t *testing.T) {
 	assert.True(bytes.Equal(txid, decTxid))
 
 	// Check that type is correct
-	assert.Equal(transactions.StakeType, decTX.TxType)
+	assert.Equal(transactions.StakeType, decTX.(*transactions.Stake).TxType)
 }
 
 func TestEqualsMethodStake(t *testing.T) {

@@ -10,9 +10,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 type (
@@ -98,12 +98,14 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 			return nil, err
 		}
 
-		mempoolTxs, err := transactions.FromReader(&r, lTxs)
-		if err != nil {
-			return nil, err
-		}
+		for i := uint64(0); i < lTxs; i++ {
+			tx, err := transactions.Unmarshal(&r)
+			if err != nil {
+				return nil, err
+			}
 
-		txs = append(txs, mempoolTxs...)
+			txs = append(txs, tx)
+		}
 	}
 
 	// TODO Append Provisioners rewards

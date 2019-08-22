@@ -19,12 +19,12 @@ func TestEncodeDecodeInput(t *testing.T) {
 
 	// Encode random input into buffer
 	buf := new(bytes.Buffer)
-	err = in.Encode(buf)
+	err = transactions.MarshalInput(buf, in)
 	assert.Nil(err)
 
 	// Decode buffer into a new input struct
 	decIn := &transactions.Input{}
-	err = decIn.Decode(buf)
+	err = transactions.UnmarshalInput(buf, decIn)
 	assert.Nil(err)
 
 	// Decoded input should equal original

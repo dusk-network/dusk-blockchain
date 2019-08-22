@@ -18,12 +18,11 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err := tx.Encode(buf)
+	err := transactions.Marshal(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a coinbase TX struct
-	decTX := &transactions.Coinbase{}
-	err = decTX.Decode(buf)
+	decTX, err := transactions.Unmarshal(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal

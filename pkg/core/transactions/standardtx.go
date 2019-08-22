@@ -2,10 +2,6 @@ package transactions
 
 import (
 	"bytes"
-	"encoding/binary"
-	"io"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Standard is a generic transaction. It can also be seen as a stealth transaction.
@@ -52,107 +48,6 @@ func (s *Standard) AddOutput(output *Output) {
 	s.Outputs = append(s.Outputs, output)
 }
 
-// Encode a Standard transaction and write it to an io.Writer
-func (s *Standard) Encode(w io.Writer) error {
-
-	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(w, s.R); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(w, uint8(s.Version)); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarInt(w, uint64(len(s.Inputs))); err != nil {
-		return err
-	}
-
-	for _, input := range s.Inputs {
-		if err := input.Encode(w); err != nil {
-			return err
-		}
-	}
-	if err := encoding.WriteVarInt(w, uint64(len(s.Outputs))); err != nil {
-		return err
-	}
-
-	for _, output := range s.Outputs {
-		if err := output.Encode(w); err != nil {
-			return err
-		}
-	}
-
-	if err := encoding.WriteUint64(w, binary.LittleEndian, s.Fee); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteVarBytes(w, s.RangeProof); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Decode a reader into a standard transaction struct.
-func (s *Standard) Decode(r io.Reader) error {
-
-	var Type uint8
-	if err := encoding.ReadUint8(r, &Type); err != nil {
-		return err
-	}
-	s.TxType = TxType(Type)
-
-	if err := encoding.Read256(r, &s.R); err != nil {
-		return err
-	}
-
-	var ver uint8
-	if err := encoding.ReadUint8(r, &ver); err != nil {
-		return err
-	}
-
-	s.Version = ver
-
-	lInputs, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
-	}
-
-	s.Inputs = make(Inputs, lInputs)
-	for i := uint64(0); i < lInputs; i++ {
-		s.Inputs[i] = &Input{}
-		if err := s.Inputs[i].Decode(r); err != nil {
-			return err
-		}
-	}
-
-	lOutputs, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
-	}
-
-	s.Outputs = make(Outputs, lOutputs)
-	for i := uint64(0); i < lOutputs; i++ {
-		s.Outputs[i] = &Output{}
-		if err := s.Outputs[i].Decode(r); err != nil {
-			return err
-		}
-	}
-
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &s.Fee); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadVarBytes(r, &s.RangeProof); err != nil {
-		return err
-	}
-	return nil
-}
-
 // CalculateHash hashes all of the encoded fields in a tx, if this has not been done already.
 // The resulting byte array is also it's identifier
 //// Implements merkletree.Payload interface
@@ -161,7 +56,12 @@ func (s *Standard) CalculateHash() ([]byte, error) {
 		return s.TxID, nil
 	}
 
-	txid, err := hashBytes(s.Encode)
+	buf := new(bytes.Buffer)
+	if err := MarshalStandard(buf, s); err != nil {
+		return nil, err
+	}
+
+	txid, err := hashBytes(buf)
 	if err != nil {
 		return nil, err
 	}

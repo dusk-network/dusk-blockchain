@@ -12,8 +12,12 @@ func TestDecodeTransactions(t *testing.T) {
 	txs := helper.RandomSliceOfTxs(t, 20)
 	r := helper.TxsToReader(t, txs)
 
-	decTxs, err := transactions.FromReader(r, uint64(len(txs)))
-	assert.Nil(t, err)
+	decTxs := make([]transactions.Transaction, len(txs))
+	for i := 0; i < len(txs); i++ {
+		tx, err := transactions.Unmarshal(r)
+		assert.Nil(t, err)
+		decTxs[i] = tx
+	}
 
 	assert.Equal(t, len(txs), len(decTxs))
 

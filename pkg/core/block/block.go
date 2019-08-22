@@ -8,6 +8,48 @@ import (
 	"github.com/dusk-network/dusk-crypto/merkletree"
 )
 
+func Marshal(r io.Writer, b *Block) error {
+	if err := MarshalHeader(r, b.Header); err != nil {
+		return err
+	}
+
+	lenTxs := uint64(len(b.Txs))
+	if err := encoding.WriteVarInt(r, lenTxs); err != nil {
+		return err
+	}
+
+	// TODO: parallelize transaction serialization
+	for _, tx := range b.Txs {
+		if err := transactions.Marshal(r, tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func Unmarshal(r io.Reader, b *Block) error {
+	if err := UnmarshalHeader(r, b.Header); err != nil {
+		return err
+	}
+
+	lTxs, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return err
+	}
+
+	b.Txs = make([]transactions.Transaction, lTxs)
+	for i := range b.Txs {
+		tx, err := transactions.Unmarshal(r)
+		if err != nil {
+			return err
+		}
+		b.Txs[i] = tx
+	}
+
+	return nil
+}
+
 // Block defines a block on the Dusk blockchain.
 type Block struct {
 	Header *Header
@@ -61,46 +103,6 @@ func (b *Block) Clear() {
 // SetHash will set the block hash.
 func (b *Block) SetHash() error {
 	return b.Header.SetHash()
-}
-
-// Encode a Block struct and write to w.
-func (b *Block) Encode(w io.Writer) error {
-	if err := b.Header.Encode(w); err != nil {
-		return err
-	}
-
-	lTxs := uint64(len(b.Txs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return err
-	}
-
-	for _, tx := range b.Txs {
-		if err := tx.Encode(w); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Decode a Block struct from r into b.
-func (b *Block) Decode(r io.Reader) error {
-	b.Header = &Header{}
-	if err := b.Header.Decode(r); err != nil {
-		return err
-	}
-
-	lTxs, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
-	}
-
-	b.Txs, err = transactions.FromReader(r, lTxs)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Equals returns true if two blocks are equal

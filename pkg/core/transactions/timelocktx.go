@@ -1,11 +1,6 @@
 package transactions
 
-import (
-	"encoding/binary"
-	"io"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-)
+import "bytes"
 
 // TimeLock represents a standard transaction that has an additional time restriction
 // What does the time-lock represent?
@@ -39,30 +34,6 @@ func NewTimeLock(ver uint8, lock, fee uint64, R []byte) *TimeLock {
 	return t
 }
 
-// Encode implements the Encoder interface
-func (t *TimeLock) Encode(w io.Writer) error {
-	if err := t.Standard.Encode(w); err != nil {
-		return err
-	}
-	if err := encoding.WriteUint64(w, binary.LittleEndian, t.Lock); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Decode implements the Decoder interface
-func (t *TimeLock) Decode(r io.Reader) error {
-
-	if err := t.Standard.Decode(r); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &t.Lock); err != nil {
-		return err
-	}
-	return nil
-}
-
 // StandardTX returns the embedded standard tx
 // Implements Transaction interface.
 func (t TimeLock) StandardTX() Standard {
@@ -77,7 +48,12 @@ func (t *TimeLock) CalculateHash() ([]byte, error) {
 		return t.TxID, nil
 	}
 
-	txid, err := hashBytes(t.Encode)
+	buf := new(bytes.Buffer)
+	if err := MarshalTimelock(buf, t); err != nil {
+		return nil, err
+	}
+
+	txid, err := hashBytes(buf)
 	if err != nil {
 		return nil, err
 	}

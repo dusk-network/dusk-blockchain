@@ -35,7 +35,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map header.Hash to block.Block
 	buf := new(bytes.Buffer)
-	if err := b.Encode(buf); err != nil {
+	if err := block.Marshal(buf, b); err != nil {
 		return err
 	}
 
@@ -115,8 +115,8 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 		return nil, database.ErrBlockNotFound
 	}
 
-	b := block.Block{}
-	if err := b.Decode(bytes.NewReader(data)); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
 		return nil, err
 	}
 
@@ -131,8 +131,8 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 		return nil, database.ErrBlockNotFound
 	}
 
-	b := block.Block{}
-	if err := b.Decode(bytes.NewReader(data)); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
 		return nil, err
 	}
 
@@ -154,8 +154,8 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 		return nil, database.ErrBlockNotFound
 	}
 
-	b := block.Block{}
-	if err := b.Decode(bytes.NewReader(data)); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
 		return nil, err
 	}
 
@@ -203,7 +203,7 @@ func (t *transaction) StoreCandidateBlock(b *block.Block) error {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := b.Encode(buf); err != nil {
+	if err := block.Marshal(buf, b); err != nil {
 		return err
 	}
 	t.batch[candidatesTableInd][toKey(b.Header.Hash)] = buf.Bytes()
@@ -220,8 +220,8 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 		return nil, database.ErrBlockNotFound
 	}
 
-	b := &block.Block{}
-	if err := b.Decode(bytes.NewReader(data)); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
 		return nil, err
 	}
 
@@ -233,8 +233,8 @@ func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 	var count uint32
 	for key, data := range t.db.storage[candidatesTableInd] {
 
-		b := &block.Block{}
-		if err := b.Decode(bytes.NewReader(data)); err != nil {
+		b := block.NewBlock()
+		if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
 			return count, err
 		}
 
