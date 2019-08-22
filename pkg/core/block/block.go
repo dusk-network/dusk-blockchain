@@ -59,10 +59,7 @@ type Block struct {
 // NewBlock will return an empty Block with an empty BlockHeader.
 func NewBlock() *Block {
 	return &Block{
-		Header: &Header{
-			Version:     0x00,
-			Certificate: EmptyCertificate(),
-		},
+		Header: NewHeader(),
 	}
 }
 

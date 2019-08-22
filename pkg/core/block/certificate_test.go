@@ -17,12 +17,12 @@ func TestEncodeDecodeCert(t *testing.T) {
 
 	// Encode certificate into a buffer
 	buf := new(bytes.Buffer)
-	err := cert.Encode(buf)
+	err := block.MarshalCertificate(buf, cert)
 	assert.Nil(err)
 
 	// Decode buffer into a certificate struct
 	decCert := &block.Certificate{}
-	err = decCert.Decode(buf)
+	err = block.UnmarshalCertificate(buf, decCert)
 	assert.Nil(err)
 
 	// Check both structs are equal

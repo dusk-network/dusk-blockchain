@@ -88,7 +88,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := b.Header.Encode(blockHeaderFields); err != nil {
+	if err := block.MarshalHeader(blockHeaderFields, b.Header); err != nil {
 		return err
 	}
 
@@ -290,8 +290,8 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 		return nil, err
 	}
 
-	header := new(block.Header)
-	err = header.Decode(bytes.NewReader(value))
+	header := block.NewHeader()
+	err = block.UnmarshalHeader(bytes.NewReader(value), header)
 
 	if err != nil {
 		return nil, err
