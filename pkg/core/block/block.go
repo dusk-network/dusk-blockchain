@@ -1,54 +1,9 @@
 package block
 
 import (
-	"io"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 )
-
-func Marshal(r io.Writer, b *Block) error {
-	if err := MarshalHeader(r, b.Header); err != nil {
-		return err
-	}
-
-	lenTxs := uint64(len(b.Txs))
-	if err := encoding.WriteVarInt(r, lenTxs); err != nil {
-		return err
-	}
-
-	// TODO: parallelize transaction serialization
-	for _, tx := range b.Txs {
-		if err := transactions.Marshal(r, tx); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func Unmarshal(r io.Reader, b *Block) error {
-	if err := UnmarshalHeader(r, b.Header); err != nil {
-		return err
-	}
-
-	lTxs, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
-	}
-
-	b.Txs = make([]transactions.Transaction, lTxs)
-	for i := range b.Txs {
-		tx, err := transactions.Unmarshal(r)
-		if err != nil {
-			return err
-		}
-		b.Txs[i] = tx
-	}
-
-	return nil
-}
 
 // Block defines a block on the Dusk blockchain.
 type Block struct {

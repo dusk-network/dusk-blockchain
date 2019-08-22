@@ -2,59 +2,7 @@ package block
 
 import (
 	"bytes"
-	"encoding/binary"
-	"io"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
-
-func MarshalCertificate(r io.Writer, c *Certificate) error {
-	if err := encoding.WriteBLS(r, c.StepOneBatchedSig); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteBLS(r, c.StepTwoBatchedSig); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(r, c.Step); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint64(r, binary.LittleEndian, c.StepOneCommittee); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint64(r, binary.LittleEndian, c.StepTwoCommittee); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func UnmarshalCertificate(r io.Reader, c *Certificate) error {
-	if err := encoding.ReadBLS(r, &c.StepOneBatchedSig); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadBLS(r, &c.StepTwoBatchedSig); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &c.Step); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &c.StepOneCommittee); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &c.StepTwoCommittee); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 // Certificate defines a block certificate made as a result from the consensus.
 type Certificate struct {
