@@ -17,8 +17,8 @@ func NewTxInChecker(blk block.Block) []TxInChecker {
 
 	for _, tx := range blk.Txs {
 		keyImages := make([]keyImage, 0)
-		for _, input := range tx.StandardTX().Inputs {
-			keyImages = append(keyImages, input.KeyImage)
+		for _, input := range tx.StandardTx().Inputs {
+			keyImages = append(keyImages, input.KeyImage.Bytes())
 		}
 		txcheckers = append(txcheckers, TxInChecker{keyImages})
 	}

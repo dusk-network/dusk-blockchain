@@ -9,8 +9,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
@@ -77,7 +77,10 @@ func (b *BidList) repopulate(db database.DB) {
 				continue
 			}
 
-			x := CalculateX(bid.Outputs[0].Commitment, bid.M)
+			// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
+			// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
+			// as this is most likely a consensus-breaking change)
+			x := CalculateX(bid.Outputs[0].Commitment.Bytes(), bid.M)
 			x.EndHeight = searchingHeight + bid.Lock
 			b.AddBid(x)
 		}
@@ -182,7 +185,7 @@ func (b *BidList) RemoveExpired(round uint64) {
 	}
 }
 
-func CalculateX(d []byte, m []byte) Bid {
+func CalculateX(d, m []byte) Bid {
 	dScalar := ristretto.Scalar{}
 	dScalar.UnmarshalBinary(d)
 

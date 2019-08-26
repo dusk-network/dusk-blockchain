@@ -17,8 +17,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 // CLICommands holds all of the wallet commands that the user can call through
@@ -136,8 +136,9 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 		return
 	}
 
+	// TODO: turning commitment to d into a Scalar from a Point, investigate if this is fine
 	var d ristretto.Scalar
-	d.UnmarshalBinary(bid.Outputs[0].Commitment)
+	d.UnmarshalBinary(bid.Outputs[0].Commitment.Bytes())
 
 	// launch generation component
 	publicKey := cliWallet.PublicKey()

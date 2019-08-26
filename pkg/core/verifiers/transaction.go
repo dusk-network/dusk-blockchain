@@ -1,14 +1,11 @@
 package verifiers
 
 import (
-	"bytes"
 	"fmt"
 
-	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/rangeproof"
 	"github.com/pkg/errors"
 )
@@ -22,7 +19,7 @@ import (
 // If it is a solo transaction, the blockTime is calculated by using currentBlockTime+consensusSeconds
 // Returns nil if a tx is valid
 func CheckTx(db database.DB, index uint64, blockTime uint64, tx transactions.Transaction) error {
-	if err := CheckStandardTx(db, tx.StandardTX()); err != nil && tx.Type() != transactions.CoinbaseType {
+	if err := CheckStandardTx(db, tx.StandardTx()); err != nil && tx.Type() != transactions.CoinbaseType {
 		return err
 	}
 
@@ -46,7 +43,7 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 		return errors.New("invalid transaction type")
 	}
 
-	if tx.Fee < uint64(config.MinFee) {
+	if tx.Fee.BigInt().Uint64() < uint64(config.MinFee) {
 		return errors.New("fee too low")
 	}
 
@@ -104,7 +101,7 @@ func CheckStandardTx(db database.DB, tx transactions.Standard) error {
 // CheckSpecialFields TBD
 func CheckSpecialFields(txIndex uint64, blockTime uint64, tx transactions.Transaction) error {
 	switch x := tx.(type) {
-	case *transactions.TimeLock:
+	case *transactions.Timelock:
 		return VerifyTimelock(txIndex, blockTime, x)
 	case *transactions.Bid:
 		return VerifyBid(txIndex, blockTime, x)
@@ -133,9 +130,7 @@ func VerifyCoinbase(txIndex uint64, tx *transactions.Coinbase) error {
 	}
 
 	// Ensure the reward is the fixed one
-	rewardScalar := ristretto.Scalar{}
-	rewardScalar.UnmarshalBinary(tx.Rewards[0].EncryptedAmount)
-	if rewardScalar.BigInt().Uint64() != config.GeneratorReward {
+	if tx.Rewards[0].EncryptedAmount.BigInt().Uint64() != config.GeneratorReward {
 		return fmt.Errorf("coinbase transaction must include a fixed reward of %d", config.GeneratorReward)
 	}
 
@@ -156,7 +151,7 @@ func VerifyStake(index uint64, blockTime uint64, tx *transactions.Stake) error {
 	return nil
 }
 
-func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.TimeLock) error {
+func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.Timelock) error {
 	if err := checkLockTimeValid(tx.Lock, blockTime); err != nil {
 		return err
 	}
@@ -181,16 +176,8 @@ func checkTXDoubleSpent(db database.DB, inputs transactions.Inputs) error {
 
 	err := db.View(func(t database.Transaction) error {
 		for _, input := range inputs {
-			// Decode signature
-			var sig mlsag.Signature
-			buf := bytes.NewReader(input.Signature)
-			err := sig.Decode(buf, true)
-			if err != nil {
-				return err
-			}
-
 			// Check First key in verification is valid
-			for _, keyV := range sig.PubKeys {
+			for _, keyV := range input.Signature.PubKeys {
 				key := keyV.OutputKey()
 				exists, err := t.FetchOutputExists(key.Bytes())
 				if err != nil {
@@ -211,7 +198,7 @@ func checkTXDoubleSpent(db database.DB, inputs transactions.Inputs) error {
 
 	return db.View(func(t database.Transaction) error {
 		for _, input := range inputs {
-			exists, txID, _ := t.FetchKeyImageExists(input.KeyImage)
+			exists, txID, _ := t.FetchKeyImageExists(input.KeyImage.Bytes())
 			if exists || txID != nil {
 				return errors.New("already spent")
 			}

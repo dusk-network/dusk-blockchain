@@ -10,7 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 type transaction struct {
@@ -63,8 +63,8 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 		t.batch[txsInd][toKey(txID)] = data
 
 		// Map KeyImage to Transaction
-		for _, input := range tx.StandardTX().Inputs {
-			t.batch[keyImagesInd][toKey(input.KeyImage)] = txID
+		for _, input := range tx.StandardTx().Inputs {
+			t.batch[keyImagesInd][toKey(input.KeyImage.Bytes())] = txID
 		}
 	}
 

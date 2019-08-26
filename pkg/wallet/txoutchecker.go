@@ -3,8 +3,8 @@ package wallet
 import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	wiretx "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 // TxOutChecker holds all of the necessary data
@@ -12,7 +12,7 @@ import (
 type TxOutChecker struct {
 	encryptedValues bool
 	R               ristretto.Point
-	Outputs         []*transactions.Output
+	Outputs         transactions.Outputs
 }
 
 func NewTxOutChecker(blk block.Block) []TxOutChecker {
@@ -24,21 +24,13 @@ func NewTxOutChecker(blk block.Block) []TxOutChecker {
 		}
 
 		var RBytes [32]byte
-		copy(RBytes[:], tx.StandardTX().R[:])
+		txR := tx.StandardTx().R
+		copy(RBytes[:], txR.Bytes()[:])
 		var R ristretto.Point
 		R.SetBytes(&RBytes)
-
 		txchecker.R = R
 
-		// Convert dusk-node outputs to dusk-wallet outputs
-		outs := make([]*transactions.Output, 0, tx.StandardTX().Outputs.Len())
-		for _, output := range tx.StandardTX().Outputs {
-
-			outs = append(outs, transactions.OutputFromWire(*output))
-
-		}
-		txchecker.Outputs = outs
-
+		txchecker.Outputs = tx.StandardTx().Outputs
 		txcheckers = append(txcheckers, txchecker)
 	}
 	return txcheckers

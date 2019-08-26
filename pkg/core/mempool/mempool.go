@@ -11,12 +11,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	logger "github.com/sirupsen/logrus"
 )
@@ -378,8 +378,8 @@ func (m Mempool) onGetMempoolTxs(r wire.Req) {
 // all checks against mempool verified txs but not blockchain db.
 func (m *Mempool) checkTXDoubleSpent(tx transactions.Transaction) error {
 
-	for _, input := range tx.StandardTX().Inputs {
-		exists := m.verified.ContainsKeyImage(input.KeyImage)
+	for _, input := range tx.StandardTx().Inputs {
+		exists := m.verified.ContainsKeyImage(input.KeyImage.Bytes())
 		if exists {
 			return errors.New("tx already spent")
 		}

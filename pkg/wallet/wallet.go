@@ -13,10 +13,10 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"golang.org/x/crypto/sha3"
 
@@ -45,7 +45,7 @@ type Wallet struct {
 type SignableTx interface {
 	AddDecoys(numMixins int, f transactions.FetchDecoys) error
 	Prove() error
-	Standard() (*transactions.StandardTx, error)
+	StandardTx() transactions.Standard
 }
 
 func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
@@ -123,18 +123,18 @@ func LoadFromFile(netPrefix byte, db *database.DB, fDecoys transactions.FetchDec
 	}, nil
 }
 
-func (w *Wallet) NewStandardTx(fee int64) (*transactions.StandardTx, error) {
-	tx, err := transactions.NewStandard(w.netPrefix, fee)
+func (w *Wallet) NewStandardTx(fee int64) (*transactions.Standard, error) {
+	tx, err := transactions.NewStandard(0, w.netPrefix, fee)
 	if err != nil {
 		return nil, err
 	}
 	return tx, nil
 }
 
-func (w *Wallet) NewStakeTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.StakeTx, error) {
+func (w *Wallet) NewStakeTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.Stake, error) {
 	edPubBytes := w.consensusKeys.EdPubKeyBytes
 	blsPubBytes := w.consensusKeys.BLSPubKeyBytes
-	tx, err := transactions.NewStakeTx(w.netPrefix, fee, lockTime, edPubBytes, blsPubBytes)
+	tx, err := transactions.NewStake(0, w.netPrefix, fee, lockTime, edPubBytes, blsPubBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (w *Wallet) NewStakeTx(fee int64, lockTime uint64, amount ristretto.Scalar)
 	return tx, nil
 }
 
-func (w *Wallet) NewBidTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.BidTx, error) {
+func (w *Wallet) NewBidTx(fee int64, lockTime uint64, amount ristretto.Scalar) (*transactions.Bid, error) {
 	privateSpend, err := w.keyPair.PrivateSpend()
 	privateSpend.Bytes()
 
@@ -156,7 +156,7 @@ func (w *Wallet) NewBidTx(fee int64, lockTime uint64, amount ristretto.Scalar) (
 	// To avoid any privacy implications, the wallet should increment
 	// the index by how many bidding txs are seen
 	mBytes := generateM(privateSpend.Bytes(), 0)
-	tx, err := transactions.NewBidTx(w.netPrefix, fee, lockTime, mBytes)
+	tx, err := transactions.NewBid(0, w.netPrefix, fee, lockTime, mBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -170,13 +170,7 @@ func (w *Wallet) NewBidTx(fee int64, lockTime uint64, amount ristretto.Scalar) (
 	return tx, nil
 }
 
-func (w *Wallet) NewCoinbaseTx() *transactions.CoinbaseTx {
-	tx := transactions.NewCoinBaseTx(w.netPrefix)
-	return tx
-}
-
 func (w *Wallet) CheckWireBlock(blk block.Block) (uint64, uint64, error) {
-
 	spentCount, err := w.CheckWireBlockSpent(blk)
 	if err != nil {
 		return 0, 0, err
@@ -303,7 +297,7 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 }
 
 // AddInputs adds up the total outputs and fee then fetches inputs to consolidate this
-func (w *Wallet) AddInputs(tx *transactions.StandardTx) error {
+func (w *Wallet) AddInputs(tx *transactions.Standard) error {
 
 	totalAmount := tx.Fee.BigInt().Int64() + tx.TotalSent.BigInt().Int64()
 
@@ -334,13 +328,10 @@ func (w *Wallet) Sign(tx SignableTx) error {
 
 	// Assuming user has added all of the outputs
 
-	standardTx, err := tx.Standard()
-	if err != nil {
-		return err
-	}
+	standardTx := tx.StandardTx()
 
 	// Fetch Inputs
-	err = w.AddInputs(standardTx)
+	err := w.AddInputs(&standardTx)
 	if err != nil {
 		return err
 	}

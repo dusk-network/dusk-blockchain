@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 const (
@@ -53,10 +53,10 @@ func (m *HashMap) Put(t TxDesc) error {
 	m.txsSize += uint64(unsafe.Sizeof(t.tx))
 
 	// store all tx key images, if provided
-	for i, input := range t.tx.StandardTX().Inputs {
-		if len(input.KeyImage) == keyImageSize {
+	for i, input := range t.tx.StandardTx().Inputs {
+		if len(input.KeyImage.Bytes()) == keyImageSize {
 			var ki keyImage
-			copy(ki[:], input.KeyImage)
+			copy(ki[:], input.KeyImage.Bytes())
 			m.spentkeyImages[ki] = true
 		} else {
 			return fmt.Errorf("invalid key image found at index %d", i)

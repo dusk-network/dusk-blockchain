@@ -10,7 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant
@@ -355,13 +355,13 @@ func TestFetchKeyImageExists(test *testing.T) {
 	err := db.View(func(t database.Transaction) error {
 		for _, block := range blocks {
 			for _, tx := range block.Txs {
-				for _, input := range tx.StandardTX().Inputs {
+				for _, input := range tx.StandardTx().Inputs {
 
-					if len(input.KeyImage) == 0 {
+					if len(input.KeyImage.Bytes()) == 0 {
 						test.Fatal("Testing with empty keyImage")
 					}
 
-					exists, txID, err := t.FetchKeyImageExists(input.KeyImage)
+					exists, txID, err := t.FetchKeyImageExists(input.KeyImage.Bytes())
 
 					if !exists {
 						test.Fatal("FetchKeyImageExists cannot find keyImage")

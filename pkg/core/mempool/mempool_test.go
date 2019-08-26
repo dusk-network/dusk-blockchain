@@ -2,7 +2,6 @@ package mempool
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"math"
 	"sync"
@@ -12,11 +11,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +23,7 @@ var verifyFunc = func(tx transactions.Transaction) error {
 
 	// some dummy check to distinguish between valid and non-valid txs for
 	// this test
-	val := float64(tx.StandardTX().Version)
+	val := float64(tx.StandardTx().Version)
 	if math.Mod(val, 2) != 0 {
 		return errors.New("invalid tx version")
 	}
@@ -157,14 +155,12 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 			t.Fatalf("expecting %d propagated txs but mempool stores %d txs", len(c.propagated), len(txs))
 		}
 	}
-
 }
 
 func TestProcessPendingTxs(t *testing.T) {
 
 	initCtx(t)
 
-	var version uint8
 	txs := randomSliceOfTxs(t, 5)
 
 	for _, tx := range txs {
@@ -180,13 +176,11 @@ func TestProcessPendingTxs(t *testing.T) {
 		c.bus.Publish(string(topics.Tx), buf)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
-		version++
-		R, err := crypto.RandEntropy(32)
+		tx := helper.RandomStandardTx(t, false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx := transactions.NewStandard(version, 2, R)
-		tx.RangeProof = R
+		tx.Version++
 		buf = new(bytes.Buffer)
 		err = transactions.Marshal(buf, tx)
 		if err != nil {
@@ -199,6 +193,7 @@ func TestProcessPendingTxs(t *testing.T) {
 		// Publish a duplicated tx
 		buf = new(bytes.Buffer)
 		_ = transactions.Marshal(buf, tx)
+		c.addTx(tx)
 		c.bus.Publish(string(topics.Tx), buf)
 	}
 
@@ -253,11 +248,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		go func() {
 			for y := 0; y <= 5; y++ {
 				buf := new(bytes.Buffer)
-
-				e, _ := crypto.RandEntropy(64)
-				R, _ := crypto.RandEntropy(32)
-				fee := binary.LittleEndian.Uint64(e)
-				tx := transactions.NewStandard(1, fee, R)
+				tx := helper.RandomStandardTx(t, false)
+				tx.Version++
 				_ = transactions.Marshal(buf, tx)
 
 				c.bus.Publish(string(topics.Tx), buf)
@@ -340,14 +332,13 @@ func TestDoubleSpent(t *testing.T) {
 
 	// Create double-spent tx by replicating an already added txs but with
 	// differnt TxID
-	R, _ := crypto.RandEntropy(32)
-	tx := transactions.NewStandard(0, txs[0].StandardTX().Fee+1, R)
+	tx := helper.RandomStandardTx(t, false)
 
 	// Inputs
-	tx.Inputs = txs[0].StandardTX().Inputs
+	tx.Inputs = txs[0].StandardTx().Inputs
 
 	// Outputs
-	tx.Outputs = txs[0].StandardTX().Outputs
+	tx.Outputs = txs[0].StandardTx().Outputs
 
 	buf := new(bytes.Buffer)
 	err := transactions.Marshal(buf, tx)

@@ -14,9 +14,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/key"
 )
@@ -116,9 +116,8 @@ func publishRandomTxs(t *testing.T, h *harness) (int, error) {
 }
 
 func canSpend(t *testing.T, tx *transactions.Coinbase, h *harness) bool {
-	P := bytesToPoint(tx.Rewards[0].DestKey)
-	R := bytesToPoint(tx.R[:])
-	_, spendable := h.genWallet.DidReceiveTx(R, key.StealthAddress{P: P}, 0)
+	P := tx.Rewards[0].PubKey.P
+	_, spendable := h.genWallet.DidReceiveTx(tx.R, key.StealthAddress{P: P}, 0)
 	return spendable
 }
 

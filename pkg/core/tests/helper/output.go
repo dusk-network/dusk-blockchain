@@ -3,44 +3,42 @@ package helper
 import (
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
 // RandomOutput returns a random output for testing
-func RandomOutput(t *testing.T, malformed bool) (*transactions.Output, error) {
+func RandomOutput(t *testing.T) *transactions.Output {
+	seed := RandomSlice(t, 128)
+	keyPair := key.NewKeyPair(seed)
 
-	var commSize, keySize uint32 = 32, 32
+	r := ristretto.Scalar{}
+	r.Rand()
+	amount := ristretto.Scalar{}
+	amount.Rand()
+	encAmount := ristretto.Scalar{}
+	encAmount.Rand()
+	encMask := ristretto.Scalar{}
+	encMask.Rand()
 
-	if malformed {
-		commSize = 45 // This does not have an effect, while Bidding transaction can have clear text
-		// and so the commitment size is not fixed
-		keySize = 23
-	}
+	output := transactions.NewOutput(r, amount, 0, *keyPair.PublicKey())
 
-	comm := RandomSlice(t, commSize)
-	key := RandomSlice(t, keySize)
-	output, err := transactions.NewOutput(comm, key)
-	if err != nil {
-		return output, err
-	}
-	output.EncryptedAmount = RandomSlice(t, keySize)
-	output.EncryptedMask = RandomSlice(t, keySize)
-	return output, err
+	output.EncryptedAmount = encAmount
+	output.EncryptedMask = encMask
+	return output
 }
 
 // RandomOutputs returns a slice of random outputs for testing
-func RandomOutputs(t *testing.T, size int, malformed bool) transactions.Outputs {
+func RandomOutputs(t *testing.T, size int) transactions.Outputs {
 
 	var outs transactions.Outputs
 
 	for i := 0; i < size; i++ {
-		out, err := RandomOutput(t, malformed)
-		if !malformed {
-			assert.Nil(t, err)
-			assert.NotNil(t, out)
-			outs = append(outs, out)
-		}
+		out := RandomOutput(t)
+		assert.NotNil(t, out)
+		outs = append(outs, out)
 	}
 
 	return outs

@@ -8,8 +8,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/bls"
 	"golang.org/x/crypto/ed25519"
 )
@@ -105,8 +105,9 @@ func (p *Provisioners) repopulate(db database.DB) uint64 {
 
 			// Only add them if their stake is still valid
 			if searchingHeight+stake.Lock > currentHeight {
-				p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
-				totalWeight += stake.GetOutputAmount()
+				amount := stake.Outputs[0].EncryptedAmount.BigInt().Uint64()
+				p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, amount, searchingHeight, searchingHeight+stake.Lock)
+				totalWeight += amount
 			}
 		}
 

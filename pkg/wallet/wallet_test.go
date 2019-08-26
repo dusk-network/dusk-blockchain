@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-wallet/key"
 
 	"math/rand"
 
@@ -98,9 +98,8 @@ func TestCheckBlock(t *testing.T) {
 	var blk block.Block
 	for i := 0; i < numTxs; i++ {
 		tx := generateStandardTx(t, *bobAddr, 20, alice)
-		wireStandardTx, err := tx.WireStandardTx()
 		assert.Nil(t, err)
-		blk.AddTx(wireStandardTx)
+		blk.AddTx(tx)
 	}
 
 	count, err := bob.CheckWireBlockReceived(blk)
@@ -122,7 +121,7 @@ func generateWallet(t *testing.T, netPrefix byte, path string) *Wallet {
 	return w
 }
 
-func generateStandardTx(t *testing.T, receiver key.PublicAddress, amount int64, sender *Wallet) *transactions.StandardTx {
+func generateStandardTx(t *testing.T, receiver key.PublicAddress, amount int64, sender *Wallet) *transactions.Standard {
 	tx, err := sender.NewStandardTx(0)
 	assert.Nil(t, err)
 
