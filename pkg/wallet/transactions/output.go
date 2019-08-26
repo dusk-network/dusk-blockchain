@@ -1,10 +1,11 @@
 package transactions
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-wallet/key"
 
 	"github.com/bwesterb/go-ristretto"
@@ -36,33 +37,13 @@ type Output struct {
 
 func NewOutput(r, amount ristretto.Scalar, index uint32, pubKey key.PublicKey) *Output {
 	output := &Output{
-		amount: amount,
+		amount:  amount,
+		Index:   index,
+		PubKey:  *pubKey.StealthAddress(r, index),
+		viewKey: *pubKey.PubView,
 	}
-
-	output.setIndex(index)
-
-	stealthAddr := pubKey.StealthAddress(r, index)
-	output.setDestKey(stealthAddr)
-
-	output.viewKey = *pubKey.PubView
 
 	return output
-}
-
-func OutputFromWire(out transactions.Output) *Output {
-
-	commitment := sliceToPoint(out.Commitment)
-	destKey := sliceToPoint(out.DestKey)
-	encAmount := sliceToScalar(out.EncryptedAmount)
-	encMask := sliceToScalar(out.EncryptedMask)
-
-	walletOut := &Output{
-		Commitment:      commitment,
-		EncryptedAmount: encAmount,
-		EncryptedMask:   encMask,
-		PubKey:          key.StealthAddress{P: destKey},
-	}
-	return walletOut
 }
 
 func sliceToPoint(b []byte) ristretto.Point {
@@ -83,79 +64,53 @@ func sliceToScalar(b []byte) ristretto.Scalar {
 	return p
 }
 
-func (o *Output) Encode(w io.Writer) error {
-	err := binary.Write(w, binary.BigEndian, o.Commitment.Bytes())
-	if err != nil {
-		return err
-	}
-	// XXX: This can be inferred from the tx layout
-	err = binary.Write(w, binary.BigEndian, o.Index)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(w, binary.BigEndian, o.PubKey.P.Bytes())
-	if err != nil {
-		return err
-	}
-	err = binary.Write(w, binary.BigEndian, o.EncryptedAmount.Bytes())
-	if err != nil {
-		return err
-	}
-	return binary.Write(w, binary.BigEndian, o.EncryptedMask.Bytes())
-}
-func (o *Output) Decode(r io.Reader) error {
-	var CommBytes [32]byte
-	err := binary.Read(r, binary.BigEndian, &CommBytes)
-	if err != nil {
-		return err
-	}
-	o.Commitment.SetBytes(&CommBytes)
-
-	err = binary.Read(r, binary.BigEndian, &o.Index)
-	if err != nil {
+// Encode an Output struct and write to w.
+func MarshalOutput(w io.Writer, o *Output) error {
+	if err := encoding.Write256(w, o.Commitment.Bytes()); err != nil {
 		return err
 	}
 
-	var PubKeyBytes [32]byte
-	err = binary.Read(r, binary.BigEndian, &PubKeyBytes)
-	if err != nil {
+	if err := encoding.Write256(w, o.PubKey.P.Bytes()); err != nil {
 		return err
 	}
-	o.PubKey.P.SetBytes(&PubKeyBytes)
 
-	var EncAmountBytes [32]byte
-	err = binary.Read(r, binary.BigEndian, &EncAmountBytes)
-	if err != nil {
+	if err := encoding.WriteVarBytes(w, o.EncryptedAmount.Bytes()); err != nil {
 		return err
 	}
-	o.EncryptedAmount.SetBytes(&EncAmountBytes)
 
-	var EncMaskBytes [32]byte
-	err = binary.Read(r, binary.BigEndian, &EncMaskBytes)
-	if err != nil {
+	if err := encoding.WriteVarBytes(w, o.EncryptedMask.Bytes()); err != nil {
 		return err
 	}
-	o.EncryptedMask.SetBytes(&EncMaskBytes)
+
 	return nil
 }
 
-func (o *Output) setIndex(index uint32) {
-	o.Index = index
-}
-func (o *Output) setDestKey(stealthAddr *key.StealthAddress) {
-	o.PubKey = *stealthAddr
-}
-func (o *Output) setCommitment(comm ristretto.Point) {
-	o.Commitment = comm
-}
-func (o *Output) setMask(mask ristretto.Scalar) {
-	o.mask = mask
-}
-func (o *Output) setEncryptedAmount(x ristretto.Scalar) {
-	o.EncryptedAmount.Set(&x)
-}
-func (o *Output) setEncryptedMask(x ristretto.Scalar) {
-	o.EncryptedMask = x
+// Decode an Output object from r into an output struct.
+func UnmarshalOutput(r io.Reader, o *Output) error {
+	var commBytes []byte
+	if err := encoding.Read256(r, &commBytes); err != nil {
+		return err
+	}
+	o.Commitment.UnmarshalBinary(commBytes)
+
+	var pubKeyBytes []byte
+	if err := encoding.Read256(r, &pubKeyBytes); err != nil {
+		return err
+	}
+	o.PubKey.P.UnmarshalBinary(pubKeyBytes)
+
+	var encAmountBytes []byte
+	if err := encoding.ReadVarBytes(r, &encAmountBytes); err != nil {
+		return err
+	}
+	o.EncryptedAmount.UnmarshalBinary(encAmountBytes)
+
+	var encMaskBytes []byte
+	if err := encoding.ReadVarBytes(r, &encMaskBytes); err != nil {
+		return err
+	}
+	o.EncryptedMask.UnmarshalBinary(encMaskBytes)
+	return nil
 }
 
 // encAmount = amount + H(H(H(r*PubViewKey || index)))
@@ -232,4 +187,25 @@ func uint32ToBytes(x uint32) []byte {
 	a := make([]byte, 4)
 	binary.BigEndian.PutUint32(a, x)
 	return a
+}
+
+// Equals returns true if two outputs are the same
+func (o *Output) Equals(out *Output) bool {
+	if o == nil || out == nil {
+		return false
+	}
+
+	if !bytes.Equal(o.Commitment.Bytes(), out.Commitment.Bytes()) {
+		return false
+	}
+
+	if !bytes.Equal(o.PubKey.P.Bytes(), out.PubKey.P.Bytes()) {
+		return false
+	}
+
+	if !bytes.Equal(o.EncryptedAmount.Bytes(), out.EncryptedAmount.Bytes()) {
+		return false
+	}
+
+	return bytes.Equal(o.EncryptedMask.Bytes(), out.EncryptedMask.Bytes())
 }
