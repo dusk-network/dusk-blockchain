@@ -124,7 +124,7 @@ func TestResumeRight(t *testing.T) {
 		}
 	}
 
-	assert.InDelta(t, float64(3), round2["blockTime"], float64(1))
+	assert.GreaterOrEqual(t, round2["blockTime"], float64(3), float64(1))
 
 	_ = supervisor.Stop()
 	wg.Wait()
