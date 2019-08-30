@@ -24,6 +24,7 @@ func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) 
 	broker := newBroker(eventBroker, c, keys)
 	currentRound := getInitialRound(eventBroker)
 	broker.updateRound(currentRound)
+	go broker.Listen()
 }
 
 type broker struct {
