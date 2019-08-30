@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -17,6 +18,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestWrongCommittee(t *testing.T) {
@@ -105,5 +107,30 @@ func TestWrongCommittee(t *testing.T) {
 	// Now, verify this event.
 	if err := broker.handler.Verify(aev); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestStress(t *testing.T) {
+	committeeMock, k := MockCommittee(20, true, 20)
+	bus := wire.NewEventBus()
+
+	broker := newBroker(bus, committeeMock, k[0])
+	broker.filter.UpdateRound(1)
+	bus.RemoveAllPreprocessors(string(topics.Agreement))
+
+	time.Sleep(200 * time.Millisecond)
+
+	for i := 1; i <= 10; i++ {
+		hash, _ := crypto.RandEntropy(32)
+		go func() {
+			for j := 0; j < 50; j++ {
+				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k))
+			}
+		}()
+		evs := <-broker.filter.Accumulator.CollectedVotesChan
+		for _, ev := range evs {
+			assert.Equal(t, uint64(i), ev.(*Agreement).Round)
+		}
+		broker.filter.UpdateRound(uint64(i + 1))
 	}
 }
