@@ -2,16 +2,13 @@ package agreement
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,10 +27,11 @@ func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) 
 }
 
 type broker struct {
-	publisher wire.EventPublisher
-	handler   *agreementHandler
-	state     consensus.State
-	filter    *consensus.EventFilter
+	publisher  wire.EventPublisher
+	handler    *agreementHandler
+	state      consensus.State
+	filter     *consensus.EventFilter
+	resultChan <-chan voteSet
 }
 
 func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
@@ -50,31 +48,32 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 	state := consensus.NewState()
 	filter := launchFilter(eventBroker, committee, handler, state)
 	b := &broker{
-		publisher: eventBroker,
-		handler:   handler,
-		state:     state,
-		filter:    filter,
+		publisher:  eventBroker,
+		handler:    handler,
+		state:      state,
+		filter:     filter,
+		resultChan: initReductionResultCollector(eventBroker),
 	}
 
-	eventBroker.SubscribeCallback(msg.ReductionResultTopic, b.sendAgreement)
 	return b
 }
 
 // Listen for results coming from the accumulator and updating the round accordingly
-func (b *broker) Listen(votesChan <-chan []wire.Event) {
-	evs := <-votesChan
-	b.publishEvent(evs)
-	b.publishWinningHash(evs)
-	b.updateRound(b.state.Round() + 1)
+func (b *broker) Listen() {
+	for {
+		select {
+		case evs := <-b.filter.Accumulator.CollectedVotesChan:
+			b.publishEvent(evs)
+			b.publishWinningHash(evs)
+			b.updateRound(b.state.Round() + 1)
+		case voteSet := <-b.resultChan:
+			b.sendAgreement(voteSet)
+		}
+	}
 }
 
-func (b *broker) sendAgreement(m *bytes.Buffer) error {
-	var round uint64
-	if err := encoding.ReadUint64(m, binary.LittleEndian, &round); err != nil {
-		return err
-	}
-
-	if round != b.state.Round() {
+func (b *broker) sendAgreement(voteSet voteSet) error {
+	if voteSet.round != b.state.Round() {
 		return errors.New("received results message is from a different round")
 	}
 
@@ -83,14 +82,7 @@ func (b *broker) sendAgreement(m *bytes.Buffer) error {
 	defer b.state.IncrementStep()
 
 	if b.handler.AmMember(b.state.Round(), b.state.Step()) {
-		unmarshaller := reduction.NewUnMarshaller()
-		voteSet, err := unmarshaller.UnmarshalVoteSet(m)
-		if err != nil {
-			log.WithField("process", "agreement").WithError(err).Warnln("problem unmarshalling voteset")
-			return err
-		}
-
-		msg, err := b.handler.createAgreement(voteSet, b.state.Round(), b.state.Step())
+		msg, err := b.handler.createAgreement(voteSet.votes, b.state.Round(), b.state.Step())
 		if err != nil {
 			log.WithField("process", "agreement").WithError(err).Errorln("problem creating agreement vote")
 			return err
@@ -110,7 +102,6 @@ func (b *broker) updateRound(round uint64) {
 	b.filter.UpdateRound(round)
 	consensus.UpdateRound(b.publisher, round)
 	b.filter.FlushQueue()
-	go b.Listen(b.filter.Accumulator.CollectedVotesChan)
 }
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
