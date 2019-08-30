@@ -2,6 +2,7 @@ package reduction_test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"testing"
 	"time"
@@ -13,12 +14,65 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
 var timeOut = 200 * time.Millisecond
+
+func TestStress(t *testing.T) {
+	eventBus, streamer, k := launchReductionTest(true)
+
+	// subscribe for the voteset
+	voteSetChan := make(chan *bytes.Buffer, 1)
+	eventBus.Subscribe(msg.ReductionResultTopic, voteSetChan)
+
+	// Because round updates are asynchronous (sent through a channel), we wait
+	// for a bit to let the broker update its round.
+	time.Sleep(200 * time.Millisecond)
+	hash, _ := crypto.RandEntropy(32)
+	for i := 0; i < 10; i++ {
+		go launchCandidateVerifier(false)
+		go func() {
+			// Blast the reducer with events
+			for i := 1; i <= 100; i++ {
+				go sendReductionBuffers(50, k, hash, 1, uint8(i), eventBus)
+			}
+		}()
+		sendSelection(1, hash, eventBus)
+
+		for i := 0; i < 2; i++ {
+			// discard reduction events, we dont give a fuck about those
+			if _, err := streamer.Read(); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		voteSetBuf := <-voteSetChan
+		// Remove the round bytes first
+		var round uint64
+		if err := encoding.ReadUint64(voteSetBuf, binary.LittleEndian, &round); err != nil {
+			t.Fatal(err)
+		}
+
+		// Unmarshal votesBytes and check them for correctness
+		unmarshaller := reduction.NewUnMarshaller()
+		voteSet, err := unmarshaller.UnmarshalVoteSet(voteSetBuf)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Make sure we have an equal amount of votes for each step, and no events snuck in where they don't belong
+		stepMap := make(map[uint8]int)
+		for _, vote := range voteSet {
+			stepMap[vote.(*reduction.Reduction).Step]++
+		}
+
+		assert.Equal(t, stepMap[1], stepMap[2])
+	}
+}
 
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
