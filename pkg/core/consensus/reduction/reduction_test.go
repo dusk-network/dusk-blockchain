@@ -23,7 +23,7 @@ import (
 var timeOut = 4000 * time.Millisecond
 
 func TestStress(t *testing.T) {
-	eventBus, _, _ := launchReductionTest(true, 38)
+	eventBus, _, _ := launchReductionTest(true, 25)
 
 	// subscribe for the voteset
 	voteSetChan := make(chan *bytes.Buffer, 1)
