@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -36,7 +37,7 @@ func TestAgreementRace(t *testing.T) {
 	k := createProvisionerSet(t, c, committeeSize)
 	broker := newBroker(eb, c, k[0])
 	broker.updateRound(1)
-	go broker.Listen(broker.filter.Accumulator.CollectedVotesChan)
+	go broker.Listen()
 
 	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 	// We need to catch the outgoing agreement message
@@ -49,7 +50,7 @@ func TestAgreementRace(t *testing.T) {
 	// First, we make a voteset for the `sendAgreement` call.
 	ru := reduction.NewUnMarshaller()
 	hash, _ := crypto.RandEntropy(32)
-	events := createVoteSet(t, k, hash, committeeSize)
+	events := createVoteSet(t, k, hash, committeeSize, 1)
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
 		t.Fatal(err)
@@ -68,7 +69,7 @@ func TestAgreementRace(t *testing.T) {
 
 	// Now we try to aggregate the reduction events created earlier. The round update should coincide
 	// with the aggregation.
-	broker.sendAgreement(buf)
+	eb.Publish(msg.ReductionResultTopic, buf)
 
 	// Read and discard the resulting event
 	if _, err := streamer.Read(); err != nil {
@@ -77,7 +78,7 @@ func TestAgreementRace(t *testing.T) {
 
 	// Let's now create a reduction vote set with the previous public keys
 	hash, _ = crypto.RandEntropy(32)
-	events = createVoteSet(t, k, hash, committeeSize)
+	events = createVoteSet(t, k, hash, committeeSize, 2)
 
 	// Now, we create our agreement event. Our step counter should be one off from the events we are aggregating.
 	aevBuf, err := broker.handler.createAgreement(events, broker.state.Round(), broker.state.Step())
@@ -174,7 +175,7 @@ func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []u
 	return
 }
 
-func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int) (events []wire.Event) {
+func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int, round uint64) (events []wire.Event) {
 	for i := 1; i <= 2; i++ {
 		// We should only pick a certain key once, no dupes.
 		picked := make(map[int]struct{})
@@ -191,7 +192,7 @@ func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int) (events [
 				}
 			}
 
-			ev := reduction.MockReduction(k[n], hash, 1, uint8(i))
+			ev := reduction.MockReduction(k[n], hash, round, uint8(i))
 			events = append(events, ev)
 		}
 	}
