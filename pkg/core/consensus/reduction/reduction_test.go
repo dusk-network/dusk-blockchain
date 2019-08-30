@@ -20,10 +20,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var timeOut = 1000 * time.Millisecond
+var timeOut = 2000 * time.Millisecond
 
 func TestStress(t *testing.T) {
-	eventBus, _, k := launchReductionTest(true, 38)
+	eventBus, _, _ := launchReductionTest(true, 38)
 
 	// subscribe for the voteset
 	voteSetChan := make(chan *bytes.Buffer, 1)
@@ -38,9 +38,9 @@ func TestStress(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go launchCandidateVerifier(false)
 		go func() {
-			// Blast the reducer with events
-			for i := 1; i <= 100; i++ {
-				go sendReductionBuffers(50, k, hash, 1, uint8(i), eventBus)
+			// Blast the reducer with many more events than quorum, to see if anything will sneak in
+			for i := 1; i <= 50; i++ {
+				go sendReductionBuffers(50, hash, 1, uint8(i), eventBus)
 			}
 		}()
 		sendSelection(1, hash, eventBus)
@@ -62,16 +62,17 @@ func TestStress(t *testing.T) {
 		// Make sure we have an equal amount of votes for each step, and no events snuck in where they don't belong
 		stepMap := make(map[uint8]int)
 		for _, vote := range voteSet {
-			stepMap[vote.(*reduction.Reduction).Step]++
+			stepMap[vote.(*reduction.Reduction).Step%2]++
 		}
 
-		assert.Equal(t, stepMap[1], stepMap[2])
+		assert.Equal(t, stepMap[1], stepMap[0])
 	}
 }
 
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
-	eventBus, streamer, k := launchReductionTest(true, 2)
+	eventBus, streamer, _ := launchReductionTest(true, 2)
+	go launchCandidateVerifier(false)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
@@ -81,8 +82,8 @@ func TestReduction(t *testing.T) {
 	sendSelection(1, hash, eventBus)
 
 	// send mocked events until we get a result from the outgoingAgreement channel
-	sendReductionBuffers(2, k, hash, 1, 1, eventBus)
-	sendReductionBuffers(2, k, hash, 1, 2, eventBus)
+	sendReductionBuffers(2, hash, 1, 1, eventBus)
+	sendReductionBuffers(2, hash, 1, 2, eventBus)
 
 	timer := time.AfterFunc(1*time.Second, func() {
 		t.Fatal("")
@@ -236,9 +237,9 @@ func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Key
 	eb.RemoveAllPreprocessors(string(topics.Reduction))
 }
 
-func sendReductionBuffers(amount int, k user.Keys, hash []byte, round uint64, step uint8,
-	eventBus *wire.EventBus) {
+func sendReductionBuffers(amount int, hash []byte, round uint64, step uint8, eventBus *wire.EventBus) {
 	for i := 0; i < amount; i++ {
+		k, _ := user.NewRandKeys()
 		ev := reduction.MockReductionBuffer(k, hash, round, step)
 		eventBus.Publish(string(topics.Reduction), ev)
 	}

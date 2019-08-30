@@ -21,31 +21,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWrongCommittee(t *testing.T) {
-	// Sadly, we can not use the mocked committee for this test
-	// So, let's create one
+// This test checks whether there is a race condition between the agreement component's round updates,
+// and the sending of agreement events.
+func TestAgreementRace(t *testing.T) {
 	eb := wire.NewEventBus()
 	_, db := lite.CreateDBConnection()
-	c := committee.NewAgreement(eb, db)
-	// We make a set of 50 keys, add these as provisioners and start the agreement component with key zero
-	committeeSize := 50
-	var k []user.Keys
-	for i := 0; i < committeeSize; i++ {
-		keys, _ := user.NewRandKeys()
-		buf := new(bytes.Buffer)
-		_ = encoding.Write256(buf, keys.EdPubKeyBytes)
-		_ = encoding.WriteVarBytes(buf, keys.BLSPubKeyBytes)
-		_ = encoding.WriteUint64(buf, binary.LittleEndian, 500)
-		_ = encoding.WriteUint64(buf, binary.LittleEndian, 0)
-		_ = encoding.WriteUint64(buf, binary.LittleEndian, 10000)
-		if err := c.AddProvisioner(buf); err != nil {
-			t.Fatal(err)
-		}
-		k = append(k, keys)
-	}
 
+	// Sadly, we can not use the mocked committee for this test.
+	// Our agreement events and reduction events need to be just like they are in production.
+	// So, let's create a proper committee.
+	c := committee.NewAgreement(eb, db)
+	// We make a set of 50 keys, add these as provisioners and start the agreement component.
+	committeeSize := 50
+	k := createProvisionerSet(t, c, committeeSize)
 	broker := newBroker(eb, c, k[0])
 	broker.updateRound(1)
+	go broker.Listen(broker.filter.Accumulator.CollectedVotesChan)
 
 	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 	// We need to catch the outgoing agreement message
@@ -53,34 +44,42 @@ func TestWrongCommittee(t *testing.T) {
 	streamer := helper.NewSimpleStreamer()
 	eb.SubscribeStream(string(topics.Gossip), streamer)
 
-	// Increment the step counter on the agreement component
-	broker.state.IncrementStep()
-
-	// Let's now create a reduction vote set with the previous public keys
+	// Create an agreement message, and update the round concurrently. If the bug has not been fixed,
+	// this should cause our step counter to be off in the next round.
+	// First, we make a voteset for the `sendAgreement` call.
+	ru := reduction.NewUnMarshaller()
 	hash, _ := crypto.RandEntropy(32)
-
-	var events []wire.Event
-	for i := 1; i <= 2; i++ {
-		// We should only pick a certain key once, no dupes
-		picked := make(map[int]struct{})
-
-		// We do 38 votes per step, 75% of 50
-		for j := 0; j < 38; j++ {
-			// Key choices need to be randomized. There is no sorting in production
-			var n int
-			for {
-				n = rand.Intn(50)
-				if _, ok := picked[n]; !ok {
-					picked[n] = struct{}{}
-					break
-				}
-			}
-
-			ev := reduction.MockReduction(k[n], hash, 1, uint8(i))
-			events = append(events, ev)
-		}
+	events := createVoteSet(t, k, hash, committeeSize)
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
+		t.Fatal(err)
 	}
 
+	if err := ru.MarshalVoteSet(buf, events); err != nil {
+		t.Fatal(err)
+	}
+
+	// Then, we send a random agreement event to the broker, to update the round.
+	// Note that we start this goroutine before trying to aggregate the voteset,
+	// as it takes a short while to start up.
+	go func(events []wire.Event) {
+		broker.filter.Accumulator.CollectedVotesChan <- []wire.Event{MockAgreementEvent(hash, 1, 1, k)}
+	}(events)
+
+	// Now we try to aggregate the reduction events created earlier. The round update should coincide
+	// with the aggregation.
+	broker.sendAgreement(buf)
+
+	// Read and discard the resulting event
+	if _, err := streamer.Read(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Let's now create a reduction vote set with the previous public keys
+	hash, _ = crypto.RandEntropy(32)
+	events = createVoteSet(t, k, hash, committeeSize)
+
+	// Now, we create our agreement event. Our step counter should be one off from the events we are aggregating.
 	aevBuf, err := broker.handler.createAgreement(events, broker.state.Round(), broker.state.Step())
 	eb.Stream(string(topics.Gossip), aevBuf)
 
@@ -104,33 +103,98 @@ func TestWrongCommittee(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Now, verify this event.
+	// Now, verify this event. The test should fail here if the bug has not been fixed.
 	if err := broker.handler.Verify(aev); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestStress(t *testing.T) {
+	// Setup stuff
 	committeeMock, k := MockCommittee(20, true, 20)
 	bus := wire.NewEventBus()
-
 	broker := newBroker(bus, committeeMock, k[0])
 	broker.filter.UpdateRound(1)
 	bus.RemoveAllPreprocessors(string(topics.Agreement))
 
+	// Wait a bit for the round update to go through
 	time.Sleep(200 * time.Millisecond)
 
+	// Do 10 agreement cycles
 	for i := 1; i <= 10; i++ {
 		hash, _ := crypto.RandEntropy(32)
-		go func() {
+
+		// Blast the filter with many more events than quorum, to see if anything sneaks in
+		go func(i int) {
 			for j := 0; j < 50; j++ {
 				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k))
 			}
-		}()
+		}(i)
+
+		// Make sure the events we got back are all from the proper round
 		evs := <-broker.filter.Accumulator.CollectedVotesChan
 		for _, ev := range evs {
 			assert.Equal(t, uint64(i), ev.(*Agreement).Round)
 		}
+
 		broker.filter.UpdateRound(uint64(i + 1))
 	}
+}
+
+func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []user.Keys) {
+	for i := 0; i < size; i++ {
+		keys, _ := user.NewRandKeys()
+		buf := new(bytes.Buffer)
+		if err := encoding.Write256(buf, keys.EdPubKeyBytes); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := encoding.WriteVarBytes(buf, keys.BLSPubKeyBytes); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := encoding.WriteUint64(buf, binary.LittleEndian, 500); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := encoding.WriteUint64(buf, binary.LittleEndian, 0); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := encoding.WriteUint64(buf, binary.LittleEndian, 10000); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := c.AddProvisioner(buf); err != nil {
+			t.Fatal(err)
+		}
+		k = append(k, keys)
+	}
+
+	return
+}
+
+func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int) (events []wire.Event) {
+	for i := 1; i <= 2; i++ {
+		// We should only pick a certain key once, no dupes.
+		picked := make(map[int]struct{})
+
+		// We need 75% of the committee size worth of events to reach quorum.
+		for j := 0; j < int(float64(size)*0.75); j++ {
+			// Key choices need to be randomized. There is no sorting in production.
+			var n int
+			for {
+				n = rand.Intn(size)
+				if _, ok := picked[n]; !ok {
+					picked[n] = struct{}{}
+					break
+				}
+			}
+
+			ev := reduction.MockReduction(k[n], hash, 1, uint8(i))
+			events = append(events, ev)
+		}
+	}
+
+	return
 }

@@ -61,8 +61,8 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 }
 
 // Listen for results coming from the accumulator and updating the round accordingly
-func (b *broker) Listen() {
-	evs := <-b.filter.Accumulator.CollectedVotesChan
+func (b *broker) Listen(votesChan <-chan []wire.Event) {
+	evs := <-votesChan
 	b.publishEvent(evs)
 	b.publishWinningHash(evs)
 	b.updateRound(b.state.Round() + 1)
@@ -110,7 +110,7 @@ func (b *broker) updateRound(round uint64) {
 	b.filter.UpdateRound(round)
 	consensus.UpdateRound(b.publisher, round)
 	b.filter.FlushQueue()
-	go b.Listen()
+	go b.Listen(b.filter.Accumulator.CollectedVotesChan)
 }
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
