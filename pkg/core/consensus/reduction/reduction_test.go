@@ -20,10 +20,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var timeOut = 200 * time.Millisecond
+var timeOut = 1000 * time.Millisecond
 
 func TestStress(t *testing.T) {
-	eventBus, streamer, k := launchReductionTest(true)
+	eventBus, _, k := launchReductionTest(true, 38)
 
 	// subscribe for the voteset
 	voteSetChan := make(chan *bytes.Buffer, 1)
@@ -33,6 +33,8 @@ func TestStress(t *testing.T) {
 	// for a bit to let the broker update its round.
 	time.Sleep(200 * time.Millisecond)
 	hash, _ := crypto.RandEntropy(32)
+
+	// Do 10 reduction cycles in a row
 	for i := 0; i < 10; i++ {
 		go launchCandidateVerifier(false)
 		go func() {
@@ -43,15 +45,8 @@ func TestStress(t *testing.T) {
 		}()
 		sendSelection(1, hash, eventBus)
 
-		for i := 0; i < 2; i++ {
-			// discard reduction events, we dont give a fuck about those
-			if _, err := streamer.Read(); err != nil {
-				t.Fatal(err)
-			}
-		}
-
 		voteSetBuf := <-voteSetChan
-		// Remove the round bytes first
+		// The vote set buffer will have a round as it's first item. Let's read it and discard it
 		var round uint64
 		if err := encoding.ReadUint64(voteSetBuf, binary.LittleEndian, &round); err != nil {
 			t.Fatal(err)
@@ -76,7 +71,7 @@ func TestStress(t *testing.T) {
 
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
-	eventBus, streamer, k := launchReductionTest(true)
+	eventBus, streamer, k := launchReductionTest(true, 2)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
@@ -104,7 +99,7 @@ func TestReduction(t *testing.T) {
 
 // Test that the reducer does not send any messages when it is not part of the committee.
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
-	eventBus, streamer, _ := launchReductionTest(false)
+	eventBus, streamer, _ := launchReductionTest(false, 2)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
@@ -131,7 +126,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 
 // Test that timeouts in the reduction phase result in proper behavior.
 func TestReductionTimeout(t *testing.T) {
-	eb, streamer, _ := launchReductionTest(true)
+	eb, streamer, _ := launchReductionTest(true, 2)
 
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
@@ -159,29 +154,8 @@ func TestReductionTimeout(t *testing.T) {
 	<-stopChan
 }
 
-func launchCandidateVerifier(failVerification bool) {
-	r := <-wire.VerifyCandidateBlockChan
-	if failVerification {
-		r.ErrChan <- errors.New("verification failed")
-	} else {
-		r.RespChan <- bytes.Buffer{}
-	}
-}
-
-func launchReductionTest(inCommittee bool) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
-	eb, streamer := helper.CreateGossipStreamer()
-	committeeMock := reduction.MockCommittee(2, inCommittee)
-	k, _ := user.NewRandKeys()
-	rpcBus := wire.NewRPCBus()
-	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
-	// update round
-	consensus.UpdateRound(eb, 1)
-
-	return eb, streamer, k
-}
-
 func TestTimeOutVariance(t *testing.T) {
-	eb, _, _ := launchReductionTest(true)
+	eb, _, _ := launchReductionTest(true, 2)
 
 	// subscribe to reduction results
 	resultChan := make(chan *bytes.Buffer, 1)
@@ -233,6 +207,27 @@ func TestTimeOutVariance(t *testing.T) {
 	assert.InDelta(t, elapsed1.Seconds(), elapsed3.Seconds(), 0.05)
 }
 
+func launchCandidateVerifier(failVerification bool) {
+	r := <-wire.VerifyCandidateBlockChan
+	if failVerification {
+		r.ErrChan <- errors.New("verification failed")
+	} else {
+		r.RespChan <- bytes.Buffer{}
+	}
+}
+
+func launchReductionTest(inCommittee bool, quorum int) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
+	eb, streamer := helper.CreateGossipStreamer()
+	committeeMock := reduction.MockCommittee(quorum, inCommittee)
+	k, _ := user.NewRandKeys()
+	rpcBus := wire.NewRPCBus()
+	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
+	// update round
+	consensus.UpdateRound(eb, 1)
+
+	return eb, streamer, k
+}
+
 // Convenience function, which launches the reduction component and removes the
 // preprocessors for testing purposes (bypassing the republisher and the validator).
 // This ensures proper handling of mocked Reduction events.
@@ -246,7 +241,6 @@ func sendReductionBuffers(amount int, k user.Keys, hash []byte, round uint64, st
 	for i := 0; i < amount; i++ {
 		ev := reduction.MockReductionBuffer(k, hash, round, step)
 		eventBus.Publish(string(topics.Reduction), ev)
-		time.Sleep(1 * time.Millisecond)
 	}
 }
 
