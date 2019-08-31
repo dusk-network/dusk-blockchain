@@ -77,9 +77,11 @@ func (b *BidList) repopulate(db database.DB) {
 				continue
 			}
 
-			x := CalculateX(bid.Outputs[0].Commitment, bid.M)
-			x.EndHeight = searchingHeight + bid.Lock
-			b.AddBid(x)
+			if searchingHeight+bid.Lock > currentHeight {
+				x := CalculateX(bid.Outputs[0].Commitment, bid.M)
+				x.EndHeight = searchingHeight + bid.Lock
+				b.AddBid(x)
+			}
 		}
 
 		searchingHeight++
@@ -198,7 +200,7 @@ func CalculateX(d []byte, m []byte) Bid {
 
 func (b *BidList) remove(bid Bid, idx int) {
 	list := *b
-	if idx == len(list)-1 || idx == 0 {
+	if idx == len(list)-1 {
 		list = list[:idx]
 	} else {
 		list = append(list[:idx], list[idx+1:]...)
