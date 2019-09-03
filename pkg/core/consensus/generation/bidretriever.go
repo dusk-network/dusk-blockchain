@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	log "github.com/sirupsen/logrus"
 )
 
 // bidRetriever is a simple searcher, who's responsibility is to find a bid transaction, when given
@@ -63,6 +64,17 @@ func findCorrespondingBid(txs []transactions.Transaction, m []byte, searchingHei
 		}
 
 		if bytes.Equal(m, bid.M) && bid.Lock+searchingHeight > currentHeight {
+			hash, err := bid.CalculateHash()
+			if err != nil {
+				// If we found a valid bid tx, we should under no circumstance have issues marshalling it
+				panic(err)
+			}
+
+			log.WithFields(log.Fields{
+				"process": "generation",
+				"height":  searchingHeight,
+				"tx hash": hash,
+			}).Debugln("bid found in chain")
 			return bid, nil
 		}
 	}
