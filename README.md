@@ -1,4 +1,4 @@
-# Dusk Network Testnet 
+# Dusk Network Testnet [![Build Status](https://travis-ci.org/dusk-network/dusk-blockchain.svg?branch=testnet)](https://travis-ci.com/dusk-network/dusk-blockchain)
 ## Shin (殉星) Release
 |Table of Contents|
 |---|

@@ -34,7 +34,7 @@ type (
 		p                 wire.EventPublisher
 		entry             *log.Entry
 		acceptedBlockChan <-chan block.Block
-		EntryChan         chan *log.Entry
+		EntryChan         chan []byte
 		quitChan          chan struct{}
 		listener          *wire.TopicListener
 	}
@@ -56,7 +56,7 @@ func New(p wire.EventBroker, w io.WriteCloser, formatter log.Formatter) *LogProc
 		Logger:            logger,
 		entry:             entry,
 		acceptedBlockChan: acceptedBlockChan,
-		EntryChan:         make(chan *log.Entry, 100),
+		EntryChan:         make(chan []byte, 100),
 		quitChan:          make(chan struct{}, 1),
 		listener:          listener,
 	}
@@ -98,18 +98,13 @@ func (l *LogProcessor) Close() error {
 }
 
 // Send specifies the format and the writer for the log
-func (l *LogProcessor) Send(entry *log.Entry) error {
-	formatted, err := l.Formatter.Format(entry)
-	if err != nil {
-		return err
-	}
-
+func (l *LogProcessor) Send(entry []byte) error {
 	// Set a write deadline in case we are writing to a connection, to avoid hangs
 	if conn, ok := l.Out.(net.Conn); ok {
 		conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	}
 
-	if _, err = l.Out.Write(formatted); err != nil {
+	if _, err := l.Out.Write(entry); err != nil {
 		return err
 	}
 

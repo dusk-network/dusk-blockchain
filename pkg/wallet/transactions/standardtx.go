@@ -10,8 +10,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/key"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/mlsag"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-crypto/rangeproof"
 
 	"github.com/bwesterb/go-ristretto"
