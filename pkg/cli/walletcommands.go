@@ -3,17 +3,18 @@ package cli
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
@@ -25,18 +26,12 @@ import (
 
 var testnet = byte(2)
 
-// cliWallet will be used to scan blocks in the background
-// when we received a topic.AcceptedBlock
-var cliWallet *wallet.Wallet
-
-// DBInstance will be used to close any open connections to
-// the database
-var DBInstance *walletdb.DB
+// Make sure we only load one wallet
+var walletLoaded = false
 
 func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-
-	if DBInstance != nil {
-		DBInstance.Close()
+	if walletLoaded {
+		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
 	}
 
 	if args == nil || len(args) < 1 {
@@ -65,15 +60,18 @@ func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPC
 	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
-	cliWallet = w
-	DBInstance = db
+	walletLoaded = true
 
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(publisher, rpcBus, cliWallet)
+		initiator.LaunchConsensus(publisher, rpcBus, w)
 	}
 }
 
 func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+	if walletLoaded {
+		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
+	}
+
 	if args == nil || len(args) < 1 {
 		fmt.Fprintf(os.Stdout, commandInfo["loadwallet"]+"\n")
 		return
@@ -95,16 +93,14 @@ func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
+	walletLoaded = true
+
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(publisher, rpcBus, cliWallet)
+		initiator.LaunchConsensus(publisher, rpcBus, w)
 	}
 }
 
 func loadWallet(password string) (*wallet.Wallet, error) {
-	if DBInstance != nil {
-		DBInstance.Close()
-	}
-
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
@@ -119,89 +115,21 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 		return nil, err
 	}
 
-	cliWallet = w
-	DBInstance = db
-
 	return w, nil
 }
 
-func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 3 {
-		fmt.Fprintf(os.Stdout, commandInfo["transfer"]+"\n")
-		return
-	}
-
-	amount, err := stringToScalar(args[0])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf("%s\n", err.Error()))
-		return
-	}
-
-	address := args[1]
-	password := args[2]
-
-	// Load wallet using password
-	w, err := loadWallet(password)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
-		return
-	}
-
-	// Sync wallet
-	if err := syncWallet(); err != nil {
-		fmt.Fprintf(os.Stdout, "%v", err)
-		return
-	}
-
-	// Create a new standard tx
-	tx, err := w.NewStandardTx(cfg.MinFee)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
-		return
-	}
-
-	// Send amount to address
-	tx.AddOutput(key.PublicAddress(address), amount)
-
-	// Sign tx
-	err = w.Sign(tx)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireStandardTx()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-	buf := new(bytes.Buffer)
-	if err := wireTx.Encode(buf); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
-		return
-	}
-
-	_, err = wireTx.CalculateHash()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
-
-	publisher.Publish(string(topics.Tx), buf)
-}
-
 func createFromSeedCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+	if walletLoaded {
+		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
+	}
+
 	if args == nil || len(args) < 2 {
 		fmt.Fprintf(os.Stdout, commandInfo["createfromseed"]+"\n")
 		return
 	}
 
 	seed := args[0]
-
 	password := args[1]
-
 	seedBytes, err := hex.DecodeString(seed)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error attempting to decode seed: %v\n", err)
@@ -223,17 +151,14 @@ func createFromSeedCMD(args []string, publisher wire.EventBroker, rpcBus *wire.R
 
 	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\nPublic Address: %s\n", pubAddr)
 
+	walletLoaded = true
+
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(publisher, rpcBus, cliWallet)
+		initiator.LaunchConsensus(publisher, rpcBus, w)
 	}
 }
 
 func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
-
-	if DBInstance != nil {
-		DBInstance.Close()
-	}
-
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
@@ -246,239 +171,58 @@ func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
 		return nil, err
 	}
 
-	cliWallet = w
-	DBInstance = db
-
 	return w, nil
+}
+
+func balanceCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
+	if !walletLoaded {
+		fmt.Fprintln(os.Stdout, "Please load a wallet before checking your balance")
+		return
+	}
 
 }
 
-func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 3 {
-		fmt.Fprintf(os.Stdout, commandInfo["stake"]+"\n")
+func transferCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
+	if !walletLoaded {
+		fmt.Fprintln(os.Stdout, "Please load a wallet before sending DUSK")
 		return
 	}
 
-	amount, err := stringToScalar(args[0])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stdout, "Please specify an amount and an address")
 		return
 	}
 
-	lockTime, err := stringToUint64(args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	password := args[2]
-
-	// Load wallet using password
-	w, err := loadWallet(password)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
-		return
-	}
-
-	// Sync wallet
-	if err := syncWallet(); err != nil {
-		fmt.Fprintf(os.Stdout, "%v", err)
-		return
-	}
-
-	// Create a new stake tx
-	tx, err := w.NewStakeTx(cfg.MinFee, lockTime, amount)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
-		return
-	}
-
-	// Sign tx
-	err = w.Sign(tx)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireStakeTx()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
 	buf := new(bytes.Buffer)
-	if err := wireTx.Encode(buf); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
-		return
-	}
 
-	_, err = wireTx.CalculateHash()
+	amountInt, err := stringToUint64(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		fmt.Fprintln(os.Stdout, "Please specify a numerical value for the amount")
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
-	publisher.Publish(string(topics.Tx), buf)
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, amountInt); err != nil {
+		fmt.Fprintf(os.Stdout, "%v\n", err)
+		return
+	}
+
+	if _, err := buf.Write([]byte(args[1])); err != nil {
+		fmt.Fprintf(os.Stdout, "%v\n", err)
+		return
+	}
+
+	eventBroker.Publish(string(topics.Transfer), buf)
 }
 
-func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 3 {
-		fmt.Fprintf(os.Stdout, commandInfo["bid"]+"\n")
-		return
-	}
-
-	amount, err := stringToScalar(args[0])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	lockTime, err := stringToUint64(args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	password := args[2]
-
-	// Load wallet using password
-	w, err := loadWallet(password)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
-		return
-	}
-
-	// Sync wallet
-	if err := syncWallet(); err != nil {
-		fmt.Fprintf(os.Stdout, "%v", err)
-		return
-	}
-
-	// Create a new bid tx
-	tx, err := w.NewBidTx(cfg.MinFee, lockTime, amount)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
-		return
-	}
-
-	// Sign tx
-	err = w.Sign(tx)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireBid()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-	buf := new(bytes.Buffer)
-	if err := wireTx.Encode(buf); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
-		return
-	}
-
-	_, err = wireTx.CalculateHash()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
-
-	publisher.Publish(string(topics.Tx), buf)
+func sendBidCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
+	eventBroker.Publish(string(topics.Bid), nil)
 }
 
-func syncWallet() error {
-	var totalSpent, totalReceived uint64
-	// keep looping until tipHash = currentBlockHash
-	for {
-		// Get Wallet height
-		walletHeight, err := cliWallet.GetSavedHeight()
-		if err != nil {
-			cliWallet.UpdateWalletHeight(0)
-		}
-
-		// Get next block using walletHeight and tipHash of the node
-		blk, tipHash, tipHeight, err := fetchBlockHeightAndState(walletHeight)
-		if err != nil {
-			return fmt.Errorf("\nerror fetching block from node db: %v", err)
-		}
-
-		fmt.Fprintf(os.Stdout, "\rSyncing wallet... (%v/%v)", blk.Header.Height, tipHeight)
-		// call wallet.CheckBlock
-		spentCount, receivedCount, err := cliWallet.CheckWireBlock(*blk)
-		if err != nil {
-			return fmt.Errorf("\nerror fetching block: %v", err)
-		}
-
-		totalSpent += spentCount
-		totalReceived += receivedCount
-
-		// check if state is equal to the block that we fetched
-		if bytes.Equal(tipHash, blk.Header.Hash) {
-			break
-		}
-	}
-
-	fmt.Fprintf(os.Stdout, "\nFound %d spends and %d receives\n", totalSpent, totalReceived)
-	return nil
-}
-
-func balanceCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if cliWallet == nil {
-		fmt.Fprintf(os.Stdout, "please load a wallet before trying to check balance\n")
-		return
-	}
-
-	if err := syncWallet(); err != nil {
-		fmt.Fprintf(os.Stdout, "%v", err)
-		return
-	}
-
-	balance, err := cliWallet.Balance()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error fetching balance: %v\n", err)
-		return
-	}
-	fmt.Fprintf(os.Stdout, "Balance: %.8f\n", balance)
-}
-
-func fetchBlockHeightAndState(height uint64) (*block.Block, []byte, uint64, error) {
-	_, db := heavy.CreateDBConnection()
-
-	var blk *block.Block
-	var state *database.State
-	var tipHeight uint64
-	err := db.View(func(t database.Transaction) error {
-		hash, err := t.FetchBlockHashByHeight(height)
-		if err != nil {
-			return err
-		}
-		state, err = t.FetchState()
-		if err != nil {
-			return err
-		}
-
-		blk, err = t.FetchBlock(hash)
-		if err != nil {
-			return err
-		}
-
-		tipHeight, err = t.FetchCurrentHeight()
-		return err
-	})
-	if err != nil {
-		return nil, nil, 0, err
-	}
-
-	return blk, state.TipHash, tipHeight, nil
+func sendStakeCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
+	eventBroker.Publish(string(topics.Stake), nil)
 }
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
-
 	_, db := heavy.CreateDBConnection()
 
 	var pubKeys []mlsag.PubKeys
