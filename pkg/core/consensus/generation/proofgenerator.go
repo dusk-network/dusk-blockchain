@@ -15,26 +15,34 @@ type Generator interface {
 	GenerateProof([]byte) zkproof.ZkProof
 	UpdateBidList(user.Bid)
 	RemoveExpiredBids(uint64)
+	InBidList() bool
 }
 
 type proofGenerator struct {
-	d, k    ristretto.Scalar
+	d, k, x ristretto.Scalar
 	lock    sync.RWMutex
 	bidList *user.BidList
 }
 
-func newProofGenerator(d, k ristretto.Scalar) *proofGenerator {
+func newProofGenerator(d, k, m ristretto.Scalar) (*proofGenerator, error) {
 	bidList, err := user.NewBidList(nil)
 	if err != nil {
-		// If we can't repopulate the bidlist, panic
-		panic(err)
+		return nil, err
 	}
 
+	x := zkproof.CalculateX(d, m)
 	return &proofGenerator{
 		d:       d,
 		k:       k,
+		x:       x,
 		bidList: bidList,
-	}
+	}, nil
+}
+
+func (g *proofGenerator) InBidList() bool {
+	var bid user.Bid
+	copy(bid.X[:], g.x.Bytes())
+	return g.bidList.Contains(bid)
 }
 
 func (g *proofGenerator) UpdateBidList(bid user.Bid) {

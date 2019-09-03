@@ -80,9 +80,11 @@ func (b *BidList) repopulate(db database.DB) {
 			// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
 			// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
 			// as this is most likely a consensus-breaking change)
-			x := CalculateX(bid.Outputs[0].Commitment.Bytes(), bid.M)
-			x.EndHeight = searchingHeight + bid.Lock
-			b.AddBid(x)
+			if searchingHeight+bid.Lock > currentHeight {
+				x := CalculateX(bid.Outputs[0].Commitment.Bytes(), bid.M)
+				x.EndHeight = searchingHeight + bid.Lock
+				b.AddBid(x)
+			}
 		}
 
 		searchingHeight++
@@ -201,7 +203,7 @@ func CalculateX(d, m []byte) Bid {
 
 func (b *BidList) remove(bid Bid, idx int) {
 	list := *b
-	if idx == len(list)-1 || idx == 0 {
+	if idx == len(list)-1 {
 		list = list[:idx]
 	} else {
 		list = append(list[:idx], list[idx+1:]...)
