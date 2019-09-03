@@ -3,8 +3,6 @@ package initiator
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
-	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -15,7 +13,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	log "github.com/sirupsen/logrus"
 )
+
+var l = log.WithField("process", "consensus initiator")
 
 func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
 	go startProvisioner(eventBroker, rpcBus, w)
@@ -27,8 +28,8 @@ func startProvisioner(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wall
 	f := factory.New(eventBroker, rpcBus, config.ConsensusTimeOut, w.ConsensusKeys())
 	f.StartConsensus()
 
+	// Get starting round
 	blsPubKey := w.ConsensusKeys().BLSPubKeyBytes
-
 	startingRound := getStartingRound(blsPubKey, eventBroker)
 
 	// Notify consensus components
@@ -41,21 +42,16 @@ func startBlockGenerator(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *w
 	// make some random keys to sign the seed with
 	keys, err := user.NewRandKeys()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error starting block generation component - could not generate keys: %v\n", err)
+		l.WithError(err).Warnln("could not start block generation component - problem generating keys")
 		return
 	}
 
 	// reconstruct k
-	zeroPadding := make([]byte, 4)
-	privSpend, err := w.PrivateSpend()
+	k, err := reconstructK(w)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error starting block generation component - could not get private spend: %v\n", err)
+		l.WithError(err).Warnln("could not start block generation component - problem reconstructing K")
 		return
 	}
-
-	kBytes := append(privSpend, zeroPadding...)
-	var k ristretto.Scalar
-	k.Derive(kBytes)
 
 	// get public key that the rewards should go to
 	publicKey := w.PublicKey()
@@ -63,7 +59,7 @@ func startBlockGenerator(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *w
 	// launch generation component
 	go func() {
 		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
-			fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
+			l.WithError(err).Warnln("error launching block generation component")
 		}
 	}()
 }
@@ -78,4 +74,17 @@ func getStartingRound(blsPubKey []byte, eventBroker wire.EventBroker) uint64 {
 		blk := <-acceptedBlockChan
 		return blk.Header.Height + 1
 	}
+}
+
+func reconstructK(w *wallet.Wallet) (ristretto.Scalar, error) {
+	zeroPadding := make([]byte, 4)
+	privSpend, err := w.PrivateSpend()
+	if err != nil {
+		return ristretto.Scalar{}, err
+	}
+
+	kBytes := append(privSpend, zeroPadding...)
+	var k ristretto.Scalar
+	k.Derive(kBytes)
+	return k, nil
 }
