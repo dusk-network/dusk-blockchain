@@ -17,27 +17,27 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 )
 
-func LaunchConsensus(publisher wire.EventPublisher, rpcBus *wire.RPCBus, w *wallet.Wallet) {
-	go startProvisioner(publisher, rpcBus, w)
-	go startBlockGenerator(publisher, rpcBus, w)
+func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
+	go startProvisioner(eventBroker, rpcBus, w)
+	go startBlockGenerator(eventBroker, rpcBus, w)
 }
 
-func startProvisioner(publisher wire.EventPublisher, rpcBus *wire.RPCBus, w *wallet.Wallet) {
+func startProvisioner(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
 	// Setting up the consensus factory
-	f := factory.New(publisher, rpcBus, config.ConsensusTimeOut, w.ConsensusKeys())
+	f := factory.New(eventBroker, rpcBus, config.ConsensusTimeOut, w.ConsensusKeys())
 	f.StartConsensus()
 
 	blsPubKey := w.ConsensusKeys().BLSPubKeyBytes
 
-	startingRound := getStartingRound(blsPubKey, publisher)
+	startingRound := getStartingRound(blsPubKey, eventBroker)
 
 	// Notify consensus components
 	roundBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundBytes, startingRound)
-	publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+	eventBroker.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
 }
 
-func startBlockGenerator(publisher wire.EventPublisher, rpcBus *wire.RPCBus, w *wallet.Wallet) {
+func startBlockGenerator(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
 	// make some random keys to sign the seed with
 	keys, err := user.NewRandKeys()
 	if err != nil {
@@ -62,7 +62,7 @@ func startBlockGenerator(publisher wire.EventPublisher, rpcBus *wire.RPCBus, w *
 
 	// launch generation component
 	go func() {
-		if err := generation.Launch(publisher, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
+		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
 			fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
 		}
 	}()
