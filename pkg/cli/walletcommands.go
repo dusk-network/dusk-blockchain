@@ -215,10 +215,20 @@ func transferCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBu
 }
 
 func sendBidCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
+	if !walletLoaded {
+		fmt.Fprintln(os.Stdout, "Please load a wallet before bidding DUSK")
+		return
+	}
+
 	eventBroker.Publish(string(topics.Bid), nil)
 }
 
 func sendStakeCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
+	if !walletLoaded {
+		fmt.Fprintln(os.Stdout, "Please load a wallet before staking DUSK")
+		return
+	}
+
 	eventBroker.Publish(string(topics.Stake), nil)
 }
 
