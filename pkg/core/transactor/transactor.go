@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"os"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -91,23 +90,9 @@ func (t *transactor) listen() {
 		case lockTime := <-t.lockTimeChan:
 			t.lockTime = lockTime
 		case amount := <-t.amountChan:
-			amountScalar := ristretto.Scalar{}
-			amountScalar.SetBigInt(big.NewInt(0).SetUint64(amount))
-			t.amount = amountScalar
+			t.onAmount(amount)
 		case r := <-wire.GetBalanceChan:
-			balance, err := t.balance()
-			if err != nil {
-				r.ErrChan <- err
-				continue
-			}
-
-			buf := new(bytes.Buffer)
-			if err := binary.Write(buf, binary.LittleEndian, balance); err != nil {
-				r.ErrChan <- err
-				continue
-			}
-
-			r.RespChan <- *buf
+			t.onGetBalance(r)
 		}
 	}
 }
@@ -160,35 +145,35 @@ func (t *transactor) sendStake() {
 	// Create a new stake tx
 	tx, err := t.w.NewStakeTx(cfg.MinFee, t.lockTime, t.amount)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
+		l.WithError(err).Warnln("error creating stake")
 		return
 	}
 
 	// Sign tx
 	err = t.w.Sign(tx)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		l.WithError(err).Warnln("error signing stake")
 		return
 	}
 
 	// Convert wallet-tx to wireTx and encode into buffer
 	wireTx, err := tx.WireStakeTx()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		l.WithError(err).Warnln("error converting stake")
 		return
 	}
 	buf := new(bytes.Buffer)
 	if err := wireTx.Encode(buf); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
+		l.WithError(err).Warnln("error encoding stake")
 		return
 	}
 
 	_, err = wireTx.CalculateHash()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		l.WithError(err).Warnln("error calculating stake hash")
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+	l.WithField("hash", hex.EncodeToString(wireTx.TxID)).Debugln("stake created")
 
 	t.publisher.Publish(string(topics.Tx), buf)
 }
@@ -197,35 +182,35 @@ func (t *transactor) sendBid() {
 	// Create a new bid tx
 	tx, err := t.w.NewBidTx(cfg.MinFee, t.lockTime, t.amount)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
+		l.WithError(err).Warnln("error creating bid")
 		return
 	}
 
 	// Sign tx
 	err = t.w.Sign(tx)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		l.WithError(err).Warnln("error signing bid")
 		return
 	}
 
 	// Convert wallet-tx to wireTx and encode into buffer
 	wireTx, err := tx.WireBid()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		l.WithError(err).Warnln("error converting bid")
 		return
 	}
 	buf := new(bytes.Buffer)
 	if err := wireTx.Encode(buf); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
+		l.WithError(err).Warnln("error encoding bid")
 		return
 	}
 
 	_, err = wireTx.CalculateHash()
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		l.WithError(err).Warnln("error calculating bid hash")
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+	l.WithField("hash", hex.EncodeToString(wireTx.TxID)).Debugln("bid created")
 
 	t.publisher.Publish(string(topics.Tx), buf)
 }
@@ -250,7 +235,7 @@ func (t *transactor) syncWallet() error {
 		// call wallet.CheckBlock
 		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk)
 		if err != nil {
-			return fmt.Errorf("error fetching block: %v\n", err)
+			return fmt.Errorf("error checking block: %v\n", err)
 		}
 
 		totalSpent += spentCount
@@ -303,4 +288,26 @@ func (t *transactor) balance() (float64, error) {
 	}
 
 	return balance, nil
+}
+
+func (t *transactor) onGetBalance(r wire.Req) {
+	balance, err := t.balance()
+	if err != nil {
+		r.ErrChan <- err
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	if err := binary.Write(buf, binary.LittleEndian, balance); err != nil {
+		r.ErrChan <- err
+		return
+	}
+
+	r.RespChan <- *buf
+}
+
+func (t *transactor) onAmount(amount uint64) {
+	amountScalar := ristretto.Scalar{}
+	amountScalar.SetBigInt(big.NewInt(0).SetUint64(amount))
+	t.amount = amountScalar
 }
