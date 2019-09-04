@@ -102,7 +102,11 @@ func (t *transactor) listen() {
 			}
 
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, balance)
+			if err := binary.Write(buf, binary.LittleEndian, balance); err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
 			r.RespChan <- *buf
 		}
 	}
