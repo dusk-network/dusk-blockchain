@@ -2,8 +2,11 @@ package rpc
 
 import (
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dusk-network/dusk-blockchain/pkg/cli"
 	"strconv"
 	"time"
 
@@ -18,12 +21,13 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		"version":       version,
-		"ping":          pong,
-		"uptime":        uptime,
+		"version": version,
+		"ping":    pong,
+		"uptime":  uptime,
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,
+		"sendBidTx":    sendBidTx,
 	}
 
 	// rpcAdminCmd holds all admin methods.
@@ -72,9 +76,21 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 		return "", fmt.Errorf("%s is not supported by publishTopic API", jsonrpcTopic)
 	}
 
-	payloadBuf := bytes.NewBufferString(params[1])
-	s.eventBus.Publish(jsonrpcTopic, payloadBuf)
+	payload, _ := hex.DecodeString(params[1])
+	s.eventBus.Publish(jsonrpcTopic, bytes.NewBuffer(payload))
+	return "{result: \"published\"}", nil
+}
+var sendBidTx = func(s *Server, params []string) (string, error) {
 
-	res := fmt.Sprintf("published %s with len(payload) %d", jsonrpcTopic, len(params[1]))
-	return res, nil
+	if len(params) < 3 {
+		return "", fmt.Errorf("invalid number of parameters %d", len(params))
+	}
+
+	txid, err := cli.SendBidCMD([]string{params[0], params[1], params[2]}, s.eventBus, s.rpcBus)
+	if err != nil {
+		return "", err
+	}
+
+	res, err := json.Marshal(txid)
+	return string(res), err
 }
