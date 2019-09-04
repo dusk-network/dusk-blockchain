@@ -28,7 +28,12 @@ var (
 // Registry stores all loaded configurations according to the config order
 // NB It should be cheap to be copied by value
 type Registry struct {
+
+	// UsedConfigFile points at the loaded config file
 	UsedConfigFile string
+	// FixedConfigFile fixes the config file to be loaded. If not set,
+	// the default search-for-config procedure is used
+	FixedConfigFile string
 
 	// All configuration groups
 	General     generalConfiguration
@@ -40,10 +45,10 @@ type Registry struct {
 	RPC         rpcConfiguration
 	Performance performanceConfiguration
 	Mempool     mempoolConfiguration
-	Gql	 		gqlConfiguration
+	Gql         gqlConfiguration
 }
 
-// Load makes an attempt to read and unmershal any configs from flag, env and
+// Load makes an attempt to read and unmarshal any configs from flag, env and
 // dusk config file.
 //
 // It  uses the following precedence order. Each item takes precedence over the item below it:
@@ -70,6 +75,17 @@ func Load() error {
 	return nil
 }
 
+// LoadFromFile unmarshals configPath file into a new Registry instance
+// NB. It does not overwrite the global Registry
+func LoadFromFile(configPath string) (Registry, error) {
+
+	registry := Registry{FixedConfigFile: configPath}
+
+	// Initialization
+	err := registry.init()
+	return registry, err
+}
+
 // Get returns registry by value in order to avoid further modifications after
 // initial configuration loading
 func Get() Registry {
@@ -87,10 +103,13 @@ func (r *Registry) init() error {
 	viper.AddConfigPath(searchPath2)
 
 	// Initialize and parse flags
-	confFile, err := loadFlags()
-
-	if err != nil {
-		return err
+	confFile := r.FixedConfigFile
+	if len(confFile) == 0 {
+		var err error
+		confFile, err = loadFlags()
+		if err != nil {
+			return err
+		}
 	}
 
 	// confPath is overwritten by the one from command line
@@ -155,6 +174,7 @@ func defineFlags() {
 	_ = pflag.StringP("wallet.file", "w", "wallet.dat", "sets the wallet file to use")
 	_ = pflag.StringP("wallet.store", "d", "walletDB", "sets the wallet database directory")
 	_ = pflag.StringP("rpc.port", "r", "9000", "sets rpc server port")
+	_ = pflag.StringP("gql.port", "q", "9500", "sets gql server port")
 }
 
 // define a set of environment variables as bindings to config file settings
