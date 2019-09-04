@@ -2,6 +2,7 @@ package transactor
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -10,6 +11,7 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -39,6 +41,9 @@ type transactor struct {
 	// channels to update consensus tx values
 	lockTimeChan <-chan uint64
 	amountChan   <-chan uint64
+
+	// channel to trigger wallet sync
+	acceptedBlockChan <-chan block.Block
 }
 
 // Instantiate a new transactor struct.
@@ -51,14 +56,16 @@ func newTransactor(eventBroker wire.EventBroker, w *wallet.Wallet) *transactor {
 	eventBroker.Subscribe(string(topics.Bid), bidChan)
 	stakeChan := make(chan *bytes.Buffer, 1)
 	eventBroker.Subscribe(string(topics.Stake), stakeChan)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 	return &transactor{
-		publisher:    eventBroker,
-		w:            w,
-		lockTime:     lockTime,
-		amount:       amount,
-		transferChan: initTransferCollector(eventBroker),
-		bidChan:      bidChan,
-		stakeChan:    stakeChan,
+		publisher:         eventBroker,
+		w:                 w,
+		lockTime:          lockTime,
+		amount:            amount,
+		transferChan:      initTransferCollector(eventBroker),
+		bidChan:           bidChan,
+		stakeChan:         stakeChan,
+		acceptedBlockChan: acceptedBlockChan,
 	}
 }
 
@@ -71,6 +78,10 @@ func Launch(eventBroker wire.EventBroker, w *wallet.Wallet) {
 func (t *transactor) listen() {
 	for {
 		select {
+		case <-t.acceptedBlockChan:
+			if err := t.syncWallet(); err != nil {
+				l.WithError(err).Warnln("error syncing wallet")
+			}
 		case info := <-t.transferChan:
 			t.transfer(info.amount, info.address)
 		case <-t.bidChan:
@@ -83,16 +94,21 @@ func (t *transactor) listen() {
 			amountScalar := ristretto.Scalar{}
 			amountScalar.SetBigInt(big.NewInt(0).SetUint64(amount))
 			t.amount = amountScalar
+		case r := <-wire.GetBalanceChan:
+			balance, err := t.balance()
+			if err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
+			buf := new(bytes.Buffer)
+			binary.Write(buf, binary.LittleEndian, balance)
+			r.RespChan <- *buf
 		}
 	}
 }
 
 func (t *transactor) transfer(amount uint64, address string) {
-	if err := t.syncWallet(); err != nil {
-		// log
-		return
-	}
-
 	// Create a new standard tx
 	tx, err := t.w.NewStandardTx(cfg.MinFee)
 	if err != nil {
@@ -137,11 +153,6 @@ func (t *transactor) transfer(amount uint64, address string) {
 }
 
 func (t *transactor) sendStake() {
-	if err := t.syncWallet(); err != nil {
-		// log
-		return
-	}
-
 	// Create a new stake tx
 	tx, err := t.w.NewStakeTx(cfg.MinFee, t.lockTime, t.amount)
 	if err != nil {
@@ -179,11 +190,6 @@ func (t *transactor) sendStake() {
 }
 
 func (t *transactor) sendBid() {
-	if err := t.syncWallet(); err != nil {
-		// log
-		return
-	}
-
 	// Create a new bid tx
 	tx, err := t.w.NewBidTx(cfg.MinFee, t.lockTime, t.amount)
 	if err != nil {
@@ -285,17 +291,12 @@ func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []by
 	return blk, state.TipHash, nil
 }
 
-func (t *transactor) balance(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) float64 {
-	if err := t.syncWallet(); err != nil {
-		l.WithError(err).Warnln("error syncing wallet")
-		return 0.0
-	}
-
+func (t *transactor) balance() (float64, error) {
 	balance, err := t.w.Balance()
 	if err != nil {
 		l.WithError(err).Warnln("error fetching balance")
-		return 0.0
+		return 0.0, err
 	}
 
-	return balance
+	return balance, nil
 }

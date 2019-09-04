@@ -180,6 +180,20 @@ func balanceCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus
 		return
 	}
 
+	req := wire.NewRequest(bytes.Buffer{}, 2)
+	buf, err := rpcBus.Call(wire.GetBalance, req)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error getting balance: %v\n", err)
+		return
+	}
+
+	var balance float64
+	if err := binary.Read(&buf, binary.LittleEndian, balance); err != nil {
+		fmt.Fprintf(os.Stdout, "error reading response: %v\n", err)
+		return
+	}
+
+	fmt.Fprintln(os.Stdout, balance)
 }
 
 func transferCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
