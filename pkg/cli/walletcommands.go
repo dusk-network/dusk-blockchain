@@ -13,6 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -61,6 +62,7 @@ func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPC
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
 	walletLoaded = true
+	transactor.Launch(publisher, w)
 
 	if !cfg.Get().General.WalletOnly {
 		initiator.LaunchConsensus(publisher, rpcBus, w)
@@ -94,6 +96,7 @@ func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
 	walletLoaded = true
+	transactor.Launch(publisher, w)
 
 	if !cfg.Get().General.WalletOnly {
 		initiator.LaunchConsensus(publisher, rpcBus, w)
@@ -152,6 +155,7 @@ func createFromSeedCMD(args []string, publisher wire.EventBroker, rpcBus *wire.R
 	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\nPublic Address: %s\n", pubAddr)
 
 	walletLoaded = true
+	transactor.Launch(publisher, w)
 
 	if !cfg.Get().General.WalletOnly {
 		initiator.LaunchConsensus(publisher, rpcBus, w)
