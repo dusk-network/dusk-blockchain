@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 var receiveFn = func(c net.Conn) {
@@ -90,7 +90,7 @@ func TestWriteLoop(t *testing.T) {
 	go func() {
 		responseChan := make(chan *bytes.Buffer)
 		writer := peer.NewWriter(client, protocol.TestNet, bus)
-		go writer.WriteLoop(responseChan)
+		go writer.Serve(responseChan, make(chan struct{}, 1))
 
 		bufCopy := *buf
 		responseChan <- &bufCopy
@@ -149,7 +149,6 @@ func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 func addPeer(bus *wire.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
 	client, srv := net.Pipe()
 	pw := peer.NewWriter(client, protocol.TestNet, bus)
-	pw.Subscribe(bus)
 	go receiveFunc(srv)
 	return pw
 }

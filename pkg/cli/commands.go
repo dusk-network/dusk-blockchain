@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
@@ -9,15 +11,13 @@ import (
 	"strconv"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/factory"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/generation"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
 // CLICommands holds all of the wallet commands that the user can call through
@@ -31,7 +31,6 @@ var CLICommands = map[string]func([]string, wire.EventBroker, *wire.RPCBus){
 	"transfer":            transferCMD,
 	"stake":               sendStakeCMD,
 	"bid":                 sendBidCMD,
-	"sync":                syncWalletCMD,
 	"startprovisioner":    startProvisioner,
 	"startblockgenerator": startBlockGenerator,
 	"exit":                stopNode,
@@ -72,20 +71,21 @@ func startProvisioner(args []string, publisher wire.EventBroker, rpcBus *wire.RP
 	f := factory.New(publisher, rpcBus, config.ConsensusTimeOut, cliWallet.ConsensusKeys())
 	f.StartConsensus()
 
-	if err := consensus.GetStartingRound(publisher, nil, cliWallet.ConsensusKeys()); err != nil {
-		fmt.Fprintf(os.Stdout, "error starting consensus: %v\n", err)
-		return
-	}
+	blsPubKey := cliWallet.ConsensusKeys().BLSPubKeyBytes
 
-	fmt.Fprintf(os.Stdout, "provisioner module started\n")
+	go func() {
+		startingRound := getStartingRound(blsPubKey, publisher)
+
+		// Notify consensus components
+		roundBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(roundBytes, startingRound)
+		publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+	}()
+
+	fmt.Fprintf(os.Stdout, "provisioner module started\nto more accurately follow the progression of consensus, use the showlogs command\n")
 }
 
 func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if len(args) == 0 || args[0] == "" {
-		fmt.Fprintf(os.Stdout, "please provide a bidding tx hash to start block generation\n")
-		return
-	}
-
 	if cliWallet == nil {
 		fmt.Fprintf(os.Stdout, "please load a wallet before trying to participate in consensus\n")
 		return
@@ -110,35 +110,17 @@ func startBlockGenerator(args []string, publisher wire.EventBroker, rpcBus *wire
 	var k ristretto.Scalar
 	k.Derive(kBytes)
 
-	// fetch d
-	txID := []byte(args[0])
-	_, db := heavy.SetupDatabase()
-	var tx transactions.Transaction
-	err = db.View(func(t database.Transaction) error {
-		var err error
-		tx, _, _, err = t.FetchBlockTxByHash(txID)
-		return err
-	})
-
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "could not find supplied bid tx\n")
-		return
-	}
-
-	bid, ok := tx.(*transactions.Bid)
-	if !ok {
-		fmt.Fprintf(os.Stdout, "supplied txID does not point to a bidding transaction\n")
-		return
-	}
-
-	var d ristretto.Scalar
-	d.UnmarshalBinary(bid.Outputs[0].Commitment)
+	// get public key that the rewards should go to
+	publicKey := cliWallet.PublicKey()
 
 	// launch generation component
-	publicKey := cliWallet.PublicKey()
-	generation.Launch(publisher, rpcBus, d, k, nil, nil, keys, &publicKey)
+	go func() {
+		if err := generation.Launch(publisher, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
+			fmt.Fprintf(os.Stdout, "error launching block generation component: %v\n", err)
+		}
+	}()
 
-	fmt.Fprintf(os.Stdout, "block generator module started\n")
+	fmt.Fprintf(os.Stdout, "block generation component started\nto more accurately follow the progression of consensus, use the showlogs command\n")
 }
 
 func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
@@ -187,4 +169,16 @@ func stringToUint64(s string) (uint64, error) {
 		return 0, err
 	}
 	return (uint64(sInt)), nil
+}
+
+func getStartingRound(blsPubKey []byte, eventBroker wire.EventBroker) uint64 {
+	// Start listening for accepted blocks, regardless of if we found stakes or not
+	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(eventBroker)
+	// Unsubscribe from AcceptedBlock once we're done
+	defer listener.Quit()
+
+	for {
+		blk := <-acceptedBlockChan
+		return blk.Header.Height + 1
+	}
 }

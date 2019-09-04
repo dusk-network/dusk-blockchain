@@ -5,12 +5,12 @@ import (
 	"sync"
 	"unsafe"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -20,9 +20,7 @@ type (
 	Member struct {
 		PublicKeyEd  ed25519.PublicKey
 		PublicKeyBLS bls.PublicKey
-		Stake        uint64
-		StartHeight  uint64
-		EndHeight    uint64
+		Stakes       []*stake
 	}
 
 	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
@@ -32,7 +30,22 @@ type (
 		members   map[string]*Member
 		sizeCache map[uint64]int
 	}
+
+	stake struct {
+		amount      uint64
+		startHeight uint64
+		endHeight   uint64
+	}
 )
+
+func (m *Member) addStake(stake *stake) {
+	m.Stakes = append(m.Stakes, stake)
+}
+
+func (m *Member) removeStake(idx int) {
+	m.Stakes[idx] = m.Stakes[len(m.Stakes)-1]
+	m.Stakes = m.Stakes[:len(m.Stakes)-1]
+}
 
 // NewProvisioners returns an initialized Provisioners struct.
 func NewProvisioners(db database.DB) (*Provisioners, uint64, error) {
@@ -43,7 +56,7 @@ func NewProvisioners(db database.DB) (*Provisioners, uint64, error) {
 	}
 
 	if db == nil {
-		_, db = heavy.SetupDatabase()
+		_, db = heavy.CreateDBConnection()
 	}
 
 	totalWeight := p.repopulate(db)
@@ -90,8 +103,11 @@ func (p *Provisioners) repopulate(db database.DB) uint64 {
 				continue
 			}
 
-			p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
-			totalWeight += stake.GetOutputAmount()
+			// Only add them if their stake is still valid
+			if searchingHeight+stake.Lock > currentHeight {
+				p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, stake.GetOutputAmount(), searchingHeight, searchingHeight+stake.Lock)
+				totalWeight += stake.GetOutputAmount()
+			}
 		}
 
 		searchingHeight++
@@ -132,8 +148,12 @@ func (p *Provisioners) MemberAt(i int) *Member {
 func (p *Provisioners) membersAt(round uint64) int {
 	size := 0
 	for _, member := range p.members {
-		if member.StartHeight <= round {
-			size++
+		for _, stake := range member.Stakes {
+			// If there is at least one stake active on or before this round, they are counted.
+			if stake.startHeight <= round {
+				size++
+				break
+			}
 		}
 	}
 
@@ -147,8 +167,8 @@ func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
 	return p.members[strPk(pubKeyBLS)]
 }
 
-// AddMember will add a Member to the Provisioners by using the bytes of a BLS public key. Returns the index at which the key has been inserted. If the member alredy exists, AddMember overrides its stake with the new one
-func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight, endHeight uint64) error {
+// AddMember will add a Member to the Provisioners by using the bytes of a BLS public key.
+func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
 	if len(pubKeyEd) != 32 {
 		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
 	}
@@ -157,6 +177,20 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight,
 		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
 
+	i := strPk(pubKeyBLS)
+	stake := &stake{amount, startHeight, endHeight}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	// Check for duplicates
+	inserted := p.set.Insert(pubKeyBLS)
+	if !inserted {
+		// If they already exist, just add their new stake
+		p.members[i].addStake(stake)
+		return nil
+	}
+
+	// This is a new provisioner, so let's initialize the Member struct and add them to the list
 	m := &Member{}
 	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
 
@@ -166,20 +200,7 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, stake, startHeight,
 	}
 
 	m.PublicKeyBLS = *pubKey
-	m.Stake = stake
-	m.StartHeight = startHeight
-	m.EndHeight = endHeight
-
-	i := strPk(pubKeyBLS)
-
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	// Check for duplicates
-	inserted := p.set.Insert(pubKeyBLS)
-	if !inserted {
-		p.members[i].Stake = stake
-		return nil
-	}
+	m.addStake(stake)
 
 	p.members[i] = m
 	return nil
@@ -196,13 +217,26 @@ func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
 	return p.set.Remove(pubKeyBLS)
 }
 
-func (p *Provisioners) RemoveExpired(round uint64) {
-	members := p.getMembers()
-	for pk, member := range members {
-		if member.EndHeight < round {
-			p.Remove([]byte(pk))
+// RemoveExpired removes Provisioners which stake expired
+func (p *Provisioners) RemoveExpired(round uint64) uint64 {
+	var totalRemoved uint64
+	for pk, member := range p.members {
+		for i := 0; i < len(member.Stakes); i++ {
+			if member.Stakes[i].endHeight < round {
+				totalRemoved += member.Stakes[i].amount
+				member.removeStake(i)
+				// If they have no stakes left, we should remove them entirely to keep our Size() calls accurate.
+				if len(member.Stakes) == 0 {
+					p.Remove([]byte(pk))
+				}
+
+				// Reset index
+				i = -1
+			}
 		}
 	}
+
+	return totalRemoved
 }
 
 // GetStake will find a certain provisioner in the committee by BLS public key,
@@ -221,12 +255,10 @@ func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 		return 0, fmt.Errorf("public key %v not found among provisioner set", pubKeyBLS)
 	}
 
-	return m.Stake, nil
-}
+	var totalStake uint64
+	for _, stake := range m.Stakes {
+		totalStake += stake.amount
+	}
 
-func (p *Provisioners) getMembers() map[string]*Member {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	members := p.members
-	return members
+	return totalStake, nil
 }

@@ -7,21 +7,21 @@ import (
 	"math"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-crypto/merkletree"
 	logger "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/merkletree"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
-var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "mempool"})
+var log = logger.WithFields(logger.Fields{"prefix": "mempool"})
 
 const (
 	consensusSeconds = 20
@@ -63,7 +63,7 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 
 	// retrieve read-only connection to the blockchain database
 	if m.db == nil {
-		_, m.db = heavy.SetupDatabase()
+		_, m.db = heavy.CreateDBConnection()
 	}
 
 	// run the default blockchain verifier
@@ -71,10 +71,12 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 	return verifiers.CheckTx(m.db, 0, approxBlockTime, tx)
 }
 
+// Collector implements the wire.EventCollector interface
 type Collector struct {
 	blockChan chan block.Block
 }
 
+// Collect as specified by the wire.EventCollector interface
 func (c *Collector) Collect(msg *bytes.Buffer) error {
 	b := block.NewBlock()
 	if err := b.Decode(msg); err != nil {

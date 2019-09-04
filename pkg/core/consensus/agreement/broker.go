@@ -5,15 +5,15 @@ import (
 	"encoding/binary"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
@@ -22,6 +22,7 @@ import (
 func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) {
 	if c == nil {
 		c = committee.NewAgreement(eventBroker, nil)
+		eventBroker.SubscribeCallback(msg.RoundUpdateTopic, c.RemoveExpiredProvisioners)
 	}
 	broker := newBroker(eventBroker, c, keys)
 	currentRound := getInitialRound(eventBroker)
@@ -85,7 +86,7 @@ func (b *broker) sendAgreement(m *bytes.Buffer) error {
 		unmarshaller := reduction.NewUnMarshaller()
 		voteSet, err := unmarshaller.UnmarshalVoteSet(m)
 		if err != nil {
-			log.WithField("process", "agreement").WithError(err).Errorln("problem unmarshalling voteset")
+			log.WithField("process", "agreement").WithError(err).Warnln("problem unmarshalling voteset")
 			return err
 		}
 

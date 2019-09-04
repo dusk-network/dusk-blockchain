@@ -3,7 +3,7 @@ package msg
 import (
 	"errors"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"golang.org/x/crypto/ed25519"
 )
 

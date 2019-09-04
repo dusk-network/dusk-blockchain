@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 var syncTime = 30 * time.Second
@@ -17,12 +17,13 @@ type Counter struct {
 	lock            sync.RWMutex
 	blocksRemaining uint64
 
-	timer *time.Timer
+	timer    *time.Timer
+	stopChan chan struct{}
 }
 
 // NewCounter returns an initialized counter. It will decrement each time we accept a new block.
 func NewCounter(subscriber wire.EventSubscriber) *Counter {
-	sc := &Counter{}
+	sc := &Counter{stopChan: make(chan struct{})}
 	subscriber.SubscribeCallback(string(topics.AcceptedBlock), sc.decrement)
 	return sc
 }
@@ -32,6 +33,13 @@ func (s *Counter) decrement(b *bytes.Buffer) error {
 	defer s.lock.Unlock()
 	if s.blocksRemaining > 0 {
 		s.blocksRemaining--
+
+		// Stop the timer goroutine if we're done
+		if s.blocksRemaining == 0 {
+			s.stopChan <- struct{}{}
+			return nil
+		}
+
 		// Refresh the timer whenever we get a new block during sync
 		s.timer.Reset(syncTime)
 	}
@@ -56,12 +64,15 @@ func (s *Counter) startSyncing(heightDiff uint64) {
 
 	s.blocksRemaining = heightDiff
 	s.timer = time.NewTimer(syncTime)
-	go s.listenForTimer()
+	go s.listenForTimer(s.timer)
 }
 
-func (s *Counter) listenForTimer() {
-	<-s.timer.C
-	s.lock.Lock()
-	s.blocksRemaining = 0
-	s.lock.Unlock()
+func (s *Counter) listenForTimer(timer *time.Timer) {
+	select {
+	case <-timer.C:
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		s.blocksRemaining = 0
+	case <-s.stopChan:
+	}
 }

@@ -3,9 +3,9 @@ package agreement
 import (
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
 )
 
 func TestVoteVerification(t *testing.T) {

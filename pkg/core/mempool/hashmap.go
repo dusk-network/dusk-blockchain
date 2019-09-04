@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 )
 
 const (

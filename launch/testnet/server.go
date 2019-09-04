@@ -4,22 +4,23 @@ import (
 	"bytes"
 	"net"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/chain"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/mempool"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/dupemap"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/rpc"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
+// Server is the main process of the node
 type Server struct {
 	eventBus *wire.EventBus
 	rpcBus   *wire.RPCBus
@@ -93,9 +94,11 @@ func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
 	return dupeBlacklist
 }
 
+// OnAccept read incoming packet from the peers
 func (s *Server) OnAccept(conn net.Conn) {
-	responseChan := make(chan *bytes.Buffer, 100)
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, responseChan)
+	writeQueueChan := make(chan *bytes.Buffer, 1000)
+	exitChan := make(chan struct{}, 1)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
@@ -113,16 +116,17 @@ func (s *Server) OnAccept(conn net.Conn) {
 	}).Debugln("connection established")
 
 	go peerReader.ReadLoop()
+
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
-	peerWriter.Subscribe(s.eventBus)
-	go peerWriter.WriteLoop(responseChan)
+	go peerWriter.Serve(writeQueueChan, exitChan)
 }
 
+// OnConnection is the callback for writing to the peers
 func (s *Server) OnConnection(conn net.Conn, addr string) {
-	messageQueueChan := make(chan *bytes.Buffer, 100)
+	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
 
-	if err := peerWriter.Connect(s.eventBus); err != nil {
+	if err := peerWriter.Connect(); err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -134,16 +138,19 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 		"address": peerWriter.Addr(),
 	}).Debugln("connection established")
 
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, messageQueueChan)
+	exitChan := make(chan struct{}, 1)
+	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
 
 	go peerReader.ReadLoop()
-	go peerWriter.WriteLoop(messageQueueChan)
+	go peerWriter.Serve(writeQueueChan, exitChan)
 }
 
+// Close the chain and the connections created through the RPC bus
 func (s *Server) Close() {
+	// TODO: disconnect peers
 	s.chain.Close()
 	s.rpcBus.Close()
 }

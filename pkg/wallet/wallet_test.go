@@ -3,16 +3,17 @@ package wallet
 import (
 	"bytes"
 	"math/big"
-	"math/rand"
 	"os"
 	"testing"
 	"time"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-crypto/mlsag"
+
+	"math/rand"
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +28,7 @@ func TestNewWallet(t *testing.T) {
 	assert.Nil(t, err)
 	defer os.RemoveAll(dbPath)
 
-	w, err := New(netPrefix, db, generateDecoys, fetchInputs, "pass")
+	w, err := New(randReader, netPrefix, db, generateDecoys, fetchInputs, "pass")
 	assert.Nil(t, err)
 
 	// wrong wallet password
@@ -54,7 +55,7 @@ func TestReceivedTx(t *testing.T) {
 	assert.Nil(t, err)
 	defer os.RemoveAll(dbPath)
 
-	w, err := New(netPrefix, db, generateDecoys, fetchInputs, "pass")
+	w, err := New(randReader, netPrefix, db, generateDecoys, fetchInputs, "pass")
 	assert.Nil(t, err)
 
 	tx, err := w.NewStandardTx(fee)
@@ -116,7 +117,7 @@ func generateWallet(t *testing.T, netPrefix byte, path string) *Wallet {
 	assert.Nil(t, err)
 	defer os.RemoveAll(path)
 
-	w, err := New(netPrefix, db, generateDecoys, fetchInputs, "pass")
+	w, err := New(randReader, netPrefix, db, generateDecoys, fetchInputs, "pass")
 	assert.Nil(t, err)
 	return w
 }
@@ -239,4 +240,8 @@ func generateDecoys(numMixins int) []mlsag.PubKeys {
 		pubKeys = append(pubKeys, pubKeyVector)
 	}
 	return pubKeys
+}
+
+func randReader(b []byte) (n int, err error) {
+	return len(b), nil
 }

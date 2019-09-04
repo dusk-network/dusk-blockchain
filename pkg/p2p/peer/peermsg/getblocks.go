@@ -3,7 +3,7 @@ package peermsg
 import (
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // GetBlocks defines a getblocks message on the Dusk wire protocol. It is used to

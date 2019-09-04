@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 )
 
 func TestEncodeDecodeInventory(t *testing.T) {

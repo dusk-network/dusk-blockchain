@@ -6,12 +6,12 @@ import (
 	"math/rand"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/prerror"
-	"gitlab.dusk.network/dusk-core/zkproof"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 // Bid is the 32 byte X value, created from a bidding transaction amount and M.
@@ -31,7 +31,7 @@ type BidList []Bid
 func NewBidList(db database.DB) (*BidList, error) {
 	bl := &BidList{}
 	if db == nil {
-		_, db = heavy.SetupDatabase()
+		_, db = heavy.CreateDBConnection()
 	}
 
 	bl.repopulate(db)
@@ -77,9 +77,11 @@ func (b *BidList) repopulate(db database.DB) {
 				continue
 			}
 
-			x := CalculateX(bid.Outputs[0].Commitment, bid.M)
-			x.EndHeight = searchingHeight + bid.Lock
-			b.AddBid(x)
+			if searchingHeight+bid.Lock > currentHeight {
+				x := CalculateX(bid.Outputs[0].Commitment, bid.M)
+				x.EndHeight = searchingHeight + bid.Lock
+				b.AddBid(x)
+			}
 		}
 
 		searchingHeight++
@@ -198,7 +200,7 @@ func CalculateX(d []byte, m []byte) Bid {
 
 func (b *BidList) remove(bid Bid, idx int) {
 	list := *b
-	if idx == len(list)-1 || idx == 0 {
+	if idx == len(list)-1 {
 		list = list[:idx]
 	} else {
 		list = append(list[:idx], list[idx+1:]...)

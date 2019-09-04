@@ -8,11 +8,11 @@ import (
 	"io"
 	"math/big"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	wiretx "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/rangeproof"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-crypto/rangeproof"
 
 	"github.com/bwesterb/go-ristretto"
 	"golang.org/x/crypto/sha3"

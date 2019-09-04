@@ -6,16 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reduction"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 var timeOut = 200 * time.Millisecond
@@ -133,9 +133,7 @@ func TestTimeOutVariance(t *testing.T) {
 	resultChan := make(chan *bytes.Buffer, 1)
 	eb.Subscribe(msg.ReductionResultTopic, resultChan)
 
-	// update round
-	consensus.UpdateRound(eb, 1)
-
+	// Wait a bit for the round update to go through
 	time.Sleep(200 * time.Millisecond)
 
 	// measure the time it takes for reduction to time out
@@ -163,6 +161,10 @@ func TestTimeOutVariance(t *testing.T) {
 
 	// update round
 	consensus.UpdateRound(eb, 2)
+
+	// Wait a bit for the round update to go through
+	time.Sleep(200 * time.Millisecond)
+
 	start = time.Now()
 	// send a hash to start reduction
 	eb.Publish(msg.BestScoreTopic, nil)

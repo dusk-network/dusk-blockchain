@@ -3,7 +3,7 @@ package consensus
 import (
 	"bytes"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
 func LaunchNotification(eventbus wire.EventSubscriber, deserializer wire.EventDeserializer, topic string) <-chan wire.Event {

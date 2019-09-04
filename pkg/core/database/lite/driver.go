@@ -1,8 +1,8 @@
 package lite
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 var (
@@ -33,7 +33,7 @@ func init() {
 	}
 }
 
-func SetupDatabase() (database.Driver, database.DB) {
+func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(DriverName)
 	if err != nil {
 		panic(err)

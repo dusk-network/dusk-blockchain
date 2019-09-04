@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -52,4 +53,39 @@ func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
 	}
 
 	return eb, myChan, id
+}
+
+// Test that a streaming goroutine is killed when the exit signal is sent
+func TestExitChan(t *testing.T) {
+
+	eb := NewEventBus()
+	topic := "foo"
+	_ = eb.SubscribeStream(topic, &mockWriteCloser{})
+	// Put something on ring buffer
+	val := new(bytes.Buffer)
+	val.Write([]byte{0})
+	eb.Stream(topic, val)
+	// Wait for event to be handled
+	// NB: 'Writer' must return error to force consumer termination
+	time.Sleep(100 * time.Millisecond)
+
+	var closed bool
+	handlers := eb.streamHandlers.Load(topic)
+	for _, handler := range handlers {
+		sh := handler.(*streamHandler)
+		closed = sh.ringbuffer.Closed()
+	}
+
+	assert.True(t, closed)
+}
+
+type mockWriteCloser struct {
+}
+
+func (m *mockWriteCloser) Write(data []byte) (int, error) {
+	return 0, errors.New("failed")
+}
+
+func (m *mockWriteCloser) Close() error {
+	return nil
 }

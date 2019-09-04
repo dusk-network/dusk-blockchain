@@ -1,14 +1,15 @@
 package reduction
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/reputation"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reputation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
-const committeeSize = 50
+const committeeSize = 64
 
 // Reducers defines a committee of reducers, and provides the ability to detect those
 // who are not properly participating in this phase of the consensus.
@@ -22,9 +23,12 @@ type reductionCommittee struct {
 }
 
 func newReductionCommittee(eventBroker wire.EventBroker, db database.DB) *reductionCommittee {
-	return &reductionCommittee{
+	r := &reductionCommittee{
 		Extractor: committee.NewExtractor(eventBroker, db),
 	}
+
+	eventBroker.SubscribeCallback(msg.RoundUpdateTopic, r.RemoveExpiredProvisioners)
+	return r
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee

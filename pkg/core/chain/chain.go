@@ -6,25 +6,23 @@ import (
 	"fmt"
 	"sync"
 
-	//"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	logger "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/committee"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/heavy"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/verifiers"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
@@ -50,11 +48,11 @@ type Chain struct {
 
 // New returns a new chain object
 func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
-	_, db := heavy.SetupDatabase()
+	_, db := heavy.CreateDBConnection()
 
 	l, err := newLoader(db)
 	if err != nil {
-		return nil, fmt.Errorf("failure %s on loading chain '%s'", err.Error(), cfg.Get().Database.Dir)
+		return nil, fmt.Errorf("%s on loading chain db '%s'", err.Error(), cfg.Get().Database.Dir)
 	}
 
 	// set up collectors
@@ -97,8 +95,13 @@ func (c *Chain) Listen() {
 			buf := new(bytes.Buffer)
 
 			c.mu.RLock()
-			_ = c.prevBlock.Encode(buf)
+			prevBlock := c.prevBlock
 			c.mu.RUnlock()
+
+			if err := prevBlock.Encode(buf); err != nil {
+				r.ErrChan <- err
+				continue
+			}
 
 			r.RespChan <- *buf
 
@@ -213,13 +216,16 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 2. Check the certificate
+	// This check should avoid a possible race condition between accepting two blocks
+	// at the same height, as the probability of the committee creating two valid certificates
+	// for the same round is negligible.
 	if err := verifiers.CheckBlockCertificate(c.committee, blk); err != nil {
 		l.Errorf("verifying the certificate failed: %s", err.Error())
 		return err
 	}
 
 	// 3. Add provisioners and block generators
-	c.addConsensusNodes(blk.Txs, blk.Header.Height+1)
+	c.addConsensusNodes(blk.Txs, blk.Header.Height)
 
 	// 4. Store block in database
 	err := c.db.Update(func(t database.Transaction) error {
@@ -265,6 +271,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		log.Infof("%d deleted candidate blocks", count)
 	}
 
+	// 8. Remove expired provisioners
+	// We remove provisioners from accepted block height + 1,
+	// to set up our committee correctly for the next block.
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, blk.Header.Height+1)
+	c.committee.RemoveExpiredProvisioners(bytes.NewBuffer(roundBytes))
+
 	l.Trace("procedure ended")
 
 	return nil
@@ -308,7 +321,7 @@ func (c *Chain) handleWinningHash(blockHash []byte) error {
 	// Fetch the candidate block that the winningHash points at
 	candidate, err := c.fetchCandidateBlock(blockHash)
 	if err != nil {
-		log.Errorf("fetching a candidate block failed: %s", err.Error())
+		log.Warnf("fetching a candidate block failed: %s", err.Error())
 		return err
 	}
 
@@ -339,7 +352,7 @@ func (c *Chain) verifyCandidateBlock(hash []byte) error {
 func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
 	candidate, err := c.fetchCandidateBlock(blockHash)
 	if err != nil {
-		log.Errorf("error fetching candidate block to add certificate: %s", err.Error())
+		log.Warnf("could not fetch candidate block to add certificate: %s", err.Error())
 		return
 	}
 

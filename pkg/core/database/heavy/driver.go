@@ -1,9 +1,9 @@
 package heavy
 
 import (
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/protocol"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 var (
@@ -34,7 +34,7 @@ func init() {
 	}
 }
 
-func SetupDatabase() (database.Driver, database.DB) {
+func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
 	if err != nil {
 		panic(err)

@@ -8,10 +8,9 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/eventmon/logger"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 var MaxAttempts int = 3
@@ -45,18 +44,16 @@ func Launch(broker wire.EventBroker, monUrl string) (LogSupervisor, error) {
 }
 
 type unixSupervisor struct {
-	broker      wire.EventBroker
-	lock        sync.Mutex
-	processor   *logger.LogProcessor
-	uri         *url.URL
-	processorId uint32
-	attempts    int
-	activeProc  bool
+	broker     wire.EventBroker
+	lock       sync.Mutex
+	processor  *logger.LogProcessor
+	uri        *url.URL
+	attempts   int
+	activeProc bool
 }
 
 func (m *unixSupervisor) Levels() []log.Level {
 	return []log.Level{
-		// log.WarnLevel,
 		log.ErrorLevel,
 		log.FatalLevel,
 		log.PanicLevel,
@@ -64,26 +61,37 @@ func (m *unixSupervisor) Levels() []log.Level {
 }
 
 func (m *unixSupervisor) Fire(entry *log.Entry) error {
+	// Format the entry first. Since the logger still uses this entry after the hook has fired,
+	// race conditions can occur if the `Logger` formats the entry after receiving it through the channel.
+	// So, we format it here and send the bytes over instead.
+	formatted, err := m.processor.Logger.Formatter.Format(entry)
+	if err != nil {
+		return err
+	}
+
 	if m.activeProc {
-		return m.processor.Send(entry)
+		// Drop events if the queue is filled up, to avoid extended lockups
+		select {
+		case m.processor.EntryChan <- formatted:
+		default:
+		}
 	}
 	return nil
 }
 
 func newUnixSupervisor(broker wire.EventBroker, uri *url.URL) (LogSupervisor, error) {
 
-	logProc, id, err := initLogProcessor(broker, uri)
+	logProc, err := initLogProcessor(broker, uri)
 	if err != nil {
 		return nil, err
 	}
 
 	return &unixSupervisor{
-		broker:      broker,
-		lock:        sync.Mutex{},
-		processor:   logProc,
-		uri:         uri,
-		processorId: id,
-		activeProc:  true,
+		broker:     broker,
+		lock:       sync.Mutex{},
+		processor:  logProc,
+		uri:        uri,
+		activeProc: true,
 	}, nil
 }
 
@@ -146,13 +154,13 @@ func (m *unixSupervisor) Reconnect() error {
 		return err
 	}
 
-	proc, id, err := initLogProcessor(m.broker, m.uri)
+	proc, err := initLogProcessor(m.broker, m.uri)
 	if err != nil {
 		return err
 	}
+	go proc.Listen()
 	m.activeProc = true
 	m.processor = proc
-	m.processorId = id
 	m.attempts = 0
 	return nil
 }
@@ -166,22 +174,21 @@ func (m *unixSupervisor) Stop() error {
 func (m *unixSupervisor) stop() error {
 	if m.activeProc {
 		m.activeProc = false
-		m.broker.RemovePreprocessor(string(topics.Gossip), m.processorId)
 		return m.processor.Close()
 	}
 	return nil
 }
 
-func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcessor, uint32, error) {
+func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcessor, error) {
 	wc, err := start(uri)
 	if err != nil {
-		return nil, uint32(0), err
+		return nil, err
 	}
 
 	logProcessor := logger.New(broker, wc, nil)
-	ids := broker.RegisterPreprocessor(string(topics.Gossip), logProcessor)
+	go logProcessor.Listen()
 
-	return logProcessor, ids[0], nil
+	return logProcessor, nil
 }
 
 func start(uri *url.URL) (io.WriteCloser, error) {

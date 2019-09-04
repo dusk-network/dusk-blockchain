@@ -1,24 +1,15 @@
-# Dusk Network Testnet 
+# Dusk Network Testnet [![Build Status](https://travis-ci.org/dusk-network/dusk-blockchain.svg?branch=testnet)](https://travis-ci.com/dusk-network/dusk-blockchain)
 ## Shin (殉星) Release
 |Table of Contents|
 |---|
-|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-a-dusk-network-testnet-v1-shin)|
-|[Why should one participate in the Dusk Network Testnet Shin (殉星)?](#why-should-one-participate-in-the-dusk-network-testnet-v1-shin)|
+|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-the-dusk-network-testnet-shin)|
 |[Specification Requirements](#specification-requirements)|
-|[Intallation Guide](#intallation-guide)|
+|[Installation Guide](#installation-guide)|
 |[Features](#features)|
 |[Upcoming Features](#upcoming-features)|
-|[How to create a wallet?](#how-to-create-a-wallet)|
-|[How to create a wallet from a seed?](#how-to-create-a-wallet-from-a-seed)|
-|[How to load a wallet?](#how-to-load-a-wallet)|
-|[How to check the balance of the address?](#how-to-check-the-balance-of-the-address)|
-|[How to claim Testnet DUSK?](#how-to-claim-testnet-dusk)|
-|[How to transfer tDUSK?](#how-to-transfer-tdusk)|
-|[How to become a Provisioner?](#how-to-become-a-provisioner)|
-|[How to become a Block Generator?](#how-to-become-a-block-generator)|
-## What is a Dusk Network Testnet Shin (殉星) ?
+|[How to use the wallet?](#how-to-use-the-wallet)|
+## What is the Dusk Network Testnet Shin (殉星) ?
 Dusk Network Testnet Shin (殉星) is the first publicly-available implementation of the Dusk Network protocol. Dusk Network is a privacy-oriented blockchain protocol, that anyone can use to create zero-knowledge dApps. The Dusk Network protocol is secured via Segregated Byzantine Agreement consensus protocol. Segregated Byzantine Agreement is a permission-less consensus protocol with statistical block finality. Segregated Byzantine Agreement also includes Proof of Blind Bid, a novel Private Proof-of-Stake implementation, that enables Block Generators to stake anonymously.
-## Why should one participate in the Dusk Network Testnet Shin (殉星) ?
 ## Specification Requirements
 ### Minimum Specifications
 | CPU | RAM | Storage | Network Connection |
@@ -28,8 +19,10 @@ Dusk Network Testnet Shin (殉星) is the first publicly-available implementatio
 | CPU | RAM | Storage | Network Connection |
 |---|---|---|---|
 |4 cores; 2 GHz| 4 GB | 250 GB | 10 Mbps |
-## Intallation Guide
-This guide is for building the node from source. If you would like to just download the compiled program, head over to the releases tab.
+## Installation Guide
+This guide is for building the node from source. If you would like to just download the compiled program, head over to the releases tab. 
+
+NOTE: This guide assumes you are building and running from a UNIX-like operating system. The node is not tested on Windows.
 
 ### Requirements
 [Go](https://golang.org/) 1.11 or newer.
@@ -71,25 +64,25 @@ These features will be introduced in the later iterations of the Testnet (starti
 3. Cryptoeconomics Model - Will include an optimized reward mechanism for the consensus alongside the slashing conditions as well as introducing the lower and upper thresholds for the bids and stakes. The cryptoeconomics model will also include the rolling transaction fee model.
 4. Poseidon Hash Function - Will include the Poseidon hash function which will supersede LongsightL as the new zero-knowledge proof-friendly hash function.
 5. Anonymous Networking Layer - Will include the anonymous P2P communication model based on onion routing.
-## How to create a wallet?
+## How to use the wallet?
+A video tutorial can be found here: https://youtu.be/VWP-IY31jxI
+### How to create a wallet?
 Open the Command Line Interface (CLI) and type `createwallet [password]`, where `[password]` stands for the secret combination of user-choice.
-## How to create a wallet from a seed?
+### How to create a wallet from a seed?
 Open the Command Line Interface (CLI) and type `createfromseed [seed] [password]`, where `[seed]` stands for a hex seed and `[password]` stands for the secret combination of user-choice.
-## How to load a wallet?
+### How to load a wallet?
 Open the Command Line Interface (CLI) and type `loadwallet [password]`, where `[password]` stands for the secret combination previously selected by the user.
-## How to sync the wallet with the blockchain?
-Open the Command Line Interface (CLI) and type `sync`. The wallet will download blocks and check for UTXOs that belong to it.
-## How to check the balance of the address?
-Open the Command Line Interface (CLI) and type `balance`. Make sure to `sync` the wallet first.
-## How to claim Testnet DUSK?
+### How to check the balance of the address?
+Open the Command Line Interface (CLI) and type `balance`. 
+### How to claim Testnet DUSK?
 To claim Testnet DUSK (tDUSK), the user is required to make a Twitter post containing his/her wallet address ([example](https://twitter.com/ellie12496641/status/1147604746280361984)). Following the post on Twitter, the user should go to the faucet [webpage](https://faucet.dusk.network/) and paste the Twitter post link into the empty box and click the `Send Dusk!` button. The tDUSK will be deposited onto the aforementioned address within a minute. The user can claim tDUSK for the same address once per 24 hours.
-## How to transfer tDUSK?
-Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
-## How to become a Provisioner?
-Open the Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks until which the bid is locked (`block_height < locktime < 2^64`) (max is 250000), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+### How to transfer tDUSK?
+Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. 
+### How to become a Provisioner?
+Open the Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the stake is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
 
 After completion, type `startprovisioner` into the CLI to join the consensus.
-## How to become a Block Generator?
-Open a Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks until which the stake is locked (`block_height < locktime < 2^64`) (max is 250000), and `[password]` stands for the wallet password. Make sure to `sync` the wallet first.
+### How to become a Block Generator?
+Open a Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the bid is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
 
 After completion, type `startblockgenerator` into the CLI to join the consensus.

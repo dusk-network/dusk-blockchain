@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"github.com/dusk-network/dusk-crypto/bls"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -21,9 +21,20 @@ type Keys struct {
 // NewRandKeys will generate and return new bls and ed25519
 // keys to be used in consensus
 func NewRandKeys() (Keys, error) {
-	return NewKeysFromReader(nil)
+	var keys Keys
+	var err error
+	for {
+		keys, err = NewKeysFromReader(nil)
+		if err == io.EOF {
+			continue
+		}
+		break
+	}
+
+	return keys, err
 }
 
+// NewKeysFromReader takes a reader and uses it as a seed for generating random user.Keys
 func NewKeysFromReader(r io.Reader) (Keys, error) {
 	blsPub, blsPriv, err := bls.GenKeyPair(r)
 	if err != nil {
@@ -45,6 +56,7 @@ func NewKeysFromReader(r io.Reader) (Keys, error) {
 	}, nil
 }
 
+// NewKeysFromBytes gets an array of bytes as seed for the pseudo-random generation of user.Keys
 func NewKeysFromBytes(seed []byte) (Keys, error) {
 
 	r := bytes.NewBuffer(seed)

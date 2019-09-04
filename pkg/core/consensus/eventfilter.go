@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
 type (
@@ -95,6 +95,8 @@ func (ef *EventFilter) UpdateRound(round uint64) {
 	defer ef.lock.Unlock()
 	ef.state.Update(round)
 	ef.Accumulator = NewAccumulator(ef.handler, NewAccumulatorStore(), ef.state, ef.checkStep)
+	ef.Accumulator.CreateWorkers()
+	go ef.Accumulator.Accumulate()
 	ef.queue.Clear(round - 1)
 }
 
@@ -102,6 +104,8 @@ func (ef *EventFilter) ResetAccumulator() {
 	ef.lock.Lock()
 	defer ef.lock.Unlock()
 	ef.Accumulator = NewAccumulator(ef.handler, NewAccumulatorStore(), ef.state, ef.checkStep)
+	ef.Accumulator.CreateWorkers()
+	go ef.Accumulator.Accumulate()
 }
 
 // FlushQueue will retrieve all queued events for a certain point in consensus,

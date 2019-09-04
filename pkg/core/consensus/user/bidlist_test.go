@@ -1,12 +1,13 @@
 package user_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 func TestAddAndRemoveBid(t *testing.T) {
@@ -61,10 +62,27 @@ func TestReconstructBidListSubset(t *testing.T) {
 func TestRemoveExpired(t *testing.T) {
 	bidList := createBidList(10)
 
-	// All bids have their end height at 1000 - so let's remove them all
+	// Let's change the end heights alternatingly, to make sure the bidlist removes bids properly
+	bl := *bidList
+	for i, bid := range bl {
+		if i%2 == 0 {
+			bid.EndHeight = 2000
+			bl[i] = bid
+		}
+	}
+
+	bidList = &bl
+
+	fmt.Println(bidList)
+
+	// All other bids have their end height at 1000 - so let's remove them
 	bidList.RemoveExpired(1001)
 
-	assert.Equal(t, 0, len(*bidList))
+	assert.Equal(t, 5, len(*bidList))
+
+	for _, bid := range *bidList {
+		assert.Equal(t, uint64(2000), bid.EndHeight)
+	}
 }
 
 func createBidList(amount int) *user.BidList {

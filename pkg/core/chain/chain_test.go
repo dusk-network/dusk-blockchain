@@ -1,15 +1,23 @@
 package chain
 
 import (
+	"bytes"
+	"encoding/binary"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/agreement"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	_ "gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
 )
 
 /*
@@ -73,4 +81,56 @@ func TestFetchTip(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, chain.prevBlock.Header.Hash, s.TipHash)
+}
+
+// Make sure that certificates can still be properly verified when a provisioner is removed on round update.
+func TestCertificateExpiredProvisioner(t *testing.T) {
+	eb := wire.NewEventBus()
+	rpc := wire.NewRPCBus()
+	_, db := lite.CreateDBConnection()
+	c := committee.NewAgreement(eb, db)
+	chain, err := New(eb, rpc, c)
+
+	assert.Nil(t, err)
+	defer chain.Close()
+
+	// Add some provisioners to our chain, including one that is just about to expire
+	k1 := newProvisioner(100, eb, 0, 10)
+	k2 := newProvisioner(100, eb, 0, 10)
+	k3 := newProvisioner(100, eb, 0, 1)
+	keys := []user.Keys{k1, k2, k3}
+
+	// Update round. This should not remove the third provisioner from our committee
+	consensus.UpdateRound(eb, 2)
+
+	// Create block 1
+	blk := helper.RandomBlock(t, 1, 1)
+	// Remove all txs except coinbase, as the helper transactions do not pass verification
+	blk.Txs = blk.Txs[0:1]
+	blk.SetRoot()
+	blk.SetHash()
+	// Add cert and prev hash
+	blk.Header.Certificate = createMockedCertificate(blk.Header.Hash, 1, keys)
+	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash
+	// Accept it
+	assert.NoError(t, chain.AcceptBlock(*blk))
+	// Provisioner with k3 should no longer be in the committee now
+	assert.False(t, c.IsMember(k3.BLSPubKeyBytes, 2, 1))
+}
+
+func newProvisioner(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64) user.Keys {
+	k, _ := user.NewRandKeys()
+	publishNewStake(stake, eb, startHeight, endHeight, k)
+	return k
+}
+
+func publishNewStake(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64, k user.Keys) {
+	buffer := bytes.NewBuffer(*k.EdPubKey)
+	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
+
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, startHeight)
+	_ = encoding.WriteUint64(buffer, binary.LittleEndian, endHeight)
+
+	eb.Publish(msg.NewProvisionerTopic, buffer)
 }

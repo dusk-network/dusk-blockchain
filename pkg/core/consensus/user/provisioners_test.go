@@ -7,15 +7,15 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database/lite"
 )
 
 // Test that creation of a voting committee from a set of Provisioners works as intended.
 func TestCreateVotingCommittee(t *testing.T) {
 	// Set up a committee set with a stakes map
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	p, _, err := user.NewProvisioners(db)
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func btoi(k user.Keys) *big.Int {
 // Test that provisioners are sorted properly.
 func TestMemberAt(t *testing.T) {
 	nr := 50
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	p, _, err := user.NewProvisioners(db)
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestMemberAt(t *testing.T) {
 func TestAddGetMember(t *testing.T) {
 	// Set up a committee set with a stakes map
 	tKeys := make([][]byte, 0)
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	p, _, err := user.NewProvisioners(db)
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestAddGetMember(t *testing.T) {
 
 // Add and then a remove a provisioner, to check if removal works properly.
 func TestRemove(t *testing.T) {
-	_, db := lite.SetupDatabase()
+	_, db := lite.CreateDBConnection()
 	p, _, err := user.NewProvisioners(db)
 	if err != nil {
 		t.Fatal(err)

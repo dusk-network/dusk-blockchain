@@ -10,14 +10,14 @@ import (
 	"io/ioutil"
 	"math/big"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/key"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/mlsag"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
-	"gitlab.dusk.network/dusk-core/zkproof"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-crypto/mlsag"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 	"golang.org/x/crypto/sha3"
 
 	"github.com/bwesterb/go-ristretto"
@@ -26,8 +26,6 @@ import (
 
 // Number of mixins per ring. ringsize = mixin + 1
 const numMixins = 7
-
-const walletName = "wallet.dat"
 
 // FetchInputs returns a slice of inputs such that Sum(Inputs)- Sum(Outputs) >= 0
 // If > 0, then a change address is created for the remaining amount
@@ -50,11 +48,11 @@ type SignableTx interface {
 	Standard() (*transactions.StandardTx, error)
 }
 
-func New(netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
+func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
 
 	// random seed
 	seed := make([]byte, 64)
-	_, err := rand.Read(seed)
+	_, err := Read(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -197,6 +195,7 @@ func (w *Wallet) CheckWireBlock(blk block.Block) (uint64, uint64, error) {
 }
 
 // CheckWireBlockSpent checks if the block has any outputs spent by this wallet
+// Returns the number of txs that the sender spent funds in
 func (w *Wallet) CheckWireBlockSpent(blk block.Block) (uint64, error) {
 
 	var totalSpentCount uint64
@@ -216,7 +215,7 @@ func (w *Wallet) CheckWireBlockSpent(blk block.Block) (uint64, error) {
 
 func (w *Wallet) scanInputs(txChecker TxInChecker) (uint64, error) {
 
-	var spentCount uint64
+	var didSpendFunds uint64
 
 	for _, keyImage := range txChecker.keyImages {
 		pubKey, err := w.db.Get(keyImage)
@@ -224,20 +223,19 @@ func (w *Wallet) scanInputs(txChecker TxInChecker) (uint64, error) {
 			continue
 		}
 		if err != nil {
-			return spentCount, err
+			return didSpendFunds, err
 		}
-
-		spentCount++
 
 		err = w.db.RemoveInput(pubKey)
 		if err != nil {
-			return spentCount, err
+			return didSpendFunds, err
 		}
 	}
-	return spentCount, nil
+	return didSpendFunds, nil
 }
 
 // CheckWireBlockReceived checks if the wire block has transactions for this wallet
+// Returns the number of tx's that the reciever recieved funds in
 func (w *Wallet) CheckWireBlockReceived(blk block.Block) (uint64, error) {
 
 	var totalReceivedCount uint64
@@ -254,6 +252,7 @@ func (w *Wallet) CheckWireBlockReceived(blk block.Block) (uint64, error) {
 	return totalReceivedCount, nil
 }
 
+// scans the outputs of one transaction
 func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 
 	privView, err := w.keyPair.PrivateView()
@@ -265,7 +264,7 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 		return 0, err
 	}
 
-	var receiveCount uint64
+	var didReceiveFunds uint64
 
 	for i, output := range txchecker.Outputs {
 		privKey, ok := w.keyPair.DidReceiveTx(txchecker.R, output.PubKey, uint32(i))
@@ -273,7 +272,7 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 			continue
 		}
 
-		receiveCount++
+		didReceiveFunds = 1
 
 		var amount, mask ristretto.Scalar
 		amount.Set(&output.EncryptedAmount)
@@ -286,7 +285,7 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 
 		err := w.db.PutInput(privSpend.Bytes(), output.PubKey.P, amount, mask, *privKey)
 		if err != nil {
-			return receiveCount, err
+			return didReceiveFunds, err
 		}
 
 		// cache the keyImage, so we can quickly check whether our input was spent
@@ -296,11 +295,11 @@ func (w *Wallet) scanOutputs(txchecker TxOutChecker) (uint64, error) {
 
 		err = w.db.Put(keyImage.Bytes(), output.PubKey.P.Bytes())
 		if err != nil {
-			return receiveCount, err
+			return didReceiveFunds, err
 		}
 	}
 
-	return receiveCount, nil
+	return didReceiveFunds, nil
 }
 
 // AddInputs adds up the total outputs and fee then fetches inputs to consolidate this
@@ -361,7 +360,7 @@ func (w *Wallet) Balance() (float64, error) {
 		return 0, err
 	}
 	balanceInt, err := w.db.FetchBalance(privSpend.Bytes())
-	return float64(balanceInt / config.DUSK), nil
+	return float64(float64(balanceInt) / float64(cfg.DUSK)), nil
 }
 
 func (w *Wallet) GetSavedHeight() (uint64, error) {
@@ -417,7 +416,7 @@ func saveSeed(seed []byte, password string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(walletName, gcm.Seal(nonce, nonce, seed, nil), 0777)
+	return ioutil.WriteFile(cfg.Get().Wallet.File, gcm.Seal(nonce, nonce, seed, nil), 0777)
 }
 
 //Modified from https://tutorialedge.net/golang/go-encrypt-decrypt-aes-tutorial/
@@ -425,7 +424,7 @@ func fetchSeed(password string) ([]byte, error) {
 
 	digest := sha3.Sum256([]byte(password))
 
-	ciphertext, err := ioutil.ReadFile(walletName)
+	ciphertext, err := ioutil.ReadFile(cfg.Get().Wallet.File)
 	if err != nil {
 		return nil, err
 	}

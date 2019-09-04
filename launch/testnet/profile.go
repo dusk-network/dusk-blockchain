@@ -9,7 +9,7 @@ import (
 
 	_ "net/http/pprof"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
 type profileMngr struct {

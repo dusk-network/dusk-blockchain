@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 )
 
 const (
@@ -44,8 +44,6 @@ func (l *loader) prefetch() error {
 	if err := l.prefetchChainTip(); err != nil {
 		return err
 	}
-
-	// TODO: prefetch active stakes and bids
 
 	return nil
 }
@@ -132,6 +130,21 @@ func (l *loader) prefetchChainTip() error {
 			}
 
 			l.chainTip = &block.Block{Header: h, Txs: txs}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Verify chain state. There shouldn't be any blocks higher than chainTip
+	err = l.db.View(func(t database.Transaction) error {
+		nextHeight := l.chainTip.Header.Height + 1
+		hash, err := t.FetchBlockHashByHeight(nextHeight)
+		// Check if
+		if err == nil && len(hash) > 0 {
+			return fmt.Errorf("state points at %d height but the tip is higher", l.chainTip.Header.Height)
 		}
 		return nil
 	})

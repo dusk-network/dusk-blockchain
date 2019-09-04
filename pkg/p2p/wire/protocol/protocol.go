@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	cfg "gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
 // ServiceFlag indicates the services provided by the Node.
@@ -22,7 +22,7 @@ const (
 var NodeVer = &Version{
 	Major: 0,
 	Minor: 1,
-	Patch: 0,
+	Patch: 1,
 }
 
 // Magic is the network that Dusk is running on

@@ -1,13 +1,15 @@
 package hashset
 
-import "gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/hash"
+import "github.com/dusk-network/dusk-crypto/hash"
 
 var _empty = new(struct{})
 
+// Set is a hashset implementation. The hashing function is Xxhash for its high performance
 type Set struct {
 	entries map[string]*struct{}
 }
 
+// New creates a new Set
 func New() *Set {
 	return &Set{
 		entries: make(map[string]*struct{}),
@@ -33,6 +35,7 @@ func (s *Set) has(k string) bool {
 	return found
 }
 
+// Size returns the number of elements in the Set
 func (s *Set) Size() int {
 	return len(s.entries)
 }

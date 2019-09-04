@@ -1,14 +1,13 @@
 package helper
 
 import (
-	"encoding/binary"
 	"math/big"
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/stretchr/testify/assert"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/config"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
 )
 
 const (
@@ -78,13 +77,6 @@ func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
 	reward := ristretto.Scalar{}
 	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 	tx.Rewards[0].EncryptedAmount = reward.Bytes()
-
-	// Do this to pass verification on the chain
-	// TODO: this currently doesn't make much sense, fix before release
-	bs := make([]byte, 32)
-	binary.LittleEndian.PutUint64(bs, config.GeneratorReward)
-	tx.Rewards[0].Commitment = bs
-
 	return tx
 }
 

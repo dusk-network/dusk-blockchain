@@ -5,11 +5,11 @@ import (
 	"encoding/binary"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/database"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
 
 type (
@@ -18,6 +18,7 @@ type (
 	Committee interface {
 		IsMember([]byte, uint64, uint8) bool
 		Quorum(uint64) int
+		RemoveExpiredProvisioners(*bytes.Buffer) error
 	}
 
 	// Foldable represents a Committee which can be packed into a bitset, to drastically
@@ -65,7 +66,6 @@ func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
 	}
 	eventBroker.SubscribeCallback(msg.NewProvisionerTopic, store.AddProvisioner)
 	eventBroker.SubscribeCallback(msg.RemoveProvisionerTopic, store.RemoveProvisioner)
-	eventBroker.SubscribeCallback(msg.RoundUpdateTopic, store.RemoveExpiredProvisioners)
 	return store
 }
 
@@ -95,7 +95,8 @@ func (s *Store) RemoveExpiredProvisioners(m *bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(m.Bytes())
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.provisioners.RemoveExpired(round)
+	removedStakesAmount := s.provisioners.RemoveExpired(round)
+	s.totalWeight -= removedStakesAmount
 	return nil
 }
 

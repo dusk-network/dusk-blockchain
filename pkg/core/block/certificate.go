@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Certificate defines a block certificate made as a result from the consensus.

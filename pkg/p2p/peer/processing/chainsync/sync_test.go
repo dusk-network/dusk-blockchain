@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"testing"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/processing/chainsync"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
@@ -18,7 +18,7 @@ func TestSynchronizeBehind(t *testing.T) {
 	// Create a block that is a few rounds in the future
 	blk := randomBlockBuffer(t, 5, 20)
 
-	if err := cs.Synchronize(blk); err != nil {
+	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -45,7 +45,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	// Make a block which should follow our genesis block
 	blk := randomBlockBuffer(t, 1, 20)
 
-	if err := cs.Synchronize(blk); err != nil {
+	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
 	}
 

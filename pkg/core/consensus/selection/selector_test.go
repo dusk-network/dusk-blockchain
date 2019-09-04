@@ -6,18 +6,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/mocks"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gitlab.dusk.network/dusk-core/dusk-go/mocks"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/header"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/msg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/selection"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/tests/helper"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 // Test the functionality of the selector, in a condition where it receives multiple
@@ -103,7 +103,11 @@ func TestTimeOutVariance(t *testing.T) {
 	sendMockEvent(eb)
 
 	// wait for result
-	<-bestScoreChan
+	select {
+	case <-bestScoreChan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waiting for a best score took too long")
+	}
 	elapsed1 := time.Now().Sub(start)
 
 	// publish a regeneration message, which should double the timer
@@ -113,11 +117,40 @@ func TestTimeOutVariance(t *testing.T) {
 	sendMockEvent(eb)
 
 	// wait for result again
-	<-bestScoreChan
+	select {
+	case <-bestScoreChan:
+	case <-time.After(4 * time.Second):
+		t.Fatal("waiting for a best score took too long")
+	}
 	elapsed2 := time.Now().Sub(start)
 
 	// compare
 	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.05)
+}
+
+// This test should make sure that obsolete selection messages do not stay in the selector after updating the round
+func TestObsoleteSelection(t *testing.T) {
+	eb := wire.NewEventBus()
+	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*100)
+	// subscribe to receive a result
+	bestScoreChan := make(chan *bytes.Buffer, 2)
+	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
+
+	// Start selection and let it run out
+	consensus.UpdateRound(eb, 1)
+	<-bestScoreChan
+
+	// Now send an event to the selector
+	sendMockEvent(eb)
+	time.Sleep(200 * time.Millisecond)
+
+	// Start selection on round 2
+	// This should clear the bestEvent, and let no others through
+	consensus.UpdateRound(eb, 2)
+
+	// Result should be nil
+	result := <-bestScoreChan
+	assert.Equal(t, 0, result.Len())
 }
 
 func publishRegeneration(eb *wire.EventBus) {
@@ -135,7 +168,7 @@ type mockScoreHandler struct {
 	consensus.EventHandler
 }
 
-func newMockScoreHandler() selection.ScoreEventHandler {
+func newMockScoreHandler() *mockScoreHandler {
 	return &mockScoreHandler{
 		EventHandler: newMockHandler(),
 	}
@@ -146,8 +179,11 @@ func (m *mockScoreHandler) Priority(ev1, ev2 wire.Event) bool {
 }
 
 func (m *mockScoreHandler) Marshal(b *bytes.Buffer, ev wire.Event) error {
-	_, err := b.Write([]byte("foo"))
-	return err
+	if ev != nil {
+		_, err := b.Write([]byte("foo"))
+		return err
+	}
+	return nil
 }
 
 func (m *mockScoreHandler) UpdateBidList(bL user.Bid)      {}

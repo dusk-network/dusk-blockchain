@@ -7,15 +7,16 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/util/nativeutils/ring"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
+	lg "github.com/sirupsen/logrus"
 )
 
 var _ EventBroker = (*EventBus)(nil)
 
-var ringBufferLength = 200
+var ringBufferLength = 2000
 var napTime = 1 * time.Millisecond
 var _signal struct{}
+var logEB = lg.WithField("process", "eventbus")
 
 // EventBus - box for handlers and callbacks.
 type EventBus struct {
@@ -24,7 +25,6 @@ type EventBus struct {
 	callbackHandlers *handlerMap
 	streamHandlers   *handlerMap
 	preprocessors    map[string][]idTopicProcessor
-	ringbuffer       *ring.Buffer
 }
 
 type idTopicProcessor struct {
@@ -40,100 +40,60 @@ func NewEventBus() *EventBus {
 		newHandlerMap(),
 		newHandlerMap(),
 		make(map[string][]idTopicProcessor),
-		ring.NewBuffer(ringBufferLength),
 	}
-}
-
-// subscribe handles the subscription logic and is utilized by the public
-// Subscribe functions
-func (bus *EventBus) subscribe(topic string, handler *channelHandler) {
-	bus.handlers.Store(topic, handler)
 }
 
 // Subscribe subscribes to a topic with a channel.
 func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer) uint32 {
-	id := rand.Uint32()
-	bus.subscribe(topic, &channelHandler{
-		id, messageChannel,
-	})
-
-	return id
-}
-
-func (bus *EventBus) subscribeCallback(topic string, handler *callbackHandler) {
-	bus.callbackHandlers.Store(topic, handler)
+	return bus.handlers.Store(topic, &channelHandler{messageChannel})
 }
 
 // SubscribeCallback subscribes to a topic with a callback.
 func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer) error) uint32 {
-	id := rand.Uint32()
-	bus.subscribeCallback(topic, &callbackHandler{
-		id, callback,
-	})
-
-	return id
-}
-
-func (bus *EventBus) subscribeStream(topic string, handler *streamHandler) {
-	bus.streamHandlers.Store(topic, handler)
-}
-
-func newStreamHandler(id uint32, topic string) *streamHandler {
-	exitChan := make(chan struct{})
-	return &streamHandler{id, exitChan, topic}
-}
-
-// Pipe to a WriteCloser. If all messages are consumed, the process stops to give the producer a chance to produce more messages
-func (s *streamHandler) Pipe(c *ring.Consumer, w io.WriteCloser) {
-	for {
-		select {
-		case <-s.exitChan:
-			if err := w.Close(); err != nil {
-				log.WithFields(log.Fields{
-					"process": "eventbus",
-					"topic":   s.topic,
-				}).WithError(err).Warnln("error in closing the WriteCloser")
-			}
-			return
-		default:
-			data, duplicate := c.Consume()
-			if !duplicate {
-				if _, err := w.Write(data); err != nil {
-					log.WithFields(log.Fields{
-						"process": "eventbus",
-						"topic":   s.topic,
-					}).WithError(err).Warnln("error in writing to WriteCloser")
-					s.exitChan <- _signal
-				}
-				continue
-			}
-			time.Sleep(napTime)
-		}
-	}
+	return bus.callbackHandlers.Store(topic, &callbackHandler{callback})
 }
 
 // SubscribeStream subscribes to a topic with a stream.
 func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
-	id := rand.Uint32()
-	c := ring.NewConsumer(bus.ringbuffer)
-	sh := newStreamHandler(id, topic)
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
-	bus.subscribeStream(topic, sh)
 
-	go sh.Pipe(c, w)
-	return id
+	// Each streamHandler uses its own ringBuffer to collect topic events
+	// Multiple-producers single-consumer approach utilizing a ringBuffer
+	ringBuf := ring.NewBuffer(ringBufferLength)
+	sh := &streamHandler{topic, ringBuf}
+
+	// single-consumer
+	_ = ring.NewConsumer(ringBuf, Consume, w)
+
+	return bus.streamHandlers.Store(topic, sh)
+}
+
+// Consume an item by writing it to the specified WriteCloser
+func Consume(items [][]byte, w io.WriteCloser) bool {
+	for _, data := range items {
+		if _, err := w.Write(data); err != nil {
+			logEB.WithField("queue", "ringbuffer").WithError(err).Warnln("error in writing to WriteCloser")
+			return false
+		}
+	}
+
+	return true
 }
 
 // Unsubscribe removes a handler defined for a topic.
-// Returns true if a handler is found with the id and the topic specified
 func (bus *EventBus) Unsubscribe(topic string, id uint32) {
-	bus.handlers.Delete(topic, id)
-	bus.callbackHandlers.Delete(topic, id)
-	bus.streamHandlers.Delete(topic, id)
+	found := bus.handlers.Delete(topic, id) ||
+		bus.callbackHandlers.Delete(topic, id) ||
+		bus.streamHandlers.Delete(topic, id)
+
+	logEB.WithFields(lg.Fields{
+		"found": found,
+		"topic": topic,
+	}).Traceln("unsubscribing")
 }
 
-// RegisterPreprocessor will add a set of preprocessors to a specified topic.
+// RegisterPreprocessor will add a set of TopicProcessor to a specified topic.
 func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicProcessor) []uint32 {
 	pproc := make([]idTopicProcessor, len(preprocessors))
 	pprocIds := make([]uint32, len(preprocessors))
@@ -157,6 +117,7 @@ func (bus *EventBus) RegisterPreprocessor(topic string, preprocessors ...TopicPr
 	return pprocIds
 }
 
+// RemovePreprocessor removes all TopicProcessor previously registered on a given topic using its ID
 func (bus *EventBus) RemovePreprocessor(topic string, id uint32) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
@@ -172,6 +133,7 @@ func (bus *EventBus) RemovePreprocessor(topic string, id uint32) {
 	}
 }
 
+// RemoveAllPreprocessors removes all TopicProcessor from a topic
 func (bus *EventBus) RemoveAllPreprocessors(topic string) {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
@@ -196,20 +158,14 @@ func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (*byt
 func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	processedMsg, err := bus.preprocess(topic, messageBuffer)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "eventbus",
-			"error":   err,
-		}).Errorln("preprocessor error")
+		logEB.WithError(err).Errorln("preprocessor error")
 		return
 	}
 
 	if handlers := bus.handlers.Load(topic); handlers != nil {
 		for _, handler := range handlers {
 			if err := handler.Publish(processedMsg); err != nil {
-				log.WithFields(log.Fields{
-					"topic":   topic,
-					"process": "eventbus",
-				}).Warnln("handler.messageChannel buffer failed")
+				logEB.WithField("topic", topic).Warnln("handler.messageChannel buffer failed")
 			}
 		}
 	}
@@ -217,11 +173,7 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	if callbackHandlers := bus.callbackHandlers.Load(topic); callbackHandlers != nil {
 		for _, handler := range callbackHandlers {
 			if err := handler.Publish(processedMsg); err != nil {
-				log.WithFields(log.Fields{
-					"topic":   topic,
-					"process": "event bus",
-					"error":   err,
-				}).Errorln("error when triggering callback")
+				logEB.WithError(err).WithField("topic", topic).Warnln("error when triggering callback")
 			}
 		}
 	}
@@ -231,15 +183,17 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 	processedMsg, err := bus.preprocess(topic, messageBuffer)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "eventbus",
-			"error":   err,
-		}).Errorln("preprocessor error")
+		logEB.WithError(err).WithField("topic", topic).Errorln("preprocessor error")
 		return
 	}
 
-	if handlers := bus.streamHandlers.Load(topic); handlers != nil {
-		bus.ringbuffer.Put(processedMsg.Bytes())
+	// The handlers are simply a means to avoid memory leaks.
+	handlers := bus.streamHandlers.Load(topic)
+	for _, handler := range handlers {
+		if err := handler.Publish(processedMsg); err != nil {
+			logEB.WithError(err).WithField("topic", topic).Debugln("cannot publish event on stringhandler")
+			continue
+		}
 	}
 }
 

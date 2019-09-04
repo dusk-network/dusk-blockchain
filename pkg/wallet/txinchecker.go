@@ -1,7 +1,7 @@
 package wallet
 
 import (
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 )
 
 type keyImage []byte

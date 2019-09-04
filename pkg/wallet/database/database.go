@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -72,6 +72,7 @@ func (db DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.In
 	var totalAmount = amount
 
 	iter := db.storage.NewIterator(util.BytesPrefix(inputPrefix), nil)
+	defer iter.Release()
 	for iter.Next() {
 		val := iter.Value()
 
@@ -103,7 +104,6 @@ func (db DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.In
 		return nil, 0, errors.New("accumulated value of all of your inputs do not account for the total amount inputted")
 	}
 
-	iter.Release()
 	err := iter.Error()
 	if err != nil {
 		return nil, 0, err
@@ -129,6 +129,7 @@ func (db DB) FetchBalance(decryptionKey []byte) (uint64, error) {
 	balance.SetZero()
 
 	iter := db.storage.NewIterator(util.BytesPrefix(inputPrefix), nil)
+	defer iter.Release()
 	for iter.Next() {
 		val := iter.Value()
 
@@ -151,7 +152,6 @@ func (db DB) FetchBalance(decryptionKey []byte) (uint64, error) {
 
 	}
 
-	iter.Release()
 	err := iter.Error()
 	if err != nil {
 		return 0, err

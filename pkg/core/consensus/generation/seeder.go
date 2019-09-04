@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"sync"
 
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/consensus/user"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/crypto/bls"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 type seeder struct {
@@ -16,7 +16,6 @@ type seeder struct {
 }
 
 func (s *seeder) GenerateSeed(round uint64, prevSeed []byte) error {
-	// TODO: make an actual seed by signing the previous block seed
 	s.lock.Lock()
 	seed, err := bls.Sign(s.keys.BLSSecretKey, s.keys.BLSPubKey, prevSeed)
 	if err != nil {

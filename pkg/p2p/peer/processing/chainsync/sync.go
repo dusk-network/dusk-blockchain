@@ -3,13 +3,14 @@ package chainsync
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	logger "github.com/sirupsen/logrus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/block"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/peer/peermsg"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/p2p/wire/topics"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "synchronizer"})
@@ -38,7 +39,7 @@ func NewChainSynchronizer(publisher wire.EventPublisher, rpcBus *wire.RPCBus, re
 }
 
 // Synchronize our blockchain with our peers.
-func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
+func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) error {
 	r := bufio.NewReader(blkBuf)
 	height, err := peekBlockHeight(r)
 	if err != nil {
@@ -50,11 +51,16 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer) error {
 		return err
 	}
 
-	log.WithField("our height", blk.Header.Height).WithField("their height", height).Traceln("block received")
+	log.WithField("our height", blk.Header.Height).WithField("received block height", height).Debugln("block received")
 	// Only ask for missing blocks if we are not currently syncing, to prevent
 	// asking many peers for (generally) the same blocks.
 	diff := compareHeights(blk.Header.Height, height)
 	if !s.isSyncing() && diff > 1 {
+
+		hash := base64.StdEncoding.EncodeToString(blk.Header.Hash)
+		log.Debugf("Start syncing from %s", peerInfo)
+		log.Debugf("Local tip: height %d [%s]", blk.Header.Height, hash)
+
 		msg := createGetBlocksMsg(blk.Header.Hash)
 		buf, err := marshalGetBlocks(msg)
 		if err != nil {

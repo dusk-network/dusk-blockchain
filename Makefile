@@ -1,6 +1,6 @@
 
-PROJECT_NAME := "dusk-go"
-PKG := "gitlab.dusk.network/dusk-core/$(PROJECT_NAME)"
+PROJECT_NAME := "dusk-blockchain"
+PKG := "github.com/dusk-network/$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
 TEST_LIST := $(shell go list ${PKG}/...)
 #TEST_FLAGS := "-count=1"
