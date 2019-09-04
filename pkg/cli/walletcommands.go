@@ -215,7 +215,7 @@ func transferCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBu
 
 	amountInt, err := stringToUint64(args[0])
 	if err != nil {
-		fmt.Fprintln(os.Stdout, "Please specify a numerical value for the amount")
+		fmt.Fprintf(os.Stdout, "error converting amount to integer value: %v\n", err)
 		return
 	}
 
@@ -278,13 +278,11 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 func generateDualKey() mlsag.PubKeys {
 	pubkeys := mlsag.PubKeys{}
 
-	var primaryKey ristretto.Point
-	primaryKey.Rand()
-	pubkeys.AddPubKey(primaryKey)
-
-	var secondaryKey ristretto.Point
-	secondaryKey.Rand()
-	pubkeys.AddPubKey(secondaryKey)
+	for i := 0; i < 2; i++ {
+		var key ristretto.Point
+		key.Rand()
+		pubkeys.AddPubKey(key)
+	}
 
 	return pubkeys
 }
