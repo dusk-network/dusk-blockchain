@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"time"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -72,6 +73,12 @@ func startProvisioner(args []string, publisher wire.EventBroker, rpcBus *wire.RP
 	f.StartConsensus()
 
 	blsPubKey := cliWallet.ConsensusKeys().BLSPubKeyBytes
+
+	time.Sleep(2 * time.Second)
+	// TODO: Patch
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, 1)
+	publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
 
 	go func() {
 		startingRound := getStartingRound(blsPubKey, publisher)

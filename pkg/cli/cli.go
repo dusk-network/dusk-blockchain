@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
@@ -14,6 +15,15 @@ import (
 
 // Start the interactive shell.
 func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File) {
+
+	// TODO: Remove the hard-coded cli commands
+	time.Sleep(2 * time.Second)
+	CLICommands["loadwallet"]([]string{"password"}, eventBroker, rpcBus)
+	time.Sleep(2 * time.Second)
+	CLICommands["startblockgenerator"]([]string{""}, eventBroker, rpcBus)
+	time.Sleep(2 * time.Second)
+	CLICommands["startprovisioner"]([]string{""}, eventBroker, rpcBus)
+
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")
 	for scanner.Scan() {

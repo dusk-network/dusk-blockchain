@@ -381,6 +381,67 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 	publisher.Publish(string(topics.Tx), buf)
 }
 
+func SendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) (string, error) {
+	if args == nil || len(args) < 3 {
+		return "", fmt.Errorf(commandInfo["bid"])
+	}
+
+	amount, err := stringToScalar(args[0])
+	if err != nil {
+		return "", fmt.Errorf("%s", err.Error())
+	}
+
+	lockTime, err := stringToUint64(args[1])
+	if err != nil {
+		return "", fmt.Errorf("%s", err.Error())
+	}
+
+	password := args[2]
+
+	// Load wallet using password
+	w, err := loadWallet(password)
+	if err != nil {
+		return "", fmt.Errorf("error attempting to load wallet: %v", err)
+	}
+
+	// Sync wallet
+	if err := syncWallet(); err != nil {
+		return "", fmt.Errorf("%v", err)
+	}
+
+	// Create a new bid tx
+	tx, err := w.NewBidTx(cfg.MinFee, lockTime, amount)
+	if err != nil {
+		return "", fmt.Errorf("error creating tx: %v", err)
+	}
+
+	// Sign tx
+	err = w.Sign(tx)
+	if err != nil {
+		return "", fmt.Errorf("%s", err.Error())
+	}
+
+	// Convert wallet-tx to wireTx and encode into buffer
+	wireTx, err := tx.WireBid()
+	if err != nil {
+		return "", fmt.Errorf("%s", err.Error())
+	}
+	buf := new(bytes.Buffer)
+	if err := wireTx.Encode(buf); err != nil {
+		return "", fmt.Errorf("error encoding tx: %v", err)
+	}
+
+	_, err = wireTx.CalculateHash()
+	if err != nil {
+		return "", fmt.Errorf("%s", err.Error())
+	}
+	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+
+	publisher.Publish(string(topics.Tx), buf)
+
+	return hex.EncodeToString(wireTx.TxID), nil
+}
+
 func syncWallet() error {
 	var totalSpent, totalReceived uint64
 	// keep looping until tipHash = currentBlockHash
