@@ -142,7 +142,7 @@ func TestBlocksTxs(t *testing.T) {
         				},
         				"transactions": [
         					{
-        						"txid": "4ece06d56234051bad0ac5b99b951a02a59d5724eb89bddb8551f3d6ae3b2675",
+        						"txid": "6ea89ed79c970477fbac038b12bdf72a79a29977c6e2a6b6af23f450abb2f5a0",
         						"txtype": "3"
         					}
         				]
@@ -153,7 +153,6 @@ func TestBlocksTxs(t *testing.T) {
 	`
 	assertQuery(t, query, response)
 }
-
 
 func TestLastBlocks(t *testing.T) {
 	query := `

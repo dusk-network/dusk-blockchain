@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/graphql-go/graphql"
 
-	rawtxs "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	rawtxs "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 type mempool struct {
@@ -51,14 +52,19 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			return "", err
 		}
 
-		fetched, err := rawtxs.FromReader(&r, lTxs)
-		if err != nil {
-			return "", err
+		var fetched []rawtxs.Transaction
+		for i := uint64(0); i < lTxs; i++ {
+			tx, err := rawtxs.Unmarshal(&r)
+			if err != nil {
+				return "", err
+			}
+
+			fetched = append(fetched, tx)
 		}
 
 		txs := make([]rawtxs.Standard, 0)
 		for _, tx := range fetched {
-			sTx := tx.StandardTX()
+			sTx := tx.StandardTx()
 			sTx.TxID, err = tx.CalculateHash()
 			if err == nil {
 				txs = append(txs, sTx)

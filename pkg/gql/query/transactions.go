@@ -2,13 +2,13 @@ package query
 
 import (
 	"encoding/hex"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
-	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	core "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
-
 
 type transactions struct {
 }
@@ -80,7 +80,7 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]out
 			txId, _ := tx.CalculateHash()
 			txs = append(txs, output{
 				TxID:      txId,
-				TxType:    tx.StandardTX().TxType,
+				TxType:    tx.StandardTx().TxType,
 				BlockHash: hash,
 			})
 		}
