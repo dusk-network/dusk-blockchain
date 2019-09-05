@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -15,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
@@ -27,11 +25,15 @@ import (
 
 var testnet = byte(2)
 
-// Make sure we only load one wallet
-var walletLoaded = false
+// TODO: rename
+type CLI struct {
+	eventBroker wire.EventBroker
+	rpcBus      *wire.RPCBus
+	transactor  *transactor.Transactor
+}
 
-func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if walletLoaded {
+func (c *CLI) createWalletCMD(args []string) {
+	if c.transactor != nil {
 		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
 	}
 
@@ -61,16 +63,15 @@ func createWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPC
 	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
-	walletLoaded = true
-	transactor.Launch(publisher, w)
+	c.transactor = transactor.New(w)
 
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(publisher, rpcBus, w)
+		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w)
 	}
 }
 
-func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if walletLoaded {
+func (c *CLI) loadWalletCMD(args []string) {
+	if c.transactor != nil {
 		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
 	}
 
@@ -95,11 +96,10 @@ func loadWalletCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBu
 	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
-	walletLoaded = true
-	transactor.Launch(publisher, w)
+	c.transactor = transactor.New(w)
 
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(publisher, rpcBus, w)
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w)
 	}
 }
 
@@ -121,8 +121,8 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 	return w, nil
 }
 
-func createFromSeedCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if walletLoaded {
+func (c *CLI) createFromSeedCMD(args []string) {
+	if c.transactor != nil {
 		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
 	}
 
@@ -154,11 +154,10 @@ func createFromSeedCMD(args []string, publisher wire.EventBroker, rpcBus *wire.R
 
 	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\nPublic Address: %s\n", pubAddr)
 
-	walletLoaded = true
-	transactor.Launch(publisher, w)
+	c.transactor = transactor.New(w)
 
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(publisher, rpcBus, w)
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w)
 	}
 }
 
@@ -178,30 +177,18 @@ func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
 	return w, nil
 }
 
-func balanceCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
-	if !walletLoaded {
+func (c *CLI) balanceCMD(args []string) {
+	if c.transactor == nil {
 		fmt.Fprintln(os.Stdout, "Please load a wallet before checking your balance")
 		return
 	}
 
-	req := wire.NewRequest(bytes.Buffer{}, 2)
-	buf, err := rpcBus.Call(wire.GetBalance, req)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error getting balance: %v\n", err)
-		return
-	}
-
-	var balance float64
-	if err := binary.Read(&buf, binary.LittleEndian, balance); err != nil {
-		fmt.Fprintf(os.Stdout, "error reading response: %v\n", err)
-		return
-	}
-
+	balance, err := c.transactor.Balance()
 	fmt.Fprintln(os.Stdout, balance)
 }
 
-func transferCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
-	if !walletLoaded {
+func (c *CLI) transferCMD(args []string) {
+	if c.transactor == nil {
 		fmt.Fprintln(os.Stdout, "Please load a wallet before sending DUSK")
 		return
 	}
@@ -211,43 +198,88 @@ func transferCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBu
 		return
 	}
 
-	buf := new(bytes.Buffer)
-
-	amountInt, err := stringToUint64(args[0])
+	amount, err := stringToUint64(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error converting amount to integer value: %v\n", err)
+		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
 		return
 	}
 
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, amountInt); err != nil {
-		fmt.Fprintf(os.Stdout, "%v\n", err)
+	tx, err := c.transactor.CreateStandardTx(amount, args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error creating transaction: %v\n", err)
 		return
 	}
 
-	if _, err := buf.Write([]byte(args[1])); err != nil {
-		fmt.Fprintf(os.Stdout, "%v\n", err)
-		return
+	buf := new(bytes.Buffer)
+	if err := transactions.Marshal(buf, tx); err != nil {
+		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
 	}
 
-	eventBroker.Publish(string(topics.Transfer), buf)
+	c.eventBroker.Publish(string(topics.Tx), buf)
 }
 
-func sendBidCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
-	if !walletLoaded {
+func (c *CLI) sendBidCMD(args []string) {
+	if c.transactor == nil {
 		fmt.Fprintln(os.Stdout, "Please load a wallet before bidding DUSK")
 		return
 	}
 
-	eventBroker.Publish(string(topics.Bid), nil)
+	amount, err := stringToUint64(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
+		return
+	}
+
+	lockTime, err := stringToUint64(args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error converting locktime string to an integer: %v\n", err)
+		return
+	}
+
+	tx, err := c.transactor.CreateBidTx(amount, lockTime)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error creating transaction: %v\n", err)
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	if err := transactions.Marshal(buf, tx); err != nil {
+		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
+	}
+
+	c.eventBroker.Publish(string(topics.Tx), buf)
 }
 
-func sendStakeCMD(args []string, eventBroker wire.EventBroker, rpcBus *wire.RPCBus) {
-	if !walletLoaded {
+func (c *CLI) sendStakeCMD(args []string) {
+	if c.transactor == nil {
 		fmt.Fprintln(os.Stdout, "Please load a wallet before staking DUSK")
 		return
 	}
 
-	eventBroker.Publish(string(topics.Stake), nil)
+	amount, err := stringToUint64(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
+		return
+	}
+
+	lockTime, err := stringToUint64(args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error converting locktime string to an integer: %v\n", err)
+		return
+	}
+
+	tx, err := c.transactor.CreateStakeTx(amount, lockTime)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error creating transaction: %v\n", err)
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	if err := transactions.Marshal(buf, tx); err != nil {
+		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
+	}
+
+	c.eventBroker.Publish(string(topics.Tx), buf)
 }
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {
