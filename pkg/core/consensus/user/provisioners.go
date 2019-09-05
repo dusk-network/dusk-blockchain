@@ -20,7 +20,7 @@ type (
 	Member struct {
 		PublicKeyEd  ed25519.PublicKey
 		PublicKeyBLS bls.PublicKey
-		Stakes       []*stake
+		Stakes       []*Stake
 	}
 
 	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
@@ -31,14 +31,14 @@ type (
 		sizeCache map[uint64]int
 	}
 
-	stake struct {
+	Stake struct {
 		amount      uint64
 		startHeight uint64
-		endHeight   uint64
+		EndHeight   uint64
 	}
 )
 
-func (m *Member) addStake(stake *stake) {
+func (m *Member) addStake(stake *Stake) {
 	m.Stakes = append(m.Stakes, stake)
 }
 
@@ -179,7 +179,7 @@ func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, amount, startHeight
 	}
 
 	i := strPk(pubKeyBLS)
-	stake := &stake{amount, startHeight, endHeight}
+	stake := &Stake{amount, startHeight, endHeight}
 
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -223,7 +223,7 @@ func (p *Provisioners) RemoveExpired(round uint64) uint64 {
 	var totalRemoved uint64
 	for pk, member := range p.members {
 		for i := 0; i < len(member.Stakes); i++ {
-			if member.Stakes[i].endHeight < round {
+			if member.Stakes[i].EndHeight < round {
 				totalRemoved += member.Stakes[i].amount
 				member.removeStake(i)
 				// If they have no stakes left, we should remove them entirely to keep our Size() calls accurate.

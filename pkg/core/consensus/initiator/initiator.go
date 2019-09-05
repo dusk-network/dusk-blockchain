@@ -19,6 +19,7 @@ import (
 var l = log.WithField("process", "consensus initiator")
 
 func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
+	// TODO: sync first
 	go startProvisioner(eventBroker, rpcBus, w)
 	go startBlockGenerator(eventBroker, rpcBus, w)
 }

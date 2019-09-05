@@ -13,10 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/key"
-	log "github.com/sirupsen/logrus"
 )
-
-var l = log.WithField("process", "transactor")
 
 // TODO: rename
 type Transactor struct {
@@ -30,18 +27,16 @@ func New(w *wallet.Wallet) *Transactor {
 	}
 }
 
-func (t *Transactor) CreateStandardTx(amount uint64, address string) transactions.Transaction {
+func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactions.Transaction, error) {
 	if err := t.syncWallet(); err != nil {
-		l.WithError(err).Warnln("error syncing wallet")
-		return nil
+		return nil, err
 	}
 
 	// Create a new standard tx
 	// TODO: customizable fee
 	tx, err := t.w.NewStandardTx(cfg.MinFee)
 	if err != nil {
-		l.WithError(err).Warnln("error creating transaction")
-		return nil
+		return nil, err
 	}
 
 	// Turn amount into a scalar
@@ -54,17 +49,15 @@ func (t *Transactor) CreateStandardTx(amount uint64, address string) transaction
 	// Sign tx
 	err = t.w.Sign(tx)
 	if err != nil {
-		l.WithError(err).Warnln("error signing transaction")
-		return nil
+		return nil, err
 	}
 
-	return tx
+	return tx, nil
 }
 
-func (t *Transactor) sendStake(amount, lockTime uint64) transactions.Transaction {
+func (t *Transactor) CreateStakeTx(amount, lockTime uint64) (transactions.Transaction, error) {
 	if err := t.syncWallet(); err != nil {
-		l.WithError(err).Warnln("error syncing wallet")
-		return nil
+		return nil, err
 	}
 
 	// Turn amount into a scalar
@@ -74,24 +67,21 @@ func (t *Transactor) sendStake(amount, lockTime uint64) transactions.Transaction
 	// Create a new stake tx
 	tx, err := t.w.NewStakeTx(cfg.MinFee, lockTime, amountScalar)
 	if err != nil {
-		l.WithError(err).Warnln("error creating stake")
-		return nil
+		return nil, err
 	}
 
 	// Sign tx
 	err = t.w.Sign(tx)
 	if err != nil {
-		l.WithError(err).Warnln("error signing stake")
-		return nil
+		return nil, err
 	}
 
-	return tx
+	return tx, nil
 }
 
-func (t *Transactor) sendBid(amount, lockTime uint64) transactions.Transaction {
+func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transaction, error) {
 	if err := t.syncWallet(); err != nil {
-		l.WithError(err).Warnln("error syncing wallet")
-		return nil
+		return nil, err
 	}
 
 	// Turn amount into a scalar
@@ -101,18 +91,16 @@ func (t *Transactor) sendBid(amount, lockTime uint64) transactions.Transaction {
 	// Create a new bid tx
 	tx, err := t.w.NewBidTx(cfg.MinFee, lockTime, amountScalar)
 	if err != nil {
-		l.WithError(err).Warnln("error creating bid")
-		return nil
+		return nil, err
 	}
 
 	// Sign tx
 	err = t.w.Sign(tx)
 	if err != nil {
-		l.WithError(err).Warnln("error signing bid")
-		return nil
+		return nil, err
 	}
 
-	return tx
+	return tx, nil
 }
 
 func (t *Transactor) syncWallet() error {
@@ -147,10 +135,6 @@ func (t *Transactor) syncWallet() error {
 		}
 	}
 
-	l.WithFields(log.Fields{
-		"spends":   totalSpent,
-		"receives": totalReceived,
-	}).Debugln("finished wallet sync")
 	return nil
 }
 
@@ -182,13 +166,11 @@ func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []by
 
 func (t *Transactor) Balance() (float64, error) {
 	if err := t.syncWallet(); err != nil {
-		l.WithError(err).Warnln("error syncing wallet")
 		return 0.0, err
 	}
 
 	balance, err := t.w.Balance()
 	if err != nil {
-		l.WithError(err).Warnln("error fetching balance")
 		return 0.0, err
 	}
 

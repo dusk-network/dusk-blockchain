@@ -51,8 +51,8 @@ type (
 	}
 )
 
-// launchStore creates a component that listens to changes to the Provisioners
-func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
+// LaunchStore creates a component that listens to changes to the Provisioners
+func LaunchStore(eventBroker wire.EventBroker, db database.DB) *Store {
 	p, totalWeight, err := user.NewProvisioners(db)
 	if err != nil {
 		// If we can not repopulate our committee, we can not properly verify blocks
@@ -72,7 +72,7 @@ func launchStore(eventBroker wire.EventBroker, db database.DB) *Store {
 // NewExtractor returns a committee extractor which maintains its own store and cache.
 func NewExtractor(eventBroker wire.EventBroker, db database.DB) *Extractor {
 	return &Extractor{
-		Store:          launchStore(eventBroker, db),
+		Store:          LaunchStore(eventBroker, db),
 		committeeCache: make(map[uint8]user.VotingCommittee),
 	}
 }
