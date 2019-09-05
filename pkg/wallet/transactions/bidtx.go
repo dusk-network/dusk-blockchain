@@ -1,77 +1,73 @@
 package transactions
 
 import (
-	"encoding/binary"
-	"io"
+	"bytes"
 
-	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-crypto/hash"
 )
 
-type BidTx struct {
-	*TimelockTx
+type Bid struct {
+	*Timelock
 	M []byte
 }
 
-func NewBidTx(netPrefix byte, fee int64, lock uint64, M []byte) (*BidTx, error) {
-	tx, err := NewTimeLockTx(netPrefix, fee, lock)
+func NewBid(ver uint8, netPrefix byte, fee int64, lock uint64, M []byte) (*Bid, error) {
+	tx, err := NewTimelock(ver, netPrefix, fee, lock)
 	if err != nil {
 		return nil, err
 	}
 
-	return &BidTx{
+	tx.TxType = BidType
+	return &Bid{
 		tx,
 		M,
 	}, nil
 }
 
-func (b *BidTx) Hash() ([]byte, error) {
-	return hashBytes(b.encode)
-}
-
-func (b *BidTx) encode(w io.Writer, encodeSig bool) error {
-	if err := b.TimelockTx.encode(w, encodeSig); err != nil {
-		return err
-	}
-	return binary.Write(w, binary.BigEndian, b.M)
-}
-
-func (b *BidTx) Prove() error {
-	return b.prove(b.Hash, false)
-}
-
-func (b *BidTx) Encode(w io.Writer) error {
-	return b.encode(w, true)
-}
-
-func (b *BidTx) Decode(r io.Reader) error {
-	b.TimelockTx = &TimelockTx{}
-
-	if err := b.TimelockTx.Decode(r); err != nil {
-		return err
+func (b *Bid) CalculateHash() ([]byte, error) {
+	if len(b.TxID) != 0 {
+		return b.TxID, nil
 	}
 
-	var MBytes [32]byte
-	err := binary.Read(r, binary.BigEndian, &MBytes)
-	if err != nil {
-		return err
+	buf := new(bytes.Buffer)
+	if err := marshalBid(buf, b, false); err != nil {
+		return nil, err
 	}
-	copy(b.M, MBytes[:])
 
-	return nil
-}
-
-func (b *BidTx) WireBid() (*wiretx.Bid, error) {
-
-	tl, err := b.WireTimeLockTx()
+	txid, err := hash.Sha3256(buf.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	tx := &wiretx.Bid{
-		*tl,
-		b.M,
-	}
-	tx.TxType = wiretx.BidType
+	b.TxID = txid
+	return txid, nil
+}
 
-	return tx, nil
+func (b *Bid) StandardTx() Standard {
+	return *b.Standard
+}
+
+func (b *Bid) Type() TxType {
+	return b.TxType
+}
+
+func (b *Bid) Prove() error {
+	return b.prove(b.CalculateHash, false)
+}
+
+func (b *Bid) Equals(t Transaction) bool {
+	other, ok := t.(*Bid)
+	if !ok {
+		return false
+	}
+
+	if !b.Timelock.Equals(other.Timelock) {
+		return false
+	}
+
+	if !bytes.Equal(b.M, other.M) {
+		return false
+	}
+
+	return true
 }

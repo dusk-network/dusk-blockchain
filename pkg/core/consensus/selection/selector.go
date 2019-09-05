@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -112,7 +113,7 @@ func (s *eventSelector) propagateCertificate(ev wire.Event) {
 		panic(err)
 	}
 
-	if err := sev.Certificate.Encode(buf); err != nil {
+	if err := block.MarshalCertificate(buf, sev.Certificate); err != nil {
 		panic(err)
 	}
 

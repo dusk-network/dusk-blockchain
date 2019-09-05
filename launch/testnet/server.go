@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
@@ -50,14 +51,27 @@ func Setup() *Server {
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
 
+	// Instantiate RPC server
 	if cfg.Get().RPC.Enabled {
 		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus)
 		if err != nil {
-			log.Errorf("RPC server error: %s", err.Error())
+			log.Errorf("RPC http server error: %s", err.Error())
 		}
 
 		if err := rpcServ.Start(); err != nil {
-			log.Errorf("RPC server error: %s", err.Error())
+			log.Errorf("RPC failed to start: %s", err.Error())
+		}
+	}
+
+	// Instantiate GraphQL server
+	if cfg.Get().Gql.Enabled {
+		gqlServer, err := gql.NewHTTPServer(eventBus, rpcBus)
+		if err != nil {
+			log.Errorf("GraphQL http server error: %s", err.Error())
+		}
+
+		if err := gqlServer.Start(); err != nil {
+			log.Errorf("GraphQL failed to start: %s", err.Error())
 		}
 	}
 

@@ -15,16 +15,16 @@ func TestEncodeDecodeBlock(t *testing.T) {
 	assert := assert.New(t)
 
 	// random block
-	blk := helper.RandomBlock(t, 200, 20)
+	blk := helper.RandomBlock(t, 200, 2)
 
 	// Encode block into a buffer
 	buf := new(bytes.Buffer)
-	err := blk.Encode(buf)
+	err := block.Marshal(buf, blk)
 	assert.Nil(err)
 
 	// Decode buffer into a block struct
 	decBlk := block.NewBlock()
-	err = decBlk.Decode(buf)
+	err = block.Unmarshal(buf, decBlk)
 	assert.Nil(err)
 
 	// Check both structs are equal

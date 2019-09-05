@@ -11,7 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -88,7 +88,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := b.Header.Encode(blockHeaderFields); err != nil {
+	if err := block.MarshalHeader(blockHeaderFields, b.Header); err != nil {
 		return err
 	}
 
@@ -146,8 +146,8 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Value = txID
 		//
 		// To make FetchKeyImageExists functioning
-		for _, input := range tx.StandardTX().Inputs {
-			t.put(append(KeyImagePrefix, input.KeyImage...), txID)
+		for _, input := range tx.StandardTx().Inputs {
+			t.put(append(KeyImagePrefix, input.KeyImage.Bytes()...), txID)
 		}
 
 		// Schema
@@ -156,8 +156,8 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Value = tx.output.PublicKey
 		//
 		// To make FetchOutputKey functioning
-		for _, output := range tx.StandardTX().Outputs {
-			t.put(append(OutputKeyPrefix, output.DestKey...), output.DestKey)
+		for _, output := range tx.StandardTx().Outputs {
+			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), output.PubKey.P.Bytes())
 		}
 
 	}
@@ -290,8 +290,8 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 		return nil, err
 	}
 
-	header := new(block.Header)
-	err = header.Decode(bytes.NewReader(value))
+	header := block.NewHeader()
+	err = block.UnmarshalHeader(bytes.NewReader(value), header)
 
 	if err != nil {
 		return nil, err
@@ -476,7 +476,7 @@ func (t transaction) StoreCandidateBlock(b *block.Block) error {
 	key = append(key, heightBuf.Bytes()...)
 
 	buf := new(bytes.Buffer)
-	if err := b.Encode(buf); err != nil {
+	if err := block.Marshal(buf, b); err != nil {
 		return err
 	}
 
@@ -498,7 +498,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 
 	if iterator.First() {
 		b := block.NewBlock()
-		if err := b.Decode(bytes.NewReader(iterator.Value())); err != nil {
+		if err := block.Unmarshal(bytes.NewReader(iterator.Value()), b); err != nil {
 			return nil, err
 		}
 

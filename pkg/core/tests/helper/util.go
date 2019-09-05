@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -25,7 +25,7 @@ func TxsToReader(t *testing.T, txs []transactions.Transaction) io.Reader {
 	buf := new(bytes.Buffer)
 
 	for _, tx := range txs {
-		err := tx.Encode(buf)
+		err := transactions.Marshal(buf, tx)
 		if err != nil {
 			assert.Nil(t, err)
 		}

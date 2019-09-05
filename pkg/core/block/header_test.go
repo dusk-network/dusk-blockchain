@@ -20,12 +20,12 @@ func TestEncodeDecodeHeader(t *testing.T) {
 
 	// Encode header into a buffer
 	buf := new(bytes.Buffer)
-	err = hdr.Encode(buf)
+	err = block.MarshalHeader(buf, hdr)
 	assert.Nil(err)
 
 	// Decode buffer into a header struct
-	decHdr := &block.Header{}
-	err = decHdr.Decode(buf)
+	decHdr := block.NewHeader()
+	err = block.UnmarshalHeader(buf, decHdr)
 	assert.Nil(err)
 
 	// Check both structs are equal

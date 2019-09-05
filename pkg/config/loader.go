@@ -41,6 +41,7 @@ type Registry struct {
 	Performance performanceConfiguration
 	Mempool     mempoolConfiguration
 	Consensus   consensusConfiguration
+	Gql         gqlConfiguration
 }
 
 // Load makes an attempt to read and unmershal any configs from flag, env and

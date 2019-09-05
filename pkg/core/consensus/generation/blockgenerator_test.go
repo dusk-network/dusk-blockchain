@@ -14,17 +14,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 func respond(rpcBus *wire.RPCBus, b block.Block) {
 	r := <-wire.GetLastBlockChan
 	buf := new(bytes.Buffer)
-	if err := b.Encode(buf); err != nil {
+	if err := block.Marshal(buf, &b); err != nil {
 		panic(err)
 	}
 	r.RespChan <- *buf
@@ -103,7 +103,7 @@ func publishRandomTxs(t *testing.T, h *harness) (int, error) {
 
 		// Publish non-coinbase tx
 		buf := new(bytes.Buffer)
-		err := tx.Encode(buf)
+		err := transactions.Marshal(buf, tx)
 		if err != nil {
 			return 0, err
 		}
@@ -116,9 +116,8 @@ func publishRandomTxs(t *testing.T, h *harness) (int, error) {
 }
 
 func canSpend(t *testing.T, tx *transactions.Coinbase, h *harness) bool {
-	P := bytesToPoint(tx.Rewards[0].DestKey)
-	R := bytesToPoint(tx.R[:])
-	_, spendable := h.genWallet.DidReceiveTx(R, key.StealthAddress{P: P}, 0)
+	P := tx.Rewards[0].PubKey.P
+	_, spendable := h.genWallet.DidReceiveTx(tx.R, key.StealthAddress{P: P}, 0)
 	return spendable
 }
 

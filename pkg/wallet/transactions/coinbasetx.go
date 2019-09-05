@@ -1,54 +1,52 @@
 package transactions
 
 import (
-	"encoding/binary"
+	"bytes"
 	"errors"
-	"io"
 
-	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/key"
 
 	"github.com/bwesterb/go-ristretto"
 )
 
-type CoinbaseTx struct {
+type Coinbase struct {
+	//// Encoded fields
+	TxType
+	R       ristretto.Point
+	Score   []byte
+	Proof   []byte
+	Rewards Outputs
+
+	//// Non-encoded fields
 	index     uint32
 	netPrefix byte
 	r         ristretto.Scalar
-	R         ristretto.Point
-	Score     []byte
-	Proof     []byte
-	Rewards   []*Output
+	TxID      []byte
 }
 
-func NewCoinBaseTx(netPrefix byte) *CoinbaseTx {
-
-	tx := &CoinbaseTx{}
-
-	// Index for subaddresses
-	tx.index = 0
-
-	// prefix to signify testnet/mainnet
-	tx.netPrefix = netPrefix
+func NewCoinbase(proof, score []byte, netPrefix byte) *Coinbase {
+	tx := &Coinbase{
+		TxType:    CoinbaseType,
+		Score:     score,
+		Proof:     proof,
+		index:     0,
+		netPrefix: netPrefix,
+	}
 
 	// randomly generated nonce - r
 	var r ristretto.Scalar
 	r.Rand()
-	tx.setTxPubKey(r)
+	tx.SetTxPubKey(r)
 
 	return tx
 }
 
-func (c *CoinbaseTx) AddReward(pubAddr key.PublicAddress, amount ristretto.Scalar) error {
-
+func (c *Coinbase) AddReward(pubKey key.PublicKey, amount ristretto.Scalar) error {
 	if len(c.Rewards)+1 > maxOutputs {
 		return errors.New("maximum amount of outputs reached")
 	}
 
-	pubKey, err := pubAddr.ToKey(c.netPrefix)
-	if err != nil {
-		return err
-	}
 	stealthAddr := pubKey.StealthAddress(c.r, c.index)
 
 	output := &Output{
@@ -57,83 +55,66 @@ func (c *CoinbaseTx) AddReward(pubAddr key.PublicAddress, amount ristretto.Scala
 	}
 
 	c.Rewards = append(c.Rewards, output)
-
 	c.index = c.index + 1
-
 	return nil
 }
 
-func (c *CoinbaseTx) Encode(w io.Writer) error {
-
-	err := binary.Write(w, binary.BigEndian, c.R.Bytes())
-	if err != nil {
-		return err
-	}
-
-	lenRewards := uint32(len(c.Rewards))
-	err = binary.Write(w, binary.BigEndian, lenRewards)
-	if err != nil {
-		return err
-	}
-	for _, output := range c.Rewards {
-		err = output.Encode(w)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *CoinbaseTx) Decode(r io.Reader) error {
-
-	var RBytes [32]byte
-	err := binary.Read(r, binary.BigEndian, &RBytes)
-	if err != nil {
-		return err
-	}
-	c.R.SetBytes(&RBytes)
-
-	var lenRewards uint32
-	err = binary.Read(r, binary.BigEndian, &lenRewards)
-	if err != nil {
-		return err
-	}
-
-	c.Rewards = make([]*Output, lenRewards)
-
-	for i := uint32(0); i < lenRewards; i++ {
-		output := &Output{}
-		err = output.Decode(r)
-		if err != nil {
-			return err
-		}
-		c.Rewards[i] = output
-	}
-
-	return nil
-}
-
-func (s *CoinbaseTx) setTxPubKey(r ristretto.Scalar) {
+func (s *Coinbase) SetTxPubKey(r ristretto.Scalar) {
 	s.r = r
 	s.R.ScalarMultBase(&r)
 }
 
-func (s *CoinbaseTx) WireCoinbaseTx() (*wiretx.Coinbase, error) {
-	c := &wiretx.Coinbase{}
-
-	c.Proof = s.Proof
-	c.Score = s.Score
-	c.R = s.R.Bytes()
-
-	for _, reward := range s.Rewards {
-		wireOut, err := wiretx.NewOutput([]byte{}, reward.PubKey.P.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		wireOut.EncryptedAmount = reward.amount.Bytes()
-		wireOut.EncryptedMask = []byte{}
-
-		c.AddReward(wireOut)
+func (s *Coinbase) CalculateHash() ([]byte, error) {
+	if len(s.TxID) != 0 {
+		return s.TxID, nil
 	}
-	return c, nil
+
+	buf := new(bytes.Buffer)
+	if err := MarshalCoinbase(buf, s); err != nil {
+		return nil, err
+	}
+
+	txid, err := hash.Sha3256(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	s.TxID = txid
+	return txid, nil
+}
+
+func (s *Coinbase) StandardTx() Standard {
+	return Standard{
+		Outputs: s.Rewards,
+		R:       s.R,
+	}
+}
+
+func (s *Coinbase) Type() TxType {
+	return s.TxType
+}
+
+func (s *Coinbase) Equals(t Transaction) bool {
+	other, ok := t.(*Coinbase)
+	if !ok {
+		return false
+	}
+
+	if !bytes.Equal(s.R.Bytes(), other.R.Bytes()) {
+		return false
+	}
+
+	if !bytes.Equal(s.Score, other.Score) {
+		return false
+	}
+
+	if !bytes.Equal(s.Proof, other.Proof) {
+		return false
+	}
+
+	if !s.Rewards.Equals(other.Rewards) {
+		return false
+	}
+
+	return true
 }

@@ -5,7 +5,8 @@ require (
 	github.com/dusk-network/dusk-crypto v0.1.0
 	github.com/dusk-network/dusk-wallet v0.0.0-20190821143707-c0ccce099e3a
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
-	github.com/golang/protobuf v1.3.2 // indirect
+	github.com/go-chi/render v1.0.1
+	github.com/graphql-go/graphql v0.7.8
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/onsi/ginkgo v1.9.0 // indirect

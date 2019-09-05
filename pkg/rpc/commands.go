@@ -2,20 +2,11 @@ package rpc
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"strconv"
 	"time"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -27,15 +18,12 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		"version":       version,
-		"ping":          pong,
-		"uptime":        uptime,
-		"getLastBlock":  getlastblock,
-		"getMempoolTxs": getmempooltxs,
+		"version": version,
+		"ping":    pong,
+		"uptime":  uptime,
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,
-		"exportData":   exportData,
 	}
 
 	// rpcAdminCmd holds all admin methods.
@@ -61,44 +49,6 @@ var pong = func(s *Server, params []string) (string, error) {
 // uptime returns the server uptime.
 var uptime = func(s *Server, params []string) (string, error) {
 	return strconv.FormatInt(time.Now().Unix()-s.startTime, 10), nil
-}
-
-var getlastblock = func(s *Server, params []string) (string, error) {
-
-	r, err := s.rpcBus.Call(wire.GetLastBlock, wire.NewRequest(bytes.Buffer{}, 1))
-	if err != nil {
-		return "", err
-	}
-
-	b := &block.Block{}
-	err = b.Decode(&r)
-	if err != nil {
-		return "", err
-	}
-
-	res, err := json.MarshalIndent(b, "", "\t")
-	return string(res), err
-}
-
-var getmempooltxs = func(s *Server, params []string) (string, error) {
-
-	r, err := s.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
-	if err != nil {
-		return "", err
-	}
-
-	lTxs, err := encoding.ReadVarInt(&r)
-	if err != nil {
-		return "", err
-	}
-
-	txs, err := transactions.FromReader(&r, lTxs)
-	if err != nil {
-		return "", err
-	}
-
-	res, err := json.MarshalIndent(txs, "", "\t")
-	return string(res), err
 }
 
 var publishTopic = func(s *Server, params []string) (string, error) {
@@ -127,57 +77,4 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 	res := fmt.Sprintf("published %s with len(payload) %d", jsonrpcTopic, len(params[1]))
 	return res, nil
-}
-
-var exportData = func(s *Server, params []string) (string, error) {
-
-	_, db := heavy.CreateDBConnection()
-
-	optionTransactions := false
-	if len(params) > 0 {
-		if params[0] == "includeBlockTxs" {
-			optionTransactions = true
-		}
-	}
-
-	var chain []block.Block
-	err := db.View(func(t database.Transaction) error {
-		var height uint64
-		for {
-
-			hash, err := t.FetchBlockHashByHeight(height)
-			if err != nil {
-				return nil
-			}
-
-			header, err := t.FetchBlockHeader(hash)
-			if err != nil {
-				return err
-			}
-
-			txs := make([]transactions.Transaction, 0)
-			if optionTransactions {
-				txs, err = t.FetchBlockTxs(hash)
-				if err != nil {
-					return err
-				}
-			}
-			b := block.Block{
-				Header: header,
-				Txs:    txs,
-			}
-
-			chain = append(chain, b)
-			height++
-		}
-	})
-
-	// encode as json
-	encoded, _ := json.MarshalIndent(chain, "", "\t")
-
-	// Export to a temp file
-	filePath := fmt.Sprintf("/tmp/dusk-node_%s.json", cfg.Get().RPC.Port)
-	_ = ioutil.WriteFile(filePath, encoded, 0644)
-
-	return fmt.Sprintf("\"exported to %s\"", filePath), err
 }
