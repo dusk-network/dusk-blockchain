@@ -63,16 +63,26 @@ preallocTxs = 100
 # To disable topics.Mempool handling, set it to 0
 maxInvItems = 10000
 
-# rpc service configs
+# RPC API service
 [rpc]
 
 # rpc port to listen on
 port=9000
 # enable rpc service
-enabled=true
+enabled=false
 user="default"
 pass="default"
 cert=""
+
+# GraphQL API service
+[gql]
+# enable graphql service
+enabled=true
+user=""
+pass=""
+cert=""
+port=9001
+
 
 [prof]
 # profiling service address

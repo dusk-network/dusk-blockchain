@@ -16,6 +16,7 @@ const (
 	// block table index
 	blocksInd = iota
 	txsInd
+	txHashInd
 	keyImagesInd
 	candidatesTableInd
 	heightInd
