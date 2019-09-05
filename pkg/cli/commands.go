@@ -10,27 +10,9 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
-// CLICommands holds all of the wallet commands that the user can call through
-// the interactive shell.
-var CLICommands = map[string]func([]string, wire.EventBroker, *wire.RPCBus){
-	"help":               showHelp,
-	"createwallet":       createWalletCMD,
-	"loadwallet":         loadWalletCMD,
-	"createfromseed":     createFromSeedCMD,
-	"balance":            balanceCMD,
-	"transfer":           transferCMD,
-	"stake":              sendStakeCMD,
-	"bid":                sendBidCMD,
-	"setdefaultlocktime": setLocktimeCMD,
-	"setdefaultvalue":    setDefaultValueCMD,
-	"exit":               stopNode,
-	"quit":               stopNode,
-}
-
-func showHelp(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+func showHelp(args []string) {
 	if args != nil && len(args) > 0 {
 		helpStr, ok := commandInfo[args[0]]
 		if !ok {
@@ -53,7 +35,7 @@ func showHelp(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 	}
 }
 
-func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
+func stopNode() {
 	fmt.Fprintln(os.Stdout, "stopping node")
 
 	// Send an interrupt signal to the running process
@@ -67,42 +49,6 @@ func stopNode(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
 		// Neither should this
 		panic(err)
 	}
-}
-
-func setLocktimeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 1 {
-		fmt.Fprintln(os.Stdout, "please specify a default locktime")
-		return
-	}
-
-	locktime, err := strconv.Atoi(args[0])
-	if err != nil {
-		fmt.Fprintln(os.Stdout, err)
-		return
-	}
-
-	if locktime > 250000 {
-		fmt.Fprintln(os.Stdout, "locktime can not be higher than 250000")
-	}
-
-	// Send value to tx sender
-	fmt.Println(locktime)
-}
-
-func setDefaultValueCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 1 {
-		fmt.Fprintln(os.Stdout, "please specify a default value")
-		return
-	}
-
-	value, err := strconv.Atoi(args[0])
-	if err != nil {
-		fmt.Fprintln(os.Stdout, err)
-		return
-	}
-
-	// Send value to tx sender
-	fmt.Println(value)
 }
 
 func intToScalar(amount int64) ristretto.Scalar {

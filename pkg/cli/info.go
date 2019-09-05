@@ -13,10 +13,10 @@ var commandInfo = map[string]string{
 		Prints the balance of the loaded wallet.`,
 	"transfer": `Usage: transfer [amount] [address]
 		Send DUSK to a given address.`,
-	"stake": `Usage: stake 
-		Stake a set amount of DUSK, to allow participation as a provisioner in consensus. The amount is determined by the value specified with the 'setdefaultvalue' command, or the config if none was specified.`,
-	"bid": `Usage: bid 
-		Bid a set amount of DUSK, to allow participation as a block generator in consensus. The amount is determined by the value specified with the 'setdefaultvalue' command, or the config if none was specified.`,
+	"stake": `Usage: stake [amount] [locktime]
+		Stake a set amount of DUSK, to allow participation as a provisioner in consensus.`,
+	"bid": `Usage: bid [amount] [locktime]
+		Bid a set amount of DUSK, to allow participation as a block generator in consensus.`,
 	"setdefaultlocktime": `Usage: setdefaultlocktime [locktime]
 		Sets the locktime for consensus transactions.`,
 	"setdefaultvalue": `Usage: setdefaultvalue [amount]
