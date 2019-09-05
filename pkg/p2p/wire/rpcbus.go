@@ -42,11 +42,6 @@ var (
 	// Used by the reduction component.
 	VerifyCandidateBlock     = "verifyCandidateBlock"
 	VerifyCandidateBlockChan chan Req
-
-	// Get the loaded wallet balance, if one is loaded.
-	// Used by the transactor.
-	GetBalance     = "getBalance"
-	GetBalanceChan chan Req
 )
 
 // RPCBus is a request–response mechanism for internal communication between node
@@ -94,11 +89,6 @@ func NewRPCBus() *RPCBus {
 
 	VerifyCandidateBlockChan = make(chan Req)
 	if err := bus.Register(VerifyCandidateBlock, VerifyCandidateBlockChan); err != nil {
-		panic(err)
-	}
-
-	GetBalanceChan = make(chan Req)
-	if err := bus.Register(GetBalance, GetBalanceChan); err != nil {
 		panic(err)
 	}
 
