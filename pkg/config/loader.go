@@ -40,6 +40,7 @@ type Registry struct {
 	RPC         rpcConfiguration
 	Performance performanceConfiguration
 	Mempool     mempoolConfiguration
+	Gql	 		gqlConfiguration
 }
 
 // Load makes an attempt to read and unmershal any configs from flag, env and

@@ -61,6 +61,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 		}
 
 		t.batch[txsInd][toKey(txID)] = data
+		t.batch[txHashInd][toKey(txID)] =  b.Header.Hash
 
 		// Map KeyImage to Transaction
 		for _, input := range tx.StandardTx().Inputs {
@@ -175,8 +176,12 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 		return nil, math.MaxUint32, nil, database.ErrTxNotFound
 	}
 
-	// TODO: hashHeader the tx belongs to
-	return tx, txIndex, nil, err
+	var hash []byte
+	if hash, exists = t.db.storage[txHashInd][toKey(txID)]; !exists {
+		return nil, math.MaxUint32, nil, database.ErrTxNotFound
+	}
+
+	return tx, txIndex, hash, err
 }
 
 func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) {

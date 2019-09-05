@@ -64,6 +64,13 @@ type rpcConfiguration struct {
 	Pass    string
 }
 
+type gqlConfiguration struct {
+	Port    string
+	Enabled bool
+	User    string
+	Pass    string
+}
+
 // Performance parameters
 type performanceConfiguration struct {
 	AccumulatorWorkers int

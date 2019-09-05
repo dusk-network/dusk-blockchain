@@ -74,6 +74,9 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*C
 		certificateChan: certificateChan,
 	}
 
+	// call `RemoveExpiredProvisioners` to sync the Chain committee with those of the consensus components.
+	chain.removeExpiredProvisioners(l.chainTip.Header.Height + 1)
+
 	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
 	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
 	return chain, nil
@@ -274,13 +277,17 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// 8. Remove expired provisioners
 	// We remove provisioners from accepted block height + 1,
 	// to set up our committee correctly for the next block.
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, blk.Header.Height+1)
-	c.committee.RemoveExpiredProvisioners(bytes.NewBuffer(roundBytes))
+	c.removeExpiredProvisioners(blk.Header.Height + 1)
 
 	l.Trace("procedure ended")
 
 	return nil
+}
+
+func (c *Chain) removeExpiredProvisioners(round uint64) {
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, round)
+	c.committee.RemoveExpiredProvisioners(bytes.NewBuffer(roundBytes))
 }
 
 func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight uint64) {
