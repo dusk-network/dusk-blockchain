@@ -13,9 +13,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -103,7 +103,11 @@ func TestTimeOutVariance(t *testing.T) {
 	sendMockEvent(eb)
 
 	// wait for result
-	<-bestScoreChan
+	select {
+	case <-bestScoreChan:
+	case <-time.After(2 * time.Second):
+		t.Fatal("waiting for a best score took too long")
+	}
 	elapsed1 := time.Now().Sub(start)
 
 	// publish a regeneration message, which should double the timer
@@ -113,7 +117,11 @@ func TestTimeOutVariance(t *testing.T) {
 	sendMockEvent(eb)
 
 	// wait for result again
-	<-bestScoreChan
+	select {
+	case <-bestScoreChan:
+	case <-time.After(4 * time.Second):
+		t.Fatal("waiting for a best score took too long")
+	}
 	elapsed2 := time.Now().Sub(start)
 
 	// compare

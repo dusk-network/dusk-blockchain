@@ -6,6 +6,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	log "github.com/sirupsen/logrus"
 )
 
 // Use the TxRetriever to get a valid bid transaction that belongs to us, and return the D value from that bid.
@@ -13,8 +14,21 @@ func getD(m ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) r
 	retriever := newBidRetriever(db)
 	bid, err := retriever.SearchForBid(m.Bytes())
 	if err != nil {
+		log.WithField("process", "generation").Debugln("no bids belonging to us found in the chain")
+
 		// If we did not get any values from scanning the chain, we will wait to get a valid one from incoming blocks
 		bid = waitForBid(subscriber, m.Bytes())
+
+		hash, err := bid.CalculateHash()
+		if err != nil {
+			// If we found a valid bid tx, we should under no circumstance have issues marshalling it
+			panic(err)
+		}
+
+		log.WithFields(log.Fields{
+			"process": "generation",
+			"tx hash": hash,
+		}).Debugln("new bid received")
 	}
 
 	d := ristretto.Scalar{}

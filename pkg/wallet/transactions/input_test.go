@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/crypto/mlsag"
+	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/stretchr/testify/assert"
 )
 
