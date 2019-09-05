@@ -10,8 +10,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
 )
@@ -58,16 +58,7 @@ func (t *Transactor) CreateStandardTx(amount uint64, address string) transaction
 		return nil
 	}
 
-	// Convert wallet-tx to wireTx
-	// TODO: Unification of tx structures makes this obsolete. Remove when
-	// unified tx structure is merged
-	wireTx, err := tx.WireStandardTx()
-	if err != nil {
-		l.WithError(err).Warnln("error converting transaction")
-		return nil
-	}
-
-	return wireTx
+	return tx
 }
 
 func (t *Transactor) sendStake(amount, lockTime uint64) transactions.Transaction {
@@ -94,14 +85,7 @@ func (t *Transactor) sendStake(amount, lockTime uint64) transactions.Transaction
 		return nil
 	}
 
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireStakeTx()
-	if err != nil {
-		l.WithError(err).Warnln("error converting stake")
-		return nil
-	}
-
-	return wireTx
+	return tx
 }
 
 func (t *Transactor) sendBid(amount, lockTime uint64) transactions.Transaction {
@@ -128,14 +112,7 @@ func (t *Transactor) sendBid(amount, lockTime uint64) transactions.Transaction {
 		return nil
 	}
 
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireBid()
-	if err != nil {
-		l.WithError(err).Warnln("error converting bid")
-		return nil
-	}
-
-	return wireTx
+	return tx
 }
 
 func (t *Transactor) syncWallet() error {
