@@ -76,7 +76,7 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := sev.Certificate.Decode(r); err != nil {
+	if err := block.UnmarshalCertificate(r, sev.Certificate); err != nil {
 		return err
 	}
 
@@ -130,7 +130,7 @@ func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := sev.Certificate.Encode(r); err != nil {
+	if err := block.MarshalCertificate(r, sev.Certificate); err != nil {
 		return err
 	}
 

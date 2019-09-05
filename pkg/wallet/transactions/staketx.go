@@ -1,102 +1,79 @@
 package transactions
 
 import (
-	"encoding/binary"
-	"io"
+	"bytes"
 
-	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-crypto/hash"
 )
 
-type StakeTx struct {
-	*TimelockTx
+type Stake struct {
+	*Timelock
 	PubKeyEd  []byte
 	PubKeyBLS []byte
 }
 
-func NewStakeTx(netPrefix byte, fee int64, lock uint64, pubKeyEd, pubKeyBLS []byte) (*StakeTx, error) {
-
-	tx, err := NewTimeLockTx(netPrefix, fee, lock)
+func NewStake(ver uint8, netPrefix byte, fee int64, lock uint64, pubKeyEd, pubKeyBLS []byte) (*Stake, error) {
+	tx, err := NewTimelock(ver, netPrefix, fee, lock)
 	if err != nil {
 		return nil, err
 	}
 
-	return &StakeTx{
+	tx.TxType = StakeType
+	return &Stake{
 		tx,
 		pubKeyEd,
 		pubKeyBLS,
 	}, nil
 }
 
-func (s *StakeTx) Hash() ([]byte, error) {
-	return hashBytes(s.encode)
-}
-
-func (s *StakeTx) encode(w io.Writer, encodeSig bool) error {
-	if err := s.TimelockTx.encode(w, encodeSig); err != nil {
-		return err
+func (s *Stake) CalculateHash() ([]byte, error) {
+	if len(s.TxID) != 0 {
+		return s.TxID, nil
 	}
 
-	lenEd := uint64(len(s.PubKeyEd))
-	if err := binary.Write(w, binary.BigEndian, lenEd); err != nil {
-		return err
-	}
-	if err := binary.Write(w, binary.BigEndian, s.PubKeyEd); err != nil {
-		return err
+	buf := new(bytes.Buffer)
+	if err := marshalStake(buf, s, false); err != nil {
+		return nil, err
 	}
 
-	lenBLS := uint64(len(s.PubKeyBLS))
-	if err := binary.Write(w, binary.BigEndian, lenBLS); err != nil {
-		return err
-	}
-	return binary.Write(w, binary.BigEndian, s.PubKeyBLS)
-}
-
-func (s *StakeTx) Prove() error {
-	return s.prove(s.Hash, false)
-}
-
-func (s *StakeTx) Encode(w io.Writer) error {
-	return s.encode(w, true)
-}
-
-func (s *StakeTx) Decode(r io.Reader) error {
-
-	s.TimelockTx = &TimelockTx{}
-
-	if err := s.TimelockTx.Decode(r); err != nil {
-		return err
-	}
-
-	var lenEd, lenBLS uint64
-	if err := binary.Read(r, binary.BigEndian, &lenEd); err != nil {
-		return err
-	}
-	s.PubKeyEd = make([]byte, lenEd)
-	if err := binary.Read(r, binary.BigEndian, &s.PubKeyEd); err != nil {
-		return err
-	}
-
-	if err := binary.Read(r, binary.BigEndian, &lenBLS); err != nil {
-		return err
-	}
-	s.PubKeyBLS = make([]byte, lenBLS)
-
-	return binary.Read(r, binary.BigEndian, &s.PubKeyBLS)
-}
-
-func (s *StakeTx) WireStakeTx() (*wiretx.Stake, error) {
-
-	tl, err := s.WireTimeLockTx()
+	txid, err := hash.Sha3256(buf.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
-	tx := &wiretx.Stake{
-		*tl,
-		s.PubKeyEd,
-		s.PubKeyBLS,
-	}
-	tx.TxType = wiretx.StakeType
+	s.TxID = txid
+	return txid, nil
+}
 
-	return tx, nil
+func (s *Stake) StandardTx() Standard {
+	return *s.Standard
+}
+
+func (s *Stake) Type() TxType {
+	return s.TxType
+}
+
+func (s *Stake) Prove() error {
+	return s.prove(s.CalculateHash, false)
+}
+
+func (s *Stake) Equals(t Transaction) bool {
+	other, ok := t.(*Stake)
+	if !ok {
+		return false
+	}
+
+	if !s.Timelock.Equals(other.Timelock) {
+		return false
+	}
+
+	if !bytes.Equal(s.PubKeyEd, other.PubKeyEd) {
+		return false
+	}
+
+	if !bytes.Equal(s.PubKeyBLS, other.PubKeyBLS) {
+		return false
+	}
+
+	return true
 }

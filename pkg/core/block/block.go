@@ -1,10 +1,7 @@
 package block
 
 import (
-	"io"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 )
 
@@ -17,10 +14,7 @@ type Block struct {
 // NewBlock will return an empty Block with an empty BlockHeader.
 func NewBlock() *Block {
 	return &Block{
-		Header: &Header{
-			Version:     0x00,
-			Certificate: EmptyCertificate(),
-		},
+		Header: NewHeader(),
 	}
 }
 
@@ -61,46 +55,6 @@ func (b *Block) Clear() {
 // SetHash will set the block hash.
 func (b *Block) SetHash() error {
 	return b.Header.SetHash()
-}
-
-// Encode a Block struct and write to w.
-func (b *Block) Encode(w io.Writer) error {
-	if err := b.Header.Encode(w); err != nil {
-		return err
-	}
-
-	lTxs := uint64(len(b.Txs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return err
-	}
-
-	for _, tx := range b.Txs {
-		if err := tx.Encode(w); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Decode a Block struct from r into b.
-func (b *Block) Decode(r io.Reader) error {
-	b.Header = &Header{}
-	if err := b.Header.Decode(r); err != nil {
-		return err
-	}
-
-	lTxs, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return err
-	}
-
-	b.Txs, err = transactions.FromReader(r, lTxs)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Equals returns true if two blocks are equal

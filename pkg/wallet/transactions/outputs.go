@@ -14,7 +14,9 @@ type Outputs []*Output
 func (out Outputs) Len() int { return len(out) }
 
 // Less implements the sort interface
-func (out Outputs) Less(i, j int) bool { return bytes.Compare(out[i].DestKey, out[j].DestKey) == -1 }
+func (out Outputs) Less(i, j int) bool {
+	return bytes.Compare(out[i].PubKey.P.Bytes(), out[j].PubKey.P.Bytes()) == -1
+}
 
 // Swap implements the sort interface
 func (out Outputs) Swap(i, j int) { out[i], out[j] = out[j], out[i] }
@@ -30,9 +32,9 @@ func (out Outputs) Equals(other Outputs) bool {
 	}
 
 	for i := range out {
-		firstInput := out[i]
-		secondInput := other[i]
-		if !firstInput.Equals(secondInput) {
+		firstOutput := out[i]
+		secondOutput := other[i]
+		if !firstOutput.Equals(secondOutput) {
 			return false
 		}
 	}
@@ -43,7 +45,7 @@ func (out Outputs) Equals(other Outputs) bool {
 // This is done by checking that there are no matching Destination keys
 func (out Outputs) HasDuplicates() bool {
 	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
-		if bytes.Equal(out[i].DestKey, out[j].DestKey) {
+		if bytes.Equal(out[i].PubKey.P.Bytes(), out[j].PubKey.P.Bytes()) {
 			return true
 		}
 	}

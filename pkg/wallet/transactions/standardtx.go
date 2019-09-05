@@ -2,20 +2,16 @@ package transactions
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	wiretx "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-crypto/rangeproof"
+	"github.com/dusk-network/dusk-wallet/key"
 
 	"github.com/bwesterb/go-ristretto"
-	"golang.org/x/crypto/sha3"
 )
 
 const minDecoys = 7
@@ -24,41 +20,54 @@ const maxOutputs = 16
 
 type FetchDecoys func(numMixins int) []mlsag.PubKeys
 
-const (
-	coinbaseType uint8 = 1
-	standardType       = 2
-	bidType            = 3
-	stakeType          = 4
-	timelockType       = 5
-)
+// Standard is a generic transaction. It can also be seen as a stealth transaction.
+// It is used to make basic payments on the dusk network.
+type Standard struct {
+	//// Encoded fields
+	// TxType represents the transaction type
+	TxType TxType
 
-type StandardTx struct {
-	r ristretto.Scalar
+	// R is the transaction Public Key
 	R ristretto.Point
 
-	Inputs  []*Input
-	Outputs []*Output
-	Fee     ristretto.Scalar
+	// Version is the transaction version. It does not use semver.
+	// A new transaction version denotes a modification of the previous structure
+	Version uint8 // 1 byte
 
-	index     uint32
+	// Inputs represent a list of inputs to the transaction.
+	Inputs
+	// Outputs represent a list of outputs to the transaction
+	Outputs
+
+	Fee ristretto.Scalar
+
+	// RangeProof is the bulletproof rangeproof that proves that the hidden amount
+	// is between 0 and 2^64
+	RangeProof rangeproof.Proof
+
+	////
+	//// Non-encoded fields
+	r     ristretto.Scalar
+	index uint32
+
+	// Prefix that signifies for which network this transaction is intended (testnet, mainnet)
 	netPrefix byte
 
-	RangeProof rangeproof.Proof
+	// TxID is the hash of the transaction fields.
+	TxID []byte
 
 	TotalSent ristretto.Scalar
 }
 
-func NewStandard(netPrefix byte, fee int64) (*StandardTx, error) {
-
-	tx := &StandardTx{}
+func NewStandard(ver uint8, netPrefix byte, fee int64) (*Standard, error) {
+	tx := &Standard{
+		TxType:    StandardType,
+		Version:   ver,
+		index:     0,
+		netPrefix: netPrefix,
+	}
 
 	tx.TotalSent.SetZero()
-
-	// Index for subaddresses
-	tx.index = 0
-
-	// prefix to signify testnet/mainnet
-	tx.netPrefix = netPrefix
 
 	// randomly generated nonce - r
 	var r ristretto.Scalar
@@ -73,11 +82,11 @@ func NewStandard(netPrefix byte, fee int64) (*StandardTx, error) {
 	return tx, nil
 }
 
-func (s *StandardTx) setTxPubKey(r ristretto.Scalar) {
+func (s *Standard) setTxPubKey(r ristretto.Scalar) {
 	s.r = r
 	s.R.ScalarMultBase(&r)
 }
-func (s *StandardTx) setTxFee(fee int64) error {
+func (s *Standard) setTxFee(fee int64) error {
 	if fee < 0 {
 		return errors.New("fee cannot be negative")
 	}
@@ -86,7 +95,7 @@ func (s *StandardTx) setTxFee(fee int64) error {
 	return nil
 }
 
-func (s *StandardTx) AddInput(i *Input) error {
+func (s *Standard) AddInput(i *Input) error {
 	if len(s.Inputs)+1 > maxInputs {
 		return errors.New("maximum amount of inputs reached")
 	}
@@ -94,7 +103,7 @@ func (s *StandardTx) AddInput(i *Input) error {
 	return nil
 }
 
-func (s *StandardTx) AddOutput(pubAddr key.PublicAddress, amount ristretto.Scalar) error {
+func (s *Standard) AddOutput(pubAddr key.PublicAddress, amount ristretto.Scalar) error {
 	if len(s.Outputs)+1 > maxOutputs {
 		return errors.New("maximum amount of outputs reached")
 	}
@@ -115,7 +124,7 @@ func (s *StandardTx) AddOutput(pubAddr key.PublicAddress, amount ristretto.Scala
 	return nil
 }
 
-func (s *StandardTx) AddDecoys(numMixins int, f FetchDecoys) error {
+func (s *Standard) AddDecoys(numMixins int, f FetchDecoys) error {
 
 	if f == nil {
 		return errors.New("fetch decoys function cannot be nil")
@@ -128,7 +137,7 @@ func (s *StandardTx) AddDecoys(numMixins int, f FetchDecoys) error {
 	return nil
 }
 
-func (s *StandardTx) ProveRangeProof() error {
+func (s *Standard) ProveRangeProof() error {
 
 	lenOutputs := len(s.Outputs)
 	if lenOutputs < 1 {
@@ -156,8 +165,8 @@ func (s *StandardTx) ProveRangeProof() error {
 	// Move commitment values to their respective outputs
 	// along with their blinding factors
 	for i := 0; i < lenOutputs; i++ {
-		s.Outputs[i].setCommitment(proof.V[i].Value)
-		s.Outputs[i].setMask(proof.V[i].BlindingFactor)
+		s.Outputs[i].Commitment = proof.V[i].Value
+		s.Outputs[i].mask = proof.V[i].BlindingFactor
 	}
 	return nil
 }
@@ -205,33 +214,33 @@ func calculateCommToZero(inputs []*Input, outputs []*Output) {
 	}
 }
 
-func (s *StandardTx) encryptOutputValues(encryptValues bool) {
+func (s *Standard) encryptOutputValues(encryptValues bool) {
 	var zero ristretto.Scalar
 	zero.SetZero()
 	for i := range s.Outputs {
 		output := s.Outputs[i]
 
 		if !encryptValues {
-			output.setEncryptedAmount(output.amount)
-			output.setEncryptedMask(zero)
+			output.EncryptedAmount = output.amount
+			output.EncryptedMask = zero
 			continue
 		}
 
 		encryptedAmount := EncryptAmount(output.amount, s.r, output.Index, output.viewKey)
-		output.setEncryptedAmount(encryptedAmount)
+		output.EncryptedAmount = encryptedAmount
 
 		encryptedMask := EncryptMask(output.mask, s.r, output.Index, output.viewKey)
-		output.setEncryptedMask(encryptedMask)
+		output.EncryptedMask = encryptedMask
 	}
 }
 
 // Prove creates the rangeproof for output values and creates the mlsag balance and ownership proof
 // Prove assumes that all inputs, outputs and decoys have been added to the transaction
-func (s *StandardTx) Prove() error {
-	return s.prove(s.Hash, true)
+func (s *Standard) Prove() error {
+	return s.prove(s.CalculateHash, true)
 }
 
-func (s *StandardTx) prove(hasher func() ([]byte, error), encryptValues bool) error {
+func (s *Standard) prove(hasher func() ([]byte, error), encryptValues bool) error {
 	// Prove rangeproof, creating the commitments for each output
 	err := s.ProveRangeProof()
 	if err != nil {
@@ -275,165 +284,31 @@ func (s *StandardTx) prove(hasher func() ([]byte, error), encryptValues bool) er
 	return nil
 }
 
-func (s *StandardTx) encode(w io.Writer, encodeSignature bool) error {
-	err := binary.Write(w, binary.BigEndian, s.R.Bytes())
-	if err != nil {
-		return err
+func (s *Standard) CalculateHash() ([]byte, error) {
+	if len(s.TxID) != 0 {
+		return s.TxID, nil
 	}
-	err = binary.Write(w, binary.BigEndian, s.Fee.Bytes())
-	if err != nil {
-		return err
-	}
-	lenIn := uint64(len(s.Inputs))
-	err = binary.Write(w, binary.BigEndian, lenIn)
-	if err != nil {
-		return err
-	}
-	for _, input := range s.Inputs {
-		err = input.encode(w, encodeSignature)
-		if err != nil {
-			return err
-		}
-	}
-	lenOut := uint64(len(s.Outputs))
-	err = binary.Write(w, binary.BigEndian, lenOut)
-	if err != nil {
-		return err
-	}
-	for _, output := range s.Outputs {
-		err = output.Encode(w)
-		if err != nil {
-			return err
-		}
-	}
-	return s.RangeProof.Encode(w, false)
-}
 
-func (s *StandardTx) Encode(w io.Writer) error {
-	return s.encode(w, true)
-}
+	buf := new(bytes.Buffer)
+	if err := marshalStandard(buf, s, false); err != nil {
+		return nil, err
+	}
 
-func (s *StandardTx) Hash() ([]byte, error) {
-	return hashBytes(s.encode)
-}
-
-func hashBytes(encoder func(io.Writer, bool) error) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	err := encoder(buf, false)
+	txid, err := hash.Sha3256(buf.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	hash := sha3.Sum256(buf.Bytes())
-	return hash[:], nil
-}
-func (s *StandardTx) Decode(r io.Reader) error {
 
-	var RBytes [32]byte
-	err := binary.Read(r, binary.BigEndian, &RBytes)
-	if err != nil {
-		return err
-	}
-	s.R.SetBytes(&RBytes)
-	var FeeBytes [32]byte
-	err = binary.Read(r, binary.BigEndian, &FeeBytes)
-	if err != nil {
-		return err
-	}
-	s.Fee.SetBytes(&FeeBytes)
-
-	var lenIn uint64
-	err = binary.Read(r, binary.BigEndian, &lenIn)
-	if err != nil {
-		return err
-	}
-
-	for i := uint64(0); i < lenIn; i++ {
-		var input *Input
-		err = input.Decode(r)
-		if err != nil {
-			return err
-		}
-		s.Inputs = append(s.Inputs, input)
-	}
-
-	var lenOut uint64
-	err = binary.Read(r, binary.BigEndian, &lenOut)
-	if err != nil {
-		return err
-	}
-
-	for i := uint64(0); i < lenOut; i++ {
-		var output *Output
-		err = output.Decode(r)
-		if err != nil {
-			return err
-		}
-		s.Outputs = append(s.Outputs, output)
-	}
-
-	return s.RangeProof.Decode(r, true)
+	s.TxID = txid
+	return txid, nil
 }
 
-func (s *StandardTx) WireStandardTx() (*wiretx.Standard, error) {
-
-	fee := s.Fee.BigInt().Uint64()
-
-	wireTx := wiretx.NewStandard(0, fee, s.R.Bytes())
-
-	// Serialise rangeproof
-	buf := &bytes.Buffer{}
-	err := s.RangeProof.Encode(buf, true)
-	if err != nil {
-		return nil, err
-	}
-	wireTx.RangeProof = buf.Bytes()
-
-	// Serialise inputs
-	for i := 0; i < len(s.Inputs); i++ {
-
-		input := s.Inputs[i]
-
-		keyImage := input.KeyImage.Bytes()
-		pubKey := input.PubKey.P.Bytes()
-		pseudoCommitment := input.PseudoCommitment.Bytes()
-
-		buf = &bytes.Buffer{}
-		err = input.Signature.Encode(buf, true)
-		if err != nil {
-			return nil, err
-		}
-		sig := buf.Bytes()
-
-		wireInput, err := transactions.NewInput(keyImage, pubKey, pseudoCommitment, sig)
-		if err != nil {
-			return nil, err
-		}
-		wireTx.AddInput(wireInput)
-	}
-
-	// Serialise outputs
-	for i := 0; i < len(s.Outputs); i++ {
-		output := s.Outputs[i]
-
-		commitment := output.Commitment.Bytes()
-		destKey := output.PubKey.P.Bytes()
-		encAmount := output.EncryptedAmount.Bytes()
-		encMask := output.EncryptedMask.Bytes()
-
-		wireOutput, err := transactions.NewOutput(commitment, destKey)
-		if err != nil {
-			return nil, err
-		}
-		wireOutput.EncryptedAmount = encAmount
-		wireOutput.EncryptedMask = encMask
-
-		wireTx.AddOutput(wireOutput)
-	}
-	return wireTx, nil
+func (s *Standard) StandardTx() Standard {
+	return *s
 }
 
-func (s *StandardTx) Standard() (*StandardTx, error) {
-	return s, nil
+func (s *Standard) Type() TxType {
+	return s.TxType
 }
 
 func generateScalars(n int) []ristretto.Scalar {
@@ -459,4 +334,39 @@ func CommitAmount(amount, mask ristretto.Scalar) ristretto.Point {
 	commitment.Add(&aH, &bG)
 
 	return commitment
+}
+
+// Equals returns true if two standard tx's are the same
+func (s *Standard) Equals(t Transaction) bool {
+	other, ok := t.(*Standard)
+	if !ok {
+		return false
+	}
+
+	if s.Version != other.Version {
+		return false
+	}
+
+	if !bytes.Equal(s.R.Bytes(), other.R.Bytes()) {
+		return false
+	}
+
+	if !s.Inputs.Equals(other.Inputs) {
+		return false
+	}
+
+	if !s.Outputs.Equals(other.Outputs) {
+		return false
+	}
+
+	if !bytes.Equal(s.Fee.Bytes(), other.Fee.Bytes()) {
+		return false
+	}
+
+	// TxID is not compared, as this could be nil (not set)
+	// We could check whether it is set and then check, but
+	// the txid is not updated, if a modification is made after
+	// calculating the hash. What we can do, is state this edge case and analyse our use-cases.
+
+	return s.RangeProof.Equals(other.RangeProof, true)
 }

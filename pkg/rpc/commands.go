@@ -18,9 +18,9 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		"version":       version,
-		"ping":          pong,
-		"uptime":        uptime,
+		"version": version,
+		"ping":    pong,
+		"uptime":  uptime,
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,

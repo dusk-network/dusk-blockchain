@@ -4,8 +4,8 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,7 +32,7 @@ func getD(m ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) r
 	}
 
 	d := ristretto.Scalar{}
-	d.UnmarshalBinary(bid.(*transactions.Bid).Outputs[0].Commitment)
+	d.UnmarshalBinary(bid.(*transactions.Bid).Outputs[0].Commitment.Bytes())
 	return d
 }
 

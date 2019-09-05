@@ -12,7 +12,9 @@ type Inputs []*Input
 func (in Inputs) Len() int { return len(in) }
 
 // Less implements the sort interface
-func (in Inputs) Less(i, j int) bool { return bytes.Compare(in[i].KeyImage, in[j].KeyImage) == -1 }
+func (in Inputs) Less(i, j int) bool {
+	return bytes.Compare(in[i].KeyImage.Bytes(), in[j].KeyImage.Bytes()) == -1
+}
 
 // Swap implements the sort interface
 func (in Inputs) Swap(i, j int) { in[i], in[j] = in[j], in[i] }
@@ -41,7 +43,7 @@ func (in Inputs) Equals(other Inputs) bool {
 // This is done by checking their keyImages
 func (in Inputs) HasDuplicates() bool {
 	for i, j := 0, len(in)-1; i < j; i, j = i+1, j-1 {
-		if bytes.Equal(in[i].KeyImage, in[j].KeyImage) {
+		if bytes.Equal(in[i].KeyImage.Bytes(), in[j].KeyImage.Bytes()) {
 			return true
 		}
 	}

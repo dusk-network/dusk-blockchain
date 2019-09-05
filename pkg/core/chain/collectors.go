@@ -34,7 +34,7 @@ func initBlockCollector(eventBus *wire.EventBus, topic string) chan *block.Block
 
 func (b *blockCollector) Collect(message *bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := blk.Decode(message); err != nil {
+	if err := block.Unmarshal(message, blk); err != nil {
 		return err
 	}
 
@@ -56,7 +56,7 @@ func (c *certificateCollector) Collect(m *bytes.Buffer) error {
 	}
 
 	cert := block.EmptyCertificate()
-	if err := cert.Decode(m); err != nil {
+	if err := block.UnmarshalCertificate(m, cert); err != nil {
 		return err
 	}
 

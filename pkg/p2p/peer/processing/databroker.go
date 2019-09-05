@@ -6,7 +6,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -136,7 +136,7 @@ func (d *DataBroker) SendTxsItems() error {
 
 func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
-	if err := b.Encode(buf); err != nil {
+	if err := block.Marshal(buf, b); err != nil {
 		return nil, err
 	}
 
@@ -145,7 +145,7 @@ func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 
 func marshalTx(tx transactions.Transaction) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
-	if err := tx.Encode(buf); err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
 		return nil, err
 	}
 

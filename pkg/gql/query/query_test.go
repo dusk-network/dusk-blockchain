@@ -1,18 +1,23 @@
 package query
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"reflect"
+	"testing"
+
+	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	core "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-crypto/rangeproof"
 	"github.com/graphql-go/graphql"
-	"os"
-	"reflect"
-	"testing"
 )
 
 var sc graphql.Schema
@@ -89,7 +94,7 @@ func assertQuery(t *testing.T, query, response string) {
 		t.Error(err)
 	}
 
-	//t.Logf("Result:\n%s", result)
+	t.Logf("Result:\n%s", result)
 	if !equal {
 		t.Error("expecting other response from this query")
 	}
@@ -111,7 +116,58 @@ func assertJSONs(result, expected []byte) (bool, error) {
 }
 
 func fixedTransaction(t *testing.T, fee int) core.Transaction {
-	tx := core.NewStandard(0, uint64(fee), make([]byte, 32))
-	tx.RangeProof = make([]byte, 32)
+	tx, err := core.NewStandard(0, 2, int64(fee))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx.R = ristretto.Point{}
+	tx.R.SetZero()
+	tx.RangeProof = fixedRangeProof(t)
+
 	return tx
+}
+
+func fixedRangeProof(t *testing.T) rangeproof.Proof {
+	lenComm := uint32(1)
+	commBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(commBytes, lenComm)
+	buf := bytes.NewBuffer(commBytes)
+	comm := ristretto.Point{}
+	comm.SetZero()
+	if _, err := buf.Write(comm.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create random points
+	for i := 0; i < 4; i++ {
+		p := ristretto.Point{}
+		p.SetZero()
+		if _, err := buf.Write(p.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create random scalars
+	for i := 0; i < 5; i++ {
+		s := ristretto.Scalar{}
+		s.SetZero()
+		if _, err := buf.Write(s.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for i := 0; i < 2; i++ {
+		p := ristretto.Point{}
+		p.SetZero()
+		if _, err := buf.Write(p.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rp := rangeproof.Proof{}
+	if err := rp.Decode(buf, true); err != nil {
+		t.Fatal(err)
+	}
+
+	return rp
 }

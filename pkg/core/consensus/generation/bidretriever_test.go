@@ -7,7 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +16,7 @@ func TestSearchForBid(t *testing.T) {
 	k := ristretto.Scalar{}
 	k.Rand()
 
-	d := ristretto.Scalar{}
+	d := ristretto.Point{}
 	d.Rand()
 	db, err := initTest(t)
 	assert.NoError(t, err)
@@ -24,7 +24,7 @@ func TestSearchForBid(t *testing.T) {
 	bid, err := helper.RandomBidTx(t, false)
 	assert.NoError(t, err)
 
-	bid.Outputs[0].Commitment = d.Bytes()
+	bid.Outputs[0].Commitment = d
 	m := zkproof.CalculateM(k)
 	bid.M = m.Bytes()
 
@@ -41,7 +41,7 @@ func TestSearchForBid(t *testing.T) {
 	retrieved, err = retriever.SearchForBid(m.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, retrieved)
-	assert.Equal(t, d.Bytes(), retrieved.(*transactions.Bid).Outputs[0].Commitment)
+	assert.Equal(t, d.Bytes(), retrieved.(*transactions.Bid).Outputs[0].Commitment.Bytes())
 }
 
 func initTest(t *testing.T) (database.DB, error) {

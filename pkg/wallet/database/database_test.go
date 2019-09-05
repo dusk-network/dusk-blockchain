@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,9 @@ func TestPutGet(t *testing.T) {
 	// New
 	db, err := New(path)
 	assert.Nil(t, err)
+
+	// Make sure to delete this dir after test
+	defer os.RemoveAll(path)
 
 	// Put
 	key := []byte("hello")

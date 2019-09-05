@@ -3,11 +3,12 @@ package query
 import (
 	"encoding/hex"
 	"errors"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 
-	core "github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	core "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 // File purpose is to define all arguments and resolvers relevant to "blocks" query only
@@ -113,7 +114,7 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 			}
 
 			for _, tx := range fetched {
-				sTx := tx.StandardTX()
+				sTx := tx.StandardTx()
 				sTx.TxID, _ = tx.CalculateHash()
 				txs = append(txs, sTx)
 			}

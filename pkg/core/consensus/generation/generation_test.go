@@ -13,9 +13,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,7 +24,7 @@ import (
 // Note that the proof generator is mocked here, so the actual validity of the data
 // is not tested.
 func TestScoreGeneration(t *testing.T) {
-	d := ristretto.Scalar{}
+	d := ristretto.Point{}
 	d.Rand()
 	k := ristretto.Scalar{}
 	k.Rand()
@@ -44,7 +44,7 @@ func TestScoreGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bid.Outputs[0].Commitment = d.Bytes()
+	bid.Outputs[0].Commitment = d
 	m := zkproof.CalculateM(k)
 	bid.M = m.Bytes()
 
@@ -60,7 +60,7 @@ func TestScoreGeneration(t *testing.T) {
 	// send a block to start generation
 	blk = helper.RandomBlock(t, 0, 1)
 	b := new(bytes.Buffer)
-	if err := blk.Encode(b); err != nil {
+	if err := block.Marshal(b, blk); err != nil {
 		t.Fatal(err)
 	}
 	eb.Publish(string(topics.AcceptedBlock), b)

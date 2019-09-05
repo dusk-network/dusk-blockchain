@@ -18,11 +18,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
@@ -101,7 +101,7 @@ func (c *Chain) Listen() {
 			prevBlock := c.prevBlock
 			c.mu.RUnlock()
 
-			if err := prevBlock.Encode(buf); err != nil {
+			if err := block.Marshal(buf, &prevBlock); err != nil {
 				r.ErrChan <- err
 				continue
 			}
@@ -121,7 +121,7 @@ func (c *Chain) Listen() {
 
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := new(bytes.Buffer)
-	if err := blk.Encode(buffer); err != nil {
+	if err := block.Marshal(buffer, &blk); err != nil {
 		return err
 	}
 
@@ -140,7 +140,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 		return err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, tx.GetOutputAmount()); err != nil {
+	if err := encoding.WriteUint64(buffer, binary.LittleEndian, tx.Outputs[0].EncryptedAmount.BigInt().Uint64()); err != nil {
 		return err
 	}
 
@@ -157,7 +157,7 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 }
 
 func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) error {
-	x := user.CalculateX(tx.Outputs[0].Commitment, tx.M)
+	x := user.CalculateX(tx.Outputs[0].Commitment.Bytes(), tx.M)
 	x.EndHeight = startHeight + tx.Lock
 
 	c.propagateBid(x)
@@ -191,7 +191,7 @@ func (c *Chain) Close() error {
 
 func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := blk.Decode(m); err != nil {
+	if err := block.Unmarshal(m, blk); err != nil {
 		return err
 	}
 
@@ -247,7 +247,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// mempool.Mempool
 	// consensus.generation.broker
 	buf := new(bytes.Buffer)
-	if err := blk.Encode(buf); err != nil {
+	if err := block.Marshal(buf, &blk); err != nil {
 		l.Errorf("block encoding failed: %s", err.Error())
 		return err
 	}

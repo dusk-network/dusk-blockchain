@@ -123,7 +123,7 @@ func InitAcceptedBlockUpdate(subscriber wire.EventSubscriber) (chan block.Block,
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
 func (c *acceptedBlockCollector) Collect(r *bytes.Buffer) error {
 	b := block.NewBlock()
-	if err := b.Decode(r); err != nil {
+	if err := block.Unmarshal(r, b); err != nil {
 		return err
 	}
 
