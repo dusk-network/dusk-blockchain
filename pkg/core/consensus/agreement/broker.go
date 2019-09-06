@@ -82,6 +82,13 @@ func (b *broker) sendAgreement(voteSet voteSet) error {
 	// This way, we are always on the same step as everybody else.
 	defer b.state.IncrementStep()
 
+	// Make sure we actually received a voteset, before trying to aggregate it.
+	if voteSet.votes == nil {
+		// If we didn't return here, so we do increment the step to stay in sync.
+		log.WithField("process", "agreement").Debugln("received an empty voteset")
+		return nil
+	}
+
 	if b.handler.AmMember(b.state.Round(), b.state.Step()) {
 		msg, err := b.handler.createAgreement(voteSet.votes, b.state.Round(), b.state.Step())
 		if err != nil {
