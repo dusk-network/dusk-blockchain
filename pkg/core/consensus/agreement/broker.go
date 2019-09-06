@@ -84,7 +84,7 @@ func (b *broker) sendAgreement(voteSet voteSet) error {
 
 	// Make sure we actually received a voteset, before trying to aggregate it.
 	if voteSet.votes == nil {
-		// If we didn't return here, so we do increment the step to stay in sync.
+		// If we didn't, return here, so that we increment the step to stay in sync.
 		log.WithField("process", "agreement").Debugln("received an empty voteset")
 		return nil
 	}
