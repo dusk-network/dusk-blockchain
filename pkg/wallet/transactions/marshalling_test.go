@@ -270,6 +270,8 @@ func calcTxAndStandardHash(t *testing.T, tx transactions.Transaction) ([]byte, [
 
 	standard := tx.StandardTx()
 	standardHash, err := standard.CalculateHash()
+	// Clear TxID field, as it will be populated by the underlying Standard struct
+	standard.TxID = nil
 
 	txHash, err := tx.CalculateHash()
 	assert.Nil(t, err)
