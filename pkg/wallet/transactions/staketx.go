@@ -45,8 +45,8 @@ func (s *Stake) CalculateHash() ([]byte, error) {
 	return txid, nil
 }
 
-func (s *Stake) StandardTx() Standard {
-	return *s.Standard
+func (s *Stake) StandardTx() *Standard {
+	return s.Standard
 }
 
 func (s *Stake) Type() TxType {

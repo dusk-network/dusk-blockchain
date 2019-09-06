@@ -303,8 +303,8 @@ func (s *Standard) CalculateHash() ([]byte, error) {
 	return txid, nil
 }
 
-func (s *Standard) StandardTx() Standard {
-	return *s
+func (s *Standard) StandardTx() *Standard {
+	return s
 }
 
 func (s *Standard) Type() TxType {

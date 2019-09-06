@@ -32,7 +32,7 @@ func CheckTx(db database.DB, index uint64, blockTime uint64, tx transactions.Tra
 
 // CheckStandardTx checks whether the standard fields are correct against the
 // passed blockchain db. These checks are both stateless and stateful.
-func CheckStandardTx(db database.DB, tx transactions.Standard) error {
+func CheckStandardTx(db database.DB, tx *transactions.Standard) error {
 	// Version -- currently we only accept Version 0
 	if tx.Version != 0 {
 		return errors.New("invalid transaction version")

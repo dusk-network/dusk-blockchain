@@ -62,7 +62,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			fetched = append(fetched, tx)
 		}
 
-		txs := make([]rawtxs.Standard, 0)
+		txs := make([]*rawtxs.Standard, 0)
 		for _, tx := range fetched {
 			sTx := tx.StandardTx()
 			sTx.TxID, err = tx.CalculateHash()

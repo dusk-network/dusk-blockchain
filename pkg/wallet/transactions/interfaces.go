@@ -18,5 +18,5 @@ type Transaction interface {
 	TypeInfo
 	merkletree.Payload
 	Equals(Transaction) bool
-	StandardTx() Standard
+	StandardTx() *Standard
 }
