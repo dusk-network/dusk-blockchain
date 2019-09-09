@@ -28,9 +28,9 @@ func TestSearchForBid(t *testing.T) {
 	m := zkproof.CalculateM(k)
 	bid.M = m.Bytes()
 
-	retriever := newBidRetriever(db)
+	retriever := NewBidRetriever(db)
 	// We shouldn't get anything back yet, as the bid is not included in a block in the db
-	retrieved, err := retriever.SearchForBid(m.Bytes())
+	retrieved, _, err := retriever.SearchForBid(m.Bytes())
 	assert.Error(t, err)
 	assert.Nil(t, retrieved)
 
@@ -38,7 +38,7 @@ func TestSearchForBid(t *testing.T) {
 	storeTx(t, db, bid)
 
 	// This time, we shouldn't get an error, and an actual value returned
-	retrieved, err = retriever.SearchForBid(m.Bytes())
+	retrieved, _, err = retriever.SearchForBid(m.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, retrieved)
 	assert.Equal(t, d.Bytes(), retrieved.(*transactions.Bid).Outputs[0].Commitment.Bytes())
