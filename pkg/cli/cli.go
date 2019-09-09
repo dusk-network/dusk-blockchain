@@ -49,10 +49,6 @@ func (c *CLI) runCmd(cmd string, args []string, logFile *os.File) {
 		c.sendStakeCMD(args)
 	case "bid":
 		c.sendBidCMD(args)
-	case "setdefaultlocktime":
-		c.setLocktimeCMD(args)
-	case "setdefaultvalue":
-		c.setDefaultValueCMD(args)
 	case "exit", "quit":
 		stopNode()
 	case "showlogs":

@@ -17,10 +17,6 @@ var commandInfo = map[string]string{
 		Stake a set amount of DUSK, to allow participation as a provisioner in consensus.`,
 	"bid": `Usage: bid [amount] [locktime]
 		Bid a set amount of DUSK, to allow participation as a block generator in consensus.`,
-	"setdefaultlocktime": `Usage: setdefaultlocktime [locktime]
-		Sets the locktime for consensus transactions.`,
-	"setdefaultvalue": `Usage: setdefaultvalue [amount]
-		Sets the default value for consensus transactions.`,
 	"showlogs":  "Close the shell and show the internal logs on the terminal. Press enter to return to the shell.",
 	"exit/quit": `Shut down the node and close the console`,
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strconv"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -356,40 +355,4 @@ func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Ke
 		return nil, 0, err
 	}
 	return db.FetchInputs(privSpend.Bytes(), totalAmount)
-}
-
-func (c *CLI) setLocktimeCMD(args []string) {
-	if args == nil || len(args) < 1 {
-		fmt.Fprintln(os.Stdout, "please specify a default locktime")
-		return
-	}
-
-	locktime, err := strconv.Atoi(args[0])
-	if err != nil {
-		fmt.Fprintln(os.Stdout, err)
-		return
-	}
-
-	if locktime > 250000 {
-		fmt.Fprintln(os.Stdout, "locktime can not be higher than 250000")
-	}
-
-	// Send value to tx sender
-	fmt.Println(locktime)
-}
-
-func (c *CLI) setDefaultValueCMD(args []string) {
-	if args == nil || len(args) < 1 {
-		fmt.Fprintln(os.Stdout, "please specify a default value")
-		return
-	}
-
-	value, err := strconv.Atoi(args[0])
-	if err != nil {
-		fmt.Fprintln(os.Stdout, err)
-		return
-	}
-
-	// Send value to tx sender
-	fmt.Println(value)
 }
