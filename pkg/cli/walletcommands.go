@@ -79,6 +79,11 @@ func (c *CLI) launchMaintainer(w *wallet.Wallet) error {
 	r := cfg.Get()
 	value := r.Consensus.DefaultValue
 	lockTime := r.Consensus.DefaultLockTime
+	if lockTime > transactions.MaxLockTime {
+		fmt.Fprintf(os.Stdout, "default locktime was configured to be greater than the maximum (%v) - defaulting to %v\n", lockTime, transactions.MaxLockTime)
+		lockTime = transactions.MaxLockTime
+	}
+
 	buffer := r.Consensus.DefaultBuffer
 	k, err := w.ReconstructK()
 	if err != nil {
