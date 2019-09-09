@@ -86,6 +86,6 @@ type mempoolConfiguration struct {
 
 type consensusConfiguration struct {
 	DefaultLockTime uint64
-	DefaultValue    uint64
-	DefaultBuffer   uint64
+	DefaultAmount   uint64
+	DefaultOffset   uint64
 }

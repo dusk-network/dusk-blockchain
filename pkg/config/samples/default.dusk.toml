@@ -102,5 +102,6 @@ accumulatorWorkers = 4
 # Information for the node to send consensus transactions with
 [consensus]
 defaultlocktime = 250000
-defaultvalue = 5
-defaultbuffer = 100
+defaultamount = 5
+# Default amount of rounds before expiry to renew a stake or bid
+defaultoffset = 100

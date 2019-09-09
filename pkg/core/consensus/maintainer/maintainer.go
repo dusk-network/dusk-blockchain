@@ -33,12 +33,12 @@ type maintainer struct {
 	bidEndHeight   uint64
 	stakeEndHeight uint64
 
-	value, lockTime, buffer uint64
+	amount, lockTime, offset uint64
 
 	transactor *transactor.Transactor
 }
 
-func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, value, lockTime, buffer uint64) (*maintainer, error) {
+func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*maintainer, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -50,14 +50,14 @@ func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byt
 		c:            committee.LaunchStore(eventBroker, db),
 		bidRetriever: generation.NewBidRetriever(nil),
 		transactor:   transactor,
-		value:        value,
+		amount:       amount,
 		lockTime:     lockTime,
-		buffer:       buffer,
+		offset:       offset,
 	}, nil
 }
 
-func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, value, lockTime, buffer uint64) error {
-	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, transactor, value, lockTime, buffer)
+func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) error {
+	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, transactor, amount, lockTime, offset)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ri
 func (m *maintainer) listen() {
 	for {
 		round := <-m.roundChan
-		if round+m.buffer >= m.bidEndHeight {
+		if round+m.offset >= m.bidEndHeight {
 			endHeight, err := m.findActiveBid()
 			if err != nil && err != generation.NoBidFound {
 				// If we get a more serious error, we exit the loop. It means there is something wrong with the db.
@@ -96,7 +96,7 @@ func (m *maintainer) listen() {
 			m.bidEndHeight = endHeight
 		}
 
-		if round+m.buffer >= m.stakeEndHeight {
+		if round+m.offset >= m.stakeEndHeight {
 			endHeight := m.findActiveStake()
 			if endHeight == 0 {
 				if err := m.sendStake(); err != nil {
@@ -130,7 +130,7 @@ func (m *maintainer) findActiveStake() uint64 {
 }
 
 func (m *maintainer) sendBid() error {
-	bid, err := m.transactor.CreateBidTx(m.value, m.lockTime)
+	bid, err := m.transactor.CreateBidTx(m.amount, m.lockTime)
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (m *maintainer) sendBid() error {
 }
 
 func (m *maintainer) sendStake() error {
-	stake, err := m.transactor.CreateStakeTx(m.value, m.lockTime)
+	stake, err := m.transactor.CreateStakeTx(m.amount, m.lockTime)
 	if err != nil {
 		return err
 	}

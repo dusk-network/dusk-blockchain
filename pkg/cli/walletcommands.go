@@ -77,20 +77,20 @@ func (c *CLI) createWalletCMD(args []string) {
 
 func (c *CLI) launchMaintainer(w *wallet.Wallet) error {
 	r := cfg.Get()
-	value := r.Consensus.DefaultValue
+	amount := r.Consensus.DefaultAmount
 	lockTime := r.Consensus.DefaultLockTime
 	if lockTime > transactions.MaxLockTime {
 		fmt.Fprintf(os.Stdout, "default locktime was configured to be greater than the maximum (%v) - defaulting to %v\n", lockTime, transactions.MaxLockTime)
 		lockTime = transactions.MaxLockTime
 	}
 
-	buffer := r.Consensus.DefaultBuffer
+	offset := r.Consensus.DefaultOffset
 	k, err := w.ReconstructK()
 	if err != nil {
 		return err
 	}
 
-	return maintainer.Launch(c.eventBroker, nil, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), c.transactor, value, lockTime, buffer)
+	return maintainer.Launch(c.eventBroker, nil, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), c.transactor, amount, lockTime, offset)
 }
 
 func (c *CLI) loadWalletCMD(args []string) {
