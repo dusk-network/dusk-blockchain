@@ -142,6 +142,29 @@ func TestStress(t *testing.T) {
 	}
 }
 
+func TestIncrementOnNilVoteSet(t *testing.T) {
+	committeeMock, k := MockCommittee(20, true, 20)
+	bus := wire.NewEventBus()
+	broker := newBroker(bus, committeeMock, k[0])
+	broker.filter.UpdateRound(1)
+	go broker.Listen()
+
+	// Wait a bit for the round update to go through
+	time.Sleep(200 * time.Millisecond)
+
+	// Run `sendAgreement` with a `voteSet` that has no votes, by publishing a
+	// ReductionResult message.
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, 1)
+	bus.Publish(msg.ReductionResultTopic, bytes.NewBuffer(roundBytes))
+
+	// Wait a bit for the message to go through
+	time.Sleep(200 * time.Millisecond)
+
+	// Now, the step counter should be at 2
+	assert.Equal(t, uint8(2), broker.state.Step())
+}
+
 func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []user.Keys) {
 	for i := 0; i < size; i++ {
 		keys, _ := user.NewRandKeys()
