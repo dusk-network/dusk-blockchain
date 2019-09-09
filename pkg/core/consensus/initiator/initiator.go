@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
@@ -48,7 +47,7 @@ func startBlockGenerator(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *w
 	}
 
 	// reconstruct k
-	k, err := reconstructK(w)
+	k, err := w.ReconstructK()
 	if err != nil {
 		l.WithError(err).Warnln("could not start block generation component - problem reconstructing K")
 		return
@@ -75,17 +74,4 @@ func getStartingRound(blsPubKey []byte, eventBroker wire.EventBroker) uint64 {
 		blk := <-acceptedBlockChan
 		return blk.Header.Height + 1
 	}
-}
-
-func reconstructK(w *wallet.Wallet) (ristretto.Scalar, error) {
-	zeroPadding := make([]byte, 4)
-	privSpend, err := w.PrivateSpend()
-	if err != nil {
-		return ristretto.Scalar{}, err
-	}
-
-	kBytes := append(privSpend, zeroPadding...)
-	var k ristretto.Scalar
-	k.Derive(kBytes)
-	return k, nil
 }
