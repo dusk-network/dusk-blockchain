@@ -17,13 +17,19 @@ import (
 
 // TODO: rename
 type Transactor struct {
-	w *wallet.Wallet
+	w  *wallet.Wallet
+	db database.DB
 }
 
 // Instantiate a new Transactor struct.
-func New(w *wallet.Wallet) *Transactor {
+func New(w *wallet.Wallet, db database.DB) *Transactor {
+	if db == nil {
+		_, db = heavy.CreateDBConnection()
+	}
+
 	return &Transactor{
-		w: w,
+		w:  w,
+		db: db,
 	}
 }
 
@@ -105,7 +111,6 @@ func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transact
 
 func (t *Transactor) syncWallet() error {
 	var totalSpent, totalReceived uint64
-	_, db := heavy.CreateDBConnection()
 	// keep looping until tipHash = currentBlockHash
 	for {
 		// Get Wallet height
@@ -115,7 +120,10 @@ func (t *Transactor) syncWallet() error {
 		}
 
 		// Get next block using walletHeight and tipHash of the node
-		blk, tipHash, err := fetchBlockHeightAndState(db, walletHeight)
+		blk, tipHash, err := fetchBlockHeightAndState(t.db, walletHeight)
+		if err == database.ErrBlockNotFound {
+			break
+		}
 		if err != nil {
 			return fmt.Errorf("error fetching block from node db: %v\n", err)
 		}

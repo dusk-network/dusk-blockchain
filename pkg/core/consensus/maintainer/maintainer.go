@@ -1,11 +1,13 @@
-package consensus
+package maintainer
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
@@ -20,58 +22,53 @@ import (
 type maintainer struct {
 	eventBroker wire.EventBroker
 	roundChan   <-chan uint64
-	bidChan     <-chan Bid
 
-	pubKeyBLS []byte
-	m         ristretto.Scalar
-	c         *committee.Store
-	bidList   *BidList
+	pubKeyBLS    []byte
+	m            ristretto.Scalar
+	c            *committee.Store
+	bidRetriever *generation.BidRetriever
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
 
-	value, lockTime uint64
+	value, lockTime, buffer uint64
 
-	db         database.DB
 	transactor *transactor.Transactor
 }
 
-func newMaintainer(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor) (*maintainer, error) {
-	_, db := heavy.CreateDBConnection()
-	// bidList, err := NewBidList(db)
-	// if err != nil {
-	// 	log.WithFields(log.Fields{
-	// 		"process": "maintainer",
-	// 		"error":   err,
-	// 	}).Errorln("could not repopulate bidlist")
-	// 	return nil, err
-	// }
-
+func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, value, lockTime, buffer uint64) (*maintainer, error) {
+	if db == nil {
+		_, db = heavy.CreateDBConnection()
+	}
 	return &maintainer{
-		eventBroker: eventBroker,
-		roundChan:   InitRoundUpdate(eventBroker),
-		pubKeyBLS:   pubKeyBLS,
-		m:           m,
-		c:           committee.LaunchStore(eventBroker, db),
-		// bidList:     bidList,
-		db:         db,
-		transactor: transactor,
+		eventBroker:  eventBroker,
+		roundChan:    consensus.InitRoundUpdate(eventBroker),
+		pubKeyBLS:    pubKeyBLS,
+		m:            m,
+		c:            committee.LaunchStore(eventBroker, db),
+		bidRetriever: generation.NewBidRetriever(nil),
+		transactor:   transactor,
+		value:        value,
+		lockTime:     lockTime,
+		buffer:       buffer,
 	}, nil
 }
 
-func LaunchMaintainer(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor) error {
-	maintainer, err := newMaintainer(eventBroker, pubKeyBLS, m, transactor)
+func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, value, lockTime, buffer uint64) error {
+	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, transactor, value, lockTime, buffer)
 	if err != nil {
 		return err
 	}
 
 	// Let's see if we have active stakes and bids already
 	maintainer.bidEndHeight, err = maintainer.findActiveBid()
-	if err != nil {
+	if err != nil && err != generation.NoBidFound {
 		return err
 	}
 
 	maintainer.stakeEndHeight = maintainer.findActiveStake()
+
+	// Set up listening loop
 	go maintainer.listen()
 	return nil
 }
@@ -79,23 +76,45 @@ func LaunchMaintainer(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristrett
 func (m *maintainer) listen() {
 	for {
 		round := <-m.roundChan
-		if round >= m.bidEndHeight {
+		if round+m.buffer >= m.bidEndHeight {
+			endHeight, err := m.findActiveBid()
+			if err != nil && err != generation.NoBidFound {
+				// log
+				return
+			}
 
+			if endHeight == 0 {
+				if err := m.sendBid(); err != nil {
+					fmt.Println(err)
+					// log
+					return
+				}
+			}
+
+			m.bidEndHeight = endHeight
 		}
 
-		if round >= m.stakeEndHeight {
+		if round+m.buffer >= m.stakeEndHeight {
 			endHeight := m.findActiveStake()
-			if endHeight != 0 {
-				// Send stake and wait for it to get included
-
+			if endHeight == 0 {
+				if err := m.sendStake(); err != nil {
+					// log
+					return
+				}
 			}
+
 			m.stakeEndHeight = endHeight
 		}
 	}
 }
 
 func (m *maintainer) findActiveBid() (uint64, error) {
-	return 0, nil
+	_, height, err := m.bidRetriever.SearchForBid(m.m.Bytes())
+	if err != nil {
+		return 0, err
+	}
+
+	return height, nil
 }
 
 func (m *maintainer) findActiveStake() uint64 {
@@ -108,17 +127,7 @@ func (m *maintainer) findActiveStake() uint64 {
 	return 0
 }
 
-// TODO: DRY
 func (m *maintainer) sendBid() error {
-	balance, err := m.transactor.Balance()
-	if err != nil {
-		return err
-	}
-
-	if balance < float64(m.value) {
-		return errors.New("insufficient balance for automated bid tx")
-	}
-
 	bid, err := m.transactor.CreateBidTx(m.value, m.lockTime)
 	if err != nil {
 		return err
@@ -134,15 +143,6 @@ func (m *maintainer) sendBid() error {
 }
 
 func (m *maintainer) sendStake() error {
-	balance, err := m.transactor.Balance()
-	if err != nil {
-		return err
-	}
-
-	if balance < float64(m.value) {
-		return errors.New("insufficient balance for automated stake tx")
-	}
-
 	stake, err := m.transactor.CreateStakeTx(m.value, m.lockTime)
 	if err != nil {
 		return err
