@@ -2,7 +2,6 @@ package maintainer
 
 import (
 	"bytes"
-	"fmt"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -14,7 +13,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	log "github.com/sirupsen/logrus"
 )
+
+var l = log.WithField("process", "maintainer")
 
 // The maintainer is a process that keeps note of when certain consensus transactions
 // expire, and makes sure the node remains within the bidlist/committee, when those
@@ -79,15 +81,15 @@ func (m *maintainer) listen() {
 		if round+m.buffer >= m.bidEndHeight {
 			endHeight, err := m.findActiveBid()
 			if err != nil && err != generation.NoBidFound {
-				// log
+				// If we get a more serious error, we exit the loop. It means there is something wrong with the db.
+				l.WithError(err).Errorln("problem attempting to search for bids")
 				return
 			}
 
 			if endHeight == 0 {
 				if err := m.sendBid(); err != nil {
-					fmt.Println(err)
-					// log
-					return
+					l.WithError(err).Warnln("could not send bid tx")
+					continue
 				}
 			}
 
@@ -98,8 +100,8 @@ func (m *maintainer) listen() {
 			endHeight := m.findActiveStake()
 			if endHeight == 0 {
 				if err := m.sendStake(); err != nil {
-					// log
-					return
+					l.WithError(err).Warnln("could not send stake tx")
+					continue
 				}
 			}
 
