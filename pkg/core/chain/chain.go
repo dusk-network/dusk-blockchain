@@ -169,6 +169,10 @@ func (c *Chain) propagateBid(bid user.Bid) {
 		panic(err)
 	}
 
+	if err := encoding.Write256(buf, bid.M[:]); err != nil {
+		panic(err)
+	}
+
 	if err := encoding.WriteUint64(buf, binary.LittleEndian, bid.EndHeight); err != nil {
 		panic(err)
 	}

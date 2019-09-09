@@ -17,12 +17,14 @@ import (
 // Bid is the 32 byte X value, created from a bidding transaction amount and M.
 type Bid struct {
 	X         [32]byte
+	M         [32]byte
 	EndHeight uint64
 }
 
 // Equals will return whether or not the two bids are the same.
 func (b Bid) Equals(bid Bid) bool {
-	return bytes.Equal(b.X[:], bid.X[:])
+	return bytes.Equal(b.X[:], bid.X[:]) &&
+		bytes.Equal(b.M[:], bid.M[:])
 }
 
 // BidList is a list of bid X values.
@@ -198,6 +200,7 @@ func CalculateX(d, m []byte) Bid {
 
 	var bid Bid
 	copy(bid.X[:], x.Bytes()[:])
+	copy(bid.M[:], m[:])
 	return bid
 }
 
