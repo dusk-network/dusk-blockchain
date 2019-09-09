@@ -476,3 +476,16 @@ func generateM(PrivateSpend []byte, index uint32) []byte {
 	m := zkproof.CalculateM(k)
 	return m.Bytes()
 }
+
+func (w *Wallet) ReconstructK() (ristretto.Scalar, error) {
+	zeroPadding := make([]byte, 4)
+	privSpend, err := w.PrivateSpend()
+	if err != nil {
+		return ristretto.Scalar{}, err
+	}
+
+	kBytes := append(privSpend, zeroPadding...)
+	var k ristretto.Scalar
+	k.Derive(kBytes)
+	return k, nil
+}
