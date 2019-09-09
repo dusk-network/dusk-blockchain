@@ -103,3 +103,4 @@ accumulatorWorkers = 4
 [consensus]
 defaultlocktime = 250000
 defaultvalue = 5
+defaultbuffer = 100
