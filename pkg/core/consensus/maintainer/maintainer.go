@@ -6,7 +6,7 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
@@ -24,11 +24,12 @@ var l = log.WithField("process", "maintainer")
 type maintainer struct {
 	eventBroker wire.EventBroker
 	roundChan   <-chan uint64
+	bidChan     <-chan user.Bid
 
-	pubKeyBLS    []byte
-	m            ristretto.Scalar
-	c            *committee.Store
-	bidRetriever *generation.BidRetriever
+	pubKeyBLS []byte
+	m         ristretto.Scalar
+	c         *committee.Store
+	bidList   *user.BidList
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
@@ -42,17 +43,24 @@ func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byt
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
+
+	bidList, err := user.NewBidList(db)
+	if err != nil {
+		return nil, err
+	}
+
 	return &maintainer{
-		eventBroker:  eventBroker,
-		roundChan:    consensus.InitRoundUpdate(eventBroker),
-		pubKeyBLS:    pubKeyBLS,
-		m:            m,
-		c:            committee.LaunchStore(eventBroker, db),
-		bidRetriever: generation.NewBidRetriever(nil),
-		transactor:   transactor,
-		amount:       amount,
-		lockTime:     lockTime,
-		offset:       offset,
+		eventBroker: eventBroker,
+		bidChan:     consensus.InitBidListUpdate(eventBroker),
+		roundChan:   consensus.InitRoundUpdate(eventBroker),
+		pubKeyBLS:   pubKeyBLS,
+		m:           m,
+		c:           committee.LaunchStore(eventBroker, db),
+		bidList:     bidList,
+		transactor:  transactor,
+		amount:      amount,
+		lockTime:    lockTime,
+		offset:      offset,
 	}, nil
 }
 
@@ -63,12 +71,20 @@ func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ri
 	}
 
 	// Let's see if we have active stakes and bids already
-	maintainer.bidEndHeight, err = maintainer.findActiveBid()
-	if err != nil && err != generation.NoBidFound {
-		return err
+	maintainer.bidEndHeight = maintainer.findActiveBid()
+	// If not, we create them here
+	if maintainer.bidEndHeight == 0 {
+		if err := maintainer.sendBid(); err != nil {
+			return err
+		}
 	}
 
 	maintainer.stakeEndHeight = maintainer.findActiveStake()
+	if maintainer.stakeEndHeight == 0 {
+		if err := maintainer.sendStake(); err != nil {
+			return err
+		}
+	}
 
 	// Set up listening loop
 	go maintainer.listen()
@@ -77,46 +93,52 @@ func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ri
 
 func (m *maintainer) listen() {
 	for {
-		round := <-m.roundChan
-		if round+m.offset >= m.bidEndHeight {
-			endHeight, err := m.findActiveBid()
-			if err != nil && err != generation.NoBidFound {
-				// If we get a more serious error, we exit the loop. It means there is something wrong with the db.
-				l.WithError(err).Errorln("problem attempting to search for bids")
-				return
-			}
+		select {
+		case round := <-m.roundChan:
+			m.bidList.RemoveExpired(round)
+			if round+m.offset >= m.bidEndHeight {
+				endHeight := m.findActiveBid()
 
-			if endHeight == 0 {
-				if err := m.sendBid(); err != nil {
-					l.WithError(err).Warnln("could not send bid tx")
-					continue
+				// Only send bid if this is the first time we notice it's about to expire
+				if endHeight == m.bidEndHeight && m.bidEndHeight != 0 {
+					if err := m.sendBid(); err != nil {
+						l.WithError(err).Warnln("could not send bid tx")
+						continue
+					}
+					m.bidEndHeight = 0
+				} else {
+					m.bidEndHeight = endHeight
 				}
 			}
 
-			m.bidEndHeight = endHeight
-		}
+			if round+m.offset >= m.stakeEndHeight {
+				endHeight := m.findActiveStake()
 
-		if round+m.offset >= m.stakeEndHeight {
-			endHeight := m.findActiveStake()
-			if endHeight == 0 {
-				if err := m.sendStake(); err != nil {
-					l.WithError(err).Warnln("could not send stake tx")
-					continue
+				// Only send stake if this is the first time we notice it's about to expire
+				if endHeight == m.stakeEndHeight && m.stakeEndHeight != 0 {
+					if err := m.sendStake(); err != nil {
+						l.WithError(err).Warnln("could not send stake tx")
+						continue
+					}
+					m.stakeEndHeight = 0
+				} else {
+					m.stakeEndHeight = endHeight
 				}
 			}
-
-			m.stakeEndHeight = endHeight
+		case bid := <-m.bidChan:
+			m.bidList.AddBid(bid)
 		}
 	}
 }
 
-func (m *maintainer) findActiveBid() (uint64, error) {
-	_, height, err := m.bidRetriever.SearchForBid(m.m.Bytes())
-	if err != nil {
-		return 0, err
+func (m *maintainer) findActiveBid() uint64 {
+	for _, bid := range *m.bidList {
+		if bytes.Equal(m.m.Bytes(), bid.M[:]) {
+			return bid.EndHeight
+		}
 	}
 
-	return height, nil
+	return 0
 }
 
 func (m *maintainer) findActiveStake() uint64 {
