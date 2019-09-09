@@ -11,22 +11,22 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// BidRetriever is a simple searcher, who's responsibility is to find a bid transaction, when given
+// bidRetriever is a simple searcher, who's responsibility is to find a bid transaction, when given
 // an M value.
-type BidRetriever struct {
+type bidRetriever struct {
 	db database.DB
 }
 
 var NoBidFound = errors.New("could not find corresponding value for specified item")
 
-// NewBidRetriever returns an initialized BidRetriever, ready for use.
-func NewBidRetriever(db database.DB) *BidRetriever {
+// newBidRetriever returns an initialized BidRetriever, ready for use.
+func newBidRetriever(db database.DB) *bidRetriever {
 	// Get a db connection, if none was given.
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
 
-	return &BidRetriever{
+	return &bidRetriever{
 		db: db,
 	}
 }
@@ -34,7 +34,7 @@ func NewBidRetriever(db database.DB) *BidRetriever {
 // SearchForBid will walk up the blockchain to find a bid with the corresponding `m`,
 // by running a comparison function on each tx for every found block. If the comparison function finds a match,
 // then this tx is returned. This tx can then be used by the generation component to start or reset itself.
-func (i *BidRetriever) SearchForBid(m []byte) (transactions.Transaction, uint64, error) {
+func (i *bidRetriever) SearchForBid(m []byte) (transactions.Transaction, error) {
 	currentHeight := i.getCurrentHeight()
 	searchingHeight := i.getSearchingHeight(currentHeight)
 
@@ -44,7 +44,7 @@ func (i *BidRetriever) SearchForBid(m []byte) (transactions.Transaction, uint64,
 			break
 		}
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 
 		tx, err := findCorrespondingBid(blk.Txs, m, searchingHeight, currentHeight)
@@ -53,10 +53,10 @@ func (i *BidRetriever) SearchForBid(m []byte) (transactions.Transaction, uint64,
 			continue
 		}
 
-		return tx, searchingHeight, nil
+		return tx, nil
 	}
 
-	return nil, 0, NoBidFound
+	return nil, NoBidFound
 }
 
 // If given a set of transactions and an M value, this function will return a bid
@@ -89,14 +89,14 @@ func findCorrespondingBid(txs []transactions.Transaction, m []byte, searchingHei
 
 // Bid transactions can only be valid for the maximum locktime. So, we will begin our search at
 // the tip height, minus the maximum locktime. This function will tell us exactly what that height is.
-func (i *BidRetriever) getSearchingHeight(currentHeight uint64) uint64 {
+func (i *bidRetriever) getSearchingHeight(currentHeight uint64) uint64 {
 	if currentHeight < transactions.MaxLockTime {
 		return 0
 	}
 	return currentHeight - transactions.MaxLockTime
 }
 
-func (i *BidRetriever) getBlock(searchingHeight uint64) (*block.Block, error) {
+func (i *bidRetriever) getBlock(searchingHeight uint64) (*block.Block, error) {
 	var b *block.Block
 	err := i.db.View(func(t database.Transaction) error {
 		hash, err := t.FetchBlockHashByHeight(searchingHeight)
@@ -111,7 +111,7 @@ func (i *BidRetriever) getBlock(searchingHeight uint64) (*block.Block, error) {
 	return b, err
 }
 
-func (i *BidRetriever) getCurrentHeight() (currentHeight uint64) {
+func (i *bidRetriever) getCurrentHeight() (currentHeight uint64) {
 	err := i.db.View(func(t database.Transaction) error {
 		var err error
 		currentHeight, err = t.FetchCurrentHeight()

@@ -11,8 +11,8 @@ import (
 
 // Use the TxRetriever to get a valid bid transaction that belongs to us, and return the D value from that bid.
 func getD(m ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) ristretto.Scalar {
-	retriever := NewBidRetriever(db)
-	bid, _, err := retriever.SearchForBid(m.Bytes())
+	retriever := newBidRetriever(db)
+	bid, err := retriever.SearchForBid(m.Bytes())
 	if err != nil {
 		log.WithField("process", "generation").Debugln("no bids belonging to us found in the chain")
 
