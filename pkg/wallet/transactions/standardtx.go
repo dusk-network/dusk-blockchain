@@ -266,6 +266,12 @@ func (s *Standard) prove(hasher func() ([]byte, error), encryptValues bool) erro
 	if err != nil {
 		return err
 	}
+	// Remove this has from the TxID field - the hash will be changed after the proof
+	// is done.
+	// TODO: CalculateHash should not set anything, as it's name implies only the
+	// calculation of the hash. This should be adjusted and the rest of the code
+	// refactored accordingly.
+	s.TxID = nil
 
 	// Prove Mlsag
 	for i := range s.Inputs {
@@ -303,8 +309,8 @@ func (s *Standard) CalculateHash() ([]byte, error) {
 	return txid, nil
 }
 
-func (s *Standard) StandardTx() Standard {
-	return *s
+func (s *Standard) StandardTx() *Standard {
+	return s
 }
 
 func (s *Standard) Type() TxType {

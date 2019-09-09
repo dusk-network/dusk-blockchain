@@ -83,8 +83,8 @@ func (s *Coinbase) CalculateHash() ([]byte, error) {
 	return txid, nil
 }
 
-func (s *Coinbase) StandardTx() Standard {
-	return Standard{
+func (s *Coinbase) StandardTx() *Standard {
+	return &Standard{
 		Outputs: s.Rewards,
 		R:       s.R,
 	}

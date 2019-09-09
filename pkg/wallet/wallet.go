@@ -45,7 +45,7 @@ type Wallet struct {
 type SignableTx interface {
 	AddDecoys(numMixins int, f transactions.FetchDecoys) error
 	Prove() error
-	StandardTx() transactions.Standard
+	StandardTx() *transactions.Standard
 }
 
 func New(Read func(buf []byte) (n int, err error), netPrefix byte, db *database.DB, fDecoys transactions.FetchDecoys, fInputs FetchInputs, password string) (*Wallet, error) {
@@ -331,7 +331,7 @@ func (w *Wallet) Sign(tx SignableTx) error {
 	standardTx := tx.StandardTx()
 
 	// Fetch Inputs
-	err := w.AddInputs(&standardTx)
+	err := w.AddInputs(standardTx)
 	if err != nil {
 		return err
 	}

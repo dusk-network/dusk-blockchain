@@ -97,7 +97,7 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 
 func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 
-	var txs []core.Standard
+	var txs []*core.Standard
 	b, ok := p.Source.(*block.Block)
 	if ok {
 
