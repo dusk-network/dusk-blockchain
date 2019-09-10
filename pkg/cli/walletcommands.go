@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
@@ -32,6 +33,7 @@ type CLI struct {
 	eventBroker wire.EventBroker
 	rpcBus      *wire.RPCBus
 	transactor  *transactor.Transactor
+	counter     *chainsync.Counter
 }
 
 func (c *CLI) createWalletCMD(args []string) {
@@ -68,7 +70,7 @@ func (c *CLI) createWalletCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w)
+		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
 		if err := c.launchMaintainer(w); err != nil {
 			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 		}
@@ -122,7 +124,7 @@ func (c *CLI) loadWalletCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w)
+		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
 		if err := c.launchMaintainer(w); err != nil {
 			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 		}
@@ -183,7 +185,7 @@ func (c *CLI) createFromSeedCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w)
+		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
 		if err := c.launchMaintainer(w); err != nil {
 			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 		}
