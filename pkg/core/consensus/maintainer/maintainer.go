@@ -71,18 +71,20 @@ func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ri
 	}
 
 	// Let's see if we have active stakes and bids already
-	maintainer.bidEndHeight = maintainer.findActiveBid()
+	maintainer.bidEndHeight = maintainer.findMostRecentBid()
 	// If not, we create them here
 	if maintainer.bidEndHeight == 0 {
 		if err := maintainer.sendBid(); err != nil {
-			return err
+			l.WithError(err).Warnln("could not send bid tx")
+			maintainer.bidEndHeight = 1
 		}
 	}
 
-	maintainer.stakeEndHeight = maintainer.findActiveStake()
+	maintainer.stakeEndHeight = maintainer.findMostRecentStake()
 	if maintainer.stakeEndHeight == 0 {
 		if err := maintainer.sendStake(); err != nil {
-			return err
+			l.WithError(err).Warnln("could not send stake tx")
+			maintainer.stakeEndHeight = 1
 		}
 	}
 
@@ -97,32 +99,32 @@ func (m *maintainer) listen() {
 		case round := <-m.roundChan:
 			m.bidList.RemoveExpired(round)
 			if round+m.offset >= m.bidEndHeight {
-				endHeight := m.findActiveBid()
+				endHeight := m.findMostRecentBid()
 
 				// Only send bid if this is the first time we notice it's about to expire
-				if endHeight == m.bidEndHeight && m.bidEndHeight != 0 {
+				if endHeight > m.bidEndHeight {
+					m.bidEndHeight = endHeight
+				} else if m.bidEndHeight != 0 {
 					if err := m.sendBid(); err != nil {
 						l.WithError(err).Warnln("could not send bid tx")
 						continue
 					}
 					m.bidEndHeight = 0
-				} else {
-					m.bidEndHeight = endHeight
 				}
 			}
 
 			if round+m.offset >= m.stakeEndHeight {
-				endHeight := m.findActiveStake()
+				endHeight := m.findMostRecentStake()
 
 				// Only send stake if this is the first time we notice it's about to expire
-				if endHeight == m.stakeEndHeight && m.stakeEndHeight != 0 {
+				if endHeight > m.stakeEndHeight {
+					m.stakeEndHeight = endHeight
+				} else if m.stakeEndHeight != 0 {
 					if err := m.sendStake(); err != nil {
 						l.WithError(err).Warnln("could not send stake tx")
 						continue
 					}
 					m.stakeEndHeight = 0
-				} else {
-					m.stakeEndHeight = endHeight
 				}
 			}
 		case bid := <-m.bidChan:
@@ -131,21 +133,28 @@ func (m *maintainer) listen() {
 	}
 }
 
-func (m *maintainer) findActiveBid() uint64 {
+func (m *maintainer) findMostRecentBid() uint64 {
+	var highest uint64
 	for _, bid := range *m.bidList {
-		if bytes.Equal(m.m.Bytes(), bid.M[:]) {
-			return bid.EndHeight
+		if bytes.Equal(m.m.Bytes(), bid.M[:]) && bid.EndHeight > highest {
+			highest = bid.EndHeight
 		}
 	}
 
-	return 0
+	return highest
 }
 
-func (m *maintainer) findActiveStake() uint64 {
+func (m *maintainer) findMostRecentStake() uint64 {
 	p := m.c.Provisioners()
 	member := p.GetMember(m.pubKeyBLS)
 	if member != nil {
-		return member.Stakes[0].EndHeight
+		var highest uint64
+		for _, stake := range member.Stakes {
+			if stake.EndHeight > highest {
+				highest = stake.EndHeight
+			}
+		}
+		return highest
 	}
 
 	return 0
