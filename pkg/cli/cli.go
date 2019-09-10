@@ -16,7 +16,7 @@ import (
 // Start the interactive shell.
 func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File) {
 
-	// TODO: Remove the hard-coded cli commands
+	// TODO: Remove when dusk-blockchain/issues/27 is done
 	time.Sleep(2 * time.Second)
 	CLICommands["loadwallet"]([]string{"password"}, eventBroker, rpcBus)
 	time.Sleep(2 * time.Second)

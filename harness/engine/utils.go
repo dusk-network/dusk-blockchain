@@ -126,7 +126,8 @@ func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([
 	return data, nil
 }
 
-// SendCommand sends a jsonrpc request to the specified network node
+// SendWireMsg sends a P2P message to the specified network node
+// NB: Handshaking procedure must be performed prior to the message sending
 func (n *Network) SendWireMsg(nodeIndex uint, msg []byte, writeTimeout int) error {
 
 	if nodeIndex >= uint(len(n.Nodes)) {

@@ -1,11 +1,8 @@
 package tests
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/dusk-network/dusk-blockchain/harness/engine"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"log"
@@ -105,14 +102,4 @@ func TestSendBidTransaction(t *testing.T) {
 			break
 		}
 	}
-}
-
-func TestInvalidWireMsg(t *testing.T) {
-
-	msg, _ := engine.ConstructWireFrame(protocol.TestNet, topics.Version, new(bytes.Buffer))
-
-	log.Printf("Sending wire msg")
-	localNet.SendWireMsg(0, msg, 3)
-
-	time.Sleep(100 * time.Second)
 }

@@ -303,67 +303,14 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 }
 
 func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) {
-	if args == nil || len(args) < 3 {
-		fmt.Fprintf(os.Stdout, commandInfo["bid"]+"\n")
-		return
-	}
 
-	amount, err := stringToScalar(args[0])
+	txid, err := SendBidCMD(args, publisher, rpcBus)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
+		fmt.Fprintf(os.Stdout, err.Error())
 		return
 	}
 
-	lockTime, err := stringToUint64(args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	password := args[2]
-
-	// Load wallet using password
-	w, err := loadWallet(password)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
-		return
-	}
-
-	// Sync wallet
-	if err := syncWallet(); err != nil {
-		fmt.Fprintf(os.Stdout, "%v", err)
-		return
-	}
-
-	// Create a new bid tx
-	tx, err := w.NewBidTx(cfg.MinFee, lockTime, amount)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating tx: %v\n", err)
-		return
-	}
-
-	// Sign tx
-	err = w.Sign(tx)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-
-	// Marshal
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
-		return
-	}
-
-	_, err = tx.CalculateHash()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(tx.TxID))
-
-	publisher.Publish(string(topics.Tx), buf)
+	fmt.Fprintf(os.Stdout, "hash: %s\n", txid)
 }
 
 func SendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) (string, error) {
@@ -405,26 +352,20 @@ func SendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 	if err != nil {
 		return "", fmt.Errorf("%s", err.Error())
 	}
-
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireBid()
-	if err != nil {
-		return "", fmt.Errorf("%s", err.Error())
-	}
+	// Marshal
 	buf := new(bytes.Buffer)
-	if err := wireTx.Encode(buf); err != nil {
-		return "", fmt.Errorf("error encoding tx: %v", err)
+	if err := transactions.Marshal(buf, tx); err != nil {
+		return "", fmt.Errorf("error encoding tx: %v\n", err)
 	}
 
-	_, err = wireTx.CalculateHash()
+	_, err = tx.CalculateHash()
 	if err != nil {
-		return "", fmt.Errorf("%s", err.Error())
+		return "", fmt.Errorf("%s\n", err.Error())
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
 
-	return hex.EncodeToString(wireTx.TxID), nil
+	return hex.EncodeToString(tx.TxID), nil
 }
 
 func syncWallet() error {
