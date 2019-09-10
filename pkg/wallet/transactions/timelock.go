@@ -49,8 +49,8 @@ func (tl *Timelock) CalculateHash() ([]byte, error) {
 	return txid, nil
 }
 
-func (tl *Timelock) StandardTx() Standard {
-	return *tl.Standard
+func (tl *Timelock) StandardTx() *Standard {
+	return tl.Standard
 }
 
 func (tl *Timelock) Type() TxType {

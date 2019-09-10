@@ -58,10 +58,10 @@ func (r *reductionResultCollector) Collect(m *bytes.Buffer) error {
 		return err
 	}
 
-	votes, err := r.reductionUnmarshaller.UnmarshalVoteSet(m)
-	if err != nil {
-		return err
-	}
+	// We drop the error here. If there is no vote set included in the message,
+	// we still need to trigger `sendAgreement` for the step counter to stay
+	// in sync.
+	votes, _ := r.reductionUnmarshaller.UnmarshalVoteSet(m)
 
 	r.resultChan <- voteSet{round, votes}
 	return nil
