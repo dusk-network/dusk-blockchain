@@ -5,37 +5,57 @@ import (
 	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	log "github.com/sirupsen/logrus"
 )
 
 var l = log.WithField("process", "consensus initiator")
 
-func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
+func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// TODO: sync first
-	go startProvisioner(eventBroker, rpcBus, w)
+	go startProvisioner(eventBroker, rpcBus, w, counter)
 	go startBlockGenerator(eventBroker, rpcBus, w)
 }
 
-func startProvisioner(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
+func startProvisioner(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// Setting up the consensus factory
 	f := factory.New(eventBroker, rpcBus, config.ConsensusTimeOut, w.ConsensusKeys())
 	f.StartConsensus()
 
-	// Get starting round
-	blsPubKey := w.ConsensusKeys().BLSPubKeyBytes
-	startingRound := getStartingRound(blsPubKey, eventBroker)
+	// Get current height
+	req := wire.NewRequest(bytes.Buffer{}, 1)
+	resultBuf, err := rpcBus.Call(wire.GetLastBlock, req)
+	if err != nil {
+		l.WithError(err).Warnln("could not retrieve current height, starting from 1")
+		sendInitMessage(eventBroker, 1)
+		return
+	}
 
-	// Notify consensus components
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, startingRound)
-	eventBroker.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+	var currentHeight uint64
+	if err := encoding.ReadUint64(&resultBuf, binary.LittleEndian, &currentHeight); err != nil {
+		l.WithError(err).Warnln("could not decode current height, starting from 1")
+		sendInitMessage(eventBroker, 1)
+		return
+	}
+
+	if currentHeight > 0 {
+		// Get starting round
+		startingRound := getStartingRound(eventBroker, counter)
+		sendInitMessage(eventBroker, startingRound)
+		return
+	}
+
+	// We are at genesis. Start from 1
+	sendInitMessage(eventBroker, 1)
 }
 
 func startBlockGenerator(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet) {
@@ -64,14 +84,39 @@ func startBlockGenerator(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *w
 	}()
 }
 
-func getStartingRound(blsPubKey []byte, eventBroker wire.EventBroker) uint64 {
+func getStartingRound(eventBroker wire.EventBroker, counter *chainsync.Counter) uint64 {
 	// Start listening for accepted blocks, regardless of if we found stakes or not
 	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(eventBroker)
 	// Unsubscribe from AcceptedBlock once we're done
 	defer listener.Quit()
 
+	// Sync first
+	syncToTip(acceptedBlockChan, counter)
+
 	for {
 		blk := <-acceptedBlockChan
 		return blk.Header.Height + 1
+	}
+}
+
+func sendInitMessage(publisher wire.EventPublisher, startingRound uint64) {
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, startingRound)
+	publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+}
+
+func syncToTip(acceptedBlockChan <-chan block.Block, counter *chainsync.Counter) {
+	i := 0
+	for {
+		<-acceptedBlockChan
+		if counter.IsSyncing() {
+			i = 0
+			continue
+		}
+
+		i++
+		if i > 2 {
+			break
+		}
 	}
 }
