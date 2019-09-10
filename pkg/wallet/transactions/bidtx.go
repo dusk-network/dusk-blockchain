@@ -43,8 +43,8 @@ func (b *Bid) CalculateHash() ([]byte, error) {
 	return txid, nil
 }
 
-func (b *Bid) StandardTx() Standard {
-	return *b.Standard
+func (b *Bid) StandardTx() *Standard {
+	return b.Standard
 }
 
 func (b *Bid) Type() TxType {
