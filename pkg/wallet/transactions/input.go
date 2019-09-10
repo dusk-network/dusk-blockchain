@@ -1,11 +1,12 @@
 package transactions
 
 import (
-	"encoding/binary"
+	"bytes"
 	"io"
 
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-wallet/key"
 
 	"github.com/bwesterb/go-ristretto"
 )
@@ -18,7 +19,7 @@ type Input struct {
 	// public key can unlock the funds available at this utxo
 	PubKey  key.StealthAddress
 	privKey ristretto.Scalar
-	//PseudoCommitment refers to a commitment which commits to the same amount
+	// PseudoCommitment refers to a commitment which commits to the same amount
 	// as our `Commitment` value, however the mask value is changed. This is to be used in proving
 	// that the sumInputs-SumOutputs = 0
 	PseudoCommitment ristretto.Point
@@ -69,50 +70,78 @@ func (i *Input) Prove() error {
 	return nil
 }
 
-func (i *Input) encode(w io.Writer, encodeSignature bool) error {
-	err := binary.Write(w, binary.BigEndian, i.PubKey.P.Bytes())
-	if err != nil {
+// MarshalInput marshals an Input object into an io.Writer.
+func MarshalInput(w io.Writer, i *Input, encodeSignature bool) error {
+	if err := encoding.Write256(w, i.KeyImage.Bytes()); err != nil {
 		return err
 	}
-	err = binary.Write(w, binary.BigEndian, i.PseudoCommitment.Bytes())
-	if err != nil {
+
+	if err := encoding.Write256(w, i.PubKey.P.Bytes()); err != nil {
 		return err
 	}
-	err = binary.Write(w, binary.BigEndian, i.KeyImage.Bytes())
-	if err != nil {
+
+	if err := encoding.Write256(w, i.PseudoCommitment.Bytes()); err != nil {
 		return err
 	}
-	if !encodeSignature {
-		return nil
+
+	if encodeSignature {
+		// Signature needs to be encoded and decoded as VarBytes, to ensure backwards-compatibility with
+		// the current testnet.
+		buf := new(bytes.Buffer)
+		if err := i.Signature.Encode(buf, true); err != nil {
+			return err
+		}
+
+		return encoding.WriteVarBytes(w, buf.Bytes())
 	}
-	return i.Signature.Encode(w, false)
+	return nil
 }
 
-func (i *Input) Encode(w io.Writer) error {
-	return i.encode(w, true)
+// Decode an Input object from a io.reader.
+func UnmarshalInput(r io.Reader, i *Input) error {
+	var keyImageBytes []byte
+	if err := encoding.Read256(r, &keyImageBytes); err != nil {
+		return err
+	}
+	i.KeyImage.UnmarshalBinary(keyImageBytes)
+
+	var pubKeyBytes []byte
+	if err := encoding.Read256(r, &pubKeyBytes); err != nil {
+		return err
+	}
+	i.PubKey.P.UnmarshalBinary(pubKeyBytes)
+
+	var pseudoCommBytes []byte
+	if err := encoding.Read256(r, &pseudoCommBytes); err != nil {
+		return err
+	}
+	i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
+
+	var sigBytes []byte
+	if err := encoding.ReadVarBytes(r, &sigBytes); err != nil {
+		return err
+	}
+
+	return i.Signature.Decode(bytes.NewBuffer(sigBytes), true)
 }
 
-func (i *Input) Decode(r io.Reader) error {
-	var PubKeyBytes [32]byte
-	err := binary.Read(r, binary.BigEndian, &PubKeyBytes)
-	if err != nil {
-		return err
+// Equals returns true if two inputs are the same
+func (i *Input) Equals(in *Input) bool {
+	if in == nil || i == nil {
+		return false
 	}
-	i.PubKey.P.SetBytes(&PubKeyBytes)
 
-	var PseudoBytes [32]byte
-	err = binary.Read(r, binary.BigEndian, &PseudoBytes)
-	if err != nil {
-		return err
+	if !bytes.Equal(i.KeyImage.Bytes(), in.KeyImage.Bytes()) {
+		return false
 	}
-	i.PseudoCommitment.SetBytes(&PseudoBytes)
 
-	var KeyImageBytes [32]byte
-	err = binary.Read(r, binary.BigEndian, &KeyImageBytes)
-	if err != nil {
-		return err
+	if !bytes.Equal(i.PubKey.P.Bytes(), in.PubKey.P.Bytes()) {
+		return false
 	}
-	i.KeyImage.SetBytes(&KeyImageBytes)
 
-	return i.Signature.Decode(r, false)
+	if !bytes.Equal(i.PseudoCommitment.Bytes(), in.PseudoCommitment.Bytes()) {
+		return false
+	}
+
+	return i.Signature.Equals(*in.Signature, false)
 }

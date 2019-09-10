@@ -9,10 +9,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 type (
@@ -98,12 +98,14 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 			return nil, err
 		}
 
-		mempoolTxs, err := transactions.FromReader(&r, lTxs)
-		if err != nil {
-			return nil, err
-		}
+		for i := uint64(0); i < lTxs; i++ {
+			tx, err := transactions.Unmarshal(&r)
+			if err != nil {
+				return nil, err
+			}
 
-		txs = append(txs, mempoolTxs...)
+			txs = append(txs, tx)
+		}
 	}
 
 	// TODO Append Provisioners rewards
@@ -122,36 +124,18 @@ func (c *blockGenerator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proo
 	var r ristretto.Scalar
 	r.Rand()
 
-	// The transaction is broadcast along with R=rG
-	var R ristretto.Point
-	R.ScalarMultBase(&r)
+	// Create transaction
+	tx := transactions.NewCoinbase(proof, score, 2)
 
-	// Store the reward in the coinbase tx
-	tx := transactions.NewCoinbase(proof, score, R.Bytes())
-
-	// To sign reward output, we calculate P = H(rA)G + B where
-	//
-	// A is the BlockGenerator's PubView key (BlockGenerator's public key 1)
-	// B is the BlockGenerator's SpendView key (BlockGenerator's public key 2)
-	// r is a random big number
-	// G is the curve generator point
-	// H is hashing function
-	const coinbaseIndex = 0
-	P := rewardReceiver.StealthAddress(r, coinbaseIndex).P
+	// Set r to our generated value
+	tx.SetTxPubKey(r)
 
 	// Disclose  reward
 	var reward ristretto.Scalar
 	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 
-	output := &transactions.Output{
-		// EncryptedAmount field in coinbase tx represents the reward
-		EncryptedAmount: reward.Bytes(),
-		EncryptedMask:   make([]byte, 1),
-		Commitment:      make([]byte, 32),
-		DestKey:         P.Bytes(),
-	}
-
-	tx.AddReward(output)
+	// Store the reward in the coinbase tx
+	tx.AddReward(*rewardReceiver, reward)
 
 	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
 	// This could be achieved with a request to dusk-wallet

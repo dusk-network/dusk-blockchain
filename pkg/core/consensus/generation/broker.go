@@ -12,10 +12,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )
@@ -190,7 +190,7 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 		return err
 	}
 
-	if err := cert.Encode(buf); err != nil {
+	if err := block.MarshalCertificate(buf, cert); err != nil {
 		return err
 	}
 

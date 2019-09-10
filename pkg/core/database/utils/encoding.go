@@ -8,7 +8,7 @@ import (
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 var (
@@ -34,7 +34,7 @@ func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) 
 	}
 
 	// Write transactions.Transaction bytes
-	err := tx.Encode(buf)
+	err := transactions.Marshal(buf, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -69,42 +69,8 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Tr
 		return nil, txIndex, err
 	}
 
-	switch txReadType {
-	case transactions.StandardType:
-		tx = &transactions.Standard{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.TimelockType:
-		tx = &transactions.TimeLock{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.BidType:
-		tx = &transactions.Bid{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.StakeType:
-		tx = &transactions.Stake{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	case transactions.CoinbaseType:
-		tx = &transactions.Coinbase{}
-		err := tx.Decode(reader)
-		if err != nil {
-			return nil, txIndex, err
-		}
-	default:
-		return nil, txIndex, fmt.Errorf("unknown transaction type: %d", txReadType)
-	}
-
-	return tx, txIndex, nil
+	tx, err = transactions.Unmarshal(reader)
+	return tx, txIndex, err
 }
 
 // writeUint32 Tx utility to use a Tx byteOrder on internal encoding

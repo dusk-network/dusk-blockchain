@@ -93,7 +93,7 @@ func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
 	}
 
 	blk := block.NewBlock()
-	if err := blk.Decode(&blkBuf); err != nil {
+	if err := block.Unmarshal(&blkBuf, blk); err != nil {
 		return nil, err
 	}
 

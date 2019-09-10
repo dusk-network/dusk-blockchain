@@ -12,12 +12,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-wallet/key"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
@@ -164,24 +164,19 @@ func transferCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus)
 		return
 	}
 
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireStandardTx()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
+	// Marshal
 	buf := new(bytes.Buffer)
-	if err := wireTx.Encode(buf); err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
 		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
 		return
 	}
 
-	_, err = wireTx.CalculateHash()
+	_, err = tx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(tx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
 }
@@ -290,24 +285,19 @@ func sendStakeCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus
 		return
 	}
 
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireStakeTx()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
+	// Marshal
 	buf := new(bytes.Buffer)
-	if err := wireTx.Encode(buf); err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
 		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
 		return
 	}
 
-	_, err = wireTx.CalculateHash()
+	_, err = tx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(tx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
 }
@@ -359,24 +349,19 @@ func sendBidCMD(args []string, publisher wire.EventBroker, rpcBus *wire.RPCBus) 
 		return
 	}
 
-	// Convert wallet-tx to wireTx and encode into buffer
-	wireTx, err := tx.WireBid()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
-		return
-	}
+	// Marshal
 	buf := new(bytes.Buffer)
-	if err := wireTx.Encode(buf); err != nil {
+	if err := transactions.Marshal(buf, tx); err != nil {
 		fmt.Fprintf(os.Stdout, "error encoding tx: %v\n", err)
 		return
 	}
 
-	_, err = wireTx.CalculateHash()
+	_, err = tx.CalculateHash()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "%s\n", err.Error())
 		return
 	}
-	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(wireTx.TxID))
+	fmt.Fprintf(os.Stdout, "hash: %s\n", hex.EncodeToString(tx.TxID))
 
 	publisher.Publish(string(topics.Tx), buf)
 }

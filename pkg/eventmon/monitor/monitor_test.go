@@ -13,6 +13,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
@@ -110,16 +111,20 @@ func TestResumeRight(t *testing.T) {
 	}
 
 	time.Sleep(3 * time.Second)
-	// If we got any messages, discard (it could happen that we get a goroutine message for instance)
-	for len(msgChan) > 0 {
-		<-msgChan
-	}
 
+	// Publish next block
 	testBuf = mockBlockBuf(t, 24)
 	eb.Publish(string(topics.AcceptedBlock), testBuf)
-	round2 := <-msgChan
+	var round2 map[string]interface{}
+	for {
+		// If we get a message, discard it if it is not a block event message
+		round2 = <-msgChan
+		if round2["blockTime"] != nil {
+			break
+		}
+	}
 
-	assert.InDelta(t, float64(3), round2["blockTime"], float64(1))
+	assert.GreaterOrEqual(t, round2["blockTime"], float64(3), float64(1))
 
 	_ = supervisor.Stop()
 	wg.Wait()
@@ -186,7 +191,7 @@ func TestHook(t *testing.T) {
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, 4)
 	buf := new(bytes.Buffer)
-	if err := blk.Encode(buf); err != nil {
+	if err := block.Marshal(buf, blk); err != nil {
 		panic(err)
 	}
 

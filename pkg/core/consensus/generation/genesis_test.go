@@ -8,7 +8,7 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
@@ -36,8 +36,8 @@ func TestGenerateGenesis(t *testing.T) {
 	var buf bytes.Buffer
 	buf.Write(blob)
 
-	b := block.Block{}
-	if err := b.Decode(&buf); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(&buf, b); err != nil {
 		t.Fatalf("expecting decodable hex %s", err.Error())
 	}
 
@@ -56,8 +56,8 @@ func TestGenesisBlock(t *testing.T) {
 	var buf bytes.Buffer
 	buf.Write(blob)
 
-	b := block.Block{}
-	if err := b.Decode(&buf); err != nil {
+	b := block.NewBlock()
+	if err := block.Unmarshal(&buf, b); err != nil {
 		t.Fatalf("expecting decodable cfg.TestNetGenesisBlob %s", err.Error())
 	}
 
