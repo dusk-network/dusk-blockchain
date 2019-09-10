@@ -16,6 +16,7 @@ type Generator interface {
 	UpdateBidList(user.Bid)
 	RemoveExpiredBids(uint64)
 	InBidList() bool
+	UpdateProofValues(ristretto.Scalar, ristretto.Scalar)
 }
 
 type proofGenerator struct {
@@ -55,6 +56,12 @@ func (g *proofGenerator) RemoveExpiredBids(round uint64) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.bidList.RemoveExpired(round)
+}
+
+func (g *proofGenerator) UpdateProofValues(d, m ristretto.Scalar) {
+	x := zkproof.CalculateX(d, m)
+	g.x = x
+	g.d = d
 }
 
 // GenerateProof will generate the proof of blind bid, needed to successfully

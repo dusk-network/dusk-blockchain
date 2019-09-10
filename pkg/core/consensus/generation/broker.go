@@ -34,10 +34,11 @@ func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, 
 }
 
 type broker struct {
-	k                    ristretto.Scalar
-	m                    ristretto.Scalar
-	eventBroker          wire.EventBroker
-	proofGenerator       Generator
+	k              ristretto.Scalar
+	m              ristretto.Scalar
+	eventBroker    wire.EventBroker
+	proofGenerator Generator
+
 	forwarder            *forwarder
 	seeder               *seeder
 	certificateGenerator *certificateGenerator
@@ -117,11 +118,9 @@ func (b *broker) Listen() {
 	for {
 		select {
 		case bid := <-b.bidChan:
-			if b.proofGenerator != nil {
-				b.proofGenerator.UpdateBidList(bid)
-			}
+			b.proofGenerator.UpdateBidList(bid)
 		case state := <-b.regenerationChan:
-			if state.Round == b.seeder.Round() && b.proofGenerator != nil {
+			if state.Round == b.seeder.Round() {
 				b.forwarder.threshold.Lower()
 				b.generateProofAndBlock()
 			}
@@ -129,9 +128,7 @@ func (b *broker) Listen() {
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
 		case blk := <-b.acceptedBlockChan:
-			if b.proofGenerator != nil {
-				b.onBlock(blk)
-			}
+			b.onBlock(blk)
 		}
 	}
 }
@@ -156,14 +153,11 @@ func (b *broker) handleBlock(blk block.Block) error {
 	if b.proofGenerator.InBidList() {
 		b.generateProofAndBlock()
 	} else {
-		// We will remove the old proofgenerator, to avoid creation of obsolete proofs
-		// until we get new proof values
-		b.proofGenerator = nil
-
 		// Then, we will wait till a new bid belonging to us is found
-		go func() {
-			b.updateProofValues()
-		}()
+		b.updateProofValues()
+
+		// Drain the regeneration, winning block hash and accepted block channels
+		b.drainChannels()
 	}
 
 	return nil
@@ -203,11 +197,20 @@ func (b *broker) updateProofValues() {
 	log.WithFields(log.Fields{
 		"process": "generation",
 	}).Debugln("changing d value")
-	var err error
-	b.proofGenerator, err = newProofGenerator(d, b.k, b.m)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "generation",
-		}).WithError(err).Errorln("could not repopulate bidlist")
+
+	b.proofGenerator.UpdateProofValues(d, b.m)
+}
+
+func (b *broker) drainChannels() {
+	for len(b.regenerationChan) > 0 {
+		<-b.regenerationChan
+	}
+
+	for len(b.winningBlockHashChan) > 0 {
+		<-b.winningBlockHashChan
+	}
+
+	for len(b.acceptedBlockChan) > 0 {
+		<-b.acceptedBlockChan
 	}
 }
