@@ -342,7 +342,23 @@ func (w *Wallet) Sign(tx SignableTx) error {
 		return err
 	}
 
-	return tx.Prove()
+	if err := tx.Prove(); err != nil {
+		return err
+	}
+
+	// Remove inputs from the db, to prevent accidental double-spend attempts
+	// when sending transactions quickly after one another.
+	for _, input := range tx.StandardTx().Inputs {
+		pubKey, err := w.db.Get(input.KeyImage.Bytes())
+		if err == leveldb.ErrNotFound {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		w.db.RemoveInput(pubKey)
+	}
+	return nil
 }
 
 func (w *Wallet) Balance() (float64, error) {
