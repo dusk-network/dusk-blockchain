@@ -17,15 +17,23 @@ type Network struct {
 
 // Bootstrap performs all actions needed to initialize and start a local network
 // This network is alive by the end of all tests execution
-func (n *Network) Bootstrap(workspace string) {
+func (n *Network) Bootstrap(workspace string) error {
 
 	initProfiles()
 
-	blockchainExec, blindBidExec, seederExec := n.getExec()
+	blockchainExec, blindBidExec, seederExec, err := n.getExec()
+	if err != nil {
+		return err
+	}
 
 	// Start voucher seeder
 	if len(seederExec) > 0 {
-		n.start("", seederExec)
+		if err := n.start("", seederExec); err != nil {
+			return err
+		}
+	} else {
+		// If path not provided, then it's assumed that the seeder is already running
+		log.Warnf("Seeder path not provided.")
 	}
 
 	// Foreach node read localNet.Nodes, configure and run new nodes
@@ -35,8 +43,7 @@ func (n *Network) Bootstrap(workspace string) {
 		nodeDir := workspace + "/node-" + node.Id
 		err := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm)
 		if err != nil {
-			fmt.Printf(err.Error())
-			break
+			return err
 		}
 
 		node.Dir = nodeDir
@@ -47,65 +54,107 @@ func (n *Network) Bootstrap(workspace string) {
 		walletsPath += "/../data/"
 
 		// Generate node default config file
-		tomlFilePath := n.generateConfig(i, walletsPath)
+		tomlFilePath, err := n.generateConfig(i, walletsPath)
+		if err != nil {
+			return err
+		}
 
 		// Run dusk-blockchain node process
-		n.start(nodeDir, blockchainExec, "--config", tomlFilePath)
+		if err := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); err != nil {
+			return err
+		}
 
 		// Run blindbid node process
-		n.start(nodeDir, blindBidExec)
+		if err := n.start(nodeDir, blindBidExec); err != nil {
+			return err
+		}
 	}
 
 	log.Infof("Local network workspace: %s", workspace)
 	log.Infof("Running %d nodes", len(n.Nodes))
 
-	// TODO: WaitFor consensus reaching block 2
 	time.Sleep(10 * time.Second)
+
+	return nil
 }
 
 func (n *Network) Teardown() {
 	for _, process := range n.processes {
-		process.Kill()
+		_ = process.Kill()
 	}
 }
 
-func (n *Network) generateConfig(index int, walletPath string) string {
+// generateConfig loads config profile assigned to this node
+// It's based on viper global var so it cannot be called concurrently
+func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, error) {
 
-	node := n.Nodes[index]
+	node := n.Nodes[nodeIndex]
 
+	// Load config profile
 	profileFunc, ok := profileList[node.ConfigProfileID]
 	if !ok {
-		panic("invalid config profile")
+		return "", fmt.Errorf("invalid config profile for node index %d", nodeIndex)
 	}
 
-	profileFunc(index, node, walletPath)
+	profileFunc(nodeIndex, node, walletPath)
 
 	configPath := node.Dir + "/dusk.toml"
-	viper.WriteConfigAs(configPath)
+	if err := viper.WriteConfigAs(configPath); err != nil {
+		return "", fmt.Errorf("config profile err '%s' for node index %d", err.Error(), nodeIndex)
+	}
 
 	// Load back
 	var err error
 	node.Cfg, err = config.LoadFromFile(configPath)
 	if err != nil {
-		fmt.Printf("LoadFromFile %s failed with err %s", configPath, err.Error())
+		return "", fmt.Errorf("LoadFromFile %s failed with err %s", configPath, err.Error())
 	}
 
-	return configPath
+	return configPath, nil
 }
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network
-func (n *Network) start(nodeDir string, name string, arg ...string) {
+func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	cmd := exec.Command(name, arg...)
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
 	if err := cmd.Start(); err != nil {
-		fmt.Printf(err.Error())
+		return err
 	} else {
 		n.processes = append(n.processes, cmd.Process)
 	}
+
+	return nil
 }
 
 // getExec returns paths of all node executables
-// dusk-blockchain, blindbid, voucher
-func (n *Network) getExec() (string, string, string) {
-	return os.Getenv("DUSK_BLOCKCHAIN"), os.Getenv("DUSK_BLINDBID"), os.Getenv("DUSK_SEEDER")
+// dusk-blockchain, blindbid and seeder
+func (n *Network) getExec() (string, string, string, error) {
+
+	blockchainExec, err := getEnv("DUSK_BLOCKCHAIN")
+	if err != nil {
+		return "", "", "", err
+	}
+
+	blindBidExec, err := getEnv("DUSK_BLINDBID")
+	if err != nil {
+		return "", "", "", err
+	}
+
+	seederExec, _ := getEnv("DUSK_SEEDER")
+
+	return blockchainExec, blindBidExec, seederExec, nil
+}
+
+func getEnv(envVarName string) (string, error) {
+
+	execPath := os.Getenv(envVarName)
+	if len(execPath) == 0 {
+		return "", fmt.Errorf("ENV variable %s is not declared", envVarName)
+	}
+
+	if _, err := os.Stat(execPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("ENV variable %s points at non-existing file", envVarName)
+	}
+
+	return execPath, nil
 }

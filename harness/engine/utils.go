@@ -63,7 +63,9 @@ func (n *Network) SendQuery(nodeIndex uint, query string) (map[string][]map[stri
 	}
 
 	var decoded map[string]map[string][]map[string]string
-	json.NewDecoder(resp.Body).Decode(&decoded)
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		return nil, err
+	}
 
 	result, ok := decoded["data"]
 	if !ok {

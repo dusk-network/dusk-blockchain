@@ -29,7 +29,6 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("mempool.maxSizeMB", "100")
 	viper.Set("mempool.poolType", "hashmap")
 	viper.Set("mempool.preallocTxs", "100")
-	return
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)
@@ -40,7 +39,7 @@ func Profile2(index int, node *DuskNode, walletPath string) {
 }
 
 func initProfiles() {
-	profileList = make(Profiles, 0)
+	profileList = make(Profiles)
 	profileList["default"] = Profile1
 	profileList["defaultWithLite"] = Profile2
 }

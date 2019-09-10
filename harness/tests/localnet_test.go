@@ -38,10 +38,16 @@ func TestMain(m *testing.M) {
 		localNet.Nodes = append(localNet.Nodes, node)
 	}
 
-	localNet.Bootstrap(workspace)
-
-	// Start all tests
-	code := m.Run()
+	var code int
+	err = localNet.Bootstrap(workspace)
+	if err != nil {
+		// Failed temp network bootstrapping
+		code = 1
+		log.Fatal(err)
+	} else {
+		// Start all tests
+		code = m.Run()
+	}
 
 	localNet.Teardown()
 	os.RemoveAll(workspace)
@@ -54,8 +60,13 @@ func TestMain(m *testing.M) {
 // the same block
 func TestSendBidTransaction(t *testing.T) {
 
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	if len(walletsPass) == 0 {
+		t.Logf("Empty DUSK_WALLET_PASS")
+	}
+
 	// Send request to node 0 to generate and process a Bid transaction
-	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "1", os.Getenv("DUSK_WALLET_PASS")})
+	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "1", walletsPass})
 	if err != nil {
 		t.Error(err.Error())
 	}
