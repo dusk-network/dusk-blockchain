@@ -23,8 +23,7 @@ type Bid struct {
 
 // Equals will return whether or not the two bids are the same.
 func (b Bid) Equals(bid Bid) bool {
-	return bytes.Equal(b.X[:], bid.X[:]) &&
-		bytes.Equal(b.M[:], bid.M[:])
+	return bytes.Equal(b.X[:], bid.X[:])
 }
 
 // BidList is a list of bid X values.
