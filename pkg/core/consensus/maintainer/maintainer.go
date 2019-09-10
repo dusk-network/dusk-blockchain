@@ -76,6 +76,7 @@ func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ri
 	if maintainer.bidEndHeight == 0 {
 		if err := maintainer.sendBid(); err != nil {
 			l.WithError(err).Warnln("could not send bid tx")
+			// Set end height to 1 so we retry sending the tx in `listen`
 			maintainer.bidEndHeight = 1
 		}
 	}
@@ -109,6 +110,7 @@ func (m *maintainer) listen() {
 						l.WithError(err).Warnln("could not send bid tx")
 						continue
 					}
+					// Set end height to 0 to ensure we only send a transaction once
 					m.bidEndHeight = 0
 				}
 			}
