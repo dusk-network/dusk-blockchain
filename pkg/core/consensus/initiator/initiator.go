@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
@@ -37,7 +37,7 @@ func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *walle
 
 func startProvisioner(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// Setting up the consensus factory
-	f := factory.New(eventBroker, rpcBus, config.ConsensusTimeOut, w.ConsensusKeys())
+	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, w.ConsensusKeys())
 	f.StartConsensus()
 
 	// Get current height
