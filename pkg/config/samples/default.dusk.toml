@@ -3,6 +3,7 @@
 # general node configs
 [general]
 network = "testnet"
+# walletonly will prevent the node from starting consensus components when the wallet is loaded
 walletonly = false
 
 # logger configs
