@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -17,8 +18,9 @@ import (
 
 // TODO: rename
 type Transactor struct {
-	w  *wallet.Wallet
-	db database.DB
+	w        *wallet.Wallet
+	db       database.DB
+	syncLock sync.Mutex
 }
 
 // Instantiate a new Transactor struct.
@@ -112,6 +114,8 @@ func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transact
 }
 
 func (t *Transactor) syncWallet() error {
+	t.syncLock.Lock()
+	defer t.syncLock.Unlock()
 	var totalSpent, totalReceived uint64
 	// keep looping until tipHash = currentBlockHash
 	for {
