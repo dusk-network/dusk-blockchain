@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 
@@ -15,6 +16,8 @@ import (
 
 type DB struct {
 	storage *leveldb.DB
+	// Mutex to prevent concurrent writing/reading
+	lock sync.RWMutex
 }
 
 var (
@@ -31,6 +34,8 @@ func New(path string) (*DB, error) {
 }
 
 func (db *DB) Put(key, value []byte) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	return db.storage.Put(key, value, nil)
 }
 
@@ -65,7 +70,7 @@ func (db *DB) RemoveInput(pubkey []byte) error {
 	return db.Delete(key)
 }
 
-func (db DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.Input, int64, error) {
+func (db *DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.Input, int64, error) {
 
 	var inputs []*inputDB
 
@@ -123,7 +128,7 @@ func (db DB) FetchInputs(decryptionKey []byte, amount int64) ([]*transactions.In
 	return tInputs, changeAmount, nil
 }
 
-func (db DB) FetchBalance(decryptionKey []byte) (uint64, error) {
+func (db *DB) FetchBalance(decryptionKey []byte) (uint64, error) {
 
 	var balance ristretto.Scalar
 	balance.SetZero()
@@ -160,7 +165,7 @@ func (db DB) FetchBalance(decryptionKey []byte) (uint64, error) {
 	return balance.BigInt().Uint64(), nil
 }
 
-func (db DB) GetWalletHeight() (uint64, error) {
+func (db *DB) GetWalletHeight() (uint64, error) {
 	heightBytes, err := db.storage.Get(walletHeightPrefix, nil)
 	if err != nil {
 		return 0, err
@@ -170,17 +175,21 @@ func (db DB) GetWalletHeight() (uint64, error) {
 	return height, nil
 }
 
-func (db DB) UpdateWalletHeight(newHeight uint64) error {
+func (db *DB) UpdateWalletHeight(newHeight uint64) error {
 	heightBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(heightBytes, newHeight)
 	return db.Put(walletHeightPrefix, heightBytes)
 }
 
-func (db DB) Get(key []byte) ([]byte, error) {
+func (db *DB) Get(key []byte) ([]byte, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
 	return db.storage.Get(key, nil)
 }
 
 func (db *DB) Delete(key []byte) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 	return db.storage.Delete(key, nil)
 }
 
