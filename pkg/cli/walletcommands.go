@@ -70,7 +70,7 @@ func (c *CLI) createWalletCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
 		if err := c.launchMaintainer(w); err != nil {
 			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 		}
@@ -124,7 +124,7 @@ func (c *CLI) loadWalletCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
 		if err := c.launchMaintainer(w); err != nil {
 			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 		}
@@ -185,7 +185,7 @@ func (c *CLI) createFromSeedCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		go initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
 		if err := c.launchMaintainer(w); err != nil {
 			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 		}
