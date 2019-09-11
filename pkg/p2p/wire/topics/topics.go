@@ -40,11 +40,6 @@ const (
 	Agreement      Topic = "blockagreement"
 	StartConsensus Topic = "startconsensus"
 
-	// Transaction topics
-	Transfer Topic = "transfer"
-	Bid      Topic = "bid"
-	Stake    Topic = "stake"
-
 	// Peer topics
 	Gossip Topic = "gossip"
 
