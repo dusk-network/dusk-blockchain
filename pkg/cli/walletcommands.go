@@ -313,18 +313,6 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 	return pubKeys
 }
 
-func generateDualKey() mlsag.PubKeys {
-	pubkeys := mlsag.PubKeys{}
-
-	for i := 0; i < 2; i++ {
-		var key ristretto.Point
-		key.Rand()
-		pubkeys.AddPubKey(key)
-	}
-
-	return pubkeys
-}
-
 func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
 	// Fetch all inputs from database that are >= totalAmount
 	// returns error if inputs do not add up to total amount

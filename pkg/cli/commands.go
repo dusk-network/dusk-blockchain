@@ -2,14 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"math"
-	"math/big"
 	"os"
 	"sort"
 	"strconv"
-
-	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
 func showHelp(args []string) {
@@ -49,30 +44,6 @@ func stopNode() {
 		// Neither should this
 		panic(err)
 	}
-}
-
-func intToScalar(amount int64) ristretto.Scalar {
-	var x ristretto.Scalar
-	x.SetBigInt(big.NewInt(amount))
-	return x
-}
-
-func stringToScalar(s string) (ristretto.Scalar, error) {
-	sFloat, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return ristretto.Scalar{}, err
-	}
-
-	sInt := int64(math.Floor(sFloat * float64(config.DUSK)))
-	return intToScalar(sInt), nil
-}
-
-func stringToInt64(s string) (int64, error) {
-	sInt, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, err
-	}
-	return (int64(sInt)), nil
 }
 
 func stringToUint64(s string) (uint64, error) {
