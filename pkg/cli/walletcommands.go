@@ -101,7 +101,7 @@ func (c *CLI) loadWalletCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
 	}
 }
 
@@ -159,7 +159,7 @@ func (c *CLI) createFromSeedCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
 	}
 }
 
