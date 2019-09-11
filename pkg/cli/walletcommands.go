@@ -10,7 +10,6 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
@@ -21,7 +20,6 @@ import (
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-wallet/key"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
@@ -70,29 +68,8 @@ func (c *CLI) createWalletCMD(args []string) {
 	c.transactor = transactor.New(w, nil)
 
 	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
-		if err := c.launchMaintainer(w); err != nil {
-			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
-		}
+		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
 	}
-}
-
-func (c *CLI) launchMaintainer(w *wallet.Wallet) error {
-	r := cfg.Get()
-	amount := r.Consensus.DefaultAmount
-	lockTime := r.Consensus.DefaultLockTime
-	if lockTime > transactions.MaxLockTime {
-		fmt.Fprintf(os.Stdout, "default locktime was configured to be greater than the maximum (%v) - defaulting to %v\n", lockTime, transactions.MaxLockTime)
-		lockTime = transactions.MaxLockTime
-	}
-
-	offset := r.Consensus.DefaultOffset
-	k, err := w.ReconstructK()
-	if err != nil {
-		return err
-	}
-
-	return maintainer.Launch(c.eventBroker, nil, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), c.transactor, amount, lockTime, offset)
 }
 
 func (c *CLI) loadWalletCMD(args []string) {
@@ -125,9 +102,6 @@ func (c *CLI) loadWalletCMD(args []string) {
 
 	if !cfg.Get().General.WalletOnly {
 		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
-		if err := c.launchMaintainer(w); err != nil {
-			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
-		}
 	}
 }
 
@@ -186,9 +160,6 @@ func (c *CLI) createFromSeedCMD(args []string) {
 
 	if !cfg.Get().General.WalletOnly {
 		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter)
-		if err := c.launchMaintainer(w); err != nil {
-			fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
-		}
 	}
 }
 

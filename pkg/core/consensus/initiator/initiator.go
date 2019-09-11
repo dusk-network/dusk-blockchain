@@ -3,27 +3,36 @@ package initiator
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"os"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )
 
 var l = log.WithField("process", "consensus initiator")
 
-func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
+func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter, transactor *transactor.Transactor) {
 	// TODO: sync first
 	go startProvisioner(eventBroker, rpcBus, w, counter)
 	go startBlockGenerator(eventBroker, rpcBus, w)
+	if err := launchMaintainer(eventBroker, transactor, w); err != nil {
+		fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
+	}
 }
 
 func startProvisioner(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
@@ -119,4 +128,22 @@ func syncToTip(acceptedBlockChan <-chan block.Block, counter *chainsync.Counter)
 			break
 		}
 	}
+}
+
+func launchMaintainer(eventBroker wire.EventBroker, transactor *transactor.Transactor, w *wallet.Wallet) error {
+	r := cfg.Get()
+	amount := r.Consensus.DefaultAmount
+	lockTime := r.Consensus.DefaultLockTime
+	if lockTime > transactions.MaxLockTime {
+		fmt.Fprintf(os.Stdout, "default locktime was configured to be greater than the maximum (%v) - defaulting to %v\n", lockTime, transactions.MaxLockTime)
+		lockTime = transactions.MaxLockTime
+	}
+
+	offset := r.Consensus.DefaultOffset
+	k, err := w.ReconstructK()
+	if err != nil {
+		return err
+	}
+
+	return maintainer.Launch(eventBroker, nil, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor, amount, lockTime, offset)
 }
