@@ -18,7 +18,7 @@ import (
 func TestAddProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
 	_, db := lite.CreateDBConnection()
-	c := launchStore(bus, db)
+	c := LaunchStore(bus, db)
 
 	newProvisioner(10, bus, 0, 1000)
 	// Give the committee store some time to add the provisioner
@@ -31,7 +31,7 @@ func TestAddProvisioner(t *testing.T) {
 func TestRemoveProvisioner(t *testing.T) {
 	bus := wire.NewEventBus()
 	_, db := lite.CreateDBConnection()
-	c := launchStore(bus, db)
+	c := LaunchStore(bus, db)
 
 	k := newProvisioner(10, bus, 0, 1000)
 	// Give the committee store some time to add the provisioner

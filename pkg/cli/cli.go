@@ -7,25 +7,20 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 	log "github.com/sirupsen/logrus"
 )
 
 // Start the interactive shell.
-func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File) {
+func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File, counter *chainsync.Counter) {
+	cli := &CLI{eventBroker, rpcBus, nil, counter}
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")
 	for scanner.Scan() {
 		args := strings.Split(scanner.Text(), " ")
-		if fn := CLICommands[args[0]]; fn != nil {
-			fn(args[1:], eventBroker, rpcBus)
-		} else if args[0] == "showlogs" {
-			showLogs(args[1:], logFile)
-		} else {
-			fmt.Printf("%v is not a supported command\n", args[0])
-		}
-
+		cli.runCmd(args[0], args[1:], logFile)
 		fmt.Print("> ")
 	}
 
@@ -34,6 +29,33 @@ func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File) 
 			"process": "cli",
 			"error":   scanner.Err(),
 		}).Errorln("cli error")
+	}
+}
+
+func (c *CLI) runCmd(cmd string, args []string, logFile *os.File) {
+	switch cmd {
+	case "help":
+		showHelp(args)
+	case "createwallet":
+		c.createWalletCMD(args)
+	case "loadwallet":
+		c.loadWalletCMD(args)
+	case "createfromseed":
+		c.createFromSeedCMD(args)
+	case "balance":
+		c.balanceCMD()
+	case "transfer":
+		c.transferCMD(args)
+	case "stake":
+		c.sendStakeCMD(args)
+	case "bid":
+		c.sendBidCMD(args)
+	case "exit", "quit":
+		stopNode()
+	case "showlogs":
+		showLogs(args, logFile)
+	default:
+		fmt.Fprintf(os.Stdout, "command %s not recognized\n", cmd)
 	}
 }
 

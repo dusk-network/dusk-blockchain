@@ -6,8 +6,8 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 var (
@@ -22,6 +22,8 @@ var (
 	ErrBlockNotFound = errors.New("database: block not found")
 	// ErrStateNotFound returned on missing state db entry
 	ErrStateNotFound = errors.New("database: state not found")
+	// ErrOutputNotFound returned on output lookup during tx verification
+	ErrOutputNotFound = errors.New("database: output not found")
 
 	// AnyTxType is used as a filter value on FetchBlockTxByHash
 	AnyTxType = transactions.TxType(math.MaxUint8)

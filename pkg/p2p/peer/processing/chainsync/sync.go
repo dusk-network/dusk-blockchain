@@ -55,7 +55,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 	// Only ask for missing blocks if we are not currently syncing, to prevent
 	// asking many peers for (generally) the same blocks.
 	diff := compareHeights(blk.Header.Height, height)
-	if !s.isSyncing() && diff > 1 {
+	if !s.IsSyncing() && diff > 1 {
 
 		hash := base64.StdEncoding.EncodeToString(blk.Header.Hash)
 		log.Debugf("Start syncing from %s", peerInfo)

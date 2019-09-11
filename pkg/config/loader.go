@@ -40,7 +40,8 @@ type Registry struct {
 	RPC         rpcConfiguration
 	Performance performanceConfiguration
 	Mempool     mempoolConfiguration
-	Gql	 		gqlConfiguration
+	Consensus   consensusConfiguration
+	Gql         gqlConfiguration
 }
 
 // Load makes an attempt to read and unmershal any configs from flag, env and
@@ -150,7 +151,7 @@ func defineFlags() {
 	_ = pflag.StringP("logger.level", "l", "", "override logger.level settings in config file")
 	_ = pflag.StringP("general.network", "n", "testnet", "override general.network settings in config file")
 	_ = pflag.StringP("network.port", "p", "7000", "port for the node to bind on")
-	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output")
+	_ = pflag.StringP("logger.output", "o", "dusk", "specifies the log output destination")
 	_ = pflag.StringP("database.dir", "b", "chain", "sets the blockchain database directory")
 	_ = pflag.StringP("wallet.file", "w", "wallet.dat", "sets the wallet file to use")
 	_ = pflag.StringP("wallet.store", "d", "walletDB", "sets the wallet database directory")

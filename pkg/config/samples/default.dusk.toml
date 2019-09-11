@@ -3,6 +3,8 @@
 # general node configs
 [general]
 network = "testnet"
+# walletonly will prevent the node from starting consensus components when the wallet is loaded
+walletonly = false
 
 # logger configs
 [logger]
@@ -97,3 +99,10 @@ memFile=""
 [performance]
 # Number of workers to spawn on an accumulator component
 accumulatorWorkers = 4
+
+# Information for the node to send consensus transactions with
+[consensus]
+defaultlocktime = 250000
+defaultamount = 5
+# Default amount of rounds before expiry to renew a stake or bid
+defaultoffset = 100

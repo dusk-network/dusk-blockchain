@@ -17,7 +17,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -167,6 +166,10 @@ func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) error {
 func (c *Chain) propagateBid(bid user.Bid) {
 	buf := new(bytes.Buffer)
 	if err := encoding.Write256(buf, bid.X[:]); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.Write256(buf, bid.M[:]); err != nil {
 		panic(err)
 	}
 

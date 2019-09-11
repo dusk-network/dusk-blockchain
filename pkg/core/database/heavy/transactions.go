@@ -241,7 +241,7 @@ func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
 	// see also nilIfNotFound in leveldb/db.go
 	if !exists && err == nil {
 		// overwrite error message
-		err = database.ErrBlockNotFound
+		err = database.ErrOutputNotFound
 	}
 
 	return exists, err
