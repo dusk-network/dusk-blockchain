@@ -12,11 +12,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestAddProvisioner(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	_, db := lite.CreateDBConnection()
 	c := LaunchStore(bus, db)
 
@@ -29,7 +30,7 @@ func TestAddProvisioner(t *testing.T) {
 }
 
 func TestRemoveProvisioner(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	_, db := lite.CreateDBConnection()
 	c := LaunchStore(bus, db)
 
@@ -47,7 +48,7 @@ func TestRemoveProvisioner(t *testing.T) {
 
 // Test that a committee cache keeps copies of produced voting committees.
 func TestUpsertCommitteeCache(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	_, db := lite.CreateDBConnection()
 	e := NewExtractor(bus, db)
 
@@ -75,7 +76,7 @@ func TestUpsertCommitteeCache(t *testing.T) {
 // Test that an Extractor clears its committee cache when asked to produce a committee
 // for a different round.
 func TestCleanCommitteeCache(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	_, db := lite.CreateDBConnection()
 	e := NewExtractor(bus, db)
 
@@ -98,7 +99,7 @@ func TestCleanCommitteeCache(t *testing.T) {
 }
 
 func TestRemoveExpired(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	_, db := lite.CreateDBConnection()
 	e := NewExtractor(bus, db)
 
@@ -119,7 +120,7 @@ func TestRemoveExpired(t *testing.T) {
 }
 
 func TestMultiStake(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	_, db := lite.CreateDBConnection()
 	e := NewExtractor(bus, db)
 
@@ -158,7 +159,7 @@ func newMockEvent(sender []byte) wire.Event {
 	return mockEvent
 }
 
-func publishNewStake(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64, k user.Keys) {
+func publishNewStake(stake uint64, eb *eventbus.EventBus, startHeight, endHeight uint64, k user.Keys) {
 	buffer := bytes.NewBuffer(*k.EdPubKey)
 	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
 
@@ -169,13 +170,13 @@ func publishNewStake(stake uint64, eb *wire.EventBus, startHeight, endHeight uin
 	eb.Publish(msg.NewProvisionerTopic, buffer)
 }
 
-func newProvisioner(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64) user.Keys {
+func newProvisioner(stake uint64, eb *eventbus.EventBus, startHeight, endHeight uint64) user.Keys {
 	k, _ := user.NewRandKeys()
 	publishNewStake(stake, eb, startHeight, endHeight, k)
 	return k
 }
 
-func newProvisioners(amount int, stake uint64, eb *wire.EventBus) {
+func newProvisioners(amount int, stake uint64, eb *eventbus.EventBus) {
 	for i := 0; i < amount; i++ {
 		_ = newProvisioner(stake, eb, 0, 1000)
 	}

@@ -11,17 +11,18 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 type forwarder struct {
-	publisher      wire.EventPublisher
+	publisher      eventbus.Publisher
 	blockGenerator BlockGenerator
 	threshold      *consensus.Threshold
 	prevBlock      block.Block
 }
 
-func newForwarder(publisher wire.EventPublisher, blockGenerator BlockGenerator) *forwarder {
+func newForwarder(publisher eventbus.Publisher, blockGenerator BlockGenerator) *forwarder {
 	return &forwarder{
 		publisher:      publisher,
 		blockGenerator: blockGenerator,

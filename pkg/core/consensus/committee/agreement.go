@@ -2,7 +2,7 @@ package committee
 
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
 
@@ -12,7 +12,7 @@ type Agreement struct {
 	*Extractor
 }
 
-func NewAgreement(eventBroker wire.EventBroker, db database.DB) *Agreement {
+func NewAgreement(eventBroker eventbus.Broker, db database.DB) *Agreement {
 	return &Agreement{
 		Extractor: NewExtractor(eventBroker, db),
 	}

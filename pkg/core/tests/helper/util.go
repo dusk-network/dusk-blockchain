@@ -9,14 +9,15 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -115,8 +116,8 @@ func (ms *SimpleStreamer) Close() error {
 
 // CreateGossipStreamer sets up and event bus, subscribes a SimpleStreamer to the
 // gossip topic, and sets the right preprocessors up for the gossip topic.
-func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
-	eb := wire.NewEventBus()
+func CreateGossipStreamer() (*eventbus.EventBus, *SimpleStreamer) {
+	eb := eventbus.New()
 	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 	// subscribe to gossip topic
 	streamer := NewSimpleStreamer()
@@ -125,7 +126,7 @@ func CreateGossipStreamer() (*wire.EventBus, *SimpleStreamer) {
 	return eb, streamer
 }
 
-func StartPeerReader(conn net.Conn, bus *wire.EventBus, rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*peer.Reader, error) {
+func StartPeerReader(conn net.Conn, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*peer.Reader, error) {
 	dupeMap := dupemap.NewDupeMap(5)
 	exitChan := make(chan struct{}, 1)
 	return peer.NewReader(conn, protocol.TestNet, dupeMap, bus, rpcBus, counter, responseChan, exitChan)

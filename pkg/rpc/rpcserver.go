@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -20,8 +21,8 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "rpc"})
 type Server struct {
 	started bool // Indicates whether or not server has started
 
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
+	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
 
 	authSHA  []byte       // Hash of the auth credentials
 	listener net.Listener // RPC Server listener
@@ -30,7 +31,7 @@ type Server struct {
 }
 
 // NewRPCServer instantiates a new RPCServer.
-func NewRPCServer(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Server, error) {
+func NewRPCServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server, error) {
 
 	srv := Server{
 		eventBus: eventBus,

@@ -8,8 +8,8 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/key"
@@ -25,11 +25,11 @@ type (
 	blockGenerator struct {
 		// generator Public Keys to sign the rewards tx
 		genPubKey *key.PublicKey
-		rpcBus    *wire.RPCBus
+		rpcBus    *rpcbus.RPCBus
 	}
 )
 
-func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus) *blockGenerator {
+func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus) *blockGenerator {
 	return &blockGenerator{
 		rpcBus:    rpcBus,
 		genPubKey: genPubKey,
@@ -86,7 +86,7 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 10))
+		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}, 10))
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the the chain.
 		if err != nil {

@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,7 +24,7 @@ import (
 // Test the functionality of the selector, in a condition where it receives multiple
 // events, and is allowed to time out.
 func TestSelection(t *testing.T) {
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
 	// subscribe to receive a result
 	bestScoreChan := make(chan *bytes.Buffer, 1)
@@ -65,7 +66,7 @@ func TestRepropagation(t *testing.T) {
 
 // Test that the selector does not return any value when it is stopped before timeout.
 func TestStopSelector(t *testing.T) {
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
 	// subscribe to receive a result
 	bestScoreChan := make(chan *bytes.Buffer, 2)
@@ -90,7 +91,7 @@ func TestStopSelector(t *testing.T) {
 }
 
 func TestTimeOutVariance(t *testing.T) {
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
 	// subscribe to receive a result
 	bestScoreChan := make(chan *bytes.Buffer, 2)
@@ -130,7 +131,7 @@ func TestTimeOutVariance(t *testing.T) {
 
 // This test should make sure that obsolete selection messages do not stay in the selector after updating the round
 func TestObsoleteSelection(t *testing.T) {
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*100)
 	// subscribe to receive a result
 	bestScoreChan := make(chan *bytes.Buffer, 2)
@@ -153,14 +154,14 @@ func TestObsoleteSelection(t *testing.T) {
 	assert.Equal(t, 0, result.Len())
 }
 
-func publishRegeneration(eb *wire.EventBus) {
+func publishRegeneration(eb *eventbus.EventBus) {
 	state := make([]byte, 9)
 	binary.LittleEndian.PutUint64(state[0:8], 1)
 	state[8] = byte(2)
 	eb.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(state))
 }
 
-func sendMockEvent(eb *wire.EventBus) {
+func sendMockEvent(eb *eventbus.EventBus) {
 	eb.Publish(string(topics.Score), bytes.NewBuffer([]byte("foo")))
 }
 

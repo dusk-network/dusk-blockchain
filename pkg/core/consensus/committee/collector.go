@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
@@ -53,10 +53,10 @@ func decodeNewProvisioner(r *bytes.Buffer) (*provisioner, error) {
 	return &provisioner{pubKeyEd, pubKeyBLS, amount, startHeight, endHeight}, nil
 }
 
-func initRemoveProvisionerCollector(subscriber wire.EventSubscriber) chan []byte {
+func initRemoveProvisionerCollector(subscriber eventbus.Subscriber) chan []byte {
 	removeProvisionerChan := make(chan []byte, 50)
 	collector := &removeProvisionerCollector{removeProvisionerChan}
-	go wire.NewTopicListener(subscriber, collector, msg.RemoveProvisionerTopic).Accept()
+	go eventbus.NewTopicListener(subscriber, collector, msg.RemoveProvisionerTopic).Accept()
 	return removeProvisionerChan
 }
 
