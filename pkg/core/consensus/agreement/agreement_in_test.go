@@ -52,7 +52,7 @@ func TestAgreementRace(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 	events := createVoteSet(t, k, hash, committeeSize, 1)
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
+	if err := encoding.WriteUint64LE(buf, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,15 +177,15 @@ func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []u
 			t.Fatal(err)
 		}
 
-		if err := encoding.WriteUint64(buf, binary.LittleEndian, 500); err != nil {
+		if err := encoding.WriteUint64LE(buf, 500); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := encoding.WriteUint64(buf, binary.LittleEndian, 0); err != nil {
+		if err := encoding.WriteUint64LE(buf, 0); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := encoding.WriteUint64(buf, binary.LittleEndian, 10000); err != nil {
+		if err := encoding.WriteUint64LE(buf, 10000); err != nil {
 			t.Fatal(err)
 		}
 

@@ -2,7 +2,6 @@ package reputation
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
@@ -13,8 +12,8 @@ type absentees struct {
 }
 
 func decodeAbsentees(m *bytes.Buffer) (*absentees, error) {
-	var round uint64
-	if err := encoding.ReadUint64(m, binary.LittleEndian, &round); err != nil {
+	round, err := encoding.ReadUint64LE(m)
+	if err != nil {
 		return nil, err
 	}
 
@@ -25,7 +24,8 @@ func decodeAbsentees(m *bytes.Buffer) (*absentees, error) {
 
 	pks := make([][]byte, lenAbsentees)
 	for i := range pks {
-		if err := encoding.ReadVarBytes(m, &pks[i]); err != nil {
+		pks[i], err = encoding.ReadVarBytes(m)
+		if err != nil {
 			return nil, err
 		}
 	}

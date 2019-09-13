@@ -2,7 +2,6 @@ package transactions
 
 import (
 	"bytes"
-	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/mlsag"
@@ -70,8 +69,8 @@ func (i *Input) Prove() error {
 	return nil
 }
 
-// MarshalInput marshals an Input object into an io.Writer.
-func MarshalInput(w io.Writer, i *Input, encodeSignature bool) error {
+// MarshalInput marshals an Input object into a bytes.Buffer.
+func MarshalInput(w *bytes.Buffer, i *Input, encodeSignature bool) error {
 	if err := encoding.Write256(w, i.KeyImage.Bytes()); err != nil {
 		return err
 	}
@@ -97,28 +96,28 @@ func MarshalInput(w io.Writer, i *Input, encodeSignature bool) error {
 	return nil
 }
 
-// Decode an Input object from a io.reader.
-func UnmarshalInput(r io.Reader, i *Input) error {
-	var keyImageBytes []byte
-	if err := encoding.Read256(r, &keyImageBytes); err != nil {
+// Decode an Input object from a bytes.Buffer.
+func UnmarshalInput(r *bytes.Buffer, i *Input) error {
+	keyImageBytes, err := encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 	i.KeyImage.UnmarshalBinary(keyImageBytes)
 
-	var pubKeyBytes []byte
-	if err := encoding.Read256(r, &pubKeyBytes); err != nil {
+	pubKeyBytes, err := encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 	i.PubKey.P.UnmarshalBinary(pubKeyBytes)
 
-	var pseudoCommBytes []byte
-	if err := encoding.Read256(r, &pseudoCommBytes); err != nil {
+	pseudoCommBytes, err := encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 	i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
 
-	var sigBytes []byte
-	if err := encoding.ReadVarBytes(r, &sigBytes); err != nil {
+	sigBytes, err := encoding.ReadVarBytes(r)
+	if err != nil {
 		return err
 	}
 

@@ -53,8 +53,8 @@ func initReductionResultCollector(subscriber wire.EventSubscriber) <-chan voteSe
 }
 
 func (r *reductionResultCollector) Collect(m *bytes.Buffer) error {
-	var round uint64
-	if err := encoding.ReadUint64(m, binary.LittleEndian, &round); err != nil {
+	round, err := encoding.ReadUint64LE(m)
+	if err != nil {
 		return err
 	}
 

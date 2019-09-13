@@ -8,9 +8,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
@@ -86,10 +86,10 @@ func TestSign(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, red.SignedHash)
 
-	sig := make([]byte, 64)
-	pk := make([]byte, 32)
-	assert.NoError(t, encoding.Read512(signed, &sig))
-	assert.NoError(t, encoding.Read256(signed, &pk))
+	sig, err := encoding.Read512(signed)
+	assert.NoError(t, err)
+	_, err = encoding.Read256(signed)
+	assert.NoError(t, err)
 	assert.True(t, ed25519.Verify(*k.EdPubKey, signed.Bytes(), sig))
 
 	ev := reduction.New()
@@ -109,10 +109,10 @@ func TestSignBuffer(t *testing.T) {
 	assert.NoError(t, reduction.SignBuffer(b, k))
 
 	// verifying the ED25519 signature
-	sig := make([]byte, 64)
-	pk := make([]byte, 32)
-	assert.NoError(t, encoding.Read512(b, &sig))
-	assert.NoError(t, encoding.Read256(b, &pk))
+	sig, err := encoding.Read512(b)
+	assert.NoError(t, err)
+	_, err = encoding.Read256(b)
+	assert.NoError(t, err)
 	assert.True(t, ed25519.Verify(*k.EdPubKey, b.Bytes(), sig))
 
 	ev, err := reduction.NewUnMarshaller().Deserialize(b)

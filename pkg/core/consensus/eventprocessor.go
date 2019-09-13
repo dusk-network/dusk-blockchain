@@ -38,13 +38,13 @@ func (r *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) 
 // Process a buffer by validating the ED25519 Signature. It uses a io.TeeReader to
 // preserve the original message. It returns a copy of the message.
 func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
-	sig := make([]byte, 64)
-	if err := encoding.Read512(buf, &sig); err != nil {
+	sig, err := encoding.Read512(buf)
+	if err != nil {
 		return nil, err
 	}
 
-	edPubKey := make([]byte, 32)
-	if err := encoding.Read256(buf, &edPubKey); err != nil {
+	edPubKey, err := encoding.Read256(buf)
+	if err != nil {
 		return nil, err
 	}
 

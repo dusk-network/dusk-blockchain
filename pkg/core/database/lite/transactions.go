@@ -61,7 +61,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 		}
 
 		t.batch[txsInd][toKey(txID)] = data
-		t.batch[txHashInd][toKey(txID)] =  b.Header.Hash
+		t.batch[txHashInd][toKey(txID)] = b.Header.Hash
 
 		// Map KeyImage to Transaction
 		for _, input := range tx.StandardTx().Inputs {
@@ -117,7 +117,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
+	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +133,7 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
+	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -156,7 +156,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
+	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -226,7 +226,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
+	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -239,7 +239,7 @@ func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 	for key, data := range t.db.storage[candidatesTableInd] {
 
 		b := block.NewBlock()
-		if err := block.Unmarshal(bytes.NewReader(data), b); err != nil {
+		if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
 			return count, err
 		}
 

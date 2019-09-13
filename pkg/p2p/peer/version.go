@@ -2,8 +2,6 @@ package peer
 
 import (
 	"bytes"
-	"encoding/binary"
-	"io"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -23,19 +21,18 @@ func newVersionMessageBuffer(v *protocol.Version, services protocol.ServiceFlag)
 		return nil, err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian,
-		uint64(time.Now().Unix())); err != nil {
+	if err := encoding.WriteUint64LE(buffer, uint64(time.Now().Unix())); err != nil {
 		return nil, err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, uint64(services)); err != nil {
+	if err := encoding.WriteUint64LE(buffer, uint64(services)); err != nil {
 		return nil, err
 	}
 
 	return buffer, nil
 }
 
-func decodeVersionMessage(r io.Reader) (*VersionMessage, error) {
+func decodeVersionMessage(r *bytes.Buffer) (*VersionMessage, error) {
 	versionMessage := &VersionMessage{
 		Version: &protocol.Version{},
 	}
@@ -43,15 +40,15 @@ func decodeVersionMessage(r io.Reader) (*VersionMessage, error) {
 		return nil, err
 	}
 
-	var time uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &time); err != nil {
+	time, err := encoding.ReadUint64LE(r)
+	if err != nil {
 		return nil, err
 	}
 
 	versionMessage.Timestamp = int64(time)
 
-	var services uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &services); err != nil {
+	services, err := encoding.ReadUint64LE(r)
+	if err != nil {
 		return nil, err
 	}
 

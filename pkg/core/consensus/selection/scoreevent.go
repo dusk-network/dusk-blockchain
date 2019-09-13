@@ -2,7 +2,6 @@ package selection
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -52,27 +51,34 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	sev := ev.(*ScoreEvent)
 
 	// Decoding Round
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &sev.Round); err != nil {
+	var err error
+	sev.Round, err = encoding.ReadUint64LE(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.Score); err != nil {
+	sev.Score, err = encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &sev.Proof); err != nil {
+	sev.Proof, err = encoding.ReadVarBytes(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.Z); err != nil {
+	sev.Z, err = encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadVarBytes(r, &sev.BidListSubset); err != nil {
+	sev.BidListSubset, err = encoding.ReadVarBytes(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.PrevHash); err != nil {
+	sev.PrevHash, err = encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 
@@ -80,11 +86,13 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &sev.Seed); err != nil {
+	sev.Seed, err = encoding.ReadBLS(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.VoteHash); err != nil {
+	sev.VoteHash, err = encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 
@@ -102,7 +110,7 @@ func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return nil
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, sev.Round); err != nil {
+	if err := encoding.WriteUint64LE(r, sev.Round); err != nil {
 		return err
 	}
 

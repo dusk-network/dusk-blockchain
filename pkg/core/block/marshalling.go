@@ -1,14 +1,13 @@
 package block
 
 import (
-	"encoding/binary"
-	"io"
+	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
-func Marshal(r io.Writer, b *Block) error {
+func Marshal(r *bytes.Buffer, b *Block) error {
 	if err := MarshalHeader(r, b.Header); err != nil {
 		return err
 	}
@@ -28,7 +27,7 @@ func Marshal(r io.Writer, b *Block) error {
 	return nil
 }
 
-func Unmarshal(r io.Reader, b *Block) error {
+func Unmarshal(r *bytes.Buffer, b *Block) error {
 	if err := UnmarshalHeader(r, b.Header); err != nil {
 		return err
 	}
@@ -50,16 +49,16 @@ func Unmarshal(r io.Reader, b *Block) error {
 	return nil
 }
 
-func MarshalHashable(r io.Writer, h *Header) error {
+func MarshalHashable(r *bytes.Buffer, h *Header) error {
 	if err := encoding.WriteUint8(r, h.Version); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, h.Height); err != nil {
+	if err := encoding.WriteUint64LE(r, h.Height); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, uint64(h.Timestamp)); err != nil {
+	if err := encoding.WriteUint64LE(r, uint64(h.Timestamp)); err != nil {
 		return err
 	}
 
@@ -74,7 +73,7 @@ func MarshalHashable(r io.Writer, h *Header) error {
 	return nil
 }
 
-func MarshalHeader(r io.Writer, h *Header) error {
+func MarshalHeader(r *bytes.Buffer, h *Header) error {
 	if err := MarshalHashable(r, h); err != nil {
 		return err
 	}
@@ -94,30 +93,36 @@ func MarshalHeader(r io.Writer, h *Header) error {
 	return nil
 }
 
-func UnmarshalHeader(r io.Reader, h *Header) error {
-	if err := encoding.ReadUint8(r, &h.Version); err != nil {
+func UnmarshalHeader(r *bytes.Buffer, h *Header) error {
+	var err error
+	h.Version, err = encoding.ReadUint8(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &h.Height); err != nil {
+	h.Height, err = encoding.ReadUint64LE(r)
+	if err != nil {
 		return err
 	}
 
-	var timestamp uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &timestamp); err != nil {
+	timestamp, err := encoding.ReadUint64LE(r)
+	if err != nil {
 		return err
 	}
 	h.Timestamp = int64(timestamp)
 
-	if err := encoding.Read256(r, &h.PrevBlockHash); err != nil {
+	h.PrevBlockHash, err = encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &h.Seed); err != nil {
+	h.Seed, err = encoding.ReadBLS(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &h.TxRoot); err != nil {
+	h.TxRoot, err = encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 
@@ -125,14 +130,15 @@ func UnmarshalHeader(r io.Reader, h *Header) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &h.Hash); err != nil {
+	h.Hash, err = encoding.Read256(r)
+	if err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func MarshalCertificate(r io.Writer, c *Certificate) error {
+func MarshalCertificate(r *bytes.Buffer, c *Certificate) error {
 	if err := encoding.WriteBLS(r, c.StepOneBatchedSig); err != nil {
 		return err
 	}
@@ -145,35 +151,41 @@ func MarshalCertificate(r io.Writer, c *Certificate) error {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, c.StepOneCommittee); err != nil {
+	if err := encoding.WriteUint64LE(r, c.StepOneCommittee); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, c.StepTwoCommittee); err != nil {
+	if err := encoding.WriteUint64LE(r, c.StepTwoCommittee); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func UnmarshalCertificate(r io.Reader, c *Certificate) error {
-	if err := encoding.ReadBLS(r, &c.StepOneBatchedSig); err != nil {
+func UnmarshalCertificate(r *bytes.Buffer, c *Certificate) error {
+	var err error
+	c.StepOneBatchedSig, err = encoding.ReadBLS(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &c.StepTwoBatchedSig); err != nil {
+	c.StepTwoBatchedSig, err = encoding.ReadBLS(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint8(r, &c.Step); err != nil {
+	c.Step, err = encoding.ReadUint8(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &c.StepOneCommittee); err != nil {
+	c.StepOneCommittee, err = encoding.ReadUint64LE(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &c.StepTwoCommittee); err != nil {
+	c.StepTwoCommittee, err = encoding.ReadUint64LE(r)
+	if err != nil {
 		return err
 	}
 

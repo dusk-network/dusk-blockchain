@@ -162,9 +162,9 @@ func publishNewStake(stake uint64, eb *wire.EventBus, startHeight, endHeight uin
 	buffer := bytes.NewBuffer(*k.EdPubKey)
 	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
 
-	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
-	_ = encoding.WriteUint64(buffer, binary.LittleEndian, startHeight)
-	_ = encoding.WriteUint64(buffer, binary.LittleEndian, endHeight)
+	_ = encoding.WriteUint64LE(buffer, stake)
+	_ = encoding.WriteUint64LE(buffer, startHeight)
+	_ = encoding.WriteUint64LE(buffer, endHeight)
 
 	eb.Publish(msg.NewProvisionerTopic, buffer)
 }

@@ -2,16 +2,15 @@ package reputation_test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reputation"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -84,7 +83,7 @@ func launchModerator() (wire.EventBroker, chan *bytes.Buffer) {
 
 func publishStrike(round uint64, eb wire.EventBroker, keys ...[]byte) {
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, round); err != nil {
+	if err := encoding.WriteUint64LE(buf, round); err != nil {
 		panic(err)
 	}
 

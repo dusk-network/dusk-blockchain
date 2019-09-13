@@ -139,15 +139,15 @@ func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error
 		return err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, tx.Outputs[0].EncryptedAmount.BigInt().Uint64()); err != nil {
+	if err := encoding.WriteUint64LE(buffer, tx.Outputs[0].EncryptedAmount.BigInt().Uint64()); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, startHeight); err != nil {
+	if err := encoding.WriteUint64LE(buffer, startHeight); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, startHeight+tx.Lock); err != nil {
+	if err := encoding.WriteUint64LE(buffer, startHeight+tx.Lock); err != nil {
 		return err
 	}
 
@@ -173,7 +173,7 @@ func (c *Chain) propagateBid(bid user.Bid) {
 		panic(err)
 	}
 
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, bid.EndHeight); err != nil {
+	if err := encoding.WriteUint64LE(buf, bid.EndHeight); err != nil {
 		panic(err)
 	}
 

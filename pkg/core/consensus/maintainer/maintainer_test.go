@@ -2,7 +2,6 @@ package maintainer_test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"math/rand"
 	"os"
 	"testing"
@@ -107,7 +106,7 @@ func propagateBid(bid user.Bid, bus *wire.EventBus) {
 		panic(err)
 	}
 
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, bid.EndHeight); err != nil {
+	if err := encoding.WriteUint64LE(buf, bid.EndHeight); err != nil {
 		panic(err)
 	}
 
@@ -120,15 +119,15 @@ func propagateStake(tx *transactions.Stake, startHeight uint64, bus *wire.EventB
 		panic(err)
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, tx.Outputs[0].EncryptedAmount.BigInt().Uint64()); err != nil {
+	if err := encoding.WriteUint64LE(buffer, tx.Outputs[0].EncryptedAmount.BigInt().Uint64()); err != nil {
 		panic(err)
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, startHeight); err != nil {
+	if err := encoding.WriteUint64LE(buffer, startHeight); err != nil {
 		panic(err)
 	}
 
-	if err := encoding.WriteUint64(buffer, binary.LittleEndian, startHeight+tx.Lock); err != nil {
+	if err := encoding.WriteUint64LE(buffer, startHeight+tx.Lock); err != nil {
 		panic(err)
 	}
 

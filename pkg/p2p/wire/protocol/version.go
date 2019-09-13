@@ -1,8 +1,7 @@
 package protocol
 
 import (
-	"encoding/binary"
-	"io"
+	"bytes"
 	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -20,7 +19,7 @@ func (v Version) String() string {
 }
 
 // Encode will encode a Version struct to w.
-func (v *Version) Encode(w io.Writer) error {
+func (v *Version) Encode(w *bytes.Buffer) error {
 	if err := encoding.WriteUint8(w, v.Major); err != nil {
 		return err
 	}
@@ -29,7 +28,7 @@ func (v *Version) Encode(w io.Writer) error {
 		return err
 	}
 
-	if err := encoding.WriteUint16(w, binary.LittleEndian, v.Patch); err != nil {
+	if err := encoding.WriteUint16LE(w, v.Patch); err != nil {
 		return err
 	}
 
@@ -37,16 +36,20 @@ func (v *Version) Encode(w io.Writer) error {
 }
 
 // Decode will Decodde a Version struct from r.
-func (v *Version) Decode(r io.Reader) error {
-	if err := encoding.ReadUint8(r, &v.Major); err != nil {
+func (v *Version) Decode(r *bytes.Buffer) error {
+	var err error
+	v.Major, err = encoding.ReadUint8(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint8(r, &v.Minor); err != nil {
+	v.Minor, err = encoding.ReadUint8(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint16(r, binary.LittleEndian, &v.Patch); err != nil {
+	v.Patch, err = encoding.ReadUint16LE(r)
+	if err != nil {
 		return err
 	}
 

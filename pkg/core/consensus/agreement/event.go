@@ -2,7 +2,6 @@ package agreement
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -131,16 +130,18 @@ func (au *UnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
 func (au *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	a := ev.(*Agreement)
-	if err := au.UnMarshaller.Unmarshal(r, a.Header); err != nil {
+	err := au.UnMarshaller.Unmarshal(r, a.Header)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &a.SignedVotes); err != nil {
+	a.SignedVotes, err = encoding.ReadBLS(r)
+	if err != nil {
 		return err
 	}
 
 	votesPerStep := make([]*StepVotes, 2)
-	err := UnmarshalVotes(r, &votesPerStep)
+	err = UnmarshalVotes(r, &votesPerStep)
 	if err != nil {
 		return err
 	}
@@ -196,11 +197,10 @@ func UnmarshalVotes(r *bytes.Buffer, votes *[]*StepVotes) error {
 
 // UnmarshalStepVotes unmarshals a single StepVote
 func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
-	var err error
 	sv := NewStepVotes()
 	// APK
-	apk := make([]byte, 129)
-	if err := encoding.ReadVarBytes(r, &apk); err != nil {
+	apk, err := encoding.ReadVarBytes(r)
+	if err != nil {
 		return nil, err
 	}
 
@@ -210,15 +210,15 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	}
 
 	// BitSet
-	bitset := uint64(0)
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &bitset); err != nil {
+	bitset, err := encoding.ReadUint64LE(r)
+	if err != nil {
 		return nil, err
 	}
 	sv.BitSet = bitset
 
 	// Signature
-	signature := make([]byte, 33)
-	if err := encoding.ReadBLS(r, &signature); err != nil {
+	signature, err := encoding.ReadBLS(r)
+	if err != nil {
 		return nil, err
 	}
 
@@ -254,7 +254,7 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	}
 
 	// BitSet
-	if err := encoding.WriteUint64(r, binary.LittleEndian, vote.BitSet); err != nil {
+	if err := encoding.WriteUint64LE(r, vote.BitSet); err != nil {
 		return err
 	}
 

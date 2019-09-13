@@ -97,7 +97,7 @@ func TestSendAgreement(t *testing.T) {
 	// Initiate the sending of an agreement message
 	hash, _ := crypto.RandEntropy(32)
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
+	if err := encoding.WriteUint64LE(buf, 1); err != nil {
 		t.Fatal(err)
 	}
 

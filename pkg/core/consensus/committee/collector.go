@@ -2,7 +2,6 @@ package committee
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 
@@ -25,28 +24,28 @@ type (
 )
 
 func decodeNewProvisioner(r *bytes.Buffer) (*provisioner, error) {
-	var pubKeyEd []byte
-	if err := encoding.Read256(r, &pubKeyEd); err != nil {
+	pubKeyEd, err := encoding.Read256(r)
+	if err != nil {
 		return nil, err
 	}
 
-	var pubKeyBLS []byte
-	if err := encoding.ReadVarBytes(r, &pubKeyBLS); err != nil {
+	pubKeyBLS, err := encoding.ReadVarBytes(r)
+	if err != nil {
 		return nil, err
 	}
 
-	var amount uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &amount); err != nil {
+	amount, err := encoding.ReadUint64LE(r)
+	if err != nil {
 		return nil, err
 	}
 
-	var startHeight uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &startHeight); err != nil {
+	startHeight, err := encoding.ReadUint64LE(r)
+	if err != nil {
 		return nil, err
 	}
 
-	var endHeight uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &endHeight); err != nil {
+	endHeight, err := encoding.ReadUint64LE(r)
+	if err != nil {
 		return nil, err
 	}
 

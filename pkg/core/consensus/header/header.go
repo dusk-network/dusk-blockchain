@@ -2,7 +2,6 @@ package header
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -72,7 +71,9 @@ func (hu *headerUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*Header)
 
 	// Decoding PubKey BLS
-	if err := encoding.ReadVarBytes(r, &consensusEv.PubKeyBLS); err != nil {
+	var err error
+	consensusEv.PubKeyBLS, err = encoding.ReadVarBytes(r)
+	if err != nil {
 		return err
 	}
 
@@ -82,7 +83,7 @@ func (hu *headerUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 // MarshalSignableVote marshals the fields necessary for a Committee member to cast
 // a Vote (namely the Round, the Step and the BlockHash).
 func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
-	if err := encoding.WriteUint64(r, binary.LittleEndian, vote.Round); err != nil {
+	if err := encoding.WriteUint64LE(r, vote.Round); err != nil {
 		return err
 	}
 
@@ -96,13 +97,17 @@ func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
 // UnmarshalSignableVote unmarshals the fields necessary for a Committee member to cast
 // a Vote (namely the Round, the Step and the BlockHash).
 func UnmarshalSignableVote(r *bytes.Buffer, vote *Header) error {
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &vote.Round); err != nil {
+	var err error
+	vote.Round, err = encoding.ReadUint64LE(r)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadUint8(r, &vote.Step); err != nil {
+	vote.Step, err = encoding.ReadUint8(r)
+	if err != nil {
 		return err
 	}
 
-	return encoding.Read256(r, &vote.BlockHash)
+	vote.BlockHash, err = encoding.Read256(r)
+	return err
 }

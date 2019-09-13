@@ -9,7 +9,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -17,11 +16,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
-// TxsToReader converts a slice of transactions to an io.Reader
-func TxsToReader(t *testing.T, txs []transactions.Transaction) io.Reader {
+// TxsToBuffer converts a slice of transactions to a bytes.Buffer.
+func TxsToBuffer(t *testing.T, txs []transactions.Transaction) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 
 	for _, tx := range txs {
@@ -31,7 +31,7 @@ func TxsToReader(t *testing.T, txs []transactions.Transaction) io.Reader {
 		}
 	}
 
-	return bytes.NewReader(buf.Bytes())
+	return bytes.NewBuffer(buf.Bytes())
 }
 
 // RandomSlice returns a random slice of size `size`
