@@ -3,29 +3,27 @@
 package encoding
 
 import (
-	"fmt"
-	"io"
+	"bytes"
 )
 
 // ReadVarBytes will read a CompactSize int denoting the length, then
 // proceeds to read that amount of bytes from r into b.
-func ReadVarBytes(r io.Reader, b *[]byte) error {
+func ReadVarBytes(r *bytes.Buffer) ([]byte, error) {
 	c, err := ReadVarInt(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	*b = make([]byte, c)
-	n, err := r.Read(*b)
-	if err != nil || n != len(*b) {
-		return fmt.Errorf("encoding: ReadVarBytes read %v/%v bytes - %v", n, c, err)
+	b := make([]byte, c)
+	if _, err := r.Read(b); err != nil {
+		return nil, err
 	}
-	return nil
+	return b, nil
 }
 
 // WriteVarBytes will serialize a CompactSize int denoting the length, then
 // proceeds to write b into w.
-func WriteVarBytes(w io.Writer, b []byte) error {
+func WriteVarBytes(w *bytes.Buffer, b []byte) error {
 	if err := WriteVarInt(w, uint64(len(b))); err != nil {
 		return err
 	}
@@ -39,16 +37,15 @@ func WriteVarBytes(w io.Writer, b []byte) error {
 
 // ReadString reads the data with ReadVarBytes and returns it as a string
 // by simple type conversion.
-func ReadString(r io.Reader, s *string) error {
-	var b []byte
-	if err := ReadVarBytes(r, &b); err != nil {
-		return err
+func ReadString(r *bytes.Buffer) (string, error) {
+	b, err := ReadVarBytes(r)
+	if err != nil {
+		return "", err
 	}
-	*s = string(b)
-	return nil
+	return string(b), nil
 }
 
 // WriteString will write string s as a slice of bytes through WriteVarBytes.
-func WriteString(w io.Writer, s string) error {
+func WriteString(w *bytes.Buffer, s string) error {
 	return WriteVarBytes(w, []byte(s))
 }

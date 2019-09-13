@@ -3,88 +3,79 @@
 package encoding
 
 import (
+	"bytes"
 	"encoding/binary"
-	"fmt"
-	"io"
 )
 
-// ReadUint8 will read a single byte and put it into v.
-func ReadUint8(r io.Reader, v *uint8) error {
+// ReadUint8 will read a single byte and return it.
+func ReadUint8(r *bytes.Buffer) (uint8, error) {
 	var b [1]byte
 	if _, err := r.Read(b[:]); err != nil {
-		return err
+		return 0, err
 	}
-	// Since we only read one byte, it will either succeed
-	// or throw an EOF error. Thus, we don't check the number of
-	// bytes read here.
-	*v = b[0]
-	return nil
+	v := uint8(b[0])
+	return v, nil
 }
 
-// ReadUint16 will read two bytes and convert them to a uint16
-// from the specified byte order. The result is put into v.
-func ReadUint16(r io.Reader, o binary.ByteOrder, v *uint16) error {
+// ReadUint16LE will read two bytes and convert them to a uint16
+// assuming little-endian byte order. The result is returned.
+func ReadUint16LE(r *bytes.Buffer) (uint16, error) {
 	var b [2]byte
-	n, err := r.Read(b[:])
-	if err != nil || n != len(b) {
-		return fmt.Errorf("encoding: ReadUint16 read %v/2 bytes - %v", n, err)
+	if _, err := r.Read(b[:]); err != nil {
+		return 0, err
 	}
-	*v = o.Uint16(b[:])
-	return nil
+	v := binary.LittleEndian.Uint16(b[:])
+	return v, nil
 }
 
-// ReadUint32 will read four bytes and convert them to a uint32
-// from the specified byte order. The result is put into v.
-func ReadUint32(r io.Reader, o binary.ByteOrder, v *uint32) error {
+// ReadUint32LE will read four bytes and convert them to a uint32
+// assuming little-endian byte order. The result is returned.
+func ReadUint32LE(r *bytes.Buffer) (uint32, error) {
 	var b [4]byte
-	n, err := r.Read(b[:])
-	if err != nil || n != len(b) {
-		return fmt.Errorf("encoding: ReadUint32 read %v/4 bytes - %v", n, err)
+	if _, err := r.Read(b[:]); err != nil {
+		return 0, err
 	}
-	*v = o.Uint32(b[:])
-	return nil
+	v := binary.LittleEndian.Uint32(b[:])
+	return v, nil
 }
 
-// ReadUint64 will read eight bytes and convert them to a uint64
-// from the specified byte order. The result is put into v.
-func ReadUint64(r io.Reader, o binary.ByteOrder, v *uint64) error {
+// ReadUint64LE will read eight bytes and convert them to a uint64
+// assuming little-endian byte order. The result is returned.
+func ReadUint64LE(r *bytes.Buffer) (uint64, error) {
 	var b [8]byte
-	n, err := r.Read(b[:])
-	if err != nil || n != len(b) {
-		return fmt.Errorf("encoding: ReadUint64 read %v/8 bytes - %v", n, err)
+	if _, err := r.Read(b[:]); err != nil {
+		return 0, err
 	}
-	*v = o.Uint64(b[:])
-	return nil
+	v := binary.LittleEndian.Uint64(b[:])
+	return v, nil
 }
 
 // WriteUint8 will write a single byte.
-func WriteUint8(w io.Writer, v uint8) error {
-	var b [1]byte
-	b[0] = v
-	_, err := w.Write(b[:])
+func WriteUint8(w *bytes.Buffer, v uint8) error {
+	_, err := w.Write([]byte{v})
 	return err
 }
 
-// WriteUint16 will write two bytes in the specified byte order.
-func WriteUint16(w io.Writer, o binary.ByteOrder, v uint16) error {
+// WriteUint16LE will write two bytes in little-endian byte order.
+func WriteUint16LE(w *bytes.Buffer, v uint16) error {
 	var b [2]byte
-	o.PutUint16(b[:], v)
+	binary.LittleEndian.PutUint16(b[:], v)
 	_, err := w.Write(b[:])
 	return err
 }
 
-// WriteUint32 will write four bytes in the specified byte order.
-func WriteUint32(w io.Writer, o binary.ByteOrder, v uint32) error {
+// WriteUint32LE will write four bytes in little-endian byte order.
+func WriteUint32LE(w *bytes.Buffer, v uint32) error {
 	var b [4]byte
-	o.PutUint32(b[:], v)
+	binary.LittleEndian.PutUint32(b[:], v)
 	_, err := w.Write(b[:])
 	return err
 }
 
-// WriteUint64 will write eight bytes in the specified byte order.
-func WriteUint64(w io.Writer, o binary.ByteOrder, v uint64) error {
+// WriteUint64LE will write eight bytes in little-endian byte order.
+func WriteUint64LE(w *bytes.Buffer, v uint64) error {
 	var b [8]byte
-	o.PutUint64(b[:], v)
+	binary.LittleEndian.PutUint64(b[:], v)
 	_, err := w.Write(b[:])
 	return err
 }
