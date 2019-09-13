@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,16 +16,16 @@ func TestCompactSize(t *testing.T) {
 
 	// Serialize
 	buf := new(bytes.Buffer)
-	if err := WriteVarInt(buf, uint64(a)); err != nil {
+	if err := WriteVarInt(buf, a); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteVarInt(buf, uint64(b)); err != nil {
+	if err := WriteVarInt(buf, b); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteVarInt(buf, uint64(c)); err != nil {
+	if err := WriteVarInt(buf, c); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteVarInt(buf, uint64(d)); err != nil {
+	if err := WriteVarInt(buf, d); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,6 +42,7 @@ func TestCompactSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fmt.Println("reading h")
 	h, err := ReadVarInt(buf)
 	if err != nil {
 		t.Fatal(err)
