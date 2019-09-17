@@ -44,6 +44,13 @@ func (m *Member) RemoveStake(idx int) {
 	m.Stakes = m.Stakes[:len(m.Stakes)-1]
 }
 
+func NewProvisioners() *Provisioners {
+	return &Provisioners{
+		Set:     sortedset.New(),
+		Members: make(map[string]*Member),
+	}
+}
+
 // MemberAt returns the Member at a certain index.
 func (p Provisioners) MemberAt(i int) *Member {
 	bigI := p.Set[i]

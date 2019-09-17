@@ -1,8 +1,6 @@
 package committee
 
 import (
-	"bytes"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
@@ -12,8 +10,7 @@ type (
 	// extracted for a given step
 	Committee interface {
 		IsMember([]byte, uint64, uint8) bool
-		Quorum(uint64) int
-		RemoveExpiredProvisioners(*bytes.Buffer) error
+		Quorum() int
 	}
 
 	// Foldable represents a Committee which can be packed into a bitset, to drastically
@@ -36,32 +33,34 @@ type (
 )
 
 // NewExtractor returns a committee extractor which maintains it's own cache.
+// The extractor will still have an empty Stakers field, which should be populated by
+// information received on round updates.
 func NewExtractor() *Extractor {
 	return &Extractor{
 		committeeCache: make(map[uint8]user.VotingCommittee),
 	}
 }
 
-// PregenerateCommittees will generate committees for a given amount of steps.
+// PregenerateCommittees will generate committees for a given range of steps.
 // This method is best called when the Stakers field is updated, allowing the user to
 // do some of the calculation before any events come in.
-func (e *Extractor) PregenerateCommittees(round, totalWeight uint64, steps uint8, size int) {
-	for i := uint8(1); i <= steps; i++ {
-		e.UpsertCommitteeCache(round, totalWeight, i, size)
+func (e *Extractor) PregenerateCommittees(round uint64, initialStep, stepAmount uint8, size int) {
+	for i := initialStep; i <= initialStep+stepAmount; i++ {
+		e.UpsertCommitteeCache(round, i, size)
 	}
 }
 
 // UpsertCommitteeCache will return a voting committee for a given round, step and size.
 // If the committee has not yet been produced before, it is put on the cache. If it has,
 // it is simply retrieved and returned.
-func (e *Extractor) UpsertCommitteeCache(round, totalWeight uint64, step uint8, size int) user.VotingCommittee {
+func (e *Extractor) UpsertCommitteeCache(round uint64, step uint8, size int) user.VotingCommittee {
 	if round > e.round {
 		e.round = round
 		e.committeeCache = make(map[uint8]user.VotingCommittee)
 	}
 	votingCommittee, found := e.committeeCache[step]
 	if !found {
-		votingCommittee = e.Stakers.CreateVotingCommittee(round, totalWeight, step, size)
+		votingCommittee = e.Stakers.CreateVotingCommittee(round, e.Stakers.TotalWeight, step, size)
 		e.committeeCache[step] = votingCommittee
 	}
 	return votingCommittee
