@@ -43,18 +43,19 @@ func btoi(k Keys) *big.Int {
 
 // Test if MemberKeys returns all public keys in the correct order.
 func TestMemberKeys(t *testing.T) {
-
-	p, _, err := NewProvisioners(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := NewProvisioners()
 
 	var ks sortedKeys
 	for i := 0; i < 50; i++ {
 		keys, _ := NewRandKeys()
-		if err := p.AddMember(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
-			t.Fatal(err)
-		}
+		member := &Member{}
+		member.PublicKeyEd = keys.EdPubKeyBytes
+		member.PublicKeyBLS = keys.BLSPubKeyBytes
+		member.Stakes = make([]Stake, 1)
+		member.Stakes[0].Amount = 500
+		member.Stakes[0].EndHeight = 10000
+		p.Members[string(keys.BLSPubKeyBytes)] = member
+
 		ks = append(ks, keys)
 	}
 

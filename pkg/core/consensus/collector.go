@@ -6,9 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -22,10 +20,6 @@ type (
 
 	regenerationCollector struct {
 		regenerationChan chan AsyncState
-	}
-
-	bidListCollector struct {
-		bidListChan chan<- user.Bid
 	}
 
 	acceptedBlockCollector struct {
@@ -78,44 +72,6 @@ func (rg *regenerationCollector) Collect(r *bytes.Buffer) error {
 	}
 	rg.regenerationChan <- state
 	return nil
-}
-
-// InitBidListUpdate creates and initiates a channel for the updates in the BidList
-func InitBidListUpdate(subscriber wire.EventSubscriber) chan user.Bid {
-	bidListChan := make(chan user.Bid)
-	collector := &bidListCollector{bidListChan}
-	go wire.NewTopicListener(subscriber, collector, string(msg.BidListTopic)).Accept()
-	return bidListChan
-}
-
-// Collect implements EventCollector.
-// It reconstructs the bidList and sends it on its BidListChan
-func (b *bidListCollector) Collect(r *bytes.Buffer) error {
-	b.bidListChan <- decodeBid(r)
-	return nil
-}
-
-func decodeBid(r *bytes.Buffer) user.Bid {
-	var xSlice []byte
-	if err := encoding.Read256(r, &xSlice); err != nil {
-		panic(err)
-	}
-
-	var mSlice []byte
-	if err := encoding.Read256(r, &mSlice); err != nil {
-		panic(err)
-	}
-
-	var endHeight uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &endHeight); err != nil {
-		panic(err)
-	}
-
-	var x [32]byte
-	copy(x[:], xSlice)
-	var m [32]byte
-	copy(m[:], mSlice)
-	return user.Bid{x, m, endHeight}
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain

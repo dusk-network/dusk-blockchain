@@ -71,8 +71,8 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 		}
 	}
 
-	if allVoters < a.Quorum(ev.Round) {
-		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(ev.Round))
+	if allVoters < a.Quorum() {
+		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum())
 	}
 	return nil
 }

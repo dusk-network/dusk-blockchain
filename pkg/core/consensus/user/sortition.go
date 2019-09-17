@@ -68,7 +68,7 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
-func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64, step uint8, size int) *VotingCommittee {
+func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64, step uint8, size int) VotingCommittee {
 
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(totalWeight)
@@ -95,7 +95,7 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64, step uin
 		}
 	}
 
-	return votingCommittee
+	return *votingCommittee
 }
 
 // extractCommitteeMember walks through the committee set, while deducting

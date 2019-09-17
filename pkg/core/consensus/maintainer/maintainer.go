@@ -5,10 +5,8 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -24,12 +22,11 @@ var l = log.WithField("process", "maintainer")
 type maintainer struct {
 	eventBroker wire.EventBroker
 	roundChan   <-chan uint64
-	bidChan     <-chan user.Bid
 
 	pubKeyBLS []byte
 	m         ristretto.Scalar
-	c         *committee.Store
-	bidList   *user.BidList
+	p         user.Provisioners
+	bidList   user.BidList
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
@@ -39,24 +36,13 @@ type maintainer struct {
 	transactor *transactor.Transactor
 }
 
-func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*maintainer, error) {
-	if db == nil {
-		_, db = heavy.CreateDBConnection()
-	}
-
-	bidList, err := user.NewBidList(db)
-	if err != nil {
-		return nil, err
-	}
-
+func newMaintainer(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*maintainer, error) {
 	return &maintainer{
 		eventBroker: eventBroker,
 		bidChan:     consensus.InitBidListUpdate(eventBroker),
 		roundChan:   consensus.InitRoundUpdate(eventBroker),
 		pubKeyBLS:   pubKeyBLS,
 		m:           m,
-		c:           committee.LaunchStore(eventBroker, db),
-		bidList:     bidList,
 		transactor:  transactor,
 		amount:      amount,
 		lockTime:    lockTime,
@@ -147,8 +133,7 @@ func (m *maintainer) findMostRecentBid() uint64 {
 }
 
 func (m *maintainer) findMostRecentStake() uint64 {
-	p := m.c.Provisioners()
-	member := p.GetMember(m.pubKeyBLS)
+	member := m.p.GetMember(m.pubKeyBLS)
 	if member != nil {
 		var highest uint64
 		for _, stake := range member.Stakes {

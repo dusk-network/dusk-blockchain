@@ -78,8 +78,7 @@ func (a *Accumulator) Accumulate() {
 			if err := a.handler.ExtractIdentifier(ev, b); err == nil {
 				hash := hex.EncodeToString(b.Bytes())
 				count := a.Insert(ev, hash)
-				header := a.handler.ExtractHeader(ev)
-				if count >= a.handler.Quorum(header.Round) {
+				if count >= a.handler.Quorum() {
 					votes := a.Get(hash)
 					a.CollectedVotesChan <- votes
 					a.Clear()

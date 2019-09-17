@@ -84,7 +84,7 @@ func MockReductionBuffer(keys user.Keys, hash []byte, round uint64, step uint8) 
 // testing the Reduction component.
 func MockCommittee(quorum int, isMember bool) Reducers {
 	committeeMock := &mocks.Reducers{}
-	committeeMock.On("Quorum", mock.Anything).Return(quorum)
+	committeeMock.On("Quorum").Return(quorum)
 	committeeMock.On("FilterAbsentees", mock.Anything,
 		mock.Anything, mock.Anything).Return(user.VotingCommittee{})
 	committeeMock.On("IsMember",

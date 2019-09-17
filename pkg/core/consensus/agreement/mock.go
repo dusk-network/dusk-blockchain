@@ -102,7 +102,7 @@ func MockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, [
 	}
 
 	committeeMock := &mocks.Foldable{}
-	committeeMock.On("Quorum", mock.Anything).Return(quorum)
+	committeeMock.On("Quorum").Return(quorum)
 	committeeMock.On("IsMember",
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),

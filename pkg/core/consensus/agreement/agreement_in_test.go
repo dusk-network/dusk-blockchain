@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -26,12 +25,15 @@ import (
 // and the sending of agreement events.
 func TestAgreementRace(t *testing.T) {
 	eb := wire.NewEventBus()
-	_, db := lite.CreateDBConnection()
 
 	// Sadly, we can not use the mocked committee for this test.
 	// Our agreement events and reduction events need to be just like they are in production.
 	// So, let's create a proper committee.
-	c := committee.NewAgreement(eb, db)
+	c := committee.NewAgreement()
+	stakers := user.Stakers{
+		Provisioners: *user.NewProvisioners(),
+	}
+	c.Extractor.Stakers = stakers
 	// We make a set of 50 keys, add these as provisioners and start the agreement component.
 	committeeSize := 50
 	k := createProvisionerSet(t, c, committeeSize)
@@ -168,30 +170,17 @@ func TestIncrementOnNilVoteSet(t *testing.T) {
 func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []user.Keys) {
 	for i := 0; i < size; i++ {
 		keys, _ := user.NewRandKeys()
-		buf := new(bytes.Buffer)
-		if err := encoding.Write256(buf, keys.EdPubKeyBytes); err != nil {
-			t.Fatal(err)
-		}
 
-		if err := encoding.WriteVarBytes(buf, keys.BLSPubKeyBytes); err != nil {
-			t.Fatal(err)
-		}
+		member := &user.Member{}
+		member.PublicKeyEd = keys.EdPubKeyBytes
+		member.PublicKeyBLS = keys.BLSPubKeyBytes
+		member.Stakes = make([]user.Stake, 1)
+		member.Stakes[0].Amount = 500
+		member.Stakes[0].EndHeight = 10000
+		c.Extractor.Stakers.Set.Insert(keys.BLSPubKeyBytes)
+		c.Extractor.Stakers.Members[string(keys.BLSPubKeyBytes)] = member
+		c.Extractor.Stakers.TotalWeight += 500
 
-		if err := encoding.WriteUint64(buf, binary.LittleEndian, 500); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := encoding.WriteUint64(buf, binary.LittleEndian, 0); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := encoding.WriteUint64(buf, binary.LittleEndian, 10000); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := c.AddProvisioner(buf); err != nil {
-			t.Fatal(err)
-		}
 		k = append(k, keys)
 	}
 
