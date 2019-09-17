@@ -17,15 +17,22 @@ type DuskNode struct {
 	Dir string
 }
 
-func NewDuskNode(gqlPort, rpcPort string, profileID string) *DuskNode {
+func NewDuskNode(gqlPort, nodeID string, profileID string) *DuskNode {
 
 	node := new(DuskNode)
-	node.Id = rpcPort
+	node.Id = nodeID
 	node.ConfigProfileID = profileID
 
 	node.Cfg = config.Registry{}
 	node.Cfg.Gql.Port = gqlPort
-	node.Cfg.RPC.Port = rpcPort
+
+	if *RPCNetworkType == "unix" {
+		node.Cfg.RPC.Network = "unix"
+		node.Cfg.RPC.Address = "/tmp/dusk-node-" + nodeID + ".sock"
+	} else {
+		node.Cfg.RPC.Network = "tcp"
+		node.Cfg.RPC.Address = "127.0.0.1:" + nodeID
+	}
 
 	node.Gql = graphql.NewClient("http://127.0.0.1:" + node.Cfg.Gql.Port)
 	return node

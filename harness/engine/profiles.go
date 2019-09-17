@@ -1,10 +1,11 @@
 package engine
 
 import (
+	"strconv"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/spf13/viper"
-	"strconv"
 )
 
 type Profiles map[string]func(index int, node *DuskNode, walletPath string)
@@ -18,7 +19,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("logger.output", node.Dir+"/dusk")
 	viper.Set("gql.port", node.Cfg.Gql.Port)
 	viper.Set("gql.enabled", "true")
-	viper.Set("rpc.port", node.Cfg.RPC.Port)
+	viper.Set("rpc.network", node.Cfg.RPC.Network)
+	viper.Set("rpc.address", node.Cfg.RPC.Address)
 	viper.Set("rpc.enabled", "true")
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")

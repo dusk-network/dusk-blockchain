@@ -2,17 +2,19 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
@@ -24,7 +26,7 @@ func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 	}
 
 	targetNode := n.Nodes[nodeIndex]
-	addr := "http://127.0.0.1:" + targetNode.Cfg.RPC.Port
+	addr := "http://127.0.0.1:" + targetNode.Cfg.RPC.Address
 	request := &rpc.JSONRequest{Method: "publishTopic", Id: 1}
 	request.Params = []string{topic, payload}
 
@@ -83,7 +85,6 @@ func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([
 	}
 
 	targetNode := n.Nodes[nodeIndex]
-	addr := "http://127.0.0.1:" + targetNode.Cfg.RPC.Port
 
 	req := rpc.JSONRequest{
 		Method: method,
@@ -102,7 +103,23 @@ func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([
 		return nil, err
 	}
 
-	resp, err := http.Post(addr, "application/json", &buf)
+	addr := targetNode.Cfg.RPC.Address
+	network := targetNode.Cfg.RPC.Network
+
+	httpc := http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial(network, addr)
+			},
+		},
+	}
+
+	url := "http://" + addr
+	if network == "unix" {
+		url = "http://unix" + addr
+	}
+
+	resp, err := httpc.Post(url, "application/json", &buf)
 	if err != nil {
 		return nil, err
 	}
