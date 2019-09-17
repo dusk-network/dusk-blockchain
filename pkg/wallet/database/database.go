@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 
@@ -16,8 +15,6 @@ import (
 
 type DB struct {
 	storage *leveldb.DB
-	// Mutex to prevent concurrent writing/reading
-	lock sync.RWMutex
 }
 
 var (
@@ -34,8 +31,6 @@ func New(path string) (*DB, error) {
 }
 
 func (db *DB) Put(key, value []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	return db.storage.Put(key, value, nil)
 }
 
@@ -182,14 +177,10 @@ func (db *DB) UpdateWalletHeight(newHeight uint64) error {
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
 	return db.storage.Get(key, nil)
 }
 
 func (db *DB) Delete(key []byte) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	return db.storage.Delete(key, nil)
 }
 

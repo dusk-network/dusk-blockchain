@@ -2,24 +2,18 @@ package cli
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"os"
 
-	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
-	"github.com/dusk-network/dusk-crypto/mlsag"
-	"github.com/dusk-network/dusk-wallet/key"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
@@ -30,78 +24,56 @@ var testnet = byte(2)
 type CLI struct {
 	eventBroker wire.EventBroker
 	rpcBus      *wire.RPCBus
-	transactor  *transactor.Transactor
 	counter     *chainsync.Counter
 }
 
 func (c *CLI) createWalletCMD(args []string) {
-	if c.transactor != nil {
-		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
-	}
-
 	if args == nil || len(args) < 1 {
 		fmt.Fprintf(os.Stdout, commandInfo["createwallet"]+"\n")
 		return
 	}
 	password := args[0]
 
-	db, err := walletdb.New(cfg.Get().Wallet.Store)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error opening database: %v\n", err)
-		return
-	}
+	pBuf := bytes.Newbuffer([]byte(password))
+	req := wire.NewRequest(pBuf, 2)
+	c.rpcBus.Call(wire.CreateWallet, req)
 
-	w, err := wallet.New(rand.Read, testnet, db, fetchDecoys, fetchInputs, password)
-	if err != nil {
+	select {
+	case addrBuf := <-req.RespChan:
+		pubAddr := string(addrBuf.Bytes())
+		fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
+		fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
+
+		if !cfg.Get().General.WalletOnly {
+			initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
+		}
+	case err := <-req.ErrChan:
 		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
-		return
-	}
-	pubAddr, err := w.PublicAddress()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to get your public address: %v\n", err)
-		return
-	}
-
-	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
-	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
-
-	c.transactor = transactor.New(w, nil)
-
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
 	}
 }
 
 func (c *CLI) loadWalletCMD(args []string) {
-	if c.transactor != nil {
-		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
-	}
-
 	if args == nil || len(args) < 1 {
 		fmt.Fprintf(os.Stdout, commandInfo["loadwallet"]+"\n")
 		return
 	}
 	password := args[0]
 
-	w, err := loadWallet(password)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to load wallet: %v\n", err)
-		return
-	}
+	pBuf := bytes.Newbuffer([]byte(password))
+	req := wire.NewRequest(pBuf, 2)
+	c.rpcBus.Call(wire.LoadWallet, req)
 
-	pubAddr, err := w.PublicAddress()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to get your public address: %v\n", err)
-		return
-	}
+	select {
+	case addrBuf := <-req.RespChan:
+		pubAddr := string(addrBuf.Bytes())
+		fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
+		fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
 
-	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
-	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
-
-	c.transactor = transactor.New(w, nil)
-
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
+		if !cfg.Get().General.WalletOnly {
+			initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
+		}
+	case err := <-req.ErrChan:
+		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
 	}
 }
 
@@ -286,39 +258,4 @@ func (c *CLI) sendStakeCMD(args []string) {
 	}
 
 	c.eventBroker.Publish(string(topics.Tx), buf)
-}
-
-func fetchDecoys(numMixins int) []mlsag.PubKeys {
-	_, db := heavy.CreateDBConnection()
-
-	var pubKeys []mlsag.PubKeys
-	var decoys []ristretto.Point
-	db.View(func(t database.Transaction) error {
-		decoys = t.FetchDecoys(numMixins)
-		return nil
-	})
-
-	// Potential panic if the database does not have enough decoys
-	for i := 0; i < numMixins; i++ {
-
-		var keyVector mlsag.PubKeys
-		keyVector.AddPubKey(decoys[i])
-
-		var secondaryKey ristretto.Point
-		secondaryKey.Rand()
-		keyVector.AddPubKey(secondaryKey)
-
-		pubKeys = append(pubKeys, keyVector)
-	}
-	return pubKeys
-}
-
-func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
-	// Fetch all inputs from database that are >= totalAmount
-	// returns error if inputs do not add up to total amount
-	privSpend, err := key.PrivateSpend()
-	if err != nil {
-		return nil, 0, err
-	}
-	return db.FetchInputs(privSpend.Bytes(), totalAmount)
 }

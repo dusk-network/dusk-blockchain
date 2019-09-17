@@ -2,9 +2,11 @@ package transactor
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -12,15 +14,16 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
 // TODO: rename
 type Transactor struct {
-	w        *wallet.Wallet
-	db       database.DB
-	syncLock sync.Mutex
+	w  *wallet.Wallet
+	db database.DB
 }
 
 // Instantiate a new Transactor struct.
@@ -33,6 +36,113 @@ func New(w *wallet.Wallet, db database.DB) *Transactor {
 		w:  w,
 		db: db,
 	}
+}
+
+func (t *Transactor) Listen() {
+	for {
+		select {
+		case r := <-wire.CreateWalletChan:
+			if t.w != nil {
+				r.ErrChan <- errors.New("wallet is already loaded")
+				continue
+			}
+
+			t.createWallet(string(r.Params.Bytes()))
+		case r := <-wire.LoadWalletChan:
+			if t.w != nil {
+				r.ErrChan <- errors.New("wallet is already loaded")
+				continue
+			}
+
+			t.loadWallet(string(r.Params.Bytes()))
+		case r := <-wire.SendTxChan:
+			if t.w == nil {
+				r.ErrChan <- errors.New("wallet is not loaded yet")
+				continue
+			}
+
+			txType := make([]byte, 1)
+			if _, err := &r.Params.Read(txType); err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
+			amountBytes := make([]byte, 8)
+			if _, err := &r.Params.Read(amountBytes); err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
+			amount := binary.LittleEndian.Uint64(amountBytes)
+			var tx transactions.Transaction
+			var err error
+			switch transactions.TxType(txType[0]) {
+			case transactions.StandardType:
+				tx, err = t.CreateStandardTx(amount, string(r.Params.Bytes()))
+				if err != nil {
+					r.ErrChan <- err
+					continue
+				}
+			case transactions.BidType:
+				tx, err = t.CreateBidTx(amount, binary.LittleEndian.Uint64(r.Params.Bytes()))
+				if err != nil {
+					r.ErrChan <- err
+					continue
+				}
+			case transactions.StakeType:
+				tx, err = t.CreateStakeTx(amount, binary.LittleEndian.Uint64(r.Params.Bytes()))
+				if err != nil {
+					r.ErrChan <- err
+					continue
+				}
+			default:
+				r.ErrChan <- errors.New("transaction type was not recognized")
+				continue
+			}
+
+			respBuf := new(bytes.Buffer)
+			if err := transactions.Marshal(respBuf, tx); err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
+			r.RespChan <- *respBuf
+		case r := <-wire.GetBalanceChan:
+			if t.w == nil {
+				r.ErrChan <- errors.New("wallet is not loaded yet")
+				continue
+			}
+
+			balance, err := t.Balance()
+			if err != nil {
+				r.ErrChan <- err
+				continue
+			}
+
+			buf := new(bytes.Buffer)
+			binary.Write(buf, binary.LittleEndian, balance)
+			r.RespChan <- *buf
+		}
+	}
+}
+
+func (t *Transactor) createWallet(password string) error {
+	db, err := walletdb.New(cfg.Get().Wallet.Store)
+	if err != nil {
+		return err
+	}
+
+	w, err := wallet.New(rand.Read, testnet, db, fetchDecoys, fetchInputs, password)
+	if err != nil {
+		return err
+	}
+	pubAddr, err := w.PublicAddress()
+	if err != nil {
+		return err
+	}
+
+	t.w = w
+	return nil
 }
 
 func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactions.Transaction, error) {
@@ -114,8 +224,6 @@ func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transact
 }
 
 func (t *Transactor) syncWallet() error {
-	t.syncLock.Lock()
-	defer t.syncLock.Unlock()
 	var totalSpent, totalReceived uint64
 	// keep looping until tipHash = currentBlockHash
 	for {
@@ -189,4 +297,39 @@ func (t *Transactor) Balance() (float64, error) {
 	}
 
 	return balance, nil
+}
+
+func fetchDecoys(numMixins int) []mlsag.PubKeys {
+	_, db := heavy.CreateDBConnection()
+
+	var pubKeys []mlsag.PubKeys
+	var decoys []ristretto.Point
+	db.View(func(t database.Transaction) error {
+		decoys = t.FetchDecoys(numMixins)
+		return nil
+	})
+
+	// Potential panic if the database does not have enough decoys
+	for i := 0; i < numMixins; i++ {
+
+		var keyVector mlsag.PubKeys
+		keyVector.AddPubKey(decoys[i])
+
+		var secondaryKey ristretto.Point
+		secondaryKey.Rand()
+		keyVector.AddPubKey(secondaryKey)
+
+		pubKeys = append(pubKeys, keyVector)
+	}
+	return pubKeys
+}
+
+func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Key) ([]*transactions.Input, int64, error) {
+	// Fetch all inputs from database that are >= totalAmount
+	// returns error if inputs do not add up to total amount
+	privSpend, err := key.PrivateSpend()
+	if err != nil {
+		return nil, 0, err
+	}
+	return db.FetchInputs(privSpend.Bytes(), totalAmount)
 }
