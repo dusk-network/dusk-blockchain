@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -263,13 +264,22 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 }
 
 func (c *Chain) sendRoundUpdate(round uint64) error {
+	buf := new(bytes.Buffer)
+	roundBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(roundBytes, round)
+	if _, err := buf.Write(roundBytes); err != nil {
+		return err
+	}
 	membersBuf, err := c.marshalProvisioners()
 	if err != nil {
 		return err
 	}
 
+	if _, err := buf.ReadFrom(membersBuf); err != nil {
+		return err
+	}
 	// TODO: add bidlist buffer as well
-	c.eventBus.Publish(msg.RoundUpdateTopic, membersBuf)
+	c.eventBus.Publish(msg.RoundUpdateTopic, buf)
 	return nil
 }
 
