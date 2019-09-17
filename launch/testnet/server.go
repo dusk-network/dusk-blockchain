@@ -2,8 +2,9 @@ package main
 
 import (
 	"bytes"
-	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"net"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -42,7 +43,7 @@ func Setup() *Server {
 	m.Run()
 
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus, rpcBus, nil)
+	chain, err := chain.New(eventBus, rpcBus)
 	if err != nil {
 		panic(err)
 	}

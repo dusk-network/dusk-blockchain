@@ -7,14 +7,13 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/dusk-network/dusk-crypto/bls"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -29,11 +28,12 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
-	db       database.DB
-	p        *user.Provisioners
-	bidList  *user.BidList
+	eventBus  *wire.EventBus
+	rpcBus    *wire.RPCBus
+	db        database.DB
+	p         *user.Provisioners
+	committee *committee.Agreement
+	bidList   *user.BidList
 
 	prevBlock block.Block
 	// protect prevBlock with mutex as it's touched out of the main chain loop
@@ -60,20 +60,27 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	certificateChan := initCertificateCollector(eventBus)
 
 	// set up committee
-	c = committee.LaunchStore(eventBus, db)
 	// set up bidlist
-	bidList := user.NewBidList(db)
+	bidList, err := user.NewBidList(db)
+	if err != nil {
+		return nil, err
+	}
 
 	chain := &Chain{
 		eventBus:        eventBus,
 		rpcBus:          rpcBus,
 		db:              db,
-		committeeStore:  c,
+		committee:       committee.NewAgreement(),
 		bidList:         bidList,
 		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
 		certificateChan: certificateChan,
 	}
+	if err := chain.newProvisioners(); err != nil {
+		return nil, err
+	}
+
+	chain.updateCommittee()
 
 	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
 	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
@@ -132,12 +139,9 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) addProvisioner(tx *transactions.Stake, startHeight uint64) error {
-	return c.committeeStore.AddProvisioner(tx.PubKeyEd, tx.PubKeyBLS, tx.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+tx.Lock)
-}
-
 func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
-	x := user.CreateBid(tx.Outputs[0].Commitment.Bytes(), tx.M, startHeight+tx.Lock)
+	x := user.CalculateX(tx.Outputs[0].Commitment.Bytes(), tx.M)
+	x.EndHeight = startHeight + tx.Lock
 	c.bidList.AddBid(x)
 }
 
@@ -241,10 +245,31 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// 8. Remove expired provisioners
 	// We remove provisioners from accepted block height + 1,
 	// to set up our committee correctly for the next block.
-	c.committeeStore.RemoveExpiredProvisioners(blk.Header.Height + 1)
+	// We also update our committee along with this.
+	c.removeExpiredProvisioners(blk.Header.Height + 1)
+	c.updateCommittee()
+
+	// 9. Send round update
+	// We send a round update after accepting a new block, which should include
+	// a set of provisioners, and a bidlist. This allows the consensus components
+	// to rehydrate their state properly for the next round.
+	if err := c.sendRoundUpdate(blk.Header.Height + 1); err != nil {
+		l.Errorf("sending round update failed: %s", err.Error())
+		return err
+	}
 
 	l.Trace("procedure ended")
+	return nil
+}
 
+func (c *Chain) sendRoundUpdate(round uint64) error {
+	membersBuf, err := c.marshalProvisioners()
+	if err != nil {
+		return err
+	}
+
+	// TODO: add bidlist buffer as well
+	c.eventBus.Publish(msg.RoundUpdateTopic, membersBuf)
 	return nil
 }
 
@@ -256,14 +281,12 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight ui
 		switch tx.Type() {
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake, startHeight); err != nil {
+			if err := c.addProvisioner(stake.PubKeyEd, stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight+stake.Lock); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
 		case transactions.BidType:
 			bid := tx.(*transactions.Bid)
-			if err := c.addBidder(bid, startHeight); err != nil {
-				l.Errorf("adding bidder failed: %s", err.Error())
-			}
+			c.addBidder(bid, startHeight)
 		}
 	}
 }
@@ -345,14 +368,11 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 }
 
 // newProvisioners returns an initialized Provisioners struct.
-func (c *Chain) newProvisioners() (*Provisioners, uint64, error) {
-	p := &Provisioners{
-		Set:     sortedset.New(),
-		Members: make(map[string]*Member),
-	}
-
+func (c *Chain) newProvisioners() error {
+	p := user.NewProvisioners()
+	c.p = p
 	c.repopulateProvisioners()
-	return p, nil
+	return nil
 }
 
 func (c *Chain) repopulateProvisioners() {
@@ -397,7 +417,7 @@ func (c *Chain) repopulateProvisioners() {
 			// Only add them if their stake is still valid
 			if searchingHeight+stake.Lock > currentHeight {
 				amount := stake.Outputs[0].EncryptedAmount.BigInt().Uint64()
-				c.p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, amount, searchingHeight, searchingHeight+stake.Lock)
+				c.addProvisioner(stake.PubKeyEd, stake.PubKeyBLS, amount, searchingHeight+stake.Lock)
 			}
 		}
 
@@ -413,10 +433,10 @@ func (c *Chain) removeExpiredProvisioners(round uint64) uint64 {
 		for i := 0; i < len(member.Stakes); i++ {
 			if member.Stakes[i].EndHeight < round {
 				totalRemoved += member.Stakes[i].Amount
-				member.removeStake(i)
-				// If they have no stakes left, we should remove them entirely to keep our Size() calls accurate.
+				member.RemoveStake(i)
+				// If they have no stakes left, we should remove them entirely.
 				if len(member.Stakes) == 0 {
-					p.Remove([]byte(pk))
+					c.removeProvisioner([]byte(pk))
 				}
 
 				// Reset index
@@ -439,43 +459,50 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, endHeight uin
 	}
 
 	i := string(pubKeyBLS)
-	stake := &Stake{amount, endHeight}
+	stake := user.Stake{amount, endHeight}
 
 	// Check for duplicates
-	inserted := p.Set.Insert(pubKeyBLS)
+	inserted := c.p.Set.Insert(pubKeyBLS)
 	if !inserted {
 		// If they already exist, just add their new stake
-		p.Members[i].AddStake(stake)
+		c.p.Members[i].AddStake(stake)
 		return nil
 	}
 
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
-	m := &Member{}
+	m := &user.Member{}
 	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
 
-	pubKey := &bls.PublicKey{}
-	if err := pubKey.Unmarshal(pubKeyBLS); err != nil {
-		return err
-	}
-
-	m.PublicKeyBLS = *pubKey
+	m.PublicKeyBLS = pubKeyBLS
 	m.AddStake(stake)
 
-	p.Members[i] = m
+	c.p.Members[i] = m
 	return nil
 }
 
 // Remove a Member, designated by their BLS public key.
 func (c *Chain) removeProvisioner(pubKeyBLS []byte) bool {
-	delete(c.p.Members, strPk(pubKeyBLS))
+	delete(c.p.Members, string(pubKeyBLS))
 	return c.p.Set.Remove(pubKeyBLS)
 }
 
+func (c *Chain) marshalProvisioners() (*bytes.Buffer, error) {
+	members := c.sortProvisioners()
+	buf := new(bytes.Buffer)
+	err := user.MarshalMembers(buf, members)
+	return buf, err
+}
+
 func (c *Chain) sortProvisioners() []user.Member {
-	members := make([]user.Members, len(c.p.Members))
-	for i := range len(c.p.Members) {
-		members[i] = c.p.MemberAt(i)
+	members := make([]user.Member, len(c.p.Members))
+	for i := 0; i < len(c.p.Members); i++ {
+		members[i] = *c.p.MemberAt(i)
 	}
 
 	return members
+}
+
+func (c *Chain) updateCommittee() {
+	members := c.sortProvisioners()
+	c.committee.Extractor.Stakers = user.NewStakers(members)
 }
