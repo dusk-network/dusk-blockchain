@@ -6,7 +6,7 @@ import (
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	cli "github.com/dusk-network/dusk-blockchain/pkg/voucher/client/utils"
+	client "github.com/dusk-network/dusk-blockchain/pkg/voucher/client/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,7 +38,7 @@ func ConnectToSeeder() []string {
 	}
 
 	// Perform the request for the seeders
-	nodes, err := cli.RequestSeeders(&seederKey, &seeder, &nodePubKey, nodeSocket)
+	nodes, err := client.RequestSeeders(&seederKey, &seeder, &nodePubKey, nodeSocket)
 	if err != nil {
 		log.Errorf("Could not fetch the seeders from the voucher: %s", err)
 		return nil
@@ -54,7 +54,7 @@ func ConnectToSeeder() []string {
 	go func() {
 		for {
 			time.Sleep(4 * time.Second)
-			err := cli.PingVoucher(&seeder)
+			err := client.PingVoucher(&seeder)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"process": "main",
