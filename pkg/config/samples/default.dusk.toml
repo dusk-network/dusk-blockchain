@@ -32,7 +32,7 @@ port=7000
 
 [network.seeder]
 # array of seeder servers
-addresses=["voucher.dusk.network:8081"]
+addresses=["178.62.193.89:8083"]
 # fixed network addresses to setup local P2P network
 # supported only in testnet
 fixed = []
