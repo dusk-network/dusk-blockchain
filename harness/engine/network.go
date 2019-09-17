@@ -1,13 +1,27 @@
 package engine
 
 import (
+	"errors"
+	"flag"
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+)
+
+var (
+	// EnableHarness a test CLI param to enable harness bootstrapping
+	EnableHarness = flag.Bool("enable", false, "Enable Test Harness bootstrapping")
+	// RPCNetworkType a test CLI param to set jsonrpc network type (unix or tcp)
+	RPCNetworkType = flag.String("rpc_transport", "unix", "JSON-RPC transport type (unix/tcp)")
+
+	// Errors
+	// ErrDisabledHarness
+	ErrDisabledHarness = errors.New("disabled test harness")
 )
 
 type Network struct {
@@ -18,6 +32,15 @@ type Network struct {
 // Bootstrap performs all actions needed to initialize and start a local network
 // This network is alive by the end of all tests execution
 func (n *Network) Bootstrap(workspace string) error {
+
+	// Network bootstrapping is disabled by default as it's intended to be run
+	// on demand only but not by CI for now.
+	// To enable it: go test -v ./...  -args -enable
+	if !*EnableHarness {
+		log.Println("Test Harness bootstrapping is disabled.")
+		log.Println("To enable it: `go test -v ./...  -args -enable`")
+		return ErrDisabledHarness
+	}
 
 	initProfiles()
 
@@ -33,7 +56,7 @@ func (n *Network) Bootstrap(workspace string) error {
 		}
 	} else {
 		// If path not provided, then it's assumed that the seeder is already running
-		log.Warnf("Seeder path not provided.")
+		log.Warnf("Seeder path not provided. Please, ensure dusk-seeder is already running")
 	}
 
 	// Foreach node read localNet.Nodes, configure and run new nodes
