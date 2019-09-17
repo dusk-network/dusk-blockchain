@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -69,8 +68,7 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
-func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
-	step uint8, size int) *VotingCommittee {
+func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64, step uint8, size int) *VotingCommittee {
 
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(totalWeight)
@@ -83,14 +81,14 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 
 		score := generateSortitionScore(hash, W)
 		i, blsPk := p.extractCommitteeMember(score, round)
-		if !votingCommittee.Insert(blsPk.Marshal()) {
+		if !votingCommittee.Insert(blsPk) {
 			for {
 				i++
-				if i >= p.Size(round) {
+				if i >= len(p.Members) {
 					i = 0
 				}
 				m := p.MemberAt(i)
-				if votingCommittee.Insert(m.PublicKeyBLS.Marshal()) {
+				if votingCommittee.Insert(m.PublicKeyBLS) {
 					break
 				}
 			}
@@ -103,15 +101,15 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 // extractCommitteeMember walks through the committee set, while deducting
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a hexadecimal string.
-func (p *Provisioners) extractCommitteeMember(score, round uint64) (int, bls.PublicKey) {
+func (p *Provisioners) extractCommitteeMember(score, round uint64) (int, []byte) {
 	for i := 0; ; i++ {
 		// make sure we wrap around the provisioners array
-		if i >= p.Size(round) {
+		if i >= len(p.Members) {
 			i = 0
 		}
 
 		m := p.MemberAt(i)
-		stake, err := p.GetStake(m.PublicKeyBLS.Marshal())
+		stake, err := p.GetStake(m.PublicKeyBLS)
 		if err != nil {
 			// If we get an error from GetStake, it means we either got a public key of a
 			// provisioner who is no longer in the set, or we got a malformed public key.
