@@ -77,12 +77,6 @@ Open the Command Line Interface (CLI) and type `balance`.
 ### How to claim Testnet DUSK?
 To claim Testnet DUSK (tDUSK), the user is required to make a Twitter post containing his/her wallet address ([example](https://twitter.com/ellie12496641/status/1147604746280361984)). Following the post on Twitter, the user should go to the faucet [webpage](https://faucet.dusk.network/) and paste the Twitter post link into the empty box and click the `Send Dusk!` button. The tDUSK will be deposited onto the aforementioned address within a minute. The user can claim tDUSK for the same address once per 24 hours.
 ### How to transfer tDUSK?
-Open the Command Line Interface (CLI) and type `transfer [amount] [address] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[address]` stands for the recipient address, and `[password]` stands for the wallet password. 
-### How to become a Provisioner?
-Open the Command Line Interface (CLI) and type `stake [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to stake (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the stake is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
-
-After completion, type `startprovisioner` into the CLI to join the consensus.
-### How to become a Block Generator?
-Open a Command Line Interface (CLI) and type `bid [amount] [locktime] [password]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), `[locktime]` stands for the amount of blocks for which the bid is locked (`0 < locktime < 250000`), and `[password]` stands for the wallet password. 
-
-After completion, type `startblockgenerator` into the CLI to join the consensus.
+Open the Command Line Interface (CLI) and type `transfer [amount] [address]`, where `[amount]` stands for the amount of tDUSK the user is willing to bid (`0 < amount <= balance`), and `[address]` stands for the recipient address. Note that a wallet needs to be loaded for this to work.
+### How to participate in consensus?
+Once the node is started and a wallet is loaded, the node will automatically begin staking and bidding tDUSK once it finds some in the wallet. Once these transactions are included in a valid block, the node will begin performing it's consensus-related duties.

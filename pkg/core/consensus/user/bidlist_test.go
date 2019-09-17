@@ -1,7 +1,6 @@
 package user_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,8 +71,6 @@ func TestRemoveExpired(t *testing.T) {
 	}
 
 	bidList = &bl
-
-	fmt.Println(bidList)
 
 	// All other bids have their end height at 1000 - so let's remove them
 	bidList.RemoveExpired(1001)

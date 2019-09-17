@@ -17,7 +17,9 @@ type bidRetriever struct {
 	db database.DB
 }
 
-// newBidRetriever returns an initialized bidRetriever, ready for use.
+var NoBidFound = errors.New("could not find corresponding value for specified item")
+
+// newBidRetriever returns an initialized BidRetriever, ready for use.
 func newBidRetriever(db database.DB) *bidRetriever {
 	// Get a db connection, if none was given.
 	if db == nil {
@@ -38,8 +40,11 @@ func (i *bidRetriever) SearchForBid(m []byte) (transactions.Transaction, error) 
 
 	for {
 		blk, err := i.getBlock(searchingHeight)
-		if err != nil {
+		if err == database.ErrBlockNotFound {
 			break
+		}
+		if err != nil {
+			return nil, err
 		}
 
 		tx, err := findCorrespondingBid(blk.Txs, m, searchingHeight, currentHeight)
@@ -51,7 +56,7 @@ func (i *bidRetriever) SearchForBid(m []byte) (transactions.Transaction, error) 
 		return tx, nil
 	}
 
-	return nil, errors.New("could not find corresponding value for specified item")
+	return nil, NoBidFound
 }
 
 // If given a set of transactions and an M value, this function will return a bid

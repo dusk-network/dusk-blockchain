@@ -101,6 +101,11 @@ func decodeBid(r *bytes.Buffer) user.Bid {
 		panic(err)
 	}
 
+	var mSlice []byte
+	if err := encoding.Read256(r, &mSlice); err != nil {
+		panic(err)
+	}
+
 	var endHeight uint64
 	if err := encoding.ReadUint64(r, binary.LittleEndian, &endHeight); err != nil {
 		panic(err)
@@ -108,7 +113,9 @@ func decodeBid(r *bytes.Buffer) user.Bid {
 
 	var x [32]byte
 	copy(x[:], xSlice)
-	return user.Bid{x, endHeight}
+	var m [32]byte
+	copy(m[:], mSlice)
+	return user.Bid{x, m, endHeight}
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain

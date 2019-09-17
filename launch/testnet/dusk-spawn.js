@@ -42,12 +42,12 @@ async function main(nodes = 1, ...flags) {
     process.env["TMPDIR"] = path.join(basepath, "nodes", String(port));
     await mkdir(process.env["TMPDIR"], { recursive: true });
 
-    await whenComplete(spawn("rm",[ "-rf", "walletDb", "demo"+port]))
+    await whenComplete(spawn("rm",[ "-rf", "walletDB*", "demo"+port]))
 
     const node = spawn(
       "./testnet",
-      ["-p=" + port, "-b=demo" + port, "-r=" + rpcport,],
-      { stdio: ["ignore", "pipe", "pipe" ]}
+      ["-p=" + port, "-b=demo" + port, "-r=" + rpcport, "-w=wallets/wallet"+i+".dat", "-d=walletDB"+i,],
+      { stdio: ["pipe", "pipe", "pipe" ]}
     );
 
     stdout(`spawner ${port}`, node.stdout);
@@ -59,6 +59,9 @@ async function main(nodes = 1, ...flags) {
     stdout(`bid ${port}`, bid.stdout);
     stdout(`bid ${port}`, bid.stderr);
 
+		process.stdin.pipe(node.stdin);
+		node.stdin.write("loadwallet password\n");
+		node.stdin.end();
   }
 }
 main(process.argv.slice(2));

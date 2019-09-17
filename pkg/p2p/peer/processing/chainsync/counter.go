@@ -47,7 +47,7 @@ func (s *Counter) decrement(b *bytes.Buffer) error {
 	return nil
 }
 
-func (s *Counter) isSyncing() bool {
+func (s *Counter) IsSyncing() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.blocksRemaining > 0

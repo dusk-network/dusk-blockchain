@@ -17,6 +17,7 @@ import (
 // Bid is the 32 byte X value, created from a bidding transaction amount and M.
 type Bid struct {
 	X         [32]byte
+	M         [32]byte
 	EndHeight uint64
 }
 
@@ -198,6 +199,7 @@ func CalculateX(d, m []byte) Bid {
 
 	var bid Bid
 	copy(bid.X[:], x.Bytes()[:])
+	copy(bid.M[:], m[:])
 	return bid
 }
 

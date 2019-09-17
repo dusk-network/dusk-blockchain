@@ -84,7 +84,7 @@ func main() {
 
 	// Start interactive shell
 	if cfg.Get().Logger.Output != "stdout" {
-		go cli.Start(srv.eventBus, srv.rpcBus, logFile)
+		go cli.Start(srv.eventBus, srv.rpcBus, logFile, srv.counter)
 	}
 
 	// Wait until the interrupt signal is received from an OS signal or

@@ -342,7 +342,23 @@ func (w *Wallet) Sign(tx SignableTx) error {
 		return err
 	}
 
-	return tx.Prove()
+	if err := tx.Prove(); err != nil {
+		return err
+	}
+
+	// Remove inputs from the db, to prevent accidental double-spend attempts
+	// when sending transactions quickly after one another.
+	for _, input := range tx.StandardTx().Inputs {
+		pubKey, err := w.db.Get(input.KeyImage.Bytes())
+		if err == leveldb.ErrNotFound {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		w.db.RemoveInput(pubKey)
+	}
+	return nil
 }
 
 func (w *Wallet) Balance() (float64, error) {
@@ -475,4 +491,17 @@ func generateM(PrivateSpend []byte, index uint32) []byte {
 
 	m := zkproof.CalculateM(k)
 	return m.Bytes()
+}
+
+func (w *Wallet) ReconstructK() (ristretto.Scalar, error) {
+	zeroPadding := make([]byte, 4)
+	privSpend, err := w.PrivateSpend()
+	if err != nil {
+		return ristretto.Scalar{}, err
+	}
+
+	kBytes := append(privSpend, zeroPadding...)
+	var k ristretto.Scalar
+	k.Derive(kBytes)
+	return k, nil
 }

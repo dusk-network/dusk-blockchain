@@ -1,7 +1,8 @@
 package config
 
 type generalConfiguration struct {
-	Network string
+	Network    string
+	WalletOnly bool
 }
 
 type loggerConfiguration struct {
@@ -82,4 +83,10 @@ type mempoolConfiguration struct {
 	PoolType    string
 	PreallocTxs uint32
 	MaxInvItems uint32
+}
+
+type consensusConfiguration struct {
+	DefaultLockTime uint64
+	DefaultAmount   uint64
+	DefaultOffset   uint64
 }
