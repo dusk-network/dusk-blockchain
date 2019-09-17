@@ -1,15 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	cli "github.com/dusk-network/dusk-blockchain/pkg/voucher/client/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,34 +25,36 @@ func ConnectToSeeder() []string {
 		log.Errorf("Empty list of seeder addresses")
 		return nil
 	}
+	seeder := seeders[0]
 
-	conn, err := net.Dial("tcp", seeders[0])
+	// Define the node information to submit to the voucher
+	seederKey := []byte(os.Getenv("SEEDER_KEY"))
+	nodePubKey := []byte("PubKey won't precede wallet")
+	nodePort := ":" + cfg.Get().Network.Port
+	nodeSocket, err := net.ResolveTCPAddr("tcp", nodePort)
 	if err != nil {
-		panic(err)
-	}
-	log.WithField("prefix", "main").Debugln("connected to voucher seeder")
-
-	if err := completeChallenge(conn); err != nil {
-		panic(err)
-	}
-	log.WithField("prefix", "main").Debugln("voucher seeder challenge completed")
-
-	// get IP list
-	buf := make([]byte, 2048)
-	if _, err := conn.Read(buf); err != nil {
-		// panic(err) <- if the seeder return error == EOF,  return nil, dont panic
-		log.WithFields(log.Fields{
-			"process": "main",
-			"error":   err,
-		}).Errorln("error reading IPs from voucher seeder")
+		log.Errorf("Could not define the node network addr: %s", err)
 		return nil
+	}
+
+	// Perform the request for the seeders
+	nodes, err := cli.RequestSeeders(&seederKey, &seeder, &nodePubKey, nodeSocket)
+	if err != nil {
+		log.Errorf("Could not fetch the seeders from the voucher: %s", err)
+		return nil
+	}
+
+	// Assemble the list of addresses from the nodes
+	addrs := []string{}
+	for _, node := range *nodes {
+		addrs = append(addrs, node.Addr.String())
 	}
 
 	// start a goroutine with a ping loop for the seeder, so it knows when we shut down
 	go func() {
 		for {
 			time.Sleep(4 * time.Second)
-			_, err := conn.Write([]byte{1})
+			err := cli.PingVoucher(&seeder)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"process": "main",
@@ -66,34 +65,5 @@ func ConnectToSeeder() []string {
 		}
 	}()
 
-	// Trim all trailing empty bytes
-	trimmedBuf := bytes.Trim(buf, "\x00")
-	return strings.Split(string(trimmedBuf), ",")
-}
-
-func completeChallenge(conn net.Conn) error {
-	// wait for voucher to send challenge
-	buf := make([]byte, 64)
-	if _, err := conn.Read(buf); err != nil {
-		return err
-	}
-
-	// get generated string out
-	generated := strings.Split(string(buf), "\n")[0]
-
-	// hash it with the secret
-	hash := sha256.New()
-	if _, err := hash.Write(append([]byte(generated), []byte(os.Getenv("SEEDER_KEY"))...)); err != nil {
-		return err
-	}
-
-	// turn into uppercase string, add port
-	ret := strings.ToUpper(hex.EncodeToString(hash.Sum(nil))) + "," + cfg.Get().Network.Port + "\n"
-
-	// write response
-	if _, err := conn.Write([]byte(ret)); err != nil {
-		return err
-	}
-
-	return nil
+	return addrs
 }
