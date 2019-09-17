@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -58,18 +59,30 @@ func (s *Server) Start() error {
 		ReadTimeout: time.Second * 10,
 	}
 
+	network := cfg.Get().RPC.Network
+	address := cfg.Get().RPC.Address
+
 	// HTTP handler
 	ServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Connection", "close")
 		w.Header().Set("Content-Type", "application/json")
+
+		log.Tracef("Handle request method: %s", r.Method)
+
 		r.Close = true
 
 		isAdmin := s.checkAuth(r)
 		s.handleRequest(w, *r, isAdmin)
 	})
 
+	if network == "unix" {
+		if err := os.RemoveAll(address); err != nil {
+			return err
+		}
+	}
+
 	// Set up listener
-	l, err := net.Listen("tcp", "localhost:"+cfg.Get().RPC.Port)
+	l, err := net.Listen(network, address)
 	if err != nil {
 		return err
 	}
@@ -87,9 +100,13 @@ func (s *Server) Start() error {
 
 // Listen on the http server.
 func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
-	log.Infof("RPC server listening on port %v", cfg.Get().RPC.Port)
-	httpServer.Serve(s.listener)
-	log.Info("RPC server stopped listening")
+	log.Infof("RPC server listening on (%s) %s", cfg.Get().RPC.Network, cfg.Get().RPC.Address)
+
+	if err := httpServer.Serve(s.listener); err != http.ErrServerClosed {
+		log.Errorf("RPC server stopped with error %v", err)
+	} else {
+		log.Info("RPC server stopped listening")
+	}
 }
 
 // checkAuth checks whether supplied credentials match the server credentials.

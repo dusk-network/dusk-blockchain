@@ -66,8 +66,13 @@ maxInvItems = 10000
 # RPC API service
 [rpc]
 
-# rpc port to listen on
-port=9000
+# network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
+network="unix"
+# in case the network is unix, 
+# address must be a path to a unix socket (e.g /tmp/file.sock)
+# in case the network is tcp*,
+# address must be in form of a IP address (e.g 127.0.0.1:9000)
+address="/tmp/dusk-rpc.sock"
 # enable rpc service
 enabled=false
 user="default"

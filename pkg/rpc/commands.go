@@ -3,10 +3,8 @@ package rpc
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/pkg/cli"
 	"strconv"
 	"time"
 
@@ -78,19 +76,22 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 	payload, _ := hex.DecodeString(params[1])
 	s.eventBus.Publish(jsonrpcTopic, bytes.NewBuffer(payload))
-	return "{result: \"published\"}", nil
+
+	result :=
+		`{ 
+			"result": "published"
+		}`
+	return result, nil
 }
+
 var sendBidTx = func(s *Server, params []string) (string, error) {
 
-	if len(params) < 3 {
-		return "", fmt.Errorf("invalid number of parameters %d", len(params))
-	}
+	// TODO: Not Implemented
 
-	txid, err := cli.SendBidCMD([]string{params[0], params[1], params[2]}, s.eventBus, s.rpcBus)
-	if err != nil {
-		return "", err
-	}
+	result :=
+		`{ 
+			"txid": "unknown"
+		}`
 
-	res, err := json.Marshal(txid)
-	return string(res), err
+	return result, nil
 }
