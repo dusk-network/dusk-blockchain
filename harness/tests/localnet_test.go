@@ -1,9 +1,8 @@
 package tests
 
 import (
+	"flag"
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/harness/engine"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"log"
 	"os"
@@ -11,6 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/harness/engine"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -22,6 +24,8 @@ var localNet engine.Network
 // TestMain sets up a temporarily local network of N nodes running from genesis block
 // The network should be fully functioning and ready to accept messaging
 func TestMain(m *testing.M) {
+
+	flag.Parse()
 
 	workspace, err := ioutil.TempDir(os.TempDir(), "localnet-")
 	if err != nil {
@@ -40,10 +44,17 @@ func TestMain(m *testing.M) {
 
 	var code int
 	err = localNet.Bootstrap(workspace)
+
+	if err == engine.ErrDisabledHarness {
+		os.RemoveAll(workspace)
+		os.Exit(0)
+	}
+
 	if err != nil {
 		// Failed temp network bootstrapping
 		code = 1
 		log.Fatal(err)
+
 	} else {
 		// Start all tests
 		code = m.Run()
@@ -65,10 +76,16 @@ func TestSendBidTransaction(t *testing.T) {
 		t.Logf("Empty DUSK_WALLET_PASS")
 	}
 
-	// Send request to node 0 to generate and process a Bid transaction
-	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "1", walletsPass})
+	// Send request to node 0 to loadWallet
+	_, err := localNet.SendCommand(0, "loadWallet", []string{walletsPass})
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
+	}
+
+	// Send request to node 0 to generate and process a Bid transaction
+	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "1"})
+	if err != nil {
+		t.Fatal(err.Error())
 	}
 
 	txid := string(data)
