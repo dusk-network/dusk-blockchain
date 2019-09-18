@@ -120,15 +120,13 @@ func TestSendAgreement(t *testing.T) {
 }
 
 // Launch the agreement component, and consume the initial round update that gets emitted.
-func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
+func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan consensus.RoundUpdate) {
 	bus := wire.NewEventBus()
 	roundChan := consensus.InitRoundUpdate(bus)
 	k, _ := user.NewRandKeys()
 	go agreement.Launch(bus, c, k)
 	time.Sleep(200 * time.Millisecond)
-	init := make([]byte, 8)
-	binary.LittleEndian.PutUint64(init, 1)
-	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
+	bus.Publish(msg.InitializationTopic, mockRoundUpdateBuffer(1))
 
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
@@ -136,4 +134,43 @@ func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
 	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
 	<-roundChan
 	return bus, roundChan
+}
+
+func mockRoundUpdateBuffer(round uint64) *bytes.Buffer {
+	init := make([]byte, 8)
+	binary.LittleEndian.PutUint64(init, 1)
+	buf := bytes.NewBuffer(init)
+
+	p, blsBytes := mockProvisioners()
+	user.MarshalMembers(buf, []user.Member{*p.Members[string(blsBytes)]})
+
+	bidList := mockBidList()
+	user.MarshalBidList(buf, bidList)
+	return buf
+}
+
+func mockProvisioners() (*user.Provisioners, []byte) {
+	p := &user.Provisioners{}
+	keys, _ := user.NewRandKeys()
+	member := &user.Member{}
+	member.PublicKeyEd = keys.EdPubKeyBytes
+	member.PublicKeyBLS = keys.BLSPubKeyBytes
+	member.Stakes = make([]user.Stake, 1)
+	member.Stakes[0].Amount = 500
+	member.Stakes[0].EndHeight = 10000
+	p.Members[string(keys.BLSPubKeyBytes)] = member
+	p.Set.Insert(keys.BLSPubKeyBytes)
+	return p, keys.BLSPubKeyBytes
+}
+
+func mockBidList() user.BidList {
+	bidList := make([]user.Bid, 1)
+	xSlice, _ := crypto.RandEntropy(32)
+	mSlice, _ := crypto.RandEntropy(32)
+	var x [32]byte
+	var m [32]byte
+	copy(x[:], xSlice)
+	copy(m[:], mSlice)
+	bidList[0] = user.Bid{x, m, 10}
+	return bidList
 }
