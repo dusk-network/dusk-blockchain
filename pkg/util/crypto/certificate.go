@@ -56,8 +56,8 @@ func GenerateX509Certificate() (*x509.Certificate, *ed25519.PrivateKey, error) {
 	return generatedCert, &priv, nil
 }
 
-// GenerateTlsCertificate will produce a tls certificate from GenerateX509Certificate
-func GenerateTlsCertificate() (*tls.Certificate, error) {
+// GenerateTLSCertificate will produce a tls certificate from GenerateX509Certificate
+func GenerateTLSCertificate() (*tls.Certificate, error) {
 	x509Cert, priv, err := GenerateX509Certificate()
 	if err != nil {
 		return nil, err

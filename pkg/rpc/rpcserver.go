@@ -71,7 +71,7 @@ func (s *Server) Start() error {
 	})
 
 	// Generate self-signed certificate
-	tlsCert, err := cryptoUtils.GenerateTlsCertificate()
+	tlsCert, err := cryptoUtils.GenerateTLSCertificate()
 	if err != nil {
 		return err
 	}

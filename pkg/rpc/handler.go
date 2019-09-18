@@ -11,14 +11,14 @@ import (
 type JSONRequest struct {
 	Method string   `json:"method"`
 	Params []string `json:"params,omitempty"`
-	Id     int      `json:"id"`
+	ID     int      `json:"id"`
 }
 
 // JSONResponse defines a JSON-RPC response to a method call.
 type JSONResponse struct {
 	Result *json.RawMessage `json:"result"`
 	Error  string           `json:"error"`
-	Id     int              `json:"id"`
+	ID     int              `json:"id"`
 }
 
 // handleRequest takes a JSON-RPC request and parses it, then returns the result to the
@@ -62,7 +62,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r http.Request, isAdmin bo
 	}
 
 	rawMessage := json.RawMessage([]byte(result))
-	resp := JSONResponse{Result: &rawMessage, Error: errorDesc, Id: req.Id}
+	resp := JSONResponse{Result: &rawMessage, Error: errorDesc, ID: req.ID}
 	resultData, err := json.MarshalIndent(resp, "", "\t")
 	if err != nil {
 		log.Errorf("marshal response: %v", err)
