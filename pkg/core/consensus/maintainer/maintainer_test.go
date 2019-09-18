@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
@@ -86,10 +87,17 @@ func propagateTxValues(txs []transactions.Transaction, bus *wire.EventBus, heigh
 	for _, tx := range txs {
 		switch tx.Type() {
 		case transactions.BidType:
-			bid := tx.(*transactions.Bid)
-			x := user.CalculateX(bid.Outputs[0].Commitment.Bytes(), bid.M)
-			x.EndHeight = height + bid.Lock
-			propagateBid(x, bus)
+			bidTx := tx.(*transactions.Bid)
+			var dScalar ristretto.Scalar
+			dScalar.UnmarshalBinary(bidTx.Outputs[0].Commitment.Bytes())
+			var mScalar ristretto.Scalar
+			mScalar.UnmarshalBinary(bidTx.M)
+			x := zkproof.CalculateX(dScalar, mScalar)
+			var bid user.Bid
+			copy(bid.X[:], x.Bytes())
+			copy(bid.M[:], bidTx.M)
+			bid.EndHeight = height + bidTx.Lock
+			propagateBid(bid, bus)
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
 			propagateStake(stake, height, bus)
@@ -154,7 +162,7 @@ func setupMaintainerTest(t *testing.T) (*wire.EventBus, chan *bytes.Buffer) {
 
 	k, err := w.ReconstructK()
 	assert.NoError(t, err)
-	assert.NoError(t, maintainer.Launch(bus, db, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor.New(w, db), 10, 10, 5))
+	assert.NoError(t, maintainer.Launch(bus, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor.New(w, db), 10, 10, 5))
 
 	return bus, txChan
 }

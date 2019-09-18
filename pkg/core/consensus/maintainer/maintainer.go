@@ -6,7 +6,6 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -21,11 +20,11 @@ var l = log.WithField("process", "maintainer")
 // transactions are close to expiring.
 type maintainer struct {
 	eventBroker wire.EventBroker
-	roundChan   <-chan uint64
+	roundChan   <-chan consensus.RoundUpdate
 
 	pubKeyBLS []byte
 	m         ristretto.Scalar
-	p         user.Provisioners
+	p         user.Stakers
 	bidList   user.BidList
 
 	bidEndHeight   uint64
@@ -39,7 +38,6 @@ type maintainer struct {
 func newMaintainer(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*maintainer, error) {
 	return &maintainer{
 		eventBroker: eventBroker,
-		bidChan:     consensus.InitBidListUpdate(eventBroker),
 		roundChan:   consensus.InitRoundUpdate(eventBroker),
 		pubKeyBLS:   pubKeyBLS,
 		m:           m,
@@ -50,8 +48,9 @@ func newMaintainer(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristretto.S
 	}, nil
 }
 
-func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) error {
-	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, transactor, amount, lockTime, offset)
+func Launch(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) error {
+
+	maintainer, err := newMaintainer(eventBroker, pubKeyBLS, m, transactor, amount, lockTime, offset)
 	if err != nil {
 		return err
 	}
@@ -83,9 +82,13 @@ func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ri
 func (m *maintainer) listen() {
 	for {
 		select {
-		case round := <-m.roundChan:
-			m.bidList.RemoveExpired(round)
-			if round+m.offset >= m.bidEndHeight {
+		case roundUpdate := <-m.roundChan:
+			// Rehydrate consensus state
+			m.p = roundUpdate.P
+			m.bidList = roundUpdate.BidList
+
+			// TODO: handle new provisioners and bidlist coming from roundupdate
+			if roundUpdate.Round+m.offset >= m.bidEndHeight {
 				endHeight := m.findMostRecentBid()
 
 				// Only send bid if this is the first time we notice it's about to expire
@@ -101,7 +104,7 @@ func (m *maintainer) listen() {
 				}
 			}
 
-			if round+m.offset >= m.stakeEndHeight {
+			if roundUpdate.Round+m.offset >= m.stakeEndHeight {
 				endHeight := m.findMostRecentStake()
 
 				// Only send stake if this is the first time we notice it's about to expire
@@ -115,15 +118,13 @@ func (m *maintainer) listen() {
 					m.stakeEndHeight = 0
 				}
 			}
-		case bid := <-m.bidChan:
-			m.bidList.AddBid(bid)
 		}
 	}
 }
 
 func (m *maintainer) findMostRecentBid() uint64 {
 	var highest uint64
-	for _, bid := range *m.bidList {
+	for _, bid := range m.bidList {
 		if bytes.Equal(m.m.Bytes(), bid.M[:]) && bid.EndHeight > highest {
 			highest = bid.EndHeight
 		}
