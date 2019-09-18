@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -55,12 +56,10 @@ func InitRoundUpdate(subscriber wire.EventSubscriber) <-chan RoundUpdate {
 // Collect as specified in the EventCollector interface. In this case Collect simply
 // performs unmarshalling of the round event
 func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
-	roundBytes := make([]byte, 8)
-	if _, err := roundBuffer.Read(roundBytes); err != nil {
+	var round uint64
+	if err := encoding.ReadUint64(roundBuffer, binary.LittleEndian, &round); err != nil {
 		return err
 	}
-
-	round := binary.LittleEndian.Uint64(roundBytes)
 
 	stakers, err := user.UnmarshalStakers(roundBuffer)
 	if err != nil {

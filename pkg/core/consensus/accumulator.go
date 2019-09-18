@@ -7,7 +7,6 @@ import (
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	log "github.com/sirupsen/logrus"
 )
@@ -16,8 +15,9 @@ import (
 // specific to the accumulator.
 type AccumulatorHandler interface {
 	EventHandler
-	committee.Committee
 	ExtractIdentifier(wire.Event, *bytes.Buffer) error
+	Quorum() int
+	IsMember([]byte, uint64, uint8) bool
 }
 
 // Accumulator is a generic event accumulator, that will accumulate events until it

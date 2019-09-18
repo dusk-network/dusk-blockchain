@@ -102,24 +102,29 @@ func MockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, [
 	}
 
 	committeeMock := &mocks.Foldable{}
-	committeeMock.On("Quorum").Return(quorum)
+	committeeMock.On("Quorum", mock.AnythingOfType("user.Stakers")).Return(quorum)
 	committeeMock.On("IsMember",
+		mock.AnythingOfType("user.Stakers"),
 		mock.AnythingOfType("[]uint8"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint8")).Return(isMember)
 	committeeMock.On("Unpack",
+		mock.AnythingOfType("user.Stakers"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint64"),
 		uint8(1)).Return(mockSubCommittees[0])
 	committeeMock.On("Unpack",
+		mock.AnythingOfType("user.Stakers"),
 		mock.AnythingOfType("uint64"),
 		mock.AnythingOfType("uint64"),
 		uint8(2)).Return(mockSubCommittees[1])
 	committeeMock.On("Pack",
+		mock.AnythingOfType("user.Stakers"),
 		mock.Anything,
 		mock.AnythingOfType("uint64"),
 		uint8(1)).Return(wholeCommittee.Bits(mockSubCommittees[0]))
 	committeeMock.On("Pack",
+		mock.AnythingOfType("user.Stakers"),
 		mock.Anything,
 		mock.AnythingOfType("uint64"),
 		uint8(2)).Return(wholeCommittee.Bits(mockSubCommittees[1]))

@@ -33,12 +33,12 @@ func TestAgreementRace(t *testing.T) {
 	stakers := user.Stakers{
 		Provisioners: *user.NewProvisioners(),
 	}
-	c.Extractor.Stakers = stakers
+	c.Cache.Stakers = stakers
 	// We make a set of 50 keys, add these as provisioners and start the agreement component.
 	committeeSize := 50
 	k := createProvisionerSet(t, c, committeeSize)
 	broker := newBroker(eb, c, k[0])
-	broker.updateRound(1)
+	broker.filter.UpdateRound(1)
 	go broker.Listen()
 
 	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
@@ -177,9 +177,9 @@ func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []u
 		member.Stakes = make([]user.Stake, 1)
 		member.Stakes[0].Amount = 500
 		member.Stakes[0].EndHeight = 10000
-		c.Extractor.Stakers.Set.Insert(keys.BLSPubKeyBytes)
-		c.Extractor.Stakers.Members[string(keys.BLSPubKeyBytes)] = member
-		c.Extractor.Stakers.TotalWeight += 500
+		c.Cache.Stakers.Set.Insert(keys.BLSPubKeyBytes)
+		c.Cache.Stakers.Members[string(keys.BLSPubKeyBytes)] = member
+		c.Cache.Stakers.TotalWeight += 500
 
 		k = append(k, keys)
 	}

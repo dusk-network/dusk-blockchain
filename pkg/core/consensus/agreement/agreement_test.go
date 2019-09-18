@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
@@ -22,47 +21,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test that the agreement component emits a round update on startup.
-func TestInitBroker(t *testing.T) {
-	committeeMock, k := agreement.MockCommittee(2, true, 2)
-	bus := wire.NewEventBus()
-	roundChan := consensus.InitRoundUpdate(bus)
-
-	go agreement.Launch(bus, committeeMock, k[0])
-	time.Sleep(200 * time.Millisecond)
-	init := make([]byte, 8)
-	binary.LittleEndian.PutUint64(init, 1)
-	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
-
-	round := <-roundChan
-	assert.Equal(t, uint64(1), round)
-}
-
 // Test the accumulation of agreement events. It should result in the agreement component
 // publishing a round update.
 func TestBroker(t *testing.T) {
 	committeeMock, keys := agreement.MockCommittee(2, true, 2)
-	eb, roundChan := initAgreement(committeeMock)
+	eb, winningHashChan := initAgreement(committeeMock)
 
 	hash, _ := crypto.RandEntropy(32)
 	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
-	round := <-roundChan
-	assert.Equal(t, uint64(2), round)
+	winningHash := <-winningHashChan
+	assert.Equal(t, hash, winningHash.Bytes())
 }
 
 // Test that the agreement component does not emit a round update if it doesn't get
 // the desired amount of events.
 func TestNoQuorum(t *testing.T) {
 	committeeMock, keys := agreement.MockCommittee(3, true, 3)
-	eb, roundChan := initAgreement(committeeMock)
+	eb, winningHashChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
 	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	select {
-	case <-roundChan:
+	case <-winningHashChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
@@ -72,12 +55,12 @@ func TestNoQuorum(t *testing.T) {
 // Test that events, which contain a sender that is unknown to the committee, are skipped.
 func TestSkipNoMember(t *testing.T) {
 	committeeMock, keys := agreement.MockCommittee(1, false, 2)
-	eb, roundChan := initAgreement(committeeMock)
+	eb, winningHashChan := initAgreement(committeeMock)
 	hash, _ := crypto.RandEntropy(32)
 	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
 
 	select {
-	case <-roundChan:
+	case <-winningHashChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
@@ -120,47 +103,50 @@ func TestSendAgreement(t *testing.T) {
 }
 
 // Launch the agreement component, and consume the initial round update that gets emitted.
-func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan consensus.RoundUpdate) {
+func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan *bytes.Buffer) {
 	bus := wire.NewEventBus()
-	roundChan := consensus.InitRoundUpdate(bus)
+	winningHashChan := make(chan *bytes.Buffer, 1)
+	bus.Subscribe(msg.WinningBlockHashTopic, winningHashChan)
 	k, _ := user.NewRandKeys()
 	go agreement.Launch(bus, c, k)
 	time.Sleep(200 * time.Millisecond)
-	bus.Publish(msg.InitializationTopic, mockRoundUpdateBuffer(1))
+	bus.Publish(msg.RoundUpdateTopic, mockRoundUpdateBuffer(1))
 
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
 	bus.RemoveAllPreprocessors(string(topics.Agreement))
-	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
-	<-roundChan
-	return bus, roundChan
+	return bus, winningHashChan
 }
 
 func mockRoundUpdateBuffer(round uint64) *bytes.Buffer {
 	init := make([]byte, 8)
-	binary.LittleEndian.PutUint64(init, 1)
+	binary.LittleEndian.PutUint64(init, round)
 	buf := bytes.NewBuffer(init)
 
-	p, blsBytes := mockProvisioners()
-	user.MarshalMembers(buf, []user.Member{*p.Members[string(blsBytes)]})
+	members := mockMembers(1)
+	user.MarshalMembers(buf, members)
 
 	bidList := mockBidList()
 	user.MarshalBidList(buf, bidList)
 	return buf
 }
 
-func mockProvisioners() (*user.Provisioners, []byte) {
-	p := &user.Provisioners{}
-	keys, _ := user.NewRandKeys()
-	member := &user.Member{}
-	member.PublicKeyEd = keys.EdPubKeyBytes
-	member.PublicKeyBLS = keys.BLSPubKeyBytes
-	member.Stakes = make([]user.Stake, 1)
-	member.Stakes[0].Amount = 500
-	member.Stakes[0].EndHeight = 10000
-	p.Members[string(keys.BLSPubKeyBytes)] = member
-	p.Set.Insert(keys.BLSPubKeyBytes)
-	return p, keys.BLSPubKeyBytes
+func mockMembers(amount int) []user.Member {
+	members := make([]user.Member, amount)
+
+	for i := 0; i < amount; i++ {
+		keys, _ := user.NewRandKeys()
+		member := &user.Member{}
+		member.PublicKeyEd = keys.EdPubKeyBytes
+		member.PublicKeyBLS = keys.BLSPubKeyBytes
+		member.Stakes = make([]user.Stake, 1)
+		member.Stakes[0].Amount = 500
+		member.Stakes[0].EndHeight = 10000
+		members[i] = *member
+
+	}
+
+	return members
 }
 
 func mockBidList() user.BidList {

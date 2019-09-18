@@ -21,8 +21,8 @@ func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) 
 		c = committee.NewAgreement()
 	}
 	broker := newBroker(eventBroker, c, keys)
-	currentRound := getInitialRound(eventBroker)
-	broker.updateRound(currentRound)
+	roundUpdate := <-broker.roundChan
+	broker.updateRound(roundUpdate)
 	go broker.Listen()
 }
 
@@ -32,6 +32,7 @@ type broker struct {
 	state      consensus.State
 	filter     *consensus.EventFilter
 	resultChan <-chan voteSet
+	roundChan  <-chan consensus.RoundUpdate
 }
 
 func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
@@ -53,6 +54,7 @@ func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys 
 		state:      state,
 		filter:     filter,
 		resultChan: initReductionResultCollector(eventBroker),
+		roundChan:  consensus.InitRoundUpdate(eventBroker),
 	}
 
 	return b
@@ -65,9 +67,10 @@ func (b *broker) Listen() {
 		case evs := <-b.filter.Accumulator.CollectedVotesChan:
 			b.publishEvent(evs)
 			b.publishWinningHash(evs)
-			b.updateRound(b.state.Round() + 1)
 		case voteSet := <-b.resultChan:
 			b.sendAgreement(voteSet)
+		case roundUpdate := <-b.roundChan:
+			b.updateRound(roundUpdate)
 		}
 	}
 }
@@ -101,13 +104,13 @@ func (b *broker) sendAgreement(voteSet voteSet) error {
 	return nil
 }
 
-func (b *broker) updateRound(round uint64) {
+func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 	log.WithFields(log.Fields{
 		"process": "agreement",
-		"round":   round,
+		"round":   roundUpdate.Round,
 	}).Debugln("updating round")
-	b.filter.UpdateRound(round)
-	consensus.UpdateRound(b.publisher, round)
+	b.filter.UpdateRound(roundUpdate.Round)
+	b.handler.stakers = roundUpdate.P
 	b.filter.FlushQueue()
 }
 
