@@ -66,6 +66,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r http.Request, isAdmin bo
 	resultData, err := json.MarshalIndent(resp, "", "\t")
 	if err != nil {
 		log.Errorf("marshal response: %v", err)
+		return
 	}
 
 	if _, err := w.Write([]byte(resultData)); err != nil {

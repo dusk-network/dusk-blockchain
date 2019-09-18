@@ -38,12 +38,12 @@ var (
 
 // version will return the version of the client.
 var version = func(s *Server, params []string) (string, error) {
-	return protocol.NodeVer.String(), nil
+	return fmt.Sprintf("\"%v\"", protocol.NodeVer.String()), nil
 }
 
 // pong simply returns "pong" to let the caller know the server is up.
 var pong = func(s *Server, params []string) (string, error) {
-	return "pong", nil
+	return "\"pong\"", nil
 }
 
 // uptime returns the server uptime.
