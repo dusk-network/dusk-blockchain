@@ -44,7 +44,6 @@ type broker struct {
 	certificateGenerator *certificateGenerator
 
 	// subscriber channels
-	bidChan              <-chan user.Bid
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
 	acceptedBlockChan    <-chan block.Block
@@ -78,7 +77,6 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k, m ristre
 		eventBroker:          eventBroker,
 		proofGenerator:       gen,
 		certificateGenerator: certGenerator,
-		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
 		acceptedBlockChan:    acceptedBlockChan,
@@ -117,8 +115,6 @@ func getLatestBlock() *block.Block {
 func (b *broker) Listen() {
 	for {
 		select {
-		case bid := <-b.bidChan:
-			b.proofGenerator.UpdateBidList(bid)
 		case state := <-b.regenerationChan:
 			if state.Round == b.seeder.Round() {
 				b.forwarder.threshold.Lower()
@@ -135,9 +131,6 @@ func (b *broker) Listen() {
 
 func (b *broker) onBlock(blk block.Block) error {
 	b.forwarder.threshold.Reset()
-
-	// Remove old bids before generating a new score
-	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
 
 	return b.handleBlock(blk)
 }

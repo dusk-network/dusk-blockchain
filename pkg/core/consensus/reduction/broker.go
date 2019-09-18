@@ -22,7 +22,7 @@ type (
 		ctx *context
 
 		// channels linked to subscribers
-		roundUpdateChan <-chan uint64
+		roundUpdateChan <-chan consensus.RoundUpdate
 		stepChan        <-chan struct{}
 		selectionChan   <-chan *selection.ScoreEvent
 	}
@@ -70,14 +70,14 @@ func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout 
 func (b *broker) Listen() {
 	for {
 		select {
-		case round := <-b.roundUpdateChan:
+		case roundUpdate := <-b.roundUpdateChan:
 			log.WithFields(log.Fields{
 				"process": "reduction",
-				"round":   round,
+				"round":   roundUpdate.Round,
 			}).Debug("Got round update")
 			b.reducer.end()
 			b.reducer.lock.Lock()
-			b.filter.UpdateRound(round)
+			b.filter.UpdateRound(roundUpdate.Round)
 			b.ctx.timer.ResetTimeOut()
 			b.reducer.lock.Unlock()
 		case ev := <-b.selectionChan:

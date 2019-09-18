@@ -29,7 +29,7 @@ type moderator struct {
 	strikes   map[string]uint8
 	round     uint64
 
-	roundChan <-chan uint64
+	roundChan <-chan consensus.RoundUpdate
 }
 
 // Launch creates a component that tallies strikes for provisioners.
@@ -51,11 +51,11 @@ func newModerator(eventBroker wire.EventBroker) *moderator {
 func (m *moderator) listen() {
 	for {
 		select {
-		case round := <-m.roundChan:
+		case roundUpdate := <-m.roundChan:
 			// clean strikes map on round update
 			m.lock.Lock()
 			m.strikes = make(map[string]uint8)
-			m.round = round
+			m.round = roundUpdate.Round
 			m.lock.Unlock()
 		}
 	}
