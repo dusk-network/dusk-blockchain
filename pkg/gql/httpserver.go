@@ -1,6 +1,7 @@
 package gql
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -14,6 +15,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	cryptoUtils "github.com/dusk-network/dusk-blockchain/pkg/util/crypto"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -88,8 +90,21 @@ func (s *Server) Start() error {
 	s.schema = &sc
 	_, s.db = heavy.CreateDBConnection()
 
+	// Generate self-signed certificate
+	tlsCert, err := cryptoUtils.GenerateTLSCertificate()
+	if err != nil {
+		return err
+	}
+
+	// Define TLS configuration
+	tlsConfig := tls.Config{
+		Certificates:       []tls.Certificate{*tlsCert},
+		InsecureSkipVerify: true,
+	}
+
 	// Set up listener
-	l, err := net.Listen("tcp", "localhost:"+cfg.Get().Gql.Port)
+	bindAddr := "localhost:" + cfg.Get().Gql.Port
+	l, err := tls.Listen("tcp", bindAddr, &tlsConfig)
 	if err != nil {
 		return err
 	}
