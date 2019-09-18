@@ -55,6 +55,7 @@ func TestMemberKeys(t *testing.T) {
 		member.Stakes[0].Amount = 500
 		member.Stakes[0].EndHeight = 10000
 		p.Members[string(keys.BLSPubKeyBytes)] = member
+		p.Set.Insert(keys.BLSPubKeyBytes)
 
 		ks = append(ks, keys)
 	}
