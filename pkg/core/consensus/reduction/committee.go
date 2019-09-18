@@ -11,6 +11,7 @@ const committeeSize = 64
 // who are not properly participating in this phase of the consensus.
 type Reducers interface {
 	committee.Committee
+	UpdateProvisioners(user.Stakers)
 }
 
 type reductionCommittee struct {
@@ -23,6 +24,10 @@ func newReductionCommittee() *reductionCommittee {
 		Extractor: committee.NewExtractor(),
 	}
 	return r
+}
+
+func (r *reductionCommittee) UpdateProvisioners(stakers user.Stakers) {
+	r.Extractor.Stakers = stakers
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
