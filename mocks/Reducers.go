@@ -11,13 +11,13 @@ type Reducers struct {
 	mock.Mock
 }
 
-// IsMember provides a mock function with given fields: _a0, _a1, _a2
-func (_m *Reducers) IsMember(_a0 []byte, _a1 uint64, _a2 uint8) bool {
-	ret := _m.Called(_a0, _a1, _a2)
+// IsMember provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *Reducers) IsMember(_a0 user.Stakers, _a1 []byte, _a2 uint64, _a3 uint8) bool {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func([]byte, uint64, uint8) bool); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(user.Stakers, []byte, uint64, uint8) bool); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -25,21 +25,16 @@ func (_m *Reducers) IsMember(_a0 []byte, _a1 uint64, _a2 uint8) bool {
 	return r0
 }
 
-// Quorum provides a mock function with given fields:
-func (_m *Reducers) Quorum() int {
-	ret := _m.Called()
+// Quorum provides a mock function with given fields: _a0
+func (_m *Reducers) Quorum(_a0 user.Stakers) int {
+	ret := _m.Called(_a0)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(user.Stakers) int); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
 
 	return r0
-}
-
-// UpdateProvisioners provides a mock function with given fields: _a0
-func (_m *Reducers) UpdateProvisioners(_a0 user.Stakers) {
-	_m.Called(_a0)
 }
