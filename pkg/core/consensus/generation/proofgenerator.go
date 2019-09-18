@@ -13,8 +13,6 @@ import (
 // propose blocks in the consensus.
 type Generator interface {
 	GenerateProof([]byte) zkproof.ZkProof
-	UpdateBidList(user.Bid)
-	RemoveExpiredBids(uint64)
 	InBidList() bool
 	UpdateProofValues(ristretto.Scalar, ristretto.Scalar)
 }
@@ -22,21 +20,15 @@ type Generator interface {
 type proofGenerator struct {
 	d, k, x ristretto.Scalar
 	lock    sync.RWMutex
-	bidList *user.BidList
+	bidList user.BidList
 }
 
 func newProofGenerator(d, k, m ristretto.Scalar) (*proofGenerator, error) {
-	bidList, err := user.NewBidList(nil)
-	if err != nil {
-		return nil, err
-	}
-
 	x := zkproof.CalculateX(d, m)
 	return &proofGenerator{
-		d:       d,
-		k:       k,
-		x:       x,
-		bidList: bidList,
+		d: d,
+		k: k,
+		x: x,
 	}, nil
 }
 
@@ -44,18 +36,6 @@ func (g *proofGenerator) InBidList() bool {
 	var bid user.Bid
 	copy(bid.X[:], g.x.Bytes())
 	return g.bidList.Contains(bid)
-}
-
-func (g *proofGenerator) UpdateBidList(bid user.Bid) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-	g.bidList.AddBid(bid)
-}
-
-func (g *proofGenerator) RemoveExpiredBids(round uint64) {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-	g.bidList.RemoveExpired(round)
 }
 
 func (g *proofGenerator) UpdateProofValues(d, m ristretto.Scalar) {
@@ -83,15 +63,15 @@ func (g *proofGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 
 // bidsToScalars will take a global public list, take a subset from it, and then
 // return it as a slice of scalars.
-func createBidListSubset(bidList *user.BidList) user.BidList {
+func createBidListSubset(bidList user.BidList) user.BidList {
 	numBids := getNumBids(bidList)
 	return bidList.Subset(numBids)
 }
 
 // getNumBids will return how many bids to include in the bid list subset
 // for the proof.
-func getNumBids(bidList *user.BidList) int {
-	numBids := len(*bidList)
+func getNumBids(bidList user.BidList) int {
+	numBids := len(bidList)
 	if numBids > 10 {
 		numBids = 10
 	}
