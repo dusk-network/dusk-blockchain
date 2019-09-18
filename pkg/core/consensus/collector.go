@@ -6,6 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -15,7 +16,7 @@ import (
 // should use InitRoundUpdate instead
 type (
 	roundCollector struct {
-		roundChan chan uint64
+		roundChan chan RoundUpdate
 	}
 
 	regenerationCollector struct {
@@ -24,6 +25,12 @@ type (
 
 	acceptedBlockCollector struct {
 		blockChan chan<- block.Block
+	}
+
+	RoundUpdate struct {
+		Round   uint64
+		P       user.Stakers
+		BidList user.BidList
 	}
 )
 
@@ -38,8 +45,8 @@ func UpdateRound(bus wire.EventPublisher, round uint64) {
 // as well. Its purpose is to lighten up a bit the amount of arguments in creating
 // the handler for the collectors. Also it removes the need to store subscribers on
 // the consensus process
-func InitRoundUpdate(subscriber wire.EventSubscriber) <-chan uint64 {
-	roundChan := make(chan uint64, 1)
+func InitRoundUpdate(subscriber wire.EventSubscriber) <-chan RoundUpdate {
+	roundChan := make(chan RoundUpdate, 1)
 	roundCollector := &roundCollector{roundChan}
 	go wire.NewTopicListener(subscriber, roundCollector, string(msg.RoundUpdateTopic)).Accept()
 	return roundChan
@@ -48,8 +55,24 @@ func InitRoundUpdate(subscriber wire.EventSubscriber) <-chan uint64 {
 // Collect as specified in the EventCollector interface. In this case Collect simply
 // performs unmarshalling of the round event
 func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-	r.roundChan <- round
+	roundBytes := make([]byte, 8)
+	if _, err := roundBuffer.Read(roundBytes); err != nil {
+		return err
+	}
+
+	round := binary.LittleEndian.Uint64(roundBytes)
+
+	stakers, err := user.UnmarshalStakers(roundBuffer)
+	if err != nil {
+		return err
+	}
+
+	bidList, err := user.UnmarshalBidList(roundBuffer)
+	if err != nil {
+		return err
+	}
+
+	r.roundChan <- RoundUpdate{round, stakers, bidList}
 	return nil
 }
 
