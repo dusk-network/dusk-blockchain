@@ -110,7 +110,7 @@ func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 		"round":   roundUpdate.Round,
 	}).Debugln("updating round")
 	b.filter.UpdateRound(roundUpdate.Round)
-	b.handler.stakers = roundUpdate.P
+	b.handler.provisioners = roundUpdate.P
 	b.filter.FlushQueue()
 }
 

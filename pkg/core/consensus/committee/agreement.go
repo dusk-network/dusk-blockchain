@@ -19,18 +19,18 @@ func NewAgreement() *Agreement {
 }
 
 // IsMember checks if the BLS key belongs to one of the Provisioners in the committee
-func (a *Agreement) IsMember(stakers user.Stakers, pubKeyBLS []byte, round uint64, step uint8) bool {
-	votingCommittee := a.UpsertCommitteeCache(stakers, round, step, a.size(stakers))
+func (a *Agreement) IsMember(provisioners user.Provisioners, pubKeyBLS []byte, round uint64, step uint8) bool {
+	votingCommittee := a.UpsertCommitteeCache(provisioners, round, step, a.size(provisioners))
 	return votingCommittee.IsMember(pubKeyBLS)
 }
 
 // Quorum returns the amount of votes to reach a quorum
-func (a *Agreement) Quorum(stakers user.Stakers) int {
-	return int(float64(a.size(stakers)) * 0.75)
+func (a *Agreement) Quorum(provisioners user.Provisioners) int {
+	return int(float64(a.size(provisioners)) * 0.75)
 }
 
-func (a *Agreement) size(stakers user.Stakers) int {
-	size := len(stakers.Provisioners.Members)
+func (a *Agreement) size(provisioners user.Provisioners) int {
+	size := len(provisioners.Members)
 	if size > committeeSize {
 		return committeeSize
 	}
@@ -39,13 +39,13 @@ func (a *Agreement) size(stakers user.Stakers) int {
 }
 
 // Pack creates a uint64 bitset representation of a Committee subset for a given round and step
-func (a *Agreement) Pack(stakers user.Stakers, set sortedset.Set, round uint64, step uint8) uint64 {
-	votingCommittee := a.UpsertCommitteeCache(stakers, round, step, a.size(stakers))
+func (a *Agreement) Pack(provisioners user.Provisioners, set sortedset.Set, round uint64, step uint8) uint64 {
+	votingCommittee := a.UpsertCommitteeCache(provisioners, round, step, a.size(provisioners))
 	return votingCommittee.Bits(set)
 }
 
 // Unpack the Committee subset from a uint64 bitset representation for a give round and step
-func (a *Agreement) Unpack(stakers user.Stakers, bitset uint64, round uint64, step uint8) sortedset.Set {
-	votingCommittee := a.UpsertCommitteeCache(stakers, round, step, a.size(stakers))
+func (a *Agreement) Unpack(provisioners user.Provisioners, bitset uint64, round uint64, step uint8) sortedset.Set {
+	votingCommittee := a.UpsertCommitteeCache(provisioners, round, step, a.size(provisioners))
 	return votingCommittee.Intersect(bitset)
 }

@@ -17,7 +17,7 @@ type (
 		user.Keys
 		Reducers
 		*UnMarshaller
-		stakers user.Stakers
+		provisioners user.Provisioners
 	}
 )
 
@@ -33,11 +33,11 @@ func newReductionHandler(committee Reducers, keys user.Keys) *reductionHandler {
 
 // AmMember checks if we are part of the committee.
 func (b *reductionHandler) AmMember(round uint64, step uint8) bool {
-	return b.Reducers.IsMember(b.stakers, b.Keys.BLSPubKeyBytes, round, step)
+	return b.Reducers.IsMember(b.provisioners, b.Keys.BLSPubKeyBytes, round, step)
 }
 
 func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return b.Reducers.IsMember(b.stakers, pubKeyBLS, round, step)
+	return b.Reducers.IsMember(b.provisioners, pubKeyBLS, round, step)
 }
 
 func (b *reductionHandler) ExtractHeader(e wire.Event) *header.Header {
@@ -64,5 +64,5 @@ func (b *reductionHandler) Verify(e wire.Event) error {
 }
 
 func (b *reductionHandler) Quorum() int {
-	return b.Reducers.Quorum(b.stakers)
+	return b.Reducers.Quorum(b.provisioners)
 }

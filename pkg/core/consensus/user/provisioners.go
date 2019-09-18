@@ -28,11 +28,6 @@ type (
 		Amount    uint64
 		EndHeight uint64
 	}
-
-	Stakers struct {
-		Provisioners
-		TotalWeight uint64
-	}
 )
 
 func (m *Member) AddStake(stake Stake) {
@@ -93,24 +88,6 @@ func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 	return totalWeight
 }
 
-func NewStakers(members []Member) Stakers {
-	p := Provisioners{
-		Set:     sortedset.New(),
-		Members: make(map[string]*Member),
-	}
-
-	var totalWeight uint64
-	for _, member := range members {
-		p.Set.Insert(member.PublicKeyBLS)
-		p.Members[string(member.PublicKeyBLS)] = &member
-		for _, stake := range member.Stakes {
-			totalWeight += stake.Amount
-		}
-	}
-
-	return Stakers{p, totalWeight}
-}
-
 func MarshalMembers(r *bytes.Buffer, members []Member) error {
 	if err := encoding.WriteVarInt(r, uint64(len(members))); err != nil {
 		return err
@@ -159,21 +136,18 @@ func marshalStake(r *bytes.Buffer, stake Stake) error {
 	return nil
 }
 
-func UnmarshalStakers(r *bytes.Buffer) (Stakers, error) {
+func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 	lMembers, err := encoding.ReadVarInt(r)
 	if err != nil {
-		return Stakers{}, err
+		return Provisioners{}, err
 	}
 
-	var totalWeight uint64
 	members := make([]Member, lMembers)
 	for i := uint64(0); i < lMembers; i++ {
-		var amount uint64
-		members[i], amount, err = unmarshalMember(r)
+		members[i], err = unmarshalMember(r)
 		if err != nil {
-			return Stakers{}, err
+			return Provisioners{}, err
 		}
-		totalWeight += amount
 	}
 
 	// Reconstruct sorted set and member map
@@ -184,41 +158,36 @@ func UnmarshalStakers(r *bytes.Buffer) (Stakers, error) {
 		memberMap[string(member.PublicKeyBLS)] = &member
 	}
 
-	return Stakers{
-		Provisioners: Provisioners{
-			Set:     set,
-			Members: memberMap,
-		},
-		TotalWeight: totalWeight,
+	return Provisioners{
+		Set:     set,
+		Members: memberMap,
 	}, nil
 }
 
-func unmarshalMember(r *bytes.Buffer) (Member, uint64, error) {
+func unmarshalMember(r *bytes.Buffer) (Member, error) {
 	member := Member{}
 	if err := encoding.Read256(r, &member.PublicKeyEd); err != nil {
-		return Member{}, 0, err
+		return Member{}, err
 	}
 
 	if err := encoding.ReadVarBytes(r, &member.PublicKeyBLS); err != nil {
-		return Member{}, 0, err
+		return Member{}, err
 	}
 
 	lStakes, err := encoding.ReadVarInt(r)
 	if err != nil {
-		return Member{}, 0, err
+		return Member{}, err
 	}
 
-	var amount uint64
 	member.Stakes = make([]Stake, lStakes)
 	for i := uint64(0); i < lStakes; i++ {
 		member.Stakes[i], err = unmarshalStake(r)
 		if err != nil {
-			return Member{}, 0, err
+			return Member{}, err
 		}
-		amount += member.Stakes[i].Amount
 	}
 
-	return member, amount, nil
+	return member, nil
 }
 
 func unmarshalStake(r *bytes.Buffer) (Stake, error) {

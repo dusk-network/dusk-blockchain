@@ -24,7 +24,7 @@ type maintainer struct {
 
 	pubKeyBLS []byte
 	m         ristretto.Scalar
-	p         user.Stakers
+	p         user.Provisioners
 	bidList   user.BidList
 
 	bidEndHeight   uint64

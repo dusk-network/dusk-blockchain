@@ -35,7 +35,7 @@ func TestUpsertCommitteeCache(t *testing.T) {
 	}
 }
 
-func addNewProvisioner(p *user.Stakers, stake uint64, endHeight uint64, k user.Keys) {
+func addNewProvisioner(p *user.Provisioners, stake uint64, endHeight uint64, k user.Keys) {
 	member := &user.Member{}
 	member.PublicKeyEd = k.EdPubKeyBytes
 	member.PublicKeyBLS = k.BLSPubKeyBytes
@@ -47,7 +47,7 @@ func addNewProvisioner(p *user.Stakers, stake uint64, endHeight uint64, k user.K
 	p.TotalWeight += stake
 }
 
-func addNewProvisioners(p *user.Stakers, amount int, stake uint64, endHeight uint64) {
+func addNewProvisioners(p *user.Provisioners, amount int, stake uint64, endHeight uint64) {
 	for i := 0; i < amount; i++ {
 		k, _ := user.NewRandKeys()
 		addNewProvisioner(p, stake, endHeight, k)
@@ -55,11 +55,11 @@ func addNewProvisioners(p *user.Stakers, amount int, stake uint64, endHeight uin
 }
 
 func setupExtractorTest() *Extractor {
-	stakers := user.Stakers{
+	provisioners := user.Provisioners{
 		Provisioners: *user.NewProvisioners(),
 	}
 	e := NewExtractor()
-	e.Stakers = stakers
+	e.Stakers = provisioners
 
 	return e
 }

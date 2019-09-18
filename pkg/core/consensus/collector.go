@@ -30,7 +30,7 @@ type (
 
 	RoundUpdate struct {
 		Round   uint64
-		P       user.Stakers
+		P       user.Provisioners
 		BidList user.BidList
 	}
 )
@@ -61,7 +61,7 @@ func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 		return err
 	}
 
-	stakers, err := user.UnmarshalStakers(roundBuffer)
+	provisioners, err := user.UnmarshalProvisioners(roundBuffer)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 		return err
 	}
 
-	r.roundChan <- RoundUpdate{round, stakers, bidList}
+	r.roundChan <- RoundUpdate{round, provisioners, bidList}
 	return nil
 }
 

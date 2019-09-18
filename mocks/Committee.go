@@ -11,11 +11,11 @@ type Committee struct {
 }
 
 // IsMember provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *Committee) IsMember(_a0 user.Stakers, _a1 []byte, _a2 uint64, _a3 uint8) bool {
+func (_m *Committee) IsMember(_a0 user.Provisioners, _a1 []byte, _a2 uint64, _a3 uint8) bool {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(user.Stakers, []byte, uint64, uint8) bool); ok {
+	if rf, ok := ret.Get(0).(func(user.Provisioners, []byte, uint64, uint8) bool); ok {
 		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -25,11 +25,11 @@ func (_m *Committee) IsMember(_a0 user.Stakers, _a1 []byte, _a2 uint64, _a3 uint
 }
 
 // Quorum provides a mock function with given fields: _a0
-func (_m *Committee) Quorum(_a0 user.Stakers) int {
+func (_m *Committee) Quorum(_a0 user.Provisioners) int {
 	ret := _m.Called(_a0)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func(user.Stakers) int); ok {
+	if rf, ok := ret.Get(0).(func(user.Provisioners) int); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(int)

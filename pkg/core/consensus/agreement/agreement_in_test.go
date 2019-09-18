@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -30,15 +31,11 @@ func TestAgreementRace(t *testing.T) {
 	// Our agreement events and reduction events need to be just like they are in production.
 	// So, let's create a proper committee.
 	c := committee.NewAgreement()
-	stakers := user.Stakers{
-		Provisioners: *user.NewProvisioners(),
-	}
-	c.Cache.Stakers = stakers
 	// We make a set of 50 keys, add these as provisioners and start the agreement component.
 	committeeSize := 50
-	k := createProvisionerSet(t, c, committeeSize)
+	p, k := createProvisionerSet(t, c, committeeSize)
 	broker := newBroker(eb, c, k[0])
-	broker.filter.UpdateRound(1)
+	broker.updateRound(consensus.RoundUpdate{1, p, nil})
 	go broker.Listen()
 
 	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
@@ -167,9 +164,15 @@ func TestIncrementOnNilVoteSet(t *testing.T) {
 	assert.Equal(t, uint8(2), broker.state.Step())
 }
 
-func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []user.Keys) {
+func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (user.Provisioners, []user.Keys) {
+
+	k := make([]user.Keys, size)
+	p := user.NewProvisioners()
 	for i := 0; i < size; i++ {
-		keys, _ := user.NewRandKeys()
+		keys, err := user.NewRandKeys()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		member := &user.Member{}
 		member.PublicKeyEd = keys.EdPubKeyBytes
@@ -177,14 +180,13 @@ func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (k []u
 		member.Stakes = make([]user.Stake, 1)
 		member.Stakes[0].Amount = 500
 		member.Stakes[0].EndHeight = 10000
-		c.Cache.Stakers.Set.Insert(keys.BLSPubKeyBytes)
-		c.Cache.Stakers.Members[string(keys.BLSPubKeyBytes)] = member
-		c.Cache.Stakers.TotalWeight += 500
+		p.Set.Insert(keys.BLSPubKeyBytes)
+		p.Members[string(keys.BLSPubKeyBytes)] = member
 
-		k = append(k, keys)
+		k[i] = keys
 	}
 
-	return
+	return *p, k
 }
 
 func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int, round uint64) (events []wire.Event) {

@@ -76,7 +76,6 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	if err := chain.newProvisioners(); err != nil {
 		return nil, err
 	}
-	chain.updateCommittee()
 
 	if err := chain.newBidList(); err != nil {
 		return nil, err
@@ -194,7 +193,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// This check should avoid a possible race condition between accepting two blocks
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
-	if err := verifiers.CheckBlockCertificate(c.committee, blk); err != nil {
+	if err := verifiers.CheckBlockCertificate(c.committee, *c.p, blk); err != nil {
 		l.Errorf("verifying the certificate failed: %s", err.Error())
 		return err
 	}
@@ -249,9 +248,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// 8. Remove expired provisioners
 	// We remove provisioners from accepted block height + 1,
 	// to set up our committee correctly for the next block.
-	// We also update our committee along with this.
 	c.removeExpiredProvisioners(blk.Header.Height + 1)
-	c.updateCommittee()
 
 	// 9. Send round update
 	// We send a round update after accepting a new block, which should include
@@ -517,11 +514,6 @@ func (c *Chain) sortProvisioners() []user.Member {
 	}
 
 	return members
-}
-
-func (c *Chain) updateCommittee() {
-	members := c.sortProvisioners()
-	c.committee.Extractor.Stakers = user.NewStakers(members)
 }
 
 func (c *Chain) newBidList() error {

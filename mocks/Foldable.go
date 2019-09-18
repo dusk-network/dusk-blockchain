@@ -12,11 +12,11 @@ type Foldable struct {
 }
 
 // IsMember provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *Foldable) IsMember(_a0 user.Stakers, _a1 []byte, _a2 uint64, _a3 uint8) bool {
+func (_m *Foldable) IsMember(_a0 user.Provisioners, _a1 []byte, _a2 uint64, _a3 uint8) bool {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(user.Stakers, []byte, uint64, uint8) bool); ok {
+	if rf, ok := ret.Get(0).(func(user.Provisioners, []byte, uint64, uint8) bool); ok {
 		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -26,11 +26,11 @@ func (_m *Foldable) IsMember(_a0 user.Stakers, _a1 []byte, _a2 uint64, _a3 uint8
 }
 
 // Pack provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *Foldable) Pack(_a0 user.Stakers, _a1 sortedset.Set, _a2 uint64, _a3 uint8) uint64 {
+func (_m *Foldable) Pack(_a0 user.Provisioners, _a1 sortedset.Set, _a2 uint64, _a3 uint8) uint64 {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 uint64
-	if rf, ok := ret.Get(0).(func(user.Stakers, sortedset.Set, uint64, uint8) uint64); ok {
+	if rf, ok := ret.Get(0).(func(user.Provisioners, sortedset.Set, uint64, uint8) uint64); ok {
 		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r0 = ret.Get(0).(uint64)
@@ -40,11 +40,11 @@ func (_m *Foldable) Pack(_a0 user.Stakers, _a1 sortedset.Set, _a2 uint64, _a3 ui
 }
 
 // Quorum provides a mock function with given fields: _a0
-func (_m *Foldable) Quorum(_a0 user.Stakers) int {
+func (_m *Foldable) Quorum(_a0 user.Provisioners) int {
 	ret := _m.Called(_a0)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func(user.Stakers) int); ok {
+	if rf, ok := ret.Get(0).(func(user.Provisioners) int); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(int)
@@ -54,11 +54,11 @@ func (_m *Foldable) Quorum(_a0 user.Stakers) int {
 }
 
 // Unpack provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *Foldable) Unpack(_a0 user.Stakers, _a1 uint64, _a2 uint64, _a3 uint8) sortedset.Set {
+func (_m *Foldable) Unpack(_a0 user.Provisioners, _a1 uint64, _a2 uint64, _a3 uint8) sortedset.Set {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 sortedset.Set
-	if rf, ok := ret.Get(0).(func(user.Stakers, uint64, uint64, uint8) sortedset.Set); ok {
+	if rf, ok := ret.Get(0).(func(user.Provisioners, uint64, uint64, uint8) sortedset.Set); ok {
 		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		if ret.Get(0) != nil {

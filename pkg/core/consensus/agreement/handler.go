@@ -21,7 +21,7 @@ type agreementHandler struct {
 	user.Keys
 	committee.Foldable
 	*UnMarshaller
-	stakers user.Stakers
+	provisioners user.Provisioners
 }
 
 // newHandler returns an initialized agreementHandler.
@@ -35,15 +35,15 @@ func newHandler(committee committee.Foldable, keys user.Keys) *agreementHandler 
 
 // AmMember checks if we are part of the committee.
 func (a *agreementHandler) AmMember(round uint64, step uint8) bool {
-	return a.Foldable.IsMember(a.stakers, a.Keys.BLSPubKeyBytes, round, step)
+	return a.Foldable.IsMember(a.provisioners, a.Keys.BLSPubKeyBytes, round, step)
 }
 
 func (a *agreementHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return a.Foldable.IsMember(a.stakers, pubKeyBLS, round, step)
+	return a.Foldable.IsMember(a.provisioners, pubKeyBLS, round, step)
 }
 
 func (a *agreementHandler) Quorum() int {
-	return a.Foldable.Quorum(a.stakers)
+	return a.Foldable.Quorum(a.provisioners)
 }
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *header.Header {
@@ -68,7 +68,7 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
 		step := uint8(int(ev.Step*2) + (i - 1)) // the event step is the second one of the reduction cycle
-		subcommittee := a.Unpack(a.stakers, votes.BitSet, ev.Round, step)
+		subcommittee := a.Unpack(a.provisioners, votes.BitSet, ev.Round, step)
 		allVoters += len(subcommittee)
 		apk, err := ReconstructApk(subcommittee)
 		if err != nil {
@@ -209,7 +209,7 @@ func (a *agreementHandler) Aggregate(h *header.Header, voteSet []wire.Event) (*A
 	aev.Header = h
 	for step, stepVotes := range stepVotesMap {
 		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
-		sv.BitSet = a.Pack(a.stakers, provisioners, h.Round, sv.Step)
+		sv.BitSet = a.Pack(a.provisioners, provisioners, h.Round, sv.Step)
 		if step%2 == 0 {
 			aev.VotesPerStep[1] = sv
 		} else {
