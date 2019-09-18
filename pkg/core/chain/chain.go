@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -60,29 +62,27 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
 	certificateChan := initCertificateCollector(eventBus)
 
-	// set up committee
-	// set up bidlist
-	bidList, err := user.NewBidList(db)
-	if err != nil {
-		return nil, err
-	}
-
 	chain := &Chain{
 		eventBus:        eventBus,
 		rpcBus:          rpcBus,
 		db:              db,
 		committee:       committee.NewAgreement(),
-		bidList:         bidList,
 		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
 		certificateChan: certificateChan,
 	}
+
+	// Set up consensus caches
 	if err := chain.newProvisioners(); err != nil {
 		return nil, err
 	}
-
 	chain.updateCommittee()
 
+	if err := chain.newBidList(); err != nil {
+		return nil, err
+	}
+
+	// Hook the chain up to the required topics
 	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
 	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
 	return chain, nil
@@ -141,9 +141,12 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 }
 
 func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
-	x := user.CalculateX(tx.Outputs[0].Commitment.Bytes(), tx.M)
-	x.EndHeight = startHeight + tx.Lock
-	c.bidList.AddBid(x)
+	var bid user.Bid
+	x := calculateXFromBytes(tx.Outputs[0].Commitment.Bytes(), tx.M)
+	copy(bid.X[:], x.Bytes())
+	copy(bid.M[:], tx.M)
+	bid.EndHeight = startHeight + tx.Lock
+	c.addBid(bid)
 }
 
 func (c *Chain) Close() error {
@@ -278,7 +281,11 @@ func (c *Chain) sendRoundUpdate(round uint64) error {
 	if _, err := buf.ReadFrom(membersBuf); err != nil {
 		return err
 	}
-	// TODO: add bidlist buffer as well
+
+	if err := user.MarshalBidList(buf, *c.bidList); err != nil {
+		return err
+	}
+
 	c.eventBus.Publish(msg.RoundUpdateTopic, buf)
 	return nil
 }
@@ -515,4 +522,112 @@ func (c *Chain) sortProvisioners() []user.Member {
 func (c *Chain) updateCommittee() {
 	members := c.sortProvisioners()
 	c.committee.Extractor.Stakers = user.NewStakers(members)
+}
+
+func (c *Chain) newBidList() error {
+	bl := &user.BidList{}
+	c.bidList = bl
+	c.repopulateBidList()
+	return nil
+}
+
+func (c *Chain) repopulateBidList() {
+	var currentHeight uint64
+	err := c.db.View(func(t database.Transaction) error {
+		var err error
+		currentHeight, err = t.FetchCurrentHeight()
+		return err
+	})
+
+	if err != nil {
+		currentHeight = 0
+	}
+
+	searchingHeight := uint64(0)
+	if currentHeight > transactions.MaxLockTime {
+		searchingHeight = currentHeight - transactions.MaxLockTime
+	}
+
+	for {
+		var blk *block.Block
+		err := c.db.View(func(t database.Transaction) error {
+			hash, err := t.FetchBlockHashByHeight(searchingHeight)
+			if err != nil {
+				return err
+			}
+
+			blk, err = t.FetchBlock(hash)
+			return err
+		})
+
+		if err != nil {
+			break
+		}
+
+		for _, tx := range blk.Txs {
+			bidTx, ok := tx.(*transactions.Bid)
+			if !ok {
+				continue
+			}
+
+			// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
+			// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
+			// as this is most likely a consensus-breaking change)
+			if searchingHeight+bidTx.Lock > currentHeight {
+				var bid user.Bid
+				x := calculateXFromBytes(bidTx.Outputs[0].Commitment.Bytes(), bidTx.M)
+				copy(bid.X[:], x.Bytes())
+				copy(bid.M[:], bidTx.M)
+				bid.EndHeight = searchingHeight + bidTx.Lock
+				c.addBid(bid)
+			}
+		}
+
+		searchingHeight++
+	}
+}
+
+func calculateXFromBytes(d, m []byte) ristretto.Scalar {
+	var dBytes [32]byte
+	copy(dBytes[:], d)
+	var mBytes [32]byte
+	copy(mBytes[:], m)
+	var dScalar ristretto.Scalar
+	dScalar.SetBytes(&dBytes)
+	var mScalar ristretto.Scalar
+	mScalar.SetBytes(&mBytes)
+	x := zkproof.CalculateX(dScalar, mScalar)
+	return x
+}
+
+// AddBid will add a bid to the BidList.
+func (c *Chain) addBid(bid user.Bid) {
+	// Check for duplicates
+	for _, bidFromList := range *c.bidList {
+		if bidFromList.Equals(bid) {
+			return
+		}
+	}
+
+	*c.bidList = append(*c.bidList, bid)
+}
+
+// RemoveBid will iterate over a BidList to remove a specified bid.
+func (c *Chain) removeBid(bid user.Bid) {
+	for i, bidFromList := range *c.bidList {
+		if bidFromList.Equals(bid) {
+			c.bidList.Remove(i)
+		}
+	}
+}
+
+// RemoveExpired iterates over a BidList to remove expired bids.
+func (c *Chain) removeExpiredBids(round uint64) {
+	for _, bid := range *c.bidList {
+		if bid.EndHeight < round {
+			// We need to call RemoveBid here and loop twice, as the index
+			// could be off if more than one bid is removed.
+			c.removeBid(bid)
+		}
+	}
 }
