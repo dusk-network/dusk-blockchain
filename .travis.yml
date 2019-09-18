@@ -3,6 +3,10 @@ dist: xenial
 
 language: go
 
+branches:
+  only:
+  - master
+
 # Force-enable Go modules. Also force go to use the code in vendor/
 # These will both be unnecessary when Go 1.13 lands.
 env:
