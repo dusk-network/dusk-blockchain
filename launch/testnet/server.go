@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
-	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"net"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -50,6 +52,13 @@ func Setup() *Server {
 
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
+
+	// Setting up the transactor component
+	transactor, err := transactor.New(eventBus, rpcBus, nil)
+	if err != nil {
+		panic(err)
+	}
+	go transactor.Listen()
 
 	// Instantiate RPC server
 	if cfg.Get().RPC.Enabled {
