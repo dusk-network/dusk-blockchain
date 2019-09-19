@@ -88,13 +88,13 @@ func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 	return totalWeight
 }
 
-func MarshalMembers(r *bytes.Buffer, members []Member) error {
-	if err := encoding.WriteVarInt(r, uint64(len(members))); err != nil {
+func MarshalProvisioners(r *bytes.Buffer, p *Provisioners) error {
+	if err := encoding.WriteVarInt(r, uint64(len(p.Members))); err != nil {
 		return err
 	}
 
-	for _, member := range members {
-		if err := marshalMember(r, member); err != nil {
+	for _, member := range p.Members {
+		if err := marshalMember(r, *member); err != nil {
 			return err
 		}
 	}
@@ -142,7 +142,7 @@ func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 		return Provisioners{}, err
 	}
 
-	members := make([]Member, lMembers)
+	members := make([]*Member, lMembers)
 	for i := uint64(0); i < lMembers; i++ {
 		members[i], err = unmarshalMember(r)
 		if err != nil {
@@ -155,7 +155,7 @@ func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 	memberMap := make(map[string]*Member)
 	for _, member := range members {
 		set.Insert(member.PublicKeyBLS)
-		memberMap[string(member.PublicKeyBLS)] = &member
+		memberMap[string(member.PublicKeyBLS)] = member
 	}
 
 	return Provisioners{
@@ -164,26 +164,26 @@ func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 	}, nil
 }
 
-func unmarshalMember(r *bytes.Buffer) (Member, error) {
-	member := Member{}
+func unmarshalMember(r *bytes.Buffer) (*Member, error) {
+	member := &Member{}
 	if err := encoding.Read256(r, &member.PublicKeyEd); err != nil {
-		return Member{}, err
+		return nil, err
 	}
 
 	if err := encoding.ReadVarBytes(r, &member.PublicKeyBLS); err != nil {
-		return Member{}, err
+		return nil, err
 	}
 
 	lStakes, err := encoding.ReadVarInt(r)
 	if err != nil {
-		return Member{}, err
+		return nil, err
 	}
 
 	member.Stakes = make([]Stake, lStakes)
 	for i := uint64(0); i < lStakes; i++ {
 		member.Stakes[i], err = unmarshalStake(r)
 		if err != nil {
-			return Member{}, err
+			return nil, err
 		}
 	}
 

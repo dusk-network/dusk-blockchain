@@ -1,4 +1,4 @@
-package user
+package user_test
 
 import (
 	"bytes"
@@ -6,6 +6,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +16,7 @@ func TestRemove(t *testing.T) {
 	nr := 5
 	committee := newCommittee()
 	for i := 0; i < nr; i++ {
-		k, _ := NewRandKeys()
+		k, _ := user.NewRandKeys()
 		bk := (&big.Int{}).SetBytes(k.BLSPubKeyBytes)
 		committee.Set = append(committee.Set, bk)
 	}
@@ -43,25 +45,9 @@ func btoi(k Keys) *big.Int {
 
 // Test if MemberKeys returns all public keys in the correct order.
 func TestMemberKeys(t *testing.T) {
-	p := NewProvisioners()
-
-	var ks sortedKeys
-	for i := 0; i < 50; i++ {
-		keys, _ := NewRandKeys()
-		member := &Member{}
-		member.PublicKeyEd = keys.EdPubKeyBytes
-		member.PublicKeyBLS = keys.BLSPubKeyBytes
-		member.Stakes = make([]Stake, 1)
-		member.Stakes[0].Amount = 500
-		member.Stakes[0].EndHeight = 10000
-		p.Members[string(keys.BLSPubKeyBytes)] = member
-		p.Set.Insert(keys.BLSPubKeyBytes)
-
-		ks = append(ks, keys)
-	}
-
+	p, ks := consensus.MockProvisioners(50)
 	sort.Sort(ks)
-	v := p.CreateVotingCommittee(1, 500*50, 1, 50)
+	v := p.CreateVotingCommittee(1, 1, 50)
 	mk := v.MemberKeys()
 	assert.Equal(t, 50, len(mk))
 	for i := 0; i < 3; i++ {

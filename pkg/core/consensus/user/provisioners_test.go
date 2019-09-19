@@ -14,7 +14,6 @@ import (
 func TestCreateVotingCommittee(t *testing.T) {
 	// Set up a committee set with a stakes map
 	p := &user.Provisioners{}
-	var totalWeight uint64
 	for i := 0; i < 50; i++ {
 		keys, _ := user.NewRandKeys()
 		member := &user.Member{}
@@ -24,12 +23,10 @@ func TestCreateVotingCommittee(t *testing.T) {
 		member.Stakes[0].Amount = 500
 		member.Stakes[0].EndHeight = 10000
 		p.Members[string(keys.BLSPubKeyBytes)] = member
-
-		totalWeight += 500
 	}
 
 	// Run sortition to get 50 members (as a Set, committee cannot contain any duplicate)
-	committee := p.CreateVotingCommittee(100, totalWeight, 1, 50)
+	committee := p.CreateVotingCommittee(100, 1, 50)
 
 	// total amount of members in the committee should be 50
 	assert.Equal(t, 50, committee.Size())
