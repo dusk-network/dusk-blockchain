@@ -17,33 +17,36 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
+const MaxCommitteeSize = 64
+
 type agreementHandler struct {
-	user.Keys
-	committee.Foldable
+	*committee.Handler
 	*UnMarshaller
-	provisioners user.Provisioners
 }
 
 // newHandler returns an initialized agreementHandler.
-func newHandler(committee committee.Foldable, keys user.Keys) *agreementHandler {
+func newHandler(keys user.Keys) *agreementHandler {
 	return &agreementHandler{
-		Keys:         keys,
-		Foldable:     committee,
+		Handler:      committee.NewHandler(keys),
 		UnMarshaller: NewUnMarshaller(),
 	}
 }
 
 // AmMember checks if we are part of the committee.
 func (a *agreementHandler) AmMember(round uint64, step uint8) bool {
-	return a.Foldable.IsMember(a.provisioners, a.Keys.BLSPubKeyBytes, round, step)
+	return a.Handler.AmMember(round, step, MaxCommitteeSize)
 }
 
 func (a *agreementHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
-	return a.Foldable.IsMember(a.provisioners, pubKeyBLS, round, step)
+	return a.Handler.IsMember(pubKeyBLS, round, step, MaxCommitteeSize)
+}
+
+func (a *agreementHandler) Committee(round uint64, step uint8) user.VotingCommittee {
+	return a.Handler.Committee(round, step, MaxCommitteeSize)
 }
 
 func (a *agreementHandler) Quorum() int {
-	return a.Foldable.Quorum(a.provisioners)
+	return int(float64(a.CommitteeSize(MaxCommitteeSize)) * 0.75)
 }
 
 func (a *agreementHandler) ExtractHeader(e wire.Event) *header.Header {
@@ -68,7 +71,9 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
 		step := uint8(int(ev.Step*2) + (i - 1)) // the event step is the second one of the reduction cycle
-		subcommittee := a.Unpack(a.provisioners, votes.BitSet, ev.Round, step)
+		committee := a.Committee(ev.Round, step)
+		subcommittee := committee.Intersect(votes.BitSet)
+
 		allVoters += len(subcommittee)
 		apk, err := ReconstructApk(subcommittee)
 		if err != nil {
@@ -208,8 +213,9 @@ func (a *agreementHandler) Aggregate(h *header.Header, voteSet []wire.Event) (*A
 	aev := New()
 	aev.Header = h
 	for step, stepVotes := range stepVotesMap {
-		sv, provisioners := stepVotes.StepVotes, stepVotes.Set
-		sv.BitSet = a.Pack(a.provisioners, provisioners, h.Round, sv.Step)
+		sv, set := stepVotes.StepVotes, stepVotes.Set
+		committee := a.Committee(h.Round, sv.Step)
+		sv.BitSet = committee.Bits(set)
 		if step%2 == 0 {
 			aev.VotesPerStep[1] = sv
 		} else {

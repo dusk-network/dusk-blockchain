@@ -2,31 +2,27 @@ package agreement
 
 import (
 	"bytes"
-	"crypto/rand"
 
-	"github.com/dusk-network/dusk-blockchain/mocks"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/stretchr/testify/mock"
 )
 
 // MockAgreementEvent returns a mocked Agreement Event, to be used for testing purposes.
-func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys) *Agreement {
+func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee) *Agreement {
 	a := New()
-	pk, sk, _ := bls.GenKeyPair(rand.Reader)
-	a.PubKeyBLS = pk.Marshal()
+	a.PubKeyBLS = keys[0].BLSPubKeyBytes
 	a.Round = round
 	a.Step = step
 	a.BlockHash = hash
 
 	// generating reduction events (votes) and signing them
-	steps := GenVotes(hash, round, step, keys)
+	steps := GenVotes(hash, round, step, keys, committee)
 	a.VotesPerStep = steps
 	buf := new(bytes.Buffer)
 	_ = MarshalVotes(buf, a.VotesPerStep)
-	sig, _ := bls.Sign(sk, pk, buf.Bytes())
+	sig, _ := bls.Sign(keys[0].BLSSecretKey, keys[0].BLSPubKey, buf.Bytes())
 	a.SignedVotes = sig.Compress()
 	return a
 }
@@ -34,9 +30,9 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys)
 // MockAgreement mocks an Agreement event, and returns the marshalled representation
 // of it as a `*bytes.Buffer`.
 // NOTE: it does not include the topic
-func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys) *bytes.Buffer {
+func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee) *bytes.Buffer {
 	buf := new(bytes.Buffer)
-	ev := MockAgreementEvent(hash, round, step, keys)
+	ev := MockAgreementEvent(hash, round, step, keys, committee)
 
 	marshaller := NewUnMarshaller()
 	_ = marshaller.Marshal(buf, ev)
@@ -45,11 +41,12 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys) *byt
 
 // GenVotes randomly generates a slice of StepVotes with the indicated lenght.
 // Albeit random, the generation is consistent with the rules of Votes
-func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVotes {
+func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee) []*StepVotes {
 	if len(keys) < 2 {
 		panic("At least two votes are required to mock an Agreement")
 	}
 
+	sets := make([]sortedset.Set, 2)
 	votes := make([]*StepVotes, 2)
 	for i, k := range keys {
 
@@ -74,59 +71,13 @@ func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys) []*StepVo
 		if err := stepVote.Add(sigma.Compress(), k.BLSPubKeyBytes, thisStep); err != nil {
 			panic(err)
 		}
+		sets[stepCycle].Insert(k.BLSPubKeyBytes)
 		votes[stepCycle] = stepVote
 	}
 
-	return votes
-}
-
-// MockCommittee mocks a Foldable committee implementation, which can be used for
-// testing the Agreement component.
-func MockCommittee(quorum int, isMember bool, membersNr int) (*mocks.Foldable, []user.Keys) {
-	keys := make([]user.Keys, membersNr)
-	mockSubCommittees := make([]sortedset.Set, 2)
-	wholeCommittee := sortedset.New()
-
-	// splitting the subcommittees into 2 different sets
-	for i := 0; i < membersNr; i++ {
-		stepCycle := i % 2
-		sc := mockSubCommittees[stepCycle]
-		if sc == nil {
-			sc = sortedset.New()
-		}
-		k, _ := user.NewRandKeys()
-		sc.Insert(k.BLSPubKeyBytes)
-		wholeCommittee.Insert(k.BLSPubKeyBytes)
-		keys[i] = k
-		mockSubCommittees[stepCycle] = sc
+	for i, sv := range votes {
+		sv.BitSet = committee.Bits(sets[i])
 	}
 
-	committeeMock := &mocks.Foldable{}
-	committeeMock.On("Quorum", mock.AnythingOfType("user.Provisioners")).Return(quorum)
-	committeeMock.On("IsMember",
-		mock.AnythingOfType("user.Provisioners"),
-		mock.AnythingOfType("[]uint8"),
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint8")).Return(isMember)
-	committeeMock.On("Unpack",
-		mock.AnythingOfType("user.Provisioners"),
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint64"),
-		uint8(1)).Return(mockSubCommittees[0])
-	committeeMock.On("Unpack",
-		mock.AnythingOfType("user.Provisioners"),
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint64"),
-		uint8(2)).Return(mockSubCommittees[1])
-	committeeMock.On("Pack",
-		mock.AnythingOfType("user.Provisioners"),
-		mock.Anything,
-		mock.AnythingOfType("uint64"),
-		uint8(1)).Return(wholeCommittee.Bits(mockSubCommittees[0]))
-	committeeMock.On("Pack",
-		mock.AnythingOfType("user.Provisioners"),
-		mock.Anything,
-		mock.AnythingOfType("uint64"),
-		uint8(2)).Return(wholeCommittee.Bits(mockSubCommittees[1]))
-	return committeeMock, keys
+	return votes
 }

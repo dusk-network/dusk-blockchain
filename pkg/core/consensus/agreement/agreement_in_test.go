@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -30,12 +29,10 @@ func TestAgreementRace(t *testing.T) {
 	// Sadly, we can not use the mocked committee for this test.
 	// Our agreement events and reduction events need to be just like they are in production.
 	// So, let's create a proper committee.
-	c := committee.NewAgreement()
-	// We make a set of 50 keys, add these as provisioners and start the agreement component.
 	committeeSize := 50
-	p, k := createProvisionerSet(t, c, committeeSize)
-	broker := newBroker(eb, c, k[0])
-	broker.updateRound(consensus.RoundUpdate{1, p, nil})
+	p, k := consensus.MockProvisioners(committeeSize)
+	broker := newBroker(eb, k[0])
+	broker.updateRound(consensus.RoundUpdate{1, *p, nil})
 	go broker.Listen()
 
 	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
@@ -62,9 +59,9 @@ func TestAgreementRace(t *testing.T) {
 	// Then, we send a random agreement event to the broker, to update the round.
 	// Note that we start this goroutine before trying to aggregate the voteset,
 	// as it takes a short while to start up.
-	go func(events []wire.Event) {
-		broker.filter.Accumulator.CollectedVotesChan <- []wire.Event{MockAgreementEvent(hash, 1, 1, k)}
-	}(events)
+	go func() {
+		eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, nil))
+	}()
 
 	// Now we try to aggregate the reduction events created earlier. The round update should coincide
 	// with the aggregation.
@@ -78,17 +75,23 @@ func TestAgreementRace(t *testing.T) {
 	// Let's now create a reduction vote set with the previous public keys
 	hash, _ = crypto.RandEntropy(32)
 	events = createVoteSet(t, k, hash, committeeSize, 2)
+	buf.Reset()
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, 2); err != nil {
+		t.Fatal(err)
+	}
 
-	// Now, we create our agreement event. Our step counter should be one off from the events we are aggregating.
-	aevBuf, err := broker.handler.createAgreement(events, broker.state.Round(), broker.state.Step())
-	eb.Stream(string(topics.Gossip), aevBuf)
+	if err := ru.MarshalVoteSet(buf, events); err != nil {
+		t.Fatal(err)
+	}
+
+	eb.Publish(msg.ReductionResultTopic, buf)
 
 	aevBytes, err := streamer.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	aevBuf = bytes.NewBuffer(aevBytes)
+	aevBuf := bytes.NewBuffer(aevBytes)
 
 	// Remove Ed25519 stuff first
 	// 64 for signature + 32 for pubkey = 96
@@ -111,14 +114,12 @@ func TestAgreementRace(t *testing.T) {
 
 func TestStress(t *testing.T) {
 	// Setup stuff
-	committeeMock, k := MockCommittee(20, true, 20)
+	committeeSize := 10
 	bus := wire.NewEventBus()
-	broker := newBroker(bus, committeeMock, k[0])
-	broker.filter.UpdateRound(1)
+	p, k := consensus.MockProvisioners(committeeSize)
+	broker := newBroker(bus, k[0])
 	bus.RemoveAllPreprocessors(string(topics.Agreement))
-
-	// Wait a bit for the round update to go through
-	time.Sleep(200 * time.Millisecond)
+	broker.updateRound(consensus.RoundUpdate{1, *p, nil})
 
 	// Do 10 agreement cycles
 	for i := 1; i <= 10; i++ {
@@ -126,8 +127,8 @@ func TestStress(t *testing.T) {
 
 		// Blast the filter with many more events than quorum, to see if anything sneaks in
 		go func(i int) {
-			for j := 0; j < 50; j++ {
-				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k))
+			for j := 0; j < committeeSize; j++ {
+				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k, p.CreateVotingCommittee(uint64(i), 1, committeeSize)))
 			}
 		}(i)
 
@@ -137,14 +138,19 @@ func TestStress(t *testing.T) {
 			assert.Equal(t, uint64(i), ev.(*Agreement).Round)
 		}
 
-		broker.filter.UpdateRound(uint64(i + 1))
+		broker.updateRound(consensus.RoundUpdate{uint64(i + 1), *p, nil})
 	}
 }
 
 func TestIncrementOnNilVoteSet(t *testing.T) {
-	committeeMock, k := MockCommittee(20, true, 20)
+	var k []user.Keys
+	for i := 0; i < 50; i++ {
+		keys, _ := user.NewRandKeys()
+		k = append(k, keys)
+	}
+
 	bus := wire.NewEventBus()
-	broker := newBroker(bus, committeeMock, k[0])
+	broker := newBroker(bus, k[0])
 	broker.filter.UpdateRound(1)
 	go broker.Listen()
 
@@ -162,31 +168,6 @@ func TestIncrementOnNilVoteSet(t *testing.T) {
 
 	// Now, the step counter should be at 2
 	assert.Equal(t, uint8(2), broker.state.Step())
-}
-
-func createProvisionerSet(t *testing.T, c *committee.Agreement, size int) (user.Provisioners, []user.Keys) {
-
-	k := make([]user.Keys, size)
-	p := user.NewProvisioners()
-	for i := 0; i < size; i++ {
-		keys, err := user.NewRandKeys()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		member := &user.Member{}
-		member.PublicKeyEd = keys.EdPubKeyBytes
-		member.PublicKeyBLS = keys.BLSPubKeyBytes
-		member.Stakes = make([]user.Stake, 1)
-		member.Stakes[0].Amount = 500
-		member.Stakes[0].EndHeight = 10000
-		p.Set.Insert(keys.BLSPubKeyBytes)
-		p.Members[string(keys.BLSPubKeyBytes)] = member
-
-		k[i] = keys
-	}
-
-	return *p, k
 }
 
 func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int, round uint64) (events []wire.Event) {
