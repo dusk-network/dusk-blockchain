@@ -145,5 +145,10 @@ func launchMaintainer(eventBroker wire.EventBroker, transactor *transactor.Trans
 		return err
 	}
 
-	return maintainer.Launch(eventBroker, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor, amount, lockTime, offset)
+	m, err := maintainer.New(eventBroker, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor, amount, lockTime, offset)
+	if err != nil {
+		return err
+	}
+	go m.Listen()
+	return nil
 }
