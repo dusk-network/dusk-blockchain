@@ -67,16 +67,11 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
 		certificateChan: certificateChan,
+		p:               user.NewProvisioners(),
+		bidList:         &user.BidList{},
 	}
 
-	// Set up consensus caches
-	if err := chain.newProvisioners(); err != nil {
-		return nil, err
-	}
-
-	if err := chain.newBidList(); err != nil {
-		return nil, err
-	}
+	chain.restoreConsensusData()
 
 	// Hook the chain up to the required topics
 	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
@@ -378,15 +373,9 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	return nil
 }
 
-// newProvisioners returns an initialized Provisioners struct.
-func (c *Chain) newProvisioners() error {
-	p := user.NewProvisioners()
-	c.p = p
-	c.repopulateProvisioners()
-	return nil
-}
-
-func (c *Chain) repopulateProvisioners() {
+// TODO: consensus data should be persisted to disk, to increase
+// startup times
+func (c *Chain) restoreConsensusData() {
 	var currentHeight uint64
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
@@ -420,15 +409,25 @@ func (c *Chain) repopulateProvisioners() {
 		}
 
 		for _, tx := range blk.Txs {
-			stake, ok := tx.(*transactions.Stake)
-			if !ok {
-				continue
-			}
-
-			// Only add them if their stake is still valid
-			if searchingHeight+stake.Lock > currentHeight {
-				amount := stake.Outputs[0].EncryptedAmount.BigInt().Uint64()
-				c.addProvisioner(stake.PubKeyEd, stake.PubKeyBLS, amount, searchingHeight+stake.Lock)
+			switch t := tx.(type) {
+			case *transactions.Stake:
+				// Only add them if their stake is still valid
+				if searchingHeight+t.Lock > currentHeight {
+					amount := t.Outputs[0].EncryptedAmount.BigInt().Uint64()
+					c.addProvisioner(t.PubKeyEd, t.PubKeyBLS, amount, searchingHeight+t.Lock)
+				}
+			case *transactions.Bid:
+				// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
+				// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
+				// as this is most likely a consensus-breaking change)
+				if searchingHeight+t.Lock > currentHeight {
+					var bid user.Bid
+					x := calculateXFromBytes(t.Outputs[0].Commitment.Bytes(), t.M)
+					copy(bid.X[:], x.Bytes())
+					copy(bid.M[:], t.M)
+					bid.EndHeight = searchingHeight + t.Lock
+					c.addBid(bid)
+				}
 			}
 		}
 
@@ -501,69 +500,6 @@ func (c *Chain) marshalProvisioners() (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	err := user.MarshalProvisioners(buf, c.p)
 	return buf, err
-}
-
-func (c *Chain) newBidList() error {
-	bl := &user.BidList{}
-	c.bidList = bl
-	c.repopulateBidList()
-	return nil
-}
-
-func (c *Chain) repopulateBidList() {
-	var currentHeight uint64
-	err := c.db.View(func(t database.Transaction) error {
-		var err error
-		currentHeight, err = t.FetchCurrentHeight()
-		return err
-	})
-
-	if err != nil {
-		currentHeight = 0
-	}
-
-	searchingHeight := uint64(0)
-	if currentHeight > transactions.MaxLockTime {
-		searchingHeight = currentHeight - transactions.MaxLockTime
-	}
-
-	for {
-		var blk *block.Block
-		err := c.db.View(func(t database.Transaction) error {
-			hash, err := t.FetchBlockHashByHeight(searchingHeight)
-			if err != nil {
-				return err
-			}
-
-			blk, err = t.FetchBlock(hash)
-			return err
-		})
-
-		if err != nil {
-			break
-		}
-
-		for _, tx := range blk.Txs {
-			bidTx, ok := tx.(*transactions.Bid)
-			if !ok {
-				continue
-			}
-
-			// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
-			// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
-			// as this is most likely a consensus-breaking change)
-			if searchingHeight+bidTx.Lock > currentHeight {
-				var bid user.Bid
-				x := calculateXFromBytes(bidTx.Outputs[0].Commitment.Bytes(), bidTx.M)
-				copy(bid.X[:], x.Bytes())
-				copy(bid.M[:], bidTx.M)
-				bid.EndHeight = searchingHeight + bidTx.Lock
-				c.addBid(bid)
-			}
-		}
-
-		searchingHeight++
-	}
 }
 
 func calculateXFromBytes(d, m []byte) ristretto.Scalar {
