@@ -42,8 +42,7 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	assert.True(t, txs[0].Type() == transactions.BidType)
 	assert.True(t, txs[1].Type() == transactions.StakeType)
 
-	// Send round update, to a point where the buffer will kick in
-	// We should also add ourselves to the provisioners and the bidlist,
+	// add ourselves to the provisioners and the bidlist,
 	// so that the maintainer gets the proper ending heights.
 	// Provisioners
 	member := consensus.MockMember(keys)
@@ -56,7 +55,10 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	copy(mArr[:], m.Bytes())
 	bid := user.Bid{mArr, mArr, 10}
 	bl[0] = bid
+	// Then, send a round update to update the values on the maintainer
 	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, bl))
+
+	// Send another round update that is within the 'offset', to trigger sending a new pair of txs
 	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(6, p, bl))
 
 	// We should get another set of two txs
