@@ -6,7 +6,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -50,7 +49,7 @@ func CheckBlock(db database.DB, prevBlock block.Block, blk block.Block) error {
 }
 
 // CheckBlockCertificate ensures that the block certificate is valid.
-func CheckBlockCertificate(committee committee.Foldable, provisioners user.Provisioners, blk block.Block) error {
+func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) error {
 	if blk.Header.Height < 2 {
 		return nil
 	}
@@ -72,15 +71,17 @@ func CheckBlockCertificate(committee committee.Foldable, provisioners user.Provi
 	}
 
 	// Now, check the certificate's correctness for both reduction steps
-	if err := checkBlockCertificateForStep(stepOneBatchedSig, blk.Header.Certificate.StepOneCommittee, blk.Header.Height, stepOne, committee, provisioners, blk.Header.Hash); err != nil {
+	if err := checkBlockCertificateForStep(stepOneBatchedSig, blk.Header.Certificate.StepOneCommittee, blk.Header.Height, stepOne, provisioners, blk.Header.Hash); err != nil {
 		return err
 	}
 
-	return checkBlockCertificateForStep(stepTwoBatchedSig, blk.Header.Certificate.StepTwoCommittee, blk.Header.Height, stepTwo, committee, provisioners, blk.Header.Hash)
+	return checkBlockCertificateForStep(stepTwoBatchedSig, blk.Header.Certificate.StepTwoCommittee, blk.Header.Height, stepTwo, provisioners, blk.Header.Hash)
 }
 
-func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, round uint64, step uint8, committee committee.Foldable, provisioners user.Provisioners, blockHash []byte) error {
-	subcommittee := committee.Unpack(provisioners, bitSet, round, step)
+func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash []byte) error {
+	// TODO: need real committee size here
+	committee := provisioners.CreateVotingCommittee(round, step, agreement.MaxCommitteeSize)
+	subcommittee := committee.Intersect(bitSet)
 	apk, err := agreement.ReconstructApk(subcommittee)
 	if err != nil {
 		return err

@@ -15,7 +15,6 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -31,12 +30,11 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus  *wire.EventBus
-	rpcBus    *wire.RPCBus
-	db        database.DB
-	p         *user.Provisioners
-	committee *committee.Agreement
-	bidList   *user.BidList
+	eventBus *wire.EventBus
+	rpcBus   *wire.RPCBus
+	db       database.DB
+	p        *user.Provisioners
+	bidList  *user.BidList
 
 	prevBlock block.Block
 	// protect prevBlock with mutex as it's touched out of the main chain loop
@@ -66,7 +64,6 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 		eventBus:        eventBus,
 		rpcBus:          rpcBus,
 		db:              db,
-		committee:       committee.NewAgreement(),
 		prevBlock:       *l.chainTip,
 		candidateChan:   candidateChan,
 		certificateChan: certificateChan,
@@ -193,7 +190,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// This check should avoid a possible race condition between accepting two blocks
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
-	if err := verifiers.CheckBlockCertificate(c.committee, *c.p, blk); err != nil {
+	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
 		l.Errorf("verifying the certificate failed: %s", err.Error())
 		return err
 	}
@@ -501,19 +498,9 @@ func (c *Chain) removeProvisioner(pubKeyBLS []byte) bool {
 }
 
 func (c *Chain) marshalProvisioners() (*bytes.Buffer, error) {
-	members := c.sortProvisioners()
 	buf := new(bytes.Buffer)
-	err := user.MarshalMembers(buf, members)
+	err := user.MarshalProvisioners(buf, c.p)
 	return buf, err
-}
-
-func (c *Chain) sortProvisioners() []user.Member {
-	members := make([]user.Member, len(c.p.Members))
-	for i := 0; i < len(c.p.Members); i++ {
-		members[i] = *c.p.MemberAt(i)
-	}
-
-	return members
 }
 
 func (c *Chain) newBidList() error {
