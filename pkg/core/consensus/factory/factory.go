@@ -5,7 +5,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reputation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -41,7 +40,6 @@ func New(eventBus wire.EventBroker, rpcBus *wire.RPCBus, timerLength time.Durati
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
-	reputation.Launch(c.eventBus)
 	selection.Launch(c.eventBus, nil, c.timerLength)
 	reduction.Launch(c.eventBus, c.Keys, c.timerLength, c.rpcBus)
 	go agreement.Launch(c.eventBus, c.Keys)
