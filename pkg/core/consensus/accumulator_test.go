@@ -93,6 +93,8 @@ func TestNonCommitteeEvent(t *testing.T) {
 type mockAccumulatorHandler struct {
 	identifier string
 	consensus.EventHandler
+	quorum   int
+	isMember bool
 }
 
 func newMockHandlerAccumulator(round uint64, step uint8, verifyErr error, sender []byte, quorum int, identifier string,
@@ -118,6 +120,8 @@ func newMockHandlerAccumulator(round uint64, step uint8, verifyErr error, sender
 	return &mockAccumulatorHandler{
 		EventHandler: mockEventHandler,
 		identifier:   identifier,
+		quorum:       quorum,
+		isMember:     isMember,
 	}
 }
 
@@ -129,4 +133,12 @@ func (m *mockAccumulatorHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer
 	}
 
 	return nil
+}
+
+func (m *mockAccumulatorHandler) Quorum() int {
+	return m.quorum
+}
+
+func (m *mockAccumulatorHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
+	return m.isMember
 }
