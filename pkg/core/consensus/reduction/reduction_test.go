@@ -189,7 +189,7 @@ func TestTimeOutVariance(t *testing.T) {
 	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.1)
 
 	// update round
-	consensus.UpdateRound(eb, 2)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, nil, nil))
 
 	// Wait a bit for the round update to go through
 	time.Sleep(200 * time.Millisecond)
@@ -217,13 +217,20 @@ func launchCandidateVerifier(failVerification bool) {
 	}
 }
 
-func launchReductionTest(inCommittee bool, quorum int) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
+func launchReductionTest(inCommittee bool, amount int) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
 	eb, streamer := helper.CreateGossipStreamer()
 	k, _ := user.NewRandKeys()
 	rpcBus := wire.NewRPCBus()
 	launchReduction(eb, k, timeOut, rpcBus)
 	// update round
-	consensus.UpdateRound(eb, 1)
+	p, _ := consensus.MockProvisioners(amount)
+	if inCommittee {
+		member := consensus.MockMember(k)
+		p.Set.Insert(k.BLSPubKeyBytes)
+		p.Members[string(k.BLSPubKeyBytes)] = member
+	}
+
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
 
 	return eb, streamer, k
 }
