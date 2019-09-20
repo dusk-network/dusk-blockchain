@@ -32,12 +32,7 @@ func MockProvisioners(amount int) (*user.Provisioners, []user.Keys) {
 	k := make([]user.Keys, amount)
 	for i := 0; i < amount; i++ {
 		keys, _ := user.NewRandKeys()
-		member := &user.Member{}
-		member.PublicKeyEd = keys.EdPubKeyBytes
-		member.PublicKeyBLS = keys.BLSPubKeyBytes
-		member.Stakes = make([]user.Stake, 1)
-		member.Stakes[0].Amount = 500
-		member.Stakes[0].EndHeight = 10000
+		member := MockMember(keys)
 
 		p.Members[string(keys.BLSPubKeyBytes)] = member
 		p.Set.Insert(keys.BLSPubKeyBytes)
@@ -45,6 +40,16 @@ func MockProvisioners(amount int) (*user.Provisioners, []user.Keys) {
 	}
 
 	return p, k
+}
+
+func MockMember(keys user.Keys) *user.Member {
+	member := &user.Member{}
+	member.PublicKeyEd = keys.EdPubKeyBytes
+	member.PublicKeyBLS = keys.BLSPubKeyBytes
+	member.Stakes = make([]user.Stake, 1)
+	member.Stakes[0].Amount = 500
+	member.Stakes[0].EndHeight = 10000
+	return member
 }
 
 func MockBidList() user.BidList {
