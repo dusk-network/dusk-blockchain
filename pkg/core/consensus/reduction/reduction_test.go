@@ -219,10 +219,9 @@ func launchCandidateVerifier(failVerification bool) {
 
 func launchReductionTest(inCommittee bool, quorum int) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
 	eb, streamer := helper.CreateGossipStreamer()
-	committeeMock := reduction.MockCommittee(quorum, inCommittee)
 	k, _ := user.NewRandKeys()
 	rpcBus := wire.NewRPCBus()
-	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
+	launchReduction(eb, k, timeOut, rpcBus)
 	// update round
 	consensus.UpdateRound(eb, 1)
 
@@ -232,8 +231,8 @@ func launchReductionTest(inCommittee bool, quorum int) (*wire.EventBus, *helper.
 // Convenience function, which launches the reduction component and removes the
 // preprocessors for testing purposes (bypassing the republisher and the validator).
 // This ensures proper handling of mocked Reduction events.
-func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration, rpcBus *wire.RPCBus) {
-	reduction.Launch(eb, committee, k, timeOut, rpcBus)
+func launchReduction(eb *wire.EventBus, k user.Keys, timeOut time.Duration, rpcBus *wire.RPCBus) {
+	reduction.Launch(eb, k, timeOut, rpcBus)
 	eb.RemoveAllPreprocessors(string(topics.Reduction))
 }
 

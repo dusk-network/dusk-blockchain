@@ -30,13 +30,8 @@ type (
 
 // Launch creates and wires a broker, initiating the components that
 // have to do with Block Reduction
-func Launch(eventBroker wire.EventBroker, committee Reducers, keys user.Keys,
-	timeout time.Duration, rpcBus *wire.RPCBus) {
-	if committee == nil {
-		committee = newReductionCommittee()
-	}
-
-	handler := newReductionHandler(committee, keys)
+func Launch(eventBroker wire.EventBroker, keys user.Keys, timeout time.Duration, rpcBus *wire.RPCBus) {
+	handler := newReductionHandler(keys)
 	broker := newBroker(eventBroker, handler, timeout, rpcBus)
 	go broker.Listen()
 }
