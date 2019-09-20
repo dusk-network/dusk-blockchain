@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,17 +14,7 @@ import (
 // Test that creation of a voting committee from a set of Provisioners works as intended.
 func TestCreateVotingCommittee(t *testing.T) {
 	// Set up a committee set with a stakes map
-	p := &user.Provisioners{}
-	for i := 0; i < 50; i++ {
-		keys, _ := user.NewRandKeys()
-		member := &user.Member{}
-		member.PublicKeyEd = keys.EdPubKeyBytes
-		member.PublicKeyBLS = keys.BLSPubKeyBytes
-		member.Stakes = make([]user.Stake, 1)
-		member.Stakes[0].Amount = 500
-		member.Stakes[0].EndHeight = 10000
-		p.Members[string(keys.BLSPubKeyBytes)] = member
-	}
+	p, _ := consensus.MockProvisioners(50)
 
 	// Run sortition to get 50 members (as a Set, committee cannot contain any duplicate)
 	committee := p.CreateVotingCommittee(100, 1, 50)
@@ -51,17 +42,8 @@ func TestMemberAt(t *testing.T) {
 	nr := 50
 	p := &user.Provisioners{}
 	var ks sortedKeys
-	for i := 0; i < nr; i++ {
-		keys, _ := user.NewRandKeys()
-		member := &user.Member{}
-		member.PublicKeyEd = keys.EdPubKeyBytes
-		member.PublicKeyBLS = keys.BLSPubKeyBytes
-		member.Stakes = make([]user.Stake, 1)
-		member.Stakes[0].Amount = 500
-		member.Stakes[0].EndHeight = 10000
-		p.Members[string(keys.BLSPubKeyBytes)] = member
-		ks = append(ks, keys)
-	}
+	p, k := consensus.MockProvisioners(nr)
+	ks = append(ks, k...)
 
 	sort.Sort(ks)
 
@@ -75,16 +57,8 @@ func TestMemberAt(t *testing.T) {
 func TestGetMember(t *testing.T) {
 	// Set up a committee set with a stakes map
 	tKeys := make([][]byte, 0)
-	p := &user.Provisioners{}
-	for i := 0; i < 50; i++ {
-		keys, _ := user.NewRandKeys()
-		member := &user.Member{}
-		member.PublicKeyEd = keys.EdPubKeyBytes
-		member.PublicKeyBLS = keys.BLSPubKeyBytes
-		member.Stakes = make([]user.Stake, 1)
-		member.Stakes[0].Amount = 500
-		member.Stakes[0].EndHeight = 10000
-		p.Members[string(keys.BLSPubKeyBytes)] = member
+	p, k := consensus.MockProvisioners(50)
+	for _, keys := range k {
 		tKeys = append(tKeys, keys.BLSPubKeyBytes)
 	}
 
