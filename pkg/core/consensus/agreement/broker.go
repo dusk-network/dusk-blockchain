@@ -3,7 +3,6 @@ package agreement
 import (
 	"bytes"
 	"errors"
-	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
@@ -105,8 +104,7 @@ func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 		"process": "agreement",
 		"round":   roundUpdate.Round,
 	}).Debugln("updating round")
-	b.handler.Handler.Provisioners = roundUpdate.P
-	b.handler.Handler.Committees = make([]user.VotingCommittee, math.MaxUint8)
+	b.handler.UpdateProvisioners(roundUpdate.P)
 	b.filter.UpdateRound(roundUpdate.Round)
 	b.filter.FlushQueue()
 }

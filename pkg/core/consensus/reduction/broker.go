@@ -72,6 +72,7 @@ func (b *broker) Listen() {
 			}).Debug("Got round update")
 			b.reducer.end()
 			b.reducer.lock.Lock()
+			b.ctx.handler.UpdateProvisioners(roundUpdate.P)
 			b.filter.UpdateRound(roundUpdate.Round)
 			b.ctx.timer.ResetTimeOut()
 			b.reducer.lock.Unlock()
@@ -81,22 +82,21 @@ func (b *broker) Listen() {
 					"process": "reduction",
 				}).Debug("got empty selection message")
 				b.reducer.startReduction(make([]byte, 32))
-				b.filter.FlushQueue()
 			} else if ev.Round == b.ctx.state.Round() {
 				log.WithFields(log.Fields{
 					"process": "reduction",
 					"hash":    hex.EncodeToString(ev.VoteHash),
 				}).Debug("got selection message")
 				b.reducer.startReduction(ev.VoteHash)
-				b.filter.FlushQueue()
 			} else {
 				log.WithFields(log.Fields{
 					"process":     "reduction",
 					"event round": ev.Round,
 				}).Debug("got obsolete selection message")
 				b.reducer.startReduction(make([]byte, 32))
-				b.filter.FlushQueue()
 			}
+
+			b.filter.FlushQueue()
 		}
 	}
 }
