@@ -1,8 +1,6 @@
 package chain
 
 import (
-	"bytes"
-	"encoding/binary"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
@@ -14,7 +12,6 @@ import (
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,8 +47,8 @@ func TestDemoSaveFunctionality(t *testing.T) {
 }
 */
 
-func createMockedCertificate(hash []byte, round uint64, keys []user.Keys) *block.Certificate {
-	votes := agreement.GenVotes(hash, round, 1, keys)
+func createMockedCertificate(hash []byte, round uint64, keys []user.Keys, p *user.Provisioners) *block.Certificate {
+	votes := agreement.GenVotes(hash, round, 1, keys, p.CreateVotingCommittee(round, 1, len(p.Members)))
 	return &block.Certificate{
 		StepOneBatchedSig: votes[0].Signature.Compress(),
 		StepTwoBatchedSig: votes[1].Signature.Compress(),
@@ -91,13 +88,11 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	defer chain.Close()
 
 	// Add some provisioners to our chain, including one that is just about to expire
-	k1 := newProvisioner(100, eb, 0, 10)
-	k2 := newProvisioner(100, eb, 0, 10)
-	k3 := newProvisioner(100, eb, 0, 1)
-	keys := []user.Keys{k1, k2, k3}
+	p, k := consensus.MockProvisioners(3)
+	p.Members[string(k[0].BLSPubKeyBytes)].Stakes[0].EndHeight = 1
 
 	// Update round. This should not remove the third provisioner from our committee
-	consensus.UpdateRound(eb, 2)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, nil))
 
 	// Create block 1
 	blk := helper.RandomBlock(t, 1, 1)
@@ -106,27 +101,10 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	blk.SetRoot()
 	blk.SetHash()
 	// Add cert and prev hash
-	blk.Header.Certificate = createMockedCertificate(blk.Header.Hash, 1, keys)
+	blk.Header.Certificate = createMockedCertificate(blk.Header.Hash, 1, k, p)
 	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash
 	// Accept it
 	assert.NoError(t, chain.AcceptBlock(*blk))
 	// Provisioner with k3 should no longer be in the committee now
 	// assert.False(t, c.IsMember(k3.BLSPubKeyBytes, 2, 1))
-}
-
-func newProvisioner(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64) user.Keys {
-	k, _ := user.NewRandKeys()
-	publishNewStake(stake, eb, startHeight, endHeight, k)
-	return k
-}
-
-func publishNewStake(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64, k user.Keys) {
-	buffer := bytes.NewBuffer(*k.EdPubKey)
-	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
-
-	_ = encoding.WriteUint64(buffer, binary.LittleEndian, stake)
-	_ = encoding.WriteUint64(buffer, binary.LittleEndian, startHeight)
-	_ = encoding.WriteUint64(buffer, binary.LittleEndian, endHeight)
-
-	eb.Publish(msg.NewProvisionerTopic, buffer)
 }
