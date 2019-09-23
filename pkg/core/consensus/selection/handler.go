@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -50,7 +49,7 @@ func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
 }
 
 func (sh *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	ev := &ScoreEvent{Certificate: block.EmptyCertificate()}
+	ev := &ScoreEvent{}
 	if err := sh.Unmarshal(r, ev); err != nil {
 		return nil, err
 	}

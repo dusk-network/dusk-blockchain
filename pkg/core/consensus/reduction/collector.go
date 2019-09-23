@@ -3,7 +3,6 @@ package reduction
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -31,7 +30,7 @@ func initBestScoreUpdate(subscriber wire.EventSubscriber) chan *selection.ScoreE
 func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
 	// copy shared pointer
 	copyBuf := *r
-	ev := &selection.ScoreEvent{Certificate: block.EmptyCertificate()}
+	ev := &selection.ScoreEvent{}
 	if err := selection.UnmarshalScoreEvent(&copyBuf, ev); err != nil {
 		return err
 	}

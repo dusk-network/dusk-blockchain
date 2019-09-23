@@ -5,11 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	log "github.com/sirupsen/logrus"
 )
@@ -87,7 +85,6 @@ func (s *eventSelector) Process(ev wire.Event) {
 		}
 
 		s.repropagate(ev)
-		s.propagateCertificate(ev)
 		s.setBestEvent(ev)
 	}
 }
@@ -104,20 +101,6 @@ func (s *eventSelector) repropagate(ev wire.Event) {
 	}
 
 	s.publisher.Stream(string(topics.Gossip), msg)
-}
-
-func (s *eventSelector) propagateCertificate(ev wire.Event) {
-	sev := ev.(*ScoreEvent)
-	buf := new(bytes.Buffer)
-	if err := encoding.Write256(buf, sev.PrevHash); err != nil {
-		panic(err)
-	}
-
-	if err := block.MarshalCertificate(buf, sev.Certificate); err != nil {
-		panic(err)
-	}
-
-	s.publisher.Publish(string(topics.Certificate), buf)
 }
 
 func (s *eventSelector) publishBestEvent() {

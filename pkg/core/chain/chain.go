@@ -21,6 +21,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
@@ -43,8 +44,7 @@ type Chain struct {
 	mu sync.RWMutex
 
 	// collector channels
-	candidateChan   <-chan *block.Block
-	certificateChan <-chan certMsg
+	candidateChan <-chan *block.Block
 }
 
 // New returns a new chain object
@@ -58,17 +58,15 @@ func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
 
 	// set up collectors
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
-	certificateChan := initCertificateCollector(eventBus)
 
 	chain := &Chain{
-		eventBus:        eventBus,
-		rpcBus:          rpcBus,
-		db:              db,
-		prevBlock:       *l.chainTip,
-		candidateChan:   candidateChan,
-		certificateChan: certificateChan,
-		p:               user.NewProvisioners(),
-		bidList:         &user.BidList{},
+		eventBus:      eventBus,
+		rpcBus:        rpcBus,
+		db:            db,
+		prevBlock:     *l.chainTip,
+		candidateChan: candidateChan,
+		p:             user.NewProvisioners(),
+		bidList:       &user.BidList{},
 	}
 
 	chain.restoreConsensusData()
@@ -86,9 +84,6 @@ func (c *Chain) Listen() {
 
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
-		case cMsg := <-c.certificateChan:
-			c.addCertificate(cMsg.hash, cMsg.cert)
-
 		// wire.RPCBus requests handlers
 		case r := <-wire.GetLastBlockChan:
 
@@ -185,6 +180,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// This check should avoid a possible race condition between accepting two blocks
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
+	// FIXME: make sure we actually have only one valid certificate per block (frontrunning consensus (please follow the fucking protocol already))
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
 		l.Errorf("verifying the certificate failed: %s", err.Error())
 		return err
@@ -205,25 +201,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 5. Notify other subsystems for the accepted block
-	// Subsystems listening for this topic:
-	// mempool.Mempool
-	// consensus.generation.broker
-	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, &blk); err != nil {
-		l.Errorf("block encoding failed: %s", err.Error())
-		return err
-	}
-
-	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
-
-	// 6. Gossip advertise block Hash
+	// 5. Gossip advertise block Hash
 	if err := c.advertiseBlock(blk); err != nil {
 		l.Errorf("block advertising failed: %s", err.Error())
 		return err
 	}
 
-	// 7. Cleanup obsolete candidate blocks
+	// 6. Cleanup obsolete candidate blocks
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
 		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
@@ -237,16 +221,29 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		log.Infof("%d deleted candidate blocks", count)
 	}
 
-	// 8. Remove expired provisioners
-	// We remove provisioners from accepted block height + 1,
+	// 7. Remove expired provisioners and bids
+	// We remove provisioners and bids from accepted block height + 1,
 	// to set up our committee correctly for the next block.
 	c.removeExpiredProvisioners(blk.Header.Height + 1)
+	c.removeExpiredBids(blk.Header.Height + 1)
+
+	// 8. Notify other subsystems for the accepted block
+	// Subsystems listening for this topic:
+	// mempool.Mempool
+	// consensus.generation.broker
+	buf := new(bytes.Buffer)
+	if err := block.Marshal(buf, &blk); err != nil {
+		l.Errorf("block encoding failed: %s", err.Error())
+		return err
+	}
+
+	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
 
 	// 9. Send round update
 	// We send a round update after accepting a new block, which should include
 	// a set of provisioners, and a bidlist. This allows the consensus components
 	// to rehydrate their state properly for the next round.
-	if err := c.sendRoundUpdate(blk.Header.Height + 1); err != nil {
+	if err := c.sendRoundUpdate(blk.Header.Height+1, blk.Header.Seed, blk.Header.Hash); err != nil {
 		l.Errorf("sending round update failed: %s", err.Error())
 		return err
 	}
@@ -255,7 +252,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) sendRoundUpdate(round uint64) error {
+func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
 	buf := new(bytes.Buffer)
 	roundBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundBytes, round)
@@ -272,6 +269,14 @@ func (c *Chain) sendRoundUpdate(round uint64) error {
 	}
 
 	if err := user.MarshalBidList(buf, *c.bidList); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteBLS(buf, seed); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(buf, hash); err != nil {
 		return err
 	}
 
@@ -311,18 +316,6 @@ func (c *Chain) handleCandidateBlock(candidate block.Block) error {
 	return nil
 }
 
-func (c *Chain) handleWinningHash(blockHash []byte) error {
-	// Fetch the candidate block that the winningHash points at
-	candidate, err := c.fetchCandidateBlock(blockHash)
-	if err != nil {
-		log.Warnf("fetching a candidate block failed: %s", err.Error())
-		return err
-	}
-
-	// Run the general procedure of block accepting
-	return c.AcceptBlock(*candidate)
-}
-
 func (c *Chain) fetchCandidateBlock(hash []byte) (*block.Block, error) {
 	var candidate *block.Block
 	err := c.db.View(func(t database.Transaction) error {
@@ -341,17 +334,6 @@ func (c *Chain) verifyCandidateBlock(hash []byte) error {
 	}
 
 	return verifiers.CheckBlock(c.db, c.prevBlock, *candidate)
-}
-
-func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
-	candidate, err := c.fetchCandidateBlock(blockHash)
-	if err != nil {
-		log.Warnf("could not fetch candidate block to add certificate: %s", err.Error())
-		return
-	}
-
-	candidate.Header.Certificate = cert
-	c.AcceptBlock(*candidate)
 }
 
 // Send Inventory message to all peers
