@@ -421,12 +421,7 @@ func (c *Chain) restoreConsensusData() {
 				// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
 				// as this is most likely a consensus-breaking change)
 				if searchingHeight+t.Lock > currentHeight {
-					var bid user.Bid
-					x := calculateXFromBytes(t.Outputs[0].Commitment.Bytes(), t.M)
-					copy(bid.X[:], x.Bytes())
-					copy(bid.M[:], t.M)
-					bid.EndHeight = searchingHeight + t.Lock
-					c.addBid(bid)
+					c.addBidder(t, searchingHeight)
 				}
 			}
 		}
@@ -437,12 +432,10 @@ func (c *Chain) restoreConsensusData() {
 }
 
 // RemoveExpired removes Provisioners which stake expired
-func (c *Chain) removeExpiredProvisioners(round uint64) uint64 {
-	var totalRemoved uint64
+func (c *Chain) removeExpiredProvisioners(round uint64) {
 	for pk, member := range c.p.Members {
 		for i := 0; i < len(member.Stakes); i++ {
 			if member.Stakes[i].EndHeight < round {
-				totalRemoved += member.Stakes[i].Amount
 				member.RemoveStake(i)
 				// If they have no stakes left, we should remove them entirely.
 				if len(member.Stakes) == 0 {
@@ -454,8 +447,6 @@ func (c *Chain) removeExpiredProvisioners(round uint64) uint64 {
 			}
 		}
 	}
-
-	return totalRemoved
 }
 
 // addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
