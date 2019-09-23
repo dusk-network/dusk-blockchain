@@ -12,6 +12,8 @@ import (
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -107,4 +109,120 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	assert.NoError(t, chain.AcceptBlock(*blk))
 	// Provisioner with k3 should no longer be in the committee now
 	// assert.False(t, c.IsMember(k3.BLSPubKeyBytes, 2, 1))
+}
+
+func TestAddAndRemoveBid(t *testing.T) {
+	eb := wire.NewEventBus()
+	rpc := wire.NewRPCBus()
+	c, err := New(eb, rpc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bid := createBid(t)
+
+	c.addBid(bid)
+	assert.True(t, c.bidList.Contains(bid))
+
+	c.removeBid(bid)
+	assert.False(t, c.bidList.Contains(bid))
+}
+
+func TestRemoveExpired(t *testing.T) {
+	_, _, c := setupChainTest(t, false)
+
+	for i := 0; i < 10; i++ {
+		bid := createBid(t)
+		c.addBid(bid)
+	}
+
+	// Let's change the end heights alternatingly, to make sure the bidlist removes bids properly
+	bl := *c.bidList
+	for i, bid := range bl {
+		if i%2 == 0 {
+			bid.EndHeight = 2000
+			bl[i] = bid
+		}
+	}
+
+	c.bidList = &bl
+
+	// All other bids have their end height at 1000 - so let's remove them
+	c.removeExpiredBids(1001)
+
+	assert.Equal(t, 5, len(*c.bidList))
+
+	for _, bid := range *c.bidList {
+		assert.Equal(t, uint64(2000), bid.EndHeight)
+	}
+}
+
+// Add and then a remove a provisioner, to check if removal works properly.
+func TestRemove(t *testing.T) {
+	_, _, c := setupChainTest(t, false)
+
+	keys, _ := user.NewRandKeys()
+	if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 1000); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotNil(t, c.p.GetMember(keys.BLSPubKeyBytes))
+	assert.Equal(t, 1, len(c.p.Members))
+
+	if !c.removeProvisioner(keys.BLSPubKeyBytes) {
+		t.Fatal("could not remove a member we just added")
+	}
+
+	assert.Equal(t, 0, len(c.p.Members))
+}
+
+func TestRemoveExpiredProvisioners(t *testing.T) {
+	_, _, c := setupChainTest(t, false)
+
+	for i := 0; i < 10; i++ {
+		keys, _ := user.NewRandKeys()
+		if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 1000); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	assert.Equal(t, 10, len(c.p.Members))
+
+	var i int
+	for _, p := range c.p.Members {
+		if i%2 == 0 {
+			p.Stakes[0].EndHeight = 2000
+		}
+		i++
+	}
+
+	c.removeExpiredProvisioners(1001)
+	assert.Equal(t, 5, len(c.p.Members))
+}
+
+func createBid(t *testing.T) user.Bid {
+	b, err := crypto.RandEntropy(32)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var arr [32]byte
+	copy(arr[:], b)
+	return user.Bid{arr, arr, 1000}
+}
+
+func setupChainTest(t *testing.T, includeGenesis bool) (*wire.EventBus, *wire.RPCBus, *Chain) {
+	eb := wire.NewEventBus()
+	rpc := wire.NewRPCBus()
+	c, err := New(eb, rpc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !includeGenesis {
+		c.removeExpiredBids(transactions.GenesisExpirationHeight)
+		c.removeExpiredProvisioners(transactions.GenesisExpirationHeight)
+	}
+
+	return eb, rpc, c
 }
