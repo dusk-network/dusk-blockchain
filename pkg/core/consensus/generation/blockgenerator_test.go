@@ -11,6 +11,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -42,8 +43,9 @@ func TestGenerateBlock(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
+	keys, _ := user.NewRandKeys()
 	// Block Generator to construct a valid block
-	gen := newBlockGenerator(h.genWallet.PublicKey(), h.rpc)
+	gen := newBlockGenerator(h.genWallet.PublicKey(), h.rpc, nil, keys)
 
 	seed, _ := crypto.RandEntropy(33)
 	proof, _ := crypto.RandEntropy(32)

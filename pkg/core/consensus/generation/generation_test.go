@@ -7,13 +7,14 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
@@ -57,20 +58,15 @@ func TestScoreGeneration(t *testing.T) {
 	// launch score component
 	generation.Launch(eb, nil, k, keys, publicKey, gen, gen, db)
 
-	// send a block to start generation
-	blk = helper.RandomBlock(t, 0, 1)
-	b := new(bytes.Buffer)
-	if err := block.Marshal(b, blk); err != nil {
-		t.Fatal(err)
-	}
-	eb.Publish(string(topics.AcceptedBlock), b)
+	// send a round update to start generation
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	buf, err := streamer.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sev := &selection.ScoreEvent{Certificate: block.EmptyCertificate()}
+	sev := &selection.ScoreEvent{}
 	if err := selection.UnmarshalScoreEvent(bytes.NewBuffer(buf), sev); err != nil {
 		t.Fatal(err)
 	}
@@ -85,11 +81,32 @@ type mockGenerator struct {
 	t *testing.T
 }
 
+func (m *mockGenerator) Generate(roundUpdate consensus.RoundUpdate) (block.Block, selection.ScoreEvent, error) {
+	seed, _ := crypto.RandEntropy(33)
+	hash, _ := crypto.RandEntropy(32)
+	proof := m.GenerateProof(seed, user.BidList{})
+	blk, err := m.GenerateBlock(roundUpdate.Round, seed, proof.Proof, proof.Score, hash)
+	if err != nil {
+		panic(err)
+	}
+
+	return *blk, selection.ScoreEvent{
+		Round:         roundUpdate.Round,
+		Score:         proof.Score,
+		Proof:         proof.Proof,
+		Z:             hash,
+		BidListSubset: hash,
+		PrevHash:      hash,
+		Seed:          seed,
+		VoteHash:      hash,
+	}, nil
+}
+
 func (m *mockGenerator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error) {
 	return helper.RandomBlock(m.t, round, 10), nil
 }
 
-func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
+func (m *mockGenerator) GenerateProof(seed []byte, bl user.BidList) zkproof.ZkProof {
 	proof, _ := crypto.RandEntropy(100)
 	// add a score that will always pass threshold
 	score, _ := big.NewInt(0).SetString("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", 16)
@@ -103,7 +120,7 @@ func (m *mockGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
 	}
 }
 
-func (m *mockGenerator) InBidList() bool                         { return true }
+func (m *mockGenerator) InBidList(bidList user.BidList) bool     { return true }
 func (m *mockGenerator) UpdateBidList(bl user.Bid)               {}
 func (m *mockGenerator) RemoveExpiredBids(round uint64)          {}
 func (m *mockGenerator) UpdateProofValues(d, M ristretto.Scalar) {}

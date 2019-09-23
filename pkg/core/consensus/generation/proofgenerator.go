@@ -1,8 +1,6 @@
 package generation
 
 import (
-	"sync"
-
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	zkproof "github.com/dusk-network/dusk-zkproof"
@@ -12,15 +10,13 @@ import (
 // Generator defines the capability of generating proofs of blind bid, needed to
 // propose blocks in the consensus.
 type Generator interface {
-	GenerateProof([]byte) zkproof.ZkProof
-	InBidList() bool
+	GenerateProof([]byte, user.BidList) zkproof.ZkProof
+	InBidList(user.BidList) bool
 	UpdateProofValues(ristretto.Scalar, ristretto.Scalar)
 }
 
 type proofGenerator struct {
 	d, k, x ristretto.Scalar
-	lock    sync.RWMutex
-	bidList user.BidList
 }
 
 func newProofGenerator(d, k, m ristretto.Scalar) (*proofGenerator, error) {
@@ -32,10 +28,10 @@ func newProofGenerator(d, k, m ristretto.Scalar) (*proofGenerator, error) {
 	}, nil
 }
 
-func (g *proofGenerator) InBidList() bool {
+func (g *proofGenerator) InBidList(bidList user.BidList) bool {
 	var bid user.Bid
 	copy(bid.X[:], g.x.Bytes())
-	return g.bidList.Contains(bid)
+	return bidList.Contains(bid)
 }
 
 func (g *proofGenerator) UpdateProofValues(d, m ristretto.Scalar) {
@@ -46,16 +42,14 @@ func (g *proofGenerator) UpdateProofValues(d, m ristretto.Scalar) {
 
 // GenerateProof will generate the proof of blind bid, needed to successfully
 // propose a block to the voting committee.
-func (g *proofGenerator) GenerateProof(seed []byte) zkproof.ZkProof {
+func (g *proofGenerator) GenerateProof(seed []byte, bidList user.BidList) zkproof.ZkProof {
 	log.WithField("process", "generation").Traceln("generating proof")
 	// Turn seed into scalar
 	seedScalar := ristretto.Scalar{}
 	seedScalar.Derive(seed)
 
 	// Create a slice of scalars with a number of random bids (up to 10)
-	g.lock.Lock()
-	bidListSubset := createBidListSubset(g.bidList)
-	g.lock.Unlock()
+	bidListSubset := createBidListSubset(bidList)
 	bidListScalars := convertBidListToScalars(bidListSubset)
 
 	return zkproof.Prove(g.d, g.k, seedScalar, bidListScalars)

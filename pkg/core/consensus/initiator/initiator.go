@@ -87,6 +87,7 @@ func startBlockGenerator(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *w
 
 	// launch generation component
 	go func() {
+
 		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
 			l.WithError(err).Warnln("error launching block generation component")
 		}
