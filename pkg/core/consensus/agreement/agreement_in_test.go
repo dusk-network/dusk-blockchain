@@ -18,6 +18,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +26,7 @@ import (
 // This test checks whether there is a race condition between the agreement component's round updates,
 // and the sending of agreement events.
 func TestAgreementRace(t *testing.T) {
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	_, db := lite.CreateDBConnection()
 
 	// Sadly, we can not use the mocked committee for this test.
@@ -113,7 +114,7 @@ func TestAgreementRace(t *testing.T) {
 func TestStress(t *testing.T) {
 	// Setup stuff
 	committeeMock, k := MockCommittee(20, true, 20)
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	broker := newBroker(bus, committeeMock, k[0])
 	broker.filter.UpdateRound(1)
 	bus.RemoveAllPreprocessors(string(topics.Agreement))
@@ -144,7 +145,7 @@ func TestStress(t *testing.T) {
 
 func TestIncrementOnNilVoteSet(t *testing.T) {
 	committeeMock, k := MockCommittee(20, true, 20)
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	broker := newBroker(bus, committeeMock, k[0])
 	broker.filter.UpdateRound(1)
 	go broker.Listen()

@@ -14,10 +14,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +25,7 @@ import (
 // Test that the agreement component emits a round update on startup.
 func TestInitBroker(t *testing.T) {
 	committeeMock, k := agreement.MockCommittee(2, true, 2)
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	roundChan := consensus.InitRoundUpdate(bus)
 
 	go agreement.Launch(bus, committeeMock, k[0])
@@ -120,8 +120,8 @@ func TestSendAgreement(t *testing.T) {
 }
 
 // Launch the agreement component, and consume the initial round update that gets emitted.
-func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
-	bus := wire.NewEventBus()
+func initAgreement(c committee.Foldable) (eventbus.Broker, <-chan uint64) {
+	bus := eventbus.New()
 	roundChan := consensus.InitRoundUpdate(bus)
 	k, _ := user.NewRandKeys()
 	go agreement.Launch(bus, c, k)

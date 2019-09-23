@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -29,8 +31,8 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus  *wire.EventBus
-	rpcBus    *wire.RPCBus
+	eventBus  *eventbus.EventBus
+	rpcBus    *rpcbus.RPCBus
 	db        database.DB
 	committee committee.Foldable
 
@@ -46,7 +48,7 @@ type Chain struct {
 }
 
 // New returns a new chain object
-func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus, c committee.Foldable) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, c committee.Foldable) (*Chain, error) {
 	_, db := heavy.CreateDBConnection()
 
 	l, err := newLoader(db)
@@ -91,8 +93,8 @@ func (c *Chain) Listen() {
 		case cMsg := <-c.certificateChan:
 			c.addCertificate(cMsg.hash, cMsg.cert)
 
-		// wire.RPCBus requests handlers
-		case r := <-wire.GetLastBlockChan:
+		// rpcbus.RPCBus requests handlers
+		case r := <-rpcbus.GetLastBlockChan:
 
 			buf := new(bytes.Buffer)
 
@@ -107,7 +109,7 @@ func (c *Chain) Listen() {
 
 			r.RespChan <- *buf
 
-		case r := <-wire.VerifyCandidateBlockChan:
+		case r := <-rpcbus.VerifyCandidateBlockChan:
 			if err := c.verifyCandidateBlock(r.Params.Bytes()); err != nil {
 				r.ErrChan <- err
 				continue

@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -24,6 +25,7 @@ var (
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,
+		"sendBidTx":    sendBidTx,
 	}
 
 	// rpcAdminCmd holds all admin methods.
@@ -72,9 +74,24 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 		return "", fmt.Errorf("%s is not supported by publishTopic API", jsonrpcTopic)
 	}
 
-	payloadBuf := bytes.NewBufferString(params[1])
-	s.eventBus.Publish(jsonrpcTopic, payloadBuf)
+	payload, _ := hex.DecodeString(params[1])
+	s.eventBus.Publish(jsonrpcTopic, bytes.NewBuffer(payload))
 
-	res := fmt.Sprintf("published %s with len(payload) %d", jsonrpcTopic, len(params[1]))
-	return res, nil
+	result :=
+		`{ 
+			"result": "published"
+		}`
+	return result, nil
+}
+
+var sendBidTx = func(s *Server, params []string) (string, error) {
+
+	// TODO: Not Implemented
+
+	result :=
+		`{ 
+			"txid": "unknown"
+		}`
+
+	return result, nil
 }

@@ -12,16 +12,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
+func Launch(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
 	m := zkproof.CalculateM(k)
 	d := getD(m, eventBus, db)
 	broker, err := newBroker(eventBus, rpcBus, d, k, m, gen, blockGen, keys, publicKey)
@@ -34,10 +35,11 @@ func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, 
 }
 
 type broker struct {
-	k                    ristretto.Scalar
-	m                    ristretto.Scalar
-	eventBroker          wire.EventBroker
-	proofGenerator       Generator
+	k              ristretto.Scalar
+	m              ristretto.Scalar
+	eventBroker    eventbus.Broker
+	proofGenerator Generator
+
 	forwarder            *forwarder
 	seeder               *seeder
 	certificateGenerator *certificateGenerator
@@ -49,7 +51,7 @@ type broker struct {
 	acceptedBlockChan    <-chan block.Block
 }
 
-func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k, m ristretto.Scalar,
+func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristretto.Scalar,
 	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
 		var err error
@@ -117,11 +119,9 @@ func (b *broker) Listen() {
 	for {
 		select {
 		case bid := <-b.bidChan:
-			if b.proofGenerator != nil {
-				b.proofGenerator.UpdateBidList(bid)
-			}
+			b.proofGenerator.UpdateBidList(bid)
 		case state := <-b.regenerationChan:
-			if state.Round == b.seeder.Round() && b.proofGenerator != nil {
+			if state.Round == b.seeder.Round() {
 				b.forwarder.threshold.Lower()
 				b.generateProofAndBlock()
 			}
@@ -129,9 +129,7 @@ func (b *broker) Listen() {
 			cert := b.certificateGenerator.generateCertificate()
 			b.sendCertificateMsg(cert, winningBlockHash)
 		case blk := <-b.acceptedBlockChan:
-			if b.proofGenerator != nil {
-				b.onBlock(blk)
-			}
+			b.onBlock(blk)
 		}
 	}
 }
@@ -156,14 +154,11 @@ func (b *broker) handleBlock(blk block.Block) error {
 	if b.proofGenerator.InBidList() {
 		b.generateProofAndBlock()
 	} else {
-		// We will remove the old proofgenerator, to avoid creation of obsolete proofs
-		// until we get new proof values
-		b.proofGenerator = nil
-
 		// Then, we will wait till a new bid belonging to us is found
-		go func() {
-			b.updateProofValues()
-		}()
+		b.updateProofValues()
+
+		// Drain the regeneration, winning block hash and accepted block channels
+		b.drainChannels()
 	}
 
 	return nil
@@ -203,11 +198,20 @@ func (b *broker) updateProofValues() {
 	log.WithFields(log.Fields{
 		"process": "generation",
 	}).Debugln("changing d value")
-	var err error
-	b.proofGenerator, err = newProofGenerator(d, b.k, b.m)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "generation",
-		}).WithError(err).Errorln("could not repopulate bidlist")
+
+	b.proofGenerator.UpdateProofValues(d, b.m)
+}
+
+func (b *broker) drainChannels() {
+	for len(b.regenerationChan) > 0 {
+		<-b.regenerationChan
+	}
+
+	for len(b.winningBlockHashChan) > 0 {
+		<-b.winningBlockHashChan
+	}
+
+	for len(b.acceptedBlockChan) > 0 {
+		<-b.acceptedBlockChan
 	}
 }

@@ -1,4 +1,4 @@
-package wire
+package rpcbus
 
 import (
 	"bytes"
@@ -72,7 +72,7 @@ type Req struct {
 	ErrChan  chan error
 }
 
-func NewRPCBus() *RPCBus {
+func New() *RPCBus {
 	var bus RPCBus
 	bus.registry = make(map[string]method)
 

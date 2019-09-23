@@ -14,9 +14,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer
@@ -36,7 +37,7 @@ type Writer struct {
 	*Connection
 	gossip     *processing.Gossip
 	gossipID   uint32
-	subscriber wire.EventSubscriber
+	subscriber eventbus.Subscriber
 	// TODO: add service flag
 }
 
@@ -53,7 +54,7 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscriber) *Writer {
+func NewWriter(conn net.Conn, magic protocol.Magic, subscriber eventbus.Subscriber) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:  conn,
@@ -68,7 +69,7 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber wire.EventSubscri
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher wire.EventPublisher, rpcBus *wire.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
+func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
 	pconn := &Connection{
 		Conn:  conn,
 		magic: magic,

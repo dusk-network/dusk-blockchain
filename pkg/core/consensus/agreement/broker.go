@@ -10,13 +10,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) {
+func Launch(eventBroker eventbus.Broker, c committee.Foldable, keys user.Keys) {
 	if c == nil {
 		c = committee.NewAgreement(eventBroker, nil)
 		eventBroker.SubscribeCallback(msg.RoundUpdateTopic, c.RemoveExpiredProvisioners)
@@ -28,14 +29,14 @@ func Launch(eventBroker wire.EventBroker, c committee.Foldable, keys user.Keys) 
 }
 
 type broker struct {
-	publisher  wire.EventPublisher
+	publisher  eventbus.Publisher
 	handler    *agreementHandler
 	state      consensus.State
 	filter     *consensus.EventFilter
 	resultChan <-chan voteSet
 }
 
-func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
+func launchFilter(eventBroker eventbus.Broker, committee committee.Committee,
 	handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(handler, state, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
@@ -44,7 +45,7 @@ func launchFilter(eventBroker wire.EventBroker, committee committee.Committee,
 	return filter
 }
 
-func newBroker(eventBroker wire.EventBroker, committee committee.Foldable, keys user.Keys) *broker {
+func newBroker(eventBroker eventbus.Broker, committee committee.Foldable, keys user.Keys) *broker {
 	handler := newHandler(committee, keys)
 	state := consensus.NewState()
 	filter := launchFilter(eventBroker, committee, handler, state)

@@ -14,8 +14,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-crypto/mlsag"
@@ -28,8 +29,8 @@ var testnet = byte(2)
 
 // TODO: rename
 type CLI struct {
-	eventBroker wire.EventBroker
-	rpcBus      *wire.RPCBus
+	eventBroker eventbus.Broker
+	rpcBus      *rpcbus.RPCBus
 	transactor  *transactor.Transactor
 	counter     *chainsync.Counter
 }

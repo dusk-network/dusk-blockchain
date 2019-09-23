@@ -4,13 +4,13 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
 // Use the TxRetriever to get a valid bid transaction that belongs to us, and return the D value from that bid.
-func getD(m ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) ristretto.Scalar {
+func getD(m ristretto.Scalar, subscriber eventbus.Subscriber, db database.DB) ristretto.Scalar {
 	retriever := newBidRetriever(db)
 	bid, err := retriever.SearchForBid(m.Bytes())
 	if err != nil {
@@ -36,7 +36,7 @@ func getD(m ristretto.Scalar, subscriber wire.EventSubscriber, db database.DB) r
 	return d
 }
 
-func waitForBid(subscriber wire.EventSubscriber, m []byte) transactions.Transaction {
+func waitForBid(subscriber eventbus.Subscriber, m []byte) transactions.Transaction {
 	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(subscriber)
 	defer listener.Quit()
 

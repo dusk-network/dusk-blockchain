@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -31,10 +32,10 @@ func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
 	return nil
 }
 
-func getInitialRound(eventBus wire.EventBroker) uint64 {
+func getInitialRound(eventBus eventbus.Broker) uint64 {
 	initChannel := make(chan uint64, 1)
 	initCollector := &initCollector{initChannel}
-	go wire.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()
+	go eventbus.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()
 
 	// Wait for the initial round to be published
 	round := <-initChannel
@@ -45,10 +46,10 @@ func getInitialRound(eventBus wire.EventBroker) uint64 {
 	return round
 }
 
-func initReductionResultCollector(subscriber wire.EventSubscriber) <-chan voteSet {
+func initReductionResultCollector(subscriber eventbus.Subscriber) <-chan voteSet {
 	resultChan := make(chan voteSet, 1)
 	collector := &reductionResultCollector{resultChan, reduction.NewUnMarshaller()}
-	go wire.NewTopicListener(subscriber, collector, msg.ReductionResultTopic).Accept()
+	go eventbus.NewTopicListener(subscriber, collector, msg.ReductionResultTopic).Accept()
 	return resultChan
 }
 

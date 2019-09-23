@@ -9,7 +9,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -31,17 +31,17 @@ type (
 	LogProcessor struct {
 		*log.Logger
 		lastBlock         *block.Block
-		p                 wire.EventPublisher
+		p                 eventbus.Publisher
 		entry             *log.Entry
 		acceptedBlockChan <-chan block.Block
 		EntryChan         chan []byte
 		quitChan          chan struct{}
-		listener          *wire.TopicListener
+		listener          *eventbus.TopicListener
 	}
 )
 
 // New creates a LogProcessor
-func New(p wire.EventBroker, w io.WriteCloser, formatter log.Formatter) *LogProcessor {
+func New(p eventbus.Broker, w io.WriteCloser, formatter log.Formatter) *LogProcessor {
 	logger := log.New()
 	logger.Out = w
 	if formatter == nil {

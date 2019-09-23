@@ -8,7 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
 
@@ -52,7 +52,7 @@ type (
 )
 
 // LaunchStore creates a component that listens to changes to the Provisioners
-func LaunchStore(eventBroker wire.EventBroker, db database.DB) *Store {
+func LaunchStore(eventBroker eventbus.Broker, db database.DB) *Store {
 	p, totalWeight, err := user.NewProvisioners(db)
 	if err != nil {
 		// If we can not repopulate our committee, we can not properly verify blocks
@@ -70,7 +70,7 @@ func LaunchStore(eventBroker wire.EventBroker, db database.DB) *Store {
 }
 
 // NewExtractor returns a committee extractor which maintains its own store and cache.
-func NewExtractor(eventBroker wire.EventBroker, db database.DB) *Extractor {
+func NewExtractor(eventBroker eventbus.Broker, db database.DB) *Extractor {
 	return &Extractor{
 		Store:          LaunchStore(eventBroker, db),
 		committeeCache: make(map[uint8]user.VotingCommittee),
