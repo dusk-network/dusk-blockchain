@@ -37,19 +37,15 @@ func (v *Version) Encode(w *bytes.Buffer) error {
 
 // Decode will Decodde a Version struct from r.
 func (v *Version) Decode(r *bytes.Buffer) error {
-	var err error
-	v.Major, err = encoding.ReadUint8(r)
-	if err != nil {
+	if err := encoding.ReadUint8(r, &v.Major); err != nil {
 		return err
 	}
 
-	v.Minor, err = encoding.ReadUint8(r)
-	if err != nil {
+	if err := encoding.ReadUint8(r, &v.Minor); err != nil {
 		return err
 	}
 
-	v.Patch, err = encoding.ReadUint16LE(r)
-	if err != nil {
+	if err := encoding.ReadUint16LE(r, &v.Patch); err != nil {
 		return err
 	}
 

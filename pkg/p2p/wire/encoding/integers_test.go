@@ -24,16 +24,16 @@ func TestIntegerEncodeDecode(t *testing.T) {
 	// Serialize
 	buf := new(bytes.Buffer)
 
-	if err := WriteUint8(buf, a); err != nil {
+	if err := encoding.WriteUint8(buf, a); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteUint16(buf, binary.LittleEndian, b); err != nil {
+	if err := encoding.WriteUint16LE(buf, b); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteUint32(buf, binary.LittleEndian, c); err != nil {
+	if err := encoding.WriteUint32LE(buf, c); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteUint64(buf, binary.LittleEndian, d); err != nil {
+	if err := encoding.WriteUint64LE(buf, d); err != nil {
 		t.Fatal(err)
 	}
 
@@ -42,16 +42,16 @@ func TestIntegerEncodeDecode(t *testing.T) {
 	var f uint16
 	var g uint32
 	var h uint64
-	if err := ReadUint8(buf, &e); err != nil {
+	if err := encoding.ReadUint8(buf, &e); err != nil {
 		t.Fatal(err)
 	}
-	if err := ReadUint16(buf, binary.LittleEndian, &f); err != nil {
+	if err := encoding.ReadUint16LE(buf, &f); err != nil {
 		t.Fatal(err)
 	}
-	if err := ReadUint32(buf, binary.LittleEndian, &g); err != nil {
+	if err := encoding.ReadUint32LE(buf, &g); err != nil {
 		t.Fatal(err)
 	}
-	if err := ReadUint64(buf, binary.LittleEndian, &h); err != nil {
+	if err := encoding.ReadUint64LE(buf, &h); err != nil {
 		t.Fatal(err)
 	}
 
@@ -72,16 +72,16 @@ func TestSignedInteger(t *testing.T) {
 	// Serialize
 	buf := new(bytes.Buffer)
 
-	if err := WriteUint8(buf, uint8(a)); err != nil {
+	if err := encoding.WriteUint8(buf, uint8(a)); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteUint16(buf, binary.LittleEndian, uint16(b)); err != nil {
+	if err := encoding.WriteUint16LE(buf, uint16(b)); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteUint32(buf, binary.LittleEndian, uint32(c)); err != nil {
+	if err := encoding.WriteUint32LE(buf, uint32(c)); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteUint64(buf, binary.LittleEndian, uint64(d)); err != nil {
+	if err := encoding.WriteUint64LE(buf, uint64(d)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,16 +90,16 @@ func TestSignedInteger(t *testing.T) {
 	var f uint16
 	var g uint32
 	var h uint64
-	if err := ReadUint8(buf, &e); err != nil {
+	if err := encoding.ReadUint8(buf, &e); err != nil {
 		t.Fatal(err)
 	}
-	if err := ReadUint16(buf, binary.LittleEndian, &f); err != nil {
+	if err := encoding.ReadUint16LE(buf, &f); err != nil {
 		t.Fatal(err)
 	}
-	if err := ReadUint32(buf, binary.LittleEndian, &g); err != nil {
+	if err := encoding.ReadUint32LE(buf, &g); err != nil {
 		t.Fatal(err)
 	}
-	if err := ReadUint64(buf, binary.LittleEndian, &h); err != nil {
+	if err := encoding.ReadUint64LE(buf, &h); err != nil {
 		t.Fatal(err)
 	}
 
@@ -124,9 +124,11 @@ func BenchmarkReadUint8Interface(b *testing.B) {
 }
 
 func BenchmarkReadUint8NoInterface(b *testing.B) {
+	var v uint8
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer([]byte{1})
-		if _, err := encoding.ReadUint8(buf); err != nil {
+		if err := encoding.ReadUint8(buf, &v); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -162,9 +164,11 @@ func BenchmarkReadUint16Interface(b *testing.B) {
 }
 
 func BenchmarkReadUint16NoInterface(b *testing.B) {
+	var v uint16
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer([]byte{1, 2})
-		if _, err := encoding.ReadUint16LE(buf); err != nil {
+		if err := encoding.ReadUint16LE(buf, &v); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -200,9 +204,11 @@ func BenchmarkReadUint32Interface(b *testing.B) {
 }
 
 func BenchmarkReadUint32NoInterface(b *testing.B) {
+	var v uint32
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer([]byte{1, 2, 3, 4})
-		if _, err := encoding.ReadUint32LE(buf); err != nil {
+		if err := encoding.ReadUint32LE(buf, &v); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -238,9 +244,11 @@ func BenchmarkReadUint64Interface(b *testing.B) {
 }
 
 func BenchmarkReadUint64NoInterface(b *testing.B) {
+	var v uint64
+
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer([]byte{1, 2, 3, 4, 5, 6, 7, 8})
-		if _, err := encoding.ReadUint32LE(buf); err != nil {
+		if err := encoding.ReadUint64LE(buf, &v); err != nil {
 			b.Fatal(err)
 		}
 	}

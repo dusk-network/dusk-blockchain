@@ -47,8 +47,8 @@ func TestStress(t *testing.T) {
 
 		voteSetBuf := <-voteSetChan
 		// The vote set buffer will have a round as it's first item. Let's read it and discard it
-		_, err := encoding.ReadUint64LE(voteSetBuf)
-		if err != nil {
+		var n uint64
+		if err := encoding.ReadUint64LE(voteSetBuf, &n); err != nil {
 			t.Fatal(err)
 		}
 

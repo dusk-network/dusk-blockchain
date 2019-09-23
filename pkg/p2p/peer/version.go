@@ -40,15 +40,15 @@ func decodeVersionMessage(r *bytes.Buffer) (*VersionMessage, error) {
 		return nil, err
 	}
 
-	time, err := encoding.ReadUint64LE(r)
-	if err != nil {
+	var time uint64
+	if err := encoding.ReadUint64LE(r, &time); err != nil {
 		return nil, err
 	}
 
 	versionMessage.Timestamp = int64(time)
 
-	services, err := encoding.ReadUint64LE(r)
-	if err != nil {
+	var services uint64
+	if err := encoding.ReadUint64LE(r, &services); err != nil {
 		return nil, err
 	}
 

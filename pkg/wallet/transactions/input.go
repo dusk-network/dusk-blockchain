@@ -98,26 +98,26 @@ func MarshalInput(w *bytes.Buffer, i *Input, encodeSignature bool) error {
 
 // Decode an Input object from a bytes.Buffer.
 func UnmarshalInput(r *bytes.Buffer, i *Input) error {
-	keyImageBytes, err := encoding.Read256(r)
-	if err != nil {
+	keyImageBytes := make([]byte, 32)
+	if err := encoding.Read256(r, keyImageBytes); err != nil {
 		return err
 	}
 	i.KeyImage.UnmarshalBinary(keyImageBytes)
 
-	pubKeyBytes, err := encoding.Read256(r)
-	if err != nil {
+	pubKeyBytes := make([]byte, 32)
+	if err := encoding.Read256(r, pubKeyBytes); err != nil {
 		return err
 	}
 	i.PubKey.P.UnmarshalBinary(pubKeyBytes)
 
-	pseudoCommBytes, err := encoding.Read256(r)
-	if err != nil {
+	pseudoCommBytes := make([]byte, 32)
+	if err := encoding.Read256(r, pseudoCommBytes); err != nil {
 		return err
 	}
 	i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
 
-	sigBytes, err := encoding.ReadVarBytes(r)
-	if err != nil {
+	var sigBytes []byte
+	if err := encoding.ReadVarBytes(r, &sigBytes); err != nil {
 		return err
 	}
 

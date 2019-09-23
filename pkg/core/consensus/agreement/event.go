@@ -135,8 +135,8 @@ func (au *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	a.SignedVotes, err = encoding.ReadBLS(r)
-	if err != nil {
+	a.SignedVotes = make([]byte, 33)
+	if err = encoding.ReadBLS(r, a.SignedVotes); err != nil {
 		return err
 	}
 
@@ -199,26 +199,25 @@ func UnmarshalVotes(r *bytes.Buffer, votes *[]*StepVotes) error {
 func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	sv := NewStepVotes()
 	// APK
-	apk, err := encoding.ReadVarBytes(r)
-	if err != nil {
+	var apk []byte
+	if err := encoding.ReadVarBytes(r, &apk); err != nil {
 		return nil, err
 	}
 
+	var err error
 	sv.Apk, err = bls.UnmarshalApk(apk)
 	if err != nil {
 		return nil, err
 	}
 
 	// BitSet
-	bitset, err := encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &sv.BitSet); err != nil {
 		return nil, err
 	}
-	sv.BitSet = bitset
 
 	// Signature
-	signature, err := encoding.ReadBLS(r)
-	if err != nil {
+	signature := make([]byte, 33)
+	if err := encoding.ReadBLS(r, signature); err != nil {
 		return nil, err
 	}
 

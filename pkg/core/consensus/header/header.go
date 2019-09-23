@@ -71,9 +71,7 @@ func (hu *headerUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*Header)
 
 	// Decoding PubKey BLS
-	var err error
-	consensusEv.PubKeyBLS, err = encoding.ReadVarBytes(r)
-	if err != nil {
+	if err := encoding.ReadVarBytes(r, &consensusEv.PubKeyBLS); err != nil {
 		return err
 	}
 
@@ -97,17 +95,14 @@ func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
 // UnmarshalSignableVote unmarshals the fields necessary for a Committee member to cast
 // a Vote (namely the Round, the Step and the BlockHash).
 func UnmarshalSignableVote(r *bytes.Buffer, vote *Header) error {
-	var err error
-	vote.Round, err = encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &vote.Round); err != nil {
 		return err
 	}
 
-	vote.Step, err = encoding.ReadUint8(r)
-	if err != nil {
+	if err := encoding.ReadUint8(r, &vote.Step); err != nil {
 		return err
 	}
 
-	vote.BlockHash, err = encoding.Read256(r)
-	return err
+	vote.BlockHash = make([]byte, 32)
+	return encoding.Read256(r, vote.BlockHash)
 }

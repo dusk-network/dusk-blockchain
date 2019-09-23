@@ -24,32 +24,28 @@ type (
 )
 
 func decodeNewProvisioner(r *bytes.Buffer) (*provisioner, error) {
-	pubKeyEd, err := encoding.Read256(r)
-	if err != nil {
+	p := &provisioner{make([]byte, 32), make([]byte, 129), 0, 0, 0}
+	if err := encoding.Read256(r, p.pubKeyEd); err != nil {
 		return nil, err
 	}
 
-	pubKeyBLS, err := encoding.ReadVarBytes(r)
-	if err != nil {
+	if err := encoding.ReadVarBytes(r, &p.pubKeyBLS); err != nil {
 		return nil, err
 	}
 
-	amount, err := encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &p.amount); err != nil {
 		return nil, err
 	}
 
-	startHeight, err := encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &p.startHeight); err != nil {
 		return nil, err
 	}
 
-	endHeight, err := encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &p.endHeight); err != nil {
 		return nil, err
 	}
 
-	return &provisioner{pubKeyEd, pubKeyBLS, amount, startHeight, endHeight}, nil
+	return p, nil
 }
 
 func initRemoveProvisionerCollector(subscriber eventbus.Subscriber) chan []byte {

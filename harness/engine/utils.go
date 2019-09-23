@@ -3,7 +3,6 @@ package engine
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -172,7 +171,7 @@ func (n *Network) SendWireMsg(nodeIndex uint, msg []byte, writeTimeout int) erro
 func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
 	// Write magic
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint32(buf, binary.LittleEndian, uint32(magic)); err != nil {
+	if err := encoding.WriteUint32LE(buf, uint32(magic)); err != nil {
 		return nil, err
 	}
 
@@ -200,7 +199,7 @@ func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
 	msg := new(bytes.Buffer)
 	// Append prefix(header)
-	if err := encoding.WriteUint64(msg, binary.LittleEndian, uint64(0)); err != nil {
+	if err := encoding.WriteUint64LE(msg, uint64(0)); err != nil {
 		return nil, err
 	}
 

@@ -51,34 +51,30 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	sev := ev.(*ScoreEvent)
 
 	// Decoding Round
-	var err error
-	sev.Round, err = encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &sev.Round); err != nil {
 		return err
 	}
 
-	sev.Score, err = encoding.Read256(r)
-	if err != nil {
+	sev.Score = make([]byte, 32)
+	if err := encoding.Read256(r, sev.Score); err != nil {
 		return err
 	}
 
-	sev.Proof, err = encoding.ReadVarBytes(r)
-	if err != nil {
+	if err := encoding.ReadVarBytes(r, &sev.Proof); err != nil {
 		return err
 	}
 
-	sev.Z, err = encoding.Read256(r)
-	if err != nil {
+	sev.Z = make([]byte, 32)
+	if err := encoding.Read256(r, sev.Z); err != nil {
 		return err
 	}
 
-	sev.BidListSubset, err = encoding.ReadVarBytes(r)
-	if err != nil {
+	if err := encoding.ReadVarBytes(r, &sev.BidListSubset); err != nil {
 		return err
 	}
 
-	sev.PrevHash, err = encoding.Read256(r)
-	if err != nil {
+	sev.PrevHash = make([]byte, 32)
+	if err := encoding.Read256(r, sev.PrevHash); err != nil {
 		return err
 	}
 
@@ -86,13 +82,13 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	sev.Seed, err = encoding.ReadBLS(r)
-	if err != nil {
+	sev.Seed = make([]byte, 33)
+	if err := encoding.ReadBLS(r, sev.Seed); err != nil {
 		return err
 	}
 
-	sev.VoteHash, err = encoding.Read256(r)
-	if err != nil {
+	sev.VoteHash = make([]byte, 32)
+	if err := encoding.Read256(r, sev.VoteHash); err != nil {
 		return err
 	}
 

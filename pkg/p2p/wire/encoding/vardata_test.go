@@ -25,8 +25,8 @@ func TestVarBytesEncodeDecode(t *testing.T) {
 	}
 
 	// Deserialize
-	rbs, err := ReadVarBytes(buf)
-	if err != nil {
+	var rbs []byte
+	if err := ReadVarBytes(buf, &rbs); err != nil {
 		t.Fatal(err)
 	}
 

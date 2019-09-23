@@ -50,8 +50,8 @@ func startProvisioner(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wal
 		return
 	}
 
-	currentHeight, err := encoding.ReadUint64LE(&resultBuf)
-	if err != nil {
+	var currentHeight uint64
+	if err := encoding.ReadUint64LE(&resultBuf, &currentHeight); err != nil {
 		l.WithError(err).Warnln("could not decode current height, starting from 1")
 		sendInitMessage(eventBroker, 1)
 		return

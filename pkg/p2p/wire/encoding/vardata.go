@@ -8,17 +8,17 @@ import (
 
 // ReadVarBytes will read a CompactSize int denoting the length, then
 // proceeds to read that amount of bytes from r into b.
-func ReadVarBytes(r *bytes.Buffer) ([]byte, error) {
+func ReadVarBytes(r *bytes.Buffer, b *[]byte) error {
 	c, err := ReadVarInt(r)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	b := make([]byte, c)
-	if _, err := r.Read(b); err != nil {
-		return nil, err
+	*b = make([]byte, c)
+	if _, err := r.Read(*b); err != nil {
+		return err
 	}
-	return b, nil
+	return nil
 }
 
 // WriteVarBytes will serialize a CompactSize int denoting the length, then
@@ -38,8 +38,8 @@ func WriteVarBytes(w *bytes.Buffer, b []byte) error {
 // ReadString reads the data with ReadVarBytes and returns it as a string
 // by simple type conversion.
 func ReadString(r *bytes.Buffer) (string, error) {
-	b, err := ReadVarBytes(r)
-	if err != nil {
+	var b []byte
+	if err := ReadVarBytes(r, &b); err != nil {
 		return "", err
 	}
 	return string(b), nil

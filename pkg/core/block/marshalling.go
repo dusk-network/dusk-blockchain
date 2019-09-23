@@ -94,35 +94,32 @@ func MarshalHeader(r *bytes.Buffer, h *Header) error {
 }
 
 func UnmarshalHeader(r *bytes.Buffer, h *Header) error {
-	var err error
-	h.Version, err = encoding.ReadUint8(r)
-	if err != nil {
+	if err := encoding.ReadUint8(r, &h.Version); err != nil {
 		return err
 	}
 
-	h.Height, err = encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &h.Height); err != nil {
 		return err
 	}
 
-	timestamp, err := encoding.ReadUint64LE(r)
-	if err != nil {
+	var timestamp uint64
+	if err := encoding.ReadUint64LE(r, &timestamp); err != nil {
 		return err
 	}
 	h.Timestamp = int64(timestamp)
 
-	h.PrevBlockHash, err = encoding.Read256(r)
-	if err != nil {
+	h.PrevBlockHash = make([]byte, 32)
+	if err := encoding.Read256(r, h.PrevBlockHash); err != nil {
 		return err
 	}
 
-	h.Seed, err = encoding.ReadBLS(r)
-	if err != nil {
+	h.Seed = make([]byte, 33)
+	if err := encoding.ReadBLS(r, h.Seed); err != nil {
 		return err
 	}
 
-	h.TxRoot, err = encoding.Read256(r)
-	if err != nil {
+	h.TxRoot = make([]byte, 32)
+	if err := encoding.Read256(r, h.TxRoot); err != nil {
 		return err
 	}
 
@@ -130,8 +127,8 @@ func UnmarshalHeader(r *bytes.Buffer, h *Header) error {
 		return err
 	}
 
-	h.Hash, err = encoding.Read256(r)
-	if err != nil {
+	h.Hash = make([]byte, 32)
+	if err := encoding.Read256(r, h.Hash); err != nil {
 		return err
 	}
 
@@ -163,29 +160,25 @@ func MarshalCertificate(r *bytes.Buffer, c *Certificate) error {
 }
 
 func UnmarshalCertificate(r *bytes.Buffer, c *Certificate) error {
-	var err error
-	c.StepOneBatchedSig, err = encoding.ReadBLS(r)
-	if err != nil {
+	c.StepOneBatchedSig = make([]byte, 33)
+	if err := encoding.ReadBLS(r, c.StepOneBatchedSig); err != nil {
 		return err
 	}
 
-	c.StepTwoBatchedSig, err = encoding.ReadBLS(r)
-	if err != nil {
+	c.StepTwoBatchedSig = make([]byte, 33)
+	if err := encoding.ReadBLS(r, c.StepTwoBatchedSig); err != nil {
 		return err
 	}
 
-	c.Step, err = encoding.ReadUint8(r)
-	if err != nil {
+	if err := encoding.ReadUint8(r, &c.Step); err != nil {
 		return err
 	}
 
-	c.StepOneCommittee, err = encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &c.StepOneCommittee); err != nil {
 		return err
 	}
 
-	c.StepTwoCommittee, err = encoding.ReadUint64LE(r)
-	if err != nil {
+	if err := encoding.ReadUint64LE(r, &c.StepTwoCommittee); err != nil {
 		return err
 	}
 

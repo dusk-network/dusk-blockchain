@@ -62,8 +62,8 @@ func (u *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	bev.SignedHash, err = encoding.ReadBLS(r)
-	if err != nil {
+	bev.SignedHash = make([]byte, 33)
+	if err = encoding.ReadBLS(r, bev.SignedHash); err != nil {
 		return err
 	}
 

@@ -10,8 +10,8 @@ import (
 )
 
 func Unmarshal(r *bytes.Buffer) (Transaction, error) {
-	txType, err := encoding.ReadUint8(r)
-	if err != nil {
+	var txType uint8
+	if err := encoding.ReadUint8(r, &txType); err != nil {
 		return nil, err
 	}
 
@@ -206,17 +206,15 @@ func MarshalCoinbase(w *bytes.Buffer, c *Coinbase) error {
 }
 
 func UnmarshalStandard(w *bytes.Buffer, s *Standard) error {
-	RBytes, err := encoding.Read256(w)
-	if err != nil {
+	RBytes := make([]byte, 32)
+	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
 	}
 	s.R.UnmarshalBinary(RBytes)
 
-	ver, err := encoding.ReadUint8(w)
-	if err != nil {
+	if err := encoding.ReadUint8(w, &s.Version); err != nil {
 		return err
 	}
-	s.Version = ver
 
 	lInputs, err := encoding.ReadVarInt(w)
 	if err != nil {
@@ -244,14 +242,14 @@ func UnmarshalStandard(w *bytes.Buffer, s *Standard) error {
 		}
 	}
 
-	fee, err := encoding.ReadUint64LE(w)
-	if err != nil {
+	var fee uint64
+	if err := encoding.ReadUint64LE(w, &fee); err != nil {
 		return err
 	}
 	s.Fee.SetBigInt(big.NewInt(0).SetUint64(fee))
 
-	rangeProofBuf, err := encoding.ReadVarBytes(w)
-	if err != nil {
+	var rangeProofBuf []byte
+	if err := encoding.ReadVarBytes(w, &rangeProofBuf); err != nil {
 		return err
 	}
 	return s.RangeProof.Decode(bytes.NewBuffer(rangeProofBuf), true)
@@ -263,8 +261,7 @@ func UnmarshalTimelock(r *bytes.Buffer, tx *Timelock) error {
 		return err
 	}
 
-	tx.Lock, err = encoding.ReadUint64LE(r)
-	if err != nil {
+	if err = encoding.ReadUint64LE(r, &tx.Lock); err != nil {
 		return err
 	}
 
@@ -277,8 +274,8 @@ func UnmarshalBid(r *bytes.Buffer, tx *Bid) error {
 		return err
 	}
 
-	tx.M, err = encoding.Read256(r)
-	if err != nil {
+	tx.M = make([]byte, 32)
+	if err := encoding.Read256(r, tx.M); err != nil {
 		return err
 	}
 
@@ -291,13 +288,12 @@ func UnmarshalStake(r *bytes.Buffer, tx *Stake) error {
 		return err
 	}
 
-	tx.PubKeyEd, err = encoding.Read256(r)
-	if err != nil {
+	tx.PubKeyEd = make([]byte, 32)
+	if err := encoding.Read256(r, tx.PubKeyEd); err != nil {
 		return err
 	}
 
-	tx.PubKeyBLS, err = encoding.ReadVarBytes(r)
-	if err != nil {
+	if err := encoding.ReadVarBytes(r, &tx.PubKeyBLS); err != nil {
 		return err
 	}
 
@@ -305,19 +301,18 @@ func UnmarshalStake(r *bytes.Buffer, tx *Stake) error {
 }
 
 func UnmarshalCoinbase(w *bytes.Buffer, c *Coinbase) error {
-	RBytes, err := encoding.Read256(w)
-	if err != nil {
+	RBytes := make([]byte, 32)
+	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
 	}
 	c.R.UnmarshalBinary(RBytes)
 
-	c.Score, err = encoding.Read256(w)
-	if err != nil {
+	c.Score = make([]byte, 32)
+	if err := encoding.Read256(w, c.Score); err != nil {
 		return err
 	}
 
-	c.Proof, err = encoding.ReadVarBytes(w)
-	if err != nil {
+	if err := encoding.ReadVarBytes(w, &c.Proof); err != nil {
 		return err
 	}
 

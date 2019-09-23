@@ -96,25 +96,21 @@ func (b *bidListCollector) Collect(r *bytes.Buffer) error {
 }
 
 func decodeBid(r *bytes.Buffer) user.Bid {
-	xSlice, err := encoding.Read256(r)
-	if err != nil {
-		panic(err)
-	}
-
-	mSlice, err := encoding.Read256(r)
-	if err != nil {
-		panic(err)
-	}
-
-	endHeight, err := encoding.ReadUint64LE(r)
-	if err != nil {
-		panic(err)
-	}
-
 	var x [32]byte
-	copy(x[:], xSlice)
+	if err := encoding.Read256(r, x[:]); err != nil {
+		panic(err)
+	}
+
 	var m [32]byte
-	copy(m[:], mSlice)
+	if err := encoding.Read256(r, m[:]); err != nil {
+		panic(err)
+	}
+
+	var endHeight uint64
+	if err := encoding.ReadUint64LE(r, &endHeight); err != nil {
+		panic(err)
+	}
+
 	return user.Bid{x, m, endHeight}
 }
 

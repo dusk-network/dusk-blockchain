@@ -63,8 +63,8 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 	inv.InvList = make([]InvVect, lenVect)
 	for i := uint64(0); i < lenVect; i++ {
 
-		invType, err := encoding.ReadUint8(r)
-		if err != nil {
+		var invType uint8
+		if err := encoding.ReadUint8(r, &invType); err != nil {
 			return err
 		}
 
@@ -74,8 +74,8 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 			return fmt.Errorf("not supported inventory data type %d", inv.InvList[i].Type)
 		}
 
-		inv.InvList[i].Hash, err = encoding.Read256(r)
-		if err != nil {
+		inv.InvList[i].Hash = make([]byte, 32)
+		if err = encoding.Read256(r, inv.InvList[i].Hash); err != nil {
 			return err
 		}
 	}

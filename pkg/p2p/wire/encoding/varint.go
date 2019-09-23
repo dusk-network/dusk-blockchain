@@ -11,15 +11,15 @@ import (
 // and then deserializes the number accordingly.
 func ReadVarInt(r *bytes.Buffer) (uint64, error) {
 	// Get discriminant from variable int
-	d, err := ReadUint8(r)
-	if err != nil {
+	var d uint8
+	if err := ReadUint8(r, &d); err != nil {
 		return 0, err
 	}
 
+	var rv uint64
 	switch d {
 	case 0xff:
-		rv, err := ReadUint64LE(r)
-		if err != nil {
+		if err := ReadUint64LE(r, &rv); err != nil {
 			return 0, err
 		}
 
@@ -27,37 +27,33 @@ func ReadVarInt(r *bytes.Buffer) (uint64, error) {
 		if rv < uint64(0x100000000) {
 			return 0, fmt.Errorf("non-canonical encoding")
 		}
-
-		return rv, nil
 	case 0xfe:
-		v, err := ReadUint32LE(r)
-		if err != nil {
+		var v uint32
+		if err := ReadUint32LE(r, &v); err != nil {
 			return 0, err
 		}
-		rv := uint64(v)
+		rv = uint64(v)
 
 		// Canonical encoding check
 		if rv < uint64(0x10000) {
 			return 0, fmt.Errorf("non-canonical encoding")
 		}
-
-		return rv, nil
 	case 0xfd:
-		v, err := ReadUint16LE(r)
-		if err != nil {
+		var v uint16
+		if err := ReadUint16LE(r, &v); err != nil {
 			return 0, err
 		}
-		rv := uint64(v)
+		rv = uint64(v)
 
 		// Canonical encoding check
 		if rv < uint64(0xfd) {
 			return 0, fmt.Errorf("non-canonical encoding")
 		}
-
-		return rv, nil
 	default:
-		return uint64(d), nil
+		rv = uint64(d)
 	}
+
+	return rv, nil
 }
 
 // WriteVarInt writes a CompactSize integer with a number of bytes depending on it's value

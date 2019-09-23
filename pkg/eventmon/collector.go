@@ -84,12 +84,11 @@ func (eu *UnMarshaller) Marshal(b *bytes.Buffer, e wire.Event) error {
 func (eu *UnMarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	ev := e.(*Event)
 
-	var err error
-	ev.Severity, err = encoding.ReadUint8(b)
-	if err != nil {
+	if err := encoding.ReadUint8(b, &ev.Severity); err != nil {
 		return err
 	}
 
+	var err error
 	ev.Msg, err = encoding.ReadString(b)
 	if err != nil {
 		return err

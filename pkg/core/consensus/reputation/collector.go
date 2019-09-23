@@ -12,8 +12,8 @@ type absentees struct {
 }
 
 func decodeAbsentees(m *bytes.Buffer) (*absentees, error) {
-	round, err := encoding.ReadUint64LE(m)
-	if err != nil {
+	var round uint64
+	if err := encoding.ReadUint64LE(m, &round); err != nil {
 		return nil, err
 	}
 
@@ -24,8 +24,7 @@ func decodeAbsentees(m *bytes.Buffer) (*absentees, error) {
 
 	pks := make([][]byte, lenAbsentees)
 	for i := range pks {
-		pks[i], err = encoding.ReadVarBytes(m)
-		if err != nil {
+		if err = encoding.ReadVarBytes(m, &pks[i]); err != nil {
 			return nil, err
 		}
 	}

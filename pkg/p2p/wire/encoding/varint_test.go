@@ -2,7 +2,6 @@ package encoding
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +41,6 @@ func TestCompactSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println("reading h")
 	h, err := ReadVarInt(buf)
 	if err != nil {
 		t.Fatal(err)

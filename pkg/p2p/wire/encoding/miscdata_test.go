@@ -21,8 +21,8 @@ func TestBoolEncodeDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := encoding.ReadBool(buf)
-	if err != nil {
+	var c bool
+	if err := encoding.ReadBool(buf, &c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -48,8 +48,8 @@ func Test256EncodeDecode(t *testing.T) {
 	assert.Equal(t, len(buf.Bytes()), 32)
 
 	// Deserialize
-	hash, err := encoding.Read256(buf)
-	if err != nil {
+	hash := make([]byte, 32)
+	if err := encoding.Read256(buf, hash); err != nil {
 		t.Fatal(err)
 	}
 
@@ -74,8 +74,8 @@ func Test512EncodeDecode(t *testing.T) {
 	assert.Equal(t, len(buf.Bytes()), 64)
 
 	// Deserialize
-	hash, err := encoding.Read512(buf)
-	if err != nil {
+	hash := make([]byte, 64)
+	if err := encoding.Read512(buf, hash); err != nil {
 		t.Fatal(err)
 	}
 
@@ -154,8 +154,8 @@ func TestBLSEncodeDecode(t *testing.T) {
 	assert.Equal(t, len(buf.Bytes()), 33)
 
 	// Deserialize
-	hash, err := encoding.ReadBLS(buf)
-	if err != nil {
+	hash := make([]byte, 33)
+	if err := encoding.ReadBLS(buf, hash); err != nil {
 		t.Fatal(err)
 	}
 
@@ -202,9 +202,10 @@ func BenchmarkReadBoolInterface(b *testing.B) {
 }
 
 func BenchmarkReadBoolNoInterface(b *testing.B) {
+	var t bool
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer([]byte{1})
-		if _, err := encoding.ReadBool(buf); err != nil {
+		if err := encoding.ReadBool(buf, &t); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -237,9 +238,10 @@ func BenchmarkRead256Interface(b *testing.B) {
 }
 
 func BenchmarkRead256NoInterface(b *testing.B) {
+	bs := make([]byte, 32)
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 32))
-		if _, err := encoding.Read256(buf); err != nil {
+		if err := encoding.Read256(buf, bs); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -274,9 +276,10 @@ func BenchmarkRead512Interface(b *testing.B) {
 }
 
 func BenchmarkRead512NoInterface(b *testing.B) {
+	bs := make([]byte, 64)
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 64))
-		if _, err := encoding.Read512(buf); err != nil {
+		if err := encoding.Read512(buf, bs); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -311,9 +314,10 @@ func BenchmarkReadBLSInterface(b *testing.B) {
 }
 
 func BenchmarkReadBLSNoInterface(b *testing.B) {
+	bs := make([]byte, 33)
 	for i := 0; i < b.N; i++ {
 		buf := bytes.NewBuffer(make([]byte, 33))
-		if _, err := encoding.ReadBLS(buf); err != nil {
+		if err := encoding.ReadBLS(buf, bs); err != nil {
 			b.Fatal(err)
 		}
 	}

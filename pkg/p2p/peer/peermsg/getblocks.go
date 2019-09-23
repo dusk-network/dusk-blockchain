@@ -36,8 +36,8 @@ func (g *GetBlocks) Decode(r *bytes.Buffer) error {
 
 	g.Locators = make([][]byte, lenLocators)
 	for i := uint64(0); i < lenLocators; i++ {
-		g.Locators[i], err = encoding.Read256(r)
-		if err != nil {
+		g.Locators[i] = make([]byte, 32)
+		if err = encoding.Read256(r, g.Locators[i]); err != nil {
 			return err
 		}
 	}
