@@ -17,8 +17,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +26,7 @@ const unixSoc = "unix:///tmp/dusk-socket"
 
 func TestLogger(t *testing.T) {
 	msgChan, addr, wg := initTest()
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	conn, err := net.Dial("unix", addr)
 	assert.NoError(t, err)
 
@@ -45,7 +45,7 @@ func TestLogger(t *testing.T) {
 
 func TestSupervisor(t *testing.T) {
 	msgChan, _, wg := initTest()
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
@@ -62,7 +62,7 @@ func TestSupervisor(t *testing.T) {
 
 func TestSupervisorReconnect(t *testing.T) {
 	msgChan, addr, wg := initTest()
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
@@ -99,7 +99,7 @@ func TestSupervisorReconnect(t *testing.T) {
 
 func TestResumeRight(t *testing.T) {
 	msgChan, _, wg := initTest()
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
@@ -133,7 +133,7 @@ func TestResumeRight(t *testing.T) {
 func TestNotifyErrors(t *testing.T) {
 	endChan := make(chan struct{})
 	msgChan, _, wg := initTest()
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
@@ -163,7 +163,7 @@ func TestHook(t *testing.T) {
 	// Neither do we need the waitgroup, since waiting for this server to stop will
 	// block indefinitely.
 	_, _, _ = initTest()
-	eb := wire.NewEventBus()
+	eb := eventbus.New()
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 

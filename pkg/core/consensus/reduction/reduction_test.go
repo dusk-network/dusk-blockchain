@@ -13,9 +13,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -209,7 +210,7 @@ func TestTimeOutVariance(t *testing.T) {
 }
 
 func launchCandidateVerifier(failVerification bool) {
-	r := <-wire.VerifyCandidateBlockChan
+	r := <-rpcbus.VerifyCandidateBlockChan
 	if failVerification {
 		r.ErrChan <- errors.New("verification failed")
 	} else {
@@ -217,11 +218,11 @@ func launchCandidateVerifier(failVerification bool) {
 	}
 }
 
-func launchReductionTest(inCommittee bool, quorum int) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
+func launchReductionTest(inCommittee bool, quorum int) (*eventbus.EventBus, *helper.SimpleStreamer, user.Keys) {
 	eb, streamer := helper.CreateGossipStreamer()
 	committeeMock := reduction.MockCommittee(quorum, inCommittee)
 	k, _ := user.NewRandKeys()
-	rpcBus := wire.NewRPCBus()
+	rpcBus := rpcbus.New()
 	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
 	// update round
 	consensus.UpdateRound(eb, 1)
@@ -232,12 +233,12 @@ func launchReductionTest(inCommittee bool, quorum int) (*wire.EventBus, *helper.
 // Convenience function, which launches the reduction component and removes the
 // preprocessors for testing purposes (bypassing the republisher and the validator).
 // This ensures proper handling of mocked Reduction events.
-func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration, rpcBus *wire.RPCBus) {
+func launchReduction(eb *eventbus.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration, rpcBus *rpcbus.RPCBus) {
 	reduction.Launch(eb, committee, k, timeOut, rpcBus)
 	eb.RemoveAllPreprocessors(string(topics.Reduction))
 }
 
-func sendReductionBuffers(amount int, hash []byte, round uint64, step uint8, eventBus *wire.EventBus) {
+func sendReductionBuffers(amount int, hash []byte, round uint64, step uint8, eventBus *eventbus.EventBus) {
 	for i := 0; i < amount; i++ {
 		k, _ := user.NewRandKeys()
 		ev := reduction.MockReductionBuffer(k, hash, round, step)
@@ -245,7 +246,7 @@ func sendReductionBuffers(amount int, hash []byte, round uint64, step uint8, eve
 	}
 }
 
-func sendSelection(round uint64, hash []byte, eventBus *wire.EventBus) {
+func sendSelection(round uint64, hash []byte, eventBus *eventbus.EventBus) {
 	bestScoreBuf := selection.MockSelectionEventBuffer(round, hash)
 	eventBus.Publish(msg.BestScoreTopic, bestScoreBuf)
 }

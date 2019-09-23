@@ -9,14 +9,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 func TestHandshake(t *testing.T) {
 
-	eb := wire.NewEventBus()
-	rpcBus := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpcBus := rpcbus.New()
 	counter := chainsync.NewCounter(eb)
 	client, srv := net.Pipe()
 

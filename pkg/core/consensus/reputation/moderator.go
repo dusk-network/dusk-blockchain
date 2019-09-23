@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 
 	log "github.com/sirupsen/logrus"
 
@@ -24,7 +25,7 @@ type Filter interface {
 }
 
 type moderator struct {
-	publisher wire.EventPublisher
+	publisher eventbus.Publisher
 	lock      sync.RWMutex
 	strikes   map[string]uint8
 	round     uint64
@@ -33,13 +34,13 @@ type moderator struct {
 }
 
 // Launch creates a component that tallies strikes for provisioners.
-func Launch(eventBroker wire.EventBroker) {
+func Launch(eventBroker eventbus.Broker) {
 	moderator := newModerator(eventBroker)
 	eventBroker.SubscribeCallback(msg.AbsenteesTopic, moderator.strikeAbsentees)
 	go moderator.listen()
 }
 
-func newModerator(eventBroker wire.EventBroker) *moderator {
+func newModerator(eventBroker eventbus.Broker) *moderator {
 	return &moderator{
 		publisher: eventBroker,
 		strikes:   make(map[string]uint8),

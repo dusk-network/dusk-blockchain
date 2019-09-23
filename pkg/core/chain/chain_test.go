@@ -15,16 +15,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/stretchr/testify/assert"
 )
 
 /*
 func TestDemoSaveFunctionality(t *testing.T) {
 
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	c, keys := agreement.MockCommittee(2, true, 2)
 	chain, err := New(eb, rpc, c)
 
@@ -64,8 +65,8 @@ func createMockedCertificate(hash []byte, round uint64, keys []user.Keys) *block
 }
 
 func TestFetchTip(t *testing.T) {
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	chain, err := New(eb, rpc, nil)
 
 	assert.Nil(t, err)
@@ -85,8 +86,8 @@ func TestFetchTip(t *testing.T) {
 
 // Make sure that certificates can still be properly verified when a provisioner is removed on round update.
 func TestCertificateExpiredProvisioner(t *testing.T) {
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	_, db := lite.CreateDBConnection()
 	c := committee.NewAgreement(eb, db)
 	chain, err := New(eb, rpc, c)
@@ -118,13 +119,13 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	assert.False(t, c.IsMember(k3.BLSPubKeyBytes, 2, 1))
 }
 
-func newProvisioner(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64) user.Keys {
+func newProvisioner(stake uint64, eb *eventbus.EventBus, startHeight, endHeight uint64) user.Keys {
 	k, _ := user.NewRandKeys()
 	publishNewStake(stake, eb, startHeight, endHeight, k)
 	return k
 }
 
-func publishNewStake(stake uint64, eb *wire.EventBus, startHeight, endHeight uint64, k user.Keys) {
+func publishNewStake(stake uint64, eb *eventbus.EventBus, startHeight, endHeight uint64, k user.Keys) {
 	buffer := bytes.NewBuffer(*k.EdPubKey)
 	_ = encoding.WriteVarBytes(buffer, k.BLSPubKeyBytes)
 

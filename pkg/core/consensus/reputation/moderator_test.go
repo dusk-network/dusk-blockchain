@@ -9,9 +9,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reputation"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -74,15 +74,15 @@ func TestClean(t *testing.T) {
 	}
 }
 
-func launchModerator() (wire.EventBroker, chan *bytes.Buffer) {
-	eventBus := wire.NewEventBus()
+func launchModerator() (eventbus.Broker, chan *bytes.Buffer) {
+	eventBus := eventbus.New()
 	reputation.Launch(eventBus)
 	removeProvisionerChan := make(chan *bytes.Buffer, 1)
 	eventBus.Subscribe(msg.RemoveProvisionerTopic, removeProvisionerChan)
 	return eventBus, removeProvisionerChan
 }
 
-func publishStrike(round uint64, eb wire.EventBroker, keys ...[]byte) {
+func publishStrike(round uint64, eb eventbus.Broker, keys ...[]byte) {
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64(buf, binary.LittleEndian, round); err != nil {
 		panic(err)

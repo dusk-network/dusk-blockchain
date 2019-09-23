@@ -16,9 +16,9 @@ import (
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -82,7 +82,7 @@ func TestSendOnce(t *testing.T) {
 	}
 }
 
-func propagateTxValues(txs []transactions.Transaction, bus *wire.EventBus, height uint64) {
+func propagateTxValues(txs []transactions.Transaction, bus *eventbus.EventBus, height uint64) {
 	for _, tx := range txs {
 		switch tx.Type() {
 		case transactions.BidType:
@@ -97,7 +97,7 @@ func propagateTxValues(txs []transactions.Transaction, bus *wire.EventBus, heigh
 	}
 }
 
-func propagateBid(bid user.Bid, bus *wire.EventBus) {
+func propagateBid(bid user.Bid, bus *eventbus.EventBus) {
 	buf := new(bytes.Buffer)
 	if err := encoding.Write256(buf, bid.X[:]); err != nil {
 		panic(err)
@@ -114,7 +114,7 @@ func propagateBid(bid user.Bid, bus *wire.EventBus) {
 	bus.Publish(msg.BidListTopic, buf)
 }
 
-func propagateStake(tx *transactions.Stake, startHeight uint64, bus *wire.EventBus) {
+func propagateStake(tx *transactions.Stake, startHeight uint64, bus *eventbus.EventBus) {
 	buffer := bytes.NewBuffer(tx.PubKeyEd)
 	if err := encoding.WriteVarBytes(buffer, tx.PubKeyBLS); err != nil {
 		panic(err)
@@ -135,9 +135,9 @@ func propagateStake(tx *transactions.Stake, startHeight uint64, bus *wire.EventB
 	bus.Publish(msg.NewProvisionerTopic, buffer)
 }
 
-func setupMaintainerTest(t *testing.T) (*wire.EventBus, chan *bytes.Buffer) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer) {
 	// Initial setup
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	wdb, err := database.New(dbPath)
 	txChan := make(chan *bytes.Buffer, 2)
 	bus.Subscribe(string(topics.Tx), txChan)

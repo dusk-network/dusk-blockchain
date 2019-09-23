@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type (
@@ -17,13 +18,13 @@ type (
 
 	// Republisher is responsible for gossiping a received event buffer.
 	Republisher struct {
-		publisher wire.EventPublisher
+		publisher eventbus.Publisher
 		topic     topics.Topic
 	}
 )
 
 // NewRepublisher returns a Republisher containing the specified parameters.
-func NewRepublisher(publisher wire.EventPublisher, topic topics.Topic) *Republisher {
+func NewRepublisher(publisher eventbus.Publisher, topic topics.Topic) *Republisher {
 	return &Republisher{publisher, topic}
 }
 

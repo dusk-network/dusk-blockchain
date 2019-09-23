@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 const committeeSize = 64
@@ -22,7 +23,7 @@ type reductionCommittee struct {
 	*committee.Extractor
 }
 
-func newReductionCommittee(eventBroker wire.EventBroker, db database.DB) *reductionCommittee {
+func newReductionCommittee(eventBroker eventbus.Broker, db database.DB) *reductionCommittee {
 	r := &reductionCommittee{
 		Extractor: committee.NewExtractor(eventBroker, db),
 	}

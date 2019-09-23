@@ -10,8 +10,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	log "github.com/sirupsen/logrus"
 )
@@ -22,7 +22,7 @@ var l = log.WithField("process", "maintainer")
 // expire, and makes sure the node remains within the bidlist/committee, when those
 // transactions are close to expiring.
 type maintainer struct {
-	eventBroker wire.EventBroker
+	eventBroker eventbus.Broker
 	roundChan   <-chan uint64
 	bidChan     <-chan user.Bid
 
@@ -39,7 +39,7 @@ type maintainer struct {
 	transactor *transactor.Transactor
 }
 
-func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*maintainer, error) {
+func newMaintainer(eventBroker eventbus.Broker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*maintainer, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -64,7 +64,7 @@ func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byt
 	}, nil
 }
 
-func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) error {
+func Launch(eventBroker eventbus.Broker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) error {
 	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, transactor, amount, lockTime, offset)
 	if err != nil {
 		return err
