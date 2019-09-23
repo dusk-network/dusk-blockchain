@@ -32,7 +32,9 @@ func TestAgreementRace(t *testing.T) {
 	committeeSize := 50
 	p, k := consensus.MockProvisioners(committeeSize)
 	broker := newBroker(eb, k[0])
-	broker.updateRound(consensus.RoundUpdate{1, *p, nil})
+	seed, _ := crypto.RandEntropy(33)
+	hash, _ := crypto.RandEntropy(32)
+	broker.updateRound(consensus.RoundUpdate{1, *p, nil, seed, hash})
 	go broker.Listen()
 
 	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
@@ -45,7 +47,6 @@ func TestAgreementRace(t *testing.T) {
 	// this should cause our step counter to be off in the next round.
 	// First, we make a voteset for the `sendAgreement` call.
 	ru := reduction.NewUnMarshaller()
-	hash, _ := crypto.RandEntropy(32)
 	events := createVoteSet(t, k, hash, committeeSize, 1)
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
@@ -119,7 +120,9 @@ func TestStress(t *testing.T) {
 	p, k := consensus.MockProvisioners(committeeSize)
 	broker := newBroker(bus, k[0])
 	bus.RemoveAllPreprocessors(string(topics.Agreement))
-	broker.updateRound(consensus.RoundUpdate{1, *p, nil})
+	seed, _ := crypto.RandEntropy(33)
+	hash, _ := crypto.RandEntropy(32)
+	broker.updateRound(consensus.RoundUpdate{1, *p, nil, seed, hash})
 
 	// Do 10 agreement cycles
 	for i := 1; i <= 10; i++ {
@@ -138,7 +141,7 @@ func TestStress(t *testing.T) {
 			assert.Equal(t, uint64(i), ev.(*Agreement).Round)
 		}
 
-		broker.updateRound(consensus.RoundUpdate{uint64(i + 1), *p, nil})
+		broker.updateRound(consensus.RoundUpdate{uint64(i + 1), *p, nil, seed, hash})
 	}
 }
 

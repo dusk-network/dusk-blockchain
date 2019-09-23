@@ -32,6 +32,8 @@ type (
 		Round   uint64
 		P       user.Provisioners
 		BidList user.BidList
+		Seed    []byte
+		Hash    []byte
 	}
 )
 
@@ -71,7 +73,17 @@ func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 		return err
 	}
 
-	r.roundChan <- RoundUpdate{round, provisioners, bidList}
+	seed := make([]byte, 32)
+	if err := encoding.ReadBLS(roundBuffer, &seed); err != nil {
+		return err
+	}
+
+	hash := make([]byte, 32)
+	if err := encoding.Read256(roundBuffer, &hash); err != nil {
+		return err
+	}
+
+	r.roundChan <- RoundUpdate{round, provisioners, bidList, seed, hash}
 	return nil
 }
 

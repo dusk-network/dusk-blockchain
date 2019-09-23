@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -22,6 +23,16 @@ func MockRoundUpdateBuffer(round uint64, p *user.Provisioners, bidList user.BidL
 		bidList = MockBidList()
 	}
 	user.MarshalBidList(buf, bidList)
+
+	seed, _ := crypto.RandEntropy(33)
+	if err := encoding.WriteBLS(buf, seed); err != nil {
+		panic(err)
+	}
+
+	hash, _ := crypto.RandEntropy(32)
+	if err := encoding.Write256(buf, hash); err != nil {
+		panic(err)
+	}
 
 	return buf
 }
