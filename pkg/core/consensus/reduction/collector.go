@@ -5,7 +5,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type (
@@ -18,12 +18,12 @@ type (
 
 // initBestScoreUpdate is the utility function to create and wire a channel for
 // notifications of the best ScoreEvent.
-func initBestScoreUpdate(subscriber wire.EventSubscriber) chan *selection.ScoreEvent {
+func initBestScoreUpdate(subscriber eventbus.Subscriber) chan *selection.ScoreEvent {
 	bestVotedScoreHashChan := make(chan *selection.ScoreEvent, 1)
 	collector := &scoreCollector{
 		bestVotedScoreHashChan: bestVotedScoreHashChan,
 	}
-	go wire.NewTopicListener(subscriber, collector, string(msg.BestScoreTopic)).Accept()
+	go eventbus.NewTopicListener(subscriber, collector, string(msg.BestScoreTopic)).Accept()
 	return bestVotedScoreHashChan
 }
 

@@ -55,10 +55,8 @@ func (s *Server) handleRequest(w http.ResponseWriter, r http.Request, isAdmin bo
 	errorDesc := "null"
 	if err != nil {
 		log.Errorf("%v", err)
-		// Request was unauthorized, so return a http.Error
-		w.Header().Add("WWW-Authenticate", `Basic realm="duskd admin RPC"`)
-		http.Error(w, err.Error(), http.StatusUnauthorized)
 		errorDesc = err.Error()
+		result = "{}"
 	}
 
 	rawMessage := json.RawMessage([]byte(result))

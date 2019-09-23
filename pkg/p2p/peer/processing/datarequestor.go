@@ -4,11 +4,12 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 // DataRequestor is a processing unit which handles inventory messages received from peers
@@ -17,11 +18,11 @@ import (
 type DataRequestor struct {
 	db           database.DB
 	responseChan chan<- *bytes.Buffer
-	rpcBus       *wire.RPCBus
+	rpcBus       *rpcbus.RPCBus
 }
 
 // NewDataRequestor returns an initialized DataRequestor.
-func NewDataRequestor(db database.DB, rpcBus *wire.RPCBus, responseChan chan<- *bytes.Buffer) *DataRequestor {
+func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer) *DataRequestor {
 	return &DataRequestor{
 		db:           db,
 		responseChan: responseChan,
@@ -114,11 +115,11 @@ func marshalGetData(getData *peermsg.Inv) (*bytes.Buffer, error) {
 
 // GetMempoolTxs is a wire.GetMempoolTx API wrapper. Later it could be moved into
 // a separate utils pkg
-func GetMempoolTxs(bus *wire.RPCBus, txID []byte) ([]transactions.Transaction, error) {
+func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction, error) {
 
 	buf := new(bytes.Buffer)
 	buf.Write(txID)
-	r, err := bus.Call(wire.GetMempoolTxs, wire.NewRequest(*buf, 3))
+	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf, 3))
 	if err != nil {
 		return nil, err
 	}

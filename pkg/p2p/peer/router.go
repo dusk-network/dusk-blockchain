@@ -7,15 +7,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
 // The messageRouter is connected to all of the processing units that are tied to the peer.
 // It sends an incoming message in the right direction, according to it's topic.
 type messageRouter struct {
-	publisher wire.EventPublisher
+	publisher eventbus.Publisher
 	dupeMap   *dupemap.DupeMap
 
 	// 1-to-1 components

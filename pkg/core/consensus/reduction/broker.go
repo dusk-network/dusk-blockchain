@@ -7,8 +7,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,13 +31,13 @@ type (
 
 // Launch creates and wires a broker, initiating the components that
 // have to do with Block Reduction
-func Launch(eventBroker wire.EventBroker, keys user.Keys, timeout time.Duration, rpcBus *wire.RPCBus) {
+func Launch(eventBroker eventbus.Broker, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus) {
 	handler := newReductionHandler(keys)
 	broker := newBroker(eventBroker, handler, timeout, rpcBus)
 	go broker.Listen()
 }
 
-func launchReductionFilter(eventBroker wire.EventBroker, ctx *context) *consensus.EventFilter {
+func launchReductionFilter(eventBroker eventbus.Broker, ctx *context) *consensus.EventFilter {
 
 	filter := consensus.NewEventFilter(ctx.handler, ctx.state, true)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
@@ -46,7 +47,7 @@ func launchReductionFilter(eventBroker wire.EventBroker, ctx *context) *consensu
 }
 
 // newBroker will return a reduction broker.
-func newBroker(eventBroker wire.EventBroker, handler *reductionHandler, timeout time.Duration, rpcBus *wire.RPCBus) *broker {
+func newBroker(eventBroker eventbus.Broker, handler *reductionHandler, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
 	scoreChan := initBestScoreUpdate(eventBroker)
 	ctx := newCtx(handler, timeout)
 	filter := launchReductionFilter(eventBroker, ctx)

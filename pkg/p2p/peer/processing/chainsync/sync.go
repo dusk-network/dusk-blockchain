@@ -10,6 +10,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -20,8 +22,8 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "synchronizer
 // incoming blocks. It keeps track of the local chain tip and compares it with each incoming
 // block to make sure we stay in sync with our peers.
 type ChainSynchronizer struct {
-	publisher wire.EventPublisher
-	rpcBus    *wire.RPCBus
+	publisher eventbus.Publisher
+	rpcBus    *rpcbus.RPCBus
 	*Counter
 	responseChan chan<- *bytes.Buffer
 }
@@ -29,7 +31,7 @@ type ChainSynchronizer struct {
 // NewChainSynchronizer returns an initialized ChainSynchronizer. The passed responseChan
 // should point to an individual peer's outgoing message queue, and the passed Counter
 // should be shared between all instances of the ChainSynchronizer.
-func NewChainSynchronizer(publisher wire.EventPublisher, rpcBus *wire.RPCBus, responseChan chan<- *bytes.Buffer, counter *Counter) *ChainSynchronizer {
+func NewChainSynchronizer(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer, counter *Counter) *ChainSynchronizer {
 	return &ChainSynchronizer{
 		publisher:    publisher,
 		rpcBus:       rpcBus,
@@ -86,8 +88,8 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 }
 
 func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
-	req := wire.NewRequest(bytes.Buffer{}, 2)
-	blkBuf, err := s.rpcBus.Call(wire.GetLastBlock, req)
+	req := rpcbus.NewRequest(bytes.Buffer{}, 2)
+	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req)
 	if err != nil {
 		return nil, err
 	}

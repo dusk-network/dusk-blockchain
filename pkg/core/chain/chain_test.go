@@ -11,7 +11,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
@@ -20,8 +21,8 @@ import (
 /*
 func TestDemoSaveFunctionality(t *testing.T) {
 
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	c, keys := agreement.MockCommittee(2, true, 2)
 	chain, err := New(eb, rpc, c)
 
@@ -61,8 +62,8 @@ func createMockedCertificate(hash []byte, round uint64, keys []user.Keys, p *use
 }
 
 func TestFetchTip(t *testing.T) {
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	chain, err := New(eb, rpc)
 
 	assert.Nil(t, err)
@@ -82,10 +83,9 @@ func TestFetchTip(t *testing.T) {
 
 // Make sure that certificates can still be properly verified when a provisioner is removed on round update.
 func TestCertificateExpiredProvisioner(t *testing.T) {
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	chain, err := New(eb, rpc)
-
 	assert.Nil(t, err)
 	defer chain.Close()
 
@@ -112,8 +112,8 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 }
 
 func TestAddAndRemoveBid(t *testing.T) {
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	c, err := New(eb, rpc)
 	if err != nil {
 		t.Fatal(err)
@@ -211,9 +211,9 @@ func createBid(t *testing.T) user.Bid {
 	return user.Bid{arr, arr, 1000}
 }
 
-func setupChainTest(t *testing.T, includeGenesis bool) (*wire.EventBus, *wire.RPCBus, *Chain) {
-	eb := wire.NewEventBus()
-	rpc := wire.NewRPCBus()
+func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
+	eb := eventbus.New()
+	rpc := rpcbus.New()
 	c, err := New(eb, rpc)
 	if err != nil {
 		t.Fatal(err)

@@ -8,13 +8,14 @@ import (
 	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
 // Start the interactive shell.
-func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File, counter *chainsync.Counter) {
+func Start(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, logFile *os.File, counter *chainsync.Counter) {
 	cli := &CLI{eventBroker, rpcBus, nil, counter}
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")

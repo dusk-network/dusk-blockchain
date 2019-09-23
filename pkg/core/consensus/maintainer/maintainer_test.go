@@ -16,8 +16,8 @@ import (
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -88,9 +88,9 @@ func TestSendOnce(t *testing.T) {
 	}
 }
 
-func setupMaintainerTest(t *testing.T) (*wire.EventBus, chan *bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
 	// Initial setup
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	wdb, err := database.New(dbPath)
 	txChan := make(chan *bytes.Buffer, 2)
 	bus.Subscribe(string(topics.Tx), txChan)

@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,7 +21,7 @@ type scoreBroker struct {
 // Launch creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout time.Duration) {
+func Launch(eventBroker eventbus.Broker, handler ScoreEventHandler, timeout time.Duration) {
 	if handler == nil {
 		handler = newScoreHandler()
 	}
@@ -29,18 +29,18 @@ func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout tim
 	go broker.Listen()
 }
 
-func launchScoreFilter(eventBroker wire.EventBroker, handler ScoreEventHandler,
+func launchScoreFilter(eventBroker eventbus.Broker, handler ScoreEventHandler,
 	state consensus.State, selector *eventSelector) *filter {
 
 	filter := newFilter(handler, state, selector)
-	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Score))
+	listener := eventbus.NewTopicListener(eventBroker, filter, string(topics.Score))
 	go listener.Accept()
 	return filter
 }
 
 // newScoreBroker creates a Broker component which responsibility is to listen to the
 // eventbus and supervise Collector operations
-func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler, timeOut time.Duration) *scoreBroker {
+func newScoreBroker(eventBroker eventbus.Broker, handler ScoreEventHandler, timeOut time.Duration) *scoreBroker {
 	state := consensus.NewState()
 	selector := newEventSelector(eventBroker, handler, timeOut, state)
 	filter := launchScoreFilter(eventBroker, handler, state, selector)

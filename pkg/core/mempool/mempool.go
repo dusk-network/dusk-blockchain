@@ -16,6 +16,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/merkletree"
 	logger "github.com/sirupsen/logrus"
@@ -45,7 +47,7 @@ type Mempool struct {
 	// used by tx verification procedure
 	latestBlockTimestamp int64
 
-	eventBus *wire.EventBus
+	eventBus *eventbus.EventBus
 	db       database.DB
 
 	// the magic function that knows best what is valid chain Tx
@@ -88,7 +90,7 @@ func (c *Collector) Collect(msg *bytes.Buffer) error {
 }
 
 // NewMempool instantiates and initializes node mempool
-func NewMempool(eventBus *wire.EventBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
+func NewMempool(eventBus *eventbus.EventBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
 
 	log.Infof("create new instance")
 
@@ -107,11 +109,11 @@ func NewMempool(eventBus *wire.EventBus, verifyTx func(tx transactions.Transacti
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, maxPendingLen)
-	go wire.NewTopicListener(m.eventBus, m, string(topics.Tx)).Accept()
+	go eventbus.NewTopicListener(m.eventBus, m, string(topics.Tx)).Accept()
 
 	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
 	m.accepted.blockChan = make(chan block.Block)
-	go wire.NewTopicListener(m.eventBus, &m.accepted, string(topics.AcceptedBlock)).Accept()
+	go eventbus.NewTopicListener(m.eventBus, &m.accepted, string(topics.AcceptedBlock)).Accept()
 
 	return m
 }
@@ -126,7 +128,7 @@ func (m *Mempool) Run() {
 	go func() {
 		for {
 			select {
-			case r := <-wire.GetMempoolTxsChan:
+			case r := <-rpcbus.GetMempoolTxsChan:
 				m.onGetMempoolTxs(r)
 			// Mempool input channels
 			case b := <-m.accepted.blockChan:
@@ -324,7 +326,7 @@ func (m *Mempool) Collect(message *bytes.Buffer) error {
 
 // onGetMempoolTxs retrieves current state of the mempool of the verified but
 // still unaccepted txs
-func (m Mempool) onGetMempoolTxs(r wire.Req) {
+func (m Mempool) onGetMempoolTxs(r rpcbus.Req) {
 
 	// Read inputs
 	filterTxID := r.Params.Bytes()

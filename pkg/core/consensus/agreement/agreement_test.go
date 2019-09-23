@@ -13,10 +13,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -106,8 +106,8 @@ func TestSendAgreement(t *testing.T) {
 }
 
 // Launch the agreement component, and consume the initial round update that gets emitted.
-func initAgreement(k user.Keys) (wire.EventBroker, <-chan *bytes.Buffer) {
-	bus := wire.NewEventBus()
+func initAgreement(k user.Keys) (eventbus.Broker, <-chan *bytes.Buffer) {
+	bus := eventbus.New()
 	winningHashChan := make(chan *bytes.Buffer, 1)
 	bus.Subscribe(msg.WinningBlockHashTopic, winningHashChan)
 	go agreement.Launch(bus, k)

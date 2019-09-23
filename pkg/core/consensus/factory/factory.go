@@ -7,7 +7,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,15 +18,15 @@ import (
 // consensus. It should also contain all the relevant information for the
 // processes it intends to start up.
 type ConsensusFactory struct {
-	eventBus wire.EventBroker
-	rpcBus   *wire.RPCBus
+	eventBus eventbus.Broker
+	rpcBus   *rpcbus.RPCBus
 
 	user.Keys
 	timerLength time.Duration
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus wire.EventBroker, rpcBus *wire.RPCBus, timerLength time.Duration,
+func New(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, timerLength time.Duration,
 	keys user.Keys) *ConsensusFactory {
 
 	return &ConsensusFactory{

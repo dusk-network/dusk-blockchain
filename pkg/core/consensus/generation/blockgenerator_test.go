@@ -15,15 +15,16 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
-func respond(rpcBus *wire.RPCBus, b block.Block) {
-	r := <-wire.GetLastBlockChan
+func respond(rpcBus *rpcbus.RPCBus, b block.Block) {
+	r := <-rpcbus.GetLastBlockChan
 	buf := new(bytes.Buffer)
 	if err := block.Marshal(buf, &b); err != nil {
 		panic(err)
@@ -136,8 +137,8 @@ func bytesToPoint(b []byte) ristretto.Point {
 type harness struct {
 	tmpDataDir string
 
-	eb  *wire.EventBus
-	rpc *wire.RPCBus
+	eb  *eventbus.EventBus
+	rpc *rpcbus.RPCBus
 	m   *mempool.Mempool
 
 	// block generator tmp wallet
@@ -165,8 +166,8 @@ func newTestHarness(t *testing.T) *harness {
 	cfg.Mock(&r)
 
 	// Mock event bus object
-	h.eb = wire.NewEventBus()
-	h.rpc = wire.NewRPCBus()
+	h.eb = eventbus.New()
+	h.rpc = rpcbus.New()
 
 	// Mock mempool with no verification procedure
 	h.m = mempool.NewMempool(h.eb, func(tx transactions.Transaction) error {

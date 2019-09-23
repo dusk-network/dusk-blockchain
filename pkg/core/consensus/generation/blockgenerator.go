@@ -12,10 +12,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-crypto/bls"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/key"
@@ -33,7 +33,7 @@ type (
 	blockGenerator struct {
 		// generator Public Keys to sign the rewards tx
 		genPubKey      *key.PublicKey
-		rpcBus         *wire.RPCBus
+		rpcBus         *rpcbus.RPCBus
 		proofGenerator Generator
 		threshold      *consensus.Threshold
 		keys           user.Keys
@@ -42,7 +42,7 @@ type (
 
 var bidNotFound = errors.New("bid not found in bidlist")
 
-func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *wire.RPCBus, proofGen Generator, keys user.Keys) *blockGenerator {
+func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus, proofGen Generator, keys user.Keys) *blockGenerator {
 	return &blockGenerator{
 		rpcBus:         rpcBus,
 		genPubKey:      genPubKey,
@@ -152,7 +152,7 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 10))
+		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}, 10))
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the the chain.
 		if err != nil {

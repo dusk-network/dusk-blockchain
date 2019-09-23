@@ -7,8 +7,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,7 +19,7 @@ var l = log.WithField("process", "StakeAutomaton")
 // expire, and makes sure the node remains within the bidlist/committee, when those
 // transactions are close to expiring.
 type StakeAutomaton struct {
-	eventBroker wire.EventBroker
+	eventBroker eventbus.Broker
 	roundChan   <-chan consensus.RoundUpdate
 
 	pubKeyBLS []byte
@@ -35,7 +35,7 @@ type StakeAutomaton struct {
 	transactor *transactor.Transactor
 }
 
-func New(eventBroker wire.EventBroker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*StakeAutomaton, error) {
+func New(eventBroker eventbus.Broker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*StakeAutomaton, error) {
 	return &StakeAutomaton{
 		eventBroker:    eventBroker,
 		roundChan:      consensus.InitRoundUpdate(eventBroker),

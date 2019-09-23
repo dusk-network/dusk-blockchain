@@ -2,7 +2,7 @@ package generation
 
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type state struct {
@@ -13,7 +13,7 @@ type state struct {
 	currentState consensus.RoundUpdate
 }
 
-func NewState(eventBroker wire.EventBroker) *state {
+func NewState(eventBroker eventbus.Broker) *state {
 	return &state{
 		roundChan:        consensus.InitRoundUpdate(eventBroker),
 		regenerationChan: consensus.InitBlockRegenerationCollector(eventBroker),

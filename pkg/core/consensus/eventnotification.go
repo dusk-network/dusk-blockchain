@@ -4,11 +4,12 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-func LaunchNotification(eventbus wire.EventSubscriber, deserializer wire.EventDeserializer, topic string) <-chan wire.Event {
+func LaunchNotification(subscriber eventbus.Subscriber, deserializer wire.EventDeserializer, topic string) <-chan wire.Event {
 	notification := newNotification(deserializer)
-	listener := wire.NewTopicListener(eventbus, notification, topic)
+	listener := eventbus.NewTopicListener(subscriber, notification, topic)
 	go listener.Accept()
 	return notification.reduChan
 }

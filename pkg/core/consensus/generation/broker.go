@@ -13,13 +13,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
+func Launch(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
 	m := zkproof.CalculateM(k)
 	d := getD(m, eventBus, db)
 	broker, err := newBroker(eventBus, rpcBus, d, k, m, gen, blockGen, keys, publicKey)
@@ -33,10 +35,9 @@ func Launch(eventBus wire.EventBroker, rpcBus *wire.RPCBus, k ristretto.Scalar, 
 }
 
 type broker struct {
-	publisher   wire.EventPublisher
 	k           ristretto.Scalar
 	m           ristretto.Scalar
-	eventBroker wire.EventBroker
+	eventBroker eventbus.Broker
 	blockGen    BlockGenerator
 
 	certificateGenerator *certificateGenerator
@@ -47,7 +48,7 @@ type broker struct {
 	roundChan            <-chan consensus.RoundUpdate
 }
 
-func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k, m ristretto.Scalar,
+func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristretto.Scalar,
 	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
 		var err error
@@ -65,7 +66,6 @@ func newBroker(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, d, k, m ristre
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
 
 	b := &broker{
-		publisher:            eventBroker,
 		k:                    k,
 		m:                    m,
 		eventBroker:          eventBroker,
@@ -106,8 +106,8 @@ func (b *broker) Generate(roundUpdate consensus.RoundUpdate) {
 
 	marshalledEvent := b.marshalScore(sev)
 	marshalledBlock := b.marshalBlock(blk)
-	b.publisher.Stream(string(topics.Gossip), marshalledEvent)
-	b.publisher.Stream(string(topics.Gossip), marshalledBlock)
+	b.eventBroker.Stream(string(topics.Gossip), marshalledEvent)
+	b.eventBroker.Stream(string(topics.Gossip), marshalledBlock)
 }
 
 func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) error {
@@ -137,7 +137,7 @@ func (b *broker) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 	}
 
 	copy := *buffer
-	b.publisher.Publish(string(topics.Score), &copy)
+	b.eventBroker.Publish(string(topics.Score), &copy)
 	message, err := wire.AddTopic(buffer, topics.Score)
 	if err != nil {
 		panic(err)
@@ -153,7 +153,7 @@ func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
 	}
 
 	copy := *buffer
-	b.publisher.Publish(string(topics.Candidate), &copy)
+	b.eventBroker.Publish(string(topics.Candidate), &copy)
 	message, err := wire.AddTopic(buffer, topics.Candidate)
 	if err != nil {
 		panic(err)

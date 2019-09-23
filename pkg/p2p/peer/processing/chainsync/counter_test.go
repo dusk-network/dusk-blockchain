@@ -4,15 +4,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/assert"
 )
 
 // The timer on the Counter should not fire after the sync completes, to avoid it from
 // messing up an ongoing sync initiated afterwards.
 func TestStopTimerGoroutine(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	c := NewCounter(bus)
 
 	// Set syncTime to something more reasonable for a unit test

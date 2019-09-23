@@ -7,8 +7,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
@@ -65,9 +66,9 @@ func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.
 	return buf
 }
 
-func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *wire.EventBus, chan *bytes.Buffer) {
-	eb := wire.NewEventBus()
-	rpcBus := wire.NewRPCBus()
+func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.EventBus, chan *bytes.Buffer) {
+	eb := eventbus.New()
+	rpcBus := rpcbus.New()
 	responseChan := make(chan *bytes.Buffer, 100)
 	counter := chainsync.NewCounter(eb)
 	cs := chainsync.NewChainSynchronizer(eb, rpcBus, responseChan, counter)
@@ -77,7 +78,7 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *wire.EventB
 
 // Dummy goroutine which simply sends a random block back when the ChainSynchronizer
 // requests the last block.
-func respond(t *testing.T, rpcBus *wire.RPCBus) {
-	r := <-wire.GetLastBlockChan
+func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
+	r := <-rpcbus.GetLastBlockChan
 	r.RespChan <- *randomBlockBuffer(t, 0, 1)
 }

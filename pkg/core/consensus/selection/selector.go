@@ -9,10 +9,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
-func LaunchNotification(eventbus wire.EventSubscriber) <-chan *ScoreEvent {
+func LaunchNotification(eventbus eventbus.Subscriber) <-chan *ScoreEvent {
 	scoreChan := make(chan *ScoreEvent)
 	evChan := consensus.LaunchNotification(eventbus,
 		newScoreHandler(), msg.BestScoreTopic)
@@ -30,7 +31,7 @@ func LaunchNotification(eventbus wire.EventSubscriber) <-chan *ScoreEvent {
 var empty struct{}
 
 type eventSelector struct {
-	publisher wire.EventPublisher
+	publisher eventbus.Publisher
 	handler   ScoreEventHandler
 	lock      sync.RWMutex
 	bestEvent wire.Event
@@ -40,7 +41,7 @@ type eventSelector struct {
 }
 
 // newEventSelector creates the Selector and returns it.
-func newEventSelector(publisher wire.EventPublisher, handler ScoreEventHandler,
+func newEventSelector(publisher eventbus.Publisher, handler ScoreEventHandler,
 	timeOut time.Duration, state consensus.State) *eventSelector {
 	return &eventSelector{
 		publisher: publisher,

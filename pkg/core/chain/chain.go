@@ -9,6 +9,8 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
@@ -31,8 +33,8 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
 type Chain struct {
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
+	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
 	db       database.DB
 	p        *user.Provisioners
 	bidList  *user.BidList
@@ -48,7 +50,7 @@ type Chain struct {
 }
 
 // New returns a new chain object
-func New(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	_, db := heavy.CreateDBConnection()
 
 	l, err := newLoader(db)
@@ -85,7 +87,7 @@ func (c *Chain) Listen() {
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
 		// wire.RPCBus requests handlers
-		case r := <-wire.GetLastBlockChan:
+		case r := <-rpcbus.GetLastBlockChan:
 
 			buf := new(bytes.Buffer)
 
@@ -100,7 +102,7 @@ func (c *Chain) Listen() {
 
 			r.RespChan <- *buf
 
-		case r := <-wire.VerifyCandidateBlockChan:
+		case r := <-rpcbus.VerifyCandidateBlockChan:
 			if err := c.verifyCandidateBlock(r.Params.Bytes()); err != nil {
 				r.ErrChan <- err
 				continue
