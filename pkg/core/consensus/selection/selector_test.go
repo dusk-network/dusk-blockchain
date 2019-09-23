@@ -31,7 +31,7 @@ func TestSelection(t *testing.T) {
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Update round to start the selector
-	consensus.UpdateRound(eb, 1)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	sendMockEvent(eb)
 	sendMockEvent(eb)
@@ -47,7 +47,7 @@ func TestRepropagation(t *testing.T) {
 	eb, streamer := helper.CreateGossipStreamer()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
 	// Update round to start the selector
-	consensus.UpdateRound(eb, 1)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	sendMockEvent(eb)
 
 	timer := time.AfterFunc(500*time.Millisecond, func() {
@@ -73,7 +73,7 @@ func TestStopSelector(t *testing.T) {
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Update round to start the selector
-	consensus.UpdateRound(eb, 1)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	sendMockEvent(eb)
 	sendMockEvent(eb)
 	sendMockEvent(eb)
@@ -98,7 +98,7 @@ func TestTimeOutVariance(t *testing.T) {
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Update round to start the selector
-	consensus.UpdateRound(eb, 1)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	// measure time it takes for timer to run out
 	start := time.Now()
 	sendMockEvent(eb)
@@ -138,7 +138,7 @@ func TestObsoleteSelection(t *testing.T) {
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Start selection and let it run out
-	consensus.UpdateRound(eb, 1)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	<-bestScoreChan
 
 	// Now send an event to the selector
@@ -147,7 +147,7 @@ func TestObsoleteSelection(t *testing.T) {
 
 	// Start selection on round 2
 	// This should clear the bestEvent, and let no others through
-	consensus.UpdateRound(eb, 2)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, nil, nil))
 
 	// Result should be nil
 	result := <-bestScoreChan
@@ -187,7 +187,7 @@ func (m *mockScoreHandler) Marshal(b *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
-func (m *mockScoreHandler) UpdateBidList(bL user.Bid)      {}
+func (m *mockScoreHandler) UpdateBidList(bL user.BidList)  {}
 func (m *mockScoreHandler) RemoveExpiredBids(round uint64) {}
 func (m *mockScoreHandler) LowerThreshold()                {}
 func (m *mockScoreHandler) ResetThreshold()                {}

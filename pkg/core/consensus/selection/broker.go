@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
@@ -12,9 +11,8 @@ import (
 
 // broker is the component that supervises a collection of events
 type scoreBroker struct {
-	roundUpdateChan  <-chan uint64
+	roundUpdateChan  <-chan consensus.RoundUpdate
 	regenerationChan <-chan consensus.AsyncState
-	bidChan          <-chan user.Bid
 	filter           *filter
 	selector         *eventSelector
 	handler          ScoreEventHandler
@@ -50,7 +48,6 @@ func newScoreBroker(eventBroker eventbus.Broker, handler ScoreEventHandler, time
 	return &scoreBroker{
 		filter:           filter,
 		roundUpdateChan:  consensus.InitRoundUpdate(eventBroker),
-		bidChan:          consensus.InitBidListUpdate(eventBroker),
 		regenerationChan: consensus.InitBlockRegenerationCollector(eventBroker),
 		selector:         selector,
 		handler:          handler,
@@ -61,26 +58,24 @@ func newScoreBroker(eventBroker eventbus.Broker, handler ScoreEventHandler, time
 func (f *scoreBroker) Listen() {
 	for {
 		select {
-		case round := <-f.roundUpdateChan:
-			f.onRoundUpdate(round)
+		case roundUpdate := <-f.roundUpdateChan:
+			f.onRoundUpdate(roundUpdate)
 		case state := <-f.regenerationChan:
 			f.onRegeneration(state)
-		case bid := <-f.bidChan:
-			f.selector.handler.UpdateBidList(bid)
 		}
 	}
 }
 
-func (f *scoreBroker) onRoundUpdate(round uint64) {
+func (f *scoreBroker) onRoundUpdate(roundUpdate consensus.RoundUpdate) {
 	log.WithFields(log.Fields{
 		"process": "selection",
-		"round":   round,
+		"round":   roundUpdate.Round,
 	}).Debugln("updating round")
 
-	f.filter.UpdateRound(round)
+	f.filter.UpdateRound(roundUpdate.Round)
 	f.selector.stopSelection()
 	f.handler.ResetThreshold()
-	f.handler.RemoveExpiredBids(round)
+	f.handler.UpdateBidList(roundUpdate.BidList)
 	f.filter.FlushQueue()
 	f.selector.startSelection()
 	f.selector.timer.ResetTimeOut()

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	log "github.com/sirupsen/logrus"
 )
@@ -16,8 +15,9 @@ import (
 // specific to the accumulator.
 type AccumulatorHandler interface {
 	EventHandler
-	committee.Committee
 	ExtractIdentifier(wire.Event, *bytes.Buffer) error
+	Quorum() int
+	IsMember([]byte, uint64, uint8) bool
 }
 
 // Accumulator is a generic event accumulator, that will accumulate events until it
@@ -78,8 +78,7 @@ func (a *Accumulator) Accumulate() {
 			if err := a.handler.ExtractIdentifier(ev, b); err == nil {
 				hash := hex.EncodeToString(b.Bytes())
 				count := a.Insert(ev, hash)
-				header := a.handler.ExtractHeader(ev)
-				if count >= a.handler.Quorum(header.Round) {
+				if count >= a.handler.Quorum() {
 					votes := a.Get(hash)
 					a.CollectedVotesChan <- votes
 					a.Clear()

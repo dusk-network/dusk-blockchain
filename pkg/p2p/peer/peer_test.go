@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -133,13 +133,9 @@ func BenchmarkWriter(b *testing.B) {
 }
 
 func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
-	var keys []user.Keys
-	for i := 0; i < keyAmount; i++ {
-		keyPair, _ := user.NewRandKeys()
-		keys = append(keys, keyPair)
-	}
+	p, keys := consensus.MockProvisioners(keyAmount)
 
-	buf := agreement.MockAgreement(make([]byte, 32), 1, 2, keys)
+	buf := agreement.MockAgreement(make([]byte, 32), 1, 2, keys, p.CreateVotingCommittee(1, 2, keyAmount))
 	withTopic, err := wire.AddTopic(buf, topics.Agreement)
 	if err != nil {
 		panic(err)

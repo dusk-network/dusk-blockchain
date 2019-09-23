@@ -17,19 +17,23 @@ import (
 // should use InitRoundUpdate instead
 type (
 	roundCollector struct {
-		roundChan chan uint64
+		roundChan chan RoundUpdate
 	}
 
 	regenerationCollector struct {
 		regenerationChan chan AsyncState
 	}
 
-	bidListCollector struct {
-		bidListChan chan<- user.Bid
-	}
-
 	acceptedBlockCollector struct {
 		blockChan chan<- block.Block
+	}
+
+	RoundUpdate struct {
+		Round   uint64
+		P       user.Provisioners
+		BidList user.BidList
+		Seed    []byte
+		Hash    []byte
 	}
 )
 
@@ -44,8 +48,8 @@ func UpdateRound(bus eventbus.Publisher, round uint64) {
 // as well. Its purpose is to lighten up a bit the amount of arguments in creating
 // the handler for the collectors. Also it removes the need to store subscribers on
 // the consensus process
-func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan uint64 {
-	roundChan := make(chan uint64, 1)
+func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
+	roundChan := make(chan RoundUpdate, 1)
 	roundCollector := &roundCollector{roundChan}
 	go eventbus.NewTopicListener(subscriber, roundCollector, string(msg.RoundUpdateTopic)).Accept()
 	return roundChan
@@ -54,8 +58,32 @@ func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan uint64 {
 // Collect as specified in the EventCollector interface. In this case Collect simply
 // performs unmarshalling of the round event
 func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-	r.roundChan <- round
+	var round uint64
+	if err := encoding.ReadUint64(roundBuffer, binary.LittleEndian, &round); err != nil {
+		return err
+	}
+
+	provisioners, err := user.UnmarshalProvisioners(roundBuffer)
+	if err != nil {
+		return err
+	}
+
+	bidList, err := user.UnmarshalBidList(roundBuffer)
+	if err != nil {
+		return err
+	}
+
+	seed := make([]byte, 32)
+	if err := encoding.ReadBLS(roundBuffer, &seed); err != nil {
+		return err
+	}
+
+	hash := make([]byte, 32)
+	if err := encoding.Read256(roundBuffer, &hash); err != nil {
+		return err
+	}
+
+	r.roundChan <- RoundUpdate{round, provisioners, bidList, seed, hash}
 	return nil
 }
 
@@ -78,44 +106,6 @@ func (rg *regenerationCollector) Collect(r *bytes.Buffer) error {
 	}
 	rg.regenerationChan <- state
 	return nil
-}
-
-// InitBidListUpdate creates and initiates a channel for the updates in the BidList
-func InitBidListUpdate(subscriber eventbus.Subscriber) chan user.Bid {
-	bidListChan := make(chan user.Bid)
-	collector := &bidListCollector{bidListChan}
-	go eventbus.NewTopicListener(subscriber, collector, string(msg.BidListTopic)).Accept()
-	return bidListChan
-}
-
-// Collect implements EventCollector.
-// It reconstructs the bidList and sends it on its BidListChan
-func (b *bidListCollector) Collect(r *bytes.Buffer) error {
-	b.bidListChan <- decodeBid(r)
-	return nil
-}
-
-func decodeBid(r *bytes.Buffer) user.Bid {
-	var xSlice []byte
-	if err := encoding.Read256(r, &xSlice); err != nil {
-		panic(err)
-	}
-
-	var mSlice []byte
-	if err := encoding.Read256(r, &mSlice); err != nil {
-		panic(err)
-	}
-
-	var endHeight uint64
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &endHeight); err != nil {
-		panic(err)
-	}
-
-	var x [32]byte
-	copy(x[:], xSlice)
-	var m [32]byte
-	copy(m[:], mSlice)
-	return user.Bid{x, m, endHeight}
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
