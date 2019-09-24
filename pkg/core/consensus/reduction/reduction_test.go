@@ -26,7 +26,7 @@ func TestStress(t *testing.T) {
 	eventBus, _, _, k := launchReductionTest(true, 25)
 
 	// subscribe for the voteset
-	voteSetChan := make(chan *bytes.Buffer, 1)
+	voteSetChan := make(chan bytes.Buffer, 1)
 	eventBus.Subscribe(msg.ReductionResultTopic, voteSetChan)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
@@ -48,13 +48,13 @@ func TestStress(t *testing.T) {
 		voteSetBuf := <-voteSetChan
 		// The vote set buffer will have a round as it's first item. Let's read it and discard it
 		var n uint64
-		if err := encoding.ReadUint64LE(voteSetBuf, &n); err != nil {
+		if err := encoding.ReadUint64LE(&voteSetBuf, &n); err != nil {
 			t.Fatal(err)
 		}
 
 		// Unmarshal votesBytes and check them for correctness
 		unmarshaller := reduction.NewUnMarshaller()
-		voteSet, err := unmarshaller.UnmarshalVoteSet(voteSetBuf)
+		voteSet, err := unmarshaller.UnmarshalVoteSet(&voteSetBuf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,7 +159,7 @@ func TestTimeOutVariance(t *testing.T) {
 	eb, _, _, _ := launchReductionTest(true, 2)
 
 	// subscribe to reduction results
-	resultChan := make(chan *bytes.Buffer, 1)
+	resultChan := make(chan bytes.Buffer, 1)
 	eb.Subscribe(msg.ReductionResultTopic, resultChan)
 
 	// Wait a bit for the round update to go through
@@ -168,7 +168,7 @@ func TestTimeOutVariance(t *testing.T) {
 	// measure the time it takes for reduction to time out
 	start := time.Now()
 	// send a hash to start reduction
-	eb.Publish(msg.BestScoreTopic, nil)
+	eb.Publish(msg.BestScoreTopic, bytes.Buffer{})
 	go launchCandidateVerifier(false)
 
 	// wait for reduction to finish
@@ -177,7 +177,7 @@ func TestTimeOutVariance(t *testing.T) {
 
 	// timer should now have doubled
 	start = time.Now()
-	eb.Publish(msg.BestScoreTopic, nil)
+	eb.Publish(msg.BestScoreTopic, bytes.Buffer{})
 	// set up another goroutine for verification
 	go launchCandidateVerifier(false)
 
@@ -189,14 +189,14 @@ func TestTimeOutVariance(t *testing.T) {
 	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.1)
 
 	// update round
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(2, nil, nil))
 
 	// Wait a bit for the round update to go through
 	time.Sleep(200 * time.Millisecond)
 
 	start = time.Now()
 	// send a hash to start reduction
-	eb.Publish(msg.BestScoreTopic, nil)
+	eb.Publish(msg.BestScoreTopic, bytes.Buffer{})
 	// set up another goroutine for verification
 	go launchCandidateVerifier(false)
 
@@ -230,7 +230,7 @@ func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *hel
 		p.Members[string(k.BLSPubKeyBytes)] = member
 	}
 
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, p, nil))
 
 	return eb, streamer, k, keys
 }
@@ -246,11 +246,11 @@ func launchReduction(eb *eventbus.EventBus, k user.Keys, timeOut time.Duration, 
 func sendReductionBuffers(keys []user.Keys, hash []byte, round uint64, step uint8, eventBus *eventbus.EventBus) {
 	for i := 0; i < len(keys); i++ {
 		ev := reduction.MockReductionBuffer(keys[i], hash, round, step)
-		eventBus.Publish(string(topics.Reduction), ev)
+		eventBus.Publish(string(topics.Reduction), *ev)
 	}
 }
 
 func sendSelection(round uint64, hash []byte, eventBus *eventbus.EventBus) {
 	bestScoreBuf := selection.MockSelectionEventBuffer(round, hash)
-	eventBus.Publish(msg.BestScoreTopic, bestScoreBuf)
+	eventBus.Publish(msg.BestScoreTopic, *bestScoreBuf)
 }

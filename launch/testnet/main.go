@@ -93,7 +93,7 @@ func main() {
 	<-interrupt
 
 	// Graceful shutdown of listening components
-	srv.eventBus.Publish(msg.QuitTopic, new(bytes.Buffer))
+	srv.eventBus.Publish(msg.QuitTopic, bytes.Buffer{})
 
 	log.WithField("prefix", "main").Info("Terminated")
 }

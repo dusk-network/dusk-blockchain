@@ -12,9 +12,9 @@ type certificateGenerator struct {
 	agreementEvent wire.Event
 }
 
-func (a *certificateGenerator) setAgreementEvent(m *bytes.Buffer) error {
+func (a *certificateGenerator) setAgreementEvent(m bytes.Buffer) error {
 	unmarshaller := agreement.NewUnMarshaller()
-	ev, err := unmarshaller.Deserialize(m)
+	ev, err := unmarshaller.Deserialize(&m)
 	if err != nil {
 		return err
 	}

@@ -27,10 +27,8 @@ func newNotification(deserializer wire.EventDeserializer) *notification {
 	}
 }
 
-func (n *notification) Collect(buf *bytes.Buffer) error {
-	// Copy the buffer, as multiple components will receive this same pointer
-	copyBuf := *buf
-	ev, err := n.deserializer.Deserialize(&copyBuf)
+func (n *notification) Collect(buf bytes.Buffer) error {
+	ev, err := n.deserializer.Deserialize(&buf)
 	if err != nil {
 		return err
 	}

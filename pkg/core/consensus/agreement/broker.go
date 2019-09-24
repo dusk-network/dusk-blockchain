@@ -94,7 +94,7 @@ func (b *broker) sendAgreement(voteSet voteSet) error {
 			return err
 		}
 
-		b.publisher.Stream(string(topics.Gossip), msg)
+		b.publisher.Stream(string(topics.Gossip), *msg)
 	}
 
 	return nil
@@ -112,7 +112,7 @@ func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
-	b.publisher.Publish(msg.WinningBlockHashTopic, bytes.NewBuffer(aev.BlockHash))
+	b.publisher.Publish(msg.WinningBlockHashTopic, *bytes.NewBuffer(aev.BlockHash))
 }
 
 func (b *broker) publishEvent(evs []wire.Event) {
@@ -126,5 +126,5 @@ func (b *broker) publishEvent(evs []wire.Event) {
 		return
 	}
 
-	b.publisher.Publish(msg.AgreementEventTopic, buf)
+	b.publisher.Publish(msg.AgreementEventTopic, *buf)
 }

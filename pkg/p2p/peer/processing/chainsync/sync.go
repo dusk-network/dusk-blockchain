@@ -81,7 +81,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 			return err
 		}
 
-		s.publisher.Publish(string(topics.Block), buf)
+		s.publisher.Publish(string(topics.Block), *buf)
 	}
 
 	return nil

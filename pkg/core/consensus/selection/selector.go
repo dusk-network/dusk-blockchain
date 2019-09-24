@@ -101,7 +101,7 @@ func (s *eventSelector) repropagate(ev wire.Event) {
 		panic(err)
 	}
 
-	s.publisher.Stream(string(topics.Gossip), msg)
+	s.publisher.Stream(string(topics.Gossip), *msg)
 }
 
 func (s *eventSelector) publishBestEvent() {
@@ -116,7 +116,7 @@ func (s *eventSelector) publishBestEvent() {
 		}).Warnln("Error in marshalling score")
 		return
 	}
-	s.publisher.Publish(msg.BestScoreTopic, buf)
+	s.publisher.Publish(msg.BestScoreTopic, *buf)
 	s.state.IncrementStep()
 	s.setBestEvent(nil)
 }

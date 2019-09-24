@@ -106,8 +106,8 @@ func (b *broker) Generate(roundUpdate consensus.RoundUpdate) {
 
 	marshalledEvent := b.marshalScore(sev)
 	marshalledBlock := b.marshalBlock(blk)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledEvent)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledBlock)
+	b.eventBroker.Stream(string(topics.Gossip), *marshalledEvent)
+	b.eventBroker.Stream(string(topics.Gossip), *marshalledBlock)
 }
 
 func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) error {
@@ -120,7 +120,7 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 		return err
 	}
 
-	b.eventBroker.Publish(string(topics.Certificate), buf)
+	b.eventBroker.Publish(string(topics.Certificate), *buf)
 	return nil
 }
 
@@ -136,8 +136,7 @@ func (b *broker) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 		panic(err)
 	}
 
-	copy := *buffer
-	b.eventBroker.Publish(string(topics.Score), &copy)
+	b.eventBroker.Publish(string(topics.Score), *buffer)
 	message, err := wire.AddTopic(buffer, topics.Score)
 	if err != nil {
 		panic(err)
@@ -152,8 +151,7 @@ func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
 		panic(err)
 	}
 
-	copy := *buffer
-	b.eventBroker.Publish(string(topics.Candidate), &copy)
+	b.eventBroker.Publish(string(topics.Candidate), *buffer)
 	message, err := wire.AddTopic(buffer, topics.Candidate)
 	if err != nil {
 		panic(err)

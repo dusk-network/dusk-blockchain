@@ -28,7 +28,7 @@ func NewCounter(subscriber eventbus.Subscriber) *Counter {
 	return sc
 }
 
-func (s *Counter) decrement(b *bytes.Buffer) error {
+func (s *Counter) decrement(b bytes.Buffer) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if s.blocksRemaining > 0 {

@@ -199,7 +199,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	r.publisher.Stream(string(topics.Gossip), message)
+	r.publisher.Stream(string(topics.Gossip), *message)
 }
 
 func (r *reducer) sendResults(events []wire.Event) {
@@ -214,7 +214,7 @@ func (r *reducer) sendResults(events []wire.Event) {
 			return
 		}
 	}
-	r.publisher.Publish(msg.ReductionResultTopic, buf)
+	r.publisher.Publish(msg.ReductionResultTopic, *buf)
 }
 
 func logErr(err error, hash []byte, msg string) {
@@ -241,7 +241,7 @@ func (r *reducer) publishRegeneration() {
 	roundAndStep := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundAndStep, r.ctx.state.Round())
 	roundAndStep = append(roundAndStep, byte(r.ctx.state.Step()))
-	r.publisher.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(roundAndStep))
+	r.publisher.Publish(msg.BlockRegenerationTopic, *bytes.NewBuffer(roundAndStep))
 }
 
 func (r *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer) bool {

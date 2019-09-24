@@ -114,7 +114,7 @@ func (l *LogProcessor) Send(entry []byte) error {
 // ReportError publishes an error on the MonitorTopic
 func (l *LogProcessor) ReportError(bErr byte, err error) {
 	b := bytes.NewBuffer([]byte{bErr})
-	l.p.Publish(MonitorTopic, b)
+	l.p.Publish(MonitorTopic, *b)
 }
 
 // WithTime decorates the log with time info

@@ -52,7 +52,7 @@ func TestReader(t *testing.T) {
 	}
 
 	// Our message should come in on the agreement topic
-	agreementChan := make(chan *bytes.Buffer, 1)
+	agreementChan := make(chan bytes.Buffer, 1)
 	eb.Subscribe(string(topics.Agreement), agreementChan)
 
 	go peerReader.ReadLoop()
@@ -79,7 +79,7 @@ func TestWriteRingBuffer(t *testing.T) {
 	}
 
 	for i := 0; i < 1000; i++ {
-		bus.Stream(string(topics.Gossip), msg)
+		bus.Stream(string(topics.Gossip), *msg)
 	}
 }
 
@@ -128,7 +128,7 @@ func BenchmarkWriter(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bus.Stream(string(topics.Gossip), msg)
+		bus.Stream(string(topics.Gossip), *msg)
 	}
 }
 

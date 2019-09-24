@@ -113,7 +113,7 @@ func getStartingRound(eventBroker eventbus.Broker, counter *chainsync.Counter) u
 func sendInitMessage(publisher eventbus.Publisher, startingRound uint64) {
 	roundBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundBytes, startingRound)
-	publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+	publisher.Publish(msg.InitializationTopic, *bytes.NewBuffer(roundBytes))
 }
 
 func syncToTip(acceptedBlockChan <-chan block.Block, counter *chainsync.Counter) {

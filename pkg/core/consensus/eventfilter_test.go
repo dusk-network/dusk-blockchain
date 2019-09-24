@@ -20,7 +20,7 @@ func TestRelevantEvent(t *testing.T) {
 	eventFilter.UpdateRound(1)
 
 	// Run collect with an empty buffer, as the event will be mocked
-	assert.NoError(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.NoError(t, eventFilter.Collect(*new(bytes.Buffer)))
 	time.Sleep(200 * time.Millisecond)
 
 	// We should get an event if we call accumulator.All
@@ -37,7 +37,7 @@ func TestEarlyEvent(t *testing.T) {
 	eventFilter := newEventFilter(round, step, true, true)
 	eventFilter.UpdateRound(1)
 
-	assert.NoError(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.NoError(t, eventFilter.Collect(*new(bytes.Buffer)))
 	time.Sleep(200 * time.Millisecond)
 	// Queue should now hold an event
 	// Update the round, and flush the queue to get it
@@ -57,7 +57,7 @@ func TestObsoleteEvent(t *testing.T) {
 	eventFilter := newEventFilter(round, step, true, true)
 	eventFilter.UpdateRound(2)
 
-	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.Nil(t, eventFilter.Collect(*new(bytes.Buffer)))
 	time.Sleep(200 * time.Millisecond)
 
 	// We should not get anything from the processChan
@@ -77,7 +77,7 @@ func TestFlushQueueNoCheckStep(t *testing.T) {
 	eventFilter := newEventFilter(round, step, true, false)
 	eventFilter.UpdateRound(1)
 
-	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.Nil(t, eventFilter.Collect(*new(bytes.Buffer)))
 	time.Sleep(200 * time.Millisecond)
 	// Update round, and flush queue to get the event
 	eventFilter.UpdateRound(2)

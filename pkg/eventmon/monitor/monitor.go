@@ -96,13 +96,13 @@ func newUnixSupervisor(broker eventbus.Broker, uri *url.URL) (LogSupervisor, err
 	}, nil
 }
 
-func (m *unixSupervisor) Collect(b *bytes.Buffer) error {
+func (m *unixSupervisor) Collect(b bytes.Buffer) error {
 	// TODO: maybe diversify the action depending on the errors in the future
 	var err error
 	// whatever the case, we are going to reset the supervisor
 	defer m.resetAttempts()
 
-	err = deserializeError(b)
+	err = deserializeError(&b)
 	lg.WithField("op", "Collect").WithError(err).Warnln("Error notified by the LogProcessor. Attempting to reconnect to the monitoring server")
 
 	m.attempts++

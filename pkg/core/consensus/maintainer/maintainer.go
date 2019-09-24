@@ -130,7 +130,7 @@ func (m *StakeAutomaton) sendBid() error {
 		return err
 	}
 
-	m.eventBroker.Publish(string(topics.Tx), buf)
+	m.eventBroker.Publish(string(topics.Tx), *buf)
 	return nil
 }
 
@@ -145,6 +145,6 @@ func (m *StakeAutomaton) sendStake() error {
 		return err
 	}
 
-	m.eventBroker.Publish(string(topics.Tx), buf)
+	m.eventBroker.Publish(string(topics.Tx), *buf)
 	return nil
 }

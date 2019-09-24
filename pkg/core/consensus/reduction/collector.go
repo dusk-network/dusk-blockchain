@@ -27,11 +27,9 @@ func initBestScoreUpdate(subscriber eventbus.Subscriber) chan *selection.ScoreEv
 	return bestVotedScoreHashChan
 }
 
-func (sc *scoreCollector) Collect(r *bytes.Buffer) error {
-	// copy shared pointer
-	copyBuf := *r
+func (sc *scoreCollector) Collect(r bytes.Buffer) error {
 	ev := &selection.ScoreEvent{}
-	if err := selection.UnmarshalScoreEvent(&copyBuf, ev); err != nil {
+	if err := selection.UnmarshalScoreEvent(&r, ev); err != nil {
 		return err
 	}
 	if len(ev.VoteHash) == 32 {

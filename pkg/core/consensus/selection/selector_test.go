@@ -27,11 +27,11 @@ func TestSelection(t *testing.T) {
 	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
 	// subscribe to receive a result
-	bestScoreChan := make(chan *bytes.Buffer, 1)
+	bestScoreChan := make(chan bytes.Buffer, 1)
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	sendMockEvent(eb)
 	sendMockEvent(eb)
@@ -47,7 +47,7 @@ func TestRepropagation(t *testing.T) {
 	eb, streamer := helper.CreateGossipStreamer()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, nil, nil))
 	sendMockEvent(eb)
 
 	timer := time.AfterFunc(500*time.Millisecond, func() {
@@ -69,11 +69,11 @@ func TestStopSelector(t *testing.T) {
 	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
 	// subscribe to receive a result
-	bestScoreChan := make(chan *bytes.Buffer, 2)
+	bestScoreChan := make(chan bytes.Buffer, 2)
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, nil, nil))
 	sendMockEvent(eb)
 	sendMockEvent(eb)
 	sendMockEvent(eb)
@@ -94,11 +94,11 @@ func TestTimeOutVariance(t *testing.T) {
 	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
 	// subscribe to receive a result
-	bestScoreChan := make(chan *bytes.Buffer, 2)
+	bestScoreChan := make(chan bytes.Buffer, 2)
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, nil, nil))
 	// measure time it takes for timer to run out
 	start := time.Now()
 	sendMockEvent(eb)
@@ -134,11 +134,11 @@ func TestObsoleteSelection(t *testing.T) {
 	eb := eventbus.New()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*100)
 	// subscribe to receive a result
-	bestScoreChan := make(chan *bytes.Buffer, 2)
+	bestScoreChan := make(chan bytes.Buffer, 2)
 	eb.Subscribe(msg.BestScoreTopic, bestScoreChan)
 
 	// Start selection and let it run out
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, nil, nil))
 	<-bestScoreChan
 
 	// Now send an event to the selector
@@ -147,7 +147,7 @@ func TestObsoleteSelection(t *testing.T) {
 
 	// Start selection on round 2
 	// This should clear the bestEvent, and let no others through
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(2, nil, nil))
 
 	// Result should be nil
 	result := <-bestScoreChan
@@ -158,11 +158,11 @@ func publishRegeneration(eb *eventbus.EventBus) {
 	state := make([]byte, 9)
 	binary.LittleEndian.PutUint64(state[0:8], 1)
 	state[8] = byte(2)
-	eb.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(state))
+	eb.Publish(msg.BlockRegenerationTopic, *bytes.NewBuffer(state))
 }
 
 func sendMockEvent(eb *eventbus.EventBus) {
-	eb.Publish(string(topics.Score), bytes.NewBuffer([]byte("foo")))
+	eb.Publish(string(topics.Score), *bytes.NewBuffer([]byte("foo")))
 }
 
 type mockScoreHandler struct {

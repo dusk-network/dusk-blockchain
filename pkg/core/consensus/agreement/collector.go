@@ -26,7 +26,7 @@ type voteSet struct {
 	votes []wire.Event
 }
 
-func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
+func (i *initCollector) Collect(roundBuffer bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 	i.initChannel <- round
 	return nil
@@ -53,16 +53,16 @@ func initReductionResultCollector(subscriber eventbus.Subscriber) <-chan voteSet
 	return resultChan
 }
 
-func (r *reductionResultCollector) Collect(m *bytes.Buffer) error {
+func (r *reductionResultCollector) Collect(m bytes.Buffer) error {
 	var round uint64
-	if err := encoding.ReadUint64LE(m, &round); err != nil {
+	if err := encoding.ReadUint64LE(&m, &round); err != nil {
 		return err
 	}
 
 	// We drop the error here. If there is no vote set included in the message,
 	// we still need to trigger `sendAgreement` for the step counter to stay
 	// in sync.
-	votes, _ := r.reductionUnmarshaller.UnmarshalVoteSet(m)
+	votes, _ := r.reductionUnmarshaller.UnmarshalVoteSet(&m)
 
 	r.resultChan <- voteSet{round, votes}
 	return nil

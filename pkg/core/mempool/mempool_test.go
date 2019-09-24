@@ -174,7 +174,7 @@ func TestProcessPendingTxs(t *testing.T) {
 		}
 
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(string(topics.Tx), *buf)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		tx := helper.RandomStandardTx(t, false)
@@ -189,13 +189,13 @@ func TestProcessPendingTxs(t *testing.T) {
 		}
 
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(string(topics.Tx), *buf)
 
 		// Publish a duplicated tx
 		buf = new(bytes.Buffer)
 		_ = transactions.Marshal(buf, tx)
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(string(topics.Tx), *buf)
 	}
 
 	c.assert(t, true)
@@ -237,7 +237,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 			for _, tx := range txs {
 				buf := new(bytes.Buffer)
 				_ = transactions.Marshal(buf, tx)
-				c.bus.Publish(string(topics.Tx), buf)
+				c.bus.Publish(string(topics.Tx), *buf)
 			}
 			wg.Done()
 		}(c.verifiedTx[from:to])
@@ -253,7 +253,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 				tx.Version++
 				_ = transactions.Marshal(buf, tx)
 
-				c.bus.Publish(string(topics.Tx), buf)
+				c.bus.Publish(string(topics.Tx), *buf)
 			}
 			wg.Done()
 		}()
@@ -286,7 +286,7 @@ func TestRemoveAccepted(t *testing.T) {
 		}
 
 		// Publish valid tx
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(string(topics.Tx), *buf)
 
 		// Simulate a situation where the block has accepted each 2th tx
 		counter++
@@ -305,7 +305,7 @@ func TestRemoveAccepted(t *testing.T) {
 	buf := new(bytes.Buffer)
 	_ = block.Marshal(buf, b)
 
-	c.bus.Publish(string(topics.AcceptedBlock), buf)
+	c.bus.Publish(string(topics.AcceptedBlock), *buf)
 
 	c.assert(t, false)
 }
@@ -327,7 +327,7 @@ func TestDoubleSpent(t *testing.T) {
 		}
 
 		// Publish valid tx
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(string(topics.Tx), *buf)
 		c.addTx(tx)
 	}
 
@@ -348,7 +348,7 @@ func TestDoubleSpent(t *testing.T) {
 	}
 
 	// Publish valid tx
-	c.bus.Publish(string(topics.Tx), buf)
+	c.bus.Publish(string(topics.Tx), *buf)
 	// c.addTx(tx) do not add it into the expected list
 
 	c.wait()
@@ -371,7 +371,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 		}
 
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(string(topics.Tx), *buf)
 	}
 
 	// Publish a coinbase txs
@@ -382,7 +382,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.bus.Publish(string(topics.Tx), buf)
+	c.bus.Publish(string(topics.Tx), *buf)
 
 	c.wait()
 

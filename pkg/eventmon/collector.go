@@ -102,11 +102,11 @@ func (eu *UnMarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	return nil
 }
 
-func (c *collector) Collect(b *bytes.Buffer) error {
+func (c *collector) Collect(b bytes.Buffer) error {
 	ev := &Event{}
 	unmarshaller := &UnMarshaller{}
 
-	_ = unmarshaller.Unmarshal(b, ev)
+	_ = unmarshaller.Unmarshal(&b, ev)
 	c.logChan <- ev
 	return nil
 }

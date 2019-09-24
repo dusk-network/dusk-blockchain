@@ -9,17 +9,16 @@ import (
 
 // Handler publishes a byte array that subscribers of the EventBus can use
 type Handler interface {
-	Publish(*bytes.Buffer) error
+	Publish(bytes.Buffer) error
 	Close()
 }
 
 type callbackHandler struct {
-	callback func(*bytes.Buffer) error
+	callback func(bytes.Buffer) error
 }
 
-func (c *callbackHandler) Publish(m *bytes.Buffer) error {
-	mCopy := copyBuffer(m)
-	return c.callback(mCopy)
+func (c *callbackHandler) Publish(m bytes.Buffer) error {
+	return c.callback(m)
 }
 
 func (c *callbackHandler) Close() {
@@ -30,7 +29,7 @@ type streamHandler struct {
 	ringbuffer *ring.Buffer
 }
 
-func (s *streamHandler) Publish(m *bytes.Buffer) error {
+func (s *streamHandler) Publish(m bytes.Buffer) error {
 	if s.ringbuffer == nil {
 		return errors.New("no ringbuffer specified")
 	}
@@ -45,13 +44,12 @@ func (s *streamHandler) Close() {
 }
 
 type channelHandler struct {
-	messageChannel chan<- *bytes.Buffer
+	messageChannel chan<- bytes.Buffer
 }
 
-func (c *channelHandler) Publish(m *bytes.Buffer) error {
-	mCopy := copyBuffer(m)
+func (c *channelHandler) Publish(m bytes.Buffer) error {
 	select {
-	case c.messageChannel <- mCopy:
+	case c.messageChannel <- m:
 	default:
 		return errors.New("message channel buffer is full")
 	}

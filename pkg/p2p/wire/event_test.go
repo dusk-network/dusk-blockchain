@@ -16,7 +16,7 @@ import (
 
 func TestLameSubscriber(t *testing.T) {
 	bus := eventbus.New()
-	resultChan := make(chan *bytes.Buffer, 1)
+	resultChan := make(chan bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 	tbuf := ranbuf()
 
@@ -33,15 +33,15 @@ func TestLameSubscriber(t *testing.T) {
 func TestProcessor(t *testing.T) {
 	topic := "testTopic"
 	bus := eventbus.New()
-	resultChan := make(chan *bytes.Buffer, 1)
+	resultChan := make(chan bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 
 	ids := bus.RegisterPreprocessor(topic, &pippoAdder{}, &pippoAdder{})
 	go eventbus.NewTopicListener(bus, collector, topic).Accept()
 
-	expected := bytes.NewBufferString("pippopippo")
-	bus.Publish(topic, bytes.NewBufferString(""))
-	bus.Publish(topic, bytes.NewBufferString(""))
+	expected := *bytes.NewBufferString("pippopippo")
+	bus.Publish(topic, *bytes.NewBufferString(""))
+	bus.Publish(topic, *bytes.NewBufferString(""))
 
 	result1 := <-resultChan
 	result2 := <-resultChan
@@ -51,29 +51,29 @@ func TestProcessor(t *testing.T) {
 	// testing RemoveProcessor
 	bus.RemovePreprocessor(topic, ids[0])
 
-	expected = bytes.NewBufferString("pippo")
-	bus.Publish(topic, bytes.NewBufferString(""))
+	expected = *bytes.NewBufferString("pippo")
+	bus.Publish(topic, *bytes.NewBufferString(""))
 	res := <-resultChan
 	assert.Equal(t, expected, res)
 
 	// removing the same preprocessor does not yield any different result
 	bus.RemovePreprocessor(topic, ids[0])
-	bus.Publish(topic, bytes.NewBufferString(""))
+	bus.Publish(topic, *bytes.NewBufferString(""))
 	res = <-resultChan
 	assert.Equal(t, expected, res)
 
 	// adding a preprocessor
-	expected = bytes.NewBufferString("pippopappo")
+	expected = *bytes.NewBufferString("pippopappo")
 	otherId := bus.RegisterPreprocessor(topic, &pappoAdder{})
 	assert.Equal(t, 1, len(otherId))
-	bus.Publish(topic, bytes.NewBufferString(""))
+	bus.Publish(topic, *bytes.NewBufferString(""))
 	res = <-resultChan
 	assert.Equal(t, expected, res)
 
 	// removing another
-	expected = bytes.NewBufferString("pappo")
+	expected = *bytes.NewBufferString("pappo")
 	bus.RemovePreprocessor(topic, ids[1])
-	bus.Publish(topic, bytes.NewBufferString(""))
+	bus.Publish(topic, *bytes.NewBufferString(""))
 	res = <-resultChan
 	assert.Equal(t, expected, res)
 }
@@ -91,7 +91,7 @@ func TestQuit(t *testing.T) {
 	sub := eventbus.NewTopicListener(bus, nil, "")
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		bus.Publish(string(msg.QuitTopic), nil)
+		bus.Publish(string(msg.QuitTopic), bytes.Buffer{})
 	}()
 	sub.Accept()
 	//after 50ms the Quit should kick in and unblock Accept()
@@ -112,12 +112,12 @@ func (p *pappoAdder) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 }
 
 type mockCollector struct {
-	f func(*bytes.Buffer) error
+	f func(bytes.Buffer) error
 }
 
-func defaultMockCollector(rChan chan *bytes.Buffer, f func(*bytes.Buffer) error) *mockCollector {
+func defaultMockCollector(rChan chan bytes.Buffer, f func(bytes.Buffer) error) *mockCollector {
 	if f == nil {
-		f = func(b *bytes.Buffer) error {
+		f = func(b bytes.Buffer) error {
 			rChan <- b
 			return nil
 		}
@@ -125,9 +125,9 @@ func defaultMockCollector(rChan chan *bytes.Buffer, f func(*bytes.Buffer) error)
 	return &mockCollector{f}
 }
 
-func (m *mockCollector) Collect(b *bytes.Buffer) error { return m.f(b) }
+func (m *mockCollector) Collect(b bytes.Buffer) error { return m.f(b) }
 
-func ranbuf() *bytes.Buffer {
+func ranbuf() bytes.Buffer {
 	tbytes, _ := crypto.RandEntropy(32)
-	return bytes.NewBuffer(tbytes)
+	return *bytes.NewBuffer(tbytes)
 }

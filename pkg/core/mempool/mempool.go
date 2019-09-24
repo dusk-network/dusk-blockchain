@@ -79,9 +79,9 @@ type Collector struct {
 }
 
 // Collect as specified by the wire.EventCollector interface
-func (c *Collector) Collect(msg *bytes.Buffer) error {
+func (c *Collector) Collect(msg bytes.Buffer) error {
 	b := block.NewBlock()
-	if err := block.Unmarshal(msg, b); err != nil {
+	if err := block.Unmarshal(&msg, b); err != nil {
 		return err
 	}
 
@@ -312,9 +312,9 @@ func (m *Mempool) newPool() Pool {
 // Collect process the emitted transactions.
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
-func (m *Mempool) Collect(message *bytes.Buffer) error {
+func (m *Mempool) Collect(message bytes.Buffer) error {
 
-	tx, err := transactions.Unmarshal(message)
+	tx, err := transactions.Unmarshal(&message)
 	if err != nil {
 		return err
 	}
@@ -411,7 +411,7 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 		return err
 	}
 
-	m.eventBus.Stream(string(topics.Gossip), withTopic)
+	m.eventBus.Stream(string(topics.Gossip), *withTopic)
 	return nil
 }
 

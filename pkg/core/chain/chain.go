@@ -124,7 +124,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Stream(string(topics.Gossip), msg)
+	c.eventBus.Stream(string(topics.Gossip), *msg)
 	return nil
 }
 
@@ -149,9 +149,9 @@ func (c *Chain) Close() error {
 	return drvr.Close()
 }
 
-func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
+func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := block.Unmarshal(m, blk); err != nil {
+	if err := block.Unmarshal(&m, blk); err != nil {
 		return err
 	}
 
@@ -239,7 +239,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
+	c.eventBus.Publish(string(topics.AcceptedBlock), *buf)
 
 	// 9. Send round update
 	// We send a round update after accepting a new block, which should include
@@ -282,7 +282,7 @@ func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
 		return err
 	}
 
-	c.eventBus.Publish(msg.RoundUpdateTopic, buf)
+	c.eventBus.Publish(msg.RoundUpdateTopic, *buf)
 	return nil
 }
 
@@ -353,7 +353,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 		return err
 	}
 
-	c.eventBus.Stream(string(topics.Gossip), withTopic)
+	c.eventBus.Stream(string(topics.Gossip), *withTopic)
 	return nil
 }
 

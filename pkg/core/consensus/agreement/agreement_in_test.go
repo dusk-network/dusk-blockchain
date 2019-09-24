@@ -62,12 +62,12 @@ func TestAgreementRace(t *testing.T) {
 	// Note that we start this goroutine before trying to aggregate the voteset,
 	// as it takes a short while to start up.
 	go func() {
-		eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, nil))
+		eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(2, p, nil))
 	}()
 
 	// Now we try to aggregate the reduction events created earlier. The round update should coincide
 	// with the aggregation.
-	eb.Publish(msg.ReductionResultTopic, buf)
+	eb.Publish(msg.ReductionResultTopic, *buf)
 
 	// Read and discard the resulting event
 	if _, err := streamer.Read(); err != nil {
@@ -86,7 +86,7 @@ func TestAgreementRace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eb.Publish(msg.ReductionResultTopic, buf)
+	eb.Publish(msg.ReductionResultTopic, *buf)
 
 	aevBytes, err := streamer.Read()
 	if err != nil {
@@ -132,7 +132,7 @@ func TestStress(t *testing.T) {
 		// Blast the filter with many more events than quorum, to see if anything sneaks in
 		go func(i int) {
 			for j := 0; j < committeeSize; j++ {
-				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k, p.CreateVotingCommittee(uint64(i), 1, committeeSize)))
+				bus.Publish(string(topics.Agreement), *MockAgreement(hash, uint64(i), 1, k, p.CreateVotingCommittee(uint64(i), 1, committeeSize)))
 			}
 		}(i)
 
@@ -164,7 +164,7 @@ func TestIncrementOnNilVoteSet(t *testing.T) {
 	// ReductionResult message.
 	roundBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundBytes, 1)
-	bus.Publish(msg.ReductionResultTopic, bytes.NewBuffer(roundBytes))
+	bus.Publish(msg.ReductionResultTopic, *bytes.NewBuffer(roundBytes))
 
 	// Wait a bit for the message to go through
 	time.Sleep(200 * time.Millisecond)

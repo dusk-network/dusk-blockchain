@@ -20,7 +20,7 @@ type (
 	// and reusability across all the different components that need to read the buffer
 	// coming from the EventBus into different structs
 	EventUnmarshaller interface {
-		Unmarshal(*bytes.Buffer, Event) error
+		Unmarshal(bytes.Buffer, Event) error
 	}
 
 	// EventMarshaller is the specular operation of an EventUnmarshaller. Following
@@ -54,7 +54,7 @@ type (
 	// until a Timeout). This Interface is typically implemented by a struct that will
 	// perform some Event unmarshalling.
 	EventCollector interface {
-		Collect(*bytes.Buffer) error
+		Collect(bytes.Buffer) error
 	}
 
 	// EventDeserializer is the interface for those struct that allows deserialization of an event from scratch

@@ -20,7 +20,7 @@ func initWinningHashCollector(subscriber eventbus.Subscriber) chan []byte {
 	return hashChannel
 }
 
-func (c *hashCollector) Collect(message *bytes.Buffer) error {
+func (c *hashCollector) Collect(message bytes.Buffer) error {
 	c.hashChannel <- message.Bytes()
 	return nil
 }

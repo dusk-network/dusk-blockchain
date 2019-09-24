@@ -213,7 +213,7 @@ func (p *Reader) ReadLoop() {
 			continue
 		}
 
-		p.router.Collect(buf)
+		p.router.Collect(*buf)
 	}
 }
 

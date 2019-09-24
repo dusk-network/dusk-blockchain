@@ -16,9 +16,9 @@ const QuitTopic = "quit"
 type TopicListener struct {
 	subscriber     Subscriber
 	eventCollector wire.EventCollector
-	msgChan        <-chan *bytes.Buffer
+	msgChan        <-chan bytes.Buffer
 	msgChanID      uint32
-	quitChan       chan *bytes.Buffer
+	quitChan       chan bytes.Buffer
 	quitChanID     uint32
 	topic          string
 }
@@ -28,8 +28,8 @@ type TopicListener struct {
 func NewTopicListener(subscriber Subscriber, collector wire.EventCollector, topic string,
 	preprocessors ...TopicProcessor) *TopicListener {
 
-	msgChan := make(chan *bytes.Buffer, 100)
-	quitChan := make(chan *bytes.Buffer, 1)
+	msgChan := make(chan bytes.Buffer, 100)
+	quitChan := make(chan bytes.Buffer, 1)
 	msgChanID := subscriber.Subscribe(topic, msgChan)
 	quitChanID := subscriber.Subscribe(string(QuitTopic), quitChan)
 
@@ -78,5 +78,5 @@ func (n *TopicListener) Accept() {
 
 // Quit will kill the goroutine spawned by Accept, and unsubscribe from it's subscribed topics.
 func (n *TopicListener) Quit() {
-	n.quitChan <- new(bytes.Buffer)
+	n.quitChan <- bytes.Buffer{}
 }

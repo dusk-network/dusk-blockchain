@@ -51,7 +51,7 @@ func TestSupervisor(t *testing.T) {
 
 	testBuf := mockBlockBuf(t, 23)
 	// testing that we can receive messages
-	eb.Publish(string(topics.AcceptedBlock), testBuf)
+	eb.Publish(string(topics.AcceptedBlock), *testBuf)
 	result := <-msgChan
 
 	assert.Equal(t, "monitor", result["process"])
@@ -68,14 +68,14 @@ func TestSupervisorReconnect(t *testing.T) {
 
 	testBuf := mockBlockBuf(t, 23)
 	// testing that we can receive messages
-	eb.Publish(string(topics.AcceptedBlock), testBuf)
+	eb.Publish(string(topics.AcceptedBlock), *testBuf)
 	<-msgChan
 
 	assert.NoError(t, supervisor.Stop())
 	wg.Wait()
 
 	testBuf = mockBlockBuf(t, 24)
-	eb.Publish(string(topics.AcceptedBlock), testBuf)
+	eb.Publish(string(topics.AcceptedBlock), *testBuf)
 	select {
 	case <-msgChan:
 		assert.FailNow(t, "Expected the supervised LogProcessor to be closed")
@@ -88,7 +88,7 @@ func TestSupervisorReconnect(t *testing.T) {
 	// reconnecting the supervised process
 	assert.NoError(t, supervisor.Reconnect())
 	// messages streamed when the process is down are lost, so we need to send another message
-	eb.Publish(string(topics.AcceptedBlock), testBuf)
+	eb.Publish(string(topics.AcceptedBlock), *testBuf)
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(24), result["round"])
@@ -104,7 +104,7 @@ func TestResumeRight(t *testing.T) {
 	assert.NoError(t, err)
 
 	testBuf := mockBlockBuf(t, 23)
-	eb.Publish(string(topics.AcceptedBlock), testBuf)
+	eb.Publish(string(topics.AcceptedBlock), *testBuf)
 	round1 := <-msgChan
 	if _, ok := round1["blockTime"]; ok {
 		assert.FailNow(t, "First round should not really have a block time. Instead found %d", round1["blockTime"])
@@ -114,7 +114,7 @@ func TestResumeRight(t *testing.T) {
 
 	// Publish next block
 	testBuf = mockBlockBuf(t, 24)
-	eb.Publish(string(topics.AcceptedBlock), testBuf)
+	eb.Publish(string(topics.AcceptedBlock), *testBuf)
 	var round2 map[string]interface{}
 	for {
 		// If we get a message, discard it if it is not a block event message
@@ -149,7 +149,7 @@ func TestNotifyErrors(t *testing.T) {
 	}()
 
 	testBuf := mockBlockBuf(t, 23)
-	eb.Publish(string(topics.AcceptedBlock), testBuf)
+	eb.Publish(string(topics.AcceptedBlock), *testBuf)
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
 	<-endChan

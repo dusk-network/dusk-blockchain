@@ -41,7 +41,7 @@ type (
 func UpdateRound(bus eventbus.Publisher, round uint64) {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, round)
-	bus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(b))
+	bus.Publish(msg.RoundUpdateTopic, *bytes.NewBuffer(b))
 }
 
 // InitRoundUpdate initializes a Round update channel and fires up the TopicListener
@@ -57,29 +57,29 @@ func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 
 // Collect as specified in the EventCollector interface. In this case Collect simply
 // performs unmarshalling of the round event
-func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
+func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
 	var round uint64
-	if err := encoding.ReadUint64LE(roundBuffer, &round); err != nil {
+	if err := encoding.ReadUint64LE(&roundBuffer, &round); err != nil {
 		return err
 	}
 
-	provisioners, err := user.UnmarshalProvisioners(roundBuffer)
+	provisioners, err := user.UnmarshalProvisioners(&roundBuffer)
 	if err != nil {
 		return err
 	}
 
-	bidList, err := user.UnmarshalBidList(roundBuffer)
+	bidList, err := user.UnmarshalBidList(&roundBuffer)
 	if err != nil {
 		return err
 	}
 
 	seed := make([]byte, 33)
-	if err := encoding.ReadBLS(roundBuffer, seed); err != nil {
+	if err := encoding.ReadBLS(&roundBuffer, seed); err != nil {
 		return err
 	}
 
 	hash := make([]byte, 32)
-	if err := encoding.Read256(roundBuffer, hash); err != nil {
+	if err := encoding.Read256(&roundBuffer, hash); err != nil {
 		return err
 	}
 
@@ -97,7 +97,7 @@ func InitBlockRegenerationCollector(subscriber eventbus.Subscriber) chan AsyncSt
 	return regenerationChan
 }
 
-func (rg *regenerationCollector) Collect(r *bytes.Buffer) error {
+func (rg *regenerationCollector) Collect(r bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(r.Bytes()[:8])
 	step := uint8(r.Bytes()[8])
 	state := AsyncState{
@@ -118,9 +118,9 @@ func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, 
 }
 
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
-func (c *acceptedBlockCollector) Collect(r *bytes.Buffer) error {
+func (c *acceptedBlockCollector) Collect(r bytes.Buffer) error {
 	b := block.NewBlock()
-	if err := block.Unmarshal(r, b); err != nil {
+	if err := block.Unmarshal(&r, b); err != nil {
 		return err
 	}
 

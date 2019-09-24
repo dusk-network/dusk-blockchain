@@ -59,7 +59,7 @@ func TestScoreGeneration(t *testing.T) {
 	generation.Launch(eb, nil, k, keys, publicKey, gen, gen, db)
 
 	// send a round update to start generation
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	buf, err := streamer.Read()
 	if err != nil {

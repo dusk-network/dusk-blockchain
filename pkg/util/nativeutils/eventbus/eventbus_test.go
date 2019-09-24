@@ -16,7 +16,7 @@ func TestNewEventBus(t *testing.T) {
 
 func TestSubscribe(t *testing.T) {
 	eb := New()
-	myChan := make(chan *bytes.Buffer, 10)
+	myChan := make(chan bytes.Buffer, 10)
 	assert.NotNil(t, eb.Subscribe("whateverTopic", myChan))
 }
 
@@ -28,7 +28,7 @@ func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
 	eb.Unsubscribe("whateverTopic", id)
 
-	eb.Publish("whateverTopic", bytes.NewBufferString("whatever2"))
+	eb.Publish("whateverTopic", *bytes.NewBufferString("whatever2"))
 	select {
 	case <-myChan:
 		assert.FailNow(t, "We should have not received message")
@@ -37,13 +37,13 @@ func TestUnsubscribe(t *testing.T) {
 	}
 }
 
-func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
+func newEB(t *testing.T) (*EventBus, chan bytes.Buffer, uint32) {
 	eb := New()
-	myChan := make(chan *bytes.Buffer, 10)
+	myChan := make(chan bytes.Buffer, 10)
 	id := eb.Subscribe("whateverTopic", myChan)
 	assert.NotNil(t, id)
 
-	eb.Publish("whateverTopic", bytes.NewBufferString("whatever"))
+	eb.Publish("whateverTopic", *bytes.NewBufferString("whatever"))
 
 	select {
 	case received := <-myChan:
@@ -64,7 +64,7 @@ func TestExitChan(t *testing.T) {
 	// Put something on ring buffer
 	val := new(bytes.Buffer)
 	val.Write([]byte{0})
-	eb.Stream(topic, val)
+	eb.Stream(topic, *val)
 	// Wait for event to be handled
 	// NB: 'Writer' must return error to force consumer termination
 	time.Sleep(100 * time.Millisecond)

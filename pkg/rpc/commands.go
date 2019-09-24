@@ -75,7 +75,7 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 	}
 
 	payload, _ := hex.DecodeString(params[1])
-	s.eventBus.Publish(jsonrpcTopic, bytes.NewBuffer(payload))
+	s.eventBus.Publish(jsonrpcTopic, *bytes.NewBuffer(payload))
 
 	result :=
 		`{ 

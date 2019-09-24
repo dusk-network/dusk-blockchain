@@ -27,12 +27,12 @@ type messageRouter struct {
 	peerInfo string
 }
 
-func (m *messageRouter) Collect(b *bytes.Buffer) error {
-	topic, err := extractTopic(b)
+func (m *messageRouter) Collect(b bytes.Buffer) error {
+	topic, err := extractTopic(&b)
 	if err != nil {
 		return err
 	}
-	m.route(topic, b)
+	m.route(topic, &b)
 	return nil
 }
 
@@ -68,7 +68,7 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {
-				m.publisher.Publish(string(topic), b)
+				m.publisher.Publish(string(topic), *b)
 			}
 		} else {
 			err = fmt.Errorf("%s topic not routable", string(topic))

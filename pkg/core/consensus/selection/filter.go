@@ -22,8 +22,8 @@ func newFilter(handler ScoreEventHandler, state consensus.State, selector *event
 	}
 }
 
-func (f *filter) Collect(buffer *bytes.Buffer) error {
-	ev, err := f.handler.Deserialize(buffer)
+func (f *filter) Collect(buffer bytes.Buffer) error {
+	ev, err := f.handler.Deserialize(&buffer)
 	if err != nil {
 		return err
 	}

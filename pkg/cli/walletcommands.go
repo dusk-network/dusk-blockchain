@@ -222,7 +222,7 @@ func (c *CLI) transferCMD(args []string) {
 		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
 	}
 
-	c.eventBroker.Publish(string(topics.Tx), buf)
+	c.eventBroker.Publish(string(topics.Tx), *buf)
 }
 
 func (c *CLI) sendBidCMD(args []string) {
@@ -254,7 +254,7 @@ func (c *CLI) sendBidCMD(args []string) {
 		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
 	}
 
-	c.eventBroker.Publish(string(topics.Tx), buf)
+	c.eventBroker.Publish(string(topics.Tx), *buf)
 }
 
 func (c *CLI) sendStakeCMD(args []string) {
@@ -286,7 +286,7 @@ func (c *CLI) sendStakeCMD(args []string) {
 		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
 	}
 
-	c.eventBroker.Publish(string(topics.Tx), buf)
+	c.eventBroker.Publish(string(topics.Tx), *buf)
 }
 
 func fetchDecoys(numMixins int) []mlsag.PubKeys {

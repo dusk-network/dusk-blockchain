@@ -33,8 +33,8 @@ type (
 	// Subscriber subscribes a channel to Event notifications on a specific topic
 	Subscriber interface {
 		Preprocessor
-		Subscribe(string, chan<- *bytes.Buffer) uint32
-		SubscribeCallback(string, func(*bytes.Buffer) error) uint32
+		Subscribe(string, chan<- bytes.Buffer) uint32
+		SubscribeCallback(string, func(bytes.Buffer) error) uint32
 		SubscribeStream(string, io.WriteCloser) uint32
 		Unsubscribe(string, uint32)
 		// RegisterPreprocessor(string, ...TopicProcessor)
@@ -42,8 +42,8 @@ type (
 
 	// Publisher publishes serialized messages on a specific topic
 	Publisher interface {
-		Publish(string, *bytes.Buffer)
-		Stream(string, *bytes.Buffer)
+		Publish(string, bytes.Buffer)
+		Stream(string, bytes.Buffer)
 	}
 
 	// Broker is an Publisher and an Subscriber
@@ -79,12 +79,12 @@ func New() *EventBus {
 }
 
 // Subscribe subscribes to a topic with a channel.
-func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer) uint32 {
+func (bus *EventBus) Subscribe(topic string, messageChannel chan<- bytes.Buffer) uint32 {
 	return bus.handlers.Store(topic, &channelHandler{messageChannel})
 }
 
 // SubscribeCallback subscribes to a topic with a callback.
-func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer) error) uint32 {
+func (bus *EventBus) SubscribeCallback(topic string, callback func(bytes.Buffer) error) uint32 {
 	return bus.callbackHandlers.Store(topic, &callbackHandler{callback})
 }
 
@@ -175,23 +175,23 @@ func (bus *EventBus) RemoveAllPreprocessors(topic string) {
 	delete(bus.preprocessors, topic)
 }
 
-func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (*bytes.Buffer, error) {
+func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (bytes.Buffer, error) {
 	if preprocessors := bus.getPreprocessors(topic); len(preprocessors) > 0 {
 		for _, preprocessor := range preprocessors {
 			var err error
 			messageBuffer, err = preprocessor.Process(messageBuffer)
 			if err != nil {
-				return nil, err
+				return bytes.Buffer{}, err
 			}
 		}
 	}
 
-	return messageBuffer, nil
+	return *messageBuffer, nil
 }
 
 // Publish executes callback defined for a topic.
-func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
-	processedMsg, err := bus.preprocess(topic, messageBuffer)
+func (bus *EventBus) Publish(topic string, messageBuffer bytes.Buffer) {
+	processedMsg, err := bus.preprocess(topic, &messageBuffer)
 	if err != nil {
 		logEB.WithError(err).Errorln("preprocessor error")
 		return
@@ -215,8 +215,8 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 }
 
 // Stream a buffer to the subscribers for a specific topic.
-func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
-	processedMsg, err := bus.preprocess(topic, messageBuffer)
+func (bus *EventBus) Stream(topic string, messageBuffer bytes.Buffer) {
+	processedMsg, err := bus.preprocess(topic, &messageBuffer)
 	if err != nil {
 		logEB.WithError(err).WithField("topic", topic).Errorln("preprocessor error")
 		return
@@ -230,15 +230,6 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 			continue
 		}
 	}
-}
-
-func copyBuffer(m *bytes.Buffer) *bytes.Buffer {
-	var mCopy bytes.Buffer
-	if m != nil {
-		mCopy = *m
-	}
-
-	return &mCopy
 }
 
 func (bus *EventBus) getPreprocessors(topic string) []idTopicProcessor {

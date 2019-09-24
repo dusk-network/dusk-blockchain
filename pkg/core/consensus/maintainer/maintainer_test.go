@@ -56,10 +56,10 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bid := user.Bid{mArr, mArr, 10}
 	bl[0] = bid
 	// Then, send a round update to update the values on the maintainer
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, bl))
+	bus.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(2, p, bl))
 
 	// Send another round update that is within the 'offset', to trigger sending a new pair of txs
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(6, p, bl))
+	bus.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(6, p, bl))
 
 	// We should get another set of two txs
 	txs = receiveTxs(t, txChan)
@@ -78,7 +78,7 @@ func TestSendOnce(t *testing.T) {
 	_ = receiveTxs(t, txChan)
 
 	// Update round
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, nil))
+	bus.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(2, p, nil))
 
 	select {
 	case <-txChan:
@@ -88,11 +88,11 @@ func TestSendOnce(t *testing.T) {
 	}
 }
 
-func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
 	// Initial setup
 	bus := eventbus.New()
 	wdb, err := database.New(dbPath)
-	txChan := make(chan *bytes.Buffer, 2)
+	txChan := make(chan bytes.Buffer, 2)
 	bus.Subscribe(string(topics.Tx), txChan)
 
 	w, err := wallet.New(rand.Read, 2, wdb, wallet.GenerateDecoys, wallet.GenerateInputs, pass)
@@ -117,16 +117,16 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, 
 	// Note: we don't need to mock the bidlist as we should not be included if we want to trigger a bid transaction
 
 	// Send round update, to start the maintainer.
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
+	bus.Publish(msg.RoundUpdateTopic, *consensus.MockRoundUpdateBuffer(1, p, nil))
 
 	return bus, txChan, p, w.ConsensusKeys(), mScalar
 }
 
-func receiveTxs(t *testing.T, txChan chan *bytes.Buffer) []transactions.Transaction {
+func receiveTxs(t *testing.T, txChan chan bytes.Buffer) []transactions.Transaction {
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		txBuf := <-txChan
-		tx, err := transactions.Unmarshal(txBuf)
+		tx, err := transactions.Unmarshal(&txBuf)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
 	}

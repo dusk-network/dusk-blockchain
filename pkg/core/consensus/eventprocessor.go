@@ -32,7 +32,7 @@ func NewRepublisher(publisher eventbus.Publisher, topic topics.Topic) *Republish
 func (r *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
 	bounced := eventBuffer
 	msg, _ := wire.AddTopic(bounced, r.topic)
-	r.publisher.Stream(string(topics.Gossip), msg)
+	r.publisher.Stream(string(topics.Gossip), *msg)
 	return eventBuffer, nil
 }
 
