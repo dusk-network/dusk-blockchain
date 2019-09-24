@@ -88,11 +88,14 @@ func (eu *UnMarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 		return err
 	}
 
-	if err := encoding.ReadString(b, &ev.Msg); err != nil {
+	var err error
+	ev.Msg, err = encoding.ReadString(b)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadString(b, &ev.Originator); err != nil {
+	ev.Originator, err = encoding.ReadString(b)
+	if err != nil {
 		return err
 	}
 

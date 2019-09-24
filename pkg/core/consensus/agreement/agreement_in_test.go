@@ -50,7 +50,7 @@ func TestAgreementRace(t *testing.T) {
 	ru := reduction.NewUnMarshaller()
 	events := createVoteSet(t, k, hash, committeeSize, 1)
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
+	if err := encoding.WriteUint64LE(buf, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,7 +78,7 @@ func TestAgreementRace(t *testing.T) {
 	hash, _ = crypto.RandEntropy(32)
 	events = createVoteSet(t, k, hash, committeeSize, 2)
 	buf.Reset()
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, 2); err != nil {
+	if err := encoding.WriteUint64LE(buf, 2); err != nil {
 		t.Fatal(err)
 	}
 

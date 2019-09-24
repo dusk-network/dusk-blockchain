@@ -59,7 +59,7 @@ func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 // performs unmarshalling of the round event
 func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 	var round uint64
-	if err := encoding.ReadUint64(roundBuffer, binary.LittleEndian, &round); err != nil {
+	if err := encoding.ReadUint64LE(roundBuffer, &round); err != nil {
 		return err
 	}
 
@@ -73,13 +73,13 @@ func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 		return err
 	}
 
-	seed := make([]byte, 32)
-	if err := encoding.ReadBLS(roundBuffer, &seed); err != nil {
+	seed := make([]byte, 33)
+	if err := encoding.ReadBLS(roundBuffer, seed); err != nil {
 		return err
 	}
 
 	hash := make([]byte, 32)
-	if err := encoding.Read256(roundBuffer, &hash); err != nil {
+	if err := encoding.Read256(roundBuffer, hash); err != nil {
 		return err
 	}
 

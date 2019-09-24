@@ -204,7 +204,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 
 func (r *reducer) sendResults(events []wire.Event) {
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, r.ctx.state.Round()); err != nil {
+	if err := encoding.WriteUint64LE(buf, r.ctx.state.Round()); err != nil {
 		panic(err)
 	}
 

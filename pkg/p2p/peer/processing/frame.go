@@ -21,7 +21,7 @@ func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
 	msg := new(bytes.Buffer)
 	// Append prefix(header)
-	if err := encoding.WriteUint64(msg, binary.LittleEndian, uint64(buf.Len())); err != nil {
+	if err := encoding.WriteUint64LE(msg, uint64(buf.Len())); err != nil {
 		return nil, err
 	}
 

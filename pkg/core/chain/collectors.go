@@ -50,8 +50,8 @@ func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
 }
 
 func (c *certificateCollector) Collect(m *bytes.Buffer) error {
-	var hash []byte
-	if err := encoding.Read256(m, &hash); err != nil {
+	hash := make([]byte, 32)
+	if err := encoding.Read256(m, hash); err != nil {
 		return err
 	}
 

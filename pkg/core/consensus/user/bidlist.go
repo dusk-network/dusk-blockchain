@@ -2,7 +2,6 @@ package user
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"math/rand"
 
@@ -121,7 +120,7 @@ func marshalBid(r *bytes.Buffer, bid Bid) error {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, bid.EndHeight); err != nil {
+	if err := encoding.WriteUint64LE(r, bid.EndHeight); err != nil {
 		return err
 	}
 
@@ -145,19 +144,15 @@ func UnmarshalBidList(r *bytes.Buffer) (BidList, error) {
 }
 
 func unmarshalBid(r *bytes.Buffer, bid *Bid) error {
-	xSlice := make([]byte, 32)
-	if err := encoding.Read256(r, &xSlice); err != nil {
+	if err := encoding.Read256(r, bid.X[:]); err != nil {
 		return err
 	}
-	copy(bid.X[:], xSlice)
 
-	mSlice := make([]byte, 32)
-	if err := encoding.Read256(r, &mSlice); err != nil {
+	if err := encoding.Read256(r, bid.M[:]); err != nil {
 		return err
 	}
-	copy(bid.M[:], mSlice)
 
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &bid.EndHeight); err != nil {
+	if err := encoding.ReadUint64LE(r, &bid.EndHeight); err != nil {
 		return err
 	}
 

@@ -21,8 +21,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TxsToReader converts a slice of transactions to an io.Reader
-func TxsToReader(t *testing.T, txs []transactions.Transaction) io.Reader {
+// TxsToBuffer converts a slice of transactions to a bytes.Buffer.
+func TxsToBuffer(t *testing.T, txs []transactions.Transaction) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 
 	for _, tx := range txs {
@@ -32,7 +32,7 @@ func TxsToReader(t *testing.T, txs []transactions.Transaction) io.Reader {
 		}
 	}
 
-	return bytes.NewReader(buf.Bytes())
+	return bytes.NewBuffer(buf.Bytes())
 }
 
 // RandomSlice returns a random slice of size `size`

@@ -1,7 +1,7 @@
 package peermsg
 
 import (
-	"io"
+	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
@@ -13,7 +13,7 @@ type GetBlocks struct {
 }
 
 // Encode a GetBlocks struct and write it to w.
-func (g *GetBlocks) Encode(w io.Writer) error {
+func (g *GetBlocks) Encode(w *bytes.Buffer) error {
 	if err := encoding.WriteVarInt(w, uint64(len(g.Locators))); err != nil {
 		return err
 	}
@@ -28,7 +28,7 @@ func (g *GetBlocks) Encode(w io.Writer) error {
 }
 
 // Decode a GetBlocks struct from r into g.
-func (g *GetBlocks) Decode(r io.Reader) error {
+func (g *GetBlocks) Decode(r *bytes.Buffer) error {
 	lenLocators, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -36,7 +36,8 @@ func (g *GetBlocks) Decode(r io.Reader) error {
 
 	g.Locators = make([][]byte, lenLocators)
 	for i := uint64(0); i < lenLocators; i++ {
-		if err := encoding.Read256(r, &g.Locators[i]); err != nil {
+		g.Locators[i] = make([]byte, 32)
+		if err = encoding.Read256(r, g.Locators[i]); err != nil {
 			return err
 		}
 	}

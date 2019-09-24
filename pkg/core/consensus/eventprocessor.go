@@ -40,12 +40,12 @@ func (r *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) 
 // preserve the original message. It returns a copy of the message.
 func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	sig := make([]byte, 64)
-	if err := encoding.Read512(buf, &sig); err != nil {
+	if err := encoding.Read512(buf, sig); err != nil {
 		return nil, err
 	}
 
 	edPubKey := make([]byte, 32)
-	if err := encoding.Read256(buf, &edPubKey); err != nil {
+	if err := encoding.Read256(buf, edPubKey); err != nil {
 		return nil, err
 	}
 

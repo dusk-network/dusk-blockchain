@@ -2,7 +2,6 @@ package reduction_test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"testing"
 	"time"
@@ -48,8 +47,8 @@ func TestStress(t *testing.T) {
 
 		voteSetBuf := <-voteSetChan
 		// The vote set buffer will have a round as it's first item. Let's read it and discard it
-		var round uint64
-		if err := encoding.ReadUint64(voteSetBuf, binary.LittleEndian, &round); err != nil {
+		var n uint64
+		if err := encoding.ReadUint64LE(voteSetBuf, &n); err != nil {
 			t.Fatal(err)
 		}
 

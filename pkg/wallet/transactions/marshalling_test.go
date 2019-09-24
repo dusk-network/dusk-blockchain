@@ -281,7 +281,7 @@ func calcTxAndStandardHash(t *testing.T, tx transactions.Transaction) ([]byte, [
 
 func TestDecodeTransactions(t *testing.T) {
 	txs := helper.RandomSliceOfTxs(t, 2)
-	r := helper.TxsToReader(t, txs)
+	r := helper.TxsToBuffer(t, txs)
 
 	decTxs := make([]transactions.Transaction, len(txs))
 	for i := 0; i < len(txs); i++ {

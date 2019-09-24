@@ -2,7 +2,6 @@ package user
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -125,11 +124,11 @@ func marshalMember(r *bytes.Buffer, member Member) error {
 }
 
 func marshalStake(r *bytes.Buffer, stake Stake) error {
-	if err := encoding.WriteUint64(r, binary.LittleEndian, stake.Amount); err != nil {
+	if err := encoding.WriteUint64LE(r, stake.Amount); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, stake.EndHeight); err != nil {
+	if err := encoding.WriteUint64LE(r, stake.EndHeight); err != nil {
 		return err
 	}
 
@@ -166,7 +165,8 @@ func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 
 func unmarshalMember(r *bytes.Buffer) (*Member, error) {
 	member := &Member{}
-	if err := encoding.Read256(r, &member.PublicKeyEd); err != nil {
+	member.PublicKeyEd = make([]byte, 32)
+	if err := encoding.Read256(r, member.PublicKeyEd); err != nil {
 		return nil, err
 	}
 
@@ -192,11 +192,11 @@ func unmarshalMember(r *bytes.Buffer) (*Member, error) {
 
 func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 	stake := Stake{}
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &stake.Amount); err != nil {
+	if err := encoding.ReadUint64LE(r, &stake.Amount); err != nil {
 		return Stake{}, err
 	}
 
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &stake.EndHeight); err != nil {
+	if err := encoding.ReadUint64LE(r, &stake.EndHeight); err != nil {
 		return Stake{}, err
 	}
 
