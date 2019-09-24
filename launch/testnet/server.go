@@ -44,7 +44,7 @@ func Setup() *Server {
 	m.Run()
 
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus, rpcBus, nil)
+	chain, err := chain.New(eventBus, rpcBus)
 	if err != nil {
 		panic(err)
 	}

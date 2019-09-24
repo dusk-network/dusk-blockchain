@@ -2,13 +2,19 @@ package generation
 
 import (
 	"bytes"
+	"errors"
 	"math/big"
 	"time"
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-crypto/bls"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -19,20 +25,80 @@ type (
 	// BlockGenerator defines a method which will create and return a new block,
 	// given a height and seed.
 	BlockGenerator interface {
+		Generate(consensus.RoundUpdate) (block.Block, selection.ScoreEvent, error)
 		GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error)
+		UpdateProofValues(ristretto.Scalar, ristretto.Scalar)
 	}
 
 	blockGenerator struct {
 		// generator Public Keys to sign the rewards tx
-		genPubKey *key.PublicKey
-		rpcBus    *rpcbus.RPCBus
+		genPubKey      *key.PublicKey
+		rpcBus         *rpcbus.RPCBus
+		proofGenerator Generator
+		threshold      *consensus.Threshold
+		keys           user.Keys
 	}
 )
 
-func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus) *blockGenerator {
+var bidNotFound = errors.New("bid not found in bidlist")
+
+func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus, proofGen Generator, keys user.Keys) *blockGenerator {
 	return &blockGenerator{
-		rpcBus:    rpcBus,
-		genPubKey: genPubKey,
+		rpcBus:         rpcBus,
+		genPubKey:      genPubKey,
+		proofGenerator: proofGen,
+		keys:           keys,
+	}
+}
+
+func (bg *blockGenerator) UpdateProofValues(d, m ristretto.Scalar) {
+	bg.proofGenerator.UpdateProofValues(d, m)
+}
+
+func (bg *blockGenerator) signSeed(seed []byte) ([]byte, error) {
+	signedSeed, err := bls.Sign(bg.keys.BLSSecretKey, bg.keys.BLSPubKey, seed)
+	if err != nil {
+		return nil, err
+	}
+	compSeed := signedSeed.Compress()
+	return compSeed, nil
+}
+
+func (bg *blockGenerator) Generate(roundUpdate consensus.RoundUpdate) (block.Block, selection.ScoreEvent, error) {
+	if !bg.proofGenerator.InBidList(roundUpdate.BidList) {
+		return block.Block{}, selection.ScoreEvent{}, bidNotFound
+	}
+
+	currentSeed, err := bg.signSeed(roundUpdate.Seed)
+	if err != nil {
+		return block.Block{}, selection.ScoreEvent{}, err
+	}
+
+	proof := bg.proofGenerator.GenerateProof(currentSeed, roundUpdate.BidList)
+	if bg.threshold.Exceeds(proof.Score) {
+		return block.Block{}, selection.ScoreEvent{}, errors.New("proof score too low")
+	}
+
+	blk, err := bg.GenerateBlock(roundUpdate.Round, currentSeed, proof.Proof, proof.Score, roundUpdate.Hash)
+	if err != nil {
+		return block.Block{}, selection.ScoreEvent{}, err
+	}
+
+	sev := bg.createScoreEvent(roundUpdate, currentSeed, blk.Header.Hash, proof)
+	bg.threshold.Lower()
+	return *blk, sev, nil
+}
+
+func (bg *blockGenerator) createScoreEvent(roundUpdate consensus.RoundUpdate, seed, hash []byte, proof zkproof.ZkProof) selection.ScoreEvent {
+	return selection.ScoreEvent{
+		Round:         roundUpdate.Round,
+		Score:         proof.Score,
+		Proof:         proof.Proof,
+		Z:             proof.Z,
+		BidListSubset: proof.BinaryBidList,
+		PrevHash:      roundUpdate.Hash,
+		Seed:          seed,
+		VoteHash:      hash,
 	}
 }
 

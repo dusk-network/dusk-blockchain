@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -17,14 +16,10 @@ import (
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func Launch(eventBroker eventbus.Broker, c committee.Foldable, keys user.Keys) {
-	if c == nil {
-		c = committee.NewAgreement(eventBroker, nil)
-		eventBroker.SubscribeCallback(msg.RoundUpdateTopic, c.RemoveExpiredProvisioners)
-	}
-	broker := newBroker(eventBroker, c, keys)
-	currentRound := getInitialRound(eventBroker)
-	broker.updateRound(currentRound)
+func Launch(eventBroker eventbus.Broker, keys user.Keys) {
+	broker := newBroker(eventBroker, keys)
+	roundUpdate := <-broker.roundChan
+	broker.updateRound(roundUpdate)
 	go broker.Listen()
 }
 
@@ -34,10 +29,10 @@ type broker struct {
 	state      consensus.State
 	filter     *consensus.EventFilter
 	resultChan <-chan voteSet
+	roundChan  <-chan consensus.RoundUpdate
 }
 
-func launchFilter(eventBroker eventbus.Broker, committee committee.Committee,
-	handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
+func launchFilter(eventBroker eventbus.Broker, handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(handler, state, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
 	eventBroker.SubscribeCallback(string(topics.Agreement), filter.Collect)
@@ -45,16 +40,17 @@ func launchFilter(eventBroker eventbus.Broker, committee committee.Committee,
 	return filter
 }
 
-func newBroker(eventBroker eventbus.Broker, committee committee.Foldable, keys user.Keys) *broker {
-	handler := newHandler(committee, keys)
+func newBroker(eventBroker eventbus.Broker, keys user.Keys) *broker {
+	handler := newHandler(keys)
 	state := consensus.NewState()
-	filter := launchFilter(eventBroker, committee, handler, state)
+	filter := launchFilter(eventBroker, handler, state)
 	b := &broker{
 		publisher:  eventBroker,
 		handler:    handler,
 		state:      state,
 		filter:     filter,
 		resultChan: initReductionResultCollector(eventBroker),
+		roundChan:  consensus.InitRoundUpdate(eventBroker),
 	}
 
 	return b
@@ -67,9 +63,10 @@ func (b *broker) Listen() {
 		case evs := <-b.filter.Accumulator.CollectedVotesChan:
 			b.publishEvent(evs)
 			b.publishWinningHash(evs)
-			b.updateRound(b.state.Round() + 1)
 		case voteSet := <-b.resultChan:
 			b.sendAgreement(voteSet)
+		case roundUpdate := <-b.roundChan:
+			b.updateRound(roundUpdate)
 		}
 	}
 }
@@ -103,13 +100,13 @@ func (b *broker) sendAgreement(voteSet voteSet) error {
 	return nil
 }
 
-func (b *broker) updateRound(round uint64) {
+func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 	log.WithFields(log.Fields{
 		"process": "agreement",
-		"round":   round,
+		"round":   roundUpdate.Round,
 	}).Debugln("updating round")
-	b.filter.UpdateRound(round)
-	consensus.UpdateRound(b.publisher, round)
+	b.handler.UpdateProvisioners(roundUpdate.P)
+	b.filter.UpdateRound(roundUpdate.Round)
 	b.filter.FlushQueue()
 }
 

@@ -23,7 +23,7 @@ type (
 		ctx *context
 
 		// channels linked to subscribers
-		roundUpdateChan <-chan uint64
+		roundUpdateChan <-chan consensus.RoundUpdate
 		stepChan        <-chan struct{}
 		selectionChan   <-chan *selection.ScoreEvent
 	}
@@ -31,13 +31,8 @@ type (
 
 // Launch creates and wires a broker, initiating the components that
 // have to do with Block Reduction
-func Launch(eventBroker eventbus.Broker, committee Reducers, keys user.Keys,
-	timeout time.Duration, rpcBus *rpcbus.RPCBus) {
-	if committee == nil {
-		committee = newReductionCommittee(eventBroker, nil)
-	}
-
-	handler := newReductionHandler(committee, keys)
+func Launch(eventBroker eventbus.Broker, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus) {
+	handler := newReductionHandler(keys)
 	broker := newBroker(eventBroker, handler, timeout, rpcBus)
 	go broker.Listen()
 }
@@ -71,14 +66,15 @@ func newBroker(eventBroker eventbus.Broker, handler *reductionHandler, timeout t
 func (b *broker) Listen() {
 	for {
 		select {
-		case round := <-b.roundUpdateChan:
+		case roundUpdate := <-b.roundUpdateChan:
 			log.WithFields(log.Fields{
 				"process": "reduction",
-				"round":   round,
+				"round":   roundUpdate.Round,
 			}).Debug("Got round update")
 			b.reducer.end()
 			b.reducer.lock.Lock()
-			b.filter.UpdateRound(round)
+			b.ctx.handler.UpdateProvisioners(roundUpdate.P)
+			b.filter.UpdateRound(roundUpdate.Round)
 			b.ctx.timer.ResetTimeOut()
 			b.reducer.lock.Unlock()
 		case ev := <-b.selectionChan:
@@ -87,22 +83,21 @@ func (b *broker) Listen() {
 					"process": "reduction",
 				}).Debug("got empty selection message")
 				b.reducer.startReduction(make([]byte, 32))
-				b.filter.FlushQueue()
 			} else if ev.Round == b.ctx.state.Round() {
 				log.WithFields(log.Fields{
 					"process": "reduction",
 					"hash":    hex.EncodeToString(ev.VoteHash),
 				}).Debug("got selection message")
 				b.reducer.startReduction(ev.VoteHash)
-				b.filter.FlushQueue()
 			} else {
 				log.WithFields(log.Fields{
 					"process":     "reduction",
 					"event round": ev.Round,
 				}).Debug("got obsolete selection message")
 				b.reducer.startReduction(make([]byte, 32))
-				b.filter.FlushQueue()
 			}
+
+			b.filter.FlushQueue()
 		}
 	}
 }

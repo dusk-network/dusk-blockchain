@@ -3,6 +3,7 @@ package reduction
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -10,29 +11,33 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
+const maxCommitteeSize = 64
+
 type (
 	// ReductionHandler is responsible for performing operations that need to know
 	// about specific event fields.
 	reductionHandler struct {
-		user.Keys
-		Reducers
+		*committee.Handler
 		*UnMarshaller
 	}
 )
 
 // newReductionHandler will return a ReductionHandler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
-func newReductionHandler(committee Reducers, keys user.Keys) *reductionHandler {
+func newReductionHandler(keys user.Keys) *reductionHandler {
 	return &reductionHandler{
-		Keys:         keys,
-		Reducers:     committee,
+		Handler:      committee.NewHandler(keys),
 		UnMarshaller: NewUnMarshaller(),
 	}
 }
 
 // AmMember checks if we are part of the committee.
 func (b *reductionHandler) AmMember(round uint64, step uint8) bool {
-	return b.Reducers.IsMember(b.Keys.BLSPubKeyBytes, round, step)
+	return b.Handler.AmMember(round, step, maxCommitteeSize)
+}
+
+func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
+	return b.Handler.IsMember(pubKeyBLS, round, step, maxCommitteeSize)
 }
 
 func (b *reductionHandler) ExtractHeader(e wire.Event) *header.Header {
@@ -56,4 +61,8 @@ func (b *reductionHandler) Verify(e wire.Event) error {
 		return err
 	}
 	return msg.VerifyBLSSignature(ev.PubKeyBLS, info.Bytes(), ev.SignedHash)
+}
+
+func (b *reductionHandler) Quorum() int {
+	return int(float64(b.CommitteeSize(maxCommitteeSize)) * 0.75)
 }

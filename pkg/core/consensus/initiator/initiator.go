@@ -88,6 +88,7 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 
 	// launch generation component
 	go func() {
+
 		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
 			l.WithError(err).Warnln("error launching block generation component")
 		}
@@ -146,5 +147,10 @@ func launchMaintainer(eventBroker eventbus.Broker, transactor *transactor.Transa
 		return err
 	}
 
-	return maintainer.Launch(eventBroker, nil, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor, amount, lockTime, offset)
+	m, err := maintainer.New(eventBroker, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor, amount, lockTime, offset)
+	if err != nil {
+		return err
+	}
+	go m.Listen()
+	return nil
 }

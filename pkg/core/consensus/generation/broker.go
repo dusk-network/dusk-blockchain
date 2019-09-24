@@ -2,16 +2,15 @@ package generation
 
 import (
 	"bytes"
-	"crypto/rand"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -30,25 +29,23 @@ func Launch(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar,
 		return err
 	}
 
-	go broker.Listen()
+	state := NewState(eventBus)
+	state.Wire(broker)
 	return nil
 }
 
 type broker struct {
-	k              ristretto.Scalar
-	m              ristretto.Scalar
-	eventBroker    eventbus.Broker
-	proofGenerator Generator
+	k           ristretto.Scalar
+	m           ristretto.Scalar
+	eventBroker eventbus.Broker
+	blockGen    BlockGenerator
 
-	forwarder            *forwarder
-	seeder               *seeder
 	certificateGenerator *certificateGenerator
 
 	// subscriber channels
-	bidChan              <-chan user.Bid
 	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
-	acceptedBlockChan    <-chan block.Block
+	roundChan            <-chan consensus.RoundUpdate
 }
 
 func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristretto.Scalar,
@@ -61,122 +58,56 @@ func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristr
 		}
 	}
 
-	seed := make([]byte, 64)
-	_, _ = rand.Read(seed)
-
 	if blockGen == nil {
-		blockGen = newBlockGenerator(publicKey, rpcBus)
+		blockGen = newBlockGenerator(publicKey, rpcBus, gen, keys)
 	}
 
-	blk := getLatestBlock()
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
-	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBroker)
 
 	b := &broker{
 		k:                    k,
 		m:                    m,
 		eventBroker:          eventBroker,
-		proofGenerator:       gen,
+		blockGen:             blockGen,
 		certificateGenerator: certGenerator,
-		bidChan:              consensus.InitBidListUpdate(eventBroker),
 		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		acceptedBlockChan:    acceptedBlockChan,
-		forwarder:            newForwarder(eventBroker, blockGen),
-		seeder:               &seeder{keys: keys},
+		roundChan:            consensus.InitRoundUpdate(eventBroker),
 	}
-	b.handleBlock(*blk)
 	return b, nil
-}
-
-func getLatestBlock() *block.Block {
-	_, db := heavy.CreateDBConnection()
-	var blk *block.Block
-	err := db.View(func(t database.Transaction) error {
-		currentHeight, err := t.FetchCurrentHeight()
-		if err != nil {
-			return err
-		}
-
-		hash, err := t.FetchBlockHashByHeight(currentHeight)
-		if err != nil {
-			return err
-		}
-
-		blk, err = t.FetchBlock(hash)
-		return err
-	})
-
-	if err != nil {
-		return config.DecodeGenesis()
-	}
-
-	return blk
 }
 
 func (b *broker) Listen() {
 	for {
-		select {
-		case bid := <-b.bidChan:
-			b.proofGenerator.UpdateBidList(bid)
-		case state := <-b.regenerationChan:
-			if state.Round == b.seeder.Round() {
-				b.forwarder.threshold.Lower()
-				b.generateProofAndBlock()
-			}
-		case winningBlockHash := <-b.winningBlockHashChan:
-			cert := b.certificateGenerator.generateCertificate()
-			b.sendCertificateMsg(cert, winningBlockHash)
-		case blk := <-b.acceptedBlockChan:
-			b.onBlock(blk)
-		}
+		winningBlockHash := <-b.winningBlockHashChan
+		cert := b.certificateGenerator.generateCertificate()
+		b.sendCertificateMsg(cert, winningBlockHash)
 	}
 }
 
-func (b *broker) onBlock(blk block.Block) error {
-	b.forwarder.threshold.Reset()
-
-	// Remove old bids before generating a new score
-	b.proofGenerator.RemoveExpiredBids(blk.Header.Height + 1)
-
-	return b.handleBlock(blk)
-}
-
-func (b *broker) handleBlock(blk block.Block) error {
-	if err := b.seeder.GenerateSeed(blk.Header.Height+1, blk.Header.Seed); err != nil {
-		return err
-	}
-
-	b.forwarder.setPrevBlock(blk)
-
-	// Only generate if we are allowed to
-	if b.proofGenerator.InBidList() {
-		b.generateProofAndBlock()
-	} else {
-		// Then, we will wait till a new bid belonging to us is found
-		b.updateProofValues()
-
-		// Drain the regeneration, winning block hash and accepted block channels
+func (b *broker) Generate(roundUpdate consensus.RoundUpdate) {
+	blk, sev, err := b.blockGen.Generate(roundUpdate)
+	if err == bidNotFound {
+		d := getD(b.m, b.eventBroker, nil)
+		log.WithFields(log.Fields{
+			"process": "generation",
+		}).Debugln("changing d value")
+		b.blockGen.UpdateProofValues(d, b.m)
 		b.drainChannels()
+		return
+	}
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "generation",
+		}).WithError(err).Warnln("error generating proof and block")
+		return
 	}
 
-	return nil
-}
-
-func (b *broker) generateProofAndBlock() {
-	proof := b.proofGenerator.GenerateProof(b.seeder.LatestSeed())
-	b.Forward(proof, b.seeder.LatestSeed())
-}
-
-func (b *broker) Forward(proof zkproof.ZkProof, seed []byte) {
-	if b.seeder.isFresh(seed) {
-		if err := b.forwarder.forwardScoreEvent(proof, b.seeder.Round(), seed); err != nil {
-			log.WithFields(log.Fields{
-				"process": "generation",
-			}).WithError(err).Warnln("error forwarding score event")
-		}
-	}
+	marshalledEvent := b.marshalScore(sev)
+	marshalledBlock := b.marshalBlock(blk)
+	b.eventBroker.Stream(string(topics.Gossip), marshalledEvent)
+	b.eventBroker.Stream(string(topics.Gossip), marshalledBlock)
 }
 
 func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) error {
@@ -193,25 +124,40 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 	return nil
 }
 
-func (b *broker) updateProofValues() {
-	d := getD(b.m, b.eventBroker, nil)
-	log.WithFields(log.Fields{
-		"process": "generation",
-	}).Debugln("changing d value")
-
-	b.proofGenerator.UpdateProofValues(d, b.m)
-}
-
 func (b *broker) drainChannels() {
-	for len(b.regenerationChan) > 0 {
-		<-b.regenerationChan
-	}
-
 	for len(b.winningBlockHashChan) > 0 {
 		<-b.winningBlockHashChan
 	}
+}
 
-	for len(b.acceptedBlockChan) > 0 {
-		<-b.acceptedBlockChan
+func (b *broker) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
+	buffer := new(bytes.Buffer)
+	if err := selection.MarshalScoreEvent(buffer, &sev); err != nil {
+		panic(err)
 	}
+
+	copy := *buffer
+	b.eventBroker.Publish(string(topics.Score), &copy)
+	message, err := wire.AddTopic(buffer, topics.Score)
+	if err != nil {
+		panic(err)
+	}
+
+	return message
+}
+
+func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
+	buffer := new(bytes.Buffer)
+	if err := block.Marshal(buffer, &blk); err != nil {
+		panic(err)
+	}
+
+	copy := *buffer
+	b.eventBroker.Publish(string(topics.Candidate), &copy)
+	message, err := wire.AddTopic(buffer, topics.Candidate)
+	if err != nil {
+		panic(err)
+	}
+
+	return message
 }

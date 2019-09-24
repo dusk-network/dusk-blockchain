@@ -1,265 +1,204 @@
 package user
 
 import (
+	"bytes"
 	"fmt"
-	"sync"
-	"unsafe"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
-	"github.com/dusk-network/dusk-crypto/bls"
-	"golang.org/x/crypto/ed25519"
 )
 
 type (
 	// Member contains the bytes of a provisioner's Ed25519 public key,
 	// the bytes of his BLS public key, and how much he has staked.
 	Member struct {
-		PublicKeyEd  ed25519.PublicKey
-		PublicKeyBLS bls.PublicKey
-		Stakes       []*Stake
+		PublicKeyEd  []byte
+		PublicKeyBLS []byte
+		Stakes       []Stake
 	}
 
-	// Provisioners is a slice of Members, and makes up the current provisioner committee. It implements sort.Interface
+	// Provisioners is a map of Members, and makes up the current set of provisioners.
 	Provisioners struct {
-		lock      sync.RWMutex
-		set       sortedset.Set
-		members   map[string]*Member
-		sizeCache map[uint64]int
+		Set     sortedset.Set
+		Members map[string]*Member
 	}
 
 	Stake struct {
-		amount      uint64
-		startHeight uint64
-		EndHeight   uint64
+		Amount    uint64
+		EndHeight uint64
 	}
 )
 
-func (m *Member) addStake(stake *Stake) {
+func (m *Member) AddStake(stake Stake) {
 	m.Stakes = append(m.Stakes, stake)
 }
 
-func (m *Member) removeStake(idx int) {
+func (m *Member) RemoveStake(idx int) {
 	m.Stakes[idx] = m.Stakes[len(m.Stakes)-1]
 	m.Stakes = m.Stakes[:len(m.Stakes)-1]
 }
 
-// NewProvisioners returns an initialized Provisioners struct.
-func NewProvisioners(db database.DB) (*Provisioners, uint64, error) {
-	p := &Provisioners{
-		set:       sortedset.New(),
-		members:   make(map[string]*Member),
-		sizeCache: make(map[uint64]int),
+func NewProvisioners() *Provisioners {
+	return &Provisioners{
+		Set:     sortedset.New(),
+		Members: make(map[string]*Member),
 	}
-
-	if db == nil {
-		_, db = heavy.CreateDBConnection()
-	}
-
-	totalWeight := p.repopulate(db)
-	return p, totalWeight, nil
-}
-
-func (p *Provisioners) repopulate(db database.DB) uint64 {
-	var currentHeight uint64
-	err := db.View(func(t database.Transaction) error {
-		var err error
-		currentHeight, err = t.FetchCurrentHeight()
-		return err
-	})
-
-	if err != nil {
-		currentHeight = 0
-	}
-
-	searchingHeight := uint64(0)
-	if currentHeight > transactions.MaxLockTime {
-		searchingHeight = currentHeight - transactions.MaxLockTime
-	}
-
-	var totalWeight uint64
-	for {
-		var blk *block.Block
-		err := db.View(func(t database.Transaction) error {
-			hash, err := t.FetchBlockHashByHeight(searchingHeight)
-			if err != nil {
-				return err
-			}
-
-			blk, err = t.FetchBlock(hash)
-			return err
-		})
-
-		if err != nil {
-			break
-		}
-
-		for _, tx := range blk.Txs {
-			stake, ok := tx.(*transactions.Stake)
-			if !ok {
-				continue
-			}
-
-			// Only add them if their stake is still valid
-			if searchingHeight+stake.Lock > currentHeight {
-				amount := stake.Outputs[0].EncryptedAmount.BigInt().Uint64()
-				p.AddMember(stake.PubKeyEd, stake.PubKeyBLS, amount, searchingHeight, searchingHeight+stake.Lock)
-				totalWeight += amount
-			}
-		}
-
-		searchingHeight++
-	}
-	return totalWeight
-}
-
-// Size returns the amount of Members contained within a Provisioners struct.
-func (p *Provisioners) Size(round uint64) int {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	if size, ok := p.sizeCache[round]; ok {
-		return size
-	}
-
-	// If we don't have the size for this round yet, we can delete the old ones.
-	// It is safe to assume that we have gone to the next round, and we can free up that storage.
-	p.sizeCache = make(map[uint64]int)
-	size := p.membersAt(round)
-	p.sizeCache[round] = size
-	return size
-}
-
-// strPk is an efficient way to turn []byte into string
-func strPk(pk []byte) string {
-	return *(*string)(unsafe.Pointer(&pk))
 }
 
 // MemberAt returns the Member at a certain index.
-func (p *Provisioners) MemberAt(i int) *Member {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	bigI := p.set[i]
-	return p.members[strPk(bigI.Bytes())]
-}
-
-// Calculate how many members are active on a given round.
-func (p *Provisioners) membersAt(round uint64) int {
-	size := 0
-	for _, member := range p.members {
-		for _, stake := range member.Stakes {
-			// If there is at least one stake active on or before this round, they are counted.
-			if stake.startHeight <= round {
-				size++
-				break
-			}
-		}
-	}
-
-	return size
+func (p Provisioners) MemberAt(i int) *Member {
+	bigI := p.Set[i]
+	return p.Members[string(bigI.Bytes())]
 }
 
 // GetMember returns a member of the provisioners from its BLS public key.
-func (p *Provisioners) GetMember(pubKeyBLS []byte) *Member {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	return p.members[strPk(pubKeyBLS)]
-}
-
-// AddMember will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (p *Provisioners) AddMember(pubKeyEd, pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
-	if len(pubKeyEd) != 32 {
-		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
-	}
-
-	if len(pubKeyBLS) != 129 {
-		return fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
-	}
-
-	i := strPk(pubKeyBLS)
-	stake := &Stake{amount, startHeight, endHeight}
-
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	// Check for duplicates
-	inserted := p.set.Insert(pubKeyBLS)
-	if !inserted {
-		// If they already exist, just add their new stake
-		p.members[i].addStake(stake)
-		return nil
-	}
-
-	// This is a new provisioner, so let's initialize the Member struct and add them to the list
-	m := &Member{}
-	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
-
-	pubKey := &bls.PublicKey{}
-	if err := pubKey.Unmarshal(pubKeyBLS); err != nil {
-		return err
-	}
-
-	m.PublicKeyBLS = *pubKey
-	m.addStake(stake)
-
-	p.members[i] = m
-	return nil
-}
-
-// Remove a Member, designated by their BLS public key.
-func (p *Provisioners) Remove(pubKeyBLS []byte) bool {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	delete(p.members, strPk(pubKeyBLS))
-
-	// Reset size cache, as it might change after removing provisioners.
-	p.sizeCache = make(map[uint64]int)
-	return p.set.Remove(pubKeyBLS)
-}
-
-// RemoveExpired removes Provisioners which stake expired
-func (p *Provisioners) RemoveExpired(round uint64) uint64 {
-	var totalRemoved uint64
-	for pk, member := range p.members {
-		for i := 0; i < len(member.Stakes); i++ {
-			if member.Stakes[i].EndHeight < round {
-				totalRemoved += member.Stakes[i].amount
-				member.removeStake(i)
-				// If they have no stakes left, we should remove them entirely to keep our Size() calls accurate.
-				if len(member.Stakes) == 0 {
-					p.Remove([]byte(pk))
-				}
-
-				// Reset index
-				i = -1
-			}
-		}
-	}
-
-	return totalRemoved
+func (p Provisioners) GetMember(pubKeyBLS []byte) *Member {
+	return p.Members[string(pubKeyBLS)]
 }
 
 // GetStake will find a certain provisioner in the committee by BLS public key,
 // and return their stake.
-func (p *Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
+func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	if len(pubKeyBLS) != 129 {
 		return 0, fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
 
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	i := strPk(pubKeyBLS)
-	m, found := p.members[i]
+	i := string(pubKeyBLS)
+	m, found := p.Members[i]
 	if !found {
 		return 0, fmt.Errorf("public key %v not found among provisioner set", pubKeyBLS)
 	}
 
 	var totalStake uint64
 	for _, stake := range m.Stakes {
-		totalStake += stake.amount
+		totalStake += stake.Amount
 	}
 
 	return totalStake, nil
+}
+
+func (p *Provisioners) TotalWeight() (totalWeight uint64) {
+	for _, member := range p.Members {
+		for _, stake := range member.Stakes {
+			totalWeight += stake.Amount
+		}
+	}
+
+	return totalWeight
+}
+
+func MarshalProvisioners(r *bytes.Buffer, p *Provisioners) error {
+	if err := encoding.WriteVarInt(r, uint64(len(p.Members))); err != nil {
+		return err
+	}
+
+	for _, member := range p.Members {
+		if err := marshalMember(r, *member); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func marshalMember(r *bytes.Buffer, member Member) error {
+	if err := encoding.Write256(r, member.PublicKeyEd); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(r, member.PublicKeyBLS); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarInt(r, uint64(len(member.Stakes))); err != nil {
+		return err
+	}
+
+	for _, stake := range member.Stakes {
+		if err := marshalStake(r, stake); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func marshalStake(r *bytes.Buffer, stake Stake) error {
+	if err := encoding.WriteUint64LE(r, stake.Amount); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(r, stake.EndHeight); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
+	lMembers, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return Provisioners{}, err
+	}
+
+	members := make([]*Member, lMembers)
+	for i := uint64(0); i < lMembers; i++ {
+		members[i], err = unmarshalMember(r)
+		if err != nil {
+			return Provisioners{}, err
+		}
+	}
+
+	// Reconstruct sorted set and member map
+	set := sortedset.New()
+	memberMap := make(map[string]*Member)
+	for _, member := range members {
+		set.Insert(member.PublicKeyBLS)
+		memberMap[string(member.PublicKeyBLS)] = member
+	}
+
+	return Provisioners{
+		Set:     set,
+		Members: memberMap,
+	}, nil
+}
+
+func unmarshalMember(r *bytes.Buffer) (*Member, error) {
+	member := &Member{}
+	member.PublicKeyEd = make([]byte, 32)
+	if err := encoding.Read256(r, member.PublicKeyEd); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.ReadVarBytes(r, &member.PublicKeyBLS); err != nil {
+		return nil, err
+	}
+
+	lStakes, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return nil, err
+	}
+
+	member.Stakes = make([]Stake, lStakes)
+	for i := uint64(0); i < lStakes; i++ {
+		member.Stakes[i], err = unmarshalStake(r)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return member, nil
+}
+
+func unmarshalStake(r *bytes.Buffer) (Stake, error) {
+	stake := Stake{}
+	if err := encoding.ReadUint64LE(r, &stake.Amount); err != nil {
+		return Stake{}, err
+	}
+
+	if err := encoding.ReadUint64LE(r, &stake.EndHeight); err != nil {
+		return Stake{}, err
+	}
+
+	return stake, nil
 }

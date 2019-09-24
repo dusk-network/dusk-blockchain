@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +18,7 @@ func TestUnMarshal(t *testing.T) {
 	buf := new(bytes.Buffer)
 	assert.NoError(t, selection.MarshalScoreEvent(buf, se))
 
-	other := &selection.ScoreEvent{Certificate: block.EmptyCertificate()}
+	other := &selection.ScoreEvent{}
 	assert.NoError(t, selection.UnmarshalScoreEvent(buf, other))
 	assert.True(t, other.Equal(se))
 }

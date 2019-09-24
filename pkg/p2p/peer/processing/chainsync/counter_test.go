@@ -30,5 +30,5 @@ func TestStopTimerGoroutine(t *testing.T) {
 
 	// Wait one second, and see if the old timer fires
 	time.Sleep(1 * time.Second)
-	assert.Equal(t, uint64(1), c.blocksRemaining)
+	assert.True(t, c.IsSyncing())
 }
