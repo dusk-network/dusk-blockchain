@@ -3,15 +3,17 @@ package gql
 import (
 	"crypto/tls"
 	"encoding/base64"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/gql/query"
-	"github.com/graphql-go/graphql"
 	"net"
 	"net/http"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/gql/query"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/graphql-go/graphql"
+
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -24,8 +26,8 @@ var log *logger.Entry = logger.WithFields(logger.Fields{"process": "gql"})
 // Server defines the HTTP server of the GraphQL service node.
 type Server struct {
 	started   bool // Indicates whether or not server has started
-	eventBus  *wire.EventBus
-	rpcBus    *wire.RPCBus
+	eventBus  *eventbus.EventBus
+	rpcBus    *rpcbus.RPCBus
 	db        database.DB
 	authSHA   []byte
 	listener  net.Listener
@@ -35,7 +37,7 @@ type Server struct {
 }
 
 // NewHTTPServer instantiates a new NewHTTPServer to handle GraphQL queries.
-func NewHTTPServer(eventBus *wire.EventBus, rpcBus *wire.RPCBus) (*Server, error) {
+func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server, error) {
 
 	srv := Server{
 		eventBus: eventBus,

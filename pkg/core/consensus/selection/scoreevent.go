@@ -2,9 +2,7 @@ package selection
 
 import (
 	"bytes"
-	"encoding/binary"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
@@ -21,7 +19,6 @@ type (
 		Z             []byte
 		BidListSubset []byte
 		PrevHash      []byte
-		Certificate   *block.Certificate
 		Seed          []byte
 		VoteHash      []byte
 	}
@@ -52,11 +49,12 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	sev := ev.(*ScoreEvent)
 
 	// Decoding Round
-	if err := encoding.ReadUint64(r, binary.LittleEndian, &sev.Round); err != nil {
+	if err := encoding.ReadUint64LE(r, &sev.Round); err != nil {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.Score); err != nil {
+	sev.Score = make([]byte, 32)
+	if err := encoding.Read256(r, sev.Score); err != nil {
 		return err
 	}
 
@@ -64,7 +62,8 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.Z); err != nil {
+	sev.Z = make([]byte, 32)
+	if err := encoding.Read256(r, sev.Z); err != nil {
 		return err
 	}
 
@@ -72,19 +71,18 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	if err := encoding.Read256(r, &sev.PrevHash); err != nil {
+	sev.PrevHash = make([]byte, 32)
+	if err := encoding.Read256(r, sev.PrevHash); err != nil {
 		return err
 	}
 
-	if err := block.UnmarshalCertificate(r, sev.Certificate); err != nil {
+	sev.Seed = make([]byte, 33)
+	if err := encoding.ReadBLS(r, sev.Seed); err != nil {
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &sev.Seed); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, &sev.VoteHash); err != nil {
+	sev.VoteHash = make([]byte, 32)
+	if err := encoding.Read256(r, sev.VoteHash); err != nil {
 		return err
 	}
 
@@ -102,7 +100,7 @@ func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 		return nil
 	}
 
-	if err := encoding.WriteUint64(r, binary.LittleEndian, sev.Round); err != nil {
+	if err := encoding.WriteUint64LE(r, sev.Round); err != nil {
 		return err
 	}
 
@@ -127,10 +125,6 @@ func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	if err := encoding.Write256(r, sev.PrevHash); err != nil {
-		return err
-	}
-
-	if err := block.MarshalCertificate(r, sev.Certificate); err != nil {
 		return err
 	}
 

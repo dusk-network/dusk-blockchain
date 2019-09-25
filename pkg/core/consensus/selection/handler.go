@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -18,7 +17,7 @@ import (
 type (
 	scoreHandler struct {
 		lock    sync.RWMutex
-		bidList *user.BidList
+		bidList user.BidList
 
 		// Threshold number that a score needs to be greater than in order to be considered
 		// for selection. Messages with scores lower than this threshold should not be
@@ -31,8 +30,7 @@ type (
 	ScoreEventHandler interface {
 		consensus.EventHandler
 		wire.EventPrioritizer
-		UpdateBidList(user.Bid)
-		RemoveExpiredBids(uint64)
+		UpdateBidList(user.BidList)
 		ResetThreshold()
 		LowerThreshold()
 	}
@@ -41,20 +39,17 @@ type (
 // NewScoreHandler returns a ScoreHandler, which encapsulates specific operations
 // (e.g. verification, validation, marshalling and unmarshalling)
 func newScoreHandler() *scoreHandler {
-	bidList, err := user.NewBidList(nil)
-	if err != nil {
-		// If we can't repopulate the bidlist, panic
-		panic(err)
-	}
-
 	return &scoreHandler{
-		bidList:   bidList,
 		threshold: consensus.NewThreshold(),
 	}
 }
 
+func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
+	sh.bidList = bidList
+}
+
 func (sh *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	ev := &ScoreEvent{Certificate: block.EmptyCertificate()}
+	ev := &ScoreEvent{}
 	if err := sh.Unmarshal(r, ev); err != nil {
 		return nil, err
 	}
@@ -67,18 +62,6 @@ func (sh *scoreHandler) Unmarshal(r *bytes.Buffer, e wire.Event) error {
 
 func (sh *scoreHandler) Marshal(r *bytes.Buffer, e wire.Event) error {
 	return MarshalScoreEvent(r, e)
-}
-
-func (sh *scoreHandler) UpdateBidList(bid user.Bid) {
-	sh.lock.Lock()
-	defer sh.lock.Unlock()
-	sh.bidList.AddBid(bid)
-}
-
-func (sh *scoreHandler) RemoveExpiredBids(round uint64) {
-	sh.lock.Lock()
-	defer sh.lock.Unlock()
-	sh.bidList.RemoveExpired(round)
 }
 
 func (sh *scoreHandler) ExtractHeader(e wire.Event) *header.Header {

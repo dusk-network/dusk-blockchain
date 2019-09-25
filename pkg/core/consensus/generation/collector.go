@@ -4,7 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type (
@@ -13,10 +13,10 @@ type (
 	}
 )
 
-func initWinningHashCollector(subscriber wire.EventSubscriber) chan []byte {
+func initWinningHashCollector(subscriber eventbus.Subscriber) chan []byte {
 	hashChannel := make(chan []byte, 1)
 	collector := &hashCollector{hashChannel}
-	go wire.NewTopicListener(subscriber, collector, msg.WinningBlockHashTopic).Accept()
+	go eventbus.NewTopicListener(subscriber, collector, msg.WinningBlockHashTopic).Accept()
 	return hashChannel
 }
 

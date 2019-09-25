@@ -10,6 +10,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +28,7 @@ type LogSupervisor interface {
 	log.Hook
 }
 
-func Launch(broker wire.EventBroker, monUrl string) (LogSupervisor, error) {
+func Launch(broker eventbus.Broker, monUrl string) (LogSupervisor, error) {
 
 	uri, err := url.Parse(monUrl)
 	if err != nil {
@@ -44,7 +45,7 @@ func Launch(broker wire.EventBroker, monUrl string) (LogSupervisor, error) {
 }
 
 type unixSupervisor struct {
-	broker     wire.EventBroker
+	broker     eventbus.Broker
 	lock       sync.Mutex
 	processor  *logger.LogProcessor
 	uri        *url.URL
@@ -79,7 +80,7 @@ func (m *unixSupervisor) Fire(entry *log.Entry) error {
 	return nil
 }
 
-func newUnixSupervisor(broker wire.EventBroker, uri *url.URL) (LogSupervisor, error) {
+func newUnixSupervisor(broker eventbus.Broker, uri *url.URL) (LogSupervisor, error) {
 
 	logProc, err := initLogProcessor(broker, uri)
 	if err != nil {
@@ -179,7 +180,7 @@ func (m *unixSupervisor) stop() error {
 	return nil
 }
 
-func initLogProcessor(broker wire.EventBroker, uri *url.URL) (*logger.LogProcessor, error) {
+func initLogProcessor(broker eventbus.Broker, uri *url.URL) (*logger.LogProcessor, error) {
 	wc, err := start(uri)
 	if err != nil {
 		return nil, err

@@ -9,10 +9,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/mocks"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -91,21 +90,11 @@ func TestNonCommitteeEvent(t *testing.T) {
 	}
 }
 
-func newMockCommittee(quorum int, isMember bool) committee.Committee {
-	mockCommittee := &mocks.Committee{}
-	mockCommittee.On("Quorum", mock.Anything).Return(quorum)
-	mockCommittee.On("IsMember",
-		mock.AnythingOfType("[]uint8"),
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint8"),
-	).Return(isMember)
-	return mockCommittee
-}
-
 type mockAccumulatorHandler struct {
 	identifier string
 	consensus.EventHandler
-	committee.Committee
+	quorum   int
+	isMember bool
 }
 
 func newMockHandlerAccumulator(round uint64, step uint8, verifyErr error, sender []byte, quorum int, identifier string,
@@ -130,8 +119,9 @@ func newMockHandlerAccumulator(round uint64, step uint8, verifyErr error, sender
 	mockEventHandler.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)
 	return &mockAccumulatorHandler{
 		EventHandler: mockEventHandler,
-		Committee:    newMockCommittee(quorum, isMember),
 		identifier:   identifier,
+		quorum:       quorum,
+		isMember:     isMember,
 	}
 }
 
@@ -143,4 +133,12 @@ func (m *mockAccumulatorHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer
 	}
 
 	return nil
+}
+
+func (m *mockAccumulatorHandler) Quorum() int {
+	return m.quorum
+}
+
+func (m *mockAccumulatorHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
+	return m.isMember
 }

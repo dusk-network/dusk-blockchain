@@ -4,17 +4,15 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
 // broker is the component that supervises a collection of events
 type scoreBroker struct {
-	roundUpdateChan  <-chan uint64
+	roundUpdateChan  <-chan consensus.RoundUpdate
 	regenerationChan <-chan consensus.AsyncState
-	bidChan          <-chan user.Bid
 	filter           *filter
 	selector         *eventSelector
 	handler          ScoreEventHandler
@@ -23,7 +21,7 @@ type scoreBroker struct {
 // Launch creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout time.Duration) {
+func Launch(eventBroker eventbus.Broker, handler ScoreEventHandler, timeout time.Duration) {
 	if handler == nil {
 		handler = newScoreHandler()
 	}
@@ -31,18 +29,18 @@ func Launch(eventBroker wire.EventBroker, handler ScoreEventHandler, timeout tim
 	go broker.Listen()
 }
 
-func launchScoreFilter(eventBroker wire.EventBroker, handler ScoreEventHandler,
+func launchScoreFilter(eventBroker eventbus.Broker, handler ScoreEventHandler,
 	state consensus.State, selector *eventSelector) *filter {
 
 	filter := newFilter(handler, state, selector)
-	listener := wire.NewTopicListener(eventBroker, filter, string(topics.Score))
+	listener := eventbus.NewTopicListener(eventBroker, filter, string(topics.Score))
 	go listener.Accept()
 	return filter
 }
 
 // newScoreBroker creates a Broker component which responsibility is to listen to the
 // eventbus and supervise Collector operations
-func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler, timeOut time.Duration) *scoreBroker {
+func newScoreBroker(eventBroker eventbus.Broker, handler ScoreEventHandler, timeOut time.Duration) *scoreBroker {
 	state := consensus.NewState()
 	selector := newEventSelector(eventBroker, handler, timeOut, state)
 	filter := launchScoreFilter(eventBroker, handler, state, selector)
@@ -50,7 +48,6 @@ func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler, tim
 	return &scoreBroker{
 		filter:           filter,
 		roundUpdateChan:  consensus.InitRoundUpdate(eventBroker),
-		bidChan:          consensus.InitBidListUpdate(eventBroker),
 		regenerationChan: consensus.InitBlockRegenerationCollector(eventBroker),
 		selector:         selector,
 		handler:          handler,
@@ -61,26 +58,24 @@ func newScoreBroker(eventBroker wire.EventBroker, handler ScoreEventHandler, tim
 func (f *scoreBroker) Listen() {
 	for {
 		select {
-		case round := <-f.roundUpdateChan:
-			f.onRoundUpdate(round)
+		case roundUpdate := <-f.roundUpdateChan:
+			f.onRoundUpdate(roundUpdate)
 		case state := <-f.regenerationChan:
 			f.onRegeneration(state)
-		case bid := <-f.bidChan:
-			f.selector.handler.UpdateBidList(bid)
 		}
 	}
 }
 
-func (f *scoreBroker) onRoundUpdate(round uint64) {
+func (f *scoreBroker) onRoundUpdate(roundUpdate consensus.RoundUpdate) {
 	log.WithFields(log.Fields{
 		"process": "selection",
-		"round":   round,
+		"round":   roundUpdate.Round,
 	}).Debugln("updating round")
 
-	f.filter.UpdateRound(round)
+	f.filter.UpdateRound(roundUpdate.Round)
 	f.selector.stopSelection()
 	f.handler.ResetThreshold()
-	f.handler.RemoveExpiredBids(round)
+	f.handler.UpdateBidList(roundUpdate.BidList)
 	f.filter.FlushQueue()
 	f.selector.startSelection()
 	f.selector.timer.ResetTimeOut()

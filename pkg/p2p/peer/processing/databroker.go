@@ -6,10 +6,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 // DataBroker is a processing unit responsible for handling GetData messages. It
@@ -18,11 +19,11 @@ import (
 type DataBroker struct {
 	db           database.DB
 	responseChan chan<- *bytes.Buffer
-	rpcBus       *wire.RPCBus
+	rpcBus       *rpcbus.RPCBus
 }
 
 // NewDataBroker returns an initialized DataBroker.
-func NewDataBroker(db database.DB, rpcBus *wire.RPCBus, responseChan chan<- *bytes.Buffer) *DataBroker {
+func NewDataBroker(db database.DB, rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer) *DataBroker {
 	return &DataBroker{
 		db:           db,
 		responseChan: responseChan,

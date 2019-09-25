@@ -1,8 +1,8 @@
 package peermsg
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
@@ -28,7 +28,7 @@ type Inv struct {
 	InvList []InvVect
 }
 
-func (i *Inv) Encode(w io.Writer) error {
+func (i *Inv) Encode(w *bytes.Buffer) error {
 	if err := encoding.WriteVarInt(w, uint64(len(i.InvList))); err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (i *Inv) Encode(w io.Writer) error {
 	return nil
 }
 
-func (inv *Inv) Decode(r io.Reader) error {
+func (inv *Inv) Decode(r *bytes.Buffer) error {
 	lenVect, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -74,7 +74,8 @@ func (inv *Inv) Decode(r io.Reader) error {
 			return fmt.Errorf("not supported inventory data type %d", inv.InvList[i].Type)
 		}
 
-		if err := encoding.Read256(r, &inv.InvList[i].Hash); err != nil {
+		inv.InvList[i].Hash = make([]byte, 32)
+		if err = encoding.Read256(r, inv.InvList[i].Hash); err != nil {
 			return err
 		}
 	}

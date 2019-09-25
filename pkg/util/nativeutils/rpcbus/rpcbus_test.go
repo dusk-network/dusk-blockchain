@@ -1,4 +1,4 @@
-package wire
+package rpcbus
 
 import (
 	"bytes"
@@ -48,7 +48,7 @@ func runConsumer(delay int) {
 func TestRPCall(t *testing.T) {
 
 	cleanup()
-	bus := NewRPCBus()
+	bus := New()
 
 	runConsumer(500)
 
@@ -72,7 +72,7 @@ func TestRPCallWithError(t *testing.T) {
 
 	t.SkipNow()
 	cleanup()
-	bus := NewRPCBus()
+	bus := New()
 
 	runConsumer(500)
 
@@ -95,7 +95,7 @@ func TestRPCallWithError(t *testing.T) {
 func TestTimeoutCalls(t *testing.T) {
 
 	cleanup()
-	bus := NewRPCBus()
+	bus := New()
 
 	delay := 3000
 	runConsumer(delay)
@@ -118,7 +118,7 @@ func TestTimeoutCalls(t *testing.T) {
 
 func TestMethodExists(t *testing.T) {
 	cleanup()
-	bus := NewRPCBus()
+	bus := New()
 
 	reqChan2 := make(chan Req)
 	err := bus.Register(GetLastBlock, reqChan2)
@@ -130,7 +130,7 @@ func TestMethodExists(t *testing.T) {
 
 func TestNonExistingMethod(t *testing.T) {
 	cleanup()
-	bus := NewRPCBus()
+	bus := New()
 
 	runConsumer(500)
 
@@ -152,7 +152,7 @@ func TestNonExistingMethod(t *testing.T) {
 
 func TestInvalidReqChan(t *testing.T) {
 	cleanup()
-	bus := NewRPCBus()
+	bus := New()
 
 	err := bus.Register(GetLastBlock, nil)
 	if err != ErrInvalidReqChan {

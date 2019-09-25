@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 var syncTime = 30 * time.Second
@@ -22,7 +22,7 @@ type Counter struct {
 }
 
 // NewCounter returns an initialized counter. It will decrement each time we accept a new block.
-func NewCounter(subscriber wire.EventSubscriber) *Counter {
+func NewCounter(subscriber eventbus.Subscriber) *Counter {
 	sc := &Counter{stopChan: make(chan struct{})}
 	subscriber.SubscribeCallback(string(topics.AcceptedBlock), sc.decrement)
 	return sc

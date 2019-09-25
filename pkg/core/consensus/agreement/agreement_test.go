@@ -2,67 +2,51 @@ package agreement_test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
-// Test that the agreement component emits a round update on startup.
-func TestInitBroker(t *testing.T) {
-	committeeMock, k := agreement.MockCommittee(2, true, 2)
-	bus := wire.NewEventBus()
-	roundChan := consensus.InitRoundUpdate(bus)
-
-	go agreement.Launch(bus, committeeMock, k[0])
-	time.Sleep(200 * time.Millisecond)
-	init := make([]byte, 8)
-	binary.LittleEndian.PutUint64(init, 1)
-	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
-
-	round := <-roundChan
-	assert.Equal(t, uint64(1), round)
-}
-
 // Test the accumulation of agreement events. It should result in the agreement component
 // publishing a round update.
 func TestBroker(t *testing.T) {
-	committeeMock, keys := agreement.MockCommittee(2, true, 2)
-	eb, roundChan := initAgreement(committeeMock)
+	p, keys := consensus.MockProvisioners(3)
+	eb, winningHashChan := initAgreement(keys[0])
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
 
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
+	for i := 0; i < 3; i++ {
+		eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+	}
 
-	round := <-roundChan
-	assert.Equal(t, uint64(2), round)
+	winningHash := <-winningHashChan
+	assert.Equal(t, hash, winningHash.Bytes())
 }
 
 // Test that the agreement component does not emit a round update if it doesn't get
 // the desired amount of events.
 func TestNoQuorum(t *testing.T) {
-	committeeMock, keys := agreement.MockCommittee(3, true, 3)
-	eb, roundChan := initAgreement(committeeMock)
+	p, keys := consensus.MockProvisioners(3)
+	eb, winningHashChan := initAgreement(keys[0])
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
 
 	select {
-	case <-roundChan:
+	case <-winningHashChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
@@ -71,13 +55,13 @@ func TestNoQuorum(t *testing.T) {
 
 // Test that events, which contain a sender that is unknown to the committee, are skipped.
 func TestSkipNoMember(t *testing.T) {
-	committeeMock, keys := agreement.MockCommittee(1, false, 2)
-	eb, roundChan := initAgreement(committeeMock)
+	p, keys := consensus.MockProvisioners(3)
+	eb, winningHashChan := initAgreement(keys[0])
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
 
 	select {
-	case <-roundChan:
+	case <-winningHashChan:
 		assert.FailNow(t, "not supposed to get a round update without reaching quorum")
 	case <-time.After(100 * time.Millisecond):
 		// all good
@@ -87,8 +71,9 @@ func TestSkipNoMember(t *testing.T) {
 // Test that the agreement component properly sends out an Agreement message, upon
 // receiving a ReductionResult event.
 func TestSendAgreement(t *testing.T) {
-	committeeMock, _ := agreement.MockCommittee(3, true, 3)
-	eb, _ := initAgreement(committeeMock)
+	p, k := consensus.MockProvisioners(3)
+	eb, _ := initAgreement(k[0])
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
 
 	streamer := helper.NewSimpleStreamer()
 	eb.SubscribeStream(string(topics.Gossip), streamer)
@@ -97,7 +82,7 @@ func TestSendAgreement(t *testing.T) {
 	// Initiate the sending of an agreement message
 	hash, _ := crypto.RandEntropy(32)
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, 1); err != nil {
+	if err := encoding.WriteUint64LE(buf, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -120,20 +105,16 @@ func TestSendAgreement(t *testing.T) {
 }
 
 // Launch the agreement component, and consume the initial round update that gets emitted.
-func initAgreement(c committee.Foldable) (wire.EventBroker, <-chan uint64) {
-	bus := wire.NewEventBus()
-	roundChan := consensus.InitRoundUpdate(bus)
-	k, _ := user.NewRandKeys()
-	go agreement.Launch(bus, c, k)
+func initAgreement(k user.Keys) (eventbus.Broker, <-chan *bytes.Buffer) {
+	bus := eventbus.New()
+	winningHashChan := make(chan *bytes.Buffer, 1)
+	bus.Subscribe(msg.WinningBlockHashTopic, winningHashChan)
+	go agreement.Launch(bus, k)
 	time.Sleep(200 * time.Millisecond)
-	init := make([]byte, 8)
-	binary.LittleEndian.PutUint64(init, 1)
-	bus.Publish(msg.InitializationTopic, bytes.NewBuffer(init))
+	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
 	bus.RemoveAllPreprocessors(string(topics.Agreement))
-	// we need to discard the first update since it is triggered directly as it is supposed to update the round to all other consensus compoenents
-	<-roundChan
-	return bus, roundChan
+	return bus, winningHashChan
 }

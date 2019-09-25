@@ -5,13 +5,8 @@ import (
 	"errors"
 	"math/rand"
 
-	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 // Bid is the 32 byte X value, created from a bidding transaction amount and M.
@@ -28,69 +23,6 @@ func (b Bid) Equals(bid Bid) bool {
 
 // BidList is a list of bid X values.
 type BidList []Bid
-
-func NewBidList(db database.DB) (*BidList, error) {
-	bl := &BidList{}
-	if db == nil {
-		_, db = heavy.CreateDBConnection()
-	}
-
-	bl.repopulate(db)
-	return bl, nil
-}
-
-func (b *BidList) repopulate(db database.DB) {
-	var currentHeight uint64
-	err := db.View(func(t database.Transaction) error {
-		var err error
-		currentHeight, err = t.FetchCurrentHeight()
-		return err
-	})
-
-	if err != nil {
-		currentHeight = 0
-	}
-
-	searchingHeight := uint64(0)
-	if currentHeight > transactions.MaxLockTime {
-		searchingHeight = currentHeight - transactions.MaxLockTime
-	}
-
-	for {
-		var blk *block.Block
-		err := db.View(func(t database.Transaction) error {
-			hash, err := t.FetchBlockHashByHeight(searchingHeight)
-			if err != nil {
-				return err
-			}
-
-			blk, err = t.FetchBlock(hash)
-			return err
-		})
-
-		if err != nil {
-			break
-		}
-
-		for _, tx := range blk.Txs {
-			bid, ok := tx.(*transactions.Bid)
-			if !ok {
-				continue
-			}
-
-			// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
-			// to work with the `zkproof` package. Investigate if we should change this (reserve for testnet v2,
-			// as this is most likely a consensus-breaking change)
-			if searchingHeight+bid.Lock > currentHeight {
-				x := CalculateX(bid.Outputs[0].Commitment.Bytes(), bid.M)
-				x.EndHeight = searchingHeight + bid.Lock
-				b.AddBid(x)
-			}
-		}
-
-		searchingHeight++
-	}
-}
 
 // ReconstructBidListSubset will turn a slice of bytes into a BidList.
 func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
@@ -114,10 +46,10 @@ func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
 }
 
 // ValidateBids will check if the passed BidList subset contains valid bids.
-func (b *BidList) ValidateBids(bidListSubset BidList) *prerror.PrError {
+func (b BidList) ValidateBids(bidListSubset BidList) *prerror.PrError {
 loop:
 	for _, x := range bidListSubset {
-		for _, x2 := range *b {
+		for _, x2 := range b {
 			if x.Equals(x2) {
 				continue loop
 			}
@@ -131,23 +63,22 @@ loop:
 
 // Subset will shuffle the BidList, and returns a specified amount of
 // bids from it.
-func (b *BidList) Subset(amount int) []Bid {
+func (b BidList) Subset(amount int) []Bid {
 	// Shuffle the public list
-	list := *b
-	rand.Shuffle(len(list), func(i, j int) { list[i], list[j] = list[j], list[i] })
+	rand.Shuffle(len(b), func(i, j int) { b[i], b[j] = b[j], b[i] })
 
 	// Create our subset
 	subset := make([]Bid, amount)
 	for i := 0; i < amount; i++ {
-		subset[i] = list[i]
+		subset[i] = b[i]
 	}
 
 	return subset
 }
 
 // Contains checks if the BidList contains a specified Bid.
-func (b *BidList) Contains(bid Bid) bool {
-	for _, x := range *b {
+func (b BidList) Contains(bid Bid) bool {
+	for _, x := range b {
 		if x.Equals(bid) {
 			return true
 		}
@@ -156,54 +87,7 @@ func (b *BidList) Contains(bid Bid) bool {
 	return false
 }
 
-// AddBid will add a bid to the BidList.
-func (b *BidList) AddBid(bid Bid) {
-	// Check for duplicates
-	for _, bidFromList := range *b {
-		if bidFromList.Equals(bid) {
-			return
-		}
-	}
-
-	*b = append(*b, bid)
-}
-
-// RemoveBid will iterate over a BidList to remove a specified bid.
-func (b *BidList) RemoveBid(bid Bid) {
-	for i, bidFromList := range *b {
-		if bidFromList.Equals(bid) {
-			b.remove(bid, i)
-		}
-	}
-}
-
-// RemoveExpired iterates over a BidList to remove expired bids.
-func (b *BidList) RemoveExpired(round uint64) {
-	for _, bid := range *b {
-		if bid.EndHeight < round {
-			// We need to call RemoveBid here and loop twice, as the index
-			// could be off if more than one bid is removed.
-			b.RemoveBid(bid)
-		}
-	}
-}
-
-func CalculateX(d, m []byte) Bid {
-	dScalar := ristretto.Scalar{}
-	dScalar.UnmarshalBinary(d)
-
-	mScalar := ristretto.Scalar{}
-	mScalar.UnmarshalBinary(m)
-
-	x := zkproof.CalculateX(dScalar, mScalar)
-
-	var bid Bid
-	copy(bid.X[:], x.Bytes()[:])
-	copy(bid.M[:], m[:])
-	return bid
-}
-
-func (b *BidList) remove(bid Bid, idx int) {
+func (b *BidList) Remove(idx int) {
 	list := *b
 	if idx == len(list)-1 {
 		list = list[:idx]
@@ -211,4 +95,66 @@ func (b *BidList) remove(bid Bid, idx int) {
 		list = append(list[:idx], list[idx+1:]...)
 	}
 	*b = list
+}
+
+func MarshalBidList(r *bytes.Buffer, bidList BidList) error {
+	if err := encoding.WriteVarInt(r, uint64(len(bidList))); err != nil {
+		return err
+	}
+
+	for _, bid := range bidList {
+		if err := marshalBid(r, bid); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func marshalBid(r *bytes.Buffer, bid Bid) error {
+	if err := encoding.Write256(r, bid.X[:]); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(r, bid.M[:]); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(r, bid.EndHeight); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UnmarshalBidList(r *bytes.Buffer) (BidList, error) {
+	lBidList, err := encoding.ReadVarInt(r)
+	if err != nil {
+		return BidList{}, err
+	}
+
+	bidList := make([]Bid, lBidList)
+	for i := uint64(0); i < lBidList; i++ {
+		if err := unmarshalBid(r, &bidList[i]); err != nil {
+			return BidList{}, err
+		}
+	}
+
+	return bidList, nil
+}
+
+func unmarshalBid(r *bytes.Buffer, bid *Bid) error {
+	if err := encoding.Read256(r, bid.X[:]); err != nil {
+		return err
+	}
+
+	if err := encoding.Read256(r, bid.M[:]); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint64LE(r, &bid.EndHeight); err != nil {
+		return err
+	}
+
+	return nil
 }

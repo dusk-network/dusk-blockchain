@@ -6,10 +6,10 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,11 +77,8 @@ func BenchmarkExtract(b *testing.B) {
 func mockAggro() *bytes.Buffer {
 	hash, _ := crypto.RandEntropy(32)
 
-	ks := make([]user.Keys, 3)
-	for i := 0; i < 3; i++ {
-		ks[i], _ = user.NewRandKeys()
-	}
-	aggro := agreement.MockAgreement(hash, uint64(1), uint8(2), ks)
+	p, ks := consensus.MockProvisioners(3)
+	aggro := agreement.MockAgreement(hash, uint64(1), uint8(2), ks, p.CreateVotingCommittee(1, 2, 3))
 	_ = topics.Write(aggro, topics.Agreement)
 	return aggro
 }

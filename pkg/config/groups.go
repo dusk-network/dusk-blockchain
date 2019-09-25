@@ -59,6 +59,8 @@ type profConfiguration struct {
 
 // pkg/rpc package configs
 type rpcConfiguration struct {
+	Network string
+	Address string
 	Port    string
 	Enabled bool
 	User    string

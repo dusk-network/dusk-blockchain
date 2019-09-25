@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 const unixSoc = "unix:///tmp/dusk-socket"
@@ -31,7 +31,7 @@ var withTimeTest = []struct {
 
 func TestWithTime(t *testing.T) {
 	for _, tt := range withTimeTest {
-		eb := wire.NewEventBus()
+		eb := eventbus.New()
 		// setup
 		b := &BufCloser{new(bytes.Buffer)}
 		logBase, data := setup(eb, nil, b)
@@ -51,7 +51,7 @@ func TestWithTime(t *testing.T) {
 }
 
 func TestSendDeadlock(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 
 	addr, err := url.Parse(unixSoc)
 	if err != nil {
@@ -94,7 +94,7 @@ func TestSendDeadlock(t *testing.T) {
 	c <- struct{}{}
 }
 
-func setup(eb wire.EventBroker, formatter log.Formatter, wc io.WriteCloser) (*logger.LogProcessor, map[string]interface{}) {
+func setup(eb eventbus.Broker, formatter log.Formatter, wc io.WriteCloser) (*logger.LogProcessor, map[string]interface{}) {
 	var data map[string]interface{}
 	logBase := logger.New(eb, wc, formatter)
 	return logBase, data

@@ -3,12 +3,10 @@ package reduction
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/mocks"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/stretchr/testify/mock"
 )
 
 // MockVoteSetBuffer mocks a slice of Reduction events for two adjacent steps,
@@ -78,18 +76,4 @@ func MockReductionBuffer(keys user.Keys, hash []byte, round uint64, step uint8) 
 	buf := new(bytes.Buffer)
 	_ = marshaller.Marshal(buf, ev)
 	return buf
-}
-
-// MockCommittee mocks a Reducers committee implementation, which can be used for
-// testing the Reduction component.
-func MockCommittee(quorum int, isMember bool) Reducers {
-	committeeMock := &mocks.Reducers{}
-	committeeMock.On("Quorum", mock.Anything).Return(quorum)
-	committeeMock.On("FilterAbsentees", mock.Anything,
-		mock.Anything, mock.Anything).Return(user.VotingCommittee{})
-	committeeMock.On("IsMember",
-		mock.AnythingOfType("[]uint8"),
-		mock.AnythingOfType("uint64"),
-		mock.AnythingOfType("uint8")).Return(isMember)
-	return committeeMock
 }

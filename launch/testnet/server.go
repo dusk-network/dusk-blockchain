@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
-	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"net"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/gql"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -12,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
@@ -23,8 +25,8 @@ import (
 
 // Server is the main process of the node
 type Server struct {
-	eventBus *wire.EventBus
-	rpcBus   *wire.RPCBus
+	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
 	chain    *chain.Chain
 	dupeMap  *dupemap.DupeMap
 	counter  *chainsync.Counter
@@ -33,16 +35,16 @@ type Server struct {
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
 func Setup() *Server {
 	// creating the eventbus
-	eventBus := wire.NewEventBus()
+	eventBus := eventbus.New()
 
 	// creating the rpcbus
-	rpcBus := wire.NewRPCBus()
+	rpcBus := rpcbus.New()
 
 	m := mempool.NewMempool(eventBus, nil)
 	m.Run()
 
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus, rpcBus, nil)
+	chain, err := chain.New(eventBus, rpcBus)
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +97,7 @@ func Setup() *Server {
 	return srv
 }
 
-func launchDupeMap(eventBus wire.EventBroker) *dupemap.DupeMap {
+func launchDupeMap(eventBus eventbus.Broker) *dupemap.DupeMap {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 	dupeBlacklist := dupemap.NewDupeMap(1)
 	go func() {
