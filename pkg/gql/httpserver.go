@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -65,6 +66,9 @@ func (s *Server) Start() error {
 		ReadTimeout: time.Second * 10,
 	}
 
+	network := cfg.Get().Gql.Network
+	address := cfg.Get().Gql.Address
+
 	// GraphQL serving over HTTP
 	ServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
@@ -92,10 +96,32 @@ func (s *Server) Start() error {
 	s.schema = &sc
 	_, s.db = heavy.CreateDBConnection()
 
-	// Generate self-signed certificate
-	tlsCert, err := cryptoUtils.GenerateTLSCertificate()
-	if err != nil {
-		return err
+	if network == "unix" {
+		if err := os.RemoveAll(address); err != nil {
+			return err
+		}
+	}
+
+	var tlsCert *tls.Certificate
+
+	certFile := cfg.Get().Gql.CertFile
+	keyFile := cfg.Get().Gql.KeyFile
+
+	if len(certFile) > 0 {
+
+		// Fetch certificate from config
+		tlsCertFromFile, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			return err
+		}
+		tlsCert = &tlsCertFromFile
+	} else {
+
+		// Generate self-signed certificate
+		tlsCert, err = cryptoUtils.GenerateTLSCertificate()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Define TLS configuration
@@ -104,9 +130,16 @@ func (s *Server) Start() error {
 		InsecureSkipVerify: true,
 	}
 
-	// Set up listener
-	bindAddr := "localhost:" + cfg.Get().Gql.Port
-	l, err := tls.Listen("tcp", bindAddr, &tlsConfig)
+	// Set up tls listener socket
+	var bindSocket string
+	if network == "unix" {
+		bindSocket = cfg.Get().Gql.Address
+	} else {
+		bindSocket = cfg.Get().Gql.Address + ":" + cfg.Get().Gql.Port
+	}
+
+	// Start to listen on socket
+	l, err := tls.Listen(network, bindSocket, &tlsConfig)
 	if err != nil {
 		return err
 	}

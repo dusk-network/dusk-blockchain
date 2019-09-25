@@ -67,29 +67,43 @@ maxInvItems = 10000
 
 # RPC API service
 [rpc]
-
 # network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
 network="unix"
 # in case the network is unix, 
 # address must be a path to a unix socket (e.g /tmp/file.sock)
 # in case the network is tcp*,
-# address must be in form of a IP address (e.g 127.0.0.1:9000)
+# address must be in form of a IP address (e.g 127.0.0.1)
 address="/tmp/dusk-rpc.sock"
+port=""
 # enable rpc service
 enabled=false
 user="default"
 pass="default"
-cert=""
+# certFile and certKey can optionally specify the path of the
+# certificates used for the TLS listener. If they are not specified,
+# a certificate will be generated
+certFile=""
+certKey=""
 
 # GraphQL API service
 [gql]
+# network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
+network="tcp"
+# in case the network is unix, 
+# address must be a path to a unix socket (e.g /tmp/file.sock)
+# in case the network is tcp*,
+# address must be in form of a IP address (e.g 127.0.0.1)
+address="localhost"
+port=9001
 # enable graphql service
 enabled=true
 user=""
 pass=""
-cert=""
-port=9001
-
+# certFile and certKey can optionally specify the path of the
+# certificates used for the TLS listener. If they are not specified,
+# a certificate will be generated
+certFile=""
+certKey=""
 
 [prof]
 # profiling service address

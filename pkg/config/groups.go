@@ -59,19 +59,25 @@ type profConfiguration struct {
 
 // pkg/rpc package configs
 type rpcConfiguration struct {
-	Network string
-	Address string
-	Port    string
-	Enabled bool
-	User    string
-	Pass    string
+	Network  string
+	Address  string
+	Port     string
+	Enabled  bool
+	User     string
+	Pass     string
+	CertFile string
+	KeyFile  string
 }
 
 type gqlConfiguration struct {
-	Port    string
-	Enabled bool
-	User    string
-	Pass    string
+	Network  string
+	Address  string
+	Port     string
+	Enabled  bool
+	User     string
+	Pass     string
+	CertFile string
+	KeyFile  string
 }
 
 // Performance parameters
