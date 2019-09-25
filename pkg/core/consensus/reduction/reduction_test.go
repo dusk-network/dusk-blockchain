@@ -10,13 +10,13 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -217,9 +217,9 @@ func launchCandidateVerifier(failVerification bool) {
 	}
 }
 
-func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *helper.SimpleStreamer, user.Keys, []user.Keys) {
+func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *helper.SimpleStreamer, key.ConsensusKeys, []key.ConsensusKeys) {
 	eb, streamer := helper.CreateGossipStreamer()
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 	rpcBus := rpcbus.New()
 	launchReduction(eb, k, timeOut, rpcBus)
 	// update round
@@ -238,12 +238,12 @@ func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *hel
 // Convenience function, which launches the reduction component and removes the
 // preprocessors for testing purposes (bypassing the republisher and the validator).
 // This ensures proper handling of mocked Reduction events.
-func launchReduction(eb *eventbus.EventBus, k user.Keys, timeOut time.Duration, rpcBus *rpcbus.RPCBus) {
+func launchReduction(eb *eventbus.EventBus, k key.ConsensusKeys, timeOut time.Duration, rpcBus *rpcbus.RPCBus) {
 	reduction.Launch(eb, k, timeOut, rpcBus)
 	eb.RemoveAllPreprocessors(string(topics.Reduction))
 }
 
-func sendReductionBuffers(keys []user.Keys, hash []byte, round uint64, step uint8, eventBus *eventbus.EventBus) {
+func sendReductionBuffers(keys []key.ConsensusKeys, hash []byte, round uint64, step uint8, eventBus *eventbus.EventBus) {
 	for i := 0; i < len(keys); i++ {
 		ev := reduction.MockReductionBuffer(keys[i], hash, round, step)
 		eventBus.Publish(string(topics.Reduction), ev)

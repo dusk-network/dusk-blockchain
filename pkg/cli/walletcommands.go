@@ -12,17 +12,18 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	wallet "github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	walletdb "github.com/dusk-network/dusk-wallet/database"
 	"github.com/dusk-network/dusk-wallet/key"
+	wallet "github.com/dusk-network/dusk-wallet/wallet"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 var testnet = byte(2)
@@ -52,7 +53,7 @@ func (c *CLI) createWalletCMD(args []string) {
 		return
 	}
 
-	w, err := wallet.New(rand.Read, testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.New(rand.Read, testnet, db, fetchDecoys, fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
 		return
@@ -115,7 +116,7 @@ func loadWallet(password string) (*wallet.Wallet, error) {
 	}
 
 	// Then load the wallet
-	w, err := wallet.LoadFromFile(testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.LoadFromFile(testnet, db, fetchDecoys, fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -172,7 +173,7 @@ func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
 	}
 
 	// Then load the wallet
-	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, fetchDecoys, fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +219,7 @@ func (c *CLI) transferCMD(args []string) {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
+	if err := marshalling.MarshalTx(buf, tx); err != nil {
 		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
 	}
 
@@ -250,7 +251,7 @@ func (c *CLI) sendBidCMD(args []string) {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
+	if err := marshalling.MarshalTx(buf, tx); err != nil {
 		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
 	}
 
@@ -282,7 +283,7 @@ func (c *CLI) sendStakeCMD(args []string) {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
+	if err := marshalling.MarshalTx(buf, tx); err != nil {
 		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
 	}
 

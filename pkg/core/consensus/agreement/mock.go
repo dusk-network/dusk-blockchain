@@ -7,10 +7,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 // MockAgreementEvent returns a mocked Agreement Event, to be used for testing purposes.
-func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee) *Agreement {
+func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee) *Agreement {
 	a := New()
 	a.PubKeyBLS = keys[0].BLSPubKeyBytes
 	a.Round = round
@@ -30,7 +31,7 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys,
 // MockAgreement mocks an Agreement event, and returns the marshalled representation
 // of it as a `*bytes.Buffer`.
 // NOTE: it does not include the topic
-func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee) *bytes.Buffer {
+func MockAgreement(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 	ev := MockAgreementEvent(hash, round, step, keys, committee)
 
@@ -41,7 +42,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys, comm
 
 // GenVotes randomly generates a slice of StepVotes with the indicated lenght.
 // Albeit random, the generation is consistent with the rules of Votes
-func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee) []*StepVotes {
+func GenVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee) []*StepVotes {
 	if len(keys) < 2 {
 		panic("At least two votes are required to mock an Agreement")
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
-	core "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	core "github.com/dusk-network/dusk-wallet/transactions"
 )
 
 type transactions struct {

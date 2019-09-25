@@ -4,24 +4,24 @@ import (
 	"bytes"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )
 
 // Launch will start the processes for score/block generation.
-func Launch(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
+func Launch(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar, keys key.ConsensusKeys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
 	m := zkproof.CalculateM(k)
 	d := getD(m, eventBus, db)
 	broker, err := newBroker(eventBus, rpcBus, d, k, m, gen, blockGen, keys, publicKey)
@@ -49,7 +49,7 @@ type broker struct {
 }
 
 func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristretto.Scalar,
-	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) (*broker, error) {
+	gen Generator, blockGen BlockGenerator, keys key.ConsensusKeys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
 		var err error
 		gen, err = newProofGenerator(d, k, m)
@@ -116,7 +116,7 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 		return err
 	}
 
-	if err := block.MarshalCertificate(buf, cert); err != nil {
+	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
 		return err
 	}
 
@@ -148,7 +148,7 @@ func (b *broker) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 
 func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
 	buffer := new(bytes.Buffer)
-	if err := block.Marshal(buffer, &blk); err != nil {
+	if err := marshalling.MarshalBlock(buffer, &blk); err != nil {
 		panic(err)
 	}
 

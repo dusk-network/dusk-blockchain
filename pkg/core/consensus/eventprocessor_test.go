@@ -6,8 +6,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
@@ -15,7 +15,7 @@ import (
 func TestValidator(t *testing.T) {
 	message := []byte("This is a test message")
 
-	keys, err := user.NewRandKeys()
+	keys, err := key.NewRandConsensusKeys()
 	assert.NoError(t, err)
 	signature := ed25519.Sign(*keys.EdSecretKey, message)
 	assert.Equal(t, 64, len(signature))

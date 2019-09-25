@@ -7,10 +7,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
 )
@@ -61,7 +61,7 @@ func TestVoteSetUnMarshal(t *testing.T) {
 }
 
 func TestBlsSign(t *testing.T) {
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 	red := reduction.New()
 	red.Round = uint64(1)
 	red.Step = uint8(2)
@@ -76,7 +76,7 @@ func TestBlsSign(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 	red := reduction.New()
 	red.Round = uint64(1)
 	red.Step = uint8(2)
@@ -98,7 +98,7 @@ func TestSign(t *testing.T) {
 }
 
 func TestSignBuffer(t *testing.T) {
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 	red := reduction.New()
 	red.Round = uint64(1)
 	red.Step = uint8(2)
@@ -127,7 +127,7 @@ func TestSignBuffer(t *testing.T) {
 }
 
 func newReductionEvent(round uint64, step uint8) *reduction.Reduction {
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 	blockHash, _ := crypto.RandEntropy(32)
 	return reduction.MockReduction(k, blockHash, round, step)
 }

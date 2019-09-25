@@ -6,12 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -95,7 +96,7 @@ func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
 	}
 
 	blk := block.NewBlock()
-	if err := block.Unmarshal(&blkBuf, blk); err != nil {
+	if err := marshalling.UnmarshalBlock(&blkBuf, blk); err != nil {
 		return nil, err
 	}
 

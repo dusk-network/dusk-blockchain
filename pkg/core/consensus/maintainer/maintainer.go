@@ -6,10 +6,10 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -126,7 +126,7 @@ func (m *StakeAutomaton) sendBid() error {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, bid); err != nil {
+	if err := marshalling.MarshalTx(buf, bid); err != nil {
 		return err
 	}
 
@@ -141,7 +141,7 @@ func (m *StakeAutomaton) sendStake() error {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, stake); err != nil {
+	if err := marshalling.MarshalTx(buf, stake); err != nil {
 		return err
 	}
 

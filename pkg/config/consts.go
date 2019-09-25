@@ -5,20 +5,19 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/wallet"
 )
 
 // A signle point of constants definition
 const (
 	// GeneratorReward is the amount of Block generator default reward
 	// TODO: TBD
-	GeneratorReward = 50 * DUSK
+	GeneratorReward = 50 * wallet.DUSK
 
 	// ConsensusTimeOut is the time out for consensus step timers.
 	ConsensusTimeOut = 5 * time.Second
-
-	// DUSK is one whole unit of DUSK.
-	DUSK = uint64(100000000)
 
 	MinFee = int64(100)
 
@@ -39,7 +38,7 @@ func DecodeGenesis() *block.Block {
 
 		var buf bytes.Buffer
 		buf.Write(blob)
-		if err := block.Unmarshal(&buf, b); err != nil {
+		if err := marshalling.UnmarshalBlock(&buf, b); err != nil {
 			panic(err)
 		}
 	}

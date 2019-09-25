@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -25,7 +26,7 @@ type agreementHandler struct {
 }
 
 // newHandler returns an initialized agreementHandler.
-func newHandler(keys user.Keys) *agreementHandler {
+func newHandler(keys key.ConsensusKeys) *agreementHandler {
 	return &agreementHandler{
 		Handler:      committee.NewHandler(keys),
 		UnMarshaller: NewUnMarshaller(),
@@ -165,7 +166,7 @@ func (a *agreementHandler) createAgreement(evs []wire.Event, round uint64, step 
 	}
 
 	// BLS sign it
-	if err := Sign(aev, a.Keys); err != nil {
+	if err := Sign(aev, a.ConsensusKeys); err != nil {
 		return nil, err
 	}
 

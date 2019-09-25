@@ -15,12 +15,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/database"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
@@ -88,14 +90,14 @@ func TestSendOnce(t *testing.T) {
 	}
 }
 
-func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, *user.Provisioners, key.ConsensusKeys, ristretto.Scalar) {
 	// Initial setup
 	bus := eventbus.New()
 	wdb, err := database.New(dbPath)
 	txChan := make(chan *bytes.Buffer, 2)
 	bus.Subscribe(string(topics.Tx), txChan)
 
-	w, err := wallet.New(rand.Read, 2, wdb, wallet.GenerateDecoys, wallet.GenerateInputs, pass)
+	w, err := wallet.New(rand.Read, 2, wdb, wallet.GenerateDecoys, wallet.GenerateInputs, pass, "wallet.dat")
 	assert.NoError(t, err)
 
 	_, db := lite.CreateDBConnection()
@@ -126,7 +128,7 @@ func receiveTxs(t *testing.T, txChan chan *bytes.Buffer) []transactions.Transact
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		txBuf := <-txChan
-		tx, err := transactions.Unmarshal(txBuf)
+		tx, err := marshalling.UnmarshalTx(txBuf)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
 	}
