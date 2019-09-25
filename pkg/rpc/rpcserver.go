@@ -27,8 +27,6 @@ type Server struct {
 
 	authSHA  []byte       // Hash of the auth credentials
 	listener net.Listener // RPC Server listener
-
-	startTime int64
 }
 
 // NewRPCServer instantiates a new RPCServer.
@@ -95,7 +93,6 @@ func (s *Server) Start() error {
 	go s.listenOnHTTPServer(httpServer)
 
 	s.started = true
-	s.startTime = time.Now().Unix()
 
 	return nil
 }

@@ -22,8 +22,11 @@ func NewRoot(rpcBus *wire.RPCBus) *Root {
 				Name: "Query",
 				Fields: graphql.Fields{
 					"blocks":       blocks{}.getQuery(),
-					"transactions": transactions{}.getQuery(),
 					"mempool":      m.getQuery(),
+					"ping":         ping{}.getQuery(),
+					"transactions": transactions{}.getQuery(),
+					"uptime":       uptime{}.getQuery(),
+					"version":      version{}.getQuery(),
 				},
 			},
 		),

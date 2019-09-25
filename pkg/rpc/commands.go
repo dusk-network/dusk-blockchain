@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strconv"
-	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -18,9 +15,6 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		"version": version,
-		"ping":    pong,
-		"uptime":  uptime,
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,
@@ -35,21 +29,6 @@ var (
 		string(topics.Block),
 	}
 )
-
-// version will return the version of the client.
-var version = func(s *Server, params []string) (string, error) {
-	return fmt.Sprintf("\"%v\"", protocol.NodeVer.String()), nil
-}
-
-// pong simply returns "pong" to let the caller know the server is up.
-var pong = func(s *Server, params []string) (string, error) {
-	return "\"pong\"", nil
-}
-
-// uptime returns the server uptime.
-var uptime = func(s *Server, params []string) (string, error) {
-	return strconv.FormatInt(time.Now().Unix()-s.startTime, 10), nil
-}
 
 var publishTopic = func(s *Server, params []string) (string, error) {
 
