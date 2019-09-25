@@ -15,7 +15,7 @@ import (
 
 // Start the interactive shell.
 func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File, counter *chainsync.Counter) {
-	cli := &CLI{eventBroker, rpcBus, nil, counter}
+	cli := &CLI{eventBroker, rpcBus, counter}
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")
 	for scanner.Scan() {

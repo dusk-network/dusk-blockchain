@@ -5,6 +5,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 )
 
 var (
@@ -25,10 +26,13 @@ type Transactor struct {
 	db database.DB
 	eb *wire.EventBus
 	rb *wire.RPCBus
+
+	// Passed to the consensus component startup
+	c *chainsync.Counter
 }
 
 // Instantiate a new Transactor struct.
-func New(eb *wire.EventBus, rb *wire.RPCBus, db database.DB) (*Transactor, error) {
+func New(eb *wire.EventBus, rb *wire.RPCBus, db database.DB, counter *chainsync.Counter) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -38,6 +42,7 @@ func New(eb *wire.EventBus, rb *wire.RPCBus, db database.DB) (*Transactor, error
 		db: db,
 		eb: eb,
 		rb: rb,
+		c: counter,
 	}
 
 	err := t.registerMethods()

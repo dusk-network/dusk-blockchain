@@ -19,23 +19,29 @@ import (
 
 var testnet = byte(2)
 
-func (t *Transactor) loadWallet(password string) error {
+func (t *Transactor) loadWallet(password string) (string, error) {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
 		db.Close()
-		return err
+		return "", err
 	}
 
 	// Then load the wallet
 	w, err := wallet.LoadFromFile(testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
 		db.Close()
-		return err
+		return "", err
+	}
+
+	walletAddr, err := w.PublicAddress()
+	if err != nil {
+		db.Close()
+		return "", err
 	}
 
 	t.w = w
-	return nil
+	return walletAddr, nil
 }
 
 func (t *Transactor) createWallet(password string) error {
@@ -155,7 +161,7 @@ func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transact
 }
 
 func (t *Transactor) syncWallet() error {
-	var totalSpent, totalReceived uint64
+	//var totalSpent, totalReceived uint64
 	// keep looping until tipHash = currentBlockHash
 	for {
 		// Get Wallet height
@@ -169,18 +175,19 @@ func (t *Transactor) syncWallet() error {
 		if err == database.ErrBlockNotFound {
 			break
 		}
+
 		if err != nil {
 			return fmt.Errorf("error fetching block from node db: %v\n", err)
 		}
 
 		// call wallet.CheckBlock
-		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk)
+		_, _, err = t.w.CheckWireBlock(*blk)
 		if err != nil {
 			return fmt.Errorf("error checking block: %v\n", err)
 		}
 
-		totalSpent += spentCount
-		totalReceived += receivedCount
+		//totalSpent += spentCount
+		//totalReceived += receivedCount
 
 		// check if state is equal to the block that we fetched
 		if bytes.Equal(tipHash, blk.Header.Hash) {

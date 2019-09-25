@@ -53,13 +53,6 @@ func Setup() *Server {
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
 
-	// Setting up the transactor component
-	transactor, err := transactor.New(eventBus, rpcBus, nil)
-	if err != nil {
-		panic(err)
-	}
-	go transactor.Listen()
-
 	// Instantiate RPC server
 	if cfg.Get().RPC.Enabled {
 		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus)
@@ -92,6 +85,13 @@ func Setup() *Server {
 		dupeMap:  dupeBlacklist,
 		counter:  chainsync.NewCounter(eventBus),
 	}
+
+	// Setting up the transactor component
+	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter)
+	if err != nil {
+		panic(err)
+	}
+	go transactor.Listen()
 
 	// Connecting to the log based monitoring system
 	if err := ConnectToLogMonitor(eventBus); err != nil {

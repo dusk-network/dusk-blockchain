@@ -9,10 +9,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire" 
+	 
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,11 +33,9 @@ type maintainer struct {
 	stakeEndHeight uint64
 
 	amount, lockTime, offset uint64
-
-	transactor *transactor.Transactor
 }
 
-func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*maintainer, error) {
+func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, amount, lockTime, offset uint64) (*maintainer, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -57,15 +53,14 @@ func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byt
 		m:           m,
 		c:           committee.LaunchStore(eventBroker, db),
 		bidList:     bidList,
-		transactor:  transactor,
 		amount:      amount,
 		lockTime:    lockTime,
 		offset:      offset,
 	}, nil
 }
 
-func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) error {
-	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, transactor, amount, lockTime, offset)
+func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, amount, lockTime, offset uint64) error {
+	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, amount, lockTime, offset)
 	if err != nil {
 		return err
 	}
@@ -163,6 +158,7 @@ func (m *maintainer) findMostRecentStake() uint64 {
 }
 
 func (m *maintainer) sendBid() error {
+	/*
 	bid, err := m.transactor.CreateBidTx(m.amount, m.lockTime)
 	if err != nil {
 		return err
@@ -175,9 +171,12 @@ func (m *maintainer) sendBid() error {
 
 	m.eventBroker.Publish(string(topics.Tx), buf)
 	return nil
+	*/
+	return nil
 }
 
 func (m *maintainer) sendStake() error {
+	/*
 	stake, err := m.transactor.CreateStakeTx(m.amount, m.lockTime)
 	if err != nil {
 		return err
@@ -189,5 +188,7 @@ func (m *maintainer) sendStake() error {
 	}
 
 	m.eventBroker.Publish(string(topics.Tx), buf)
+	return nil
+	*/
 	return nil
 }

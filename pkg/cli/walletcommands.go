@@ -2,20 +2,15 @@ package cli
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"os"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 var testnet = byte(2)
@@ -28,179 +23,123 @@ type CLI struct {
 }
 
 func (c *CLI) createWalletCMD(args []string) {
-	if args == nil || len(args) < 1 {
-		fmt.Fprintf(os.Stdout, commandInfo["createwallet"]+"\n")
-		return
-	}
-	password := args[0]
 
-	pBuf := bytes.Newbuffer([]byte(password))
-	req := wire.NewRequest(pBuf, 2)
-	c.rpcBus.Call(wire.CreateWallet, req)
-
-	select {
-	case addrBuf := <-req.RespChan:
-		pubAddr := string(addrBuf.Bytes())
-		fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
-		fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
-
-		if !cfg.Get().General.WalletOnly {
-			initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
+	/*
+		if args == nil || len(args) < 1 {
+			fmt.Fprintf(os.Stdout, commandInfo["createwallet"]+"\n")
+			return
 		}
-	case err := <-req.ErrChan:
-		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
-	}
+		password := args[0]
+
+		pBuf := bytes.Newbuffer([]byte(password))
+		req := wire.NewRequest(pBuf, 2)
+		c.rpcBus.Call(wire.CreateWallet, req)
+
+		select {
+		case addrBuf := <-req.RespChan:
+			pubAddr := string(addrBuf.Bytes())
+			fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
+			fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
+
+			if !cfg.Get().General.WalletOnly {
+				initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
+			}
+		case err := <-req.ErrChan:
+			fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
+		}
+	*/
 }
 
 func (c *CLI) loadWalletCMD(args []string) {
+
 	if args == nil || len(args) < 1 {
 		fmt.Fprintf(os.Stdout, commandInfo["loadwallet"]+"\n")
 		return
 	}
-	password := args[0]
 
-	pBuf := bytes.Newbuffer([]byte(password))
-	req := wire.NewRequest(pBuf, 2)
-	c.rpcBus.Call(wire.LoadWallet, req)
+	pubKey, err := loadWallet(c.rpcBus, args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
+		return
+	}
 
-	select {
-	case addrBuf := <-req.RespChan:
-		pubAddr := string(addrBuf.Bytes())
-		fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
-		fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubAddr)
+	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
+	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubKey)
+
+}
+
+func (c *CLI) createFromSeedCMD(args []string) {
+
+	/*
+		if args == nil || len(args) < 2 {
+			fmt.Fprintf(os.Stdout, commandInfo["createfromseed"]+"\n")
+			return
+		}
+
+		seed := args[0]
+		password := args[1]
+		seedBytes, err := hex.DecodeString(seed)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error attempting to decode seed: %v\n", err)
+			return
+		}
+
+		// Then load the wallet
+		w, err := createFromSeed(seedBytes, password)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error attempting to create wallet from seed: %v\n", err)
+			return
+		}
+
+		pubAddr, err := w.PublicAddress()
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error attempting to get your public address: %v\n", err)
+			return
+		}
+
+		fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\nPublic Address: %s\n", pubAddr)
+
+		c.transactor = transactor.New(w, nil)
 
 		if !cfg.Get().General.WalletOnly {
 			initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
 		}
-	case err := <-req.ErrChan:
-		fmt.Fprintf(os.Stdout, "error creating wallet: %v\n", err)
-	}
-}
-
-func loadWallet(password string) (*wallet.Wallet, error) {
-	// First load the database
-	db, err := walletdb.New(cfg.Get().Wallet.Store)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-
-	// Then load the wallet
-	w, err := wallet.LoadFromFile(testnet, db, fetchDecoys, fetchInputs, password)
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-
-	return w, nil
-}
-
-func (c *CLI) createFromSeedCMD(args []string) {
-	if c.transactor != nil {
-		fmt.Fprintln(os.Stdout, "You have already loaded a wallet. Please re-start the node to load another.")
-	}
-
-	if args == nil || len(args) < 2 {
-		fmt.Fprintf(os.Stdout, commandInfo["createfromseed"]+"\n")
-		return
-	}
-
-	seed := args[0]
-	password := args[1]
-	seedBytes, err := hex.DecodeString(seed)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to decode seed: %v\n", err)
-		return
-	}
-
-	// Then load the wallet
-	w, err := createFromSeed(seedBytes, password)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to create wallet from seed: %v\n", err)
-		return
-	}
-
-	pubAddr, err := w.PublicAddress()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error attempting to get your public address: %v\n", err)
-		return
-	}
-
-	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\nPublic Address: %s\n", pubAddr)
-
-	c.transactor = transactor.New(w, nil)
-
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(c.eventBroker, c.rpcBus, w, c.counter, c.transactor)
-	}
-}
-
-func createFromSeed(seedBytes []byte, password string) (*wallet.Wallet, error) {
-	// First load the database
-	db, err := walletdb.New(cfg.Get().Wallet.Store)
-	if err != nil {
-		return nil, err
-	}
-
-	// Then load the wallet
-	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, fetchDecoys, fetchInputs, password)
-	if err != nil {
-		return nil, err
-	}
-
-	return w, nil
+	*/
 }
 
 func (c *CLI) balanceCMD() {
-	if c.transactor == nil {
-		fmt.Fprintln(os.Stdout, "Please load a wallet before checking your balance")
-		return
-	}
 
-	balance, err := c.transactor.Balance()
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error retrieving balance: %v\n", err)
-		return
-	}
-	fmt.Fprintln(os.Stdout, balance)
+	/*
+		balance, err := c.transactor.Balance()
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error retrieving balance: %v\n", err)
+			return
+		}
+		fmt.Fprintln(os.Stdout, balance)
+	*/
 }
 
 func (c *CLI) transferCMD(args []string) {
-	if c.transactor == nil {
-		fmt.Fprintln(os.Stdout, "Please load a wallet before sending DUSK")
-		return
-	}
 
-	if len(args) < 2 {
-		fmt.Fprintln(os.Stdout, "Please specify an amount and an address")
-		return
-	}
+	/*
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stdout, "Please specify an amount and an address")
+			return
+		}
 
-	amount, err := stringToUint64(args[0])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
-		return
-	}
+		amount, err := stringToUint64(args[0])
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
+			return
+		}
 
-	tx, err := c.transactor.CreateStandardTx(amount, args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating transaction: %v\n", err)
-		return
-	}
+		pubKey := args[1]
 
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
-	}
-
-	c.eventBroker.Publish(string(topics.Tx), buf)
+		// TODO:
+	*/
 }
 
 func (c *CLI) sendBidCMD(args []string) {
-	if c.transactor == nil {
-		fmt.Fprintln(os.Stdout, "Please load a wallet before bidding DUSK")
-		return
-	}
 
 	amount, err := stringToUint64(args[0])
 	if err != nil {
@@ -214,48 +153,77 @@ func (c *CLI) sendBidCMD(args []string) {
 		return
 	}
 
-	tx, err := c.transactor.CreateBidTx(amount, lockTime)
+	txid, err := sendBidTx(c.rpcBus, amount, lockTime)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating transaction: %v\n", err)
+		fmt.Fprintf(os.Stdout, "error: %v\n", err)
 		return
 	}
 
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
-	}
-
-	c.eventBroker.Publish(string(topics.Tx), buf)
+	fmt.Fprintf(os.Stdout, "BidTx ID: %s\n", txid)
 }
 
 func (c *CLI) sendStakeCMD(args []string) {
-	if c.transactor == nil {
-		fmt.Fprintln(os.Stdout, "Please load a wallet before staking DUSK")
-		return
+
+	/*
+		amount, err := stringToUint64(args[0])
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
+			return
+		}
+
+		lockTime, err := stringToUint64(args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "error converting locktime string to an integer: %v\n", err)
+			return
+		}
+
+		// TODO:
+	*/
+}
+
+func (c *CLI) sendTransaction(methodName string, amount, locktime uint64, pubKey string) {
+
+	pBuf := bytes.NewBuffer([]byte(""))
+	req := wire.NewRequest(*pBuf, -1)
+
+	result, err := c.rpcBus.Call(methodName, req)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error on %d call %s", err)
 	}
 
-	amount, err := stringToUint64(args[0])
+	hash := hex.EncodeToString(result.Bytes())
+	fmt.Fprintf(os.Stdout, "txid: %s", hash)
+}
+
+func loadWallet(rb *wire.RPCBus, password string) (string, error) {
+
+	pBuf := bytes.NewBufferString(password)
+	req := wire.NewRequest(*pBuf, -1)
+	pubKeyBuf, err := rb.Call(wire.LoadWallet, req)
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
-		return
+		return "", err
 	}
 
-	lockTime, err := stringToUint64(args[1])
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error converting locktime string to an integer: %v\n", err)
-		return
-	}
+	return pubKeyBuf.String(), nil
+}
 
-	tx, err := c.transactor.CreateStakeTx(amount, lockTime)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "error creating transaction: %v\n", err)
-		return
-	}
+func sendBidTx(rb *wire.RPCBus, amount, lockTime uint64) (string, error) {
 
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
-		fmt.Fprintf(os.Stdout, "error encoding transaction: %v\n", err)
+
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, amount); err != nil {
+		return "", err
 	}
 
-	c.eventBroker.Publish(string(topics.Tx), buf)
+	if err := encoding.WriteUint64(buf, binary.LittleEndian, lockTime); err != nil {
+		return "", err
+	}
+
+	req := wire.NewRequest(*buf, -1)
+	txIdBuf, err := rb.Call(wire.SendBidTx, req)
+	if err != nil {
+		return "", err
+	}
+
+	return txIdBuf.String(), nil
 }

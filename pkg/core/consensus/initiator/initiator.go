@@ -14,7 +14,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -26,11 +25,11 @@ import (
 
 var l = log.WithField("process", "consensus initiator")
 
-func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter, transactor *transactor.Transactor) {
+func LaunchConsensus(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// TODO: sync first
 	go startProvisioner(eventBroker, rpcBus, w, counter)
 	go startBlockGenerator(eventBroker, rpcBus, w)
-	if err := launchMaintainer(eventBroker, transactor, w); err != nil {
+	if err := launchMaintainer(eventBroker, w); err != nil {
 		fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 	}
 }
@@ -130,7 +129,7 @@ func syncToTip(acceptedBlockChan <-chan block.Block, counter *chainsync.Counter)
 	}
 }
 
-func launchMaintainer(eventBroker wire.EventBroker, transactor *transactor.Transactor, w *wallet.Wallet) error {
+func launchMaintainer(eventBroker wire.EventBroker, w *wallet.Wallet) error {
 	r := cfg.Get()
 	amount := r.Consensus.DefaultAmount
 	lockTime := r.Consensus.DefaultLockTime
@@ -145,5 +144,5 @@ func launchMaintainer(eventBroker wire.EventBroker, transactor *transactor.Trans
 		return err
 	}
 
-	return maintainer.Launch(eventBroker, nil, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), transactor, amount, lockTime, offset)
+	return maintainer.Launch(eventBroker, nil, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), amount, lockTime, offset)
 }

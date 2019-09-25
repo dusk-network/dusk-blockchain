@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -23,27 +25,21 @@ func (t *Transactor) Listen() {
 	for {
 		select {
 
-		// Wallet Requests to respond to
+		// Wallet requests to respond to
 		case r := <-createWalletChan:
 			handleRequest(r, t.handleCreateWallet, "CreateWallet")
-
 		case r := <-createFromSeedChan:
 			handleRequest(r, t.handleCreateFromSeed, "CreateWalletFromSeed")
-
 		case r := <-loadWalletChan:
 			handleRequest(r, t.handleLoadWallet, "LoadWallet")
 
-		// Transaction Requests to respond to
-
+		// Transaction requests to respond to
 		case r := <-sendBidTxChan:
 			handleRequest(r, t.handleSendBidTx, "BidTx")
-
 		case r := <-sendStakeTxChan:
 			handleRequest(r, t.handleSendStakeTx, "StakeTx")
-
 		case r := <-sendStandardTxChan:
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
-
 		case r := <-getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
 
@@ -85,11 +81,18 @@ func (t *Transactor) handleLoadWallet(r wire.Req) error {
 		return errWalletAlreadyLoaded
 	}
 
-	if err := t.loadWallet(r.Params.String()); err != nil {
+	pubKey, err := t.loadWallet(r.Params.String())
+	if err != nil {
 		return err
 	}
 
-	r.RespChan <- bytes.Buffer{}
+	if !cfg.Get().General.WalletOnly {
+		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
+	}
+
+	result := bytes.NewBufferString(pubKey)
+	r.RespChan <- *result
+
 	return nil
 }
 
