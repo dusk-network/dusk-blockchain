@@ -12,6 +12,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/bwesterb/go-ristretto v1.0.0/go.mod h1:N/KzfPHVf0cM6so9lbr2hamEhlH9xev3NIj+B6p+Eyc=
 github.com/bwesterb/go-ristretto v1.1.0 h1:KiOn1eqKcCe5X4Y6OPGS4u3XyVmxUnh/WAHU7bO3XXo=
 github.com/bwesterb/go-ristretto v1.1.0/go.mod h1:N/KzfPHVf0cM6so9lbr2hamEhlH9xev3NIj+B6p+Eyc=
+github.com/bwesterb/go-ristretto v1.1.1 h1:ScMQxfIReRWsrKhQ+rR9R4CoaS+9Mf+GqaGP8NQEEJg=
+github.com/bwesterb/go-ristretto v1.1.1/go.mod h1:fUIoIZaG73pV5biE2Blr2xEzDoMj7NFEuV9ekS419A0=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=
@@ -28,8 +30,8 @@ github.com/dusk-network/bn256 v0.5.0-lattices h1:3PWpy5mxJI7UNPdfjHzI3Mw2MhbZbHt
 github.com/dusk-network/bn256 v0.5.0-lattices/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
 github.com/dusk-network/dusk-crypto v0.1.0 h1:HUwtbA00D2WH8xBd1xvKSIUlJtu4ulBSte+yyKO8tZg=
 github.com/dusk-network/dusk-crypto v0.1.0/go.mod h1:Hgr/7jihizg4T/om70iCt4p0uon2asf/9AAzeegu9CU=
-github.com/dusk-network/dusk-wallet v0.1.0 h1:95HAh42ZU69ChS8x1TX9AVoMBn16ru6BB/0LEMvKz4A=
-github.com/dusk-network/dusk-wallet v0.1.0/go.mod h1:313RVAC8dSZf/bRKWBNot89hvTyMQuzWiYln87l01eY=
+github.com/dusk-network/dusk-wallet v0.1.1 h1:+YDBQhu3LY0+nNxLdkTcAnWTCY1sfkTsJiO8QE2ARZI=
+github.com/dusk-network/dusk-wallet v0.1.1/go.mod h1:313RVAC8dSZf/bRKWBNot89hvTyMQuzWiYln87l01eY=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee/go.mod h1:PpPxJzdlQ023fALM5AGWeFrIaIU2igVmxr3QiRaf+ks=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
@@ -189,6 +191,8 @@ golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20190922100055-0a153f010e69/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190924135425-2f72d4f06240 h1:iLpJnvIAms/C7g3q9Gqq14Nuo4BOdygHa5TfyO3MzEE=
 golang.org/x/sys v0.0.0-20190924135425-2f72d4f06240/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20190924154521-2837fb4f24fe h1:6fAMxZRR6sl1Uq8U61gxU+kPTs2tR8uOySCbBP7BN/M=
+golang.org/x/sys v0.0.0-20190924154521-2837fb4f24fe/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
