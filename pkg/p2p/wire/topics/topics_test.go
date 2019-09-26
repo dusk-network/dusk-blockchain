@@ -22,6 +22,23 @@ var topicTest = []struct {
 	{topics.Tx, [topics.Size]byte{116, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 }
 
+var topicString = []struct {
+	topic   topics.Topic
+	tstring string
+}{
+	{topics.Agreement, "blockagreement"},
+	{topics.Reduction, "blockreduction"},
+	{topics.Tx, "tx"},
+	{topics.Topic("pippo"), "pippo"},
+}
+
+func TestStringToTopic(t *testing.T) {
+	for _, tt := range topicString {
+		tpc := topics.StringToTopic(tt.tstring)
+		assert.Equal(t, tt.topic, tpc)
+	}
+}
+
 func TestByteArrayToTopic(t *testing.T) {
 	for _, tt := range topicTest {
 		tpc := topics.ByteArrayToTopic(tt.tba)
