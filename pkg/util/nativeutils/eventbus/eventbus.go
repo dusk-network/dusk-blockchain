@@ -54,11 +54,12 @@ type (
 
 	// EventBus - box for handlers and callbacks.
 	EventBus struct {
-		busLock          sync.RWMutex
-		handlers         *handlerMap
-		callbackHandlers *handlerMap
-		streamHandlers   *handlerMap
-		preprocessors    map[string][]idTopicProcessor
+		busLock           sync.RWMutex
+		handlers          *handlerMap
+		callbackHandlers  *handlerMap
+		streamHandlers    *handlerMap
+		defaultDispatcher *multiDispatcher
+		preprocessors     map[string][]idTopicProcessor
 	}
 
 	idTopicProcessor struct {
@@ -74,8 +75,21 @@ func New() *EventBus {
 		newHandlerMap(),
 		newHandlerMap(),
 		newHandlerMap(),
+		newMultiDispatcher(),
 		make(map[string][]idTopicProcessor),
 	}
+}
+
+// AddDefaultTopic adds a topic to the default multiDispatcher
+func (bus *EventBus) AddDefaultTopic(topic string) {
+	bus.defaultDispatcher.Add([]byte(topic))
+}
+
+// SubscribeDefault subscribes a callback to the default multiDispatcher.
+// This is normally useful for implementing a sub-dispatching mechanism
+// (i.e. bus of busses architecture)
+func (bus *EventBus) SubscribeDefault(callback func(m *bytes.Buffer) error) uint32 {
+	return bus.defaultDispatcher.Store(&callbackHandler{callback})
 }
 
 // Subscribe subscribes to a topic with a channel.
@@ -197,6 +211,9 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 		return
 	}
 
+	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
+	go bus.defaultDispatcher.Publish(topic, *messageBuffer)
+
 	if handlers := bus.handlers.Load(topic); handlers != nil {
 		for _, handler := range handlers {
 			if err := handler.Publish(processedMsg); err != nil {
@@ -226,7 +243,7 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 	handlers := bus.streamHandlers.Load(topic)
 	for _, handler := range handlers {
 		if err := handler.Publish(processedMsg); err != nil {
-			logEB.WithError(err).WithField("topic", topic).Debugln("cannot publish event on stringhandler")
+			logEB.WithError(err).WithField("topic", topic).Debugln("cannot publish event on streamhandler")
 			continue
 		}
 	}
