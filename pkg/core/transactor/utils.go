@@ -5,6 +5,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -12,8 +13,6 @@ import (
 	"github.com/dusk-network/dusk-wallet/key"
 
 	"encoding/binary"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 )
 
 func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []byte, error) {
@@ -79,7 +78,7 @@ func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Ke
 
 // readUint64Param reads uint64 value from request params buffer
 // TODO: Move this to rpcbus package as global util
-func readUint64Param(r wire.Req) (uint64, error) {
+func readUint64Param(r *rpcbus.Req) (uint64, error) {
 
 	valueBytes := make([]byte, 8)
 	if _, err := r.Params.Read(valueBytes); err != nil {

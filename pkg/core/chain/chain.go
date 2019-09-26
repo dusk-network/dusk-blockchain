@@ -2,7 +2,7 @@ package chain
 
 import (
 	"bytes"
-	"crypto/ed25519"
+
 	"encoding/binary"
 	"fmt"
 	"sync"
@@ -26,6 +26,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"golang.org/x/crypto/ed25519"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})

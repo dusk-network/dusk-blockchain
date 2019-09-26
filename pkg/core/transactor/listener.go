@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -50,7 +50,7 @@ func (t *Transactor) Listen() {
 	}
 }
 
-func handleRequest(r wire.Req, handler func(r wire.Req) error, name string) {
+func handleRequest(r rpcbus.Req, handler func(r rpcbus.Req) error, name string) {
 
 	log.Infof("Handling %s request", name)
 
@@ -63,20 +63,23 @@ func handleRequest(r wire.Req, handler func(r wire.Req) error, name string) {
 	log.Infof("Handled %s request", name)
 }
 
-func (t *Transactor) handleCreateWallet(r wire.Req) error {
+func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
 
-	if err := t.createWallet(r.Params.String()); err != nil {
+	pubKey, err := t.createWallet(r.Params.String())
+	if err != nil {
 		return err
 	}
 
-	r.RespChan <- bytes.Buffer{}
+	result := bytes.NewBufferString(pubKey)
+	r.RespChan <- *result
+
 	return nil
 }
 
-func (t *Transactor) handleLoadWallet(r wire.Req) error {
+func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -96,7 +99,7 @@ func (t *Transactor) handleLoadWallet(r wire.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleCreateFromSeed(r wire.Req) error {
+func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -104,26 +107,33 @@ func (t *Transactor) handleCreateFromSeed(r wire.Req) error {
 	seed := r.Params.String()
 	password := r.Params.String()
 
-	if err := t.createFromSeed(seed, password); err != nil {
+	pubKey, err := t.createFromSeed(seed, password)
+	if err != nil {
 		return err
 	}
 
-	r.RespChan <- bytes.Buffer{}
+	if !cfg.Get().General.WalletOnly {
+		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
+	}
+
+	result := bytes.NewBufferString(pubKey)
+	r.RespChan <- *result
+
 	return nil
 }
 
-func (t *Transactor) handleSendBidTx(r wire.Req) error {
+func (t *Transactor) handleSendBidTx(r rpcbus.Req) error {
 	if t.w == nil {
 		return errWalletNotLoaded
 	}
 
 	// read tx parameters
-	amount, err := readUint64Param(r)
+	amount, err := readUint64Param(&r)
 	if err != nil {
 		return err
 	}
 
-	lockTime, err := readUint64Param(r)
+	lockTime, err := readUint64Param(&r)
 	if err != nil {
 		return err
 	}
@@ -146,19 +156,19 @@ func (t *Transactor) handleSendBidTx(r wire.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleSendStakeTx(r wire.Req) error {
+func (t *Transactor) handleSendStakeTx(r rpcbus.Req) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
 	}
 
 	// read tx parameters
-	amount, err := readUint64Param(r)
+	amount, err := readUint64Param(&r)
 	if err != nil {
 		return err
 	}
 
-	lockTime, err := readUint64Param(r)
+	lockTime, err := readUint64Param(&r)
 	if err != nil {
 		return err
 	}
@@ -182,14 +192,14 @@ func (t *Transactor) handleSendStakeTx(r wire.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleSendStandardTx(r wire.Req) error {
+func (t *Transactor) handleSendStandardTx(r rpcbus.Req) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
 	}
 
 	// read tx parameters
-	amount, err := readUint64Param(r)
+	amount, err := readUint64Param(&r)
 	if err != nil {
 		return err
 	}
@@ -215,7 +225,7 @@ func (t *Transactor) handleSendStandardTx(r wire.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleBalance(r wire.Req) error {
+func (t *Transactor) handleBalance(r rpcbus.Req) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded

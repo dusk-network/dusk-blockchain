@@ -76,14 +76,16 @@ func TestSendBidTransaction(t *testing.T) {
 		t.Logf("Empty DUSK_WALLET_PASS")
 	}
 
-	// Send request to node 0 to loadWallet
-	_, err := localNet.SendCommand(0, "loadWallet", []string{walletsPass})
-	if err != nil {
-		t.Fatal(err.Error())
+	for i := 0; i < localNetSize; i++ {
+		// Send request to node 0 to loadWallet
+		_, err := localNet.SendCommand(uint(i), "loadWallet", []string{walletsPass})
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 	}
 
 	// Send request to node 0 to generate and process a Bid transaction
-	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "1"})
+	data, err := localNet.SendCommand(0, "sendBidTx", []string{"33", "1"})
 	if err != nil {
 		t.Fatal(err.Error())
 	}

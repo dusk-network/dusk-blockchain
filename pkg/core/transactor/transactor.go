@@ -3,36 +3,37 @@ package transactor
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 )
 
 var (
 
 	// RPCBus methods handled by Transactor
-	createWalletChan   = make(chan wire.Req)
-	createFromSeedChan = make(chan wire.Req)
-	loadWalletChan     = make(chan wire.Req)
-	sendBidTxChan      = make(chan wire.Req)
-	sendStakeTxChan    = make(chan wire.Req)
-	sendStandardTxChan = make(chan wire.Req)
-	getBalanceChan     = make(chan wire.Req)
+	createWalletChan   = make(chan rpcbus.Req)
+	createFromSeedChan = make(chan rpcbus.Req)
+	loadWalletChan     = make(chan rpcbus.Req)
+	sendBidTxChan      = make(chan rpcbus.Req)
+	sendStakeTxChan    = make(chan rpcbus.Req)
+	sendStandardTxChan = make(chan rpcbus.Req)
+	getBalanceChan     = make(chan rpcbus.Req)
 )
 
 // TODO: rename
 type Transactor struct {
 	w  *wallet.Wallet
 	db database.DB
-	eb *wire.EventBus
-	rb *wire.RPCBus
+	eb eventbus.Broker
+	rb *rpcbus.RPCBus
 
 	// Passed to the consensus component startup
 	c *chainsync.Counter
 }
 
 // Instantiate a new Transactor struct.
-func New(eb *wire.EventBus, rb *wire.RPCBus, db database.DB, counter *chainsync.Counter) (*Transactor, error) {
+func New(eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, counter *chainsync.Counter) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -42,7 +43,7 @@ func New(eb *wire.EventBus, rb *wire.RPCBus, db database.DB, counter *chainsync.
 		db: db,
 		eb: eb,
 		rb: rb,
-		c: counter,
+		c:  counter,
 	}
 
 	err := t.registerMethods()
@@ -52,31 +53,31 @@ func New(eb *wire.EventBus, rb *wire.RPCBus, db database.DB, counter *chainsync.
 // registers all rpcBus channels
 func (t *Transactor) registerMethods() error {
 
-	if err := t.rb.Register(wire.LoadWallet, loadWalletChan); err != nil {
+	if err := t.rb.Register(rpcbus.LoadWallet, loadWalletChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(wire.CreateWallet, createWalletChan); err != nil {
+	if err := t.rb.Register(rpcbus.CreateWallet, createWalletChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(wire.CreateFromSeed, createFromSeedChan); err != nil {
+	if err := t.rb.Register(rpcbus.CreateFromSeed, createFromSeedChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(wire.SendBidTx, sendBidTxChan); err != nil {
+	if err := t.rb.Register(rpcbus.SendBidTx, sendBidTxChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(wire.SendStakeTx, sendStakeTxChan); err != nil {
+	if err := t.rb.Register(rpcbus.SendStakeTx, sendStakeTxChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(wire.SendStandardTx, sendStandardTxChan); err != nil {
+	if err := t.rb.Register(rpcbus.SendStandardTx, sendStandardTxChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(wire.GetBalance, getBalanceChan); err != nil {
+	if err := t.rb.Register(rpcbus.GetBalance, getBalanceChan); err != nil {
 		return err
 	}
 
