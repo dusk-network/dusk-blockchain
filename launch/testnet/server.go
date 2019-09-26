@@ -50,6 +50,7 @@ func Setup() *Server {
 		panic(err)
 	}
 	go chain.Listen()
+	go chain.LaunchConsensus()
 
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
