@@ -113,6 +113,18 @@ func (c *Chain) Listen() {
 	}
 }
 
+// LaunchConsensus will listen for an init message, and send a round update
+// once it is received.
+func (c *Chain) LaunchConsensus() {
+	initChan := make(chan *bytes.Buffer, 1)
+	id := c.eventBus.Subscribe(msg.InitializationTopic, initChan)
+	roundBuf := <-initChan
+	round := binary.LittleEndian.Uint64(roundBuf.Bytes())
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	c.sendRoundUpdate(round, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
+}
+
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := new(bytes.Buffer)
 	if err := block.Marshal(buffer, &blk); err != nil {
