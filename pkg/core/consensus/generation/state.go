@@ -31,6 +31,7 @@ func (s *state) listen() {
 		select {
 		case roundUpdate := <-s.roundChan:
 			s.currentState = roundUpdate
+			s.broker.blockGen.ResetThreshold()
 			s.broker.Generate(roundUpdate)
 		case state := <-s.regenerationChan:
 			if state.Round == s.currentState.Round {
