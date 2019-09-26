@@ -28,8 +28,8 @@ var l = log.WithField("process", "consensus initiator")
 
 func LaunchConsensus(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// TODO: sync first
-	go startProvisioner(eventBroker, rpcBus, w, counter)
-	go startBlockGenerator(eventBroker, rpcBus, w)
+	startBlockGenerator(eventBroker, rpcBus, w)
+	startProvisioner(eventBroker, rpcBus, w, counter)
 	if err := launchMaintainer(eventBroker, w); err != nil {
 		fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 	}
@@ -85,9 +85,8 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 	// get public key that the rewards should go to
 	publicKey := w.PublicKey()
 
-	// launch generation component
 	go func() {
-
+		// launch generation component
 		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
 			l.WithError(err).Warnln("error launching block generation component")
 		}
