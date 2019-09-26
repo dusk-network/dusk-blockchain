@@ -4,9 +4,9 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type (
@@ -25,10 +25,10 @@ type (
 )
 
 // Init a block collector compatible with topics.Block and topics.Candidate
-func initBlockCollector(eventBus *wire.EventBus, topic string) chan *block.Block {
+func initBlockCollector(eventBus *eventbus.EventBus, topic string) chan *block.Block {
 	blockChan := make(chan *block.Block, 1)
 	collector := &blockCollector{blockChan}
-	go wire.NewTopicListener(eventBus, collector, topic).Accept()
+	go eventbus.NewTopicListener(eventBus, collector, topic).Accept()
 	return blockChan
 }
 
@@ -42,16 +42,16 @@ func (b *blockCollector) Collect(message *bytes.Buffer) error {
 	return nil
 }
 
-func initCertificateCollector(subscriber wire.EventSubscriber) <-chan certMsg {
+func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
 	certificateChan := make(chan certMsg, 10)
 	collector := &certificateCollector{certificateChan}
-	go wire.NewTopicListener(subscriber, collector, string(topics.Certificate)).Accept()
+	go eventbus.NewTopicListener(subscriber, collector, string(topics.Certificate)).Accept()
 	return certificateChan
 }
 
 func (c *certificateCollector) Collect(m *bytes.Buffer) error {
-	var hash []byte
-	if err := encoding.Read256(m, &hash); err != nil {
+	hash := make([]byte, 32)
+	if err := encoding.Read256(m, hash); err != nil {
 		return err
 	}
 

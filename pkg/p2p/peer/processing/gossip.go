@@ -2,7 +2,6 @@ package processing
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -21,7 +20,7 @@ type (
 
 func (h *headerWriter) Write(m *bytes.Buffer) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint32(buf, binary.LittleEndian, uint32(h.magic)); err != nil {
+	if err := encoding.WriteUint32LE(buf, uint32(h.magic)); err != nil {
 		return nil, err
 	}
 

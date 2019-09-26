@@ -13,6 +13,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -60,11 +62,11 @@ type reducer struct {
 	lock  sync.RWMutex
 	stale bool
 
-	publisher wire.EventPublisher
-	rpcBus    *wire.RPCBus
+	publisher eventbus.Publisher
+	rpcBus    *rpcbus.RPCBus
 }
 
-func newReducer(ctx *context, publisher wire.EventPublisher, filter *consensus.EventFilter, rpcBus *wire.RPCBus) *reducer {
+func newReducer(ctx *context, publisher eventbus.Publisher, filter *consensus.EventFilter, rpcBus *rpcbus.RPCBus) *reducer {
 	return &reducer{
 		ctx:        ctx,
 		publisher:  publisher,
@@ -125,8 +127,8 @@ func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 		// If our result was not a zero value hash, we should first verify it
 		// before voting on it again
 		if !bytes.Equal(hash.Bytes(), make([]byte, 32)) {
-			req := wire.NewRequest(*hash, 5)
-			if _, err := r.rpcBus.Call(wire.VerifyCandidateBlock, req); err != nil {
+			req := rpcbus.NewRequest(*hash, 5)
+			if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req); err != nil {
 				log.WithFields(log.Fields{
 					"process": "reduction",
 					"error":   err,
@@ -202,7 +204,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 
 func (r *reducer) sendResults(events []wire.Event) {
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64(buf, binary.LittleEndian, r.ctx.state.Round()); err != nil {
+	if err := encoding.WriteUint64LE(buf, r.ctx.state.Round()); err != nil {
 		panic(err)
 	}
 

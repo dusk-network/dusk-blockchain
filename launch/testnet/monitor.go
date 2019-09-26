@@ -6,14 +6,14 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
 var lg = log.WithField("process", "monitoring")
 
 // ConnectToLogMonitor launches the monitoring process in a goroutine. The goroutine performs 5 attempts before giving up
-func ConnectToLogMonitor(bus wire.EventBroker) error {
+func ConnectToLogMonitor(bus eventbus.Broker) error {
 	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
 		monitorURL := cfg.Get().Logger.Monitor.Target
 		lg.WithField("process", "monitoring").Infof("Connecting to log process on %v\n", monitorURL)
@@ -23,7 +23,7 @@ func ConnectToLogMonitor(bus wire.EventBroker) error {
 	return nil
 }
 
-func startMonitoring(bus wire.EventBroker, monURL string) {
+func startMonitoring(bus eventbus.Broker, monURL string) {
 	for i := 0; i < 5; i++ {
 		lg.Traceln("Trying to (re)start the monitoring process")
 		supervisor, err := monitor.Launch(bus, monURL)

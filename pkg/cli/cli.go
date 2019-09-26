@@ -7,20 +7,19 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
 // Start the interactive shell.
-func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File, counter *chainsync.Counter) {
-	cli := &CLI{eventBroker, rpcBus, counter}
+func Start(rpcBus *rpcbus.RPCBus, logFile *os.File) {
+	processor := &commandLineProcessor{rpcBus}
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")
 	for scanner.Scan() {
 		args := strings.Split(scanner.Text(), " ")
-		cli.runCmd(args[0], args[1:], logFile)
+		processor.runCmd(args[0], args[1:], logFile)
 		fmt.Print("> ")
 	}
 
@@ -32,7 +31,7 @@ func Start(eventBroker wire.EventBroker, rpcBus *wire.RPCBus, logFile *os.File, 
 	}
 }
 
-func (c *CLI) runCmd(cmd string, args []string, logFile *os.File) {
+func (c *commandLineProcessor) runCmd(cmd string, args []string, logFile *os.File) {
 	switch cmd {
 	case "help":
 		showHelp(args)

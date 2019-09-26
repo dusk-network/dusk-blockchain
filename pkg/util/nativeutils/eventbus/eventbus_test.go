@@ -1,4 +1,4 @@
-package wire
+package eventbus
 
 import (
 	"bytes"
@@ -10,12 +10,12 @@ import (
 )
 
 func TestNewEventBus(t *testing.T) {
-	eb := NewEventBus()
+	eb := New()
 	assert.NotNil(t, eb)
 }
 
 func TestSubscribe(t *testing.T) {
-	eb := NewEventBus()
+	eb := New()
 	myChan := make(chan *bytes.Buffer, 10)
 	assert.NotNil(t, eb.Subscribe("whateverTopic", myChan))
 }
@@ -38,7 +38,7 @@ func TestUnsubscribe(t *testing.T) {
 }
 
 func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
-	eb := NewEventBus()
+	eb := New()
 	myChan := make(chan *bytes.Buffer, 10)
 	id := eb.Subscribe("whateverTopic", myChan)
 	assert.NotNil(t, id)
@@ -58,7 +58,7 @@ func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
 // Test that a streaming goroutine is killed when the exit signal is sent
 func TestExitChan(t *testing.T) {
 
-	eb := NewEventBus()
+	eb := New()
 	topic := "foo"
 	_ = eb.SubscribeStream(topic, &mockWriteCloser{})
 	// Put something on ring buffer

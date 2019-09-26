@@ -5,29 +5,24 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire" 
-	 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
-var l = log.WithField("process", "maintainer")
+var l = log.WithField("process", "StakeAutomaton")
 
-// The maintainer is a process that keeps note of when certain consensus transactions
+// The StakeAutomaton is a process that keeps note of when certain consensus transactions
 // expire, and makes sure the node remains within the bidlist/committee, when those
 // transactions are close to expiring.
-type maintainer struct {
-	eventBroker wire.EventBroker
-	roundChan   <-chan uint64
-	bidChan     <-chan user.Bid
+type StakeAutomaton struct {
+	eventBroker eventbus.Broker
+	roundChan   <-chan consensus.RoundUpdate
 
 	pubKeyBLS []byte
 	m         ristretto.Scalar
-	c         *committee.Store
-	bidList   *user.BidList
+	p         user.Provisioners
+	bidList   user.BidList
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
@@ -35,66 +30,30 @@ type maintainer struct {
 	amount, lockTime, offset uint64
 }
 
-func newMaintainer(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, amount, lockTime, offset uint64) (*maintainer, error) {
-	if db == nil {
-		_, db = heavy.CreateDBConnection()
-	}
-
-	bidList, err := user.NewBidList(db)
-	if err != nil {
-		return nil, err
-	}
-
-	return &maintainer{
-		eventBroker: eventBroker,
-		bidChan:     consensus.InitBidListUpdate(eventBroker),
-		roundChan:   consensus.InitRoundUpdate(eventBroker),
-		pubKeyBLS:   pubKeyBLS,
-		m:           m,
-		c:           committee.LaunchStore(eventBroker, db),
-		bidList:     bidList,
-		amount:      amount,
-		lockTime:    lockTime,
-		offset:      offset,
+func New(eventBroker eventbus.Broker, pubKeyBLS []byte, m ristretto.Scalar, amount, lockTime, offset uint64) (*StakeAutomaton, error) {
+	return &StakeAutomaton{
+		eventBroker:    eventBroker,
+		roundChan:      consensus.InitRoundUpdate(eventBroker),
+		pubKeyBLS:      pubKeyBLS,
+		m:              m,
+		amount:         amount,
+		lockTime:       lockTime,
+		offset:         offset,
+		bidEndHeight:   1,
+		stakeEndHeight: 1,
 	}, nil
 }
 
-func Launch(eventBroker wire.EventBroker, db database.DB, pubKeyBLS []byte, m ristretto.Scalar, amount, lockTime, offset uint64) error {
-	maintainer, err := newMaintainer(eventBroker, db, pubKeyBLS, m, amount, lockTime, offset)
-	if err != nil {
-		return err
-	}
-
-	// Let's see if we have active stakes and bids already
-	maintainer.bidEndHeight = maintainer.findMostRecentBid()
-	// If not, we create them here
-	if maintainer.bidEndHeight == 0 {
-		if err := maintainer.sendBid(); err != nil {
-			l.WithError(err).Warnln("could not send bid tx")
-			// Set end height to 1 so we retry sending the tx in `listen`
-			maintainer.bidEndHeight = 1
-		}
-	}
-
-	maintainer.stakeEndHeight = maintainer.findMostRecentStake()
-	if maintainer.stakeEndHeight == 0 {
-		if err := maintainer.sendStake(); err != nil {
-			l.WithError(err).Warnln("could not send stake tx")
-			maintainer.stakeEndHeight = 1
-		}
-	}
-
-	// Set up listening loop
-	go maintainer.listen()
-	return nil
-}
-
-func (m *maintainer) listen() {
+func (m *StakeAutomaton) Listen() {
 	for {
 		select {
-		case round := <-m.roundChan:
-			m.bidList.RemoveExpired(round)
-			if round+m.offset >= m.bidEndHeight {
+		case roundUpdate := <-m.roundChan:
+			// Rehydrate consensus state
+			m.p = roundUpdate.P
+			m.bidList = roundUpdate.BidList
+
+			// TODO: handle new provisioners and bidlist coming from roundupdate
+			if roundUpdate.Round+m.offset >= m.bidEndHeight {
 				endHeight := m.findMostRecentBid()
 
 				// Only send bid if this is the first time we notice it's about to expire
@@ -110,7 +69,7 @@ func (m *maintainer) listen() {
 				}
 			}
 
-			if round+m.offset >= m.stakeEndHeight {
+			if roundUpdate.Round+m.offset >= m.stakeEndHeight {
 				endHeight := m.findMostRecentStake()
 
 				// Only send stake if this is the first time we notice it's about to expire
@@ -124,15 +83,13 @@ func (m *maintainer) listen() {
 					m.stakeEndHeight = 0
 				}
 			}
-		case bid := <-m.bidChan:
-			m.bidList.AddBid(bid)
 		}
 	}
 }
 
-func (m *maintainer) findMostRecentBid() uint64 {
+func (m *StakeAutomaton) findMostRecentBid() uint64 {
 	var highest uint64
-	for _, bid := range *m.bidList {
+	for _, bid := range m.bidList {
 		if bytes.Equal(m.m.Bytes(), bid.M[:]) && bid.EndHeight > highest {
 			highest = bid.EndHeight
 		}
@@ -141,9 +98,8 @@ func (m *maintainer) findMostRecentBid() uint64 {
 	return highest
 }
 
-func (m *maintainer) findMostRecentStake() uint64 {
-	p := m.c.Provisioners()
-	member := p.GetMember(m.pubKeyBLS)
+func (m *StakeAutomaton) findMostRecentStake() uint64 {
+	member := m.p.GetMember(m.pubKeyBLS)
 	if member != nil {
 		var highest uint64
 		for _, stake := range member.Stakes {
@@ -157,38 +113,38 @@ func (m *maintainer) findMostRecentStake() uint64 {
 	return 0
 }
 
-func (m *maintainer) sendBid() error {
+func (m *StakeAutomaton) sendBid() error {
 	/*
-	bid, err := m.transactor.CreateBidTx(m.amount, m.lockTime)
-	if err != nil {
-		return err
-	}
+		bid, err := m.transactor.CreateBidTx(m.amount, m.lockTime)
+		if err != nil {
+			return err
+		}
 
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, bid); err != nil {
-		return err
-	}
+		buf := new(bytes.Buffer)
+		if err := transactions.Marshal(buf, bid); err != nil {
+			return err
+		}
 
-	m.eventBroker.Publish(string(topics.Tx), buf)
-	return nil
+		m.eventBroker.Publish(string(topics.Tx), buf)
+		return nil
 	*/
 	return nil
 }
 
-func (m *maintainer) sendStake() error {
+func (m *StakeAutomaton) sendStake() error {
 	/*
-	stake, err := m.transactor.CreateStakeTx(m.amount, m.lockTime)
-	if err != nil {
-		return err
-	}
+		stake, err := m.transactor.CreateStakeTx(m.amount, m.lockTime)
+		if err != nil {
+			return err
+		}
 
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, stake); err != nil {
-		return err
-	}
+		buf := new(bytes.Buffer)
+		if err := transactions.Marshal(buf, stake); err != nil {
+			return err
+		}
 
-	m.eventBroker.Publish(string(topics.Tx), buf)
-	return nil
+		m.eventBroker.Publish(string(topics.Tx), buf)
+		return nil
 	*/
 	return nil
 }

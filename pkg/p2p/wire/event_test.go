@@ -1,4 +1,4 @@
-package wire
+package wire_test
 
 import (
 	"bytes"
@@ -6,19 +6,21 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLameSubscriber(t *testing.T) {
-	bus := NewEventBus()
+	bus := eventbus.New()
 	resultChan := make(chan *bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 	tbuf := ranbuf()
 
-	sub := NewTopicListener(bus, collector, "pippo")
+	sub := eventbus.NewTopicListener(bus, collector, "pippo")
 	go sub.Accept()
 
 	// NOTE: in real life we would never reuse the same buffer as it would most certainly be mutated by the processor or the collector
@@ -30,12 +32,12 @@ func TestLameSubscriber(t *testing.T) {
 
 func TestProcessor(t *testing.T) {
 	topic := "testTopic"
-	bus := NewEventBus()
+	bus := eventbus.New()
 	resultChan := make(chan *bytes.Buffer, 1)
 	collector := defaultMockCollector(resultChan, nil)
 
 	ids := bus.RegisterPreprocessor(topic, &pippoAdder{}, &pippoAdder{})
-	go NewTopicListener(bus, collector, topic).Accept()
+	go eventbus.NewTopicListener(bus, collector, topic).Accept()
 
 	expected := bytes.NewBufferString("pippopippo")
 	bus.Publish(topic, bytes.NewBufferString(""))
@@ -79,14 +81,14 @@ func TestProcessor(t *testing.T) {
 func TestAddTopic(t *testing.T) {
 	buf := bytes.NewBufferString("This is a test")
 	topic := topics.Gossip
-	newBuffer, err := AddTopic(buf, topic)
+	newBuffer, err := wire.AddTopic(buf, topic)
 	assert.NoError(t, err)
 	assert.Equal(t, []byte{0x67, 0x6f, 0x73, 0x73, 0x69, 0x70, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x54, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x61, 0x20, 0x74, 0x65, 0x73, 0x74}, newBuffer.Bytes())
 }
 
 func TestQuit(t *testing.T) {
-	bus := NewEventBus()
-	sub := NewTopicListener(bus, nil, "")
+	bus := eventbus.New()
+	sub := eventbus.NewTopicListener(bus, nil, "")
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		bus.Publish(string(msg.QuitTopic), nil)

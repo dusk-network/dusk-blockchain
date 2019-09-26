@@ -5,15 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"
 
 	rawtxs "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 type mempool struct {
-	rpcBus *wire.RPCBus
+	rpcBus *rpcbus.RPCBus
 }
 
 func (t mempool) getQuery() *graphql.Field {
@@ -42,7 +42,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			payload.Write(txidBytes)
 		}
 
-		r, err := t.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(payload, 5))
+		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload, 5))
 		if err != nil {
 			return "", err
 		}

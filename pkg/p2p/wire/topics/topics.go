@@ -43,12 +43,6 @@ const (
 	// Peer topics
 	Gossip Topic = "gossip"
 
-	// Blockchain topics
-	ChainInfo Topic = "chaininfo"
-
-	// RPC topics
-	RPCChainInfo Topic = "rpcchaininfo"
-
 	// Error topics
 	NotFound Topic = "notfound"
 	Reject   Topic = "reject"

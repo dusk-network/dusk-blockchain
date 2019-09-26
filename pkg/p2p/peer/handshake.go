@@ -2,7 +2,6 @@ package peer
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -105,7 +104,7 @@ func (p *Connection) readRemoteMsgVersion() error {
 
 func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint32(buf, binary.LittleEndian, uint32(p.magic)); err != nil {
+	if err := encoding.WriteUint32LE(buf, uint32(p.magic)); err != nil {
 		return nil, err
 	}
 

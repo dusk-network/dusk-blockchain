@@ -3,19 +3,13 @@
 package encoding
 
 import (
-	"encoding/binary"
+	"bytes"
 	"fmt"
-	"io"
-)
-
-var (
-	// Convenience variable
-	le = binary.LittleEndian
 )
 
 // ReadVarInt reads the discriminator byte of a CompactSize int,
 // and then deserializes the number accordingly.
-func ReadVarInt(r io.Reader) (uint64, error) {
+func ReadVarInt(r *bytes.Buffer) (uint64, error) {
 	// Get discriminant from variable int
 	var d uint8
 	if err := ReadUint8(r, &d); err != nil {
@@ -25,7 +19,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 	var rv uint64
 	switch d {
 	case 0xff:
-		if err := ReadUint64(r, le, &rv); err != nil {
+		if err := ReadUint64LE(r, &rv); err != nil {
 			return 0, err
 		}
 
@@ -35,7 +29,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 		}
 	case 0xfe:
 		var v uint32
-		if err := ReadUint32(r, le, &v); err != nil {
+		if err := ReadUint32LE(r, &v); err != nil {
 			return 0, err
 		}
 		rv = uint64(v)
@@ -46,7 +40,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 		}
 	case 0xfd:
 		var v uint16
-		if err := ReadUint16(r, le, &v); err != nil {
+		if err := ReadUint16LE(r, &v); err != nil {
 			return 0, err
 		}
 		rv = uint64(v)
@@ -63,7 +57,7 @@ func ReadVarInt(r io.Reader) (uint64, error) {
 }
 
 // WriteVarInt writes a CompactSize integer with a number of bytes depending on it's value
-func WriteVarInt(w io.Writer, v uint64) error {
+func WriteVarInt(w *bytes.Buffer, v uint64) error {
 	if v < 0xfd {
 		return WriteUint8(w, uint8(v))
 	}
@@ -72,21 +66,21 @@ func WriteVarInt(w io.Writer, v uint64) error {
 		if err := WriteUint8(w, 0xfd); err != nil {
 			return err
 		}
-		return WriteUint16(w, le, uint16(v))
+		return WriteUint16LE(w, uint16(v))
 	}
 
 	if v <= 1<<32-1 {
 		if err := WriteUint8(w, 0xfe); err != nil {
 			return err
 		}
-		return WriteUint32(w, le, uint32(v))
+		return WriteUint32LE(w, uint32(v))
 	}
 
 	if err := WriteUint8(w, 0xff); err != nil {
 		return err
 	}
 
-	return WriteUint64(w, le, v)
+	return WriteUint64LE(w, v)
 }
 
 // VarIntEncodeSize returns the number of bytes needed to serialize a CompactSize int

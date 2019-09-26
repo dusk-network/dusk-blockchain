@@ -2,7 +2,6 @@ package reduction_test
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"testing"
 	"time"
@@ -13,9 +12,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +23,7 @@ import (
 var timeOut = 4000 * time.Millisecond
 
 func TestStress(t *testing.T) {
-	eventBus, _, _ := launchReductionTest(true, 25)
+	eventBus, _, _, k := launchReductionTest(true, 25)
 
 	// subscribe for the voteset
 	voteSetChan := make(chan *bytes.Buffer, 1)
@@ -40,15 +40,15 @@ func TestStress(t *testing.T) {
 		go func() {
 			// Blast the reducer with many more events than quorum, to see if anything will sneak in
 			for i := 1; i <= 50; i++ {
-				go sendReductionBuffers(50, hash, 1, uint8(i), eventBus)
+				go sendReductionBuffers(k, hash, 1, uint8(i), eventBus)
 			}
 		}()
 		sendSelection(1, hash, eventBus)
 
 		voteSetBuf := <-voteSetChan
 		// The vote set buffer will have a round as it's first item. Let's read it and discard it
-		var round uint64
-		if err := encoding.ReadUint64(voteSetBuf, binary.LittleEndian, &round); err != nil {
+		var n uint64
+		if err := encoding.ReadUint64LE(voteSetBuf, &n); err != nil {
 			t.Fatal(err)
 		}
 
@@ -71,7 +71,7 @@ func TestStress(t *testing.T) {
 
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
-	eventBus, streamer, _ := launchReductionTest(true, 2)
+	eventBus, streamer, _, k := launchReductionTest(true, 2)
 	go launchCandidateVerifier(false)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
@@ -82,8 +82,8 @@ func TestReduction(t *testing.T) {
 	sendSelection(1, hash, eventBus)
 
 	// send mocked events until we get a result from the outgoingAgreement channel
-	sendReductionBuffers(2, hash, 1, 1, eventBus)
-	sendReductionBuffers(2, hash, 1, 2, eventBus)
+	sendReductionBuffers(k, hash, 1, 1, eventBus)
+	sendReductionBuffers(k, hash, 1, 2, eventBus)
 
 	timer := time.AfterFunc(1*time.Second, func() {
 		t.Fatal("")
@@ -100,7 +100,7 @@ func TestReduction(t *testing.T) {
 
 // Test that the reducer does not send any messages when it is not part of the committee.
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
-	eventBus, streamer, _ := launchReductionTest(false, 2)
+	eventBus, streamer, _, _ := launchReductionTest(false, 2)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
@@ -127,7 +127,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 
 // Test that timeouts in the reduction phase result in proper behavior.
 func TestReductionTimeout(t *testing.T) {
-	eb, streamer, _ := launchReductionTest(true, 2)
+	eb, streamer, _, _ := launchReductionTest(true, 2)
 
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
@@ -156,7 +156,7 @@ func TestReductionTimeout(t *testing.T) {
 }
 
 func TestTimeOutVariance(t *testing.T) {
-	eb, _, _ := launchReductionTest(true, 2)
+	eb, _, _, _ := launchReductionTest(true, 2)
 
 	// subscribe to reduction results
 	resultChan := make(chan *bytes.Buffer, 1)
@@ -189,7 +189,7 @@ func TestTimeOutVariance(t *testing.T) {
 	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.1)
 
 	// update round
-	consensus.UpdateRound(eb, 2)
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, nil, nil))
 
 	// Wait a bit for the round update to go through
 	time.Sleep(200 * time.Millisecond)
@@ -209,7 +209,7 @@ func TestTimeOutVariance(t *testing.T) {
 }
 
 func launchCandidateVerifier(failVerification bool) {
-	r := <-wire.VerifyCandidateBlockChan
+	r := <-rpcbus.VerifyCandidateBlockChan
 	if failVerification {
 		r.ErrChan <- errors.New("verification failed")
 	} else {
@@ -217,35 +217,40 @@ func launchCandidateVerifier(failVerification bool) {
 	}
 }
 
-func launchReductionTest(inCommittee bool, quorum int) (*wire.EventBus, *helper.SimpleStreamer, user.Keys) {
+func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *helper.SimpleStreamer, user.Keys, []user.Keys) {
 	eb, streamer := helper.CreateGossipStreamer()
-	committeeMock := reduction.MockCommittee(quorum, inCommittee)
 	k, _ := user.NewRandKeys()
-	rpcBus := wire.NewRPCBus()
-	launchReduction(eb, committeeMock, k, timeOut, rpcBus)
+	rpcBus := rpcbus.New()
+	launchReduction(eb, k, timeOut, rpcBus)
 	// update round
-	consensus.UpdateRound(eb, 1)
+	p, keys := consensus.MockProvisioners(amount)
+	if inCommittee {
+		member := consensus.MockMember(k)
+		p.Set.Insert(k.BLSPubKeyBytes)
+		p.Members[string(k.BLSPubKeyBytes)] = member
+	}
 
-	return eb, streamer, k
+	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
+
+	return eb, streamer, k, keys
 }
 
 // Convenience function, which launches the reduction component and removes the
 // preprocessors for testing purposes (bypassing the republisher and the validator).
 // This ensures proper handling of mocked Reduction events.
-func launchReduction(eb *wire.EventBus, committee reduction.Reducers, k user.Keys, timeOut time.Duration, rpcBus *wire.RPCBus) {
-	reduction.Launch(eb, committee, k, timeOut, rpcBus)
+func launchReduction(eb *eventbus.EventBus, k user.Keys, timeOut time.Duration, rpcBus *rpcbus.RPCBus) {
+	reduction.Launch(eb, k, timeOut, rpcBus)
 	eb.RemoveAllPreprocessors(string(topics.Reduction))
 }
 
-func sendReductionBuffers(amount int, hash []byte, round uint64, step uint8, eventBus *wire.EventBus) {
-	for i := 0; i < amount; i++ {
-		k, _ := user.NewRandKeys()
-		ev := reduction.MockReductionBuffer(k, hash, round, step)
+func sendReductionBuffers(keys []user.Keys, hash []byte, round uint64, step uint8, eventBus *eventbus.EventBus) {
+	for i := 0; i < len(keys); i++ {
+		ev := reduction.MockReductionBuffer(keys[i], hash, round, step)
 		eventBus.Publish(string(topics.Reduction), ev)
 	}
 }
 
-func sendSelection(round uint64, hash []byte, eventBus *wire.EventBus) {
+func sendSelection(round uint64, hash []byte, eventBus *eventbus.EventBus) {
 	bestScoreBuf := selection.MockSelectionEventBuffer(round, hash)
 	eventBus.Publish(msg.BestScoreTopic, bestScoreBuf)
 }

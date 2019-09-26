@@ -1,4 +1,4 @@
-package wire
+package eventbus
 
 import (
 	"bytes"
@@ -11,29 +11,64 @@ import (
 	lg "github.com/sirupsen/logrus"
 )
 
-var _ EventBroker = (*EventBus)(nil)
+var _ Broker = (*EventBus)(nil)
 
 var ringBufferLength = 2000
 var napTime = 1 * time.Millisecond
 var _signal struct{}
 var logEB = lg.WithField("process", "eventbus")
 
-// EventBus - box for handlers and callbacks.
-type EventBus struct {
-	busLock          sync.RWMutex
-	handlers         *handlerMap
-	callbackHandlers *handlerMap
-	streamHandlers   *handlerMap
-	preprocessors    map[string][]idTopicProcessor
-}
+// TopicProcessor is the interface for preprocessing events belonging to a specific topic
+type (
+	TopicProcessor interface {
+		Process(*bytes.Buffer) (*bytes.Buffer, error)
+	}
+	// Preprocessor allows registration of preprocessors to be applied to incoming Event on a specific topic
+	Preprocessor interface {
+		RegisterPreprocessor(string, ...TopicProcessor) []uint32
+		RemovePreprocessor(string, uint32)
+		RemoveAllPreprocessors(string)
+	}
 
-type idTopicProcessor struct {
-	TopicProcessor
-	id uint32
-}
+	// Subscriber subscribes a channel to Event notifications on a specific topic
+	Subscriber interface {
+		Preprocessor
+		Subscribe(string, chan<- *bytes.Buffer) uint32
+		SubscribeCallback(string, func(*bytes.Buffer) error) uint32
+		SubscribeStream(string, io.WriteCloser) uint32
+		Unsubscribe(string, uint32)
+		// RegisterPreprocessor(string, ...TopicProcessor)
+	}
 
-// NewEventBus returns new EventBus with empty handlers.
-func NewEventBus() *EventBus {
+	// Publisher publishes serialized messages on a specific topic
+	Publisher interface {
+		Publish(string, *bytes.Buffer)
+		Stream(string, *bytes.Buffer)
+	}
+
+	// Broker is an Publisher and an Subscriber
+	Broker interface {
+		Subscriber
+		Publisher
+	}
+
+	// EventBus - box for handlers and callbacks.
+	EventBus struct {
+		busLock          sync.RWMutex
+		handlers         *handlerMap
+		callbackHandlers *handlerMap
+		streamHandlers   *handlerMap
+		preprocessors    map[string][]idTopicProcessor
+	}
+
+	idTopicProcessor struct {
+		TopicProcessor
+		id uint32
+	}
+)
+
+// New returns new EventBus with empty handlers.
+func New() *EventBus {
 	return &EventBus{
 		sync.RWMutex{},
 		newHandlerMap(),

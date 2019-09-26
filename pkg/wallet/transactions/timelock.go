@@ -7,6 +7,7 @@ import (
 )
 
 const MaxLockTime = 250000
+const GenesisExpirationHeight = 250001
 
 // TimeLock represents a standard transaction that has an additional time restriction
 // What does the time-lock represent?

@@ -6,6 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type Logger interface {
@@ -13,7 +14,7 @@ type Logger interface {
 }
 
 // LaunchLoggers should do a plugin lookup and use the Connect method. For now, it accepts Loggers as a parameter and the plugging is delegated to the caller until the plugin system will be ready
-func LaunchLoggers(eventBus *wire.EventBus, l []Logger) {
+func LaunchLoggers(eventBus *eventbus.EventBus, l []Logger) {
 	logChan := InitLogCollector(eventBus)
 	for _, logger := range l {
 		logger.Connect(logChan)
@@ -87,11 +88,14 @@ func (eu *UnMarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 		return err
 	}
 
-	if err := encoding.ReadString(b, &ev.Msg); err != nil {
+	var err error
+	ev.Msg, err = encoding.ReadString(b)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadString(b, &ev.Originator); err != nil {
+	ev.Originator, err = encoding.ReadString(b)
+	if err != nil {
 		return err
 	}
 
@@ -107,9 +111,9 @@ func (c *collector) Collect(b *bytes.Buffer) error {
 	return nil
 }
 
-func InitLogCollector(eventBus *wire.EventBus) chan *Event {
+func InitLogCollector(eventBus *eventbus.EventBus) chan *Event {
 	logChan := make(chan *Event, 100)
 	collector := &collector{logChan}
-	go wire.NewTopicListener(eventBus, collector, LogTopic).Accept()
+	go eventbus.NewTopicListener(eventBus, collector, LogTopic).Accept()
 	return logChan
 }

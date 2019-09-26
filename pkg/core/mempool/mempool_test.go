@@ -11,9 +11,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,8 +42,8 @@ type ctx struct {
 	mu         sync.Mutex
 
 	m      *Mempool
-	bus    *wire.EventBus
-	rpcBus *wire.RPCBus
+	bus    *eventbus.EventBus
+	rpcBus *rpcbus.RPCBus
 }
 
 func initCtx(t *testing.T) *ctx {
@@ -61,7 +62,7 @@ func initCtx(t *testing.T) *ctx {
 		var streamer *helper.SimpleStreamer
 		c.bus, streamer = helper.CreateGossipStreamer()
 		// creating the rpcbus
-		c.rpcBus = wire.NewRPCBus()
+		c.rpcBus = rpcbus.New()
 
 		c.propagated = make([][]byte, 0)
 
@@ -114,7 +115,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(wire.GetMempoolTxs, wire.NewRequest(bytes.Buffer{}, 1))
+	r, _ := c.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}, 1))
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 

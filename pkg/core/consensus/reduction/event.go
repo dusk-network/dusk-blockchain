@@ -57,11 +57,13 @@ func (u *UnMarshaller) Deserialize(b *bytes.Buffer) (wire.Event, error) {
 // Unmarshal unmarshals the buffer into a Reduction event.
 func (u *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	bev := ev.(*Reduction)
-	if err := u.UnMarshaller.Unmarshal(r, bev.Header); err != nil {
+	err := u.UnMarshaller.Unmarshal(r, bev.Header)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.ReadBLS(r, &bev.SignedHash); err != nil {
+	bev.SignedHash = make([]byte, 33)
+	if err = encoding.ReadBLS(r, bev.SignedHash); err != nil {
 		return err
 	}
 

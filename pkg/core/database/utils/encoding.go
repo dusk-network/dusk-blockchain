@@ -47,7 +47,7 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Tr
 	txIndex := uint32(math.MaxUint32)
 
 	var tx transactions.Transaction
-	reader := bytes.NewReader(data)
+	reader := bytes.NewBuffer(data)
 
 	// Peak the type from the first byte
 	typeBytes, err := reader.ReadByte()

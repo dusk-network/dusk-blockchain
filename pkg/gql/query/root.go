@@ -3,8 +3,9 @@ package query
 import (
 	"context"
 	"fmt"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"
 )
 
@@ -12,7 +13,7 @@ type Root struct {
 	Query *graphql.Object
 }
 
-func NewRoot(rpcBus *wire.RPCBus) *Root {
+func NewRoot(rpcBus *rpcbus.RPCBus) *Root {
 
 	m := mempool{rpcBus: rpcBus}
 

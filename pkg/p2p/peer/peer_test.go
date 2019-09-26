@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -16,6 +16,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,8 +44,8 @@ func TestReader(t *testing.T) {
 		client.Write(processed.Bytes())
 	}()
 
-	eb := wire.NewEventBus()
-	rpcBus := wire.NewRPCBus()
+	eb := eventbus.New()
+	rpcBus := rpcbus.New()
 	peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, chainsync.NewCounter(eb), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +63,7 @@ func TestReader(t *testing.T) {
 
 // Test the functionality of the peer.Writer through the use of the ring buffer.
 func TestWriteRingBuffer(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	g := processing.NewGossip(protocol.TestNet)
 	bus.RegisterPreprocessor(string(topics.Gossip), g)
 
@@ -83,7 +85,7 @@ func TestWriteRingBuffer(t *testing.T) {
 
 // Test the functionality of the peer.Writer through the use of the outgoing message queue.
 func TestWriteLoop(t *testing.T) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	client, srv := net.Pipe()
 
 	buf := makeAgreementBuffer(10)
@@ -109,7 +111,7 @@ func TestWriteLoop(t *testing.T) {
 }
 
 func BenchmarkWriter(b *testing.B) {
-	bus := wire.NewEventBus()
+	bus := eventbus.New()
 	g := processing.NewGossip(protocol.TestNet)
 	bus.RegisterPreprocessor(string(topics.Gossip), g)
 
@@ -131,13 +133,9 @@ func BenchmarkWriter(b *testing.B) {
 }
 
 func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
-	var keys []user.Keys
-	for i := 0; i < keyAmount; i++ {
-		keyPair, _ := user.NewRandKeys()
-		keys = append(keys, keyPair)
-	}
+	p, keys := consensus.MockProvisioners(keyAmount)
 
-	buf := agreement.MockAgreement(make([]byte, 32), 1, 2, keys)
+	buf := agreement.MockAgreement(make([]byte, 32), 1, 2, keys, p.CreateVotingCommittee(1, 2, keyAmount))
 	withTopic, err := wire.AddTopic(buf, topics.Agreement)
 	if err != nil {
 		panic(err)
@@ -146,7 +144,7 @@ func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 	return withTopic
 }
 
-func addPeer(bus *wire.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
+func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
 	client, srv := net.Pipe()
 	pw := peer.NewWriter(client, protocol.TestNet, bus)
 	go receiveFunc(srv)

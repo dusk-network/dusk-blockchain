@@ -2,10 +2,10 @@ package user
 
 import (
 	"encoding/binary"
+	"math"
 	"math/big"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
-	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/dusk-network/dusk-crypto/hash"
 )
 
@@ -23,7 +23,7 @@ func newCommittee() *VotingCommittee {
 }
 
 // Size returns how many members there are in a VotingCommittee.
-func (v *VotingCommittee) Size() int {
+func (v VotingCommittee) Size() int {
 	return len(v.Set)
 }
 
@@ -33,7 +33,7 @@ func (v *VotingCommittee) Remove(pk []byte) bool {
 }
 
 // MemberKeys returns the BLS public keys of all the members in a VotingCommittee.
-func (v *VotingCommittee) MemberKeys() [][]byte {
+func (v VotingCommittee) MemberKeys() [][]byte {
 	pks := make([][]byte, 0)
 	for _, pk := range v.Set {
 		pks = append(pks, pk.Bytes())
@@ -42,12 +42,12 @@ func (v *VotingCommittee) MemberKeys() [][]byte {
 }
 
 // Equal checks if two VotingCommittees are the same.
-func (v *VotingCommittee) Equal(other *VotingCommittee) bool {
+func (v VotingCommittee) Equal(other *VotingCommittee) bool {
 	return v.Set.Equal(other.Set)
 }
 
 // IsMember checks if `pubKeyBLS` is within the VotingCommittee.
-func (v *VotingCommittee) IsMember(pubKeyBLS []byte) bool {
+func (v VotingCommittee) IsMember(pubKeyBLS []byte) bool {
 	_, found := v.IndexOf(pubKeyBLS)
 	return found
 }
@@ -69,11 +69,9 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 
 // CreateVotingCommittee will run the deterministic sortition function, which determines
 // who will be in the committee for a given step and round.
-func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
-	step uint8, size int) *VotingCommittee {
-
+func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
-	W := new(big.Int).SetUint64(totalWeight)
+	W := new(big.Int).SetUint64(p.TotalWeight())
 
 	for i := 0; votingCommittee.Size() < size; i++ {
 		hash, err := createSortitionHash(round, step, i)
@@ -82,36 +80,36 @@ func (p *Provisioners) CreateVotingCommittee(round, totalWeight uint64,
 		}
 
 		score := generateSortitionScore(hash, W)
-		i, blsPk := p.extractCommitteeMember(score, round)
-		if !votingCommittee.Insert(blsPk.Marshal()) {
+		idx, blsPk := p.extractCommitteeMember(score)
+		if !votingCommittee.Insert(blsPk) {
 			for {
-				i++
-				if i >= p.Size(round) {
-					i = 0
+				idx++
+				if idx >= len(p.Members) {
+					idx = 0
 				}
-				m := p.MemberAt(i)
-				if votingCommittee.Insert(m.PublicKeyBLS.Marshal()) {
+				m := p.MemberAt(idx)
+				if votingCommittee.Insert(m.PublicKeyBLS) {
 					break
 				}
 			}
 		}
 	}
 
-	return votingCommittee
+	return *votingCommittee
 }
 
 // extractCommitteeMember walks through the committee set, while deducting
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a hexadecimal string.
-func (p *Provisioners) extractCommitteeMember(score, round uint64) (int, bls.PublicKey) {
+func (p Provisioners) extractCommitteeMember(score uint64) (int, []byte) {
 	for i := 0; ; i++ {
 		// make sure we wrap around the provisioners array
-		if i >= p.Size(round) {
+		if i >= len(p.Members) {
 			i = 0
 		}
 
 		m := p.MemberAt(i)
-		stake, err := p.GetStake(m.PublicKeyBLS.Marshal())
+		stake, err := p.GetStake(m.PublicKeyBLS)
 		if err != nil {
 			// If we get an error from GetStake, it means we either got a public key of a
 			// provisioner who is no longer in the set, or we got a malformed public key.
@@ -125,4 +123,18 @@ func (p *Provisioners) extractCommitteeMember(score, round uint64) (int, bls.Pub
 
 		score -= stake
 	}
+}
+
+func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size int) []VotingCommittee {
+	if step >= math.MaxUint8-amount {
+		amount = math.MaxUint8 - step
+	}
+
+	committees := make([]VotingCommittee, amount)
+	for i := 0; i < int(amount); i++ {
+		votingCommittee := p.CreateVotingCommittee(round, step+uint8(i), size)
+		committees[i] = votingCommittee
+	}
+
+	return committees
 }

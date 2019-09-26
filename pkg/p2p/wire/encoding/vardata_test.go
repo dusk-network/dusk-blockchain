@@ -48,8 +48,8 @@ func TestVarStringEncodeDecode(t *testing.T) {
 	}
 
 	// Deserialize
-	var rstr string
-	if err := ReadString(buf, &rstr); err != nil {
+	rstr, err := ReadString(buf)
+	if err != nil {
 		t.Fatal(err)
 	}
 

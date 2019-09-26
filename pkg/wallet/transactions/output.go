@@ -3,7 +3,6 @@ package transactions
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-wallet/key"
@@ -65,7 +64,7 @@ func sliceToScalar(b []byte) ristretto.Scalar {
 }
 
 // Encode an Output struct and write to w.
-func MarshalOutput(w io.Writer, o *Output) error {
+func MarshalOutput(w *bytes.Buffer, o *Output) error {
 	if err := encoding.Write256(w, o.Commitment.Bytes()); err != nil {
 		return err
 	}
@@ -86,15 +85,15 @@ func MarshalOutput(w io.Writer, o *Output) error {
 }
 
 // Decode an Output object from r into an output struct.
-func UnmarshalOutput(r io.Reader, o *Output) error {
-	var commBytes []byte
-	if err := encoding.Read256(r, &commBytes); err != nil {
+func UnmarshalOutput(r *bytes.Buffer, o *Output) error {
+	commBytes := make([]byte, 32)
+	if err := encoding.Read256(r, commBytes); err != nil {
 		return err
 	}
 	o.Commitment.UnmarshalBinary(commBytes)
 
-	var pubKeyBytes []byte
-	if err := encoding.Read256(r, &pubKeyBytes); err != nil {
+	pubKeyBytes := make([]byte, 32)
+	if err := encoding.Read256(r, pubKeyBytes); err != nil {
 		return err
 	}
 	o.PubKey.P.UnmarshalBinary(pubKeyBytes)

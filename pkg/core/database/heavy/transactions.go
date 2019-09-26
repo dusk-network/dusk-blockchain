@@ -291,7 +291,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	header := block.NewHeader()
-	err = block.UnmarshalHeader(bytes.NewReader(value), header)
+	err = block.UnmarshalHeader(bytes.NewBuffer(value), header)
 
 	if err != nil {
 		return nil, err
@@ -498,7 +498,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 
 	if iterator.First() {
 		b := block.NewBlock()
-		if err := block.Unmarshal(bytes.NewReader(iterator.Value()), b); err != nil {
+		if err := block.Unmarshal(bytes.NewBuffer(iterator.Value()), b); err != nil {
 			return nil, err
 		}
 
