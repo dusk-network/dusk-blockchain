@@ -111,9 +111,9 @@ func TestExitChan(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	var closed bool
-	handlers := eb.streamHandlers.Load(topic)
-	for _, handler := range handlers {
-		sh := handler.(*streamHandler)
+	dispatchers := eb.streamDispatchers.Load(topic)
+	for _, dispatcher := range dispatchers {
+		sh := dispatcher.(*streamDispatcher)
 		closed = sh.ringbuffer.Closed()
 	}
 

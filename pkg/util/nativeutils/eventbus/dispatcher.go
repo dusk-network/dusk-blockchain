@@ -12,30 +12,31 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Handler publishes a byte array that subscribers of the EventBus can use
-type Handler interface {
-	Publish(*bytes.Buffer) error
+// Dispatcher publishes a byte array that subscribers of the EventBus can use
+type Dispatcher interface {
+	// TODO: Publish should pass the buffer by value rather than by reference
+	// to prevent ad hoc copying the buffer
+	Publish(bytes.Buffer) error
 	Close()
 }
 
-type callbackHandler struct {
+type callbackDispatcher struct {
 	callback func(*bytes.Buffer) error
 }
 
-func (c *callbackHandler) Publish(m *bytes.Buffer) error {
-	mCopy := copyBuffer(m)
-	return c.callback(mCopy)
+func (c *callbackDispatcher) Publish(m bytes.Buffer) error {
+	return c.callback(&m)
 }
 
-func (c *callbackHandler) Close() {
+func (c *callbackDispatcher) Close() {
 }
 
-type streamHandler struct {
+type streamDispatcher struct {
 	topic      string
 	ringbuffer *ring.Buffer
 }
 
-func (s *streamHandler) Publish(m *bytes.Buffer) error {
+func (s *streamDispatcher) Publish(m bytes.Buffer) error {
 	if s.ringbuffer == nil {
 		return errors.New("no ringbuffer specified")
 	}
@@ -43,20 +44,19 @@ func (s *streamHandler) Publish(m *bytes.Buffer) error {
 	return nil
 }
 
-func (s *streamHandler) Close() {
+func (s *streamDispatcher) Close() {
 	if s.ringbuffer != nil {
 		s.ringbuffer.Close()
 	}
 }
 
-type channelHandler struct {
+type channelDispatcher struct {
 	messageChannel chan<- *bytes.Buffer
 }
 
-func (c *channelHandler) Publish(m *bytes.Buffer) error {
-	mCopy := copyBuffer(m)
+func (c *channelDispatcher) Publish(m bytes.Buffer) error {
 	select {
-	case c.messageChannel <- mCopy:
+	case c.messageChannel <- &m:
 	default:
 		return errors.New("message channel buffer is full")
 	}
@@ -64,19 +64,19 @@ func (c *channelHandler) Publish(m *bytes.Buffer) error {
 	return nil
 }
 
-func (c *channelHandler) Close() {
+func (c *channelDispatcher) Close() {
 }
 
 type multiDispatcher struct {
 	sync.RWMutex
 	*hashset.Set
-	dispatchers []idHandler
+	dispatchers []idDispatcher
 }
 
 func newMultiDispatcher() *multiDispatcher {
 	return &multiDispatcher{
 		Set:         hashset.New(),
-		dispatchers: make([]idHandler, 0),
+		dispatchers: make([]idDispatcher, 0),
 	}
 }
 
@@ -94,16 +94,16 @@ func (m *multiDispatcher) Publish(topic string, r bytes.Buffer) {
 
 		m.RLock()
 		for _, dispatcher := range m.dispatchers {
-			dispatcher.Publish(tpcMsg)
+			dispatcher.Publish(*tpcMsg)
 		}
 		m.RUnlock()
 	}
 }
 
-func (m *multiDispatcher) Store(value Handler) uint32 {
-	h := idHandler{
-		Handler: value,
-		id:      rand.Uint32(),
+func (m *multiDispatcher) Store(value Dispatcher) uint32 {
+	h := idDispatcher{
+		Dispatcher: value,
+		id:         rand.Uint32(),
 	}
 	m.Lock()
 	m.dispatchers = append(m.dispatchers, h)

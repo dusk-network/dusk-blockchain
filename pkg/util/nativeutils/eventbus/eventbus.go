@@ -52,14 +52,14 @@ type (
 		Publisher
 	}
 
-	// EventBus - box for handlers and callbacks.
+	// EventBus - box for dispatchers and callbacks.
 	EventBus struct {
-		busLock           sync.RWMutex
-		handlers          *handlerMap
-		callbackHandlers  *handlerMap
-		streamHandlers    *handlerMap
-		defaultDispatcher *multiDispatcher
-		preprocessors     map[string][]idTopicProcessor
+		busLock             sync.RWMutex
+		dispatchers         *dispatcherMap
+		callbackDispatchers *dispatcherMap
+		streamDispatchers   *dispatcherMap
+		defaultDispatcher   *multiDispatcher
+		preprocessors       map[string][]idTopicProcessor
 	}
 
 	idTopicProcessor struct {
@@ -68,15 +68,15 @@ type (
 	}
 )
 
-// New returns new EventBus with empty handlers.
+// New returns new EventBus with empty dispatchers.
 func New() *EventBus {
 	return &EventBus{
-		busLock:           sync.RWMutex{},
-		handlers:          newHandlerMap(),
-		callbackHandlers:  newHandlerMap(),
-		streamHandlers:    newHandlerMap(),
-		defaultDispatcher: newMultiDispatcher(),
-		preprocessors:     make(map[string][]idTopicProcessor),
+		busLock:             sync.RWMutex{},
+		dispatchers:         newDispatcherMap(),
+		callbackDispatchers: newDispatcherMap(),
+		streamDispatchers:   newDispatcherMap(),
+		defaultDispatcher:   newMultiDispatcher(),
+		preprocessors:       make(map[string][]idTopicProcessor),
 	}
 }
 
@@ -89,17 +89,17 @@ func (bus *EventBus) AddDefaultTopic(topic string) {
 // This is normally useful for implementing a sub-dispatching mechanism
 // (i.e. bus of busses architecture)
 func (bus *EventBus) SubscribeDefault(callback func(m *bytes.Buffer) error) uint32 {
-	return bus.defaultDispatcher.Store(&callbackHandler{callback})
+	return bus.defaultDispatcher.Store(&callbackDispatcher{callback})
 }
 
 // Subscribe subscribes to a topic with a channel.
 func (bus *EventBus) Subscribe(topic string, messageChannel chan<- *bytes.Buffer) uint32 {
-	return bus.handlers.Store(topic, &channelHandler{messageChannel})
+	return bus.dispatchers.Store(topic, &channelDispatcher{messageChannel})
 }
 
 // SubscribeCallback subscribes to a topic with a callback.
 func (bus *EventBus) SubscribeCallback(topic string, callback func(*bytes.Buffer) error) uint32 {
-	return bus.callbackHandlers.Store(topic, &callbackHandler{callback})
+	return bus.callbackDispatchers.Store(topic, &callbackDispatcher{callback})
 }
 
 // SubscribeStream subscribes to a topic with a stream.
@@ -107,15 +107,15 @@ func (bus *EventBus) SubscribeStream(topic string, w io.WriteCloser) uint32 {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
 
-	// Each streamHandler uses its own ringBuffer to collect topic events
+	// Each streamDispatcher uses its own ringBuffer to collect topic events
 	// Multiple-producers single-consumer approach utilizing a ringBuffer
 	ringBuf := ring.NewBuffer(ringBufferLength)
-	sh := &streamHandler{topic, ringBuf}
+	sh := &streamDispatcher{topic, ringBuf}
 
 	// single-consumer
 	_ = ring.NewConsumer(ringBuf, Consume, w)
 
-	return bus.streamHandlers.Store(topic, sh)
+	return bus.streamDispatchers.Store(topic, sh)
 }
 
 // Consume an item by writing it to the specified WriteCloser
@@ -130,11 +130,11 @@ func Consume(items [][]byte, w io.WriteCloser) bool {
 	return true
 }
 
-// Unsubscribe removes a handler defined for a topic.
+// Unsubscribe removes a dispatcher defined for a topic.
 func (bus *EventBus) Unsubscribe(topic string, id uint32) {
-	found := bus.handlers.Delete(topic, id) ||
-		bus.callbackHandlers.Delete(topic, id) ||
-		bus.streamHandlers.Delete(topic, id)
+	found := bus.dispatchers.Delete(topic, id) ||
+		bus.callbackDispatchers.Delete(topic, id) ||
+		bus.streamDispatchers.Delete(topic, id)
 
 	logEB.WithFields(lg.Fields{
 		"found": found,
@@ -205,28 +205,36 @@ func (bus *EventBus) preprocess(topic string, messageBuffer *bytes.Buffer) (*byt
 
 // Publish executes callback defined for a topic.
 func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
+	var event bytes.Buffer
 	processedMsg, err := bus.preprocess(topic, messageBuffer)
 	if err != nil {
 		logEB.WithError(err).Errorln("preprocessor error")
 		return
 	}
 
-	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
-	if messageBuffer != nil {
-		go bus.defaultDispatcher.Publish(topic, *messageBuffer)
+	if processedMsg != nil {
+		event = *processedMsg
 	}
 
-	if handlers := bus.handlers.Load(topic); handlers != nil {
-		for _, handler := range handlers {
-			if err := handler.Publish(processedMsg); err != nil {
-				logEB.WithField("topic", topic).Warnln("handler.messageChannel buffer failed")
+	bus.publish(topic, event)
+}
+
+func (bus *EventBus) publish(topic string, event bytes.Buffer) {
+
+	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
+	go bus.defaultDispatcher.Publish(topic, event)
+
+	if dispatchers := bus.dispatchers.Load(topic); dispatchers != nil {
+		for _, dispatcher := range dispatchers {
+			if err := dispatcher.Publish(event); err != nil {
+				logEB.WithField("topic", topic).Warnln("dispatcher.messageChannel buffer failed")
 			}
 		}
 	}
 
-	if callbackHandlers := bus.callbackHandlers.Load(topic); callbackHandlers != nil {
-		for _, handler := range callbackHandlers {
-			if err := handler.Publish(processedMsg); err != nil {
+	if callbackDispatchers := bus.callbackDispatchers.Load(topic); callbackDispatchers != nil {
+		for _, dispatcher := range callbackDispatchers {
+			if err := dispatcher.Publish(event); err != nil {
 				logEB.WithError(err).WithField("topic", topic).Warnln("error when triggering callback")
 			}
 		}
@@ -241,11 +249,11 @@ func (bus *EventBus) Stream(topic string, messageBuffer *bytes.Buffer) {
 		return
 	}
 
-	// The handlers are simply a means to avoid memory leaks.
-	handlers := bus.streamHandlers.Load(topic)
-	for _, handler := range handlers {
-		if err := handler.Publish(processedMsg); err != nil {
-			logEB.WithError(err).WithField("topic", topic).Debugln("cannot publish event on streamhandler")
+	// The dispatchers are simply a means to avoid memory leaks.
+	dispatchers := bus.streamDispatchers.Load(topic)
+	for _, dispatcher := range dispatchers {
+		if err := dispatcher.Publish(*processedMsg); err != nil {
+			logEB.WithError(err).WithField("topic", topic).Debugln("cannot publish event on streamdispatcher")
 			continue
 		}
 	}
