@@ -123,6 +123,7 @@ func (c *Chain) LaunchConsensus() {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	c.sendRoundUpdate(round, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
+	c.eventBus.Unsubscribe(msg.InitializationTopic, id)
 }
 
 func (c *Chain) propagateBlock(blk block.Block) error {
