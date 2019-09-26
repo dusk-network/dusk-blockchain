@@ -71,12 +71,12 @@ type (
 // New returns new EventBus with empty handlers.
 func New() *EventBus {
 	return &EventBus{
-		sync.RWMutex{},
-		newHandlerMap(),
-		newHandlerMap(),
-		newHandlerMap(),
-		newMultiDispatcher(),
-		make(map[string][]idTopicProcessor),
+		busLock:           sync.RWMutex{},
+		handlers:          newHandlerMap(),
+		callbackHandlers:  newHandlerMap(),
+		streamHandlers:    newHandlerMap(),
+		defaultDispatcher: newMultiDispatcher(),
+		preprocessors:     make(map[string][]idTopicProcessor),
 	}
 }
 
@@ -212,7 +212,9 @@ func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	}
 
 	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
-	go bus.defaultDispatcher.Publish(topic, *messageBuffer)
+	if messageBuffer != nil {
+		go bus.defaultDispatcher.Publish(topic, *messageBuffer)
+	}
 
 	if handlers := bus.handlers.Load(topic); handlers != nil {
 		for _, handler := range handlers {
