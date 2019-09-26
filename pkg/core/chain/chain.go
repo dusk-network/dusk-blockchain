@@ -118,11 +118,10 @@ func (c *Chain) Listen() {
 func (c *Chain) LaunchConsensus() {
 	initChan := make(chan *bytes.Buffer, 1)
 	id := c.eventBus.Subscribe(msg.InitializationTopic, initChan)
-	roundBuf := <-initChan
-	round := binary.LittleEndian.Uint64(roundBuf.Bytes())
+	<-initChan
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	c.sendRoundUpdate(round, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
+	c.sendRoundUpdate(c.prevBlock.Header.Height+1, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
 	c.eventBus.Unsubscribe(msg.InitializationTopic, id)
 }
 
