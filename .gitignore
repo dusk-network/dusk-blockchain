@@ -30,3 +30,6 @@ demo/**.*
 
 # wallet.dat
 *wallet.dat
+
+# voucher ips, which gets created by the test harness
+*voucherips.txt
