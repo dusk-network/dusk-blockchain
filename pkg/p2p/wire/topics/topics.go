@@ -56,6 +56,14 @@ func TopicToByteArray(cmd Topic) [Size]byte {
 	return bs
 }
 
+// StringToTopic returns a Topic from a string representation
+// It supports only 15 characters topic names. It truncates the rest
+func StringToTopic(tpc string) Topic {
+	var cmd [Size]byte
+	copy(cmd[:], []byte(tpc))
+	return ByteArrayToTopic(cmd)
+}
+
 // ByteArrayToTopic turns a byte array of size 15 into a Topic,
 // for populating a received message header.
 func ByteArrayToTopic(cmd [Size]byte) Topic {
@@ -94,6 +102,7 @@ func Peek(p io.Reader) (Topic, error) {
 	return ByteArrayToTopic(cmdBuf), nil
 }
 
+// Write a topic to a Writer
 func Write(r io.Writer, topic Topic) error {
 	topicBytes := TopicToByteArray(topic)
 	if _, err := r.Write(topicBytes[:]); err != nil {
