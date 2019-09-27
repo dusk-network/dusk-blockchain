@@ -10,6 +10,38 @@ import (
 	"time"
 )
 
+// GenerateTLSServerConfig will provide a configuration for a TLS server, given some optional paths for certificates. If the provided paths are empty, the certificate will be fetched from GenerateX509Certificate
+func GenerateTLSServerConfig(certFile, keyFile string) (*tls.Config, error) {
+	var tlsCert *tls.Certificate
+	var err error
+
+	if len(certFile) > 0 {
+
+		// Fetch certificate from config
+		tlsCertFromFile, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsCert = &tlsCertFromFile
+	} else {
+
+		// Generate self-signed certificate
+		tlsCert, err = GenerateTLSCertificate()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Define TLS configuration
+	tlsConfig := tls.Config{
+		Certificates:       []tls.Certificate{*tlsCert},
+		MinVersion:         tls.VersionTLS13,
+		InsecureSkipVerify: true,
+	}
+
+	return &tlsConfig, nil
+}
+
 // GenerateX509Certificate will create a new x509 self signed certificate with ed25519 private key. It will expire in 1 year
 func GenerateX509Certificate() (*x509.Certificate, *ed25519.PrivateKey, error) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)

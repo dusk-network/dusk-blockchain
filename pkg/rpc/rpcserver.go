@@ -82,33 +82,12 @@ func (s *Server) Start() error {
 		}
 	}
 
-	var tlsCert *tls.Certificate
-	var err error
-
+	// Define TLS configuration
 	certFile := cfg.Get().RPC.CertFile
 	keyFile := cfg.Get().RPC.KeyFile
-
-	if len(certFile) > 0 {
-
-		// Fetch certificate from config
-		tlsCertFromFile, err := tls.LoadX509KeyPair(certFile, keyFile)
-		if err != nil {
-			return err
-		}
-		tlsCert = &tlsCertFromFile
-	} else {
-
-		// Generate self-signed certificate
-		tlsCert, err = cryptoUtils.GenerateTLSCertificate()
-		if err != nil {
-			return err
-		}
-	}
-
-	// Define TLS configuration
-	tlsConfig := tls.Config{
-		Certificates:       []tls.Certificate{*tlsCert},
-		InsecureSkipVerify: true,
+	tlsConfig, err := cryptoUtils.GenerateTLSServerConfig(certFile, keyFile)
+	if err != nil {
+		return err
 	}
 
 	// Set up tls listener socket
@@ -120,7 +99,7 @@ func (s *Server) Start() error {
 	}
 
 	// Start to listen on socket
-	l, err := tls.Listen(network, bindSocket, &tlsConfig)
+	l, err := tls.Listen(network, bindSocket, tlsConfig)
 	if err != nil {
 		return err
 	}
