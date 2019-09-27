@@ -139,7 +139,7 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Req) error {
 	}
 
 	// create and sign transaction
-	log.Tracef("Create a bid tx ( %d, %d)", amount, lockTime)
+	log.Tracef("Create a bid tx (%d,%d)", amount, lockTime)
 
 	tx, err := t.CreateBidTx(amount, lockTime)
 	if err != nil {
@@ -174,7 +174,7 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Req) error {
 	}
 
 	// create and sign transaction
-	log.Tracef("Create a stake tx ( %d, %d)", amount, lockTime)
+	log.Tracef("Create a stake tx (%d,%d)", amount, lockTime)
 
 	tx, err := t.CreateStakeTx(amount, lockTime)
 	if err != nil {

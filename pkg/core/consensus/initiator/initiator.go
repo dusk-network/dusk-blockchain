@@ -30,7 +30,7 @@ func LaunchConsensus(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wall
 	// TODO: sync first
 	startBlockGenerator(eventBroker, rpcBus, w)
 	startProvisioner(eventBroker, rpcBus, w, counter)
-	if err := launchMaintainer(eventBroker, w); err != nil {
+	if err := launchMaintainer(eventBroker, rpcBus, w); err != nil {
 		fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
 	}
 }
@@ -134,7 +134,7 @@ func syncToTip(acceptedBlockChan <-chan block.Block, counter *chainsync.Counter)
 	}
 }
 
-func launchMaintainer(eventBroker eventbus.Broker, w *wallet.Wallet) error {
+func launchMaintainer(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
 	r := cfg.Get()
 	amount := r.Consensus.DefaultAmount
 	lockTime := r.Consensus.DefaultLockTime
@@ -149,7 +149,7 @@ func launchMaintainer(eventBroker eventbus.Broker, w *wallet.Wallet) error {
 		return err
 	}
 
-	m, err := maintainer.New(eventBroker, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), amount, lockTime, offset)
+	m, err := maintainer.New(eventBroker, rpcBus, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), amount, lockTime, offset)
 	if err != nil {
 		return err
 	}
