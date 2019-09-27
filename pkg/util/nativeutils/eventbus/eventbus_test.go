@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,6 +35,46 @@ func TestUnsubscribe(t *testing.T) {
 		assert.FailNow(t, "We should have not received message")
 	case <-time.After(50 * time.Millisecond):
 		// success
+	}
+}
+
+func TestDefaultDispatcher(t *testing.T) {
+	eb := New()
+	msgChan := make(chan struct {
+		topic string
+		buf   bytes.Buffer
+	})
+
+	cb := func(r *bytes.Buffer) error {
+		tpc, _ := topics.Extract(r)
+
+		msgChan <- struct {
+			topic string
+			buf   bytes.Buffer
+		}{string(tpc), *r}
+		return nil
+	}
+
+	eb.AddDefaultTopic("pippo")
+	eb.AddDefaultTopic("paperino")
+	eb.SubscribeDefault(cb)
+
+	eb.Publish("pippo", bytes.NewBufferString("pluto"))
+	msg := <-msgChan
+	assert.Equal(t, "pippo", msg.topic)
+	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
+
+	eb.Publish("paperino", bytes.NewBufferString("pluto"))
+	msg = <-msgChan
+	assert.Equal(t, "paperino", msg.topic)
+	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
+
+	eb.Publish("test", bytes.NewBufferString("pluto"))
+	select {
+	case <-msgChan:
+		t.FailNow()
+	case <-time.After(100 * time.Millisecond):
+		//all good
 	}
 }
 
@@ -70,9 +111,9 @@ func TestExitChan(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	var closed bool
-	handlers := eb.streamHandlers.Load(topic)
-	for _, handler := range handlers {
-		sh := handler.(*streamHandler)
+	dispatchers := eb.streamDispatchers.Load(topic)
+	for _, dispatcher := range dispatchers {
+		sh := dispatcher.(*streamDispatcher)
 		closed = sh.ringbuffer.Closed()
 	}
 
