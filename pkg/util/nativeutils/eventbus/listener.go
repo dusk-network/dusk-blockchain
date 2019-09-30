@@ -15,9 +15,9 @@ import (
 
 // Listener publishes a byte array that subscribers of the EventBus can use
 type Listener interface {
-	// TODO: Publish should pass the buffer by value rather than by reference
-	// to prevent ad hoc copying the buffer
+	// Notify a listener of a new message
 	Notify(bytes.Buffer) error
+	// Close the listener
 	Close()
 }
 

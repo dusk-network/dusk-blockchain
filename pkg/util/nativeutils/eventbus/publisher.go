@@ -14,7 +14,8 @@ type Publisher interface {
 // Publish executes callback defined for a topic.
 func (bus *EventBus) Publish(topic string, messageBuffer *bytes.Buffer) {
 	if messageBuffer == nil {
-		logEB.WithError(fmt.Errorf("got a nil message on topic: ", topic)).Errorln("preprocessor error")
+		err := fmt.Errorf("got a nil message on topic %s", topic)
+		logEB.WithError(err).Errorln("preprocessor error")
 		return
 	}
 
@@ -34,7 +35,7 @@ func (bus *EventBus) publish(topic string, event bytes.Buffer) {
 	if listeners := bus.listeners.Load(topic); listeners != nil {
 		for _, listener := range listeners {
 			if err := listener.Notify(event); err != nil {
-				logEB.WithField("topic", topic).Warnln("listener.messageChannel buffer failed")
+				logEB.WithField("topic", topic).Warnln("listener failed to notidy buffer")
 			}
 		}
 	}

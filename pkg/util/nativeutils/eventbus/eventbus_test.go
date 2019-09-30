@@ -17,8 +17,9 @@ func TestNewEventBus(t *testing.T) {
 
 func TestSubscribe(t *testing.T) {
 	eb := New()
-	myChan := make(chan *bytes.Buffer, 10)
-	assert.NotNil(t, eb.Subscribe("whateverTopic", myChan))
+	myChan := make(chan bytes.Buffer, 10)
+	cl := NewChanListener(myChan)
+	assert.NotNil(t, eb.Subscribe("whateverTopic", cl))
 }
 
 func TestPublish(t *testing.T) {
@@ -27,9 +28,11 @@ func TestPublish(t *testing.T) {
 
 func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
+
 	eb.Unsubscribe("whateverTopic", id)
 
 	eb.Publish("whateverTopic", bytes.NewBufferString("whatever2"))
+
 	select {
 	case <-myChan:
 		assert.FailNow(t, "We should have not received message")
@@ -38,20 +41,20 @@ func TestUnsubscribe(t *testing.T) {
 	}
 }
 
-func TestDefaultDispatcher(t *testing.T) {
+func TestDefaultListener(t *testing.T) {
 	eb := New()
 	msgChan := make(chan struct {
 		topic string
 		buf   bytes.Buffer
 	})
 
-	cb := func(r *bytes.Buffer) error {
-		tpc, _ := topics.Extract(r)
+	cb := func(r bytes.Buffer) error {
+		tpc, _ := topics.Extract(&r)
 
 		msgChan <- struct {
 			topic string
 			buf   bytes.Buffer
-		}{string(tpc), *r}
+		}{string(tpc), r}
 		return nil
 	}
 
@@ -78,13 +81,14 @@ func TestDefaultDispatcher(t *testing.T) {
 	}
 }
 
-func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
+func newEB(t *testing.T) (*EventBus, chan bytes.Buffer, uint32) {
 	eb := New()
-	myChan := make(chan *bytes.Buffer, 10)
-	id := eb.Subscribe("whateverTopic", myChan)
+	myChan := make(chan bytes.Buffer, 10)
+	cl := NewChanListener(myChan)
+	id := eb.Subscribe("whateverTopic", cl)
 	assert.NotNil(t, id)
-
-	eb.Publish("whateverTopic", bytes.NewBufferString("whatever"))
+	b := bytes.NewBufferString("whatever")
+	eb.Publish("whateverTopic", b)
 
 	select {
 	case received := <-myChan:
@@ -98,26 +102,29 @@ func newEB(t *testing.T) (*EventBus, chan *bytes.Buffer, uint32) {
 
 // Test that a streaming goroutine is killed when the exit signal is sent
 func TestExitChan(t *testing.T) {
-
 	eb := New()
 	topic := "foo"
-	_ = eb.SubscribeStream(topic, &mockWriteCloser{})
+	sl := NewStreamListener(&mockWriteCloser{})
+	_ = eb.Subscribe(topic, sl)
+
 	// Put something on ring buffer
 	val := new(bytes.Buffer)
 	val.Write([]byte{0})
-	eb.Stream(topic, val)
+	eb.Publish(topic, val)
 	// Wait for event to be handled
 	// NB: 'Writer' must return error to force consumer termination
 	time.Sleep(100 * time.Millisecond)
 
-	var closed bool
-	dispatchers := eb.streamDispatchers.Load(topic)
-	for _, dispatcher := range dispatchers {
-		sh := dispatcher.(*streamDispatcher)
-		closed = sh.ringbuffer.Closed()
+	l := eb.listeners.Load(topic)
+	for _, listener := range l {
+		if streamer, ok := listener.Listener.(*StreamListener); ok {
+			if !assert.True(t, streamer.ringbuffer.Closed()) {
+				assert.FailNow(t, "ringbuffer not closed")
+			}
+			return
+		}
 	}
-
-	assert.True(t, closed)
+	assert.FailNow(t, "stream listener not found")
 }
 
 type mockWriteCloser struct {
