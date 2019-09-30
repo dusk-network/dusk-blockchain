@@ -139,7 +139,7 @@ func launchMaintainer(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wal
 	amount := r.Consensus.DefaultAmount
 	lockTime := r.Consensus.DefaultLockTime
 	if lockTime > transactions.MaxLockTime {
-		log.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v\n", lockTime, transactions.MaxLockTime)
+		log.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
 		lockTime = transactions.MaxLockTime
 	}
 
@@ -149,6 +149,7 @@ func launchMaintainer(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wal
 		return err
 	}
 
+	log.Infof("maintainer is starting with amount,locktime (%v,%v)", amount, lockTime)
 	m, err := maintainer.New(eventBroker, rpcBus, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), amount, lockTime, offset)
 	if err != nil {
 		return err
