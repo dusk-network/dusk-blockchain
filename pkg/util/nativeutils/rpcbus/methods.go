@@ -8,14 +8,24 @@ import (
 
 func (rb *RPCBus) LoadWallet(password string) (string, error) {
 
-	pBuf := bytes.NewBufferString(password)
-	req := NewRequest(*pBuf, -1)
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, password); err != nil {
+		return "", err
+	}
+
+	req := NewRequest(*buf, -1)
 	pubKeyBuf, err := rb.Call(LoadWallet, req)
 	if err != nil {
 		return "", err
 	}
 
-	return pubKeyBuf.String(), nil
+	var pubKey string
+	pubKey, err = encoding.ReadString(&pubKeyBuf)
+	if err != nil {
+		return "", err
+	}
+
+	return pubKey, nil
 }
 
 func (rb *RPCBus) CreateFromSeed(seed, password string) (string, error) {
@@ -35,7 +45,13 @@ func (rb *RPCBus) CreateFromSeed(seed, password string) (string, error) {
 		return "", err
 	}
 
-	return pubKeyBuf.String(), nil
+	var pubKey string
+	pubKey, err = encoding.ReadString(&pubKeyBuf)
+	if err != nil {
+		return "", err
+	}
+
+	return pubKey, nil
 }
 
 func (rb *RPCBus) CreateWallet(password string) (string, error) {
@@ -51,7 +67,13 @@ func (rb *RPCBus) CreateWallet(password string) (string, error) {
 		return "", err
 	}
 
-	return pubKeyBuf.String(), nil
+	var pubKey string
+	pubKey, err = encoding.ReadString(&pubKeyBuf)
+	if err != nil {
+		return "", err
+	}
+
+	return pubKey, nil
 }
 
 func (rb *RPCBus) SendBidTx(amount, lockTime uint64) ([]byte, error) {
@@ -74,45 +96,45 @@ func (rb *RPCBus) SendBidTx(amount, lockTime uint64) ([]byte, error) {
 	return txIdBuf.Bytes(), nil
 }
 
-func (rb *RPCBus) SendStakeTx(amount, lockTime uint64) (string, error) {
+func (rb *RPCBus) SendStakeTx(amount, lockTime uint64) ([]byte, error) {
 
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, amount); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := encoding.WriteUint64LE(buf, lockTime); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req := NewRequest(*buf, -1)
 	txIdBuf, err := rb.Call(SendStakeTx, req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return txIdBuf.String(), nil
+	return txIdBuf.Bytes(), nil
 }
 
-func (rb *RPCBus) SendStandardTx(amount uint64, pubkey string) (string, error) {
+func (rb *RPCBus) SendStandardTx(amount uint64, pubkey string) ([]byte, error) {
 
 	buf := new(bytes.Buffer)
 
 	if err := encoding.WriteUint64LE(buf, amount); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := encoding.WriteString(buf, pubkey); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req := NewRequest(*buf, -1)
 	txIdBuf, err := rb.Call(SendStandardTx, req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return txIdBuf.String(), nil
+	return txIdBuf.Bytes(), nil
 }
 
 func (rb *RPCBus) GetBalance() (uint64, error) {

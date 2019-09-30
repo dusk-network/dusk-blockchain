@@ -139,7 +139,7 @@ func launchMaintainer(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wal
 	amount := r.Consensus.DefaultAmount
 	lockTime := r.Consensus.DefaultLockTime
 	if lockTime > transactions.MaxLockTime {
-		fmt.Fprintf(os.Stdout, "default locktime was configured to be greater than the maximum (%v) - defaulting to %v\n", lockTime, transactions.MaxLockTime)
+		log.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v\n", lockTime, transactions.MaxLockTime)
 		lockTime = transactions.MaxLockTime
 	}
 

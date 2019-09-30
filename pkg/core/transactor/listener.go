@@ -2,12 +2,13 @@ package transactor
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -43,9 +44,9 @@ func (t *Transactor) Listen() {
 		case r := <-getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
 
-			// Event list to handle
-			//case blk := <-t.acceptedBlockChan:
-			//	b.onAcceptedBlockEvent(blk)
+		// Event list to handle
+		case b := <-t.accepted.blockChan:
+			t.onAcceptedBlockEvent(b)
 		}
 	}
 }
@@ -68,13 +69,23 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
 		return errWalletAlreadyLoaded
 	}
 
-	pubKey, err := t.createWallet(r.Params.String())
+	var password string
+	password, err := encoding.ReadString(&r.Params)
 	if err != nil {
 		return err
 	}
 
-	result := bytes.NewBufferString(pubKey)
-	r.RespChan <- *result
+	pubKey, err := t.createWallet(password)
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, pubKey); err != nil {
+		return err
+	}
+
+	r.RespChan <- *buf
 
 	return nil
 }
@@ -84,7 +95,13 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 		return errWalletAlreadyLoaded
 	}
 
-	pubKey, err := t.loadWallet(r.Params.String())
+	var password string
+	password, err := encoding.ReadString(&r.Params)
+	if err != nil {
+		return err
+	}
+
+	pubKey, err := t.loadWallet(password)
 	if err != nil {
 		return err
 	}
@@ -93,8 +110,12 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}
 
-	result := bytes.NewBufferString(pubKey)
-	r.RespChan <- *result
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, pubKey); err != nil {
+		return err
+	}
+
+	r.RespChan <- *buf
 
 	return nil
 }
@@ -104,8 +125,17 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
 		return errWalletAlreadyLoaded
 	}
 
-	seed := r.Params.String()
-	password := r.Params.String()
+	var seed string
+	seed, err := encoding.ReadString(&r.Params)
+	if err != nil {
+		return err
+	}
+
+	var password string
+	password, err = encoding.ReadString(&r.Params)
+	if err != nil {
+		return err
+	}
 
 	pubKey, err := t.createFromSeed(seed, password)
 	if err != nil {
@@ -116,8 +146,12 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
 		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}
 
-	result := bytes.NewBufferString(pubKey)
-	r.RespChan <- *result
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, pubKey); err != nil {
+		return err
+	}
+
+	r.RespChan <- *buf
 
 	return nil
 }
@@ -128,13 +162,13 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Req) error {
 	}
 
 	// read tx parameters
-	amount, err := readUint64Param(&r)
-	if err != nil {
+	var amount uint64
+	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
 		return err
 	}
 
-	lockTime, err := readUint64Param(&r)
-	if err != nil {
+	var lockTime uint64
+	if err := encoding.ReadUint64LE(&r.Params, &lockTime); err != nil {
 		return err
 	}
 
@@ -163,13 +197,13 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Req) error {
 	}
 
 	// read tx parameters
-	amount, err := readUint64Param(&r)
-	if err != nil {
+	var amount uint64
+	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
 		return err
 	}
 
-	lockTime, err := readUint64Param(&r)
-	if err != nil {
+	var lockTime uint64
+	if err := encoding.ReadUint64LE(&r.Params, &lockTime); err != nil {
 		return err
 	}
 
@@ -198,16 +232,19 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Req) error {
 		return errWalletNotLoaded
 	}
 
-	// read tx parameters
-	amount, err := readUint64Param(&r)
+	var amount uint64
+	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
+		return err
+	}
+
+	var destPubKey string
+	destPubKey, err := encoding.ReadString(&r.Params)
 	if err != nil {
 		return err
 	}
 
-	destPubKey := r.Params.String()
-
 	// create and sign transaction
-	log.Tracef("Create a standard tx ( %d, %s )", amount, destPubKey)
+	log.Tracef("Create a standard tx (%d,%s)", amount, destPubKey)
 
 	tx, err := t.CreateStandardTx(amount, destPubKey)
 	if err != nil {
@@ -237,7 +274,7 @@ func (t *Transactor) handleBalance(r rpcbus.Req) error {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := binary.Write(buf, binary.LittleEndian, balance); err != nil {
+	if err := encoding.WriteUint64LE(buf, uint64(balance)); err != nil {
 		return err
 	}
 
@@ -260,4 +297,10 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	t.eb.Publish(string(topics.Tx), buf)
 
 	return hash, nil
+}
+
+func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
+	if err := t.syncWallet(); err != nil {
+		log.Tracef("syncing failed with err: %v", err)
+	}
 }

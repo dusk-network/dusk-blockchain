@@ -23,7 +23,6 @@ func (t *Transactor) loadWallet(password string) (string, error) {
 	// First load the database
 	db, err := walletdb.New(cfg.Get().Wallet.Store)
 	if err != nil {
-		db.Close()
 		return "", err
 	}
 
@@ -52,6 +51,7 @@ func (t *Transactor) createWallet(password string) (string, error) {
 
 	w, err := wallet.New(rand.Read, testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
+		db.Close()
 		return "", err
 	}
 
@@ -81,6 +81,7 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 	// Then load the wallet
 	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, fetchDecoys, fetchInputs, password)
 	if err != nil {
+		db.Close()
 		return "", err
 	}
 

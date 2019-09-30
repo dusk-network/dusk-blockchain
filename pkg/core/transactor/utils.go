@@ -5,14 +5,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-wallet/key"
-
-	"encoding/binary"
 )
 
 func fetchBlockHeightAndState(db database.DB, height uint64) (*block.Block, []byte, error) {
@@ -74,16 +71,4 @@ func fetchInputs(netPrefix byte, db *walletdb.DB, totalAmount int64, key *key.Ke
 		return nil, 0, err
 	}
 	return db.FetchInputs(privSpend.Bytes(), totalAmount)
-}
-
-// readUint64Param reads uint64 value from request params buffer
-// TODO: Move this to rpcbus package as global util
-func readUint64Param(r *rpcbus.Req) (uint64, error) {
-
-	valueBytes := make([]byte, 8)
-	if _, err := r.Params.Read(valueBytes); err != nil {
-		return 0, err
-	}
-
-	return binary.LittleEndian.Uint64(valueBytes), nil
 }

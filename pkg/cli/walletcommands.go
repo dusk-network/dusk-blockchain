@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -101,7 +102,7 @@ func (c *commandLineProcessor) transferCMD(args []string) {
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, "StandardTx ID: %s\n", txid)
+	fmt.Fprintf(os.Stdout, "Txn Hash: %s\n", hex.EncodeToString(txid))
 }
 
 func (c *commandLineProcessor) sendBidCMD(args []string) {
@@ -129,7 +130,7 @@ func (c *commandLineProcessor) sendBidCMD(args []string) {
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, "BidTx ID: %s\n", txid)
+	fmt.Fprintf(os.Stdout, "Txn Hash: %s\n", hex.EncodeToString(txid))
 }
 
 func (c *commandLineProcessor) sendStakeCMD(args []string) {
@@ -157,5 +158,5 @@ func (c *commandLineProcessor) sendStakeCMD(args []string) {
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, "StakeTx ID: %s\n", txid)
+	fmt.Fprintf(os.Stdout, "Txn Hash: %s\n", hex.EncodeToString(txid))
 }

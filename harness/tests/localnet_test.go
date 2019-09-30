@@ -60,8 +60,10 @@ func TestMain(m *testing.M) {
 		code = m.Run()
 	}
 
-	localNet.Teardown()
-	os.RemoveAll(workspace)
+	if *engine.KeepAlive != true {
+		localNet.Teardown()
+		os.RemoveAll(workspace)
+	}
 
 	os.Exit(code)
 }
@@ -131,8 +133,8 @@ func TestSendBidTransaction(t *testing.T) {
 			return true
 		}
 
-		// asserts that given condition will be met in 240 seconds, by checking condition function each second.
-		if !assert.Eventuallyf(t, condition, 240*time.Second, time.Second, "failed node %s", node.Id) {
+		// asserts that given condition will be met in 1024 seconds, by checking condition function each second.
+		if !assert.Eventuallyf(t, condition, 1024*time.Second, time.Second, "failed node %s", node.Id) {
 			break
 		}
 	}
