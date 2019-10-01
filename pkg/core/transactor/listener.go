@@ -45,7 +45,7 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleBalance, "Balance")
 
 		// Event list to handle
-		case b := <-t.accepted.blockChan:
+		case b := <-t.acceptedBlockChan:
 			t.onAcceptedBlockEvent(b)
 		}
 	}
