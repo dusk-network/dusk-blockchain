@@ -12,7 +12,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	cryptoUtils "github.com/dusk-network/dusk-blockchain/pkg/util/crypto"
+	cryptoutils "github.com/dusk-network/dusk-blockchain/pkg/util/crypto"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"golang.org/x/crypto/sha3"
@@ -85,7 +85,7 @@ func (s *Server) Start() error {
 	// Define TLS configuration
 	certFile := cfg.Get().RPC.CertFile
 	keyFile := cfg.Get().RPC.KeyFile
-	tlsConfig, err := cryptoUtils.GenerateTLSServerConfig(certFile, keyFile)
+	tlsConfig, err := cryptoutils.GenerateTLSServerConfig(certFile, keyFile)
 	if err != nil {
 		return err
 	}

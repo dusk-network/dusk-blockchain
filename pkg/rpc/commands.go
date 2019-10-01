@@ -56,10 +56,7 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 	payload, _ := hex.DecodeString(params[1])
 	s.eventBus.Publish(jsonrpcTopic, bytes.NewBuffer(payload))
 
-	result :=
-		`{ 
-			"result": "published"
-		}`
+	result := "{ \"result\": \"published\" }"
 	return result, nil
 }
 
@@ -67,10 +64,6 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 
 	// TODO: Not Implemented
 
-	result :=
-		`{ 
-			"txid": "unknown"
-		}`
-
+	result := "{ \"txid\": \"unknown\" }"
 	return result, nil
 }
