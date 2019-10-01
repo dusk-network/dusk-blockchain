@@ -96,9 +96,6 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 }
 
 func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactions.Transaction, error) {
-	if err := t.syncWallet(); err != nil {
-		return nil, err
-	}
 
 	// Create a new standard tx
 	// TODO: customizable fee
@@ -126,9 +123,6 @@ func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactio
 }
 
 func (t *Transactor) CreateStakeTx(amount, lockTime uint64) (transactions.Transaction, error) {
-	if err := t.syncWallet(); err != nil {
-		return nil, err
-	}
 
 	// Turn amount into a scalar
 	amountScalar := ristretto.Scalar{}
@@ -150,9 +144,6 @@ func (t *Transactor) CreateStakeTx(amount, lockTime uint64) (transactions.Transa
 }
 
 func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transaction, error) {
-	if err := t.syncWallet(); err != nil {
-		return nil, err
-	}
 
 	// Turn amount into a scalar
 	amountScalar := ristretto.Scalar{}
@@ -174,7 +165,7 @@ func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transact
 }
 
 func (t *Transactor) syncWallet() error {
-	//var totalSpent, totalReceived uint64
+	var totalSpent, totalReceived uint64
 	// keep looping until tipHash = currentBlockHash
 	for {
 		// Get Wallet height
@@ -194,13 +185,13 @@ func (t *Transactor) syncWallet() error {
 		}
 
 		// call wallet.CheckBlock
-		_, _, err = t.w.CheckWireBlock(*blk)
+		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk)
 		if err != nil {
 			return fmt.Errorf("error checking block: %v\n", err)
 		}
 
-		//totalSpent += spentCount
-		//totalReceived += receivedCount
+		totalSpent += spentCount
+		totalReceived += receivedCount
 
 		// check if state is equal to the block that we fetched
 		if bytes.Equal(tipHash, blk.Header.Hash) {
@@ -208,13 +199,19 @@ func (t *Transactor) syncWallet() error {
 		}
 	}
 
+	walletAddr, err := t.w.PublicAddress()
+	if err != nil {
+		return err
+	}
+
+	if totalSpent > 0 || totalReceived > 0 {
+		log.Infof("Wallet: %s - TotalReceived %d, TotalSpent %d", walletAddr, totalReceived, totalSpent)
+	}
+
 	return nil
 }
 
 func (t *Transactor) Balance() (float64, error) {
-	if err := t.syncWallet(); err != nil {
-		return 0.0, err
-	}
 
 	balance, err := t.w.Balance()
 	if err != nil {
