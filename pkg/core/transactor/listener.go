@@ -300,6 +300,11 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 }
 
 func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
+
+	if t.w == nil {
+		return
+	}
+
 	if err := t.syncWallet(); err != nil {
 		log.Tracef("syncing failed with err: %v", err)
 	}
