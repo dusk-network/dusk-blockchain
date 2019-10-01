@@ -19,12 +19,9 @@ type proofGenerator struct {
 	d, k, x ristretto.Scalar
 }
 
-func newProofGenerator(d, k, m ristretto.Scalar) (*proofGenerator, error) {
-	x := zkproof.CalculateX(d, m)
+func newProofGenerator(k ristretto.Scalar) (*proofGenerator, error) {
 	return &proofGenerator{
-		d: d,
 		k: k,
-		x: x,
 	}, nil
 }
 

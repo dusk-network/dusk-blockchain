@@ -220,7 +220,7 @@ func (w *Wallet) scanInputs(txChecker TxInChecker) (uint64, error) {
 			return didSpendFunds, err
 		}
 
-		err = w.db.RemoveInput(pubKey)
+		err = w.db.RemoveInput(pubKey, keyImage)
 		if err != nil {
 			return didSpendFunds, err
 		}
@@ -356,7 +356,7 @@ func (w *Wallet) Sign(tx SignableTx) error {
 		if err != nil {
 			return err
 		}
-		w.db.RemoveInput(pubKey)
+		w.db.RemoveInput(pubKey, input.KeyImage.Bytes())
 	}
 	return nil
 }

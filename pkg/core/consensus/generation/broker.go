@@ -22,9 +22,7 @@ import (
 
 // Launch will start the processes for score/block generation.
 func Launch(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar, keys user.Keys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
-	m := zkproof.CalculateM(k)
-	d := getD(m, eventBus, db)
-	broker, err := newBroker(eventBus, rpcBus, d, k, m, gen, blockGen, keys, publicKey)
+	broker, err := newBroker(eventBus, rpcBus, k, gen, blockGen, keys, publicKey)
 	if err != nil {
 		return err
 	}
@@ -43,16 +41,14 @@ type broker struct {
 	certificateGenerator *certificateGenerator
 
 	// subscriber channels
-	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
-	roundChan            <-chan consensus.RoundUpdate
 }
 
-func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristretto.Scalar,
+func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar,
 	gen Generator, blockGen BlockGenerator, keys user.Keys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
 		var err error
-		gen, err = newProofGenerator(d, k, m)
+		gen, err = newProofGenerator(k)
 		if err != nil {
 			return nil, err
 		}
@@ -65,15 +61,14 @@ func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristr
 	certGenerator := &certificateGenerator{}
 	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
 
+	m := zkproof.CalculateM(k)
 	b := &broker{
 		k:                    k,
 		m:                    m,
 		eventBroker:          eventBroker,
 		blockGen:             blockGen,
 		certificateGenerator: certGenerator,
-		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		roundChan:            consensus.InitRoundUpdate(eventBroker),
 	}
 	return b, nil
 }
