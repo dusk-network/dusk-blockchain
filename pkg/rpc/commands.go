@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -20,6 +21,7 @@ var (
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,
 		"sendBidTx":    sendBidTx,
+		"loadWallet":   loadWallet,
 	}
 
 	// rpcAdminCmd holds all admin methods.
@@ -62,8 +64,36 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 var sendBidTx = func(s *Server, params []string) (string, error) {
 
-	// TODO: Not Implemented
+	if len(params) < 2 {
+		return "", fmt.Errorf("missing parameters: amount/locktime")
+	}
 
-	result := "{ \"txid\": \"unknown\" }"
-	return result, nil
+	amount, err := strconv.Atoi(params[0])
+	if err != nil {
+		return "", fmt.Errorf("converting amount string to an integer: %v", err)
+	}
+
+	lockTime, err := strconv.Atoi(params[1])
+	if err != nil {
+		return "", fmt.Errorf("converting locktime string to an integer: %v", err)
+	}
+
+	txid, err := s.rpcBus.SendBidTx(uint64(amount), uint64(lockTime))
+	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString(txid))
+	return result, err
+}
+
+var loadWallet = func(s *Server, params []string) (string, error) {
+
+	if len(params) < 1 {
+		return "", fmt.Errorf("missing parameter: password")
+	}
+
+	pubKey, err := s.rpcBus.LoadWallet(params[0])
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	return result, err
 }

@@ -42,6 +42,15 @@ var (
 	// Used by the reduction component.
 	VerifyCandidateBlock     = "verifyCandidateBlock"
 	VerifyCandidateBlockChan chan Req
+
+	// Methods implemented by Transactor
+	CreateWallet   = "createWallet"
+	CreateFromSeed = "createFromSeed"
+	LoadWallet     = "loadWallet"
+	SendBidTx      = "sendBidTx"
+	SendStakeTx    = "sendStakeTx"
+	SendStandardTx = "sendStandardTxChan"
+	GetBalance     = "getBalance"
 )
 
 // RPCBus is a request–response mechanism for internal communication between node
@@ -118,6 +127,15 @@ func (bus *RPCBus) Register(methodName string, req chan<- Req) error {
 // run the corresponding procedure and return a result or timeout
 func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
 
+	if req.Timeout > 0 {
+		return bus.callTimeout(methodName, req)
+	}
+
+	return bus.callNoTimeout(methodName, req)
+}
+
+func (bus *RPCBus) callTimeout(methodName string, req Req) (bytes.Buffer, error) {
+
 	var resp bytes.Buffer
 	method, err := bus.getMethod(methodName)
 
@@ -147,7 +165,32 @@ func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
 	return resp, err
 }
 
+func (bus *RPCBus) callNoTimeout(methodName string, req Req) (bytes.Buffer, error) {
+
+	var resp bytes.Buffer
+	method, err := bus.getMethod(methodName)
+
+	if err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	// Send the request with write-timeout
+	method.req <- req
+
+	// Wait for response or err from the consumer with read-timeout
+	select {
+	case resp = <-req.RespChan:
+	// this case happens when the consumer cannot return a valid response but an
+	// error details instead
+	case err := <-req.ErrChan:
+		return bytes.Buffer{}, err
+	}
+
+	return resp, err
+}
+
 // NewRequest builds a new request with params
+// if timeout is not positive, the call waits infinitely
 func NewRequest(p bytes.Buffer, timeout int) Req {
 	d := Req{Timeout: timeout, Params: p}
 	d.RespChan = make(chan bytes.Buffer, 1)

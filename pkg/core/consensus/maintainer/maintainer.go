@@ -2,14 +2,13 @@ package maintainer
 
 import (
 	"bytes"
+	"errors"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,6 +19,7 @@ var l = log.WithField("process", "StakeAutomaton")
 // transactions are close to expiring.
 type StakeAutomaton struct {
 	eventBroker eventbus.Broker
+	rpcBus      *rpcbus.RPCBus
 	roundChan   <-chan consensus.RoundUpdate
 
 	pubKeyBLS []byte
@@ -31,17 +31,15 @@ type StakeAutomaton struct {
 	stakeEndHeight uint64
 
 	amount, lockTime, offset uint64
-
-	transactor *transactor.Transactor
 }
 
-func New(eventBroker eventbus.Broker, pubKeyBLS []byte, m ristretto.Scalar, transactor *transactor.Transactor, amount, lockTime, offset uint64) (*StakeAutomaton, error) {
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar, amount, lockTime, offset uint64) (*StakeAutomaton, error) {
 	return &StakeAutomaton{
 		eventBroker:    eventBroker,
+		rpcBus:         rpcBus,
 		roundChan:      consensus.InitRoundUpdate(eventBroker),
 		pubKeyBLS:      pubKeyBLS,
 		m:              m,
-		transactor:     transactor,
 		amount:         amount,
 		lockTime:       lockTime,
 		offset:         offset,
@@ -120,31 +118,41 @@ func (m *StakeAutomaton) findMostRecentStake() uint64 {
 }
 
 func (m *StakeAutomaton) sendBid() error {
-	bid, err := m.transactor.CreateBidTx(m.amount, m.lockTime)
+
+	if m.amount == 0 {
+		return errors.New("zero amount")
+	}
+
+	if m.lockTime == 0 {
+		return errors.New("zero lockTime")
+	}
+
+	l.Tracef("Sending bid tx (%d,%d)", m.amount, m.lockTime)
+
+	_, err := m.rpcBus.SendBidTx(m.amount, m.lockTime)
 	if err != nil {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, bid); err != nil {
-		return err
-	}
-
-	m.eventBroker.Publish(string(topics.Tx), buf)
 	return nil
 }
 
 func (m *StakeAutomaton) sendStake() error {
-	stake, err := m.transactor.CreateStakeTx(m.amount, m.lockTime)
+
+	if m.amount == 0 {
+		return errors.New("zero amount")
+	}
+
+	if m.lockTime == 0 {
+		return errors.New("zero lockTime")
+	}
+
+	l.Tracef("Sending stake tx (%d,%d)", m.amount, m.lockTime)
+
+	_, err := m.rpcBus.SendStakeTx(m.amount, m.lockTime)
 	if err != nil {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, stake); err != nil {
-		return err
-	}
-
-	m.eventBroker.Publish(string(topics.Tx), buf)
 	return nil
 }

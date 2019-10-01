@@ -2,7 +2,7 @@ package chain
 
 import (
 	"bytes"
-	"crypto/ed25519"
+
 	"encoding/binary"
 	"fmt"
 	"sync"
@@ -26,6 +26,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"golang.org/x/crypto/ed25519"
 )
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
@@ -46,7 +47,8 @@ type Chain struct {
 	mu sync.RWMutex
 
 	// collector channels
-	candidateChan <-chan *block.Block
+	candidateChan   <-chan *block.Block
+	certificateChan <-chan certMsg
 }
 
 // New returns a new chain object
@@ -60,15 +62,17 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 
 	// set up collectors
 	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
+	certificateChan := initCertificateCollector(eventBus)
 
 	chain := &Chain{
-		eventBus:      eventBus,
-		rpcBus:        rpcBus,
-		db:            db,
-		prevBlock:     *l.chainTip,
-		candidateChan: candidateChan,
-		p:             user.NewProvisioners(),
-		bidList:       &user.BidList{},
+		eventBus:        eventBus,
+		rpcBus:          rpcBus,
+		db:              db,
+		prevBlock:       *l.chainTip,
+		candidateChan:   candidateChan,
+		p:               user.NewProvisioners(),
+		bidList:         &user.BidList{},
+		certificateChan: certificateChan,
 	}
 
 	chain.restoreConsensusData()
@@ -86,6 +90,9 @@ func (c *Chain) Listen() {
 
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
+		case certMsg := <-c.certificateChan:
+			c.addCertificate(certMsg.hash, certMsg.cert)
+
 		// wire.RPCBus requests handlers
 		case r := <-rpcbus.GetLastBlockChan:
 
@@ -111,6 +118,18 @@ func (c *Chain) Listen() {
 			r.RespChan <- bytes.Buffer{}
 		}
 	}
+}
+
+// LaunchConsensus will listen for an init message, and send a round update
+// once it is received.
+func (c *Chain) LaunchConsensus() {
+	initChan := make(chan *bytes.Buffer, 1)
+	id := c.eventBus.Subscribe(msg.InitializationTopic, initChan)
+	<-initChan
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	c.sendRoundUpdate(c.prevBlock.Header.Height+1, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
+	c.eventBus.Unsubscribe(msg.InitializationTopic, id)
 }
 
 func (c *Chain) propagateBlock(blk block.Block) error {
@@ -520,4 +539,15 @@ func (c *Chain) removeExpiredBids(round uint64) {
 			c.removeBid(bid)
 		}
 	}
+}
+
+func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
+	candidate, err := c.fetchCandidateBlock(blockHash)
+	if err != nil {
+		log.Warnf("could not fetch candidate block to add certificate: %s", err.Error())
+		return
+	}
+
+	candidate.Header.Certificate = cert
+	c.AcceptBlock(*candidate)
 }

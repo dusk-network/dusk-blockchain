@@ -1,17 +1,17 @@
 package tests
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/harness/engine"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,8 +60,10 @@ func TestMain(m *testing.M) {
 		code = m.Run()
 	}
 
-	localNet.Teardown()
-	os.RemoveAll(workspace)
+	if *engine.KeepAlive != true {
+		localNet.Teardown()
+		os.RemoveAll(workspace)
+	}
 
 	os.Exit(code)
 }
@@ -76,21 +78,27 @@ func TestSendBidTransaction(t *testing.T) {
 		t.Logf("Empty DUSK_WALLET_PASS")
 	}
 
-	// Send request to node 0 to loadWallet
-	_, err := localNet.SendCommand(0, "loadWallet", []string{walletsPass})
-	if err != nil {
-		t.Fatal(err.Error())
+	for i := 0; i < localNetSize; i++ {
+		// Send request to node 0 to loadWallet
+		_, err := localNet.SendCommand(uint(i), "loadWallet", []string{walletsPass})
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 	}
 
 	// Send request to node 0 to generate and process a Bid transaction
-	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "1"})
+	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "10"})
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	txid := string(data)
-	t.Logf("Bid transaction id: %s", txid)
-	txid = strings.Replace(txid, "\"", "", -1)
+	resp := struct{ Txid string }{}
+	if err := json.Unmarshal(data, &resp); err != nil {
+		t.Fatal(err.Error())
+	}
+
+	txid := resp.Txid
+	log.Infof("Bid transaction id: %s", txid)
 
 	// Ensure all nodes have accepted this transaction at the same height
 	blockhash := ""
@@ -125,8 +133,8 @@ func TestSendBidTransaction(t *testing.T) {
 			return true
 		}
 
-		// asserts that given condition will be met in 120 seconds, by checking condition function each second.
-		if !assert.Eventuallyf(t, condition, 120*time.Second, time.Second, "failed node %s", node.Id) {
+		// asserts that given condition will be met in 1024 seconds, by checking condition function each second.
+		if !assert.Eventuallyf(t, condition, 1024*time.Second, time.Second, "failed node %s", node.Id) {
 			break
 		}
 	}
