@@ -16,8 +16,8 @@ type Preprocessor interface {
 type ProcessorRegistry interface {
 	Preprocess(string, *bytes.Buffer) error
 	Register(string, ...Preprocessor) []uint32
-	Remove(string, uint32)
-	RemoveAll(string)
+	RemoveProcessor(string, uint32)
+	RemoveProcessors(string)
 }
 
 var _ ProcessorRegistry = (*SafeProcessorRegistry)(nil)
@@ -81,8 +81,8 @@ func wrapInIDTopic(topic string, p []Preprocessor) ([]idProcessor, []uint32) {
 	return pproc, pprocIds
 }
 
-// Remove removes all TopicProcessor previously registered on a given topic using its ID
-func (p *SafeProcessorRegistry) Remove(topic string, id uint32) {
+// RemoveProcessor removes all TopicProcessor previously registered on a given topic using its ID
+func (p *SafeProcessorRegistry) RemoveProcessor(topic string, id uint32) {
 	p.Lock()
 	defer p.Unlock()
 	if pprocs, ok := p.preprocessors[topic]; ok {
@@ -97,8 +97,8 @@ func (p *SafeProcessorRegistry) Remove(topic string, id uint32) {
 	}
 }
 
-// RemoveAll removes all TopicProcessor from a topic
-func (p *SafeProcessorRegistry) RemoveAll(topic string) {
+// RemoveProcessors removes all TopicProcessor from a topic
+func (p *SafeProcessorRegistry) RemoveProcessors(topic string) {
 	p.Lock()
 	defer p.Unlock()
 	delete(p.preprocessors, topic)

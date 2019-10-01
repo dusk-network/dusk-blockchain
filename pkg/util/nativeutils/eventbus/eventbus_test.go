@@ -7,12 +7,82 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
+//*****************
+// EVENTBUS TESTS
+//*****************
 func TestNewEventBus(t *testing.T) {
 	eb := New()
 	assert.NotNil(t, eb)
+}
+
+//*******************
+// PREPROCESSOR TESTS
+//*******************
+func TestProcessor(t *testing.T) {
+	topic := "testTopic"
+	bus := New()
+
+	resultChan := make(chan bytes.Buffer, 1)
+	collector := NewSimpleCollector(resultChan, nil)
+
+	ids := bus.Register(topic, NewAdder("pippo"), NewAdder("pippo"))
+	NewTopicListener(bus, collector, topic, ChannelType)
+
+	expected := *(bytes.NewBufferString("pippopippo"))
+	bus.Publish(topic, bytes.NewBufferString(""))
+	bus.Publish(topic, bytes.NewBufferString(""))
+
+	result1 := <-resultChan
+	result2 := <-resultChan
+	assert.Equal(t, expected, result1)
+	assert.Equal(t, expected, result2)
+
+	// testing RemoveProcessor
+	bus.RemoveProcessor(topic, ids[0])
+
+	expected = *(bytes.NewBufferString("pippo"))
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res := <-resultChan
+	assert.Equal(t, expected, res)
+
+	// removing the same preprocessor does not yield any different result
+	bus.RemoveProcessor(topic, ids[0])
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
+
+	// adding a preprocessor
+	expected = *(bytes.NewBufferString("pippopappo"))
+	otherID := bus.Register(topic, NewAdder("pappo"))
+	assert.Equal(t, 1, len(otherID))
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
+
+	// removing another
+	expected = *(bytes.NewBufferString("pappo"))
+	bus.RemoveProcessor(topic, ids[1])
+	bus.Publish(topic, bytes.NewBufferString(""))
+	res = <-resultChan
+	assert.Equal(t, expected, res)
+}
+
+//******************
+// SUBSCRIBER TESTS
+//******************
+func TestListenerMap(t *testing.T) {
+	lm := newListenerMap()
+	_, ss := CreateGossipStreamer()
+	listener := NewStreamListener(ss)
+	lm.Store("pippo", listener)
+
+	listeners := lm.Load("pippo")
+	assert.Equal(t, 1, len(listeners))
+	assert.Equal(t, listener, listeners[0].Listener)
 }
 
 func TestSubscribe(t *testing.T) {
@@ -22,15 +92,9 @@ func TestSubscribe(t *testing.T) {
 	assert.NotNil(t, eb.Subscribe("whateverTopic", cl))
 }
 
-func TestPublish(t *testing.T) {
-	newEB(t)
-}
-
 func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
-
 	eb.Unsubscribe("whateverTopic", id)
-
 	eb.Publish("whateverTopic", bytes.NewBufferString("whatever2"))
 
 	select {
@@ -41,6 +105,50 @@ func TestUnsubscribe(t *testing.T) {
 	}
 }
 
+//*********************
+// TOPIC LISTENER TESTS
+//*********************
+func TestLameSubscriber(t *testing.T) {
+	bus := New()
+	resultChan := make(chan bytes.Buffer, 1)
+
+	collector := NewSimpleCollector(resultChan, nil)
+	tbuf := ranbuf()
+
+	sub := NewTopicListener(bus, collector, "pippo", ChannelType)
+
+	bus.Publish("pippo", tbuf)
+	bus.Publish("pippo", tbuf)
+
+	assert.Equal(t, <-resultChan, *tbuf)
+	assert.Equal(t, <-resultChan, *tbuf)
+
+	sub.Quit()
+	bus.Publish("pippo", tbuf)
+
+	select {
+	case <-resultChan:
+		assert.FailNow(t, "unexpected message published after quitting a topic listener")
+	case <-time.After(50 * time.Millisecond):
+		//
+	}
+}
+
+func TestStreamer(t *testing.T) {
+	bus, streamer := CreateGossipStreamer()
+	bus.Publish(string(topics.Gossip), bytes.NewBufferString("pluto"))
+
+	packet, err := streamer.Read()
+	if !assert.NoError(t, err) {
+		assert.FailNow(t, "error in reading from the subscribed stream")
+	}
+
+	assert.Equal(t, "pluto", string(packet))
+}
+
+//******************
+// MULTICASTER TESTS
+//******************
 func TestDefaultListener(t *testing.T) {
 	eb := New()
 	msgChan := make(chan struct {
@@ -81,6 +189,9 @@ func TestDefaultListener(t *testing.T) {
 	}
 }
 
+//****************
+// SETUP FUNCTIONS
+//****************
 func newEB(t *testing.T) (*EventBus, chan bytes.Buffer, uint32) {
 	eb := New()
 	myChan := make(chan bytes.Buffer, 10)
@@ -125,6 +236,11 @@ func TestExitChan(t *testing.T) {
 		}
 	}
 	assert.FailNow(t, "stream listener not found")
+}
+
+func ranbuf() *bytes.Buffer {
+	tbytes, _ := crypto.RandEntropy(32)
+	return bytes.NewBuffer(tbytes)
 }
 
 type mockWriteCloser struct {

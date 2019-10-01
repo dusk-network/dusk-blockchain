@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	// Channel is the Listener type that relies on channels to communicate
-	Channel ListenerType = iota
-	// Callback is the Listener type that relies on Callbacks to notify
+	// ChannelType is the Listener type that relies on channels to communicate
+	ChannelType ListenerType = iota
+	// CallbackType is the Listener type that relies on Callbacks to notify
 	// messages
-	Callback
+	CallbackType
 )
 
 // QuitTopic is the topic to make all components quit
@@ -34,9 +34,9 @@ type TopicListener interface {
 // to a Subscriber with a desidered Listener
 func NewTopicListener(subscriber Subscriber, collector wire.EventCollector, topic string, listenerType ListenerType) TopicListener {
 	switch listenerType {
-	case Channel:
+	case ChannelType:
 		return newChanCollector(subscriber, collector, topic)
-	case Callback:
+	case CallbackType:
 		return newCallbackCollector(subscriber, collector.Collect, topic)
 	}
 	return nil

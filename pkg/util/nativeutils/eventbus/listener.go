@@ -26,7 +26,7 @@ type CallbackListener struct {
 	callback func(bytes.Buffer) error
 }
 
-// Publish the copy of a message as a parameter to a callback
+// Notify the copy of a message as a parameter to a callback
 func (c *CallbackListener) Notify(m bytes.Buffer) error {
 	return c.callback(m)
 }
@@ -97,7 +97,7 @@ func NewChanListener(msgChan chan<- bytes.Buffer) Listener {
 	return &ChanListener{msgChan}
 }
 
-// Publish sends a message to the internal dispatcher channel
+// Notify sends a message to the internal dispatcher channel
 func (c *ChanListener) Notify(m bytes.Buffer) error {
 	select {
 	case c.messageChannel <- m:
