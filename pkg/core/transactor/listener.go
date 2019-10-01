@@ -119,6 +119,16 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 		return err
 	}
 
+	// Sync with genesis
+	if _, err := t.w.GetSavedHeight(); err != nil {
+		t.w.UpdateWalletHeight(0)
+		b := cfg.DecodeGenesis()
+		// call wallet.CheckBlock
+		if _, _, err := t.w.CheckWireBlock(*b); err != nil {
+			return fmt.Errorf("error checking block: %v", err)
+		}
+	}
+
 	r.RespChan <- *buf
 
 	return nil
