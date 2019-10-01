@@ -80,6 +80,10 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
 		return err
 	}
 
+	if !cfg.Get().General.WalletOnly {
+		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
+	}
+
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
