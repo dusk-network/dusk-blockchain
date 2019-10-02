@@ -37,11 +37,11 @@ func TestReader(t *testing.T) {
 	client, srv := net.Pipe()
 	go func() {
 		buf := makeAgreementBuffer(10)
-		processed, err := g.Process(buf)
+		err := g.Process(buf)
 		if err != nil {
 			t.Fatal(err)
 		}
-		client.Write(processed.Bytes())
+		client.Write(buf.Bytes())
 	}()
 
 	eb := eventbus.New()
@@ -52,8 +52,9 @@ func TestReader(t *testing.T) {
 	}
 
 	// Our message should come in on the agreement topic
-	agreementChan := make(chan *bytes.Buffer, 1)
-	eb.Subscribe(string(topics.Agreement), agreementChan)
+	agreementChan := make(chan bytes.Buffer, 1)
+	l := eventbus.NewChanListener(agreementChan)
+	eb.Subscribe(string(topics.Agreement), l)
 
 	go peerReader.ReadLoop()
 
@@ -65,7 +66,7 @@ func TestReader(t *testing.T) {
 func TestWriteRingBuffer(t *testing.T) {
 	bus := eventbus.New()
 	g := processing.NewGossip(protocol.TestNet)
-	bus.RegisterPreprocessor(string(topics.Gossip), g)
+	bus.Register(string(topics.Gossip), g)
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
@@ -79,7 +80,7 @@ func TestWriteRingBuffer(t *testing.T) {
 	}
 
 	for i := 0; i < 1000; i++ {
-		bus.Stream(string(topics.Gossip), msg)
+		bus.Publish(string(topics.Gossip), msg)
 	}
 }
 
@@ -113,7 +114,7 @@ func TestWriteLoop(t *testing.T) {
 func BenchmarkWriter(b *testing.B) {
 	bus := eventbus.New()
 	g := processing.NewGossip(protocol.TestNet)
-	bus.RegisterPreprocessor(string(topics.Gossip), g)
+	bus.Register(string(topics.Gossip), g)
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
@@ -128,7 +129,7 @@ func BenchmarkWriter(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bus.Stream(string(topics.Gossip), msg)
+		bus.Publish(string(topics.Gossip), msg)
 	}
 }
 

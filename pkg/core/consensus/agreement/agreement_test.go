@@ -10,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -75,9 +74,10 @@ func TestSendAgreement(t *testing.T) {
 	eb, _ := initAgreement(k[0])
 	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
 
-	streamer := helper.NewSimpleStreamer()
-	eb.SubscribeStream(string(topics.Gossip), streamer)
-	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
+	streamer := eventbus.NewGossipStreamer()
+	streamListener := eventbus.NewStreamListener(streamer)
+	eb.Subscribe(string(topics.Gossip), streamListener)
+	eb.Register(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 
 	// Initiate the sending of an agreement message
 	hash, _ := crypto.RandEntropy(32)
@@ -105,16 +105,17 @@ func TestSendAgreement(t *testing.T) {
 }
 
 // Launch the agreement component, and consume the initial round update that gets emitted.
-func initAgreement(k user.Keys) (eventbus.Broker, <-chan *bytes.Buffer) {
+func initAgreement(k user.Keys) (eventbus.Broker, <-chan bytes.Buffer) {
 	bus := eventbus.New()
-	winningHashChan := make(chan *bytes.Buffer, 1)
-	bus.Subscribe(msg.WinningBlockHashTopic, winningHashChan)
+	winningHashChan := make(chan bytes.Buffer, 1)
+	chanListener := eventbus.NewChanListener(winningHashChan)
+	bus.Subscribe(msg.WinningBlockHashTopic, chanListener)
 	go agreement.Launch(bus, k)
 	time.Sleep(200 * time.Millisecond)
 	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
-	bus.RemoveAllPreprocessors(string(topics.Agreement))
+	bus.RemoveProcessors(string(topics.Agreement))
 	return bus, winningHashChan
 }

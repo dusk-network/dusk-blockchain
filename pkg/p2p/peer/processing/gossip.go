@@ -18,17 +18,18 @@ type (
 	}
 )
 
-func (h *headerWriter) Write(m *bytes.Buffer) (*bytes.Buffer, error) {
+func (h *headerWriter) Write(m *bytes.Buffer) error {
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint32LE(buf, uint32(h.magic)); err != nil {
-		return nil, err
+		return err
 	}
 
 	if _, err := m.WriteTo(buf); err != nil {
-		return nil, err
+		return err
 	}
 
-	return buf, nil
+	*m = *buf
+	return nil
 }
 
 // NewGossip returns a gossip preprocessor with the specified magic.
@@ -42,11 +43,10 @@ func NewGossip(magic protocol.Magic) *Gossip {
 
 // Process a message that is passing through, by prepending the network magic to the
 // buffer, and then COBS encoding it.
-func (g *Gossip) Process(m *bytes.Buffer) (*bytes.Buffer, error) {
-	buf, err := g.headerWriter.Write(m)
-	if err != nil {
-		return nil, err
+func (g *Gossip) Process(m *bytes.Buffer) error {
+	if err := g.headerWriter.Write(m); err != nil {
+		return err
 	}
 
-	return WriteFrame(buf)
+	return WriteFrame(m)
 }

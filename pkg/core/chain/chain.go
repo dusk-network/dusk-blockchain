@@ -74,8 +74,9 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	chain.restoreConsensusData()
 
 	// Hook the chain up to the required topics
-	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
-	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
+	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
+	eventBus.Subscribe(string(topics.Block), cbListener)
+	eventBus.Register(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
 	return chain, nil
 }
 
@@ -124,7 +125,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Stream(string(topics.Gossip), msg)
+	c.eventBus.Publish(string(topics.Gossip), msg)
 	return nil
 }
 
@@ -149,9 +150,9 @@ func (c *Chain) Close() error {
 	return drvr.Close()
 }
 
-func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
+func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := block.Unmarshal(m, blk); err != nil {
+	if err := block.Unmarshal(&m, blk); err != nil {
 		return err
 	}
 
@@ -353,7 +354,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 		return err
 	}
 
-	c.eventBus.Stream(string(topics.Gossip), withTopic)
+	c.eventBus.Publish(string(topics.Gossip), withTopic)
 	return nil
 }
 

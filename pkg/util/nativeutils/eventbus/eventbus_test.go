@@ -135,10 +135,11 @@ func TestLameSubscriber(t *testing.T) {
 }
 
 func TestStreamer(t *testing.T) {
-	bus, streamer := CreateGossipStreamer()
-	bus.Publish(string(topics.Gossip), bytes.NewBufferString("pluto"))
+	topic := string(topics.Gossip)
+	bus, streamer := CreateFrameStreamer(topic)
+	bus.Publish(topic, bytes.NewBufferString("pluto"))
 
-	packet, err := streamer.Read()
+	packet, err := streamer.(*SimpleStreamer).Read()
 	if !assert.NoError(t, err) {
 		assert.FailNow(t, "error in reading from the subscribed stream")
 	}

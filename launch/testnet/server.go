@@ -92,7 +92,7 @@ func Setup() *Server {
 	}
 
 	gossip := processing.NewGossip(protocol.TestNet)
-	eventBus.RegisterPreprocessor(string(topics.Gossip), gossip)
+	eventBus.Register(string(topics.Gossip), gossip)
 
 	return srv
 }

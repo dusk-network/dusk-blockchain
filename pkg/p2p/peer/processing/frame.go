@@ -13,27 +13,27 @@ const (
 	MaxFrameSize = uint64(250000)
 )
 
-//BuildFrame builds a length-prefixing wire message frame
-func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
+//WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message
+func WriteFrame(buf *bytes.Buffer) error {
 	if uint64(buf.Len()) > MaxFrameSize {
-		return nil, fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
+		return fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
 	}
 
 	msg := new(bytes.Buffer)
 	// Append prefix(header)
 	if err := encoding.WriteUint64LE(msg, uint64(buf.Len())); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Append payload
 	_, err := msg.ReadFrom(buf)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
+	*buf = *msg
 	// TODO: Append Checksum
-
-	return msg, nil
+	return nil
 }
 
 func ReadFrame(r io.Reader) ([]byte, error) {
