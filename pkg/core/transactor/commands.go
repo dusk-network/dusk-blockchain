@@ -211,7 +211,7 @@ func (t *Transactor) syncWallet() error {
 	return nil
 }
 
-func (t *Transactor) Balance() (float64, error) {
+func (t *Transactor) Balance() (uint64, error) {
 
 	balance, err := t.w.Balance()
 	if err != nil {
