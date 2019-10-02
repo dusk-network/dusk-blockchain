@@ -6,9 +6,11 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math/big"
+	"os"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
@@ -26,6 +28,10 @@ import (
 
 // Number of mixins per ring. ringsize = mixin + 1
 const numMixins = 7
+
+var (
+	ErrSeedFileExists = fmt.Errorf("wallet seed file already exists")
+)
 
 // FetchInputs returns a slice of inputs such that Sum(Inputs)- Sum(Outputs) >= 0
 // If > 0, then a change address is created for the remaining amount
@@ -405,6 +411,11 @@ func (w *Wallet) PrivateSpend() ([]byte, error) {
 
 // Save saves the seed to a dat file
 func saveSeed(seed []byte, password string) error {
+
+	// Overwriting an existing wallet seed file might cause losing assets
+	if _, err := os.Stat(cfg.Get().Wallet.File); err == nil {
+		return ErrSeedFileExists
+	}
 
 	digest := sha3.Sum256([]byte(password))
 
