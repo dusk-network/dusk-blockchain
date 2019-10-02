@@ -9,7 +9,7 @@ import (
 
 type (
 	headerWriter struct {
-		magic protocol.Magic
+		magicBuf bytes.Buffer
 	}
 
 	// Gossip is a preprocessor for gossip messages.
@@ -18,17 +18,14 @@ type (
 	}
 )
 
-func (h *headerWriter) Write(m *bytes.Buffer) error {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint32LE(buf, uint32(h.magic)); err != nil {
+func (h headerWriter) Write(m *bytes.Buffer) error {
+	b := h.magicBuf
+
+	if _, err := m.WriteTo(&b); err != nil {
 		return err
 	}
 
-	if _, err := m.WriteTo(buf); err != nil {
-		return err
-	}
-
-	*m = *buf
+	*m = b
 	return nil
 }
 
@@ -36,9 +33,15 @@ func (h *headerWriter) Write(m *bytes.Buffer) error {
 func NewGossip(magic protocol.Magic) *Gossip {
 	return &Gossip{
 		headerWriter: headerWriter{
-			magic: magic,
+			magicBuf: writeMagic(magic),
 		},
 	}
+}
+
+func writeMagic(magic protocol.Magic) bytes.Buffer {
+	b := new(bytes.Buffer)
+	_ = encoding.WriteUint32LE(b, uint32(magic))
+	return *b
 }
 
 // Process a message that is passing through, by prepending the network magic to the
