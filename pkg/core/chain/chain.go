@@ -124,8 +124,9 @@ func (c *Chain) Listen() {
 // LaunchConsensus will listen for an init message, and send a round update
 // once it is received.
 func (c *Chain) LaunchConsensus() {
-	initChan := make(chan *bytes.Buffer, 1)
-	id := c.eventBus.Subscribe(msg.InitializationTopic, initChan)
+	initChan := make(chan bytes.Buffer, 1)
+	l := eventbus.NewChanListener(initChan)
+	id := c.eventBus.Subscribe(msg.InitializationTopic, l)
 	<-initChan
 	c.mu.RLock()
 	defer c.mu.RUnlock()
