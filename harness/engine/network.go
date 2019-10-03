@@ -18,6 +18,9 @@ var (
 	EnableHarness = flag.Bool("enable", false, "Enable Test Harness bootstrapping")
 	// RPCNetworkType a test CLI param to set jsonrpc network type (unix or tcp)
 	RPCNetworkType = flag.String("rpc_transport", "unix", "JSON-RPC transport type (unix/tcp)")
+	// KeepAlive a test CLI param to keep harness running even after all  tests have passed
+	// It's useful when additional manual tests should be done
+	KeepAlive = flag.Bool("keepalive", false, "Keep Test Harness alive after tests pass")
 
 	// Errors
 	// ErrDisabledHarness
@@ -96,7 +99,7 @@ func (n *Network) Bootstrap(workspace string) error {
 	log.Infof("Local network workspace: %s", workspace)
 	log.Infof("Running %d nodes", len(n.Nodes))
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(20 * time.Second)
 
 	return nil
 }

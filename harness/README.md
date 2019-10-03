@@ -54,7 +54,7 @@ DUSK_WALLET_PASS="default"
 
 ###### Run
 ```bash
-tests$ go test -v --count=1 --test.timeout=0  ./...
+tests$ go test -v --count=1 --test.timeout=0  ./... -args -enable
 ```
 
  

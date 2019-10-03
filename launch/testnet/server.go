@@ -11,6 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -49,6 +50,7 @@ func Setup() *Server {
 		panic(err)
 	}
 	go chain.Listen()
+	go chain.LaunchConsensus()
 
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
@@ -85,6 +87,13 @@ func Setup() *Server {
 		dupeMap:  dupeBlacklist,
 		counter:  chainsync.NewCounter(eventBus),
 	}
+
+	// Setting up the transactor component
+	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter)
+	if err != nil {
+		panic(err)
+	}
+	go transactor.Listen()
 
 	// Connecting to the log based monitoring system
 	if err := ConnectToLogMonitor(eventBus); err != nil {

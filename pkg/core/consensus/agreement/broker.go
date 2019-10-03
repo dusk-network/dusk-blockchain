@@ -17,10 +17,12 @@ import (
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
 func Launch(eventBroker eventbus.Broker, keys user.Keys) {
-	broker := newBroker(eventBroker, keys)
-	roundUpdate := <-broker.roundChan
-	broker.updateRound(roundUpdate)
-	go broker.Listen()
+	b := newBroker(eventBroker, keys)
+	go func(b *broker) {
+		roundUpdate := <-b.roundChan
+		b.updateRound(roundUpdate)
+		b.Listen()
+	}(b)
 }
 
 type broker struct {

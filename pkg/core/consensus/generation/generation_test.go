@@ -126,3 +126,4 @@ func (m *mockGenerator) InBidList(bidList user.BidList) bool     { return true }
 func (m *mockGenerator) UpdateBidList(bl user.Bid)               {}
 func (m *mockGenerator) RemoveExpiredBids(round uint64)          {}
 func (m *mockGenerator) UpdateProofValues(d, M ristretto.Scalar) {}
+func (m *mockGenerator) ResetThreshold()                         {}

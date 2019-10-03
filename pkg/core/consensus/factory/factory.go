@@ -43,6 +43,6 @@ func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	selection.Launch(c.eventBus, nil, c.timerLength)
 	reduction.Launch(c.eventBus, c.Keys, c.timerLength, c.rpcBus)
-	go agreement.Launch(c.eventBus, c.Keys)
+	agreement.Launch(c.eventBus, c.Keys)
 	log.WithField("process", "factory").Info("Consensus Started")
 }
