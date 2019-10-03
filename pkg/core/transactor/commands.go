@@ -10,6 +10,7 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
@@ -185,7 +186,7 @@ func (t *Transactor) syncWallet() error {
 		}
 
 		// call wallet.CheckBlock
-		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk)
+		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk, true)
 		if err != nil {
 			return fmt.Errorf("error checking block: %v\n", err)
 		}
@@ -211,12 +212,23 @@ func (t *Transactor) syncWallet() error {
 	return nil
 }
 
-func (t *Transactor) Balance() (uint64, error) {
+// Balance returns both wallet balance and mempool balance that corresponds to the loaded wallet
+func (t *Transactor) Balance() (uint64, uint64, error) {
 
-	balance, err := t.w.Balance()
+	// retrieve balance from wallet unspent inputs
+	walletBalance, err := t.w.Balance()
 	if err != nil {
-		return 0.0, err
+		return 0, 0, err
 	}
 
-	return balance, nil
+	// retrieve balance from mempool incoming inputs
+	blk := block.NewBlock()
+	blk.Txs, err = t.rb.GetMempool()
+	if err != nil {
+		return walletBalance, 0, err
+	}
+
+	_, mempoolBalance, err := t.w.CheckWireBlockReceived(*blk, false)
+
+	return walletBalance, mempoolBalance, err
 }

@@ -118,7 +118,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 		t.w.UpdateWalletHeight(0)
 		b := cfg.DecodeGenesis()
 		// call wallet.CheckBlock
-		if _, _, err := t.w.CheckWireBlock(*b); err != nil {
+		if _, _, err := t.w.CheckWireBlock(*b, true); err != nil {
 			return fmt.Errorf("error checking block: %v", err)
 		}
 	}
@@ -276,13 +276,19 @@ func (t *Transactor) handleBalance(r rpcbus.Req) error {
 		return errWalletNotLoaded
 	}
 
-	balance, err := t.Balance()
+	walletBalance, mempoolBalance, err := t.Balance()
 	if err != nil {
 		return err
 	}
 
+	log.Tracef("wallet balance: %d, mempool balance: %d", walletBalance, mempoolBalance)
+
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, uint64(balance)); err != nil {
+	if err := encoding.WriteUint64LE(buf, uint64(walletBalance)); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(buf, uint64(mempoolBalance)); err != nil {
 		return err
 	}
 

@@ -74,13 +74,18 @@ func (c *commandLineProcessor) createFromSeedCMD(args []string) {
 
 func (c *commandLineProcessor) balanceCMD() {
 
-	balance, err := c.rpcBus.GetBalance()
+	walletBalance, mempoolBalance, err := c.rpcBus.GetBalance()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error retrieving balance: %v\n", err)
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, "%.8f DUSK\n", float64(balance)/float64(cfg.DUSK))
+	// unlocked balance is the amount of outputs currently available to spend
+	unlockedBalance := float64(walletBalance) / float64(cfg.DUSK)
+	// overall balance is sum of the unlockedBalance plus pending to be received
+	overallBalance := float64(walletBalance+mempoolBalance) / float64(cfg.DUSK)
+
+	fmt.Fprintf(os.Stdout, "Balance %.8f, Unlocked Balance %.8f\n", overallBalance, unlockedBalance)
 }
 
 func (c *commandLineProcessor) transferCMD(args []string) {

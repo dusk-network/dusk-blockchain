@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 func (rb *RPCBus) LoadWallet(password string) (string, error) {
@@ -137,18 +138,48 @@ func (rb *RPCBus) SendStandardTx(amount uint64, pubkey string) ([]byte, error) {
 	return txIdBuf.Bytes(), nil
 }
 
-func (rb *RPCBus) GetBalance() (uint64, error) {
+func (rb *RPCBus) GetBalance() (uint64, uint64, error) {
 	buf := new(bytes.Buffer)
 	req := NewRequest(*buf, -1)
-	balanceBuf, err := rb.Call(GetBalance, req)
+	resultBuf, err := rb.Call(GetBalance, req)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
-	var balance uint64
-	if err := encoding.ReadUint64LE(&balanceBuf, &balance); err != nil {
-		return 0, err
+	var walletBalance uint64
+	if err := encoding.ReadUint64LE(&resultBuf, &walletBalance); err != nil {
+		return 0, 0, err
 	}
 
-	return balance, nil
+	var mempoolBalance uint64
+	if err := encoding.ReadUint64LE(&resultBuf, &mempoolBalance); err != nil {
+		return walletBalance, 0, err
+	}
+
+	return walletBalance, mempoolBalance, nil
+}
+
+func (rb *RPCBus) GetMempool() ([]transactions.Transaction, error) {
+
+	buf := new(bytes.Buffer)
+	r, err := rb.Call(GetMempoolTxs, NewRequest(*buf, 3))
+	if err != nil {
+		return nil, err
+	}
+
+	lTxs, err := encoding.ReadVarInt(&r)
+	if err != nil {
+		return nil, err
+	}
+
+	mempoolTxs := make([]transactions.Transaction, lTxs)
+	for i := uint64(0); i < lTxs; i++ {
+		tx, err := transactions.Unmarshal(&r)
+		if err != nil {
+			return nil, err
+		}
+		mempoolTxs[i] = tx
+	}
+
+	return mempoolTxs, nil
 }
