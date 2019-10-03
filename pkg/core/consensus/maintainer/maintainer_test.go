@@ -97,13 +97,14 @@ func TestSendOnce(t *testing.T) {
 	}
 }
 
-func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
 	// Initial setup
 	bus := eventbus.New()
 	rpcBus := rpcbus.New()
 	wdb, err := database.New(dbPath)
-	txChan := make(chan *bytes.Buffer, 2)
-	bus.Subscribe(string(topics.Tx), txChan)
+	txChan := make(chan bytes.Buffer, 2)
+	l := eventbus.NewChanListener(txChan)
+	bus.Subscribe(string(topics.Tx), l)
 
 	transactor, err := transactor.New(bus, rpcBus, nil, nil)
 	if err != nil {
@@ -138,11 +139,11 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, 
 	return bus, txChan, p, w.ConsensusKeys(), mScalar
 }
 
-func receiveTxs(t *testing.T, txChan chan *bytes.Buffer) []transactions.Transaction {
+func receiveTxs(t *testing.T, txChan chan bytes.Buffer) []transactions.Transaction {
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		txBuf := <-txChan
-		tx, err := transactions.Unmarshal(txBuf)
+		tx, err := transactions.Unmarshal(&txBuf)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
 	}

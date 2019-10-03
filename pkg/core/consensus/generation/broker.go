@@ -59,7 +59,8 @@ func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.S
 	}
 
 	certGenerator := &certificateGenerator{}
-	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
+	cbListener := eventbus.NewCallbackListener(certGenerator.setAgreementEvent)
+	eventBroker.Subscribe(msg.AgreementEventTopic, cbListener)
 
 	m := zkproof.CalculateM(k)
 	b := &broker{
@@ -101,8 +102,8 @@ func (b *broker) Generate(roundUpdate consensus.RoundUpdate) {
 
 	marshalledEvent := b.marshalScore(sev)
 	marshalledBlock := b.marshalBlock(blk)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledEvent)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledBlock)
+	b.eventBroker.Publish(string(topics.Gossip), marshalledEvent)
+	b.eventBroker.Publish(string(topics.Gossip), marshalledBlock)
 }
 
 func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) error {

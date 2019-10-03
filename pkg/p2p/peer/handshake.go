@@ -57,12 +57,11 @@ func (p *Connection) writeLocalMsgVersion() error {
 		return err
 	}
 
-	frame, err := processing.WriteFrame(fullMsg)
-	if err != nil {
+	if err := processing.WriteFrame(fullMsg); err != nil {
 		return err
 	}
 
-	_, err = p.Write(frame.Bytes())
+	_, err = p.Write(fullMsg.Bytes())
 	return err
 }
 
@@ -158,12 +157,11 @@ func (p *Connection) writeVerAck() error {
 		return err
 	}
 
-	frame, err := processing.WriteFrame(verAckMsg)
-	if err != nil {
+	if err := processing.WriteFrame(verAckMsg); err != nil {
 		return err
 	}
 
-	if _, err := p.Write(frame.Bytes()); err != nil {
+	if _, err := p.Write(verAckMsg.Bytes()); err != nil {
 		return err
 	}
 

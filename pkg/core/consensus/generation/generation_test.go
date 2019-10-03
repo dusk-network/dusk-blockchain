@@ -15,6 +15,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
@@ -32,7 +33,7 @@ func TestScoreGeneration(t *testing.T) {
 
 	keys, _ := user.NewRandKeys()
 	publicKey := key.NewKeyPair(nil).PublicKey()
-	eb, streamer := helper.CreateGossipStreamer()
+	eb, streamer := eventbus.CreateGossipStreamer()
 
 	gen := &mockGenerator{t}
 
@@ -62,6 +63,7 @@ func TestScoreGeneration(t *testing.T) {
 	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	buf, err := streamer.Read()
+
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -20,14 +19,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//func init() {
+//	log.SetLevel(log.TraceLevel)
+//}
+
 var timeOut = 4000 * time.Millisecond
 
 func TestStress(t *testing.T) {
 	eventBus, _, _, k := launchReductionTest(true, 25)
 
 	// subscribe for the voteset
-	voteSetChan := make(chan *bytes.Buffer, 1)
-	eventBus.Subscribe(msg.ReductionResultTopic, voteSetChan)
+	voteSetChan := make(chan bytes.Buffer, 1)
+	l := eventbus.NewChanListener(voteSetChan)
+	eventBus.Subscribe(msg.ReductionResultTopic, l)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
@@ -48,13 +52,13 @@ func TestStress(t *testing.T) {
 		voteSetBuf := <-voteSetChan
 		// The vote set buffer will have a round as it's first item. Let's read it and discard it
 		var n uint64
-		if err := encoding.ReadUint64LE(voteSetBuf, &n); err != nil {
+		if err := encoding.ReadUint64LE(&voteSetBuf, &n); err != nil {
 			t.Fatal(err)
 		}
 
 		// Unmarshal votesBytes and check them for correctness
 		unmarshaller := reduction.NewUnMarshaller()
-		voteSet, err := unmarshaller.UnmarshalVoteSet(voteSetBuf)
+		voteSet, err := unmarshaller.UnmarshalVoteSet(&voteSetBuf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,16 +163,17 @@ func TestTimeOutVariance(t *testing.T) {
 	eb, _, _, _ := launchReductionTest(true, 2)
 
 	// subscribe to reduction results
-	resultChan := make(chan *bytes.Buffer, 1)
-	eb.Subscribe(msg.ReductionResultTopic, resultChan)
+	resultChan := make(chan bytes.Buffer, 1)
+	l := eventbus.NewChanListener(resultChan)
+	eb.Subscribe(msg.ReductionResultTopic, l)
 
 	// Wait a bit for the round update to go through
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(400 * time.Millisecond)
 
 	// measure the time it takes for reduction to time out
 	start := time.Now()
 	// send a hash to start reduction
-	eb.Publish(msg.BestScoreTopic, nil)
+	eb.Publish(msg.BestScoreTopic, new(bytes.Buffer))
 	go launchCandidateVerifier(false)
 
 	// wait for reduction to finish
@@ -177,7 +182,7 @@ func TestTimeOutVariance(t *testing.T) {
 
 	// timer should now have doubled
 	start = time.Now()
-	eb.Publish(msg.BestScoreTopic, nil)
+	eb.Publish(msg.BestScoreTopic, new(bytes.Buffer))
 	// set up another goroutine for verification
 	go launchCandidateVerifier(false)
 
@@ -196,7 +201,7 @@ func TestTimeOutVariance(t *testing.T) {
 
 	start = time.Now()
 	// send a hash to start reduction
-	eb.Publish(msg.BestScoreTopic, nil)
+	eb.Publish(msg.BestScoreTopic, new(bytes.Buffer))
 	// set up another goroutine for verification
 	go launchCandidateVerifier(false)
 
@@ -217,8 +222,8 @@ func launchCandidateVerifier(failVerification bool) {
 	}
 }
 
-func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *helper.SimpleStreamer, user.Keys, []user.Keys) {
-	eb, streamer := helper.CreateGossipStreamer()
+func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *eventbus.GossipStreamer, user.Keys, []user.Keys) {
+	eb, streamer := eventbus.CreateGossipStreamer()
 	k, _ := user.NewRandKeys()
 	rpcBus := rpcbus.New()
 	launchReduction(eb, k, timeOut, rpcBus)
@@ -240,7 +245,7 @@ func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *hel
 // This ensures proper handling of mocked Reduction events.
 func launchReduction(eb *eventbus.EventBus, k user.Keys, timeOut time.Duration, rpcBus *rpcbus.RPCBus) {
 	reduction.Launch(eb, k, timeOut, rpcBus)
-	eb.RemoveAllPreprocessors(string(topics.Reduction))
+	eb.RemoveProcessors(string(topics.Reduction))
 }
 
 func sendReductionBuffers(keys []user.Keys, hash []byte, round uint64, step uint8, eventBus *eventbus.EventBus) {

@@ -26,7 +26,7 @@ type voteSet struct {
 	votes []wire.Event
 }
 
-func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
+func (i *initCollector) Collect(roundBuffer bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
 	i.initChannel <- round
 	return nil
@@ -35,7 +35,7 @@ func (i *initCollector) Collect(roundBuffer *bytes.Buffer) error {
 func getInitialRound(eventBus eventbus.Broker) uint64 {
 	initChannel := make(chan uint64, 1)
 	initCollector := &initCollector{initChannel}
-	go eventbus.NewTopicListener(eventBus, initCollector, msg.InitializationTopic).Accept()
+	eventbus.NewTopicListener(eventBus, initCollector, msg.InitializationTopic, eventbus.ChannelType)
 
 	// Wait for the initial round to be published
 	round := <-initChannel
@@ -49,20 +49,20 @@ func getInitialRound(eventBus eventbus.Broker) uint64 {
 func initReductionResultCollector(subscriber eventbus.Subscriber) <-chan voteSet {
 	resultChan := make(chan voteSet, 1)
 	collector := &reductionResultCollector{resultChan, reduction.NewUnMarshaller()}
-	go eventbus.NewTopicListener(subscriber, collector, msg.ReductionResultTopic).Accept()
+	eventbus.NewTopicListener(subscriber, collector, msg.ReductionResultTopic, eventbus.ChannelType)
 	return resultChan
 }
 
-func (r *reductionResultCollector) Collect(m *bytes.Buffer) error {
+func (r *reductionResultCollector) Collect(m bytes.Buffer) error {
 	var round uint64
-	if err := encoding.ReadUint64LE(m, &round); err != nil {
+	if err := encoding.ReadUint64LE(&m, &round); err != nil {
 		return err
 	}
 
 	// We drop the error here. If there is no vote set included in the message,
 	// we still need to trigger `sendAgreement` for the step counter to stay
 	// in sync.
-	votes, _ := r.reductionUnmarshaller.UnmarshalVoteSet(m)
+	votes, _ := r.reductionUnmarshaller.UnmarshalVoteSet(&m)
 
 	r.resultChan <- voteSet{round, votes}
 	return nil

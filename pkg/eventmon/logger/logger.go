@@ -36,7 +36,7 @@ type (
 		acceptedBlockChan <-chan block.Block
 		EntryChan         chan []byte
 		quitChan          chan struct{}
-		listener          *eventbus.TopicListener
+		listener          eventbus.TopicListener
 	}
 )
 

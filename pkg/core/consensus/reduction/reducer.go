@@ -199,7 +199,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	r.publisher.Stream(string(topics.Gossip), message)
+	r.publisher.Publish(string(topics.Gossip), message)
 }
 
 func (r *reducer) sendResults(events []wire.Event) {

@@ -54,7 +54,7 @@ type (
 	// until a Timeout). This Interface is typically implemented by a struct that will
 	// perform some Event unmarshalling.
 	EventCollector interface {
-		Collect(*bytes.Buffer) error
+		Collect(bytes.Buffer) error
 	}
 
 	// EventDeserializer is the interface for those struct that allows deserialization of an event from scratch

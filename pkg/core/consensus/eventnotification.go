@@ -9,8 +9,7 @@ import (
 
 func LaunchNotification(subscriber eventbus.Subscriber, deserializer wire.EventDeserializer, topic string) <-chan wire.Event {
 	notification := newNotification(deserializer)
-	listener := eventbus.NewTopicListener(subscriber, notification, topic)
-	go listener.Accept()
+	eventbus.NewTopicListener(subscriber, notification, topic, eventbus.ChannelType)
 	return notification.reduChan
 }
 
@@ -27,10 +26,9 @@ func newNotification(deserializer wire.EventDeserializer) *notification {
 	}
 }
 
-func (n *notification) Collect(buf *bytes.Buffer) error {
+func (n *notification) Collect(buf bytes.Buffer) error {
 	// Copy the buffer, as multiple components will receive this same pointer
-	copyBuf := *buf
-	ev, err := n.deserializer.Deserialize(&copyBuf)
+	ev, err := n.deserializer.Deserialize(&buf)
 	if err != nil {
 		return err
 	}

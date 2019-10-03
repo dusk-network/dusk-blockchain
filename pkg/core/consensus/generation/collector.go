@@ -16,11 +16,12 @@ type (
 func initWinningHashCollector(subscriber eventbus.Subscriber) chan []byte {
 	hashChannel := make(chan []byte, 1)
 	collector := &hashCollector{hashChannel}
-	go eventbus.NewTopicListener(subscriber, collector, msg.WinningBlockHashTopic).Accept()
+	eventbus.NewTopicListener(subscriber, collector, msg.WinningBlockHashTopic, eventbus.ChannelType)
 	return hashChannel
 }
 
-func (c *hashCollector) Collect(message *bytes.Buffer) error {
+func (c *hashCollector) Collect(message bytes.Buffer) error {
+	//XXX: why do we callback into a channel?
 	c.hashChannel <- message.Bytes()
 	return nil
 }

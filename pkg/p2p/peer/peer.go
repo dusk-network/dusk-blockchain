@@ -141,7 +141,7 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	w.gossipID = w.subscriber.SubscribeStream(string(topics.Gossip), w.Connection)
+	w.gossipID = w.subscriber.Subscribe(string(topics.Gossip), eventbus.NewStreamListener(w.Connection))
 
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
@@ -159,8 +159,7 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 	for {
 		select {
 		case buf := <-writeQueueChan:
-			processed, err := w.gossip.Process(buf)
-			if err != nil {
+			if err := w.gossip.Process(buf); err != nil {
 				log.WithFields(log.Fields{
 					"process": "peer",
 					"error":   err,
@@ -168,7 +167,7 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 				continue
 			}
 
-			if _, err := w.Connection.Write(processed.Bytes()); err != nil {
+			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
 				log.WithFields(log.Fields{
 					"process": "peer",
 					"queue":   "writequeue",

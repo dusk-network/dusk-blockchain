@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -38,11 +37,14 @@ func TestAgreementRace(t *testing.T) {
 	broker.updateRound(consensus.RoundUpdate{1, *p, nil, seed, hash})
 	go broker.Listen()
 
-	eb.RegisterPreprocessor(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
+	eb.Register(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
 	// We need to catch the outgoing agreement message
 	// Let's add a SimpleStreamer to the eventbus handlers
-	streamer := helper.NewSimpleStreamer()
-	eb.SubscribeStream(string(topics.Gossip), streamer)
+
+	streamer := eventbus.NewGossipStreamer()
+	streamListener := eventbus.NewStreamListener(streamer)
+
+	eb.Subscribe(string(topics.Gossip), streamListener)
 
 	// Create an agreement message, and update the round concurrently. If the bug has not been fixed,
 	// this should cause our step counter to be off in the next round.
@@ -120,7 +122,7 @@ func TestStress(t *testing.T) {
 	bus := eventbus.New()
 	p, k := consensus.MockProvisioners(committeeSize)
 	broker := newBroker(bus, k[0])
-	bus.RemoveAllPreprocessors(string(topics.Agreement))
+	bus.RemoveProcessors(string(topics.Agreement))
 	seed, _ := crypto.RandEntropy(33)
 	hash, _ := crypto.RandEntropy(32)
 	broker.updateRound(consensus.RoundUpdate{1, *p, nil, seed, hash})
