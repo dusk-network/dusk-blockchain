@@ -80,14 +80,12 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
 		return err
 	}
 
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
-	}
-
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
+
+	t.launchConsensus()
 
 	r.RespChan <- *buf
 
@@ -110,10 +108,6 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 		return err
 	}
 
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
-	}
-
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
@@ -128,6 +122,8 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 			return fmt.Errorf("error checking block: %v", err)
 		}
 	}
+
+	t.launchConsensus()
 
 	r.RespChan <- *buf
 
@@ -156,14 +152,12 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
 		return err
 	}
 
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
-	}
-
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
+
+	t.launchConsensus()
 
 	r.RespChan <- *buf
 
@@ -321,5 +315,12 @@ func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
 
 	if err := t.syncWallet(); err != nil {
 		log.Tracef("syncing failed with err: %v", err)
+	}
+}
+
+func (t *Transactor) launchConsensus() {
+	if !cfg.Get().General.WalletOnly {
+		log.Tracef("Launch consensus")
+		go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}
 }
