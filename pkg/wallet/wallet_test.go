@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-wallet/key"
 
 	"github.com/bwesterb/go-ristretto"
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,6 +25,7 @@ func TestNewWallet(t *testing.T) {
 	assert.Nil(t, err)
 	defer os.RemoveAll(dbPath)
 
+	os.Remove(cfg.Get().Wallet.File)
 	w, err := New(randReader, netPrefix, db, GenerateDecoys, GenerateInputs, "pass")
 	assert.Nil(t, err)
 
@@ -51,6 +53,7 @@ func TestReceivedTx(t *testing.T) {
 	assert.Nil(t, err)
 	defer os.RemoveAll(dbPath)
 
+	os.Remove(cfg.Get().Wallet.File)
 	w, err := New(randReader, netPrefix, db, GenerateDecoys, GenerateInputs, "pass")
 	assert.Nil(t, err)
 
@@ -98,11 +101,11 @@ func TestCheckBlock(t *testing.T) {
 		blk.AddTx(tx)
 	}
 
-	count, err := bob.CheckWireBlockReceived(blk)
+	count, _, err := bob.CheckWireBlockReceived(blk, true)
 	assert.Nil(t, err)
 	assert.Equal(t, uint64(numTxs), count)
 
-	_, err = alice.CheckWireBlockSpent(blk)
+	_, err = alice.CheckWireBlockSpent(blk, true)
 	assert.Nil(t, err)
 }
 
@@ -112,6 +115,7 @@ func generateWallet(t *testing.T, netPrefix byte, path string) *Wallet {
 	assert.Nil(t, err)
 	defer os.RemoveAll(path)
 
+	os.Remove(cfg.Get().Wallet.File)
 	w, err := New(randReader, netPrefix, db, GenerateDecoys, GenerateInputs, "pass")
 	assert.Nil(t, err)
 	return w
