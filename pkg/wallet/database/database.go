@@ -72,7 +72,7 @@ func (db *DB) RemoveInput(pubkey []byte, keyImage []byte) error {
 	// Delete input
 	b.Delete(key)
 	// Delete associated keyImage
-	// b.Delete(keyImage)
+	b.Delete(keyImage)
 
 	return db.storage.Write(b, writeOptions)
 }

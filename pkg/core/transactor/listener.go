@@ -80,14 +80,12 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
 		return err
 	}
 
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
-	}
-
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
+
+	t.launchConsensus()
 
 	r.RespChan <- *buf
 
@@ -110,10 +108,6 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 		return err
 	}
 
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
-	}
-
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
@@ -124,10 +118,12 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 		t.w.UpdateWalletHeight(0)
 		b := cfg.DecodeGenesis()
 		// call wallet.CheckBlock
-		if _, _, err := t.w.CheckWireBlock(*b); err != nil {
+		if _, _, err := t.w.CheckWireBlock(*b, true); err != nil {
 			return fmt.Errorf("error checking block: %v", err)
 		}
 	}
+
+	t.launchConsensus()
 
 	r.RespChan <- *buf
 
@@ -156,14 +152,12 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
 		return err
 	}
 
-	if !cfg.Get().General.WalletOnly {
-		initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
-	}
-
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
+
+	t.launchConsensus()
 
 	r.RespChan <- *buf
 
@@ -282,13 +276,19 @@ func (t *Transactor) handleBalance(r rpcbus.Req) error {
 		return errWalletNotLoaded
 	}
 
-	balance, err := t.Balance()
+	walletBalance, mempoolBalance, err := t.Balance()
 	if err != nil {
 		return err
 	}
 
+	log.Tracef("wallet balance: %d, mempool balance: %d", walletBalance, mempoolBalance)
+
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, uint64(balance)); err != nil {
+	if err := encoding.WriteUint64LE(buf, uint64(walletBalance)); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint64LE(buf, uint64(mempoolBalance)); err != nil {
 		return err
 	}
 
@@ -321,5 +321,12 @@ func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
 
 	if err := t.syncWallet(); err != nil {
 		log.Tracef("syncing failed with err: %v", err)
+	}
+}
+
+func (t *Transactor) launchConsensus() {
+	if !cfg.Get().General.WalletOnly {
+		log.Tracef("Launch consensus")
+		go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}
 }
