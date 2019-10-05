@@ -2,8 +2,6 @@ package peer
 
 import (
 	"bytes"
-	"encoding/binary"
-	"io"
 	"net"
 	"sync"
 	"time"
@@ -214,17 +212,6 @@ func (p *Reader) ReadLoop() {
 
 		p.router.Collect(buf)
 	}
-}
-
-// Read the magic bytes off r, and return them as a protocol.Magic.
-func extractMagic(r io.Reader) (protocol.Magic, error) {
-	buffer := make([]byte, 4)
-	if _, err := r.Read(buffer); err != nil {
-		return protocol.Magic(0), err
-	}
-
-	magic := binary.LittleEndian.Uint32(buffer)
-	return protocol.Magic(magic), nil
 }
 
 // Write a message to the connection.

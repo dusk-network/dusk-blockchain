@@ -153,7 +153,7 @@ func TestStreamer(t *testing.T) {
 func TestDefaultListener(t *testing.T) {
 	eb := New()
 	msgChan := make(chan struct {
-		topic string
+		topic topics.Topic
 		buf   bytes.Buffer
 	})
 
@@ -161,27 +161,27 @@ func TestDefaultListener(t *testing.T) {
 		tpc, _ := topics.Extract(&r)
 
 		msgChan <- struct {
-			topic string
+			topic topics.Topic
 			buf   bytes.Buffer
-		}{string(tpc), r}
+		}{tpc, r}
 		return nil
 	}
 
-	eb.AddDefaultTopic("pippo")
-	eb.AddDefaultTopic("paperino")
+	eb.AddDefaultTopic(topics.Reject.String())
+	eb.AddDefaultTopic(topics.Unknown.String())
 	eb.SubscribeDefault(cb)
 
-	eb.Publish("pippo", bytes.NewBufferString("pluto"))
+	eb.Publish(topics.Reject.String(), bytes.NewBufferString("pluto"))
 	msg := <-msgChan
-	assert.Equal(t, "pippo", msg.topic)
+	assert.Equal(t, topics.Reject, msg.topic)
 	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
 
-	eb.Publish("paperino", bytes.NewBufferString("pluto"))
+	eb.Publish(topics.Unknown.String(), bytes.NewBufferString("pluto"))
 	msg = <-msgChan
-	assert.Equal(t, "paperino", msg.topic)
+	assert.Equal(t, topics.Unknown, msg.topic)
 	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
 
-	eb.Publish("test", bytes.NewBufferString("pluto"))
+	eb.Publish(topics.Gossip.String(), bytes.NewBufferString("pluto"))
 	select {
 	case <-msgChan:
 		t.FailNow()

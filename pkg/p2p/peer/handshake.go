@@ -72,7 +72,7 @@ func (p *Connection) readRemoteMsgVersion() error {
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
 
-	magic, err := extractMagic(decodedMsg)
+	magic, err := protocol.Extract(decodedMsg)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (p *Connection) readVerAck() error {
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
 
-	magic, err := extractMagic(decodedMsg)
+	magic, err := protocol.Extract(decodedMsg)
 	if err != nil {
 		return err
 	}

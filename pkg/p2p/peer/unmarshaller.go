@@ -17,7 +17,7 @@ func (m *messageUnmarshaller) Unmarshal(b []byte, w io.Writer) error {
 	payloadBuf := new(bytes.Buffer)
 	payloadBuf.Write(b)
 
-	magic, err := extractMagic(payloadBuf)
+	magic, err := protocol.Extract(payloadBuf)
 	if err != nil {
 		return err
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -74,13 +73,12 @@ func TestWriteRingBuffer(t *testing.T) {
 	}
 
 	ev := makeAgreementBuffer(10)
-	msg, err := wire.AddTopic(ev, topics.Agreement)
-	if err != nil {
+	if err := topics.Prepend(ev, topics.Agreement); err != nil {
 		panic(err)
 	}
 
 	for i := 0; i < 1000; i++ {
-		bus.Publish(string(topics.Gossip), msg)
+		bus.Publish(string(topics.Gossip), ev)
 	}
 }
 
@@ -122,14 +120,13 @@ func BenchmarkWriter(b *testing.B) {
 	}
 
 	ev := makeAgreementBuffer(10)
-	msg, err := wire.AddTopic(ev, topics.Agreement)
-	if err != nil {
+	if err := topics.Prepend(ev, topics.Agreement); err != nil {
 		panic(err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bus.Publish(string(topics.Gossip), msg)
+		bus.Publish(string(topics.Gossip), ev)
 	}
 }
 
@@ -137,12 +134,11 @@ func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 	p, keys := consensus.MockProvisioners(keyAmount)
 
 	buf := agreement.MockAgreement(make([]byte, 32), 1, 2, keys, p.CreateVotingCommittee(1, 2, keyAmount))
-	withTopic, err := wire.AddTopic(buf, topics.Agreement)
-	if err != nil {
+	if err := topics.Prepend(buf, topics.Agreement); err != nil {
 		panic(err)
 	}
 
-	return withTopic
+	return buf
 }
 
 func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
