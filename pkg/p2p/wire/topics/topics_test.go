@@ -30,7 +30,7 @@ func TestTopicRepr(t *testing.T) {
 			assert.FailNowf(t, "errors on string representation of topic", "idx: %d", tt.idx)
 		}
 		buf := bytes.NewBufferString("pippo")
-		Prepend(buf, tt.topic)
+		assert.NoError(t, Prepend(buf, tt.topic))
 		if !assert.Equal(t, buf.Bytes()[0], tt.tbyte) {
 			assert.FailNowf(t, "error on prepending", "idx: %d", tt.idx)
 		}

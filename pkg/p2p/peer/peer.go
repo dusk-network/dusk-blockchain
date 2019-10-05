@@ -216,15 +216,6 @@ func (p *Reader) ReadLoop() {
 	}
 }
 
-// Read the topic bytes off r, and return them as a topics.Topic.
-func extractTopic(r io.Reader) (topics.Topic, error) {
-	var cmdBuf [topics.Size]byte
-	if _, err := r.Read(cmdBuf[:]); err != nil {
-		return topics.Topic(""), err
-	}
-	return topics.ByteArrayToTopic(cmdBuf), nil
-}
-
 // Read the magic bytes off r, and return them as a protocol.Magic.
 func extractMagic(r io.Reader) (protocol.Magic, error) {
 	buffer := make([]byte, 4)

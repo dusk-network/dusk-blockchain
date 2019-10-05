@@ -22,7 +22,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -135,17 +134,12 @@ func (c *Chain) LaunchConsensus() {
 }
 
 func (c *Chain) propagateBlock(blk block.Block) error {
-	buffer := new(bytes.Buffer)
-	if err := block.Marshal(buffer, &blk); err != nil {
+	buffer := topics.Block.ToBuffer()
+	if err := block.Marshal(&buffer, &blk); err != nil {
 		return err
 	}
 
-	msg, err := wire.AddTopic(buffer, topics.Block)
-	if err != nil {
-		return err
-	}
-
-	c.eventBus.Publish(string(topics.Gossip), msg)
+	c.eventBus.Publish(string(topics.Gossip), &buffer)
 	return nil
 }
 
@@ -369,12 +363,11 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 		panic(err)
 	}
 
-	withTopic, err := wire.AddTopic(buf, topics.Inv)
-	if err != nil {
+	if err := topics.Prepend(buf, topics.Inv); err != nil {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.Gossip), withTopic)
+	c.eventBus.Publish(string(topics.Gossip), buf)
 	return nil
 }
 

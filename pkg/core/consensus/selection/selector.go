@@ -95,13 +95,11 @@ func (s *eventSelector) repropagate(ev wire.Event) {
 	if err := s.handler.Marshal(buf, ev); err != nil {
 		panic(err)
 	}
-
-	msg, err := wire.AddTopic(buf, topics.Score)
-	if err != nil {
+	if err := topics.Prepend(buf, topics.Score); err != nil {
 		panic(err)
 	}
 
-	s.publisher.Publish(string(topics.Gossip), msg)
+	s.publisher.Publish(string(topics.Gossip), buf)
 }
 
 func (s *eventSelector) publishBestEvent() {

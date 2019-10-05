@@ -8,7 +8,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -113,12 +112,12 @@ func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
 }
 
 func marshalGetBlocks(msg *peermsg.GetBlocks) (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
-	if err := msg.Encode(buf); err != nil {
+	buf := topics.GetBlocks.ToBuffer()
+	if err := msg.Encode(&buf); err != nil {
 		panic(err)
 	}
 
-	return wire.AddTopic(buf, topics.GetBlocks)
+	return &buf, nil
 }
 
 func peekBlockHeight(r *bufio.Reader) (uint64, error) {

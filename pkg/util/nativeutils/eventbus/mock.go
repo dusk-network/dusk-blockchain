@@ -148,15 +148,13 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 	decoded := bytes.NewBuffer(b)
 
 	// check the topic
-	topicBuffer := make([]byte, 15)
-	if _, err = decoded.Read(topicBuffer); err != nil {
+	topic, err := topics.Extract(decoded)
+	if err != nil {
 		return nil, err
 	}
 
-	var cmd [15]byte
-	copy(cmd[:], topicBuffer)
 	ms.lock.Lock()
-	ms.seenTopics = append(ms.seenTopics, topics.ByteArrayToTopic(cmd))
+	ms.seenTopics = append(ms.seenTopics, topic)
 	ms.lock.Unlock()
 
 	return decoded.Bytes(), nil

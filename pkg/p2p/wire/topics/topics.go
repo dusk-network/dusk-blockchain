@@ -112,6 +112,16 @@ var Topics = [...]topicBuf{
 	topicBuf{AgreementEvent, *(bytes.NewBuffer([]byte{byte(AgreementEvent)})), "agreementevent"},
 }
 
+func (t Topic) ToBuffer() bytes.Buffer {
+	var buf bytes.Buffer
+	if len(Topics) < int(t) {
+		buf = *(new(bytes.Buffer))
+	}
+
+	buf = Topics[int(t)].Buffer
+	return buf
+}
+
 // String representation of a known topic
 func (t Topic) String() string {
 	if len(Topics) > int(t) {
@@ -131,7 +141,7 @@ func StringToTopic(topic string) Topic {
 	return Unknown
 }
 
-func Prepend(b *bytes.Buffer, t Topic) {
+func Prepend(b *bytes.Buffer, t Topic) error {
 	var buf bytes.Buffer
 	if int(t) > len(Topics) {
 		buf = *(bytes.NewBuffer([]byte{byte(t)}))
@@ -139,8 +149,11 @@ func Prepend(b *bytes.Buffer, t Topic) {
 		buf = Topics[int(t)].Buffer
 	}
 
-	b.WriteTo(&buf)
+	if _, err := b.WriteTo(&buf); err != nil {
+		return err
+	}
 	*b = buf
+	return nil
 }
 
 // Extract the topic from an io.Reader

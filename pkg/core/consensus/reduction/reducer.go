@@ -193,13 +193,12 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	message, err := wire.AddTopic(vote, topics.Reduction)
-	if err != nil {
+	if err := topics.Prepend(vote, topics.Reduction); err != nil {
 		logErr(err, hash.Bytes(), "Error while adding topic")
 		return
 	}
 
-	r.publisher.Publish(string(topics.Gossip), message)
+	r.publisher.Publish(string(topics.Gossip), vote)
 }
 
 func (r *reducer) sendResults(events []wire.Event) {

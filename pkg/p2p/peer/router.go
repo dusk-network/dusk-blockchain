@@ -28,7 +28,7 @@ type messageRouter struct {
 }
 
 func (m *messageRouter) Collect(b *bytes.Buffer) error {
-	topic, err := extractTopic(b)
+	topic, err := topics.Extract(b)
 	if err != nil {
 		return err
 	}

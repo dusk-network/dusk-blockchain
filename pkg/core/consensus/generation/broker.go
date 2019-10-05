@@ -10,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -132,14 +131,15 @@ func (b *broker) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 		panic(err)
 	}
 
+	// XXX: uh? the buffer is locally defined. Why do we propagate a copy of it?
 	copy := *buffer
 	b.eventBroker.Publish(string(topics.Score), &copy)
-	message, err := wire.AddTopic(buffer, topics.Score)
-	if err != nil {
+
+	if err := topics.Prepend(buffer, topics.Score); err != nil {
 		panic(err)
 	}
 
-	return message
+	return buffer
 }
 
 func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
@@ -148,12 +148,12 @@ func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
 		panic(err)
 	}
 
+	// XXX: uh? the buffer is locally defined. Why do we propagate a copy of it?
 	copy := *buffer
 	b.eventBroker.Publish(string(topics.Candidate), &copy)
-	message, err := wire.AddTopic(buffer, topics.Candidate)
-	if err != nil {
+	if err := topics.Prepend(buffer, topics.Candidate); err != nil {
 		panic(err)
 	}
 
-	return message
+	return buffer
 }

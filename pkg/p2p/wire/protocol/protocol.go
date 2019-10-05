@@ -1,10 +1,14 @@
 package protocol
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // ServiceFlag indicates the services provided by the Node.
@@ -26,31 +30,85 @@ var NodeVer = &Version{
 }
 
 // Magic is the network that Dusk is running on
-type Magic uint32
+type Magic uint8
 
 const (
 	// MainNet identifies the production network of the Dusk blockchain
-	MainNet Magic = 0x7630401f
+	MainNet Magic = iota
 	// TestNet identifies the test network of the Dusk blockchain
-	TestNet Magic = 0x74746e41
+	TestNet
 	// DevNet identifies the development network of the Dusk blockchain
-	DevNet Magic = 0x74736e40
+	DevNet
 )
+
+const (
+	mainnetUint32 uint32 = 0x7630401f
+	testnetUint32 uint32 = 0x74746e41
+	devnetUint32  uint32 = 0x74736e40
+)
+
+type magicObj struct {
+	Magic
+	buf bytes.Buffer
+	str string
+}
+
+var magics = [...]magicObj{
+	{MainNet, asBuffer(0x7630401f), "mainnet"},
+	{TestNet, asBuffer(0x74746e41), "testnet"},
+	{DevNet, asBuffer(0x74736e40), "devnet"},
+}
+
+func (m Magic) String() string {
+	return magics[m].str
+}
+
+func (m Magic) ToBuffer() bytes.Buffer {
+	return magics[m].buf
+}
+
+func fromUint32(n uint32) Magic {
+	switch n {
+	case mainnetUint32:
+		return MainNet
+	case testnetUint32:
+		return TestNet
+	default:
+		return DevNet
+	}
+}
+
+func asBuffer(magic uint32) bytes.Buffer {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint32LE(buf, magic); err != nil {
+		panic(err)
+	}
+	return *buf
+}
 
 // MagicFromConfig reads the loaded magic config and tries to map it to magic
 // identifier. Panic, if no match found.
 func MagicFromConfig() Magic {
 
 	magic := cfg.Get().General.Network
-	switch strings.ToLower(magic) {
-	case "devnet":
-		return DevNet
-	case "testnet":
-		return TestNet
-	case "mainnet":
-		return MainNet
+	mstr := strings.ToLower(magic)
+	for _, m := range magics {
+		if mstr == m.str {
+			return m.Magic
+		}
 	}
 
 	// An invalid network identifier might cause node unexpected  behaviour
 	panic(fmt.Sprintf("not a valid network: %s", magic))
+}
+
+// Extract the magic from io.Reader. In case of unknown Magic, it returns DevNet
+func Extract(r io.Reader) (Magic, error) {
+	buffer := make([]byte, 4)
+	if _, err := r.Read(buffer); err != nil {
+		return Magic(byte(255)), err
+	}
+
+	magic := binary.LittleEndian.Uint32(buffer)
+	return fromUint32(magic), nil
 }
