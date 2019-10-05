@@ -1,22 +1,25 @@
 package eventbus
 
-import lg "github.com/sirupsen/logrus"
+import (
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	lg "github.com/sirupsen/logrus"
+)
 
 // Subscriber subscribes a channel to Event notifications on a specific topic
 type Subscriber interface {
-	Subscribe(string, Listener) uint32
-	Unsubscribe(string, uint32)
+	Subscribe(topics.Topic, Listener) uint32
+	Unsubscribe(topics.Topic, uint32)
 }
 
 // Subscribe subscribes to a topic with a channel.
-func (bus *EventBus) Subscribe(topic string, listener Listener) uint32 {
+func (bus *EventBus) Subscribe(topic topics.Topic, listener Listener) uint32 {
 	bus.busLock.Lock()
 	defer bus.busLock.Unlock()
 	return bus.listeners.Store(topic, listener)
 }
 
 // Unsubscribe removes all listeners defined for a topic.
-func (bus *EventBus) Unsubscribe(topic string, id uint32) {
+func (bus *EventBus) Unsubscribe(topic topics.Topic, id uint32) {
 	found := bus.listeners.Delete(topic, id)
 
 	logEB.WithFields(lg.Fields{

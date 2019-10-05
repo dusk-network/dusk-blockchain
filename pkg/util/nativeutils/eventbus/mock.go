@@ -58,18 +58,18 @@ func (a *Adder) Process(buf *bytes.Buffer) error {
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	eb := New()
-	eb.Register(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
+	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
 	// subscribe to gossip topic
 	streamer := NewGossipStreamer()
 	streamListener := NewStreamListener(streamer)
-	eb.Subscribe(string(topics.Gossip), streamListener)
+	eb.Subscribe(topics.Gossip, streamListener)
 
 	return eb, streamer
 }
 
 // CreateFrameStreamer sets up and event bus, subscribes a SimpleStreamer to the
 // gossip topic, and sets the right preprocessors up for the gossip topic.
-func CreateFrameStreamer(topic string) (*EventBus, io.WriteCloser) {
+func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 	eb := New()
 	eb.Register(topic, processing.NewGossip(protocol.TestNet))
 	// subscribe to gossip topic

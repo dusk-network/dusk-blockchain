@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"math/rand"
 	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 // Preprocessor is for mutating a message before it gets notified to the subscribers of a topic
@@ -14,10 +16,10 @@ type Preprocessor interface {
 
 // ProcessorRegistry is a registry of TopicProcessor
 type ProcessorRegistry interface {
-	Preprocess(string, *bytes.Buffer) error
-	Register(string, ...Preprocessor) []uint32
-	RemoveProcessor(string, uint32)
-	RemoveProcessors(string)
+	Preprocess(topics.Topic, *bytes.Buffer) error
+	Register(topics.Topic, ...Preprocessor) []uint32
+	RemoveProcessor(topics.Topic, uint32)
+	RemoveProcessors(topics.Topic)
 }
 
 var _ ProcessorRegistry = (*SafeProcessorRegistry)(nil)
@@ -26,18 +28,18 @@ var _ ProcessorRegistry = (*SafeProcessorRegistry)(nil)
 // It is threadsafe
 type SafeProcessorRegistry struct {
 	sync.RWMutex
-	preprocessors map[string][]idProcessor
+	preprocessors map[topics.Topic][]idProcessor
 }
 
 // NewSafeProcessorRegistry creates a new Preprocessor
 func NewSafeProcessorRegistry() ProcessorRegistry {
 	return &SafeProcessorRegistry{
-		preprocessors: make(map[string][]idProcessor),
+		preprocessors: make(map[topics.Topic][]idProcessor),
 	}
 }
 
 // Preprocess applies to a message all preprocessors registered for a topic
-func (p *SafeProcessorRegistry) Preprocess(topic string, messageBuffer *bytes.Buffer) error {
+func (p *SafeProcessorRegistry) Preprocess(topic topics.Topic, messageBuffer *bytes.Buffer) error {
 	p.RLock()
 	pp := p.preprocessors[topic]
 	p.RUnlock()
@@ -52,7 +54,7 @@ func (p *SafeProcessorRegistry) Preprocess(topic string, messageBuffer *bytes.Bu
 }
 
 // Register creates a new set of TopicProcessor to a specified topic.
-func (p *SafeProcessorRegistry) Register(topic string, preprocessors ...Preprocessor) []uint32 {
+func (p *SafeProcessorRegistry) Register(topic topics.Topic, preprocessors ...Preprocessor) []uint32 {
 	pproc, pprocIds := wrapInIDTopic(topic, preprocessors)
 
 	p.Lock()
@@ -67,7 +69,7 @@ func (p *SafeProcessorRegistry) Register(topic string, preprocessors ...Preproce
 }
 
 //wrapInIDTopic is a convenient function to wrap a slice of TopicProcessor into a slice of idProcessor
-func wrapInIDTopic(topic string, p []Preprocessor) ([]idProcessor, []uint32) {
+func wrapInIDTopic(topic topics.Topic, p []Preprocessor) ([]idProcessor, []uint32) {
 	pproc := make([]idProcessor, len(p))
 	pprocIds := make([]uint32, len(p))
 	for i := 0; i < len(p); i++ {
@@ -82,7 +84,7 @@ func wrapInIDTopic(topic string, p []Preprocessor) ([]idProcessor, []uint32) {
 }
 
 // RemoveProcessor removes all TopicProcessor previously registered on a given topic using its ID
-func (p *SafeProcessorRegistry) RemoveProcessor(topic string, id uint32) {
+func (p *SafeProcessorRegistry) RemoveProcessor(topic topics.Topic, id uint32) {
 	p.Lock()
 	defer p.Unlock()
 	if pprocs, ok := p.preprocessors[topic]; ok {
@@ -98,7 +100,7 @@ func (p *SafeProcessorRegistry) RemoveProcessor(topic string, id uint32) {
 }
 
 // RemoveProcessors removes all TopicProcessor from a topic
-func (p *SafeProcessorRegistry) RemoveProcessors(topic string) {
+func (p *SafeProcessorRegistry) RemoveProcessors(topic topics.Topic) {
 	p.Lock()
 	defer p.Unlock()
 	delete(p.preprocessors, topic)
