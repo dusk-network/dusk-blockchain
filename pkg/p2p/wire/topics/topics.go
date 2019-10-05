@@ -1,113 +1,159 @@
 package topics
 
 import (
-	"bufio"
+	"bytes"
 	"io"
 )
 
 // Topic defines a topic
-type Topic string
-
-// Size is the size of a topic field in bytes
-const Size = 15
+type Topic uint8
 
 // A list of all valid topics
 const (
 	// Standard topics
-	Version Topic = "version"
-	VerAck  Topic = "verack"
-	Ping    Topic = "ping"
-	Pong    Topic = "pong"
+	Version Topic = iota
+	VerAck
+	Ping
+	Pong
 
 	// Data exchange topics
-	Addr          Topic = "addr"
-	GetAddr       Topic = "getaddr"
-	GetData       Topic = "getdata"
-	GetBlocks     Topic = "getblocks"
-	GetHeaders    Topic = "getheaders"
-	Tx            Topic = "tx"
-	Block         Topic = "block"
-	AcceptedBlock Topic = "acceptedblock"
-	Headers       Topic = "headers"
-	MemPool       Topic = "mempool"
-	Inv           Topic = "inv"
-	Certificate   Topic = "certificate"
+	Addr
+	GetAddr
+	GetData
+	GetBlocks
+	GetHeaders
+	Tx
+	Block
+	AcceptedBlock
+	Headers
+	MemPool
+	Inv
+	Certificate
 
 	// Consensus topics
-	Candidate      Topic = "candidate"
-	Score          Topic = "score"
-	Reduction      Topic = "blockreduction"
-	Agreement      Topic = "blockagreement"
-	StartConsensus Topic = "startconsensus"
+	Candidate
+	Score
+	Reduction
+	Agreement
+	StartConsensus
 
 	// Peer topics
-	Gossip Topic = "gossip"
+	Gossip
 
 	// Error topics
-	NotFound Topic = "notfound"
-	Reject   Topic = "reject"
+	NotFound
+	Unknown
+	Reject
+
+	//Internal
+	Initialization
+	RoundUpdate
+	BlockRegeneration
+	BlockSelection
+	ReductionResult
+	NewProvisioner
+	ProvisionerAdded
+	BestScore
+	BlockAgreement
+	Quit
+	BidList
+	WinningBlockHash
+	Absentees
+	RemoveProvisioner
+	AgreementEvent
 )
 
-// TopicToByteArray turns a Topic to a byte array of size 15,
-// to prepare it for sending over the wire protocol.
-func TopicToByteArray(cmd Topic) [Size]byte {
-	bs := [Size]byte{}
-	copy(bs[:], cmd)
-	return bs
+type topicBuf struct {
+	Topic
+	bytes.Buffer
+	str string
 }
 
-// StringToTopic returns a Topic from a string representation
-// It supports only 15 characters topic names. It truncates the rest
-func StringToTopic(tpc string) Topic {
-	var cmd [Size]byte
-	copy(cmd[:], []byte(tpc))
-	return ByteArrayToTopic(cmd)
+var Topics = [...]topicBuf{
+	topicBuf{Version, *(bytes.NewBuffer([]byte{byte(Version)})), "version"},
+	topicBuf{VerAck, *(bytes.NewBuffer([]byte{byte(VerAck)})), "verack"},
+	topicBuf{Ping, *(bytes.NewBuffer([]byte{byte(Ping)})), "ping"},
+	topicBuf{Pong, *(bytes.NewBuffer([]byte{byte(Pong)})), "pong"},
+	topicBuf{Addr, *(bytes.NewBuffer([]byte{byte(Addr)})), "addr"},
+	topicBuf{GetAddr, *(bytes.NewBuffer([]byte{byte(GetAddr)})), "getaddr"},
+	topicBuf{GetData, *(bytes.NewBuffer([]byte{byte(GetData)})), "getdata"},
+	topicBuf{GetBlocks, *(bytes.NewBuffer([]byte{byte(GetBlocks)})), "getblocks"},
+	topicBuf{GetHeaders, *(bytes.NewBuffer([]byte{byte(GetHeaders)})), "getheaders"},
+	topicBuf{Tx, *(bytes.NewBuffer([]byte{byte(Tx)})), "tx"},
+	topicBuf{Block, *(bytes.NewBuffer([]byte{byte(Block)})), "block"},
+	topicBuf{AcceptedBlock, *(bytes.NewBuffer([]byte{byte(AcceptedBlock)})), "acceptedblock"},
+	topicBuf{Headers, *(bytes.NewBuffer([]byte{byte(Headers)})), "headers"},
+	topicBuf{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
+	topicBuf{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
+	topicBuf{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
+	topicBuf{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
+	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
+	topicBuf{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
+	topicBuf{Agreement, *(bytes.NewBuffer([]byte{byte(Agreement)})), "agreement"},
+	topicBuf{StartConsensus, *(bytes.NewBuffer([]byte{byte(StartConsensus)})), "startconsensus"},
+	topicBuf{Gossip, *(bytes.NewBuffer([]byte{byte(Gossip)})), "gossip"},
+	topicBuf{NotFound, *(bytes.NewBuffer([]byte{byte(NotFound)})), "notfound"},
+	topicBuf{Unknown, *(bytes.NewBuffer([]byte{byte(Unknown)})), "unknown"},
+	topicBuf{Reject, *(bytes.NewBuffer([]byte{byte(Reject)})), "reject"},
+	topicBuf{Initialization, *(bytes.NewBuffer([]byte{byte(Initialization)})), "initialization"},
+	topicBuf{RoundUpdate, *(bytes.NewBuffer([]byte{byte(RoundUpdate)})), "roundupdate"},
+	topicBuf{BlockRegeneration, *(bytes.NewBuffer([]byte{byte(BlockRegeneration)})), "blockregeneration"},
+	topicBuf{BlockSelection, *(bytes.NewBuffer([]byte{byte(BlockSelection)})), "blockselection"},
+	topicBuf{ReductionResult, *(bytes.NewBuffer([]byte{byte(ReductionResult)})), "reductionresult"},
+	topicBuf{NewProvisioner, *(bytes.NewBuffer([]byte{byte(NewProvisioner)})), "newprovisioner"},
+	topicBuf{ProvisionerAdded, *(bytes.NewBuffer([]byte{byte(ProvisionerAdded)})), "provisioneradded"},
+	topicBuf{BestScore, *(bytes.NewBuffer([]byte{byte(BestScore)})), "bestscore"},
+	topicBuf{BlockAgreement, *(bytes.NewBuffer([]byte{byte(BlockAgreement)})), "blockagreement"},
+	topicBuf{Quit, *(bytes.NewBuffer([]byte{byte(Quit)})), "quit"},
+	topicBuf{BidList, *(bytes.NewBuffer([]byte{byte(BidList)})), "bidlist"},
+	topicBuf{WinningBlockHash, *(bytes.NewBuffer([]byte{byte(WinningBlockHash)})), "winningblockhash"},
+	topicBuf{Absentees, *(bytes.NewBuffer([]byte{byte(Absentees)})), "absentees"},
+	topicBuf{RemoveProvisioner, *(bytes.NewBuffer([]byte{byte(RemoveProvisioner)})), "removeprovisioner"},
+	topicBuf{AgreementEvent, *(bytes.NewBuffer([]byte{byte(AgreementEvent)})), "agreementevent"},
 }
 
-// ByteArrayToTopic turns a byte array of size 15 into a Topic,
-// for populating a received message header.
-func ByteArrayToTopic(cmd [Size]byte) Topic {
-	buf := []byte{}
-	for i := 0; i < Size; i++ {
-		if cmd[i] == 0 {
-			break
+// String representation of a known topic
+func (t Topic) String() string {
+	if len(Topics) > int(t) {
+		return Topics[t].str
+	}
+	return "unknown"
+}
+
+// StringToTopic turns a string into a Topic if the Topic is in the enum of known topics.
+// Return Unknown topic if the string is not coupled with any
+func StringToTopic(topic string) Topic {
+	for _, t := range Topics {
+		if t.Topic.String() == topic {
+			return t.Topic
 		}
-		buf = append(buf, cmd[i])
 	}
-	return Topic(buf)
+	return Unknown
 }
 
-// Extract the topic by reading the first `topic.Size` bytes
+func Prepend(b *bytes.Buffer, t Topic) {
+	var buf bytes.Buffer
+	if int(t) > len(Topics) {
+		buf = *(bytes.NewBuffer([]byte{byte(t)}))
+	} else {
+		buf = Topics[int(t)].Buffer
+	}
+
+	b.WriteTo(&buf)
+	*b = buf
+}
+
+// Extract the topic from an io.Reader
 func Extract(p io.Reader) (Topic, error) {
-	var cmdBuf [Size]byte
+	var cmdBuf [1]byte
 	if _, err := p.Read(cmdBuf[:]); err != nil {
-		return "", err
+		return Reject, err
 	}
-
-	return ByteArrayToTopic(cmdBuf), nil
-}
-
-// Peek the topic without advancing the reader
-// Deprecated: Peek is several order of magnitude slower than Extract. Even if having to Tee read the whole buffer, Extract should be used
-func Peek(p io.Reader) (Topic, error) {
-	var cmdBuf [Size]byte
-	bf := bufio.NewReader(p)
-
-	topic, err := bf.Peek(Size)
-	if err != nil {
-		return "", err
-	}
-
-	copy(cmdBuf[:], topic)
-	return ByteArrayToTopic(cmdBuf), nil
+	return Topic(cmdBuf[0]), nil
 }
 
 // Write a topic to a Writer
 func Write(r io.Writer, topic Topic) error {
-	topicBytes := TopicToByteArray(topic)
-	if _, err := r.Write(topicBytes[:]); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.Write([]byte{byte(topic)})
+	return err
 }
