@@ -308,7 +308,7 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 
-	t.eb.Publish(string(topics.Tx), buf)
+	t.eb.Publish(topics.Tx, buf)
 
 	return hash, nil
 }

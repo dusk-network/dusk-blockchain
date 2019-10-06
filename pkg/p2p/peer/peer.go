@@ -139,7 +139,7 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	w.gossipID = w.subscriber.Subscribe(string(topics.Gossip), eventbus.NewStreamListener(w.Connection))
+	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(w.Connection))
 
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
@@ -149,7 +149,7 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 func (w *Writer) onDisconnect() {
 	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
 	w.Conn.Close()
-	w.subscriber.Unsubscribe(string(topics.Gossip), w.gossipID)
+	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
 }
 
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {

@@ -108,11 +108,11 @@ func NewMempool(eventBus *eventbus.EventBus, verifyTx func(tx transactions.Trans
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, maxPendingLen)
-	eventbus.NewTopicListener(m.eventBus, m, string(topics.Tx), eventbus.ChannelType)
+	eventbus.NewTopicListener(m.eventBus, m, topics.Tx, eventbus.ChannelType)
 
 	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
 	m.accepted.blockChan = make(chan block.Block)
-	eventbus.NewTopicListener(m.eventBus, &m.accepted, string(topics.AcceptedBlock), eventbus.ChannelType)
+	eventbus.NewTopicListener(m.eventBus, &m.accepted, topics.AcceptedBlock, eventbus.ChannelType)
 
 	return m
 }
@@ -410,7 +410,7 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 		return err
 	}
 
-	m.eventBus.Publish(string(topics.Gossip), buf)
+	m.eventBus.Publish(topics.Gossip, buf)
 	return nil
 }
 

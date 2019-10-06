@@ -3,8 +3,8 @@ package reduction
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -23,7 +23,7 @@ func initBestScoreUpdate(subscriber eventbus.Subscriber) chan *selection.ScoreEv
 	collector := &scoreCollector{
 		bestVotedScoreHashChan: bestVotedScoreHashChan,
 	}
-	eventbus.NewTopicListener(subscriber, collector, string(msg.BestScoreTopic), eventbus.ChannelType)
+	eventbus.NewTopicListener(subscriber, collector, topics.BestScore, eventbus.ChannelType)
 	return bestVotedScoreHashChan
 }
 

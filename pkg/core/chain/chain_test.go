@@ -6,11 +6,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -94,7 +94,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	p.Members[string(k[0].BLSPubKeyBytes)].Stakes[0].EndHeight = 1
 
 	// Update round. This should not remove the third provisioner from our committee
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, nil))
 
 	// Create block 1
 	blk := helper.RandomBlock(t, 1, 1)

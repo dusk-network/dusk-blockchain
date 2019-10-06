@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -35,11 +34,10 @@ type broker struct {
 }
 
 func launchFilter(eventBroker eventbus.Broker, handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
-	agreementTopic := string(topics.Agreement)
 	filter := consensus.NewEventFilter(handler, state, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
-	eventbus.NewTopicListener(eventBroker, filter, agreementTopic, eventbus.CallbackType)
-	eventBroker.Register(agreementTopic, republisher, &consensus.Validator{})
+	eventbus.NewTopicListener(eventBroker, filter, topics.Agreement, eventbus.CallbackType)
+	eventBroker.Register(topics.Agreement, republisher, &consensus.Validator{})
 	return filter
 }
 
@@ -97,7 +95,7 @@ func (b *broker) sendAgreement(voteSet voteSet) error {
 			return err
 		}
 
-		b.publisher.Publish(string(topics.Gossip), msg)
+		b.publisher.Publish(topics.Gossip, msg)
 	}
 
 	return nil
@@ -115,7 +113,7 @@ func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
-	b.publisher.Publish(msg.WinningBlockHashTopic, bytes.NewBuffer(aev.BlockHash))
+	b.publisher.Publish(topics.WinningBlockHash, bytes.NewBuffer(aev.BlockHash))
 }
 
 func (b *broker) publishEvent(evs []wire.Event) {
@@ -129,5 +127,5 @@ func (b *broker) publishEvent(evs []wire.Event) {
 		return
 	}
 
-	b.publisher.Publish(msg.AgreementEventTopic, buf)
+	b.publisher.Publish(topics.AgreementEvent, buf)
 }

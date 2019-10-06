@@ -17,7 +17,6 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -60,7 +59,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	}
 
 	// set up collectors
-	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
+	candidateChan := initBlockCollector(eventBus, topics.Candidate)
 	certificateChan := initCertificateCollector(eventBus)
 
 	chain := &Chain{
@@ -78,8 +77,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 
 	// Hook the chain up to the required topics
 	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
-	eventBus.Subscribe(string(topics.Block), cbListener)
-	eventBus.Register(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
+	eventBus.Subscribe(topics.Block, cbListener)
+	eventBus.Register(topics.Candidate, consensus.NewRepublisher(eventBus, topics.Candidate))
 	return chain, nil
 }
 
@@ -125,12 +124,12 @@ func (c *Chain) Listen() {
 func (c *Chain) LaunchConsensus() {
 	initChan := make(chan bytes.Buffer, 1)
 	l := eventbus.NewChanListener(initChan)
-	id := c.eventBus.Subscribe(msg.InitializationTopic, l)
+	id := c.eventBus.Subscribe(topics.Initialization, l)
 	<-initChan
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	c.sendRoundUpdate(c.prevBlock.Header.Height+1, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
-	c.eventBus.Unsubscribe(msg.InitializationTopic, id)
+	c.eventBus.Unsubscribe(topics.Initialization, id)
 }
 
 func (c *Chain) propagateBlock(blk block.Block) error {
@@ -139,7 +138,7 @@ func (c *Chain) propagateBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.Gossip), &buffer)
+	c.eventBus.Publish(topics.Gossip, &buffer)
 	return nil
 }
 
@@ -254,7 +253,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
+	c.eventBus.Publish(topics.AcceptedBlock, buf)
 
 	// 9. Send round update
 	// We send a round update after accepting a new block, which should include
@@ -297,7 +296,7 @@ func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
 		return err
 	}
 
-	c.eventBus.Publish(msg.RoundUpdateTopic, buf)
+	c.eventBus.Publish(topics.RoundUpdate, buf)
 	return nil
 }
 
@@ -367,7 +366,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.Gossip), buf)
+	c.eventBus.Publish(topics.Gossip, buf)
 	return nil
 }
 

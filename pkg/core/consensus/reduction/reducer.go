@@ -9,7 +9,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -198,7 +197,7 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 		return
 	}
 
-	r.publisher.Publish(string(topics.Gossip), vote)
+	r.publisher.Publish(topics.Gossip, vote)
 }
 
 func (r *reducer) sendResults(events []wire.Event) {
@@ -213,7 +212,7 @@ func (r *reducer) sendResults(events []wire.Event) {
 			return
 		}
 	}
-	r.publisher.Publish(msg.ReductionResultTopic, buf)
+	r.publisher.Publish(topics.ReductionResult, buf)
 }
 
 func logErr(err error, hash []byte, msg string) {
@@ -240,7 +239,7 @@ func (r *reducer) publishRegeneration() {
 	roundAndStep := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundAndStep, r.ctx.state.Round())
 	roundAndStep = append(roundAndStep, byte(r.ctx.state.Step()))
-	r.publisher.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(roundAndStep))
+	r.publisher.Publish(topics.BlockRegeneration, bytes.NewBuffer(roundAndStep))
 }
 
 func (r *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer) bool {

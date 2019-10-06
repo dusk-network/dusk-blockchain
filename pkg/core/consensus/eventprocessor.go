@@ -33,7 +33,7 @@ func (r *Republisher) Process(eventBuffer *bytes.Buffer) error {
 		return err
 	}
 
-	r.publisher.Publish(string(topics.Gossip), eventBuffer)
+	r.publisher.Publish(topics.Gossip, eventBuffer)
 	return nil
 }
 

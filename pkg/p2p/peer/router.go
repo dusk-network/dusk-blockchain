@@ -68,7 +68,7 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {
-				m.publisher.Publish(string(topic), b)
+				m.publisher.Publish(topic, b)
 			}
 		} else {
 			err = fmt.Errorf("%s topic not routable", string(topic))

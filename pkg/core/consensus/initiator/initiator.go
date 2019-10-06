@@ -12,10 +12,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
@@ -114,7 +114,7 @@ func sendInitMessage(publisher eventbus.Publisher, startingRound uint64) {
 
 	roundBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundBytes, startingRound)
-	publisher.Publish(msg.InitializationTopic, bytes.NewBuffer(roundBytes))
+	publisher.Publish(topics.Initialization, bytes.NewBuffer(roundBytes))
 
 }
 

@@ -101,7 +101,7 @@ func Setup() *Server {
 	}
 
 	gossip := processing.NewGossip(protocol.TestNet)
-	eventBus.Register(string(topics.Gossip), gossip)
+	eventBus.Register(topics.Gossip, gossip)
 
 	return srv
 }

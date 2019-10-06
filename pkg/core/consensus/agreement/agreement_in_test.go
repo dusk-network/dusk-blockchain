@@ -37,7 +37,7 @@ func TestAgreementRace(t *testing.T) {
 	broker.updateRound(consensus.RoundUpdate{1, *p, nil, seed, hash})
 	go broker.Listen()
 
-	eb.Register(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
+	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
 	// We need to catch the outgoing agreement message
 	// Let's add a SimpleStreamer to the eventbus handlers
 

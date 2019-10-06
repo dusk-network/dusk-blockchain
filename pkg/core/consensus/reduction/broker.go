@@ -42,8 +42,8 @@ func launchReductionFilter(eventBroker eventbus.Broker, ctx *context) *consensus
 	filter := consensus.NewEventFilter(ctx.handler, ctx.state, true)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
 	cbListener := eventbus.NewCallbackListener(filter.Collect)
-	eventBroker.Subscribe(string(topics.Reduction), cbListener)
-	eventBroker.Register(string(topics.Reduction), republisher, &consensus.Validator{})
+	eventBroker.Subscribe(topics.Reduction, cbListener)
+	eventBroker.Register(topics.Reduction, republisher, &consensus.Validator{})
 	return filter
 }
 
