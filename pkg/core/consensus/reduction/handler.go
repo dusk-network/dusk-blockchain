@@ -40,6 +40,10 @@ func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) 
 	return b.Handler.IsMember(pubKeyBLS, round, step, maxCommitteeSize)
 }
 
+func (b *reductionHandler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
+	return b.Handler.VotesFor(pubKeyBLS, round, step, maxCommitteeSize)
+}
+
 func (b *reductionHandler) ExtractHeader(e wire.Event) *header.Header {
 	ev := e.(*Reduction)
 	return &header.Header{

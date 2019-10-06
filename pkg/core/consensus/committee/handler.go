@@ -34,6 +34,11 @@ func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8, maxSize i
 	return b.Committee(round, step, maxSize).IsMember(pubKeyBLS)
 }
 
+// VotesFor returns the amount of votes for a public key for a given round and step.
+func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8, maxSize int) int {
+	return b.Committee(round, step, maxSize).OccurrencesOf(pubKeyBLS)
+}
+
 // Committee returns a VotingCommittee for a given round and step.
 func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCommittee {
 	if b.membersAt(step-1) == 0 {

@@ -23,7 +23,7 @@ import (
 var timeOut = 4000 * time.Millisecond
 
 func TestStress(t *testing.T) {
-	eventBus, _, _, k := launchReductionTest(true, 25)
+	eventBus, _, _, k := launchReductionTest(true, 15)
 
 	// subscribe for the voteset
 	voteSetChan := make(chan *bytes.Buffer, 1)
@@ -35,11 +35,11 @@ func TestStress(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 
 	// Do 10 reduction cycles in a row
-	for i := 0; i < 10; i++ {
+	for i := 1; i <= 10; i++ {
 		go launchCandidateVerifier(false)
 		go func() {
 			// Blast the reducer with many more events than quorum, to see if anything will sneak in
-			for i := 1; i <= 50; i++ {
+			for i := 1; i <= 20; i++ {
 				go sendReductionBuffers(k, hash, 1, uint8(i), eventBus)
 			}
 		}()
@@ -59,13 +59,18 @@ func TestStress(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Make sure we have an equal amount of votes for each step, and no events snuck in where they don't belong
-		stepMap := make(map[uint8]int)
 		for _, vote := range voteSet {
-			stepMap[vote.(*reduction.Reduction).Step%2]++
+			if int(vote.(*reduction.Reduction).Step) != i*2 && int(vote.(*reduction.Reduction).Step) != (i*2)-1 {
+				t.Fatal("found vote which doesn't belong in the set")
+			}
 		}
 
-		assert.Equal(t, stepMap[1], stepMap[0])
+		// Make sure we clean up any hanging goroutine
+		select {
+		case rpcbus.VerifyCandidateBlockChan <- rpcbus.Req{}:
+		default:
+		}
+
 	}
 }
 

@@ -3,7 +3,6 @@ package agreement
 import (
 	"bytes"
 	"encoding/binary"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -48,7 +46,7 @@ func TestAgreementRace(t *testing.T) {
 	// this should cause our step counter to be off in the next round.
 	// First, we make a voteset for the `sendAgreement` call.
 	ru := reduction.NewUnMarshaller()
-	events := createVoteSet(t, k, hash, committeeSize, 1)
+	events := CreateCommitteeVoteSet(p, k, hash, committeeSize, 1, 1)
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, 1); err != nil {
 		t.Fatal(err)
@@ -69,31 +67,52 @@ func TestAgreementRace(t *testing.T) {
 	// with the aggregation.
 	eb.Publish(msg.ReductionResultTopic, buf)
 
-	// Read and discard the resulting event
-	if _, err := streamer.Read(); err != nil {
-		t.Fatal(err)
+	doneChan := make(chan []byte, 1)
+	go readEvent(t, doneChan, streamer)
+
+	select {
+	case <-doneChan:
+	case <-time.After(1 * time.Second):
+		// Make sure the goroutine dies
+		eb.Stream(string(topics.Gossip), bytes.NewBufferString("pippopippopippopippo"))
+		<-doneChan
 	}
 
 	// Let's now create a reduction vote set with the previous public keys
-	hash, _ = crypto.RandEntropy(32)
-	events = createVoteSet(t, k, hash, committeeSize, 2)
-	buf.Reset()
-	if err := encoding.WriteUint64LE(buf, 2); err != nil {
-		t.Fatal(err)
+	var aevBuf *bytes.Buffer
+
+	// Because the sortition now allows multiple extraction,
+	// we can not guarantee we are in the committee at any
+	// given point. So, we will keep looping until we are.
+	for i := 1; ; i += 2 {
+		buf := new(bytes.Buffer)
+		hash, _ = crypto.RandEntropy(32)
+		events := CreateCommitteeVoteSet(p, k, hash, committeeSize, 2, uint8(i))
+		if err := encoding.WriteUint64LE(buf, 2); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := ru.MarshalVoteSet(buf, events); err != nil {
+			t.Fatal(err)
+		}
+
+		eb.Publish(msg.ReductionResultTopic, buf)
+
+		doneChan := make(chan []byte, 1)
+		go readEvent(t, doneChan, streamer)
+
+		select {
+		case aevBytes := <-doneChan:
+			aevBuf = bytes.NewBuffer(aevBytes)
+		case <-time.After(1 * time.Second):
+			// Make sure the goroutine dies
+			eb.Stream(string(topics.Gossip), bytes.NewBufferString("pippopippopippopippo"))
+			<-doneChan
+			continue
+		}
+
+		break
 	}
-
-	if err := ru.MarshalVoteSet(buf, events); err != nil {
-		t.Fatal(err)
-	}
-
-	eb.Publish(msg.ReductionResultTopic, buf)
-
-	aevBytes, err := streamer.Read()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	aevBuf := bytes.NewBuffer(aevBytes)
 
 	// Remove Ed25519 stuff first
 	// 64 for signature + 32 for pubkey = 96
@@ -114,6 +133,15 @@ func TestAgreementRace(t *testing.T) {
 	}
 }
 
+func readEvent(t *testing.T, doneChan chan []byte, streamer *helper.SimpleStreamer) {
+	bs, err := streamer.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doneChan <- bs
+}
+
 func TestStress(t *testing.T) {
 	// Setup stuff
 	committeeSize := 10
@@ -132,7 +160,7 @@ func TestStress(t *testing.T) {
 		// Blast the filter with many more events than quorum, to see if anything sneaks in
 		go func(i int) {
 			for j := 0; j < committeeSize; j++ {
-				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k, p.CreateVotingCommittee(uint64(i), 1, committeeSize)))
+				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k, p))
 			}
 		}(i)
 
@@ -171,29 +199,4 @@ func TestIncrementOnNilVoteSet(t *testing.T) {
 
 	// Now, the step counter should be at 2
 	assert.Equal(t, uint8(2), broker.state.Step())
-}
-
-func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int, round uint64) (events []wire.Event) {
-	for i := 1; i <= 2; i++ {
-		// We should only pick a certain key once, no dupes.
-		picked := make(map[int]struct{})
-
-		// We need 75% of the committee size worth of events to reach quorum.
-		for j := 0; j < int(float64(size)*0.75); j++ {
-			// Key choices need to be randomized. There is no sorting in production.
-			var n int
-			for {
-				n = rand.Intn(size)
-				if _, ok := picked[n]; !ok {
-					picked[n] = struct{}{}
-					break
-				}
-			}
-
-			ev := reduction.MockReduction(k[n], hash, round, uint8(i))
-			events = append(events, ev)
-		}
-	}
-
-	return
 }

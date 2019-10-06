@@ -66,7 +66,9 @@ func (b *broker) Listen() {
 			b.publishEvent(evs)
 			b.publishWinningHash(evs)
 		case voteSet := <-b.resultChan:
-			b.sendAgreement(voteSet)
+			if err := b.sendAgreement(voteSet); err != nil {
+				log.WithField("process", "agreement").WithError(err).Warnln("sending agreement failed")
+			}
 		case roundUpdate := <-b.roundChan:
 			b.updateRound(roundUpdate)
 		}
@@ -107,8 +109,8 @@ func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 		"process": "agreement",
 		"round":   roundUpdate.Round,
 	}).Debugln("updating round")
-	b.handler.UpdateProvisioners(roundUpdate.P)
 	b.filter.UpdateRound(roundUpdate.Round)
+	b.handler.UpdateProvisioners(roundUpdate.P)
 	b.filter.FlushQueue()
 }
 

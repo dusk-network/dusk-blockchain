@@ -42,7 +42,7 @@ func (sec *AccumulatorStore) Contains(event wire.Event, identifier string) bool 
 	return false
 }
 
-// Insert the Event keeping track of the identifier (step, block hash, voted hash)
+// Insert the Event `count` times, keeping track of the identifier (step, block hash, voted hash)
 // it belongs to. It silently ignores duplicates (meaning it does not store an event
 // in case it is already found at the identifier specified). It returns the number of
 // events stored at specified identifier *after* the store operation

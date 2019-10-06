@@ -14,7 +14,7 @@ func TestVoteVerification(t *testing.T) {
 	p, keys := consensus.MockProvisioners(50)
 
 	hash, _ := crypto.RandEntropy(32)
-	ev := MockAgreementEvent(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 50))
+	ev := MockAgreementEvent(hash, 1, 1, keys, p)
 	handler := newHandler(user.Keys{})
 	handler.Handler.Provisioners = *p
 	assert.NoError(t, handler.Verify(ev))

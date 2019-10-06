@@ -80,19 +80,8 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 		}
 
 		score := generateSortitionScore(hash, W)
-		idx, blsPk := p.extractCommitteeMember(score)
-		if !votingCommittee.Insert(blsPk) {
-			for {
-				idx++
-				if idx >= len(p.Members) {
-					idx = 0
-				}
-				m := p.MemberAt(idx)
-				if votingCommittee.Insert(m.PublicKeyBLS) {
-					break
-				}
-			}
-		}
+		_, blsPk := p.extractCommitteeMember(score)
+		votingCommittee.Insert(blsPk)
 	}
 
 	return *votingCommittee

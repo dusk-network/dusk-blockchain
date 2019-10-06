@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -18,6 +17,7 @@ type AccumulatorHandler interface {
 	ExtractIdentifier(wire.Event, *bytes.Buffer) error
 	Quorum() int
 	IsMember([]byte, uint64, uint8) bool
+	VotesFor([]byte, uint64, uint8) int
 }
 
 // Accumulator is a generic event accumulator, that will accumulate events until it
@@ -25,6 +25,7 @@ type AccumulatorHandler interface {
 type Accumulator struct {
 	WorkerTimeOut time.Duration
 	wire.Store
+	quorumCounter      int
 	state              State
 	checkStep          bool
 	handler            AccumulatorHandler
@@ -55,11 +56,6 @@ func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State, c
 // Process a received Event, by passing it to a worker in the worker pool (if the event
 // sender is part of the voting committee).
 func (a *Accumulator) Process(ev wire.Event) {
-	if a.shouldSkip(ev) {
-		log.WithError(errors.New("sender not part of committee")).Debugln("event dropped")
-		return
-	}
-
 	a.verificationChan <- ev
 }
 
@@ -77,11 +73,14 @@ func (a *Accumulator) Accumulate() {
 			b := new(bytes.Buffer)
 			if err := a.handler.ExtractIdentifier(ev, b); err == nil {
 				hash := hex.EncodeToString(b.Bytes())
-				count := a.Insert(ev, hash)
-				if count >= a.handler.Quorum() {
+				_ = a.Insert(ev, hash)
+				header := a.handler.ExtractHeader(ev)
+				a.quorumCounter += a.handler.VotesFor(ev.Sender(), header.Round, header.Step)
+				if a.quorumCounter >= a.handler.Quorum() {
 					votes := a.Get(hash)
 					a.CollectedVotesChan <- votes
 					a.Clear()
+					a.quorumCounter = 0
 				}
 			}
 		case <-ticker.C:
@@ -92,18 +91,13 @@ func (a *Accumulator) Accumulate() {
 		}
 	}
 }
+
 func (a *Accumulator) isObsolete(ev wire.Event) bool {
 	header := a.handler.ExtractHeader(ev)
 	if !a.checkStep {
 		return header.Round < a.state.Round()
 	}
 	return header.Step < a.state.Step() || header.Round < a.state.Round()
-}
-
-// ShouldSkip checks if the message is propagated by a committee member.
-func (a *Accumulator) shouldSkip(ev wire.Event) bool {
-	header := a.handler.ExtractHeader(ev)
-	return !a.handler.IsMember(ev.Sender(), header.Round, header.Step)
 }
 
 func (a *Accumulator) CreateWorkers() {

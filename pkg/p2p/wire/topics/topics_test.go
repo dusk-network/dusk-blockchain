@@ -95,7 +95,7 @@ func mockAggro() *bytes.Buffer {
 	hash, _ := crypto.RandEntropy(32)
 
 	p, ks := consensus.MockProvisioners(3)
-	aggro := agreement.MockAgreement(hash, uint64(1), uint8(2), ks, p.CreateVotingCommittee(1, 2, 3))
+	aggro := agreement.MockAgreement(hash, uint64(1), uint8(2), ks, p)
 	_ = topics.Write(aggro, topics.Agreement)
 	return aggro
 }

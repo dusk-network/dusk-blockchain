@@ -72,24 +72,6 @@ func TestFailedVerification(t *testing.T) {
 	}
 }
 
-// Test that events which come from senders which are not in the committee are ignored.
-func TestNonCommitteeEvent(t *testing.T) {
-	// Make an accumulator that should fail verification every time
-	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1, nil, []byte{}, 2, "foo", false), consensus.NewAccumulatorStore(), consensus.NewState(), false)
-	accumulator.CreateWorkers()
-	go accumulator.Accumulate()
-	// Send two mock events to the accumulator
-	accumulator.Process(newMockEvent())
-	accumulator.Process(newMockEvent())
-	// We should not get anything from the CollectedVotesChan
-	timer := time.After(100 * time.Millisecond)
-	select {
-	case <-accumulator.CollectedVotesChan:
-		t.Fatal("reached quorum when passed events should have been dropped")
-	case <-timer:
-	}
-}
-
 type mockAccumulatorHandler struct {
 	identifier string
 	consensus.EventHandler
@@ -141,4 +123,8 @@ func (m *mockAccumulatorHandler) Quorum() int {
 
 func (m *mockAccumulatorHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
 	return m.isMember
+}
+
+func (m *mockAccumulatorHandler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
+	return 1
 }

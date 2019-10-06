@@ -45,6 +45,10 @@ func (a *agreementHandler) Committee(round uint64, step uint8) user.VotingCommit
 	return a.Handler.Committee(round, step, MaxCommitteeSize)
 }
 
+func (a *agreementHandler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
+	return a.Handler.VotesFor(pubKeyBLS, round, step, MaxCommitteeSize)
+}
+
 func (a *agreementHandler) Quorum() int {
 	return int(float64(a.CommitteeSize(MaxCommitteeSize)) * 0.75)
 }
@@ -75,12 +79,12 @@ func (a *agreementHandler) Verify(e wire.Event) error {
 		subcommittee := committee.Intersect(votes.BitSet)
 
 		allVoters += len(subcommittee)
-		apk, err := ReconstructApk(subcommittee)
-		if err != nil {
-			return err
-		}
+		// _, err := ReconstructApk(subcommittee)
+		// if err != nil {
+		// 	return err
+		// }
 
-		if err := VerifySignatures(ev.Round, step, ev.BlockHash, apk, votes.Signature); err != nil {
+		if err := VerifySignatures(ev.Round, step, ev.BlockHash, votes.Apk, votes.Signature); err != nil {
 			return err
 		}
 	}
@@ -97,17 +101,24 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	if len(subcommittee) == 0 {
 		return nil, errors.New("Subcommittee is empty")
 	}
+
+	// We need to avoid adding duplicates to the APK, as it will cause verification to fail.
+	duplicates := make(map[string]struct{})
+
 	for i, ipk := range subcommittee {
-		pk, err := bls.UnmarshalPk(ipk.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		if i == 0 {
-			apk = bls.NewApk(pk)
-			continue
-		}
-		if err := apk.Aggregate(pk); err != nil {
-			return nil, err
+		if _, ok := duplicates[string(ipk.Bytes())]; !ok {
+			duplicates[string(ipk.Bytes())] = struct{}{}
+			pk, err := bls.UnmarshalPk(ipk.Bytes())
+			if err != nil {
+				return nil, err
+			}
+			if i == 0 {
+				apk = bls.NewApk(pk)
+				continue
+			}
+			if err := apk.Aggregate(pk); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -206,7 +217,17 @@ func (a *agreementHandler) Aggregate(h *header.Header, voteSet []wire.Event) (*A
 		if err := sv.StepVotes.Add(reduction.SignedHash, reduction.Sender(), reduction.Step); err != nil {
 			return nil, err
 		}
-		sv.Set.Insert(reduction.PubKeyBLS)
+
+		// We only include events in the vote set once, but we need to
+		// insert the sender's public key into the sorted set as many times
+		// as they appear in the committee.
+		// This ensures a proper packing and unpacking of the bitset, as well as
+		// a proper unmarshalling of the BLS public keys and signatures.
+		occurrences := a.VotesFor(reduction.PubKeyBLS, reduction.Round, reduction.Step)
+		for i := 0; i < occurrences; i++ {
+			sv.Set.Insert(reduction.PubKeyBLS)
+		}
+
 		stepVotesMap[reduction.Step] = sv
 	}
 

@@ -29,7 +29,7 @@ func TestBroker(t *testing.T) {
 
 	hash, _ := crypto.RandEntropy(32)
 	for i := 0; i < 3; i++ {
-		eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+		eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p))
 	}
 
 	winningHash := <-winningHashChan
@@ -42,8 +42,8 @@ func TestNoQuorum(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	eb, winningHashChan := initAgreement(keys[0])
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p))
 
 	select {
 	case <-winningHashChan:
@@ -58,7 +58,7 @@ func TestSkipNoMember(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	eb, winningHashChan := initAgreement(keys[0])
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p))
 
 	select {
 	case <-winningHashChan:

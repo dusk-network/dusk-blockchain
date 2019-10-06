@@ -90,6 +90,20 @@ func TestFlushQueueNoCheckStep(t *testing.T) {
 	assert.Equal(t, 1, len(evs))
 }
 
+// Test that events which come from senders which are not in the committee are ignored.
+func TestNonCommitteeEvent(t *testing.T) {
+	// Make an accumulator that should fail verification every time
+	eventFilter := newEventFilter(1, 1, false, true)
+	eventFilter.UpdateRound(1)
+
+	// Attempt to collect an event
+	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+
+	// We should not get anything accumulator.All()
+	evs := eventFilter.Accumulator.All()
+	assert.Empty(t, evs)
+}
+
 // newEventFilter simplifies the creation of an EventFilter with specific mocked
 // components.
 func newEventFilter(round uint64, step uint8, isMember bool, checkStep bool) *consensus.EventFilter {

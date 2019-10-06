@@ -466,14 +466,15 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, endHeight uin
 	stake := user.Stake{amount, endHeight}
 
 	// Check for duplicates
-	inserted := c.p.Set.Insert(pubKeyBLS)
-	if !inserted {
+	_, inserted := c.p.Set.IndexOf(pubKeyBLS)
+	if inserted {
 		// If they already exist, just add their new stake
 		c.p.Members[i].AddStake(stake)
 		return nil
 	}
 
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
+	c.p.Set.Insert(pubKeyBLS)
 	m := &user.Member{}
 	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
 

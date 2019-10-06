@@ -2,10 +2,12 @@ package consensus
 
 import (
 	"bytes"
+	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	log "github.com/sirupsen/logrus"
 )
 
 type (
@@ -62,6 +64,12 @@ func (ef *EventFilter) Collect(buffer *bytes.Buffer) error {
 	}
 
 	if ef.isRelevant(roundDiff, stepDiff) {
+		if !ef.inCommittee(ev.Sender(), header.Round, header.Step) {
+			log.WithError(errors.New("sender not part of committee")).Debugln("event dropped")
+			ef.lock.Unlock()
+			return nil
+		}
+
 		ef.Accumulator.Process(ev)
 	}
 
@@ -86,6 +94,10 @@ func (ef *EventFilter) isRelevant(roundDiff, stepDiff int) bool {
 	}
 	relevantStep := stepDiff == 0
 	return relevantRound && relevantStep
+}
+
+func (ef *EventFilter) inCommittee(sender []byte, round uint64, step uint8) bool {
+	return ef.handler.IsMember(sender, round, step)
 }
 
 // UpdateRound updates the state for the EventFilter, and empties the queue of
