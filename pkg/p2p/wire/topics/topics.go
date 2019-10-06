@@ -63,6 +63,7 @@ const (
 	AgreementEvent
 	Log
 	Monitor
+	Test
 )
 
 type topicBuf struct {
@@ -114,6 +115,7 @@ var Topics = [...]topicBuf{
 	topicBuf{AgreementEvent, *(bytes.NewBuffer([]byte{byte(AgreementEvent)})), "agreementevent"},
 	topicBuf{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
 	topicBuf{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
+	topicBuf{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {

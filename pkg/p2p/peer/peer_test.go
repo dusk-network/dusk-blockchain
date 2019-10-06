@@ -53,7 +53,7 @@ func TestReader(t *testing.T) {
 	// Our message should come in on the agreement topic
 	agreementChan := make(chan bytes.Buffer, 1)
 	l := eventbus.NewChanListener(agreementChan)
-	eb.Subscribe(string(topics.Agreement), l)
+	eb.Subscribe(topics.Agreement, l)
 
 	go peerReader.ReadLoop()
 
@@ -65,7 +65,7 @@ func TestReader(t *testing.T) {
 func TestWriteRingBuffer(t *testing.T) {
 	bus := eventbus.New()
 	g := processing.NewGossip(protocol.TestNet)
-	bus.Register(string(topics.Gossip), g)
+	bus.Register(topics.Gossip, g)
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
@@ -78,7 +78,7 @@ func TestWriteRingBuffer(t *testing.T) {
 	}
 
 	for i := 0; i < 1000; i++ {
-		bus.Publish(string(topics.Gossip), ev)
+		bus.Publish(topics.Gossip, ev)
 	}
 }
 
@@ -112,7 +112,7 @@ func TestWriteLoop(t *testing.T) {
 func BenchmarkWriter(b *testing.B) {
 	bus := eventbus.New()
 	g := processing.NewGossip(protocol.TestNet)
-	bus.Register(string(topics.Gossip), g)
+	bus.Register(topics.Gossip, g)
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
@@ -126,7 +126,7 @@ func BenchmarkWriter(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bus.Publish(string(topics.Gossip), ev)
+		bus.Publish(topics.Gossip, ev)
 	}
 }
 

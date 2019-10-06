@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -44,7 +43,7 @@ func TestAgreementRace(t *testing.T) {
 	streamer := eventbus.NewGossipStreamer()
 	streamListener := eventbus.NewStreamListener(streamer)
 
-	eb.Subscribe(string(topics.Gossip), streamListener)
+	eb.Subscribe(topics.Gossip, streamListener)
 
 	// Create an agreement message, and update the round concurrently. If the bug has not been fixed,
 	// this should cause our step counter to be off in the next round.
@@ -64,12 +63,12 @@ func TestAgreementRace(t *testing.T) {
 	// Note that we start this goroutine before trying to aggregate the voteset,
 	// as it takes a short while to start up.
 	go func() {
-		eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, nil))
+		eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, nil))
 	}()
 
 	// Now we try to aggregate the reduction events created earlier. The round update should coincide
 	// with the aggregation.
-	eb.Publish(msg.ReductionResultTopic, buf)
+	eb.Publish(topics.ReductionResult, buf)
 
 	// Read and discard the resulting event
 	if _, err := streamer.Read(); err != nil {
@@ -88,7 +87,7 @@ func TestAgreementRace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eb.Publish(msg.ReductionResultTopic, buf)
+	eb.Publish(topics.ReductionResult, buf)
 
 	aevBytes, err := streamer.Read()
 	if err != nil {
@@ -122,7 +121,7 @@ func TestStress(t *testing.T) {
 	bus := eventbus.New()
 	p, k := consensus.MockProvisioners(committeeSize)
 	broker := newBroker(bus, k[0])
-	bus.RemoveProcessors(string(topics.Agreement))
+	bus.RemoveProcessors(topics.Agreement)
 	seed, _ := crypto.RandEntropy(33)
 	hash, _ := crypto.RandEntropy(32)
 	broker.updateRound(consensus.RoundUpdate{1, *p, nil, seed, hash})
@@ -134,7 +133,7 @@ func TestStress(t *testing.T) {
 		// Blast the filter with many more events than quorum, to see if anything sneaks in
 		go func(i int) {
 			for j := 0; j < committeeSize; j++ {
-				bus.Publish(string(topics.Agreement), MockAgreement(hash, uint64(i), 1, k, p.CreateVotingCommittee(uint64(i), 1, committeeSize)))
+				bus.Publish(topics.Agreement, MockAgreement(hash, uint64(i), 1, k, p.CreateVotingCommittee(uint64(i), 1, committeeSize)))
 			}
 		}(i)
 
@@ -166,7 +165,7 @@ func TestIncrementOnNilVoteSet(t *testing.T) {
 	// ReductionResult message.
 	roundBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundBytes, 1)
-	bus.Publish(msg.ReductionResultTopic, bytes.NewBuffer(roundBytes))
+	bus.Publish(topics.ReductionResult, bytes.NewBuffer(roundBytes))
 
 	// Wait a bit for the message to go through
 	time.Sleep(200 * time.Millisecond)

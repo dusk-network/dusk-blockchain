@@ -11,7 +11,6 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -61,10 +60,10 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bid := user.Bid{mArr, mArr, 10}
 	bl[0] = bid
 	// Then, send a round update to update the values on the maintainer
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, bl))
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, bl))
 
 	// Send another round update that is within the 'offset', to trigger sending a new pair of txs
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(6, p, bl))
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(6, p, bl))
 
 	// We should get another set of two txs
 	txs = receiveTxs(t, txChan)
@@ -87,7 +86,7 @@ func TestSendOnce(t *testing.T) {
 	_ = receiveTxs(t, txChan)
 
 	// Update round
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, p, nil))
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, nil))
 
 	select {
 	case <-txChan:
@@ -104,7 +103,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *
 	wdb, err := database.New(dbPath)
 	txChan := make(chan bytes.Buffer, 2)
 	l := eventbus.NewChanListener(txChan)
-	bus.Subscribe(string(topics.Tx), l)
+	bus.Subscribe(topics.Tx, l)
 
 	transactor, err := transactor.New(bus, rpcBus, nil, nil)
 	if err != nil {
@@ -134,7 +133,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *
 	// Note: we don't need to mock the bidlist as we should not be included if we want to trigger a bid transaction
 
 	// Send round update, to start the maintainer.
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
 
 	return bus, txChan, p, w.ConsensusKeys(), mScalar
 }

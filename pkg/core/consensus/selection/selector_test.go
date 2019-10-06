@@ -9,7 +9,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/mocks"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -28,7 +27,7 @@ func TestSelection(t *testing.T) {
 	// subscribe to receive a result
 	bestScoreChan := subBestScore(eb)
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	sendMockEvent(eb)
 	sendMockEvent(eb)
@@ -44,7 +43,7 @@ func TestRepropagation(t *testing.T) {
 	eb, streamer := eventbus.CreateGossipStreamer()
 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	sendMockEvent(eb)
 
 	timer := time.AfterFunc(500*time.Millisecond, func() {
@@ -69,7 +68,7 @@ func TestStopSelector(t *testing.T) {
 	bestScoreChan := subBestScore(eb)
 
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	sendMockEvent(eb)
 	sendMockEvent(eb)
 	sendMockEvent(eb)
@@ -93,7 +92,7 @@ func TestTimeOutVariance(t *testing.T) {
 	bestScoreChan := subBestScore(eb)
 
 	// Update round to start the selector
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	// measure time it takes for timer to run out
 	start := time.Now()
 	sendMockEvent(eb)
@@ -131,7 +130,7 @@ func TestObsoleteSelection(t *testing.T) {
 	// subscribe to receive a result
 	bestScoreChan := subBestScore(eb)
 	// Start selection and let it run out
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
 	<-bestScoreChan
 
 	// Now send an event to the selector
@@ -140,7 +139,7 @@ func TestObsoleteSelection(t *testing.T) {
 
 	// Start selection on round 2
 	// This should clear the bestEvent, and let no others through
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(2, nil, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, nil, nil))
 
 	// Result should be nil
 	result := <-bestScoreChan
@@ -150,7 +149,7 @@ func TestObsoleteSelection(t *testing.T) {
 func subBestScore(eb eventbus.Subscriber) chan bytes.Buffer {
 	bestScoreChan := make(chan bytes.Buffer, 2)
 	l := eventbus.NewChanListener(bestScoreChan)
-	eb.Subscribe(msg.BestScoreTopic, l)
+	eb.Subscribe(topics.BestScore, l)
 	return bestScoreChan
 }
 
@@ -158,11 +157,11 @@ func publishRegeneration(eb *eventbus.EventBus) {
 	state := make([]byte, 9)
 	binary.LittleEndian.PutUint64(state[0:8], 1)
 	state[8] = byte(2)
-	eb.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(state))
+	eb.Publish(topics.BlockRegeneration, bytes.NewBuffer(state))
 }
 
 func sendMockEvent(eb *eventbus.EventBus) {
-	eb.Publish(string(topics.Score), bytes.NewBuffer([]byte("foo")))
+	eb.Publish(topics.Score, bytes.NewBuffer([]byte("foo")))
 }
 
 type mockScoreHandler struct {
