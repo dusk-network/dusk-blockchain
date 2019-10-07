@@ -29,11 +29,15 @@ func NewRepublisher(publisher eventbus.Publisher, topic topics.Topic) *Republish
 
 // Process propagates a received event buffer to other nodes in the network.
 func (r *Republisher) Process(eventBuffer *bytes.Buffer) error {
-	if err := topics.Prepend(eventBuffer, r.topic); err != nil {
+	return r.process(*eventBuffer)
+}
+
+func (r *Republisher) process(eventBuffer bytes.Buffer) error {
+	if err := topics.Prepend(&eventBuffer, r.topic); err != nil {
 		return err
 	}
 
-	r.publisher.Publish(topics.Gossip, eventBuffer)
+	r.publisher.Publish(topics.Gossip, &eventBuffer)
 	return nil
 }
 

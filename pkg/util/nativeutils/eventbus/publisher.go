@@ -16,12 +16,12 @@ type Publisher interface {
 func (bus *EventBus) Publish(topic topics.Topic, messageBuffer *bytes.Buffer) {
 	if messageBuffer == nil {
 		err := fmt.Errorf("got a nil message on topic %s", topic)
-		logEB.WithField("topic", string(topic)).WithError(err).Errorln("preprocessor error")
+		logEB.WithField("topic", topic.String()).WithError(err).Errorln("preprocessor error")
 		return
 	}
 
 	if err := bus.Preprocess(topic, messageBuffer); err != nil {
-		logEB.WithField("topic", string(topic)).WithError(err).Errorln("preprocessor error")
+		logEB.WithField("topic", topic.String()).WithError(err).Errorln("preprocessor error")
 		return
 	}
 
