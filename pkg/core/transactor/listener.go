@@ -325,7 +325,7 @@ func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
 }
 
 func (t *Transactor) launchConsensus() {
-	if !cfg.Get().General.WalletOnly {
+	if !t.walletOnly {
 		log.Tracef("Launch consensus")
 		go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}

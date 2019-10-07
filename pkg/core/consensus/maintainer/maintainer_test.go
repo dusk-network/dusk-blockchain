@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 
 	bus = eventbus.New()
 	rpcBus = rpcbus.New()
-	tr, err = transactor.New(bus, rpcBus, nil, nil, wallet.GenerateDecoys, wallet.GenerateInputs)
+	tr, err = transactor.New(bus, rpcBus, nil, nil, wallet.GenerateDecoys, wallet.GenerateInputs, true)
 	if err != nil {
 		panic(err)
 	}

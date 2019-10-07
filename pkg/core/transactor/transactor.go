@@ -32,6 +32,7 @@ type Transactor struct {
 	rb          *rpcbus.RPCBus
 	fetchDecoys transactions.FetchDecoys
 	fetchInputs wallet.FetchInputs
+	walletOnly  bool
 
 	// Passed to the consensus component startup
 	c                 *chainsync.Counter
@@ -39,7 +40,9 @@ type Transactor struct {
 }
 
 // Instantiate a new Transactor struct.
-func New(eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, counter *chainsync.Counter, fdecoys transactions.FetchDecoys, finputs wallet.FetchInputs) (*Transactor, error) {
+func New(eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB,
+	counter *chainsync.Counter, fdecoys transactions.FetchDecoys,
+	finputs wallet.FetchInputs, walletOnly bool) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
@@ -52,6 +55,7 @@ func New(eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, counter *chainsy
 		c:           counter,
 		fetchDecoys: fdecoys,
 		fetchInputs: finputs,
+		walletOnly:  walletOnly,
 	}
 
 	if t.fetchDecoys == nil {
