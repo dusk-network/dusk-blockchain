@@ -13,7 +13,7 @@ import (
 )
 
 // The messageRouter is connected to all of the processing units that are tied to the peer.
-// It sends an incoming message in the right direction, according to it's topic.
+// It sends an incoming message in the right direction, according to its topic.
 type messageRouter struct {
 	publisher eventbus.Publisher
 	dupeMap   *dupemap.DupeMap

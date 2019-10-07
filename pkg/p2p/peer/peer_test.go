@@ -90,7 +90,8 @@ func TestWriteLoop(t *testing.T) {
 	buf := makeAgreementBuffer(10)
 	go func() {
 		responseChan := make(chan *bytes.Buffer)
-		writer := peer.NewWriter(client, protocol.TestNet, bus)
+		g := processing.NewGossip(protocol.TestNet)
+		writer := peer.NewWriter(client, g, bus)
 		go writer.Serve(responseChan, make(chan struct{}, 1))
 
 		bufCopy := *buf
@@ -98,14 +99,20 @@ func TestWriteLoop(t *testing.T) {
 	}()
 
 	r := bufio.NewReader(srv)
-	bs, err := processing.ReadFrame(r)
+	length, err := processing.ReadFrame(r)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Decode and remove magic
-	decoded := bytes.NewBuffer(bs)
+	bs := make([]byte, length)
+	_, err = r.Read(bs)
 
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+
+	decoded := bytes.NewBuffer(bs)
 	assert.Equal(t, decoded.Bytes()[4:], buf.Bytes())
 }
 
@@ -143,7 +150,8 @@ func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 
 func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *peer.Writer {
 	client, srv := net.Pipe()
-	pw := peer.NewWriter(client, protocol.TestNet, bus)
+	g := processing.NewGossip(protocol.TestNet)
+	pw := peer.NewWriter(client, g, bus)
 	go receiveFunc(srv)
 	return pw
 }

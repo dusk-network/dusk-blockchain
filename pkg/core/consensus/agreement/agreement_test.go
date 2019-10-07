@@ -73,7 +73,7 @@ func TestSendAgreement(t *testing.T) {
 	eb, _ := initAgreement(k[0])
 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
 
-	streamer := eventbus.NewGossipStreamer()
+	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	streamListener := eventbus.NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, streamListener)
 	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))

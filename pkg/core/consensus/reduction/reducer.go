@@ -190,9 +190,9 @@ func (r *reducer) GenerateReduction(hash *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	//if err := topics.Prepend(vote, topics.Reduction); err != nil {
-	//	return nil, err
-	//}
+	if err := topics.Prepend(vote, topics.Reduction); err != nil {
+		return nil, err
+	}
 
 	return vote, nil
 }

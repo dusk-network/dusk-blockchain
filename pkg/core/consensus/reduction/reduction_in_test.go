@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,9 @@ func TestReductionIntegrity(t *testing.T) {
 	if err != nil {
 		assert.FailNow(t, "generate reduction returned error")
 	}
+
+	topic, _ := topics.Extract(vote)
+	assert.Equal(t, topics.Reduction, topic)
 
 	gossip := processing.NewGossip(protocol.DevNet)
 	if !assert.NoError(t, gossip.Process(vote)) {

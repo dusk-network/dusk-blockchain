@@ -40,7 +40,7 @@ func TestAgreementRace(t *testing.T) {
 	// We need to catch the outgoing agreement message
 	// Let's add a SimpleStreamer to the eventbus handlers
 
-	streamer := eventbus.NewGossipStreamer()
+	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	streamListener := eventbus.NewStreamListener(streamer)
 
 	eb.Subscribe(topics.Gossip, streamListener)
