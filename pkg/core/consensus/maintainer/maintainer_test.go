@@ -18,23 +18,40 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
 
-const dbPath = "testDb"
 const pass = "password"
+
+var bus *eventbus.EventBus
+var rpcBus *rpcbus.RPCBus
+var tr *transactor.Transactor
+
+func TestMain(m *testing.M) {
+
+	var err error
+
+	bus = eventbus.New()
+	rpcBus = rpcbus.New()
+	tr, err = transactor.New(bus, rpcBus, nil, nil, wallet.GenerateDecoys, wallet.GenerateInputs)
+	if err != nil {
+		panic(err)
+	}
+	go tr.Listen()
+	time.Sleep(100 * time.Millisecond)
+
+	code := m.Run()
+	os.Exit(code)
+}
 
 // Test that the maintainer will properly send new stake and bid transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainStakesAndBids(t *testing.T) {
 
-	// TODO: Enable
-	t.SkipNow()
-
 	bus, txChan, p, keys, m := setupMaintainerTest(t)
-	defer os.RemoveAll(dbPath)
 	defer os.Remove("wallet.dat")
 
 	// receive first txs
@@ -74,7 +91,6 @@ func TestMaintainStakesAndBids(t *testing.T) {
 func TestSendOnce(t *testing.T) {
 
 	bus, txChan, p, _, _ := setupMaintainerTest(t)
-	defer os.RemoveAll(dbPath)
 	defer os.Remove("wallet.dat")
 
 	// receive first txs
@@ -93,32 +109,17 @@ func TestSendOnce(t *testing.T) {
 
 func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
 	// Initial setup
-	bus := eventbus.New()
-	rpcBus := rpcbus.New()
-	//wdb, err := database.New(dbPath)
+
 	txChan := make(chan *bytes.Buffer, 2)
 	bus.Subscribe(string(topics.Tx), txChan)
 
-	transactor, err := transactor.New(bus, rpcBus, nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	go transactor.Listen()
-
-	time.Sleep(100 * time.Millisecond)
-
 	os.Remove(cfg.Get().Wallet.File)
-	_, err = rpcBus.CreateWallet(pass)
-	assert.NoError(t, err)
+	_, err := rpcBus.CreateWallet(pass)
 
 	time.Sleep(100 * time.Millisecond)
 
-	w, err := transactor.Wallet()
+	w, err := tr.Wallet()
 	assert.NoError(t, err)
-
-	//os.Remove(cfg.Get().Wallet.File)
-	//w, err := wallet.New(rand.Read, 2, wdb, wallet.GenerateDecoys, wallet.GenerateInputs, pass)
-	//assert.NoError(t, err)
 
 	_, db := lite.CreateDBConnection()
 	// Ensure we have a genesis block

@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
 var (
@@ -25,10 +26,12 @@ var (
 
 // TODO: rename
 type Transactor struct {
-	w  *wallet.Wallet
-	db database.DB
-	eb eventbus.Broker
-	rb *rpcbus.RPCBus
+	w           *wallet.Wallet
+	db          database.DB
+	eb          eventbus.Broker
+	rb          *rpcbus.RPCBus
+	fetchDecoys transactions.FetchDecoys
+	fetchInputs wallet.FetchInputs
 
 	// Passed to the consensus component startup
 	c                 *chainsync.Counter
@@ -36,17 +39,27 @@ type Transactor struct {
 }
 
 // Instantiate a new Transactor struct.
-func New(eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, counter *chainsync.Counter) (*Transactor, error) {
+func New(eb eventbus.Broker, rb *rpcbus.RPCBus, db database.DB, counter *chainsync.Counter, fdecoys transactions.FetchDecoys, finputs wallet.FetchInputs) (*Transactor, error) {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
 	}
 
 	t := &Transactor{
-		w:  nil,
-		db: db,
-		eb: eb,
-		rb: rb,
-		c:  counter,
+		w:           nil,
+		db:          db,
+		eb:          eb,
+		rb:          rb,
+		c:           counter,
+		fetchDecoys: fdecoys,
+		fetchInputs: finputs,
+	}
+
+	if t.fetchDecoys == nil {
+		t.fetchDecoys = fetchDecoys
+	}
+
+	if t.fetchInputs == nil {
+		t.fetchInputs = fetchInputs
 	}
 
 	err := t.registerMethods()

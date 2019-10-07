@@ -89,7 +89,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter)
+	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil)
 	if err != nil {
 		panic(err)
 	}
