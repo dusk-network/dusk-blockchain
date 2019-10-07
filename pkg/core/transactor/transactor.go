@@ -92,3 +92,12 @@ func (t *Transactor) registerMethods() error {
 
 	return nil
 }
+
+func (t *Transactor) Wallet() (*wallet.Wallet, error) {
+
+	if t.w == nil {
+		return nil, errWalletNotLoaded
+	}
+
+	return t.w, nil
+}

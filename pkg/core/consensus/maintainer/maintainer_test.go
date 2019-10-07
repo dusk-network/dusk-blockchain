@@ -2,7 +2,6 @@ package maintainer_test
 
 import (
 	"bytes"
-	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -19,8 +18,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
@@ -76,9 +73,6 @@ func TestMaintainStakesAndBids(t *testing.T) {
 // Ensure the maintainer does not keep sending bids and stakes until they are included.
 func TestSendOnce(t *testing.T) {
 
-	// TODO: Enable
-	t.SkipNow()
-
 	bus, txChan, p, _, _ := setupMaintainerTest(t)
 	defer os.RemoveAll(dbPath)
 	defer os.Remove("wallet.dat")
@@ -101,7 +95,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, 
 	// Initial setup
 	bus := eventbus.New()
 	rpcBus := rpcbus.New()
-	wdb, err := database.New(dbPath)
+	//wdb, err := database.New(dbPath)
 	txChan := make(chan *bytes.Buffer, 2)
 	bus.Subscribe(string(topics.Tx), txChan)
 
@@ -111,8 +105,20 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan *bytes.Buffer, 
 	}
 	go transactor.Listen()
 
-	w, err := wallet.New(rand.Read, 2, wdb, wallet.GenerateDecoys, wallet.GenerateInputs, pass)
+	time.Sleep(100 * time.Millisecond)
+
+	os.Remove(cfg.Get().Wallet.File)
+	_, err = rpcBus.CreateWallet(pass)
 	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	w, err := transactor.Wallet()
+	assert.NoError(t, err)
+
+	//os.Remove(cfg.Get().Wallet.File)
+	//w, err := wallet.New(rand.Read, 2, wdb, wallet.GenerateDecoys, wallet.GenerateInputs, pass)
+	//assert.NoError(t, err)
 
 	_, db := lite.CreateDBConnection()
 	// Ensure we have a genesis block
