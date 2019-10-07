@@ -28,7 +28,7 @@ func (t *Transactor) loadWallet(password string) (string, error) {
 	}
 
 	// Then load the wallet
-	w, err := wallet.LoadFromFile(testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.LoadFromFile(testnet, db, t.fetchDecoys, t.fetchInputs, password)
 	if err != nil {
 		db.Close()
 		return "", err
@@ -50,7 +50,7 @@ func (t *Transactor) createWallet(password string) (string, error) {
 		return "", err
 	}
 
-	w, err := wallet.New(rand.Read, testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.New(rand.Read, testnet, db, t.fetchDecoys, t.fetchInputs, password)
 	if err != nil {
 		db.Close()
 		return "", err
@@ -80,7 +80,7 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 	}
 
 	// Then load the wallet
-	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, fetchDecoys, fetchInputs, password)
+	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, t.fetchDecoys, t.fetchInputs, password)
 	if err != nil {
 		db.Close()
 		return "", err

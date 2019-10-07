@@ -2,7 +2,6 @@ package maintainer_test
 
 import (
 	"bytes"
-	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -20,24 +19,39 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
 
-const dbPath = "testDb"
 const pass = "password"
+
+var bus *eventbus.EventBus
+var rpcBus *rpcbus.RPCBus
+var tr *transactor.Transactor
+
+func TestMain(m *testing.M) {
+
+	var err error
+
+	bus = eventbus.New()
+	rpcBus = rpcbus.New()
+	tr, err = transactor.New(bus, rpcBus, nil, nil, wallet.GenerateDecoys, wallet.GenerateInputs, true)
+	if err != nil {
+		panic(err)
+	}
+	go tr.Listen()
+	time.Sleep(100 * time.Millisecond)
+
+	code := m.Run()
+	os.Exit(code)
+}
 
 // Test that the maintainer will properly send new stake and bid transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainStakesAndBids(t *testing.T) {
 
-	// TODO: Enable
-	t.SkipNow()
-
 	bus, txChan, p, keys, m := setupMaintainerTest(t)
-	defer os.RemoveAll(dbPath)
 	defer os.Remove("wallet.dat")
 
 	// receive first txs
@@ -76,11 +90,7 @@ func TestMaintainStakesAndBids(t *testing.T) {
 // Ensure the maintainer does not keep sending bids and stakes until they are included.
 func TestSendOnce(t *testing.T) {
 
-	// TODO: Enable
-	t.SkipNow()
-
 	bus, txChan, p, _, _ := setupMaintainerTest(t)
-	defer os.RemoveAll(dbPath)
 	defer os.Remove("wallet.dat")
 
 	// receive first txs
@@ -99,20 +109,17 @@ func TestSendOnce(t *testing.T) {
 
 func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
 	// Initial setup
-	bus := eventbus.New()
-	rpcBus := rpcbus.New()
-	wdb, err := database.New(dbPath)
+
 	txChan := make(chan bytes.Buffer, 2)
 	l := eventbus.NewChanListener(txChan)
 	bus.Subscribe(string(topics.Tx), l)
 
-	transactor, err := transactor.New(bus, rpcBus, nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	go transactor.Listen()
+	os.Remove(cfg.Get().Wallet.File)
+	_, err := rpcBus.CreateWallet(pass)
 
-	w, err := wallet.New(rand.Read, 2, wdb, wallet.GenerateDecoys, wallet.GenerateInputs, pass)
+	time.Sleep(100 * time.Millisecond)
+
+	w, err := tr.Wallet()
 	assert.NoError(t, err)
 
 	_, db := lite.CreateDBConnection()
