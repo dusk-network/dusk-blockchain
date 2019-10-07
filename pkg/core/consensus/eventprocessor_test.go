@@ -30,7 +30,7 @@ func TestValidator(t *testing.T) {
 	assert.NoError(t, err)
 
 	validator := &consensus.Validator{}
-	result, err := validator.Process(buf)
+	err = validator.Process(buf)
 	assert.NoError(t, err)
-	assert.Equal(t, message, result.Bytes())
+	assert.Equal(t, message, buf.Bytes())
 }

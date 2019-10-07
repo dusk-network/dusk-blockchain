@@ -59,14 +59,14 @@ func initCtx(t *testing.T) *ctx {
 		r.Mempool.PoolType = "hashmap"
 		config.Mock(&r)
 		// eventBus
-		var streamer *helper.SimpleStreamer
-		c.bus, streamer = helper.CreateGossipStreamer()
+		var streamer *eventbus.GossipStreamer
+		c.bus, streamer = eventbus.CreateGossipStreamer()
 		// creating the rpcbus
 		c.rpcBus = rpcbus.New()
 
 		c.propagated = make([][]byte, 0)
 
-		go func(streamer *helper.SimpleStreamer, c *ctx) {
+		go func(streamer *eventbus.GossipStreamer, c *ctx) {
 			for {
 				tx, err := streamer.Read()
 				if err != nil {

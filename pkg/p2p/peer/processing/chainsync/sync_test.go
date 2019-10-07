@@ -41,8 +41,9 @@ func TestSynchronizeSynced(t *testing.T) {
 	cs, eb, _ := setupSynchronizer(t)
 
 	// subscribe to topics.Block
-	blockChan := make(chan *bytes.Buffer, 1)
-	_ = eb.Subscribe(string(topics.Block), blockChan)
+	blockChan := make(chan bytes.Buffer, 1)
+	listener := eventbus.NewChanListener(blockChan)
+	_ = eb.Subscribe(string(topics.Block), listener)
 
 	// Make a block which should follow our genesis block
 	blk := randomBlockBuffer(t, 1, 20)
