@@ -60,7 +60,7 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	eb := New()
 	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
 	// subscribe to gossip topic
-	streamer := NewGossipStreamer()
+	streamer := NewGossipStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, streamListener)
 
@@ -73,7 +73,7 @@ func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 	eb := New()
 	eb.Register(topic, processing.NewGossip(protocol.TestNet))
 	// subscribe to gossip topic
-	streamer := NewSimpleStreamer()
+	streamer := NewSimpleStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topic, streamListener)
 
@@ -91,15 +91,17 @@ type SimpleStreamer struct {
 	seenTopics []topics.Topic
 	*bufio.Reader
 	*bufio.Writer
+	gossip *processing.Gossip
 }
 
 // NewSimpleStreamer returns an initialized SimpleStreamer.
-func NewSimpleStreamer() *SimpleStreamer {
+func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 	r, w := io.Pipe()
 	return &SimpleStreamer{
 		seenTopics: make([]topics.Topic, 0),
 		Reader:     bufio.NewReader(r),
 		Writer:     bufio.NewWriter(w),
+		gossip:     processing.NewGossip(magic),
 	}
 }
 
@@ -113,29 +115,27 @@ func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
 }
 
 func (ms *SimpleStreamer) Read() ([]byte, error) {
-	bs, err := processing.ReadFrame(ms.Reader)
+	length, err := ms.gossip.UnpackLength(ms.Reader)
 	if err != nil {
 		return nil, err
 	}
 
-	decoded := bytes.NewBuffer(bs)
-
-	// read and discard the magic
-	magicBuf := make([]byte, 4)
-	if _, err := decoded.Read(magicBuf); err != nil {
+	packet := make([]byte, length)
+	if read, err := ms.Reader.Read(packet); err != nil {
 		return nil, err
+	} else if uint64(read) != length {
+		return nil, io.EOF
 	}
-
-	return decoded.Bytes(), nil
+	return packet, nil
 }
 
 type GossipStreamer struct {
 	*SimpleStreamer
 }
 
-func NewGossipStreamer() *GossipStreamer {
+func NewGossipStreamer(magic protocol.Magic) *GossipStreamer {
 	return &GossipStreamer{
-		SimpleStreamer: NewSimpleStreamer(),
+		SimpleStreamer: NewSimpleStreamer(magic),
 	}
 }
 

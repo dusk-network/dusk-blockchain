@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -26,16 +26,15 @@ var readWriteTimeout = 60 * time.Second // Max idle time for a peer
 type Connection struct {
 	lock sync.Mutex
 	net.Conn
-	magic protocol.Magic
+	gossip *processing.Gossip
 }
 
 // Writer abstracts all of the logic and fields needed to write messages to
 // other network nodes.
 type Writer struct {
 	*Connection
-	gossip     *processing.Gossip
-	gossipID   uint32
 	subscriber eventbus.Subscriber
+	gossipID   uint32
 	// TODO: add service flag
 }
 
@@ -43,22 +42,20 @@ type Writer struct {
 // other network nodes.
 type Reader struct {
 	*Connection
-	unmarshaller *messageUnmarshaller
-	router       *messageRouter
-	exitChan     chan<- struct{} // Way to kill the WriteLoop
+	router   *messageRouter
+	exitChan chan<- struct{} // Way to kill the WriteLoop
 	// TODO: add service flag
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, magic protocol.Magic, subscriber eventbus.Subscriber) *Writer {
+func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
-			Conn:  conn,
-			magic: magic,
+			Conn:   conn,
+			gossip: gossip,
 		},
-		gossip:     processing.NewGossip(magic),
 		subscriber: subscriber,
 	}
 
@@ -67,10 +64,10 @@ func NewWriter(conn net.Conn, magic protocol.Magic, subscriber eventbus.Subscrib
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
+func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
 	pconn := &Connection{
-		Conn:  conn,
-		magic: magic,
+		Conn:   conn,
+		gossip: gossip,
 	}
 
 	_, db := heavy.CreateDBConnection()
@@ -78,9 +75,8 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 	dataRequestor := processing.NewDataRequestor(db, rpcBus, responseChan)
 
 	reader := &Reader{
-		Connection:   pconn,
-		unmarshaller: &messageUnmarshaller{magic},
-		exitChan:     exitChan,
+		Connection: pconn,
+		exitChan:   exitChan,
 		router: &messageRouter{
 			publisher:       publisher,
 			dupeMap:         dupeMap,
@@ -109,7 +105,19 @@ func NewReader(conn net.Conn, magic protocol.Magic, dupeMap *dupemap.DupeMap, pu
 // ReadMessage reads from the connection
 func (c *Connection) ReadMessage() ([]byte, error) {
 	// COBS  c.reader.ReadBytes(0x00)
-	return processing.ReadFrame(c.Conn)
+	length, err := c.gossip.UnpackLength(c.Conn)
+	if err != nil {
+		return nil, err
+	}
+
+	// read a [length]byte from connection
+	buf := make([]byte, int(length))
+	_, err = io.ReadFull(c.Conn, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, err
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
@@ -201,16 +209,7 @@ func (p *Reader) ReadLoop() {
 			return
 		}
 
-		buf := new(bytes.Buffer)
-		if err := p.unmarshaller.Unmarshal(b, buf); err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error unmarshalling message")
-			continue
-		}
-
-		p.router.Collect(buf)
+		p.router.Collect(bytes.NewBuffer(b))
 	}
 }
 

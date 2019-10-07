@@ -10,19 +10,18 @@ import (
 // Publisher publishes serialized messages on a specific topic
 type Publisher interface {
 	Publish(topics.Topic, *bytes.Buffer)
-	//Stream(string, *bytes.Buffer)
 }
 
 // Publish executes callback defined for a topic.
 func (bus *EventBus) Publish(topic topics.Topic, messageBuffer *bytes.Buffer) {
 	if messageBuffer == nil {
 		err := fmt.Errorf("got a nil message on topic %s", topic)
-		logEB.WithError(err).Errorln("preprocessor error")
+		logEB.WithField("topic", string(topic)).WithError(err).Errorln("preprocessor error")
 		return
 	}
 
 	if err := bus.Preprocess(topic, messageBuffer); err != nil {
-		logEB.WithError(err).Errorln("preprocessor error")
+		logEB.WithField("topic", string(topic)).WithError(err).Errorln("preprocessor error")
 		return
 	}
 

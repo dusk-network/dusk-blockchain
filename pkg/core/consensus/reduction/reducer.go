@@ -172,7 +172,7 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 	}
 }
 
-func (r *reducer) sendReduction(hash *bytes.Buffer) {
+func (r *reducer) GenerateReduction(hash *bytes.Buffer) (*bytes.Buffer, error) {
 	vote := new(bytes.Buffer)
 
 	h := &header.Header{
@@ -183,17 +183,24 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 	}
 
 	if err := header.MarshalSignableVote(vote, h); err != nil {
-		logErr(err, hash.Bytes(), "Error during marshalling of the reducer vote")
-		return
+		return nil, err
 	}
 
 	if err := SignBuffer(vote, r.ctx.handler.Keys); err != nil {
-		logErr(err, hash.Bytes(), "Error while signing vote")
-		return
+		return nil, err
 	}
 
-	if err := topics.Prepend(vote, topics.Reduction); err != nil {
-		logErr(err, hash.Bytes(), "Error while adding topic")
+	//if err := topics.Prepend(vote, topics.Reduction); err != nil {
+	//	return nil, err
+	//}
+
+	return vote, nil
+}
+
+func (r *reducer) sendReduction(hash *bytes.Buffer) {
+	vote, err := r.GenerateReduction(hash)
+	if err != nil {
+		logErr(err, hash.Bytes(), "Error while generating reducer vote")
 		return
 	}
 

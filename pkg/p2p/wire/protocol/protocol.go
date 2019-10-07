@@ -59,6 +59,10 @@ var magics = [...]magicObj{
 	{DevNet, asBuffer(0x74736e40), "devnet"},
 }
 
+func (m Magic) Len() int {
+	return magics[m].buf.Len()
+}
+
 func (m Magic) String() string {
 	return magics[m].str
 }

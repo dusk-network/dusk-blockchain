@@ -72,15 +72,6 @@ func (p *Connection) readRemoteMsgVersion() error {
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
 
-	magic, err := protocol.Extract(decodedMsg)
-	if err != nil {
-		return err
-	}
-
-	if magic != p.magic {
-		return errors.New("magic mismatch")
-	}
-
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -100,7 +91,7 @@ func (p *Connection) readRemoteMsgVersion() error {
 }
 
 func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) error {
-	buf := p.magic.ToBuffer()
+	buf := p.gossip.Magic.ToBuffer()
 	if err := topics.Write(&buf, topic); err != nil {
 		return err
 	}
@@ -122,15 +113,6 @@ func (p *Connection) readVerAck() error {
 
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
-
-	magic, err := protocol.Extract(decodedMsg)
-	if err != nil {
-		return err
-	}
-
-	if magic != p.magic {
-		return errors.New("magic mismatch")
-	}
 
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {

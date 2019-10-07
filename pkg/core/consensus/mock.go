@@ -9,6 +9,24 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
+func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) RoundUpdate {
+	var provisioners = p
+	if p == nil {
+		provisioners, _ = MockProvisioners(1)
+	}
+
+	var bidders = bidList
+	if bidList == nil || len(bidList) == 0 {
+		bidders = MockBidList()
+	}
+
+	return RoundUpdate{
+		Round:   round,
+		P:       *provisioners,
+		BidList: bidders,
+	}
+}
+
 func MockRoundUpdateBuffer(round uint64, p *user.Provisioners, bidList user.BidList) *bytes.Buffer {
 	init := make([]byte, 8)
 	binary.LittleEndian.PutUint64(init, round)
