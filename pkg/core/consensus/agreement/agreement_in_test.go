@@ -75,7 +75,7 @@ func TestAgreementRace(t *testing.T) {
 	case <-doneChan:
 	case <-time.After(1 * time.Second):
 		// Make sure the goroutine dies
-		eb.Stream(string(topics.Gossip), bytes.NewBufferString("pippopippopippopippo"))
+		eb.Publish(topics.Gossip, bytes.NewBufferString("pippopippopippopippo"))
 		<-doneChan
 	}
 
@@ -107,7 +107,7 @@ func TestAgreementRace(t *testing.T) {
 			aevBuf = bytes.NewBuffer(aevBytes)
 		case <-time.After(1 * time.Second):
 			// Make sure the goroutine dies
-			eb.Stream(string(topics.Gossip), bytes.NewBufferString("pippopippopippopippo"))
+			eb.Publish(topics.Gossip, bytes.NewBufferString("pippopippopippopippo"))
 			<-doneChan
 			continue
 		}
@@ -134,7 +134,7 @@ func TestAgreementRace(t *testing.T) {
 	}
 }
 
-func readEvent(t *testing.T, doneChan chan []byte, streamer *helper.SimpleStreamer) {
+func readEvent(t *testing.T, doneChan chan []byte, streamer *eventbus.GossipStreamer) {
 	bs, err := streamer.Read()
 	if err != nil {
 		t.Fatal(err)

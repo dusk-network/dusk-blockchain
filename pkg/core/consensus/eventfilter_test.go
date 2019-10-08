@@ -97,7 +97,7 @@ func TestNonCommitteeEvent(t *testing.T) {
 	eventFilter.UpdateRound(1)
 
 	// Attempt to collect an event
-	assert.Nil(t, eventFilter.Collect(new(bytes.Buffer)))
+	assert.Nil(t, eventFilter.Collect(bytes.Buffer{}))
 
 	// We should not get anything accumulator.All()
 	evs := eventFilter.Accumulator.All()
