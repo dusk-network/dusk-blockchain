@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/wallet"
 )
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
@@ -72,16 +73,32 @@ func generateSortitionScore(hash []byte, W *big.Int) uint64 {
 func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) VotingCommittee {
 	votingCommittee := newCommittee()
 	W := new(big.Int).SetUint64(p.TotalWeight())
+	// Deep copy the Members map, to avoid mutating the original set.
+	members := copyMembers(p.Members)
+	p.Members = members
 
 	for i := 0; votingCommittee.Size() < size; i++ {
+		if W.Uint64() == 0 {
+			// We ran out of staked DUSK, so we return the result prematurely
+			break
+		}
+
 		hash, err := createSortitionHash(round, step, i)
 		if err != nil {
 			panic(err)
 		}
 
 		score := generateSortitionScore(hash, W)
-		_, blsPk := p.extractCommitteeMember(score)
+		blsPk := p.extractCommitteeMember(score)
 		votingCommittee.Insert(blsPk)
+
+		// Subtract up to one DUSK from the extracted committee member.
+		m := p.GetMember(blsPk)
+		subtracted := m.SubtractFromStake(1 * wallet.DUSK)
+
+		// Also subtract the subtracted amount from the total weight, to ensure
+		// consistency.
+		subtractFromTotalWeight(W, subtracted)
 	}
 
 	return *votingCommittee
@@ -90,7 +107,7 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 // extractCommitteeMember walks through the committee set, while deducting
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a hexadecimal string.
-func (p Provisioners) extractCommitteeMember(score uint64) (int, []byte) {
+func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	for i := 0; ; i++ {
 		// make sure we wrap around the provisioners array
 		if i >= len(p.Members) {
@@ -107,7 +124,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) (int, []byte) {
 		}
 
 		if stake >= score {
-			return i, m.PublicKeyBLS
+			return m.PublicKeyBLS
 		}
 
 		score -= stake
@@ -126,4 +143,33 @@ func (p Provisioners) GenerateCommittees(round uint64, amount, step uint8, size 
 	}
 
 	return committees
+}
+
+func subtractFromTotalWeight(W *big.Int, amount uint64) {
+	if W.Uint64() > amount {
+		W.Sub(W, big.NewInt(int64(amount)))
+		return
+	}
+
+	W.Set(big.NewInt(0))
+}
+
+// Deep copy a Members map. Since slices are treated as 'reference types' by Go, we
+// need to iterate over, and individually copy each Stake to the new Member struct,
+// to avoid mutating the original set.
+func copyMembers(members map[string]*Member) map[string]*Member {
+	m := make(map[string]*Member)
+	for k, v := range members {
+		member := &Member{
+			PublicKeyEd:  v.PublicKeyEd,
+			PublicKeyBLS: v.PublicKeyBLS,
+		}
+
+		for _, stake := range v.Stakes {
+			member.Stakes = append(member.Stakes, stake)
+		}
+		m[k] = member
+	}
+
+	return m
 }

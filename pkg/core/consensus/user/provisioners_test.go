@@ -16,7 +16,7 @@ func TestCreateVotingCommittee(t *testing.T) {
 	// Set up a committee set with a stakes map
 	p, _ := consensus.MockProvisioners(50)
 
-	// Run sortition to get 50 members (as a Set, committee cannot contain any duplicate)
+	// Run sortition to get 50 members
 	committee := p.CreateVotingCommittee(100, 1, 50)
 
 	// total amount of members in the committee should be 50
