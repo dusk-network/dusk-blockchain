@@ -1,17 +1,17 @@
-package processing
+package processing_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestProcess(t *testing.T) {
-	g := NewGossip(protocol.DevNet)
+	g := processing.NewGossip(protocol.DevNet)
 
 	m := bytes.NewBufferString("pippo")
 
@@ -19,36 +19,30 @@ func TestProcess(t *testing.T) {
 		assert.FailNow(t, "error in processing buffer")
 	}
 
-	msg, err := ReadFrame(m)
+	length, err := processing.ReadFrame(m)
 	if !assert.NoError(t, err) {
 		assert.FailNow(t, "error in reading frame")
 	}
 
-	b := new(bytes.Buffer)
-	if err := encoding.WriteUint32LE(b, uint32(protocol.DevNet)); err != nil {
-		b.Write([]byte("pippo"))
-		assert.Equal(t, b.Bytes(), msg)
+	msg := make([]byte, length)
+	if _, err := m.Read(msg); err != nil {
+		assert.FailNow(t, fmt.Sprintf("error in reading the message with length %d", length))
 	}
+
+	buf := protocol.DevNet.ToBuffer()
+	buf.Write([]byte("pippo"))
+	assert.Equal(t, buf.Bytes(), msg)
 }
 
-var Res []byte
+func TestUnpackLength(t *testing.T) {
+	test := "pippo"
+	b := bytes.NewBufferString(test)
 
-func BenchmarkWriteReset(b *testing.B) {
+	g := processing.NewGossip(protocol.DevNet)
+	assert.NoError(t, g.Process(b))
 
-	var m *bytes.Buffer
-	hw := headerWriter{
-		magicBuf: writeMagic(protocol.DevNet),
-	}
-	buf, _ := crypto.RandEntropy(1200)
+	length, err := g.UnpackLength(b)
+	assert.NoError(t, err)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		m = bytes.NewBuffer(buf)
-		b.StartTimer()
-		_ = hw.Write(m)
-	}
-
-	b.StopTimer()
-	Res = m.Bytes()
+	assert.Equal(t, len(test), int(length))
 }

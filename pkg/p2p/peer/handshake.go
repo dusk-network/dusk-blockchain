@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -52,16 +51,15 @@ func (p *Connection) writeLocalMsgVersion() error {
 		return err
 	}
 
-	fullMsg, err := p.addHeader(message, topics.Version)
-	if err != nil {
+	if err := p.addHeader(message, topics.Version); err != nil {
 		return err
 	}
 
-	if err := processing.WriteFrame(fullMsg); err != nil {
+	if err := processing.WriteFrame(message); err != nil {
 		return err
 	}
 
-	_, err = p.Write(fullMsg.Bytes())
+	_, err = p.Write(message.Bytes())
 	return err
 }
 
@@ -74,16 +72,7 @@ func (p *Connection) readRemoteMsgVersion() error {
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
 
-	magic, err := extractMagic(decodedMsg)
-	if err != nil {
-		return err
-	}
-
-	if magic != p.magic {
-		return errors.New("magic mismatch")
-	}
-
-	topic, err := extractTopic(decodedMsg)
+	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
 	}
@@ -101,22 +90,18 @@ func (p *Connection) readRemoteMsgVersion() error {
 	return verifyVersion(version.Version)
 }
 
-func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint32LE(buf, uint32(p.magic)); err != nil {
-		return nil, err
-	}
-
-	topicBytes := topics.TopicToByteArray(topic)
-	if _, err := buf.Write(topicBytes[:]); err != nil {
-		return nil, err
+func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) error {
+	buf := p.gossip.Magic.ToBuffer()
+	if err := topics.Write(&buf, topic); err != nil {
+		return err
 	}
 
 	if _, err := buf.ReadFrom(m); err != nil {
-		return nil, err
+		return err
 	}
 
-	return buf, nil
+	*m = buf
+	return nil
 }
 
 func (p *Connection) readVerAck() error {
@@ -129,16 +114,7 @@ func (p *Connection) readVerAck() error {
 	decodedMsg := new(bytes.Buffer)
 	decodedMsg.Write(msgBytes)
 
-	magic, err := extractMagic(decodedMsg)
-	if err != nil {
-		return err
-	}
-
-	if magic != p.magic {
-		return errors.New("magic mismatch")
-	}
-
-	topic, err := extractTopic(decodedMsg)
+	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
 	}
@@ -152,8 +128,8 @@ func (p *Connection) readVerAck() error {
 }
 
 func (p *Connection) writeVerAck() error {
-	verAckMsg, err := p.addHeader(new(bytes.Buffer), topics.VerAck)
-	if err != nil {
+	verAckMsg := new(bytes.Buffer)
+	if err := p.addHeader(verAckMsg, topics.VerAck); err != nil {
 		return err
 	}
 

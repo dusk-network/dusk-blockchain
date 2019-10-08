@@ -179,13 +179,12 @@ func (a *agreementHandler) createAgreement(evs []wire.Event, round uint64, step 
 	signed := a.signEd25519(buffer)
 
 	// add the topic
-	msg, err := wire.AddTopic(signed, topics.Agreement)
-	if err != nil {
+	if err := topics.Prepend(signed, topics.Agreement); err != nil {
 		return nil, err
 	}
 
 	//send it
-	return msg, nil
+	return signed, nil
 }
 
 // Aggregate the Agreement event into an Agreement outgoing event

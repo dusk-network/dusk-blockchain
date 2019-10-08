@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	lg "github.com/sirupsen/logrus"
 )
 
@@ -14,9 +15,6 @@ const (
 	// messages
 	CallbackType
 )
-
-// QuitTopic is the topic to make all components quit
-const QuitTopic = "quit"
 
 // ListenerType is the enum of the type of available listeners
 type ListenerType int
@@ -32,7 +30,7 @@ type TopicListener interface {
 
 // NewTopicListener creates a topic listener that subscribes an EventCollector
 // to a Subscriber with a desidered Listener
-func NewTopicListener(subscriber Subscriber, collector wire.EventCollector, topic string, listenerType ListenerType) TopicListener {
+func NewTopicListener(subscriber Subscriber, collector wire.EventCollector, topic topics.Topic, listenerType ListenerType) TopicListener {
 	switch listenerType {
 	case ChannelType:
 		return newChanCollector(subscriber, collector, topic)
@@ -46,10 +44,10 @@ type callbackCollector struct {
 	Listener
 	subscriber Subscriber
 	id         uint32
-	topic      string
+	topic      topics.Topic
 }
 
-func newCallbackCollector(subscriber Subscriber, callback func(bytes.Buffer) error, topic string) TopicListener {
+func newCallbackCollector(subscriber Subscriber, callback func(bytes.Buffer) error, topic topics.Topic) TopicListener {
 	cbListener := NewCallbackListener(callback)
 	id := subscriber.Subscribe(topic, cbListener)
 	return &callbackCollector{
@@ -74,13 +72,13 @@ type chanCollector struct {
 	msgChanID      uint32
 	quitChan       chan bytes.Buffer
 	quitChanID     uint32
-	topic          string
+	topic          topics.Topic
 	log            *lg.Entry
 }
 
 // NewTopicListener creates the TopicListener listening to a topic on the EventBus.
 // The EventBus, EventCollector and Topic are injected
-func newChanCollector(subscriber Subscriber, collector wire.EventCollector, topic string) TopicListener {
+func newChanCollector(subscriber Subscriber, collector wire.EventCollector, topic topics.Topic) TopicListener {
 	msgChan := make(chan bytes.Buffer, 100)
 	msgListener := NewChanListener(msgChan)
 
@@ -92,7 +90,7 @@ func newChanCollector(subscriber Subscriber, collector wire.EventCollector, topi
 		msgChan:        msgChan,
 		msgChanID:      subscriber.Subscribe(topic, msgListener),
 		quitChan:       quitChan,
-		quitChanID:     subscriber.Subscribe(string(QuitTopic), quitListener),
+		quitChanID:     subscriber.Subscribe(topics.Quit, quitListener),
 		eventCollector: collector,
 		log: lg.WithFields(lg.Fields{
 			"topic":   topic,
@@ -110,7 +108,7 @@ func (n *chanCollector) accept() {
 		select {
 		case <-n.quitChan:
 			n.subscriber.Unsubscribe(n.topic, n.msgChanID)
-			n.subscriber.Unsubscribe(string(QuitTopic), n.quitChanID)
+			n.subscriber.Unsubscribe(topics.Quit, n.quitChanID)
 			return
 
 		case eventBuffer := <-n.msgChan:

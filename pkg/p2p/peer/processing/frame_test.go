@@ -2,7 +2,6 @@ package processing
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,8 +10,10 @@ import (
 func TestWriteReadFrame(t *testing.T) {
 	b := bytes.NewBufferString("pippo")
 	WriteFrame(b)
-	fmt.Println(b.Bytes())
 
-	buf, _ := ReadFrame(b)
+	length, _ := ReadFrame(b)
+	buf := make([]byte, length)
+	b.Read(buf)
+
 	assert.Equal(t, "pippo", string(buf))
 }

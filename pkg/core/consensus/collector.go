@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -41,7 +40,7 @@ type (
 func UpdateRound(bus eventbus.Publisher, round uint64) {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, round)
-	bus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(b))
+	bus.Publish(topics.RoundUpdate, bytes.NewBuffer(b))
 }
 
 // InitRoundUpdate initializes a Round update channel and fires up the TopicListener
@@ -51,7 +50,7 @@ func UpdateRound(bus eventbus.Publisher, round uint64) {
 func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 	roundChan := make(chan RoundUpdate, 1)
 	roundCollector := &roundCollector{roundChan}
-	eventbus.NewTopicListener(subscriber, roundCollector, string(msg.RoundUpdateTopic), eventbus.ChannelType)
+	eventbus.NewTopicListener(subscriber, roundCollector, topics.RoundUpdate, eventbus.ChannelType)
 	return roundChan
 }
 
@@ -94,7 +93,7 @@ func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
 func InitBlockRegenerationCollector(subscriber eventbus.Subscriber) chan AsyncState {
 	regenerationChan := make(chan AsyncState, 1)
 	collector := &regenerationCollector{regenerationChan}
-	eventbus.NewTopicListener(subscriber, collector, msg.BlockRegenerationTopic, eventbus.ChannelType)
+	eventbus.NewTopicListener(subscriber, collector, topics.BlockRegeneration, eventbus.ChannelType)
 	return regenerationChan
 }
 
@@ -113,7 +112,7 @@ func (rg *regenerationCollector) Collect(r bytes.Buffer) error {
 func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, eventbus.TopicListener) {
 	acceptedBlockChan := make(chan block.Block)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
-	tl := eventbus.NewTopicListener(subscriber, collector, string(topics.AcceptedBlock), eventbus.ChannelType)
+	tl := eventbus.NewTopicListener(subscriber, collector, topics.AcceptedBlock, eventbus.ChannelType)
 	return acceptedBlockChan, tl
 }
 

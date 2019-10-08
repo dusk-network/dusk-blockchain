@@ -3,6 +3,8 @@ package eventbus
 import (
 	"math/rand"
 	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 type idListener struct {
@@ -12,17 +14,17 @@ type idListener struct {
 
 type listenerMap struct {
 	lock      sync.RWMutex
-	listeners map[string][]idListener
+	listeners map[topics.Topic][]idListener
 }
 
 func newListenerMap() *listenerMap {
 	return &listenerMap{
-		listeners: make(map[string][]idListener),
+		listeners: make(map[topics.Topic][]idListener),
 	}
 }
 
 // Store a Listener into an ordered slice stored at a key
-func (h *listenerMap) Store(key string, value Listener) uint32 {
+func (h *listenerMap) Store(key topics.Topic, value Listener) uint32 {
 	id := rand.Uint32()
 	h.lock.Lock()
 	h.listeners[key] = append(h.listeners[key], idListener{id, value})
@@ -31,7 +33,7 @@ func (h *listenerMap) Store(key string, value Listener) uint32 {
 }
 
 // Load a copy of the listeners stored for a given key
-func (h *listenerMap) Load(key string) []idListener {
+func (h *listenerMap) Load(key topics.Topic) []idListener {
 	h.lock.RLock()
 	listeners, _ := h.listeners[key]
 	h.lock.RUnlock()
@@ -39,7 +41,7 @@ func (h *listenerMap) Load(key string) []idListener {
 }
 
 // Delete a listener using the uint32 key returned during the Store operation. Return wether the item was found or otherwise
-func (h *listenerMap) Delete(key string, id uint32) bool {
+func (h *listenerMap) Delete(key topics.Topic, id uint32) bool {
 	found := false
 	h.lock.Lock()
 	listeners := h.listeners[key]

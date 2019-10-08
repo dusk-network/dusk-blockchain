@@ -2,8 +2,6 @@ package wire
 
 import (
 	"bytes"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 type (
@@ -71,20 +69,3 @@ type (
 		All() []Event
 	}
 )
-
-// AddTopic is a convenience function to add a specified topic at the start of
-// a buffer. This topic is later decoded by the peer when gossiping messages,
-// to be put on the message header.
-func AddTopic(m *bytes.Buffer, topic topics.Topic) (*bytes.Buffer, error) {
-	buffer := new(bytes.Buffer)
-	topicBytes := topics.TopicToByteArray(topic)
-	if _, err := buffer.Write(topicBytes[:]); err != nil {
-		return nil, err
-	}
-
-	if _, err := buffer.Write(m.Bytes()); err != nil {
-		return nil, err
-	}
-
-	return buffer, nil
-}

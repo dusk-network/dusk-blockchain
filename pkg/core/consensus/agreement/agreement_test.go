@@ -7,7 +7,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -24,11 +23,11 @@ import (
 func TestBroker(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	eb, winningHashChan := initAgreement(keys[0])
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
 
 	hash, _ := crypto.RandEntropy(32)
 	for i := 0; i < 3; i++ {
-		eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+		eb.Publish(topics.Agreement, agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
 	}
 
 	winningHash := <-winningHashChan
@@ -41,8 +40,8 @@ func TestNoQuorum(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	eb, winningHashChan := initAgreement(keys[0])
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+	eb.Publish(topics.Agreement, agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+	eb.Publish(topics.Agreement, agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
 
 	select {
 	case <-winningHashChan:
@@ -57,7 +56,7 @@ func TestSkipNoMember(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	eb, winningHashChan := initAgreement(keys[0])
 	hash, _ := crypto.RandEntropy(32)
-	eb.Publish(string(topics.Agreement), agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
+	eb.Publish(topics.Agreement, agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
 
 	select {
 	case <-winningHashChan:
@@ -72,12 +71,12 @@ func TestSkipNoMember(t *testing.T) {
 func TestSendAgreement(t *testing.T) {
 	p, k := consensus.MockProvisioners(3)
 	eb, _ := initAgreement(k[0])
-	eb.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, p, nil))
+	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
 
-	streamer := eventbus.NewGossipStreamer()
+	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	streamListener := eventbus.NewStreamListener(streamer)
-	eb.Subscribe(string(topics.Gossip), streamListener)
-	eb.Register(string(topics.Gossip), processing.NewGossip(protocol.TestNet))
+	eb.Subscribe(topics.Gossip, streamListener)
+	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
 
 	// Initiate the sending of an agreement message
 	hash, _ := crypto.RandEntropy(32)
@@ -90,7 +89,7 @@ func TestSendAgreement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	eb.Publish(msg.ReductionResultTopic, buf)
+	eb.Publish(topics.ReductionResult, buf)
 
 	// There should now be an agreement message in the streamer
 	_, err := streamer.Read()
@@ -109,13 +108,13 @@ func initAgreement(k user.Keys) (eventbus.Broker, <-chan bytes.Buffer) {
 	bus := eventbus.New()
 	winningHashChan := make(chan bytes.Buffer, 1)
 	chanListener := eventbus.NewChanListener(winningHashChan)
-	bus.Subscribe(msg.WinningBlockHashTopic, chanListener)
+	bus.Subscribe(topics.WinningBlockHash, chanListener)
 	go agreement.Launch(bus, k)
 	time.Sleep(200 * time.Millisecond)
-	bus.Publish(msg.RoundUpdateTopic, consensus.MockRoundUpdateBuffer(1, nil, nil))
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
 
 	// we remove the pre-processors here that the Launch function adds, so the mocked
 	// buffers can be deserialized properly
-	bus.RemoveProcessors(string(topics.Agreement))
+	bus.RemoveProcessors(topics.Agreement)
 	return bus, winningHashChan
 }

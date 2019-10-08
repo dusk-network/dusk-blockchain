@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -109,11 +108,11 @@ func NewMempool(eventBus *eventbus.EventBus, verifyTx func(tx transactions.Trans
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, maxPendingLen)
-	eventbus.NewTopicListener(m.eventBus, m, string(topics.Tx), eventbus.ChannelType)
+	eventbus.NewTopicListener(m.eventBus, m, topics.Tx, eventbus.ChannelType)
 
 	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
 	m.accepted.blockChan = make(chan block.Block)
-	eventbus.NewTopicListener(m.eventBus, &m.accepted, string(topics.AcceptedBlock), eventbus.ChannelType)
+	eventbus.NewTopicListener(m.eventBus, &m.accepted, topics.AcceptedBlock, eventbus.ChannelType)
 
 	return m
 }
@@ -401,17 +400,17 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	msg := &peermsg.Inv{}
 	msg.AddItem(peermsg.InvTypeMempoolTx, txID)
 
+	// TODO: can we simply encode the message directly on a topic carrying buffer?
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		panic(err)
 	}
 
-	withTopic, err := wire.AddTopic(buf, topics.Inv)
-	if err != nil {
+	if err := topics.Prepend(buf, topics.Inv); err != nil {
 		return err
 	}
 
-	m.eventBus.Publish(string(topics.Gossip), withTopic)
+	m.eventBus.Publish(topics.Gossip, buf)
 	return nil
 }
 

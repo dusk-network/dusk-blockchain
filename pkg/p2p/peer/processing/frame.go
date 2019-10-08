@@ -15,13 +15,14 @@ const (
 
 //WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message
 func WriteFrame(buf *bytes.Buffer) error {
-	if uint64(buf.Len()) > MaxFrameSize {
+	ln := uint64(buf.Len())
+	if ln > MaxFrameSize {
 		return fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
 	}
 
 	msg := new(bytes.Buffer)
 	// Append prefix(header)
-	if err := encoding.WriteUint64LE(msg, uint64(buf.Len())); err != nil {
+	if err := encoding.WriteUint64LE(msg, ln); err != nil {
 		return err
 	}
 
@@ -36,22 +37,20 @@ func WriteFrame(buf *bytes.Buffer) error {
 	return nil
 }
 
-func ReadFrame(r io.Reader) ([]byte, error) {
+func ReadFrame(r io.Reader) (uint64, error) {
+	var length uint64
 	sizeBytes := make([]byte, 8)
+	// this is used mainly for net.Conn, therefore io.ReadFull prevents weird
+	// unbuffered reads which would terminate the reading operation before
+	// actually reading 8 bytes
 	if _, err := io.ReadFull(r, sizeBytes); err != nil {
-		return nil, err
+		return length, err
 	}
 
-	size := binary.LittleEndian.Uint64(sizeBytes)
-	if size > MaxFrameSize {
-		return nil, fmt.Errorf("message size exceeds MaxFrameSize (%d), %d", MaxFrameSize, size)
+	length = binary.LittleEndian.Uint64(sizeBytes)
+	if length > MaxFrameSize {
+		return 0, fmt.Errorf("message size exceeds MaxFrameSize (%d), %d", MaxFrameSize, length)
 	}
 
-	buf := make([]byte, int(size))
-	_, err := io.ReadFull(r, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf, nil
+	return length, nil
 }

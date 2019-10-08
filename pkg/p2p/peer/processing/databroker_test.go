@@ -38,7 +38,7 @@ func TestSendData(t *testing.T) {
 		buf := <-responseChan
 
 		// Check for correctness of topic
-		topic := extractTopic(buf)
+		topic, _ := topics.Extract(buf)
 		if topic != topics.Block {
 			t.Fatalf("unexpected topic %s, expected Block", topic)
 		}

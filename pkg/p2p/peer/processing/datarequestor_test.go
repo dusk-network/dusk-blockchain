@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 func TestRequestData(t *testing.T) {
@@ -32,7 +32,7 @@ func TestRequestData(t *testing.T) {
 	response := <-responseChan
 
 	// Check topic
-	topic := extractTopic(response)
+	topic, _ := topics.Extract(response)
 	if topic != topics.GetData {
 		t.Fatalf("unexpected topic %s, expected GetData", topic)
 	}

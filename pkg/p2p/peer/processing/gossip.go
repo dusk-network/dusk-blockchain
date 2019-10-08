@@ -2,54 +2,58 @@ package processing
 
 import (
 	"bytes"
+	"errors"
+	"io"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 )
 
 type (
-	headerWriter struct {
-		magicBuf bytes.Buffer
-	}
-
 	// Gossip is a preprocessor for gossip messages.
 	Gossip struct {
-		headerWriter
+		Magic protocol.Magic
 	}
 )
-
-func (h headerWriter) Write(m *bytes.Buffer) error {
-	b := h.magicBuf
-
-	if _, err := m.WriteTo(&b); err != nil {
-		return err
-	}
-
-	*m = b
-	return nil
-}
 
 // NewGossip returns a gossip preprocessor with the specified magic.
 func NewGossip(magic protocol.Magic) *Gossip {
 	return &Gossip{
-		headerWriter: headerWriter{
-			magicBuf: writeMagic(magic),
-		},
+		Magic: magic,
 	}
-}
-
-func writeMagic(magic protocol.Magic) bytes.Buffer {
-	b := new(bytes.Buffer)
-	_ = encoding.WriteUint32LE(b, uint32(magic))
-	return *b
 }
 
 // Process a message that is passing through, by prepending the network magic to the
 // buffer, and then COBS encoding it.
 func (g *Gossip) Process(m *bytes.Buffer) error {
-	if err := g.headerWriter.Write(m); err != nil {
+	buf := g.Magic.ToBuffer()
+	if _, err := buf.ReadFrom(m); err != nil {
 		return err
 	}
 
-	return WriteFrame(m)
+	if err := WriteFrame(&buf); err != nil {
+		return err
+	}
+
+	*m = buf
+	return nil
+}
+
+// UnpackLength unwraps the incoming packet (likely from a net.Conn struct) and returns the length of the packet without reading the payload (which is left to the user of this method)
+func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
+	var magic protocol.Magic
+	packetLength, err := ReadFrame(r)
+	if err != nil {
+		return 0, err
+	}
+
+	magic, err = protocol.Extract(r)
+	if err != nil {
+		return 0, err
+	}
+
+	if magic != g.Magic {
+		return 0, errors.New("magic mismatch")
+	}
+
+	return packetLength - uint64(magic.Len()), nil
 }

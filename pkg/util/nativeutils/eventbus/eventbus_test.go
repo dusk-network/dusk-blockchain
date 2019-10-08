@@ -23,7 +23,7 @@ func TestNewEventBus(t *testing.T) {
 // PREPROCESSOR TESTS
 //*******************
 func TestProcessor(t *testing.T) {
-	topic := "testTopic"
+	topic := topics.Test
 	bus := New()
 
 	resultChan := make(chan bytes.Buffer, 1)
@@ -78,9 +78,9 @@ func TestListenerMap(t *testing.T) {
 	lm := newListenerMap()
 	_, ss := CreateGossipStreamer()
 	listener := NewStreamListener(ss)
-	lm.Store("pippo", listener)
+	lm.Store(topics.Test, listener)
 
-	listeners := lm.Load("pippo")
+	listeners := lm.Load(topics.Test)
 	assert.Equal(t, 1, len(listeners))
 	assert.Equal(t, listener, listeners[0].Listener)
 }
@@ -89,13 +89,13 @@ func TestSubscribe(t *testing.T) {
 	eb := New()
 	myChan := make(chan bytes.Buffer, 10)
 	cl := NewChanListener(myChan)
-	assert.NotNil(t, eb.Subscribe("whateverTopic", cl))
+	assert.NotNil(t, eb.Subscribe(topics.Test, cl))
 }
 
 func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
-	eb.Unsubscribe("whateverTopic", id)
-	eb.Publish("whateverTopic", bytes.NewBufferString("whatever2"))
+	eb.Unsubscribe(topics.Test, id)
+	eb.Publish(topics.Test, bytes.NewBufferString("whatever2"))
 
 	select {
 	case <-myChan:
@@ -115,16 +115,16 @@ func TestLameSubscriber(t *testing.T) {
 	collector := NewSimpleCollector(resultChan, nil)
 	tbuf := ranbuf()
 
-	sub := NewTopicListener(bus, collector, "pippo", ChannelType)
+	sub := NewTopicListener(bus, collector, topics.Test, ChannelType)
 
-	bus.Publish("pippo", tbuf)
-	bus.Publish("pippo", tbuf)
+	bus.Publish(topics.Test, tbuf)
+	bus.Publish(topics.Test, tbuf)
 
 	assert.Equal(t, <-resultChan, *tbuf)
 	assert.Equal(t, <-resultChan, *tbuf)
 
 	sub.Quit()
-	bus.Publish("pippo", tbuf)
+	bus.Publish(topics.Test, tbuf)
 
 	select {
 	case <-resultChan:
@@ -135,7 +135,7 @@ func TestLameSubscriber(t *testing.T) {
 }
 
 func TestStreamer(t *testing.T) {
-	topic := string(topics.Gossip)
+	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)
 	bus.Publish(topic, bytes.NewBufferString("pluto"))
 
@@ -153,7 +153,7 @@ func TestStreamer(t *testing.T) {
 func TestDefaultListener(t *testing.T) {
 	eb := New()
 	msgChan := make(chan struct {
-		topic string
+		topic topics.Topic
 		buf   bytes.Buffer
 	})
 
@@ -161,27 +161,27 @@ func TestDefaultListener(t *testing.T) {
 		tpc, _ := topics.Extract(&r)
 
 		msgChan <- struct {
-			topic string
+			topic topics.Topic
 			buf   bytes.Buffer
-		}{string(tpc), r}
+		}{tpc, r}
 		return nil
 	}
 
-	eb.AddDefaultTopic("pippo")
-	eb.AddDefaultTopic("paperino")
+	eb.AddDefaultTopic(topics.Reject)
+	eb.AddDefaultTopic(topics.Unknown)
 	eb.SubscribeDefault(cb)
 
-	eb.Publish("pippo", bytes.NewBufferString("pluto"))
+	eb.Publish(topics.Reject, bytes.NewBufferString("pluto"))
 	msg := <-msgChan
-	assert.Equal(t, "pippo", msg.topic)
+	assert.Equal(t, topics.Reject, msg.topic)
 	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
 
-	eb.Publish("paperino", bytes.NewBufferString("pluto"))
+	eb.Publish(topics.Unknown, bytes.NewBufferString("pluto"))
 	msg = <-msgChan
-	assert.Equal(t, "paperino", msg.topic)
+	assert.Equal(t, topics.Unknown, msg.topic)
 	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
 
-	eb.Publish("test", bytes.NewBufferString("pluto"))
+	eb.Publish(topics.Gossip, bytes.NewBufferString("pluto"))
 	select {
 	case <-msgChan:
 		t.FailNow()
@@ -197,10 +197,10 @@ func newEB(t *testing.T) (*EventBus, chan bytes.Buffer, uint32) {
 	eb := New()
 	myChan := make(chan bytes.Buffer, 10)
 	cl := NewChanListener(myChan)
-	id := eb.Subscribe("whateverTopic", cl)
+	id := eb.Subscribe(topics.Test, cl)
 	assert.NotNil(t, id)
 	b := bytes.NewBufferString("whatever")
-	eb.Publish("whateverTopic", b)
+	eb.Publish(topics.Test, b)
 
 	select {
 	case received := <-myChan:
@@ -215,7 +215,7 @@ func newEB(t *testing.T) (*EventBus, chan bytes.Buffer, uint32) {
 // Test that a streaming goroutine is killed when the exit signal is sent
 func TestExitChan(t *testing.T) {
 	eb := New()
-	topic := "foo"
+	topic := topics.Test
 	sl := NewStreamListener(&mockWriteCloser{})
 	_ = eb.Subscribe(topic, sl)
 

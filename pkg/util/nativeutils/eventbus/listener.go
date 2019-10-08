@@ -125,21 +125,18 @@ func newMultiListener() *multiListener {
 	}
 }
 
-func (m *multiListener) Notify(topic string, r bytes.Buffer) {
-	if m.Has([]byte(topic)) {
-		tpc := topics.StringToTopic(topic)
+func (m *multiListener) Notify(topic topics.Topic, r bytes.Buffer) {
+	if m.Has([]byte{byte(topic)}) {
 		// creating a new Buffer carrying also the topic
-		tpcMsg := new(bytes.Buffer)
-		topics.Write(tpcMsg, tpc)
-
-		if _, err := r.WriteTo(tpcMsg); err != nil {
-			log.WithField("topic", topic).WithError(err).Warnln("error in writing topic to a multi-dispatched packet")
+		tpcMsg := topic.ToBuffer()
+		if _, err := tpcMsg.ReadFrom(&r); err != nil {
+			log.WithField("topic", topic.String()).WithError(err).Warnln("error in writing topic to a multi-dispatched packet")
 			return
 		}
 
 		m.RLock()
 		for _, dispatcher := range m.dispatchers {
-			dispatcher.Notify(*tpcMsg)
+			dispatcher.Notify(tpcMsg)
 		}
 		m.RUnlock()
 	}
