@@ -75,7 +75,7 @@ func TestAgreementRace(t *testing.T) {
 	case <-doneChan:
 	case <-time.After(1 * time.Second):
 		// Make sure the goroutine dies
-		eb.Publish(topics.Gossip, bytes.NewBufferString("pippopippopippopippo"))
+		eb.Publish(topics.Gossip, bytes.NewBufferString("pippo"))
 		<-doneChan
 	}
 
@@ -107,7 +107,7 @@ func TestAgreementRace(t *testing.T) {
 			aevBuf = bytes.NewBuffer(aevBytes)
 		case <-time.After(1 * time.Second):
 			// Make sure the goroutine dies
-			eb.Publish(topics.Gossip, bytes.NewBufferString("pippopippopippopippo"))
+			eb.Publish(topics.Gossip, bytes.NewBufferString("pippo"))
 			<-doneChan
 			continue
 		}
