@@ -26,7 +26,7 @@ func TestReductionIntegrity(t *testing.T) {
 	blockHash, _ := crypto.RandEntropy(32)
 	broker := initBroker(eventbus.New(), k, time.Second, nil)
 	broker.propagateRound(consensus.MockRoundUpdate(1, nil, nil))
-	vote, err := broker.Reducer.GenerateReduction(bytes.NewBuffer(blockHash))
+	vote, err := broker.Reducer.GenerateReduction(blockHash)
 	if err != nil {
 		assert.FailNow(t, "generate reduction returned error")
 	}
