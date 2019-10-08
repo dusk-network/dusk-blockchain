@@ -6,6 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
@@ -22,8 +23,6 @@ func LaunchLoggers(eventBus *eventbus.EventBus, l []Logger) {
 }
 
 const (
-	LogTopic = "LOG"
-
 	Info uint8 = iota
 	Warn uint8 = iota
 	Err  uint8 = iota
@@ -102,11 +101,11 @@ func (eu *UnMarshaller) Unmarshal(b *bytes.Buffer, e wire.Event) error {
 	return nil
 }
 
-func (c *collector) Collect(b *bytes.Buffer) error {
+func (c *collector) Collect(b bytes.Buffer) error {
 	ev := &Event{}
 	unmarshaller := &UnMarshaller{}
 
-	_ = unmarshaller.Unmarshal(b, ev)
+	_ = unmarshaller.Unmarshal(&b, ev)
 	c.logChan <- ev
 	return nil
 }
@@ -114,6 +113,6 @@ func (c *collector) Collect(b *bytes.Buffer) error {
 func InitLogCollector(eventBus *eventbus.EventBus) chan *Event {
 	logChan := make(chan *Event, 100)
 	collector := &collector{logChan}
-	go eventbus.NewTopicListener(eventBus, collector, LogTopic).Accept()
+	eventbus.NewTopicListener(eventBus, collector, topics.Log, eventbus.ChannelType)
 	return logChan
 }

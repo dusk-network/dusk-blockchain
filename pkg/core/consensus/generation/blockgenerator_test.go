@@ -111,7 +111,7 @@ func publishRandomTxs(t *testing.T, h *harness) (int, error) {
 			return 0, err
 		}
 
-		h.eb.Publish(string(topics.Tx), buf)
+		h.eb.Publish(topics.Tx, buf)
 		txsCount++
 	}
 

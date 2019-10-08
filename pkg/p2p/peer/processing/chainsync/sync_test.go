@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/stretchr/testify/assert"
 )
 
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
@@ -27,9 +28,8 @@ func TestSynchronizeBehind(t *testing.T) {
 	msg := <-responseChan
 
 	// Check topic
-	var topicBytes [15]byte
-	copy(topicBytes[:], msg.Bytes()[0:15])
-	topic := topics.ByteArrayToTopic(topicBytes)
+	topic, err := topics.Extract(msg)
+	assert.NoError(t, err)
 	if topic != topics.GetBlocks {
 		t.Fatal("did not receive expected GetBlocks message")
 	}
@@ -41,8 +41,9 @@ func TestSynchronizeSynced(t *testing.T) {
 	cs, eb, _ := setupSynchronizer(t)
 
 	// subscribe to topics.Block
-	blockChan := make(chan *bytes.Buffer, 1)
-	_ = eb.Subscribe(string(topics.Block), blockChan)
+	blockChan := make(chan bytes.Buffer, 1)
+	listener := eventbus.NewChanListener(blockChan)
+	_ = eb.Subscribe(topics.Block, listener)
 
 	// Make a block which should follow our genesis block
 	blk := randomBlockBuffer(t, 1, 20)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -173,7 +172,7 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 	}
 }
 
-func (r *reducer) sendReduction(hash *bytes.Buffer) {
+func (r *reducer) GenerateReduction(hash *bytes.Buffer) (*bytes.Buffer, error) {
 	vote := new(bytes.Buffer)
 
 	h := &header.Header{
@@ -184,22 +183,28 @@ func (r *reducer) sendReduction(hash *bytes.Buffer) {
 	}
 
 	if err := header.MarshalSignableVote(vote, h); err != nil {
-		logErr(err, hash.Bytes(), "Error during marshalling of the reducer vote")
-		return
+		return nil, err
 	}
 
 	if err := SignBuffer(vote, r.ctx.handler.Keys); err != nil {
-		logErr(err, hash.Bytes(), "Error while signing vote")
-		return
+		return nil, err
 	}
 
-	message, err := wire.AddTopic(vote, topics.Reduction)
+	if err := topics.Prepend(vote, topics.Reduction); err != nil {
+		return nil, err
+	}
+
+	return vote, nil
+}
+
+func (r *reducer) sendReduction(hash *bytes.Buffer) {
+	vote, err := r.GenerateReduction(hash)
 	if err != nil {
-		logErr(err, hash.Bytes(), "Error while adding topic")
+		logErr(err, hash.Bytes(), "Error while generating reducer vote")
 		return
 	}
 
-	r.publisher.Stream(string(topics.Gossip), message)
+	r.publisher.Publish(topics.Gossip, vote)
 }
 
 func (r *reducer) sendResults(events []wire.Event) {
@@ -214,7 +219,7 @@ func (r *reducer) sendResults(events []wire.Event) {
 			return
 		}
 	}
-	r.publisher.Publish(msg.ReductionResultTopic, buf)
+	r.publisher.Publish(topics.ReductionResult, buf)
 }
 
 func logErr(err error, hash []byte, msg string) {
@@ -241,7 +246,7 @@ func (r *reducer) publishRegeneration() {
 	roundAndStep := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundAndStep, r.ctx.state.Round())
 	roundAndStep = append(roundAndStep, byte(r.ctx.state.Step()))
-	r.publisher.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(roundAndStep))
+	r.publisher.Publish(topics.BlockRegeneration, bytes.NewBuffer(roundAndStep))
 }
 
 func (r *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer) bool {

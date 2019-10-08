@@ -17,12 +17,10 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -61,7 +59,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	}
 
 	// set up collectors
-	candidateChan := initBlockCollector(eventBus, string(topics.Candidate))
+	candidateChan := initBlockCollector(eventBus, topics.Candidate)
 	certificateChan := initCertificateCollector(eventBus)
 
 	chain := &Chain{
@@ -78,8 +76,9 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	chain.restoreConsensusData()
 
 	// Hook the chain up to the required topics
-	eventBus.SubscribeCallback(string(topics.Block), chain.onAcceptBlock)
-	eventBus.RegisterPreprocessor(string(topics.Candidate), consensus.NewRepublisher(eventBus, topics.Candidate))
+	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
+	eventBus.Subscribe(topics.Block, cbListener)
+	eventBus.Register(topics.Candidate, consensus.NewRepublisher(eventBus, topics.Candidate))
 	return chain, nil
 }
 
@@ -123,27 +122,23 @@ func (c *Chain) Listen() {
 // LaunchConsensus will listen for an init message, and send a round update
 // once it is received.
 func (c *Chain) LaunchConsensus() {
-	initChan := make(chan *bytes.Buffer, 1)
-	id := c.eventBus.Subscribe(msg.InitializationTopic, initChan)
+	initChan := make(chan bytes.Buffer, 1)
+	l := eventbus.NewChanListener(initChan)
+	id := c.eventBus.Subscribe(topics.Initialization, l)
 	<-initChan
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	c.sendRoundUpdate(c.prevBlock.Header.Height+1, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
-	c.eventBus.Unsubscribe(msg.InitializationTopic, id)
+	c.eventBus.Unsubscribe(topics.Initialization, id)
 }
 
 func (c *Chain) propagateBlock(blk block.Block) error {
-	buffer := new(bytes.Buffer)
-	if err := block.Marshal(buffer, &blk); err != nil {
+	buffer := topics.Block.ToBuffer()
+	if err := block.Marshal(&buffer, &blk); err != nil {
 		return err
 	}
 
-	msg, err := wire.AddTopic(buffer, topics.Block)
-	if err != nil {
-		return err
-	}
-
-	c.eventBus.Stream(string(topics.Gossip), msg)
+	c.eventBus.Publish(topics.Gossip, &buffer)
 	return nil
 }
 
@@ -168,9 +163,9 @@ func (c *Chain) Close() error {
 	return drvr.Close()
 }
 
-func (c *Chain) onAcceptBlock(m *bytes.Buffer) error {
+func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := block.Unmarshal(m, blk); err != nil {
+	if err := block.Unmarshal(&m, blk); err != nil {
 		return err
 	}
 
@@ -258,7 +253,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 		return err
 	}
 
-	c.eventBus.Publish(string(topics.AcceptedBlock), buf)
+	c.eventBus.Publish(topics.AcceptedBlock, buf)
 
 	// 9. Send round update
 	// We send a round update after accepting a new block, which should include
@@ -301,7 +296,7 @@ func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
 		return err
 	}
 
-	c.eventBus.Publish(msg.RoundUpdateTopic, buf)
+	c.eventBus.Publish(topics.RoundUpdate, buf)
 	return nil
 }
 
@@ -367,12 +362,11 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 		panic(err)
 	}
 
-	withTopic, err := wire.AddTopic(buf, topics.Inv)
-	if err != nil {
+	if err := topics.Prepend(buf, topics.Inv); err != nil {
 		return err
 	}
 
-	c.eventBus.Stream(string(topics.Gossip), withTopic)
+	c.eventBus.Publish(topics.Gossip, buf)
 	return nil
 }
 

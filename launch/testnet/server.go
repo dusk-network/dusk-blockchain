@@ -31,6 +31,7 @@ type Server struct {
 	chain    *chain.Chain
 	dupeMap  *dupemap.DupeMap
 	counter  *chainsync.Counter
+	gossip   *processing.Gossip
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
@@ -86,10 +87,11 @@ func Setup() *Server {
 		chain:    chain,
 		dupeMap:  dupeBlacklist,
 		counter:  chainsync.NewCounter(eventBus),
+		gossip:   processing.NewGossip(protocol.TestNet),
 	}
 
 	// Setting up the transactor component
-	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter)
+	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil, cfg.Get().General.WalletOnly)
 	if err != nil {
 		panic(err)
 	}
@@ -100,8 +102,7 @@ func Setup() *Server {
 		panic(err)
 	}
 
-	gossip := processing.NewGossip(protocol.TestNet)
-	eventBus.RegisterPreprocessor(string(topics.Gossip), gossip)
+	eventBus.Register(topics.Gossip, srv.gossip)
 
 	return srv
 }
@@ -123,7 +124,7 @@ func launchDupeMap(eventBus eventbus.Broker) *dupemap.DupeMap {
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
+	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}
@@ -142,14 +143,14 @@ func (s *Server) OnAccept(conn net.Conn) {
 
 	go peerReader.ReadLoop()
 
-	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
+	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 	go peerWriter.Serve(writeQueueChan, exitChan)
 }
 
 // OnConnection is the callback for writing to the peers
 func (s *Server) OnConnection(conn net.Conn, addr string) {
 	writeQueueChan := make(chan *bytes.Buffer, 1000)
-	peerWriter := peer.NewWriter(conn, protocol.TestNet, s.eventBus)
+	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 
 	if err := peerWriter.Connect(); err != nil {
 		log.WithFields(log.Fields{
@@ -164,7 +165,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}).Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, protocol.TestNet, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
+	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
 		panic(err)
 	}

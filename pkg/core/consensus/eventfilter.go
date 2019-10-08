@@ -47,9 +47,9 @@ func NewEventFilter(handler AccumulatorHandler, state State, checkStep bool) *Ev
 }
 
 // Collect an event buffer, deserialize it, and then pass it to the proper component.
-func (ef *EventFilter) Collect(buffer *bytes.Buffer) error {
+func (ef *EventFilter) Collect(buffer bytes.Buffer) error {
 	ef.lock.Lock()
-	ev, err := ef.handler.Deserialize(buffer)
+	ev, err := ef.handler.Deserialize(&buffer)
 	if err != nil {
 		ef.lock.Unlock()
 		return err

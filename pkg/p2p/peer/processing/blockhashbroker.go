@@ -5,7 +5,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -100,5 +99,6 @@ func marshalInv(inv *peermsg.Inv) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	return wire.AddTopic(buf, topics.Inv)
+	topics.Prepend(buf, topics.Inv)
+	return buf, nil
 }

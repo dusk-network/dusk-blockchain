@@ -4,7 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strconv"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
@@ -45,7 +47,7 @@ func (c *commandLineProcessor) loadWalletCMD(args []string) {
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
+	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubKey)
 
 }
@@ -66,19 +68,24 @@ func (c *commandLineProcessor) createFromSeedCMD(args []string) {
 		return
 	}
 
-	fmt.Fprintf(os.Stdout, "Wallet loaded successfully!\n")
+	fmt.Fprintf(os.Stdout, "Wallet created successfully!\n")
 	fmt.Fprintf(os.Stdout, "Public Address: %s\n", pubKey)
 }
 
 func (c *commandLineProcessor) balanceCMD() {
 
-	balance, err := c.rpcBus.GetBalance()
+	walletBalance, mempoolBalance, err := c.rpcBus.GetBalance()
 	if err != nil {
 		fmt.Fprintf(os.Stdout, "error retrieving balance: %v\n", err)
 		return
 	}
 
-	fmt.Fprintln(os.Stdout, balance)
+	// unlocked balance is the amount of outputs currently available to spend
+	unlockedBalance := float64(walletBalance) / float64(cfg.DUSK)
+	// overall balance is sum of the unlockedBalance plus pending to be received
+	overallBalance := float64(walletBalance+mempoolBalance) / float64(cfg.DUSK)
+
+	fmt.Fprintf(os.Stdout, "Balance %.8f, Unlocked Balance %.8f\n", overallBalance, unlockedBalance)
 }
 
 func (c *commandLineProcessor) transferCMD(args []string) {
@@ -88,9 +95,9 @@ func (c *commandLineProcessor) transferCMD(args []string) {
 		return
 	}
 
-	amount, err := stringToUint64(args[0])
+	amount, err := parseAmountValue(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
+		fmt.Fprintf(os.Stdout, "error converting amount: %v\n", err)
 		return
 	}
 
@@ -112,9 +119,9 @@ func (c *commandLineProcessor) sendBidCMD(args []string) {
 		return
 	}
 
-	amount, err := stringToUint64(args[0])
+	amount, err := parseAmountValue(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
+		fmt.Fprintf(os.Stdout, "error converting amount: %v\n", err)
 		return
 	}
 
@@ -140,9 +147,9 @@ func (c *commandLineProcessor) sendStakeCMD(args []string) {
 		return
 	}
 
-	amount, err := stringToUint64(args[0])
+	amount, err := parseAmountValue(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stdout, "error converting amount string to an integer: %v\n", err)
+		fmt.Fprintf(os.Stdout, "error converting amount: %v\n", err)
 		return
 	}
 
@@ -159,4 +166,19 @@ func (c *commandLineProcessor) sendStakeCMD(args []string) {
 	}
 
 	fmt.Fprintf(os.Stdout, "Txn Hash: %s\n", hex.EncodeToString(txid))
+}
+
+// parseAmountValue convert DUSK amount value into atomic units where
+// 1 atomic unit is 0.00000001 DUSK
+func parseAmountValue(value string) (uint64, error) {
+
+	amountInDusk, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// convert to DUSK atomic units
+	amountInUnits := amountInDusk * float64(cfg.DUSK)
+
+	return uint64(amountInUnits), nil
 }

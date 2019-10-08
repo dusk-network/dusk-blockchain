@@ -6,11 +6,9 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -59,7 +57,8 @@ func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.S
 	}
 
 	certGenerator := &certificateGenerator{}
-	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
+	cbListener := eventbus.NewCallbackListener(certGenerator.setAgreementEvent)
+	eventBroker.Subscribe(topics.AgreementEvent, cbListener)
 
 	m := zkproof.CalculateM(k)
 	b := &broker{
@@ -101,8 +100,8 @@ func (b *broker) Generate(roundUpdate consensus.RoundUpdate) {
 
 	marshalledEvent := b.marshalScore(sev)
 	marshalledBlock := b.marshalBlock(blk)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledEvent)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledBlock)
+	b.eventBroker.Publish(topics.Gossip, marshalledEvent)
+	b.eventBroker.Publish(topics.Gossip, marshalledBlock)
 }
 
 func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) error {
@@ -115,7 +114,7 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 		return err
 	}
 
-	b.eventBroker.Publish(string(topics.Certificate), buf)
+	b.eventBroker.Publish(topics.Certificate, buf)
 	return nil
 }
 
@@ -131,14 +130,15 @@ func (b *broker) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 		panic(err)
 	}
 
+	// XXX: uh? the buffer is locally defined. Why do we propagate a copy of it?
 	copy := *buffer
-	b.eventBroker.Publish(string(topics.Score), &copy)
-	message, err := wire.AddTopic(buffer, topics.Score)
-	if err != nil {
+	b.eventBroker.Publish(topics.Score, &copy)
+
+	if err := topics.Prepend(buffer, topics.Score); err != nil {
 		panic(err)
 	}
 
-	return message
+	return buffer
 }
 
 func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
@@ -147,12 +147,12 @@ func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
 		panic(err)
 	}
 
+	// XXX: uh? the buffer is locally defined. Why do we propagate a copy of it?
 	copy := *buffer
-	b.eventBroker.Publish(string(topics.Candidate), &copy)
-	message, err := wire.AddTopic(buffer, topics.Candidate)
-	if err != nil {
+	b.eventBroker.Publish(topics.Candidate, &copy)
+	if err := topics.Prepend(buffer, topics.Candidate); err != nil {
 		panic(err)
 	}
 
-	return message
+	return buffer
 }

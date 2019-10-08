@@ -33,9 +33,9 @@ var (
 	rpcAdminCmd = map[string]bool{}
 
 	// supported topics for injection into EventBus
-	supportedTopics = [2]string{
-		string(topics.Tx),
-		string(topics.Block),
+	supportedTopics = [2]topics.Topic{
+		topics.Tx,
+		topics.Block,
 	}
 )
 
@@ -65,7 +65,7 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 	supported := false
 	for _, topic := range supportedTopics {
-		if topic == jsonrpcTopic {
+		if topic.String() == jsonrpcTopic {
 			supported = true
 			break
 		}
@@ -76,7 +76,8 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 	}
 
 	payload, _ := hex.DecodeString(params[1])
-	s.eventBus.Publish(jsonrpcTopic, bytes.NewBuffer(payload))
+	rpcTopic := topics.StringToTopic(jsonrpcTopic)
+	s.eventBus.Publish(rpcTopic, bytes.NewBuffer(payload))
 
 	result :=
 		`{ 
