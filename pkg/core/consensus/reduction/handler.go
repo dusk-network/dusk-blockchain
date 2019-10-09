@@ -54,13 +54,13 @@ func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) erro
 }
 
 // Verify the BLS signature of the Reduction event.
-func (b *reductionHandler) Verify(e wire.Event) error {
-	ev := e.(*Reduction)
+func (b *reductionHandler) VerifySignature(hdr *header.Header, sig []byte) error {
 	info := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(info, ev.Header); err != nil {
+	if err := header.MarshalSignableVote(info, hdr); err != nil {
 		return err
 	}
-	return msg.VerifyBLSSignature(ev.PubKeyBLS, info.Bytes(), ev.SignedHash)
+
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, info.Bytes(), sig)
 }
 
 func (b *reductionHandler) Quorum() int {

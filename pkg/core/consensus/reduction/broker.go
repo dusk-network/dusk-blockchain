@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -17,81 +18,83 @@ import (
 type (
 	// Broker is the message broker for the reduction process.
 	broker struct {
-		filter  *consensus.EventFilter
 		Reducer *reducer
-
-		// utility context to group interfaces and channels to be passed around
-		ctx *context
-
-		// channels linked to subscribers
-		roundUpdateChan <-chan consensus.RoundUpdate
+		handler *reductionHandler
 	}
 )
 
-func initBroker(eventBroker eventbus.Broker, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
+func NewComponent(publisher eventbus.Publisher, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus, p user.Provisioners, requestStepUpdate func()) *broker {
 	handler := newReductionHandler(keys)
 	return newBroker(eventBroker, handler, timeout, rpcBus)
 }
 
-// Launch creates and wires a broker, initiating the components that
-// have to do with Block Reduction
-func Launch(eventBroker eventbus.Broker, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus) {
-	broker := initBroker(eventBroker, keys, timeout, rpcBus)
-	go broker.Listen()
-}
-
-func launchReductionFilter(eventBroker eventbus.Broker, ctx *context) *consensus.EventFilter {
-
-	filter := consensus.NewEventFilter(ctx.handler, ctx.state, true)
-	republisher := consensus.NewRepublisher(eventBroker, topics.Reduction)
-	cbListener := eventbus.NewCallbackListener(filter.Collect)
-	eventBroker.Subscribe(topics.Reduction, cbListener)
-	eventBroker.Register(topics.Reduction, republisher, &consensus.Validator{})
-	return filter
-}
-
 // newBroker will return a reduction broker.
-func newBroker(eventBroker eventbus.Broker, handler *reductionHandler, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
-	ctx := newCtx(handler, timeout)
-	filter := launchReductionFilter(eventBroker, ctx)
-	roundChannel := consensus.InitRoundUpdate(eventBroker)
-
+func newBroker(publisher eventbus.Publisher, handler *reductionHandler, timeOut time.Duration, rpcBus *rpcbus.RPCBus, requestStepUpdate func()) *broker {
 	b := &broker{
-		roundUpdateChan: roundChannel,
-		ctx:             ctx,
-		filter:          filter,
-		Reducer:         newReducer(ctx, eventBroker, filter, rpcBus),
+		handler: handler,
+		Reducer: newReducer(ctx, eventBroker, timeOut, filter, rpcBus, requestStepUpdate),
 	}
-
-	eventbus.NewTopicListener(eventBroker, b, topics.BestScore, eventbus.CallbackType)
 	return b
 }
 
-func (b *broker) Collect(r bytes.Buffer) error {
-	ev := &selection.ScoreEvent{}
-	if err := selection.UnmarshalScoreEvent(&r, ev); err != nil {
-		return err
+func (b *broker) Initialize() ([]consensus.Subscriber, consensus.EventHandler) {
+	reductionSubscriber := consensus.Subscriber{
+		topic:    topics.Reduction,
+		listener: consensus.NewCallbackListener(b.CollectReductionEvent),
 	}
-	if len(ev.VoteHash) == 32 {
-		b.propagateScore(ev)
 
-	} else {
-		b.propagateScore(nil)
+	scoreSubscriber := consensus.Subscriber{
+		topic:    topics.BestScore,
+		listener: consensus.NewCallbackListener(b.CollectBestScore),
 	}
-	return nil
+
+	return []Subscriber{reductionSubscriber, scoreSubscriber}, b.handler
 }
 
-func (b *broker) propagateRound(roundUpdate consensus.RoundUpdate) {
+func (b *broker) Initialize() ([]Subscriber, EventHandler) {
+	b.handler.UpdateProvisioners(roundUpdate.P)
+}
+
+func (b *broker) Finalize() {
 	log.WithFields(log.Fields{
 		"process": "reduction",
 		"round":   roundUpdate.Round,
 	}).Debug("Got round update")
 	b.Reducer.end()
-	b.Reducer.lock.Lock()
-	b.ctx.handler.UpdateProvisioners(roundUpdate.P)
-	b.filter.UpdateRound(roundUpdate.Round)
-	b.ctx.timer.ResetTimeOut()
-	b.Reducer.lock.Unlock()
+	b.timer.Close()
+}
+
+func (b *broker) CollectReductionEvent(m bytes.Buffer, hdr header.Header) error {
+	ev := New()
+	if err := reduction.Unmarshal(&m, ev); err != nil {
+		return err
+	}
+
+	if err := b.handler.VerifySignature(hdr, ev.SignedHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *broker) SetStep(step uint8) {
+	b.reducer.aggregator.Stop()
+	b.reducer.aggregator = newAggregator()
+}
+
+func (b *broker) CollectBestScore(r bytes.Buffer, hdr *header.Header) error {
+	ev := &selection.ScoreEvent{}
+	if err := selection.UnmarshalScoreEvent(&r, ev); err != nil {
+		return err
+	}
+
+	if len(ev.VoteHash) == 32 {
+		b.propagateScore(ev)
+		return nil
+	}
+
+	b.propagateScore(nil)
+	return nil
 }
 
 func (b *broker) propagateScore(ev *selection.ScoreEvent) {
@@ -100,27 +103,12 @@ func (b *broker) propagateScore(ev *selection.ScoreEvent) {
 			"process": "reduction",
 		}).Debug("got empty selection message")
 		b.Reducer.startReduction(emptyHash[:])
-	} else if ev.Round == b.ctx.state.Round() {
-		log.WithFields(log.Fields{
-			"process": "reduction",
-			"hash":    hex.EncodeToString(ev.VoteHash),
-		}).Debug("got selection message")
-		b.Reducer.startReduction(ev.VoteHash)
-	} else {
-		log.WithFields(log.Fields{
-			"process":     "reduction",
-			"event round": ev.Round,
-		}).Debug("got obsolete selection message")
-		b.Reducer.startReduction(emptyHash[:])
+		return
 	}
 
-	b.filter.FlushQueue()
-}
-
-// Listen for incoming messages.
-func (b *broker) Listen() {
-	for {
-		roundUpdate := <-b.roundUpdateChan
-		b.propagateRound(roundUpdate)
-	}
+	log.WithFields(log.Fields{
+		"process": "reduction",
+		"hash":    hex.EncodeToString(ev.VoteHash),
+	}).Debug("got selection message")
+	b.Reducer.startReduction(ev.VoteHash)
 }

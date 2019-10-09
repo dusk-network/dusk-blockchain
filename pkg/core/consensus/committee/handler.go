@@ -16,10 +16,11 @@ type Handler struct {
 	lock         sync.RWMutex
 }
 
-func NewHandler(keys user.Keys) *Handler {
+func NewHandler(keys user.Keys, p user.Provisioners) *Handler {
 	return &Handler{
-		Keys:       keys,
-		Committees: make([]user.VotingCommittee, math.MaxUint8),
+		Keys:         keys,
+		Committees:   make([]user.VotingCommittee, math.MaxUint8),
+		Provisioners: p,
 	}
 }
 
@@ -67,19 +68,4 @@ func (b *Handler) CommitteeSize(maxSize int) int {
 	}
 
 	return size
-}
-
-// UpdateProvisioners will update the Provisioners value on the Handler,
-// and cleans out the cached committees, as they will be obsolete.
-func (b *Handler) UpdateProvisioners(p user.Provisioners) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	b.Provisioners = p
-	b.Committees = make([]user.VotingCommittee, math.MaxUint8)
-}
-
-func (b *Handler) membersAt(idx uint8) int {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-	return b.Committees[idx].Set.Len()
 }
