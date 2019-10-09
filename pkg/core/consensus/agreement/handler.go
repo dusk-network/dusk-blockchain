@@ -131,8 +131,8 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 	return bls.Verify(apk, signed.Bytes(), sig)
 }
 
-func (a *agreementHandler) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
-	signature := ed25519.Sign(*a.EdSecretKey, eventBuf.Bytes())
+func (a *agreementHandler) signEd25519(agreement []byte) *bytes.Buffer {
+	signature := ed25519.Sign(*a.EdSecretKey, agreement)
 	buf := new(bytes.Buffer)
 	if err := encoding.Write512(buf, signature); err != nil {
 		panic(err)
@@ -142,7 +142,7 @@ func (a *agreementHandler) signEd25519(eventBuf *bytes.Buffer) *bytes.Buffer {
 		panic(err)
 	}
 
-	if _, err := buf.Write(eventBuf.Bytes()); err != nil {
+	if _, err := buf.Write(agreement); err != nil {
 		panic(err)
 	}
 
@@ -176,7 +176,7 @@ func (a *agreementHandler) createAgreement(evs []wire.Event, round uint64, step 
 	}
 
 	// sign the whole message
-	signed := a.signEd25519(buffer)
+	signed := a.signEd25519(buffer.Bytes())
 
 	// add the topic
 	if err := topics.Prepend(signed, topics.Agreement); err != nil {
