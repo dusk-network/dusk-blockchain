@@ -27,16 +27,8 @@ type (
 	// Agreement is the Event created at the end of the Reduction process. It includes
 	// the aggregated compressed signatures of all voters
 	Agreement struct {
-		*header.Header
 		SignedVotes  []byte
-		VotesPerStep []*StepVotes
-	}
-
-	// UnMarshaller marshals and unmarshals Agreement events.
-	UnMarshaller struct {
-		*header.UnMarshaller
-		wire.EventMarshaller
-		wire.EventUnmarshaller
+		VotesPerStep []StepVotes
 	}
 )
 
@@ -87,17 +79,10 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 	return nil
 }
 
-// NewUnMarshaller returns an initialized UnMarshaller.
-func NewUnMarshaller() *UnMarshaller {
-	return &UnMarshaller{
-		UnMarshaller: header.NewUnMarshaller(),
-	}
-}
-
 // Deserialize an Agreement event from a buffer to its struct representation.
-func (au *UnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
+func Deserialize(r *bytes.Buffer) (wire.Event, error) {
 	ev := New()
-	if err := au.Unmarshal(r, ev); err != nil {
+	if err := Unmarshal(r, ev); err != nil {
 		return nil, err
 	}
 
@@ -105,12 +90,8 @@ func (au *UnMarshaller) Deserialize(r *bytes.Buffer) (wire.Event, error) {
 }
 
 // Marshal an Agreement event into a buffer.
-func (au *UnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+func Marshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 	a := ev.(*Agreement)
-	if err := au.UnMarshaller.Marshal(r, a.Header); err != nil {
-		return err
-	}
-
 	// Marshal BLS Signature of VoteSet
 	if err := encoding.WriteBLS(r, a.SignedVotes); err != nil {
 		return err
@@ -128,20 +109,15 @@ func (au *UnMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 // Field order is the following:
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
-func (au *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	a := ev.(*Agreement)
-	err := au.UnMarshaller.Unmarshal(r, a.Header)
-	if err != nil {
-		return err
-	}
-
 	a.SignedVotes = make([]byte, 33)
 	if err = encoding.ReadBLS(r, a.SignedVotes); err != nil {
 		return err
 	}
 
 	votesPerStep := make([]*StepVotes, 2)
-	err = UnmarshalVotes(r, &votesPerStep)
+	err = UnmarshalVotes(r, votesPerStep)
 	if err != nil {
 		return err
 	}
@@ -153,8 +129,7 @@ func (au *UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 // New returns an empty Agreement event.
 func New() *Agreement {
 	return &Agreement{
-		Header:       &header.Header{},
-		VotesPerStep: make([]*StepVotes, 2),
+		VotesPerStep: make([]StepVotes, 2),
 		SignedVotes:  make([]byte, 33),
 	}
 }
@@ -162,7 +137,6 @@ func New() *Agreement {
 // Sign signs an aggregated agreement event
 func Sign(a *Agreement, keys user.Keys) error {
 	buffer := new(bytes.Buffer)
-
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {
 		return err
 	}
@@ -177,7 +151,7 @@ func Sign(a *Agreement, keys user.Keys) error {
 }
 
 // UnmarshalVotes unmarshals the array of StepVotes for a single Agreement
-func UnmarshalVotes(r *bytes.Buffer, votes *[]*StepVotes) error {
+func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -189,7 +163,7 @@ func UnmarshalVotes(r *bytes.Buffer, votes *[]*StepVotes) error {
 			return err
 		}
 
-		(*votes)[i] = sv
+		votes[i] = sv
 	}
 
 	return nil
@@ -230,7 +204,7 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 }
 
 // MarshalVotes marshals an array of StepVotes
-func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
+func MarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
 	if err := encoding.WriteVarInt(r, uint64(len(votes))); err != nil {
 		return err
 	}
@@ -246,7 +220,7 @@ func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
 // for an ordered set of votes
-func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
+func MarshalStepVotes(r *bytes.Buffer, vote StepVotes) error {
 	// APK
 	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {
 		return err

@@ -25,9 +25,9 @@ type agreementHandler struct {
 }
 
 // newHandler returns an initialized agreementHandler.
-func newHandler(keys user.Keys) *agreementHandler {
+func newHandler(keys user.Keys, p user.Provisioners) *agreementHandler {
 	return &agreementHandler{
-		Handler:      committee.NewHandler(keys),
+		Handler:      committee.NewHandler(keys, p),
 		UnMarshaller: NewUnMarshaller(),
 	}
 }
