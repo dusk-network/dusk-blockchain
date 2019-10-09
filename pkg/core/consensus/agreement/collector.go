@@ -2,14 +2,12 @@ package agreement
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	log "github.com/sirupsen/logrus"
 )
 
 type reductionResultCollector struct {
@@ -20,23 +18,6 @@ type reductionResultCollector struct {
 type voteSet struct {
 	round uint64
 	votes []wire.Event
-}
-
-func getInitialRound(eventBus eventbus.Broker) uint64 {
-	initChannel := make(chan bytes.Buffer, 1)
-	listener := eventbus.NewChanListener(initChannel)
-	id := eventBus.Subscribe(topics.Initialization, listener)
-
-	roundBuf := <-initChannel
-	round := binary.LittleEndian.Uint64(roundBuf.Bytes())
-	log.WithFields(log.Fields{
-		"process": "factory",
-		"round":   round,
-	}).Debug("Received initial round")
-
-	// unsubscribe the listener as initialization messages are no longer relevant
-	eventBus.Unsubscribe(topics.Initialization, id)
-	return round
 }
 
 func initReductionResultCollector(subscriber eventbus.Subscriber) <-chan voteSet {
