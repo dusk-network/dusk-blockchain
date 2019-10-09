@@ -15,31 +15,7 @@ type (
 		Step      uint8
 		BlockHash []byte
 	}
-
-	// headerMarshaller marshals a consensus Header as follows:
-	// - BLS Public Key
-	// - Round
-	// - Step
-	headerMarshaller struct{}
-
-	// headerUnmarshaller unmarshals consensus headers.
-	headerUnmarshaller struct{}
-
-	// UnMarshaller marshals and unmarshals consensus event headers. It is a helper
-	// to be embedded in the various consensus message unmarshallers.
-	UnMarshaller struct {
-		*headerMarshaller
-		*headerUnmarshaller
-	}
 )
-
-// NewUnMarshaller instantiates a struct to Marshal and Unmarshal event Headers
-func NewUnMarshaller() *UnMarshaller {
-	return &UnMarshaller{
-		headerMarshaller:   new(headerMarshaller),
-		headerUnmarshaller: new(headerUnmarshaller),
-	}
-}
 
 // Sender implements wire.Event.
 // Returns the BLS public key of the event sender.
@@ -57,7 +33,7 @@ func (h *Header) Equal(e wire.Event) bool {
 }
 
 // Marshal a Header into a Buffer.
-func (hm *headerMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
+func Marshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*Header)
 	if err := encoding.WriteVarBytes(r, consensusEv.PubKeyBLS); err != nil {
 		return err
@@ -67,7 +43,7 @@ func (hm *headerMarshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 }
 
 // Unmarshal unmarshals the buffer into a Header.
-func (hu *headerUnmarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
+func Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 	consensusEv := ev.(*Header)
 
 	// Decoding PubKey BLS
