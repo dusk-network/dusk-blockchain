@@ -24,6 +24,7 @@ type ListenerType int
 // Considering that the EventCollector handles finite messages rather than
 // packages, this interface is implemented only by callback and channel
 // subscribers
+// Deprecated: use eventbus.NewChanListener or eventbus.NewCallbackListener instead
 type TopicListener interface {
 	Quit()
 }
@@ -33,9 +34,9 @@ type TopicListener interface {
 func NewTopicListener(subscriber Subscriber, collector wire.EventCollector, topic topics.Topic, listenerType ListenerType) TopicListener {
 	switch listenerType {
 	case ChannelType:
-		return newChanCollector(subscriber, collector, topic)
+		return NewChanTopicListener(subscriber, collector, topic)
 	case CallbackType:
-		return newCallbackCollector(subscriber, collector.Collect, topic)
+		return NewCallbackTopicListener(subscriber, collector, topic)
 	}
 	return nil
 }
@@ -47,8 +48,8 @@ type callbackCollector struct {
 	topic      topics.Topic
 }
 
-func newCallbackCollector(subscriber Subscriber, callback func(bytes.Buffer) error, topic topics.Topic) TopicListener {
-	cbListener := NewCallbackListener(callback)
+func NewCallbackTopicListener(subscriber Subscriber, collector wire.EventCollector, topic topics.Topic) TopicListener {
+	cbListener := NewCallbackListener(collector.Collect)
 	id := subscriber.Subscribe(topic, cbListener)
 	return &callbackCollector{
 		Listener: cbListener,
@@ -65,6 +66,7 @@ func (c *callbackCollector) Quit() {
 // channelCollector accepts events from the EventBus and takes care of reacting on
 // quit Events. It delegates the business logic to the EventCollector which is
 // supposed to handle the incoming events
+// Deprecated: when the `Collect` callback includes a channel, we incur in potential backpressure because of the potentially different bufferization strategy of the `chanCollector.msgChan`
 type chanCollector struct {
 	subscriber     Subscriber
 	eventCollector wire.EventCollector
@@ -76,9 +78,9 @@ type chanCollector struct {
 	log            *lg.Entry
 }
 
-// NewTopicListener creates the TopicListener listening to a topic on the EventBus.
+// NewCallbackTopicListener creates the TopicListener listening to a topic on the EventBus.
 // The EventBus, EventCollector and Topic are injected
-func newChanCollector(subscriber Subscriber, collector wire.EventCollector, topic topics.Topic) TopicListener {
+func NewChanTopicListener(subscriber Subscriber, collector wire.EventCollector, topic topics.Topic) TopicListener {
 	msgChan := make(chan bytes.Buffer, 100)
 	msgListener := NewChanListener(msgChan)
 
