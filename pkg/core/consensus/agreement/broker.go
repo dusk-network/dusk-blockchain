@@ -36,7 +36,8 @@ type broker struct {
 func launchFilter(eventBroker eventbus.Broker, handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(handler, state, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
-	eventbus.NewTopicListener(eventBroker, filter, topics.Agreement, eventbus.CallbackType)
+	callbackListener := eventbus.NewCallbackListener(filter.Collect)
+	eventBroker.Subscribe(topics.Agreement, callbackListener)
 	eventBroker.Register(topics.Agreement, republisher, &consensus.Validator{})
 	return filter
 }
