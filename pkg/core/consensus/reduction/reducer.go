@@ -87,12 +87,12 @@ func (r *reducer) inCommittee() bool {
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
 	// empty out stop channels
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	r.firstStep.stopChan = make(chan struct{}, 1)
 	r.secondStep.stopChan = make(chan struct{}, 1)
 
-	r.lock.Lock()
 	r.stale = false
-	r.lock.Unlock()
 
 	if r.inCommittee() {
 		r.sendReduction(hash)
