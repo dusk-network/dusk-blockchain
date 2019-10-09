@@ -147,9 +147,9 @@ func (r *reducer) handleFirstResult(events []wire.Event) []byte {
 }
 
 func (r *reducer) finalizeSecondStep() {
-	r.filter.ResetAccumulator()
-	r.ctx.state.IncrementStep()
 	r.publishRegeneration()
+	r.ctx.state.IncrementStep()
+	r.filter.ResetAccumulator()
 }
 
 func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash1 []byte) {
