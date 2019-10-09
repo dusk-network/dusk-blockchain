@@ -99,7 +99,7 @@ func (b *broker) propagateScore(ev *selection.ScoreEvent) {
 		log.WithFields(log.Fields{
 			"process": "reduction",
 		}).Debug("got empty selection message")
-		b.Reducer.startReduction(make([]byte, 32))
+		b.Reducer.startReduction(emptyHash[:])
 	} else if ev.Round == b.ctx.state.Round() {
 		log.WithFields(log.Fields{
 			"process": "reduction",
@@ -111,7 +111,7 @@ func (b *broker) propagateScore(ev *selection.ScoreEvent) {
 			"process":     "reduction",
 			"event round": ev.Round,
 		}).Debug("got obsolete selection message")
-		b.Reducer.startReduction(make([]byte, 32))
+		b.Reducer.startReduction(emptyHash[:])
 	}
 
 	b.filter.FlushQueue()

@@ -146,13 +146,17 @@ func (r *reducer) handleFirstResult(events []wire.Event) []byte {
 	return nil
 }
 
+func (r *reducer) finalizeSecondStep() {
+	r.filter.ResetAccumulator()
+	r.ctx.state.IncrementStep()
+	r.publishRegeneration()
+}
+
 func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash1 []byte) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
-		defer r.filter.ResetAccumulator()
-		defer r.ctx.state.IncrementStep()
-		defer r.publishRegeneration()
+		defer r.finalizeSecondStep()
 
 		hash2 := r.extractHash(eventsSecondStep)
 		if r.isReductionSuccessful(hash1, hash2) {
