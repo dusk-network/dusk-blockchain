@@ -1,6 +1,7 @@
 package reduction
 
 import (
+	"bytes"
 	"encoding/hex"
 	"time"
 
@@ -24,7 +25,6 @@ type (
 
 		// channels linked to subscribers
 		roundUpdateChan <-chan consensus.RoundUpdate
-		selectionChan   <-chan *selection.ScoreEvent
 	}
 )
 
@@ -52,18 +52,33 @@ func launchReductionFilter(eventBroker eventbus.Broker, ctx *context) *consensus
 
 // newBroker will return a reduction broker.
 func newBroker(eventBroker eventbus.Broker, handler *reductionHandler, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
-	scoreChan := initBestScoreUpdate(eventBroker)
 	ctx := newCtx(handler, timeout)
 	filter := launchReductionFilter(eventBroker, ctx)
 	roundChannel := consensus.InitRoundUpdate(eventBroker)
 
-	return &broker{
+	b := &broker{
 		roundUpdateChan: roundChannel,
 		ctx:             ctx,
 		filter:          filter,
-		selectionChan:   scoreChan,
 		Reducer:         newReducer(ctx, eventBroker, filter, rpcBus),
 	}
+
+	eventbus.NewTopicListener(eventBroker, b, topics.BestScore, eventbus.CallbackType)
+	return b
+}
+
+func (b *broker) Collect(r bytes.Buffer) error {
+	ev := &selection.ScoreEvent{}
+	if err := selection.UnmarshalScoreEvent(&r, ev); err != nil {
+		return err
+	}
+	if len(ev.VoteHash) == 32 {
+		b.propagateScore(ev)
+
+	} else {
+		b.propagateScore(nil)
+	}
+	return nil
 }
 
 func (b *broker) propagateRound(roundUpdate consensus.RoundUpdate) {
@@ -84,7 +99,7 @@ func (b *broker) propagateScore(ev *selection.ScoreEvent) {
 		log.WithFields(log.Fields{
 			"process": "reduction",
 		}).Debug("got empty selection message")
-		b.Reducer.startReduction(make([]byte, 32))
+		b.Reducer.startReduction(emptyHash[:])
 	} else if ev.Round == b.ctx.state.Round() {
 		log.WithFields(log.Fields{
 			"process": "reduction",
@@ -96,7 +111,7 @@ func (b *broker) propagateScore(ev *selection.ScoreEvent) {
 			"process":     "reduction",
 			"event round": ev.Round,
 		}).Debug("got obsolete selection message")
-		b.Reducer.startReduction(make([]byte, 32))
+		b.Reducer.startReduction(emptyHash[:])
 	}
 
 	b.filter.FlushQueue()
@@ -105,12 +120,7 @@ func (b *broker) propagateScore(ev *selection.ScoreEvent) {
 // Listen for incoming messages.
 func (b *broker) Listen() {
 	for {
-		select {
-		case roundUpdate := <-b.roundUpdateChan:
-			b.propagateRound(roundUpdate)
-
-		case ev := <-b.selectionChan:
-			b.propagateScore(ev)
-		}
+		roundUpdate := <-b.roundUpdateChan
+		b.propagateRound(roundUpdate)
 	}
 }

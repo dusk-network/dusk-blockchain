@@ -12,21 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func LaunchNotification(eventbus eventbus.Subscriber) <-chan *ScoreEvent {
-	scoreChan := make(chan *ScoreEvent)
-	evChan := consensus.LaunchNotification(eventbus,
-		newScoreHandler(), topics.BestScore)
-
-	go func() {
-		for {
-			sEv := <-evChan
-			scoreChan <- sEv.(*ScoreEvent)
-		}
-	}()
-
-	return scoreChan
-}
-
 var empty struct{}
 
 type eventSelector struct {
@@ -78,6 +63,7 @@ func (s *eventSelector) Process(ev wire.Event) {
 	s.lock.RLock()
 	bestEvent := s.bestEvent
 	s.lock.RUnlock()
+
 	if !s.handler.Priority(bestEvent, ev) {
 		if err := s.handler.Verify(ev); err != nil {
 			log.WithField("process", "selection").Debugln(err)
@@ -90,15 +76,12 @@ func (s *eventSelector) Process(ev wire.Event) {
 }
 
 func (s *eventSelector) repropagate(ev wire.Event) {
-	buf := new(bytes.Buffer)
-	if err := s.handler.Marshal(buf, ev); err != nil {
-		panic(err)
-	}
-	if err := topics.Prepend(buf, topics.Score); err != nil {
+	buf := topics.Score.ToBuffer()
+	if err := s.handler.Marshal(&buf, ev); err != nil {
 		panic(err)
 	}
 
-	s.publisher.Publish(topics.Gossip, buf)
+	s.publisher.Publish(topics.Gossip, &buf)
 }
 
 func (s *eventSelector) publishBestEvent() {
