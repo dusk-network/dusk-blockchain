@@ -42,3 +42,7 @@ func (t *Timer) TimeOut() time.Duration {
 	defer t.lock.RUnlock()
 	return t.timeOut
 }
+
+func (t *Timer) Close() {
+	close(t.TimeOutChan)
+}
