@@ -12,10 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type initCollector struct {
-	initChannel chan uint64
-}
-
 type reductionResultCollector struct {
 	resultChan            chan voteSet
 	reductionUnmarshaller *reduction.UnMarshaller
@@ -26,23 +22,20 @@ type voteSet struct {
 	votes []wire.Event
 }
 
-func (i *initCollector) Collect(roundBuffer bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(roundBuffer.Bytes())
-	i.initChannel <- round
-	return nil
-}
-
 func getInitialRound(eventBus eventbus.Broker) uint64 {
-	initChannel := make(chan uint64, 1)
-	initCollector := &initCollector{initChannel}
-	eventbus.NewTopicListener(eventBus, initCollector, topics.Initialization, eventbus.ChannelType)
+	initChannel := make(chan bytes.Buffer, 1)
+	listener := eventbus.NewChanListener(initChannel)
+	id := eventBus.Subscribe(topics.Initialization, listener)
 
-	// Wait for the initial round to be published
-	round := <-initChannel
+	roundBuf := <-initChannel
+	round := binary.LittleEndian.Uint64(roundBuf.Bytes())
 	log.WithFields(log.Fields{
 		"process": "factory",
 		"round":   round,
 	}).Debug("Received initial round")
+
+	// unsubscribe the listener as initialization messages are no longer relevant
+	eventBus.Unsubscribe(topics.Initialization, id)
 	return round
 }
 
