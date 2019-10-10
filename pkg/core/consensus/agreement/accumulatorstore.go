@@ -1,4 +1,4 @@
-package consensus
+package agreement
 
 import (
 	"sync"
@@ -16,7 +16,7 @@ type (
 )
 
 // NewAccumulatorStore returns an initialized AccumulatorStore.
-func NewAccumulatorStore() *AccumulatorStore {
+func newAccumulatorStore() *AccumulatorStore {
 	return &AccumulatorStore{
 		evMap: make(map[string][]wire.Event),
 	}

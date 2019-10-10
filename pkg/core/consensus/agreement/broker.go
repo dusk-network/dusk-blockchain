@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -14,59 +15,56 @@ import (
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func newComponent(publisher eventbus.Publisher, keys user.Keys, p user.Provisioners) *broker {
-	b := newBroker(publisher, keys, p, requestStepUpdate)
-	go b.listen()
-	return b
+func newComponent(publisher eventbus.Publisher, keys user.Keys) *agreement {
+	return newAgreement(publisher, keys)
 }
 
-// TODO: change naming to agreement for method receivers
-type broker struct {
-	broker      eventbus.Publisher
+type agreement struct {
+	publisher   eventbus.Publisher
 	handler     *agreementHandler
 	accumulator *consensus.Accumulator
+	keys        user.Keys
 }
 
-func newBroker(publisher eventbus.Publisher, keys user.Keys) *broker {
-	handler := newHandler(keys, p)
-	b := &broker{
+func newAgreement(publisher eventbus.Publisher, keys user.Keys) *agreement {
+	return &agreement{
 		publisher: publisher,
-		handler:   handler,
+		keys:      keys,
 	}
-	return b
 }
 
-func (b *broker) Initialize(provisioners user.Provisioners) []consensus.Subscriber {
-	b.handler = newHandler(b.keys, provisioners)
+func (a *agreement) Initialize(provisioners user.Provisioners) []consensus.Subscriber {
+	a.handler = newHandler(a.keys, provisioners)
+	a.accumulator = newAccumulator(a.handler, newAccumulatorStore())
 	agreementSubscriber := &consensus.Subscriber{
-		consensus.NewFilteringListener(b.CollectAgreementEvent, b.Filter),
+		consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter),
 		topics.Agreement,
 	}
 
+	go a.listen()
 	return []Subscriber{agreementSubscriber}
 }
 
-func (b *broker) Filter() bool {
-	return true
+func (a *agreement) Filter(hdr header.Header) bool {
+	return !a.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
+
+// SetStep implements Component
+func (a *agreement) SetStep(step uint8) {}
 
 // Listen for results coming from the accumulator
-func (b *broker) listen() {
-	for {
-		select {
-		case evs := <-b.filter.Accumulator.CollectedVotesChan:
-			b.publishEvent(evs)
-			b.publishWinningHash(evs)
-		}
-	}
+func (a *agreement) listen() {
+	evs := <-a.filter.Accumulator.CollectedVotesChan
+	a.publishEvent(evs)
+	a.publishWinningHash(evs)
 }
 
-func (b *broker) publishWinningHash(evs []wire.Event) {
+func (a *agreement) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
-	b.broker.Publish(topics.WinningBlockHash, bytes.NewBuffer(aev.BlockHash))
+	a.publisher.Publish(topics.WinningBlockHash, bytes.NewBuffer(aev.BlockHash))
 }
 
-func (b *broker) publishEvent(evs []wire.Event) {
+func (a *agreement) publishEvent(evs []wire.Event) {
 	marshaller := NewUnMarshaller()
 	buf := new(bytes.Buffer)
 	if err := marshaller.Marshal(buf, evs[0]); err != nil {
@@ -77,9 +75,9 @@ func (b *broker) publishEvent(evs []wire.Event) {
 		return
 	}
 
-	b.broker.Publish(topics.AgreementEvent, buf)
+	a.publisher.Publish(topics.AgreementEvent, buf)
 }
 
-func (b *broker) Finalize() {
-	b.broker.Unsubscribe(topics.Agreement, b.agreementID)
+func (a *agreement) Finalize() {
+	a.accumulator.Stop()
 }
