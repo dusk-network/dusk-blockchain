@@ -25,7 +25,6 @@ type AccumulatorHandler interface {
 type Accumulator struct {
 	WorkerTimeOut time.Duration
 	wire.Store
-	state              State
 	checkStep          bool
 	handler            AccumulatorHandler
 	verificationChan   chan wire.Event
@@ -34,7 +33,7 @@ type Accumulator struct {
 }
 
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
-func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State, checkStep bool) *Accumulator {
+func NewAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
 	// set up worker pool
 	eventChan := make(chan wire.Event, 100)
 	verificationChan := make(chan wire.Event, 100)
@@ -43,8 +42,6 @@ func NewAccumulator(handler AccumulatorHandler, store wire.Store, state State, c
 	return &Accumulator{
 		WorkerTimeOut:      10 * time.Second,
 		Store:              store,
-		state:              state,
-		checkStep:          checkStep,
 		handler:            handler,
 		verificationChan:   verificationChan,
 		eventChan:          eventChan,

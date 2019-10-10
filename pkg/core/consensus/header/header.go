@@ -17,10 +17,37 @@ type (
 	}
 )
 
+type Phase uint8
+
+const (
+	Same Phase = iota
+	Before
+	After
+)
+
 // Sender implements wire.Event.
 // Returns the BLS public key of the event sender.
 func (h *Header) Sender() []byte {
 	return h.PubKeyBLS
+}
+
+// ComparePhase is used to see if
+func (h *Header) Compare(round uint64, step uint8) Phase {
+	if h.Round < round {
+		return Before
+	}
+
+	if h.Round == round {
+		if h.Step < step {
+			return Before
+		}
+
+		if h.Step == step {
+			return Same
+		}
+	}
+
+	return After
 }
 
 // Equal implements wire.Event.

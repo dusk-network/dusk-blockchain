@@ -6,110 +6,127 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-crypto/bls"
 )
 
-type Component interface {
-	Finalize()
-	Initialize(Signer) ([]Subscriber, EventHandler)
-	Notify(topics.Topic, []wire.Event, bool) error
-}
-
-type Listener interface {
-	Notify(bytes.Buffer, *header.Header) error
-}
-
-type CallbackListener struct {
-	callback func(bytes.Buffer, *header.Header) error
-}
-
-func NewCallbackListener(callback func(bytes.Buffer, *header.Header) error) Listener {
-	return &CallbackListener{callback}
-}
-
-type Signer struct {
-	keys      user.Keys
-	consensus *Consensus
-}
-
-type Subscriber struct {
-	topic    topics.Topic
-	listener eventbus.Listener
-}
-
 type Consensus struct {
-	eventBus    eventbus.Broker
+	*SyncState
+	eventBus    *eventbus.EventBus
 	rpcBus      *rpcbus.RPCBus
 	keys        user.Keys
+	factories   []ComponentFactory
 	components  []Component
 	lock        sync.RWMutex
-	subscribers map[topics.Topic][]Subscriber
+	subscribers map[topics.Topic][]Listener
 }
 
-func (c *Consensus) New(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, keys user.Keys) *Consensus {
-	// TODO: listen for initialization message
-	return *Consensus{
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys user.Keys, factories []ComponentFactory) *Consensus {
+	c := &Consensus{
+		SyncState:   NewState(),
 		eventBus:    eventBus,
 		rpcBus:      rpcBus,
 		keys:        keys,
-		components:  make([]Component, 4),
-		subscribers: eventbus.NewListenerMap(),
+		factories:   factories,
+		components:  make([]Component, len(factories)),
+		subscribers: make(map[topics.Topic][]Listener),
+	}
+
+	listener := eventbus.NewCallbackListener(c.CollectEvent)
+	eventBus.SubscribeDefault(listener)
+
+	// TODO: listen for initialization message and call reinstantiateComponents()
+	return c
+}
+
+func (c *Consensus) initialize(component Component, fromScratch bool) Component {
+	subs := component.Initialize(c.requestStepUpdate)
+	for _, sub := range subs {
+		if fromScratch {
+			c.eventBus.AddDefaultTopic(sub.topic)
+			c.eventBus.Register(sub.topic, NewRepublisher(c.eventBus, sub.topic), &Validator{})
+		}
+		c.subscribe(sub.topic, sub)
+	}
+
+	return component
+}
+
+func (c *Consensus) subscribe(topic topics.Topic, sub Listener) {
+	subscribers := c.subscribers[topic]
+	if subscribers == nil {
+		subscribers = []Listener{sub}
+	} else {
+		subscribers = append(subscribers, sub)
+	}
+	c.subscribers[topic] = subscribers
+}
+
+func (c *Consensus) reinstantiateComponents(fromScratch bool) {
+	c.clearSubscribers()
+	for i, factory := range c.factories {
+		c.components[i].Finalize()
+		component := factory.Instantiate()
+		c.components[i] = c.initialize(component, fromScratch)
 	}
 }
 
 func (c *Consensus) CollectRoundUpdate(m bytes.Buffer) error {
-	r, err := decodeRoundUpdate(m)
-	if err != nil {
+	r := RoundUpdate{}
+	if err := DecodeRound(&m, &r); err != nil {
 		return err
 	}
 
 	c.lock.Lock()
-	defer c.lock.Unlock()
-	for _, component := range c.components {
-		c.Finalize()
-	}
-
-	_ = c.subscribers.Clear()
-
-	c.components = make([]Component, 4)
-	subs, handler := agreement.NewComponent(c.eventBus, c.keys, r.Round, r.P)
+	c.reinstantiateComponents(false)
+	c.lock.Unlock()
+	return nil
 }
 
-func (s *Signer) BLSSign(payload []byte) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, s.consensus.getRound()); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint8(buf, s.consensus.getStep()); err != nil {
-		return nil, err
-	}
-
-	if _, err := buf.Write(payload); err != nil {
-		return nil, err
-	}
-
-	signedHash, err := bls.Sign(s.keys.BLSSecretKey, s.keys.BLSPubKey, payload)
+func (c *Consensus) CollectEvent(m bytes.Buffer) error {
+	topic, err := topics.Extract(&m)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return signedHash.Compress(), nil
+	// check header
+	hdr := header.Header{}
+	if err := header.Unmarshal(&m, &hdr); err != nil {
+		return err
+	}
+
+	switch hdr.Compare(c.Round(), c.Step()) {
+	case header.Before:
+		// obsolete
+		return nil
+	case header.After:
+		// TODO: queue the message
+		return nil
+	}
+
+	c.lock.RLock()
+	subscribers := c.subscribers[topic]
+	c.lock.RUnlock()
+
+	for _, sub := range subscribers {
+		if err := sub.NotifyPayload(m, hdr); err != nil {
+			//TODO: log this
+		}
+	}
+
+	return nil
 }
 
-func (c *Consensus) getRound() uint64 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.round
+func (c *Consensus) requestStepUpdate() {
+	c.IncrementStep()
+	for _, component := range c.components {
+		component.SetStep(c.Step())
+	}
 }
 
-func (c *Consensus) getStep() uint8 {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.step
+func (c *Consensus) clearSubscribers() {
+	for k := range c.subscribers {
+		delete(c.subscribers, k)
+	}
 }

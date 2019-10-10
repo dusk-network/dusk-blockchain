@@ -43,22 +43,8 @@ func UpdateRound(bus eventbus.Publisher, round uint64) {
 	bus.Publish(topics.RoundUpdate, bytes.NewBuffer(b))
 }
 
-// InitRoundUpdate initializes a Round update channel and fires up the TopicListener
-// as well. Its purpose is to lighten up a bit the amount of arguments in creating
-// the handler for the collectors. Also it removes the need to store subscribers on
-// the consensus process
-func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
-	roundChan := make(chan RoundUpdate, 1)
-	roundCollector := &roundCollector{roundChan}
-	eventbus.NewTopicListener(subscriber, roundCollector, topics.RoundUpdate, eventbus.ChannelType)
-	return roundChan
-}
-
-// Collect as specified in the EventCollector interface. In this case Collect simply
-// performs unmarshalling of the round event
-func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
+func DecodeRound(rb *bytes.Buffer, update *RoundUpdate) error {
 	var round uint64
-	rb := &roundBuffer
 	if err := encoding.ReadUint64LE(rb, &round); err != nil {
 		return err
 	}
@@ -83,7 +69,32 @@ func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
 		return err
 	}
 
-	r.roundChan <- RoundUpdate{round, provisioners, bidList, seed, hash}
+	update.Round = round
+	update.BidList = bidList
+	update.Seed = seed
+	update.Hash = hash
+	return nil
+}
+
+// InitRoundUpdate initializes a Round update channel and fires up the TopicListener
+// as well. Its purpose is to lighten up a bit the amount of arguments in creating
+// the handler for the collectors. Also it removes the need to store subscribers on
+// the consensus process
+func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
+	roundChan := make(chan RoundUpdate, 1)
+	roundCollector := &roundCollector{roundChan}
+	eventbus.NewTopicListener(subscriber, roundCollector, topics.RoundUpdate, eventbus.ChannelType)
+	return roundChan
+}
+
+// Collect as specified in the EventCollector interface. In this case Collect simply
+// performs unmarshalling of the round event
+func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
+	update := RoundUpdate{}
+	if err := DecodeRound(&roundBuffer, &update); err != nil {
+		return err
+	}
+	r.roundChan <- update
 	return nil
 }
 
