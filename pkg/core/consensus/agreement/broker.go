@@ -14,7 +14,7 @@ import (
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func NewComponent(publisher eventbus.Publisher, keys user.Keys, p user.Provisioners) *broker {
+func newComponent(publisher eventbus.Publisher, keys user.Keys, p user.Provisioners) *broker {
 	b := newBroker(publisher, keys, p, requestStepUpdate)
 	go b.listen()
 	return b
@@ -27,7 +27,7 @@ type broker struct {
 	accumulator *consensus.Accumulator
 }
 
-func newBroker(publisher eventbus.Publisher, keys user.Keys, p user.Provisioners) *broker {
+func newBroker(publisher eventbus.Publisher, keys user.Keys) *broker {
 	handler := newHandler(keys, p)
 	b := &broker{
 		publisher: publisher,
@@ -36,13 +36,18 @@ func newBroker(publisher eventbus.Publisher, keys user.Keys, p user.Provisioners
 	return b
 }
 
-func (b *broker) Initialize() ([]consensus.Subscriber, consensus.EventHandler) {
-	agreementSubscriber := consensus.Subscriber{
-		topic:    topics.Agreement,
-		listener: consensus.NewCallbackListener(b.CollectAgreementEvent),
+func (b *broker) Initialize(provisioners user.Provisioners) []consensus.Subscriber {
+	b.handler = newHandler(b.keys, provisioners)
+	agreementSubscriber := &consensus.Subscriber{
+		consensus.NewFilteringListener(b.CollectAgreementEvent, b.Filter),
+		topics.Agreement,
 	}
 
-	return []Subscriber{agreementSubscriber}, b.handler
+	return []Subscriber{agreementSubscriber}
+}
+
+func (b *broker) Filter() bool {
+	return true
 }
 
 // Listen for results coming from the accumulator
