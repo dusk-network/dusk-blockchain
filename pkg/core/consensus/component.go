@@ -44,7 +44,7 @@ type FilteringListener struct {
 	filter func(header.Header) bool
 }
 
-func NewFilteringListener(callback func(bytes.Buffer, header.Header) error, filter func(hdr header.Header) bool) Listener {
+func NewFilteringListener(callback func(bytes.Buffer, header.Header) error, filter func(header.Header) bool) Listener {
 	return &FilteringListener{&SimpleListener{callback}, filter}
 }
 

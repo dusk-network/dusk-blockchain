@@ -12,6 +12,8 @@ type Timer struct {
 	TimeOutChan chan struct{}
 }
 
+const BaseTimeOut = 5 * time.Second
+
 // The timer can double a maximum amount of 10 times.
 const maxDouble = 1024 // 2^10
 
