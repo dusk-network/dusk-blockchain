@@ -7,6 +7,21 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 )
 
+type method uint8
+
+const (
+	GetLastBlock method = iota
+	GetMempoolTxs
+	VerifyCandidateBlock
+	CreateWallet
+	CreateFromSeed
+	LoadWallet
+	SendBidTx
+	SendStakeTx
+	SendStandardTx
+	GetBalance
+)
+
 func (rb *RPCBus) LoadWallet(password string) (string, error) {
 
 	buf := new(bytes.Buffer)
