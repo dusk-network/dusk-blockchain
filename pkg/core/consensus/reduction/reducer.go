@@ -19,6 +19,7 @@ type reducer struct {
 	publisher         eventbus.Publisher
 	rpcBus            *rpcbus.RPCBus
 	signer            *consensus.Signer
+	keys              user.Keys
 	requestStepUpdate func()
 
 	svs     []agreement.StepVotes
@@ -32,16 +33,21 @@ type reducer struct {
 	timer      *timer
 }
 
+// NewComponent returns an uninitialized reduction component.
 func NewComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user.Keys) *reducer {
 	return &reducer{
 		publisher: publisher,
 		rpcBus:    rpcBus,
 		svs:       make([]agreement.StepVotes, 0, 2),
+		keys:      keys,
 	}
 }
 
-func (r *reducer) Initialize(provisioners user.Provisioners) []consensus.Subscribers {
-	r.handler = newReductionHandler(provisioners, keys)
+// Initialize the reduction component, by instantiating the handler and creating
+// the topic subscribers.
+// Implements consensus.Component
+func (r *reducer) Initialize(ru consensus.RoundUpdate) []consensus.Subscribers {
+	r.handler = newReductionHandler(ru.P, r.keys)
 	reductionSubscriber := consensus.Subscriber{
 		topic:    topics.Reduction,
 		listener: consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter),
@@ -52,9 +58,12 @@ func (r *reducer) Initialize(provisioners user.Provisioners) []consensus.Subscri
 		listener: consensus.NewSimpleListener(r.CollectBestScore),
 	}
 
-	return []Subscriber{reductionSubscriber, scoreSubscriber}
+	return []consensus.Subscriber{reductionSubscriber, scoreSubscriber}
 }
 
+// Finalize the reducer component by killing the timer, if it is still running.
+// This will stop a reduction cycle short, and renders this reducer useless
+// after calling.
 func (r *reducer) Finalize() {
 	r.timer.Stop()
 }
@@ -96,10 +105,12 @@ func (r *reducer) collectStepVotes(svs []agreement.StepVotes, blockHash []byte) 
 		r.sendAgreement(ag)
 		r.resetStepVotes()
 	default:
+		// This function should never be called with any other length than 1 or 2.
 		panic("stepvotes slice is of unexpected length")
 	}
 }
 
+// CollectBestScore activates the 2-step reduction cycle.
 func (r *reducer) CollectBestScore(blockHash []byte) {
 	r.activateAggregator()
 	r.sendReductionVote(blockHash)
