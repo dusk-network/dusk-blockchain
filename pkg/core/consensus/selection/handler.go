@@ -3,7 +3,6 @@ package selection
 import (
 	"bytes"
 	"errors"
-	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -16,7 +15,6 @@ import (
 
 type (
 	scoreHandler struct {
-		lock    sync.RWMutex
 		bidList user.BidList
 
 		// Threshold number that a score needs to be greater than in order to be considered
@@ -30,7 +28,6 @@ type (
 	ScoreEventHandler interface {
 		consensus.EventHandler
 		wire.EventPrioritizer
-		UpdateBidList(user.BidList)
 		ResetThreshold()
 		LowerThreshold()
 	}
@@ -38,14 +35,11 @@ type (
 
 // NewScoreHandler returns a ScoreHandler, which encapsulates specific operations
 // (e.g. verification, validation, marshalling and unmarshalling)
-func newScoreHandler() *scoreHandler {
+func newScoreHandler(bidList user.BidList) *scoreHandler {
 	return &scoreHandler{
+		bidList:   bidList,
 		threshold: consensus.NewThreshold(),
 	}
-}
-
-func (sh *scoreHandler) UpdateBidList(bidList user.BidList) {
-	sh.bidList = bidList
 }
 
 func (sh *scoreHandler) Deserialize(r *bytes.Buffer) (wire.Event, error) {
@@ -128,7 +122,5 @@ func (sh *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) *prerro
 		return err
 	}
 
-	sh.lock.Lock()
-	defer sh.lock.Unlock()
 	return sh.bidList.ValidateBids(bidListSubset)
 }

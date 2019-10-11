@@ -3,68 +3,101 @@ package selection
 import (
 	"bytes"
 	"sync"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
-var empty struct{}
-
-type eventSelector struct {
+type selector struct {
 	publisher eventbus.Publisher
 	handler   ScoreEventHandler
 	lock      sync.RWMutex
 	bestEvent wire.Event
-	state     consensus.State
-	timer     *consensus.Timer
-	running   bool
+
+	timer *timer
+
+	requestStepUpdate func()
 }
 
-// newEventSelector creates the Selector and returns it.
-func newEventSelector(publisher eventbus.Publisher, handler ScoreEventHandler,
-	timeOut time.Duration, state consensus.State) *eventSelector {
-	return &eventSelector{
+// Launch creates and launches the component which responsibility is to validate
+// and select the best score among the blind bidders. The component publishes under
+// the topic BestScoreTopic
+func NewComponent(publisher eventbus.Publisher, keys user.Keys) {
+	return newSelector(eventBroker)
+}
+
+func newSelector(publisher eventbus.Publisher) *selector {
+	return &selector{
 		publisher: publisher,
-		handler:   handler,
-		timer:     consensus.NewTimer(timeOut, make(chan struct{})),
-		state:     state,
 	}
 }
 
-// StartSelection starts the selection of the best ScoreEvent.
-func (s *eventSelector) startSelection() {
-	s.lock.Lock()
-	s.running = true
-	s.lock.Unlock()
-	log.WithFields(log.Fields{
-		"process":        "selection",
-		"selector state": s.state.String(),
-	}).Debugln("starting selection")
-	go func() {
-		// propagating the best event after timeout,
-		// or stopping on reading from timeoutchan
-		timer := time.NewTimer(s.timer.TimeOut())
-		select {
-		case <-timer.C:
-			s.publishBestEvent()
-		case <-s.timer.TimeOutChan:
-		}
-		s.lock.Lock()
-		s.running = false
-		s.lock.Unlock()
-	}()
+func (s *selector) Initialize(r consensus.RoundUpdate) []consensus.Subscribers {
+	s.handler = newScoreHandler(r.BidList)
+
+	scoreSubscriber := consensus.Subscriber{
+		topic:    topics.Score,
+		listener: consensus.NewFilteringListener(s.CollectScoreEvent, r.Filter),
+	}
+
+	regenSubscriber := consensus.Subscriber{
+		topic:    topics.Regeneration,
+		listener: consensus.NewSimpleListener(s.CollectRegeneration),
+	}
+
+	return []consensus.Subscriber{scoreSubscriber, regenSubscriber}
 }
 
-func (s *eventSelector) Process(ev wire.Event) {
-	s.lock.RLock()
-	bestEvent := s.bestEvent
-	s.lock.RUnlock()
+func (s *selector) Finalize() {
+	s.stopSelection()
+}
 
-	if !s.handler.Priority(bestEvent, ev) {
+func (s *selector) CollectScoreEvent(m bytes.Buffer, hdr header.Header) error {
+	ev := ScoreEvent{}
+	if err := UnmarshalScoreEvent(&m, &ev); err != nil {
+		return err
+	}
+
+	s.Process(ev)
+}
+
+// Filter always returns false, as we don't do committee checks on bidders.
+// Bidder relevant checks like proof verifications are done further down the pipeline
+// (see `Process`).
+// Implements consensus.Component
+func (s *selector) Filter(hdr header.Header) bool {
+	return false
+}
+
+// SetStep clears out the `bestEvent` field on the selector, as this event becomes
+// irrelevant on a step update.
+// Implements consensus.Component
+func (s *selector) SetStep(step uint8) {
+	s.setBestEvent(nil)
+}
+
+func (s *selector) CollectRegeneration(m bytes.Buffer, hdr header.Header) error {
+	s.handler.LowerThreshold()
+	s.timer.IncreaseTimeOut()
+	s.startSelection()
+	return nil
+}
+
+func (s *selector) startSelection() {
+	s.timer.Start()
+}
+
+func (s *selector) stopSelection() {
+	s.timer.Stop()
+}
+
+func (s *selector) Process(ev wire.Event) {
+	if !s.handler.Priority(s.getBestEvent(), ev) {
 		if err := s.handler.Verify(ev); err != nil {
 			log.WithField("process", "selection").Debugln(err)
 			return
@@ -75,7 +108,17 @@ func (s *eventSelector) Process(ev wire.Event) {
 	}
 }
 
-func (s *eventSelector) repropagate(ev wire.Event) {
+func (s *selector) publishBestEvent() {
+	buf := new(bytes.Buffer)
+	if err := s.handler.Marshal(buf, s.getBestEvent()); err != nil {
+		panic(err)
+	}
+
+	s.requestStepUpdate()
+	s.publisher.Publish(topics.BestScore, buf)
+}
+
+func (s *selector) repropagate(ev wire.Event) {
 	buf := topics.Score.ToBuffer()
 	if err := s.handler.Marshal(&buf, ev); err != nil {
 		panic(err)
@@ -84,39 +127,15 @@ func (s *eventSelector) repropagate(ev wire.Event) {
 	s.publisher.Publish(topics.Gossip, &buf)
 }
 
-func (s *eventSelector) publishBestEvent() {
+func (s *selector) getBestEvent() wire.Event {
 	s.lock.RLock()
+	defer s.lock.RUnlock()
 	bestEvent := s.bestEvent
-	s.lock.RUnlock()
-	buf := new(bytes.Buffer)
-	err := s.handler.Marshal(buf, bestEvent)
-	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
-			"process": "score selection",
-		}).Warnln("Error in marshalling score")
-		return
-	}
-	s.publisher.Publish(topics.BestScore, buf)
-	s.state.IncrementStep()
-	s.setBestEvent(nil)
+	return bestEvent
 }
 
-func (s *eventSelector) stopSelection() {
-	s.setBestEvent(nil)
-	select {
-	case s.timer.TimeOutChan <- empty:
-	default:
-	}
-}
-
-func (s *eventSelector) setBestEvent(ev wire.Event) {
+func (s *selector) setBestEvent(ev wire.Event) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.bestEvent = ev
-}
-
-func (s *eventSelector) isRunning() bool {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.running
 }
