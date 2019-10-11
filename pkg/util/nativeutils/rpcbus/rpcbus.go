@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	// ErrReqTimeout is returned when request timeout-ed
-	ErrReqTimeout = errors.New("timeout-ed request")
+	// ErrRequestTimeout is returned when request timeout-ed
+	ErrRequestTimeout = errors.New("timeout-ed request")
 
 	// ErrMethodExists is returned when method is already registered
 	ErrMethodExists = errors.New("method exists already")
@@ -17,8 +17,8 @@ var (
 	// ErrMethodNotExists is returned when calling an unregistered method
 	ErrMethodNotExists = errors.New("method not registered")
 
-	// ErrInvalidReqChan is returned method is bound to nil chan
-	ErrInvalidReqChan = errors.New("invalid request channel")
+	// ErrInvalidRequestChan is returned method is bound to nil chan
+	ErrInvalidRequestChan = errors.New("invalid request channel")
 )
 
 var (
@@ -29,19 +29,19 @@ var (
 	// Can be implemented by Chain pkg or Database pkg.
 	// Returns block.Block marshaled
 	GetLastBlock     = "getLastBlock"
-	GetLastBlockChan chan Req
+	GetLastBlockChan chan Request
 
 	// Provide the list of verified txs ready to be included into next block
 	// Param 1: list of TxIDs to request. If empty, returns all available txs
 	// Implemented by mempool
 	GetMempoolTxs     = "getMempoolTxs"
-	GetMempoolTxsChan chan Req
+	GetMempoolTxsChan chan Request
 
 	// Verify a specified candidate block
 	//
 	// Used by the reduction component.
 	VerifyCandidateBlock     = "verifyCandidateBlock"
-	VerifyCandidateBlockChan chan Req
+	VerifyCandidateBlockChan chan Request
 
 	// Methods implemented by Transactor
 	CreateWallet   = "createWallet"
@@ -71,14 +71,18 @@ type RPCBus struct {
 
 type method struct {
 	Name string
-	req  chan<- Req
+	req  chan<- Request
 }
 
-type Req struct {
+type Request struct {
 	Params   bytes.Buffer
 	Timeout  int
-	RespChan chan bytes.Buffer
-	ErrChan  chan error
+	RespChan chan Response
+}
+
+type Response struct {
+	Resp bytes.Buffer
+	Err  error
 }
 
 func New() *RPCBus {
@@ -86,17 +90,17 @@ func New() *RPCBus {
 	bus.registry = make(map[string]method)
 
 	// default methods
-	GetLastBlockChan = make(chan Req)
+	GetLastBlockChan = make(chan Request)
 	if err := bus.Register(GetLastBlock, GetLastBlockChan); err != nil {
 		panic(err)
 	}
 
-	GetMempoolTxsChan = make(chan Req)
+	GetMempoolTxsChan = make(chan Request)
 	if err := bus.Register(GetMempoolTxs, GetMempoolTxsChan); err != nil {
 		panic(err)
 	}
 
-	VerifyCandidateBlockChan = make(chan Req)
+	VerifyCandidateBlockChan = make(chan Request)
 	if err := bus.Register(VerifyCandidateBlock, VerifyCandidateBlockChan); err != nil {
 		panic(err)
 	}
@@ -106,13 +110,13 @@ func New() *RPCBus {
 
 // Register registers a method and binds it to a handler channel. methodName
 // must be unique per node instance. if not, returns err
-func (bus *RPCBus) Register(methodName string, req chan<- Req) error {
+func (bus *RPCBus) Register(methodName string, req chan<- Request) error {
 
 	bus.mu.Lock()
 	defer bus.mu.Unlock()
 
 	if req == nil {
-		return ErrInvalidReqChan
+		return ErrInvalidRequestChan
 	}
 
 	if _, ok := bus.registry[methodName]; ok {
@@ -125,7 +129,7 @@ func (bus *RPCBus) Register(methodName string, req chan<- Req) error {
 
 // Call runs a long-polling technique to request from the method Consumer to
 // run the corresponding procedure and return a result or timeout
-func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
+func (bus *RPCBus) Call(methodName string, req Request) (bytes.Buffer, error) {
 
 	if req.Timeout > 0 {
 		return bus.callTimeout(methodName, req)
@@ -134,11 +138,8 @@ func (bus *RPCBus) Call(methodName string, req Req) (bytes.Buffer, error) {
 	return bus.callNoTimeout(methodName, req)
 }
 
-func (bus *RPCBus) callTimeout(methodName string, req Req) (bytes.Buffer, error) {
-
-	var resp bytes.Buffer
+func (bus *RPCBus) callTimeout(methodName string, req Request) (bytes.Buffer, error) {
 	method, err := bus.getMethod(methodName)
-
 	if err != nil {
 		return bytes.Buffer{}, err
 	}
@@ -147,29 +148,22 @@ func (bus *RPCBus) callTimeout(methodName string, req Req) (bytes.Buffer, error)
 	select {
 	case method.req <- req:
 	case <-time.After(time.Duration(req.Timeout) * time.Second):
-		return bytes.Buffer{}, ErrReqTimeout
+		return bytes.Buffer{}, ErrRequestTimeout
 	}
 
 	// Wait for response or err from the consumer with read-timeout
+	var resp Response
 	select {
 	case resp = <-req.RespChan:
-	// this case happens when the consumer cannot return a valid response but an
-	// error details instead
-	case err := <-req.ErrChan:
-		return bytes.Buffer{}, err
-	// terminate the procedure if timeout-ed
 	case <-time.After(time.Duration(req.Timeout) * time.Second):
-		err = ErrReqTimeout
+		err = ErrRequestTimeout
 	}
 
-	return resp, err
+	return resp.Resp, resp.Err
 }
 
-func (bus *RPCBus) callNoTimeout(methodName string, req Req) (bytes.Buffer, error) {
-
-	var resp bytes.Buffer
+func (bus *RPCBus) callNoTimeout(methodName string, req Request) (bytes.Buffer, error) {
 	method, err := bus.getMethod(methodName)
-
 	if err != nil {
 		return bytes.Buffer{}, err
 	}
@@ -178,23 +172,16 @@ func (bus *RPCBus) callNoTimeout(methodName string, req Req) (bytes.Buffer, erro
 	method.req <- req
 
 	// Wait for response or err from the consumer with read-timeout
-	select {
-	case resp = <-req.RespChan:
-	// this case happens when the consumer cannot return a valid response but an
-	// error details instead
-	case err := <-req.ErrChan:
-		return bytes.Buffer{}, err
-	}
+	resp := <-req.RespChan
 
-	return resp, err
+	return resp.Resp, resp.Err
 }
 
 // NewRequest builds a new request with params
 // if timeout is not positive, the call waits infinitely
-func NewRequest(p bytes.Buffer, timeout int) Req {
-	d := Req{Timeout: timeout, Params: p}
-	d.RespChan = make(chan bytes.Buffer, 1)
-	d.ErrChan = make(chan error, 1)
+func NewRequest(p bytes.Buffer, timeout int) Request {
+	d := Request{Timeout: timeout, Params: p}
+	d.RespChan = make(chan Response, 1)
 	return d
 }
 

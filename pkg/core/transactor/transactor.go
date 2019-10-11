@@ -15,13 +15,13 @@ import (
 var (
 
 	// RPCBus methods handled by Transactor
-	createWalletChan   = make(chan rpcbus.Req)
-	createFromSeedChan = make(chan rpcbus.Req)
-	loadWalletChan     = make(chan rpcbus.Req)
-	sendBidTxChan      = make(chan rpcbus.Req)
-	sendStakeTxChan    = make(chan rpcbus.Req)
-	sendStandardTxChan = make(chan rpcbus.Req)
-	getBalanceChan     = make(chan rpcbus.Req)
+	createWalletChan   = make(chan rpcbus.Request)
+	createFromSeedChan = make(chan rpcbus.Request)
+	loadWalletChan     = make(chan rpcbus.Request)
+	sendBidTxChan      = make(chan rpcbus.Request)
+	sendStakeTxChan    = make(chan rpcbus.Request)
+	sendStandardTxChan = make(chan rpcbus.Request)
+	getBalanceChan     = make(chan rpcbus.Request)
 )
 
 // TODO: rename

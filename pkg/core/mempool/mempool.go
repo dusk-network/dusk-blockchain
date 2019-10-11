@@ -325,7 +325,7 @@ func (m *Mempool) Collect(message bytes.Buffer) error {
 
 // onGetMempoolTxs retrieves current state of the mempool of the verified but
 // still unaccepted txs
-func (m Mempool) onGetMempoolTxs(r rpcbus.Req) {
+func (m Mempool) onGetMempoolTxs(r rpcbus.Request) {
 
 	// Read inputs
 	filterTxID := r.Params.Bytes()

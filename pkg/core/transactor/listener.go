@@ -51,7 +51,7 @@ func (t *Transactor) Listen() {
 	}
 }
 
-func handleRequest(r rpcbus.Req, handler func(r rpcbus.Req) error, name string) {
+func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name string) {
 
 	log.Infof("Handling %s request", name)
 
@@ -64,7 +64,7 @@ func handleRequest(r rpcbus.Req, handler func(r rpcbus.Req) error, name string) 
 	log.Infof("Handled %s request", name)
 }
 
-func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
+func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -92,7 +92,7 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
+func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -130,7 +130,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
+func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -164,7 +164,7 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleSendBidTx(r rpcbus.Req) error {
+func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 	if t.w == nil {
 		return errWalletNotLoaded
 	}
@@ -198,7 +198,7 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleSendStakeTx(r rpcbus.Req) error {
+func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
@@ -234,7 +234,7 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleSendStandardTx(r rpcbus.Req) error {
+func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
@@ -270,7 +270,7 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Req) error {
 	return nil
 }
 
-func (t *Transactor) handleBalance(r rpcbus.Req) error {
+func (t *Transactor) handleBalance(r rpcbus.Request) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
