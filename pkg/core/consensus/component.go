@@ -18,7 +18,7 @@ type ComponentFactory interface {
 
 // Component is an ephemeral instance that lives solely for a round
 type Component interface {
-	Initialize(Provisioners) []Subscriber
+	Initialize(RoundUpdate) []Subscriber
 	Finalize()
 	SetStep(uint8)
 }

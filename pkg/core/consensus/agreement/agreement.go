@@ -33,8 +33,8 @@ func newAgreement(publisher eventbus.Publisher, keys user.Keys) *agreement {
 	}
 }
 
-func (a *agreement) Initialize(provisioners user.Provisioners) []consensus.Subscriber {
-	a.handler = newHandler(a.keys, provisioners)
+func (a *agreement) Initialize(r consensus.RoundUpdate) []consensus.Subscriber {
+	a.handler = newHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, newAccumulatorStore())
 	agreementSubscriber := &consensus.Subscriber{
 		consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter),
@@ -47,6 +47,16 @@ func (a *agreement) Initialize(provisioners user.Provisioners) []consensus.Subsc
 
 func (a *agreement) Filter(hdr header.Header) bool {
 	return !a.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
+}
+
+func (a *agreement) CollectAgreementEvent(m bytes.Buffer, hdr *header.Header) error {
+	ev := New()
+	if err := Unmarshal(&m, ev); err != nil {
+		return err
+	}
+
+	a.accumulator.Process(ev)
+	return nil
 }
 
 // SetStep implements Component
