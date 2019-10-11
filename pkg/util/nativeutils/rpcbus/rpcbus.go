@@ -31,7 +31,6 @@ type RPCBus struct {
 
 type Request struct {
 	Params   bytes.Buffer
-	Timeout  int
 	RespChan chan Response
 }
 
@@ -65,59 +64,49 @@ func (bus *RPCBus) Register(m method, req chan<- Request) error {
 
 // Call runs a long-polling technique to request from the method Consumer to
 // run the corresponding procedure and return a result or timeout
-func (bus *RPCBus) Call(m method, req Request) (bytes.Buffer, error) {
-	if req.Timeout > 0 {
-		return bus.callTimeout(m, req)
-	}
-
-	return bus.callNoTimeout(m, req)
-}
-
-func (bus *RPCBus) callTimeout(m method, req Request) (bytes.Buffer, error) {
+func (bus *RPCBus) Call(m method, req Request, timeOut int) (bytes.Buffer, error) {
 	reqChan, err := bus.getReqChan(m)
 	if err != nil {
 		return bytes.Buffer{}, err
 	}
 
-	// Send the request with write-timeout
+	if timeOut > 0 {
+		return bus.callTimeout(reqChan, req, timeOut)
+	}
+
+	return bus.callNoTimeout(reqChan, req)
+}
+
+func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut int) (bytes.Buffer, error) {
 	select {
 	case reqChan <- req:
-	case <-time.After(time.Duration(req.Timeout) * time.Second):
+	case <-time.After(timeOut * time.Second):
 		return bytes.Buffer{}, ErrRequestTimeout
 	}
 
-	// Wait for response or err from the consumer with read-timeout
 	var resp Response
 	select {
 	case resp = <-req.RespChan:
-	case <-time.After(time.Duration(req.Timeout) * time.Second):
-		err = ErrRequestTimeout
+	case <-time.After(timeOut * time.Second):
+		return bytes.Buffer{}, ErrRequestTimeout
 	}
 
 	return resp.Resp, resp.Err
 }
 
-func (bus *RPCBus) callNoTimeout(m method, req Request) (bytes.Buffer, error) {
-	reqChan, err := bus.getReqChan(m)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	// Send the request with write-timeout
+func (bus *RPCBus) callNoTimeout(reqChan chan<- Request, req Request) (bytes.Buffer, error) {
 	reqChan <- req
-
-	// Wait for response or err from the consumer with read-timeout
 	resp := <-req.RespChan
-
 	return resp.Resp, resp.Err
 }
 
 // NewRequest builds a new request with params
 // if timeout is not positive, the call waits infinitely
-func NewRequest(p bytes.Buffer, timeout int) Request {
-	d := Request{Timeout: timeout, Params: p}
-	d.RespChan = make(chan Response, 1)
-	return d
+func NewRequest(p bytes.Buffer) Request {
+	return Request{
+		Params: p,
+		RespChan = make(chan Response, 1).
+	}
 }
 
 func (bus *RPCBus) getReqChan(m method) (chan<- Request, error) {
