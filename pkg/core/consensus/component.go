@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -11,6 +10,10 @@ import (
 	"github.com/dusk-network/dusk-crypto/bls"
 )
 
+type Store interface {
+	RequestStepUpdate()
+}
+
 // ComponentFactory holds the data to create a Component (i.e. Signer, EventPublisher, RPCBus). Its responsibility is to recreate it on demand
 type ComponentFactory interface {
 	Instantiate() Component
@@ -18,25 +21,25 @@ type ComponentFactory interface {
 
 // Component is an ephemeral instance that lives solely for a round
 type Component interface {
-	Initialize(RoundUpdate) []Subscriber
+	Initialize(Store, RoundUpdate) []Subscriber
 	Finalize()
 	SetStep(uint8)
 }
 
 type Listener interface {
-	NotifyPayload(bytes.Buffer, header.Header) error
+	NotifyPayload(Event) error
 }
 
 type SimpleListener struct {
-	callback func(bytes.Buffer, header.Header) error
+	callback func(Event) error
 }
 
-func NewSimpleListener(callback func(bytes.Buffer, header.Header) error) Listener {
+func NewSimpleListener(callback func(Event) error) Listener {
 	return &SimpleListener{callback}
 }
 
-func (s *SimpleListener) NotifyPayload(b bytes.Buffer, hdr header.Header) error {
-	return s.callback(b, hdr)
+func (s *SimpleListener) NotifyPayload(ev Event) error {
+	return s.callback(ev)
 }
 
 type FilteringListener struct {
@@ -44,19 +47,15 @@ type FilteringListener struct {
 	filter func(header.Header) bool
 }
 
-func NewFilteringListener(callback func(bytes.Buffer, header.Header) error, filter func(header.Header) bool) Listener {
+func NewFilteringListener(callback func(Event) error, filter func(header.Header) bool) Listener {
 	return &FilteringListener{&SimpleListener{callback}, filter}
 }
 
-func (cb *FilteringListener) NotifyPayload(payload bytes.Buffer, hdr header.Header) error {
-	if cb.filter(hdr) {
+func (cb *FilteringListener) NotifyPayload(ev Event) error {
+	if cb.filter(ev.Header) {
 		return nil
 	}
-	return cb.SimpleListener.NotifyPayload(payload, hdr)
-}
-
-func (cb *FilteringListener) Notify(bus bytes.Buffer) error {
-	return errors.New("not implemented")
+	return cb.SimpleListener.NotifyPayload(ev)
 }
 
 type Signer struct {

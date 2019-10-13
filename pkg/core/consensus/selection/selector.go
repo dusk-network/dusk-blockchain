@@ -37,7 +37,7 @@ func newSelector(publisher eventbus.Publisher) *selector {
 	}
 }
 
-func (s *selector) Initialize(r consensus.RoundUpdate) []consensus.Subscribers {
+func (s *selector) Initialize(r consensus.RoundUpdate) []consensus.Subscriber {
 	s.handler = newScoreHandler(r.BidList)
 
 	scoreSubscriber := consensus.Subscriber{

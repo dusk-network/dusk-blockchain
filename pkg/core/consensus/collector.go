@@ -69,6 +69,7 @@ func DecodeRound(rb *bytes.Buffer, update *RoundUpdate) error {
 		return err
 	}
 
+	update.P = provisioners
 	update.Round = round
 	update.BidList = bidList
 	update.Seed = seed

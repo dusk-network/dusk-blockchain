@@ -11,65 +11,124 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
-type Consensus struct {
-	*SyncState
-	eventBus    *eventbus.EventBus
-	rpcBus      *rpcbus.RPCBus
-	keys        user.Keys
-	factories   []ComponentFactory
-	components  []Component
-	lock        sync.RWMutex
+type roundStore struct {
 	subscribers map[topics.Topic][]Listener
+	components  []Component
+	consensus   *Consensus
 }
 
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys user.Keys, factories []ComponentFactory) *Consensus {
-	c := &Consensus{
-		SyncState:   NewState(),
-		eventBus:    eventBus,
-		rpcBus:      rpcBus,
-		keys:        keys,
-		factories:   factories,
-		components:  make([]Component, len(factories)),
+func newStore(c *Consensus) *roundStore {
+	s := &roundStore{
 		subscribers: make(map[topics.Topic][]Listener),
+		components:  make([]Component, 0),
+		consensus:   c,
 	}
 
-	listener := eventbus.NewCallbackListener(c.CollectEvent)
-	eventBus.SubscribeDefault(listener)
-
-	// TODO: listen for initialization message and call reinstantiateComponents()
-	return c
+	return s
 }
 
-func (c *Consensus) initialize(component Component, fromScratch bool) Component {
-	subs := component.Initialize(c.requestStepUpdate)
+func (s *roundStore) RequestStepUpdate() {
+	s.consensus.requestStepUpdate()
+}
+
+func (s *roundStore) addComponent(component Component, round RoundUpdate) []Subscriber {
+	subs := component.Initialize(s, round)
 	for _, sub := range subs {
-		if fromScratch {
-			c.eventBus.AddDefaultTopic(sub.topic)
-			c.eventBus.Register(sub.topic, NewRepublisher(c.eventBus, sub.topic), &Validator{})
-		}
-		c.subscribe(sub.topic, sub)
+		s.subscribe(sub.topic, sub)
 	}
-
-	return component
+	s.components = append(s.components, component)
+	return subs
 }
 
-func (c *Consensus) subscribe(topic topics.Topic, sub Listener) {
-	subscribers := c.subscribers[topic]
+func (s *roundStore) subscribe(topic topics.Topic, sub Listener) {
+	subscribers := s.subscribers[topic]
 	if subscribers == nil {
 		subscribers = []Listener{sub}
 	} else {
 		subscribers = append(subscribers, sub)
 	}
-	c.subscribers[topic] = subscribers
+	s.subscribers[topic] = subscribers
 }
 
-func (c *Consensus) reinstantiateComponents(fromScratch bool) {
-	c.clearSubscribers()
-	for i, factory := range c.factories {
-		c.components[i].Finalize()
-		component := factory.Instantiate()
-		c.components[i] = c.initialize(component, fromScratch)
+func (s *roundStore) Dispatch(ev TopicEvent) {
+	for _, sub := range s.subscribers[ev.Topic] {
+		if err := sub.NotifyPayload(ev.Event); err != nil {
+			//TODO: log this
+		}
 	}
+}
+
+func (s *roundStore) DispatchStepUpdate(step uint8) {
+	for _, component := range s.components {
+		component.SetStep(step)
+	}
+}
+
+func (s *roundStore) DispatchFinalize() {
+	for _, component := range s.components {
+		component.Finalize()
+	}
+}
+
+// Consensus encapsulates the information about the Round and the Step of the consensus. It also manages the roundStore,
+// which aim is to centralize the state of the consensus Component while decoupling them from each other and the EventBus
+type Consensus struct {
+	*SyncState
+	eventBus   *eventbus.EventBus
+	rpcBus     *rpcbus.RPCBus
+	keys       user.Keys
+	factories  []ComponentFactory
+	components []Component
+	eventqueue *Queue
+
+	lock  sync.RWMutex
+	store *roundStore
+}
+
+// New creates a new Consensus
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys user.Keys, factories []ComponentFactory) *Consensus {
+	c := &Consensus{
+		SyncState:  NewState(),
+		eventBus:   eventBus,
+		rpcBus:     rpcBus,
+		keys:       keys,
+		factories:  factories,
+		eventqueue: NewQueue(),
+	}
+
+	listener := eventbus.NewCallbackListener(c.CollectEvent)
+	eventBus.SubscribeDefault(listener)
+
+	// TODO: listen for initialization message and call recreateStore(roundUpdate, true)
+	return c
+}
+
+func (c *Consensus) initialize(subs []Subscriber) {
+	for _, sub := range subs {
+		c.eventBus.AddDefaultTopic(sub.topic)
+		c.eventBus.Register(sub.topic, NewRepublisher(c.eventBus, sub.topic), &Validator{})
+	}
+}
+
+func (c *Consensus) recreateStore(roundUpdate RoundUpdate, fromScratch bool) {
+
+	// reinstantiating the store prevents the need for locking
+	store := newStore(c)
+
+	for _, factory := range c.factories {
+		component := factory.Instantiate()
+		subs := store.addComponent(component, roundUpdate)
+		if fromScratch {
+			c.initialize(subs)
+		}
+	}
+
+	c.swapStore(store)
+}
+
+func (c *Consensus) FinalizeRound() {
+	c.store.DispatchFinalize()
+	c.eventqueue.Clear(c.Round())
 }
 
 func (c *Consensus) CollectRoundUpdate(m bytes.Buffer) error {
@@ -77,11 +136,18 @@ func (c *Consensus) CollectRoundUpdate(m bytes.Buffer) error {
 	if err := DecodeRound(&m, &r); err != nil {
 		return err
 	}
+	c.FinalizeRound()
 
-	c.lock.Lock()
-	c.reinstantiateComponents(false)
-	c.lock.Unlock()
+	c.recreateStore(r, false)
+	c.Update(r.Round)
 	return nil
+}
+
+// swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and
+func (c *Consensus) swapStore(store *roundStore) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.store = store
 }
 
 func (c *Consensus) CollectEvent(m bytes.Buffer) error {
@@ -102,31 +168,20 @@ func (c *Consensus) CollectEvent(m bytes.Buffer) error {
 		return nil
 	case header.After:
 		// TODO: queue the message
+		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
 		return nil
 	}
 
-	c.lock.RLock()
-	subscribers := c.subscribers[topic]
-	c.lock.RUnlock()
-
-	for _, sub := range subscribers {
-		if err := sub.NotifyPayload(m, hdr); err != nil {
-			//TODO: log this
-		}
-	}
-
+	c.store.Dispatch(NewTopicEvent(topic, hdr, m))
 	return nil
 }
 
 func (c *Consensus) requestStepUpdate() {
 	c.IncrementStep()
-	for _, component := range c.components {
-		component.SetStep(c.Step())
-	}
-}
+	c.store.DispatchStepUpdate(c.Step())
 
-func (c *Consensus) clearSubscribers() {
-	for k := range c.subscribers {
-		delete(c.subscribers, k)
+	events := c.eventqueue.GetEvents(c.Round(), c.Step())
+	for _, ev := range events {
+		c.store.Dispatch(ev)
 	}
 }
