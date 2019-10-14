@@ -50,7 +50,6 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 
 	// Potential panic if the database does not have enough decoys
 	for i := 0; i < numMixins; i++ {
-
 		var keyVector mlsag.PubKeys
 		keyVector.AddPubKey(decoys[i])
 

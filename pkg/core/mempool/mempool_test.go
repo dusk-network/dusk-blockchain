@@ -80,7 +80,7 @@ func initCtx(t *testing.T) *ctx {
 		}(streamer, c)
 
 		// initiate a mempool with custom verification function
-		c.m = NewMempool(c.bus, verifyFunc)
+		c.m = NewMempool(c.bus, c.rpcBus, verifyFunc)
 	} else {
 
 		// Reset shared context state
@@ -115,7 +115,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}, 1))
+	r, _ := c.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1)
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 

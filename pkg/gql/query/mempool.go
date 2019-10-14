@@ -42,7 +42,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			payload.Write(txidBytes)
 		}
 
-		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload, 5))
+		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload), 5)
 		if err != nil {
 			return "", err
 		}

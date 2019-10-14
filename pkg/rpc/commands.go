@@ -8,8 +8,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 // handler defines a method bound to an RPC command.
@@ -87,7 +89,6 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 }
 
 var sendBidTx = func(s *Server, params []string) (string, error) {
-
 	if len(params) < 2 {
 		return "", fmt.Errorf("missing parameters: amount/locktime")
 	}
@@ -102,18 +103,41 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 		return "", fmt.Errorf("converting locktime string to an integer: %v", err)
 	}
 
-	txid, err := s.rpcBus.SendBidTx(uint64(amount), uint64(lockTime))
-	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString(txid))
+	buf := new(bytes.Buffer)
+	if err := rpcbus.MarshalConsensusTxRequest(buf, uint64(amount), uint64(lockTime)); err != nil {
+		return "", err
+	}
+
+	txid, err := s.rpcBus.Call(rpcbus.SendBidTx, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	idString, err := encoding.ReadString(&txid)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString([]byte(idString)))
 	return result, err
 }
 
 var loadWallet = func(s *Server, params []string) (string, error) {
-
 	if len(params) < 1 {
 		return "", fmt.Errorf("missing parameter: password")
 	}
 
-	pubKey, err := s.rpcBus.LoadWallet(params[0])
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, params[0]); err != nil {
+		return "", err
+	}
+
+	pubKeyBuf, err := s.rpcBus.Call(rpcbus.LoadWallet, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	pubKey, err := encoding.ReadString(&pubKeyBuf)
 	if err != nil {
 		return "", err
 	}

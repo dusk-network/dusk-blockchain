@@ -117,7 +117,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 
 	buf := new(bytes.Buffer)
 	buf.Write(txID)
-	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf, 3))
+	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3)
 	if err != nil {
 		return nil, err
 	}

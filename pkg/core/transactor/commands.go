@@ -12,6 +12,8 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
 	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
@@ -223,7 +225,7 @@ func (t *Transactor) Balance() (uint64, uint64, error) {
 
 	// retrieve balance from mempool incoming inputs
 	blk := block.NewBlock()
-	blk.Txs, err = t.rb.GetMempool()
+	blk.Txs, err = t.getMempool()
 	if err != nil {
 		return walletBalance, 0, err
 	}
@@ -231,4 +233,28 @@ func (t *Transactor) Balance() (uint64, uint64, error) {
 	_, mempoolBalance, err := t.w.CheckWireBlockReceived(*blk, false)
 
 	return walletBalance, mempoolBalance, err
+}
+
+func (t *Transactor) getMempool() ([]transactions.Transaction, error) {
+	buf := new(bytes.Buffer)
+	r, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3)
+	if err != nil {
+		return nil, err
+	}
+
+	lTxs, err := encoding.ReadVarInt(&r)
+	if err != nil {
+		return nil, err
+	}
+
+	mempoolTxs := make([]transactions.Transaction, lTxs)
+	for i := uint64(0); i < lTxs; i++ {
+		tx, err := transactions.Unmarshal(&r)
+		if err != nil {
+			return nil, err
+		}
+		mempoolTxs[i] = tx
+	}
+
+	return mempoolTxs, nil
 }

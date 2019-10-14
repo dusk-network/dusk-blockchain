@@ -128,8 +128,8 @@ func (r *reducer) handleFirstResult(events []wire.Event) []byte {
 		// If our result was not a zero value hash, we should first verify it
 		// before voting on it again
 		if !bytes.Equal(hash, emptyHash[:]) {
-			req := rpcbus.NewRequest(*(bytes.NewBuffer(hash)), 5)
-			if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req); err != nil {
+			req := rpcbus.NewRequest(*(bytes.NewBuffer(hash)))
+			if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req, 5); err != nil {
 				log.WithFields(log.Fields{
 					"process": "reduction",
 					"error":   err,
