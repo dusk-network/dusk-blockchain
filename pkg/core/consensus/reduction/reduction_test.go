@@ -25,7 +25,7 @@ import (
 var timeOut = 4000 * time.Millisecond
 
 func TestStress(t *testing.T) {
-	eventBus, _, _, k := launchReductionTest(true, 15)
+	eventBus, rpcBus, _, _, k := launchReductionTest(true, 25)
 
 	// subscribe for the voteset
 	voteSetChan := make(chan bytes.Buffer, 1)
@@ -38,8 +38,8 @@ func TestStress(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 
 	// Do 10 reduction cycles in a row
-	for i := 1; i <= 10; i++ {
-		go launchCandidateVerifier(false)
+	for i := 0; i < 10; i++ {
+		go launchCandidateVerifier(rpcBus, false)
 		go func() {
 			// Blast the reducer with many more events than quorum, to see if anything will sneak in
 			for i := 1; i <= 20; i++ {
@@ -67,20 +67,13 @@ func TestStress(t *testing.T) {
 				t.Fatal("found vote which doesn't belong in the set")
 			}
 		}
-
-		// Make sure we clean up any hanging goroutine
-		select {
-		case rpcbus.VerifyCandidateBlockChan <- rpcbus.Req{}:
-		default:
-		}
-
 	}
 }
 
 // Test that the reduction phase works properly in the standard conditions.
 func TestReduction(t *testing.T) {
-	eventBus, streamer, _, k := launchReductionTest(true, 2)
-	go launchCandidateVerifier(false)
+	eventBus, rpcBus, streamer, _, k := launchReductionTest(true, 2)
+	go launchCandidateVerifier(rpcBus, false)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
@@ -108,7 +101,7 @@ func TestReduction(t *testing.T) {
 
 // Test that the reducer does not send any messages when it is not part of the committee.
 func TestNoPublishingIfNotInCommittee(t *testing.T) {
-	eventBus, streamer, _, _ := launchReductionTest(false, 2)
+	eventBus, _, streamer, _, _ := launchReductionTest(false, 2)
 
 	// Because round updates are asynchronous (sent through a channel), we wait
 	// for a bit to let the broker update its round.
@@ -135,7 +128,7 @@ func TestNoPublishingIfNotInCommittee(t *testing.T) {
 
 // Test that timeouts in the reduction phase result in proper behavior.
 func TestReductionTimeout(t *testing.T) {
-	eb, streamer, _, _ := launchReductionTest(true, 2)
+	eb, _, streamer, _, _ := launchReductionTest(true, 2)
 
 	// send a hash to start reduction
 	hash, _ := crypto.RandEntropy(32)
@@ -164,7 +157,7 @@ func TestReductionTimeout(t *testing.T) {
 }
 
 func TestTimeOutVariance(t *testing.T) {
-	eb, _, _, _ := launchReductionTest(true, 2)
+	eb, rpcBus, _, _, _ := launchReductionTest(true, 2)
 
 	// subscribe to reduction results
 	resultChan := make(chan bytes.Buffer, 1)
@@ -178,7 +171,7 @@ func TestTimeOutVariance(t *testing.T) {
 	start := time.Now()
 	// send a hash to start reduction
 	eb.Publish(topics.BestScore, new(bytes.Buffer))
-	go launchCandidateVerifier(false)
+	go launchCandidateVerifier(rpcBus, false)
 
 	// wait for reduction to finish
 	<-resultChan
@@ -188,7 +181,7 @@ func TestTimeOutVariance(t *testing.T) {
 	start = time.Now()
 	eb.Publish(topics.BestScore, new(bytes.Buffer))
 	// set up another goroutine for verification
-	go launchCandidateVerifier(false)
+	go launchCandidateVerifier(rpcBus, false)
 
 	// wait for reduction to finish
 	<-resultChan
@@ -207,7 +200,7 @@ func TestTimeOutVariance(t *testing.T) {
 	// send a hash to start reduction
 	eb.Publish(topics.BestScore, new(bytes.Buffer))
 	// set up another goroutine for verification
-	go launchCandidateVerifier(false)
+	go launchCandidateVerifier(rpcBus, false)
 
 	// wait for reduction to finish
 	<-resultChan
@@ -217,16 +210,20 @@ func TestTimeOutVariance(t *testing.T) {
 	assert.InDelta(t, elapsed1.Seconds(), elapsed3.Seconds(), 0.05)
 }
 
-func launchCandidateVerifier(failVerification bool) {
-	r := <-rpcbus.VerifyCandidateBlockChan
-	if failVerification {
-		r.ErrChan <- errors.New("verification failed")
-	} else {
-		r.RespChan <- bytes.Buffer{}
+func launchCandidateVerifier(rpcBus *rpcbus.RPCBus, failVerification bool) {
+	v := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.VerifyCandidateBlock, v)
+	for {
+		r := <-v
+		if failVerification {
+			r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("verification failed")}
+		} else {
+			r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		}
 	}
 }
 
-func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *eventbus.GossipStreamer, user.Keys, []user.Keys) {
+func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer, user.Keys, []user.Keys) {
 	eb, streamer := eventbus.CreateGossipStreamer()
 	k, _ := user.NewRandKeys()
 	rpcBus := rpcbus.New()
@@ -241,7 +238,7 @@ func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *eve
 
 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
 
-	return eb, streamer, k, keys
+	return eb, rpcBus, streamer, k, keys
 }
 
 // Convenience function, which launches the reduction component and removes the

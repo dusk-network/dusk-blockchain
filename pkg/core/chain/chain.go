@@ -47,6 +47,10 @@ type Chain struct {
 	// collector channels
 	candidateChan   <-chan *block.Block
 	certificateChan <-chan certMsg
+
+	// rpcbus channels
+	getLastBlockChan         <-chan rpcbus.Request
+	verifyCandidateBlockChan <-chan rpcbus.Request
 }
 
 // New returns a new chain object
@@ -62,15 +66,23 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	candidateChan := initBlockCollector(eventBus, topics.Candidate)
 	certificateChan := initCertificateCollector(eventBus)
 
+	// set up rpcbus channels
+	getLastBlockChan := make(chan rpcbus.Request, 1)
+	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
+	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
+
 	chain := &Chain{
-		eventBus:        eventBus,
-		rpcBus:          rpcBus,
-		db:              db,
-		prevBlock:       *l.chainTip,
-		candidateChan:   candidateChan,
-		p:               user.NewProvisioners(),
-		bidList:         &user.BidList{},
-		certificateChan: certificateChan,
+		eventBus:                 eventBus,
+		rpcBus:                   rpcBus,
+		db:                       db,
+		prevBlock:                *l.chainTip,
+		candidateChan:            candidateChan,
+		p:                        user.NewProvisioners(),
+		bidList:                  &user.BidList{},
+		certificateChan:          certificateChan,
+		getLastBlockChan:         getLastBlockChan,
+		verifyCandidateBlockChan: verifyCandidateBlockChan,
 	}
 
 	chain.restoreConsensusData()
@@ -93,7 +105,7 @@ func (c *Chain) Listen() {
 			c.addCertificate(certMsg.hash, certMsg.cert)
 
 		// wire.RPCBus requests handlers
-		case r := <-rpcbus.GetLastBlockChan:
+		case r := <-c.getLastBlockChan:
 
 			buf := new(bytes.Buffer)
 
@@ -102,19 +114,19 @@ func (c *Chain) Listen() {
 			c.mu.RUnlock()
 
 			if err := block.Marshal(buf, &prevBlock); err != nil {
-				r.ErrChan <- err
+				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 				continue
 			}
 
-			r.RespChan <- *buf
+			r.RespChan <- rpcbus.Response{*buf, nil}
 
-		case r := <-rpcbus.VerifyCandidateBlockChan:
+		case r := <-c.verifyCandidateBlockChan:
 			if err := c.verifyCandidateBlock(r.Params.Bytes()); err != nil {
-				r.ErrChan <- err
+				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 				continue
 			}
 
-			r.RespChan <- bytes.Buffer{}
+			r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 		}
 	}
 }

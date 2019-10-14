@@ -24,12 +24,14 @@ import (
 )
 
 func respond(rpcBus *rpcbus.RPCBus, b block.Block) {
-	r := <-rpcbus.GetLastBlockChan
+	g := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastBlock, g)
+	r := <-g
 	buf := new(bytes.Buffer)
 	if err := block.Marshal(buf, &b); err != nil {
 		panic(err)
 	}
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 }
 
 func TestGenerateBlock(t *testing.T) {
@@ -170,7 +172,7 @@ func newTestHarness(t *testing.T) *harness {
 	h.rpc = rpcbus.New()
 
 	// Mock mempool with no verification procedure
-	h.m = mempool.NewMempool(h.eb, func(tx transactions.Transaction) error {
+	h.m = mempool.NewMempool(h.eb, h.rpc, func(tx transactions.Transaction) error {
 		return nil
 	})
 
