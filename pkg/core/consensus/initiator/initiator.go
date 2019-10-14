@@ -41,8 +41,8 @@ func startProvisioner(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wal
 	f.StartConsensus()
 
 	// Get current height
-	req := rpcbus.NewRequest(bytes.Buffer{}, 1)
-	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req)
+	req := rpcbus.NewRequest(bytes.Buffer{})
+	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req, 1)
 	if err != nil {
 		l.WithError(err).Warnln("could not retrieve current height, starting from 1")
 		sendInitMessage(eventBroker, 1)

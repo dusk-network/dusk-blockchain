@@ -80,6 +80,8 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.Ev
 // Dummy goroutine which simply sends a random block back when the ChainSynchronizer
 // requests the last block.
 func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
-	r := <-rpcbus.GetLastBlockChan
-	r.RespChan <- *randomBlockBuffer(t, 0, 1)
+	g := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastBlock, g)
+	r := <-g
+	r.RespChan <- rpcbus.Response{*randomBlockBuffer(t, 0, 1), nil}
 }

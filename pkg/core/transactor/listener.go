@@ -27,21 +27,21 @@ func (t *Transactor) Listen() {
 		select {
 
 		// Wallet requests to respond to
-		case r := <-createWalletChan:
+		case r := <-t.createWalletChan:
 			handleRequest(r, t.handleCreateWallet, "CreateWallet")
-		case r := <-createFromSeedChan:
+		case r := <-t.createFromSeedChan:
 			handleRequest(r, t.handleCreateFromSeed, "CreateWalletFromSeed")
-		case r := <-loadWalletChan:
+		case r := <-t.loadWalletChan:
 			handleRequest(r, t.handleLoadWallet, "LoadWallet")
 
 		// Transaction requests to respond to
-		case r := <-sendBidTxChan:
+		case r := <-t.sendBidTxChan:
 			handleRequest(r, t.handleSendBidTx, "BidTx")
-		case r := <-sendStakeTxChan:
+		case r := <-t.sendStakeTxChan:
 			handleRequest(r, t.handleSendStakeTx, "StakeTx")
-		case r := <-sendStandardTxChan:
+		case r := <-t.sendStandardTxChan:
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
-		case r := <-getBalanceChan:
+		case r := <-t.getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
 
 		// Event list to handle
@@ -57,7 +57,7 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name 
 
 	if err := handler(r); err != nil {
 		log.Errorf("Failed %s request: %v", name, err)
-		r.ErrChan <- err
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}
 
@@ -87,7 +87,7 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 
 	return nil
 }
@@ -125,7 +125,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 
 	return nil
 }
@@ -159,7 +159,7 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 
 	return nil
 }
@@ -194,7 +194,7 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- *bytes.NewBuffer(txid)
+	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
 	return nil
 }
 
@@ -229,7 +229,7 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- *bytes.NewBuffer(txid)
+	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
 
 	return nil
 }
@@ -265,7 +265,7 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- *bytes.NewBuffer(txid)
+	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
 
 	return nil
 }
@@ -292,7 +292,7 @@ func (t *Transactor) handleBalance(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 	return nil
 }
 

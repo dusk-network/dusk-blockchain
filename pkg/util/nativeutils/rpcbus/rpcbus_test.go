@@ -7,82 +7,41 @@ import (
 	"time"
 )
 
-var (
-	expectedResult   string
-	consumerStarted  bool
-	errInvalidParams = errors.New("invalid params")
+const m = GetLastBlock
 
-	cleanup = func() {
-		GetLastBlockChan = nil
-		GetMempoolTxsChan = nil
-	}
-)
+var errInvalidParams = errors.New("invalid params")
 
-func runConsumer(delay int) {
-	if consumerStarted == false {
-		consumerStarted = true
-		go func(delay int) {
-			for req := range GetLastBlockChan {
-				// Simulate heavy computation
-				time.Sleep(time.Duration(delay) * time.Millisecond)
-
-				params := req.Params.String()
-
-				if len(params) == 0 {
-					// Simulate error response
-					req.ErrChan <- errInvalidParams
-				} else {
-					// Simulate non-error response
-					expectedResult = "Wrapped " + params
-
-					buf := bytes.Buffer{}
-					buf.WriteString(expectedResult)
-
-					// return result
-					req.RespChan <- buf
-				}
-			}
-		}(delay)
-	}
-}
 func TestRPCall(t *testing.T) {
-
-	cleanup()
 	bus := New()
-
-	runConsumer(500)
+	go setupConsumer(bus, true)
+	time.Sleep(100 * time.Millisecond)
 
 	// produce the call
 	buf := bytes.Buffer{}
 	buf.WriteString("input params")
 
-	d := NewRequest(buf, 10)
-	responseResult, err := bus.Call(GetLastBlock, d)
-
+	d := NewRequest(buf)
+	responseResult, err := bus.Call(m, d, 10)
 	if err != nil {
 		t.Error(err.Error())
 	}
 
-	if responseResult.String() != expectedResult {
+	if responseResult.String() != "output params" {
 		t.Errorf("expecting to retrieve response data")
 	}
 }
 
 func TestRPCallWithError(t *testing.T) {
-
-	t.SkipNow()
-	cleanup()
 	bus := New()
-
-	runConsumer(500)
+	go setupConsumer(bus, true)
+	time.Sleep(100 * time.Millisecond)
 
 	// produce the call
 	buf := bytes.Buffer{}
 	buf.WriteString("")
 
-	d := NewRequest(buf, 10)
-	responseResult, err := bus.Call(GetLastBlock, d)
-
+	d := NewRequest(buf)
+	responseResult, err := bus.Call(m, d, 10)
 	if err != errInvalidParams {
 		t.Errorf("expecting a specific error here but get %v", err)
 	}
@@ -93,21 +52,17 @@ func TestRPCallWithError(t *testing.T) {
 }
 
 func TestTimeoutCalls(t *testing.T) {
-
-	cleanup()
 	bus := New()
-
-	delay := 3000
-	runConsumer(delay)
+	go setupConsumer(bus, false)
+	time.Sleep(100 * time.Millisecond)
 
 	// produce the call
 	buf := bytes.Buffer{}
 	buf.WriteString("input params")
 
-	d := NewRequest(buf, 1)
-	responseResult, err := bus.Call(GetLastBlock, d)
-
-	if err != ErrReqTimeout {
+	d := NewRequest(buf)
+	responseResult, err := bus.Call(m, d, 1)
+	if err != ErrRequestTimeout {
 		t.Errorf("expecting timeout error but get %v", err)
 	}
 
@@ -117,11 +72,12 @@ func TestTimeoutCalls(t *testing.T) {
 }
 
 func TestMethodExists(t *testing.T) {
-	cleanup()
 	bus := New()
+	go setupConsumer(bus, true)
+	time.Sleep(100 * time.Millisecond)
 
-	reqChan2 := make(chan Req)
-	err := bus.Register(GetLastBlock, reqChan2)
+	reqChan2 := make(chan Request)
+	err := bus.Register(m, reqChan2)
 
 	if err != ErrMethodExists {
 		t.Fatalf("expecting methodExists error but get %v", err)
@@ -129,17 +85,16 @@ func TestMethodExists(t *testing.T) {
 }
 
 func TestNonExistingMethod(t *testing.T) {
-	cleanup()
 	bus := New()
-
-	runConsumer(500)
+	go setupConsumer(bus, true)
+	time.Sleep(100 * time.Millisecond)
 
 	// produce the call
 	buf := bytes.Buffer{}
 	buf.WriteString("input params")
 
-	d := NewRequest(buf, 2)
-	responseResult, err := bus.Call("Chain/NonExistingMethod", d)
+	d := NewRequest(buf)
+	responseResult, err := bus.Call(0xff, d, 2)
 
 	if err != ErrMethodNotExists {
 		t.Error("expecting methodNotExists error")
@@ -151,11 +106,25 @@ func TestNonExistingMethod(t *testing.T) {
 }
 
 func TestInvalidReqChan(t *testing.T) {
-	cleanup()
 	bus := New()
 
-	err := bus.Register(GetLastBlock, nil)
-	if err != ErrInvalidReqChan {
+	err := bus.Register(m, nil)
+	if err != ErrInvalidRequestChan {
 		t.Error("expecting ErrInvalidReqChan error")
+	}
+}
+
+func setupConsumer(rpcBus *RPCBus, respond bool) {
+	reqChan := make(chan Request, 1)
+	rpcBus.Register(m, reqChan)
+
+	if respond {
+		r := <-reqChan
+		if r.Params.Len() == 0 {
+			r.RespChan <- Response{bytes.Buffer{}, errInvalidParams}
+			return
+		}
+
+		r.RespChan <- Response{*bytes.NewBufferString("output params"), nil}
 	}
 }
