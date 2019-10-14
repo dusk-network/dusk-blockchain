@@ -8,7 +8,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -82,15 +81,15 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 			return err
 		}
 
-		s.publisher.Publish(string(topics.Block), buf)
+		s.publisher.Publish(topics.Block, buf)
 	}
 
 	return nil
 }
 
 func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
-	req := rpcbus.NewRequest(bytes.Buffer{}, 2)
-	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req)
+	req := rpcbus.NewRequest(bytes.Buffer{})
+	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req, 2)
 	if err != nil {
 		return nil, err
 	}
@@ -114,12 +113,12 @@ func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
 }
 
 func marshalGetBlocks(msg *peermsg.GetBlocks) (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
-	if err := msg.Encode(buf); err != nil {
+	buf := topics.GetBlocks.ToBuffer()
+	if err := msg.Encode(&buf); err != nil {
 		panic(err)
 	}
 
-	return wire.AddTopic(buf, topics.GetBlocks)
+	return &buf, nil
 }
 
 func peekBlockHeight(r *bufio.Reader) (uint64, error) {

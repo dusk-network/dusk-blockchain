@@ -6,7 +6,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -96,12 +95,8 @@ func (d *DataRequestor) RequestMissingItems(m *bytes.Buffer) error {
 
 // RequestMempoolItems sends topics.Mempool to request available mempool txs
 func (d *DataRequestor) RequestMempoolItems() error {
-
-	buf, err := wire.AddTopic(new(bytes.Buffer), topics.MemPool)
-	if err != nil {
-		return err
-	}
-	d.responseChan <- buf
+	buf := topics.MemPool.ToBuffer()
+	d.responseChan <- &buf
 	return nil
 }
 
@@ -111,7 +106,10 @@ func marshalGetData(getData *peermsg.Inv) (*bytes.Buffer, error) {
 		panic(err)
 	}
 
-	return wire.AddTopic(buf, topics.GetData)
+	if err := topics.Prepend(buf, topics.GetData); err != nil {
+		return nil, err
+	}
+	return buf, nil
 }
 
 // GetMempoolTxs is a wire.GetMempoolTx API wrapper. Later it could be moved into
@@ -120,7 +118,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 
 	buf := new(bytes.Buffer)
 	buf.Write(txID)
-	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf, 3))
+	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3)
 	if err != nil {
 		return nil, err
 	}

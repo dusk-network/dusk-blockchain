@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -29,24 +28,30 @@ func NewRepublisher(publisher eventbus.Publisher, topic topics.Topic) *Republish
 }
 
 // Process propagates a received event buffer to other nodes in the network.
-func (r *Republisher) Process(eventBuffer *bytes.Buffer) (*bytes.Buffer, error) {
-	bounced := eventBuffer
-	msg, _ := wire.AddTopic(bounced, r.topic)
-	r.publisher.Stream(string(topics.Gossip), msg)
-	return eventBuffer, nil
+func (r *Republisher) Process(eventBuffer *bytes.Buffer) error {
+	return r.process(*eventBuffer)
+}
+
+func (r *Republisher) process(eventBuffer bytes.Buffer) error {
+	if err := topics.Prepend(&eventBuffer, r.topic); err != nil {
+		return err
+	}
+
+	r.publisher.Publish(topics.Gossip, &eventBuffer)
+	return nil
 }
 
 // Process a buffer by validating the ED25519 Signature. It uses a io.TeeReader to
 // preserve the original message. It returns a copy of the message.
-func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
+func (v *Validator) Process(buf *bytes.Buffer) error {
 	sig := make([]byte, 64)
 	if err := encoding.Read512(buf, sig); err != nil {
-		return nil, err
+		return err
 	}
 
 	edPubKey := make([]byte, 32)
 	if err := encoding.Read256(buf, edPubKey); err != nil {
-		return nil, err
+		return err
 	}
 
 	var newBuf bytes.Buffer
@@ -55,12 +60,14 @@ func (v *Validator) Process(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	// NOTE: this should really be checked since a gigantic message can crash the machine
 	signed, err := ioutil.ReadAll(r)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := msg.VerifyEd25519Signature(edPubKey, signed, sig); err != nil {
-		return nil, err
+		return err
 	}
 
-	return &newBuf, nil
+	*buf = newBuf
+	return nil
+	//return &newBuf, nil
 }

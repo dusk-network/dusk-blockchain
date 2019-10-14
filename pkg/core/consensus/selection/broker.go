@@ -33,8 +33,8 @@ func launchScoreFilter(eventBroker eventbus.Broker, handler ScoreEventHandler,
 	state consensus.State, selector *eventSelector) *filter {
 
 	filter := newFilter(handler, state, selector)
-	listener := eventbus.NewTopicListener(eventBroker, filter, string(topics.Score))
-	go listener.Accept()
+	listener := eventbus.NewCallbackListener(filter.Collect)
+	eventBroker.Subscribe(topics.Score, listener)
 	return filter
 }
 

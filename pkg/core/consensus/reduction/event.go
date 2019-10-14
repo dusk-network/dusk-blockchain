@@ -136,7 +136,7 @@ func SignBuffer(buf *bytes.Buffer, keys key.ConsensusKeys) error {
 	return nil
 }
 
-// Sign will add the BLS and Ed25519 signatures to a Reduction event.
+// Sign adds the BLS and Ed25519 signatures to a Reduction event.
 func Sign(e *Reduction, keys key.ConsensusKeys) (*bytes.Buffer, error) {
 	if err := BlsSign(e, keys); err != nil {
 		return nil, err

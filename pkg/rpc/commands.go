@@ -8,8 +8,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 // handler defines a method bound to an RPC command.
@@ -26,15 +28,16 @@ var (
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,
 		"sendBidTx":    sendBidTx,
+		"loadWallet":   loadWallet,
 	}
 
 	// rpcAdminCmd holds all admin methods.
 	rpcAdminCmd = map[string]bool{}
 
 	// supported topics for injection into EventBus
-	supportedTopics = [2]string{
-		string(topics.Tx),
-		string(topics.Block),
+	supportedTopics = [2]topics.Topic{
+		topics.Tx,
+		topics.Block,
 	}
 )
 
@@ -64,7 +67,7 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 	supported := false
 	for _, topic := range supportedTopics {
-		if topic == jsonrpcTopic {
+		if topic.String() == jsonrpcTopic {
 			supported = true
 			break
 		}
@@ -75,7 +78,8 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 	}
 
 	payload, _ := hex.DecodeString(params[1])
-	s.eventBus.Publish(jsonrpcTopic, bytes.NewBuffer(payload))
+	rpcTopic := topics.StringToTopic(jsonrpcTopic)
+	s.eventBus.Publish(rpcTopic, bytes.NewBuffer(payload))
 
 	result :=
 		`{ 
@@ -85,13 +89,59 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 }
 
 var sendBidTx = func(s *Server, params []string) (string, error) {
+	if len(params) < 2 {
+		return "", fmt.Errorf("missing parameters: amount/locktime")
+	}
 
-	// TODO: Not Implemented
+	amount, err := strconv.Atoi(params[0])
+	if err != nil {
+		return "", fmt.Errorf("converting amount string to an integer: %v", err)
+	}
 
-	result :=
-		`{ 
-			"txid": "unknown"
-		}`
+	lockTime, err := strconv.Atoi(params[1])
+	if err != nil {
+		return "", fmt.Errorf("converting locktime string to an integer: %v", err)
+	}
 
-	return result, nil
+	buf := new(bytes.Buffer)
+	if err := rpcbus.MarshalConsensusTxRequest(buf, uint64(amount), uint64(lockTime)); err != nil {
+		return "", err
+	}
+
+	txid, err := s.rpcBus.Call(rpcbus.SendBidTx, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	idString, err := encoding.ReadString(&txid)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString([]byte(idString)))
+	return result, err
+}
+
+var loadWallet = func(s *Server, params []string) (string, error) {
+	if len(params) < 1 {
+		return "", fmt.Errorf("missing parameter: password")
+	}
+
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, params[0]); err != nil {
+		return "", err
+	}
+
+	pubKeyBuf, err := s.rpcBus.Call(rpcbus.LoadWallet, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	pubKey, err := encoding.ReadString(&pubKeyBuf)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	return result, err
 }

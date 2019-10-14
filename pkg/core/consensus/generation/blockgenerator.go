@@ -28,6 +28,7 @@ type (
 		Generate(consensus.RoundUpdate) (block.Block, selection.ScoreEvent, error)
 		GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error)
 		UpdateProofValues(ristretto.Scalar, ristretto.Scalar)
+		ResetThreshold()
 	}
 
 	blockGenerator struct {
@@ -47,8 +48,13 @@ func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus, proofGen
 		rpcBus:         rpcBus,
 		genPubKey:      genPubKey,
 		proofGenerator: proofGen,
+		threshold:      consensus.NewThreshold(),
 		keys:           keys,
 	}
+}
+
+func (bg *blockGenerator) ResetThreshold() {
+	bg.threshold.Reset()
 }
 
 func (bg *blockGenerator) UpdateProofValues(d, m ristretto.Scalar) {
@@ -152,7 +158,7 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}, 10))
+		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 10)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the the chain.
 		if err != nil {

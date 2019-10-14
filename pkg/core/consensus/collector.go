@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -42,7 +42,7 @@ type (
 func UpdateRound(bus eventbus.Publisher, round uint64) {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, round)
-	bus.Publish(msg.RoundUpdateTopic, bytes.NewBuffer(b))
+	bus.Publish(topics.RoundUpdate, bytes.NewBuffer(b))
 }
 
 // InitRoundUpdate initializes a Round update channel and fires up the TopicListener
@@ -52,35 +52,36 @@ func UpdateRound(bus eventbus.Publisher, round uint64) {
 func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 	roundChan := make(chan RoundUpdate, 1)
 	roundCollector := &roundCollector{roundChan}
-	go eventbus.NewTopicListener(subscriber, roundCollector, string(msg.RoundUpdateTopic)).Accept()
+	eventbus.NewTopicListener(subscriber, roundCollector, topics.RoundUpdate, eventbus.ChannelType)
 	return roundChan
 }
 
 // Collect as specified in the EventCollector interface. In this case Collect simply
 // performs unmarshalling of the round event
-func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
+func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
 	var round uint64
-	if err := encoding.ReadUint64LE(roundBuffer, &round); err != nil {
+	rb := &roundBuffer
+	if err := encoding.ReadUint64LE(rb, &round); err != nil {
 		return err
 	}
 
-	provisioners, err := user.UnmarshalProvisioners(roundBuffer)
+	provisioners, err := user.UnmarshalProvisioners(rb)
 	if err != nil {
 		return err
 	}
 
-	bidList, err := user.UnmarshalBidList(roundBuffer)
+	bidList, err := user.UnmarshalBidList(rb)
 	if err != nil {
 		return err
 	}
 
 	seed := make([]byte, 33)
-	if err := encoding.ReadBLS(roundBuffer, seed); err != nil {
+	if err := encoding.ReadBLS(rb, seed); err != nil {
 		return err
 	}
 
 	hash := make([]byte, 32)
-	if err := encoding.Read256(roundBuffer, hash); err != nil {
+	if err := encoding.Read256(rb, hash); err != nil {
 		return err
 	}
 
@@ -94,11 +95,11 @@ func (r *roundCollector) Collect(roundBuffer *bytes.Buffer) error {
 func InitBlockRegenerationCollector(subscriber eventbus.Subscriber) chan AsyncState {
 	regenerationChan := make(chan AsyncState, 1)
 	collector := &regenerationCollector{regenerationChan}
-	go eventbus.NewTopicListener(subscriber, collector, msg.BlockRegenerationTopic).Accept()
+	eventbus.NewTopicListener(subscriber, collector, topics.BlockRegeneration, eventbus.ChannelType)
 	return regenerationChan
 }
 
-func (rg *regenerationCollector) Collect(r *bytes.Buffer) error {
+func (rg *regenerationCollector) Collect(r bytes.Buffer) error {
 	round := binary.LittleEndian.Uint64(r.Bytes()[:8])
 	step := uint8(r.Bytes()[8])
 	state := AsyncState{
@@ -110,16 +111,15 @@ func (rg *regenerationCollector) Collect(r *bytes.Buffer) error {
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
-func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, *eventbus.TopicListener) {
+func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, eventbus.TopicListener) {
 	acceptedBlockChan := make(chan block.Block)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
-	tl := eventbus.NewTopicListener(subscriber, collector, string(topics.AcceptedBlock))
-	go tl.Accept()
+	tl := eventbus.NewTopicListener(subscriber, collector, topics.AcceptedBlock, eventbus.ChannelType)
 	return acceptedBlockChan, tl
 }
 
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
-func (c *acceptedBlockCollector) Collect(r *bytes.Buffer) error {
+func (c *acceptedBlockCollector) Collect(r bytes.Buffer) error {
 	b := block.NewBlock()
 	if err := marshalling.UnmarshalBlock(r, b); err != nil {
 		return err

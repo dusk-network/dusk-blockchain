@@ -13,7 +13,7 @@ import (
 )
 
 // The messageRouter is connected to all of the processing units that are tied to the peer.
-// It sends an incoming message in the right direction, according to it's topic.
+// It sends an incoming message in the right direction, according to its topic.
 type messageRouter struct {
 	publisher eventbus.Publisher
 	dupeMap   *dupemap.DupeMap
@@ -28,7 +28,7 @@ type messageRouter struct {
 }
 
 func (m *messageRouter) Collect(b *bytes.Buffer) error {
-	topic, err := extractTopic(b)
+	topic, err := topics.Extract(b)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {
-				m.publisher.Publish(string(topic), b)
+				m.publisher.Publish(topic, b)
 			}
 		} else {
 			err = fmt.Errorf("%s topic not routable", string(topic))

@@ -2,7 +2,6 @@ package processing_test
 
 import (
 	"bytes"
-	"io"
 	"testing"
 
 	"github.com/dusk-network/dusk-wallet/block"
@@ -40,7 +39,7 @@ func TestAdvertiseBlocks(t *testing.T) {
 	response := <-responseChan
 
 	// Check for correctness of topic
-	topic := extractTopic(response)
+	topic, _ := topics.Extract(response)
 	if topic != topics.Inv {
 		t.Fatalf("unexpected topic %s, expected Inv", topic)
 	}
@@ -82,15 +81,6 @@ func createGetBlocksBuffer(locator []byte) *bytes.Buffer {
 	}
 
 	return buf
-}
-
-func extractTopic(r io.Reader) topics.Topic {
-	var topicBytes [15]byte
-	if _, err := r.Read(topicBytes[:]); err != nil {
-		panic(err)
-	}
-
-	return topics.ByteArrayToTopic(topicBytes)
 }
 
 func storeBlocks(db database.DB, blocks []*block.Block) error {

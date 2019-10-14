@@ -1,6 +1,8 @@
 package ring
 
-import "io"
+import (
+	"io"
+)
 
 // Consumer represents an entity which can read items from a ring buffer.
 // It maintains its own read index, and cache.

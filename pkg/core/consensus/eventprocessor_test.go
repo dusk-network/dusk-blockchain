@@ -7,6 +7,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ed25519"
@@ -30,7 +32,16 @@ func TestValidator(t *testing.T) {
 	assert.NoError(t, err)
 
 	validator := &consensus.Validator{}
-	result, err := validator.Process(buf)
+	err = validator.Process(buf)
 	assert.NoError(t, err)
-	assert.Equal(t, message, result.Bytes())
+	assert.Equal(t, message, buf.Bytes())
+}
+
+func TestRepublisherIntegrity(t *testing.T) {
+	bus := eventbus.New()
+	buf := bytes.NewBuffer([]byte{1, 2, 3})
+	r := consensus.NewRepublisher(bus, topics.Reduction)
+	r.Process(buf)
+
+	assert.Equal(t, []byte{1, 2, 3}, buf.Bytes())
 }

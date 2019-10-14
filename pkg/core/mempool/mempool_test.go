@@ -59,14 +59,14 @@ func initCtx(t *testing.T) *ctx {
 		r.Mempool.PoolType = "hashmap"
 		config.Mock(&r)
 		// eventBus
-		var streamer *helper.SimpleStreamer
-		c.bus, streamer = helper.CreateGossipStreamer()
+		var streamer *eventbus.GossipStreamer
+		c.bus, streamer = eventbus.CreateGossipStreamer()
 		// creating the rpcbus
 		c.rpcBus = rpcbus.New()
 
 		c.propagated = make([][]byte, 0)
 
-		go func(streamer *helper.SimpleStreamer, c *ctx) {
+		go func(streamer *eventbus.GossipStreamer, c *ctx) {
 			for {
 				tx, err := streamer.Read()
 				if err != nil {
@@ -80,7 +80,7 @@ func initCtx(t *testing.T) *ctx {
 		}(streamer, c)
 
 		// initiate a mempool with custom verification function
-		c.m = NewMempool(c.bus, verifyFunc)
+		c.m = NewMempool(c.bus, c.rpcBus, verifyFunc)
 	} else {
 
 		// Reset shared context state
@@ -115,7 +115,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}, 1))
+	r, _ := c.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1)
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 
@@ -174,7 +174,7 @@ func TestProcessPendingTxs(t *testing.T) {
 		}
 
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(topics.Tx, buf)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		tx := helper.RandomStandardTx(t, false)
@@ -189,13 +189,13 @@ func TestProcessPendingTxs(t *testing.T) {
 		}
 
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(topics.Tx, buf)
 
 		// Publish a duplicated tx
 		buf = new(bytes.Buffer)
 		_ = marshalling.MarshalTx(buf, tx)
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(topics.Tx, buf)
 	}
 
 	c.assert(t, true)
@@ -237,7 +237,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 			for _, tx := range txs {
 				buf := new(bytes.Buffer)
 				_ = marshalling.MarshalTx(buf, tx)
-				c.bus.Publish(string(topics.Tx), buf)
+				c.bus.Publish(topics.Tx, buf)
 			}
 			wg.Done()
 		}(c.verifiedTx[from:to])
@@ -253,7 +253,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 				tx.Version++
 				_ = marshalling.MarshalTx(buf, tx)
 
-				c.bus.Publish(string(topics.Tx), buf)
+				c.bus.Publish(topics.Tx, buf)
 			}
 			wg.Done()
 		}()
@@ -286,7 +286,7 @@ func TestRemoveAccepted(t *testing.T) {
 		}
 
 		// Publish valid tx
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(topics.Tx, buf)
 
 		// Simulate a situation where the block has accepted each 2th tx
 		counter++
@@ -305,7 +305,7 @@ func TestRemoveAccepted(t *testing.T) {
 	buf := new(bytes.Buffer)
 	_ = marshalling.MarshalBlock(buf, b)
 
-	c.bus.Publish(string(topics.AcceptedBlock), buf)
+	c.bus.Publish(topics.AcceptedBlock, buf)
 
 	c.assert(t, false)
 }
@@ -327,7 +327,7 @@ func TestDoubleSpent(t *testing.T) {
 		}
 
 		// Publish valid tx
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(topics.Tx, buf)
 		c.addTx(tx)
 	}
 
@@ -348,7 +348,7 @@ func TestDoubleSpent(t *testing.T) {
 	}
 
 	// Publish valid tx
-	c.bus.Publish(string(topics.Tx), buf)
+	c.bus.Publish(topics.Tx, buf)
 	// c.addTx(tx) do not add it into the expected list
 
 	c.wait()
@@ -371,7 +371,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 		}
 
 		c.addTx(tx)
-		c.bus.Publish(string(topics.Tx), buf)
+		c.bus.Publish(topics.Tx, buf)
 	}
 
 	// Publish a coinbase txs
@@ -382,7 +382,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c.bus.Publish(string(topics.Tx), buf)
+	c.bus.Publish(topics.Tx, buf)
 
 	c.wait()
 

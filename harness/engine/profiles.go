@@ -27,7 +27,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("wallet.store", node.Dir+"/walletDB/")
 	viper.Set("wallet.file", walletPath+"/wallet-"+node.Id+".dat")
 	viper.Set("network.seeder.addresses", []string{"127.0.0.1:8081"})
-	viper.Set("network.port", strconv.Itoa(7000+index))
+	viper.Set("network.port", strconv.Itoa(7100+index))
 	viper.Set("mempool.maxSizeMB", "100")
 	viper.Set("mempool.poolType", "hashmap")
 	viper.Set("mempool.preallocTxs", "100")

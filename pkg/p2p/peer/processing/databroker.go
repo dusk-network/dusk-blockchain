@@ -7,7 +7,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -58,10 +57,10 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 			}
 
 			// Send the block data back to the initiator node as topics.Block msg
-			buf, err = marshalBlock(b)
-			if err != nil {
+			if buf, err = marshalBlock(b); err != nil {
 				return err
 			}
+
 		case peermsg.InvTypeMempoolTx:
 			// Try to retireve tx from local mempool state. It might not be
 			// available
@@ -137,19 +136,31 @@ func (d *DataBroker) SendTxsItems() error {
 }
 
 func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
+	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
+	// buf := topics.Topics[topics.Block].Buffer
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, b); err != nil {
 		return nil, err
 	}
 
-	return wire.AddTopic(buf, topics.Block)
+	if err := topics.Prepend(buf, topics.Block); err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func marshalTx(tx transactions.Transaction) (*bytes.Buffer, error) {
+	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
+	// buf := topics.Topics[topics.Block].Buffer
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalTx(buf, tx); err != nil {
 		return nil, err
 	}
 
-	return wire.AddTopic(buf, topics.Tx)
+	if err := topics.Prepend(buf, topics.Tx); err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }

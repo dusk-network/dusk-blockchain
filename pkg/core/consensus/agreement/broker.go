@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -17,10 +16,12 @@ import (
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
 func Launch(eventBroker eventbus.Broker, keys key.ConsensusKeys) {
-	broker := newBroker(eventBroker, keys)
-	roundUpdate := <-broker.roundChan
-	broker.updateRound(roundUpdate)
-	go broker.Listen()
+	b := newBroker(eventBroker, keys)
+	go func(b *broker) {
+		roundUpdate := <-b.roundChan
+		b.updateRound(roundUpdate)
+		b.Listen()
+	}(b)
 }
 
 type broker struct {
@@ -35,8 +36,9 @@ type broker struct {
 func launchFilter(eventBroker eventbus.Broker, handler consensus.AccumulatorHandler, state consensus.State) *consensus.EventFilter {
 	filter := consensus.NewEventFilter(handler, state, false)
 	republisher := consensus.NewRepublisher(eventBroker, topics.Agreement)
-	eventBroker.SubscribeCallback(string(topics.Agreement), filter.Collect)
-	eventBroker.RegisterPreprocessor(string(topics.Agreement), republisher, &consensus.Validator{})
+	callbackListener := eventbus.NewCallbackListener(filter.Collect)
+	eventBroker.Subscribe(topics.Agreement, callbackListener)
+	eventBroker.Register(topics.Agreement, republisher, &consensus.Validator{})
 	return filter
 }
 
@@ -94,7 +96,7 @@ func (b *broker) sendAgreement(voteSet voteSet) error {
 			return err
 		}
 
-		b.publisher.Stream(string(topics.Gossip), msg)
+		b.publisher.Publish(topics.Gossip, msg)
 	}
 
 	return nil
@@ -112,7 +114,7 @@ func (b *broker) updateRound(roundUpdate consensus.RoundUpdate) {
 
 func (b *broker) publishWinningHash(evs []wire.Event) {
 	aev := evs[0].(*Agreement)
-	b.publisher.Publish(msg.WinningBlockHashTopic, bytes.NewBuffer(aev.BlockHash))
+	b.publisher.Publish(topics.WinningBlockHash, bytes.NewBuffer(aev.BlockHash))
 }
 
 func (b *broker) publishEvent(evs []wire.Event) {
@@ -126,5 +128,5 @@ func (b *broker) publishEvent(evs []wire.Event) {
 		return
 	}
 
-	b.publisher.Publish(msg.AgreementEventTopic, buf)
+	b.publisher.Publish(topics.AgreementEvent, buf)
 }

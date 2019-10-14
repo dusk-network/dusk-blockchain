@@ -6,27 +6,11 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
-
-func LaunchNotification(eventbus eventbus.Subscriber) <-chan *ScoreEvent {
-	scoreChan := make(chan *ScoreEvent)
-	evChan := consensus.LaunchNotification(eventbus,
-		newScoreHandler(), msg.BestScoreTopic)
-
-	go func() {
-		for {
-			sEv := <-evChan
-			scoreChan <- sEv.(*ScoreEvent)
-		}
-	}()
-
-	return scoreChan
-}
 
 var empty struct{}
 
@@ -79,6 +63,7 @@ func (s *eventSelector) Process(ev wire.Event) {
 	s.lock.RLock()
 	bestEvent := s.bestEvent
 	s.lock.RUnlock()
+
 	if !s.handler.Priority(bestEvent, ev) {
 		if err := s.handler.Verify(ev); err != nil {
 			log.WithField("process", "selection").Debugln(err)
@@ -91,17 +76,12 @@ func (s *eventSelector) Process(ev wire.Event) {
 }
 
 func (s *eventSelector) repropagate(ev wire.Event) {
-	buf := new(bytes.Buffer)
-	if err := s.handler.Marshal(buf, ev); err != nil {
+	buf := topics.Score.ToBuffer()
+	if err := s.handler.Marshal(&buf, ev); err != nil {
 		panic(err)
 	}
 
-	msg, err := wire.AddTopic(buf, topics.Score)
-	if err != nil {
-		panic(err)
-	}
-
-	s.publisher.Stream(string(topics.Gossip), msg)
+	s.publisher.Publish(topics.Gossip, &buf)
 }
 
 func (s *eventSelector) publishBestEvent() {
@@ -116,7 +96,7 @@ func (s *eventSelector) publishBestEvent() {
 		}).Warnln("Error in marshalling score")
 		return
 	}
-	s.publisher.Publish(msg.BestScoreTopic, buf)
+	s.publisher.Publish(topics.BestScore, buf)
 	s.state.IncrementStep()
 	s.setBestEvent(nil)
 }

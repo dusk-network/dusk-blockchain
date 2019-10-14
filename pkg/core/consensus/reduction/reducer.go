@@ -9,7 +9,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -17,6 +16,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	log "github.com/sirupsen/logrus"
 )
+
+var emptyHash = [32]byte{}
 
 var empty struct{}
 
@@ -86,15 +87,15 @@ func (r *reducer) inCommittee() bool {
 func (r *reducer) startReduction(hash []byte) {
 	log.Traceln("Starting Reduction")
 	// empty out stop channels
+	r.lock.Lock()
+	defer r.lock.Unlock()
 	r.firstStep.stopChan = make(chan struct{}, 1)
 	r.secondStep.stopChan = make(chan struct{}, 1)
 
-	r.lock.Lock()
 	r.stale = false
-	r.lock.Unlock()
 
 	if r.inCommittee() {
-		r.sendReduction(bytes.NewBuffer(hash))
+		r.sendReduction(hash)
 	}
 
 	go r.begin()
@@ -111,7 +112,7 @@ func (r *reducer) begin() {
 	r.handleSecondResult(events, eventsSecondStep, hash)
 }
 
-func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
+func (r *reducer) handleFirstResult(events []wire.Event) []byte {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
@@ -126,14 +127,14 @@ func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 
 		// If our result was not a zero value hash, we should first verify it
 		// before voting on it again
-		if !bytes.Equal(hash.Bytes(), make([]byte, 32)) {
-			req := rpcbus.NewRequest(*hash, 5)
-			if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req); err != nil {
+		if !bytes.Equal(hash, emptyHash[:]) {
+			req := rpcbus.NewRequest(*(bytes.NewBuffer(hash)))
+			if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req, 5); err != nil {
 				log.WithFields(log.Fields{
 					"process": "reduction",
 					"error":   err,
 				}).Errorln("verifying the candidate block failed")
-				r.sendReduction(bytes.NewBuffer(make([]byte, 32)))
+				r.sendReduction(emptyHash[:])
 				return hash
 			}
 		}
@@ -145,13 +146,17 @@ func (r *reducer) handleFirstResult(events []wire.Event) *bytes.Buffer {
 	return nil
 }
 
-func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash1 *bytes.Buffer) {
+func (r *reducer) finalizeSecondStep() {
+	r.publishRegeneration()
+	r.ctx.state.IncrementStep()
+	r.filter.ResetAccumulator()
+}
+
+func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash1 []byte) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	if !r.stale {
-		defer r.filter.ResetAccumulator()
-		defer r.ctx.state.IncrementStep()
-		defer r.publishRegeneration()
+		defer r.finalizeSecondStep()
 
 		hash2 := r.extractHash(eventsSecondStep)
 		if r.isReductionSuccessful(hash1, hash2) {
@@ -159,7 +164,7 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 			log.WithFields(log.Fields{
 				"process":    "reducer",
 				"votes":      len(allEvents),
-				"block hash": hex.EncodeToString(hash1.Bytes()),
+				"block hash": hex.EncodeToString(hash1),
 			}).Debugln("Reduction successful")
 
 			r.sendResults(allEvents)
@@ -173,33 +178,40 @@ func (r *reducer) handleSecondResult(events, eventsSecondStep []wire.Event, hash
 	}
 }
 
-func (r *reducer) sendReduction(hash *bytes.Buffer) {
+func (r *reducer) GenerateReduction(hash []byte) (*bytes.Buffer, error) {
 	vote := new(bytes.Buffer)
 
 	h := &header.Header{
 		PubKeyBLS: r.ctx.handler.ConsensusKeys.BLSPubKeyBytes,
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
-		BlockHash: hash.Bytes(),
+		BlockHash: hash,
 	}
 
 	if err := header.MarshalSignableVote(vote, h); err != nil {
-		logErr(err, hash.Bytes(), "Error during marshalling of the reducer vote")
-		return
+		return nil, err
 	}
 
 	if err := SignBuffer(vote, r.ctx.handler.ConsensusKeys); err != nil {
-		logErr(err, hash.Bytes(), "Error while signing vote")
-		return
+		return nil, err
 	}
 
-	message, err := wire.AddTopic(vote, topics.Reduction)
+	// we need to prepend the topic AFTER signing the buffer otherwise it'd influence the hashing
+	if err := topics.Prepend(vote, topics.Reduction); err != nil {
+		return nil, err
+	}
+
+	return vote, nil
+}
+
+func (r *reducer) sendReduction(hash []byte) {
+	vote, err := r.GenerateReduction(hash)
 	if err != nil {
-		logErr(err, hash.Bytes(), "Error while adding topic")
+		logErr(err, hash, "Error while generating reducer vote")
 		return
 	}
 
-	r.publisher.Stream(string(topics.Gossip), message)
+	r.publisher.Publish(topics.Gossip, vote)
 }
 
 func (r *reducer) sendResults(events []wire.Event) {
@@ -214,7 +226,7 @@ func (r *reducer) sendResults(events []wire.Event) {
 			return
 		}
 	}
-	r.publisher.Publish(msg.ReductionResultTopic, buf)
+	r.publisher.Publish(topics.ReductionResult, buf)
 }
 
 func logErr(err error, hash []byte, msg string) {
@@ -225,30 +237,28 @@ func logErr(err error, hash []byte, msg string) {
 		}).WithError(err).Errorln(msg)
 }
 
-func (r *reducer) extractHash(events []wire.Event) *bytes.Buffer {
+func (r *reducer) extractHash(events []wire.Event) []byte {
 	if events == nil {
-		return bytes.NewBuffer(make([]byte, 32))
+		return emptyHash[:]
 	}
 
 	hash := new(bytes.Buffer)
 	if err := r.ctx.handler.ExtractIdentifier(events[0], hash); err != nil {
 		panic(err)
 	}
-	return hash
+	return hash.Bytes()
 }
 
 func (r *reducer) publishRegeneration() {
 	roundAndStep := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundAndStep, r.ctx.state.Round())
 	roundAndStep = append(roundAndStep, byte(r.ctx.state.Step()))
-	r.publisher.Publish(msg.BlockRegenerationTopic, bytes.NewBuffer(roundAndStep))
+	r.publisher.Publish(topics.BlockRegeneration, bytes.NewBuffer(roundAndStep))
 }
 
-func (r *reducer) isReductionSuccessful(hash1, hash2 *bytes.Buffer) bool {
-	bothNotNil := !bytes.Equal(hash1.Bytes(), make([]byte, 32)) &&
-		!bytes.Equal(hash2.Bytes(), make([]byte, 32))
-	identicalResults := bytes.Equal(hash1.Bytes(), hash2.Bytes())
-	return bothNotNil && identicalResults
+func (r *reducer) isReductionSuccessful(hash1, hash2 []byte) bool {
+	bothNotNil := !bytes.Equal(hash1, emptyHash[:]) && !bytes.Equal(hash2, emptyHash[:])
+	return bothNotNil && bytes.Equal(hash1, hash2)
 }
 
 func (r *reducer) end() {

@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -34,6 +35,7 @@ const (
 // Mempool is a storage for the chain transactions that are valid according to the
 // current chain state and can be included in the next block.
 type Mempool struct {
+	getMempoolTxsChan <-chan rpcbus.Request
 
 	// transactions emitted by RPC and Peer subsystems
 	// pending to be verified before adding them to verified pool
@@ -43,7 +45,7 @@ type Mempool struct {
 	verified Pool
 
 	// the collector to listen for new accepted blocks
-	accepted Collector
+	acceptedBlockChan <-chan block.Block
 
 	// used by tx verification procedure
 	latestBlockTimestamp int64
@@ -58,7 +60,6 @@ type Mempool struct {
 
 // checkTx is responsible to determine if a tx is valid or not
 func (m *Mempool) checkTx(tx transactions.Transaction) error {
-
 	// check if external verifyTx is provided
 	if m.verifyTx != nil {
 		return m.verifyTx(tx)
@@ -74,31 +75,22 @@ func (m *Mempool) checkTx(tx transactions.Transaction) error {
 	return verifiers.CheckTx(m.db, 0, approxBlockTime, tx)
 }
 
-// Collector implements the wire.EventCollector interface
-type Collector struct {
-	blockChan chan block.Block
-}
-
-// Collect as specified by the wire.EventCollector interface
-func (c *Collector) Collect(msg *bytes.Buffer) error {
-	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(msg, b); err != nil {
-		return err
-	}
-
-	c.blockChan <- *b
-	return nil
-}
-
 // NewMempool instantiates and initializes node mempool
-func NewMempool(eventBus *eventbus.EventBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
+func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx func(tx transactions.Transaction) error) *Mempool {
 
 	log.Infof("create new instance")
+
+	getMempoolTxsChan := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetMempoolTxs, getMempoolTxsChan)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	m := &Mempool{
 		eventBus:             eventBus,
 		latestBlockTimestamp: math.MinInt32,
-		quitChan:             make(chan struct{})}
+		quitChan:             make(chan struct{}),
+		acceptedBlockChan:    acceptedBlockChan,
+		getMempoolTxsChan:    getMempoolTxsChan,
+	}
 
 	if verifyTx != nil {
 		m.verifyTx = verifyTx
@@ -110,11 +102,7 @@ func NewMempool(eventBus *eventbus.EventBus, verifyTx func(tx transactions.Trans
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, maxPendingLen)
-	go eventbus.NewTopicListener(m.eventBus, m, string(topics.Tx)).Accept()
-
-	// topics.AcceptedBlock will be published by Chain subsystem when new block is accepted into blockchain
-	m.accepted.blockChan = make(chan block.Block)
-	go eventbus.NewTopicListener(m.eventBus, &m.accepted, string(topics.AcceptedBlock)).Accept()
+	eventbus.NewTopicListener(m.eventBus, m, topics.Tx, eventbus.ChannelType)
 
 	return m
 }
@@ -129,10 +117,10 @@ func (m *Mempool) Run() {
 	go func() {
 		for {
 			select {
-			case r := <-rpcbus.GetMempoolTxsChan:
+			case r := <-m.getMempoolTxsChan:
 				m.onGetMempoolTxs(r)
 			// Mempool input channels
-			case b := <-m.accepted.blockChan:
+			case b := <-m.acceptedBlockChan:
 				m.onAcceptedBlock(b)
 			case tx := <-m.pending:
 				m.onPendingTx(tx)
@@ -313,7 +301,7 @@ func (m *Mempool) newPool() Pool {
 // Collect process the emitted transactions.
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
-func (m *Mempool) Collect(message *bytes.Buffer) error {
+func (m *Mempool) Collect(message bytes.Buffer) error {
 
 	tx, err := marshalling.UnmarshalTx(message)
 	if err != nil {
@@ -327,7 +315,7 @@ func (m *Mempool) Collect(message *bytes.Buffer) error {
 
 // onGetMempoolTxs retrieves current state of the mempool of the verified but
 // still unaccepted txs
-func (m Mempool) onGetMempoolTxs(r rpcbus.Req) {
+func (m Mempool) onGetMempoolTxs(r rpcbus.Request) {
 
 	// Read inputs
 	filterTxID := r.Params.Bytes()
@@ -355,7 +343,7 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Req) {
 	})
 
 	if err != nil {
-		r.ErrChan <- err
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}
 
@@ -363,18 +351,18 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Req) {
 	w := new(bytes.Buffer)
 	lTxs := uint64(len(outputTxs))
 	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		r.ErrChan <- err
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}
 
 	for _, tx := range outputTxs {
 		if err := marshalling.MarshalTx(w, tx); err != nil {
-			r.ErrChan <- err
+			r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 			return
 		}
 	}
 
-	r.RespChan <- *w
+	r.RespChan <- rpcbus.Response{*w, nil}
 }
 
 // checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes
@@ -402,17 +390,17 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	msg := &peermsg.Inv{}
 	msg.AddItem(peermsg.InvTypeMempoolTx, txID)
 
+	// TODO: can we simply encode the message directly on a topic carrying buffer?
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
 		panic(err)
 	}
 
-	withTopic, err := wire.AddTopic(buf, topics.Inv)
-	if err != nil {
+	if err := topics.Prepend(buf, topics.Inv); err != nil {
 		return err
 	}
 
-	m.eventBus.Stream(string(topics.Gossip), withTopic)
+	m.eventBus.Publish(topics.Gossip, buf)
 	return nil
 }
 

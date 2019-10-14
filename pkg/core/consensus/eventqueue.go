@@ -64,8 +64,8 @@ func (eq *EventQueue) Clear(round uint64) {
 func (eq *EventQueue) Flush(round uint64) []wire.Event {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
-	events := make([]wire.Event, 0)
 	if eq.entries[round] != nil {
+		events := make([]wire.Event, 0)
 		for step, evs := range eq.entries[round] {
 			events = append(events, evs...)
 			eq.entries[round][step] = nil

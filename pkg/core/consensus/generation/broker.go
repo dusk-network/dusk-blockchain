@@ -5,11 +5,9 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -22,9 +20,7 @@ import (
 
 // Launch will start the processes for score/block generation.
 func Launch(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar, keys key.ConsensusKeys, publicKey *key.PublicKey, gen Generator, blockGen BlockGenerator, db database.DB) error {
-	m := zkproof.CalculateM(k)
-	d := getD(m, eventBus, db)
-	broker, err := newBroker(eventBus, rpcBus, d, k, m, gen, blockGen, keys, publicKey)
+	broker, err := newBroker(eventBus, rpcBus, k, gen, blockGen, keys, publicKey)
 	if err != nil {
 		return err
 	}
@@ -43,16 +39,14 @@ type broker struct {
 	certificateGenerator *certificateGenerator
 
 	// subscriber channels
-	regenerationChan     <-chan consensus.AsyncState
 	winningBlockHashChan <-chan []byte
-	roundChan            <-chan consensus.RoundUpdate
 }
 
-func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristretto.Scalar,
+func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, k ristretto.Scalar,
 	gen Generator, blockGen BlockGenerator, keys key.ConsensusKeys, publicKey *key.PublicKey) (*broker, error) {
 	if gen == nil {
 		var err error
-		gen, err = newProofGenerator(d, k, m)
+		gen, err = newProofGenerator(k)
 		if err != nil {
 			return nil, err
 		}
@@ -63,17 +57,17 @@ func newBroker(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, d, k, m ristr
 	}
 
 	certGenerator := &certificateGenerator{}
-	eventBroker.SubscribeCallback(msg.AgreementEventTopic, certGenerator.setAgreementEvent)
+	cbListener := eventbus.NewCallbackListener(certGenerator.setAgreementEvent)
+	eventBroker.Subscribe(topics.AgreementEvent, cbListener)
 
+	m := zkproof.CalculateM(k)
 	b := &broker{
 		k:                    k,
 		m:                    m,
 		eventBroker:          eventBroker,
 		blockGen:             blockGen,
 		certificateGenerator: certGenerator,
-		regenerationChan:     consensus.InitBlockRegenerationCollector(eventBroker),
 		winningBlockHashChan: initWinningHashCollector(eventBroker),
-		roundChan:            consensus.InitRoundUpdate(eventBroker),
 	}
 	return b, nil
 }
@@ -106,8 +100,8 @@ func (b *broker) Generate(roundUpdate consensus.RoundUpdate) {
 
 	marshalledEvent := b.marshalScore(sev)
 	marshalledBlock := b.marshalBlock(blk)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledEvent)
-	b.eventBroker.Stream(string(topics.Gossip), marshalledBlock)
+	b.eventBroker.Publish(topics.Gossip, marshalledEvent)
+	b.eventBroker.Publish(topics.Gossip, marshalledBlock)
 }
 
 func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) error {
@@ -120,7 +114,7 @@ func (b *broker) sendCertificateMsg(cert *block.Certificate, blockHash []byte) e
 		return err
 	}
 
-	b.eventBroker.Publish(string(topics.Certificate), buf)
+	b.eventBroker.Publish(topics.Certificate, buf)
 	return nil
 }
 
@@ -136,14 +130,15 @@ func (b *broker) marshalScore(sev selection.ScoreEvent) *bytes.Buffer {
 		panic(err)
 	}
 
+	// XXX: uh? the buffer is locally defined. Why do we propagate a copy of it?
 	copy := *buffer
-	b.eventBroker.Publish(string(topics.Score), &copy)
-	message, err := wire.AddTopic(buffer, topics.Score)
-	if err != nil {
+	b.eventBroker.Publish(topics.Score, &copy)
+
+	if err := topics.Prepend(buffer, topics.Score); err != nil {
 		panic(err)
 	}
 
-	return message
+	return buffer
 }
 
 func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
@@ -152,12 +147,12 @@ func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
 		panic(err)
 	}
 
+	// XXX: uh? the buffer is locally defined. Why do we propagate a copy of it?
 	copy := *buffer
-	b.eventBroker.Publish(string(topics.Candidate), &copy)
-	message, err := wire.AddTopic(buffer, topics.Candidate)
-	if err != nil {
+	b.eventBroker.Publish(topics.Candidate, &copy)
+	if err := topics.Prepend(buffer, topics.Candidate); err != nil {
 		panic(err)
 	}
 
-	return message
+	return buffer
 }

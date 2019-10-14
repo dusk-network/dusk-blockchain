@@ -170,14 +170,9 @@ func (n *Network) SendWireMsg(nodeIndex uint, msg []byte, writeTimeout int) erro
 
 func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
 	// Write magic
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint32LE(buf, uint32(magic)); err != nil {
-		return nil, err
-	}
-
+	buf := magic.ToBuffer()
 	// Write topic
-	topicBytes := topics.TopicToByteArray(cmd)
-	if _, err := buf.Write(topicBytes[:]); err != nil {
+	if err := topics.Write(&buf, cmd); err != nil {
 		return nil, err
 	}
 
@@ -187,7 +182,7 @@ func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.B
 	}
 
 	// Build frame
-	frame, err := WriteFrame(buf)
+	frame, err := WriteFrame(&buf)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +190,7 @@ func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.B
 	return frame.Bytes(), nil
 }
 
+// TODO: remove *bytes.Buffer from the returned parameters
 func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
 	msg := new(bytes.Buffer)

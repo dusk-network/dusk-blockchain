@@ -61,11 +61,7 @@ func TestVoteSetUnMarshal(t *testing.T) {
 }
 
 func TestBlsSign(t *testing.T) {
-	k, _ := key.NewRandConsensusKeys()
-	red := reduction.New()
-	red.Round = uint64(1)
-	red.Step = uint8(2)
-	red.BlockHash, _ = crypto.RandEntropy(32)
+	red, k := newBasicReduction()
 	red.PubKeyBLS = k.BLSPubKeyBytes
 
 	assert.NoError(t, reduction.BlsSign(red, k))
@@ -76,11 +72,7 @@ func TestBlsSign(t *testing.T) {
 }
 
 func TestSign(t *testing.T) {
-	k, _ := key.NewRandConsensusKeys()
-	red := reduction.New()
-	red.Round = uint64(1)
-	red.Step = uint8(2)
-	red.BlockHash, _ = crypto.RandEntropy(32)
+	red, k := newBasicReduction()
 	red.PubKeyBLS = k.BLSPubKeyBytes
 	signed, err := reduction.Sign(red, k)
 	assert.NoError(t, err)
@@ -98,11 +90,7 @@ func TestSign(t *testing.T) {
 }
 
 func TestSignBuffer(t *testing.T) {
-	k, _ := key.NewRandConsensusKeys()
-	red := reduction.New()
-	red.Round = uint64(1)
-	red.Step = uint8(2)
-	red.BlockHash, _ = crypto.RandEntropy(32)
+	red, k := newBasicReduction()
 
 	b := new(bytes.Buffer)
 	assert.NoError(t, header.MarshalSignableVote(b, red.Header))
@@ -130,4 +118,13 @@ func newReductionEvent(round uint64, step uint8) *reduction.Reduction {
 	k, _ := key.NewRandConsensusKeys()
 	blockHash, _ := crypto.RandEntropy(32)
 	return reduction.MockReduction(k, blockHash, round, step)
+}
+
+func newBasicReduction() (*reduction.Reduction, key.ConsensusKeys) {
+	k, _ := key.NewRandConsensusKeys()
+	red := reduction.New()
+	red.Round = uint64(1)
+	red.Step = uint8(2)
+	red.BlockHash, _ = crypto.RandEntropy(32)
+	return red, k
 }
