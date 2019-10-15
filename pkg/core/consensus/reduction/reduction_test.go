@@ -38,7 +38,7 @@ func TestStress(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
 
 	// Do 10 reduction cycles in a row
-	for i := 0; i < 10; i++ {
+	for i := 1; i <= 10; i++ {
 		go launchCandidateVerifier(rpcBus, false)
 		go func() {
 			// Blast the reducer with many more events than quorum, to see if anything will sneak in
