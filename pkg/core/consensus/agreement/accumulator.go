@@ -1,14 +1,13 @@
 package agreement
 
 import (
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
 
 // Accumulator is an event accumulator, that will accumulate events until it
 // reaches a certain threshold.
 type Accumulator struct {
-	handler            *handler
+	handler            Handler
 	verificationChan   chan Agreement
 	eventChan          chan Agreement
 	CollectedVotesChan chan []Agreement
@@ -16,7 +15,7 @@ type Accumulator struct {
 }
 
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
-func newAccumulator(handler *handler) *Accumulator {
+func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 	// set up worker pool
 	eventChan := make(chan Agreement, 100)
 	verificationChan := make(chan Agreement, 100)
@@ -30,7 +29,7 @@ func newAccumulator(handler *handler) *Accumulator {
 		store:              newStore(),
 	}
 
-	a.CreateWorkers()
+	a.CreateWorkers(workerAmount)
 	return a
 }
 
@@ -48,7 +47,7 @@ func (a *Accumulator) Accumulate() {
 		}
 
 		hash := string(ev.Header.BlockHash)
-		count := a.store.Insert(hash, ev)
+		count := a.store.Insert(ev, hash)
 		if count >= a.handler.Quorum() {
 			votes := a.store.Get(hash)
 			a.CollectedVotesChan <- votes
@@ -57,8 +56,7 @@ func (a *Accumulator) Accumulate() {
 	}
 }
 
-func (a *Accumulator) CreateWorkers() {
-	amount := cfg.Get().Performance.AccumulatorWorkers
+func (a *Accumulator) CreateWorkers(amount int) {
 	if amount == 0 {
 		amount = 4
 	}

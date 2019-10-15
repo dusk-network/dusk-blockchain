@@ -14,6 +14,15 @@ import (
 
 const MaxCommitteeSize = 64
 
+// Handler interface is handy for tests
+type Handler interface {
+	AmMember(uint64, uint8) bool
+	IsMember([]byte, uint64, uint8) bool
+	Committee(uint64, uint8) user.VotingCommittee
+	Quorum() int
+	Verify(Agreement) error
+}
+
 type handler struct {
 	*committee.Handler
 }

@@ -1,26 +1,22 @@
-package agreement_test
+package agreement
 
 import (
-	"bytes"
-	"reflect"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/stretchr/testify/require"
 )
 
-type MockEvent struct{ field string }
-
-func (me *MockEvent) Equal(ev wire.Event) bool       { return reflect.DeepEqual(me, ev) }
-func (me MockEvent) Unmarshal(b *bytes.Buffer) error { return nil }
-func (me MockEvent) Sender() []byte                  { return nil }
+func mockAgreement(id string) Agreement {
+	return Agreement{
+		SignedVotes: []byte(id),
+	}
+}
 
 func TestStore(t *testing.T) {
-	sec := consensus.NewAccumulatorStore()
-	ev1 := &MockEvent{"one"}
-	ev2 := &MockEvent{"two"}
-	ev3 := &MockEvent{"one"}
+	sec := newStore()
+	ev1 := mockAgreement("one")
+	ev2 := mockAgreement("two")
+	ev3 := mockAgreement("one")
 
 	require.Equal(t, 1, sec.Insert(ev1, "1"))
 	require.Equal(t, 1, sec.Insert(ev1, "1"))
@@ -30,10 +26,10 @@ func TestStore(t *testing.T) {
 }
 
 func TestClear(t *testing.T) {
-	sec := consensus.NewAccumulatorStore()
-	ev1 := &MockEvent{"one"}
-	ev2 := &MockEvent{"two"}
-	ev3 := &MockEvent{"three"}
+	sec := newStore()
+	ev1 := mockAgreement("one")
+	ev2 := mockAgreement("two")
+	ev3 := mockAgreement("three")
 
 	stepOne := "1"
 	sec.Insert(ev1, stepOne)
@@ -53,11 +49,11 @@ func TestClear(t *testing.T) {
 }
 
 func TestContains(t *testing.T) {
-	sec := consensus.NewAccumulatorStore()
-	ev1 := &MockEvent{"one"}
-	ev2 := &MockEvent{"two"}
-	ev3 := &MockEvent{"three"}
-	ev4 := &MockEvent{"one"}
+	sec := newStore()
+	ev1 := mockAgreement("one")
+	ev2 := mockAgreement("two")
+	ev3 := mockAgreement("three")
+	ev4 := mockAgreement("one")
 
 	stepOne := "1"
 	sec.Insert(ev1, stepOne)
@@ -70,10 +66,10 @@ func TestContains(t *testing.T) {
 }
 
 func TestSECOperations(t *testing.T) {
-	sec := consensus.NewAccumulatorStore()
-	ev1 := &MockEvent{"one"}
-	ev2 := &MockEvent{"two"}
-	ev3 := &MockEvent{"one"}
+	sec := newStore()
+	ev1 := mockAgreement("one")
+	ev2 := mockAgreement("two")
+	ev3 := mockAgreement("one")
 
 	// checking if the length of the array of step is consistent
 	require.Equal(t, 1, sec.Insert(ev1, "1"))

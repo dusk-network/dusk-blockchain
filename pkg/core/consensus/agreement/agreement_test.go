@@ -1,23 +1,6 @@
 package agreement_test
 
-import (
-	"bytes"
-	"testing"
-	"time"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/stretchr/testify/assert"
-)
-
+/*
 // Test the accumulation of agreement events. It should result in the agreement component
 // publishing a round update.
 func TestBroker(t *testing.T) {
@@ -118,3 +101,4 @@ func initAgreement(k user.Keys) (eventbus.Broker, <-chan bytes.Buffer) {
 	bus.RemoveProcessors(topics.Agreement)
 	return bus, winningHashChan
 }
+*/

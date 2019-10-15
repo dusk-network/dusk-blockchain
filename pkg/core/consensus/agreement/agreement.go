@@ -13,30 +13,26 @@ import (
 
 var _ consensus.Component = (*agreement)(nil)
 
-// Launch is a helper to minimize the wiring of TopicListeners, collector and
-// channels. The agreement component notarizes the new blocks after having
-// collected a quorum of votes
-func newComponent(publisher eventbus.Publisher, keys user.Keys) *agreement {
-	return newAgreement(publisher, keys)
-}
-
 type agreement struct {
-	publisher   eventbus.Publisher
-	handler     *handler
-	accumulator *Accumulator
-	keys        user.Keys
+	publisher    eventbus.Publisher
+	handler      *handler
+	accumulator  *Accumulator
+	keys         user.Keys
+	workerAmount int
 }
 
-func newAgreement(publisher eventbus.Publisher, keys user.Keys) *agreement {
+// newComponent is used by the agreement factory to instantiate the component
+func newComponent(publisher eventbus.Publisher, keys user.Keys, workerAmount int) *agreement {
 	return &agreement{
-		publisher: publisher,
-		keys:      keys,
+		publisher:    publisher,
+		keys:         keys,
+		workerAmount: workerAmount,
 	}
 }
 
 func (a *agreement) Initialize(store consensus.Store, r consensus.RoundUpdate) []consensus.Subscriber {
 	a.handler = newHandler(a.keys, r.P)
-	a.accumulator = newAccumulator(a.handler)
+	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	agreementSubscriber := consensus.Subscriber{
 		consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter),
 		topics.Agreement,

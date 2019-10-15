@@ -1,6 +1,9 @@
 package agreement
 
-import "sync"
+import (
+	"bytes"
+	"sync"
+)
 
 type store struct {
 	sync.RWMutex
@@ -14,7 +17,7 @@ func newStore() *store {
 }
 
 // Put collects the Agreement and returns the number of agreement stored for a blockhash
-func (s *store) Insert(blockHash string, a Agreement) int {
+func (s *store) Insert(a Agreement, blockHash string) int {
 	s.Lock()
 	defer s.Unlock()
 
@@ -34,4 +37,23 @@ func (s *store) Get(hash string) []Agreement {
 	s.RLock()
 	defer s.RUnlock()
 	return s.collected[hash]
+}
+
+func (s *store) Contains(a Agreement, blockHash string) bool {
+	s.RLock()
+	defer s.RUnlock()
+	for _, aggro := range s.collected[blockHash] {
+		if bytes.Equal(aggro.SignedVotes, a.SignedVotes) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *store) Clear() {
+	s.Lock()
+	defer s.Unlock()
+	for k := range s.collected {
+		delete(s.collected, k)
+	}
 }

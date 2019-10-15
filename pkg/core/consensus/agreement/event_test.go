@@ -41,7 +41,7 @@ func TestStepVotes(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 
-	assert.NoError(t, MarshalStepVotes(buf, expectedStepVotes))
+	assert.NoError(t, MarshalStepVotes(buf, *expectedStepVotes))
 
 	result, err := UnmarshalStepVotes(buf)
 	assert.NoError(t, err)
