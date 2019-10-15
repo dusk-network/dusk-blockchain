@@ -84,6 +84,7 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
 			dataRequestor:   dataRequestor,
 			dataBroker:      processing.NewDataBroker(db, rpcBus, responseChan),
+			ponger:          processing.NewPonger(responseChan),
 			peerInfo:        conn.RemoteAddr().String(),
 		},
 	}
@@ -149,6 +150,9 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 	// Single-consumer pushes messages to the socket
 	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(w.Connection))
 
+	// Ping loop - ensures connection stays alive during quiet periods
+	go w.pingLoop()
+
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
 	w.writeLoop(writeQueueChan, exitChan)
@@ -158,6 +162,38 @@ func (w *Writer) onDisconnect() {
 	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
 	w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
+}
+
+func (w *Writer) pingLoop() {
+	// We ping every 30 seconds to keep the connection alive
+	ticker := time.NewTicker(30 * time.Second)
+
+	for {
+		<-ticker.C
+		if err := w.ping(); err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error pinging peer")
+			// Clean up ticker
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+func (w *Writer) ping() error {
+	buf := new(bytes.Buffer)
+	if err := topics.Prepend(buf, topics.Ping); err != nil {
+		return err
+	}
+
+	if err := w.Connection.gossip.Process(buf); err != nil {
+		return err
+	}
+
+	_, err := w.Connection.Write(buf)
+	return err
 }
 
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
