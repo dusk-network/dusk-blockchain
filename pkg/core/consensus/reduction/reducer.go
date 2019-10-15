@@ -23,7 +23,6 @@ var emptyHash = [32]byte{}
 type reducer struct {
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus
-	signer    *consensus.Signer
 	keys      user.Keys
 	store     consensus.Store
 

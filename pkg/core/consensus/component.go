@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -56,11 +55,6 @@ func (cb *FilteringListener) NotifyPayload(ev Event) error {
 		return nil
 	}
 	return cb.SimpleListener.NotifyPayload(ev)
-}
-
-type Signer struct {
-	keys      user.Keys
-	consensus *Consensus
 }
 
 type Subscriber struct {
