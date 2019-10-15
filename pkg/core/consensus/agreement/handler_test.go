@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/key"
@@ -24,7 +23,7 @@ func TestVoteVerification(t *testing.T) {
 }
 
 func TestSignEd25519(t *testing.T) {
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 	p, keys := consensus.MockProvisioners(50)
 	hash, _ := crypto.RandEntropy(32)
 	buf := MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 50))

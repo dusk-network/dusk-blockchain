@@ -147,7 +147,7 @@ func (c *Chain) LaunchConsensus() {
 
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := topics.Block.ToBuffer()
-	if err := marshalling.MarshalBlock(buffer, &blk); err != nil {
+	if err := marshalling.MarshalBlock(&buffer, &blk); err != nil {
 		return err
 	}
 
@@ -178,7 +178,7 @@ func (c *Chain) Close() error {
 
 func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(m, blk); err != nil {
+	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
 		return err
 	}
 

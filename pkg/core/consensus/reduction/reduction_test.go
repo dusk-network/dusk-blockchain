@@ -9,7 +9,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -226,9 +225,9 @@ func launchCandidateVerifier(rpcBus *rpcbus.RPCBus, failVerification bool) {
 	}
 }
 
-func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer, key.ConsensusKeys, []user.Keys) {
+func launchReductionTest(inCommittee bool, amount int) (*eventbus.EventBus, *rpcbus.RPCBus, *eventbus.GossipStreamer, key.ConsensusKeys, []key.ConsensusKeys) {
 	eb, streamer := eventbus.CreateGossipStreamer()
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 	rpcBus := rpcbus.New()
 	launchReduction(eb, k, timeOut, rpcBus)
 	// update round

@@ -7,9 +7,9 @@ import (
 	"os"
 	"strconv"
 
-	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/wallet"
 )
 
 // commandLineProcessor interprets the CLI commands
@@ -77,9 +77,9 @@ func (c *commandLineProcessor) balanceCMD() {
 	}
 
 	// unlocked balance is the amount of outputs currently available to spend
-	unlockedBalance := float64(walletBalance) / float64(cfg.DUSK)
+	unlockedBalance := float64(walletBalance) / float64(wallet.DUSK)
 	// overall balance is sum of the unlockedBalance plus pending to be received
-	overallBalance := float64(walletBalance+mempoolBalance) / float64(cfg.DUSK)
+	overallBalance := float64(walletBalance+mempoolBalance) / float64(wallet.DUSK)
 
 	fmt.Fprintf(os.Stdout, "Balance %.8f, Unlocked Balance %.8f\n", overallBalance, unlockedBalance)
 }
@@ -170,7 +170,7 @@ func parseAmountValue(value string) (uint64, error) {
 	}
 
 	// convert to DUSK atomic units
-	amountInUnits := amountInDusk * float64(cfg.DUSK)
+	amountInUnits := amountInDusk * float64(wallet.DUSK)
 	return uint64(amountInUnits), nil
 }
 

@@ -28,7 +28,7 @@ type (
 	}
 )
 
-func initBroker(eventBroker eventbus.Broker, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
+func initBroker(eventBroker eventbus.Broker, keys key.ConsensusKeys, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
 	handler := newReductionHandler(keys)
 	return newBroker(eventBroker, handler, timeout, rpcBus)
 }

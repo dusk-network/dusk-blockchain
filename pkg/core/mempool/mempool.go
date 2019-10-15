@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -303,7 +302,7 @@ func (m *Mempool) newPool() Pool {
 // NB This is always run in a different than main mempool routine
 func (m *Mempool) Collect(message bytes.Buffer) error {
 
-	tx, err := marshalling.UnmarshalTx(message)
+	tx, err := marshalling.UnmarshalTx(&message)
 	if err != nil {
 		return err
 	}

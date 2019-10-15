@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -121,7 +120,7 @@ func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, 
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it
 func (c *acceptedBlockCollector) Collect(r bytes.Buffer) error {
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(r, b); err != nil {
+	if err := marshalling.UnmarshalBlock(&r, b); err != nil {
 		return err
 	}
 

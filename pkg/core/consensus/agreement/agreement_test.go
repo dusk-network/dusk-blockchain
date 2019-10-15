@@ -104,7 +104,7 @@ func TestSendAgreement(t *testing.T) {
 }
 
 // Launch the agreement component, and consume the initial round update that gets emitted.
-func initAgreement(k key.ConsensusKeys) (eventbus.Broker, <-chan *bytes.Buffer) {
+func initAgreement(k key.ConsensusKeys) (eventbus.Broker, <-chan bytes.Buffer) {
 	bus := eventbus.New()
 	winningHashChan := make(chan bytes.Buffer, 1)
 	chanListener := eventbus.NewChanListener(winningHashChan)

@@ -19,9 +19,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet"
-	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
@@ -140,7 +140,7 @@ func receiveTxs(t *testing.T, txChan chan bytes.Buffer) []transactions.Transacti
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		txBuf := <-txChan
-		tx, err := marshalling.UnmarshalTx(txBuf)
+		tx, err := marshalling.UnmarshalTx(&txBuf)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
 	}
