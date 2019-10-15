@@ -130,15 +130,18 @@ func TestPingLoop(t *testing.T) {
 	responseChan2 := make(chan *bytes.Buffer, 10)
 	writer2 := peer.NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
 	go writer2.Serve(responseChan2, make(chan struct{}, 1))
+	// Give the goroutine some time to start
+	time.Sleep(100 * time.Millisecond)
 
 	reader, err := peer.NewReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan2, make(chan struct{}, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
 	go reader.ReadLoop()
+	// Read the `mempool` message
+	<-responseChan2
 
 	// We should eventually get a pong message out of responseChan2
-
 	buf := <-responseChan2
 	topic, err := topics.Extract(buf)
 	if err != nil {
