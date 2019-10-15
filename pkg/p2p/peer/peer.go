@@ -192,7 +192,7 @@ func (w *Writer) ping() error {
 		return err
 	}
 
-	_, err := w.Connection.Write(buf)
+	_, err := w.Connection.Write(buf.Bytes())
 	return err
 }
 
