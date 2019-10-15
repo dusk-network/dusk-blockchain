@@ -5,13 +5,13 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 type Store interface {
 	RequestStepUpdate()
+	RequestSignature([]byte) ([]byte, error)
+	WriteHeader([]byte, *bytes.Buffer) error
 }
 
 // ComponentFactory holds the data to create a Component (i.e. Signer, EventPublisher, RPCBus). Its responsibility is to recreate it on demand
@@ -63,30 +63,7 @@ type Signer struct {
 	consensus *Consensus
 }
 
-func (s *Signer) BLSSign(payload []byte) ([]byte, error) {
-	round, step := s.consensus.Round(), s.consensus.Step()
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, round); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint8(buf, step); err != nil {
-		return nil, err
-	}
-
-	if _, err := buf.Write(payload); err != nil {
-		return nil, err
-	}
-
-	signedHash, err := bls.Sign(s.keys.BLSSecretKey, s.keys.BLSPubKey, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	return signedHash.Compress(), nil
-}
-
 type Subscriber struct {
 	Listener
-	topic topics.Topic
+	Topic topics.Topic
 }

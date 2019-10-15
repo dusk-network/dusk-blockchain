@@ -147,7 +147,6 @@ func (b *broker) marshalBlock(blk block.Block) *bytes.Buffer {
 		panic(err)
 	}
 
-	// XXX: uh? the buffer is locally defined. Why do we propagate a copy of it?
 	copy := *buffer
 	b.eventBroker.Publish(topics.Candidate, &copy)
 	if err := topics.Prepend(buffer, topics.Candidate); err != nil {

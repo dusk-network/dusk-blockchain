@@ -3,6 +3,7 @@ package factory
 import (
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
@@ -18,7 +19,7 @@ import (
 // consensus. It should also contain all the relevant information for the
 // processes it intends to start up.
 type ConsensusFactory struct {
-	eventBus eventbus.Broker
+	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 
 	user.Keys
@@ -26,7 +27,7 @@ type ConsensusFactory struct {
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, timerLength time.Duration,
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration,
 	keys user.Keys) *ConsensusFactory {
 
 	return &ConsensusFactory{
@@ -41,8 +42,10 @@ func New(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, timerLength time.Durat
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
-	selection.Launch(c.eventBus, nil, c.timerLength)
-	reduction.Launch(c.eventBus, c.Keys, c.timerLength, c.rpcBus)
-	agreement.Launch(c.eventBus, c.Keys)
+	sel := selection.NewFactory(c.eventBus, c.timerLength)
+	red := reduction.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
+	agr := agreement.NewFactory(c.eventBus, c.Keys)
+
+	consensus.Start(c.eventBus, c.Keys, sel, red, agr)
 	log.WithField("process", "factory").Info("Consensus Started")
 }

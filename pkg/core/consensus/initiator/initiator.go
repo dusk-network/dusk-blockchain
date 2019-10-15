@@ -26,7 +26,7 @@ import (
 
 var l = log.WithField("process", "consensus initiator")
 
-func LaunchConsensus(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
+func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// TODO: sync first
 	startBlockGenerator(eventBroker, rpcBus, w)
 	startProvisioner(eventBroker, rpcBus, w, counter)
@@ -35,7 +35,7 @@ func LaunchConsensus(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wall
 	}
 }
 
-func startProvisioner(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
+func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// Setting up the consensus factory
 	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, w.ConsensusKeys())
 	f.StartConsensus()

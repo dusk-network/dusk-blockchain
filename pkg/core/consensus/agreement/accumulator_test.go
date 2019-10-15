@@ -9,9 +9,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/mocks"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -101,19 +99,6 @@ func newMockHandlerAccumulator(round uint64, step uint8, verifyErr error, sender
 	isMember bool) consensus.AccumulatorHandler {
 	mockEventHandler := &mocks.EventHandler{}
 	mockEventHandler.On("Deserialize", mock.Anything).Return(newMockEvent(), nil)
-	mockEventHandler.On("ExtractHeader",
-		mock.MatchedBy(func(ev wire.Event) bool {
-			if len(sender) == 0 {
-				sender, _ = crypto.RandEntropy(32)
-			}
-			return true
-		})).Return(func(e wire.Event) *header.Header {
-		return &header.Header{
-			Round:     round,
-			Step:      step,
-			PubKeyBLS: sender,
-		}
-	})
 	mockEventHandler.On("Verify", mock.Anything).Return(verifyErr)
 	mockEventHandler.On("NewEvent").Return(newMockEvent())
 	mockEventHandler.On("Unmarshal", mock.Anything, mock.Anything).Return(nil)

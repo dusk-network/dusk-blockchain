@@ -69,3 +69,9 @@ func (b *Handler) CommitteeSize(maxSize int) int {
 
 	return size
 }
+
+func (b *Handler) membersAt(idx uint8) int {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+	return b.Committees[idx].Set.Len()
+}

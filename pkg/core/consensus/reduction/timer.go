@@ -17,5 +17,5 @@ func (t *timer) stop() {
 
 func (t *timer) trigger() {
 	t.r.resetStepVotes()
-	t.r.requestStepUpdate()
+	t.r.store.RequestStepUpdate()
 }

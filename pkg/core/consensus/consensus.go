@@ -6,10 +6,13 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-crypto/bls"
 )
+
+var _ Store = (*roundStore)(nil)
 
 type roundStore struct {
 	subscribers map[topics.Topic][]Listener
@@ -27,6 +30,25 @@ func newStore(c *Consensus) *roundStore {
 	return s
 }
 
+// WriteHeader writes the header to a payload before publishing the event
+func (s *roundStore) WriteHeader(blockHash []byte, payload *bytes.Buffer) error {
+	hBuf, err := s.consensus.header(blockHash)
+	if err != nil {
+		return err
+	}
+
+	if _, err := hBuf.ReadFrom(payload); err != nil {
+		return err
+	}
+
+	*payload = hBuf
+	return nil
+}
+
+func (s *roundStore) RequestSignature(payload []byte) ([]byte, error) {
+	return s.consensus.sign(payload)
+}
+
 func (s *roundStore) RequestStepUpdate() {
 	s.consensus.requestStepUpdate()
 }
@@ -34,7 +56,7 @@ func (s *roundStore) RequestStepUpdate() {
 func (s *roundStore) addComponent(component Component, round RoundUpdate) []Subscriber {
 	subs := component.Initialize(s, round)
 	for _, sub := range subs {
-		s.subscribe(sub.topic, sub)
+		s.subscribe(sub.Topic, sub)
 	}
 	s.components = append(s.components, component)
 	return subs
@@ -75,38 +97,49 @@ func (s *roundStore) DispatchFinalize() {
 type Consensus struct {
 	*SyncState
 	eventBus   *eventbus.EventBus
-	rpcBus     *rpcbus.RPCBus
 	keys       user.Keys
 	factories  []ComponentFactory
 	components []Component
 	eventqueue *Queue
 
-	lock  sync.RWMutex
-	store *roundStore
+	pubkeyBuf bytes.Buffer
+
+	lock     sync.RWMutex
+	store    *roundStore
+	unsynced bool
 }
 
-// New creates a new Consensus
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys user.Keys, factories []ComponentFactory) *Consensus {
+// Start the consensus by wiring the listener to the RoundUpdate
+func Start(eventBus *eventbus.EventBus, keys user.Keys, factories ...ComponentFactory) *Consensus {
+	pkBuf := new(bytes.Buffer)
+
+	if err := encoding.WriteVarBytes(pkBuf, keys.BLSPubKeyBytes); err != nil {
+		panic(err)
+	}
+
 	c := &Consensus{
 		SyncState:  NewState(),
 		eventBus:   eventBus,
-		rpcBus:     rpcBus,
 		keys:       keys,
 		factories:  factories,
 		eventqueue: NewQueue(),
+		pubkeyBuf:  *pkBuf,
+		unsynced:   true,
 	}
 
+	// completing the initialization
 	listener := eventbus.NewCallbackListener(c.CollectEvent)
-	eventBus.SubscribeDefault(listener)
+	c.eventBus.SubscribeDefault(listener)
 
-	// TODO: listen for initialization message and call recreateStore(roundUpdate, true)
+	l := eventbus.NewCallbackListener(c.CollectRoundUpdate)
+	c.eventBus.Subscribe(topics.RoundUpdate, l)
 	return c
 }
 
 func (c *Consensus) initialize(subs []Subscriber) {
 	for _, sub := range subs {
-		c.eventBus.AddDefaultTopic(sub.topic)
-		c.eventBus.Register(sub.topic, NewRepublisher(c.eventBus, sub.topic), &Validator{})
+		c.eventBus.AddDefaultTopic(sub.Topic)
+		c.eventBus.Register(sub.Topic, NewRepublisher(c.eventBus, sub.Topic), &Validator{})
 	}
 }
 
@@ -137,9 +170,9 @@ func (c *Consensus) CollectRoundUpdate(m bytes.Buffer) error {
 		return err
 	}
 	c.FinalizeRound()
-
-	c.recreateStore(r, false)
+	c.recreateStore(r, c.unsynced)
 	c.Update(r.Round)
+	c.unsynced = false
 	return nil
 }
 
@@ -184,4 +217,41 @@ func (c *Consensus) requestStepUpdate() {
 	for _, ev := range events {
 		c.store.Dispatch(ev)
 	}
+}
+
+func (c *Consensus) header(blockHash []byte) (bytes.Buffer, error) {
+	buf := c.pubkeyBuf
+	stateBuf := c.ToBuffer()
+	if _, err := buf.ReadFrom(&stateBuf); err != nil {
+		return buf, err
+	}
+
+	if err := encoding.Write256(&buf, blockHash); err != nil {
+		return buf, err
+	}
+
+	return buf, nil
+}
+
+func (c *Consensus) sign(payload []byte) ([]byte, error) {
+	round, step := c.Round(), c.Step()
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, round); err != nil {
+		return nil, err
+	}
+
+	if err := encoding.WriteUint8(buf, step); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Write(payload); err != nil {
+		return nil, err
+	}
+
+	signedHash, err := bls.Sign(c.keys.BLSSecretKey, c.keys.BLSPubKey, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return signedHash.Compress(), nil
 }

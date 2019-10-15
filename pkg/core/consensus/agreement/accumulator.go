@@ -1,45 +1,33 @@
 package agreement
 
 import (
-	"bytes"
-	"encoding/hex"
-
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	log "github.com/sirupsen/logrus"
 )
-
-// AccumulatorHandler is a generic event handler with some added functionality, that is
-// specific to the accumulator.
-type AccumulatorHandler interface {
-	EventHandler
-	ExtractIdentifier(wire.Event, *bytes.Buffer) error
-	Quorum() int
-}
 
 // Accumulator is an event accumulator, that will accumulate events until it
 // reaches a certain threshold.
 type Accumulator struct {
-	wire.Store
-	handler            AccumulatorHandler
-	verificationChan   chan wire.Event
-	eventChan          chan wire.Event
-	CollectedVotesChan chan []wire.Event
+	handler            *handler
+	verificationChan   chan Agreement
+	eventChan          chan Agreement
+	CollectedVotesChan chan []Agreement
+	store              *store
 }
 
 // NewAccumulator initializes a worker pool, starts up an Accumulator and returns it.
-func newAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
+func newAccumulator(handler *handler) *Accumulator {
 	// set up worker pool
-	eventChan := make(chan wire.Event, 100)
-	verificationChan := make(chan wire.Event, 100)
+	eventChan := make(chan Agreement, 100)
+	verificationChan := make(chan Agreement, 100)
 
 	// create accumulator
 	a := &Accumulator{
-		Store:              store,
 		handler:            handler,
 		verificationChan:   verificationChan,
 		eventChan:          eventChan,
-		CollectedVotesChan: make(chan []wire.Event, 1),
+		CollectedVotesChan: make(chan []Agreement, 1),
+		store:              newStore(),
 	}
 
 	a.CreateWorkers()
@@ -48,7 +36,7 @@ func newAccumulator(handler AccumulatorHandler, store wire.Store) *Accumulator {
 
 // Process a received Event, by passing it to a worker in the worker pool (if the event
 // sender is part of the voting committee).
-func (a *Accumulator) Process(ev wire.Event) {
+func (a *Accumulator) Process(ev Agreement) {
 	a.verificationChan <- ev
 }
 
@@ -59,15 +47,12 @@ func (a *Accumulator) Accumulate() {
 			return
 		}
 
-		b := new(bytes.Buffer)
-		if err := a.handler.ExtractIdentifier(ev, b); err == nil {
-			hash := hex.EncodeToString(b.Bytes())
-			count := a.Insert(ev, hash)
-			if count >= a.handler.Quorum() {
-				votes := a.Get(hash)
-				a.CollectedVotesChan <- votes
-				return
-			}
+		hash := string(ev.Header.BlockHash)
+		count := a.store.Insert(hash, ev)
+		if count >= a.handler.Quorum() {
+			votes := a.store.Get(hash)
+			a.CollectedVotesChan <- votes
+			return
 		}
 	}
 }
@@ -83,7 +68,7 @@ func (a *Accumulator) CreateWorkers() {
 	}
 }
 
-func verify(verificationChan <-chan wire.Event, eventChan chan<- wire.Event, verifyFunc func(wire.Event) error) {
+func verify(verificationChan <-chan Agreement, eventChan chan<- Agreement, verifyFunc func(Agreement) error) {
 	for {
 		ev, ok := <-verificationChan
 		if !ok {

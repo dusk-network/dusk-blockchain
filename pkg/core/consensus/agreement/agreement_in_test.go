@@ -1,5 +1,6 @@
 package agreement
 
+/*
 import (
 	"bytes"
 	"encoding/binary"
@@ -198,3 +199,4 @@ func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int, round uin
 
 	return
 }
+*/

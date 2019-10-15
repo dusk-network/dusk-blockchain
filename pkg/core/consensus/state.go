@@ -1,8 +1,11 @@
 package consensus
 
 import (
+	"bytes"
 	"strconv"
 	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 var empty struct{}
@@ -11,9 +14,10 @@ type (
 	// SyncState is an implementation of State which can be shared by multiple processes.
 	// It also notifies subscribers of changes in the state's step.
 	SyncState struct {
-		Lock  sync.RWMutex
-		round uint64
-		step  uint8
+		Lock    sync.RWMutex
+		round   uint64
+		step    uint8
+		bufRepr bytes.Buffer
 	}
 
 	// AsyncState is a representation of the consensus state at any given point in time.
@@ -27,9 +31,22 @@ type (
 // NewState returns an initialized SyncState.
 func NewState() *SyncState {
 	return &SyncState{
-		round: 0,
-		step:  1,
+		round:   0,
+		step:    1,
+		bufRepr: recreate(0, 1),
 	}
+}
+
+func recreate(round uint64, step uint8) bytes.Buffer {
+	r := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(r, round); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.WriteUint8(r, step); err != nil {
+		panic(err)
+	}
+	return *r
 }
 
 // Round returns the round that the SyncState is on.
@@ -56,6 +73,7 @@ func (s *SyncState) Update(round uint64) {
 	s.Lock.Lock()
 	s.round = round
 	s.step = 1
+	s.bufRepr = recreate(round, s.step)
 	s.Lock.Unlock()
 }
 
@@ -65,4 +83,11 @@ func (s *SyncState) IncrementStep() {
 	s.Lock.Lock()
 	defer s.Lock.Unlock()
 	s.step++
+	s.bufRepr = recreate(s.round, s.step)
+}
+
+func (s *SyncState) ToBuffer() bytes.Buffer {
+	s.Lock.RLock()
+	defer s.Lock.RUnlock()
+	return s.bufRepr
 }

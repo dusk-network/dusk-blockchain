@@ -11,6 +11,8 @@ import (
 	"github.com/dusk-network/dusk-crypto/bls"
 )
 
+var _ wire.Event = (*Agreement)(nil)
+
 type (
 	// StepVotes represents the aggregated votes for one reduction step.
 	// Normally an Agreement event includes two of these structures. They need to
@@ -27,6 +29,7 @@ type (
 	// Agreement is the Event created at the end of the Reduction process. It includes
 	// the aggregated compressed signatures of all voters
 	Agreement struct {
+		header.Header
 		SignedVotes  []byte
 		VotesPerStep []StepVotes
 	}
@@ -79,19 +82,8 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 	return nil
 }
 
-// Deserialize an Agreement event from a buffer to its struct representation.
-func Deserialize(r *bytes.Buffer) (wire.Event, error) {
-	ev := New()
-	if err := Unmarshal(r, ev); err != nil {
-		return nil, err
-	}
-
-	return ev, nil
-}
-
 // Marshal an Agreement event into a buffer.
-func Marshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
-	a := ev.(*Agreement)
+func Marshal(r *bytes.Buffer, a Agreement) error {
 	// Marshal BLS Signature of VoteSet
 	if err := encoding.WriteBLS(r, a.SignedVotes); err != nil {
 		return err
@@ -109,28 +101,27 @@ func Marshaller) Marshal(r *bytes.Buffer, ev wire.Event) error {
 // Field order is the following:
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
-func UnMarshaller) Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	a := ev.(*Agreement)
+func Unmarshal(r *bytes.Buffer, a *Agreement) error {
 	a.SignedVotes = make([]byte, 33)
-	if err = encoding.ReadBLS(r, a.SignedVotes); err != nil {
+	if err := encoding.ReadBLS(r, a.SignedVotes); err != nil {
 		return err
 	}
 
-	votesPerStep := make([]*StepVotes, 2)
-	err = UnmarshalVotes(r, votesPerStep)
-	if err != nil {
+	votesPerStep := make([]StepVotes, 2)
+	if err := UnmarshalVotes(r, votesPerStep); err != nil {
 		return err
 	}
+
 	a.VotesPerStep = votesPerStep
-
 	return nil
 }
 
 // New returns an empty Agreement event.
-func New() *Agreement {
+func New(h header.Header) *Agreement {
 	return &Agreement{
 		VotesPerStep: make([]StepVotes, 2),
 		SignedVotes:  make([]byte, 33),
+		Header:       h,
 	}
 }
 
@@ -151,7 +142,7 @@ func Sign(a *Agreement, keys user.Keys) error {
 }
 
 // UnmarshalVotes unmarshals the array of StepVotes for a single Agreement
-func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
+func UnmarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -163,7 +154,7 @@ func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 			return err
 		}
 
-		votes[i] = sv
+		votes[i] = *sv
 	}
 
 	return nil

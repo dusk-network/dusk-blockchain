@@ -61,6 +61,7 @@ const (
 	Absentees
 	RemoveProvisioner
 	AgreementEvent
+	Regeneration
 	Log
 	Monitor
 	Test
@@ -113,6 +114,7 @@ var Topics = [...]topicBuf{
 	topicBuf{Absentees, *(bytes.NewBuffer([]byte{byte(Absentees)})), "absentees"},
 	topicBuf{RemoveProvisioner, *(bytes.NewBuffer([]byte{byte(RemoveProvisioner)})), "removeprovisioner"},
 	topicBuf{AgreementEvent, *(bytes.NewBuffer([]byte{byte(AgreementEvent)})), "agreementevent"},
+	topicBuf{Regeneration, *(bytes.NewBuffer([]byte{byte(Regeneration)})), "regeneration"},
 	topicBuf{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
 	topicBuf{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
 	topicBuf{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
