@@ -1,4 +1,4 @@
-package transactions
+package marshalling
 
 import (
 	"bytes"
@@ -7,46 +7,47 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
-func Unmarshal(r *bytes.Buffer) (Transaction, error) {
+func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
 	var txType uint8
 	if err := encoding.ReadUint8(r, &txType); err != nil {
 		return nil, err
 	}
 
 	// Unmarshal
-	switch TxType(txType) {
-	case StandardType:
-		tx := &Standard{TxType: TxType(txType)}
+	switch transactions.TxType(txType) {
+	case transactions.StandardType:
+		tx := &transactions.Standard{TxType: transactions.TxType(txType)}
 		err := UnmarshalStandard(r, tx)
 		return tx, err
-	case TimelockType:
-		tx, err := NewTimelock(0, 0, 0, 0)
+	case transactions.TimelockType:
+		tx, err := transactions.NewTimelock(0, 0, 0, 0)
 		if err != nil {
 			return nil, err
 		}
 
 		err = UnmarshalTimelock(r, tx)
 		return tx, err
-	case BidType:
-		tx, err := NewBid(0, 0, 0, 0, nil)
+	case transactions.BidType:
+		tx, err := transactions.NewBid(0, 0, 0, 0, nil)
 		if err != nil {
 			return nil, err
 		}
 
 		err = UnmarshalBid(r, tx)
 		return tx, err
-	case StakeType:
-		tx, err := NewStake(0, 0, 0, 0, nil, nil)
+	case transactions.StakeType:
+		tx, err := transactions.NewStake(0, 0, 0, 0, nil, nil)
 		if err != nil {
 			return nil, err
 		}
 
 		err = UnmarshalStake(r, tx)
 		return tx, err
-	case CoinbaseType:
-		tx := &Coinbase{TxType: TxType(txType)}
+	case transactions.CoinbaseType:
+		tx := &transactions.Coinbase{TxType: transactions.TxType(txType)}
 		err := UnmarshalCoinbase(r, tx)
 		return tx, err
 	default:
@@ -54,28 +55,28 @@ func Unmarshal(r *bytes.Buffer) (Transaction, error) {
 	}
 }
 
-func Marshal(r *bytes.Buffer, tx Transaction) error {
+func MarshalTx(r *bytes.Buffer, tx transactions.Transaction) error {
 	switch tx.Type() {
-	case StandardType:
-		return MarshalStandard(r, tx.(*Standard))
-	case TimelockType:
-		return MarshalTimelock(r, tx.(*Timelock))
-	case BidType:
-		return MarshalBid(r, tx.(*Bid))
-	case StakeType:
-		return MarshalStake(r, tx.(*Stake))
-	case CoinbaseType:
-		return MarshalCoinbase(r, tx.(*Coinbase))
+	case transactions.StandardType:
+		return MarshalStandard(r, tx.(*transactions.Standard))
+	case transactions.TimelockType:
+		return MarshalTimelock(r, tx.(*transactions.Timelock))
+	case transactions.BidType:
+		return MarshalBid(r, tx.(*transactions.Bid))
+	case transactions.StakeType:
+		return MarshalStake(r, tx.(*transactions.Stake))
+	case transactions.CoinbaseType:
+		return MarshalCoinbase(r, tx.(*transactions.Coinbase))
 	default:
 		return fmt.Errorf("unknown transaction type: %d", tx.Type())
 	}
 }
 
-func MarshalStandard(w *bytes.Buffer, s *Standard) error {
+func MarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	return marshalStandard(w, s, true)
 }
 
-func marshalStandard(w *bytes.Buffer, s *Standard, encodeSignature bool) error {
+func marshalStandard(w *bytes.Buffer, s *transactions.Standard, encodeSignature bool) error {
 	if err := encoding.WriteUint8(w, uint8(s.TxType)); err != nil {
 		return err
 	}
@@ -123,11 +124,11 @@ func marshalStandard(w *bytes.Buffer, s *Standard, encodeSignature bool) error {
 	return encoding.WriteVarBytes(w, buf.Bytes())
 }
 
-func MarshalTimelock(r *bytes.Buffer, tx *Timelock) error {
+func MarshalTimelock(r *bytes.Buffer, tx *transactions.Timelock) error {
 	return marshalTimelock(r, tx, true)
 }
 
-func marshalTimelock(r *bytes.Buffer, tx *Timelock, encodeSignature bool) error {
+func marshalTimelock(r *bytes.Buffer, tx *transactions.Timelock, encodeSignature bool) error {
 	if err := marshalStandard(r, tx.Standard, encodeSignature); err != nil {
 		return err
 	}
@@ -139,11 +140,11 @@ func marshalTimelock(r *bytes.Buffer, tx *Timelock, encodeSignature bool) error 
 	return nil
 }
 
-func MarshalBid(r *bytes.Buffer, tx *Bid) error {
+func MarshalBid(r *bytes.Buffer, tx *transactions.Bid) error {
 	return marshalBid(r, tx, true)
 }
 
-func marshalBid(r *bytes.Buffer, tx *Bid, encodeSignature bool) error {
+func marshalBid(r *bytes.Buffer, tx *transactions.Bid, encodeSignature bool) error {
 	if err := marshalTimelock(r, tx.Timelock, encodeSignature); err != nil {
 		return err
 	}
@@ -155,11 +156,11 @@ func marshalBid(r *bytes.Buffer, tx *Bid, encodeSignature bool) error {
 	return nil
 }
 
-func MarshalStake(r *bytes.Buffer, tx *Stake) error {
+func MarshalStake(r *bytes.Buffer, tx *transactions.Stake) error {
 	return marshalStake(r, tx, true)
 }
 
-func marshalStake(r *bytes.Buffer, tx *Stake, encodeSignature bool) error {
+func marshalStake(r *bytes.Buffer, tx *transactions.Stake, encodeSignature bool) error {
 	if err := marshalTimelock(r, tx.Timelock, encodeSignature); err != nil {
 		return err
 	}
@@ -175,7 +176,7 @@ func marshalStake(r *bytes.Buffer, tx *Stake, encodeSignature bool) error {
 	return nil
 }
 
-func MarshalCoinbase(w *bytes.Buffer, c *Coinbase) error {
+func MarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	if err := encoding.WriteUint8(w, uint8(c.TxType)); err != nil {
 		return err
 	}
@@ -205,7 +206,7 @@ func MarshalCoinbase(w *bytes.Buffer, c *Coinbase) error {
 	return nil
 }
 
-func UnmarshalStandard(w *bytes.Buffer, s *Standard) error {
+func UnmarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	RBytes := make([]byte, 32)
 	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
@@ -221,9 +222,9 @@ func UnmarshalStandard(w *bytes.Buffer, s *Standard) error {
 		return err
 	}
 
-	s.Inputs = make(Inputs, lInputs)
+	s.Inputs = make(transactions.Inputs, lInputs)
 	for i := range s.Inputs {
-		s.Inputs[i] = &Input{Proof: mlsag.NewDualKey(), Signature: &mlsag.Signature{}}
+		s.Inputs[i] = &transactions.Input{Proof: mlsag.NewDualKey(), Signature: &mlsag.Signature{}}
 		if err := UnmarshalInput(w, s.Inputs[i]); err != nil {
 			return err
 		}
@@ -234,9 +235,9 @@ func UnmarshalStandard(w *bytes.Buffer, s *Standard) error {
 		return err
 	}
 
-	s.Outputs = make(Outputs, lOutputs)
+	s.Outputs = make(transactions.Outputs, lOutputs)
 	for i := range s.Outputs {
-		s.Outputs[i] = &Output{}
+		s.Outputs[i] = &transactions.Output{}
 		if err := UnmarshalOutput(w, s.Outputs[i]); err != nil {
 			return err
 		}
@@ -255,7 +256,7 @@ func UnmarshalStandard(w *bytes.Buffer, s *Standard) error {
 	return s.RangeProof.Decode(bytes.NewBuffer(rangeProofBuf), true)
 }
 
-func UnmarshalTimelock(r *bytes.Buffer, tx *Timelock) error {
+func UnmarshalTimelock(r *bytes.Buffer, tx *transactions.Timelock) error {
 	err := UnmarshalStandard(r, tx.Standard)
 	if err != nil {
 		return err
@@ -268,7 +269,7 @@ func UnmarshalTimelock(r *bytes.Buffer, tx *Timelock) error {
 	return nil
 }
 
-func UnmarshalBid(r *bytes.Buffer, tx *Bid) error {
+func UnmarshalBid(r *bytes.Buffer, tx *transactions.Bid) error {
 	err := UnmarshalTimelock(r, tx.Timelock)
 	if err != nil {
 		return err
@@ -282,7 +283,7 @@ func UnmarshalBid(r *bytes.Buffer, tx *Bid) error {
 	return nil
 }
 
-func UnmarshalStake(r *bytes.Buffer, tx *Stake) error {
+func UnmarshalStake(r *bytes.Buffer, tx *transactions.Stake) error {
 	err := UnmarshalTimelock(r, tx.Timelock)
 	if err != nil {
 		return err
@@ -300,7 +301,7 @@ func UnmarshalStake(r *bytes.Buffer, tx *Stake) error {
 	return nil
 }
 
-func UnmarshalCoinbase(w *bytes.Buffer, c *Coinbase) error {
+func UnmarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	RBytes := make([]byte, 32)
 	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
@@ -321,13 +322,117 @@ func UnmarshalCoinbase(w *bytes.Buffer, c *Coinbase) error {
 		return err
 	}
 
-	c.Rewards = make(Outputs, lRewards)
+	c.Rewards = make(transactions.Outputs, lRewards)
 	for i := range c.Rewards {
-		c.Rewards[i] = &Output{}
+		c.Rewards[i] = &transactions.Output{}
 		if err := UnmarshalOutput(w, c.Rewards[i]); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// Encode an Output struct and write to w.
+func MarshalOutput(w *bytes.Buffer, o *transactions.Output) error {
+	if err := encoding.Write256(w, o.Commitment.Bytes()); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(w, o.PubKey.P.Bytes()); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(w, o.EncryptedAmount.Bytes()); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteVarBytes(w, o.EncryptedMask.Bytes()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Decode an Output object from r into an output struct.
+func UnmarshalOutput(r *bytes.Buffer, o *transactions.Output) error {
+	commBytes := make([]byte, 32)
+	if err := encoding.Read256(r, commBytes); err != nil {
+		return err
+	}
+	o.Commitment.UnmarshalBinary(commBytes)
+
+	pubKeyBytes := make([]byte, 32)
+	if err := encoding.Read256(r, pubKeyBytes); err != nil {
+		return err
+	}
+	o.PubKey.P.UnmarshalBinary(pubKeyBytes)
+
+	var encAmountBytes []byte
+	if err := encoding.ReadVarBytes(r, &encAmountBytes); err != nil {
+		return err
+	}
+	o.EncryptedAmount.UnmarshalBinary(encAmountBytes)
+
+	var encMaskBytes []byte
+	if err := encoding.ReadVarBytes(r, &encMaskBytes); err != nil {
+		return err
+	}
+	o.EncryptedMask.UnmarshalBinary(encMaskBytes)
+	return nil
+}
+
+// MarshalInput marshals an Input object into a bytes.Buffer.
+func MarshalInput(w *bytes.Buffer, i *transactions.Input, encodeSignature bool) error {
+	if err := encoding.Write256(w, i.KeyImage.Bytes()); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(w, i.PubKey.P.Bytes()); err != nil {
+		return err
+	}
+
+	if err := encoding.Write256(w, i.PseudoCommitment.Bytes()); err != nil {
+		return err
+	}
+
+	if encodeSignature {
+		// Signature needs to be encoded and decoded as VarBytes, to ensure backwards-compatibility with
+		// the current testnet.
+		buf := new(bytes.Buffer)
+		if err := i.Signature.Encode(buf, true); err != nil {
+			return err
+		}
+
+		return encoding.WriteVarBytes(w, buf.Bytes())
+	}
+	return nil
+}
+
+// Decode an Input object from a bytes.Buffer.
+func UnmarshalInput(r *bytes.Buffer, i *transactions.Input) error {
+	keyImageBytes := make([]byte, 32)
+	if err := encoding.Read256(r, keyImageBytes); err != nil {
+		return err
+	}
+	i.KeyImage.UnmarshalBinary(keyImageBytes)
+
+	pubKeyBytes := make([]byte, 32)
+	if err := encoding.Read256(r, pubKeyBytes); err != nil {
+		return err
+	}
+	i.PubKey.P.UnmarshalBinary(pubKeyBytes)
+
+	pseudoCommBytes := make([]byte, 32)
+	if err := encoding.Read256(r, pseudoCommBytes); err != nil {
+		return err
+	}
+	i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
+
+	var sigBytes []byte
+	if err := encoding.ReadVarBytes(r, &sigBytes); err != nil {
+		return err
+	}
+
+	return i.Signature.Decode(bytes.NewBuffer(sigBytes), true)
 }

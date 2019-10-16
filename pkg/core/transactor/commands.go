@@ -10,14 +10,15 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/block"
+	walletdb "github.com/dusk-network/dusk-wallet/database"
 	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/wallet"
 )
 
 var testnet = byte(2)
@@ -30,7 +31,7 @@ func (t *Transactor) loadWallet(password string) (string, error) {
 	}
 
 	// Then load the wallet
-	w, err := wallet.LoadFromFile(testnet, db, t.fetchDecoys, t.fetchInputs, password)
+	w, err := wallet.LoadFromFile(testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
 		db.Close()
 		return "", err
@@ -52,7 +53,7 @@ func (t *Transactor) createWallet(password string) (string, error) {
 		return "", err
 	}
 
-	w, err := wallet.New(rand.Read, testnet, db, t.fetchDecoys, t.fetchInputs, password)
+	w, err := wallet.New(rand.Read, testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
 		db.Close()
 		return "", err
@@ -82,7 +83,7 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 	}
 
 	// Then load the wallet
-	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, t.fetchDecoys, t.fetchInputs, password)
+	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
 		db.Close()
 		return "", err
@@ -249,7 +250,7 @@ func (t *Transactor) getMempool() ([]transactions.Transaction, error) {
 
 	mempoolTxs := make([]transactions.Transaction, lTxs)
 	for i := uint64(0); i < lTxs; i++ {
-		tx, err := transactions.Unmarshal(&r)
+		tx, err := marshalling.UnmarshalTx(&r)
 		if err != nil {
 			return nil, err
 		}

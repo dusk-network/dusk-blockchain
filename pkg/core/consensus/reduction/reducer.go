@@ -182,7 +182,7 @@ func (r *reducer) GenerateReduction(hash []byte) (*bytes.Buffer, error) {
 	vote := new(bytes.Buffer)
 
 	h := &header.Header{
-		PubKeyBLS: r.ctx.handler.Keys.BLSPubKeyBytes,
+		PubKeyBLS: r.ctx.handler.ConsensusKeys.BLSPubKeyBytes,
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
 		BlockHash: hash,
@@ -192,7 +192,7 @@ func (r *reducer) GenerateReduction(hash []byte) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	if err := SignBuffer(vote, r.ctx.handler.Keys); err != nil {
+	if err := SignBuffer(vote, r.ctx.handler.ConsensusKeys); err != nil {
 		return nil, err
 	}
 

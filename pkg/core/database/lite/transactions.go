@@ -7,10 +7,11 @@ import (
 	"math"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 type transaction struct {
@@ -35,7 +36,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map header.Hash to block.Block
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, b); err != nil {
+	if err := marshalling.MarshalBlock(buf, b); err != nil {
 		return err
 	}
 
@@ -117,7 +118,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
+	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +134,7 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
+	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -156,7 +157,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
+	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -208,7 +209,7 @@ func (t *transaction) StoreCandidateBlock(b *block.Block) error {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, b); err != nil {
+	if err := marshalling.MarshalBlock(buf, b); err != nil {
 		return err
 	}
 	t.batch[candidatesTableInd][toKey(b.Header.Hash)] = buf.Bytes()
@@ -226,7 +227,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 	}
 
 	b := block.NewBlock()
-	if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
+	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -239,7 +240,7 @@ func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
 	for key, data := range t.db.storage[candidatesTableInd] {
 
 		b := block.NewBlock()
-		if err := block.Unmarshal(bytes.NewBuffer(data), b); err != nil {
+		if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 			return count, err
 		}
 

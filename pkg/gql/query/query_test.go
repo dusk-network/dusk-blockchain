@@ -11,11 +11,11 @@ import (
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	core "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	core "github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/rangeproof"
 	"github.com/graphql-go/graphql"
 )

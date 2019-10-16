@@ -8,10 +8,11 @@ import (
 	"math"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -88,7 +89,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := block.MarshalHeader(blockHeaderFields, b.Header); err != nil {
+	if err := marshalling.MarshalHeader(blockHeaderFields, b.Header); err != nil {
 		return err
 	}
 
@@ -291,7 +292,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	header := block.NewHeader()
-	err = block.UnmarshalHeader(bytes.NewBuffer(value), header)
+	err = marshalling.UnmarshalHeader(bytes.NewBuffer(value), header)
 
 	if err != nil {
 		return nil, err
@@ -476,7 +477,7 @@ func (t transaction) StoreCandidateBlock(b *block.Block) error {
 	key = append(key, heightBuf.Bytes()...)
 
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, b); err != nil {
+	if err := marshalling.MarshalBlock(buf, b); err != nil {
 		return err
 	}
 
@@ -498,7 +499,7 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 
 	if iterator.First() {
 		b := block.NewBlock()
-		if err := block.Unmarshal(bytes.NewBuffer(iterator.Value()), b); err != nil {
+		if err := marshalling.UnmarshalBlock(bytes.NewBuffer(iterator.Value()), b); err != nil {
 			return nil, err
 		}
 

@@ -8,18 +8,19 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/merkletree"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -301,7 +302,7 @@ func (m *Mempool) newPool() Pool {
 // NB This is always run in a different than main mempool routine
 func (m *Mempool) Collect(message bytes.Buffer) error {
 
-	tx, err := transactions.Unmarshal(&message)
+	tx, err := marshalling.UnmarshalTx(&message)
 	if err != nil {
 		return err
 	}
@@ -354,7 +355,7 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) {
 	}
 
 	for _, tx := range outputTxs {
-		if err := transactions.Marshal(w, tx); err != nil {
+		if err := marshalling.MarshalTx(w, tx); err != nil {
 			r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 			return
 		}

@@ -11,19 +11,20 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -113,7 +114,7 @@ func (c *Chain) Listen() {
 			prevBlock := c.prevBlock
 			c.mu.RUnlock()
 
-			if err := block.Marshal(buf, &prevBlock); err != nil {
+			if err := marshalling.MarshalBlock(buf, &prevBlock); err != nil {
 				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 				continue
 			}
@@ -146,7 +147,7 @@ func (c *Chain) LaunchConsensus() {
 
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := topics.Block.ToBuffer()
-	if err := block.Marshal(&buffer, &blk); err != nil {
+	if err := marshalling.MarshalBlock(&buffer, &blk); err != nil {
 		return err
 	}
 
@@ -177,7 +178,7 @@ func (c *Chain) Close() error {
 
 func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := block.Unmarshal(&m, blk); err != nil {
+	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
 		return err
 	}
 
@@ -260,7 +261,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// mempool.Mempool
 	// consensus.generation.broker
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, &blk); err != nil {
+	if err := marshalling.MarshalBlock(buf, &blk); err != nil {
 		l.Errorf("block encoding failed: %s", err.Error())
 		return err
 	}

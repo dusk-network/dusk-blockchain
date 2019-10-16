@@ -2,12 +2,12 @@ package transactor
 
 import (
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 
-	walletdb "github.com/dusk-network/dusk-blockchain/pkg/wallet/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	walletdb "github.com/dusk-network/dusk-wallet/database"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-wallet/key"
 )

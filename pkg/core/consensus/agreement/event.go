@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 type (
@@ -160,7 +160,7 @@ func New() *Agreement {
 }
 
 // Sign signs an aggregated agreement event
-func Sign(a *Agreement, keys user.Keys) error {
+func Sign(a *Agreement, keys key.ConsensusKeys) error {
 	buffer := new(bytes.Buffer)
 
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {

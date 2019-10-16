@@ -5,17 +5,17 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
 )
 
 // Launch is a helper to minimize the wiring of TopicListeners, collector and
 // channels. The agreement component notarizes the new blocks after having
 // collected a quorum of votes
-func Launch(eventBroker eventbus.Broker, keys user.Keys) {
+func Launch(eventBroker eventbus.Broker, keys key.ConsensusKeys) {
 	b := newBroker(eventBroker, keys)
 	go func(b *broker) {
 		roundUpdate := <-b.roundChan
@@ -42,7 +42,7 @@ func launchFilter(eventBroker eventbus.Broker, handler consensus.AccumulatorHand
 	return filter
 }
 
-func newBroker(eventBroker eventbus.Broker, keys user.Keys) *broker {
+func newBroker(eventBroker eventbus.Broker, keys key.ConsensusKeys) *broker {
 	handler := newHandler(keys)
 	state := consensus.NewState()
 	filter := launchFilter(eventBroker, handler, state)

@@ -6,9 +6,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,19 +21,19 @@ type ConsensusFactory struct {
 	eventBus eventbus.Broker
 	rpcBus   *rpcbus.RPCBus
 
-	user.Keys
+	key.ConsensusKeys
 	timerLength time.Duration
 }
 
 // New returns an initialized ConsensusFactory.
 func New(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, timerLength time.Duration,
-	keys user.Keys) *ConsensusFactory {
+	keys key.ConsensusKeys) *ConsensusFactory {
 
 	return &ConsensusFactory{
-		eventBus:    eventBus,
-		rpcBus:      rpcBus,
-		Keys:        keys,
-		timerLength: timerLength,
+		eventBus:      eventBus,
+		rpcBus:        rpcBus,
+		ConsensusKeys: keys,
+		timerLength:   timerLength,
 	}
 }
 
@@ -42,7 +42,7 @@ func New(eventBus eventbus.Broker, rpcBus *rpcbus.RPCBus, timerLength time.Durat
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	selection.Launch(c.eventBus, nil, c.timerLength)
-	reduction.Launch(c.eventBus, c.Keys, c.timerLength, c.rpcBus)
-	agreement.Launch(c.eventBus, c.Keys)
+	reduction.Launch(c.eventBus, c.ConsensusKeys, c.timerLength, c.rpcBus)
+	agreement.Launch(c.eventBus, c.ConsensusKeys)
 	log.WithField("process", "factory").Info("Consensus Started")
 }

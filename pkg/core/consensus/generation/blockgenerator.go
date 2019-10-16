@@ -8,17 +8,17 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/block"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 type (
@@ -37,13 +37,13 @@ type (
 		rpcBus         *rpcbus.RPCBus
 		proofGenerator Generator
 		threshold      *consensus.Threshold
-		keys           user.Keys
+		keys           key.ConsensusKeys
 	}
 )
 
 var bidNotFound = errors.New("bid not found in bidlist")
 
-func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus, proofGen Generator, keys user.Keys) *blockGenerator {
+func newBlockGenerator(genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus, proofGen Generator, keys key.ConsensusKeys) *blockGenerator {
 	return &blockGenerator{
 		rpcBus:         rpcBus,
 		genPubKey:      genPubKey,
@@ -171,7 +171,7 @@ func (bg *blockGenerator) ConstructBlockTxs(proof, score []byte) ([]transactions
 		}
 
 		for i := uint64(0); i < lTxs; i++ {
-			tx, err := transactions.Unmarshal(&r)
+			tx, err := marshalling.UnmarshalTx(&r)
 			if err != nil {
 				return nil, err
 			}
