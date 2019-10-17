@@ -18,10 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//func init() {
-//	log.SetLevel(log.TraceLevel)
-//}
-
 var timeOut = 4000 * time.Millisecond
 
 func TestStress(t *testing.T) {

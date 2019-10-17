@@ -151,7 +151,7 @@ func (c *Coordinator) recreateStore(roundUpdate RoundUpdate, fromScratch bool) {
 	for _, factory := range c.factories {
 		component := factory.Instantiate()
 		subs := store.addComponent(component, roundUpdate)
-		if fromScratch {
+		if fromScratch && subs != nil {
 			c.initialize(subs)
 		}
 	}

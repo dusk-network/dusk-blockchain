@@ -71,10 +71,6 @@ func (bg *blockGenerator) signSeed(seed []byte) ([]byte, error) {
 }
 
 func (bg *blockGenerator) Generate(roundUpdate consensus.RoundUpdate) (block.Block, selection.ScoreEvent, error) {
-	if !bg.proofGenerator.InBidList(roundUpdate.BidList) {
-		return block.Block{}, selection.ScoreEvent{}, bidNotFound
-	}
-
 	currentSeed, err := bg.signSeed(roundUpdate.Seed)
 	if err != nil {
 		return block.Block{}, selection.ScoreEvent{}, err

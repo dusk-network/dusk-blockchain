@@ -34,18 +34,18 @@ type reducer struct {
 	aggregatorSemaphore bool
 
 	aggregator *aggregator
-	timeout    time.Duration
+	timeOut    time.Duration
 	timer      *timer
 }
 
 // NewComponent returns an uninitialized reduction component.
-func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user.Keys, timeout time.Duration) *reducer {
+func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user.Keys, timeOut time.Duration) *reducer {
 	return &reducer{
 		publisher: publisher,
 		rpcBus:    rpcBus,
 		svs:       make([]agreement.StepVotes, 0, 2),
 		keys:      keys,
-		timeout:   timeout,
+		timeOut:   timeOut,
 	}
 }
 
@@ -161,7 +161,7 @@ func (r *reducer) SetStep(step uint8) {
 }
 
 func (r *reducer) startReduction() {
-	r.timer.start(r.timeout)
+	r.timer.start(r.timeOut)
 	r.aggregator = newAggregator(r)
 	//r.aggregator.Start()
 }
