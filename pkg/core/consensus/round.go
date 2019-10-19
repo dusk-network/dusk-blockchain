@@ -176,7 +176,7 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	return nil
 }
 
-// swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and
+// swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and CollectEvent
 func (c *Coordinator) swapStore(store *roundStore) {
 	c.lock.Lock()
 	defer c.lock.Unlock()

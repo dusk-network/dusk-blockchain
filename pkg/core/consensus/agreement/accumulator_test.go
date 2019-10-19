@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,8 +45,8 @@ func (m *MockHandler) Verify(ev Agreement) error {
 }
 
 func TestAccumulatorStop(t *testing.T) {
-	hdlr := &MockHandler{nil, true, true, user.VotingCommittee{}, 2, true}
-	accumulator := newAccumulator(nil, 100)
+	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 2, true}
+	accumulator := newAccumulator(hdlr, 100)
 	go accumulator.Accumulate()
 
 	time.Sleep(3 * time.Second)
@@ -57,17 +59,42 @@ func TestAccumulatorStop(t *testing.T) {
 // events on the CollectedVotesChan once we do.
 func TestAccumulation(t *testing.T) {
 	// Make an accumulator that has a quorum of 2
-	hdlr := &MockHandler{nil, true, true, user.VotingCommittee{}, 2, true}
-	accumulator := consensus.NewAccumulator(hdlr.handler, 4)
+	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 2, true}
+	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()
 
+	createAgreement := newAggroFactory(10)
+
 	// Send two mock events to the accumulator
-	accumulator.Process(newMockEvent())
-	accumulator.Process(newMockEvent())
+	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 1))
 	// Should get something back on CollectedVotesChan
 	events := <-accumulator.CollectedVotesChan
 	// Should have two events
 	assert.Equal(t, 2, len(events))
+}
+
+func TestStop(t *testing.T) {
+	// Make an accumulator that has a quorum of 3
+	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 3, true}
+	accumulator := newAccumulator(hdlr, 4)
+	go accumulator.Accumulate()
+
+	createAgreement := newAggroFactory(10)
+
+	// Send two mock events to the accumulator
+	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 1))
+	accumulator.Stop()
+	accumulator.Process(createAgreement(1, 1))
+
+	// Should NOT get something back on CollectedVotesChan
+	select {
+	case <-accumulator.CollectedVotesChan:
+		assert.FailNow(t, "accumulator should not have collected votes")
+	case <-time.After(50 * time.Millisecond):
+		// all good
+	}
 }
 
 /*
@@ -147,3 +174,14 @@ func (m *mockAccumulatorHandler) IsMember(pubKeyBLS []byte, round uint64, step u
 	return m.isMember
 }
 */
+
+func newAggroFactory(provisionersNr int) func(uint64, uint8) Agreement {
+	hash, _ := crypto.RandEntropy(32)
+	p, ks := consensus.MockProvisioners(provisionersNr)
+
+	return func(round uint64, step uint8) Agreement {
+		vc := p.CreateVotingCommittee(round, step, provisionersNr)
+		a := MockAgreementEvent(hash, round, step, ks, vc)
+		return *a
+	}
+}

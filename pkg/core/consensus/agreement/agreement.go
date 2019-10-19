@@ -11,6 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var lg = log.WithField("process", "agreement")
+
 var _ consensus.Component = (*agreement)(nil)
 
 type agreement struct {
@@ -69,10 +71,7 @@ func (a *agreement) listen() {
 func (a *agreement) publishAgreement(aev Agreement) {
 	buf := new(bytes.Buffer)
 	if err := Marshal(buf, aev); err != nil {
-		log.WithFields(log.Fields{
-			"process": "agreement",
-			"error":   err,
-		}).Errorln("could not marshal agreement event")
+		lg.WithError(err).Errorln("could not marshal agreement event")
 		return
 	}
 
