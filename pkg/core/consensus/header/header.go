@@ -27,12 +27,12 @@ const (
 
 // Sender implements wire.Event.
 // Returns the BLS public key of the event sender.
-func (h *Header) Sender() []byte {
+func (h Header) Sender() []byte {
 	return h.PubKeyBLS
 }
 
 // ComparePhase is used to see if
-func (h *Header) Compare(round uint64, step uint8) Phase {
+func (h Header) Compare(round uint64, step uint8) Phase {
 	if h.Round < round {
 		return Before
 	}
@@ -52,8 +52,8 @@ func (h *Header) Compare(round uint64, step uint8) Phase {
 
 // Equal implements wire.Event.
 // Checks if two headers are the same.
-func (h *Header) Equal(e wire.Event) bool {
-	other, ok := e.(*Header)
+func (h Header) Equal(e wire.Event) bool {
+	other, ok := e.(Header)
 	return ok && (bytes.Equal(h.PubKeyBLS, other.PubKeyBLS)) &&
 		(h.Round == other.Round) && (h.Step == other.Step) &&
 		(bytes.Equal(h.BlockHash, other.BlockHash))
@@ -61,7 +61,7 @@ func (h *Header) Equal(e wire.Event) bool {
 
 // Marshal a Header into a Buffer.
 func Marshal(r *bytes.Buffer, ev wire.Event) error {
-	consensusEv := ev.(*Header)
+	consensusEv := ev.(Header)
 	if err := encoding.WriteVarBytes(r, consensusEv.PubKeyBLS); err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 
 // MarshalSignableVote marshals the fields necessary for a Committee member to cast
 // a Vote (namely the Round, the Step and the BlockHash).
-func MarshalSignableVote(r *bytes.Buffer, vote *Header) error {
+func MarshalSignableVote(r *bytes.Buffer, vote Header) error {
 	if err := encoding.WriteUint64LE(r, vote.Round); err != nil {
 		return err
 	}
