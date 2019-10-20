@@ -10,9 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -68,28 +66,29 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 }
 
 func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
-	// make some random keys to sign the seed with
-	keys, err := user.NewRandKeys()
-	if err != nil {
-		l.WithError(err).Warnln("could not start block generation component - problem generating keys")
-		return
-	}
+	// // make some random keys to sign the seed with
+	// keys, err := user.NewRandKeys()
+	// if err != nil {
+	// 	l.WithError(err).Warnln("could not start block generation component - problem generating keys")
+	// 	return
+	// }
 
-	// reconstruct k
-	k, err := w.ReconstructK()
-	if err != nil {
-		l.WithError(err).Warnln("could not start block generation component - problem reconstructing K")
-		return
-	}
+	// // reconstruct k
+	// k, err := w.ReconstructK()
+	// if err != nil {
+	// 	l.WithError(err).Warnln("could not start block generation component - problem reconstructing K")
+	// 	return
+	// }
 
-	// get public key that the rewards should go to
-	publicKey := w.PublicKey()
+	// // get public key that the rewards should go to
+	// publicKey := w.PublicKey()
 
 	go func() {
 		// launch generation component
-		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
-			l.WithError(err).Warnln("error launching block generation component")
-		}
+		// FIXME: generation needs a consensus.Coordinator as it no longer manages itself
+		//if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
+		//	l.WithError(err).Warnln("error launching block generation component")
+		//}
 	}()
 }
 
