@@ -52,7 +52,7 @@ func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) 
 // Verify the BLS signature of the Reduction event.
 func (b *reductionHandler) VerifySignature(hdr header.Header, sig []byte) error {
 	info := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(info, &hdr); err != nil {
+	if err := header.MarshalSignableVote(info, hdr); err != nil {
 		return err
 	}
 
