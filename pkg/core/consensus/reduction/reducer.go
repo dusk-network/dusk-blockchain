@@ -227,7 +227,7 @@ func (r *reducer) sendReduction(hash []byte, m *bytes.Buffer) error {
 
 func (r *reducer) generateAgreement(hash []byte, svs []agreement.StepVotes, sig []byte) (*bytes.Buffer, error) {
 	ev := agreement.Agreement{}
-	ev.SignedVotes = sig
+	ev.SetSignature(sig)
 	ev.VotesPerStep = svs
 
 	buf := new(bytes.Buffer)

@@ -103,7 +103,7 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 // The signed message needs to carry information about the round and the step
 func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
 	signed := new(bytes.Buffer)
-	vote := &header.Header{
+	vote := header.Header{
 		Round:     round,
 		Step:      step,
 		BlockHash: blockHash,

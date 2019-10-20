@@ -3,6 +3,7 @@ package agreement
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -30,10 +31,37 @@ type (
 	// the aggregated compressed signatures of all voters
 	Agreement struct {
 		header.Header
-		SignedVotes  []byte
+		signedVotes  []byte
 		VotesPerStep []StepVotes
+		intRepr      *big.Int
 	}
 )
+
+func (a Agreement) Cmp(other Agreement) int {
+	return a.intRepr.Cmp(other.intRepr)
+}
+
+func (a *Agreement) SetSignature(signedVotes []byte) {
+	a.intRepr = new(big.Int).SetBytes(signedVotes)
+	a.signedVotes = signedVotes
+}
+
+func (a Agreement) SignedVotes() []byte {
+	return a.signedVotes
+}
+
+func (a Agreement) Sender() []byte {
+	return a.Header.Sender()
+}
+
+func (a Agreement) Equal(ev wire.Event) bool {
+	aev, ok := ev.(Agreement)
+	if !ok {
+		return false
+	}
+
+	return a.Header.Equal(aev.Header) && a.intRepr.Cmp(aev.intRepr) == 0
+}
 
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash
 func NewStepVotes() *StepVotes {
@@ -85,7 +113,7 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 // Marshal an Agreement event into a buffer.
 func Marshal(r *bytes.Buffer, a Agreement) error {
 	// Marshal BLS Signature of VoteSet
-	if err := encoding.WriteBLS(r, a.SignedVotes); err != nil {
+	if err := encoding.WriteBLS(r, a.SignedVotes()); err != nil {
 		return err
 	}
 
@@ -102,10 +130,11 @@ func Marshal(r *bytes.Buffer, a Agreement) error {
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
 func Unmarshal(r *bytes.Buffer, a *Agreement) error {
-	a.SignedVotes = make([]byte, 33)
-	if err := encoding.ReadBLS(r, a.SignedVotes); err != nil {
+	signedVotes := make([]byte, 33)
+	if err := encoding.ReadBLS(r, signedVotes); err != nil {
 		return err
 	}
+	a.SetSignature(signedVotes)
 
 	votesPerStep := make([]StepVotes, 2)
 	if err := UnmarshalVotes(r, votesPerStep); err != nil {
@@ -120,7 +149,8 @@ func Unmarshal(r *bytes.Buffer, a *Agreement) error {
 func New(h header.Header) *Agreement {
 	return &Agreement{
 		VotesPerStep: make([]StepVotes, 2),
-		SignedVotes:  make([]byte, 33),
+		signedVotes:  make([]byte, 33),
+		intRepr:      new(big.Int),
 		Header:       h,
 	}
 }
@@ -137,7 +167,7 @@ func Sign(a *Agreement, keys user.Keys) error {
 		return err
 	}
 
-	a.SignedVotes = signedVoteSet.Compress()
+	a.SetSignature(signedVoteSet.Compress())
 	return nil
 }
 

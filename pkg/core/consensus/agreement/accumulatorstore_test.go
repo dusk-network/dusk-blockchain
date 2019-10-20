@@ -1,87 +1,69 @@
 package agreement
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/stretchr/testify/assert"
 )
 
-func mockAgreement(id string) Agreement {
-	return Agreement{
-		SignedVotes: []byte(id),
+var hdr header.Header
+
+func init() {
+
+	blsPubKey, _ := crypto.RandEntropy(32)
+	hdr = header.Header{
+		Round:     uint64(1),
+		Step:      uint8(1),
+		PubKeyBLS: blsPubKey,
 	}
 }
 
+func mockAgreement(id string, blockHash []byte) Agreement {
+	h := hdr
+	h.BlockHash = blockHash
+	a := Agreement{
+		Header: h,
+	}
+	a.SetSignature([]byte(id))
+	return a
+}
+
+var test = []struct {
+	sig              string
+	hash             []byte
+	storedAgreements int
+}{
+	{"pippo", []byte("hash1"), 1},
+	{"pluto", []byte("hash2"), 1},
+	{"pippo", []byte("hash1"), 1},
+	{"paperino", []byte("hash2"), 2},
+	{"pippo", []byte("hash2"), 3},
+}
+
 func TestStore(t *testing.T) {
-	sec := newStore()
-	ev1 := mockAgreement("one")
-	ev2 := mockAgreement("two")
-	ev3 := mockAgreement("one")
+	s := newStore()
+	hashes := make([][]byte, 0)
+	for i, tt := range test {
+		hashes = append(hashes, tt.hash)
+		mock := mockAgreement(tt.sig, tt.hash)
+		if !assert.Equal(t, tt.storedAgreements, s.Insert(mock)) {
+			assert.FailNow(t, fmt.Sprintf("store.Insertion failed at row: %d", i))
+		}
+		if !assert.True(t, s.Contains(mock)) {
+			assert.FailNow(t, fmt.Sprintf("store.Contains failed at row: %d", i))
+		}
+		if !assert.Equal(t, tt.storedAgreements, len(s.Get(tt.hash))) {
+			assert.FailNow(t, fmt.Sprintf("store.Get failed at row: %d", i))
+		}
+	}
 
-	require.Equal(t, 1, sec.Insert(ev1, "1"))
-	require.Equal(t, 1, sec.Insert(ev1, "1"))
-	require.Equal(t, 1, sec.Insert(ev1, "2"))
-	require.Equal(t, 2, sec.Insert(ev2, "2"))
-	require.Equal(t, 2, sec.Insert(ev3, "2"))
-}
-
-func TestClear(t *testing.T) {
-	sec := newStore()
-	ev1 := mockAgreement("one")
-	ev2 := mockAgreement("two")
-	ev3 := mockAgreement("three")
-
-	stepOne := "1"
-	sec.Insert(ev1, stepOne)
-	sec.Insert(ev2, stepOne)
-	stepOneSize := sec.Insert(ev3, stepOne)
-	require.Equal(t, 3, stepOneSize)
-
-	stepTwo := "2"
-	sec.Insert(ev1, stepTwo)
-	sec.Insert(ev2, stepTwo)
-	stepTwoSize := sec.Insert(ev3, stepTwo)
-	require.Equal(t, 3, stepTwoSize)
-
-	sec.Clear()
-	require.Equal(t, 0, len(sec.Get(stepOne)))
-	require.Equal(t, 0, len(sec.Get(stepTwo)))
-}
-
-func TestContains(t *testing.T) {
-	sec := newStore()
-	ev1 := mockAgreement("one")
-	ev2 := mockAgreement("two")
-	ev3 := mockAgreement("three")
-	ev4 := mockAgreement("one")
-
-	stepOne := "1"
-	sec.Insert(ev1, stepOne)
-	sec.Insert(ev2, stepOne)
-
-	require.True(t, sec.Contains(ev1, stepOne))
-	require.True(t, sec.Contains(ev2, stepOne))
-	require.False(t, sec.Contains(ev3, stepOne))
-	require.True(t, sec.Contains(ev4, stepOne))
-}
-
-func TestSECOperations(t *testing.T) {
-	sec := newStore()
-	ev1 := mockAgreement("one")
-	ev2 := mockAgreement("two")
-	ev3 := mockAgreement("one")
-
-	// checking if the length of the array of step is consistent
-	require.Equal(t, 1, sec.Insert(ev1, "1"))
-	require.Equal(t, 1, sec.Insert(ev1, "1"))
-	require.Equal(t, 1, sec.Insert(ev1, "2"))
-	require.Equal(t, 2, sec.Insert(ev2, "2"))
-	require.Equal(t, 2, sec.Insert(ev3, "2"))
-
-	sec.Clear()
-	require.Equal(t, 1, sec.Insert(ev1, "1"))
-	require.Equal(t, 1, sec.Insert(ev1, "1"))
-	require.Equal(t, 1, sec.Insert(ev1, "2"))
-	require.Equal(t, 2, sec.Insert(ev2, "2"))
-	require.Equal(t, 2, sec.Insert(ev3, "2"))
+	s.Clear()
+	for _, hh := range hashes {
+		if !assert.Nil(t, s.Get(hh)) {
+			assert.FailNow(t, fmt.Sprintf("store.Clear failed to clean 0x%x", hh))
+		}
+	}
 }
