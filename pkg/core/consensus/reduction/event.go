@@ -73,21 +73,3 @@ func MarshalVoteSet(r *bytes.Buffer, evs []Reduction) error {
 
 	return nil
 }
-
-// TODO: sign in the consensus.Consensus
-// SignBuffer is a shortcut to BLS
-/*
-func SignBuffer(buf *bytes.Buffer, keys user.Keys) error {
-	e := New()
-	if err := Unmarshal(buf, e); err != nil {
-		return err
-	}
-
-	if err := BlsSign(e, keys); err != nil {
-		return nil, err
-	}
-
-	*buf = *signed
-	return nil
-}
-*/

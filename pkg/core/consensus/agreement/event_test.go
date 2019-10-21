@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,8 +63,8 @@ func TestStepVotesAdd(t *testing.T) {
 	assert.NoError(t, bls.Verify(sv.Apk, hash, sv.Signature))
 }
 
-func genKeys(set *sortedset.Set) user.Keys {
-	k, _ := user.NewRandKeys()
+func genKeys(set *sortedset.Set) key.ConsensusKeys {
+	k, _ := key.NewRandConsensusKeys()
 	set.Insert(k.BLSPubKeyBytes)
 	return k
 }

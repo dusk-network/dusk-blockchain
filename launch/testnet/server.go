@@ -42,7 +42,7 @@ func Setup() *Server {
 	// creating the rpcbus
 	rpcBus := rpcbus.New()
 
-	m := mempool.NewMempool(eventBus, nil)
+	m := mempool.NewMempool(eventBus, rpcBus, nil)
 	m.Run()
 
 	// creating and firing up the chain process

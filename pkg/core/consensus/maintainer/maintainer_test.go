@@ -13,45 +13,27 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	"github.com/stretchr/testify/assert"
 )
 
 const pass = "password"
 
-var bus *eventbus.EventBus
-var rpcBus *rpcbus.RPCBus
-var tr *transactor.Transactor
-
-func TestMain(m *testing.M) {
-
-	var err error
-
-	bus = eventbus.New()
-	rpcBus = rpcbus.New()
-	tr, err = transactor.New(bus, rpcBus, nil, nil, wallet.GenerateDecoys, wallet.GenerateInputs, true)
-	if err != nil {
-		panic(err)
-	}
-	go tr.Listen()
-	time.Sleep(100 * time.Millisecond)
-
-	code := m.Run()
-	os.Exit(code)
-}
-
 // Test that the maintainer will properly send new stake and bid transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainStakesAndBids(t *testing.T) {
-
 	bus, txChan, p, keys, m := setupMaintainerTest(t)
 	defer os.Remove("wallet.dat")
+	defer os.RemoveAll("walletDB")
 
 	// receive first txs
 	txs := receiveTxs(t, txChan)
@@ -91,6 +73,7 @@ func TestSendOnce(t *testing.T) {
 
 	bus, txChan, p, _, _ := setupMaintainerTest(t)
 	defer os.Remove("wallet.dat")
+	defer os.RemoveAll("walletDB")
 
 	// receive first txs
 	_ = receiveTxs(t, txChan)
@@ -106,15 +89,23 @@ func TestSendOnce(t *testing.T) {
 	}
 }
 
-func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *user.Provisioners, user.Keys, ristretto.Scalar) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *user.Provisioners, key.ConsensusKeys, ristretto.Scalar) {
 	// Initial setup
+	bus := eventbus.New()
+	rpcBus := rpcbus.New()
+
+	tr, err := transactor.New(bus, rpcBus, nil, nil, wallet.GenerateDecoys, wallet.GenerateInputs, true)
+	if err != nil {
+		panic(err)
+	}
+	go tr.Listen()
 
 	txChan := make(chan bytes.Buffer, 2)
 	l := eventbus.NewChanListener(txChan)
 	bus.Subscribe(topics.Tx, l)
 
 	os.Remove(cfg.Get().Wallet.File)
-	_, err := rpcBus.CreateWallet(pass)
+	assert.NoError(t, createWallet(rpcBus, pass))
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -149,10 +140,20 @@ func receiveTxs(t *testing.T, txChan chan bytes.Buffer) []transactions.Transacti
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		txBuf := <-txChan
-		tx, err := transactions.Unmarshal(&txBuf)
+		tx, err := marshalling.UnmarshalTx(&txBuf)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
 	}
 
 	return txs
+}
+
+func createWallet(rpcBus *rpcbus.RPCBus, password string) error {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, password); err != nil {
+		return err
+	}
+
+	_, err := rpcBus.Call(rpcbus.CreateWallet, rpcbus.NewRequest(*buf), 0)
+	return err
 }

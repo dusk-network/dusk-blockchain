@@ -7,19 +7,19 @@ import (
 	"os"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )
@@ -41,8 +41,8 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	f.StartConsensus()
 
 	// Get current height
-	req := rpcbus.NewRequest(bytes.Buffer{}, 1)
-	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req)
+	req := rpcbus.NewRequest(bytes.Buffer{})
+	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req, 1)
 	if err != nil {
 		l.WithError(err).Warnln("could not retrieve current height, starting from 1")
 		sendInitMessage(eventBroker, 1)
@@ -69,7 +69,7 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 
 func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
 	// make some random keys to sign the seed with
-	keys, err := user.NewRandKeys()
+	keys, err := key.NewRandConsensusKeys()
 	if err != nil {
 		l.WithError(err).Warnln("could not start block generation component - problem generating keys")
 		return

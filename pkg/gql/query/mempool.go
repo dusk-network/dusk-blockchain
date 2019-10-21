@@ -5,11 +5,12 @@ import (
 	"encoding/hex"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"
 
-	rawtxs "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	rawtxs "github.com/dusk-network/dusk-wallet/transactions"
 )
 
 type mempool struct {
@@ -42,7 +43,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			payload.Write(txidBytes)
 		}
 
-		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload, 5))
+		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload), 5)
 		if err != nil {
 			return "", err
 		}
@@ -54,7 +55,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 
 		var fetched []rawtxs.Transaction
 		for i := uint64(0); i < lTxs; i++ {
-			tx, err := rawtxs.Unmarshal(&r)
+			tx, err := marshalling.UnmarshalTx(&r)
 			if err != nil {
 				return "", err
 			}

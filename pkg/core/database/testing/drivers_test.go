@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant
@@ -229,11 +229,11 @@ func TestFetchBlockHeader(test *testing.T) {
 
 			// Get bytes of the fetched block.Header
 			fetchedBuf := new(bytes.Buffer)
-			_ = block.MarshalHeader(fetchedBuf, fheader)
+			_ = marshalling.MarshalHeader(fetchedBuf, fheader)
 
 			// Get bytes of the origin block.Header
 			originBuf := new(bytes.Buffer)
-			_ = block.MarshalHeader(originBuf, b.Header)
+			_ = marshalling.MarshalHeader(originBuf, b.Header)
 
 			// Ensure the fetched header is what the original header bytes are
 			if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
@@ -289,7 +289,7 @@ func TestFetchBlockTxs(test *testing.T) {
 				// Get bytes of the fetched transactions.Transaction
 				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
-				_ = transactions.Marshal(fetchedBuf, fblockTx)
+				_ = marshalling.MarshalTx(fetchedBuf, fblockTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
@@ -297,7 +297,7 @@ func TestFetchBlockTxs(test *testing.T) {
 
 				// Get bytes of the origin transactions.Transaction to compare with
 				originBuf := new(bytes.Buffer)
-				_ = transactions.Marshal(originBuf, oBlockTx)
+				_ = marshalling.MarshalTx(originBuf, oBlockTx)
 
 				if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
 					return errors.New("transactions.Transaction not retrieved properly from storage")
@@ -635,14 +635,14 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 
 				fetchedBuf := new(bytes.Buffer)
-				_ = transactions.Marshal(fetchedBuf, fetchedTx)
+				_ = marshalling.MarshalTx(fetchedBuf, fetchedTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
 				}
 
 				originBuf := new(bytes.Buffer)
-				_ = transactions.Marshal(originBuf, originTx)
+				_ = marshalling.MarshalTx(originBuf, originTx)
 
 				if !bytes.Equal(fetchedBuf.Bytes(), originBuf.Bytes()) {
 					test.Fatal("Invalid tx fetched")
@@ -788,7 +788,7 @@ func TestFetchCandidateBlock(test *testing.T) {
 
 			// compare with the already stored blocks
 			expectedBuf := new(bytes.Buffer)
-			_ = block.Marshal(expectedBuf, b)
+			_ = marshalling.MarshalBlock(expectedBuf, b)
 
 			if len(expectedBuf.Bytes()) == 0 {
 				test.Fatal("Empty expected buffer")
@@ -796,7 +796,7 @@ func TestFetchCandidateBlock(test *testing.T) {
 
 			// Get bytes of the fetched block
 			fetchedBuf := new(bytes.Buffer)
-			_ = block.Marshal(fetchedBuf, fetched)
+			_ = marshalling.MarshalBlock(fetchedBuf, fetched)
 
 			if len(fetchedBuf.Bytes()) == 0 {
 				test.Fatal("Empty fetched buffer")

@@ -23,6 +23,7 @@ type messageRouter struct {
 	dataRequestor   *processing.DataRequestor
 	dataBroker      *processing.DataBroker
 	synchronizer    *chainsync.ChainSynchronizer
+	ponger          processing.Ponger
 
 	peerInfo string
 }
@@ -65,6 +66,12 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		}
 	case topics.Block:
 		err = m.synchronizer.Synchronize(b, m.peerInfo)
+	case topics.Ping:
+		m.ponger.Pong()
+	case topics.Pong:
+		// Just here to avoid the error message, as pong is unroutable but
+		// otherwise carries no relevant information beyond the receiving
+		// of this message
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {

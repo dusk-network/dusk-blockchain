@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/bls"
 )
 
