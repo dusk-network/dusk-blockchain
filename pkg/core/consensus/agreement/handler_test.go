@@ -1,7 +1,6 @@
 package agreement
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -15,9 +14,8 @@ func TestMockAgreementEvent(t *testing.T) {
 	vc := p.CreateVotingCommittee(1, 1, 50)
 	hash, _ := crypto.RandEntropy(32)
 	ev := MockAgreementEvent(hash, 1, 1, keys, vc)
-	fmt.Println(ev.VotesPerStep[0].BitSet)
-	fmt.Println(ev.VotesPerStep[1].BitSet)
-
+	assert.NotEqual(t, 0, ev.VotesPerStep[0].BitSet)
+	assert.NotEqual(t, 0, ev.VotesPerStep[1].BitSet)
 }
 
 func TestVoteVerification(t *testing.T) {

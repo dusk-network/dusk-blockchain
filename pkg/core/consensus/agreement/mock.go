@@ -15,6 +15,7 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys,
 
 	// generating reduction events (votes) and signing them
 	steps := GenVotes(hash, round, step, keys, committee)
+
 	a.VotesPerStep = steps
 	buf := new(bytes.Buffer)
 	if err := MarshalVotes(buf, a.VotesPerStep); err != nil {
@@ -36,8 +37,8 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys, comm
 	return buf
 }
 
-func isEmpty(sv StepVotes) bool {
-	return sv.Apk == nil
+func isEmpty(sv *StepVotes) bool {
+	return sv == nil || sv.Apk == nil
 }
 
 // GenVotes randomly generates a slice of StepVotes with the indicated lenght.
@@ -47,15 +48,16 @@ func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys, committee
 		panic("At least two votes are required to mock an Agreement")
 	}
 
+	votes := make([]*StepVotes, 2)
 	sets := make([]sortedset.Set, 2)
-	votes := make([]StepVotes, 2)
+
 	for i, k := range keys {
 
 		stepCycle := i % 2
 		thisStep := step + uint8(stepCycle)
 		stepVote := votes[stepCycle]
 		if isEmpty(stepVote) {
-			stepVote = *(NewStepVotes())
+			stepVote = NewStepVotes()
 		}
 
 		h := header.Header{
@@ -80,5 +82,5 @@ func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys, committee
 		sv.BitSet = committee.Bits(sets[i])
 	}
 
-	return votes
+	return []StepVotes{*votes[0], *votes[1]}
 }
