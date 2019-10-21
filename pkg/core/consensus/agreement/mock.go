@@ -17,7 +17,10 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys,
 	steps := GenVotes(hash, round, step, keys, committee)
 	a.VotesPerStep = steps
 	buf := new(bytes.Buffer)
-	_ = MarshalVotes(buf, a.VotesPerStep)
+	if err := MarshalVotes(buf, a.VotesPerStep); err != nil {
+		panic(err)
+	}
+
 	sig, _ := bls.Sign(keys[0].BLSSecretKey, keys[0].BLSPubKey, buf.Bytes())
 	a.SetSignature(sig.Compress())
 	return a

@@ -31,7 +31,7 @@ func (h Header) Sender() []byte {
 	return h.PubKeyBLS
 }
 
-// ComparePhase is used to see if
+// Compare headers to establish time order
 func (h Header) Compare(round uint64, step uint8) Phase {
 	if h.Round < round {
 		return Before
