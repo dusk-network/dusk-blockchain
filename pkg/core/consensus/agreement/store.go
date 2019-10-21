@@ -117,7 +117,6 @@ func (s *store) Contains(a Agreement) bool {
 	s.RLock()
 	defer s.RUnlock()
 	idx := s.find(a)
-	fmt.Println(idx)
 	return s.contains(idx, a)
 }
 

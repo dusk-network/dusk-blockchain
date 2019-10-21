@@ -65,9 +65,9 @@ func TestAccumulation(t *testing.T) {
 
 	createAgreement := newAggroFactory(10)
 
-	// Send two mock events to the accumulator
+	// Send two mock events to the accumulator (they must be different otherwise the store is gonna ignore them)
 	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 2))
 	// Should get something back on CollectedVotesChan
 	events := <-accumulator.CollectedVotesChan
 	// Should have two events
@@ -84,9 +84,9 @@ func TestStop(t *testing.T) {
 
 	// Send two mock events to the accumulator
 	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 2))
 	accumulator.Stop()
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 3))
 
 	// Should NOT get something back on CollectedVotesChan
 	select {
@@ -108,7 +108,7 @@ func TestFailedVerification(t *testing.T) {
 
 	// Send two mock events to the accumulator
 	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 2))
 	// We should not get anything from the CollectedVotesChan
 	timer := time.After(100 * time.Millisecond)
 	select {
