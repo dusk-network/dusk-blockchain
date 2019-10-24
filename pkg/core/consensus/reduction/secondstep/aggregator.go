@@ -1,15 +1,22 @@
-package reduction
+package secondstep
 
 import (
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
 
 type aggregator struct {
-	r *reducer
+	requestHalt    func([]byte, ...*agreement.StepVotes)
+	publisher      eventbus.Publisher
+	handler        *reduction.Handler
+	signer         consensus.Signer
+	firstStepVotes *agreement.StepVotes
 
 	lock     sync.RWMutex
 	voteSets map[string]struct {
@@ -18,9 +25,13 @@ type aggregator struct {
 	}
 }
 
-func newAggregator(r *reducer) *aggregator {
+func newAggregator(requestHalt func([]byte, ...*agreement.StepVotes), publisher eventbus.Publisher, handler *reduction.Handler, firstStepVotes *agreement.StepVotes, signer consensus.Signer) *aggregator {
 	return &aggregator{
-		r: r,
+		requestHalt:    requestHalt,
+		publisher:      publisher,
+		handler:        handler,
+		signer:         signer,
+		firstStepVotes: firstStepVotes,
 		voteSets: make(map[string]struct {
 			*agreement.StepVotes
 			sortedset.Set
@@ -28,7 +39,7 @@ func newAggregator(r *reducer) *aggregator {
 	}
 }
 
-func (a *aggregator) collectVote(ev Reduction, hdr header.Header) error {
+func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -45,14 +56,14 @@ func (a *aggregator) collectVote(ev Reduction, hdr header.Header) error {
 
 	sv.Set.Insert(hdr.PubKeyBLS)
 	a.voteSets[hash] = sv
-	if len(sv.Set) == a.r.handler.Quorum() {
+	if len(sv.Set) == a.handler.Quorum() {
 		a.addBitSet(sv.StepVotes, sv.Set, hdr.Round, hdr.Step)
-		a.r.addStepVotes(sv.StepVotes, hdr.BlockHash)
+		a.requestHalt(hdr.BlockHash, a.firstStepVotes, sv.StepVotes)
 	}
 	return nil
 }
 
 func (a *aggregator) addBitSet(sv *agreement.StepVotes, set sortedset.Set, round uint64, step uint8) {
-	committee := a.r.handler.Committee(round, step)
+	committee := a.handler.Committee(round, step)
 	sv.BitSet = committee.Bits(set)
 }

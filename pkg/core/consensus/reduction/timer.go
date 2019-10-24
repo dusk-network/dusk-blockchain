@@ -1,21 +1,31 @@
 package reduction
 
-import "time"
+import (
+	"time"
 
-type timer struct {
-	r *reducer
-	t *time.Timer
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+)
+
+type Timer struct {
+	requestHalt func([]byte, ...*agreement.StepVotes)
+	t           *time.Timer
 }
 
-func (t *timer) start(timeOut time.Duration) {
+func NewTimer(publisher eventbus.Publisher, requestHalt func([]byte, ...*agreement.StepVotes)) *Timer {
+	return &Timer{
+		requestHalt: requestHalt,
+	}
+}
+
+func (t *Timer) Start(timeOut time.Duration) {
 	t.t = time.NewTimer(timeOut)
 }
 
-func (t *timer) stop() {
+func (t *Timer) Stop() {
 	t.t.Stop()
 }
 
-func (t *timer) trigger() {
-	t.r.resetStepVotes()
-	t.r.stepper.RequestStepUpdate()
+func (t *Timer) Trigger() {
+	t.requestHalt(nil)
 }

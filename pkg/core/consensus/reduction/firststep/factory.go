@@ -1,4 +1,4 @@
-package reduction
+package firststep
 
 import (
 	"time"
@@ -10,15 +10,15 @@ import (
 )
 
 type Factory struct {
-	publisher eventbus.Publisher
-	rpcBus    *rpcbus.RPCBus
-	keys      key.ConsensusKeys
-	timeout   time.Duration
+	broker  eventbus.Broker
+	rpcBus  *rpcbus.RPCBus
+	keys    key.ConsensusKeys
+	timeout time.Duration
 }
 
-func NewFactory(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) *Factory {
+func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) *Factory {
 	return &Factory{
-		publisher,
+		broker,
 		rpcBus,
 		keys,
 		timeout,
@@ -26,5 +26,5 @@ func NewFactory(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys key.Co
 }
 
 func (f *Factory) Instantiate() consensus.Component {
-	return NewComponent(f.publisher, f.rpcBus, f.keys, f.timeout)
+	return NewComponent(f.broker, f.rpcBus, f.keys, f.timeout)
 }

@@ -13,31 +13,31 @@ import (
 const maxCommitteeSize = 64
 
 type (
-	// ReductionHandler is responsible for performing operations that need to know
+	// Handler is responsible for performing operations that need to know
 	// about specific event fields.
-	reductionHandler struct {
+	Handler struct {
 		*committee.Handler
 	}
 )
 
-// newReductionHandler will return a ReductionHandler, injected with the passed committee
+// newHandler will return a Handler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
-func newReductionHandler(keys key.ConsensusKeys, p user.Provisioners) *reductionHandler {
-	return &reductionHandler{
+func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *Handler {
+	return &Handler{
 		Handler: committee.NewHandler(keys, p),
 	}
 }
 
 // AmMember checks if we are part of the committee.
-func (b *reductionHandler) AmMember(round uint64, step uint8) bool {
+func (b *Handler) AmMember(round uint64, step uint8) bool {
 	return b.Handler.AmMember(round, step, maxCommitteeSize)
 }
 
-func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
+func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
 	return b.Handler.IsMember(pubKeyBLS, round, step, maxCommitteeSize)
 }
 
-// func (b *reductionHandler) ExtractHeader(e wire.Event) *header.Header {
+// func (b *Handler) ExtractHeader(e wire.Event) *header.Header {
 // 	ev := e.(*Reduction)
 // 	return &header.Header{
 // 		Round: ev.Round,
@@ -45,13 +45,13 @@ func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) 
 // 	}
 // }
 
-// func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
+// func (b *Handler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
 // 	ev := e.(*Reduction)
 // 	return encoding.Write256(r, ev.BlockHash)
 // }
 
 // Verify the BLS signature of the Reduction event. Since the payload is nil, verifying the signature equates to verifying solely the Header
-func (b *reductionHandler) VerifySignature(hdr header.Header, sig []byte) error {
+func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
 	packet := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(packet, hdr, nil); err != nil {
 		return err
@@ -60,11 +60,11 @@ func (b *reductionHandler) VerifySignature(hdr header.Header, sig []byte) error 
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
 }
 
-func (b *reductionHandler) Quorum() int {
+func (b *Handler) Quorum() int {
 	return int(float64(b.CommitteeSize(maxCommitteeSize)) * 0.75)
 }
 
 // Committee returns a VotingCommittee for a given round and step.
-func (b *reductionHandler) Committee(round uint64, step uint8) user.VotingCommittee {
+func (b *Handler) Committee(round uint64, step uint8) user.VotingCommittee {
 	return b.Handler.Committee(round, step, maxCommitteeSize)
 }
