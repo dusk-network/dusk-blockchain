@@ -49,14 +49,14 @@ func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) 
 // 	return encoding.Write256(r, ev.BlockHash)
 // }
 
-// Verify the BLS signature of the Reduction event.
+// Verify the BLS signature of the Reduction event. Since the payload is nil, verifying the signature equates to verifying solely the Header
 func (b *reductionHandler) VerifySignature(hdr header.Header, sig []byte) error {
-	info := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(info, hdr); err != nil {
+	packet := new(bytes.Buffer)
+	if err := header.MarshalSignableVote(packet, hdr); err != nil {
 		return err
 	}
 
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, info.Bytes(), sig)
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
 }
 
 func (b *reductionHandler) Quorum() int {
