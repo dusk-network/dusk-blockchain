@@ -5,11 +5,11 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 var _ Store = (*roundStore)(nil)
@@ -97,7 +97,7 @@ func (s *roundStore) DispatchFinalize() {
 type Coordinator struct {
 	*SyncState
 	eventBus   *eventbus.EventBus
-	keys       user.Keys
+	keys       key.ConsensusKeys
 	factories  []ComponentFactory
 	components []Component
 	eventqueue *Queue
@@ -110,7 +110,7 @@ type Coordinator struct {
 }
 
 // Start the coordinator by wiring the listener to the RoundUpdate
-func Start(eventBus *eventbus.EventBus, keys user.Keys, factories ...ComponentFactory) *Coordinator {
+func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...ComponentFactory) *Coordinator {
 	pkBuf := new(bytes.Buffer)
 
 	if err := encoding.WriteVarBytes(pkBuf, keys.BLSPubKeyBytes); err != nil {
@@ -139,12 +139,12 @@ func Start(eventBus *eventbus.EventBus, keys user.Keys, factories ...ComponentFa
 func (c *Coordinator) initialize(subs []Subscriber) {
 	for _, sub := range subs {
 		c.eventBus.AddDefaultTopic(sub.Topic)
+		// TODO: not all subs need a republisher and validator
 		c.eventBus.Register(sub.Topic, NewRepublisher(c.eventBus, sub.Topic), &Validator{})
 	}
 }
 
 func (c *Coordinator) recreateStore(roundUpdate RoundUpdate, fromScratch bool) {
-
 	// reinstantiating the store prevents the need for locking
 	store := newStore(c)
 
@@ -169,7 +169,11 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	if err := DecodeRound(&m, &r); err != nil {
 		return err
 	}
-	c.FinalizeRound()
+	// On the first round update, the store could still be nil.
+	if c.store != nil {
+		c.FinalizeRound()
+	}
+
 	c.recreateStore(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
@@ -200,7 +204,6 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		// obsolete
 		return nil
 	case header.After:
-		// TODO: queue the message
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
 		return nil
 	}
