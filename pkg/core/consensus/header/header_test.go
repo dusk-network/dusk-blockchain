@@ -11,15 +11,15 @@ import (
 
 // Test that the MarshalSignableVote and UnmarshalSignableVote functions store/retrieve
 // the passed data properly.
-func TestSignableVote(t *testing.T) {
+func TestUnMarshalFields(t *testing.T) {
 	red := header.Header{}
 	red.Round = uint64(1)
 	red.Step = uint8(2)
 	red.BlockHash, _ = crypto.RandEntropy(32)
 	test := header.Header{}
 	buf := new(bytes.Buffer)
-	assert.NoError(t, header.MarshalSignableVote(buf, red))
-	assert.NoError(t, header.UnmarshalSignableVote(buf, &test))
+	assert.NoError(t, header.MarshalFields(buf, red))
+	assert.NoError(t, header.UnmarshalFields(buf, &test))
 	assert.Equal(t, red, test)
 }
 

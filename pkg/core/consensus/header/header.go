@@ -17,6 +17,12 @@ type (
 	}
 )
 
+// Writer writes the header to a Buffer. It is an interface injected into components
+type Writer interface {
+	WriteHeader([]byte, *bytes.Buffer) error
+}
+
+// Phase is used to introduce a time order to the Header
 type Phase uint8
 
 const (
@@ -66,7 +72,7 @@ func Marshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	return MarshalSignableVote(r, consensusEv)
+	return MarshalFields(r, consensusEv)
 }
 
 // Unmarshal unmarshals the buffer into a Header.
@@ -78,34 +84,54 @@ func Unmarshal(r *bytes.Buffer, ev wire.Event) error {
 		return err
 	}
 
-	return UnmarshalSignableVote(r, consensusEv)
+	return UnmarshalFields(r, consensusEv)
+}
+
+// MarshalFields marshals the core field of the Header (i.e. Round, Step and BlockHash)
+func MarshalFields(r *bytes.Buffer, h Header) error {
+	if err := encoding.WriteUint64LE(r, h.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.WriteUint8(r, h.Step); err != nil {
+		return err
+	}
+
+	return encoding.Write256(r, h.BlockHash)
+}
+
+// UnmarshalFields unmarshals the core field of the Header (i.e. Round, Step and BlockHash)
+func UnmarshalFields(r *bytes.Buffer, h *Header) error {
+	if err := encoding.ReadUint64LE(r, &h.Round); err != nil {
+		return err
+	}
+
+	if err := encoding.ReadUint8(r, &h.Step); err != nil {
+		return err
+	}
+
+	h.BlockHash = make([]byte, 32)
+	return encoding.Read256(r, h.BlockHash)
 }
 
 // MarshalSignableVote marshals the fields necessary for a Committee member to cast
 // a Vote (namely the Round, the Step and the BlockHash).
-func MarshalSignableVote(r *bytes.Buffer, vote Header) error {
-	if err := encoding.WriteUint64LE(r, vote.Round); err != nil {
+// Note: UnmarshalSignableVote does not make sense as the only reason to use it would be if we could somehow revert a signature to the preimage and thus unmarshal it into a struct :P
+func MarshalSignableVote(r *bytes.Buffer, h Header, packet []byte) error {
+	if err := MarshalFields(r, h); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint8(r, vote.Step); err != nil {
-		return err
+	if packet != nil {
+		switch len(packet) {
+		case 32:
+			return encoding.Write256(r, packet)
+		case 64:
+			return encoding.Write512(r, packet)
+		default:
+			return encoding.WriteVarBytes(r, packet)
+		}
 	}
 
-	return encoding.Write256(r, vote.BlockHash)
-}
-
-// UnmarshalSignableVote unmarshals the fields necessary for a Committee member to cast
-// a Vote (namely the Round, the Step and the BlockHash).
-func UnmarshalSignableVote(r *bytes.Buffer, vote *Header) error {
-	if err := encoding.ReadUint64LE(r, &vote.Round); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint8(r, &vote.Step); err != nil {
-		return err
-	}
-
-	vote.BlockHash = make([]byte, 32)
-	return encoding.Read256(r, vote.BlockHash)
+	return nil
 }
