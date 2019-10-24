@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -53,6 +54,10 @@ func (a *handler) Quorum() int {
 
 // Verify checks the signature of the set.
 func (a *handler) Verify(ev Agreement) error {
+	if err := verifyWhole(ev); err != nil {
+		return err
+	}
+
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
 		step := uint8(int(ev.Step*2) + (i - 1)) // the event step is the second one of the reduction cycle
@@ -74,6 +79,20 @@ func (a *handler) Verify(ev Agreement) error {
 		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum())
 	}
 	return nil
+}
+
+func verifyWhole(a Agreement) error {
+	payloadBuf := new(bytes.Buffer)
+	if err := MarshalVotes(payloadBuf, a.VotesPerStep); err != nil {
+		return err
+	}
+
+	r := new(bytes.Buffer)
+	if err := header.MarshalSignableVote(r, a.Header, payloadBuf.Bytes()); err != nil {
+		return err
+	}
+
+	return msg.VerifyBLSSignature(a.Header.PubKeyBLS, r.Bytes(), a.SignedVotes())
 }
 
 // ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
@@ -100,7 +119,7 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 }
 
 // VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
-// The signed message needs to carry information about the round and the step
+// The signed message needs to carry information about the round, the step and the blockhash
 func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
 	signed := new(bytes.Buffer)
 	vote := header.Header{
@@ -109,7 +128,7 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 		BlockHash: blockHash,
 	}
 
-	if err := header.MarshalSignableVote(signed, vote); err != nil {
+	if err := header.MarshalSignableVote(signed, vote, nil); err != nil {
 		return err
 	}
 
