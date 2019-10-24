@@ -65,9 +65,9 @@ func TestAccumulation(t *testing.T) {
 
 	createAgreement := newAggroFactory(10)
 
-	// Send two mock events to the accumulator
+	// Send two mock events to the accumulator (they must be different otherwise the store is gonna ignore them)
 	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 2))
 	// Should get something back on CollectedVotesChan
 	events := <-accumulator.CollectedVotesChan
 	// Should have two events
@@ -84,9 +84,9 @@ func TestStop(t *testing.T) {
 
 	// Send two mock events to the accumulator
 	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 2))
 	accumulator.Stop()
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 3))
 
 	// Should NOT get something back on CollectedVotesChan
 	select {
@@ -97,26 +97,48 @@ func TestStop(t *testing.T) {
 	}
 }
 
-/*
 // Test that events which fail verification are not stored.
 func TestFailedVerification(t *testing.T) {
-	// Make an accumulator that should fail verification every time
-	accumulator := consensus.NewAccumulator(newMockHandlerAccumulator(1, 1,
-		errors.New("verification failed"), []byte{}, 2, "foo", true), consensus.NewAccumulatorStore(), consensus.NewState(), false)
-	accumulator.CreateWorkers()
+	// Make an accumulator that has a quorum of 2 and fails verification
+	hdlr := &MockHandler{true, true, user.VotingCommittee{}, 3, false}
+	accumulator := newAccumulator(hdlr, 4)
 	go accumulator.Accumulate()
+
+	createAgreement := newAggroFactory(10)
+
 	// Send two mock events to the accumulator
-	accumulator.Process(newMockEvent())
-	accumulator.Process(newMockEvent())
+	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 2))
 	// We should not get anything from the CollectedVotesChan
 	timer := time.After(100 * time.Millisecond)
 	select {
 	case <-accumulator.CollectedVotesChan:
-		t.Fatal("reached quorum when passed events should have been dropped")
+		assert.FailNow(t, "reached quorum when passed events should have been dropped")
 	case <-timer:
 	}
 }
 
+// Test that events which fail verification are not stored.
+func TestNotInCommittee(t *testing.T) {
+	// Make an accumulator that has a quorum of 1 and is not in the committee
+	hdlr := &MockHandler{true, false, user.VotingCommittee{}, 1, false}
+	accumulator := newAccumulator(hdlr, 4)
+	go accumulator.Accumulate()
+
+	createAgreement := newAggroFactory(10)
+
+	// Send two mock events to the accumulator
+	accumulator.Process(createAgreement(1, 1))
+	// We should not get anything from the CollectedVotesChan
+	timer := time.After(100 * time.Millisecond)
+	select {
+	case <-accumulator.CollectedVotesChan:
+		assert.FailNow(t, "reached quorum when passed events should have been dropped")
+	case <-timer:
+	}
+}
+
+/*
 // Test that events which come from senders which are not in the committee are ignored.
 func TestNonCommitteeEvent(t *testing.T) {
 	// Make an accumulator that should fail verification every time

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestReductionIntegrity tests *synchronously* the fullo chain of a Reduction
+// TestReductionIntegrity tests *synchronously* the full chain of a Reduction
 // message, from creation (by the reducer) to unpacking (supposedly from the
 // peer). The EventBuffer is skipped (while the same processing is applied) to
 // avoid the concurrent process that it would otherwise introduce

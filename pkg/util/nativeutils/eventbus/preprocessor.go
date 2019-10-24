@@ -20,6 +20,7 @@ type ProcessorRegistry interface {
 	Register(topics.Topic, ...Preprocessor) []uint32
 	RemoveProcessor(topics.Topic, uint32)
 	RemoveProcessors(topics.Topic)
+	RemoveAllProcessors()
 }
 
 var _ ProcessorRegistry = (*SafeProcessorRegistry)(nil)
@@ -104,4 +105,13 @@ func (p *SafeProcessorRegistry) RemoveProcessors(topic topics.Topic) {
 	p.Lock()
 	defer p.Unlock()
 	delete(p.preprocessors, topic)
+}
+
+// RemoveAllProcessors removes all TopicProcessors from all topics
+func (p *SafeProcessorRegistry) RemoveAllProcessors() {
+	p.Lock()
+	defer p.Unlock()
+	for topic := range p.preprocessors {
+		delete(p.preprocessors, topic)
+	}
 }

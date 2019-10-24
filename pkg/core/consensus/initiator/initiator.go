@@ -9,7 +9,6 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -17,7 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
@@ -68,29 +66,32 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 }
 
 func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
-	// make some random keys to sign the seed with
-	keys, err := key.NewRandConsensusKeys()
-	if err != nil {
-		l.WithError(err).Warnln("could not start block generation component - problem generating keys")
-		return
-	}
-
-	// reconstruct k
-	k, err := w.ReconstructK()
-	if err != nil {
-		l.WithError(err).Warnln("could not start block generation component - problem reconstructing K")
-		return
-	}
-
-	// get public key that the rewards should go to
-	publicKey := w.PublicKey()
-
-	go func() {
-		// launch generation component
-		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
-			l.WithError(err).Warnln("error launching block generation component")
+	/*
+		// make some random keys to sign the seed with
+		keys, err := key.NewRandConsensusKeys()
+		if err != nil {
+			l.WithError(err).Warnln("could not start block generation component - problem generating keys")
+			return
 		}
-	}()
+
+		// reconstruct k
+		k, err := w.ReconstructK()
+		if err != nil {
+			l.WithError(err).Warnln("could not start block generation component - problem reconstructing K")
+			return
+		}
+
+		// get public key that the rewards should go to
+		publicKey := w.PublicKey()
+
+		go func() {
+			// launch generation component
+			// FIXME: generation needs a consensus.Coordinator as it no longer manages itself
+			//if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
+			//	l.WithError(err).Warnln("error launching block generation component")
+			//}
+		}()
+	*/
 }
 
 func getStartingRound(eventBroker eventbus.Broker, counter *chainsync.Counter) uint64 {

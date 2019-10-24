@@ -7,6 +7,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
+var _ wire.Event = (*ScoreEvent)(nil)
+
 type (
 	// ScoreEvent represents the Score Message with the fields consistent with the Blind Bid data structure
 	ScoreEvent struct {

@@ -47,7 +47,7 @@ func (a *aggregator) collectVote(ev Reduction, hdr header.Header) error {
 	a.voteSets[hash] = sv
 	if len(sv.Set) == a.r.handler.Quorum() {
 		a.addBitSet(sv.StepVotes, sv.Set, hdr.Round, hdr.Step)
-		a.r.addStepVotes(*sv.StepVotes, hdr.BlockHash)
+		a.r.addStepVotes(sv.StepVotes, hdr.BlockHash)
 	}
 	return nil
 }

@@ -19,9 +19,9 @@ type Handler struct {
 
 func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *Handler {
 	return &Handler{
-		Keys:         keys,
-		Committees:   make([]user.VotingCommittee, math.MaxUint8),
-		Provisioners: p,
+		ConsensusKeys: keys,
+		Committees:    make([]user.VotingCommittee, math.MaxUint8),
+		Provisioners:  p,
 	}
 }
 

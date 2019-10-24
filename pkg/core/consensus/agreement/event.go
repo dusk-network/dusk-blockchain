@@ -3,6 +3,7 @@ package agreement
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
@@ -30,10 +31,37 @@ type (
 	// the aggregated compressed signatures of all voters
 	Agreement struct {
 		header.Header
-		SignedVotes  []byte
-		VotesPerStep []StepVotes
+		signedVotes  []byte
+		VotesPerStep []*StepVotes
+		intRepr      *big.Int
 	}
 )
+
+func (a Agreement) Cmp(other Agreement) int {
+	return a.intRepr.Cmp(other.intRepr)
+}
+
+func (a *Agreement) SetSignature(signedVotes []byte) {
+	a.intRepr = new(big.Int).SetBytes(signedVotes)
+	a.signedVotes = signedVotes
+}
+
+func (a Agreement) SignedVotes() []byte {
+	return a.signedVotes
+}
+
+func (a Agreement) Sender() []byte {
+	return a.Header.Sender()
+}
+
+func (a Agreement) Equal(ev wire.Event) bool {
+	aev, ok := ev.(Agreement)
+	if !ok {
+		return false
+	}
+
+	return a.Header.Equal(aev.Header) && a.intRepr.Cmp(aev.intRepr) == 0
+}
 
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash
 func NewStepVotes() *StepVotes {
@@ -85,7 +113,7 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 // Marshal an Agreement event into a buffer.
 func Marshal(r *bytes.Buffer, a Agreement) error {
 	// Marshal BLS Signature of VoteSet
-	if err := encoding.WriteBLS(r, a.SignedVotes); err != nil {
+	if err := encoding.WriteBLS(r, a.SignedVotes()); err != nil {
 		return err
 	}
 
@@ -102,12 +130,13 @@ func Marshal(r *bytes.Buffer, a Agreement) error {
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
 func Unmarshal(r *bytes.Buffer, a *Agreement) error {
-	a.SignedVotes = make([]byte, 33)
-	if err := encoding.ReadBLS(r, a.SignedVotes); err != nil {
+	signedVotes := make([]byte, 33)
+	if err := encoding.ReadBLS(r, signedVotes); err != nil {
 		return err
 	}
+	a.SetSignature(signedVotes)
 
-	votesPerStep := make([]StepVotes, 2)
+	votesPerStep := make([]*StepVotes, 2)
 	if err := UnmarshalVotes(r, votesPerStep); err != nil {
 		return err
 	}
@@ -119,8 +148,9 @@ func Unmarshal(r *bytes.Buffer, a *Agreement) error {
 // New returns an empty Agreement event.
 func New(h header.Header) *Agreement {
 	return &Agreement{
-		VotesPerStep: make([]StepVotes, 2),
-		SignedVotes:  make([]byte, 33),
+		VotesPerStep: make([]*StepVotes, 2),
+		signedVotes:  make([]byte, 33),
+		intRepr:      new(big.Int),
 		Header:       h,
 	}
 }
@@ -137,12 +167,12 @@ func Sign(a *Agreement, keys key.ConsensusKeys) error {
 		return err
 	}
 
-	a.SignedVotes = signedVoteSet.Compress()
+	a.SetSignature(signedVoteSet.Compress())
 	return nil
 }
 
 // UnmarshalVotes unmarshals the array of StepVotes for a single Agreement
-func UnmarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
+func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -154,7 +184,7 @@ func UnmarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
 			return err
 		}
 
-		votes[i] = *sv
+		votes[i] = sv
 	}
 
 	return nil
@@ -195,7 +225,7 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 }
 
 // MarshalVotes marshals an array of StepVotes
-func MarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
+func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	if err := encoding.WriteVarInt(r, uint64(len(votes))); err != nil {
 		return err
 	}
@@ -211,7 +241,7 @@ func MarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
 
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
 // for an ordered set of votes
-func MarshalStepVotes(r *bytes.Buffer, vote StepVotes) error {
+func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	// APK
 	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {
 		return err
@@ -228,3 +258,4 @@ func MarshalStepVotes(r *bytes.Buffer, vote StepVotes) error {
 	}
 	return nil
 }
+

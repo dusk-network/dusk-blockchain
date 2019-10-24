@@ -41,9 +41,9 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Du
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	sel := selection.NewFactory(c.eventBus, c.timerLength)
-	red := reduction.NewFactory(c.eventBus, c.rpcBus, c.Keys, c.timerLength)
-	agr := agreement.NewFactory(c.eventBus, c.Keys)
+	red := reduction.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
+	agr := agreement.NewFactory(c.eventBus, c.ConsensusKeys)
 
-	consensus.Start(c.eventBus, c.Keys, sel, red, agr)
+	consensus.Start(c.eventBus, c.ConsensusKeys, sel, red, agr)
 	log.WithField("process", "factory").Info("Consensus Started")
 }

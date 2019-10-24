@@ -2,11 +2,12 @@ package generation
 
 import (
 	"bytes"
-	"time"
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -14,40 +15,38 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user.Keys, timeOut time.Duration) *generator {
+// FIXME: this component is in a VERY sorry state
+func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus) *generator {
 	return &generator{
 		publisher: publisher,
 		rpcBus:    rpcBus,
-		keys:      keys,
 	}
 }
 
 type generator struct {
-	store     consensus.Store
+	roundInfo consensus.RoundUpdate
 	k         ristretto.Scalar
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus
-	bidList   user.BidList
 
 	blockGen BlockGenerator
 }
 
 // Initialize the generator, by creating listeners for the desired topics.
 // Implements consensus.Component.
-func (g *generator) Initialize(store consensus.Store, ru consensus.RoundUpdate) []consensus.Subscriber {
-	g.store = store
-	g.bidList = ru.BidList
+func (g *generator) Initialize(signer consensus.Signer, ru consensus.RoundUpdate) []consensus.Subscriber {
+	g.roundInfo = ru
 
 	// If we are not in this round's bid list, we can skip initialization, as there
 	// would be no need to listen for these events if we are not qualified to generate
 	// scores and blocks.
-	if !b.blockGen.proofGenerator.InBidList(g.bidList) {
-		return nil
-	}
+	//if !g.blockGen.proofGenerator.InBidList(g.bidList) {
+	//	return nil
+	//}
 
 	regenSubscriber := consensus.Subscriber{
 		Topic:    topics.Regeneration,
-		Listener: consensus.NewSimpleListener(s.CollectRegeneration),
+		Listener: consensus.NewSimpleListener(g.CollectRegeneration),
 	}
 
 	agreementEventSubscriber := consensus.Subscriber{
@@ -65,12 +64,19 @@ func (g *generator) Finalize() {}
 
 func (g *generator) CollectRegeneration(e consensus.Event) error {
 	g.generateBlock()
+	return nil
 }
 
 func (g *generator) CollectAgreementEvent(e consensus.Event) error {
-	cert := g.generateCertificate(e)
+	a := agreement.Agreement{}
+	if err := agreement.Unmarshal(&e.Payload, &a); err != nil {
+		return err
+	}
+
+	cert := g.generateCertificate(a)
+
 	buf := new(bytes.Buffer)
-	if err := block.MarshalCertificate(buf, cert); err != nil {
+	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
 		return err
 	}
 
@@ -79,7 +85,7 @@ func (g *generator) CollectAgreementEvent(e consensus.Event) error {
 }
 
 func (g *generator) generateBlock() {
-	blk, sev, err := g.blockGen.Generate(roundUpdate)
+	blk, sev, err := g.blockGen.Generate(g.roundInfo)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"process": "generation",
@@ -87,18 +93,28 @@ func (g *generator) generateBlock() {
 		return
 	}
 
-	marshalledEvent := b.marshalScore(sev)
-	marshalledBlock := b.marshalBlock(blk)
-	g.publisher.Publish(topics.Gossip, marshalledEvent)
-	g.publisher.Publish(topics.Gossip, marshalledBlock)
+	scoreBuf := new(bytes.Buffer)
+	if err := selection.MarshalScoreEvent(scoreBuf, &sev); err != nil {
+		// TODO: log this
+		return
+	}
+
+	blockBuf := new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(blockBuf, &blk); err != nil {
+		// TODO: log this
+		return
+	}
+
+	g.publisher.Publish(topics.Gossip, scoreBuf)
+	g.publisher.Publish(topics.Gossip, blockBuf)
 }
 
-func (g *generator) generateCertificate() *block.Certificate {
+func (g *generator) generateCertificate(a agreement.Agreement) *block.Certificate {
 	return &block.Certificate{
-		StepOneBatchedSig: a.agreementEvent.VotesPerStep[0].Signature.Compress(),
-		StepTwoBatchedSig: a.agreementEvent.VotesPerStep[1].Signature.Compress(),
-		Step:              a.agreementEvent.Header.Step,
-		StepOneCommittee:  a.agreementEvent.VotesPerStep[0].BitSet,
-		StepTwoCommittee:  a.agreementEvent.VotesPerStep[1].BitSet,
+		StepOneBatchedSig: a.VotesPerStep[0].Signature.Compress(),
+		StepTwoBatchedSig: a.VotesPerStep[1].Signature.Compress(),
+		Step:              a.Header.Step,
+		StepOneCommittee:  a.VotesPerStep[0].BitSet,
+		StepTwoCommittee:  a.VotesPerStep[1].BitSet,
 	}
 }

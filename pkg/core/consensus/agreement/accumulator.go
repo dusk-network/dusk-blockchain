@@ -2,8 +2,6 @@ package agreement
 
 import (
 	"sync"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Accumulator is an event accumulator, that will accumulate events until it
@@ -28,6 +26,7 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 	}
 
 	a.CreateWorkers(workerAmount)
+	go a.Accumulate()
 	return a
 }
 
@@ -48,10 +47,15 @@ func (a *Accumulator) Process(ev Agreement) {
 // Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
-		hash := string(ev.Header.BlockHash)
-		count := a.store.Insert(ev, hash)
+		collected := a.store.Get(ev.BlockHash)
+		count := a.store.Insert(ev)
+		if count == len(collected) {
+			lg.Warnln("Agreement was not accumulated since it is a duplicate")
+			continue
+		}
+
 		if count >= a.handler.Quorum() {
-			votes := a.store.Get(hash)
+			votes := a.store.Get(ev.Header.BlockHash)
 			a.CollectedVotesChan <- votes
 			return
 		}
@@ -67,7 +71,7 @@ func (a *Accumulator) CreateWorkers(amount int) {
 
 	wg.Add(amount)
 	for i := 0; i < amount; i++ {
-		go verify(a.verificationChan, a.eventChan, a.handler.Verify, wg)
+		go verify(a.verificationChan, a.eventChan, a.handler.Verify, &wg)
 	}
 
 	go func() {
@@ -76,8 +80,9 @@ func (a *Accumulator) CreateWorkers(amount int) {
 	}()
 }
 
-func verify(verificationChan <-chan Agreement, eventChan chan<- Agreement, verifyFunc func(Agreement) error, wg sync.WaitGroup) {
+func verify(verificationChan <-chan Agreement, eventChan chan<- Agreement, verifyFunc func(Agreement) error, wg *sync.WaitGroup) {
 	for ev := range verificationChan {
+
 		if err := verifyFunc(ev); err != nil {
 			lg.WithError(err).Errorln("event verification failed")
 			continue
@@ -86,7 +91,7 @@ func verify(verificationChan <-chan Agreement, eventChan chan<- Agreement, verif
 		select {
 		case eventChan <- ev:
 		default:
-			log.WithField("process", "accumulator worker").Debugln("skipped sending event")
+			lg.Warnln("accumulator skipped sending event")
 		}
 	}
 	wg.Done()

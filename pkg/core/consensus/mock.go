@@ -68,7 +68,6 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
 		p.Set.Insert(keys.BLSPubKeyBytes)
 		k[i] = keys
 	}
-
 	return p, k
 }
 
