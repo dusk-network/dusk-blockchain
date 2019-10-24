@@ -10,9 +10,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-crypto/bls"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ed25519"
 )
 
-var _ Store = (*roundStore)(nil)
+var _ Stepper = (*Coordinator)(nil)
+var _ Signer = (*Coordinator)(nil)
+
+var lg = log.WithField("process", "coordinator")
 
 type roundStore struct {
 	subscribers map[topics.Topic][]Listener
@@ -30,31 +35,8 @@ func newStore(c *Coordinator) *roundStore {
 	return s
 }
 
-// WriteHeader writes the header to a payload before publishing the event
-func (s *roundStore) WriteHeader(blockHash []byte, payload *bytes.Buffer) error {
-	hBuf, err := s.coordinator.header(blockHash)
-	if err != nil {
-		return err
-	}
-
-	if _, err := hBuf.ReadFrom(payload); err != nil {
-		return err
-	}
-
-	*payload = hBuf
-	return nil
-}
-
-func (s *roundStore) RequestSignature(payload []byte) ([]byte, error) {
-	return s.coordinator.sign(payload)
-}
-
-func (s *roundStore) RequestStepUpdate() {
-	s.coordinator.requestStepUpdate()
-}
-
 func (s *roundStore) addComponent(component Component, round RoundUpdate) []Subscriber {
-	subs := component.Initialize(s, round)
+	subs := component.Initialize(s.coordinator, s.coordinator, round)
 	for _, sub := range subs {
 		s.subscribe(sub.Topic, sub)
 	}
@@ -159,28 +141,17 @@ func (c *Coordinator) recreateStore(roundUpdate RoundUpdate, fromScratch bool) {
 	c.swapStore(store)
 }
 
-func (c *Coordinator) FinalizeRound() {
-	c.store.DispatchFinalize()
-	c.eventqueue.Clear(c.Round())
-}
-
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	r := RoundUpdate{}
 	if err := DecodeRound(&m, &r); err != nil {
 		return err
 	}
+
 	c.FinalizeRound()
 	c.recreateStore(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
 	return nil
-}
-
-// swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and CollectEvent
-func (c *Coordinator) swapStore(store *roundStore) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.store = store
 }
 
 func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
@@ -197,10 +168,10 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 
 	switch hdr.Compare(c.Round(), c.Step()) {
 	case header.Before:
-		// obsolete
+		lg.WithField("topic", topic).Debugln("discarding obsolete event")
 		return nil
 	case header.After:
-		// TODO: queue the message
+		lg.WithField("topic", topic).Debugln("storing future event")
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
 		return nil
 	}
@@ -209,7 +180,21 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 	return nil
 }
 
-func (c *Coordinator) requestStepUpdate() {
+// swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and CollectEvent
+func (c *Coordinator) swapStore(store *roundStore) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.store = store
+}
+
+func (c *Coordinator) FinalizeRound() {
+	if c.store != nil {
+		c.store.DispatchFinalize()
+		c.eventqueue.Clear(c.Round())
+	}
+}
+
+func (c *Coordinator) RequestStepUpdate() {
 	c.IncrementStep()
 	c.store.DispatchStepUpdate(c.Step())
 
@@ -219,8 +204,73 @@ func (c *Coordinator) requestStepUpdate() {
 	}
 }
 
+// XXX: adjust the signature verification on reduction (and agreement)
+// Sign uses the blockhash (which is lost when decoupling the Header and the Payload) to recompose the Header and sign the Payload
+// by adding it to the signature. Argument packet can be nil
+func (c *Coordinator) Sign(hash, packet []byte) ([]byte, error) {
+	preimage := new(bytes.Buffer)
+	h := header.Header{
+		Round:     c.Round(),
+		Step:      c.Step(),
+		BlockHash: hash,
+		PubKeyBLS: c.keys.BLSPubKeyBytes,
+	}
+
+	if err := header.MarshalSignableVote(preimage, h, packet); err != nil {
+		return nil, err
+	}
+
+	signedHash, err := bls.Sign(c.keys.BLSSecretKey, c.keys.BLSPubKey, preimage.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return signedHash.Compress(), nil
+}
+
+// SendAuthenticated sign the payload with Ed25519 and publishes it to the Gossip topic
+func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer) error {
+	buf, err := c.header(blockHash)
+	if err != nil {
+		return err
+	}
+
+	if _, err := buf.ReadFrom(payload); err != nil {
+		return err
+	}
+
+	edSigned := ed25519.Sign(*c.keys.EdSecretKey, buf.Bytes())
+
+	// messages start from the signature
+	whole := new(bytes.Buffer)
+	if err := encoding.Write512(whole, edSigned); err != nil {
+		return err
+	}
+
+	// adding Ed public key
+	if err := encoding.Write256(whole, c.keys.EdPubKeyBytes); err != nil {
+		return err
+	}
+
+	// adding marshalled header+payload
+	if _, err := whole.ReadFrom(payload); err != nil {
+		return err
+	}
+
+	// prepending topic
+	if err := topics.Prepend(whole, topic); err != nil {
+		return err
+	}
+
+	// gossip away
+	c.eventBus.Publish(topics.Gossip, whole)
+	return nil
+}
+
+// header reconstructs the header of a message from the blockHash
 func (c *Coordinator) header(blockHash []byte) (bytes.Buffer, error) {
 	buf := c.pubkeyBuf
+	// ToBuffer is part of the SyncState struct
 	stateBuf := c.ToBuffer()
 	if _, err := buf.ReadFrom(&stateBuf); err != nil {
 		return buf, err
@@ -231,27 +281,4 @@ func (c *Coordinator) header(blockHash []byte) (bytes.Buffer, error) {
 	}
 
 	return buf, nil
-}
-
-func (c *Coordinator) sign(payload []byte) ([]byte, error) {
-	round, step := c.Round(), c.Step()
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, round); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteUint8(buf, step); err != nil {
-		return nil, err
-	}
-
-	if _, err := buf.Write(payload); err != nil {
-		return nil, err
-	}
-
-	signedHash, err := bls.Sign(c.keys.BLSSecretKey, c.keys.BLSPubKey, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	return signedHash.Compress(), nil
 }

@@ -32,12 +32,12 @@ func newComponent(publisher eventbus.Publisher, keys user.Keys, workerAmount int
 	}
 }
 
-func (a *agreement) Initialize(store consensus.Store, r consensus.RoundUpdate) []consensus.Subscriber {
+func (a *agreement) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.Subscriber {
 	a.handler = newHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	agreementSubscriber := consensus.Subscriber{
-		consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter),
-		topics.Agreement,
+		Listener: consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter),
+		Topic:    topics.Agreement,
 	}
 
 	go a.listen()
@@ -48,15 +48,22 @@ func (a *agreement) Filter(hdr header.Header) bool {
 	return !a.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
+// CollectAgreementEvent is the callback to get Events from the Coordinator. It forwards the events to the accumulator until Quorum is reached
 func (a *agreement) CollectAgreementEvent(event consensus.Event) error {
-
-	ev := New(event.Header)
-	if err := Unmarshal(&event.Payload, ev); err != nil {
+	ev, err := convertToAgreement(event)
+	if err != nil {
 		return err
 	}
-
 	a.accumulator.Process(*ev)
 	return nil
+}
+
+func convertToAgreement(event consensus.Event) (*Agreement, error) {
+	ev := New(event.Header)
+	if err := Unmarshal(&event.Payload, ev); err != nil {
+		return nil, err
+	}
+	return ev, nil
 }
 
 // SetStep implements Component

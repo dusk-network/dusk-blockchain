@@ -24,9 +24,10 @@ type reducer struct {
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus
 	keys      user.Keys
-	store     consensus.Store
+	stepper   consensus.Stepper
+	signer    consensus.Signer
 
-	svs     []agreement.StepVotes
+	svs     []*agreement.StepVotes
 	handler *reductionHandler
 
 	lock sync.RWMutex
@@ -43,7 +44,7 @@ func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user
 	return &reducer{
 		publisher: publisher,
 		rpcBus:    rpcBus,
-		svs:       make([]agreement.StepVotes, 0, 2),
+		svs:       make([]*agreement.StepVotes, 0, 2),
 		keys:      keys,
 		timeOut:   timeOut,
 	}
@@ -52,8 +53,9 @@ func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user
 // Initialize the reduction component, by instantiating the handler and creating
 // the topic subscribers.
 // Implements consensus.Component
-func (r *reducer) Initialize(store consensus.Store, ru consensus.RoundUpdate) []consensus.Subscriber {
-	r.store = store
+func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.Subscriber {
+	r.stepper = stepper
+	r.signer = signer
 	r.handler = newReductionHandler(r.keys, ru.P)
 	r.timer = &timer{r: r}
 
@@ -78,10 +80,10 @@ func (r *reducer) Finalize() {
 }
 
 func (r *reducer) resetStepVotes() {
-	r.svs = make([]agreement.StepVotes, 0, 2)
+	r.svs = make([]*agreement.StepVotes, 0, 2)
 }
 
-func (r *reducer) addStepVotes(sv agreement.StepVotes, blockHash []byte) {
+func (r *reducer) addStepVotes(sv *agreement.StepVotes, blockHash []byte) {
 	r.svs = append(r.svs, sv)
 
 	if r.isAggregatorActive() {
@@ -91,33 +93,24 @@ func (r *reducer) addStepVotes(sv agreement.StepVotes, blockHash []byte) {
 	}
 
 	r.collectStepVotes(r.svs, blockHash)
-	r.store.RequestStepUpdate()
+	r.stepper.RequestStepUpdate()
 
 	if !r.isAggregatorActive() {
 		r.publishRegeneration()
 	}
 }
 
-func (r *reducer) collectStepVotes(svs []agreement.StepVotes, blockHash []byte) {
+func (r *reducer) collectStepVotes(svs []*agreement.StepVotes, blockHash []byte) {
 	switch len(svs) {
 	case 1:
-		r.sendReductionVote(blockHash)
+		if err := r.sendReduction(blockHash); err != nil {
+			//TODO: handle
+		}
 	case 2:
-		m := new(bytes.Buffer)
-		if err := agreement.MarshalVotes(m, svs); err != nil {
-			//TODO: handle
-		}
-		sig, err := r.store.RequestSignature(m.Bytes())
-		if err != nil {
+		if err := r.sendAgreement(blockHash, svs); err != nil {
 			//TODO: handle
 		}
 
-		ag, err := r.generateAgreement(blockHash, svs, sig)
-		if err != nil {
-			//TODO: handle
-		}
-
-		r.sendAgreement(ag)
 		r.resetStepVotes()
 	default:
 		// This function should never be called with any other length than 1 or 2.
@@ -128,7 +121,7 @@ func (r *reducer) collectStepVotes(svs []agreement.StepVotes, blockHash []byte) 
 // CollectBestScore activates the 2-step reduction cycle.
 func (r *reducer) CollectBestScore(e consensus.Event) error {
 	r.activateAggregator()
-	r.sendReductionVote(e.Payload.Bytes())
+	r.sendReduction(e.Payload.Bytes())
 	r.startReduction()
 	return nil
 }
@@ -189,61 +182,44 @@ func (r *reducer) publishRegeneration() {
 	r.publisher.Publish(topics.BlockRegeneration, regenerationPackage)
 }
 
-func (r *reducer) sendReductionVote(hash []byte) error {
-	ev, err := r.generateReduction(hash)
+func (r *reducer) sendReduction(hash []byte) error {
+	sig, err := r.signer.Sign(hash, nil)
 	if err != nil {
 		return err
 	}
 
-	return r.sendReduction(hash, ev)
-}
-
-func (r *reducer) generateReduction(hash []byte) (*bytes.Buffer, error) {
-
-	sig, err := r.store.RequestSignature(hash)
-	if err != nil {
-		return nil, err
-	}
-
-	vote := new(bytes.Buffer)
-	if err := encoding.Write256(vote, hash); err != nil {
-		return nil, err
-	}
-
-	if err := encoding.WriteBLS(vote, sig); err != nil {
-		return nil, err
-	}
-
-	return vote, nil
-}
-
-func (r *reducer) sendReduction(hash []byte, m *bytes.Buffer) error {
-	if err := r.store.WriteHeader(hash, m); err != nil {
+	payload := new(bytes.Buffer)
+	if err := encoding.WriteBLS(payload, sig); err != nil {
 		return err
 	}
-	r.publisher.Publish(topics.Reduction, m)
-	return nil
+
+	return r.signer.SendAuthenticated(topics.Reduction, hash, payload)
 }
 
-func (r *reducer) generateAgreement(hash []byte, svs []agreement.StepVotes, sig []byte) (*bytes.Buffer, error) {
+func (r *reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) error {
+	// first we sign the marshalled StepVotes
+	payloadBuf := new(bytes.Buffer)
+	if err := agreement.MarshalVotes(payloadBuf, svs); err != nil {
+		//TODO: handle
+	}
+
+	sig, err := r.signer.Sign(hash, payloadBuf.Bytes())
+	if err != nil {
+		//TODO: handle
+	}
+
+	// then we create the full BLS signed Agreement
 	ev := agreement.Agreement{}
 	ev.SetSignature(sig)
 	ev.VotesPerStep = svs
 
-	buf := new(bytes.Buffer)
-	if err := agreement.Marshal(buf, ev); err != nil {
-		return nil, err
+	eventBuf := new(bytes.Buffer)
+	if err := agreement.Marshal(eventBuf, ev); err != nil {
+		return err
 	}
 
-	if err := r.store.WriteHeader(hash, buf); err != nil {
-		return nil, err
-	}
-
-	return buf, nil
-}
-
-func (r *reducer) sendAgreement(m *bytes.Buffer) {
-	r.publisher.Publish(topics.Agreement, m)
+	// then we forward the marshalled Agreement to the store to be sent
+	return r.signer.SendAuthenticated(topics.Agreement, hash, eventBuf)
 }
 
 func (r *reducer) isAggregatorActive() bool {
