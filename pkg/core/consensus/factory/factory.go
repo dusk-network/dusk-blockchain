@@ -5,7 +5,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -41,9 +42,10 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Du
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
 	sel := selection.NewFactory(c.eventBus, c.timerLength)
-	red := reduction.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
+	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
+	redSecondStep := secondstep.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
 	agr := agreement.NewFactory(c.eventBus, c.ConsensusKeys)
 
-	consensus.Start(c.eventBus, c.ConsensusKeys, sel, red, agr)
+	consensus.Start(c.eventBus, c.ConsensusKeys, sel, redFirstStep, redSecondStep, agr)
 	log.WithField("process", "factory").Info("Consensus Started")
 }
