@@ -117,9 +117,8 @@ func (s *selector) publishBestEvent() error {
 		return err
 	}
 
-	// TODO: check the order of events
-	s.stepper.RequestStepUpdate()
 	s.publisher.Publish(topics.BestScore, buf)
+	s.stepper.RequestStepUpdate()
 	return nil
 }
 
