@@ -59,6 +59,14 @@ func (s *store) String() string {
 	return sb.String()
 }
 
+func (s *store) Size() int {
+	var i int
+	for _, v := range s.collected {
+		i += len(v)
+	}
+	return i
+}
+
 // Put collects the Agreement and returns the number of agreement stored for a blockhash
 func (s *store) Insert(a Agreement) int {
 	s.Lock()
