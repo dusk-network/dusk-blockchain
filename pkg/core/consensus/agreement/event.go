@@ -32,7 +32,7 @@ type (
 	Agreement struct {
 		header.Header
 		signedVotes  []byte
-		VotesPerStep []StepVotes
+		VotesPerStep []*StepVotes
 		intRepr      *big.Int
 	}
 )
@@ -136,7 +136,7 @@ func Unmarshal(r *bytes.Buffer, a *Agreement) error {
 	}
 	a.SetSignature(signedVotes)
 
-	votesPerStep := make([]StepVotes, 2)
+	votesPerStep := make([]*StepVotes, 2)
 	if err := UnmarshalVotes(r, votesPerStep); err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func Unmarshal(r *bytes.Buffer, a *Agreement) error {
 // New returns an empty Agreement event.
 func New(h header.Header) *Agreement {
 	return &Agreement{
-		VotesPerStep: make([]StepVotes, 2),
+		VotesPerStep: make([]*StepVotes, 2),
 		signedVotes:  make([]byte, 33),
 		intRepr:      new(big.Int),
 		Header:       h,
@@ -172,7 +172,7 @@ func Sign(a *Agreement, keys user.Keys) error {
 }
 
 // UnmarshalVotes unmarshals the array of StepVotes for a single Agreement
-func UnmarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
+func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
@@ -184,7 +184,7 @@ func UnmarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
 			return err
 		}
 
-		votes[i] = *sv
+		votes[i] = sv
 	}
 
 	return nil
@@ -225,7 +225,7 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 }
 
 // MarshalVotes marshals an array of StepVotes
-func MarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
+func MarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	if err := encoding.WriteVarInt(r, uint64(len(votes))); err != nil {
 		return err
 	}
@@ -241,7 +241,7 @@ func MarshalVotes(r *bytes.Buffer, votes []StepVotes) error {
 
 // MarshalStepVotes marshals the aggregated form of the BLS PublicKey and Signature
 // for an ordered set of votes
-func MarshalStepVotes(r *bytes.Buffer, vote StepVotes) error {
+func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	// APK
 	if err := encoding.WriteVarBytes(r, vote.Apk.Marshal()); err != nil {
 		return err
@@ -258,3 +258,4 @@ func MarshalStepVotes(r *bytes.Buffer, vote StepVotes) error {
 	}
 	return nil
 }
+
