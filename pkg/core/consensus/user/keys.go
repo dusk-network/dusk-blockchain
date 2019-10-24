@@ -2,6 +2,8 @@ package user
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
 	"io"
 
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -16,6 +18,10 @@ type Keys struct {
 	EdPubKey       *ed25519.PublicKey
 	EdPubKeyBytes  []byte
 	EdSecretKey    *ed25519.PrivateKey
+}
+
+func (k Keys) String() string {
+	return fmt.Sprintf("0x%s", hex.EncodeToString(k.BLSPubKeyBytes))
 }
 
 // NewRandKeys will generate and return new bls and ed25519
