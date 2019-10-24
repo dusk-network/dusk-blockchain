@@ -20,7 +20,7 @@ type selector struct {
 	timer   *timer
 	timeout time.Duration
 
-	store consensus.Store
+	stepper consensus.Stepper
 }
 
 // NewComponent creates and launches the component which responsibility is to validate
@@ -33,8 +33,8 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *selector
 	}
 }
 
-func (s *selector) Initialize(store consensus.Store, r consensus.RoundUpdate) []consensus.Subscriber {
-	s.store = store
+func (s *selector) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.Subscriber {
+	s.stepper = stepper
 	s.handler = newScoreHandler(r.BidList)
 
 	scoreSubscriber := consensus.Subscriber{
@@ -122,7 +122,7 @@ func (s *selector) publishBestEvent() error {
 	}
 
 	// TODO: check the order of events
-	s.store.RequestStepUpdate()
+	s.stepper.RequestStepUpdate()
 	s.publisher.Publish(topics.BestScore, buf)
 	return nil
 }

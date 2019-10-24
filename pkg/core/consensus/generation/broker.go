@@ -24,7 +24,6 @@ func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus) *generato
 
 type generator struct {
 	roundInfo consensus.RoundUpdate
-	store     consensus.Store
 	k         ristretto.Scalar
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus
@@ -34,8 +33,7 @@ type generator struct {
 
 // Initialize the generator, by creating listeners for the desired topics.
 // Implements consensus.Component.
-func (g *generator) Initialize(store consensus.Store, ru consensus.RoundUpdate) []consensus.Subscriber {
-	g.store = store
+func (g *generator) Initialize(signer consensus.Signer, ru consensus.RoundUpdate) []consensus.Subscriber {
 	g.roundInfo = ru
 
 	// If we are not in this round's bid list, we can skip initialization, as there

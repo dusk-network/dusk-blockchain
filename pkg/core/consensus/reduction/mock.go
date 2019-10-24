@@ -56,7 +56,7 @@ func MockReduction(keys user.Keys, hash []byte, round uint64, step uint8) Reduct
 	}
 
 	r := new(bytes.Buffer)
-	_ = header.MarshalSignableVote(r, hdr)
+	_ = header.MarshalSignableVote(r, hdr, nil)
 
 	sigma, _ := bls.Sign(keys.BLSSecretKey, keys.BLSPubKey, r.Bytes())
 	reduction.SignedHash = sigma.Compress()
