@@ -1,22 +1,53 @@
 package agreement_test
 
-/*
-// Test the accumulation of agreement events. It should result in the agreement component
-// publishing a round update.
-func TestBroker(t *testing.T) {
-	p, keys := consensus.MockProvisioners(3)
-	eb, winningHashChan := initAgreement(keys[0])
-	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+import (
+	"testing"
 
-	hash, _ := crypto.RandEntropy(32)
-	for i := 0; i < 3; i++ {
-		eb.Publish(topics.Agreement, agreement.MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 3)))
-	}
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+)
 
-	winningHash := <-winningHashChan
-	assert.Equal(t, hash, winningHash.Bytes())
+func init() {
+	logrus.SetLevel(logrus.TraceLevel)
 }
 
+// Test the accumulation of agreement events. It should result in the agreement component
+// publishing a round update.
+func TestAgreement(t *testing.T) {
+	nr := 50
+	_, hlp := wireAgreement(nr)
+	hash, _ := crypto.RandEntropy(32)
+	vc := hlp.P.CreateVotingCommittee(1, 1, nr)
+	for i := 0; i < nr; i++ {
+		aev := agreement.MockWire(hash, 1, 1, hlp.Keys, vc, i)
+		hlp.Bus.Publish(topics.Agreement, aev)
+	}
+
+	res := <-hlp.WinningHashChan
+	assert.Equal(t, hash, res.Bytes())
+}
+
+func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helper) {
+	eb := eventbus.New()
+	h := agreement.NewHelper(eb, nrProvisioners)
+	factory := agreement.NewFactory(eb, h.Keys[0])
+	coordinator := consensus.Start(eb, h.Keys[0], factory)
+	// starting up the coordinator
+	ru := *consensus.MockRoundUpdateBuffer(1, h.P, nil)
+	if err := coordinator.CollectRoundUpdate(ru); err != nil {
+		panic(err)
+	}
+	// we need to remove annoying ED25519 verification or the Republisher
+	eb.RemoveAllProcessors()
+	return coordinator, h
+}
+
+/*
 // Test that the agreement component does not emit a round update if it doesn't get
 // the desired amount of events.
 func TestNoQuorum(t *testing.T) {
@@ -92,6 +123,7 @@ func initAgreement(k user.Keys) (eventbus.Broker, <-chan bytes.Buffer) {
 	winningHashChan := make(chan bytes.Buffer, 1)
 	chanListener := eventbus.NewChanListener(winningHashChan)
 	bus.Subscribe(topics.WinningBlockHash, chanListener)
+
 	go agreement.Launch(bus, k)
 	time.Sleep(200 * time.Millisecond)
 	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
