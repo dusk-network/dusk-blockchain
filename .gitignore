@@ -30,3 +30,6 @@ demo/**.*
 
 # wallet.dat
 *wallet.dat
+
+# Testnet binary
+launch/testnet/testnet
