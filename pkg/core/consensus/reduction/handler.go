@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 const maxCommitteeSize = 64
@@ -21,7 +22,7 @@ type (
 
 // newReductionHandler will return a ReductionHandler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
-func newReductionHandler(keys user.Keys, p user.Provisioners) *reductionHandler {
+func newReductionHandler(keys key.ConsensusKeys, p user.Provisioners) *reductionHandler {
 	return &reductionHandler{
 		Handler: committee.NewHandler(keys, p),
 	}

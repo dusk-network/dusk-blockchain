@@ -11,6 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 const MaxCommitteeSize = 64
@@ -29,7 +30,7 @@ type handler struct {
 }
 
 // newHandler returns an initialized handler.
-func newHandler(keys user.Keys, p user.Provisioners) *handler {
+func newHandler(keys key.ConsensusKeys, p user.Provisioners) *handler {
 	return &handler{
 		Handler: committee.NewHandler(keys, p),
 	}

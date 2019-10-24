@@ -11,19 +11,20 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -47,6 +48,10 @@ type Chain struct {
 	// collector channels
 	candidateChan   <-chan *block.Block
 	certificateChan <-chan certMsg
+
+	// rpcbus channels
+	getLastBlockChan         <-chan rpcbus.Request
+	verifyCandidateBlockChan <-chan rpcbus.Request
 }
 
 // New returns a new chain object
@@ -62,15 +67,23 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	candidateChan := initBlockCollector(eventBus, topics.Candidate)
 	certificateChan := initCertificateCollector(eventBus)
 
+	// set up rpcbus channels
+	getLastBlockChan := make(chan rpcbus.Request, 1)
+	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
+	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
+
 	chain := &Chain{
-		eventBus:        eventBus,
-		rpcBus:          rpcBus,
-		db:              db,
-		prevBlock:       *l.chainTip,
-		candidateChan:   candidateChan,
-		p:               user.NewProvisioners(),
-		bidList:         &user.BidList{},
-		certificateChan: certificateChan,
+		eventBus:                 eventBus,
+		rpcBus:                   rpcBus,
+		db:                       db,
+		prevBlock:                *l.chainTip,
+		candidateChan:            candidateChan,
+		p:                        user.NewProvisioners(),
+		bidList:                  &user.BidList{},
+		certificateChan:          certificateChan,
+		getLastBlockChan:         getLastBlockChan,
+		verifyCandidateBlockChan: verifyCandidateBlockChan,
 	}
 
 	chain.restoreConsensusData()
@@ -93,7 +106,7 @@ func (c *Chain) Listen() {
 			c.addCertificate(certMsg.hash, certMsg.cert)
 
 		// wire.RPCBus requests handlers
-		case r := <-rpcbus.GetLastBlockChan:
+		case r := <-c.getLastBlockChan:
 
 			buf := new(bytes.Buffer)
 
@@ -101,20 +114,20 @@ func (c *Chain) Listen() {
 			prevBlock := c.prevBlock
 			c.mu.RUnlock()
 
-			if err := block.Marshal(buf, &prevBlock); err != nil {
-				r.ErrChan <- err
+			if err := marshalling.MarshalBlock(buf, &prevBlock); err != nil {
+				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 				continue
 			}
 
-			r.RespChan <- *buf
+			r.RespChan <- rpcbus.Response{*buf, nil}
 
-		case r := <-rpcbus.VerifyCandidateBlockChan:
+		case r := <-c.verifyCandidateBlockChan:
 			if err := c.verifyCandidateBlock(r.Params.Bytes()); err != nil {
-				r.ErrChan <- err
+				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 				continue
 			}
 
-			r.RespChan <- bytes.Buffer{}
+			r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 		}
 	}
 }
@@ -134,7 +147,7 @@ func (c *Chain) LaunchConsensus() {
 
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := topics.Block.ToBuffer()
-	if err := block.Marshal(&buffer, &blk); err != nil {
+	if err := marshalling.MarshalBlock(&buffer, &blk); err != nil {
 		return err
 	}
 
@@ -165,7 +178,7 @@ func (c *Chain) Close() error {
 
 func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := block.Unmarshal(&m, blk); err != nil {
+	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
 		return err
 	}
 
@@ -248,7 +261,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// mempool.Mempool
 	// consensus.generation.broker
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, &blk); err != nil {
+	if err := marshalling.MarshalBlock(buf, &blk); err != nil {
 		l.Errorf("block encoding failed: %s", err.Error())
 		return err
 	}

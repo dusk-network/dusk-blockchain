@@ -4,19 +4,19 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 type Factory struct {
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus
-	keys      user.Keys
+	keys      key.ConsensusKeys
 	timeout   time.Duration
 }
 
-func NewFactory(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user.Keys, timeout time.Duration) *Factory {
+func NewFactory(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) *Factory {
 	return &Factory{
 		publisher,
 		rpcBus,

@@ -3,7 +3,6 @@ package chain
 import (
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -13,8 +12,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,7 +51,7 @@ func TestDemoSaveFunctionality(t *testing.T) {
 }
 */
 
-func createMockedCertificate(hash []byte, round uint64, keys []user.Keys, p *user.Provisioners) *block.Certificate {
+func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
 	votes := agreement.GenVotes(hash, round, 1, keys, p.CreateVotingCommittee(round, 1, len(p.Members)))
 	return &block.Certificate{
 		StepOneBatchedSig: votes[0].Signature.Compress(),
@@ -161,7 +162,7 @@ func TestRemoveExpired(t *testing.T) {
 func TestRemove(t *testing.T) {
 	_, _, c := setupChainTest(t, false)
 
-	keys, _ := user.NewRandKeys()
+	keys, _ := key.NewRandConsensusKeys()
 	if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 1000); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +181,7 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 	_, _, c := setupChainTest(t, false)
 
 	for i := 0; i < 10; i++ {
-		keys, _ := user.NewRandKeys()
+		keys, _ := key.NewRandConsensusKeys()
 		if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 1000); err != nil {
 			t.Fatal(err)
 		}

@@ -8,11 +8,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 // MockAgreementEvent returns a mocked Agreement Event, to be used for testing purposes.
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing
-func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee, iterativeIdx ...int) *Agreement {
+func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee, iterativeIdx ...int) *Agreement {
 
 	idx := 0
 	if len(iterativeIdx) != 0 {
@@ -44,7 +45,7 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []user.Keys,
 }
 
 // MockWire creates a buffer representing an Agreement travelling to other Provisioners
-func MockWire(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee, i ...int) *bytes.Buffer {
+func MockWire(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee, i ...int) *bytes.Buffer {
 	ev := MockAgreementEvent(hash, round, step, keys, committee, i...)
 
 	buf := new(bytes.Buffer)
@@ -62,7 +63,7 @@ func MockWire(hash []byte, round uint64, step uint8, keys []user.Keys, committee
 // of it as a `*bytes.Buffer`.
 // The `i` parameter is used to diversify the mocks to avoid duplicates
 // NOTE: it does not include the topic nor the Header
-func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee, i ...int) *bytes.Buffer {
+func MockAgreement(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee, i ...int) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 	ev := MockAgreementEvent(hash, round, step, keys, committee, i...)
 	_ = Marshal(buf, *ev)
@@ -70,7 +71,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []user.Keys, comm
 }
 
 // MockConsensusEvent mocks a consensus.Event with an Agreement payload.
-func MockConsensusEvent(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee, i ...int) consensus.Event {
+func MockConsensusEvent(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee, i ...int) consensus.Event {
 	aev := MockAgreementEvent(hash, round, step, keys, committee, i...)
 	hdr := aev.Header
 
@@ -85,7 +86,7 @@ func MockConsensusEvent(hash []byte, round uint64, step uint8, keys []user.Keys,
 
 // GenVotes randomly generates a slice of StepVotes with the indicated lenght.
 // Albeit random, the generation is consistent with the rules of Votes
-func GenVotes(hash []byte, round uint64, step uint8, keys []user.Keys, committee user.VotingCommittee) []*StepVotes {
+func GenVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, committee user.VotingCommittee) []*StepVotes {
 	if len(keys) < 2 {
 		panic("At least two votes are required to mock an Agreement")
 	}

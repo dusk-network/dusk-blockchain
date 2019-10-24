@@ -4,11 +4,11 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 
-	core "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	core "github.com/dusk-network/dusk-wallet/transactions"
 )
 
 // File purpose is to define all arguments and resolvers relevant to "blocks" query only

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-wallet/block"
 )
 
 // Test the behaviour of the data broker, when it receives a GetData message.
@@ -45,7 +46,7 @@ func TestSendData(t *testing.T) {
 
 		// Decode block
 		blk := block.NewBlock()
-		if err := block.Unmarshal(buf, blk); err != nil {
+		if err := marshalling.UnmarshalBlock(buf, blk); err != nil {
 			t.Fatal(err)
 		}
 
