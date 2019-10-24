@@ -65,6 +65,7 @@ const (
 	Log
 	Monitor
 	Test
+	StepVotes
 )
 
 type topicBuf struct {
@@ -118,6 +119,7 @@ var Topics = [...]topicBuf{
 	topicBuf{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
 	topicBuf{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
 	topicBuf{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
+	topicBuf{StepVotes, *(bytes.NewBuffer([]byte{byte(StepVotes)})), "stepvotes"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {
