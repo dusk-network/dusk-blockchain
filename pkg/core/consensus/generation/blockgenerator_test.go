@@ -10,26 +10,28 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 func respond(rpcBus *rpcbus.RPCBus, b block.Block) {
-	r := <-rpcbus.GetLastBlockChan
+	g := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastBlock, g)
+	r := <-g
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, &b); err != nil {
+	if err := marshalling.MarshalBlock(buf, &b); err != nil {
 		panic(err)
 	}
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 }
 
 func TestGenerateBlock(t *testing.T) {
@@ -44,7 +46,7 @@ func TestGenerateBlock(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	keys, _ := user.NewRandKeys()
+	keys, _ := key.NewRandConsensusKeys()
 	// Block Generator to construct a valid block
 	gen := newBlockGenerator(h.genWallet.PublicKey(), h.rpc, nil, keys)
 
@@ -106,7 +108,7 @@ func publishRandomTxs(t *testing.T, h *harness) (int, error) {
 
 		// Publish non-coinbase tx
 		buf := new(bytes.Buffer)
-		err := transactions.Marshal(buf, tx)
+		err := marshalling.MarshalTx(buf, tx)
 		if err != nil {
 			return 0, err
 		}
@@ -170,7 +172,7 @@ func newTestHarness(t *testing.T) *harness {
 	h.rpc = rpcbus.New()
 
 	// Mock mempool with no verification procedure
-	h.m = mempool.NewMempool(h.eb, func(tx transactions.Transaction) error {
+	h.m = mempool.NewMempool(h.eb, h.rpc, func(tx transactions.Transaction) error {
 		return nil
 	})
 

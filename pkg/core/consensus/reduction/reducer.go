@@ -8,11 +8,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,7 +23,7 @@ var emptyHash = [32]byte{}
 type reducer struct {
 	publisher eventbus.Publisher
 	rpcBus    *rpcbus.RPCBus
-	keys      user.Keys
+	keys      key.ConsensusKeys
 	stepper   consensus.Stepper
 	signer    consensus.Signer
 
@@ -40,7 +40,7 @@ type reducer struct {
 }
 
 // NewComponent returns an uninitialized reduction component.
-func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys user.Keys, timeOut time.Duration) *reducer {
+func newComponent(publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) *reducer {
 	return &reducer{
 		publisher: publisher,
 		rpcBus:    rpcBus,
@@ -163,8 +163,8 @@ func (r *reducer) verifyCandidateBlock(blockHash []byte) error {
 	// If our result was not a zero value hash, we should first verify it
 	// before voting on it again
 	if !bytes.Equal(blockHash, emptyHash[:]) {
-		req := rpcbus.NewRequest(*(bytes.NewBuffer(blockHash)), 5)
-		if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req); err != nil {
+		req := rpcbus.NewRequest(*(bytes.NewBuffer(blockHash)))
+		if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req, 5*time.Second); err != nil {
 			log.WithFields(log.Fields{
 				"process": "reduction",
 				"error":   err,

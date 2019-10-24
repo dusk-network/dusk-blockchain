@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +18,7 @@ func TestRemove(t *testing.T) {
 	nr := 5
 	committee := &user.VotingCommittee{sortedset.New()}
 	for i := 0; i < nr; i++ {
-		k, _ := user.NewRandKeys()
+		k, _ := key.NewRandConsensusKeys()
 		bk := (&big.Int{}).SetBytes(k.BLSPubKeyBytes)
 		committee.Set = append(committee.Set, bk)
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
@@ -31,7 +31,7 @@ func TestScoreGeneration(t *testing.T) {
 	k := ristretto.Scalar{}
 	k.Rand()
 
-	keys, _ := user.NewRandKeys()
+	keys, _ := key.NewRandConsensusKeys()
 	publicKey := key.NewKeyPair(nil).PublicKey()
 	eb, streamer := eventbus.CreateGossipStreamer()
 

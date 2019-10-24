@@ -5,11 +5,11 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ed25519"
 )
@@ -79,7 +79,7 @@ func (s *roundStore) DispatchFinalize() {
 type Coordinator struct {
 	*SyncState
 	eventBus   *eventbus.EventBus
-	keys       user.Keys
+	keys       key.ConsensusKeys
 	factories  []ComponentFactory
 	components []Component
 	eventqueue *Queue
@@ -92,7 +92,7 @@ type Coordinator struct {
 }
 
 // Start the coordinator by wiring the listener to the RoundUpdate
-func Start(eventBus *eventbus.EventBus, keys user.Keys, factories ...ComponentFactory) *Coordinator {
+func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...ComponentFactory) *Coordinator {
 	pkBuf := new(bytes.Buffer)
 
 	if err := encoding.WriteVarBytes(pkBuf, keys.BLSPubKeyBytes); err != nil {

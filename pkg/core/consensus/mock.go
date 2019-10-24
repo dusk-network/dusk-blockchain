@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) RoundUpdate {
@@ -55,12 +56,12 @@ func MockRoundUpdateBuffer(round uint64, p *user.Provisioners, bidList user.BidL
 	return buf
 }
 
-func MockProvisioners(amount int) (*user.Provisioners, []user.Keys) {
+func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
 	p := user.NewProvisioners()
 
-	k := make([]user.Keys, amount)
+	k := make([]key.ConsensusKeys, amount)
 	for i := 0; i < amount; i++ {
-		keys, _ := user.NewRandKeys()
+		keys, _ := key.NewRandConsensusKeys()
 		member := MockMember(keys)
 
 		p.Members[string(keys.BLSPubKeyBytes)] = member
@@ -70,7 +71,7 @@ func MockProvisioners(amount int) (*user.Provisioners, []user.Keys) {
 	return p, k
 }
 
-func MockMember(keys user.Keys) *user.Member {
+func MockMember(keys key.ConsensusKeys) *user.Member {
 	member := &user.Member{}
 	member.PublicKeyEd = keys.EdPubKeyBytes
 	member.PublicKeyBLS = keys.BLSPubKeyBytes

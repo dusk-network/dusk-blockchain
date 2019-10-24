@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/key"
 )
@@ -29,7 +29,7 @@ func GenerateGenesisBlock(generatorPubKey *key.PublicKey) (string, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, b); err != nil {
+	if err := marshalling.MarshalBlock(buf, b); err != nil {
 		return "", err
 	}
 

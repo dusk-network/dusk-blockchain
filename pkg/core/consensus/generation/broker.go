@@ -4,13 +4,14 @@ import (
 	"bytes"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -75,7 +76,7 @@ func (g *generator) CollectAgreementEvent(e consensus.Event) error {
 	cert := g.generateCertificate(a)
 
 	buf := new(bytes.Buffer)
-	if err := block.MarshalCertificate(buf, cert); err != nil {
+	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
 		return err
 	}
 
@@ -99,7 +100,7 @@ func (g *generator) generateBlock() {
 	}
 
 	blockBuf := new(bytes.Buffer)
-	if err := block.Marshal(blockBuf, &blk); err != nil {
+	if err := marshalling.MarshalBlock(blockBuf, &blk); err != nil {
 		// TODO: log this
 		return
 	}
