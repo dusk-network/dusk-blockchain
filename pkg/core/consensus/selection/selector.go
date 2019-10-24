@@ -33,21 +33,23 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *selector
 	}
 }
 
-func (s *selector) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.Subscriber {
+func (s *selector) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.stepper = stepper
 	s.handler = newScoreHandler(r.BidList)
 
-	scoreSubscriber := consensus.Subscriber{
+	scoreListener, _ := consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter)
+	scoreSubscriber := consensus.TopicListener{
 		Topic:    topics.Score,
-		Listener: consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter),
+		Listener: scoreListener,
 	}
 
-	regenSubscriber := consensus.Subscriber{
+	regenListener, _ := consensus.NewSimpleListener(s.CollectRegeneration)
+	regenSubscriber := consensus.TopicListener{
 		Topic:    topics.Regeneration,
-		Listener: consensus.NewSimpleListener(s.CollectRegeneration),
+		Listener: regenListener,
 	}
 
-	return []consensus.Subscriber{scoreSubscriber, regenSubscriber}
+	return []consensus.TopicListener{scoreSubscriber, regenSubscriber}
 }
 
 func (s *selector) Finalize() {
@@ -71,16 +73,10 @@ func (s *selector) Filter(hdr header.Header) bool {
 	return false
 }
 
-// SetStep clears out the `bestEvent` field on the selector, as this event becomes
-// irrelevant on a step update.
-// Implements consensus.Component
-func (s *selector) SetStep(step uint8) {
-	s.setBestEvent(nil)
-}
-
 func (s *selector) CollectRegeneration(e consensus.Event) error {
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
+	s.setBestEvent(nil)
 	s.startSelection()
 	return nil
 }

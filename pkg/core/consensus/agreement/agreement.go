@@ -32,16 +32,17 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 	}
 }
 
-func (a *agreement) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.Subscriber {
+func (a *agreement) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	a.handler = newHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
-	agreementSubscriber := consensus.Subscriber{
-		Listener: consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter),
+	agListener, _ := consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter)
+	agreementSubscriber := consensus.TopicListener{
+		Listener: agListener,
 		Topic:    topics.Agreement,
 	}
 
 	go a.listen()
-	return []consensus.Subscriber{agreementSubscriber}
+	return []consensus.TopicListener{agreementSubscriber}
 }
 
 func (a *agreement) Filter(hdr header.Header) bool {
@@ -65,9 +66,6 @@ func convertToAgreement(event consensus.Event) (*Agreement, error) {
 	}
 	return ev, nil
 }
-
-// SetStep implements Component
-func (a *agreement) SetStep(step uint8) {}
 
 // Listen for results coming from the accumulator
 func (a *agreement) listen() {

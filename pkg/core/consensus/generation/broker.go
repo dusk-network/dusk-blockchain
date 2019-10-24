@@ -34,7 +34,7 @@ type generator struct {
 
 // Initialize the generator, by creating listeners for the desired topics.
 // Implements consensus.Component.
-func (g *generator) Initialize(signer consensus.Signer, ru consensus.RoundUpdate) []consensus.Subscriber {
+func (g *generator) Initialize(signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
 	g.roundInfo = ru
 
 	// If we are not in this round's bid list, we can skip initialization, as there
@@ -43,20 +43,21 @@ func (g *generator) Initialize(signer consensus.Signer, ru consensus.RoundUpdate
 	//if !g.blockGen.proofGenerator.InBidList(g.bidList) {
 	//	return nil
 	//}
-
-	regenSubscriber := consensus.Subscriber{
+	regenListener, _ := consensus.NewSimpleListener(g.CollectRegeneration)
+	regenSubscriber := consensus.TopicListener{
 		Topic:    topics.Regeneration,
-		Listener: consensus.NewSimpleListener(g.CollectRegeneration),
+		Listener: regenListener,
 	}
 
-	agreementEventSubscriber := consensus.Subscriber{
+	agreementEventListener, _ := consensus.NewSimpleListener(g.CollectAgreementEvent)
+	agreementEventSubscriber := consensus.TopicListener{
 		Topic:    topics.AgreementEvent,
-		Listener: consensus.NewSimpleListener(g.CollectAgreementEvent),
+		Listener: agreementEventListener,
 	}
 
 	// We always generate a block and score immediately on round update.
 	g.generateBlock()
-	return []consensus.Subscriber{regenSubscriber, agreementEventSubscriber}
+	return []consensus.TopicListener{regenSubscriber, agreementEventSubscriber}
 }
 
 // Finalize implements consensus.Component.
