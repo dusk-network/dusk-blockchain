@@ -8,17 +8,17 @@ import (
 )
 
 type Factory struct {
-	publisher eventbus.Publisher
-	timeout   time.Duration
+	Bus     eventbus.Broker
+	timeout time.Duration
 }
 
-func NewFactory(publisher eventbus.Publisher, timeout time.Duration) *Factory {
+func NewFactory(bus eventbus.Broker, timeout time.Duration) *Factory {
 	return &Factory{
-		publisher,
+		bus,
 		timeout,
 	}
 }
 
 func (f *Factory) Instantiate() consensus.Component {
-	return NewComponent(f.publisher, f.timeout)
+	return NewComponent(f.Bus, f.timeout)
 }
