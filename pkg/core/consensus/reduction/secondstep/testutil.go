@@ -26,7 +26,8 @@ type Helper struct {
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
 
-	StepVotesChan chan bytes.Buffer
+	AgreementChan chan bytes.Buffer
+	RegenChan     chan bytes.Buffer
 	nr            int
 
 	lock               sync.RWMutex
@@ -37,7 +38,7 @@ type Helper struct {
 // NewHelper creates a Helper
 func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, provisioners int) *Helper {
 	p, keys := consensus.MockProvisioners(provisioners)
-	factory := NewFactory(eb, rpcbus, keys[0], 100*time.Millisecond)
+	factory := NewFactory(eb, rpcbus, keys[0], 1000*time.Millisecond)
 	a := factory.Instantiate()
 	red := a.(*Reducer)
 	hlp := &Helper{
@@ -47,7 +48,8 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consens
 		Reducer:            red,
 		eventPlayer:        eventPlayer,
 		signer:             signer,
-		StepVotesChan:      make(chan bytes.Buffer, 1),
+		AgreementChan:      make(chan bytes.Buffer, 1),
+		RegenChan:          make(chan bytes.Buffer, 1),
 		nr:                 provisioners,
 		failOnVerification: false,
 		Handler:            reduction.NewHandler(keys[0], *p),
@@ -56,37 +58,39 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consens
 	return hlp
 }
 
-func (hlp *Helper) Verify(hash []byte, sv *agreement.StepVotes) error {
-	vc := hlp.P.CreateVotingCommittee(1, 1, hlp.nr)
+func (hlp *Helper) Verify(hash []byte, sv *agreement.StepVotes, round uint64, step uint8) error {
+	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
 	sub := vc.Intersect(sv.BitSet)
 	apk, err := agreement.ReconstructApk(sub)
 	if err != nil {
 		return err
 	}
 
-	return header.VerifySignatures(1, 1, hash, apk, sv.Signature)
+	return header.VerifySignatures(round, step, hash, apk, sv.Signature)
 }
 
 // CreateResultChan is used by tests (internal and external) to quickly wire the StepVotes resulting from the firststep reduction to a channel to listen to
 func (hlp *Helper) createResultChan() {
-	chanListener := eventbus.NewChanListener(hlp.StepVotesChan)
-	hlp.Bus.Subscribe(topics.StepVotes, chanListener)
+	agListener := eventbus.NewChanListener(hlp.AgreementChan)
+	hlp.Bus.Subscribe(topics.Agreement, agListener)
+	regenListener := eventbus.NewChanListener(hlp.RegenChan)
+	hlp.Bus.Subscribe(topics.Regeneration, regenListener)
 }
 
 // SendBatch of consensus events to the reducer callback CollectReductionEvent
-func (hlp *Helper) SendBatch(hash []byte) {
-	batch := hlp.Spawn(hash)
+func (hlp *Helper) SendBatch(hash []byte, round uint64, step uint8) {
+	batch := hlp.Spawn(hash, round, step)
 	for _, ev := range batch {
 		go hlp.Reducer.CollectReductionEvent(ev)
 	}
 }
 
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
-func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
+func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []consensus.Event {
 	evs := make([]consensus.Event, hlp.nr)
-	vc := hlp.P.CreateVotingCommittee(1, 1, hlp.nr)
+	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
 	for i := 0; i < hlp.nr; i++ {
-		ev := reduction.MockConsensusEvent(hash, 1, 1, hlp.Keys, vc, i)
+		ev := reduction.MockConsensusEvent(hash, round, step, hlp.Keys, vc, i)
 		evs[i] = ev
 
 	}
@@ -98,12 +102,24 @@ func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
 	hlp.Reducer.Initialize(hlp.eventPlayer, hlp.signer, ru)
 }
 
+func (hlp *Helper) StartReduction(sv *agreement.StepVotes) error {
+	buf := new(bytes.Buffer)
+	if sv != nil {
+		if err := agreement.MarshalStepVotes(buf, sv); err != nil {
+			return err
+		}
+	}
+
+	hlp.Reducer.CollectStepVotes(consensus.Event{header.Header{}, *buf})
+	return nil
+}
+
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
-func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, nr int, withTimeout bool) (*Helper, []byte) {
+func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, nr int, withTimeout bool, round uint64, step uint8) (*Helper, []byte) {
 	h := NewHelper(eb, rpcbus, eventPlayer, signer, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, h.P, nil)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
-	h.Spawn(hash)
+	h.Spawn(hash, round, step)
 	return h, hash
 }

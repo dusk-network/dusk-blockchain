@@ -119,10 +119,10 @@ func (r *Reducer) sendReduction(hash []byte) error {
 func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
-	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], nil)
+	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], regenerationPackage)
 
 	// TODO: check if an agreement on an empty block should be propagated
-	if hash != nil && len(b) == 2 {
+	if hash != nil && stepVotesAreValid(b) {
 		r.sendAgreement(hash, b)
 	}
 	r.eventPlayer.Forward()
@@ -143,7 +143,7 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 		}
 	}
 
-	r.sendReduction(e.Header.BlockHash)
+	go r.sendReduction(e.Header.BlockHash)
 	r.startReduction(sv)
 	return nil
 }
@@ -176,4 +176,8 @@ func (r *Reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
 	if err := r.signer.SendAuthenticated(topics.Agreement, hash, eventBuf); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in Ed25519 signing and gossip the agreement")
 	}
+}
+
+func stepVotesAreValid(svs []*agreement.StepVotes) bool {
+	return len(svs) == 2 && svs[0] != nil && svs[1] != nil
 }
