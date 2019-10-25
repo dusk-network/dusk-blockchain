@@ -11,9 +11,9 @@ import (
 
 // Factory creates a first step reduction Component
 type Factory struct {
-	broker  eventbus.Broker
-	rpcBus  *rpcbus.RPCBus
-	keys    key.ConsensusKeys
+	Bus     eventbus.Broker
+	RpcBus  *rpcbus.RPCBus
+	Keys    key.ConsensusKeys
 	timeout time.Duration
 }
 
@@ -29,5 +29,5 @@ func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consensu
 
 // Instantiate a first step reduction Component
 func (f *Factory) Instantiate() consensus.Component {
-	return NewComponent(f.broker, f.rpcBus, f.keys, f.timeout)
+	return NewComponent(f.Bus, f.RpcBus, f.Keys, f.timeout)
 }
