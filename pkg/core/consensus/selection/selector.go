@@ -13,7 +13,7 @@ import (
 
 type Selector struct {
 	publisher eventbus.Publisher
-	handler   *scoreHandler
+	handler   *Handler
 	lock      sync.RWMutex
 	bestEvent *ScoreEvent
 
@@ -37,7 +37,7 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector
 func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
-	s.handler = newScoreHandler(r.BidList)
+	s.handler = NewHandler(r.BidList)
 
 	scoreSubscriber := consensus.TopicListener{
 		Topic:         topics.Score,

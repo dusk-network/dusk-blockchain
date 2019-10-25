@@ -5,7 +5,7 @@ import (
 )
 
 type timer struct {
-	s *selector
+	s *Selector
 	t *time.Timer
 }
 
