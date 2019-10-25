@@ -71,7 +71,7 @@ func (a *handler) Verify(ev Agreement) error {
 			return err
 		}
 
-		if err := VerifySignatures(ev.Round, step, ev.BlockHash, apk, votes.Signature); err != nil {
+		if err := header.VerifySignatures(ev.Round, step, ev.BlockHash, apk, votes.Signature); err != nil {
 			return err
 		}
 	}
@@ -117,21 +117,4 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	}
 
 	return apk, nil
-}
-
-// VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
-// The signed message needs to carry information about the round, the step and the blockhash
-func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
-	signed := new(bytes.Buffer)
-	vote := header.Header{
-		Round:     round,
-		Step:      step,
-		BlockHash: blockHash,
-	}
-
-	if err := header.MarshalSignableVote(signed, vote, nil); err != nil {
-		return err
-	}
-
-	return bls.Verify(apk, signed.Bytes(), sig)
 }

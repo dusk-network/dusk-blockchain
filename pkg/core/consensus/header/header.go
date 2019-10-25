@@ -5,6 +5,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 type (
@@ -150,4 +151,21 @@ func MarshalSignableVote(r *bytes.Buffer, h Header, packet []byte) error {
 	}
 
 	return nil
+}
+
+// VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
+// The signed message needs to carry information about the round, the step and the blockhash
+func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
+	signed := new(bytes.Buffer)
+	vote := Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: blockHash,
+	}
+
+	if err := MarshalSignableVote(signed, vote, nil); err != nil {
+		return err
+	}
+
+	return bls.Verify(apk, signed.Bytes(), sig)
 }
