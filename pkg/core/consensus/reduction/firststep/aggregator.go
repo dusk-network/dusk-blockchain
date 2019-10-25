@@ -65,7 +65,6 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 			blockHash = emptyHash[:]
 		}
 
-		// TODO: bufferize, and add blockhash
 		a.requestHalt(blockHash, sv.StepVotes)
 	}
 	return nil

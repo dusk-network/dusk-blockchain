@@ -36,7 +36,7 @@ func newStore(c *Coordinator) *roundStore {
 }
 
 func (s *roundStore) addComponent(component Component, round RoundUpdate) []TopicListener {
-	subs := component.Initialize(s.coordinator, s.coordinator, round)
+	subs := component.Initialize(s.coordinator, s.coordinator, s.coordinator, round)
 	for _, sub := range subs {
 		s.subscribe(sub.Topic, sub)
 	}
@@ -279,6 +279,29 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, pa
 
 	// gossip away
 	c.eventBus.Publish(topics.Gossip, whole)
+	return nil
+}
+
+// SendWithHeader prepends a header to the given payload, and publishes it on the
+// desired topic.
+func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer) error {
+	hdr := header.Header{
+		Round:     c.Round(),
+		Step:      c.Step(),
+		BlockHash: hash,
+		PubKeyBLS: c.keys.BLSPubKeyBytes,
+	}
+
+	buf := new(bytes.Buffer)
+	if err := header.Marshal(buf, hdr); err != nil {
+		return err
+	}
+
+	if _, err := buf.ReadFrom(payload); err != nil {
+		return err
+	}
+
+	c.eventBus.Publish(topic, buf)
 	return nil
 }
 

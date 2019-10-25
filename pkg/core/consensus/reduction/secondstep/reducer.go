@@ -49,9 +49,10 @@ func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consen
 // Initialize the reduction component, by instantiating the handler and creating
 // the topic subscribers.
 // Implements consensus.Component
-func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer, subscriber consensus.Subscriber, ru consensus.RoundUpdate) []consensus.TopicListener {
 	r.stepper = stepper
 	r.signer = signer
+	r.subscriber = subscriber
 	r.handler = reduction.NewHandler(r.keys, ru.P)
 	r.timer = reduction.NewTimer(r.broker, r.Halt)
 
@@ -91,7 +92,7 @@ func (r *reducer) Filter(hdr header.Header) bool {
 
 func (r *reducer) startReduction(sv *agreement.StepVotes) {
 	r.timer.Start(r.timeOut)
-	r.aggregator = newAggregator(r.Halt, r.broker, r.handler, sv, r.signer)
+	r.aggregator = newAggregator(r.Halt, r.broker, r.handler, sv)
 	//r.aggregator.Start()
 }
 
@@ -111,8 +112,15 @@ func (r *reducer) sendReduction(hash []byte) error {
 
 func (r *reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.subscriber.Unsubscribe(r.reductionID)
-	r.broker.Publish(topics.Regeneration, nil)
-	r.sendAgreement(hash, b)
+	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], nil)
+
+	if len(b) == 2 {
+		if err := r.sendAgreement(hash, b); err != nil {
+			// sending an agreement should never fail
+			panic(err)
+		}
+	}
+
 	r.stepper.RequestStepUpdate()
 }
 
@@ -121,12 +129,18 @@ func (r *reducer) CollectStepVotes(e consensus.Event) error {
 	listener, reductionID := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
 	r.subscriber.Subscribe(topics.Reduction, listener)
 	r.reductionID = reductionID
+	var sv *agreement.StepVotes
 
-	// TODO: unmarshal to retrieve blockhash and stepvotes
-	sv, err := agreement.UnmarshalStepVotes(&e.Payload)
-	if err != nil {
-		return err
+	// If the first step did not have a winning block, we should get an empty buffer
+	if e.Payload.Len() > 0 {
+		// Otherwise though, we should retrieve the information
+		var err error
+		sv, err = agreement.UnmarshalStepVotes(&e.Payload)
+		if err != nil {
+			return err
+		}
 	}
+
 	r.sendReduction(e.Header.BlockHash)
 	r.startReduction(sv)
 	return nil
@@ -135,12 +149,12 @@ func (r *reducer) CollectStepVotes(e consensus.Event) error {
 func (r *reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) error {
 	payloadBuf := new(bytes.Buffer)
 	if err := agreement.MarshalVotes(payloadBuf, svs); err != nil {
-		//TODO: handle
+		return err
 	}
 
 	sig, err := r.signer.Sign(hash, payloadBuf.Bytes())
 	if err != nil {
-		//TODO: handle
+		return err
 	}
 
 	// then we create the full BLS signed Agreement

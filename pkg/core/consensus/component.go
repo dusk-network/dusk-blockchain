@@ -15,6 +15,7 @@ type Stepper interface {
 type Signer interface {
 	Sign([]byte, []byte) ([]byte, error)
 	SendAuthenticated(topics.Topic, []byte, *bytes.Buffer) error
+	SendWithHeader(topics.Topic, []byte, *bytes.Buffer) error
 }
 
 type Subscriber interface {
@@ -29,7 +30,7 @@ type ComponentFactory interface {
 
 // Component is an ephemeral instance that lives solely for a round
 type Component interface {
-	Initialize(Stepper, Signer, RoundUpdate) []TopicListener
+	Initialize(Stepper, Signer, Subscriber, RoundUpdate) []TopicListener
 	Finalize()
 }
 

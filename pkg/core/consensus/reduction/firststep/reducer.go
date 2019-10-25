@@ -49,9 +49,10 @@ func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consen
 // Initialize the reduction component, by instantiating the handler and creating
 // the topic subscribers.
 // Implements consensus.Component
-func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer, subscriber consensus.Subscriber, ru consensus.RoundUpdate) []consensus.TopicListener {
 	r.stepper = stepper
 	r.signer = signer
+	r.subscriber = subscriber
 	r.handler = reduction.NewHandler(r.keys, ru.P)
 	r.timer = reduction.NewTimer(r.broker, r.Halt)
 
@@ -111,15 +112,15 @@ func (r *reducer) sendReduction(hash []byte) error {
 
 func (r *reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 	r.subscriber.Unsubscribe(r.reductionID)
-	// TODO: bufferize
+
 	buf := new(bytes.Buffer)
 	if len(svs) > 0 {
 		if err := agreement.MarshalStepVotes(buf, svs[0]); err != nil {
-			// TODO: handle
+			panic(err)
 		}
 	}
 
-	r.broker.Publish(topics.StepVotes, buf)
+	r.signer.SendWithHeader(topics.StepVotes, hash, buf)
 	r.stepper.RequestStepUpdate()
 }
 

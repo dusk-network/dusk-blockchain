@@ -32,7 +32,7 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 	}
 }
 
-func (a *agreement) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
+func (a *agreement) Initialize(stepper consensus.Stepper, signer consensus.Signer, subscriber consensus.Subscriber, r consensus.RoundUpdate) []consensus.TopicListener {
 	a.handler = newHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	agListener, _ := consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter)

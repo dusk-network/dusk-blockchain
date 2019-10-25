@@ -21,6 +21,7 @@ type selector struct {
 	timeout time.Duration
 
 	stepper consensus.Stepper
+	signer  consensus.Signer
 }
 
 // NewComponent creates and launches the component which responsibility is to validate
@@ -33,8 +34,9 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *selector
 	}
 }
 
-func (s *selector) Initialize(stepper consensus.Stepper, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
+func (s *selector) Initialize(stepper consensus.Stepper, signer consensus.Signer, subscribe consensus.Subscriber, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.stepper = stepper
+	s.signer = signer
 	s.handler = newScoreHandler(r.BidList)
 
 	scoreListener, _ := consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter)
@@ -113,11 +115,9 @@ func (s *selector) IncreaseTimeOut() {
 
 func (s *selector) publishBestEvent() error {
 	buf := new(bytes.Buffer)
-	if err := MarshalScoreEvent(buf, s.getBestEvent()); err != nil {
-		return err
-	}
+	bestEvent := s.getBestEvent()
 
-	s.publisher.Publish(topics.BestScore, buf)
+	s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf)
 	s.stepper.RequestStepUpdate()
 	return nil
 }
