@@ -19,7 +19,7 @@ func NewTimer(publisher eventbus.Publisher, requestHalt func([]byte, ...*agreeme
 }
 
 func (t *Timer) Start(timeOut time.Duration) {
-	t.t = time.NewTimer(timeOut)
+	t.t = time.AfterFunc(timeOut, t.Trigger)
 }
 
 func (t *Timer) Stop() {
