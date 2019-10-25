@@ -93,7 +93,6 @@ func (r *reducer) Filter(hdr header.Header) bool {
 func (r *reducer) startReduction(sv *agreement.StepVotes) {
 	r.timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.Halt, r.broker, r.handler, sv)
-	//r.aggregator.Start()
 }
 
 func (r *reducer) sendReduction(hash []byte) error {

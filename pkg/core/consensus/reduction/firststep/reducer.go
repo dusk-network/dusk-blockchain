@@ -96,7 +96,6 @@ func (r *reducer) Filter(hdr header.Header) bool {
 func (r *reducer) startReduction() {
 	r.timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.Halt, r.broker, r.handler, r.rpcBus)
-	//r.aggregator.Start()
 }
 
 func (r *reducer) sendReduction(hash []byte) error {
@@ -133,7 +132,7 @@ func (r *reducer) CollectBestScore(e consensus.Event) error {
 	r.subscriber.Subscribe(topics.Reduction, listener)
 	r.reductionID = reductionID
 
-	r.sendReduction(e.Payload.Bytes())
+	r.sendReduction(e.Header.BlockHash)
 	r.startReduction()
 	return nil
 }
