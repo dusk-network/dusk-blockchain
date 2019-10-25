@@ -26,8 +26,11 @@ type Writer interface {
 type Phase uint8
 
 const (
+	// Same indicates that headers belong to the same phase
 	Same Phase = iota
+	// Before indicates that the header indicates a past event
 	Before
+	// After indicates that the header indicates a future event
 	After
 )
 
@@ -73,6 +76,19 @@ func Marshal(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	return MarshalFields(r, consensusEv)
+}
+
+// Compose is useful when header information is cached and there is an opportunity to avoid unnecessary allocations
+func Compose(blsPubKey bytes.Buffer, phase bytes.Buffer, hash []byte) (bytes.Buffer, error) {
+	if _, err := blsPubKey.ReadFrom(&phase); err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	if err := encoding.Write256(&blsPubKey, hash); err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	return blsPubKey, nil
 }
 
 // Unmarshal unmarshals the buffer into a Header.
