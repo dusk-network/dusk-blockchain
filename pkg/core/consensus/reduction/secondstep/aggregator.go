@@ -3,7 +3,6 @@ package secondstep
 import (
 	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -15,7 +14,6 @@ type aggregator struct {
 	requestHalt    func([]byte, ...*agreement.StepVotes)
 	publisher      eventbus.Publisher
 	handler        *reduction.Handler
-	signer         consensus.Signer
 	firstStepVotes *agreement.StepVotes
 
 	lock     sync.RWMutex
@@ -25,12 +23,11 @@ type aggregator struct {
 	}
 }
 
-func newAggregator(requestHalt func([]byte, ...*agreement.StepVotes), publisher eventbus.Publisher, handler *reduction.Handler, firstStepVotes *agreement.StepVotes, signer consensus.Signer) *aggregator {
+func newAggregator(requestHalt func([]byte, ...*agreement.StepVotes), publisher eventbus.Publisher, handler *reduction.Handler, firstStepVotes *agreement.StepVotes) *aggregator {
 	return &aggregator{
 		requestHalt:    requestHalt,
 		publisher:      publisher,
 		handler:        handler,
-		signer:         signer,
 		firstStepVotes: firstStepVotes,
 		voteSets: make(map[string]struct {
 			*agreement.StepVotes
