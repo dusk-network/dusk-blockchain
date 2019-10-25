@@ -36,6 +36,24 @@ func TestFirstStep(t *testing.T) {
 	assert.NoError(t, hlp.Verify(hash, sv))
 }
 
+func TestFirstStepTimeOut(t *testing.T) {
+	committeeSize := 50
+	bus, rpcBus := eventbus.New(), rpcbus.New()
+	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
+	hash, _ := crypto.RandEntropy(32)
+	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
+
+	// Start the first step
+	hlp.StartReduction(hash)
+
+	// Wait for resulting StepVotes
+	svBuf := <-hlp.StepVotesChan
+	// Retrieve StepVotes
+	_, err := agreement.UnmarshalStepVotes(&svBuf)
+	// Should get an EOF
+	assert.Error(t, err)
+}
+
 // No-op implementation of consensus.EventPlayer
 type mockPlayer struct{}
 
