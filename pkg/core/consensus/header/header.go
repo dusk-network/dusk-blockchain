@@ -5,6 +5,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-crypto/bls"
 )
 
 type (
@@ -26,8 +27,11 @@ type Writer interface {
 type Phase uint8
 
 const (
+	// Same indicates that headers belong to the same phase
 	Same Phase = iota
+	// Before indicates that the header indicates a past event
 	Before
+	// After indicates that the header indicates a future event
 	After
 )
 
@@ -73,6 +77,19 @@ func Marshal(r *bytes.Buffer, ev wire.Event) error {
 	}
 
 	return MarshalFields(r, consensusEv)
+}
+
+// Compose is useful when header information is cached and there is an opportunity to avoid unnecessary allocations
+func Compose(blsPubKey bytes.Buffer, phase bytes.Buffer, hash []byte) (bytes.Buffer, error) {
+	if _, err := blsPubKey.ReadFrom(&phase); err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	if err := encoding.Write256(&blsPubKey, hash); err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	return blsPubKey, nil
 }
 
 // Unmarshal unmarshals the buffer into a Header.
@@ -134,4 +151,21 @@ func MarshalSignableVote(r *bytes.Buffer, h Header, packet []byte) error {
 	}
 
 	return nil
+}
+
+// VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
+// The signed message needs to carry information about the round, the step and the blockhash
+func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, sig *bls.Signature) error {
+	signed := new(bytes.Buffer)
+	vote := Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: blockHash,
+	}
+
+	if err := MarshalSignableVote(signed, vote, nil); err != nil {
+		return err
+	}
+
+	return bls.Verify(apk, signed.Bytes(), sig)
 }

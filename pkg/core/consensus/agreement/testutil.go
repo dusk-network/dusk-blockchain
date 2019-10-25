@@ -38,13 +38,24 @@ func (hlp *Helper) createResultChan() {
 	hlp.Bus.Subscribe(topics.WinningBlockHash, chanListener)
 }
 
+// SendBatch let agreement collect  additional batches of consensus events
+func (hlp *Helper) SendBatch(hash []byte) {
+	batch := hlp.Spawn(hash)
+	for _, ev := range batch {
+		go hlp.Aggro.CollectAgreementEvent(ev)
+	}
+}
+
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
-func (hlp *Helper) Spawn(hash []byte) {
+func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
+	evs := make([]consensus.Event, hlp.nr)
 	vc := hlp.P.CreateVotingCommittee(1, 1, hlp.nr)
 	for i := 0; i < hlp.nr; i++ {
 		ev := MockConsensusEvent(hash, 1, 1, hlp.Keys, vc, i)
-		go hlp.Aggro.CollectAgreementEvent(ev)
+		evs[i] = ev
+
 	}
+	return evs
 }
 
 // Initialize the Agreement with a Round update
@@ -58,6 +69,6 @@ func ProduceWinningHash(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	roundUpdate := consensus.MockRoundUpdate(1, hlp.P, nil)
 	hlp.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
-	hlp.Spawn(hash)
+	hlp.SendBatch(hash)
 	return hlp, hash
 }

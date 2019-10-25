@@ -13,14 +13,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/key"
+	log "github.com/sirupsen/logrus"
 )
 
-var _ consensus.Component = (*reducer)(nil)
-
+var lg = log.WithField("process", "first-step reduction")
 var emptyHash = [32]byte{}
 var regenerationPackage = new(bytes.Buffer)
 
-type reducer struct {
+type Reducer struct {
 	broker     eventbus.Broker
 	rpcBus     *rpcbus.RPCBus
 	keys       key.ConsensusKeys
@@ -33,12 +33,12 @@ type reducer struct {
 	handler    *reduction.Handler
 	aggregator *aggregator
 	timeOut    time.Duration
-	timer      *reduction.Timer
+	Timer      *reduction.Timer
 }
 
 // NewComponent returns an uninitialized reduction component.
-func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) *reducer {
-	return &reducer{
+func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) consensus.Component {
+	return &Reducer{
 		broker:  broker,
 		rpcBus:  rpcBus,
 		keys:    keys,
@@ -54,12 +54,11 @@ func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer,
 	r.signer = signer
 	r.subscriber = subscriber
 	r.handler = reduction.NewHandler(r.keys, ru.P)
-	r.timer = reduction.NewTimer(r.broker, r.Halt)
+	r.Timer = reduction.NewTimer(r.Halt)
 
-	bestScoreListener, _ := consensus.NewSimpleListener(r.CollectBestScore)
 	bestScoreSubscriber := consensus.TopicListener{
 		Topic:    topics.BestScore,
-		Listener: bestScoreListener,
+		Listener: consensus.NewSimpleListener(r.CollectBestScore),
 	}
 
 	// Manually add preprocessors for reduction, as we don't use a TopicListener to
@@ -69,14 +68,14 @@ func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer,
 	return []consensus.TopicListener{bestScoreSubscriber}
 }
 
-// Finalize the reducer component by killing the timer, if it is still running.
-// This will stop a reduction cycle short, and renders this reducer useless
+// Finalize the Reducer component by killing the timer, if it is still running.
+// This will stop a reduction cycle short, and renders this Reducer useless
 // after calling.
-func (r *reducer) Finalize() {
-	r.timer.Stop()
+func (r *Reducer) Finalize() {
+	r.Timer.Stop()
 }
 
-func (r *reducer) CollectReductionEvent(e consensus.Event) error {
+func (r *Reducer) CollectReductionEvent(e consensus.Event) error {
 	ev := reduction.New()
 	if err := reduction.Unmarshal(&e.Payload, ev); err != nil {
 		return err
@@ -90,36 +89,40 @@ func (r *reducer) CollectReductionEvent(e consensus.Event) error {
 	return nil
 }
 
-func (r *reducer) Filter(hdr header.Header) bool {
+func (r *Reducer) Filter(hdr header.Header) bool {
 	return !r.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
-func (r *reducer) startReduction() {
-	r.timer.Start(r.timeOut)
-	r.aggregator = newAggregator(r.Halt, r.broker, r.handler, r.rpcBus)
+func (r *Reducer) startReduction() {
+	r.Timer.Start(r.timeOut)
+	r.aggregator = newAggregator(r.Halt, r.handler, r.rpcBus)
 }
 
-func (r *reducer) sendReduction(hash []byte) error {
+func (r *Reducer) sendReduction(hash []byte) {
 	sig, err := r.signer.Sign(hash, nil)
 	if err != nil {
-		return err
+		lg.WithField("category", "BUG").WithError(err).Errorln("error in signing reduction")
+		return
 	}
 
 	payload := new(bytes.Buffer)
 	if err := encoding.WriteBLS(payload, sig); err != nil {
-		return err
+		lg.WithField("category", "BUG").WithError(err).Errorln("error in encoding BLS signature")
+		return
 	}
 
-	return r.signer.SendAuthenticated(topics.Reduction, hash, payload)
+	if err := r.signer.SendAuthenticated(topics.Reduction, hash, payload); err != nil {
+		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")
+	}
 }
 
-func (r *reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
+func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 	r.subscriber.Unsubscribe(r.reductionID)
-
 	buf := new(bytes.Buffer)
 	if len(svs) > 0 {
 		if err := agreement.MarshalStepVotes(buf, svs[0]); err != nil {
-			panic(err)
+			lg.WithField("category", "BUG").WithError(err).Errorln("error in marshalling StepVotes")
+			return
 		}
 	}
 
@@ -128,12 +131,14 @@ func (r *reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 }
 
 // CollectBestScore activates the 2-step reduction cycle.
-func (r *reducer) CollectBestScore(e consensus.Event) error {
-	listener, reductionID := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
+func (r *Reducer) CollectBestScore(e consensus.Event) error {
+	listener := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
 	r.subscriber.Subscribe(topics.Reduction, listener)
-	r.reductionID = reductionID
+	r.reductionID = listener.ID()
 
-	r.sendReduction(e.Header.BlockHash)
+	// sending reduction can very well be done concurrently
+	go r.sendReduction(e.Header.BlockHash)
 	r.startReduction()
+
 	return nil
 }

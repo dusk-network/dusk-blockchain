@@ -244,7 +244,7 @@ func (c *Coordinator) Sign(hash, packet []byte) ([]byte, error) {
 
 // SendAuthenticated sign the payload with Ed25519 and publishes it to the Gossip topic
 func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer) error {
-	buf, err := c.header(blockHash)
+	buf, err := header.Compose(c.pubkeyBuf, c.ToBuffer(), blockHash)
 	if err != nil {
 		return err
 	}
@@ -284,7 +284,7 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, pa
 // SendWithHeader prepends a header to the given payload, and publishes it on the
 // desired topic.
 func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer) error {
-	buf, err := c.header(hash)
+	buf, err := header.Compose(c.pubkeyBuf, c.ToBuffer(), hash)
 	if err != nil {
 		return err
 	}
@@ -295,20 +295,4 @@ func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *b
 
 	c.eventBus.Publish(topic, &buf)
 	return nil
-}
-
-// header reconstructs the header of a message from the blockHash
-func (c *Coordinator) header(blockHash []byte) (bytes.Buffer, error) {
-	buf := c.pubkeyBuf
-	// ToBuffer is part of the SyncState struct
-	stateBuf := c.ToBuffer()
-	if _, err := buf.ReadFrom(&stateBuf); err != nil {
-		return buf, err
-	}
-
-	if err := encoding.Write256(&buf, blockHash); err != nil {
-		return buf, err
-	}
-
-	return buf, nil
 }

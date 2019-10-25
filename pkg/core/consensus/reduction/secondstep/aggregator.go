@@ -6,13 +6,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 )
 
 type aggregator struct {
 	requestHalt    func([]byte, ...*agreement.StepVotes)
-	publisher      eventbus.Publisher
 	handler        *reduction.Handler
 	firstStepVotes *agreement.StepVotes
 
@@ -23,10 +21,13 @@ type aggregator struct {
 	}
 }
 
-func newAggregator(requestHalt func([]byte, ...*agreement.StepVotes), publisher eventbus.Publisher, handler *reduction.Handler, firstStepVotes *agreement.StepVotes) *aggregator {
+func newAggregator(
+	requestHalt func([]byte, ...*agreement.StepVotes),
+	handler *reduction.Handler,
+	firstStepVotes *agreement.StepVotes) *aggregator {
+
 	return &aggregator{
 		requestHalt:    requestHalt,
-		publisher:      publisher,
 		handler:        handler,
 		firstStepVotes: firstStepVotes,
 		voteSets: make(map[string]struct {

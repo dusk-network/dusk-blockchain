@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type Timer struct {
@@ -12,7 +11,7 @@ type Timer struct {
 	t           *time.Timer
 }
 
-func NewTimer(publisher eventbus.Publisher, requestHalt func([]byte, ...*agreement.StepVotes)) *Timer {
+func NewTimer(requestHalt func([]byte, ...*agreement.StepVotes)) *Timer {
 	return &Timer{
 		requestHalt: requestHalt,
 	}
