@@ -129,7 +129,6 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 func (c *Coordinator) initialize(subs []TopicListener) {
 	for _, sub := range subs {
 		c.eventBus.AddDefaultTopic(sub.Topic)
-		// TODO: not all subs need a republisher and validator
 		c.eventBus.Register(sub.Topic, sub.Preprocessors...)
 	}
 }
@@ -285,15 +284,8 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, pa
 // SendWithHeader prepends a header to the given payload, and publishes it on the
 // desired topic.
 func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer) error {
-	hdr := header.Header{
-		Round:     c.Round(),
-		Step:      c.Step(),
-		BlockHash: hash,
-		PubKeyBLS: c.keys.BLSPubKeyBytes,
-	}
-
-	buf := new(bytes.Buffer)
-	if err := header.Marshal(buf, hdr); err != nil {
+	buf, err := c.header(hash)
+	if err != nil {
 		return err
 	}
 
@@ -301,7 +293,7 @@ func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *b
 		return err
 	}
 
-	c.eventBus.Publish(topic, buf)
+	c.eventBus.Publish(topic, &buf)
 	return nil
 }
 
