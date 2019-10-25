@@ -37,19 +37,6 @@ func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
 	return b.Handler.IsMember(pubKeyBLS, round, step, maxCommitteeSize)
 }
 
-// func (b *Handler) ExtractHeader(e wire.Event) *header.Header {
-// 	ev := e.(*Reduction)
-// 	return &header.Header{
-// 		Round: ev.Round,
-// 		Step:  ev.Step,
-// 	}
-// }
-
-// func (b *Handler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
-// 	ev := e.(*Reduction)
-// 	return encoding.Write256(r, ev.BlockHash)
-// }
-
 // Verify the BLS signature of the Reduction event. Since the payload is nil, verifying the signature equates to verifying solely the Header
 func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
 	packet := new(bytes.Buffer)
