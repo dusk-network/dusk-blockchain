@@ -38,7 +38,7 @@ type Helper struct {
 // NewHelper creates a Helper
 func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, provisioners int) *Helper {
 	p, keys := consensus.MockProvisioners(provisioners)
-	factory := NewFactory(eb, rpcbus, keys[0], 100*time.Millisecond)
+	factory := NewFactory(eb, rpcbus, keys[0], 1000*time.Millisecond)
 	a := factory.Instantiate()
 	red := a.(*Reducer)
 	hlp := &Helper{
@@ -125,6 +125,11 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 // Initialize the reducer with a Round update
 func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
 	hlp.Reducer.Initialize(hlp.eventPlayer, hlp.signer, ru)
+}
+
+func (hlp *Helper) StartReduction(hash []byte) {
+	hdr := header.Header{BlockHash: hash}
+	hlp.Reducer.CollectBestScore(consensus.Event{hdr, bytes.Buffer{}})
 }
 
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
