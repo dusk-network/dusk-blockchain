@@ -118,6 +118,7 @@ func (r *Reducer) sendReduction(hash []byte) {
 }
 
 func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
+	r.Timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 	buf := new(bytes.Buffer)
 	if len(svs) > 0 {

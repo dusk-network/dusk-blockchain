@@ -117,6 +117,7 @@ func (r *Reducer) sendReduction(hash []byte) error {
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
 func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
+	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], nil)
 
