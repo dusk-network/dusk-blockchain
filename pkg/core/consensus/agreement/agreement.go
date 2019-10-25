@@ -37,8 +37,9 @@ func (a *agreement) Initialize(stepper consensus.Stepper, signer consensus.Signe
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	agListener, _ := consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter)
 	agreementSubscriber := consensus.TopicListener{
-		Listener: agListener,
-		Topic:    topics.Agreement,
+		Listener:      agListener,
+		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(a.publisher, topics.Agreement), &consensus.Validator{}},
+		Topic:         topics.Agreement,
 	}
 
 	go a.listen()

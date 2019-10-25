@@ -130,7 +130,7 @@ func (c *Coordinator) initialize(subs []TopicListener) {
 	for _, sub := range subs {
 		c.eventBus.AddDefaultTopic(sub.Topic)
 		// TODO: not all subs need a republisher and validator
-		c.eventBus.Register(sub.Topic, NewRepublisher(c.eventBus, sub.Topic), &Validator{})
+		c.eventBus.Register(sub.Topic, sub.Preprocessors...)
 	}
 }
 

@@ -41,8 +41,9 @@ func (s *selector) Initialize(stepper consensus.Stepper, signer consensus.Signer
 
 	scoreListener, _ := consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter)
 	scoreSubscriber := consensus.TopicListener{
-		Topic:    topics.Score,
-		Listener: scoreListener,
+		Topic:         topics.Score,
+		Preprocessors: []eventbus.Preprocessor{&consensus.Validator{}},
+		Listener:      scoreListener,
 	}
 
 	regenListener, _ := consensus.NewSimpleListener(s.CollectRegeneration)

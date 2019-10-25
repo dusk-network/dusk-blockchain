@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type Stepper interface {
@@ -76,5 +77,6 @@ func (cb *FilteringListener) NotifyPayload(ev Event) error {
 
 type TopicListener struct {
 	Listener
-	Topic topics.Topic
+	Preprocessors []eventbus.Preprocessor
+	Topic         topics.Topic
 }
