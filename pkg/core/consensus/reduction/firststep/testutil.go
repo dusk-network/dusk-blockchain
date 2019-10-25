@@ -21,11 +21,11 @@ import (
 // Helper for reducing test boilerplate
 type Helper struct {
 	*Factory
-	Keys    []key.ConsensusKeys
-	P       *user.Provisioners
-	Reducer *Reducer
-	stepper consensus.Stepper
-	signer  consensus.Signer
+	Keys        []key.ConsensusKeys
+	P           *user.Provisioners
+	Reducer     *Reducer
+	eventPlayer consensus.EventPlayer
+	signer      consensus.Signer
 
 	StepVotesChan chan bytes.Buffer
 	nr            int
@@ -36,7 +36,7 @@ type Helper struct {
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, stepper consensus.Stepper, signer consensus.Signer, provisioners int) *Helper {
+func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, provisioners int) *Helper {
 	p, keys := consensus.MockProvisioners(provisioners)
 	factory := NewFactory(eb, rpcbus, keys[0], 100*time.Millisecond)
 	a := factory.Instantiate()
@@ -46,7 +46,7 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, stepper consensus.S
 		Keys:               keys,
 		P:                  p,
 		Reducer:            red,
-		stepper:            stepper,
+		eventPlayer:        eventPlayer,
 		signer:             signer,
 		StepVotesChan:      make(chan bytes.Buffer, 1),
 		nr:                 provisioners,
@@ -124,12 +124,12 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 
 // Initialize the reducer with a Round update
 func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.Reducer.Initialize(hlp.stepper, hlp.signer, ru)
+	hlp.Reducer.Initialize(hlp.eventPlayer, hlp.signer, ru)
 }
 
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
-func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, stepper consensus.Stepper, signer consensus.Signer, nr int, withTimeout bool) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, stepper, signer, nr)
+func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, nr int, withTimeout bool) (*Helper, []byte) {
+	h := NewHelper(eb, rpcbus, eventPlayer, signer, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, h.P, nil)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
