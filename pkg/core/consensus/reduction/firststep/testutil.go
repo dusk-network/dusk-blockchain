@@ -103,19 +103,19 @@ func (hlp *Helper) createResultChan() {
 }
 
 // SendBatch of consensus events to the reducer callback CollectReductionEvent
-func (hlp *Helper) SendBatch(hash []byte) {
-	batch := hlp.Spawn(hash)
+func (hlp *Helper) SendBatch(hash []byte, round uint64, step uint8) {
+	batch := hlp.Spawn(hash, round, step)
 	for _, ev := range batch {
 		go hlp.Reducer.CollectReductionEvent(ev)
 	}
 }
 
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
-func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
+func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []consensus.Event {
 	evs := make([]consensus.Event, hlp.nr)
 	vc := hlp.P.CreateVotingCommittee(1, 1, hlp.nr)
 	for i := 0; i < hlp.nr; i++ {
-		ev := reduction.MockConsensusEvent(hash, 1, 1, hlp.Keys, vc, i)
+		ev := reduction.MockConsensusEvent(hash, round, step, hlp.Keys, vc, i)
 		evs[i] = ev
 
 	}
@@ -133,11 +133,11 @@ func (hlp *Helper) StartReduction(hash []byte) {
 }
 
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
-func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, nr int, withTimeout bool) (*Helper, []byte) {
+func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, nr int, withTimeout bool, round uint64, step uint8) (*Helper, []byte) {
 	h := NewHelper(eb, rpcbus, eventPlayer, signer, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, h.P, nil)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
-	h.Spawn(hash)
+	h.Spawn(hash, round, step)
 	return h, hash
 }

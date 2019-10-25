@@ -16,7 +16,7 @@ func TestSuccessfulAggro(t *testing.T) {
 	eb, rbus := eventbus.New(), rpcbus.New()
 	hlp := NewHelper(eb, rbus, nil, nil, 10)
 	hash, _ := crypto.RandEntropy(32)
-	evs := hlp.Spawn(hash)
+	evs := hlp.Spawn(hash, 1, 1)
 
 	res := make(chan error, 1)
 	test := func(hash []byte, svs ...*agreement.StepVotes) {

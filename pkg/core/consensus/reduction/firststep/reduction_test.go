@@ -3,6 +3,7 @@ package firststep
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -24,10 +25,16 @@ func TestFirstStep(t *testing.T) {
 	hlp.StartReduction(hash)
 
 	// Send events
-	hlp.SendBatch(hash)
+	hlp.SendBatch(hash, 1, 1)
 
 	// Wait for resulting StepVotes
-	svBuf := <-hlp.StepVotesChan
+	var svBuf bytes.Buffer
+	select {
+	case svBuf = <-hlp.StepVotesChan:
+		// Success
+	case <-time.After(2 * time.Second):
+		t.Fatal("should have received a StepVotes message")
+	}
 	// Retrieve StepVotes
 	sv, err := agreement.UnmarshalStepVotes(&svBuf)
 	assert.NoError(t, err)
@@ -47,7 +54,13 @@ func TestFirstStepTimeOut(t *testing.T) {
 	hlp.StartReduction(hash)
 
 	// Wait for resulting StepVotes
-	svBuf := <-hlp.StepVotesChan
+	var svBuf bytes.Buffer
+	select {
+	case svBuf = <-hlp.StepVotesChan:
+		// Success
+	case <-time.After(2 * time.Second):
+		t.Fatal("should have received a StepVotes message")
+	}
 	// Retrieve StepVotes
 	_, err := agreement.UnmarshalStepVotes(&svBuf)
 	// Should get an EOF
