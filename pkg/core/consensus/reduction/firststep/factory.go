@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
+// Factory creates a first step reduction Component
 type Factory struct {
 	broker  eventbus.Broker
 	rpcBus  *rpcbus.RPCBus
@@ -16,6 +17,7 @@ type Factory struct {
 	timeout time.Duration
 }
 
+// NewFactory instantiates a Factory
 func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) *Factory {
 	return &Factory{
 		broker,
@@ -25,6 +27,7 @@ func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consensu
 	}
 }
 
+// Instantiate a first step reduction Component
 func (f *Factory) Instantiate() consensus.Component {
 	return NewComponent(f.broker, f.rpcBus, f.keys, f.timeout)
 }
