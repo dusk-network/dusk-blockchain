@@ -16,13 +16,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var _ consensus.Component = (*reducer)(nil)
+var _ consensus.Component = (*Reducer)(nil)
 
 var emptyHash = [32]byte{}
 var regenerationPackage = new(bytes.Buffer)
 var lg = log.WithField("process", "second-step reduction")
 
-type reducer struct {
+type Reducer struct {
 	broker      eventbus.Broker
 	rpcBus      *rpcbus.RPCBus
 	keys        key.ConsensusKeys
@@ -39,7 +39,7 @@ type reducer struct {
 
 // NewComponent returns an uninitialized reduction component.
 func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) consensus.Component {
-	return &reducer{
+	return &Reducer{
 		broker:  broker,
 		rpcBus:  rpcBus,
 		keys:    keys,
@@ -50,7 +50,7 @@ func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consen
 // Initialize the reduction component, by instantiating the handler and creating
 // the topic subscribers.
 // Implements consensus.Component
-func (r *reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
 	r.eventPlayer = eventPlayer
 	r.signer = signer
 	r.handler = reduction.NewHandler(r.keys, ru.P)
@@ -70,14 +70,14 @@ func (r *reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	return []consensus.TopicListener{stepVotesSubscriber, reductionSubscriber}
 }
 
-// Finalize the reducer component by killing the timer, if it is still running.
-// This will stop a reduction cycle short, and renders this reducer useless
+// Finalize the Reducer component by killing the timer, if it is still running.
+// This will stop a reduction cycle short, and renders this Reducer useless
 // after calling.
-func (r *reducer) Finalize() {
+func (r *Reducer) Finalize() {
 	r.timer.Stop()
 }
 
-func (r *reducer) CollectReductionEvent(e consensus.Event) error {
+func (r *Reducer) CollectReductionEvent(e consensus.Event) error {
 	ev := reduction.New()
 	if err := reduction.Unmarshal(&e.Payload, ev); err != nil {
 		return err
@@ -91,16 +91,16 @@ func (r *reducer) CollectReductionEvent(e consensus.Event) error {
 	return nil
 }
 
-func (r *reducer) Filter(hdr header.Header) bool {
+func (r *Reducer) Filter(hdr header.Header) bool {
 	return !r.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
-func (r *reducer) startReduction(sv *agreement.StepVotes) {
+func (r *Reducer) startReduction(sv *agreement.StepVotes) {
 	r.timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.Halt, r.handler, sv)
 }
 
-func (r *reducer) sendReduction(hash []byte) error {
+func (r *Reducer) sendReduction(hash []byte) error {
 	sig, err := r.signer.Sign(hash, nil)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func (r *reducer) sendReduction(hash []byte) error {
 
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
-func (r *reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
+func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.eventPlayer.Pause(r.reductionID)
 	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], nil)
 
@@ -127,8 +127,8 @@ func (r *reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.eventPlayer.Forward()
 }
 
-// CollectStepVotes is triggered when the first StepVotes get published by the first step reducer
-func (r *reducer) CollectStepVotes(e consensus.Event) error {
+// CollectStepVotes is triggered when the first StepVotes get published by the first step Reducer
+func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 	r.eventPlayer.Resume(r.reductionID)
 	var sv *agreement.StepVotes
 
@@ -147,7 +147,7 @@ func (r *reducer) CollectStepVotes(e consensus.Event) error {
 	return nil
 }
 
-func (r *reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
+func (r *Reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
 	payloadBuf := new(bytes.Buffer)
 	if err := agreement.MarshalVotes(payloadBuf, svs); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("cannot marshal the StepVotes")
