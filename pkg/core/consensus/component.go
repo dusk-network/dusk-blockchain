@@ -10,14 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-// Stepper requests a Step update
-type Stepper interface {
-	// RequestStepUpdate is used by components to signal the termination of some processing.
-	// It is used to avoid manipulating the Step directly in the Component since this is shared
-	// across all components
-	RequestStepUpdate()
-}
-
 // Signer encapsulate the credentials to sign or authenticate outgoing events
 type Signer interface {
 	Sign([]byte, []byte) ([]byte, error)
@@ -25,11 +17,10 @@ type Signer interface {
 	SendWithHeader(topics.Topic, []byte, *bytes.Buffer) error
 }
 
-// Subscriber to the Coordinator. It mimics the eventbus.Subscriber but uses a different kind of Listener
-// more suitable to the consensus Components
-type Subscriber interface {
-	Subscribe(topics.Topic, Listener)
-	Unsubscribe(uint32)
+type EventPlayer interface {
+	Forward()
+	Pause(uint32)
+	Resume(uint32)
 }
 
 // ComponentFactory holds the data to create a Component (i.e. Signer, EventPublisher, RPCBus). Its responsibility is to recreate it on demand
@@ -41,7 +32,7 @@ type ComponentFactory interface {
 // Component is an ephemeral instance that lives solely for a round
 type Component interface {
 	// Initialize a Component with data relevant to the current Round
-	Initialize(Stepper, Signer, Subscriber, RoundUpdate) []TopicListener
+	Initialize(EventPlayer, Signer, RoundUpdate) []TopicListener
 	// Finalize allows a Component to perform cleanup operations before begin garbage collected
 	Finalize()
 }
@@ -104,4 +95,12 @@ type TopicListener struct {
 	Listener
 	Preprocessors []eventbus.Preprocessor
 	Topic         topics.Topic
+}
+
+func (t *TopicListener) Pause() {
+
+}
+
+func (t *TopicListener) Resume() {
+
 }

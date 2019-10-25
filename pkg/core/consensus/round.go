@@ -14,13 +14,14 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-var _ Stepper = (*Coordinator)(nil)
+var _ EventPlayer = (*Coordinator)(nil)
 var _ Signer = (*Coordinator)(nil)
 
 var lg = log.WithField("process", "coordinator")
 
 type roundStore struct {
 	subscribers map[topics.Topic][]Listener
+	paused      map[topics.Topic][]Listener
 	components  []Component
 	coordinator *Coordinator
 }
@@ -28,6 +29,7 @@ type roundStore struct {
 func newStore(c *Coordinator) *roundStore {
 	s := &roundStore{
 		subscribers: make(map[topics.Topic][]Listener),
+		paused:      make(map[topics.Topic][]Listener),
 		components:  make([]Component, 0),
 		coordinator: c,
 	}
@@ -36,7 +38,7 @@ func newStore(c *Coordinator) *roundStore {
 }
 
 func (s *roundStore) addComponent(component Component, round RoundUpdate) []TopicListener {
-	subs := component.Initialize(s.coordinator, s.coordinator, s.coordinator, round)
+	subs := component.Initialize(s.coordinator, s.coordinator, round)
 	for _, sub := range subs {
 		s.subscribe(sub.Topic, sub)
 	}
@@ -55,19 +57,31 @@ func (s *roundStore) subscribe(topic topics.Topic, sub Listener) {
 }
 
 func (s *roundStore) unsubscribe(id uint32) {
-	for _, listeners := range s.subscribers {
+	for topic, listeners := range s.subscribers {
 		for i, listener := range listeners {
 			if listener.ID() == id {
 				listeners = append(
 					listeners[:i],
 					listeners[i+1:]...,
 				)
+				s.paused[topic] = append(s.paused[topic], listener)
 				return
 			}
 		}
 	}
 }
 
+func (s *roundStore) resume(id uint32) {
+	for topic, listeners := range s.paused {
+		for i, listener := range listeners {
+			if listener.ID() == id {
+				s.paused[topic] = append(s.paused[topic][:i], s.paused[topic][i+1:]...)
+				s.subscribe(topic, listener)
+				return
+			}
+		}
+	}
+}
 func (s *roundStore) Dispatch(ev TopicEvent) {
 	for _, sub := range s.subscribers[ev.Topic] {
 		if err := sub.NotifyPayload(ev.Event); err != nil {
@@ -131,14 +145,6 @@ func (c *Coordinator) initialize(subs []TopicListener) {
 		c.eventBus.AddDefaultTopic(sub.Topic)
 		c.eventBus.Register(sub.Topic, sub.Preprocessors...)
 	}
-}
-
-func (c *Coordinator) Subscribe(topic topics.Topic, listener Listener) {
-	c.store.subscribe(topic, listener)
-}
-
-func (c *Coordinator) Unsubscribe(id uint32) {
-	c.store.unsubscribe(id)
 }
 
 func (c *Coordinator) recreateStore(roundUpdate RoundUpdate, fromScratch bool) {
@@ -209,7 +215,7 @@ func (c *Coordinator) FinalizeRound() {
 	}
 }
 
-func (c *Coordinator) RequestStepUpdate() {
+func (c *Coordinator) Forward() {
 	c.IncrementStep()
 
 	events := c.eventqueue.GetEvents(c.Round(), c.Step())
@@ -295,4 +301,12 @@ func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *b
 
 	c.eventBus.Publish(topic, &buf)
 	return nil
+}
+
+func (c *Coordinator) Pause(id uint32) {
+	c.store.unsubscribe(id)
+}
+
+func (c *Coordinator) Resume(id uint32) {
+	c.store.resume(id)
 }

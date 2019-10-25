@@ -23,12 +23,11 @@ var regenerationPackage = new(bytes.Buffer)
 var lg = log.WithField("process", "second-step reduction")
 
 type reducer struct {
-	broker     eventbus.Broker
-	rpcBus     *rpcbus.RPCBus
-	keys       key.ConsensusKeys
-	stepper    consensus.Stepper
-	signer     consensus.Signer
-	subscriber consensus.Subscriber
+	broker      eventbus.Broker
+	rpcBus      *rpcbus.RPCBus
+	keys        key.ConsensusKeys
+	eventPlayer consensus.EventPlayer
+	signer      consensus.Signer
 
 	reductionID uint32
 
@@ -51,10 +50,9 @@ func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consen
 // Initialize the reduction component, by instantiating the handler and creating
 // the topic subscribers.
 // Implements consensus.Component
-func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer, subscriber consensus.Subscriber, ru consensus.RoundUpdate) []consensus.TopicListener {
-	r.stepper = stepper
+func (r *reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+	r.eventPlayer = eventPlayer
 	r.signer = signer
-	r.subscriber = subscriber
 	r.handler = reduction.NewHandler(r.keys, ru.P)
 	r.timer = reduction.NewTimer(r.Halt)
 
@@ -63,7 +61,13 @@ func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer,
 		Listener: consensus.NewSimpleListener(r.CollectStepVotes),
 	}
 
-	return []consensus.TopicListener{stepVotesSubscriber}
+	reductionSubscriber := consensus.TopicListener{
+		Topic:    topics.Reduction,
+		Listener: consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter),
+	}
+	r.reductionID = reductionSubscriber.Listener.ID()
+
+	return []consensus.TopicListener{stepVotesSubscriber, reductionSubscriber}
 }
 
 // Finalize the reducer component by killing the timer, if it is still running.
@@ -113,22 +117,19 @@ func (r *reducer) sendReduction(hash []byte) error {
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
 func (r *reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
-	r.subscriber.Unsubscribe(r.reductionID)
+	r.eventPlayer.Pause(r.reductionID)
 	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], nil)
 
 	// TODO: check if an agreement on an empty block should be propagated
 	if hash != nil && len(b) == 2 {
 		r.sendAgreement(hash, b)
 	}
-	r.stepper.RequestStepUpdate()
+	r.eventPlayer.Forward()
 }
 
 // CollectStepVotes is triggered when the first StepVotes get published by the first step reducer
 func (r *reducer) CollectStepVotes(e consensus.Event) error {
-	listener := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
-
-	r.subscriber.Subscribe(topics.Reduction, listener)
-	r.reductionID = listener.ID()
+	r.eventPlayer.Resume(r.reductionID)
 	var sv *agreement.StepVotes
 
 	// If the first step did not have a winning block, we should get an empty buffer

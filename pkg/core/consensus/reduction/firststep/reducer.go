@@ -21,12 +21,11 @@ var emptyHash = [32]byte{}
 var regenerationPackage = new(bytes.Buffer)
 
 type Reducer struct {
-	broker     eventbus.Broker
-	rpcBus     *rpcbus.RPCBus
-	keys       key.ConsensusKeys
-	stepper    consensus.Stepper
-	signer     consensus.Signer
-	subscriber consensus.Subscriber
+	broker      eventbus.Broker
+	rpcBus      *rpcbus.RPCBus
+	keys        key.ConsensusKeys
+	eventPlayer consensus.EventPlayer
+	signer      consensus.Signer
 
 	reductionID uint32
 
@@ -49,10 +48,9 @@ func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consen
 // Initialize the reduction component, by instantiating the handler and creating
 // the topic subscribers.
 // Implements consensus.Component
-func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer, subscriber consensus.Subscriber, ru consensus.RoundUpdate) []consensus.TopicListener {
-	r.stepper = stepper
+func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+	r.eventPlayer = eventPlayer
 	r.signer = signer
-	r.subscriber = subscriber
 	r.handler = reduction.NewHandler(r.keys, ru.P)
 	r.Timer = reduction.NewTimer(r.Halt)
 
@@ -61,11 +59,14 @@ func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer,
 		Listener: consensus.NewSimpleListener(r.CollectBestScore),
 	}
 
-	// Manually add preprocessors for reduction, as we don't use a TopicListener to
-	// subscribe, but rather subscribe directly whenever it is appropriate
-	r.broker.Register(topics.Reduction, consensus.NewRepublisher(r.broker, topics.Reduction), &consensus.Validator{})
+	reductionSubscriber := consensus.TopicListener{
+		Topic:         topics.Reduction,
+		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(r.broker, topics.Reduction), &consensus.Validator{}},
+		Listener:      consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter),
+	}
+	r.reductionID = reductionSubscriber.Listener.ID()
 
-	return []consensus.TopicListener{bestScoreSubscriber}
+	return []consensus.TopicListener{bestScoreSubscriber, reductionSubscriber}
 }
 
 // Finalize the Reducer component by killing the timer, if it is still running.
@@ -117,7 +118,7 @@ func (r *Reducer) sendReduction(hash []byte) {
 }
 
 func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
-	r.subscriber.Unsubscribe(r.reductionID)
+	r.eventPlayer.Pause(r.reductionID)
 	buf := new(bytes.Buffer)
 	if len(svs) > 0 {
 		if err := agreement.MarshalStepVotes(buf, svs[0]); err != nil {
@@ -127,14 +128,12 @@ func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 	}
 
 	r.signer.SendWithHeader(topics.StepVotes, hash, buf)
-	r.stepper.RequestStepUpdate()
+	r.eventPlayer.Forward()
 }
 
 // CollectBestScore activates the 2-step reduction cycle.
 func (r *Reducer) CollectBestScore(e consensus.Event) error {
-	listener := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
-	r.subscriber.Subscribe(topics.Reduction, listener)
-	r.reductionID = listener.ID()
+	r.eventPlayer.Resume(r.reductionID)
 
 	// sending reduction can very well be done concurrently
 	go r.sendReduction(e.Header.BlockHash)
