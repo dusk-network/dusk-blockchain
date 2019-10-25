@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 // CheckBlock will verify whether a block is valid according to the rules of the consensus
@@ -87,7 +88,7 @@ func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, roun
 		return err
 	}
 
-	return agreement.VerifySignatures(round, step, blockHash, apk, batchedSig)
+	return header.VerifySignatures(round, step, blockHash, apk, batchedSig)
 }
 
 // CheckBlockHeader checks whether a block header is malformed,
