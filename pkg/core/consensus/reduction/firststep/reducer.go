@@ -62,7 +62,8 @@ func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer,
 		Listener: bestScoreListener,
 	}
 
-	// Manually add preprocessors for reduction
+	// Manually add preprocessors for reduction, as we don't use a TopicListener to
+	// subscribe, but rather subscribe directly whenever it is appropriate
 	r.broker.Register(topics.Reduction, consensus.NewRepublisher(r.broker, topics.Reduction), &consensus.Validator{})
 
 	return []consensus.TopicListener{bestScoreSubscriber}
