@@ -13,12 +13,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/key"
+	log "github.com/sirupsen/logrus"
 )
 
 var _ consensus.Component = (*reducer)(nil)
 
 var emptyHash = [32]byte{}
 var regenerationPackage = new(bytes.Buffer)
+var lg = log.WithField("process", "second-step reduction")
 
 type reducer struct {
 	broker     eventbus.Broker
@@ -37,7 +39,7 @@ type reducer struct {
 }
 
 // NewComponent returns an uninitialized reduction component.
-func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) *reducer {
+func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) consensus.Component {
 	return &reducer{
 		broker:  broker,
 		rpcBus:  rpcBus,
@@ -53,12 +55,11 @@ func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer,
 	r.stepper = stepper
 	r.signer = signer
 	r.handler = reduction.NewHandler(r.keys, ru.P)
-	r.timer = reduction.NewTimer(r.broker, r.Halt)
+	r.timer = reduction.NewTimer(r.Halt)
 
-	stepVotesListener, _ := consensus.NewSimpleListener(r.CollectStepVotes)
 	stepVotesSubscriber := consensus.TopicListener{
 		Topic:    topics.StepVotes,
-		Listener: stepVotesListener,
+		Listener: consensus.NewSimpleListener(r.CollectStepVotes),
 	}
 
 	return []consensus.TopicListener{stepVotesSubscriber}
@@ -91,8 +92,7 @@ func (r *reducer) Filter(hdr header.Header) bool {
 
 func (r *reducer) startReduction(sv *agreement.StepVotes) {
 	r.timer.Start(r.timeOut)
-	r.aggregator = newAggregator(r.Halt, r.broker, r.handler, sv, r.signer)
-	//r.aggregator.Start()
+	r.aggregator = newAggregator(r.Halt, r.handler, sv)
 }
 
 func (r *reducer) sendReduction(hash []byte) error {
@@ -109,20 +109,26 @@ func (r *reducer) sendReduction(hash []byte) error {
 	return r.signer.SendAuthenticated(topics.Reduction, hash, payload)
 }
 
+// Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
+// In the latter case no agreement message is pushed forward
 func (r *reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.subscriber.Unsubscribe(r.reductionID)
 	r.broker.Publish(topics.Regeneration, nil)
-	r.sendAgreement(hash, b)
+
+	// TODO: check if an agreement on an empty block should be propagated
+	if hash != nil && len(b) > 0 {
+		r.sendAgreement(hash, b)
+	}
 	r.stepper.RequestStepUpdate()
 }
 
-// CollectBestScore activates the 2-step reduction cycle.
+// CollectStepVotes is triggered when the first StepVotes get published by the first step reducer
 func (r *reducer) CollectStepVotes(e consensus.Event) error {
-	listener, reductionID := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
-	r.subscriber.Subscribe(topics.Reduction, listener)
-	r.reductionID = reductionID
+	listener := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
 
-	// TODO: unmarshal to retrieve blockhash and stepvotes
+	r.subscriber.Subscribe(topics.Reduction, listener)
+	r.reductionID = listener.ID()
+
 	sv, err := agreement.UnmarshalStepVotes(&e.Payload)
 	if err != nil {
 		return err
@@ -132,15 +138,17 @@ func (r *reducer) CollectStepVotes(e consensus.Event) error {
 	return nil
 }
 
-func (r *reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) error {
+func (r *reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
 	payloadBuf := new(bytes.Buffer)
 	if err := agreement.MarshalVotes(payloadBuf, svs); err != nil {
-		//TODO: handle
+		lg.WithField("category", "BUG").WithError(err).Errorln("cannot marshal the StepVotes")
+		return
 	}
 
 	sig, err := r.signer.Sign(hash, payloadBuf.Bytes())
 	if err != nil {
-		//TODO: handle
+		lg.WithField("category", "BUG").WithError(err).Errorln("cannot sign the agreement")
+		return
 	}
 
 	// then we create the full BLS signed Agreement
@@ -150,9 +158,12 @@ func (r *reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) error {
 
 	eventBuf := new(bytes.Buffer)
 	if err := agreement.Marshal(eventBuf, ev); err != nil {
-		return err
+		lg.WithField("category", "BUG").WithError(err).Errorln("cannot marshal the agreement")
+		return
 	}
 
 	// then we forward the marshalled Agreement to the store to be sent
-	return r.signer.SendAuthenticated(topics.Agreement, hash, eventBuf)
+	if err := r.signer.SendAuthenticated(topics.Agreement, hash, eventBuf); err != nil {
+		lg.WithField("category", "BUG").WithError(err).Errorln("error in Ed25519 signing and gossip the agreement")
+	}
 }

@@ -43,16 +43,14 @@ func (g *generator) Initialize(signer consensus.Signer, ru consensus.RoundUpdate
 	//if !g.blockGen.proofGenerator.InBidList(g.bidList) {
 	//	return nil
 	//}
-	regenListener, _ := consensus.NewSimpleListener(g.CollectRegeneration)
 	regenSubscriber := consensus.TopicListener{
 		Topic:    topics.Regeneration,
-		Listener: regenListener,
+		Listener: consensus.NewSimpleListener(g.CollectRegeneration),
 	}
 
-	agreementEventListener, _ := consensus.NewSimpleListener(g.CollectAgreementEvent)
 	agreementEventSubscriber := consensus.TopicListener{
 		Topic:    topics.AgreementEvent,
-		Listener: agreementEventListener,
+		Listener: consensus.NewSimpleListener(g.CollectAgreementEvent),
 	}
 
 	// We always generate a block and score immediately on round update.

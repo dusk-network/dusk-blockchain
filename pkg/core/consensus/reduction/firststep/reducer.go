@@ -15,8 +15,6 @@ import (
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
-var _ consensus.Component = (*reducer)(nil)
-
 var emptyHash = [32]byte{}
 var regenerationPackage = new(bytes.Buffer)
 
@@ -37,7 +35,7 @@ type reducer struct {
 }
 
 // NewComponent returns an uninitialized reduction component.
-func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) *reducer {
+func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) consensus.Component {
 	return &reducer{
 		broker:  broker,
 		rpcBus:  rpcBus,
@@ -53,12 +51,11 @@ func (r *reducer) Initialize(stepper consensus.Stepper, signer consensus.Signer,
 	r.stepper = stepper
 	r.signer = signer
 	r.handler = reduction.NewHandler(r.keys, ru.P)
-	r.timer = reduction.NewTimer(r.broker, r.Halt)
+	r.timer = reduction.NewTimer(r.Halt)
 
-	bestScoreListener, _ := consensus.NewSimpleListener(r.CollectBestScore)
 	bestScoreSubscriber := consensus.TopicListener{
 		Topic:    topics.BestScore,
-		Listener: bestScoreListener,
+		Listener: consensus.NewSimpleListener(r.CollectBestScore),
 	}
 
 	return []consensus.TopicListener{bestScoreSubscriber}
@@ -91,7 +88,7 @@ func (r *reducer) Filter(hdr header.Header) bool {
 
 func (r *reducer) startReduction() {
 	r.timer.Start(r.timeOut)
-	r.aggregator = newAggregator(r.Halt, r.broker, r.handler, r.rpcBus)
+	r.aggregator = newAggregator(r.Halt, r.handler, r.rpcBus)
 	//r.aggregator.Start()
 }
 
@@ -125,9 +122,9 @@ func (r *reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 
 // CollectBestScore activates the 2-step reduction cycle.
 func (r *reducer) CollectBestScore(e consensus.Event) error {
-	listener, reductionID := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
+	listener := consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter)
 	r.subscriber.Subscribe(topics.Reduction, listener)
-	r.reductionID = reductionID
+	r.reductionID = listener.ID()
 
 	r.sendReduction(e.Payload.Bytes())
 	r.startReduction()

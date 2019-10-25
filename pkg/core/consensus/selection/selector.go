@@ -37,16 +37,14 @@ func (s *selector) Initialize(stepper consensus.Stepper, signer consensus.Signer
 	s.stepper = stepper
 	s.handler = newScoreHandler(r.BidList)
 
-	scoreListener, _ := consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter)
 	scoreSubscriber := consensus.TopicListener{
 		Topic:    topics.Score,
-		Listener: scoreListener,
+		Listener: consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter),
 	}
 
-	regenListener, _ := consensus.NewSimpleListener(s.CollectRegeneration)
 	regenSubscriber := consensus.TopicListener{
 		Topic:    topics.Regeneration,
-		Listener: regenListener,
+		Listener: consensus.NewSimpleListener(s.CollectRegeneration),
 	}
 
 	return []consensus.TopicListener{scoreSubscriber, regenSubscriber}
