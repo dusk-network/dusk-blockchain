@@ -11,7 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-type selector struct {
+type Selector struct {
 	publisher eventbus.Publisher
 	handler   *scoreHandler
 	lock      sync.RWMutex
@@ -27,14 +27,14 @@ type selector struct {
 // NewComponent creates and launches the component which responsibility is to validate
 // and select the best score among the blind bidders. The component publishes under
 // the topic BestScoreTopic
-func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *selector {
-	return &selector{
+func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector {
+	return &Selector{
 		timeout:   timeout,
 		publisher: publisher,
 	}
 }
 
-func (s *selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
+func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
 	s.handler = newScoreHandler(r.BidList)
@@ -53,11 +53,11 @@ func (s *selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	return []consensus.TopicListener{scoreSubscriber, regenSubscriber}
 }
 
-func (s *selector) Finalize() {
+func (s *Selector) Finalize() {
 	s.stopSelection()
 }
 
-func (s *selector) CollectScoreEvent(e consensus.Event) error {
+func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 	ev := &ScoreEvent{}
 	if err := UnmarshalScoreEvent(&e.Payload, ev); err != nil {
 		return err
@@ -70,11 +70,11 @@ func (s *selector) CollectScoreEvent(e consensus.Event) error {
 // Bidder relevant checks like proof verifications are done further down the pipeline
 // (see `Process`).
 // Implements consensus.Component
-func (s *selector) Filter(hdr header.Header) bool {
+func (s *Selector) Filter(hdr header.Header) bool {
 	return false
 }
 
-func (s *selector) CollectRegeneration(e consensus.Event) error {
+func (s *Selector) CollectRegeneration(e consensus.Event) error {
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
 	s.setBestEvent(nil)
@@ -82,15 +82,15 @@ func (s *selector) CollectRegeneration(e consensus.Event) error {
 	return nil
 }
 
-func (s *selector) startSelection() {
+func (s *Selector) startSelection() {
 	s.timer.start(s.timeout)
 }
 
-func (s *selector) stopSelection() {
+func (s *Selector) stopSelection() {
 	s.timer.stop()
 }
 
-func (s *selector) Process(ev *ScoreEvent) error {
+func (s *Selector) Process(ev *ScoreEvent) error {
 	if s.handler.Priority(s.getBestEvent(), ev) {
 		// if the current best score has priority, we return
 		return nil
@@ -108,11 +108,11 @@ func (s *selector) Process(ev *ScoreEvent) error {
 	return nil
 }
 
-func (s *selector) IncreaseTimeOut() {
+func (s *Selector) IncreaseTimeOut() {
 	s.timeout = s.timeout * 2
 }
 
-func (s *selector) publishBestEvent() error {
+func (s *Selector) publishBestEvent() error {
 	buf := new(bytes.Buffer)
 	bestEvent := s.getBestEvent()
 
@@ -121,7 +121,7 @@ func (s *selector) publishBestEvent() error {
 	return nil
 }
 
-func (s *selector) repropagate(ev *ScoreEvent) error {
+func (s *Selector) repropagate(ev *ScoreEvent) error {
 	buf := topics.Score.ToBuffer()
 	if err := MarshalScoreEvent(&buf, ev); err != nil {
 		return err
@@ -131,14 +131,14 @@ func (s *selector) repropagate(ev *ScoreEvent) error {
 	return nil
 }
 
-func (s *selector) getBestEvent() *ScoreEvent {
+func (s *Selector) getBestEvent() *ScoreEvent {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	bestEvent := s.bestEvent
 	return bestEvent
 }
 
-func (s *selector) setBestEvent(ev *ScoreEvent) {
+func (s *Selector) setBestEvent(ev *ScoreEvent) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.bestEvent = ev

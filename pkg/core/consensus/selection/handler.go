@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	scoreHandler struct {
+	Handler struct {
 		bidList user.BidList
 
 		// Threshold number that a score needs to be greater than in order to be considered
@@ -21,27 +21,27 @@ type (
 	}
 )
 
-func newScoreHandler(bidList user.BidList) *scoreHandler {
-	return &scoreHandler{
+func NewHandler(bidList user.BidList) *Handler {
+	return &Handler{
 		bidList:   bidList,
 		threshold: consensus.NewThreshold(),
 	}
 }
 
-func (sh *scoreHandler) ResetThreshold() {
+func (sh *Handler) ResetThreshold() {
 	sh.threshold.Reset()
 }
 
-func (sh *scoreHandler) LowerThreshold() {
+func (sh *Handler) LowerThreshold() {
 	sh.threshold.Lower()
 }
 
 // Priority returns true if the first element has priority over the second, false otherwise
-func (sh *scoreHandler) Priority(first, second *ScoreEvent) bool {
+func (sh *Handler) Priority(first, second *ScoreEvent) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
 
-func (sh *scoreHandler) Verify(m *ScoreEvent) error {
+func (sh *Handler) Verify(m *ScoreEvent) error {
 	// Check threshold
 	if !sh.threshold.Exceeds(m.Score) {
 		return errors.New("score does not exceed threshold")
@@ -70,7 +70,7 @@ func (sh *scoreHandler) Verify(m *ScoreEvent) error {
 	return nil
 }
 
-func (sh *scoreHandler) validateBidListSubset(bidListSubsetBytes []byte) error {
+func (sh *Handler) validateBidListSubset(bidListSubsetBytes []byte) error {
 	bidListSubset, err := user.ReconstructBidListSubset(bidListSubsetBytes)
 	if err != nil {
 		return err
