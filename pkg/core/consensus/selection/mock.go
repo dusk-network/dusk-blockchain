@@ -3,40 +3,46 @@ package selection
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
 
 // MockSelectionEventBuffer mocks a Selection event, marshals it, and returns the
 // resulting buffer.
-func MockSelectionEventBuffer(round uint64, hash []byte) *bytes.Buffer {
-	se := MockSelectionEvent(round, hash)
+func MockSelectionEventBuffer(hash []byte, bidList user.BidList) *bytes.Buffer {
+	se := MockSelectionEvent(hash, bidList)
 	r := new(bytes.Buffer)
 	_ = MarshalScoreEvent(r, se)
 	return r
 }
 
 // MockSelectionEvent mocks a Selection event and returns it.
-func MockSelectionEvent(round uint64, hash []byte) *ScoreEvent {
-	// 32 bytes
+func MockSelectionEvent(hash []byte, bidList user.BidList) *ScoreEvent {
 	score, _ := crypto.RandEntropy(32)
-	// Var Bytes
 	proof, _ := crypto.RandEntropy(1477)
-	// 32 bytes
 	z, _ := crypto.RandEntropy(32)
-	// Var Bytes
-	bidListSubset, _ := crypto.RandEntropy(32)
-	// BLS is 33 bytes
+	subset := bidList.Subset(len(bidList))
 	seed, _ := crypto.RandEntropy(33)
-	se := &ScoreEvent{
-		Round:         round,
+
+	return &ScoreEvent{
 		Score:         score,
 		Proof:         proof,
 		Z:             z,
 		Seed:          seed,
-		BidListSubset: bidListSubset,
+		BidListSubset: bidListToBytes(subset),
 		PrevHash:      hash,
 		VoteHash:      hash,
 	}
+}
 
-	return se
+func bidListToBytes(bidList []user.Bid) []byte {
+	buf := new(bytes.Buffer)
+	for _, bid := range bidList {
+		if err := encoding.Write256(buf, bid.X[:]); err != nil {
+			panic(err)
+		}
+	}
+
+	return buf.Bytes()
 }
