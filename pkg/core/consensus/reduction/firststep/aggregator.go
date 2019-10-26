@@ -49,6 +49,7 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 	if !found {
 		sv.StepVotes = agreement.NewStepVotes()
 		sv.Set = sortedset.New()
+
 	}
 
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
@@ -63,6 +64,8 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 
 		if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
 			blockHash = emptyHash[:]
+			a.requestHalt(emptyHash[:])
+			return nil
 		}
 
 		a.requestHalt(blockHash, sv.StepVotes)
