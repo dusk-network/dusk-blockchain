@@ -15,14 +15,7 @@ import (
 )
 
 func TestFirstStep(t *testing.T) {
-	committeeSize := 50
-	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
-	hash, _ := crypto.RandEntropy(32)
-	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
-
-	// Start the first step
-	hlp.StartReduction(hash)
+	hlp, hash := startReductionTest()
 
 	// Send events
 	hlp.SendBatch(hash, 1, 1)
@@ -44,14 +37,9 @@ func TestFirstStep(t *testing.T) {
 }
 
 func TestFirstStepTimeOut(t *testing.T) {
-	committeeSize := 50
-	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
-	hash, _ := crypto.RandEntropy(32)
-	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
+	hlp, _ := startReductionTest()
 
-	// Start the first step
-	hlp.StartReduction(hash)
+	// No sending events here, as we want the step to timeout
 
 	// Wait for resulting StepVotes
 	var svBuf bytes.Buffer
@@ -65,6 +53,17 @@ func TestFirstStepTimeOut(t *testing.T) {
 	_, err := agreement.UnmarshalStepVotes(&svBuf)
 	// Should get an EOF
 	assert.Error(t, err)
+}
+
+// Common functionality to start all reduction tests
+func startReductionTest() (*Helper, []byte) {
+	committeeSize := 50
+	bus, rpcBus := eventbus.New(), rpcbus.New()
+	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
+	hash, _ := crypto.RandEntropy(32)
+	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
+	hlp.StartReduction(hash)
+	return hlp, hash
 }
 
 // No-op implementation of consensus.EventPlayer
