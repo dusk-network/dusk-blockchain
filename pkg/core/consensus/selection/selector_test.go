@@ -1,194 +1,95 @@
 package selection_test
 
-// Test the functionality of the selector, in a condition where it receives multiple
-// events, and is allowed to time out.
-// func TestSelection(t *testing.T) {
-// 	eb := eventbus.New()
-// 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
-// 	// subscribe to receive a result
-// 	bestScoreChan := subBestScore(eb)
-// 	// Update round to start the selector
-// 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
-//
-// 	sendMockEvent(eb)
-// 	sendMockEvent(eb)
-// 	sendMockEvent(eb)
-//
-// 	// we should receive something on the bestScoreChan after timeout
-// 	ev := <-bestScoreChan
-// 	assert.NotNil(t, ev)
-// }
-//
-// // Test that the selector repropagates events which pass the priority check.
-// func TestRepropagation(t *testing.T) {
-// 	eb, streamer := eventbus.CreateGossipStreamer()
-// 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*200)
-// 	// Update round to start the selector
-// 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
-// 	sendMockEvent(eb)
-//
-// 	timer := time.AfterFunc(500*time.Millisecond, func() {
-// 		t.Fail()
-// 	})
-//
-// 	buf, err := streamer.Read()
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-//
-// 	assert.True(t, len(buf) > 0)
-// 	// Test is finished, stop the timer
-// 	timer.Stop()
-// }
-//
-// // Test that the selector does not return any value when it is stopped before timeout.
-// func TestStopSelector(t *testing.T) {
-// 	eb := eventbus.New()
-// 	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
-// 	// subscribe to receive a result
-// 	bestScoreChan := subBestScore(eb)
-//
-// 	// Update round to start the selector
-// 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
-// 	sendMockEvent(eb)
-// 	sendMockEvent(eb)
-// 	sendMockEvent(eb)
-//
-// 	// Update round again to stop the selector
-// 	consensus.UpdateRound(eb, 2)
-//
-// 	timer := time.After(200 * time.Millisecond)
-// 	select {
-// 	case <-bestScoreChan:
-// 		assert.FailNow(t, "Selector should have not returned a value")
-// 	case <-timer:
-// 		// success :)
-// 	}
-// }
-//
-// func TestTimeOutVariance(t *testing.T) {
-// 	eb := eventbus.New()
-// 	selection.Launch(eb, newMockScoreHandler(), time.Second*1)
-// 	// subscribe to receive a result
-// 	bestScoreChan := subBestScore(eb)
-//
-// 	// Update round to start the selector
-// 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
-// 	// measure time it takes for timer to run out
-// 	start := time.Now()
-// 	sendMockEvent(eb)
-//
-// 	// wait for result
-// 	select {
-// 	case <-bestScoreChan:
-// 	case <-time.After(2 * time.Second):
-// 		t.Fatal("waiting for a best score took too long")
-// 	}
-// 	elapsed1 := time.Now().Sub(start)
-//
-// 	// publish a regeneration message, which should double the timer
-// 	publishRegeneration(eb)
-// 	start = time.Now()
-//
-// 	sendMockEvent(eb)
-//
-// 	// wait for result again
-// 	select {
-// 	case <-bestScoreChan:
-// 	case <-time.After(4 * time.Second):
-// 		t.Fatal("waiting for a best score took too long")
-// 	}
-// 	elapsed2 := time.Now().Sub(start)
-//
-// 	// compare
-// 	assert.InDelta(t, elapsed1.Seconds()*2, elapsed2.Seconds(), 0.05)
-// }
-//
-// // This test should make sure that obsolete selection messages do not stay in the selector after updating the round
-// func TestObsoleteSelection(t *testing.T) {
-// 	eb := eventbus.New()
-// 	selection.Launch(eb, newMockScoreHandler(), time.Millisecond*100)
-// 	// subscribe to receive a result
-// 	bestScoreChan := subBestScore(eb)
-// 	// Start selection and let it run out
-// 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, nil, nil))
-// 	<-bestScoreChan
-//
-// 	// Now send an event to the selector
-// 	sendMockEvent(eb)
-// 	time.Sleep(200 * time.Millisecond)
-//
-// 	// Start selection on round 2
-// 	// This should clear the bestEvent, and let no others through
-// 	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, nil, nil))
-//
-// 	// Result should be nil
-// 	result := <-bestScoreChan
-// 	assert.Equal(t, 0, result.Len())
-// }
-//
-// func subBestScore(eb eventbus.Subscriber) chan bytes.Buffer {
-// 	bestScoreChan := make(chan bytes.Buffer, 2)
-// 	l := eventbus.NewChanListener(bestScoreChan)
-// 	eb.Subscribe(topics.BestScore, l)
-// 	return bestScoreChan
-// }
-//
-// func publishRegeneration(eb *eventbus.EventBus) {
-// 	state := make([]byte, 9)
-// 	binary.LittleEndian.PutUint64(state[0:8], 1)
-// 	state[8] = byte(2)
-// 	eb.Publish(topics.BlockRegeneration, bytes.NewBuffer(state))
-// }
-//
-// func sendMockEvent(eb *eventbus.EventBus) {
-// 	eb.Publish(topics.Score, bytes.NewBuffer([]byte("foo")))
-// }
-//
-// type mockScoreHandler struct {
-// 	consensus.EventHandler
-// }
-//
-// func newMockScoreHandler() *mockScoreHandler {
-// 	return &mockScoreHandler{
-// 		EventHandler: newMockHandler(),
-// 	}
-// }
-//
-// func (m *mockScoreHandler) Priority(ev1, ev2 wire.Event) bool {
-// 	return false
-// }
-//
-// func (m *mockScoreHandler) Marshal(b *bytes.Buffer, ev wire.Event) error {
-// 	if ev != nil {
-// 		_, err := b.Write([]byte("foo"))
-// 		return err
-// 	}
-// 	return nil
-// }
-//
-// func (m *mockScoreHandler) UpdateBidList(bL user.BidList)  {}
-// func (m *mockScoreHandler) RemoveExpiredBids(round uint64) {}
-// func (m *mockScoreHandler) LowerThreshold()                {}
-// func (m *mockScoreHandler) ResetThreshold()                {}
-//
-// func newMockHandler() consensus.EventHandler {
-// 	var sender []byte
-// 	mockEventHandler := &mocks.EventHandler{}
-// 	mockEventHandler.On("Verify", mock.Anything).Return(nil)
-// 	mockEventHandler.On("Marshal", mock.Anything, mock.Anything).Return(nil)
-// 	mockEventHandler.On("Deserialize", mock.Anything).
-// 		Return(selection.MockSelectionEvent(1, make([]byte, 32)), nil)
-// 	mockEventHandler.On("ExtractHeader",
-// 		mock.MatchedBy(func(ev wire.Event) bool {
-// 			sender, _ = crypto.RandEntropy(32)
-// 			return true
-// 		})).Return(func(e wire.Event) *header.Header {
-// 		return &header.Header{
-// 			Round:     1,
-// 			Step:      1,
-// 			PubKeyBLS: sender,
-// 		}
-// 	})
-// 	return mockEventHandler
-// }
+import (
+	"bytes"
+	"testing"
+	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestSelection(t *testing.T) {
+	bus := eventbus.New()
+	hlp := selection.NewHelper(bus, &mockPlayer{}, &mockSigner{bus})
+	// Sub to BestScore, to observe the outcome of the Selector
+	bestScoreChan := make(chan bytes.Buffer, 1)
+	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
+
+	// Start selection with a round update
+	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+
+	// Make sure to replace the handler, to avoid zkproof verification
+	hlp.SetHandler(newMockHandler())
+
+	// Send a set of events
+	hash, _ := crypto.RandEntropy(32)
+	hlp.SendBatch(hash)
+
+	// Wait for a result on the best score channel
+	select {
+	case evBuf := <-bestScoreChan:
+		h := make([]byte, 32)
+		if err := encoding.Read256(&evBuf, h); err != nil {
+			t.Fatal(err)
+		}
+
+		// We should've gotten a non-zero result
+		assert.NotEqual(t, make([]byte, 32), h)
+	case <-time.After(2 * time.Second):
+		t.Fatal("was supposed to receive a best score event")
+	}
+}
+
+// No-op implementation of consensus.EventPlayer
+type mockPlayer struct{}
+
+func (m *mockPlayer) Resume(uint32) {}
+func (m *mockPlayer) Pause(uint32)  {}
+func (m *mockPlayer) Forward()      {}
+
+type mockSigner struct {
+	bus *eventbus.EventBus
+}
+
+func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
+	return make([]byte, 33), nil
+}
+
+func (m *mockSigner) SendAuthenticated(topics.Topic, []byte, *bytes.Buffer) error { return nil }
+
+func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+	// Because the buffer in a BestScore message is empty, we will write the hash to it.
+	// This way, we can check for correctness during tests.
+	if err := encoding.Write256(b, hash); err != nil {
+		return err
+	}
+
+	m.bus.Publish(topic, b)
+	return nil
+}
+
+// Mock implementation of a selection.Handler to avoid elaborate set-up of
+// a Rust process for the purposes of zkproof verification.
+type mockHandler struct {
+}
+
+func newMockHandler() *mockHandler {
+	return &mockHandler{}
+}
+
+func (m *mockHandler) Verify(*selection.ScoreEvent) error {
+	return nil
+}
+
+func (m *mockHandler) LowerThreshold() {}
+func (m *mockHandler) ResetThreshold() {}
+
+func (m *mockHandler) Priority(first, second *selection.ScoreEvent) bool {
+	return bytes.Compare(second.Score, first.Score) != 1
+}

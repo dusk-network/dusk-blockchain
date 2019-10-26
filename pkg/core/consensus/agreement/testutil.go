@@ -63,12 +63,17 @@ func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
 	hlp.Aggro.Initialize(nil, nil, ru)
 }
 
-// ProduceWinningHash is used to produce enough valid Events to reach Quorum and trigger sending a winning hash to the channel
-func ProduceWinningHash(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
+func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	hlp := NewHelper(eb, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, hlp.P, nil)
 	hlp.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
+	return hlp, hash
+}
+
+// ProduceWinningHash is used to produce enough valid Events to reach Quorum and trigger sending a winning hash to the channel
+func ProduceWinningHash(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
+	hlp, hash := LaunchHelper(eb, nr)
 	hlp.SendBatch(hash)
 	return hlp, hash
 }

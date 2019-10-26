@@ -93,7 +93,6 @@ func (bg *blockGenerator) Generate(roundUpdate consensus.RoundUpdate) (block.Blo
 
 func (bg *blockGenerator) createScoreEvent(roundUpdate consensus.RoundUpdate, seed, hash []byte, proof zkproof.ZkProof) selection.ScoreEvent {
 	return selection.ScoreEvent{
-		Round:         roundUpdate.Round,
 		Score:         proof.Score,
 		Proof:         proof.Proof,
 		Z:             proof.Z,

@@ -16,11 +16,7 @@ import (
 )
 
 func TestSecondStep(t *testing.T) {
-	committeeSize := 50
-	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
-	hash, _ := crypto.RandEntropy(32)
-	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
+	hlp, hash := startReductionTest()
 
 	// Generate first StepVotes
 	svs := agreement.GenVotes(hash, 1, 1, hlp.Keys, hlp.P.CreateVotingCommittee(1, 1, 50))
@@ -61,11 +57,7 @@ func TestSecondStep(t *testing.T) {
 }
 
 func TestSecondStepAfterFailure(t *testing.T) {
-	committeeSize := 50
-	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
-	hash, _ := crypto.RandEntropy(32)
-	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
+	hlp, hash := startReductionTest()
 
 	// Start the first step
 	if err := hlp.StartReduction(nil); err != nil {
@@ -93,10 +85,7 @@ func TestSecondStepAfterFailure(t *testing.T) {
 }
 
 func TestSecondStepTimeOut(t *testing.T) {
-	committeeSize := 50
-	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
-	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
+	hlp, _ := startReductionTest()
 
 	// Start the first step
 	if err := hlp.StartReduction(nil); err != nil {
@@ -118,6 +107,15 @@ func TestSecondStepTimeOut(t *testing.T) {
 	case <-time.After(time.Second * 1):
 		// Success
 	}
+}
+
+func startReductionTest() (*Helper, []byte) {
+	committeeSize := 50
+	bus, rpcBus := eventbus.New(), rpcbus.New()
+	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
+	hash, _ := crypto.RandEntropy(32)
+	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
+	return hlp, hash
 }
 
 // No-op implementation of consensus.EventPlayer

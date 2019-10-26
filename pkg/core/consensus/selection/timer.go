@@ -10,7 +10,7 @@ type timer struct {
 }
 
 func (t *timer) start(timeOut time.Duration) {
-	t.t = time.NewTimer(timeOut)
+	t.t = time.AfterFunc(timeOut, t.trigger)
 }
 
 func (t *timer) stop() {
