@@ -10,8 +10,10 @@ import (
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
+var _ Handler = (*ScoreHandler)(nil)
+
 type (
-	Handler struct {
+	ScoreHandler struct {
 		bidList user.BidList
 
 		// Threshold number that a score needs to be greater than in order to be considered
@@ -19,29 +21,38 @@ type (
 		// repropagated.
 		threshold *consensus.Threshold
 	}
+
+	// Handler is an abstraction of the selection component event handler.
+	// It is primarily used for testing purposes, to bypass the zkproof verification.
+	Handler interface {
+		Verify(*ScoreEvent) error
+		ResetThreshold()
+		LowerThreshold()
+		Priority(*ScoreEvent, *ScoreEvent) bool
+	}
 )
 
-func NewHandler(bidList user.BidList) *Handler {
-	return &Handler{
+func NewScoreHandler(bidList user.BidList) *ScoreHandler {
+	return &ScoreHandler{
 		bidList:   bidList,
 		threshold: consensus.NewThreshold(),
 	}
 }
 
-func (sh *Handler) ResetThreshold() {
+func (sh *ScoreHandler) ResetThreshold() {
 	sh.threshold.Reset()
 }
 
-func (sh *Handler) LowerThreshold() {
+func (sh *ScoreHandler) LowerThreshold() {
 	sh.threshold.Lower()
 }
 
 // Priority returns true if the first element has priority over the second, false otherwise
-func (sh *Handler) Priority(first, second *ScoreEvent) bool {
+func (sh *ScoreHandler) Priority(first, second *ScoreEvent) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
 
-func (sh *Handler) Verify(m *ScoreEvent) error {
+func (sh *ScoreHandler) Verify(m *ScoreEvent) error {
 	// Check threshold
 	if !sh.threshold.Exceeds(m.Score) {
 		return errors.New("score does not exceed threshold")
@@ -70,7 +81,7 @@ func (sh *Handler) Verify(m *ScoreEvent) error {
 	return nil
 }
 
-func (sh *Handler) validateBidListSubset(bidListSubsetBytes []byte) error {
+func (sh *ScoreHandler) validateBidListSubset(bidListSubsetBytes []byte) error {
 	bidListSubset, err := user.ReconstructBidListSubset(bidListSubsetBytes)
 	if err != nil {
 		return err
