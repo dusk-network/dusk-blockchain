@@ -13,7 +13,7 @@ import (
 
 type Selector struct {
 	publisher eventbus.Publisher
-	handler   *Handler
+	handler   Handler
 	lock      sync.RWMutex
 	bestEvent *ScoreEvent
 
@@ -37,7 +37,8 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector
 func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
-	s.handler = NewHandler(r.BidList)
+	s.handler = NewScoreHandler(r.BidList)
+	s.timer = &timer{s: s}
 
 	scoreSubscriber := consensus.TopicListener{
 		Topic:         topics.Score,
@@ -50,6 +51,8 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 		Listener: consensus.NewSimpleListener(s.CollectRegeneration),
 	}
 
+	// We should trigger a selection on round update
+	s.startSelection()
 	return []consensus.TopicListener{scoreSubscriber, regenSubscriber}
 }
 
@@ -91,9 +94,14 @@ func (s *Selector) stopSelection() {
 }
 
 func (s *Selector) Process(ev *ScoreEvent) error {
-	if s.handler.Priority(s.getBestEvent(), ev) {
-		// if the current best score has priority, we return
-		return nil
+	bestEvent := s.getBestEvent()
+
+	// Only check for priority if we already have a best event
+	if bestEvent != nil {
+		if s.handler.Priority(s.getBestEvent(), ev) {
+			// if the current best score has priority, we return
+			return nil
+		}
 	}
 
 	if err := s.handler.Verify(ev); err != nil {
@@ -115,8 +123,13 @@ func (s *Selector) IncreaseTimeOut() {
 func (s *Selector) publishBestEvent() error {
 	buf := new(bytes.Buffer)
 	bestEvent := s.getBestEvent()
+	// If we had no best event, we should send an empty hash
+	if bestEvent == nil {
+		s.signer.SendWithHeader(topics.BestScore, make([]byte, 32), buf)
+	} else {
+		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf)
+	}
 
-	s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf)
 	s.eventPlayer.Forward()
 	return nil
 }
