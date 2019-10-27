@@ -3,7 +3,6 @@ package selection_test
 import (
 	"bytes"
 	"testing"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
@@ -32,18 +31,14 @@ func TestSelection(t *testing.T) {
 	hlp.SendBatch(hash)
 
 	// Wait for a result on the best score channel
-	select {
-	case evBuf := <-bestScoreChan:
-		h := make([]byte, 32)
-		if err := encoding.Read256(&evBuf, h); err != nil {
-			t.Fatal(err)
-		}
-
-		// We should've gotten a non-zero result
-		assert.NotEqual(t, make([]byte, 32), h)
-	case <-time.After(2 * time.Second):
-		t.Fatal("was supposed to receive a best score event")
+	evBuf := <-bestScoreChan
+	h := make([]byte, 32)
+	if err := encoding.Read256(&evBuf, h); err != nil {
+		t.Fatal(err)
 	}
+
+	// We should've gotten a non-zero result
+	assert.NotEqual(t, make([]byte, 32), h)
 }
 
 // No-op implementation of consensus.EventPlayer
