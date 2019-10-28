@@ -138,8 +138,6 @@ func TestPingLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	go reader.ReadLoop()
-	// Read the `mempool` message
-	<-responseChan2
 
 	// We should eventually get a pong message out of responseChan2
 	buf := <-responseChan2
