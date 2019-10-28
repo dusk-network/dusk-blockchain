@@ -3,6 +3,7 @@ package firststep
 import (
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -28,7 +29,7 @@ func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consensu
 }
 
 // Instantiate a first step reduction Component
-func (f *Factory) Instantiate() reduction.Reducer {
+func (f *Factory) Instantiate() consensus.Component {
 	return NewComponent(f.Bus, f.RBus, f.Keys, f.timeout)
 }
 

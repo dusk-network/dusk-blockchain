@@ -70,6 +70,7 @@ func (hlp *Helper) createResultChan() {
 
 // ActivateReduction sends the reducer a BestScore event to trigger a EvenPlayer.Resume
 func (hlp *Helper) ActivateReduction(hash []byte) {
+	hlp.CollectionWaitGroup.Wait()
 	hdr := header.Header{BlockHash: hash, Round: hlp.Round, Step: hlp.Step(), PubKeyBLS: hlp.PubKeyBLS}
 	hlp.Reducer.(*Reducer).CollectBestScore(consensus.Event{hdr, bytes.Buffer{}})
 }

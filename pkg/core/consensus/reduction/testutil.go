@@ -17,16 +17,6 @@ import (
 
 const round = uint64(1)
 
-// State indicates the status of the EventPlayer
-type State uint8
-
-const (
-	// PAUSED player
-	PAUSED State = iota
-	// RUNNING player
-	RUNNING
-)
-
 type mockSigner struct {
 	bus *eventbus.EventBus
 }
@@ -58,12 +48,9 @@ type Helper struct {
 	signer    consensus.Signer
 	PubKeyBLS []byte
 	nr        int
-	lock      sync.RWMutex
 	Handler   *Handler
-	stepLock  sync.Mutex
-	step      uint8
-	State     State
-	Round     uint64
+	*consensus.SimplePlayer
+	CollectionWaitGroup sync.WaitGroup
 }
 
 // NewHelper creates a Helper
@@ -71,16 +58,15 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, f
 	p, keys := consensus.MockProvisioners(provisioners)
 	red := factory(eb, rpcbus, keys[0], 1000*time.Millisecond)
 	hlp := &Helper{
-		Bus:     eb,
-		RBus:    rpcbus,
-		Keys:    keys,
-		P:       p,
-		Reducer: red,
-		signer:  &mockSigner{eb},
-		nr:      provisioners,
-		Handler: NewHandler(keys[0], *p),
-		Round:   round,
-		step:    uint8(1),
+		Bus:          eb,
+		RBus:         rpcbus,
+		Keys:         keys,
+		P:            p,
+		Reducer:      red,
+		signer:       &mockSigner{eb},
+		nr:           provisioners,
+		Handler:      NewHandler(keys[0], *p),
+		SimplePlayer: consensus.NewSimplePlayer(),
 	}
 
 	return hlp
@@ -98,35 +84,19 @@ func (hlp *Helper) Verify(hash []byte, sv *agreement.StepVotes, step uint8) erro
 	return header.VerifySignatures(round, step, hash, apk, sv.Signature)
 }
 
-// Forward upticks the step
-func (hlp *Helper) Forward() {
-	hlp.lock.Lock()
-	defer hlp.lock.Unlock()
-	hlp.step++
-}
-
-// Step guards the step with a lock
-func (hlp *Helper) Step() uint8 {
-	hlp.lock.RLock()
-	defer hlp.lock.RUnlock()
-	return hlp.step
-}
-
-// Pause as specified by the EventPlayer interface
-func (hlp *Helper) Pause(id uint32) {
-	hlp.State = PAUSED
-}
-
-// Resume as specified by the EventPlayer interface
-func (hlp *Helper) Resume(id uint32) {
-	hlp.State = RUNNING
-}
-
 // SendBatch of consensus events to the reducer callback CollectReductionEvent
 func (hlp *Helper) SendBatch(hash []byte) {
+	hlp.CollectionWaitGroup.Wait()
 	batch := hlp.Spawn(hash)
+	hlp.CollectionWaitGroup.Add(len(batch))
 	for _, ev := range batch {
-		go hlp.Reducer.Collect(ev)
+		go func(ev consensus.Event) {
+			if err := hlp.Reducer.Collect(ev); err != nil {
+				panic(err)
+			}
+
+			hlp.CollectionWaitGroup.Done()
+		}(ev)
 	}
 }
 
@@ -144,6 +114,5 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 
 // Initialize the reducer with a Round update
 func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.step = uint8(1)
 	hlp.Reducer.Initialize(hlp, hlp.signer, ru)
 }

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -28,7 +28,7 @@ func TestFirstStep(t *testing.T) {
 	// test that EventPlayer.Forward has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
-	assert.Equal(t, reduction.PAUSED, hlp.State)
+	assert.Equal(t, consensus.PAUSED, hlp.State)
 }
 
 func TestMoreSteps(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMoreSteps(t *testing.T) {
 	// test that EventPlayer.Forward has been called
 	assert.Equal(t, uint8(3), hlp.Step())
 	// test that the Player is PAUSED
-	assert.Equal(t, reduction.PAUSED, hlp.State)
+	assert.Equal(t, consensus.PAUSED, hlp.State)
 }
 
 func TestFirstStepTimeOut(t *testing.T) {
@@ -64,7 +64,7 @@ func TestFirstStepTimeOut(t *testing.T) {
 	// test that EventPlayer.Forward has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
-	assert.Equal(t, reduction.PAUSED, hlp.State)
+	assert.Equal(t, consensus.PAUSED, hlp.State)
 }
 
 func BenchmarkFirstStep(b *testing.B) {

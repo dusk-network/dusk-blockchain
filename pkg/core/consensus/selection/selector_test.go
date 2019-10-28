@@ -15,7 +15,7 @@ import (
 
 func TestSelection(t *testing.T) {
 	bus := eventbus.New()
-	hlp := selection.NewHelper(bus, &mockPlayer{}, &mockSigner{bus})
+	hlp := selection.NewHelper(bus)
 	// Sub to BestScore, to observe the outcome of the Selector
 	bestScoreChan := make(chan bytes.Buffer, 1)
 	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
@@ -39,34 +39,8 @@ func TestSelection(t *testing.T) {
 
 	// We should've gotten a non-zero result
 	assert.NotEqual(t, make([]byte, 32), h)
-}
-
-// No-op implementation of consensus.EventPlayer
-type mockPlayer struct{}
-
-func (m *mockPlayer) Resume(uint32) {}
-func (m *mockPlayer) Pause(uint32)  {}
-func (m *mockPlayer) Forward()      {}
-
-type mockSigner struct {
-	bus *eventbus.EventBus
-}
-
-func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
-	return make([]byte, 33), nil
-}
-
-func (m *mockSigner) SendAuthenticated(topics.Topic, []byte, *bytes.Buffer) error { return nil }
-
-func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
-	// Because the buffer in a BestScore message is empty, we will write the hash to it.
-	// This way, we can check for correctness during tests.
-	if err := encoding.Write256(b, hash); err != nil {
-		return err
-	}
-
-	m.bus.Publish(topic, b)
-	return nil
+	// Ensure `Forward()` was called
+	assert.Equal(t, uint8(2), hlp.Step())
 }
 
 // Mock implementation of a selection.Handler to avoid elaborate set-up of

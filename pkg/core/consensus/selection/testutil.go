@@ -7,23 +7,45 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
+type mockSigner struct {
+	bus *eventbus.EventBus
+}
+
+func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
+	return make([]byte, 33), nil
+}
+
+func (m *mockSigner) SendAuthenticated(topics.Topic, []byte, *bytes.Buffer) error { return nil }
+
+func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+	// Because the buffer in a BestScore message is empty, we will write the hash to it.
+	// This way, we can check for correctness during tests.
+	if err := encoding.Write256(b, hash); err != nil {
+		return err
+	}
+
+	m.bus.Publish(topic, b)
+	return nil
+}
+
 // Helper for reducing selection test boilerplate
 type Helper struct {
 	*Factory
-	BidList     user.BidList
-	Selector    *Selector
-	eventPlayer consensus.EventPlayer
-	signer      consensus.Signer
+	BidList  user.BidList
+	Selector *Selector
+	*consensus.SimplePlayer
+	signer consensus.Signer
 
 	BestScoreChan chan bytes.Buffer
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, eventPlayer consensus.EventPlayer, signer consensus.Signer) *Helper {
+func NewHelper(eb *eventbus.EventBus) *Helper {
 	bidList := consensus.MockBidList(10)
 	factory := NewFactory(eb, 1000*time.Millisecond)
 	s := factory.Instantiate()
@@ -32,8 +54,8 @@ func NewHelper(eb *eventbus.EventBus, eventPlayer consensus.EventPlayer, signer 
 		Factory:       factory,
 		BidList:       bidList,
 		Selector:      sel,
-		eventPlayer:   eventPlayer,
-		signer:        signer,
+		SimplePlayer:  consensus.NewSimplePlayer(),
+		signer:        &mockSigner{eb},
 		BestScoreChan: make(chan bytes.Buffer, 1),
 	}
 	hlp.createResultChan()
@@ -47,7 +69,7 @@ func (h *Helper) createResultChan() {
 
 // Initialize the selector with the given round update.
 func (h *Helper) Initialize(ru consensus.RoundUpdate) {
-	h.Selector.Initialize(h.eventPlayer, h.signer, ru)
+	h.Selector.Initialize(h, h.signer, ru)
 }
 
 // Spawn a set of score events.
