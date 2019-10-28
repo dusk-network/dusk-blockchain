@@ -17,42 +17,71 @@ import (
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
+const round = uint64(1)
+
+// State indicates the status of the EventPlayer
+type State uint8
+
+const (
+	// PAUSED player
+	PAUSED State = iota
+	// RUNNING player
+	RUNNING
+)
+
+type mockSigner struct {
+	bus *eventbus.EventBus
+}
+
+func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
+	return make([]byte, 33), nil
+}
+
+func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+	m.bus.Publish(topic, b)
+	return nil
+}
+
+func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+	m.bus.Publish(topic, b)
+	return nil
+}
+
 // Helper for reducing test boilerplate
 type Helper struct {
 	*Factory
-	Keys        []key.ConsensusKeys
-	P           *user.Provisioners
-	Reducer     *Reducer
-	eventPlayer consensus.EventPlayer
-	signer      consensus.Signer
-
+	Reducer       reduction.Reducer
 	AgreementChan chan bytes.Buffer
 	RegenChan     chan bytes.Buffer
-	nr            int
 
-	lock               sync.RWMutex
-	failOnVerification bool
-	Handler            *reduction.Handler
+	Keys      []key.ConsensusKeys
+	P         *user.Provisioners
+	signer    consensus.Signer
+	PubKeyBLS []byte
+	nr        int
+	lock      sync.RWMutex
+	Handler   *reduction.Handler
+	stepLock  sync.Mutex
+	step      uint8
+	State     State
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, provisioners int) *Helper {
+func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int) *Helper {
 	p, keys := consensus.MockProvisioners(provisioners)
 	factory := NewFactory(eb, rpcbus, keys[0], 1000*time.Millisecond)
 	a := factory.Instantiate()
-	red := a.(*Reducer)
+	red := a.(reduction.Reducer)
 	hlp := &Helper{
-		Factory:            factory,
-		Keys:               keys,
-		P:                  p,
-		Reducer:            red,
-		eventPlayer:        eventPlayer,
-		signer:             signer,
-		AgreementChan:      make(chan bytes.Buffer, 1),
-		RegenChan:          make(chan bytes.Buffer, 1),
-		nr:                 provisioners,
-		failOnVerification: false,
-		Handler:            reduction.NewHandler(keys[0], *p),
+		Factory:       factory,
+		Keys:          keys,
+		P:             p,
+		Reducer:       red,
+		signer:        &mockSigner{eb},
+		AgreementChan: make(chan bytes.Buffer, 1),
+		RegenChan:     make(chan bytes.Buffer, 1),
+		nr:            provisioners,
+		Handler:       reduction.NewHandler(keys[0], *p),
 	}
 	hlp.createResultChan()
 	return hlp
@@ -69,6 +98,30 @@ func (hlp *Helper) Verify(hash []byte, sv *agreement.StepVotes, round uint64, st
 	return header.VerifySignatures(round, step, hash, apk, sv.Signature)
 }
 
+// Forward upticks the step
+func (hlp *Helper) Forward() {
+	hlp.lock.Lock()
+	defer hlp.lock.Unlock()
+	hlp.step++
+}
+
+// Step guards the step with a lock
+func (hlp *Helper) Step() uint8 {
+	hlp.lock.RLock()
+	defer hlp.lock.RUnlock()
+	return hlp.step
+}
+
+// Pause as specified by the EventPlayer interface
+func (hlp *Helper) Pause(id uint32) {
+	hlp.State = PAUSED
+}
+
+// Resume as specified by the EventPlayer interface
+func (hlp *Helper) Resume(id uint32) {
+	hlp.State = RUNNING
+}
+
 // CreateResultChan is used by tests (internal and external) to quickly wire the StepVotes resulting from the firststep reduction to a channel to listen to
 func (hlp *Helper) createResultChan() {
 	agListener := eventbus.NewChanListener(hlp.AgreementChan)
@@ -77,11 +130,11 @@ func (hlp *Helper) createResultChan() {
 	hlp.Bus.Subscribe(topics.Regeneration, regenListener)
 }
 
-// SendBatch of consensus events to the reducer callback CollectReductionEvent
+// SendBatch of consensus events to the reducer callback Collect
 func (hlp *Helper) SendBatch(hash []byte, round uint64, step uint8) {
 	batch := hlp.Spawn(hash, round, step)
 	for _, ev := range batch {
-		go hlp.Reducer.CollectReductionEvent(ev)
+		go hlp.Reducer.Collect(ev)
 	}
 }
 
@@ -99,7 +152,7 @@ func (hlp *Helper) Spawn(hash []byte, round uint64, step uint8) []consensus.Even
 
 // Initialize the reducer with a Round update
 func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.Reducer.Initialize(hlp.eventPlayer, hlp.signer, ru)
+	hlp.Reducer.Initialize(hlp, hlp.signer, ru)
 }
 
 func (hlp *Helper) StartReduction(sv *agreement.StepVotes) error {
@@ -110,13 +163,13 @@ func (hlp *Helper) StartReduction(sv *agreement.StepVotes) error {
 		}
 	}
 
-	hlp.Reducer.CollectStepVotes(consensus.Event{header.Header{}, *buf})
+	hlp.Reducer.(*Reducer).CollectStepVotes(consensus.Event{header.Header{}, *buf})
 	return nil
 }
 
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
 func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, nr int, withTimeout bool, round uint64, step uint8) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, eventPlayer, signer, nr)
+	h := NewHelper(eb, rpcbus, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, h.P, nil)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)

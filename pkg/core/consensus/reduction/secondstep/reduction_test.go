@@ -8,7 +8,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -112,33 +111,8 @@ func TestSecondStepTimeOut(t *testing.T) {
 func startReductionTest() (*Helper, []byte) {
 	committeeSize := 50
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp := NewHelper(bus, rpcBus, &mockPlayer{}, &mockSigner{bus}, committeeSize)
+	hlp := NewHelper(bus, rpcBus, committeeSize)
 	hash, _ := crypto.RandEntropy(32)
 	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
 	return hlp, hash
-}
-
-// No-op implementation of consensus.EventPlayer
-type mockPlayer struct{}
-
-func (m *mockPlayer) Resume(uint32) {}
-func (m *mockPlayer) Pause(uint32)  {}
-func (m *mockPlayer) Forward()      {}
-
-type mockSigner struct {
-	bus *eventbus.EventBus
-}
-
-func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
-	return make([]byte, 33), nil
-}
-
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
-	m.bus.Publish(topic, b)
-	return nil
-}
-
-func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
-	m.bus.Publish(topic, b)
-	return nil
 }
