@@ -63,6 +63,7 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name 
 	}
 
 	log.Infof("Handled %s request", name)
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 }
 
 func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
