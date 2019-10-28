@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/key"
@@ -12,7 +13,7 @@ import (
 // Factory creates a second step reduction Component
 type Factory struct {
 	Bus     eventbus.Broker
-	RpcBus  *rpcbus.RPCBus
+	RBus    *rpcbus.RPCBus
 	Keys    key.ConsensusKeys
 	timeout time.Duration
 }
@@ -29,5 +30,12 @@ func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consensu
 
 // Instantiate a second step reduction Component
 func (f *Factory) Instantiate() consensus.Component {
-	return NewComponent(f.Bus, f.RpcBus, f.Keys, f.timeout)
+	return NewComponent(f.Bus, f.RBus, f.Keys, f.timeout)
+}
+
+// CreateReducer is callback used by reduction.Helper to wire up the tests
+var CreateReducer reduction.FactoryFunc = func(eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeout time.Duration) reduction.Reducer {
+	f := NewFactory(eb, rpcBus, keys, timeout)
+	a := f.Instantiate()
+	return a.(*Reducer)
 }

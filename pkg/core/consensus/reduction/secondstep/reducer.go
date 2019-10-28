@@ -38,7 +38,7 @@ type Reducer struct {
 }
 
 // NewComponent returns an uninitialized reduction component.
-func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) consensus.Component {
+func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) reduction.Reducer {
 	return &Reducer{
 		broker:  broker,
 		rpcBus:  rpcBus,
@@ -63,7 +63,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 
 	reductionSubscriber := consensus.TopicListener{
 		Topic:    topics.Reduction,
-		Listener: consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter),
+		Listener: consensus.NewFilteringListener(r.Collect, r.Filter),
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
 
@@ -77,7 +77,7 @@ func (r *Reducer) Finalize() {
 	r.timer.Stop()
 }
 
-func (r *Reducer) CollectReductionEvent(e consensus.Event) error {
+func (r *Reducer) Collect(e consensus.Event) error {
 	ev := reduction.New()
 	if err := reduction.Unmarshal(&e.Payload, ev); err != nil {
 		return err

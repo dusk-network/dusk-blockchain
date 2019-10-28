@@ -22,7 +22,7 @@ func TestSuccessfulAggro(t *testing.T) {
 		res <- hlp.Verify(hash, svs[0], 1)
 	}
 
-	aggregator := newAggregator(test, hlp.Handler, hlp.RpcBus)
+	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
 		r := reduction.Reduction{}
@@ -50,7 +50,7 @@ func TestInvalidBlock(t *testing.T) {
 		res <- struct{}{}
 	}
 
-	aggregator := newAggregator(test, hlp.Handler, hlp.RpcBus)
+	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
 		r := reduction.Reduction{}
