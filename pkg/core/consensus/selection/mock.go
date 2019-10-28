@@ -13,19 +13,19 @@ import (
 func MockSelectionEventBuffer(hash []byte, bidList user.BidList) *bytes.Buffer {
 	se := MockSelectionEvent(hash, bidList)
 	r := new(bytes.Buffer)
-	_ = MarshalScoreEvent(r, se)
+	_ = MarshalScore(r, se)
 	return r
 }
 
 // MockSelectionEvent mocks a Selection event and returns it.
-func MockSelectionEvent(hash []byte, bidList user.BidList) *ScoreEvent {
+func MockSelectionEvent(hash []byte, bidList user.BidList) *Score {
 	score, _ := crypto.RandEntropy(32)
 	proof, _ := crypto.RandEntropy(1477)
 	z, _ := crypto.RandEntropy(32)
 	subset := bidList.Subset(len(bidList))
 	seed, _ := crypto.RandEntropy(33)
 
-	return &ScoreEvent{
+	return &Score{
 		Score:         score,
 		Proof:         proof,
 		Z:             z,
