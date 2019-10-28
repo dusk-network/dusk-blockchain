@@ -1,4 +1,4 @@
-package generation
+package candidate
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 // as they would be different per network type. Once a genesis block is
 // approved, its hex blob should be copied into config.TestNetGenesisBlob
 func GenerateGenesisBlock(generatorPubKey *key.PublicKey) (string, error) {
-	g := &blockGenerator{
+	g := &Generator{
 		rpcBus:    nil,
 		genPubKey: generatorPubKey,
 	}

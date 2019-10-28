@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
 )
@@ -86,4 +87,14 @@ func (a *agreement) publishAgreement(aev Agreement) {
 
 func (a *agreement) Finalize() {
 	a.accumulator.Stop()
+}
+
+func (a *agreement) generateCertificate(ag Agreement) *block.Certificate {
+	return &block.Certificate{
+		StepOneBatchedSig: ag.VotesPerStep[0].Signature.Compress(),
+		StepTwoBatchedSig: ag.VotesPerStep[1].Signature.Compress(),
+		Step:              ag.Header.Step,
+		StepOneCommittee:  ag.VotesPerStep[0].BitSet,
+		StepTwoCommittee:  ag.VotesPerStep[1].BitSet,
+	}
 }

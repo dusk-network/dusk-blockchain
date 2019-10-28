@@ -47,6 +47,7 @@ var (
 	CandidateBlockPrefix = []byte{0x06}
 	StatePrefix          = []byte{0x07}
 	OutputKeyPrefix      = []byte{0x08}
+	BidValuesPrefix      = []byte{0x09}
 )
 
 type transaction struct {
@@ -592,4 +593,34 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	}
 
 	return header.Height, nil
+}
+
+func (t transaction) SaveBidValues(d, k []byte) error {
+	// First, delete the old values (if any)
+	key := BidValuesPrefix
+	exists, err := t.snapshot.Has(key, nil)
+	if exists && err == nil {
+		t.batch.Delete(key)
+	}
+	if err != nil {
+		return err
+	}
+
+	t.put(key, append(d, k...))
+	return nil
+}
+
+func (t transaction) GetBidValues() ([]byte, []byte, error) {
+	key := BidValuesPrefix
+	value, err := t.snapshot.Get(key, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Let's avoid any runtime panics by doing a sanity check on the value length before
+	if len(value) != 64 {
+		return nil, nil, errors.New("bid values non-existant or incorrectly encoded")
+	}
+
+	return value[0:32], value[32:64], nil
 }

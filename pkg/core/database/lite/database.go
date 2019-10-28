@@ -21,6 +21,7 @@ const (
 	candidatesTableInd
 	heightInd
 	stateInd
+	bidValuesInd
 	maxInd
 )
 

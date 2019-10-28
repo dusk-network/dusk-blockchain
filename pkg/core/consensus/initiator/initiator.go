@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -35,12 +36,13 @@ func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *w
 
 func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// Setting up the consensus factory
-	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, w.ConsensusKeys())
+	pubKey := w.PublicKey()
+	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, &pubKey, w.ConsensusKeys())
 	f.StartConsensus()
 
 	// Get current height
 	req := rpcbus.NewRequest(bytes.Buffer{})
-	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req, 1)
+	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req, 1*time.Second)
 	if err != nil {
 		l.WithError(err).Warnln("could not retrieve current height, starting from 1")
 		sendInitMessage(eventBroker, 1)

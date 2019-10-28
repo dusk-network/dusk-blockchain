@@ -1,45 +1,78 @@
 package generation
 
 import (
+	"bytes"
+	"errors"
+
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )
 
-// Generator defines the capability of generating proofs of blind bid, needed to
-// propose blocks in the consensus.
-type Generator interface {
-	GenerateProof([]byte, user.BidList) zkproof.ZkProof
-	InBidList(user.BidList) bool
-	UpdateProofValues(ristretto.Scalar, ristretto.Scalar)
+var _ consensus.Component = (*Generator)(nil)
+
+var emptyHash [32]byte
+
+func NewComponent(publisher eventbus.Publisher, consensusKeys key.ConsensusKeys, d, k ristretto.Scalar) *Generator {
+	return &Generator{
+		publisher:     publisher,
+		ConsensusKeys: consensusKeys,
+		k:             k,
+		d:             d,
+		threshold:     consensus.NewThreshold(),
+	}
 }
 
-type proofGenerator struct {
-	d, k, x ristretto.Scalar
+type Generator struct {
+	publisher eventbus.Publisher
+	roundInfo consensus.RoundUpdate
+	seed      []byte
+	d, k      ristretto.Scalar
+	key.ConsensusKeys
+	threshold *consensus.Threshold
+
+	signer consensus.Signer
 }
 
-func newProofGenerator(k ristretto.Scalar) (*proofGenerator, error) {
-	return &proofGenerator{
-		k: k,
-	}, nil
+func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+	g.signer = signer
+	g.roundInfo = ru
+	signedSeed, err := g.sign(ru.Seed)
+	if err != nil {
+		// TODO: handle
+	}
+
+	g.seed = signedSeed
+
+	// If we are not in this round's bid list, we can skip initialization, as there
+	// would be no need to listen for these events if we are not qualified to generate
+	// scores and blocks.
+	if !inBidList(g.d, g.k, g.roundInfo.BidList) {
+		return nil
+	}
+
+	regenSubscriber := consensus.TopicListener{
+		Topic:    topics.Regeneration,
+		Listener: consensus.NewSimpleListener(g.Collect),
+	}
+
+	// We generate a score immediately on round update
+	go g.generateScore()
+	return []consensus.TopicListener{regenSubscriber}
 }
 
-func (g *proofGenerator) InBidList(bidList user.BidList) bool {
-	var bid user.Bid
-	copy(bid.X[:], g.x.Bytes())
-	return bidList.Contains(bid)
-}
+// Finalize implements consensus.Component.
+func (g *Generator) Finalize() {}
 
-func (g *proofGenerator) UpdateProofValues(d, m ristretto.Scalar) {
-	x := zkproof.CalculateX(d, m)
-	g.x = x
-	g.d = d
-}
-
-// GenerateProof will generate the proof of blind bid, needed to successfully
+// Prove will generate the proof of blind bid, needed to successfully
 // propose a block to the voting committee.
-func (g *proofGenerator) GenerateProof(seed []byte, bidList user.BidList) zkproof.ZkProof {
+func (g *Generator) Prove(seed []byte, bidList user.BidList) zkproof.ZkProof {
 	log.WithField("process", "generation").Traceln("generating proof")
 	// Turn seed into scalar
 	seedScalar := ristretto.Scalar{}
@@ -50,6 +83,38 @@ func (g *proofGenerator) GenerateProof(seed []byte, bidList user.BidList) zkproo
 	bidListScalars := convertBidListToScalars(bidListSubset)
 
 	return zkproof.Prove(g.d, g.k, seedScalar, bidListScalars)
+}
+
+func (g *Generator) Collect(e consensus.Event) error {
+	g.threshold.Lower()
+	return g.generateScore()
+}
+
+func (g *Generator) generateScore() error {
+	proof := g.Prove(g.seed, g.roundInfo.BidList)
+	if g.threshold.Exceeds(proof.Score) {
+		return errors.New("proof score is below threshold")
+	}
+
+	sev := g.createScoreEvent(g.seed, proof)
+	buf := new(bytes.Buffer)
+	if err := Marshal(buf, sev); err != nil {
+		return err
+	}
+
+	return g.signer.SendWithHeader(topics.Score, emptyHash[:], buf)
+}
+
+func (g *Generator) createScoreEvent(seed []byte, proof zkproof.ZkProof) ScoreEvent {
+	return ScoreEvent{
+		Proof: zkproof.ZkProof{
+			Score:         proof.Score,
+			Proof:         proof.Proof,
+			Z:             proof.Z,
+			BinaryBidList: proof.BinaryBidList,
+		},
+		Seed: seed,
+	}
 }
 
 // bidsToScalars will take a global public list, take a subset from it, and then
@@ -84,4 +149,21 @@ func convertBidListToScalars(bidList user.BidList) []ristretto.Scalar {
 	}
 
 	return scalarList
+}
+
+func inBidList(d, k ristretto.Scalar, bidList user.BidList) bool {
+	m := zkproof.CalculateM(k)
+	x := zkproof.CalculateX(d, m)
+	var bid user.Bid
+	copy(bid.X[:], x.Bytes())
+	return bidList.Contains(bid)
+}
+
+func (g *Generator) sign(seed []byte) ([]byte, error) {
+	signedSeed, err := bls.Sign(g.ConsensusKeys.BLSSecretKey, g.ConsensusKeys.BLSPubKey, seed)
+	if err != nil {
+		return nil, err
+	}
+	compSeed := signedSeed.Compress()
+	return compSeed, nil
 }

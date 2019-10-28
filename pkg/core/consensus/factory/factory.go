@@ -3,8 +3,10 @@ package factory
 import (
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
@@ -23,15 +25,17 @@ type ConsensusFactory struct {
 	eventBus *eventbus.EventBus
 	rpcBus   *rpcbus.RPCBus
 
+	walletPubKey *key.PublicKey
 	key.ConsensusKeys
 	timerLength time.Duration
 }
 
 // New returns an initialized ConsensusFactory.
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, keys key.ConsensusKeys) *ConsensusFactory {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Duration, walletPubKey *key.PublicKey, keys key.ConsensusKeys) *ConsensusFactory {
 	return &ConsensusFactory{
 		eventBus:      eventBus,
 		rpcBus:        rpcBus,
+		walletPubKey:  walletPubKey,
 		ConsensusKeys: keys,
 		timerLength:   timerLength,
 	}
@@ -41,11 +45,13 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, timerLength time.Du
 // start the consensus components.
 func (c *ConsensusFactory) StartConsensus() {
 	log.WithField("process", "factory").Info("Starting consensus")
+	can := candidate.NewFactory(c.eventBus, c.rpcBus, c.walletPubKey)
+	gen := generation.NewFactory(c.eventBus, c.ConsensusKeys, nil)
 	sel := selection.NewFactory(c.eventBus, c.timerLength)
 	redFirstStep := firststep.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
 	redSecondStep := secondstep.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
 	agr := agreement.NewFactory(c.eventBus, c.ConsensusKeys)
 
-	consensus.Start(c.eventBus, c.ConsensusKeys, sel, redFirstStep, redSecondStep, agr)
+	consensus.Start(c.eventBus, c.ConsensusKeys, can, gen, sel, redFirstStep, redSecondStep, agr)
 	log.WithField("process", "factory").Info("Consensus Started")
 }
