@@ -98,14 +98,17 @@ func TestSendBidTransaction(t *testing.T) {
 	}
 
 	txid := resp.Txid
-	log.Infof("Bid transaction id: %s", txid)
+	t.Logf("Bid transaction id: %s", txid)
 
 	// Ensure all nodes have accepted this transaction at the same height
 	blockhash := ""
 	for i, node := range localNet.Nodes {
 		condition := func() bool {
 			// Construct query to fetch txid
-			query := fmt.Sprintf("{ transactions (txid: \"%s\") { txid blockhash } }", txid)
+			query := fmt.Sprintf(
+				"{\"query\" : \"{ transactions (txid: \\\"%s\\\") { txid blockhash } }\"}",
+				txid)
+
 			result, err := localNet.SendQuery(uint(i), query)
 			if err != nil {
 				return false
