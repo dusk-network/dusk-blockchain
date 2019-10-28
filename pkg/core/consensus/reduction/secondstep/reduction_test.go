@@ -1,7 +1,6 @@
 package secondstep
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
@@ -17,58 +16,41 @@ func TestSecondStep(t *testing.T) {
 	svs := agreement.GenVotes(hash, 1, 1, hlp.Keys, hlp.P.CreateVotingCommittee(1, 1, 50))
 
 	// Start the first step
-	if err := hlp.StartReduction(svs[0]); err != nil {
+	if err := hlp.ActivateReduction(hash, svs[0]); err != nil {
 		t.Fatal(err)
 	}
 
-	// Send events
-	hlp.SendBatch(hash, 1, 2)
+	// Send events (most probably this requires a Forward)
+	hlp.SendBatch(hash)
 
 	// Wait for resulting Agreement
-	var agBuf bytes.Buffer
-	select {
-	case agBuf = <-hlp.AgreementChan:
-		// Success
-	case <-time.After(2 * time.Second):
-		t.Fatal("should have received an Agreement message")
-	}
+	agBuf := <-hlp.AgreementChan
 
 	// Ensure we get a regeneration message
-	select {
-	case <-hlp.RegenChan:
-		// Success
-	case <-time.After(time.Second * 2):
-		t.Fatal("no regeneration message received after halting")
-	}
+	<-hlp.RegenChan
 
 	// Retrieve Agreement
 	ag := agreement.New(header.Header{})
-	err := agreement.Unmarshal(&agBuf, ag)
-	assert.NoError(t, err)
+	assert.NoError(t, agreement.Unmarshal(&agBuf, ag))
 
 	// StepVotes should be valid
-	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[0], 1, 1))
-	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[1], 1, 2))
+	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[0], 1))
+	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[1], 2))
 }
 
 func TestSecondStepAfterFailure(t *testing.T) {
 	hlp, hash := Kickstart(50)
 
 	// Start the first step
-	if err := hlp.StartReduction(nil); err != nil {
+	if err := hlp.ActivateReduction(hash, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	// Send events
-	hlp.SendBatch(hash, 1, 2)
+	hlp.SendBatch(hash)
 
 	// Ensure we get a regeneration message
-	select {
-	case <-hlp.RegenChan:
-		// Success
-	case <-time.After(time.Second * 2):
-		t.Fatal("no regeneration message received after halting")
-	}
+	<-hlp.RegenChan
 
 	// Make sure no agreement message is sent
 	select {
@@ -80,20 +62,15 @@ func TestSecondStepAfterFailure(t *testing.T) {
 }
 
 func TestSecondStepTimeOut(t *testing.T) {
-	hlp, _ := Kickstart(50)
+	hlp, hash := Kickstart(50)
 
 	// Start the first step
-	if err := hlp.StartReduction(nil); err != nil {
+	if err := hlp.ActivateReduction(hash, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	// Ensure we get a regeneration message
-	select {
-	case <-hlp.RegenChan:
-		// Success
-	case <-time.After(time.Second * 2):
-		t.Fatal("no regeneration message received after halting")
-	}
+	<-hlp.RegenChan
 
 	// Make sure no agreement message is sent
 	select {

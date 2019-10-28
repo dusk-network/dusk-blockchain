@@ -80,6 +80,7 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, f
 		nr:      provisioners,
 		Handler: NewHandler(keys[0], *p),
 		Round:   round,
+		step:    uint8(1),
 	}
 
 	return hlp
@@ -137,7 +138,6 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 	for i := 0; i < hlp.nr; i++ {
 		ev := MockConsensusEvent(hash, round, step, hlp.Keys, vc, i)
 		evs[i] = ev
-
 	}
 	return evs
 }
