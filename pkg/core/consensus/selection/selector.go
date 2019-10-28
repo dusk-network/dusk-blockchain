@@ -15,7 +15,7 @@ type Selector struct {
 	publisher eventbus.Publisher
 	handler   Handler
 	lock      sync.RWMutex
-	bestEvent *ScoreEvent
+	bestEvent *Score
 
 	timer   *timer
 	timeout time.Duration
@@ -61,8 +61,8 @@ func (s *Selector) Finalize() {
 }
 
 func (s *Selector) CollectScoreEvent(e consensus.Event) error {
-	ev := &ScoreEvent{}
-	if err := UnmarshalScoreEvent(&e.Payload, ev); err != nil {
+	ev := &Score{}
+	if err := UnmarshalScore(&e.Payload, ev); err != nil {
 		return err
 	}
 
@@ -93,7 +93,7 @@ func (s *Selector) stopSelection() {
 	s.timer.stop()
 }
 
-func (s *Selector) Process(ev *ScoreEvent) error {
+func (s *Selector) Process(ev *Score) error {
 	bestEvent := s.getBestEvent()
 
 	// Only check for priority if we already have a best event
@@ -134,9 +134,9 @@ func (s *Selector) publishBestEvent() error {
 	return nil
 }
 
-func (s *Selector) repropagate(ev *ScoreEvent) error {
+func (s *Selector) repropagate(ev *Score) error {
 	buf := topics.Score.ToBuffer()
-	if err := MarshalScoreEvent(&buf, ev); err != nil {
+	if err := MarshalScore(&buf, ev); err != nil {
 		return err
 	}
 
@@ -144,14 +144,14 @@ func (s *Selector) repropagate(ev *ScoreEvent) error {
 	return nil
 }
 
-func (s *Selector) getBestEvent() *ScoreEvent {
+func (s *Selector) getBestEvent() *Score {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	bestEvent := s.bestEvent
 	return bestEvent
 }
 
-func (s *Selector) setBestEvent(ev *ScoreEvent) {
+func (s *Selector) setBestEvent(ev *Score) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.bestEvent = ev

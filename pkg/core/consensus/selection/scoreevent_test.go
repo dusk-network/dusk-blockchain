@@ -17,9 +17,9 @@ func TestUnMarshal(t *testing.T) {
 	se := selection.MockSelectionEvent(hash, consensus.MockBidList(2))
 
 	buf := new(bytes.Buffer)
-	assert.NoError(t, selection.MarshalScoreEvent(buf, se))
+	assert.NoError(t, selection.MarshalScore(buf, se))
 
-	other := &selection.ScoreEvent{}
-	assert.NoError(t, selection.UnmarshalScoreEvent(buf, other))
+	other := &selection.Score{}
+	assert.NoError(t, selection.UnmarshalScore(buf, other))
 	assert.True(t, other.Equal(se))
 }

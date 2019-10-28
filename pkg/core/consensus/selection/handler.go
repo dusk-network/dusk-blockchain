@@ -25,10 +25,10 @@ type (
 	// Handler is an abstraction of the selection component event handler.
 	// It is primarily used for testing purposes, to bypass the zkproof verification.
 	Handler interface {
-		Verify(*ScoreEvent) error
+		Verify(*Score) error
 		ResetThreshold()
 		LowerThreshold()
-		Priority(*ScoreEvent, *ScoreEvent) bool
+		Priority(*Score, *Score) bool
 	}
 )
 
@@ -48,11 +48,11 @@ func (sh *ScoreHandler) LowerThreshold() {
 }
 
 // Priority returns true if the first element has priority over the second, false otherwise
-func (sh *ScoreHandler) Priority(first, second *ScoreEvent) bool {
+func (sh *ScoreHandler) Priority(first, second *Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
 
-func (sh *ScoreHandler) Verify(m *ScoreEvent) error {
+func (sh *ScoreHandler) Verify(m *Score) error {
 	// Check threshold
 	if !sh.threshold.Exceeds(m.Score) {
 		return errors.New("score does not exceed threshold")

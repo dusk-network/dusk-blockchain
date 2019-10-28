@@ -52,13 +52,13 @@ func newMockHandler() *mockHandler {
 	return &mockHandler{}
 }
 
-func (m *mockHandler) Verify(*selection.ScoreEvent) error {
+func (m *mockHandler) Verify(*selection.Score) error {
 	return nil
 }
 
 func (m *mockHandler) LowerThreshold() {}
 func (m *mockHandler) ResetThreshold() {}
 
-func (m *mockHandler) Priority(first, second *selection.ScoreEvent) bool {
+func (m *mockHandler) Priority(first, second *selection.Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
