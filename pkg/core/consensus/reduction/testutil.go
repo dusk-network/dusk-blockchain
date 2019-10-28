@@ -34,7 +34,12 @@ type mockSigner struct {
 func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
 	return make([]byte, 33), nil
 }
-func (m *mockSigner) SendAuthenticated(topics.Topic, []byte, *bytes.Buffer) error { return nil }
+
+func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+	m.bus.Publish(topic, b)
+	return nil
+}
+
 func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
 	m.bus.Publish(topic, b)
 	return nil
