@@ -67,11 +67,6 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
-		return err
-	}
-
 	score := &selection.Score{
 		Score:         sev.Proof.Score,
 		Proof:         sev.Proof.Proof,
@@ -90,6 +85,12 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	if err := bg.signer.SendAuthenticated(topics.Score, blk.Header.Hash, scoreBuf); err != nil {
 		return err
 	}
+
+	buf := new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+		return err
+	}
+
 	return bg.signer.SendAuthenticated(topics.Candidate, blk.Header.Hash, buf)
 }
 
