@@ -21,7 +21,7 @@ func TestRPCall(t *testing.T) {
 	buf.WriteString("input params")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(m, d, 10)
+	responseResult, err := bus.Call(m, d, 10*time.Second)
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -41,7 +41,7 @@ func TestRPCallWithError(t *testing.T) {
 	buf.WriteString("")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(m, d, 10)
+	responseResult, err := bus.Call(m, d, 10*time.Second)
 	if err != errInvalidParams {
 		t.Errorf("expecting a specific error here but get %v", err)
 	}
@@ -61,7 +61,7 @@ func TestTimeoutCalls(t *testing.T) {
 	buf.WriteString("input params")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(m, d, 1)
+	responseResult, err := bus.Call(m, d, 1*time.Second)
 	if err != ErrRequestTimeout {
 		t.Errorf("expecting timeout error but get %v", err)
 	}
@@ -94,7 +94,7 @@ func TestNonExistingMethod(t *testing.T) {
 	buf.WriteString("input params")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(0xff, d, 2)
+	responseResult, err := bus.Call(0xff, d, 2*time.Second)
 
 	if err != ErrMethodNotExists {
 		t.Error("expecting methodNotExists error")

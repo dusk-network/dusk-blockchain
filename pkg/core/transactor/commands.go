@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"math/big"
 
@@ -238,7 +239,7 @@ func (t *Transactor) Balance() (uint64, uint64, error) {
 
 func (t *Transactor) getMempool() ([]transactions.Transaction, error) {
 	buf := new(bytes.Buffer)
-	r, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3)
+	r, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
 	if err != nil {
 		return nil, err
 	}

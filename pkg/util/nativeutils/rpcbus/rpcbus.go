@@ -88,14 +88,14 @@ func (bus *RPCBus) Call(m method, req Request, timeOut time.Duration) (bytes.Buf
 func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time.Duration) (bytes.Buffer, error) {
 	select {
 	case reqChan <- req:
-	case <-time.After(timeOut * time.Second):
+	case <-time.After(timeOut):
 		return bytes.Buffer{}, ErrRequestTimeout
 	}
 
 	var resp Response
 	select {
 	case resp = <-req.RespChan:
-	case <-time.After(timeOut * time.Second):
+	case <-time.After(timeOut):
 		return bytes.Buffer{}, ErrRequestTimeout
 	}
 

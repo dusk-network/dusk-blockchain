@@ -7,6 +7,7 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -192,6 +193,19 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 
 	//  Publish transaction to the mempool processing
 	txid, err := t.publishTx(tx)
+	if err != nil {
+		return err
+	}
+
+	// Save relevant values in the database for the generation component to use
+	err = t.db.Update(func(tr database.Transaction) error {
+		k, err := t.w.ReconstructK()
+		if err != nil {
+			return err
+		}
+
+		return tr.SaveBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes())
+	})
 	if err != nil {
 		return err
 	}
