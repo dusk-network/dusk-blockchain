@@ -20,6 +20,8 @@ var lg = log.WithField("process", "first-step reduction")
 var emptyHash = [32]byte{}
 var regenerationPackage = new(bytes.Buffer)
 
+// Reducer for the firststep. Although its logic is fairly close to the second step reducer, there are nuances that prevent the use of a generalized Reducer for both steps.
+// For instance, the first step reducer produces a StepVote as a result (as opposed to an Agreement), while the start of Reduction event collection should happen after a BestScore event is received (as opposed to a first StepVote)
 type Reducer struct {
 	broker      eventbus.Broker
 	rpcBus      *rpcbus.RPCBus
@@ -36,7 +38,7 @@ type Reducer struct {
 }
 
 // NewComponent returns an uninitialized reduction component.
-func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) consensus.Component {
+func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.ConsensusKeys, timeOut time.Duration) reduction.Reducer {
 	return &Reducer{
 		broker:  broker,
 		rpcBus:  rpcBus,
@@ -62,7 +64,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	reductionSubscriber := consensus.TopicListener{
 		Topic:         topics.Reduction,
 		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(r.broker, topics.Reduction), &consensus.Validator{}},
-		Listener:      consensus.NewFilteringListener(r.CollectReductionEvent, r.Filter),
+		Listener:      consensus.NewFilteringListener(r.Collect, r.Filter),
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
 
@@ -76,7 +78,8 @@ func (r *Reducer) Finalize() {
 	r.Timer.Stop()
 }
 
-func (r *Reducer) CollectReductionEvent(e consensus.Event) error {
+// Collect forwards Reduction to the aggregator
+func (r *Reducer) Collect(e consensus.Event) error {
 	ev := reduction.New()
 	if err := reduction.Unmarshal(&e.Payload, ev); err != nil {
 		return err
@@ -86,8 +89,7 @@ func (r *Reducer) CollectReductionEvent(e consensus.Event) error {
 		return err
 	}
 
-	r.aggregator.collectVote(*ev, e.Header)
-	return nil
+	return r.aggregator.collectVote(*ev, e.Header)
 }
 
 func (r *Reducer) Filter(hdr header.Header) bool {
