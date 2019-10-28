@@ -113,12 +113,7 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	idString, err := encoding.ReadString(&txid)
-	if err != nil {
-		return "", err
-	}
-
-	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString([]byte(idString)))
+	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString(txid.Bytes()))
 	return result, err
 }
 
