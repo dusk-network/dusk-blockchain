@@ -5,17 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSecondStep(t *testing.T) {
-	hlp, hash := startReductionTest()
+	hlp, hash := Kickstart(50)
 
 	// Generate first StepVotes
 	svs := agreement.GenVotes(hash, 1, 1, hlp.Keys, hlp.P.CreateVotingCommittee(1, 1, 50))
@@ -56,7 +52,7 @@ func TestSecondStep(t *testing.T) {
 }
 
 func TestSecondStepAfterFailure(t *testing.T) {
-	hlp, hash := startReductionTest()
+	hlp, hash := Kickstart(50)
 
 	// Start the first step
 	if err := hlp.StartReduction(nil); err != nil {
@@ -84,7 +80,7 @@ func TestSecondStepAfterFailure(t *testing.T) {
 }
 
 func TestSecondStepTimeOut(t *testing.T) {
-	hlp, _ := startReductionTest()
+	hlp, _ := Kickstart(50)
 
 	// Start the first step
 	if err := hlp.StartReduction(nil); err != nil {
@@ -106,13 +102,4 @@ func TestSecondStepTimeOut(t *testing.T) {
 	case <-time.After(time.Second * 1):
 		// Success
 	}
-}
-
-func startReductionTest() (*Helper, []byte) {
-	committeeSize := 50
-	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp := NewHelper(bus, rpcBus, committeeSize)
-	hash, _ := crypto.RandEntropy(32)
-	hlp.Initialize(consensus.MockRoundUpdate(1, hlp.P, nil))
-	return hlp, hash
 }

@@ -167,12 +167,11 @@ func (hlp *Helper) StartReduction(sv *agreement.StepVotes) error {
 	return nil
 }
 
-// ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
-func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, eventPlayer consensus.EventPlayer, signer consensus.Signer, nr int, withTimeout bool, round uint64, step uint8) (*Helper, []byte) {
+func Kickstart(nr int) (*Helper, []byte) {
+	eb, rpcbus := eventbus.New(), rpcbus.New()
 	h := NewHelper(eb, rpcbus, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, h.P, nil)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
-	h.Spawn(hash, round, step)
 	return h, hash
 }
