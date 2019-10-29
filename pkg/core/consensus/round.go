@@ -20,6 +20,7 @@ var _ Signer = (*Coordinator)(nil)
 var lg = log.WithField("process", "coordinator")
 
 type roundStore struct {
+	lock        sync.RWMutex
 	subscribers map[topics.Topic][]Listener
 	paused      map[topics.Topic][]Listener
 	components  []Component
@@ -42,11 +43,15 @@ func (s *roundStore) addComponent(component Component, round RoundUpdate) []Topi
 	for _, sub := range subs {
 		s.subscribe(sub.Topic, sub)
 	}
+	s.lock.Lock()
 	s.components = append(s.components, component)
+	s.lock.Unlock()
 	return subs
 }
 
 func (s *roundStore) subscribe(topic topics.Topic, sub Listener) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	subscribers := s.subscribers[topic]
 	if subscribers == nil {
 		subscribers = []Listener{sub}
@@ -56,7 +61,9 @@ func (s *roundStore) subscribe(topic topics.Topic, sub Listener) {
 	s.subscribers[topic] = subscribers
 }
 
-func (s *roundStore) unsubscribe(id uint32) {
+func (s *roundStore) pause(id uint32) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	for topic, listeners := range s.subscribers {
 		for i, listener := range listeners {
 			if listener.ID() == id {
@@ -64,6 +71,7 @@ func (s *roundStore) unsubscribe(id uint32) {
 					listeners[:i],
 					listeners[i+1:]...,
 				)
+				s.subscribers[topic] = listeners
 				s.paused[topic] = append(s.paused[topic], listener)
 				return
 			}
@@ -72,20 +80,28 @@ func (s *roundStore) unsubscribe(id uint32) {
 }
 
 func (s *roundStore) resume(id uint32) {
+	s.lock.Lock()
 	for topic, listeners := range s.paused {
 		for i, listener := range listeners {
 			if listener.ID() == id {
 				s.paused[topic] = append(s.paused[topic][:i], s.paused[topic][i+1:]...)
+				s.lock.Unlock()
 				s.subscribe(topic, listener)
 				return
 			}
 		}
 	}
+
+	s.lock.Unlock()
 }
+
 func (s *roundStore) Dispatch(ev TopicEvent) {
-	for _, sub := range s.subscribers[ev.Topic] {
+	s.lock.RLock()
+	subscribers := s.subscribers[ev.Topic]
+	s.lock.RUnlock()
+	for _, sub := range subscribers {
 		if err := sub.NotifyPayload(ev.Event); err != nil {
-			//TODO: log this
+			lg.WithField("topic", ev.Topic.String()).WithError(err).Warnln("notifying subscriber failed")
 		}
 	}
 }
@@ -172,6 +188,7 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	c.recreateStore(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
+	c.dispatchQueuedEvents()
 	return nil
 }
 
@@ -217,7 +234,10 @@ func (c *Coordinator) FinalizeRound() {
 
 func (c *Coordinator) Forward() {
 	c.IncrementStep()
+	c.dispatchQueuedEvents()
+}
 
+func (c *Coordinator) dispatchQueuedEvents() {
 	events := c.eventqueue.GetEvents(c.Round(), c.Step())
 	for _, ev := range events {
 		c.store.Dispatch(ev)
@@ -304,7 +324,7 @@ func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *b
 }
 
 func (c *Coordinator) Pause(id uint32) {
-	c.store.unsubscribe(id)
+	c.store.pause(id)
 }
 
 func (c *Coordinator) Resume(id uint32) {
