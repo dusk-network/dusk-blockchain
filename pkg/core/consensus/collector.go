@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
@@ -20,10 +19,6 @@ type (
 		roundChan chan RoundUpdate
 	}
 
-	regenerationCollector struct {
-		regenerationChan chan AsyncState
-	}
-
 	acceptedBlockCollector struct {
 		blockChan chan<- block.Block
 	}
@@ -36,13 +31,6 @@ type (
 		Hash    []byte
 	}
 )
-
-// UpdateRound is a shortcut for propagating a round
-func UpdateRound(bus eventbus.Publisher, round uint64) {
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, round)
-	bus.Publish(topics.RoundUpdate, bytes.NewBuffer(b))
-}
 
 func DecodeRound(rb *bytes.Buffer, update *RoundUpdate) error {
 	var round uint64
@@ -97,27 +85,6 @@ func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
 		return err
 	}
 	r.roundChan <- update
-	return nil
-}
-
-// InitBlockRegenerationCollector initializes a regeneration channel, creates a
-// regenerationCollector, and subscribes this collector to the BlockRegenerationTopic.
-// The channel is then returned.
-func InitBlockRegenerationCollector(subscriber eventbus.Subscriber) chan AsyncState {
-	regenerationChan := make(chan AsyncState, 1)
-	collector := &regenerationCollector{regenerationChan}
-	eventbus.NewTopicListener(subscriber, collector, topics.BlockRegeneration, eventbus.ChannelType)
-	return regenerationChan
-}
-
-func (rg *regenerationCollector) Collect(r bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(r.Bytes()[:8])
-	step := uint8(r.Bytes()[8])
-	state := AsyncState{
-		Round: round,
-		Step:  step,
-	}
-	rg.regenerationChan <- state
 	return nil
 }
 
