@@ -198,15 +198,7 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 	}
 
 	// Save relevant values in the database for the generation component to use
-	err = t.db.Update(func(tr database.Transaction) error {
-		k, err := t.w.ReconstructK()
-		if err != nil {
-			return err
-		}
-
-		return tr.SaveBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes())
-	})
-	if err != nil {
+	if err := t.writeBidValues(tx); err != nil {
 		return err
 	}
 
@@ -345,4 +337,15 @@ func (t *Transactor) launchConsensus() {
 		log.Tracef("Launch consensus")
 		go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}
+}
+
+func (t *Transactor) writeBidValues(tx transactions.Transaction) error {
+	return t.db.Update(func(tr database.Transaction) error {
+		k, err := t.w.ReconstructK()
+		if err != nil {
+			return err
+		}
+
+		return tr.SaveBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes())
+	})
 }
