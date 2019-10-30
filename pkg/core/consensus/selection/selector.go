@@ -9,16 +9,22 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	log "github.com/sirupsen/logrus"
 )
+
+var lg *log.Entry = log.WithField("process", "selector")
+var emptyScore = Score{}
 
 type Selector struct {
 	publisher eventbus.Publisher
 	handler   Handler
 	lock      sync.RWMutex
-	bestEvent *Score
+	bestEvent Score
 
 	timer   *timer
 	timeout time.Duration
+
+	scoreID uint32
 
 	eventPlayer consensus.EventPlayer
 	signer      consensus.Signer
@@ -43,16 +49,17 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	scoreSubscriber := consensus.TopicListener{
 		Topic:         topics.Score,
 		Preprocessors: []eventbus.Preprocessor{&consensus.Validator{}},
-		Listener:      consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter),
+		Listener:      consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter, consensus.LowPriority),
+		Paused:        true,
 	}
+	s.scoreID = scoreSubscriber.ID()
 
 	regenSubscriber := consensus.TopicListener{
 		Topic:    topics.Regeneration,
-		Listener: consensus.NewSimpleListener(s.CollectRegeneration),
+		Listener: consensus.NewSimpleListener(s.CollectRegeneration, consensus.HighPriority),
 	}
 
-	// We should trigger a selection on round update
-	s.startSelection()
+	go s.startSelection()
 	return []consensus.TopicListener{scoreSubscriber, regenSubscriber}
 }
 
@@ -61,8 +68,8 @@ func (s *Selector) Finalize() {
 }
 
 func (s *Selector) CollectScoreEvent(e consensus.Event) error {
-	ev := &Score{}
-	if err := UnmarshalScore(&e.Payload, ev); err != nil {
+	ev := Score{}
+	if err := UnmarshalScore(&e.Payload, &ev); err != nil {
 		return err
 	}
 
@@ -80,8 +87,10 @@ func (s *Selector) Filter(hdr header.Header) bool {
 func (s *Selector) CollectRegeneration(e consensus.Event) error {
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
-	s.setBestEvent(nil)
+	s.setBestEvent(emptyScore)
 	s.startSelection()
+	s.eventPlayer.Forward()
+	s.eventPlayer.Resume(s.scoreID)
 	return nil
 }
 
@@ -93,11 +102,11 @@ func (s *Selector) stopSelection() {
 	s.timer.stop()
 }
 
-func (s *Selector) Process(ev *Score) error {
+func (s *Selector) Process(ev Score) error {
 	bestEvent := s.getBestEvent()
 
 	// Only check for priority if we already have a best event
-	if bestEvent != nil {
+	if !bestEvent.Equal(emptyScore) {
 		if s.handler.Priority(s.getBestEvent(), ev) {
 			// if the current best score has priority, we return
 			return nil
@@ -124,34 +133,33 @@ func (s *Selector) publishBestEvent() error {
 	buf := new(bytes.Buffer)
 	bestEvent := s.getBestEvent()
 	// If we had no best event, we should send an empty hash
-	if bestEvent == nil {
+	if bestEvent.Equal(emptyScore) {
 		s.signer.SendWithHeader(topics.BestScore, make([]byte, 32), buf)
 	} else {
 		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf)
 	}
 
-	s.eventPlayer.Forward()
+	s.eventPlayer.Pause(s.scoreID)
 	return nil
 }
 
-func (s *Selector) repropagate(ev *Score) error {
-	buf := topics.Score.ToBuffer()
-	if err := MarshalScore(&buf, ev); err != nil {
+func (s *Selector) repropagate(ev Score) error {
+	buf := new(bytes.Buffer)
+	if err := MarshalScore(buf, &ev); err != nil {
 		return err
 	}
 
-	s.publisher.Publish(topics.Gossip, &buf)
+	s.signer.SendAuthenticated(topics.Score, ev.VoteHash, buf)
 	return nil
 }
 
-func (s *Selector) getBestEvent() *Score {
+func (s *Selector) getBestEvent() Score {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	bestEvent := s.bestEvent
-	return bestEvent
+	return s.bestEvent
 }
 
-func (s *Selector) setBestEvent(ev *Score) {
+func (s *Selector) setBestEvent(ev Score) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.bestEvent = ev

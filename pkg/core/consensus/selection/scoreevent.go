@@ -24,7 +24,7 @@ type (
 
 // Equal as specified in the Event interface
 func (e Score) Equal(ev wire.Event) bool {
-	other, ok := ev.(*Score)
+	other, ok := ev.(Score)
 	return ok && bytes.Equal(other.VoteHash, e.VoteHash)
 }
 
@@ -37,14 +37,7 @@ func (e Score) Sender() []byte {
 // Field order is the following:
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash]
 func UnmarshalScore(r *bytes.Buffer, ev wire.Event) error {
-	// check if the buffer has contents first
-	// if not, we did not get any messages this round
-	if r.Len() == 0 {
-		return nil
-	}
-
 	sev := ev.(*Score)
-
 	sev.Score = make([]byte, 32)
 	if err := encoding.Read256(r, sev.Score); err != nil {
 		return err
