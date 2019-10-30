@@ -42,6 +42,9 @@ func (s *roundStore) addComponent(component Component, round RoundUpdate) []Topi
 	subs := component.Initialize(s.coordinator, s.coordinator, round)
 	for _, sub := range subs {
 		s.subscribe(sub.Topic, sub)
+		if sub.Paused {
+			s.pause(sub.ID())
+		}
 	}
 	s.lock.Lock()
 	s.components = append(s.components, component)
@@ -97,13 +100,35 @@ func (s *roundStore) resume(id uint32) {
 
 func (s *roundStore) Dispatch(ev TopicEvent) {
 	s.lock.RLock()
-	subscribers := s.subscribers[ev.Topic]
+	subscribers := s.createSubscriberQueue(ev.Topic)
 	s.lock.RUnlock()
 	for _, sub := range subscribers {
 		if err := sub.NotifyPayload(ev.Event); err != nil {
-			lg.WithField("topic", ev.Topic.String()).WithError(err).Warnln("notifying subscriber failed")
+			lg.WithFields(log.Fields{
+				"topic": ev.Topic.String(),
+				"id":    sub.ID(),
+			}).WithError(err).Warnln("notifying subscriber failed")
 		}
 	}
+}
+
+// order subscribers by priority for event dispatch
+// TODO: it makes more sense to do this once per round
+func (s *roundStore) createSubscriberQueue(topic topics.Topic) []Listener {
+	subQueue := make([]Listener, 0, len(s.subscribers[topic]))
+	for _, sub := range s.subscribers[topic] {
+		if sub.Priority() == HighPriority {
+			subQueue = append(subQueue, sub)
+		}
+	}
+
+	for _, sub := range s.subscribers[topic] {
+		if sub.Priority() == LowPriority {
+			subQueue = append(subQueue, sub)
+		}
+	}
+
+	return subQueue
 }
 
 func (s *roundStore) DispatchFinalize() {
@@ -179,6 +204,7 @@ func (c *Coordinator) recreateStore(roundUpdate RoundUpdate, fromScratch bool) {
 }
 
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
+	lg.Debugln("received round update")
 	r := RoundUpdate{}
 	if err := DecodeRound(&m, &r); err != nil {
 		return err
@@ -188,7 +214,6 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	c.recreateStore(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
-	c.dispatchQueuedEvents()
 	return nil
 }
 
@@ -204,10 +229,18 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		return err
 	}
 
+	lg.WithFields(log.Fields{
+		"topic": topic.String(),
+		"round": hdr.Round,
+		"step":  hdr.Step,
+	}).Traceln("collected event")
 	switch hdr.Compare(c.Round(), c.Step()) {
 	case header.Before:
-		lg.WithField("topic", topic).Debugln("discarding obsolete event")
-		return nil
+		// Unless it's an Agreement message, we should drop it if it's arriving late.
+		if topic != topics.Agreement {
+			lg.WithField("topic", topic).Debugln("discarding obsolete event")
+			return nil
+		}
 	case header.After:
 		lg.WithField("topic", topic).Debugln("storing future event")
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
@@ -234,7 +267,6 @@ func (c *Coordinator) FinalizeRound() {
 
 func (c *Coordinator) Forward() {
 	c.IncrementStep()
-	c.dispatchQueuedEvents()
 }
 
 func (c *Coordinator) dispatchQueuedEvents() {
@@ -293,7 +325,7 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, pa
 	}
 
 	// adding marshalled header+payload
-	if _, err := whole.ReadFrom(payload); err != nil {
+	if _, err := whole.ReadFrom(&buf); err != nil {
 		return err
 	}
 
@@ -310,12 +342,15 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, pa
 // SendWithHeader prepends a header to the given payload, and publishes it on the
 // desired topic.
 func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer) error {
+	lg.WithField("topic", topic.String()).Debugln("sending event internally")
 	buf, err := header.Compose(c.pubkeyBuf, c.ToBuffer(), hash)
 	if err != nil {
+		lg.Traceln("could not compose header")
 		return err
 	}
 
 	if _, err := buf.ReadFrom(payload); err != nil {
+		lg.Traceln("could not extract payload")
 		return err
 	}
 
@@ -329,4 +364,5 @@ func (c *Coordinator) Pause(id uint32) {
 
 func (c *Coordinator) Resume(id uint32) {
 	c.store.resume(id)
+	c.dispatchQueuedEvents()
 }
