@@ -54,7 +54,7 @@ func (a *Accumulator) Accumulate() {
 			continue
 		}
 
-		if count >= a.handler.Quorum() {
+		if count == a.handler.Quorum() {
 			votes := a.store.Get(ev.Header.BlockHash)
 			a.CollectedVotesChan <- votes
 			return
