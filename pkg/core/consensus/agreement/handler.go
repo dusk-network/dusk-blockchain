@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -50,7 +51,7 @@ func (a *handler) Committee(round uint64, step uint8) user.VotingCommittee {
 }
 
 func (a *handler) Quorum() int {
-	return int(float64(a.CommitteeSize(MaxCommitteeSize)) * 0.75)
+	return int(math.Ceil(float64(a.CommitteeSize(MaxCommitteeSize)) * 0.75))
 }
 
 // Verify checks the signature of the set.
@@ -61,7 +62,7 @@ func (a *handler) Verify(ev Agreement) error {
 
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
-		step := uint8(int(ev.Step*2) + (i - 1)) // the event step is the second one of the reduction cycle
+		step := uint8(int(ev.Step-1) + (i - 1))
 		committee := a.Committee(ev.Round, step)
 		subcommittee := committee.Intersect(votes.BitSet)
 
