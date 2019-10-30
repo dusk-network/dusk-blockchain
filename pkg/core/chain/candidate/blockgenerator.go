@@ -19,9 +19,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-wallet/transactions"
+	log "github.com/sirupsen/logrus"
 )
 
 var _ consensus.Component = (*Generator)(nil)
+
+var lg *log.Entry = log.WithField("process", "candidate generator")
 
 type Generator struct {
 	publisher eventbus.Publisher
@@ -47,7 +50,7 @@ func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consen
 
 	scoreEventListener := consensus.TopicListener{
 		Topic:    topics.ScoreEvent,
-		Listener: consensus.NewSimpleListener(bg.Collect),
+		Listener: consensus.NewSimpleListener(bg.Collect, consensus.LowPriority),
 	}
 
 	return []consensus.TopicListener{scoreEventListener}
@@ -82,6 +85,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
+	lg.Debugln("sending score")
 	if err := bg.signer.SendAuthenticated(topics.Score, blk.Header.Hash, scoreBuf); err != nil {
 		return err
 	}
@@ -91,6 +95,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
+	lg.Debugln("sending candidate")
 	return bg.signer.SendAuthenticated(topics.Candidate, blk.Header.Hash, buf)
 }
 
@@ -148,7 +153,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 10*time.Second)
+		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 4*time.Second)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.
 		if err != nil {
