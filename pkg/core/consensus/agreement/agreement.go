@@ -2,9 +2,12 @@ package agreement
 
 import (
 	"bytes"
+	"encoding/hex"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -22,6 +25,8 @@ type agreement struct {
 	accumulator  *Accumulator
 	keys         key.ConsensusKeys
 	workerAmount int
+
+	agreementID uint32
 }
 
 // newComponent is used by the agreement factory to instantiate the component
@@ -39,8 +44,9 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 	agreementSubscriber := consensus.TopicListener{
 		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(a.publisher, topics.Agreement), &consensus.Validator{}},
 		Topic:         topics.Agreement,
-		Listener:      consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter),
+		Listener:      consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter, consensus.LowPriority),
 	}
+	a.agreementID = agreementSubscriber.Listener.ID()
 
 	go a.listen()
 	return []consensus.TopicListener{agreementSubscriber}
@@ -56,6 +62,13 @@ func (a *agreement) CollectAgreementEvent(event consensus.Event) error {
 	if err != nil {
 		return err
 	}
+
+	lg.WithFields(log.Fields{
+		"round":  event.Header.Round,
+		"step":   event.Header.Step,
+		"sender": hex.EncodeToString(event.Header.Sender()),
+		"id":     a.agreementID,
+	}).Debugln("received event")
 	a.accumulator.Process(*ev)
 	return nil
 }
@@ -71,18 +84,22 @@ func convertToAgreement(event consensus.Event) (*Agreement, error) {
 // Listen for results coming from the accumulator
 func (a *agreement) listen() {
 	evs := <-a.accumulator.CollectedVotesChan
-	a.publishAgreement(evs[0])
+	lg.WithField("id", a.agreementID).Debugln("quorum reached")
+	a.sendCertificate(evs[0])
 }
 
-func (a *agreement) publishAgreement(aev Agreement) {
+func (a *agreement) sendCertificate(ag Agreement) {
+	cert := a.generateCertificate(ag)
 	buf := new(bytes.Buffer)
-	if err := Marshal(buf, aev); err != nil {
-		lg.WithError(err).Errorln("could not marshal agreement event")
-		return
+	if err := encoding.Write256(buf, ag.Header.BlockHash); err != nil {
+		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling block hash")
 	}
 
-	a.publisher.Publish(topics.AgreementEvent, buf)
-	a.publisher.Publish(topics.WinningBlockHash, bytes.NewBuffer(aev.BlockHash))
+	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
+		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling certificate")
+	}
+
+	a.publisher.Publish(topics.Certificate, buf)
 }
 
 func (a *agreement) Finalize() {
