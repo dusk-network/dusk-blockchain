@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-wallet/key"
+	log "github.com/sirupsen/logrus"
 )
 
 // Factory creates a first step reduction Component
@@ -38,7 +39,7 @@ func (f *Factory) Instantiate() consensus.Component {
 	})
 
 	if err != nil {
-		// TODO: log
+		log.WithField("process", "proof generator factory").WithError(err).Warnln("error retrieving bid values from database")
 	}
 
 	var dScalar, kScalar ristretto.Scalar
