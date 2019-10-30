@@ -2,6 +2,7 @@ package firststep
 
 import (
 	"bytes"
+	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -58,13 +59,14 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 
 	bestScoreSubscriber := consensus.TopicListener{
 		Topic:    topics.BestScore,
-		Listener: consensus.NewSimpleListener(r.CollectBestScore),
+		Listener: consensus.NewSimpleListener(r.CollectBestScore, consensus.LowPriority),
 	}
 
 	reductionSubscriber := consensus.TopicListener{
 		Topic:         topics.Reduction,
 		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(r.broker, topics.Reduction), &consensus.Validator{}},
-		Listener:      consensus.NewFilteringListener(r.Collect, r.Filter),
+		Listener:      consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority),
+		Paused:        true,
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
 
@@ -89,6 +91,12 @@ func (r *Reducer) Collect(e consensus.Event) error {
 		return err
 	}
 
+	lg.WithFields(log.Fields{
+		"round":  e.Header.Round,
+		"step":   e.Header.Step,
+		"sender": hex.EncodeToString(e.Header.Sender()),
+		"id":     r.reductionID,
+	}).Debugln("received event")
 	return r.aggregator.collectVote(*ev, e.Header)
 }
 
@@ -120,6 +128,7 @@ func (r *Reducer) sendReduction(hash []byte) {
 }
 
 func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
+	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.Timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 	buf := new(bytes.Buffer)
@@ -131,16 +140,17 @@ func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 	}
 
 	r.signer.SendWithHeader(topics.StepVotes, hash, buf)
-	r.eventPlayer.Forward()
 }
 
 // CollectBestScore activates the 2-step reduction cycle.
 func (r *Reducer) CollectBestScore(e consensus.Event) error {
+	lg.WithField("id", r.reductionID).Traceln("starting reduction")
+	r.startReduction()
+	r.eventPlayer.Forward()
 	r.eventPlayer.Resume(r.reductionID)
 
 	// sending reduction can very well be done concurrently
 	go r.sendReduction(e.Header.BlockHash)
-	r.startReduction()
 
 	return nil
 }

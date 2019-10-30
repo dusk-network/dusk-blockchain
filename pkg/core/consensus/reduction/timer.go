@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	log "github.com/sirupsen/logrus"
 )
 
 type Timer struct {
@@ -32,5 +33,6 @@ func (t *Timer) Stop() {
 }
 
 func (t *Timer) Trigger() {
+	log.WithField("process", "reduction timer").Debugln("timer triggered")
 	t.requestHalt(nil)
 }

@@ -2,6 +2,7 @@ package secondstep
 
 import (
 	"bytes"
+	"encoding/hex"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -58,12 +59,13 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 
 	stepVotesSubscriber := consensus.TopicListener{
 		Topic:    topics.StepVotes,
-		Listener: consensus.NewSimpleListener(r.CollectStepVotes),
+		Listener: consensus.NewSimpleListener(r.CollectStepVotes, consensus.LowPriority),
 	}
 
 	reductionSubscriber := consensus.TopicListener{
 		Topic:    topics.Reduction,
-		Listener: consensus.NewFilteringListener(r.Collect, r.Filter),
+		Listener: consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority),
+		Paused:   true,
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
 
@@ -87,6 +89,12 @@ func (r *Reducer) Collect(e consensus.Event) error {
 		return err
 	}
 
+	lg.WithFields(log.Fields{
+		"round":  e.Header.Round,
+		"step":   e.Header.Step,
+		"sender": hex.EncodeToString(e.Header.Sender()),
+		"id":     r.reductionID,
+	}).Debugln("received event")
 	r.aggregator.collectVote(*ev, e.Header)
 	return nil
 }
@@ -117,20 +125,23 @@ func (r *Reducer) sendReduction(hash []byte) error {
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
 func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
+	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
-	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], regenerationPackage)
 
-	// TODO: check if an agreement on an empty block should be propagated
-	if hash != nil && stepVotesAreValid(b) {
+	// Sending of agreement happens on it's own step
+	r.eventPlayer.Forward()
+	// TODO: queue needs to be flushed here, but we have no direct way of doing it
+	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) {
 		r.sendAgreement(hash, b)
 	}
-	r.eventPlayer.Forward()
+
+	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], regenerationPackage)
 }
 
 // CollectStepVotes is triggered when the first StepVotes get published by the first step Reducer
 func (r *Reducer) CollectStepVotes(e consensus.Event) error {
-	r.eventPlayer.Resume(r.reductionID)
+	lg.WithField("id", r.reductionID).Traceln("starting reduction")
 	var sv *agreement.StepVotes
 
 	// If the first step did not have a winning block, we should get an empty buffer
@@ -143,8 +154,10 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 		}
 	}
 
-	go r.sendReduction(e.Header.BlockHash)
 	r.startReduction(sv)
+	r.eventPlayer.Forward()
+	r.eventPlayer.Resume(r.reductionID)
+	go r.sendReduction(e.Header.BlockHash)
 	return nil
 }
 
