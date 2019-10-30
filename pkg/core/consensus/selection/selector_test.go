@@ -39,8 +39,40 @@ func TestSelection(t *testing.T) {
 
 	// We should've gotten a non-zero result
 	assert.NotEqual(t, make([]byte, 32), h)
-	// Ensure `Forward()` was called
-	assert.Equal(t, uint8(2), hlp.Step())
+}
+
+// Ensure that the Ed25519 header of the score message is changed when repropagated
+func TestSwapHeader(t *testing.T) {
+	bus := eventbus.New()
+	hlp := selection.NewHelper(bus)
+	// Sub to gossip, so we can catch any outgoing events
+	gossipChan := make(chan bytes.Buffer, 1)
+	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
+
+	// Start selection with a round update
+	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+
+	// Make sure to replace the handler, to avoid zkproof verification
+	hlp.SetHandler(newMockHandler())
+
+	// Create some score messages
+	hash, _ := crypto.RandEntropy(32)
+	evs := hlp.Spawn(hash)
+
+	// We save the Ed25519 fields for comparison later
+	edFields := hlp.GenerateEd25519Fields(evs[0])
+
+	// Send this event to the selector, and get it repropagated
+	hlp.Selector.CollectScoreEvent(evs[0])
+
+	// Catch the repropagated event
+	repropagated := <-gossipChan
+	repropagatedEdFields := make([]byte, 96)
+	if _, err := repropagated.Read(repropagatedEdFields); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.NotEqual(t, edFields, repropagatedEdFields)
 }
 
 // Mock implementation of a selection.Handler to avoid elaborate set-up of
@@ -52,13 +84,13 @@ func newMockHandler() *mockHandler {
 	return &mockHandler{}
 }
 
-func (m *mockHandler) Verify(*selection.Score) error {
+func (m *mockHandler) Verify(selection.Score) error {
 	return nil
 }
 
 func (m *mockHandler) LowerThreshold() {}
 func (m *mockHandler) ResetThreshold() {}
 
-func (m *mockHandler) Priority(first, second *selection.Score) bool {
+func (m *mockHandler) Priority(first, second selection.Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
