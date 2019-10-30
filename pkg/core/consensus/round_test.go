@@ -35,7 +35,8 @@ func TestCollectEvent(t *testing.T) {
 	}
 }
 
-// Test that queued events are dispatched correctly on the appropriate state change
+// Test that queued events are dispatched correctly on the appropriate state,
+// when Resume is called.
 func TestQueuedDispatch(t *testing.T) {
 	c, comp := initCoordinatorTest(t)
 
@@ -50,6 +51,7 @@ func TestQueuedDispatch(t *testing.T) {
 
 	// Forward to step 2. The queued event should be dispatched
 	c.Forward()
+	c.Resume(0)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 	assert.Equal(t, 0, len(c.eventqueue.entries[1][2]))
 
@@ -62,6 +64,7 @@ func TestQueuedDispatch(t *testing.T) {
 	// Update to round 2. The queued event should be dispatched
 	ruBuf := MockRoundUpdateBuffer(2, nil, nil)
 	c.CollectRoundUpdate(*ruBuf)
+	c.Resume(0)
 	// Mock component should only hold one event, as it was re-instantiated
 	// on the round update
 	assert.Equal(t, 1, len(comp.receivedEvents))
@@ -152,7 +155,7 @@ func newMockComponent(topic topics.Topic) *mockComponent {
 func (m *mockComponent) Initialize(EventPlayer, Signer, RoundUpdate) []TopicListener {
 	listener := TopicListener{
 		Topic:    m.topic,
-		Listener: NewSimpleListener(m.Collect),
+		Listener: NewSimpleListener(m.Collect, LowPriority),
 	}
 	m.id = listener.Listener.ID()
 

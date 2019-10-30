@@ -42,10 +42,14 @@ func (s *SimplePlayer) Step() uint8 {
 
 // Pause as specified by the EventPlayer interface
 func (s *SimplePlayer) Pause(id uint32) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.State = PAUSED
 }
 
 // Resume as specified by the EventPlayer interface
 func (s *SimplePlayer) Resume(id uint32) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.State = RUNNING
 }

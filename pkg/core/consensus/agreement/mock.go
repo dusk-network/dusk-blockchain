@@ -97,7 +97,7 @@ func GenVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, c
 	for i, k := range keys {
 
 		stepCycle := i % 2
-		thisStep := step + uint8(stepCycle)
+		thisStep := step - 2 + uint8(stepCycle)
 		stepVote := votes[stepCycle]
 		if stepVote == nil {
 			stepVote = NewStepVotes()

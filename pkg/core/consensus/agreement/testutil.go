@@ -17,7 +17,7 @@ type Helper struct {
 	P               *user.Provisioners
 	Keys            []key.ConsensusKeys
 	Aggro           *agreement
-	WinningHashChan chan bytes.Buffer
+	CertificateChan chan bytes.Buffer
 	nr              int
 }
 
@@ -34,8 +34,8 @@ func NewHelper(eb *eventbus.EventBus, provisioners int) *Helper {
 
 // CreateResultChan is used by tests (internal and external) to quickly wire the agreement results to a channel to listen to
 func (hlp *Helper) createResultChan() {
-	chanListener := eventbus.NewChanListener(hlp.WinningHashChan)
-	hlp.Bus.Subscribe(topics.WinningBlockHash, chanListener)
+	chanListener := eventbus.NewChanListener(hlp.CertificateChan)
+	hlp.Bus.Subscribe(topics.Certificate, chanListener)
 }
 
 // SendBatch let agreement collect  additional batches of consensus events
@@ -49,9 +49,9 @@ func (hlp *Helper) SendBatch(hash []byte) {
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
 func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 	evs := make([]consensus.Event, hlp.nr)
-	vc := hlp.P.CreateVotingCommittee(1, 1, hlp.nr)
+	vc := hlp.P.CreateVotingCommittee(1, 3, hlp.nr)
 	for i := 0; i < hlp.nr; i++ {
-		ev := MockConsensusEvent(hash, 1, 1, hlp.Keys, vc, i)
+		ev := MockConsensusEvent(hash, 1, 3, hlp.Keys, vc, i)
 		evs[i] = ev
 
 	}

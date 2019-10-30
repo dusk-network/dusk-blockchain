@@ -13,14 +13,14 @@ func TestSecondStep(t *testing.T) {
 	hlp, hash := Kickstart(50)
 
 	// Generate first StepVotes
-	svs := agreement.GenVotes(hash, 1, 1, hlp.Keys, hlp.P.CreateVotingCommittee(1, 1, 50))
+	svs := agreement.GenVotes(hash, 1, 3, hlp.Keys, hlp.P.CreateVotingCommittee(1, 3, 50))
 
 	// Start the first step
 	if err := hlp.ActivateReduction(hash, svs[0]); err != nil {
 		t.Fatal(err)
 	}
 
-	// Send events (most probably this requires a Forward)
+	// Send events
 	hlp.SendBatch(hash)
 
 	// Wait for resulting Agreement

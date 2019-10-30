@@ -5,6 +5,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -22,14 +23,19 @@ func TestAgreement(t *testing.T) {
 	nr := 50
 	_, hlp := wireAgreement(nr)
 	hash, _ := crypto.RandEntropy(32)
-	vc := hlp.P.CreateVotingCommittee(1, 1, nr)
+	vc := hlp.P.CreateVotingCommittee(1, 3, nr)
 	for i := 0; i < nr; i++ {
-		aev := agreement.MockWire(hash, 1, 1, hlp.Keys, vc, i)
+		aev := agreement.MockWire(hash, 1, 3, hlp.Keys, vc, i)
 		hlp.Bus.Publish(topics.Agreement, aev)
 	}
 
-	res := <-hlp.WinningHashChan
-	assert.Equal(t, hash, res.Bytes())
+	res := <-hlp.CertificateChan
+	winningHash := make([]byte, 32)
+	if err := encoding.Read256(&res, winningHash); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, hash, winningHash)
 }
 
 func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helper) {
@@ -44,6 +50,10 @@ func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helpe
 	}
 	// we need to remove annoying ED25519 verification or the Republisher
 	eb.RemoveAllProcessors()
+	// Forward to step 3, as agreements can only be made on step 3 or later
+	// This prevents the mocked events from getting queued
+	coordinator.Forward()
+	coordinator.Forward()
 	return coordinator, h
 }
 

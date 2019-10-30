@@ -48,7 +48,6 @@ func (hlp *Helper) ActivateReduction(hash []byte, sv *agreement.StepVotes) error
 		}
 	}
 	e := consensus.Event{header.Header{Round: hlp.Round, Step: hlp.Step(), PubKeyBLS: hlp.PubKeyBLS, BlockHash: hash}, *buf}
-	hlp.Forward()
 	hlp.Reducer.(*Reducer).CollectStepVotes(e)
 	return nil
 }
