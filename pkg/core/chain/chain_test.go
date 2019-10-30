@@ -52,7 +52,7 @@ func TestDemoSaveFunctionality(t *testing.T) {
 */
 
 func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
-	votes := agreement.GenVotes(hash, round, 3, keys, p.CreateVotingCommittee(round, 1, len(p.Members)))
+	votes := agreement.GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{
 		StepOneBatchedSig: votes[0].Signature.Compress(),
 		StepTwoBatchedSig: votes[1].Signature.Compress(),

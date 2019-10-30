@@ -49,12 +49,11 @@ func (hlp *Helper) SendBatch(hash []byte) {
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
 func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 	evs := make([]consensus.Event, hlp.nr)
-	vc := hlp.P.CreateVotingCommittee(1, 3, hlp.nr)
 	for i := 0; i < hlp.nr; i++ {
-		ev := MockConsensusEvent(hash, 1, 3, hlp.Keys, vc, i)
+		ev := MockConsensusEvent(hash, 1, 3, hlp.Keys, hlp.P, i)
 		evs[i] = ev
-
 	}
+
 	return evs
 }
 

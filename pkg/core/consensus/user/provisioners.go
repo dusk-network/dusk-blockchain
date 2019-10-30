@@ -38,6 +38,23 @@ func (m *Member) RemoveStake(idx int) {
 	m.Stakes = m.Stakes[:len(m.Stakes)-1]
 }
 
+func (m *Member) SubtractFromStake(amount uint64) uint64 {
+	for i := 0; i < len(m.Stakes); i++ {
+		if m.Stakes[i].Amount > 0 {
+			if m.Stakes[i].Amount < amount {
+				subtracted := m.Stakes[i].Amount
+				m.Stakes[i].Amount = 0
+				return subtracted
+			} else {
+				m.Stakes[i].Amount -= amount
+				return amount
+			}
+		}
+	}
+
+	return 0
+}
+
 func NewProvisioners() *Provisioners {
 	return &Provisioners{
 		Set:     sortedset.New(),

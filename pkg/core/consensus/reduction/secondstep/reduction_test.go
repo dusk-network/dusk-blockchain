@@ -13,7 +13,7 @@ func TestSecondStep(t *testing.T) {
 	hlp, hash := Kickstart(50)
 
 	// Generate first StepVotes
-	svs := agreement.GenVotes(hash, 1, 3, hlp.Keys, hlp.P.CreateVotingCommittee(1, 3, 50))
+	svs := agreement.GenVotes(hash, 1, 3, hlp.Keys, hlp.P)
 
 	// Start the first step
 	if err := hlp.ActivateReduction(hash, svs[0]); err != nil {

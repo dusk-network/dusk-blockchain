@@ -50,6 +50,10 @@ func (a *handler) Committee(round uint64, step uint8) user.VotingCommittee {
 	return a.Handler.Committee(round, step, MaxCommitteeSize)
 }
 
+func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
+	return a.Handler.VotesFor(pubKeyBLS, round, step, MaxCommitteeSize)
+}
+
 func (a *handler) Quorum() int {
 	return int(math.Ceil(float64(a.CommitteeSize(MaxCommitteeSize)) * 0.75))
 }
@@ -62,7 +66,7 @@ func (a *handler) Verify(ev Agreement) error {
 
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
-		step := uint8(int(ev.Step-1) + (i - 1))
+		step := ev.Step - 2 + uint8(i)
 		committee := a.Committee(ev.Round, step)
 		subcommittee := committee.Intersect(votes.BitSet)
 
@@ -103,17 +107,24 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 	if len(subcommittee) == 0 {
 		return nil, errors.New("Subcommittee is empty")
 	}
+
+	// We need to avoid adding duplicates to the APK, as it will cause verification to fail.
+	duplicates := make(map[string]struct{})
+
 	for i, ipk := range subcommittee {
-		pk, err := bls.UnmarshalPk(ipk.Bytes())
-		if err != nil {
-			return nil, err
-		}
-		if i == 0 {
-			apk = bls.NewApk(pk)
-			continue
-		}
-		if err := apk.Aggregate(pk); err != nil {
-			return nil, err
+		if _, ok := duplicates[string(ipk.Bytes())]; !ok {
+			duplicates[string(ipk.Bytes())] = struct{}{}
+			pk, err := bls.UnmarshalPk(ipk.Bytes())
+			if err != nil {
+				return nil, err
+			}
+			if i == 0 {
+				apk = bls.NewApk(pk)
+				continue
+			}
+			if err := apk.Aggregate(pk); err != nil {
+				return nil, err
+			}
 		}
 	}
 

@@ -173,7 +173,7 @@ func BenchmarkWriter(b *testing.B) {
 func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
 	p, keys := consensus.MockProvisioners(keyAmount)
 
-	buf := agreement.MockAgreement(make([]byte, 32), 1, 2, keys, p.CreateVotingCommittee(1, 2, keyAmount))
+	buf := agreement.MockAgreement(make([]byte, 32), 1, 1, keys, p)
 	if err := topics.Prepend(buf, topics.Agreement); err != nil {
 		panic(err)
 	}

@@ -104,9 +104,8 @@ func (hlp *Helper) SendBatch(hash []byte) {
 func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 	evs := make([]consensus.Event, hlp.nr)
 	step := hlp.Step()
-	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
 	for i := 0; i < hlp.nr; i++ {
-		ev := MockConsensusEvent(hash, round, step, hlp.Keys, vc, i)
+		ev := MockConsensusEvent(hash, round, step, hlp.Keys, i)
 		evs[i] = ev
 	}
 	return evs
