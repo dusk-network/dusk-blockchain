@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -11,7 +12,7 @@ import (
 )
 
 type (
-	blockCollector struct {
+	candidateCollector struct {
 		blockChan chan<- *block.Block
 	}
 
@@ -25,21 +26,25 @@ type (
 	}
 )
 
-// Init a block collector compatible with topics.Block and topics.Candidate
-func initBlockCollector(eventBus *eventbus.EventBus, topic topics.Topic) chan *block.Block {
+func initCandidateCollector(eventBus *eventbus.EventBus) chan *block.Block {
 	blockChan := make(chan *block.Block, 1)
-	collector := &blockCollector{blockChan}
-	eventbus.NewTopicListener(eventBus, collector, topic, eventbus.ChannelType)
+	collector := &candidateCollector{blockChan}
+	eventbus.NewTopicListener(eventBus, collector, topics.Candidate, eventbus.ChannelType)
 	return blockChan
 }
 
-func (b *blockCollector) Collect(message bytes.Buffer) error {
+func (c *candidateCollector) Collect(message bytes.Buffer) error {
+	hdr := header.Header{}
+	if err := header.Unmarshal(&message, &hdr); err != nil {
+		return err
+	}
+
 	blk := block.NewBlock()
 	if err := marshalling.UnmarshalBlock(&message, blk); err != nil {
 		return err
 	}
 
-	b.blockChan <- blk
+	c.blockChan <- blk
 	return nil
 }
 
