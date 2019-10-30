@@ -2,6 +2,7 @@ package reduction
 
 import (
 	"bytes"
+	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -48,7 +49,7 @@ func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
 }
 
 func (b *Handler) Quorum() int {
-	return int(float64(b.CommitteeSize(maxCommitteeSize)) * 0.75)
+	return int(math.Ceil(float64(b.CommitteeSize(maxCommitteeSize)) * 0.75))
 }
 
 // Committee returns a VotingCommittee for a given round and step.
