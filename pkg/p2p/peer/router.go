@@ -78,7 +78,7 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 				m.publisher.Publish(topic, b)
 			}
 		} else {
-			err = fmt.Errorf("%s topic not routable", string(topic))
+			err = fmt.Errorf("%s topic not routable", topic.String())
 		}
 	}
 
@@ -86,6 +86,6 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		log.WithFields(log.Fields{
 			"process": "peer",
 			"error":   err,
-		}).Errorf("problem handling message %s", string(topic))
+		}).Errorf("problem handling message %s", topic.String())
 	}
 }
