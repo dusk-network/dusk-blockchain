@@ -18,6 +18,7 @@ import (
 var _ consensus.Component = (*Generator)(nil)
 
 var emptyHash [32]byte
+var lg *log.Entry = log.WithField("process", "score generator")
 
 func NewComponent(publisher eventbus.Publisher, consensusKeys key.ConsensusKeys, d, k ristretto.Scalar) *Generator {
 	return &Generator{
@@ -45,7 +46,8 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 	g.roundInfo = ru
 	signedSeed, err := g.sign(ru.Seed)
 	if err != nil {
-		// TODO: handle
+		lg.WithField("category", "BUG").WithError(err).Errorln("could not sign seed")
+		return nil
 	}
 
 	g.seed = signedSeed
@@ -59,7 +61,7 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 
 	regenSubscriber := consensus.TopicListener{
 		Topic:    topics.Regeneration,
-		Listener: consensus.NewSimpleListener(g.Collect),
+		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority),
 	}
 
 	// We generate a score immediately on round update
@@ -73,7 +75,7 @@ func (g *Generator) Finalize() {}
 // Prove will generate the proof of blind bid, needed to successfully
 // propose a block to the voting committee.
 func (g *Generator) Prove(seed []byte, bidList user.BidList) zkproof.ZkProof {
-	log.WithField("process", "generation").Traceln("generating proof")
+	log.Traceln("generating proof")
 	// Turn seed into scalar
 	seedScalar := ristretto.Scalar{}
 	seedScalar.Derive(seed)
@@ -102,7 +104,7 @@ func (g *Generator) generateScore() error {
 		return err
 	}
 
-	return g.signer.SendWithHeader(topics.Score, emptyHash[:], buf)
+	return g.signer.SendWithHeader(topics.ScoreEvent, emptyHash[:], buf)
 }
 
 func (g *Generator) createScoreEvent(seed []byte, proof zkproof.ZkProof) ScoreEvent {
