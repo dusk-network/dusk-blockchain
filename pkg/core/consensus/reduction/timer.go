@@ -8,6 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var emptyHash [32]byte
+
 type Timer struct {
 	requestHalt func([]byte, ...*agreement.StepVotes)
 	lock        sync.RWMutex
@@ -34,5 +36,5 @@ func (t *Timer) Stop() {
 
 func (t *Timer) Trigger() {
 	log.WithField("process", "reduction timer").Debugln("timer triggered")
-	t.requestHalt(nil)
+	t.requestHalt(emptyHash[:])
 }
