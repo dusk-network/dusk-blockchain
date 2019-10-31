@@ -23,6 +23,7 @@ type Handler interface {
 	IsMember([]byte, uint64, uint8) bool
 	Committee(uint64, uint8) user.VotingCommittee
 	Quorum() int
+	VotesFor([]byte, uint64, uint8) int
 	Verify(Agreement) error
 }
 

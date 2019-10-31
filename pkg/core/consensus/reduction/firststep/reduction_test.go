@@ -28,7 +28,7 @@ func TestFirstStep(t *testing.T) {
 	// StepVotes should be valid
 	assert.NoError(t, hlp.Verify(hash, sv, 2))
 	// test that the Player is PAUSED
-	assert.Equal(t, consensus.PAUSED, hlp.State)
+	assert.Equal(t, consensus.PAUSED, hlp.State())
 }
 
 func TestMoreSteps(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMoreSteps(t *testing.T) {
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(3), hlp.Step())
 	// test that the Player is PAUSED
-	assert.Equal(t, consensus.PAUSED, hlp.State)
+	assert.Equal(t, consensus.PAUSED, hlp.State())
 }
 
 func TestFirstStepTimeOut(t *testing.T) {
@@ -64,7 +64,7 @@ func TestFirstStepTimeOut(t *testing.T) {
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
-	assert.Equal(t, consensus.PAUSED, hlp.State)
+	assert.Equal(t, consensus.PAUSED, hlp.State())
 }
 
 func BenchmarkFirstStep(b *testing.B) {

@@ -25,12 +25,12 @@ func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
 	m.bus.Publish(topic, b)
 	return nil
 }
 
-func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
 	m.bus.Publish(topic, b)
 	return nil
 }
@@ -102,11 +102,14 @@ func (hlp *Helper) SendBatch(hash []byte) {
 
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
 func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
-	evs := make([]consensus.Event, hlp.nr)
+	evs := make([]consensus.Event, 0, hlp.nr)
 	step := hlp.Step()
-	for i := 0; i < hlp.nr; i++ {
+	i := 0
+	for count := 0; count < hlp.Handler.Quorum(); {
 		ev := MockConsensusEvent(hash, round, step, hlp.Keys, i)
-		evs[i] = ev
+		i++
+		evs = append(evs, ev)
+		count += hlp.Handler.VotesFor(hlp.Keys[i].BLSPubKeyBytes, round, step)
 	}
 	return evs
 }

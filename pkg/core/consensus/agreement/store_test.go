@@ -49,7 +49,7 @@ func TestStore(t *testing.T) {
 	for i, tt := range test {
 		hashes = append(hashes, tt.hash)
 		mock := mockAgreement(tt.sig, tt.hash)
-		if !assert.Equal(t, tt.storedAgreements, s.Insert(mock)) {
+		if !assert.Equal(t, tt.storedAgreements, s.Insert(mock, 1)) {
 			assert.FailNow(t, fmt.Sprintf("store.Insertion failed at row: %d", i))
 		}
 		if !assert.True(t, s.Contains(mock)) {

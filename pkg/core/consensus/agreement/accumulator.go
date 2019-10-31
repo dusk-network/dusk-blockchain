@@ -2,6 +2,8 @@ package agreement
 
 import (
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Accumulator is an event accumulator, that will accumulate events until it
@@ -48,13 +50,18 @@ func (a *Accumulator) Process(ev Agreement) {
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
 		collected := a.store.Get(ev.BlockHash)
-		count := a.store.Insert(ev)
+		weight := a.handler.VotesFor(ev.PubKeyBLS, ev.Round, ev.Step)
+		count := a.store.Insert(ev, weight)
 		if count == len(collected) {
 			lg.Warnln("Agreement was not accumulated since it is a duplicate")
 			continue
 		}
 
-		if count == a.handler.Quorum() {
+		lg.WithFields(log.Fields{
+			"count":  count,
+			"quorum": a.handler.Quorum(),
+		}).Debugln("collected agreement")
+		if count >= a.handler.Quorum() {
 			votes := a.store.Get(ev.Header.BlockHash)
 			a.CollectedVotesChan <- votes
 			return

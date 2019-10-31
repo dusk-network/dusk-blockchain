@@ -17,7 +17,7 @@ import (
 type Helper struct {
 	*reduction.Helper
 	AgreementChan chan bytes.Buffer
-	RegenChan     chan bytes.Buffer
+	RestartChan   chan bytes.Buffer
 }
 
 // NewHelper creates a Helper
@@ -25,7 +25,7 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int) *
 	hlp := &Helper{
 		Helper:        reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer),
 		AgreementChan: make(chan bytes.Buffer, 1),
-		RegenChan:     make(chan bytes.Buffer, 1),
+		RestartChan:   make(chan bytes.Buffer, 1),
 	}
 	hlp.createResultChan()
 	return hlp
@@ -35,8 +35,8 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int) *
 func (hlp *Helper) createResultChan() {
 	agListener := eventbus.NewChanListener(hlp.AgreementChan)
 	hlp.Bus.Subscribe(topics.Agreement, agListener)
-	regenListener := eventbus.NewChanListener(hlp.RegenChan)
-	hlp.Bus.Subscribe(topics.Regeneration, regenListener)
+	restartListener := eventbus.NewChanListener(hlp.RestartChan)
+	hlp.Bus.Subscribe(topics.Restart, restartListener)
 }
 
 // ActivateReduction starts/resumes the secondstep reduction by sending a StepVotes to Reducer.CollectStepVotes

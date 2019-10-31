@@ -20,13 +20,15 @@ func TestSuccessfulAggro(t *testing.T) {
 	var sv *agreement.StepVotes
 	aggregator := newAggregator(test, hlp.Handler, sv)
 
-	for _, ev := range evs {
-		r := reduction.Reduction{}
-		_ = reduction.Unmarshal(&ev.Payload, &r)
-		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
-			assert.FailNow(t, "error in collecting votes")
+	go func() {
+		for _, ev := range evs {
+			r := reduction.Reduction{}
+			_ = reduction.Unmarshal(&ev.Payload, &r)
+			if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
+				assert.FailNow(t, "error in collecting votes")
+			}
 		}
-	}
+	}()
 
 	err := <-res
 	assert.NoError(t, err)

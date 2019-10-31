@@ -28,6 +28,10 @@ func (m *MockHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool 
 	return m.isMember
 }
 
+func (m *MockHandler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
+	return 1
+}
+
 func (m *MockHandler) Committee(round uint64, step uint8) user.VotingCommittee {
 	return m.committee
 }

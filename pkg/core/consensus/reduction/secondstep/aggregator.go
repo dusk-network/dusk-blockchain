@@ -52,9 +52,12 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 		return err
 	}
 
-	sv.Set.Insert(hdr.PubKeyBLS)
+	votes := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
+	for i := 0; i < votes; i++ {
+		sv.Set.Insert(hdr.PubKeyBLS)
+	}
 	a.voteSets[hash] = sv
-	if len(sv.Set) == a.handler.Quorum() {
+	if len(sv.Set) >= a.handler.Quorum() {
 		a.addBitSet(sv.StepVotes, sv.Set, hdr.Round, hdr.Step)
 		a.requestHalt(hdr.BlockHash, a.firstStepVotes, sv.StepVotes)
 	}

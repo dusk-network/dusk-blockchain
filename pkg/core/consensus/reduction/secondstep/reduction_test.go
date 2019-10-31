@@ -27,7 +27,7 @@ func TestSecondStep(t *testing.T) {
 	agBuf := <-hlp.AgreementChan
 
 	// Ensure we get a regeneration message
-	<-hlp.RegenChan
+	<-hlp.RestartChan
 
 	// Retrieve Agreement
 	ag := agreement.New(header.Header{})
@@ -50,7 +50,7 @@ func TestSecondStepAfterFailure(t *testing.T) {
 	hlp.SendBatch(hash)
 
 	// Ensure we get a regeneration message
-	<-hlp.RegenChan
+	<-hlp.RestartChan
 
 	// Make sure no agreement message is sent
 	select {
@@ -70,7 +70,7 @@ func TestSecondStepTimeOut(t *testing.T) {
 	}
 
 	// Ensure we get a regeneration message
-	<-hlp.RegenChan
+	<-hlp.RestartChan
 
 	// Make sure no agreement message is sent
 	select {

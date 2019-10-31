@@ -51,7 +51,7 @@ func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helpe
 	eb.RemoveAllProcessors()
 	// Play to step 3, as agreements can only be made on step 3 or later
 	// This prevents the mocked events from getting queued
-	coordinator.Play()
-	coordinator.Play()
+	coordinator.Play(h.Aggro.ID())
+	coordinator.Play(h.Aggro.ID())
 	return coordinator, h
 }

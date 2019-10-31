@@ -68,14 +68,19 @@ func (s *store) Size() int {
 }
 
 // Put collects the Agreement and returns the number of agreement stored for a blockhash
-func (s *store) Insert(a Agreement) int {
+func (s *store) Insert(a Agreement, weight int) int {
 	s.Lock()
 	defer s.Unlock()
 	blockHash := hex.EncodeToString(a.Header.BlockHash)
 	idx := s.find(a)
 	if idx == -1 {
-		s.collected[blockHash] = storedAgreements([]Agreement{a})
-		return 1
+		agreements := make([]Agreement, weight)
+		for i := range agreements {
+			agreements[i] = a
+		}
+
+		s.collected[blockHash] = storedAgreements(agreements)
+		return weight
 	}
 
 	stored := s.collected[blockHash]
@@ -86,9 +91,11 @@ func (s *store) Insert(a Agreement) int {
 
 	// efficient insertion with minimal element copy and no additional allocation
 	// github.com/golang.go/wiki/SliceTricks
-	stored = append(stored, Agreement{})
-	copy(stored[idx+1:], stored[idx:])
-	stored[idx] = a
+	for i := 0; i < weight; i++ {
+		stored = append(stored, Agreement{})
+		copy(stored[idx+1:], stored[idx:])
+		stored[idx] = a
+	}
 
 	s.collected[blockHash] = stored
 	return len(stored)
