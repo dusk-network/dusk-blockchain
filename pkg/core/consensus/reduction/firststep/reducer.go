@@ -79,6 +79,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 // This will stop a reduction cycle short, and renders this Reducer useless
 // after calling.
 func (r *Reducer) Finalize() {
+	r.eventPlayer.Pause(r.reductionID)
 	r.Timer.Stop()
 }
 
