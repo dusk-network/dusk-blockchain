@@ -56,7 +56,7 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 	}
 
 	// First, lets get the actual reduction steps
-	// This would be the certificate step * 2 - 1, and certificate step * 2
+	// These would be the two steps preceding the one on the certificate
 	stepOne := blk.Header.Certificate.Step - 2
 	stepTwo := blk.Header.Certificate.Step - 1
 
@@ -80,8 +80,8 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 }
 
 func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash []byte) error {
-	// TODO: need real committee size here
-	committee := provisioners.CreateVotingCommittee(round, step, agreement.MaxCommitteeSize)
+	size := committeeSize(len(provisioners.Members))
+	committee := provisioners.CreateVotingCommittee(round, step, size)
 	subcommittee := committee.Intersect(bitSet)
 	apk, err := agreement.ReconstructApk(subcommittee)
 	if err != nil {
@@ -89,6 +89,14 @@ func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, roun
 	}
 
 	return header.VerifySignatures(round, step, blockHash, apk, batchedSig)
+}
+
+func committeeSize(memberAmount int) int {
+	if memberAmount > agreement.MaxCommitteeSize {
+		return agreement.MaxCommitteeSize
+	}
+
+	return memberAmount
 }
 
 // CheckBlockHeader checks whether a block header is malformed,
