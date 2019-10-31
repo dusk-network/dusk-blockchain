@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
@@ -49,8 +48,7 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	scoreSubscriber := consensus.TopicListener{
 		Topic:         topics.Score,
 		Preprocessors: []eventbus.Preprocessor{&consensus.Validator{}},
-		Listener:      consensus.NewFilteringListener(s.CollectScoreEvent, s.Filter, consensus.LowPriority),
-		Paused:        true,
+		Listener:      consensus.NewSimpleListener(s.CollectScoreEvent, consensus.LowPriority),
 	}
 	s.scoreID = scoreSubscriber.ID()
 
@@ -76,14 +74,6 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 	return s.Process(ev)
 }
 
-// Filter always returns false, as we don't do committee checks on bidders.
-// Bidder relevant checks like proof verifications are done further down the pipeline
-// (see `Process`).
-// Implements consensus.Component
-func (s *Selector) Filter(hdr header.Header) bool {
-	return false
-}
-
 func (s *Selector) CollectRegeneration(e consensus.Event) error {
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
@@ -99,6 +89,7 @@ func (s *Selector) startSelection() {
 }
 
 func (s *Selector) stopSelection() {
+	s.eventPlayer.Pause(s.scoreID)
 	s.timer.stop()
 }
 
