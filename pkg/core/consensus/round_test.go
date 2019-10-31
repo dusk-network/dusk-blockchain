@@ -17,10 +17,10 @@ var collectEventTable = []struct {
 	receivedEventsLen int
 	queuedEventsLen   int
 }{
-	{1, 1, 1, 0},
-	{0, 1, 1, 0},
-	{1, 2, 1, 1},
-	{2, 1, 1, 1},
+	{1, 0, 1, 0},
+	{0, 0, 1, 0},
+	{1, 1, 1, 1},
+	{2, 0, 1, 1},
 }
 
 // Test that the coordinator redirects events correctly, according to their header
@@ -41,34 +41,39 @@ func TestQueuedDispatch(t *testing.T) {
 	c, comp := initCoordinatorTest(t)
 
 	// Send an event which should get queued
-	ev := mockEventBuffer(t, topics.Reduction, 1, 2)
+	ev := mockEventBuffer(t, topics.Reduction, 1, 1)
 	c.CollectEvent(*ev)
 
 	// Mock component should have no events saved
 	assert.Equal(t, 0, len(comp.receivedEvents))
-	// Queue should now hold one event on round 1, step 2
-	assert.Equal(t, 1, len(c.eventqueue.entries[1][2]))
+	// Queue should now hold one event on round 1, step 1
+	assert.Equal(t, 1, len(c.eventqueue.entries[1][1]))
 
-	// Play to step 2. The queued event should be dispatched
-	c.Play()
-	c.Resume(0)
+	// Pause, so that we can resume later
+	c.Pause(comp.ID())
+	// Play to step 1. The queued event should be dispatched
+	assert.Equal(t, uint8(1), c.Play(comp.ID()))
+	c.Resume(comp.ID())
 	assert.Equal(t, 1, len(comp.receivedEvents))
-	assert.Equal(t, 0, len(c.eventqueue.entries[1][2]))
+	assert.Equal(t, 0, len(c.eventqueue.entries[1][1]))
 
 	// Send another event which should get queued for the next round
-	ev = mockEventBuffer(t, topics.Reduction, 2, 1)
+	ev = mockEventBuffer(t, topics.Reduction, 2, 0)
 	c.CollectEvent(*ev)
-	// Queue should now hold one event on round 2, step 1
-	assert.Equal(t, 1, len(c.eventqueue.entries[2][1]))
+	// Queue should now hold one event on round 2, step 0
+	assert.Equal(t, 1, len(c.eventqueue.entries[2][0]))
 
 	// Update to round 2. The queued event should be dispatched
 	ruBuf := MockRoundUpdateBuffer(2, nil, nil)
 	c.CollectRoundUpdate(*ruBuf)
-	c.Resume(0)
+	// Update our reference to `comp`, as it was swapped out.
+	comp = c.store.components[0].(*mockComponent)
+	c.Pause(comp.ID())
+	c.Resume(comp.ID())
 	// Mock component should only hold one event, as it was re-instantiated
 	// on the round update
 	assert.Equal(t, 1, len(comp.receivedEvents))
-	assert.Equal(t, 0, len(c.eventqueue.entries[2][1]))
+	assert.Equal(t, 0, len(c.eventqueue.entries[2][0]))
 }
 
 // Test that events are withheld when a component is paused, and that streaming
@@ -77,21 +82,21 @@ func TestPauseResume(t *testing.T) {
 	c, comp := initCoordinatorTest(t)
 
 	// Send an event with the correct state. It should be received
-	ev := mockEventBuffer(t, topics.Reduction, 1, 1)
+	ev := mockEventBuffer(t, topics.Reduction, 1, 0)
 	c.CollectEvent(*ev)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 
 	c.Pause(comp.id)
 
 	// Send another event with the correct state. It should not be received
-	ev = mockEventBuffer(t, topics.Reduction, 1, 1)
+	ev = mockEventBuffer(t, topics.Reduction, 1, 0)
 	c.CollectEvent(*ev)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 
 	c.Resume(comp.id)
 
 	// Send one more event, which should be received.
-	ev = mockEventBuffer(t, topics.Reduction, 1, 1)
+	ev = mockEventBuffer(t, topics.Reduction, 1, 0)
 	c.CollectEvent(*ev)
 	assert.Equal(t, 2, len(comp.receivedEvents))
 }
@@ -160,6 +165,10 @@ func (m *mockComponent) Initialize(EventPlayer, Signer, RoundUpdate) []TopicList
 	m.id = listener.Listener.ID()
 
 	return []TopicListener{listener}
+}
+
+func (m *mockComponent) ID() uint32 {
+	return m.id
 }
 
 func (m *mockComponent) Collect(ev Event) error {

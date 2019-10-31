@@ -1,4 +1,4 @@
-package generation
+package score
 
 import (
 	"bytes"
@@ -7,12 +7,12 @@ import (
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
-type ScoreEvent struct {
+type Event struct {
 	Proof zkproof.ZkProof
 	Seed  []byte
 }
 
-func Marshal(b *bytes.Buffer, s ScoreEvent) error {
+func Marshal(b *bytes.Buffer, s Event) error {
 	if err := encoding.WriteVarBytes(b, s.Proof.Proof); err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func Marshal(b *bytes.Buffer, s ScoreEvent) error {
 	return encoding.WriteBLS(b, s.Seed)
 }
 
-func Unmarshal(b *bytes.Buffer, s *ScoreEvent) error {
+func Unmarshal(b *bytes.Buffer, s *Event) error {
 	if err := encoding.ReadVarBytes(b, &s.Proof.Proof); err != nil {
 		return err
 	}

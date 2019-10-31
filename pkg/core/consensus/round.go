@@ -2,6 +2,8 @@ package consensus
 
 import (
 	"bytes"
+	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -16,6 +18,8 @@ import (
 
 var _ EventPlayer = (*Coordinator)(nil)
 var _ Signer = (*Coordinator)(nil)
+var emptyHash [32]byte
+var emptyPayload = new(bytes.Buffer)
 
 var lg = log.WithField("process", "coordinator")
 
@@ -38,18 +42,37 @@ func newStore(c *Coordinator) *roundStore {
 	return s
 }
 
-func (s *roundStore) addComponent(component Component, round RoundUpdate) []TopicListener {
-	subs := component.Initialize(s.coordinator, s.coordinator, round)
-	for _, sub := range subs {
-		s.subscribe(sub.Topic, sub)
-		if sub.Paused {
-			s.pause(sub.ID())
-		}
-	}
+func (s *roundStore) addComponent(component Component) {
 	s.lock.Lock()
 	s.components = append(s.components, component)
 	s.lock.Unlock()
-	return subs
+}
+
+func (s *roundStore) hasComponent(id uint32) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	i := sort.Search(len(s.components), func(i int) bool { return s.components[i].ID() >= id })
+	return i < len(s.components) && s.components[i].ID() == id
+}
+
+func (s *roundStore) initializeComponents(round RoundUpdate) []TopicListener {
+	allSubs := make([]TopicListener, 0, len(s.components)*2)
+	for _, component := range s.components {
+		subs := component.Initialize(s.coordinator, s.coordinator, round)
+		for _, sub := range subs {
+			s.subscribe(sub.Topic, sub)
+			if sub.Paused {
+				s.pause(sub.ID())
+			}
+		}
+
+		allSubs = append(allSubs, subs...)
+	}
+	s.lock.Lock()
+	sort.Slice(s.components, func(i, j int) bool { return s.components[i].ID() < s.components[j].ID() })
+	s.lock.Unlock()
+
+	return allSubs
 }
 
 func (s *roundStore) subscribe(topic topics.Topic, sub Listener) {
@@ -82,7 +105,7 @@ func (s *roundStore) pause(id uint32) {
 	}
 }
 
-func (s *roundStore) resume(id uint32) {
+func (s *roundStore) resume(id uint32) bool {
 	s.lock.Lock()
 	for topic, listeners := range s.paused {
 		for i, listener := range listeners {
@@ -90,12 +113,13 @@ func (s *roundStore) resume(id uint32) {
 				s.paused[topic] = append(s.paused[topic][:i], s.paused[topic][i+1:]...)
 				s.lock.Unlock()
 				s.subscribe(topic, listener)
-				return
+				return true
 			}
 		}
 	}
 
 	s.lock.Unlock()
+	return false
 }
 
 func (s *roundStore) Dispatch(ev TopicEvent) {
@@ -178,29 +202,22 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 
 	l := eventbus.NewCallbackListener(c.CollectRoundUpdate)
 	c.eventBus.Subscribe(topics.RoundUpdate, l)
+
+	finalizeListener := eventbus.NewCallbackListener(c.CollectFinalize)
+	c.eventBus.Subscribe(topics.Finalize, finalizeListener)
+
+	c.reinstantiateStore()
 	return c
 }
 
-func (c *Coordinator) initialize(subs []TopicListener) {
-	for _, sub := range subs {
-		c.eventBus.AddDefaultTopic(sub.Topic)
-		c.eventBus.Register(sub.Topic, sub.Preprocessors...)
-	}
-}
-
-func (c *Coordinator) recreateStore(roundUpdate RoundUpdate, fromScratch bool) {
-	// reinstantiating the store prevents the need for locking
-	store := newStore(c)
-
-	for _, factory := range c.factories {
-		component := factory.Instantiate()
-		subs := store.addComponent(component, roundUpdate)
-		if fromScratch && subs != nil {
-			c.initialize(subs)
+func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
+	subs := c.store.initializeComponents(roundUpdate)
+	if fromScratch && subs != nil {
+		for _, sub := range subs {
+			c.eventBus.AddDefaultTopic(sub.Topic)
+			c.eventBus.Register(sub.Topic, sub.Preprocessors...)
 		}
 	}
-
-	c.swapStore(store)
 }
 
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
@@ -210,11 +227,53 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		return err
 	}
 
-	c.FinalizeRound()
-	c.recreateStore(r, c.unsynced)
+	// TODO: when the new certificate creation procedure is implemented, this won't make
+	// much sense anymore, so we might want to remove this part afterwards
+	c.store.lock.RLock()
+	lenSubs := len(c.store.subscribers)
+	c.store.lock.RUnlock()
+	if lenSubs > 0 {
+		c.FinalizeRound()
+		c.reinstantiateStore()
+	}
+
+	c.onNewRound(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
+	// TODO: the Coordinator should not send events. someone else should kickstart the
+	// consensus loop
+	c.store.Dispatch(TopicEvent{
+		Topic: topics.Generation,
+		Event: Event{},
+	})
 	return nil
+}
+
+func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
+	// Ensure that we should take this message seriously
+	var round uint64
+	if err := encoding.ReadUint64LE(&m, &round); err != nil {
+		return err
+	}
+
+	if round != c.Round() {
+		return nil
+	}
+
+	// reinstantiating the store prevents the need for locking
+	c.FinalizeRound()
+	c.reinstantiateStore()
+	return nil
+}
+
+func (c *Coordinator) reinstantiateStore() {
+	store := newStore(c)
+	for _, factory := range c.factories {
+		component := factory.Instantiate()
+		store.addComponent(component)
+	}
+
+	c.swapStore(store)
 }
 
 func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
@@ -234,6 +293,8 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		"round": hdr.Round,
 		"step":  hdr.Step,
 	}).Traceln("collected event")
+	// TODO: agreement filtering is a little bit more intricate (it only needs
+	// to look at the round and not the step)
 	switch hdr.Compare(c.Round(), c.Step()) {
 	case header.Before:
 		// Unless it's an Agreement message, we should drop it if it's arriving late.
@@ -242,12 +303,17 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 			return nil
 		}
 	case header.After:
-		lg.WithField("topic", topic).Debugln("storing future event")
-		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
-		return nil
+		// Unless it's an Agreement message, we queue it if it's early.
+		if topic != topics.Agreement {
+			lg.WithField("topic", topic).Debugln("storing future event")
+			c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
+			return nil
+		}
 	}
 
+	c.lock.RLock()
 	c.store.Dispatch(NewTopicEvent(topic, hdr, m))
+	c.lock.RUnlock()
 	return nil
 }
 
@@ -265,8 +331,10 @@ func (c *Coordinator) FinalizeRound() {
 	}
 }
 
-func (c *Coordinator) Play() uint8 {
-	c.IncrementStep()
+func (c *Coordinator) Play(id uint32) uint8 {
+	if c.store.hasComponent(id) {
+		c.IncrementStep()
+	}
 	return c.Step()
 }
 
@@ -302,7 +370,11 @@ func (c *Coordinator) Sign(hash, packet []byte) ([]byte, error) {
 }
 
 // SendAuthenticated sign the payload with Ed25519 and publishes it to the Gossip topic
-func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer) error {
+func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer, id uint32) error {
+	if !c.store.hasComponent(id) {
+		return fmt.Errorf("caller with ID %d is unregistered", id)
+	}
+
 	buf, err := header.Compose(c.pubkeyBuf, c.ToBuffer(), blockHash)
 	if err != nil {
 		return err
@@ -342,7 +414,11 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, pa
 
 // SendWithHeader prepends a header to the given payload, and publishes it on the
 // desired topic.
-func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer) error {
+func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer, id uint32) error {
+	if !c.store.hasComponent(id) {
+		return fmt.Errorf("caller with ID %d is unregistered", id)
+	}
+
 	lg.WithField("topic", topic.String()).Debugln("sending event internally")
 	buf, err := header.Compose(c.pubkeyBuf, c.ToBuffer(), hash)
 	if err != nil {
@@ -364,6 +440,8 @@ func (c *Coordinator) Pause(id uint32) {
 }
 
 func (c *Coordinator) Resume(id uint32) {
-	c.store.resume(id)
-	c.dispatchQueuedEvents()
+	// Only dispatch events if a registered component asks to Resume
+	if c.store.resume(id) {
+		c.dispatchQueuedEvents()
+	}
 }

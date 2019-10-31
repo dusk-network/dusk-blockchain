@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -26,12 +26,12 @@ func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
 	m.bus.Publish(topic, b)
 	return nil
 }
 
-func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
 	// Because the buffer in a BestScore message is empty, we will write the hash to it.
 	// This way, we can check for correctness during tests.
 	if err := encoding.Write256(b, hash); err != nil {
@@ -93,7 +93,7 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 func (h *Helper) TriggerBlockGeneration() {
 	sev := randomScoreEvent()
 	buf := new(bytes.Buffer)
-	if err := generation.Marshal(buf, sev); err != nil {
+	if err := score.Marshal(buf, sev); err != nil {
 		panic(err)
 	}
 
@@ -126,16 +126,16 @@ func (h *Helper) ProvideTransactions(t *testing.T) {
 	r.RespChan <- rpcbus.Response{*buf, nil}
 }
 
-func randomScoreEvent() generation.ScoreEvent {
-	score, _ := crypto.RandEntropy(32)
+func randomScoreEvent() score.Event {
+	s, _ := crypto.RandEntropy(32)
 	proof, _ := crypto.RandEntropy(1477)
 	z, _ := crypto.RandEntropy(32)
 	subset, _ := crypto.RandEntropy(32)
 	seed, _ := crypto.RandEntropy(33)
-	return generation.ScoreEvent{
+	return score.Event{
 		Proof: zkproof.ZkProof{
 			Proof:         proof,
-			Score:         score,
+			Score:         s,
 			Z:             z,
 			BinaryBidList: subset,
 		},

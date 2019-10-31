@@ -27,6 +27,7 @@ type agreement struct {
 	workerAmount int
 
 	agreementID uint32
+	round       uint64
 }
 
 // newComponent is used by the agreement factory to instantiate the component
@@ -41,6 +42,7 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	a.handler = newHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
+	a.round = r.Round
 	agreementSubscriber := consensus.TopicListener{
 		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(a.publisher, topics.Agreement), &consensus.Validator{}},
 		Topic:         topics.Agreement,
@@ -50,6 +52,10 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 
 	go a.listen()
 	return []consensus.TopicListener{agreementSubscriber}
+}
+
+func (a *agreement) ID() uint32 {
+	return a.agreementID
 }
 
 func (a *agreement) Filter(hdr header.Header) bool {
@@ -85,6 +91,7 @@ func convertToAgreement(event consensus.Event) (*Agreement, error) {
 func (a *agreement) listen() {
 	evs := <-a.accumulator.CollectedVotesChan
 	lg.WithField("id", a.agreementID).Debugln("quorum reached")
+	a.sendFinalize()
 	a.sendCertificate(evs[0])
 }
 
@@ -100,6 +107,15 @@ func (a *agreement) sendCertificate(ag Agreement) {
 	}
 
 	a.publisher.Publish(topics.Certificate, buf)
+}
+
+func (a *agreement) sendFinalize() {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, a.round); err != nil {
+		lg.WithError(err).Errorln("what the fuck")
+	}
+
+	a.publisher.Publish(topics.Finalize, buf)
 }
 
 func (a *agreement) Finalize() {

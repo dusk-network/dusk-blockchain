@@ -48,7 +48,6 @@ const (
 	//Internal
 	Initialization
 	RoundUpdate
-	BlockRegeneration
 	BlockSelection
 	ReductionResult
 	NewProvisioner
@@ -61,12 +60,14 @@ const (
 	Absentees
 	RemoveProvisioner
 	AgreementEvent
-	Regeneration
 	Log
 	Monitor
 	Test
 	StepVotes
 	ScoreEvent
+	Generation
+	Finalize
+	Restart
 )
 
 type topicBuf struct {
@@ -103,7 +104,6 @@ var Topics = [...]topicBuf{
 	topicBuf{Reject, *(bytes.NewBuffer([]byte{byte(Reject)})), "reject"},
 	topicBuf{Initialization, *(bytes.NewBuffer([]byte{byte(Initialization)})), "initialization"},
 	topicBuf{RoundUpdate, *(bytes.NewBuffer([]byte{byte(RoundUpdate)})), "roundupdate"},
-	topicBuf{BlockRegeneration, *(bytes.NewBuffer([]byte{byte(BlockRegeneration)})), "blockregeneration"},
 	topicBuf{BlockSelection, *(bytes.NewBuffer([]byte{byte(BlockSelection)})), "blockselection"},
 	topicBuf{ReductionResult, *(bytes.NewBuffer([]byte{byte(ReductionResult)})), "reductionresult"},
 	topicBuf{NewProvisioner, *(bytes.NewBuffer([]byte{byte(NewProvisioner)})), "newprovisioner"},
@@ -116,12 +116,14 @@ var Topics = [...]topicBuf{
 	topicBuf{Absentees, *(bytes.NewBuffer([]byte{byte(Absentees)})), "absentees"},
 	topicBuf{RemoveProvisioner, *(bytes.NewBuffer([]byte{byte(RemoveProvisioner)})), "removeprovisioner"},
 	topicBuf{AgreementEvent, *(bytes.NewBuffer([]byte{byte(AgreementEvent)})), "agreementevent"},
-	topicBuf{Regeneration, *(bytes.NewBuffer([]byte{byte(Regeneration)})), "regeneration"},
 	topicBuf{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
 	topicBuf{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
 	topicBuf{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
 	topicBuf{StepVotes, *(bytes.NewBuffer([]byte{byte(StepVotes)})), "stepvotes"},
 	topicBuf{ScoreEvent, *(bytes.NewBuffer([]byte{byte(ScoreEvent)})), "scoreevent"},
+	topicBuf{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
+	topicBuf{Finalize, *(bytes.NewBuffer([]byte{byte(Finalize)})), "finalize"},
+	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {

@@ -19,12 +19,12 @@ func TestSelection(t *testing.T) {
 	// Sub to BestScore, to observe the outcome of the Selector
 	bestScoreChan := make(chan bytes.Buffer, 1)
 	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
-
-	// Start selection with a round update
 	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
 
 	// Make sure to replace the handler, to avoid zkproof verification
 	hlp.SetHandler(newMockHandler())
+
+	hlp.StartSelection()
 
 	// Send a set of events
 	hash, _ := crypto.RandEntropy(32)
@@ -48,12 +48,12 @@ func TestSwapHeader(t *testing.T) {
 	// Sub to gossip, so we can catch any outgoing events
 	gossipChan := make(chan bytes.Buffer, 1)
 	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
-
-	// Start selection with a round update
 	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
 
 	// Make sure to replace the handler, to avoid zkproof verification
 	hlp.SetHandler(newMockHandler())
+
+	hlp.StartSelection()
 
 	// Create some score messages
 	hash, _ := crypto.RandEntropy(32)

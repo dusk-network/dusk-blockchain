@@ -20,12 +20,12 @@ const (
 // Signer encapsulate the credentials to sign or authenticate outgoing events
 type Signer interface {
 	Sign([]byte, []byte) ([]byte, error)
-	SendAuthenticated(topics.Topic, []byte, *bytes.Buffer) error
-	SendWithHeader(topics.Topic, []byte, *bytes.Buffer) error
+	SendAuthenticated(topics.Topic, []byte, *bytes.Buffer, uint32) error
+	SendWithHeader(topics.Topic, []byte, *bytes.Buffer, uint32) error
 }
 
 type EventPlayer interface {
-	Play() uint8
+	Play(uint32) uint8
 	Pause(uint32)
 	Resume(uint32)
 }
@@ -42,6 +42,7 @@ type Component interface {
 	Initialize(EventPlayer, Signer, RoundUpdate) []TopicListener
 	// Finalize allows a Component to perform cleanup operations before begin garbage collected
 	Finalize()
+	ID() uint32
 }
 
 // Listener subscribes to the Coordinator and forwards consensus events to the components

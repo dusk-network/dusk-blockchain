@@ -32,8 +32,8 @@ type (
 func NewState() *SyncState {
 	return &SyncState{
 		round:   0,
-		step:    1,
-		bufRepr: recreate(0, 1),
+		step:    0,
+		bufRepr: recreate(0, 0),
 	}
 }
 
@@ -72,7 +72,7 @@ func (s *SyncState) String() string {
 func (s *SyncState) Update(round uint64) {
 	s.Lock.Lock()
 	s.round = round
-	s.step = 1
+	s.step = 0
 	s.bufRepr = recreate(round, s.step)
 	s.Lock.Unlock()
 }

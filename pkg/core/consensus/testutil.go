@@ -16,7 +16,7 @@ type SimplePlayer struct {
 	lock  sync.RWMutex
 	step  uint8
 	Round uint64
-	State State
+	state State
 }
 
 func NewSimplePlayer() *SimplePlayer {
@@ -27,7 +27,7 @@ func NewSimplePlayer() *SimplePlayer {
 }
 
 // Play upticks the step
-func (s *SimplePlayer) Play() uint8 {
+func (s *SimplePlayer) Play(uint32) uint8 {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.step++
@@ -45,12 +45,18 @@ func (s *SimplePlayer) Step() uint8 {
 func (s *SimplePlayer) Pause(id uint32) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.State = PAUSED
+	s.state = PAUSED
 }
 
 // Resume as specified by the EventPlayer interface
 func (s *SimplePlayer) Resume(id uint32) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.State = RUNNING
+	s.state = RUNNING
+}
+
+func (s *SimplePlayer) State() State {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.state
 }

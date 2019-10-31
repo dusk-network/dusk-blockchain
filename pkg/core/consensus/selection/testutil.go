@@ -23,7 +23,7 @@ func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer) error {
+func (m *mockSigner) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer, id uint32) error {
 	pubKeyBuf := new(bytes.Buffer)
 	if err := encoding.WriteVarBytes(pubKeyBuf, m.keys.BLSPubKeyBytes); err != nil {
 		return err
@@ -52,7 +52,7 @@ func (m *mockSigner) SendAuthenticated(topic topics.Topic, blockHash []byte, pay
 	return err
 }
 
-func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer) error {
+func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
 	// Because the buffer in a BestScore message is empty, we will write the hash to it.
 	// This way, we can check for correctness during tests.
 	if err := encoding.Write256(b, hash); err != nil {
@@ -145,6 +145,10 @@ func (h *Helper) Spawn(hash []byte) []consensus.Event {
 		evs = append(evs, consensus.Event{hdr, *ev})
 	}
 	return evs
+}
+
+func (h *Helper) StartSelection() {
+	h.Selector.startSelection()
 }
 
 // GenerateEd25519Fields will return the Ed25519 header fields for a given consensus

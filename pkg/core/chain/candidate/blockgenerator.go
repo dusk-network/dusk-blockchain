@@ -8,7 +8,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -33,7 +33,8 @@ type Generator struct {
 	rpcBus    *rpcbus.RPCBus
 	signer    consensus.Signer
 
-	roundInfo consensus.RoundUpdate
+	roundInfo    consensus.RoundUpdate
+	scoreEventID uint32
 }
 
 func NewComponent(publisher eventbus.Publisher, genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
@@ -52,16 +53,21 @@ func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consen
 		Topic:    topics.ScoreEvent,
 		Listener: consensus.NewSimpleListener(bg.Collect, consensus.LowPriority),
 	}
+	bg.scoreEventID = scoreEventListener.Listener.ID()
 
 	return []consensus.TopicListener{scoreEventListener}
+}
+
+func (bg *Generator) ID() uint32 {
+	return bg.scoreEventID
 }
 
 // Finalize implements consensus.Component
 func (bg *Generator) Finalize() {}
 
 func (bg *Generator) Collect(e consensus.Event) error {
-	sev := &generation.ScoreEvent{}
-	if err := generation.Unmarshal(&e.Payload, sev); err != nil {
+	sev := &score.Event{}
+	if err := score.Unmarshal(&e.Payload, sev); err != nil {
 		return err
 	}
 
@@ -86,7 +92,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	lg.Debugln("sending score")
-	if err := bg.signer.SendAuthenticated(topics.Score, blk.Header.Hash, scoreBuf); err != nil {
+	if err := bg.signer.SendAuthenticated(topics.Score, blk.Header.Hash, scoreBuf, bg.ID()); err != nil {
 		return err
 	}
 
@@ -96,10 +102,10 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	lg.Debugln("sending candidate")
-	return bg.signer.SendAuthenticated(topics.Candidate, blk.Header.Hash, buf)
+	return bg.signer.SendAuthenticated(topics.Candidate, blk.Header.Hash, buf, bg.ID())
 }
 
-func (bg *Generator) Generate(sev generation.ScoreEvent) (*block.Block, error) {
+func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {
 	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof.Proof, sev.Proof.Score, bg.roundInfo.Hash)
 }
 

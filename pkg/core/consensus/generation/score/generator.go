@@ -1,4 +1,4 @@
-package generation
+package score
 
 import (
 	"bytes"
@@ -38,7 +38,8 @@ type Generator struct {
 	key.ConsensusKeys
 	threshold *consensus.Threshold
 
-	signer consensus.Signer
+	signer       consensus.Signer
+	generationID uint32
 }
 
 func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
@@ -59,14 +60,17 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 		return nil
 	}
 
-	regenSubscriber := consensus.TopicListener{
-		Topic:    topics.Regeneration,
+	generationSubscriber := consensus.TopicListener{
+		Topic:    topics.Generation,
 		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority),
 	}
+	g.generationID = generationSubscriber.Listener.ID()
 
-	// We generate a score immediately on round update
-	go g.generateScore()
-	return []consensus.TopicListener{regenSubscriber}
+	return []consensus.TopicListener{generationSubscriber}
+}
+
+func (g *Generator) ID() uint32 {
+	return g.generationID
 }
 
 // Finalize implements consensus.Component.
@@ -88,7 +92,7 @@ func (g *Generator) Prove(seed []byte, bidList user.BidList) zkproof.ZkProof {
 }
 
 func (g *Generator) Collect(e consensus.Event) error {
-	g.threshold.Lower()
+	defer g.threshold.Lower()
 	return g.generateScore()
 }
 
@@ -104,11 +108,11 @@ func (g *Generator) generateScore() error {
 		return err
 	}
 
-	return g.signer.SendWithHeader(topics.ScoreEvent, emptyHash[:], buf)
+	return g.signer.SendWithHeader(topics.ScoreEvent, emptyHash[:], buf, g.ID())
 }
 
-func (g *Generator) createScoreEvent(seed []byte, proof zkproof.ZkProof) ScoreEvent {
-	return ScoreEvent{
+func (g *Generator) createScoreEvent(seed []byte, proof zkproof.ZkProof) Event {
+	return Event{
 		Proof: zkproof.ZkProof{
 			Score:         proof.Score,
 			Proof:         proof.Proof,

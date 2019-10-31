@@ -74,6 +74,10 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	return []consensus.TopicListener{stepVotesSubscriber, reductionSubscriber}
 }
 
+func (r *Reducer) ID() uint32 {
+	return r.reductionID
+}
+
 // Finalize the Reducer component by killing the timer, if it is still running.
 // This will stop a reduction cycle short, and renders this Reducer useless
 // after calling.
@@ -122,7 +126,7 @@ func (r *Reducer) sendReduction(hash []byte) error {
 		return err
 	}
 
-	return r.signer.SendAuthenticated(topics.Reduction, hash, payload)
+	return r.signer.SendAuthenticated(topics.Reduction, hash, payload, r.ID())
 }
 
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
@@ -133,13 +137,12 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.eventPlayer.Pause(r.reductionID)
 
 	// Sending of agreement happens on it's own step
-	step := r.eventPlayer.Play()
-	// TODO: queue needs to be flushed here, but we have no direct way of doing it
+	step := r.eventPlayer.Play(r.ID())
 	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
 		r.sendAgreement(hash, b)
 	}
 
-	r.signer.SendWithHeader(topics.Regeneration, emptyHash[:], regenerationPackage)
+	r.signer.SendWithHeader(topics.Restart, emptyHash[:], regenerationPackage, r.ID())
 }
 
 // CollectStepVotes is triggered when the first StepVotes get published by the first step Reducer
@@ -158,7 +161,7 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 	}
 
 	r.startReduction(sv)
-	step := r.eventPlayer.Play()
+	step := r.eventPlayer.Play(r.ID())
 	r.eventPlayer.Resume(r.reductionID)
 	if r.handler.AmMember(r.round, step) {
 		go r.sendReduction(e.Header.BlockHash)
@@ -191,7 +194,7 @@ func (r *Reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
 	}
 
 	// then we forward the marshalled Agreement to the store to be sent
-	if err := r.signer.SendAuthenticated(topics.Agreement, hash, eventBuf); err != nil {
+	if err := r.signer.SendAuthenticated(topics.Agreement, hash, eventBuf, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in Ed25519 signing and gossip the agreement")
 	}
 }

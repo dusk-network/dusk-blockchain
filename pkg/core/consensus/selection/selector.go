@@ -52,13 +52,16 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	}
 	s.scoreID = scoreSubscriber.ID()
 
-	regenSubscriber := consensus.TopicListener{
-		Topic:    topics.Regeneration,
-		Listener: consensus.NewSimpleListener(s.CollectRegeneration, consensus.HighPriority),
+	generationSubscriber := consensus.TopicListener{
+		Topic:    topics.Generation,
+		Listener: consensus.NewSimpleListener(s.CollectGeneration, consensus.HighPriority),
 	}
 
-	go s.startSelection()
-	return []consensus.TopicListener{scoreSubscriber, regenSubscriber}
+	return []consensus.TopicListener{scoreSubscriber, generationSubscriber}
+}
+
+func (s *Selector) ID() uint32 {
+	return s.scoreID
 }
 
 func (s *Selector) Finalize() {
@@ -74,17 +77,16 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 	return s.Process(ev)
 }
 
-func (s *Selector) CollectRegeneration(e consensus.Event) error {
-	s.handler.LowerThreshold()
-	s.IncreaseTimeOut()
+func (s *Selector) CollectGeneration(e consensus.Event) error {
 	s.setBestEvent(emptyScore)
+	_ = s.eventPlayer.Play(s.ID())
 	s.startSelection()
-	s.eventPlayer.Play()
-	s.eventPlayer.Resume(s.scoreID)
 	return nil
 }
 
 func (s *Selector) startSelection() {
+	// Empty queue in a goroutine to avoid letting other listeners wait
+	go s.eventPlayer.Resume(s.scoreID)
 	s.timer.start(s.timeout)
 }
 
@@ -121,16 +123,18 @@ func (s *Selector) IncreaseTimeOut() {
 }
 
 func (s *Selector) publishBestEvent() error {
+	s.eventPlayer.Pause(s.scoreID)
 	buf := new(bytes.Buffer)
 	bestEvent := s.getBestEvent()
 	// If we had no best event, we should send an empty hash
 	if bestEvent.Equal(emptyScore) {
-		s.signer.SendWithHeader(topics.BestScore, make([]byte, 32), buf)
+		s.signer.SendWithHeader(topics.BestScore, make([]byte, 32), buf, s.ID())
 	} else {
-		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf)
+		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf, s.ID())
 	}
 
-	s.eventPlayer.Pause(s.scoreID)
+	s.handler.LowerThreshold()
+	s.IncreaseTimeOut()
 	return nil
 }
 
@@ -140,7 +144,7 @@ func (s *Selector) repropagate(ev Score) error {
 		return err
 	}
 
-	s.signer.SendAuthenticated(topics.Score, ev.VoteHash, buf)
+	s.signer.SendAuthenticated(topics.Score, ev.VoteHash, buf, s.ID())
 	return nil
 }
 

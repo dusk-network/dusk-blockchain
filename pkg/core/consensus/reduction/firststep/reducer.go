@@ -75,6 +75,10 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	return []consensus.TopicListener{bestScoreSubscriber, reductionSubscriber}
 }
 
+func (r *Reducer) ID() uint32 {
+	return r.reductionID
+}
+
 // Finalize the Reducer component by killing the timer, if it is still running.
 // This will stop a reduction cycle short, and renders this Reducer useless
 // after calling.
@@ -125,7 +129,7 @@ func (r *Reducer) sendReduction(hash []byte) {
 		return
 	}
 
-	if err := r.signer.SendAuthenticated(topics.Reduction, hash, payload); err != nil {
+	if err := r.signer.SendAuthenticated(topics.Reduction, hash, payload, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")
 	}
 }
@@ -142,14 +146,14 @@ func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 		}
 	}
 
-	r.signer.SendWithHeader(topics.StepVotes, hash, buf)
+	r.signer.SendWithHeader(topics.StepVotes, hash, buf, r.ID())
 }
 
 // CollectBestScore activates the 2-step reduction cycle.
 func (r *Reducer) CollectBestScore(e consensus.Event) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
 	r.startReduction()
-	step := r.eventPlayer.Play()
+	step := r.eventPlayer.Play(r.ID())
 	r.eventPlayer.Resume(r.reductionID)
 
 	// sending reduction can very well be done concurrently
