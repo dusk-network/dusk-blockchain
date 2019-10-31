@@ -15,7 +15,7 @@ import (
 func TestFirstStep(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
 	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50)
-	// test that EventPlayer.Forward has been called
+	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 
 	// Wait for resulting StepVotes
@@ -47,7 +47,7 @@ func TestMoreSteps(t *testing.T) {
 
 	// StepVotes should be valid
 	assert.NoError(t, hlp.Verify(hash, sv, 3))
-	// test that EventPlayer.Forward has been called
+	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(3), hlp.Step())
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State)
@@ -61,7 +61,7 @@ func TestFirstStepTimeOut(t *testing.T) {
 	svBuf := <-hlp.StepVotesChan
 	// test we get an empty buffer
 	assert.Equal(t, bytes.Buffer{}, svBuf)
-	// test that EventPlayer.Forward has been called
+	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State)

@@ -265,8 +265,9 @@ func (c *Coordinator) FinalizeRound() {
 	}
 }
 
-func (c *Coordinator) Forward() {
+func (c *Coordinator) Play() uint8 {
 	c.IncrementStep()
+	return c.Step()
 }
 
 func (c *Coordinator) dispatchQueuedEvents() {

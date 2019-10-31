@@ -49,9 +49,9 @@ func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helpe
 	}
 	// we need to remove annoying ED25519 verification or the Republisher
 	eb.RemoveAllProcessors()
-	// Forward to step 3, as agreements can only be made on step 3 or later
+	// Play to step 3, as agreements can only be made on step 3 or later
 	// This prevents the mocked events from getting queued
-	coordinator.Forward()
-	coordinator.Forward()
+	coordinator.Play()
+	coordinator.Play()
 	return coordinator, h
 }

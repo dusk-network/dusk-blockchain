@@ -49,8 +49,8 @@ func TestQueuedDispatch(t *testing.T) {
 	// Queue should now hold one event on round 1, step 2
 	assert.Equal(t, 1, len(c.eventqueue.entries[1][2]))
 
-	// Forward to step 2. The queued event should be dispatched
-	c.Forward()
+	// Play to step 2. The queued event should be dispatched
+	c.Play()
 	c.Resume(0)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 	assert.Equal(t, 0, len(c.eventqueue.entries[1][2]))

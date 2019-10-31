@@ -89,7 +89,7 @@ func (s *Selector) CollectRegeneration(e consensus.Event) error {
 	s.IncreaseTimeOut()
 	s.setBestEvent(emptyScore)
 	s.startSelection()
-	s.eventPlayer.Forward()
+	s.eventPlayer.Play()
 	s.eventPlayer.Resume(s.scoreID)
 	return nil
 }

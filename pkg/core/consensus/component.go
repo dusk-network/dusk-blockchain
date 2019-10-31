@@ -25,7 +25,7 @@ type Signer interface {
 }
 
 type EventPlayer interface {
-	Forward()
+	Play() uint8
 	Pause(uint32)
 	Resume(uint32)
 }

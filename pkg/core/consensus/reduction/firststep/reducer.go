@@ -36,6 +36,7 @@ type Reducer struct {
 	aggregator *aggregator
 	timeOut    time.Duration
 	Timer      *reduction.Timer
+	round      uint64
 }
 
 // NewComponent returns an uninitialized reduction component.
@@ -56,6 +57,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	r.signer = signer
 	r.handler = reduction.NewHandler(r.keys, ru.P)
 	r.Timer = reduction.NewTimer(r.Halt)
+	r.round = ru.Round
 
 	bestScoreSubscriber := consensus.TopicListener{
 		Topic:    topics.BestScore,
@@ -146,11 +148,13 @@ func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 func (r *Reducer) CollectBestScore(e consensus.Event) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
 	r.startReduction()
-	r.eventPlayer.Forward()
+	step := r.eventPlayer.Play()
 	r.eventPlayer.Resume(r.reductionID)
 
 	// sending reduction can very well be done concurrently
-	go r.sendReduction(e.Header.BlockHash)
+	if r.handler.AmMember(r.round, step) {
+		go r.sendReduction(e.Header.BlockHash)
+	}
 
 	return nil
 }

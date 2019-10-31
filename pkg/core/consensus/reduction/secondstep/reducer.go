@@ -36,6 +36,7 @@ type Reducer struct {
 	aggregator *aggregator
 	timeOut    time.Duration
 	timer      *reduction.Timer
+	round      uint64
 }
 
 // NewComponent returns an uninitialized reduction component.
@@ -56,6 +57,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	r.signer = signer
 	r.handler = reduction.NewHandler(r.keys, ru.P)
 	r.timer = reduction.NewTimer(r.Halt)
+	r.round = ru.Round
 
 	stepVotesSubscriber := consensus.TopicListener{
 		Topic:    topics.StepVotes,
@@ -130,9 +132,9 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.eventPlayer.Pause(r.reductionID)
 
 	// Sending of agreement happens on it's own step
-	r.eventPlayer.Forward()
+	step := r.eventPlayer.Play()
 	// TODO: queue needs to be flushed here, but we have no direct way of doing it
-	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) {
+	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
 		r.sendAgreement(hash, b)
 	}
 
@@ -155,9 +157,11 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 	}
 
 	r.startReduction(sv)
-	r.eventPlayer.Forward()
+	step := r.eventPlayer.Play()
 	r.eventPlayer.Resume(r.reductionID)
-	go r.sendReduction(e.Header.BlockHash)
+	if r.handler.AmMember(r.round, step) {
+		go r.sendReduction(e.Header.BlockHash)
+	}
 	return nil
 }
 

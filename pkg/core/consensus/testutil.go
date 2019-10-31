@@ -26,11 +26,12 @@ func NewSimplePlayer() *SimplePlayer {
 	}
 }
 
-// Forward upticks the step
-func (s *SimplePlayer) Forward() {
+// Play upticks the step
+func (s *SimplePlayer) Play() uint8 {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.step++
+	return s.step
 }
 
 // Step guards the step with a lock
