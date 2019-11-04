@@ -127,6 +127,7 @@ func (h *Helper) createResultChan() {
 
 // Initialize the selector with the given round update.
 func (h *Helper) Initialize(ru consensus.RoundUpdate) {
+	h.Selector.setBestEvent(emptyScore)
 	h.Selector.Initialize(h, h.signer, ru)
 }
 
