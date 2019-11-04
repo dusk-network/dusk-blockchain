@@ -31,7 +31,9 @@ func (t *Timer) Start(timeOut time.Duration) {
 func (t *Timer) Stop() {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	t.t.Stop()
+	if t.t != nil {
+		t.t.Stop()
+	}
 }
 
 func (t *Timer) Trigger() {
