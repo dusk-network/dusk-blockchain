@@ -2,7 +2,10 @@ package selection_test
 
 import (
 	"bytes"
+	"sort"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
@@ -75,6 +78,78 @@ func TestSwapHeader(t *testing.T) {
 	assert.NotEqual(t, edFields, repropagatedEdFields)
 }
 
+func TestMultipleVerification(t *testing.T) {
+	bus := eventbus.New()
+	hlp := selection.NewHelper(bus)
+	// Sub to gossip, so we can catch any outgoing events
+	gossipChan := make(chan bytes.Buffer, 10)
+	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
+	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+
+	// Make sure to replace the handler, to avoid zkproof verification
+	hlp.SetHandler(newMockHandler())
+
+	hlp.StartSelection()
+
+	// Create some score messages
+	hash, _ := crypto.RandEntropy(32)
+	evs := hlp.Spawn(hash)
+
+	// Sort the slice so that the highest scoring message is first
+	sorted := sortEventsByScore(t, evs)
+
+	// Now send them to the selector concurrently, except for the first one, with a
+	// slight delay (guaranteeing that the highest scoring message comes in first).
+	// Only one event should be verified and propagated.
+	var wg sync.WaitGroup
+	wg.Add(len(sorted) - 1)
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		for i, ev := range sorted {
+			if i != 0 {
+				hlp.Selector.CollectScoreEvent(ev)
+				wg.Done()
+			}
+		}
+	}()
+
+	hlp.Selector.CollectScoreEvent(sorted[0])
+	wg.Wait()
+
+	// We should only have one repropagated event
+	assert.Equal(t, 1, len(gossipChan))
+}
+
+func sortEventsByScore(t *testing.T, evs []consensus.Event) []consensus.Event {
+	// Retrieve message from payload
+	scoreEvs := make([]selection.Score, 0, len(evs))
+	for _, ev := range evs {
+		score := selection.Score{}
+		if err := selection.UnmarshalScore(&ev.Payload, &score); err != nil {
+			t.Fatal(err)
+		}
+
+		scoreEvs = append(scoreEvs, score)
+	}
+
+	// Sort by score, from highest to lowest
+	sort.Slice(scoreEvs, func(i, j int) bool { return bytes.Compare(scoreEvs[i].Score, scoreEvs[j].Score) == 1 })
+
+	// Set payload back on the messages
+	sortedEvs := make([]consensus.Event, 0, len(evs))
+	for i, ev := range evs {
+		buf := new(bytes.Buffer)
+		if err := selection.MarshalScore(buf, &scoreEvs[i]); err != nil {
+			t.Fatal(err)
+		}
+
+		ev.Payload = *buf
+		sortedEvs = append(sortedEvs, ev)
+	}
+
+	return sortedEvs
+}
+
 // Mock implementation of a selection.Handler to avoid elaborate set-up of
 // a Rust process for the purposes of zkproof verification.
 type mockHandler struct {
@@ -85,6 +160,7 @@ func newMockHandler() *mockHandler {
 }
 
 func (m *mockHandler) Verify(selection.Score) error {
+	time.Sleep(500 * time.Millisecond)
 	return nil
 }
 

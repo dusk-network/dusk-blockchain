@@ -82,31 +82,32 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 		return err
 	}
 
-	bestEvent := s.getBestEvent()
-
+	// Locking here prevents the named pipe from filling up with requests to verify
+	// Score messages with a low score, as only one Score message will be verified
+	// at a time. Consequently, any lower scores are discarded.
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	// Only check for priority if we already have a best event
-	if !bestEvent.Equal(emptyScore) {
-		if s.handler.Priority(bestEvent, ev) {
+	if !s.bestEvent.Equal(emptyScore) {
+		if s.handler.Priority(*s.bestEvent, ev) {
 			// if the current best score has priority, we return
 			return nil
 		}
 	}
 
-	lg.WithFields(log.Fields{
-		"current best": bestEvent.Score,
-		"new best":     ev.Score,
-	}).Debugln("swapping best score")
-	s.setBestEvent(ev)
 	if err := s.handler.Verify(ev); err != nil {
-		s.setBestEvent(bestEvent)
 		return err
 	}
 
 	if err := s.repropagate(ev); err != nil {
-		s.setBestEvent(bestEvent)
 		return err
 	}
 
+	lg.WithFields(log.Fields{
+		"current best": s.bestEvent.Score,
+		"new best":     ev.Score,
+	}).Debugln("swapping best score")
+	s.bestEvent = &ev
 	return nil
 }
 
