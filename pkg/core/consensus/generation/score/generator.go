@@ -62,7 +62,7 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 
 	generationSubscriber := consensus.TopicListener{
 		Topic:    topics.Generation,
-		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority),
+		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority, false),
 	}
 	g.generationID = generationSubscriber.Listener.ID()
 

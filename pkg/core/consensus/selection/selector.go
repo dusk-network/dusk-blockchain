@@ -18,7 +18,7 @@ type Selector struct {
 	publisher eventbus.Publisher
 	handler   Handler
 	lock      sync.RWMutex
-	bestEvent Score
+	bestEvent *Score
 
 	timer   *timer
 	timeout time.Duration
@@ -48,13 +48,13 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	scoreSubscriber := consensus.TopicListener{
 		Topic:         topics.Score,
 		Preprocessors: []eventbus.Preprocessor{&consensus.Validator{}},
-		Listener:      consensus.NewSimpleListener(s.CollectScoreEvent, consensus.LowPriority),
+		Listener:      consensus.NewSimpleListener(s.CollectScoreEvent, consensus.LowPriority, false),
 	}
 	s.scoreID = scoreSubscriber.ID()
 
 	generationSubscriber := consensus.TopicListener{
 		Topic:    topics.Generation,
-		Listener: consensus.NewSimpleListener(s.CollectGeneration, consensus.HighPriority),
+		Listener: consensus.NewSimpleListener(s.CollectGeneration, consensus.HighPriority, false),
 	}
 
 	return []consensus.TopicListener{scoreSubscriber, generationSubscriber}
@@ -100,21 +100,27 @@ func (s *Selector) Process(ev Score) error {
 
 	// Only check for priority if we already have a best event
 	if !bestEvent.Equal(emptyScore) {
-		if s.handler.Priority(s.getBestEvent(), ev) {
+		if s.handler.Priority(bestEvent, ev) {
 			// if the current best score has priority, we return
 			return nil
 		}
 	}
 
+	lg.WithFields(log.Fields{
+		"current best": bestEvent.Score,
+		"new best":     ev.Score,
+	}).Debugln("swapping best score")
+	s.setBestEvent(ev)
 	if err := s.handler.Verify(ev); err != nil {
+		s.setBestEvent(bestEvent)
 		return err
 	}
 
 	if err := s.repropagate(ev); err != nil {
+		s.setBestEvent(bestEvent)
 		return err
 	}
 
-	s.setBestEvent(ev)
 	return nil
 }
 
@@ -151,11 +157,11 @@ func (s *Selector) repropagate(ev Score) error {
 func (s *Selector) getBestEvent() Score {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return s.bestEvent
+	return *s.bestEvent
 }
 
 func (s *Selector) setBestEvent(ev Score) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.bestEvent = ev
+	s.bestEvent = &ev
 }

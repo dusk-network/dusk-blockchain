@@ -61,13 +61,12 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 
 	stepVotesSubscriber := consensus.TopicListener{
 		Topic:    topics.StepVotes,
-		Listener: consensus.NewSimpleListener(r.CollectStepVotes, consensus.LowPriority),
+		Listener: consensus.NewSimpleListener(r.CollectStepVotes, consensus.LowPriority, false),
 	}
 
 	reductionSubscriber := consensus.TopicListener{
 		Topic:    topics.Reduction,
-		Listener: consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority),
-		Paused:   true,
+		Listener: consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority, true),
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
 
@@ -102,8 +101,7 @@ func (r *Reducer) Collect(e consensus.Event) error {
 		"sender": hex.EncodeToString(e.Header.Sender()),
 		"id":     r.reductionID,
 	}).Debugln("received event")
-	r.aggregator.collectVote(*ev, e.Header)
-	return nil
+	return r.aggregator.collectVote(*ev, e.Header)
 }
 
 func (r *Reducer) Filter(hdr header.Header) bool {
@@ -139,6 +137,7 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	// Sending of agreement happens on it's own step
 	step := r.eventPlayer.Play(r.ID())
 	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
+		lg.WithField("step", step).Debugln("sending agreement")
 		r.sendAgreement(hash, b)
 	}
 

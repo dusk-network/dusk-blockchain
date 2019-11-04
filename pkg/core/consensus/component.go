@@ -53,6 +53,9 @@ type Listener interface {
 	// multiple steps
 	ID() uint32
 	Priority() Priority
+	Paused() bool
+	Pause()
+	Resume()
 }
 
 // SimpleListener implements Listener and uses a callback for notifying events
@@ -60,12 +63,13 @@ type SimpleListener struct {
 	callback func(Event) error
 	id       uint32
 	priority Priority
+	paused   bool
 }
 
 // NewSimpleListener creates a SimpleListener
-func NewSimpleListener(callback func(Event) error, priority Priority) Listener {
+func NewSimpleListener(callback func(Event) error, priority Priority, paused bool) Listener {
 	id := rand.Uint32()
-	return &SimpleListener{callback, id, priority}
+	return &SimpleListener{callback, id, priority, paused}
 }
 
 // NotifyPayload triggers the callback specified during instantiation
@@ -82,6 +86,18 @@ func (s *SimpleListener) Priority() Priority {
 	return s.priority
 }
 
+func (s *SimpleListener) Paused() bool {
+	return s.paused
+}
+
+func (s *SimpleListener) Pause() {
+	s.paused = true
+}
+
+func (s *SimpleListener) Resume() {
+	s.paused = false
+}
+
 // FilteringListener is a Listener that performs filtering before triggering the callback specified by the component
 // Normally it is used to filter out events sent by Provisioners not being part of a committee or invalid messages.
 // Filtering is applied to the `header.Header`
@@ -91,9 +107,9 @@ type FilteringListener struct {
 }
 
 // NewFilteringListener creates a FilteringListener
-func NewFilteringListener(callback func(Event) error, filter func(header.Header) bool, priority Priority) Listener {
+func NewFilteringListener(callback func(Event) error, filter func(header.Header) bool, priority Priority, paused bool) Listener {
 	id := rand.Uint32()
-	return &FilteringListener{&SimpleListener{callback, id, priority}, filter}
+	return &FilteringListener{&SimpleListener{callback, id, priority, paused}, filter}
 }
 
 // NotifyPayload uses the filtering function to let only relevant events through
@@ -109,5 +125,4 @@ type TopicListener struct {
 	Listener
 	Preprocessors []eventbus.Preprocessor
 	Topic         topics.Topic
-	Paused        bool
 }

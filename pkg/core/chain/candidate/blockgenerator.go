@@ -51,7 +51,7 @@ func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consen
 
 	scoreEventListener := consensus.TopicListener{
 		Topic:    topics.ScoreEvent,
-		Listener: consensus.NewSimpleListener(bg.Collect, consensus.LowPriority),
+		Listener: consensus.NewSimpleListener(bg.Collect, consensus.LowPriority, false),
 	}
 	bg.scoreEventID = scoreEventListener.Listener.ID()
 

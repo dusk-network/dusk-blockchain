@@ -26,7 +26,6 @@ var lg = log.WithField("process", "coordinator")
 type roundStore struct {
 	lock        sync.RWMutex
 	subscribers map[topics.Topic][]Listener
-	paused      map[topics.Topic][]Listener
 	components  []Component
 	coordinator *Coordinator
 }
@@ -34,7 +33,6 @@ type roundStore struct {
 func newStore(c *Coordinator) *roundStore {
 	s := &roundStore{
 		subscribers: make(map[topics.Topic][]Listener),
-		paused:      make(map[topics.Topic][]Listener),
 		components:  make([]Component, 0),
 		coordinator: c,
 	}
@@ -60,10 +58,7 @@ func (s *roundStore) initializeComponents(round RoundUpdate) []TopicListener {
 	for _, component := range s.components {
 		subs := component.Initialize(s.coordinator, s.coordinator, round)
 		for _, sub := range subs {
-			s.subscribe(sub.Topic, sub)
-			if sub.Paused {
-				s.pause(sub.ID())
-			}
+			s.subscribe(sub.Topic, sub.Listener)
 		}
 
 		allSubs = append(allSubs, subs...)
@@ -88,17 +83,12 @@ func (s *roundStore) subscribe(topic topics.Topic, sub Listener) {
 }
 
 func (s *roundStore) pause(id uint32) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	for topic, listeners := range s.subscribers {
-		for i, listener := range listeners {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	for _, listeners := range s.subscribers {
+		for _, listener := range listeners {
 			if listener.ID() == id {
-				listeners = append(
-					listeners[:i],
-					listeners[i+1:]...,
-				)
-				s.subscribers[topic] = listeners
-				s.paused[topic] = append(s.paused[topic], listener)
+				listener.Pause()
 				return
 			}
 		}
@@ -106,26 +96,26 @@ func (s *roundStore) pause(id uint32) {
 }
 
 func (s *roundStore) resume(id uint32) bool {
-	s.lock.Lock()
-	for topic, listeners := range s.paused {
-		for i, listener := range listeners {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	for _, listeners := range s.subscribers {
+		for _, listener := range listeners {
 			if listener.ID() == id {
-				s.paused[topic] = append(s.paused[topic][:i], s.paused[topic][i+1:]...)
-				s.lock.Unlock()
-				s.subscribe(topic, listener)
+				listener.Resume()
 				return true
 			}
 		}
 	}
 
-	s.lock.Unlock()
 	return false
 }
 
 func (s *roundStore) Dispatch(ev TopicEvent) {
-	s.lock.RLock()
 	subscribers := s.createSubscriberQueue(ev.Topic)
-	s.lock.RUnlock()
+	lg.WithFields(log.Fields{
+		"recipients": len(subscribers),
+		"topic":      ev.Topic,
+	}).Traceln("notifying subscribers")
 	for _, sub := range subscribers {
 		if err := sub.NotifyPayload(ev.Event); err != nil {
 			lg.WithFields(log.Fields{
@@ -139,15 +129,17 @@ func (s *roundStore) Dispatch(ev TopicEvent) {
 // order subscribers by priority for event dispatch
 // TODO: it makes more sense to do this once per round
 func (s *roundStore) createSubscriberQueue(topic topics.Topic) []Listener {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	subQueue := make([]Listener, 0, len(s.subscribers[topic]))
 	for _, sub := range s.subscribers[topic] {
-		if sub.Priority() == HighPriority {
+		if sub.Priority() == HighPriority && !sub.Paused() {
 			subQueue = append(subQueue, sub)
 		}
 	}
 
 	for _, sub := range s.subscribers[topic] {
-		if sub.Priority() == LowPriority {
+		if sub.Priority() == LowPriority && !sub.Paused() {
 			subQueue = append(subQueue, sub)
 		}
 	}
@@ -222,6 +214,8 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lg.Debugln("received round update")
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	r := RoundUpdate{}
 	if err := DecodeRound(&m, &r); err != nil {
 		return err
@@ -233,6 +227,7 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lenSubs := len(c.store.subscribers)
 	c.store.lock.RUnlock()
 	if lenSubs > 0 {
+		lg.Traceln("finalizing consensus")
 		c.FinalizeRound()
 		c.reinstantiateStore()
 	}
@@ -250,16 +245,27 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 }
 
 func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	// Ensure that we should take this message seriously
 	var round uint64
 	if err := encoding.ReadUint64LE(&m, &round); err != nil {
 		return err
 	}
+	lg.WithFields(log.Fields{
+		"coordinator round": c.Round(),
+		"message round":     round,
+	}).Debugln("received Finalize message")
 
-	if round != c.Round() {
+	if round < c.Round() {
 		return nil
 	}
 
+	if round > c.Round() {
+		panic("not supposed to get a Finalize message for a future round")
+	}
+
+	lg.Traceln("finalizing consensus")
 	// reinstantiating the store prevents the need for locking
 	c.FinalizeRound()
 	c.reinstantiateStore()
@@ -277,14 +283,20 @@ func (c *Coordinator) reinstantiateStore() {
 }
 
 func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
+	// NOTE: RUnlock is not deferred here, for performance reasons.
+	// https://medium.com/i0exception/runtime-overhead-of-using-defer-in-go-7140d5c40e32
+	// TODO: once go 1.14 is out, re-examine the overhead of using `defer`.
+	c.lock.RLock()
 	topic, err := topics.Extract(&m)
 	if err != nil {
+		c.lock.RUnlock()
 		return err
 	}
 
 	// check header
 	hdr := header.Header{}
 	if err := header.Unmarshal(&m, &hdr); err != nil {
+		c.lock.RUnlock()
 		return err
 	}
 
@@ -293,25 +305,26 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		"round": hdr.Round,
 		"step":  hdr.Step,
 	}).Traceln("collected event")
-	// TODO: agreement filtering is a little bit more intricate (it only needs
-	// to look at the round and not the step)
-	switch hdr.Compare(c.Round(), c.Step()) {
-	case header.Before:
-		// Unless it's an Agreement message, we should drop it if it's arriving late.
-		if topic != topics.Agreement {
-			lg.WithField("topic", topic).Debugln("discarding obsolete event")
-			return nil
-		}
-	case header.After:
-		// Unless it's an Agreement message, we queue it if it's early.
-		if topic != topics.Agreement {
-			lg.WithField("topic", topic).Debugln("storing future event")
-			c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
-			return nil
-		}
+
+	var comparison header.Phase
+	if topic == topics.Agreement {
+		comparison = hdr.CompareRound(c.Round())
+	} else {
+		comparison = hdr.CompareRoundAndStep(c.Round(), c.Step())
 	}
 
-	c.lock.RLock()
+	switch comparison {
+	case header.Before:
+		lg.WithField("topic", topic).Debugln("discarding obsolete event")
+		c.lock.RUnlock()
+		return nil
+	case header.After:
+		lg.WithField("topic", topic).Debugln("storing future event")
+		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
+		c.lock.RUnlock()
+		return nil
+	}
+
 	c.store.Dispatch(NewTopicEvent(topic, hdr, m))
 	c.lock.RUnlock()
 	return nil
@@ -319,8 +332,6 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 
 // swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and CollectEvent
 func (c *Coordinator) swapStore(store *roundStore) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.store = store
 }
 
@@ -333,6 +344,7 @@ func (c *Coordinator) FinalizeRound() {
 
 func (c *Coordinator) Play(id uint32) uint8 {
 	if c.store.hasComponent(id) {
+		lg.WithField("id", id).Traceln("incrementing step")
 		c.IncrementStep()
 	}
 	return c.Step()
@@ -436,12 +448,14 @@ func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *b
 }
 
 func (c *Coordinator) Pause(id uint32) {
+	lg.WithField("id", id).Traceln("pausing")
 	c.store.pause(id)
 }
 
 func (c *Coordinator) Resume(id uint32) {
 	// Only dispatch events if a registered component asks to Resume
 	if c.store.resume(id) {
+		lg.WithField("id", id).Traceln("resumed")
 		c.dispatchQueuedEvents()
 	}
 }

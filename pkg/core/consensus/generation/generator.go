@@ -26,7 +26,7 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 
 	restartListener := consensus.TopicListener{
 		Topic:    topics.Restart,
-		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority),
+		Listener: consensus.NewSimpleListener(g.Collect, consensus.LowPriority, false),
 	}
 	g.restartID = restartListener.Listener.ID()
 

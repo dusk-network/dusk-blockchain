@@ -61,14 +61,13 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 
 	bestScoreSubscriber := consensus.TopicListener{
 		Topic:    topics.BestScore,
-		Listener: consensus.NewSimpleListener(r.CollectBestScore, consensus.LowPriority),
+		Listener: consensus.NewSimpleListener(r.CollectBestScore, consensus.LowPriority, false),
 	}
 
 	reductionSubscriber := consensus.TopicListener{
 		Topic:         topics.Reduction,
 		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(r.broker, topics.Reduction), &consensus.Validator{}},
-		Listener:      consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority),
-		Paused:        true,
+		Listener:      consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority, true),
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
 
