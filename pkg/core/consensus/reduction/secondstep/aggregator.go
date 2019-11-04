@@ -13,6 +13,7 @@ type aggregator struct {
 	requestHalt    func([]byte, ...*agreement.StepVotes)
 	handler        *reduction.Handler
 	firstStepVotes *agreement.StepVotes
+	finished       bool
 
 	lock     sync.RWMutex
 	voteSets map[string]struct {
@@ -40,6 +41,9 @@ func newAggregator(
 func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
+	if a.finished {
+		return nil
+	}
 
 	hash := string(hdr.BlockHash)
 	sv, found := a.voteSets[hash]
@@ -58,6 +62,7 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 	}
 	a.voteSets[hash] = sv
 	if len(sv.Set) >= a.handler.Quorum() {
+		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Set, hdr.Round, hdr.Step)
 		a.requestHalt(hdr.BlockHash, a.firstStepVotes, sv.StepVotes)
 	}
