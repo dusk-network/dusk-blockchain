@@ -25,7 +25,8 @@ var collectEventTable = []struct {
 
 // Test that the coordinator redirects events correctly, according to their header
 func TestCollectEvent(t *testing.T) {
-	c, comp := initCoordinatorTest(t)
+	c, cmps := initCoordinatorTest(t, topics.Reduction)
+	comp := cmps[0].(*mockComponent)
 
 	for _, tt := range collectEventTable {
 		ev := mockEventBuffer(t, topics.Reduction, tt.eventRound, tt.eventStep)
@@ -38,7 +39,8 @@ func TestCollectEvent(t *testing.T) {
 // Test that queued events are dispatched correctly on the appropriate state,
 // when Resume is called.
 func TestQueuedDispatch(t *testing.T) {
-	c, comp := initCoordinatorTest(t)
+	c, cmps := initCoordinatorTest(t, topics.Reduction)
+	comp := cmps[0].(*mockComponent)
 
 	// Send an event which should get queued
 	ev := mockEventBuffer(t, topics.Reduction, 1, 1)
@@ -79,7 +81,8 @@ func TestQueuedDispatch(t *testing.T) {
 // Test that events are withheld when a component is paused, and that streaming
 // continues when resumed.
 func TestPauseResume(t *testing.T) {
-	c, comp := initCoordinatorTest(t)
+	c, cmps := initCoordinatorTest(t, topics.Reduction)
+	comp := cmps[0].(*mockComponent)
 
 	// Send an event with the correct state. It should be received
 	ev := mockEventBuffer(t, topics.Reduction, 1, 0)
@@ -101,20 +104,47 @@ func TestPauseResume(t *testing.T) {
 	assert.Equal(t, 2, len(comp.receivedEvents))
 }
 
+// Test that Agreement messages are filtered differently from other topics.
+func TestEventFilter(t *testing.T) {
+	c, comp := initCoordinatorTest(t, topics.Reduction, topics.Agreement)
+	redComp := comp[0].(*mockComponent)
+	agComp := comp[1].(*mockComponent)
+
+	// Send a Reduction event with the correct state. It should be received
+	ev := mockEventBuffer(t, topics.Reduction, 1, 0)
+	c.CollectEvent(*ev)
+	assert.Equal(t, 1, len(redComp.receivedEvents))
+
+	// Send a Reduction event with future state. It should be queued
+	ev = mockEventBuffer(t, topics.Reduction, 1, 1)
+	c.CollectEvent(*ev)
+	assert.Equal(t, 1, len(c.eventqueue.entries[1][1]))
+
+	// Send an Agreement event with future state. It should be received
+	ev = mockEventBuffer(t, topics.Agreement, 1, 1)
+	c.CollectEvent(*ev)
+	assert.Equal(t, 1, len(agComp.receivedEvents))
+}
+
 // Initialize a coordinator with a single component.
-func initCoordinatorTest(t *testing.T) (*Coordinator, *mockComponent) {
+func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Component) {
 	bus := eventbus.New()
 	keys, err := key.NewRandConsensusKeys()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	c := Start(bus, keys, &mockFactory{topics.Reduction})
+	factories := make([]ComponentFactory, len(tpcs))
+	for i, topic := range tpcs {
+		factories[i] = &mockFactory{topic}
+	}
+
+	c := Start(bus, keys, factories...)
 	ruBuf := MockRoundUpdateBuffer(1, nil, nil)
 	// Collect the round update to initialize the state
 	c.CollectRoundUpdate(*ruBuf)
 
-	return c, c.store.components[0].(*mockComponent)
+	return c, c.store.components
 }
 
 func mockEventBuffer(t *testing.T, topic topics.Topic, round uint64, step uint8) *bytes.Buffer {
@@ -160,7 +190,7 @@ func newMockComponent(topic topics.Topic) *mockComponent {
 func (m *mockComponent) Initialize(EventPlayer, Signer, RoundUpdate) []TopicListener {
 	listener := TopicListener{
 		Topic:    m.topic,
-		Listener: NewSimpleListener(m.Collect, LowPriority),
+		Listener: NewSimpleListener(m.Collect, LowPriority, false),
 	}
 	m.id = listener.Listener.ID()
 
