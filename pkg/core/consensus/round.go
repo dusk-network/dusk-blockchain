@@ -107,18 +107,17 @@ func (s *roundStore) pause(id uint32) {
 
 func (s *roundStore) resume(id uint32) bool {
 	s.lock.Lock()
+	defer s.lock.Unlock()
 	for topic, listeners := range s.paused {
 		for i, listener := range listeners {
 			if listener.ID() == id {
 				s.paused[topic] = append(s.paused[topic][:i], s.paused[topic][i+1:]...)
-				s.lock.Unlock()
 				s.subscribe(topic, listener)
 				return true
 			}
 		}
 	}
 
-	s.lock.Unlock()
 	return false
 }
 
@@ -126,6 +125,11 @@ func (s *roundStore) Dispatch(ev TopicEvent) {
 	s.lock.RLock()
 	subscribers := s.createSubscriberQueue(ev.Topic)
 	s.lock.RUnlock()
+	dispatch(subscribers, ev)
+}
+
+// TODO: investigate if using goroutines with errgroups would make sense
+func dispatch(subscribers []Listener, ev TopicEvent) {
 	for _, sub := range subscribers {
 		if err := sub.NotifyPayload(ev.Event); err != nil {
 			lg.WithFields(log.Fields{
@@ -210,16 +214,8 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	return c
 }
 
-func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
-	subs := c.store.initializeComponents(roundUpdate)
-	if fromScratch && subs != nil {
-		for _, sub := range subs {
-			c.eventBus.AddDefaultTopic(sub.Topic)
-			c.eventBus.Register(sub.Topic, sub.Preprocessors...)
-		}
-	}
-}
-
+// CollectRoundUpdate deserialize the RoundUpdate, finalizes the components for the last round and
+// tells all `Factory` to instantiate this round's components
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lg.Debugln("received round update")
 	r := RoundUpdate{}
@@ -234,10 +230,9 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	c.store.lock.RUnlock()
 	if lenSubs > 0 {
 		c.FinalizeRound()
-		c.reinstantiateStore()
 	}
 
-	c.onNewRound(r, c.unsynced)
+	c.initializeComponents(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
 	// TODO: the Coordinator should not send events. someone else should kickstart the
@@ -249,6 +244,7 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	return nil
 }
 
+// CollectFinalize finalizes the round's components and reinstantiates the Store
 func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 	// Ensure that we should take this message seriously
 	var round uint64
@@ -260,22 +256,16 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 		return nil
 	}
 
-	// reinstantiating the store prevents the need for locking
 	c.FinalizeRound()
-	c.reinstantiateStore()
 	return nil
 }
 
-func (c *Coordinator) reinstantiateStore() {
-	store := newStore(c)
-	for _, factory := range c.factories {
-		component := factory.Instantiate()
-		store.addComponent(component)
-	}
-
-	c.swapStore(store)
-}
-
+// CollectEvent extracts the Header of an Event components are subscribed to and
+// forwards it appropriately if it is relevant for the current round and step.
+// Events with Headers pointing to past round or steps are discarded.
+// Future Events are queued until they are relevant again
+// XXX: We should protect from the eventuality that an attacker floods nodes with
+// a swarm of future events
 func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 	topic, err := topics.Extract(&m)
 	if err != nil {
@@ -311,8 +301,9 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		}
 	}
 
+	topicEv := NewTopicEvent(topic, hdr, m)
 	c.lock.RLock()
-	c.store.Dispatch(NewTopicEvent(topic, hdr, m))
+	c.store.Dispatch(topicEv)
 	c.lock.RUnlock()
 	return nil
 }
@@ -320,17 +311,22 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 // swapping stores is the only place that needs a lock as store is shared among the CollectRoundUpdate and CollectEvent
 func (c *Coordinator) swapStore(store *roundStore) {
 	c.lock.Lock()
-	defer c.lock.Unlock()
 	c.store = store
+	c.lock.Unlock()
 }
 
+// FinalizeRound finalizes the components, clear the EventQueue and reinstantiate the store
 func (c *Coordinator) FinalizeRound() {
 	if c.store != nil {
 		c.store.DispatchFinalize()
 		c.eventqueue.Clear(c.Round())
 	}
+	c.reinstantiateStore()
 }
 
+// Play increment the step and returns it. It uses a component ID to make sure the component is active this round and to
+// prevent race conditions
+// This is a method of EventPlayer interface
 func (c *Coordinator) Play(id uint32) uint8 {
 	if c.store.hasComponent(id) {
 		c.IncrementStep()
@@ -338,14 +334,6 @@ func (c *Coordinator) Play(id uint32) uint8 {
 	return c.Step()
 }
 
-func (c *Coordinator) dispatchQueuedEvents() {
-	events := c.eventqueue.GetEvents(c.Round(), c.Step())
-	for _, ev := range events {
-		c.store.Dispatch(ev)
-	}
-}
-
-// XXX: adjust the signature verification on reduction (and agreement)
 // Sign uses the blockhash (which is lost when decoupling the Header and the Payload) to recompose the Header and sign the Payload
 // by adding it to the signature. Argument packet can be nil
 func (c *Coordinator) Sign(hash, packet []byte) ([]byte, error) {
@@ -435,13 +423,41 @@ func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *b
 	return nil
 }
 
-func (c *Coordinator) Pause(id uint32) {
-	c.store.pause(id)
+// Pause the dispatching to a component for a specific topic by passing its specific ID
+// This is a method of EventPlayer interface
+func (c *Coordinator) Pause(ID uint32) {
+	c.store.pause(ID)
 }
 
-func (c *Coordinator) Resume(id uint32) {
+// Resume Event dispatching for subscriber specified by its ID
+// This is a method of EventPlayer interface
+func (c *Coordinator) Resume(ID uint32) {
 	// Only dispatch events if a registered component asks to Resume
-	if c.store.resume(id) {
-		c.dispatchQueuedEvents()
+	if c.store.resume(ID) {
+		events := c.eventqueue.GetEvents(c.Round(), c.Step())
+		for _, ev := range events {
+			c.store.Dispatch(ev)
+		}
 	}
+}
+
+func (c *Coordinator) initializeComponents(roundUpdate RoundUpdate, fromScratch bool) {
+	subs := c.store.initializeComponents(roundUpdate)
+	if fromScratch && subs != nil {
+		for _, sub := range subs {
+			c.eventBus.AddDefaultTopic(sub.Topic)
+			c.eventBus.Register(sub.Topic, sub.Preprocessors...)
+		}
+	}
+}
+
+// reinstantiateStore prevents the need for locking by reinstantiating the Store
+func (c *Coordinator) reinstantiateStore() {
+	store := newStore(c)
+	for _, factory := range c.factories {
+		component := factory.Instantiate()
+		store.addComponent(component)
+	}
+
+	c.swapStore(store)
 }

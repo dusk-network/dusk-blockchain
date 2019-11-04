@@ -10,23 +10,42 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
+// Priority indicates a rough order among components subscribed to the same topic
 type Priority uint8
 
 const (
+	// HighPriority indicates precedence
 	HighPriority Priority = iota
+	// LowPriority indicates that the component should be the last to get updates
 	LowPriority
 )
 
 // Signer encapsulate the credentials to sign or authenticate outgoing events
 type Signer interface {
+	// Sign a payload. The first is parameter is a block hash
 	Sign([]byte, []byte) ([]byte, error)
+	// SendAuthenticated performs a ED25519 signature on a message before forwarding
+	// It accepts a topic, a blockhash, a payload and the ID of the requesting
+	// component
 	SendAuthenticated(topics.Topic, []byte, *bytes.Buffer, uint32) error
+	// SendWithHeader is used for internal forwarding. It exposes the same
+	// parameters as SendAuthenticated but does not perform a ED25519 signature
+	// on the Event (and neither forwards it to the Gossip topic
 	SendWithHeader(topics.Topic, []byte, *bytes.Buffer, uint32) error
 }
 
+// EventPlayer is the interface used by Components to signal their intention to
+// get, pause or resume events for a given Step
 type EventPlayer interface {
+	// Play signals the Coordinator that a newly initialized Component is ready
+	// to accept new `Event`. Components need to indicate their ID to let the
+	// Coordinator identify duplicates or obsolete components.
+	// It returns the current `Step`
 	Play(uint32) uint8
+	// Pause signals the Coordinator to temporarily pause Event forwarding for
+	// a Listener specified through its ID
 	Pause(uint32)
+	// Resume the Event forwarding for a Listener
 	Resume(uint32)
 }
 
@@ -42,6 +61,8 @@ type Component interface {
 	Initialize(EventPlayer, Signer, RoundUpdate) []TopicListener
 	// Finalize allows a Component to perform cleanup operations before begin garbage collected
 	Finalize()
+	// ID allows the Coordinator to differentiate between components and
+	// establish relevance or problems
 	ID() uint32
 }
 
@@ -52,6 +73,7 @@ type Listener interface {
 	// ID is used to later unsubscribe from the Coordinator. This is useful for components active throughout
 	// multiple steps
 	ID() uint32
+	// Priority indicates the Priority of a Listener
 	Priority() Priority
 }
 
@@ -78,6 +100,7 @@ func (s *SimpleListener) ID() uint32 {
 	return s.id
 }
 
+// Priority as indicated by the Listener interface
 func (s *SimpleListener) Priority() Priority {
 	return s.priority
 }
