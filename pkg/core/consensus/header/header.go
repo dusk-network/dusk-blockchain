@@ -42,12 +42,9 @@ func (h Header) Sender() []byte {
 }
 
 // Compare headers to establish time order
-func (h Header) Compare(round uint64, step uint8) Phase {
-	if h.Round < round {
-		return Before
-	}
-
-	if h.Round == round {
+func (h Header) CompareRoundAndStep(round uint64, step uint8) Phase {
+	comparison := h.CompareRound(round)
+	if comparison == Same {
 		if h.Step < step {
 			return Before
 		}
@@ -55,6 +52,20 @@ func (h Header) Compare(round uint64, step uint8) Phase {
 		if h.Step == step {
 			return Same
 		}
+
+		return After
+	}
+
+	return comparison
+}
+
+func (h Header) CompareRound(round uint64) Phase {
+	if h.Round < round {
+		return Before
+	}
+
+	if h.Round == round {
+		return Same
 	}
 
 	return After
