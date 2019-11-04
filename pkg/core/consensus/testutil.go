@@ -12,6 +12,8 @@ const (
 	RUNNING
 )
 
+// SimplePlayer is used within tests to simulate the behaviour of the
+// consensus.EventPlayer
 type SimplePlayer struct {
 	lock  sync.RWMutex
 	step  uint8
@@ -19,6 +21,7 @@ type SimplePlayer struct {
 	state State
 }
 
+// NewSimplePlayer creates a SimplePlayer
 func NewSimplePlayer() *SimplePlayer {
 	return &SimplePlayer{
 		step:  1,
@@ -55,6 +58,7 @@ func (s *SimplePlayer) Resume(id uint32) {
 	s.state = RUNNING
 }
 
+// State s a threadsafe method to return whether the player is paused or not
 func (s *SimplePlayer) State() State {
 	s.lock.RLock()
 	defer s.lock.RUnlock()

@@ -11,9 +11,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg *log.Entry = log.WithField("process", "selector")
+var lg = log.WithField("process", "selector")
 var emptyScore = Score{}
 
+// Selector is the component responsible to collect score events and propagate
+// the best one after a timeout
 type Selector struct {
 	publisher eventbus.Publisher
 	handler   Handler
@@ -39,6 +41,7 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector
 	}
 }
 
+// Initialize the Selector according to the `consensus.Component` interface
 func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
@@ -60,42 +63,25 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	return []consensus.TopicListener{scoreSubscriber, generationSubscriber}
 }
 
+// ID of the selector is the ID of the score event listener
 func (s *Selector) ID() uint32 {
 	return s.scoreID
 }
 
+// Finalize pauses the `EventPlayer` and stops the timer
 func (s *Selector) Finalize() {
-	s.stopSelection()
+	s.eventPlayer.Pause(s.scoreID)
+	s.timer.stop()
 }
 
+// CollectScoreEvent checks the score of an incoming Event and, in case
+// it has a higher score, verifies, propagates and saves it
 func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 	ev := Score{}
 	if err := UnmarshalScore(&e.Payload, &ev); err != nil {
 		return err
 	}
 
-	return s.Process(ev)
-}
-
-func (s *Selector) CollectGeneration(e consensus.Event) error {
-	s.setBestEvent(emptyScore)
-	_ = s.eventPlayer.Play(s.ID())
-	s.startSelection()
-	return nil
-}
-
-func (s *Selector) startSelection() {
-	// Empty queue in a goroutine to avoid letting other listeners wait
-	go s.eventPlayer.Resume(s.scoreID)
-	s.timer.start(s.timeout)
-}
-
-func (s *Selector) stopSelection() {
-	s.eventPlayer.Pause(s.scoreID)
-	s.timer.stop()
-}
-
-func (s *Selector) Process(ev Score) error {
 	bestEvent := s.getBestEvent()
 
 	// Only check for priority if we already have a best event
@@ -124,6 +110,22 @@ func (s *Selector) Process(ev Score) error {
 	return nil
 }
 
+// CollectGeneration signals the selection start by triggering
+// `EventPlayer.Play`
+func (s *Selector) CollectGeneration(e consensus.Event) error {
+	s.setBestEvent(emptyScore)
+	_ = s.eventPlayer.Play(s.ID())
+	s.startSelection()
+	return nil
+}
+
+func (s *Selector) startSelection() {
+	// Empty queue in a goroutine to avoid letting other listeners wait
+	go s.eventPlayer.Resume(s.scoreID)
+	s.timer.start(s.timeout)
+}
+
+// IncreaseTimeOut increases the timeout after a failed selection
 func (s *Selector) IncreaseTimeOut() {
 	s.timeout = s.timeout * 2
 }
