@@ -147,6 +147,7 @@ func (h *Helper) Spawn(hash []byte) []consensus.Event {
 	return evs
 }
 
+// StartSelection forces the Selector to start the selection
 func (h *Helper) StartSelection() {
 	h.Selector.startSelection()
 }

@@ -109,14 +109,17 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 func (s *Selector) CollectGeneration(e consensus.Event) error {
 	s.setBestEvent(emptyScore)
 	_ = s.eventPlayer.Play(s.ID())
-
-	// Empty queue in a goroutine to avoid letting other listeners wait
-	go s.eventPlayer.Resume(s.scoreID)
-	s.timer.start(s.timeout)
+	s.startSelection()
 	return nil
 }
 
-// IncreaseTimeOut increases the selection timeout
+func (s *Selector) startSelection() {
+	// Empty queue in a goroutine to avoid letting other listeners wait
+	go s.eventPlayer.Resume(s.scoreID)
+	s.timer.start(s.timeout)
+}
+
+// IncreaseTimeOut increases the timeout after a failed selection
 func (s *Selector) IncreaseTimeOut() {
 	s.timeout = s.timeout * 2
 }
