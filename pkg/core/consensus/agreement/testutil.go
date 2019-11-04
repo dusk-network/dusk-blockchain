@@ -59,7 +59,7 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 
 // Initialize the Agreement with a Round update
 func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.Aggro.Initialize(nil, nil, ru)
+	hlp.Aggro.Initialize(consensus.NewSimplePlayer(), nil, ru)
 }
 
 func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {

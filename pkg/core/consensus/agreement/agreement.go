@@ -21,6 +21,7 @@ var _ consensus.Component = (*agreement)(nil)
 
 type agreement struct {
 	publisher    eventbus.Publisher
+	eventPlayer  consensus.EventPlayer
 	handler      *handler
 	accumulator  *Accumulator
 	keys         key.ConsensusKeys
@@ -40,13 +41,14 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 }
 
 func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
+	a.eventPlayer = eventPlayer
 	a.handler = newHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	a.round = r.Round
 	agreementSubscriber := consensus.TopicListener{
 		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(a.publisher, topics.Agreement), &consensus.Validator{}},
 		Topic:         topics.Agreement,
-		Listener:      consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter, consensus.LowPriority),
+		Listener:      consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter, consensus.LowPriority, false),
 	}
 	a.agreementID = agreementSubscriber.Listener.ID()
 
@@ -91,8 +93,8 @@ func convertToAgreement(event consensus.Event) (*Agreement, error) {
 func (a *agreement) listen() {
 	evs := <-a.accumulator.CollectedVotesChan
 	lg.WithField("id", a.agreementID).Debugln("quorum reached")
-	a.sendFinalize()
-	a.sendCertificate(evs[0])
+	go a.sendFinalize()
+	go a.sendCertificate(evs[0])
 }
 
 func (a *agreement) sendCertificate(ag Agreement) {
@@ -119,6 +121,7 @@ func (a *agreement) sendFinalize() {
 }
 
 func (a *agreement) Finalize() {
+	a.eventPlayer.Pause(a.agreementID)
 	a.accumulator.Stop()
 }
 
