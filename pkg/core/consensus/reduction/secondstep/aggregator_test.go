@@ -2,6 +2,7 @@ package secondstep
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestSuccessfulAggro(t *testing.T) {
-	hlp, hash := Kickstart(10)
+	hlp, hash := Kickstart(10, 1*time.Second)
 	evs := hlp.Spawn(hash)
 
 	res := make(chan error, 1)

@@ -3,6 +3,7 @@ package firststep
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -14,7 +15,7 @@ import (
 
 func TestFirstStep(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50)
+	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50, 1*time.Second)
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 
@@ -33,7 +34,7 @@ func TestFirstStep(t *testing.T) {
 
 func TestMoreSteps(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50)
+	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50, 1*time.Second)
 
 	// Wait for resulting StepVotes
 	<-hlp.StepVotesChan
@@ -55,7 +56,8 @@ func TestMoreSteps(t *testing.T) {
 
 func TestFirstStepTimeOut(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, _ := Kickstart(bus, rpcBus, 50)
+	timeOut := 100 * time.Millisecond
+	hlp, _ := Kickstart(bus, rpcBus, 50, timeOut)
 
 	// Wait for resulting StepVotes
 	svBuf := <-hlp.StepVotesChan
@@ -65,11 +67,13 @@ func TestFirstStepTimeOut(t *testing.T) {
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State())
+	// test that the timeout has doubled
+	assert.Equal(t, timeOut*2, hlp.Reducer.(*Reducer).timeOut)
 }
 
 func BenchmarkFirstStep(b *testing.B) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(bus, rpcBus, 50)
+	hlp, hash := Kickstart(bus, rpcBus, 50, 1*time.Second)
 	b.ResetTimer()
 	b.StopTimer()
 	for i := 0; i < b.N; i++ {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -23,9 +24,9 @@ type Helper struct {
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int) *Helper {
+func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) *Helper {
 	hlp := &Helper{
-		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer),
+		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer, timeOut),
 		StepVotesChan:      make(chan bytes.Buffer, 1),
 		failOnVerification: false,
 	}
@@ -84,8 +85,8 @@ func (hlp *Helper) NextBatch() []byte {
 }
 
 // Kickstart a Helper without sending any reduction event
-func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int) (*Helper, []byte) {
-	h := NewHelper(eb, rpcbus, nr)
+func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
+	h := NewHelper(eb, rpcbus, nr, timeOut)
 	roundUpdate := consensus.MockRoundUpdate(h.Round, h.P, nil)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)
@@ -94,8 +95,8 @@ func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int) (*Helper, [
 }
 
 // ProduceFirstStepVotes encapsulates the process of creating and forwarding Reduction events
-func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int) (*Helper, []byte) {
-	hlp, hash := Kickstart(eb, rpcbus, nr)
+func ProduceFirstStepVotes(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
+	hlp, hash := Kickstart(eb, rpcbus, nr, timeOut)
 	hlp.SendBatch(hash)
 	return hlp, hash
 }

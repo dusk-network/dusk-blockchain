@@ -2,6 +2,7 @@ package secondstep
 
 import (
 	"bytes"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -21,9 +22,9 @@ type Helper struct {
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int) *Helper {
+func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, timeOut time.Duration) *Helper {
 	hlp := &Helper{
-		Helper:        reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer),
+		Helper:        reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer, timeOut),
 		AgreementChan: make(chan bytes.Buffer, 1),
 		RestartChan:   make(chan bytes.Buffer, 1),
 	}
@@ -53,9 +54,9 @@ func (hlp *Helper) ActivateReduction(hash []byte, sv *agreement.StepVotes) error
 }
 
 // Kickstart creates a Helper and wires up the tests
-func Kickstart(nr int) (*Helper, []byte) {
+func Kickstart(nr int, timeOut time.Duration) (*Helper, []byte) {
 	eb, rpcbus := eventbus.New(), rpcbus.New()
-	h := NewHelper(eb, rpcbus, nr)
+	h := NewHelper(eb, rpcbus, nr, timeOut)
 	roundUpdate := consensus.MockRoundUpdate(1, h.P, nil)
 	h.Initialize(roundUpdate)
 	hash, _ := crypto.RandEntropy(32)

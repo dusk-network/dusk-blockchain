@@ -10,7 +10,7 @@ import (
 )
 
 func TestSecondStep(t *testing.T) {
-	hlp, hash := Kickstart(50)
+	hlp, hash := Kickstart(50, 1*time.Second)
 
 	// Generate first StepVotes
 	svs := agreement.GenVotes(hash, 1, 3, hlp.Keys, hlp.P)
@@ -39,7 +39,7 @@ func TestSecondStep(t *testing.T) {
 }
 
 func TestSecondStepAfterFailure(t *testing.T) {
-	hlp, hash := Kickstart(50)
+	hlp, hash := Kickstart(50, 1*time.Second)
 
 	// Start the first step
 	if err := hlp.ActivateReduction(hash, nil); err != nil {
@@ -62,7 +62,8 @@ func TestSecondStepAfterFailure(t *testing.T) {
 }
 
 func TestSecondStepTimeOut(t *testing.T) {
-	hlp, hash := Kickstart(50)
+	timeOut := 100 * time.Millisecond
+	hlp, hash := Kickstart(50, timeOut)
 
 	// Start the first step
 	if err := hlp.ActivateReduction(hash, nil); err != nil {
@@ -79,4 +80,7 @@ func TestSecondStepTimeOut(t *testing.T) {
 	case <-time.After(time.Second * 1):
 		// Success
 	}
+
+	// Ensure timeout was doubled
+	assert.Equal(t, timeOut*2, hlp.Reducer.(*Reducer).timeOut)
 }

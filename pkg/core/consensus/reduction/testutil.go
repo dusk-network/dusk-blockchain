@@ -54,9 +54,9 @@ type Helper struct {
 }
 
 // NewHelper creates a Helper
-func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, factory FactoryFunc) *Helper {
+func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, factory FactoryFunc, timeOut time.Duration) *Helper {
 	p, keys := consensus.MockProvisioners(provisioners)
-	red := factory(eb, rpcbus, keys[0], 1000*time.Millisecond)
+	red := factory(eb, rpcbus, keys[0], timeOut)
 	hlp := &Helper{
 		Bus:          eb,
 		RBus:         rpcbus,

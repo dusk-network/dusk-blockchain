@@ -2,6 +2,7 @@ package firststep
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
@@ -13,7 +14,7 @@ import (
 // TestSuccessfulAggro tests that upon collection of a quorum of events, a valid StepVotes get produced
 func TestSuccessfulAggro(t *testing.T) {
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10)
+	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second)
 	evs := hlp.Spawn(hash)
 
 	res := make(chan error, 1)
@@ -39,7 +40,7 @@ func TestSuccessfulAggro(t *testing.T) {
 // TestInvalidBlock tests that upon collection of a quorum of events, a valid StepVotes get produced
 func TestInvalidBlock(t *testing.T) {
 	eb, rbus := eventbus.New(), rpcbus.New()
-	hlp, hash := Kickstart(eb, rbus, 10)
+	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second)
 	hlp.FailOnVerification(true)
 	evs := hlp.Spawn(hash)
 
