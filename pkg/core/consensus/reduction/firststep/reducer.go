@@ -74,13 +74,16 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	return []consensus.TopicListener{bestScoreSubscriber, reductionSubscriber}
 }
 
+// ID returns the listener ID of the reducer.
+// Implements consensus.Component.
 func (r *Reducer) ID() uint32 {
 	return r.reductionID
 }
 
-// Finalize the Reducer component by killing the timer, if it is still running.
+// Finalize the Reducer component by killing the timer, and pausing event streaming.
 // This will stop a reduction cycle short, and renders this Reducer useless
 // after calling.
+// Implements consensus.Component.
 func (r *Reducer) Finalize() {
 	r.eventPlayer.Pause(r.reductionID)
 	r.Timer.Stop()
@@ -106,6 +109,8 @@ func (r *Reducer) Collect(e consensus.Event) error {
 	return r.aggregator.collectVote(*ev, e.Header)
 }
 
+// Filter an incoming Reduction message, by checking whether or not it was sent
+// by a member of the voting committee for the given round and step.
 func (r *Reducer) Filter(hdr header.Header) bool {
 	return !r.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
@@ -133,6 +138,8 @@ func (r *Reducer) sendReduction(hash []byte) {
 	}
 }
 
+// Halt will end the first step of reduction, and forwards whatever result it received
+// on the StepVotes topic.
 func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.Timer.Stop()

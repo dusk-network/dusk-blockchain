@@ -23,6 +23,10 @@ var emptyHash = [32]byte{}
 var regenerationPackage = new(bytes.Buffer)
 var lg = log.WithField("process", "second-step reduction")
 
+// Reducer for the second step. This reducer starts whenever it receives an internal
+// StepVotes message. It combines the contents of this message (if any) with the
+// result of it's own reduction step, and on success, creates and sends an Agreement
+// message.
 type Reducer struct {
 	broker      eventbus.Broker
 	rpcBus      *rpcbus.RPCBus
@@ -73,13 +77,16 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	return []consensus.TopicListener{stepVotesSubscriber, reductionSubscriber}
 }
 
+// ID returns the listener ID of the reducer.
+// Implements consensus.Component.
 func (r *Reducer) ID() uint32 {
 	return r.reductionID
 }
 
-// Finalize the Reducer component by killing the timer, if it is still running.
+// Finalize the Reducer component by killing the timer, and pausing event streaming.
 // This will stop a reduction cycle short, and renders this Reducer useless
 // after calling.
+// Implements consensus.Component.
 func (r *Reducer) Finalize() {
 	r.eventPlayer.Pause(r.reductionID)
 	r.timer.Stop()
@@ -104,6 +111,8 @@ func (r *Reducer) Collect(e consensus.Event) error {
 	return r.aggregator.collectVote(*ev, e.Header)
 }
 
+// Filter an incoming Reduction message, by checking whether or not it was sent
+// by a member of the voting committee for the given round and step.
 func (r *Reducer) Filter(hdr header.Header) bool {
 	return !r.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
@@ -145,7 +154,8 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.signer.SendWithHeader(topics.Restart, emptyHash[:], regenerationPackage, r.ID())
 }
 
-// CollectStepVotes is triggered when the first StepVotes get published by the first step Reducer
+// CollectStepVotes is triggered when the first StepVotes get published by the
+// first step Reducer, and starts the second step of reduction.
 func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
 	var sv *agreement.StepVotes
@@ -170,6 +180,7 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 }
 
 func (r *Reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
+	// first, sign the two StepVotes
 	payloadBuf := new(bytes.Buffer)
 	if err := agreement.MarshalVotes(payloadBuf, svs); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("cannot marshal the StepVotes")

@@ -26,6 +26,8 @@ var _ consensus.Component = (*Generator)(nil)
 
 var lg *log.Entry = log.WithField("process", "candidate generator")
 
+// Generator is responsible for generating candidate blocks, and propagating them
+// alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
 	publisher eventbus.Publisher
 	// generator Public Keys to sign the rewards tx
@@ -37,6 +39,7 @@ type Generator struct {
 	scoreEventID uint32
 }
 
+// NewComponent returns an uninitialized candidate generator.
 func NewComponent(publisher eventbus.Publisher, genPubKey *key.PublicKey, rpcBus *rpcbus.RPCBus) *Generator {
 	return &Generator{
 		publisher: publisher,
@@ -45,6 +48,9 @@ func NewComponent(publisher eventbus.Publisher, genPubKey *key.PublicKey, rpcBus
 	}
 }
 
+// Initialize the Generator, by populating the fields needed to generate candidate
+// blocks, and returns a Listener for ScoreEvents.
+// Implements consensus.Component.
 func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
 	bg.roundInfo = ru
 	bg.signer = signer
@@ -58,6 +64,8 @@ func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consen
 	return []consensus.TopicListener{scoreEventListener}
 }
 
+// ID returns the listener ID of the Generator.
+// Implements consensus.Component.
 func (bg *Generator) ID() uint32 {
 	return bg.scoreEventID
 }
@@ -65,6 +73,9 @@ func (bg *Generator) ID() uint32 {
 // Finalize implements consensus.Component
 func (bg *Generator) Finalize() {}
 
+// Collect a ScoreEvent, which triggers generation of a candidate block.
+// The Generator will propagate both the Score and Candidate messages at the end
+// of this function call.
 func (bg *Generator) Collect(e consensus.Event) error {
 	sev := &score.Event{}
 	if err := score.Unmarshal(&e.Payload, sev); err != nil {
@@ -109,6 +120,8 @@ func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {
 	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof.Proof, sev.Proof.Score, bg.roundInfo.Hash)
 }
 
+// GenerateBlock generates a candidate block, by constructing the header and filling it
+// with transactions from the mempool.
 func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHash []byte) (*block.Block, error) {
 	txs, err := bg.ConstructBlockTxs(proof, score)
 	if err != nil {
@@ -145,6 +158,8 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 	return candidateBlock, nil
 }
 
+// ConstructBlockTxs will fetch all valid transactions from the mempool, prepend a coinbase
+// transaction, and return them all.
 func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Transaction, error) {
 
 	txs := make([]transactions.Transaction, 0)
@@ -186,7 +201,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 	return txs, nil
 }
 
-// constructCoinbaseTx forges the transactions to reward the block generator
+// ConstructCoinbaseTx forges the transaction to reward the block generator.
 func (bg *Generator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) (*transactions.Coinbase, error) {
 	// The rewards for both the Generator and the Provisioners are disclosed.
 	// Provisioner reward addresses do not require obfuscation

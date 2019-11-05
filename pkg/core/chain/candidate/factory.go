@@ -7,14 +7,14 @@ import (
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
-// Factory creates a first step reduction Component
+// Factory creates a candidate.Generator.
 type Factory struct {
 	Bus          eventbus.Broker
 	RBus         *rpcbus.RPCBus
 	walletPubKey *key.PublicKey
 }
 
-// NewFactory instantiates a Factory
+// NewFactory instantiates a Factory.
 func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, walletPubKey *key.PublicKey) *Factory {
 	return &Factory{
 		Bus:          broker,
@@ -23,7 +23,8 @@ func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, walletPubKey *key
 	}
 }
 
-// Instantiate a generation component
+// Instantiate a candidate Generator.
+// Implements consensus.ComponentFactory.
 func (f *Factory) Instantiate() consensus.Component {
 	return NewComponent(f.Bus, f.walletPubKey, f.RBus)
 }

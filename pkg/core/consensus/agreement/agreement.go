@@ -42,6 +42,9 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 	}
 }
 
+// Initialize the agreement component, by creating the handler and the accumulator, and
+// return a listener for Agreement messages.
+// Implements consensus.Component.
 func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	a.eventPlayer = eventPlayer
 	a.handler = newHandler(a.keys, r.P)
@@ -58,15 +61,20 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 	return []consensus.TopicListener{agreementSubscriber}
 }
 
+// Returns the listener ID for the agreement component.
+// Implements consensus.Component.
 func (a *agreement) ID() uint32 {
 	return a.agreementID
 }
 
+// Filter an incoming Agreement message, by checking whether it was sent by a valid
+// member of the voting committee for the given round and step.
 func (a *agreement) Filter(hdr header.Header) bool {
 	return !a.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
-// CollectAgreementEvent is the callback to get Events from the Coordinator. It forwards the events to the accumulator until Quorum is reached
+// CollectAgreementEvent is the callback to get Events from the Coordinator. It forwards
+// the events to the accumulator until Quorum is reached
 func (a *agreement) CollectAgreementEvent(event consensus.Event) error {
 	ev, err := convertToAgreement(event)
 	if err != nil {
@@ -91,7 +99,7 @@ func convertToAgreement(event consensus.Event) (*Agreement, error) {
 	return ev, nil
 }
 
-// Listen for results coming from the accumulator
+// Listen for results coming from the accumulator.
 func (a *agreement) listen() {
 	select {
 	case evs := <-a.accumulator.CollectedVotesChan:
@@ -125,6 +133,10 @@ func (a *agreement) sendFinalize() {
 	a.publisher.Publish(topics.Finalize, buf)
 }
 
+// Finalize the agreement component, by pausing event streaming, and shutting down
+// the accumulator. Additionally, it ensures the `listen` goroutine is shut down.
+// The agreement component is no longer usable after this method call.
+// Implements consensus.Component.
 func (a *agreement) Finalize() {
 	a.eventPlayer.Pause(a.agreementID)
 	a.accumulator.Stop()
@@ -134,6 +146,7 @@ func (a *agreement) Finalize() {
 	}
 }
 
+// Generate a block certificate from an agreement message.
 func (a *agreement) generateCertificate(ag Agreement) *block.Certificate {
 	return &block.Certificate{
 		StepOneBatchedSig: ag.VotesPerStep[0].Signature.Compress(),

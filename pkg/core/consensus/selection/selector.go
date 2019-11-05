@@ -14,8 +14,8 @@ import (
 var lg = log.WithField("process", "selector")
 var emptyScore = Score{}
 
-// Selector is the component responsible to collect score events and propagate
-// the best one after a timeout
+// Selector is the component responsible for collecting score events and propagating
+// the best one after a timeout.
 type Selector struct {
 	publisher eventbus.Publisher
 	handler   Handler
@@ -41,7 +41,8 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector
 	}
 }
 
-// Initialize the Selector according to the `consensus.Component` interface
+// Initialize the Selector, by creating the handler and returning the needed Listeners.
+// Implements consensus.Component.
 func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
@@ -63,12 +64,14 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	return []consensus.TopicListener{scoreSubscriber, generationSubscriber}
 }
 
-// ID of the selector is the ID of the score event listener
+// ID returns the ID of the Score message Listener.
+// Implements consensus.Component
 func (s *Selector) ID() uint32 {
 	return s.scoreID
 }
 
-// Finalize pauses the `EventPlayer` and stops the timer
+// Finalize pauses event streaming and stops the timer.
+// Implements consensus.Component.
 func (s *Selector) Finalize() {
 	s.eventPlayer.Pause(s.scoreID)
 	s.timer.stop()
@@ -111,8 +114,7 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 	return nil
 }
 
-// CollectGeneration signals the selection start by triggering
-// `EventPlayer.Play`
+// CollectGeneration signals the selection start by triggering `EventPlayer.Play`
 func (s *Selector) CollectGeneration(e consensus.Event) error {
 	s.setBestEvent(emptyScore)
 	_ = s.eventPlayer.Play(s.ID())

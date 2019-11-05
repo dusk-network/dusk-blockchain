@@ -8,8 +8,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
-var empty struct{}
-
 type (
 	// SyncState is an implementation of State which can be shared by multiple processes.
 	// It also notifies subscribers of changes in the state's step.

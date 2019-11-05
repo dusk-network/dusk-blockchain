@@ -10,6 +10,7 @@ import (
 
 var _ wire.Event = (*Event)(nil)
 
+// TopicEvent is the concatenation of a consensus Event, and it's designated Topic.
 type TopicEvent struct {
 	Event
 	Topic topics.Topic
@@ -22,15 +23,21 @@ func NewTopicEvent(topic topics.Topic, hdr header.Header, payload bytes.Buffer) 
 	}
 }
 
+// Event is the collection of a consensus message header and it's payload.
+// Its primary purpose is to group all of the common fields in a consensus message
+// together, and allow for consensus components to process the topic-specific payload
+// on its own, while retaining the general information if needed.
 type Event struct {
 	Header  header.Header
 	Payload bytes.Buffer
 }
 
+// Sender returns the BLS public key of the event sender.
 func (e Event) Sender() []byte {
 	return e.Header.Sender()
 }
 
+// Equal checks if an Event is equal to another.
 func (e Event) Equal(ev wire.Event) bool {
 	ce, ok := ev.(Event)
 	if !ok {

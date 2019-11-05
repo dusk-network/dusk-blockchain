@@ -29,6 +29,7 @@ func NewFactory(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consensu
 }
 
 // Instantiate a second step reduction Component
+// Implements consensus.ComponentFactory.
 func (f *Factory) Instantiate() consensus.Component {
 	return NewComponent(f.Bus, f.RBus, f.Keys, f.timeout)
 }

@@ -23,6 +23,8 @@ var emptyPayload = new(bytes.Buffer)
 
 var lg = log.WithField("process", "coordinator")
 
+// roundStore is the central registry for all consensus components and listeners.
+// It is used for message dispatching and controlling the stream of events.
 type roundStore struct {
 	lock        sync.RWMutex
 	subscribers map[topics.Topic][]Listener
@@ -110,6 +112,7 @@ func (s *roundStore) resume(id uint32) bool {
 	return false
 }
 
+// Dispatch an event to listeners for the designated Topic.
 func (s *roundStore) Dispatch(ev TopicEvent) {
 	subscribers := s.createSubscriberQueue(ev.Topic)
 	lg.WithFields(log.Fields{
@@ -147,6 +150,8 @@ func (s *roundStore) createSubscriberQueue(topic topics.Topic) []Listener {
 	return subQueue
 }
 
+// DispatchFinalize will finalize all components on the roundStore. The store is
+// considered obsolete after calling this method.
 func (s *roundStore) DispatchFinalize() {
 	for _, component := range s.components {
 		component.Finalize()
@@ -212,6 +217,10 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 	}
 }
 
+// CollectRoundUpdate is triggered when the Chain propagates a new round update.
+// If the Finalize message was not seen earlier, it will finalize all components,
+// reinstantiate a new store, and swap it with the current one. The consensus
+// components are then initialized, and the state will be updated to the new round.
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lg.Debugln("received round update")
 	c.lock.Lock()
@@ -244,6 +253,8 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	return nil
 }
 
+// CollectFinalize is triggered when the Agreement reaches quorum, and pre-emptively
+// finalizes all consensus components, as they are no longer needed after this point.
 func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -272,6 +283,7 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 	return nil
 }
 
+// Create a new roundStore and instantiate all Components.
 func (c *Coordinator) reinstantiateStore() {
 	store := newStore(c)
 	for _, factory := range c.factories {
@@ -447,11 +459,13 @@ func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *b
 	return nil
 }
 
+// Pause event streaming for the listener with the specified ID.
 func (c *Coordinator) Pause(id uint32) {
 	lg.WithField("id", id).Traceln("pausing")
 	c.store.pause(id)
 }
 
+// Resume event streaming for the listener with the specified ID.
 func (c *Coordinator) Resume(id uint32) {
 	// Only dispatch events if a registered component asks to Resume
 	if c.store.resume(id) {

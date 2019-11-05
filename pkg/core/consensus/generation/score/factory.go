@@ -10,14 +10,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Factory creates a first step reduction Component
+// Factory creates a score.Generator.
 type Factory struct {
 	Bus eventbus.Broker
 	db  database.DB
 	key.ConsensusKeys
 }
 
-// NewFactory instantiates a Factory
+// NewFactory instantiates a Factory.
 func NewFactory(broker eventbus.Broker, consensusKeys key.ConsensusKeys, db database.DB) *Factory {
 	if db == nil {
 		_, db = heavy.CreateDBConnection()
@@ -29,7 +29,10 @@ func NewFactory(broker eventbus.Broker, consensusKeys key.ConsensusKeys, db data
 	}
 }
 
-// Instantiate a generation component
+// Instantiate a generation component. It will attempt to retrieve the relevant values
+// for score generation from the DB before instantiation, as these are ephemeral and
+// can not be kept on the Factory for this reason.
+// Implements consensus.ComponentFactory.
 func (f *Factory) Instantiate() consensus.Component {
 	var d, k []byte
 	err := f.db.View(func(t database.Transaction) error {
@@ -44,10 +47,11 @@ func (f *Factory) Instantiate() consensus.Component {
 
 	var dScalar, kScalar ristretto.Scalar
 	if err := dScalar.UnmarshalBinary(d); err != nil {
-		// TODO: log
+		log.WithField("process", "score generator factory").WithError(err).Errorln("could not unmarshal D bytes into a scalar")
 	}
+
 	if err := kScalar.UnmarshalBinary(k); err != nil {
-		// TODO: log
+		log.WithField("process", "score generator factory").WithError(err).Errorln("could not unmarshal K bytes into a scalar")
 	}
 
 	return NewComponent(f.Bus, f.ConsensusKeys, dScalar, kScalar)

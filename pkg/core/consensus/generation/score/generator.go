@@ -20,6 +20,7 @@ var _ consensus.Component = (*Generator)(nil)
 var emptyHash [32]byte
 var lg *log.Entry = log.WithField("process", "score generator")
 
+// NewComponent returns an uninitialized Generator.
 func NewComponent(publisher eventbus.Publisher, consensusKeys key.ConsensusKeys, d, k ristretto.Scalar) *Generator {
 	return &Generator{
 		publisher:     publisher,
@@ -30,6 +31,9 @@ func NewComponent(publisher eventbus.Publisher, consensusKeys key.ConsensusKeys,
 	}
 }
 
+// Generator is responsible for generating the proof of blind bid, along with the score.
+// It forwards the resulting information to the candidate generator, in a ScoreEvent
+// message.
 type Generator struct {
 	publisher eventbus.Publisher
 	roundInfo consensus.RoundUpdate
@@ -42,6 +46,9 @@ type Generator struct {
 	generationID uint32
 }
 
+// Initialize the Generator, by creating the round seed and returning the Listener
+// for the Generation topic, which triggers the Generator.
+// Implements consensus.Component.
 func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
 	g.signer = signer
 	g.roundInfo = ru
@@ -69,6 +76,8 @@ func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consens
 	return []consensus.TopicListener{generationSubscriber}
 }
 
+// ID returns the listener ID of the Generator.
+// Implements consensus.Component.
 func (g *Generator) ID() uint32 {
 	return g.generationID
 }
