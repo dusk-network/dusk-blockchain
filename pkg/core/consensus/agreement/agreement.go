@@ -26,6 +26,7 @@ type agreement struct {
 	accumulator  *Accumulator
 	keys         key.ConsensusKeys
 	workerAmount int
+	quitChan     chan struct{}
 
 	agreementID uint32
 	round       uint64
@@ -37,6 +38,7 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 		publisher:    publisher,
 		keys:         keys,
 		workerAmount: workerAmount,
+		quitChan:     make(chan struct{}),
 	}
 }
 
@@ -91,10 +93,13 @@ func convertToAgreement(event consensus.Event) (*Agreement, error) {
 
 // Listen for results coming from the accumulator
 func (a *agreement) listen() {
-	evs := <-a.accumulator.CollectedVotesChan
-	lg.WithField("id", a.agreementID).Debugln("quorum reached")
-	go a.sendFinalize()
-	go a.sendCertificate(evs[0])
+	select {
+	case evs := <-a.accumulator.CollectedVotesChan:
+		lg.WithField("id", a.agreementID).Debugln("quorum reached")
+		go a.sendFinalize()
+		go a.sendCertificate(evs[0])
+	case <-a.quitChan:
+	}
 }
 
 func (a *agreement) sendCertificate(ag Agreement) {
@@ -123,6 +128,10 @@ func (a *agreement) sendFinalize() {
 func (a *agreement) Finalize() {
 	a.eventPlayer.Pause(a.agreementID)
 	a.accumulator.Stop()
+	select {
+	case a.quitChan <- struct{}{}:
+	default:
+	}
 }
 
 func (a *agreement) generateCertificate(ag Agreement) *block.Certificate {

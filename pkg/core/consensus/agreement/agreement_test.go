@@ -1,6 +1,7 @@
 package agreement_test
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -35,6 +36,21 @@ func TestAgreement(t *testing.T) {
 	}
 
 	assert.Equal(t, hash, winningHash)
+}
+
+// Test that we properly clean up after calling Finalize.
+func TestFinalize(t *testing.T) {
+	numGRBefore := runtime.NumGoroutine()
+	// Create a set of 100 agreement components, and finalize them immediately
+	for i := 0; i < 100; i++ {
+		c, _ := wireAgreement(50)
+		c.FinalizeRound()
+	}
+
+	// Ensure we have freed up all of the resources associated with these components
+	numGRAfter := runtime.NumGoroutine()
+	// We should have roughly the same amount of goroutines
+	assert.InDelta(t, numGRBefore, numGRAfter, 10.0)
 }
 
 func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helper) {
