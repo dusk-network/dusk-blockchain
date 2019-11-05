@@ -162,7 +162,9 @@ func syncToTip(acceptedBlockChan <-chan block.Block, counter *chainsync.Counter)
 
 func launchMaintainer(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
 	r := cfg.Get()
-	amount := r.Consensus.DefaultAmount
+	// default amount is denoted in whole units of DUSK, so we should convert it to
+	// atomic units.
+	amount := r.Consensus.DefaultAmount * wallet.DUSK
 	lockTime := r.Consensus.DefaultLockTime
 	if lockTime > transactions.MaxLockTime {
 		log.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
