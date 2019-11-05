@@ -29,8 +29,8 @@ func NewSimplePlayer() *SimplePlayer {
 	}
 }
 
-// Play upticks the step
-func (s *SimplePlayer) Play(uint32) uint8 {
+// Forward upticks the step
+func (s *SimplePlayer) Forward(uint32) uint8 {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.step++
@@ -51,8 +51,8 @@ func (s *SimplePlayer) Pause(id uint32) {
 	s.state = PAUSED
 }
 
-// Resume as specified by the EventPlayer interface
-func (s *SimplePlayer) Resume(id uint32) {
+// Play as specified by the EventPlayer interface
+func (s *SimplePlayer) Play(id uint32) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.state = RUNNING

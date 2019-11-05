@@ -37,16 +37,15 @@ type Signer interface {
 // EventPlayer is the interface used by Components to signal their intention to
 // get, pause or resume events for a given Step
 type EventPlayer interface {
-	// Play signals the Coordinator that a newly initialized Component is ready
-	// to accept new `Event`. Components need to indicate their ID to let the
-	// Coordinator identify duplicates or obsolete components.
-	// It returns the current `Step`
-	Play(uint32) uint8
+	// Forward signals the Coordinator that a component wishes to further the step
+	// of the consensus. An ID needs to be supplied in order for the Coordinator to
+	// decide if this request is valid.
+	Forward(uint32) uint8
 	// Pause signals the Coordinator to temporarily pause Event forwarding for
-	// a Listener specified through its ID
+	// a Listener specified through its ID.
 	Pause(uint32)
-	// Resume the Event forwarding for a Listener
-	Resume(uint32)
+	// Play resumes the Event forwarding for a Listener with the given ID.
+	Play(uint32)
 }
 
 // ComponentFactory holds the data to create a Component (i.e. Signer, EventPublisher, RPCBus). Its responsibility is to recreate it on demand

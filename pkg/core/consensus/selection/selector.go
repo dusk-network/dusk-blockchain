@@ -117,14 +117,14 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 // CollectGeneration signals the selection start by triggering `EventPlayer.Play`
 func (s *Selector) CollectGeneration(e consensus.Event) error {
 	s.setBestEvent(emptyScore)
-	_ = s.eventPlayer.Play(s.ID())
+	_ = s.eventPlayer.Forward(s.ID())
 	s.startSelection()
 	return nil
 }
 
 func (s *Selector) startSelection() {
 	// Empty queue in a goroutine to avoid letting other listeners wait
-	go s.eventPlayer.Resume(s.scoreID)
+	go s.eventPlayer.Play(s.scoreID)
 	s.timer.start(s.timeout)
 }
 

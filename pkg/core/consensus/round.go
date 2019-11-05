@@ -354,7 +354,7 @@ func (c *Coordinator) FinalizeRound() {
 	}
 }
 
-func (c *Coordinator) Play(id uint32) uint8 {
+func (c *Coordinator) Forward(id uint32) uint8 {
 	if c.store.hasComponent(id) {
 		lg.WithField("id", id).Traceln("incrementing step")
 		c.IncrementStep()
@@ -465,8 +465,8 @@ func (c *Coordinator) Pause(id uint32) {
 	c.store.pause(id)
 }
 
-// Resume event streaming for the listener with the specified ID.
-func (c *Coordinator) Resume(id uint32) {
+// Play will resume event streaming for the listener with the specified ID.
+func (c *Coordinator) Play(id uint32) {
 	// Only dispatch events if a registered component asks to Resume
 	if c.store.resume(id) {
 		lg.WithField("id", id).Traceln("resumed")

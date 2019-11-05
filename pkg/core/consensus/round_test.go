@@ -37,7 +37,7 @@ func TestCollectEvent(t *testing.T) {
 }
 
 // Test that queued events are dispatched correctly on the appropriate state,
-// when Resume is called.
+// when Play is called.
 func TestQueuedDispatch(t *testing.T) {
 	c, cmps := initCoordinatorTest(t, topics.Reduction)
 	comp := cmps[0].(*mockComponent)
@@ -53,9 +53,9 @@ func TestQueuedDispatch(t *testing.T) {
 
 	// Pause, so that we can resume later
 	c.Pause(comp.ID())
-	// Play to step 1. The queued event should be dispatched
-	assert.Equal(t, uint8(1), c.Play(comp.ID()))
-	c.Resume(comp.ID())
+	// Forward to step 1. The queued event should be dispatched
+	assert.Equal(t, uint8(1), c.Forward(comp.ID()))
+	c.Play(comp.ID())
 	assert.Equal(t, 1, len(comp.receivedEvents))
 	assert.Equal(t, 0, len(c.eventqueue.entries[1][1]))
 
@@ -71,7 +71,7 @@ func TestQueuedDispatch(t *testing.T) {
 	// Update our reference to `comp`, as it was swapped out.
 	comp = c.store.components[0].(*mockComponent)
 	c.Pause(comp.ID())
-	c.Resume(comp.ID())
+	c.Play(comp.ID())
 	// Mock component should only hold one event, as it was re-instantiated
 	// on the round update
 	assert.Equal(t, 1, len(comp.receivedEvents))
@@ -80,7 +80,7 @@ func TestQueuedDispatch(t *testing.T) {
 
 // Test that events are withheld when a component is paused, and that streaming
 // continues when resumed.
-func TestPauseResume(t *testing.T) {
+func TestPausePlay(t *testing.T) {
 	c, cmps := initCoordinatorTest(t, topics.Reduction)
 	comp := cmps[0].(*mockComponent)
 
@@ -96,7 +96,7 @@ func TestPauseResume(t *testing.T) {
 	c.CollectEvent(*ev)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 
-	c.Resume(comp.id)
+	c.Play(comp.id)
 
 	// Send one more event, which should be received.
 	ev = mockEventBuffer(t, topics.Reduction, 1, 0)

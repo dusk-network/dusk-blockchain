@@ -145,7 +145,7 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	r.timeOut = r.timeOut * 2
 
 	// Sending of agreement happens on it's own step
-	step := r.eventPlayer.Play(r.ID())
+	step := r.eventPlayer.Forward(r.ID())
 	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
 		lg.WithField("step", step).Debugln("sending agreement")
 		r.sendAgreement(hash, b)
@@ -171,8 +171,8 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 	}
 
 	r.startReduction(sv)
-	step := r.eventPlayer.Play(r.ID())
-	r.eventPlayer.Resume(r.reductionID)
+	step := r.eventPlayer.Forward(r.ID())
+	r.eventPlayer.Play(r.reductionID)
 	if r.handler.AmMember(r.round, step) {
 		go r.sendReduction(e.Header.BlockHash)
 	}

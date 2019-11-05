@@ -160,8 +160,8 @@ func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 func (r *Reducer) CollectBestScore(e consensus.Event) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
 	r.startReduction()
-	step := r.eventPlayer.Play(r.ID())
-	r.eventPlayer.Resume(r.reductionID)
+	step := r.eventPlayer.Forward(r.ID())
+	r.eventPlayer.Play(r.reductionID)
 
 	// sending reduction can very well be done concurrently
 	if r.handler.AmMember(r.round, step) {
