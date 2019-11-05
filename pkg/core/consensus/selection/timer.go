@@ -14,7 +14,9 @@ func (t *timer) start(timeOut time.Duration) {
 }
 
 func (t *timer) stop() {
-	t.t.Stop()
+	if t.t != nil {
+		t.t.Stop()
+	}
 }
 
 func (t *timer) trigger() {
