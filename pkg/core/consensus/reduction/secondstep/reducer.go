@@ -133,6 +133,7 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
+	r.timeOut = r.timeOut * 2
 
 	// Sending of agreement happens on it's own step
 	step := r.eventPlayer.Play(r.ID())
