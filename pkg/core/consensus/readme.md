@@ -36,6 +36,17 @@ The Provisioner is eligible to participate in two phases:
 
 The two mentioned phases are the way for Provisioners to reach consensus on a single block, which can then be added to the chain.
 
+### Values
+
+#### Message Header
+
+| Field     | Type          |
+| --------- | ------------- |
+| pubkeyBLS | BLS Signature |
+| round     | uint64        |
+| step      | uint64        |
+| blockhash | uint256       |
+
 ### Redux-like architecture
 
 The architecture for the implementation is based on a **Flux** or **Redux** like approach, where a single component holds the right to mutate the state, and any peripheral components/processes merely receive read-only copies of it. These peripheral components can request updates to the state, but the central `Coordinator` ultimately decides whether or not this state change will be enacted.

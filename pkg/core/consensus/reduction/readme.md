@@ -1,5 +1,7 @@
 ## Binary Reduction
 
+### Abstract
+
 The Binary Reduction algorithm lays at the core of SBA\*. It converts the problem of reaching consensus on arbitrary values to reaching consensus on one of two values. It is an adaptation of the Turpin and Coan algorithm, originally concocted to solve the general Byzantine agreement when given a binary Byzantine agreement algorithm as a subroutine, for `n > 3f` (with `n` defined as total number of nodes and `f` defined as adversarial nodes).
 
 Unlike other implementations, which normally utilize the original algorithm, Binary Reduction adopted in SBA\* follows a two-step approach, with the input of the second step depending on the output of the first one.
@@ -12,26 +14,19 @@ Binary Reduction acts as a uniform value extraction function which is then fed t
 
 #### Block Reduction Event
 
-| Field           | Type    |
-| --------------- | ------- |
-| pubkeyBLS       | BLS Signature |
-| round           | uint64  |
-| step            | uint64  |
-| blockhash       | uint256 |
+| Field           | Type          |
+| --------------- | ------------- |
 | signedblockhash | BLS Signature |
-
-### API
-
-- Launch(eventbus, committee, duration) - Launches the reduction component, which publishes on the `Reduction` and `ReductionResultTopic` topics.
 
 ### Architecture
 
-The `Block Reducer` component follows the event driven paradigm. It is connected to the node's `EventBus` through a `broker` and it delegates event-specific operations to its `EventHandler` implementation.
+The reduction phase is split up into two components - one for each step. This is because, despite their similarity in logic, subtle nuances between the two steps make it more feasible to split the logic between two different components, for readability purposes. At the core, a `Reducer` works like this:
 
-The `Reducer` entity is generic and spawns two `eventStopWatch` (one per step) to regulate the collection of the events and handle eventual timeout.
+- It gets triggered by a message of a certain topic (first step: `BestScore` / second step: `StepVotes`). This instantiates an `Aggregator` and starts a timer.
+- It starts collecting Reduction messages, passing them down to the `Accumulator`
+- When the `Aggregator` reaches quorum, or when the timer is triggered, the `Reducer` will send out one or more messages (first step: `StepVotes` / second step: `Restart` & `Agreement`)
+- It stops collecting events, and waits for the next `BestScore` or `StepVotes`
 
-Like all the other consensus components, collection of the events and their marshalling/unmarshalling is delegated to an `EventFilter`.
+#### Aggregator
 
-#### Block Reducer Diagram
-
-![](docs/Block%20Reduction.jpg)
+Each `Reducer` makes use of an `Aggregator`, which is a component akin to a storage for incoming messages. It is instantiated with a callback, which it will call after a certain amount of messages are collected. The `Aggregator` will receive any incoming Reduction messages after they are filtered by the `Coordinator` and the `Reducer`. It will separate messages by their block hash, and proceed to aggregate the included `signedblockhash` with other collected signatures for this hash (if any). Additionally, it saves the senders BLS public key in a `sortedset.Set`. Once the amount of keys and signatures for a certain blockhash exceeds a threshold, the `Aggregator` will forward the collected information, by providing it as an argument for its given callback. After triggering this callback, the `Aggregator` will no longer accept new messages, and a new instance needs to be created for subsequent steps.
