@@ -12,7 +12,7 @@ import (
 )
 
 var lg = log.WithField("process", "selector")
-var emptyScore = Score{}
+var emptyScore [32]byte
 
 // Selector is the component responsible for collecting score events and propagating
 // the best one after a timeout.
@@ -142,7 +142,7 @@ func (s *Selector) publishBestEvent() error {
 	s.lock.RUnlock()
 	// If we had no best event, we should send an empty hash
 	if bestEvent == nil {
-		s.signer.SendWithHeader(topics.BestScore, make([]byte, 32), buf, s.ID())
+		s.signer.SendWithHeader(topics.BestScore, emptyScore[:], buf, s.ID())
 	} else {
 		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf, s.ID())
 	}
