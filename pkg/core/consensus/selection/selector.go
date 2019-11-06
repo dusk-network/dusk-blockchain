@@ -91,7 +91,7 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	// Only check for priority if we already have a best event
-	if !s.bestEvent.Equal(emptyScore) {
+	if s.bestEvent != nil {
 		if s.handler.Priority(*s.bestEvent, ev) {
 			// if the current best score has priority, we return
 			return nil
@@ -107,8 +107,7 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 	}
 
 	lg.WithFields(log.Fields{
-		"current best": s.bestEvent.Score,
-		"new best":     ev.Score,
+		"new best": ev.Score,
 	}).Debugln("swapping best score")
 	s.bestEvent = &ev
 	return nil
@@ -116,7 +115,9 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 
 // CollectGeneration signals the selection start by triggering `EventPlayer.Play`
 func (s *Selector) CollectGeneration(e consensus.Event) error {
-	s.setBestEvent(emptyScore)
+	s.lock.Lock()
+	s.bestEvent = nil
+	s.lock.Unlock()
 	_ = s.eventPlayer.Forward(s.ID())
 	s.startSelection()
 	return nil
@@ -136,9 +137,11 @@ func (s *Selector) IncreaseTimeOut() {
 func (s *Selector) publishBestEvent() error {
 	s.eventPlayer.Pause(s.scoreID)
 	buf := new(bytes.Buffer)
-	bestEvent := s.getBestEvent()
+	s.lock.RLock()
+	bestEvent := s.bestEvent
+	s.lock.RUnlock()
 	// If we had no best event, we should send an empty hash
-	if bestEvent.Equal(emptyScore) {
+	if bestEvent == nil {
 		s.signer.SendWithHeader(topics.BestScore, make([]byte, 32), buf, s.ID())
 	} else {
 		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf, s.ID())
@@ -157,16 +160,4 @@ func (s *Selector) repropagate(ev Score) error {
 
 	s.signer.SendAuthenticated(topics.Score, ev.VoteHash, buf, s.ID())
 	return nil
-}
-
-func (s *Selector) getBestEvent() Score {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return *s.bestEvent
-}
-
-func (s *Selector) setBestEvent(ev Score) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.bestEvent = &ev
 }

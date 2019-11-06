@@ -120,6 +120,26 @@ func TestMultipleVerification(t *testing.T) {
 	assert.Equal(t, 1, len(gossipChan))
 }
 
+// Ensure that `CollectScoreEvent` does not panic if it is called before
+// receiving a Generation message. (Note that this can happen, as the Score
+// listener is not paused on startup)
+func TestCollectNoGeneration(t *testing.T) {
+	assert.NotPanics(t, func() {
+		bus := eventbus.New()
+		hlp := selection.NewHelper(bus)
+		hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+
+		// Make sure to replace the handler, to avoid zkproof verification
+		hlp.SetHandler(newMockHandler())
+
+		// Create some score messages
+		hash, _ := crypto.RandEntropy(32)
+		evs := hlp.Spawn(hash)
+
+		hlp.Selector.CollectScoreEvent(evs[0])
+	})
+}
+
 func sortEventsByScore(t *testing.T, evs []consensus.Event) []consensus.Event {
 	// Retrieve message from payload
 	scoreEvs := make([]selection.Score, 0, len(evs))
