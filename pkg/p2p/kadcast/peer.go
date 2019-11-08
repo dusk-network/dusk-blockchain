@@ -36,6 +36,6 @@ func (peer *Peer) addPort(port uint16) {
 }
 
 // Computes the XOR distance between two Peers.
-func (me Peer) computePeerDistance(peer Peer) uint8 {
+func (me Peer) computePeerDistance(peer Peer) uint16 {
 	return idXor(me.id, peer.id)
 }
