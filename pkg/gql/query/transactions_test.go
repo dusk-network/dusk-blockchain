@@ -60,3 +60,33 @@ func TestTxByTxIDs(t *testing.T) {
 	`
 	assertQuery(t, query, response)
 }
+
+func TestLastTxs(t *testing.T) {
+
+	query := `
+		{ 
+			transactions(last: 2) 
+			{ 
+				txid 
+				txtype 
+			}
+	  	}
+		`
+	response := `
+		{
+			"data": {
+				"transactions": [
+					{
+						"txid": "6ea89ed79c970477fbac038b12bdf72a79a29977c6e2a6b6af23f450abb2f5a0",
+						"txtype": "3"
+					},
+					{
+						"txid": "9ea3815bf27a89b0429a1483b9907e7091331bee1882c80b9fb753e6d674de65",
+						"txtype": "3"
+					}
+				]
+			}
+		}
+	`
+	assertQuery(t, query, response)
+}
