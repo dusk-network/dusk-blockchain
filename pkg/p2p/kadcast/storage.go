@@ -1,8 +1,22 @@
 package kadcast
 
-/// The bucket stores `k = 40` triplets and a single
-/// peer has L  buckets where `L = len(ID)`.
+// Bucket stores peer info of the peers that are at a certain
+// distance range to the peer itself.
 type Bucket struct {
 	length  uint8
-	entries [40]Peer
+	entries []Peer
+}
+
+// Tree stores `L` buckets inside of it.
+// This is basically the routing info of every peer.
+type Tree struct{ buckets [256]Bucket }
+
+// Allocates space for a tree and returns an empty intance of it.
+func makeTree() Tree {
+	panic("unimplemented")
+}
+
+// Adds a Peer to the routing storage tree.
+func (tree *Tree) addPeer(peer *Peer) {
+	panic("unimplemeneted")
 }
