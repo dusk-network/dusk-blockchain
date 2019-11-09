@@ -31,6 +31,18 @@ port=9001
 ```
 
 ##### Example queries that can be sent as message body of a HTTP POST request
+
+NB: The examples from below represent only query structures. To send a query as a http request the following schema must be used:
+
+```json
+{  
+   "query":"query ($num: Int!) { transactions(last: $num) { txid txtype }}",
+   "variables":{  
+      "num": 10
+   }
+}
+```
+
 -  Fetch block by hash with full set of supported fields
 
 ```graphql
@@ -175,6 +187,17 @@ port=9001
       txid
       txtype
     }
+  }
+}
+```
+
+- Fetch last/latest 100 transactions
+```graphql
+{ 
+  transactions(last: 100) 
+  { 
+    txid 
+    txtype 
   }
 }
 ```

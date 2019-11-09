@@ -2,12 +2,18 @@ package query
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
 	core "github.com/dusk-network/dusk-wallet/transactions"
+	log "github.com/sirupsen/logrus"
+)
+
+const (
+	txsFetchLimit = 10000
 )
 
 type transactions struct {
@@ -28,6 +34,9 @@ func (t transactions) getQuery() *graphql.Field {
 			},
 			"txids": &graphql.ArgumentConfig{
 				Type: graphql.NewList(graphql.String),
+			},
+			"last": &graphql.ArgumentConfig{
+				Type: graphql.Int,
 			},
 		},
 		Resolve: t.resolve,
@@ -52,6 +61,15 @@ func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
 	ids, ok := p.Args["txids"].([]interface{})
 	if ok {
 		return t.fetchTxsByHash(db, ids)
+	}
+
+	count, ok := p.Args["last"].(int)
+	if ok {
+		if count <= 0 {
+			return nil, errors.New("invalid count")
+		}
+
+		return t.fetchLastTxs(db, count)
 	}
 
 	return nil, nil
@@ -83,6 +101,71 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]out
 				TxType:    tx.StandardTx().TxType,
 				BlockHash: hash,
 			})
+		}
+
+		return nil
+	})
+
+	return txs, err
+}
+
+// Fetch #count# number of txs from lastly accepted blocks
+func (b transactions) fetchLastTxs(db database.DB, count int) ([]output, error) {
+
+	txs := make([]output, 0)
+
+	if count <= 0 {
+		return txs, nil
+	}
+
+	if count >= txsFetchLimit {
+		msg := fmt.Sprintf("requested txs count exceeds the limit of %d", txsFetchLimit)
+		log.Warn(msg)
+
+		return txs, errors.New(msg)
+	}
+
+	err := db.View(func(t database.Transaction) error {
+
+		var tip uint64
+		tip, err := t.FetchCurrentHeight()
+		if err != nil {
+			return err
+		}
+
+		height := tip
+
+		for {
+
+			hash, err := t.FetchBlockHashByHeight(uint64(height))
+			if err != nil {
+				return err
+			}
+
+			blockTxs, err := t.FetchBlockTxs(hash)
+			if err != nil {
+				return err
+			}
+
+			for _, tx := range blockTxs {
+
+				txId, _ := tx.CalculateHash()
+				txs = append(txs, output{
+					TxID:      txId,
+					TxType:    tx.StandardTx().TxType,
+					BlockHash: hash,
+				})
+
+				if len(txs) >= count {
+					return nil
+				}
+			}
+
+			if height == 0 {
+				break
+			}
+
+			height--
 		}
 
 		return nil
