@@ -1,7 +1,16 @@
 package kadcast
 
+import (
+	"fmt"
+
+	"golang.org/x/crypto/sha3"
+
+	// Just for debugging purposes
+	_ "fmt"
+)
+
 // Computes the XOR distance between 2 different
-//ids.
+// ids.
 func idXor(a [16]byte, b [16]byte) uint16 {
 	distance := [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	i := 0
@@ -36,6 +45,10 @@ func countSetBits(byt byte) uint16 {
 
 // Performs the hash of the wallet Sk
 // and uses it as the ID of a Peer.
-func computeIDFromKey() [16]byte {
-	panic("uninplemented")
+func computeIDFromKey(key [32]byte) [16]byte {
+	var halfLenID [16]byte
+	doubleLenID := sha3.Sum256(key[:])
+	fmt.Printf("Computed hash: %x\n", doubleLenID)
+	copy(halfLenID[:], doubleLenID[0:15])
+	return halfLenID
 }
