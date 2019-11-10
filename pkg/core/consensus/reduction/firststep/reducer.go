@@ -105,6 +105,7 @@ func (r *Reducer) Collect(e consensus.Event) error {
 		"step":   e.Header.Step,
 		"sender": hex.EncodeToString(e.Header.Sender()),
 		"id":     r.reductionID,
+		"hash":   hex.EncodeToString(e.Header.BlockHash),
 	}).Debugln("received event")
 	return r.aggregator.collectVote(*ev, e.Header)
 }
@@ -161,11 +162,12 @@ func (r *Reducer) CollectBestScore(e consensus.Event) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
 	r.startReduction()
 	step := r.eventPlayer.Forward(r.ID())
-	r.eventPlayer.Play(r.reductionID)
+	// `Play` dispatches queued events, so we should do this in a goroutine to avoid
+	// waiting too long to send a message.
+	go r.eventPlayer.Play(r.reductionID)
 
-	// sending reduction can very well be done concurrently
 	if r.handler.AmMember(r.round, step) {
-		go r.sendReduction(e.Header.BlockHash)
+		r.sendReduction(e.Header.BlockHash)
 	}
 
 	return nil
