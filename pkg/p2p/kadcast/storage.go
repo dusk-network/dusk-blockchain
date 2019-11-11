@@ -33,6 +33,30 @@ func makeBucket(idlen uint8) Bucket {
 	}
 }
 
+// Finds the Least Recently Used Peer on the entries set
+// of the `Bucket` and returns it's index on the entries
+// set and the `Peer` info that is hold on it.
+func (b Bucket) findLruPeerIndex() (int, uint64) {
+	var val = b.totalPeersPassed
+	i := 0
+	for index, p := range b.entries {
+		if b.lru[p] <= val {
+			val = b.lru[p]
+			i = index
+		}
+	}
+	return i, val
+}
+
+// Remove a `Peer` from the entries set without
+// caring about the order.
+// The resulting slice of entries is then returned.
+func (b Bucket) removePeerAtIndex(index int) []Peer {
+	b.entries[index] = b.entries[len(b.entries)-1]
+	// We do not need to put s[i] at the end, as it will be discarded anyway
+	return b.entries[:len(b.entries)-1]
+}
+
 // Adds a `Peer` to the `Bucket` entries list.
 // It also increments the peerCount all according
 // the LRU policy.
@@ -55,10 +79,16 @@ func (b *Bucket) addPeerToBucket(peer Peer) {
 		// Check if peer is not already present into the
 		// entries set
 		if b.lruPresent[peer] == false {
-			panic("uninplemented")
+			// Search for the least recently used peer.
+			var index, _ = b.findLruPeerIndex()
+			// Remove it from the entries set.
+			b.entries = b.removePeerAtIndex(index)
+			// Add the new peer to the entries set.
+			b.entries = append(b.entries, peer)
+			b.totalPeersPassed++
 		}
+		b.lru[peer] = b.totalPeersPassed
 	}
-
 }
 
 // Tree stores `L` buckets inside of it.
