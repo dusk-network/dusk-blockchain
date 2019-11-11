@@ -1,7 +1,6 @@
 package kadcast
 
 import (
-	"fmt"
 	"testing"
 
 	"gotest.tools/assert"
@@ -21,15 +20,4 @@ func TestXorDistance(t *testing.T) {
 	assert.Equal(t, idXor(a, b), max)
 	assert.Equal(t, idXor(a, d), half)
 	assert.Equal(t, idXor(c, d), half)
-}
-
-func TestComputeIDFromKey(t *testing.T) {
-	zero := [32]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	hashZero := []byte("f9e2eaaa42d9fe9e558a9b8ef1bf366f190aacaa83bad2641ee106e9041096e4")
-	fmt.Printf("Web hash: %x", hashZero)
-	var key [16]byte
-	copy(key[:], hashZero[0:15])
-	fmt.Printf("%x\n", key)
-	assert.Equal(t, computeIDFromKey(zero), key)
-
 }

@@ -1,8 +1,6 @@
 package kadcast
 
 import (
-	"fmt"
-
 	"golang.org/x/crypto/sha3"
 
 	// Just for debugging purposes
@@ -48,7 +46,6 @@ func countSetBits(byt byte) uint16 {
 func computeIDFromKey(key [32]byte) [16]byte {
 	var halfLenID [16]byte
 	doubleLenID := sha3.Sum256(key[:])
-	fmt.Printf("Computed hash: %x\n", doubleLenID)
 	copy(halfLenID[:], doubleLenID[0:15])
 	return halfLenID
 }
