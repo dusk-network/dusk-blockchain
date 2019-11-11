@@ -7,6 +7,7 @@ import (
 	_ "fmt"
 )
 
+// ------------------ DISTANCE UTILS ------------------ //
 // Computes the XOR distance between 2 different
 // ids.
 func idXor(a [16]byte, b [16]byte) uint16 {
@@ -40,6 +41,8 @@ func countSetBits(byt byte) uint16 {
 	}
 	return count
 }
+
+// ------------------ HASH KEY UTILS ------------------ //
 
 // Performs the hash of the wallet Sk
 // and uses it as the ID of a Peer.
