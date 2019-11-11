@@ -1,27 +1,23 @@
 package kadcast
 
-import (
-	"net"
-)
-
 // Peer stores the info of a peer which consists on:
 // - IP of the peer.
 // - Port to connect to it.
 // - The ID of the peer.
 type Peer struct {
-	ip   net.IP
+	ip   [4]byte
 	port uint16
 	id   [16]byte
 }
 
 // Constructs a Peer with it's fields values as inputs.
-func makePeer(ip net.IP, port uint16, id [16]byte) Peer {
+func makePeer(ip [4]byte, port uint16, id [16]byte) Peer {
 	peer := Peer{ip, port, id}
 	return peer
 }
 
 // Sets the Id sent as parameter as the Peer ID.
-func (peer *Peer) addIP(ip net.IP) {
+func (peer *Peer) addIP(ip [4]byte) {
 	peer.ip = ip
 }
 
