@@ -38,7 +38,7 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 		publisher:    publisher,
 		keys:         keys,
 		workerAmount: workerAmount,
-		quitChan:     make(chan struct{}),
+		quitChan:     make(chan struct{}, 1),
 	}
 }
 
