@@ -43,11 +43,11 @@ func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8, maxSize i
 
 // Committee returns a VotingCommittee for a given round and step.
 func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCommittee {
-	if b.membersAt(step-1) == 0 {
+	if b.membersAt(step) == 0 {
 		b.generateCommittees(round, step, maxSize)
 	}
 	b.lock.RLock()
-	committee := b.Committees[step-1]
+	committee := b.Committees[step]
 	b.lock.RUnlock()
 	return committee
 }
@@ -59,7 +59,7 @@ func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
 	defer b.lock.Unlock()
 	committees := b.Provisioners.GenerateCommittees(round, PregenerationAmount, step, size)
 	for i, committee := range committees {
-		b.Committees[int(step)+i-1] = committee
+		b.Committees[int(step)+i] = committee
 	}
 }
 
