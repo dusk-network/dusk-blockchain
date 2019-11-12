@@ -1,5 +1,7 @@
 package kadcast
 
+import "net"
+
 // Tree stores `L` buckets inside of it.
 // This is basically the routing info of every peer.
 type Tree struct {
@@ -38,4 +40,10 @@ func (tree Tree) getTotalPeers() uint64 {
 		count += uint64(tree.buckets[i].peerCount)
 	}
 	return count
+}
+
+// Grabs the networking info of the `Peer` owner of the 
+// routing tree and returns it as `UDPAddr`.
+func (tree Tree) getMyPeerUDPAddr() net.UDPAddr {
+	return tree.buckets[0].entries[0].getUDPAddr()
 }
