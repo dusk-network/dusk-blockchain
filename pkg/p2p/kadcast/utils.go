@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"golang.org/x/crypto/sha3"
+	"net"
 
 	// Just for debugging purposes
 	_ "fmt"
@@ -51,4 +52,23 @@ func computeIDFromKey(key [32]byte) [16]byte {
 	doubleLenID := sha3.Sum256(key[:])
 	copy(halfLenID[:], doubleLenID[0:15])
 	return halfLenID
+}
+
+// ------------------ NET UTILS ------------------ //
+
+// Reads the network info of a `Peer` and returns the
+// corresponding `UDPAddr` struct.
+func (peer Peer) getUDPAddr() net.UDPAddr {
+	return net.UDPAddr{
+		IP: peer.ip[:],
+		Port: int(peer.port),
+		Zone: "N/A",
+	}
+}
+
+// Builds the Peer info from a UPD packet data.
+func getPeerNetworkInfo(udpAddress net.UDPAddr) ([4]byte, uint8) {
+	var ip [4]byte
+	copy(ip[:], udpAddress.IP[:])
+	return ip, uint8(udpAddress.Port)
 }
