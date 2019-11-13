@@ -66,9 +66,9 @@ func (a Agreement) Equal(ev wire.Event) bool {
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash
 func NewStepVotes() *StepVotes {
 	return &StepVotes{
-		Apk:       &bls.Apk{},
+		Apk:       nil,
 		BitSet:    uint64(0),
-		Signature: &bls.Signature{},
+		Signature: nil,
 		Step:      uint8(0),
 	}
 }
@@ -81,7 +81,7 @@ func (sv *StepVotes) Equal(other *StepVotes) bool {
 
 // Add a vote to the StepVotes struct.
 func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
-	if sv.Step == uint8(0) {
+	if sv.Apk == nil {
 		pk, err := bls.UnmarshalPk(sender)
 		if err != nil {
 			return err
@@ -258,4 +258,3 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	}
 	return nil
 }
-
