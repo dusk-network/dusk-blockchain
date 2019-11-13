@@ -89,3 +89,22 @@ func getLocalIPAddress() net.IP {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP
 }
+
+// ------------------ ENC/DEC UTILS ------------------ //
+// Set a `uint32` in bytes format.
+func getBytesFromUint(num *uint32) *[4]byte {
+	res := [4]byte{0, 0, 0, 0}
+	for i := 0; *num > 0; i++ {
+		res[i] = byte(*num & 255)
+		*num = *num >> 8
+	}
+	return &res
+}
+// Get an `uint32` from a 4-byte array.
+func getUintFromBytes(arr *[4]byte) *uint32 {
+	var res uint32 = 0
+	for i := 0; i < 4; i++ {
+		res += uint32(uint32(arr[i]) << uint32(8*i))
+	}
+	return &res
+}
