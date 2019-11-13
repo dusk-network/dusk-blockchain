@@ -121,8 +121,9 @@ func (r *Reducer) startReduction() {
 	r.aggregator = newAggregator(r.Halt, r.handler, r.rpcBus)
 }
 
-func (r *Reducer) sendReduction(hash []byte) {
-	sig, err := r.signer.Sign(hash, nil)
+func (r *Reducer) sendReduction(step uint8, hash []byte) {
+	hdr := r.constructHeader(step, hash)
+	sig, err := r.signer.Sign(hdr)
 	if err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in signing reduction")
 		return
@@ -134,7 +135,7 @@ func (r *Reducer) sendReduction(hash []byte) {
 		return
 	}
 
-	if err := r.signer.SendAuthenticated(topics.Reduction, hash, payload, r.ID()); err != nil {
+	if err := r.signer.SendAuthenticated(topics.Reduction, hdr, payload, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")
 	}
 }
@@ -162,13 +163,20 @@ func (r *Reducer) CollectBestScore(e consensus.Event) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
 	r.startReduction()
 	step := r.eventPlayer.Forward(r.ID())
-	// `Play` dispatches queued events, so we should do this in a goroutine to avoid
-	// waiting too long to send a message.
-	go r.eventPlayer.Play(r.reductionID)
+	r.eventPlayer.Play(r.reductionID)
 
 	if r.handler.AmMember(r.round, step) {
-		r.sendReduction(e.Header.BlockHash)
+		r.sendReduction(step, e.Header.BlockHash)
 	}
 
 	return nil
+}
+
+func (r *Reducer) constructHeader(step uint8, hash []byte) header.Header {
+	return header.Header{
+		Round:     r.round,
+		Step:      step,
+		PubKeyBLS: r.keys.BLSPubKeyBytes,
+		BlockHash: hash,
+	}
 }

@@ -25,7 +25,7 @@ func MockEvent(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, 
 	red := New()
 
 	r := new(bytes.Buffer)
-	_ = header.MarshalSignableVote(r, hdr, nil)
+	_ = header.MarshalSignableVote(r, hdr)
 	sigma, _ := bls.Sign(keys[idx].BLSSecretKey, keys[idx].BLSPubKey, r.Bytes())
 	red.SignedHash = sigma.Compress()
 	return *red, hdr

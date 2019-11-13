@@ -123,8 +123,9 @@ func (r *Reducer) startReduction(sv *agreement.StepVotes) {
 	r.aggregator = newAggregator(r.Halt, r.handler, sv)
 }
 
-func (r *Reducer) sendReduction(hash []byte) error {
-	sig, err := r.signer.Sign(hash, nil)
+func (r *Reducer) sendReduction(step uint8, hash []byte) error {
+	hdr := r.constructHeader(step, hash)
+	sig, err := r.signer.Sign(hdr)
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func (r *Reducer) sendReduction(hash []byte) error {
 		return err
 	}
 
-	return r.signer.SendAuthenticated(topics.Reduction, hash, payload, r.ID())
+	return r.signer.SendAuthenticated(topics.Reduction, hdr, payload, r.ID())
 }
 
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
@@ -149,7 +150,7 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	step := r.eventPlayer.Forward(r.ID())
 	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
 		lg.WithField("step", step).Debugln("sending agreement")
-		r.sendAgreement(hash, b)
+		r.sendAgreement(step, hash, b)
 	}
 
 	r.signer.SendWithHeader(topics.Restart, emptyHash[:], regenerationPackage, r.ID())
@@ -173,25 +174,17 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 
 	r.startReduction(sv)
 	step := r.eventPlayer.Forward(r.ID())
-	// `Play` dispatches queued events, so we should do this in a goroutine to avoid
-	// waiting too long to send a message.
-	go r.eventPlayer.Play(r.reductionID)
+	r.eventPlayer.Play(r.reductionID)
 
 	if r.handler.AmMember(r.round, step) {
-		r.sendReduction(e.Header.BlockHash)
+		r.sendReduction(step, e.Header.BlockHash)
 	}
 	return nil
 }
 
-func (r *Reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
-	// first, sign the two StepVotes
-	payloadBuf := new(bytes.Buffer)
-	if err := agreement.MarshalVotes(payloadBuf, svs); err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("cannot marshal the StepVotes")
-		return
-	}
-
-	sig, err := r.signer.Sign(hash, payloadBuf.Bytes())
+func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*agreement.StepVotes) {
+	hdr := r.constructHeader(step, hash)
+	sig, err := r.signer.Sign(hdr)
 	if err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("cannot sign the agreement")
 		return
@@ -209,8 +202,17 @@ func (r *Reducer) sendAgreement(hash []byte, svs []*agreement.StepVotes) {
 	}
 
 	// then we forward the marshalled Agreement to the store to be sent
-	if err := r.signer.SendAuthenticated(topics.Agreement, hash, eventBuf, r.ID()); err != nil {
+	if err := r.signer.SendAuthenticated(topics.Agreement, hdr, eventBuf, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in Ed25519 signing and gossip the agreement")
+	}
+}
+
+func (r *Reducer) constructHeader(step uint8, hash []byte) header.Header {
+	return header.Header{
+		Round:     r.round,
+		Step:      step,
+		PubKeyBLS: r.keys.BLSPubKeyBytes,
+		BlockHash: hash,
 	}
 }
 

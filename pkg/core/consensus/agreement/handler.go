@@ -89,13 +89,8 @@ func (a *handler) Verify(ev Agreement) error {
 }
 
 func verifyWhole(a Agreement) error {
-	payloadBuf := new(bytes.Buffer)
-	if err := MarshalVotes(payloadBuf, a.VotesPerStep); err != nil {
-		return err
-	}
-
 	r := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(r, a.Header, payloadBuf.Bytes()); err != nil {
+	if err := header.MarshalSignableVote(r, a.Header); err != nil {
 		return err
 	}
 

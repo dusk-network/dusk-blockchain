@@ -30,11 +30,9 @@ func MockAgreementEvent(hash []byte, round uint64, step uint8, keys []key.Consen
 	a := New(header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: cKeys[idx].BLSPubKeyBytes})
 	// generating reduction events (votes) and signing them
 	steps := GenVotes(hash, round, step, keys, p)
-	buf := new(bytes.Buffer)
-	_ = MarshalVotes(buf, steps)
 
 	whole := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(whole, a.Header, buf.Bytes()); err != nil {
+	if err := header.MarshalSignableVote(whole, a.Header); err != nil {
 		panic(err)
 	}
 
@@ -122,7 +120,7 @@ func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.Con
 			}
 
 			r := new(bytes.Buffer)
-			if err := header.MarshalSignableVote(r, h, nil); err != nil {
+			if err := header.MarshalSignableVote(r, h); err != nil {
 				panic(err)
 			}
 
@@ -211,7 +209,7 @@ func mockReduction(hash []byte, round uint64, step uint8, keys []key.ConsensusKe
 	hdr := header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: keys[idx].BLSPubKeyBytes}
 
 	r := new(bytes.Buffer)
-	_ = header.MarshalSignableVote(r, hdr, nil)
+	_ = header.MarshalSignableVote(r, hdr)
 	sigma, _ := bls.Sign(keys[idx].BLSSecretKey, keys[idx].BLSPubKey, r.Bytes())
 	signedHash := sigma.Compress()
 	return consensus.Event{hdr, *bytes.NewBuffer(signedHash)}

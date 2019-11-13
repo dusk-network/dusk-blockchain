@@ -13,7 +13,7 @@ func TestSecondStep(t *testing.T) {
 	hlp, hash := Kickstart(50, 1*time.Second)
 
 	// Generate first StepVotes
-	svs := agreement.GenVotes(hash, 1, 3, hlp.Keys, hlp.P)
+	svs := agreement.GenVotes(hash, 1, 2, hlp.Keys, hlp.P)
 
 	// Start the first step
 	if err := hlp.ActivateReduction(hash, svs[0]); err != nil {
@@ -34,8 +34,8 @@ func TestSecondStep(t *testing.T) {
 	assert.NoError(t, agreement.Unmarshal(&agBuf, ag))
 
 	// StepVotes should be valid
-	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[0], 1))
-	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[1], 2))
+	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[0], 0))
+	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[1], 1))
 }
 
 func TestSecondStepAfterFailure(t *testing.T) {

@@ -19,27 +19,13 @@ type mockSigner struct {
 	bus  *eventbus.EventBus
 }
 
-func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
+func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer, id uint32) error {
-	pubKeyBuf := new(bytes.Buffer)
-	if err := encoding.WriteVarBytes(pubKeyBuf, m.keys.BLSPubKeyBytes); err != nil {
-		return err
-	}
-
-	stateBuf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(stateBuf, 1); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint8(stateBuf, 1); err != nil {
-		return err
-	}
-
-	buf, err := header.Compose(*pubKeyBuf, *stateBuf, blockHash)
-	if err != nil {
+func (m *mockSigner) SendAuthenticated(topic topics.Topic, hdr header.Header, payload *bytes.Buffer, id uint32) error {
+	buf := new(bytes.Buffer)
+	if err := header.Marshal(buf, hdr); err != nil {
 		return err
 	}
 
@@ -47,7 +33,7 @@ func (m *mockSigner) SendAuthenticated(topic topics.Topic, blockHash []byte, pay
 		return err
 	}
 
-	signed, err := addEd25519Header(topic, m.keys, &buf)
+	signed, err := addEd25519Header(topic, m.keys, buf)
 	m.bus.Publish(topics.Gossip, signed)
 	return err
 }

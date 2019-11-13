@@ -372,16 +372,9 @@ func (c *Coordinator) dispatchQueuedEvents() {
 // XXX: adjust the signature verification on reduction (and agreement)
 // Sign uses the blockhash (which is lost when decoupling the Header and the Payload) to recompose the Header and sign the Payload
 // by adding it to the signature. Argument packet can be nil
-func (c *Coordinator) Sign(hash, packet []byte) ([]byte, error) {
+func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 	preimage := new(bytes.Buffer)
-	h := header.Header{
-		Round:     c.Round(),
-		Step:      c.Step(),
-		BlockHash: hash,
-		PubKeyBLS: c.keys.BLSPubKeyBytes,
-	}
-
-	if err := header.MarshalSignableVote(preimage, h, packet); err != nil {
+	if err := header.MarshalSignableVote(preimage, h); err != nil {
 		return nil, err
 	}
 
@@ -394,13 +387,13 @@ func (c *Coordinator) Sign(hash, packet []byte) ([]byte, error) {
 }
 
 // SendAuthenticated sign the payload with Ed25519 and publishes it to the Gossip topic
-func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, payload *bytes.Buffer, id uint32) error {
+func (c *Coordinator) SendAuthenticated(topic topics.Topic, hdr header.Header, payload *bytes.Buffer, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
 
-	buf, err := header.Compose(c.pubkeyBuf, c.ToBuffer(), blockHash)
-	if err != nil {
+	buf := new(bytes.Buffer)
+	if err := header.Marshal(buf, hdr); err != nil {
 		return err
 	}
 
@@ -422,7 +415,7 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, blockHash []byte, pa
 	}
 
 	// adding marshalled header+payload
-	if _, err := whole.ReadFrom(&buf); err != nil {
+	if _, err := whole.ReadFrom(buf); err != nil {
 		return err
 	}
 

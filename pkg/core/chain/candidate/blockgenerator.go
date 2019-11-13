@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -103,7 +104,14 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	lg.Debugln("sending score")
-	if err := bg.signer.SendAuthenticated(topics.Score, blk.Header.Hash, scoreBuf, bg.ID()); err != nil {
+	hdr := header.Header{
+		Round:     e.Header.Round,
+		Step:      e.Header.Step,
+		PubKeyBLS: e.Header.PubKeyBLS,
+		BlockHash: blk.Header.Hash,
+	}
+
+	if err := bg.signer.SendAuthenticated(topics.Score, hdr, scoreBuf, bg.ID()); err != nil {
 		return err
 	}
 
@@ -113,7 +121,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	lg.Debugln("sending candidate")
-	return bg.signer.SendAuthenticated(topics.Candidate, blk.Header.Hash, buf, bg.ID())
+	return bg.signer.SendAuthenticated(topics.Candidate, hdr, buf, bg.ID())
 }
 
 func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {

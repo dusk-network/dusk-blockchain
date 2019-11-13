@@ -20,7 +20,7 @@ func TestSuccessfulAggro(t *testing.T) {
 	res := make(chan error, 1)
 	test := func(hash []byte, svs ...*agreement.StepVotes) {
 		assert.Equal(t, hlp.Step(), svs[0].Step)
-		res <- hlp.Verify(hash, svs[0], 2)
+		res <- hlp.Verify(hash, svs[0], hlp.Step())
 	}
 
 	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)

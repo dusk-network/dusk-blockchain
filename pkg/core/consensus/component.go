@@ -23,11 +23,11 @@ const (
 // Signer encapsulate the credentials to sign or authenticate outgoing events
 type Signer interface {
 	// Sign a payload. The first is parameter is a block hash
-	Sign([]byte, []byte) ([]byte, error)
+	Sign(header.Header) ([]byte, error)
 	// SendAuthenticated performs a ED25519 signature on a message before forwarding
 	// It accepts a topic, a blockhash, a payload and the ID of the requesting
 	// component
-	SendAuthenticated(topics.Topic, []byte, *bytes.Buffer, uint32) error
+	SendAuthenticated(topics.Topic, header.Header, *bytes.Buffer, uint32) error
 	// SendWithHeader is used for internal forwarding. It exposes the same
 	// parameters as SendAuthenticated but does not perform a ED25519 signature
 	// on the Event (and neither forwards it to the Gossip topic

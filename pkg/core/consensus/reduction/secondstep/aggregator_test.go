@@ -15,7 +15,7 @@ func TestSuccessfulAggro(t *testing.T) {
 
 	res := make(chan error, 1)
 	test := func(hash []byte, svs ...*agreement.StepVotes) {
-		res <- hlp.Verify(hash, svs[1], 1)
+		res <- hlp.Verify(hash, svs[1], hlp.Step())
 	}
 
 	var sv *agreement.StepVotes

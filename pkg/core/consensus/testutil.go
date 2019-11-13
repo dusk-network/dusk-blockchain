@@ -24,7 +24,7 @@ type SimplePlayer struct {
 // NewSimplePlayer creates a SimplePlayer
 func NewSimplePlayer() *SimplePlayer {
 	return &SimplePlayer{
-		step:  1,
+		step:  0,
 		Round: 1,
 	}
 }

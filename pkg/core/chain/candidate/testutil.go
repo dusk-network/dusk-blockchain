@@ -22,11 +22,11 @@ type mockSigner struct {
 	bus *eventbus.EventBus
 }
 
-func (m *mockSigner) Sign([]byte, []byte) ([]byte, error) {
+func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
+func (m *mockSigner) SendAuthenticated(topic topics.Topic, hdr header.Header, b *bytes.Buffer, id uint32) error {
 	m.bus.Publish(topic, b)
 	return nil
 }

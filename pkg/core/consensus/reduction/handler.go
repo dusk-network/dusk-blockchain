@@ -45,7 +45,7 @@ func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 // Verify the BLS signature of the Reduction event. Since the payload is nil, verifying the signature equates to verifying solely the Header
 func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
 	packet := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(packet, hdr, nil); err != nil {
+	if err := header.MarshalSignableVote(packet, hdr); err != nil {
 		return err
 	}
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
@@ -102,7 +103,7 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 		return err
 	}
 
-	if err := s.repropagate(ev); err != nil {
+	if err := s.repropagate(e.Header, ev); err != nil {
 		return err
 	}
 
@@ -152,12 +153,12 @@ func (s *Selector) publishBestEvent() error {
 	return nil
 }
 
-func (s *Selector) repropagate(ev Score) error {
+func (s *Selector) repropagate(hdr header.Header, ev Score) error {
 	buf := new(bytes.Buffer)
 	if err := MarshalScore(buf, &ev); err != nil {
 		return err
 	}
 
-	s.signer.SendAuthenticated(topics.Score, ev.VoteHash, buf, s.ID())
+	s.signer.SendAuthenticated(topics.Score, hdr, buf, s.ID())
 	return nil
 }

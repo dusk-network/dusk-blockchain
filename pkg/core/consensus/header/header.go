@@ -145,23 +145,8 @@ func UnmarshalFields(r *bytes.Buffer, h *Header) error {
 // MarshalSignableVote marshals the fields necessary for a Committee member to cast
 // a Vote (namely the Round, the Step and the BlockHash).
 // Note: UnmarshalSignableVote does not make sense as the only reason to use it would be if we could somehow revert a signature to the preimage and thus unmarshal it into a struct :P
-func MarshalSignableVote(r *bytes.Buffer, h Header, packet []byte) error {
-	if err := MarshalFields(r, h); err != nil {
-		return err
-	}
-
-	if packet != nil {
-		switch len(packet) {
-		case 32:
-			return encoding.Write256(r, packet)
-		case 64:
-			return encoding.Write512(r, packet)
-		default:
-			return encoding.WriteVarBytes(r, packet)
-		}
-	}
-
-	return nil
+func MarshalSignableVote(r *bytes.Buffer, h Header) error {
+	return MarshalFields(r, h)
 }
 
 // VerifySignatures verifies the BLS aggregated signature carried by consensus related messages.
@@ -174,7 +159,7 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 		BlockHash: blockHash,
 	}
 
-	if err := MarshalSignableVote(signed, vote, nil); err != nil {
+	if err := MarshalSignableVote(signed, vote); err != nil {
 		return err
 	}
 
