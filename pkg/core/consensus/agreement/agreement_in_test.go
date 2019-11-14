@@ -9,7 +9,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -17,6 +16,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -148,9 +148,9 @@ func TestStress(t *testing.T) {
 }
 
 func TestIncrementOnNilVoteSet(t *testing.T) {
-	var k []user.Keys
+	var k []key.ConsensusKeys
 	for i := 0; i < 50; i++ {
-		keys, _ := user.NewRandKeys()
+		keys, _ := key.NewRandConsensusKeys()
 		k = append(k, keys)
 	}
 	bus := eventbus.New()
@@ -174,7 +174,7 @@ func TestIncrementOnNilVoteSet(t *testing.T) {
 	assert.Equal(t, uint8(2), broker.state.Step())
 }
 
-func createVoteSet(t *testing.T, k []user.Keys, hash []byte, size int, round uint64) (events []wire.Event) {
+func createVoteSet(t *testing.T, k []key.ConsensusKeys, hash []byte, size int, round uint64) (events []wire.Event) {
 	for i := 1; i <= 2; i++ {
 		// We should only pick a certain key once, no dupes.
 		picked := make(map[int]struct{})

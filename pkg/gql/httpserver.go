@@ -71,7 +71,7 @@ func (s *Server) Start() error {
 		r.Close = true
 
 		if s.started {
-			handleQuery(s.schema, w, *r, s.db)
+			handleQuery(s.schema, w, r, s.db)
 		} else {
 			log.Warn("HTTP service is not running")
 		}

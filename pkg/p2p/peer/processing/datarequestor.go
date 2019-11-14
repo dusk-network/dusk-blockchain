@@ -4,11 +4,12 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 // DataRequestor is a processing unit which handles inventory messages received from peers
@@ -117,7 +118,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 
 	buf := new(bytes.Buffer)
 	buf.Write(txID)
-	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf, 3))
+	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +130,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 
 	mempoolTxs := make([]transactions.Transaction, lTxs)
 	for i := uint64(0); i < lTxs; i++ {
-		tx, err := transactions.Unmarshal(&r)
+		tx, err := marshalling.UnmarshalTx(&r)
 		if err != nil {
 			return nil, err
 		}

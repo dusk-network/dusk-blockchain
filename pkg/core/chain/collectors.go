@@ -3,10 +3,11 @@ package chain
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-wallet/block"
 )
 
 type (
@@ -34,7 +35,7 @@ func initBlockCollector(eventBus *eventbus.EventBus, topic topics.Topic) chan *b
 
 func (b *blockCollector) Collect(message bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := block.Unmarshal(&message, blk); err != nil {
+	if err := marshalling.UnmarshalBlock(&message, blk); err != nil {
 		return err
 	}
 
@@ -56,7 +57,7 @@ func (c *certificateCollector) Collect(m bytes.Buffer) error {
 	}
 
 	cert := block.EmptyCertificate()
-	if err := block.UnmarshalCertificate(&m, cert); err != nil {
+	if err := marshalling.UnmarshalCertificate(&m, cert); err != nil {
 		return err
 	}
 

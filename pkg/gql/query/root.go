@@ -1,10 +1,6 @@
 package query
 
 import (
-	"context"
-	"fmt"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"
 )
@@ -30,19 +26,4 @@ func NewRoot(rpcBus *rpcbus.RPCBus) *Root {
 		),
 	}
 	return &root
-}
-
-func Execute(query string, schema graphql.Schema, db database.DB) *graphql.Result {
-	result := graphql.Do(graphql.Params{
-		Schema:        schema,
-		RequestString: query,
-		Context:       context.WithValue(context.Background(), "database", db),
-	})
-
-	// Error check
-	if len(result.Errors) > 0 {
-		fmt.Printf("Unexpected errors inside ExecuteQuery: %v", result.Errors)
-	}
-
-	return result
 }

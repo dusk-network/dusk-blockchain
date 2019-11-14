@@ -4,12 +4,13 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 // DataBroker is a processing unit responsible for handling GetData messages. It
@@ -138,7 +139,7 @@ func marshalBlock(b *block.Block) (*bytes.Buffer, error) {
 	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
 	// buf := topics.Topics[topics.Block].Buffer
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, b); err != nil {
+	if err := marshalling.MarshalBlock(buf, b); err != nil {
 		return nil, err
 	}
 
@@ -153,7 +154,7 @@ func marshalTx(tx transactions.Transaction) (*bytes.Buffer, error) {
 	//TODO: following is more efficient, saves an allocation and avoids the explicit Prepend
 	// buf := topics.Topics[topics.Block].Buffer
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
+	if err := marshalling.MarshalTx(buf, tx); err != nil {
 		return nil, err
 	}
 

@@ -118,7 +118,6 @@ func (m *StakeAutomaton) findMostRecentStake() uint64 {
 }
 
 func (m *StakeAutomaton) sendBid() error {
-
 	if m.amount == 0 {
 		return errors.New("zero amount")
 	}
@@ -128,8 +127,12 @@ func (m *StakeAutomaton) sendBid() error {
 	}
 
 	l.Tracef("Sending bid tx (%d,%d)", m.amount, m.lockTime)
+	buf := new(bytes.Buffer)
+	if err := rpcbus.MarshalConsensusTxRequest(buf, m.amount, m.lockTime); err != nil {
+		return err
+	}
 
-	_, err := m.rpcBus.SendBidTx(m.amount, m.lockTime)
+	_, err := m.rpcBus.Call(rpcbus.SendBidTx, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return err
 	}
@@ -138,7 +141,6 @@ func (m *StakeAutomaton) sendBid() error {
 }
 
 func (m *StakeAutomaton) sendStake() error {
-
 	if m.amount == 0 {
 		return errors.New("zero amount")
 	}
@@ -148,11 +150,11 @@ func (m *StakeAutomaton) sendStake() error {
 	}
 
 	l.Tracef("Sending stake tx (%d,%d)", m.amount, m.lockTime)
-
-	_, err := m.rpcBus.SendStakeTx(m.amount, m.lockTime)
-	if err != nil {
+	buf := new(bytes.Buffer)
+	if err := rpcbus.MarshalConsensusTxRequest(buf, m.amount, m.lockTime); err != nil {
 		return err
 	}
 
-	return nil
+	_, err := m.rpcBus.Call(rpcbus.SendStakeTx, rpcbus.NewRequest(*buf), 0)
+	return err
 }

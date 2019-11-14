@@ -7,10 +7,10 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,14 +28,14 @@ type (
 	}
 )
 
-func initBroker(eventBroker eventbus.Broker, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
+func initBroker(eventBroker eventbus.Broker, keys key.ConsensusKeys, timeout time.Duration, rpcBus *rpcbus.RPCBus) *broker {
 	handler := newReductionHandler(keys)
 	return newBroker(eventBroker, handler, timeout, rpcBus)
 }
 
 // Launch creates and wires a broker, initiating the components that
 // have to do with Block Reduction
-func Launch(eventBroker eventbus.Broker, keys user.Keys, timeout time.Duration, rpcBus *rpcbus.RPCBus) {
+func Launch(eventBroker eventbus.Broker, keys key.ConsensusKeys, timeout time.Duration, rpcBus *rpcbus.RPCBus) {
 	broker := initBroker(eventBroker, keys, timeout, rpcBus)
 	go broker.Listen()
 }

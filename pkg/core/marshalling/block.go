@@ -1,13 +1,14 @@
-package block
+package marshalling
 
 import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
-func Marshal(r *bytes.Buffer, b *Block) error {
+func MarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	if err := MarshalHeader(r, b.Header); err != nil {
 		return err
 	}
@@ -19,7 +20,7 @@ func Marshal(r *bytes.Buffer, b *Block) error {
 
 	// TODO: parallelize transaction serialization
 	for _, tx := range b.Txs {
-		if err := transactions.Marshal(r, tx); err != nil {
+		if err := MarshalTx(r, tx); err != nil {
 			return err
 		}
 	}
@@ -27,7 +28,7 @@ func Marshal(r *bytes.Buffer, b *Block) error {
 	return nil
 }
 
-func Unmarshal(r *bytes.Buffer, b *Block) error {
+func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	if err := UnmarshalHeader(r, b.Header); err != nil {
 		return err
 	}
@@ -39,7 +40,7 @@ func Unmarshal(r *bytes.Buffer, b *Block) error {
 
 	b.Txs = make([]transactions.Transaction, lTxs)
 	for i := range b.Txs {
-		tx, err := transactions.Unmarshal(r)
+		tx, err := UnmarshalTx(r)
 		if err != nil {
 			return err
 		}
@@ -49,7 +50,7 @@ func Unmarshal(r *bytes.Buffer, b *Block) error {
 	return nil
 }
 
-func MarshalHashable(r *bytes.Buffer, h *Header) error {
+func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 	if err := encoding.WriteUint8(r, h.Version); err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func MarshalHashable(r *bytes.Buffer, h *Header) error {
 	return nil
 }
 
-func MarshalHeader(r *bytes.Buffer, h *Header) error {
+func MarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	if err := MarshalHashable(r, h); err != nil {
 		return err
 	}
@@ -93,7 +94,7 @@ func MarshalHeader(r *bytes.Buffer, h *Header) error {
 	return nil
 }
 
-func UnmarshalHeader(r *bytes.Buffer, h *Header) error {
+func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	if err := encoding.ReadUint8(r, &h.Version); err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ func UnmarshalHeader(r *bytes.Buffer, h *Header) error {
 	return nil
 }
 
-func MarshalCertificate(r *bytes.Buffer, c *Certificate) error {
+func MarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 	if err := encoding.WriteBLS(r, c.StepOneBatchedSig); err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func MarshalCertificate(r *bytes.Buffer, c *Certificate) error {
 	return nil
 }
 
-func UnmarshalCertificate(r *bytes.Buffer, c *Certificate) error {
+func UnmarshalCertificate(r *bytes.Buffer, c *block.Certificate) error {
 	c.StepOneBatchedSig = make([]byte, 33)
 	if err := encoding.ReadBLS(r, c.StepOneBatchedSig); err != nil {
 		return err

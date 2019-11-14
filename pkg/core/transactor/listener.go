@@ -6,12 +6,13 @@ import (
 	"fmt"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -27,21 +28,21 @@ func (t *Transactor) Listen() {
 		select {
 
 		// Wallet requests to respond to
-		case r := <-createWalletChan:
+		case r := <-t.createWalletChan:
 			handleRequest(r, t.handleCreateWallet, "CreateWallet")
-		case r := <-createFromSeedChan:
+		case r := <-t.createFromSeedChan:
 			handleRequest(r, t.handleCreateFromSeed, "CreateWalletFromSeed")
-		case r := <-loadWalletChan:
+		case r := <-t.loadWalletChan:
 			handleRequest(r, t.handleLoadWallet, "LoadWallet")
 
 		// Transaction requests to respond to
-		case r := <-sendBidTxChan:
+		case r := <-t.sendBidTxChan:
 			handleRequest(r, t.handleSendBidTx, "BidTx")
-		case r := <-sendStakeTxChan:
+		case r := <-t.sendStakeTxChan:
 			handleRequest(r, t.handleSendStakeTx, "StakeTx")
-		case r := <-sendStandardTxChan:
+		case r := <-t.sendStandardTxChan:
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
-		case r := <-getBalanceChan:
+		case r := <-t.getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
 
 		// Event list to handle
@@ -51,20 +52,20 @@ func (t *Transactor) Listen() {
 	}
 }
 
-func handleRequest(r rpcbus.Req, handler func(r rpcbus.Req) error, name string) {
+func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name string) {
 
 	log.Infof("Handling %s request", name)
 
 	if err := handler(r); err != nil {
 		log.Errorf("Failed %s request: %v", name, err)
-		r.ErrChan <- err
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}
 
 	log.Infof("Handled %s request", name)
 }
 
-func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
+func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -87,12 +88,12 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Req) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 
 	return nil
 }
 
-func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
+func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -125,12 +126,12 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Req) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 
 	return nil
 }
 
-func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
+func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
 	}
@@ -159,12 +160,12 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Req) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 
 	return nil
 }
 
-func (t *Transactor) handleSendBidTx(r rpcbus.Req) error {
+func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 	if t.w == nil {
 		return errWalletNotLoaded
 	}
@@ -194,11 +195,11 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Req) error {
 		return err
 	}
 
-	r.RespChan <- *bytes.NewBuffer(txid)
+	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
 	return nil
 }
 
-func (t *Transactor) handleSendStakeTx(r rpcbus.Req) error {
+func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
@@ -229,12 +230,12 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Req) error {
 		return err
 	}
 
-	r.RespChan <- *bytes.NewBuffer(txid)
+	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
 
 	return nil
 }
 
-func (t *Transactor) handleSendStandardTx(r rpcbus.Req) error {
+func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
@@ -265,12 +266,12 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Req) error {
 		return err
 	}
 
-	r.RespChan <- *bytes.NewBuffer(txid)
+	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
 
 	return nil
 }
 
-func (t *Transactor) handleBalance(r rpcbus.Req) error {
+func (t *Transactor) handleBalance(r rpcbus.Request) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
@@ -292,13 +293,13 @@ func (t *Transactor) handleBalance(r rpcbus.Req) error {
 		return err
 	}
 
-	r.RespChan <- *buf
+	r.RespChan <- rpcbus.Response{*buf, nil}
 	return nil
 }
 
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	if err := transactions.Marshal(buf, tx); err != nil {
+	if err := marshalling.MarshalTx(buf, tx); err != nil {
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 

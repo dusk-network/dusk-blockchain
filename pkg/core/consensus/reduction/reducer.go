@@ -128,8 +128,8 @@ func (r *reducer) handleFirstResult(events []wire.Event) []byte {
 		// If our result was not a zero value hash, we should first verify it
 		// before voting on it again
 		if !bytes.Equal(hash, emptyHash[:]) {
-			req := rpcbus.NewRequest(*(bytes.NewBuffer(hash)), 5)
-			if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req); err != nil {
+			req := rpcbus.NewRequest(*(bytes.NewBuffer(hash)))
+			if _, err := r.rpcBus.Call(rpcbus.VerifyCandidateBlock, req, 5); err != nil {
 				log.WithFields(log.Fields{
 					"process": "reduction",
 					"error":   err,
@@ -182,7 +182,7 @@ func (r *reducer) GenerateReduction(hash []byte) (*bytes.Buffer, error) {
 	vote := new(bytes.Buffer)
 
 	h := &header.Header{
-		PubKeyBLS: r.ctx.handler.Keys.BLSPubKeyBytes,
+		PubKeyBLS: r.ctx.handler.ConsensusKeys.BLSPubKeyBytes,
 		Round:     r.ctx.state.Round(),
 		Step:      r.ctx.state.Step(),
 		BlockHash: hash,
@@ -192,7 +192,7 @@ func (r *reducer) GenerateReduction(hash []byte) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	if err := SignBuffer(vote, r.ctx.handler.Keys); err != nil {
+	if err := SignBuffer(vote, r.ctx.handler.ConsensusKeys); err != nil {
 		return nil, err
 	}
 

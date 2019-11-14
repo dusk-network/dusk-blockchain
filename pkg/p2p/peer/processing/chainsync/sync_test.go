@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -60,7 +60,7 @@ func TestSynchronizeSynced(t *testing.T) {
 func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, txBatchCount)
 	buf := new(bytes.Buffer)
-	if err := block.Marshal(buf, blk); err != nil {
+	if err := marshalling.MarshalBlock(buf, blk); err != nil {
 		panic(err)
 	}
 
@@ -80,6 +80,8 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.Ev
 // Dummy goroutine which simply sends a random block back when the ChainSynchronizer
 // requests the last block.
 func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
-	r := <-rpcbus.GetLastBlockChan
-	r.RespChan <- *randomBlockBuffer(t, 0, 1)
+	g := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastBlock, g)
+	r := <-g
+	r.RespChan <- rpcbus.Response{*randomBlockBuffer(t, 0, 1), nil}
 }

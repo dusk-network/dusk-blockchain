@@ -8,6 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +24,7 @@ func TestCreateVotingCommittee(t *testing.T) {
 	assert.Equal(t, 50, committee.Size())
 }
 
-type sortedKeys []user.Keys
+type sortedKeys []key.ConsensusKeys
 
 func (s sortedKeys) Len() int      { return len(s) }
 func (s sortedKeys) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
@@ -32,7 +33,7 @@ func (s sortedKeys) Less(i, j int) bool {
 	return btoi(s[i]).Cmp(btoi(s[j])) < 0
 }
 
-func btoi(k user.Keys) *big.Int {
+func btoi(k key.ConsensusKeys) *big.Int {
 	b := k.BLSPubKeyBytes
 	return (&big.Int{}).SetBytes(b)
 }

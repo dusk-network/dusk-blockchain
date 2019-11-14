@@ -5,27 +5,28 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 var PregenerationAmount uint8 = 8
 
 type Handler struct {
-	user.Keys
+	key.ConsensusKeys
 	Provisioners user.Provisioners
 	Committees   []user.VotingCommittee
 	lock         sync.RWMutex
 }
 
-func NewHandler(keys user.Keys) *Handler {
+func NewHandler(keys key.ConsensusKeys) *Handler {
 	return &Handler{
-		Keys:       keys,
-		Committees: make([]user.VotingCommittee, math.MaxUint8),
+		ConsensusKeys: keys,
+		Committees:    make([]user.VotingCommittee, math.MaxUint8),
 	}
 }
 
 // AmMember checks if we are part of the committee for a given round and step.
 func (b *Handler) AmMember(round uint64, step uint8, maxSize int) bool {
-	return b.IsMember(b.Keys.BLSPubKeyBytes, round, step, maxSize)
+	return b.IsMember(b.ConsensusKeys.BLSPubKeyBytes, round, step, maxSize)
 }
 
 // IsMember checks if a provisioner with a given BLS public key is

@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +20,7 @@ import (
 // peer). The EventBuffer is skipped (while the same processing is applied) to
 // avoid the concurrent process that it would otherwise introduce
 func TestReductionIntegrity(t *testing.T) {
-	k, _ := user.NewRandKeys()
+	k, _ := key.NewRandConsensusKeys()
 
 	// Sending a mock reduction event out
 	blockHash, _ := crypto.RandEntropy(32)

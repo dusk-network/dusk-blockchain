@@ -4,9 +4,9 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 // MockVoteSetBuffer mocks a slice of Reduction events for two adjacent steps,
@@ -39,7 +39,7 @@ func MockVoteSet(hash []byte, round uint64, step uint8, amount int) []wire.Event
 func MockVotes(hash []byte, round uint64, step uint8, amount int) []wire.Event {
 	var voteSet []wire.Event
 	for i := 0; i < amount; i++ {
-		k, _ := user.NewRandKeys()
+		k, _ := key.NewRandConsensusKeys()
 		r := MockReduction(k, hash, round, step)
 		voteSet = append(voteSet, r)
 	}
@@ -48,7 +48,7 @@ func MockVotes(hash []byte, round uint64, step uint8, amount int) []wire.Event {
 }
 
 // MockReduction mocks a Reduction event and returns it.
-func MockReduction(keys user.Keys, hash []byte, round uint64, step uint8) *Reduction {
+func MockReduction(keys key.ConsensusKeys, hash []byte, round uint64, step uint8) *Reduction {
 	reduction := MockOutgoingReduction(hash, round, step)
 	reduction.PubKeyBLS = keys.BLSPubKeyBytes
 
@@ -70,7 +70,7 @@ func MockOutgoingReduction(hash []byte, round uint64, step uint8) *Reduction {
 }
 
 // MockReductionBuffer mocks a Reduction event, marshals it, and returns the resulting buffer.
-func MockReductionBuffer(keys user.Keys, hash []byte, round uint64, step uint8) *bytes.Buffer {
+func MockReductionBuffer(keys key.ConsensusKeys, hash []byte, round uint64, step uint8) *bytes.Buffer {
 	ev := MockReduction(keys, hash, round, step)
 	marshaller := NewUnMarshaller()
 	buf := new(bytes.Buffer)

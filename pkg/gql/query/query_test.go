@@ -2,6 +2,7 @@ package query
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -11,12 +12,12 @@ import (
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	core "github.com/dusk-network/dusk-blockchain/pkg/wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/rangeproof"
+	"github.com/dusk-network/dusk-wallet/block"
+	core "github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/graphql-go/graphql"
 )
 
@@ -83,8 +84,23 @@ func initializeDB(db database.DB) {
 	})
 }
 
+func execute(query string, schema graphql.Schema, db database.DB) *graphql.Result {
+	result := graphql.Do(graphql.Params{
+		Schema:        schema,
+		RequestString: query,
+		Context:       context.WithValue(context.Background(), "database", db),
+	})
+
+	// Error check
+	if len(result.Errors) > 0 {
+		fmt.Printf("Unexpected errors inside ExecuteQuery: %v", result.Errors)
+	}
+
+	return result
+}
+
 func assertQuery(t *testing.T, query, response string) {
-	result, err := json.MarshalIndent(Execute(query, sc, db), "", "\t")
+	result, err := json.MarshalIndent(execute(query, sc, db), "", "\t")
 	if err != nil {
 		t.Errorf("marshal response: %v", err)
 	}

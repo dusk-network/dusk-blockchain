@@ -4,10 +4,10 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/key"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -121,7 +121,7 @@ func (u *UnMarshaller) MarshalVoteSet(r *bytes.Buffer, evs []wire.Event) error {
 }
 
 // SignBuffer is a shortcut to BLS and ED25519 sign a reduction message
-func SignBuffer(buf *bytes.Buffer, keys user.Keys) error {
+func SignBuffer(buf *bytes.Buffer, keys key.ConsensusKeys) error {
 	e := New()
 	if err := header.UnmarshalSignableVote(buf, e.Header); err != nil {
 		return err
@@ -137,7 +137,7 @@ func SignBuffer(buf *bytes.Buffer, keys user.Keys) error {
 }
 
 // Sign adds the BLS and Ed25519 signatures to a Reduction event.
-func Sign(e *Reduction, keys user.Keys) (*bytes.Buffer, error) {
+func Sign(e *Reduction, keys key.ConsensusKeys) (*bytes.Buffer, error) {
 	if err := BlsSign(e, keys); err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func Sign(e *Reduction, keys user.Keys) (*bytes.Buffer, error) {
 
 // BlsSign is a shortcut to create a BLS signature of a reduction vote and fill the
 // proper field in Reduction struct
-func BlsSign(ev *Reduction, keys user.Keys) error {
+func BlsSign(ev *Reduction, keys key.ConsensusKeys) error {
 	buf := new(bytes.Buffer)
 
 	if err := header.MarshalSignableVote(buf, ev.Header); err != nil {
