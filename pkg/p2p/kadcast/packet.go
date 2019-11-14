@@ -28,7 +28,7 @@ func (router *Router) sendPing(reciever *Peer)  {
 	// Attach sender ID
 	payload := append(packType[:], router.myPeerInfo.id[:]...)
 	// Attach IdNonce
-	payload = append(payload[:], getBytesFromUint(&router.myPeerNonce)[:]...)
+	payload = append(payload[:], getBytesFromUint(router.myPeerNonce)[:]...)
 	// Send the packet
 	sendUDPPacket("DuskNetwork", &router.myPeerUDPAddr, reciever.getUDPAddr(), payload)
 }
@@ -41,7 +41,7 @@ func (router *Router) sendPong(reciever *Peer) {
 	// Attach sender ID
 	payload := append(packType[:], router.myPeerInfo.id[:]...)
 	// Attach IdNonce
-	payload = append(payload[:], getBytesFromUint(&router.myPeerNonce)[:]...)
+	payload = append(payload[:], getBytesFromUint(router.myPeerNonce)[:]...)
 	// Send the packet
 	sendUDPPacket("DuskNetwork", &router.myPeerUDPAddr, reciever.getUDPAddr(), payload)
 }

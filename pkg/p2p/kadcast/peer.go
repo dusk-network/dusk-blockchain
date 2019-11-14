@@ -25,10 +25,11 @@ func makePeer(ip *[4]byte, port *uint16, id *[16]byte) Peer {
 // that Sybil attacks are more costly.
 func getMyNonce(myPeer *Peer) uint32 {
 	var nonce uint32 = 0
+	var hash [32]byte
 	id := myPeer.id
 	for {
-		println(sha3.Sum256(append(id[:], getBytesFromUint(&nonce)[:]...))[31])
-		if sha3.Sum256(append(id[:], getBytesFromUint(&nonce)[:]...))[31] < 10 {
+		hash = sha3.Sum256(append(id[:], getBytesFromUint(nonce)[:]...))
+		if (hash[31] | hash[30] | hash[29]) == 0 {
 			return nonce
 		}
 		nonce++

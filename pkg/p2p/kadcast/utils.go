@@ -92,11 +92,11 @@ func getLocalIPAddress() net.IP {
 
 // ------------------ ENC/DEC UTILS ------------------ //
 // Set a `uint32` in bytes format.
-func getBytesFromUint(num *uint32) *[4]byte {
+func getBytesFromUint(num uint32) *[4]byte {
 	res := [4]byte{0, 0, 0, 0}
-	for i := 0; *num > 0; i++ {
-		res[i] = byte(*num & 255)
-		*num = *num >> 8
+	for i := 0; num > 0; i++ {
+		res[i] = byte(num & 255)
+		num = num >> 8
 	}
 	return &res
 }
