@@ -20,16 +20,33 @@ type Router struct {
 
 
 
-// Builds a `PING` packet 
+// Builds and sends a `PING` packet 
 func (router *Router) sendPing(reciever *Peer)  {
 	// `PING` Type = 0
 	packType := [1]byte{0}
 	// Build `PING` payload.
+	// Attach sender ID
 	payload := append(packType[:], router.myPeerInfo.id[:]...)
+	// Attach IdNonce
 	payload = append(payload[:], getBytesFromUint(&router.myPeerNonce)[:]...)
-
+	// Send the packet
 	sendUDPPacket("DuskNetwork", &router.myPeerUDPAddr, reciever.getUDPAddr(), payload)
 }
+
+// Builds and sends a `PONG` packet
+func (router *Router) sendPong(reciever *Peer) {
+	// `PONG` Type = 1
+	packType := [1]byte{1}
+	// Build `PING` payload.
+	// Attach sender ID
+	payload := append(packType[:], router.myPeerInfo.id[:]...)
+	// Attach IdNonce
+	payload = append(payload[:], getBytesFromUint(&router.myPeerNonce)[:]...)
+	// Send the packet
+	sendUDPPacket("DuskNetwork", &router.myPeerUDPAddr, reciever.getUDPAddr(), payload)
+}
+
+
 // The function recieves a Packet and 
 func processPacket(netw net.Addr, byteNum int, payload []byte)  {
 	panic("Not implemented yet")
