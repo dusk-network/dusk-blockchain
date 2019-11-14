@@ -1,5 +1,7 @@
 package kadcast
 
+import "golang.org/x/crypto/sha3"
+
 // Peer stores the info of a peer which consists on:
 // - IP of the peer.
 // - Port to connect to it.
@@ -14,6 +16,23 @@ type Peer struct {
 func makePeer(ip *[4]byte, port *uint16, id *[16]byte) Peer {
 	peer := Peer{*ip, *port, *id}
 	return peer
+}
+
+// The function receives the user's `Peer` and computes the
+// ID nonce in order to be able to join the network.
+//
+// This operation is basically a PoW algorithm that ensures
+// that Sybil attacks are more costly.
+func getMyNonce(myPeer *Peer) uint32 {
+	var nonce uint32 = 0
+	id := myPeer.id
+	for {
+		println(sha3.Sum256(append(id[:], getBytesFromUint(&nonce)[:]...))[31])
+		if sha3.Sum256(append(id[:], getBytesFromUint(&nonce)[:]...))[31] < 10 {
+			return nonce
+		}
+		nonce++
+	}
 }
 
 // Sets the Id sent as parameter as the Peer ID.
@@ -32,6 +51,6 @@ func (peer *Peer) addPort(port *uint16) {
 }
 
 // Computes the XOR distance between two Peers.
-func (me Peer) computePeerDistance(peer *Peer) uint16 {
+func (me *Peer) computePeerDistance(peer *Peer) uint16 {
 	return idXor(&me.id, &peer.id)
 }

@@ -6,14 +6,6 @@ import "net"
 // This is basically the routing info of every peer.
 type Tree struct {
 	buckets [128]Bucket
-	// Even the port and the IP are the same info, the difference
-	// is that one IP has type `IP` and the other `[4]byte`.
-	// Since we only store one tree on the application, it's worth
-	// to keep both in order to avoid convert the types continuously.
-	myPeerUDPAddr net.UDPAddr
-	myPeerInfo Peer
-	// Holds the Nonce that satisfies: `H(ID || Nonce) < Tdiff`.
-	myPeerNonce uint32
 }
 
 // Allocates space for a tree and returns an empty intance of it.
@@ -28,19 +20,16 @@ func makeTree(myPeer *Peer) Tree {
 	bucketList[0].addPeerToBucket(*myPeer)
 	return Tree{
 		buckets: bucketList,
-		myPeerUDPAddr: *myPeer.getUDPAddr(),
-		myPeerInfo: *myPeer,
-		myPeerNonce: getMyNonce(myPeer),
 	}
 }
 
 // Classifies and adds a Peer to the routing storage tree.
-func (tree *Tree) addPeer(peer *Peer) {
-	idl := tree.myPeerInfo.computePeerDistance(peer)
+func (tree *Tree) addPeer(myPeer *Peer, otherPeer *Peer) {
+	idl := myPeer.computePeerDistance(otherPeer)
 	if idl == 0 {
 		return
 	}
-	tree.buckets[idl].addPeerToBucket(*peer)
+	tree.buckets[idl].addPeerToBucket(*otherPeer)
 }
 
 // Returns the total ammount of peers that a `Peer` is connected to.
