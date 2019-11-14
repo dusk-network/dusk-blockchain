@@ -16,24 +16,30 @@ const (
 	searchPath1 = "."
 	// home datadir
 	searchPath2 = "$HOME/.dusk/"
-
-	// name for the config file. Does not include extension.
-	configFileName = "dusk"
 )
 
 var (
 	r *Registry
 )
 
-// Registry stores all loaded configurations according to the config order
-// NB It should be cheap to be copied by value
-type Registry struct {
-
+type Base struct {
 	// UsedConfigFile points at the loaded config file
 	UsedConfigFile string
 	// FixedConfigFile fixes the config file to be loaded. If not set,
 	// the default search-for-config procedure is used
 	FixedConfigFile string
+
+	// name for the config file. Does not include extension.
+	ConfigFileName string
+
+	// custom commandline loader
+	loadFlagsFn func() (string, error)
+}
+
+// Registry stores all loaded configurations according to the config order
+// NB It should be cheap to be copied by value
+type Registry struct {
+	Base
 
 	// All configuration groups
 	General     generalConfiguration
@@ -61,12 +67,18 @@ type Registry struct {
 //
 // Dusk configuration file can be in form of TOML, JSON, YAML, HCL or Java
 // properties config files
-func Load() error {
+func Load(configFileName string, secondary interface{}, customflags func() (string, error)) error {
 
 	r = new(Registry)
+	r.ConfigFileName = configFileName
+
+	r.loadFlagsFn = loadFlags
+	if customflags != nil {
+		r.loadFlagsFn = customflags
+	}
 
 	// Initialization
-	if err := r.init(); err != nil {
+	if err := r.init(secondary); err != nil {
 		return err
 	}
 
@@ -80,10 +92,11 @@ func Load() error {
 // NB. It does not overwrite the global Registry
 func LoadFromFile(configPath string) (Registry, error) {
 
-	registry := Registry{FixedConfigFile: configPath}
+	registry := Registry{}
+	registry.FixedConfigFile = configPath
 
 	// Initialization
-	err := registry.init()
+	err := registry.init(nil)
 	return registry, err
 }
 
@@ -93,11 +106,11 @@ func Get() Registry {
 	return *r
 }
 
-func (r *Registry) init() error {
+func (r *Registry) init(secondary interface{}) error {
 
 	// Make an attempt to find dusk.toml/dusk.json/dusk.yaml in any of the
 	// provided paths below
-	viper.SetConfigName(configFileName)
+	viper.SetConfigName(r.ConfigFileName)
 
 	// search paths
 	viper.AddConfigPath(searchPath1)
@@ -107,7 +120,7 @@ func (r *Registry) init() error {
 	confFile := r.FixedConfigFile
 	if len(confFile) == 0 {
 		var err error
-		confFile, err = loadFlags()
+		confFile, err = r.loadFlagsFn()
 		if err != nil {
 			return err
 		}
@@ -130,6 +143,14 @@ func (r *Registry) init() error {
 	// Unmarshal all configurations from all conf levels to the registry struct
 	if err := viper.Unmarshal(&r); err != nil {
 		return fmt.Errorf("unable to decode into struct, %v", err)
+	}
+
+	// Load secondary registry. This would be useful when new projects derives
+	// from dusk node codebase
+	if secondary != nil {
+		if err := viper.Unmarshal(&secondary); err != nil {
+			return fmt.Errorf("secondary: unable to decode into struct, %v", err)
+		}
 	}
 
 	r.UsedConfigFile = viper.ConfigFileUsed()

@@ -1,14 +1,16 @@
 package config
 
 import (
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"os"
 	"testing"
+
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 const (
 	defaultDuskConfig = "--config=./samples/default.dusk.toml"
+	customConfig      = "--config=./samples/custom.toml"
 )
 
 var initialArgs = os.Args
@@ -22,7 +24,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 	// Mock command line arguments
 	os.Args = append(os.Args, defaultDuskConfig)
 
-	if err := Load(); err != nil {
+	if err := Load("default.dusk", nil, nil); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
@@ -50,7 +52,7 @@ func TestSupportedFlags(t *testing.T) {
 	os.Args = append(os.Args, "--logger.output=modified")
 
 	// This relies on default.dusk.toml
-	if err := Load(); err != nil {
+	if err := Load("default.dusk", nil, nil); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
@@ -89,7 +91,7 @@ func TestSupportedEnv(t *testing.T) {
 	viper.AutomaticEnv()
 
 	// This relies on default.dusk.toml
-	if err := Load(); err != nil {
+	if err := Load("default.dusk", nil, nil); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
@@ -110,7 +112,7 @@ func TestReadOnly(t *testing.T) {
 	os.Args = append(os.Args, defaultDuskConfig)
 
 	// This relies on default.dusk.toml
-	if err := Load(); err != nil {
+	if err := Load("default.dusk", nil, nil); err != nil {
 		t.Errorf("Failed parse: %v", err)
 	}
 
@@ -123,6 +125,36 @@ func TestReadOnly(t *testing.T) {
 
 	if Get().Logger.Level != "trace" {
 		t.Errorf("Invalid config %s", Get().Logger.Level)
+	}
+}
+
+func TestSecondaryRegistry(t *testing.T) {
+
+	Reset()
+
+	// Mock command line arguments
+	os.Args = append(os.Args, customConfig)
+
+	type customConfiguration struct {
+		Key string
+	}
+	type SecondaryRegistry struct {
+		Custom customConfiguration
+	}
+
+	r2 := new(SecondaryRegistry)
+
+	// This relies on default.dusk.toml
+	if err := Load("custom", r2, nil); err != nil {
+		t.Errorf("Failed parse: %v", err)
+	}
+
+	if Get().General.Network != "testnet" {
+		t.Errorf("Invalid Network value: %s", Get().General.Network)
+	}
+
+	if r2.Custom.Key != "value" {
+		t.Errorf("Invalid Custom Key value: %s", r2.Custom.Key)
 	}
 }
 
