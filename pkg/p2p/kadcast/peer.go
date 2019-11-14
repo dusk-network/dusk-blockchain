@@ -13,8 +13,9 @@ type Peer struct {
 }
 
 // Constructs a Peer with it's fields values as inputs.
-func makePeer(ip *[4]byte, port *uint16, id *[16]byte) Peer {
-	peer := Peer{*ip, *port, *id}
+func makePeer(ip *[4]byte, port *uint16) Peer {
+	id := computePeerID(*ip)
+	peer := Peer{*ip, *port, id}
 	return peer
 }
 

@@ -47,11 +47,12 @@ func countSetBits(byt *byte) uint16 {
 
 // ------------------ HASH KEY UTILS ------------------ //
 
-// Performs the hash of the wallet Sk
-// and uses it as the ID of a Peer.
-func computePeerID(key *[32]byte) [16]byte {
+// Performs the hash of the wallet public
+// IP address and gets the first 16 bytes of 
+// it.
+func computePeerID(externIP [4]byte) [16]byte {
 	var halfLenID [16]byte
-	doubleLenID := sha3.Sum256(key[:])
+	doubleLenID := sha3.Sum256(externIP[:])
 	copy(halfLenID[:], doubleLenID[0:15])
 	return halfLenID
 }
