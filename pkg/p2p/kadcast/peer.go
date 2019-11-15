@@ -61,6 +61,8 @@ func (me Peer) computePeerDistance(peer Peer) uint16 {
 	return idXor(&me.id, &peer.id)
 }
 
+// TODO: VerifyNonce function.
+
 // Reads the network info of a `Peer` and returns its
 // corresponding `UDPAddr` struct.
 func (peer Peer) getUDPAddr() net.UDPAddr {
@@ -72,8 +74,8 @@ func (peer Peer) getUDPAddr() net.UDPAddr {
 }
 
 // Builds the Peer info from a UPDAddress struct.
-func getPeerNetworkInfo(udpAddress *net.UDPAddr) ([4]byte, uint8) {
+func getPeerNetworkInfo(udpAddress net.UDPAddr) ([4]byte, uint16) {
 	var ip [4]byte
 	copy(ip[:], udpAddress.IP[:])
-	return ip, uint8(udpAddress.Port)
+	return ip, uint16(udpAddress.Port)
 }
