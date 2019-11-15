@@ -2,17 +2,15 @@ package kadcast
 
 import "testing"
 
-import "time"
-
 func TestStuff(t *testing.T) {
-	a := [4]byte{255,255,255,255}
+	a := [4]byte{255, 255, 255, 255}
 	println(*getUintFromBytes(&a))
 }
 func testPOW(t *testing.T) {
 	a := Peer{
-		ip: [4]byte{192, 169, 1, 1},
+		ip:   [4]byte{192, 169, 1, 1},
 		port: 25519,
-		id: [16]byte{22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22},
+		id:   [16]byte{22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22},
 	}
 
 	println(a.computePeerNonce())
@@ -24,13 +22,13 @@ func TestUDP(t *testing.T) {
 	router := makeRouter(ip, port)
 	//lAddr := getLocalIPAddress()
 
-	go startUDPListener("udp")
-
-	println("HIIIII")
+	go startUDPListener("udp", &router)
 
 	destPeer := makePeer(ip, port)
 
 	// Send PING packet
 	router.sendPing(destPeer)
-	time.Sleep(100000000)
+	for {
+
+	}
 }

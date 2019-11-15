@@ -1,16 +1,26 @@
 package kadcast
 
-import "net"
-
-import "fmt"
+import (
+	"log"
+	"net"
+)
 
 type Packet struct {
 	headers [22]byte
 }
 
 // The function recieves a Packet and
-func processPacket(netw net.Addr, byteNum int, payload []byte) {
-	fmt.Println(netw.Network())
-	fmt.Println(byteNum)
-	fmt.Println(payload[:])
+func processPacket(sender net.UDPAddr, byteNum int, payload []byte, router *Router) {
+	log.Printf("Revieved new packet from: %s", sender.IP)
+	destIP, port := getPeerNetworkInfo(sender)
+	var id [16]byte
+	copy(id[:], payload[1:17])
+	dest := Peer {
+		ip: destIP,
+		port: port,
+		id: id,
+	}
+	if payload[0] == 0 {
+		router.sendPong(dest)
+	}
 }
