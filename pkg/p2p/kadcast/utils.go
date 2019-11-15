@@ -59,28 +59,11 @@ func computePeerID(externIP [4]byte) [16]byte {
 
 // ------------------ NET UTILS ------------------ //
 
-// Reads the network info of a `Peer` and returns the
-// corresponding `UDPAddr` struct.
-func (peer *Peer) getUDPAddr() *net.UDPAddr {
-	return &net.UDPAddr{
-		IP:   peer.ip[:],
-		Port: int(peer.port),
-		Zone: "N/A",
-	}
-}
-
-// Builds the Peer info from a UPD packet data.
-func getPeerNetworkInfo(udpAddress *net.UDPAddr) ([4]byte, uint8) {
-	var ip [4]byte
-	copy(ip[:], udpAddress.IP[:])
-	return ip, uint8(udpAddress.Port)
-}
-
 // Gets the local IP address of the machine where
 // the node is running.
 //
 // Panics if it there's not connection.
-func getLocalIPAddress() net.IP {
+func getLocalIPAddress() net.UDPAddr {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
@@ -88,7 +71,7 @@ func getLocalIPAddress() net.IP {
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP
+	return *localAddr
 }
 
 // ------------------ ENC/DEC UTILS ------------------ //
