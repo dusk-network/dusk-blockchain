@@ -7,11 +7,11 @@ import (
 
 // Listens infinitely for UDP packet arrivals and 
 // executes it's processing inside a gorutine.
-func startUDPListener(netw string, udpAddr *net.UDPAddr) {
-
+func startUDPListener(netw string) {
+	lAddr := getLocalIPAddress()
 	for {
 		// listen to incoming udp packets
-		pc, err := net.ListenUDP(netw, udpAddr)
+		pc, err := net.ListenUDP(netw, &lAddr)
 		if err != nil {
 			log.Println(err)
 		}
@@ -27,8 +27,9 @@ func startUDPListener(netw string, udpAddr *net.UDPAddr) {
 
 // Gets the local address of the sender `Peer` and the UDPAddress of the
 // reciever `Peer` and sends to it a UDP Packet with the payload inside.
-func sendUDPPacket(netw string, localAddr *net.UDPAddr, addr *net.UDPAddr, payload []byte) {
-	conn, err := net.DialUDP(netw, localAddr, addr)
+func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
+	localAddr := getLocalIPAddress()
+	conn, err := net.DialUDP(netw, &localAddr, &addr)
 	if err != nil {
 		log.Println(err)
 	}
