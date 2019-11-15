@@ -7,7 +7,7 @@ import (
 
 // Listens infinitely for UDP packet arrivals and 
 // executes it's processing inside a gorutine.
-func startUDPListener(netw string) {
+func startUDPListener(netw string, router *Router) {
 	lAddr := getLocalIPAddress()
 	for {
 		// listen to incoming udp packets
@@ -21,7 +21,7 @@ func startUDPListener(netw string) {
 		buffer := make([]byte, 1024)
 		
 		byteNum, uAddr, _ := pc.ReadFromUDP(buffer)
-		go processPacket(uAddr, byteNum, buffer)
+		go processPacket(*uAddr, byteNum, buffer, router)
 	}
 }
 
