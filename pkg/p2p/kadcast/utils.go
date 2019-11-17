@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"log"
+	"errors"
 	"net"
 
 	"golang.org/x/crypto/sha3"
@@ -55,6 +56,23 @@ func computePeerID(externIP [4]byte) [16]byte {
 	doubleLenID := sha3.Sum256(externIP[:])
 	copy(halfLenID[:], doubleLenID[0:15])
 	return halfLenID
+}
+
+// This function is a middleware that allows the peer to verify
+// other Peers nonce's and validate them if they are correct.
+func verifyIDNonce(id [16]byte, senderAddr net.UDPAddr, nonce [4]byte) (*Peer, error) {
+	hash := sha3.Sum256(append(id[:], nonce[:]...))
+	if (hash[31] | hash[30] | hash[29]) == 0 {
+		var peerIP [4]byte
+		copy(peerIP[:], senderAddr.IP[:])
+
+		return &Peer {
+			ip: peerIP,
+			port: uint16(senderAddr.Port),
+			id: id,
+		}, nil
+	}
+	return nil, errors.New("\nId and Nonce are not valid parameters.") //Create error type.
 }
 
 // ------------------ NET UTILS ------------------ //
