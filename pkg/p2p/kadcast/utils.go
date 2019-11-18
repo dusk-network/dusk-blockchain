@@ -88,9 +88,20 @@ func getLocalIPAddress() net.UDPAddr {
 }
 
 // ------------------ ENC/DEC UTILS ------------------ //
+
 // Set a `uint32` in bytes format.
-func getBytesFromUint(num uint32) [4]byte {
+func getBytesFromUint32(num uint32) [4]byte {
 	res := [4]byte{0, 0, 0, 0}
+	for i := 0; num > 0; i++ {
+		res[i] = byte(num & 255)
+		num = num >> 8
+	}
+	return res
+}
+
+// Set a `uint16` in bytes format.
+func getBytesFromUint16(num uint16) [2]byte {
+	res := [2]byte{0, 0}
 	for i := 0; num > 0; i++ {
 		res[i] = byte(num & 255)
 		num = num >> 8

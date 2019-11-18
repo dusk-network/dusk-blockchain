@@ -33,7 +33,7 @@ func (peer Peer) computePeerNonce() uint32 {
 	var hash [32]byte
 	id := peer.id
 	for {
-		bytesUint := getBytesFromUint(nonce)
+		bytesUint := getBytesFromUint32(nonce)
 		hash = sha3.Sum256(append(id[:], bytesUint[:]...))
 		if (hash[31] | hash[30] | hash[29]) == 0 {
 			return nonce
