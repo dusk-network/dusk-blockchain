@@ -1,8 +1,9 @@
 package kadcast
 
 import (
-	"log"
+	"encoding/binary"
 	"errors"
+	"log"
 	"net"
 
 	"golang.org/x/crypto/sha3"
@@ -49,7 +50,7 @@ func countSetBits(byt *byte) uint16 {
 // ------------------ HASH KEY UTILS ------------------ //
 
 // Performs the hash of the wallet public
-// IP address and gets the first 16 bytes of 
+// IP address and gets the first 16 bytes of
 // it.
 func computePeerID(externIP [4]byte) [16]byte {
 	var halfLenID [16]byte
@@ -60,24 +61,19 @@ func computePeerID(externIP [4]byte) [16]byte {
 
 // This function is a middleware that allows the peer to verify
 // other Peers nonce's and validate them if they are correct.
-func verifyIDNonce(id [16]byte, senderAddr net.UDPAddr, nonce [4]byte) (*Peer, error) {
-	log.Printf("Received nonce: %v", getUintFromBytes(nonce))
+func verifyIDNonce(id [16]byte, nonce [4]byte) error {
+	log.Printf("Received nonce: %v", binary.LittleEndian.Uint32(nonce[:]))
 	hash := sha3.Sum256(append(id[:], nonce[:]...))
 	if (hash[31] | hash[30] | hash[29]) == 0 {
-		peerIP, port := getPeerNetworkInfo(senderAddr)
-		return &Peer {
-			ip: peerIP,
-			port: port,
-			id: id,
-		}, nil
+		return nil
 	}
-	return nil, errors.New("\nId and Nonce are not valid parameters.") //TODO: Create error type.
+	return errors.New("\nId and Nonce are not valid parameters.") //TODO: Create error type.
 }
 
 // ------------------ NET UTILS ------------------ //
 
 // Gets the local IP address of the machine where
-// the node is running.
+// the node is running in `net.UDPAddr` format.
 //
 // Panics if it there's not connection.
 func getLocalIPAddress() net.UDPAddr {
@@ -98,14 +94,6 @@ func getBytesFromUint(num uint32) [4]byte {
 	for i := 0; num > 0; i++ {
 		res[i] = byte(num & 255)
 		num = num >> 8
-	}
-	return res
-}
-// Get an `uint32` from a 4-byte array.
-func getUintFromBytes(arr [4]byte) uint32 {
-	var res uint32 = 0
-	for i := 0; i < 4; i++ {
-		res += uint32(uint32(arr[i]) << uint32(8*i))
 	}
 	return res
 }
