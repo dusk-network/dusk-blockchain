@@ -9,19 +9,27 @@ import (
 // executes it's processing inside a gorutine.
 func startUDPListener(netw string, router *Router) {
 	lAddr := getLocalIPAddress()
+	// Set listening port.
+	lAddr.Port = int(router.myPeerInfo.port)
+	log.Printf("%v", lAddr)
+	// listen to incoming udp packets
+	pc, err := net.ListenUDP(netw, &lAddr)
+	if err != nil {
+		log.Println(err)
+	}
+	defer pc.Close()
+	
 	for {
-		// listen to incoming udp packets
-		pc, err := net.ListenUDP(netw, &lAddr)
-		if err != nil {
-			log.Println(err)
-		}
-		defer pc.Close()
-
 		//simple read
 		buffer := make([]byte, 1024)
 		
-		byteNum, uAddr, _ := pc.ReadFromUDP(buffer)
-		go processPacket(*uAddr, byteNum, buffer, router)
+		byteNum, uAddr, err := pc.ReadFromUDP(buffer)
+		if err != nil {
+			log.Printf("%v", err)
+		} else {
+			log.Println("Packet recieved!")
+			go processPacket(*uAddr, byteNum, buffer, router)
+		}
 	}
 }
 
@@ -36,11 +44,11 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	defer conn.Close()
 
 	// Simple write
-	over, err := conn.Write(payload)
+	written, err := conn.Write(payload)
 	if err != nil {
 		log.Println(err)
-	} else if over > 0 {
-		log.Printf("UDP_Packet Sending error: %v bytes were not included", over)
+	} else if written == len(payload) {
+		log.Printf("Sent %v bytes", written)
 	}
 }
 
