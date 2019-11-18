@@ -36,7 +36,8 @@ func (router Router) sendPing(reciever Peer)  {
 	// Attach sender ID
 	payload := append(packType[:], router.myPeerInfo.id[:]...)
 	// Attach IdNonce
-	payload = append(payload[:], getBytesFromUint(router.myPeerNonce)[:]...)
+	idNonce := getBytesFromUint(router.myPeerNonce)
+	payload = append(payload[:], idNonce[:]...)
 	// Since return values from functions are not addressable, we need to
 	// allocate the reciever UDPAddr
 	destUDPAddr := reciever.getUDPAddr()
@@ -52,7 +53,8 @@ func (router Router) sendPong(reciever Peer) {
 	// Attach sender ID
 	payload := append(packType[:], router.myPeerInfo.id[:]...)
 	// Attach IdNonce
-	payload = append(payload[:], getBytesFromUint(router.myPeerNonce)[:]...)
+	idNonce := getBytesFromUint(router.myPeerNonce)
+	payload = append(payload[:], idNonce[:]...)
 	// Since return values from functions are not addressable, we need to
 	// allocate the reciever UDPAddr
 	destUDPAddr := reciever.getUDPAddr()

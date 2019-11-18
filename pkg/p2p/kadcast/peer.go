@@ -33,7 +33,8 @@ func (peer Peer) computePeerNonce() uint32 {
 	var hash [32]byte
 	id := peer.id
 	for {
-		hash = sha3.Sum256(append(id[:], getBytesFromUint(nonce)[:]...))
+		bytesUint := getBytesFromUint(nonce)
+		hash = sha3.Sum256(append(id[:], bytesUint[:]...))
 		if (hash[31] | hash[30] | hash[29]) == 0 {
 			return nonce
 		}
@@ -60,8 +61,6 @@ func (peer *Peer) addPort(port uint16) {
 func (me Peer) computePeerDistance(peer Peer) uint16 {
 	return idXor(&me.id, &peer.id)
 }
-
-// TODO: VerifyNonce function.
 
 // Reads the network info of a `Peer` and returns its
 // corresponding `UDPAddr` struct.

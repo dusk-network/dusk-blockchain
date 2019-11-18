@@ -61,6 +61,7 @@ func computePeerID(externIP [4]byte) [16]byte {
 // This function is a middleware that allows the peer to verify
 // other Peers nonce's and validate them if they are correct.
 func verifyIDNonce(id [16]byte, senderAddr net.UDPAddr, nonce [4]byte) (*Peer, error) {
+	log.Printf("Received nonce: %v", getUintFromBytes(nonce))
 	hash := sha3.Sum256(append(id[:], nonce[:]...))
 	if (hash[31] | hash[30] | hash[29]) == 0 {
 		peerIP, port := getPeerNetworkInfo(senderAddr)
@@ -70,7 +71,7 @@ func verifyIDNonce(id [16]byte, senderAddr net.UDPAddr, nonce [4]byte) (*Peer, e
 			id: id,
 		}, nil
 	}
-	return nil, errors.New("\nId and Nonce are not valid parameters.") //Create error type.
+	return nil, errors.New("\nId and Nonce are not valid parameters.") //TODO: Create error type.
 }
 
 // ------------------ NET UTILS ------------------ //
@@ -92,19 +93,19 @@ func getLocalIPAddress() net.UDPAddr {
 
 // ------------------ ENC/DEC UTILS ------------------ //
 // Set a `uint32` in bytes format.
-func getBytesFromUint(num uint32) *[4]byte {
+func getBytesFromUint(num uint32) [4]byte {
 	res := [4]byte{0, 0, 0, 0}
 	for i := 0; num > 0; i++ {
 		res[i] = byte(num & 255)
 		num = num >> 8
 	}
-	return &res
+	return res
 }
 // Get an `uint32` from a 4-byte array.
-func getUintFromBytes(arr *[4]byte) *uint32 {
+func getUintFromBytes(arr [4]byte) uint32 {
 	var res uint32 = 0
 	for i := 0; i < 4; i++ {
 		res += uint32(uint32(arr[i]) << uint32(8*i))
 	}
-	return &res
+	return res
 }
