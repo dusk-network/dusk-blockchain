@@ -167,6 +167,9 @@ func TestHook(t *testing.T) {
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
+	buf := new(bytes.Buffer)
+	log.SetOutput(buf)
+	defer log.SetOutput(os.Stderr)
 	log.AddHook(supervisor)
 
 	// Log 1000 events, and notify when done
@@ -186,6 +189,44 @@ func TestHook(t *testing.T) {
 	}
 
 	_ = supervisor.Stop()
+}
+
+// Test that setting the deadline on Send does not interfere
+// with other logging operations (for instance the accepted block
+// event)
+func TestDeadline(t *testing.T) {
+	msgChan, _, wg := initTest()
+	eb := eventbus.New()
+	supervisor, err := monitor.Launch(eb, unixSoc)
+	assert.NoError(t, err)
+
+	log.AddHook(supervisor)
+
+	// Send an error entry, to trigger Send
+	log.Errorln("pippo")
+
+	msg := <-msgChan
+	assert.Equal(t, "error", msg["level"])
+	assert.Equal(t, "pippo", msg["msg"])
+
+	// The write deadline is 3 seconds, so let's wait for that to expire
+	time.Sleep(3 * time.Second)
+
+	testBuf := mockBlockBuf(t, 23)
+	eb.Publish(topics.AcceptedBlock, testBuf)
+
+	// Should get the accepted block message on the msgchan
+	for {
+		msg = <-msgChan
+		// We should discard any other messages
+		if msg["code"] == "round" {
+			// Success
+			break
+		}
+	}
+
+	_ = supervisor.Stop()
+	wg.Wait()
 }
 
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
