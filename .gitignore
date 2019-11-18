@@ -11,6 +11,12 @@
 # Test binary, build with `go test -c`
 *.test
 
+# Helper script for test harness
+harness.sh
+
+# Voucher seeder txt file for test harness
+harness/tests/voucherips.txt
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 coverage.txt
@@ -30,3 +36,6 @@ demo/**.*
 
 # wallet.dat
 *wallet.dat
+
+# Testnet binary
+launch/testnet/testnet

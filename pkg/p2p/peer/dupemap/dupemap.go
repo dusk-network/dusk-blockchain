@@ -36,6 +36,5 @@ func (d *DupeMap) CanFwd(payload *bytes.Buffer) bool {
 	if found {
 		return false
 	}
-	d.tmpMap.Add(payload)
-	return true
+	return !d.tmpMap.Add(payload)
 }

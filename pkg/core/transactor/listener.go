@@ -7,6 +7,7 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -63,6 +64,7 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name 
 	}
 
 	log.Infof("Handled %s request", name)
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 }
 
 func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
@@ -192,6 +194,11 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 	//  Publish transaction to the mempool processing
 	txid, err := t.publishTx(tx)
 	if err != nil {
+		return err
+	}
+
+	// Save relevant values in the database for the generation component to use
+	if err := t.writeBidValues(tx); err != nil {
 		return err
 	}
 
@@ -330,4 +337,15 @@ func (t *Transactor) launchConsensus() {
 		log.Tracef("Launch consensus")
 		go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}
+}
+
+func (t *Transactor) writeBidValues(tx transactions.Transaction) error {
+	return t.db.Update(func(tr database.Transaction) error {
+		k, err := t.w.ReconstructK()
+		if err != nil {
+			return err
+		}
+
+		return tr.SaveBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes())
+	})
 }

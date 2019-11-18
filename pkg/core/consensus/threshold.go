@@ -1,6 +1,8 @@
 package consensus
 
-import "math/big"
+import (
+	"math/big"
+)
 
 // Threshold is a number which proof scores should be compared against.
 // If a proof score does not exceed the Threshold value, it should be discarded.
@@ -26,12 +28,12 @@ func (t *Threshold) Lower() {
 	t.limit.Div(t.limit, big.NewInt(2))
 }
 
-// Exceeds checks whether a passed score is higher or lower than the Threshold.
+// Exceeds checks whether the Threshold exceeds a given score.
 func (t *Threshold) Exceeds(score []byte) bool {
 	scoreInt := big.NewInt(0).SetBytes(score)
 	if scoreInt.Cmp(t.limit) == -1 {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }

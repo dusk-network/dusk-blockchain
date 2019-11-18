@@ -13,12 +13,12 @@ import (
 // stored to/retrieved from a Buffer.
 func TestUnMarshal(t *testing.T) {
 	hash, _ := crypto.RandEntropy(32)
-	se := selection.MockSelectionEvent(26, hash)
+	se := selection.MockSelectionEvent(hash)
 
 	buf := new(bytes.Buffer)
-	assert.NoError(t, selection.MarshalScoreEvent(buf, se))
+	assert.NoError(t, selection.MarshalScore(buf, se))
 
-	other := &selection.ScoreEvent{}
-	assert.NoError(t, selection.UnmarshalScoreEvent(buf, other))
-	assert.True(t, other.Equal(se))
+	other := &selection.Score{}
+	assert.NoError(t, selection.UnmarshalScore(buf, other))
+	assert.True(t, other.Equal(*se))
 }

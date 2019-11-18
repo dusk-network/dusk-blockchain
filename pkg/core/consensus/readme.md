@@ -36,35 +36,40 @@ The Provisioner is eligible to participate in two phases:
 
 The two mentioned phases are the way for Provisioners to reach consensus on a single block, which can then be added to the chain.
 
-### Event Driven Architecture
+### Values
 
-The consensus architecture is _event-driven_, chosen for its characteristics of allowing highly scalable applications while keeping the various architectural components highly decoupled and single-purposed. The various phases of the consensus are processed independently by single _components_, each _subscribing_ to and _publishing_ a variety of different _events_ and payloads through multiple _Topic Channels_, implemented through the `EventBus` struct.
+#### Message Header
 
-#### Broker Topology
+| Field     | Type          |
+| --------- | ------------- |
+| pubkeyBLS | BLS Signature |
+| round     | uint64        |
+| step      | uint64        |
+| blockhash | uint256       |
 
-According to the _Broker Topology Strategy_, each component is organized as a lightweight `broker`, where the event flow gets distributed across various sub-components in a chain-like fashion. This topology was chosen in order to keep the event processing flow relatively simple and to promote reusability of the different data structures and interfaces. The broker topology has the added benefit of preventing central event orchestration.
+### Redux-like architecture
 
-In our implementation of the broker topology, there are three main types of recurring architectural components:
+The architecture for the implementation is based on a **Flux** or **Redux** like approach, where a single component holds the right to mutate the state, and any peripheral components/processes merely receive read-only copies of it. These peripheral components can request updates to the state, but the central `Coordinator` ultimately decides whether or not this state change will be enacted.
 
-    - `Broker`: a federated struct that contains all the event channels used within the flow and which responsibility includes the creation and coordination of an `EventFilter`
-    - `EventFilter`: an entity receiving the _events_ and appointed to their validation, aggregation and processing
-    - one or more `channels` whereto the result of the processing get published
+This `Coordinator` is accompanied by a `roundStore` which facilitates the dispatching of incoming events to other consensus components. As the `Coordinator` holds the single source of truth regarding consensus state, it redirects incoming events to the correct endpoint depending on their own state (included in the message header). The consensus components are then given the correct events, who apply further, more specific processing.
 
-Additionally, several other entities are utilized within the `EventFilter` to help with code reuse and interface programming:
+#### Event streaming
 
-    - `EventHandler`: This entity contains the logic specific to the components and that cannot be shared
-    - `EventQueue`: A temporary storage unit to collect messages referring to a future stage. This is possible given the asynchrony of the network which could result in nodes falling a bit behind in the event processing.
-    - `Processor`: An interface component which receives filtered messages from the `EventFilter`. It conducts additional checks, and stores the received event. The `Processor` only exposes one function, `Process`, which makes it simple to create multiple implementations which fit into the `EventFilter`.
+The `Coordinator` and `roundStore` are abstracted through the `EventPlayer` interface, exposing three methods:
 
-Within the codebase, two implementations of the `Processor` currently exist:
+- `Forward(id)`
+- `Play(id)`
+- `Pause(id)`
 
-    - `Accumulator`: This component conducts additional checks on the received event, and then stores it in an `AccumulatorStore`, under an identifier which is extracted by the `EventHandler`. Once a set of events under one single identifier grows large enough, it is sent over a channel, and the `Accumulator` will clear itself for re-use.
-    - `Selector`: A component which verifies an incoming event, and only stores the 'best' event it has seen. The selector can return its current 'best' event at any point, after which it is cleared.
+Each method takes in a specific identifier, which should correspond to one of the `Listeners` saved on the `roundStore`. This ensures that requests are made by components which are considered valid.
 
-### Common structures and interfaces
+`Forward` is a way for a component to request a state change, namely incrementing the step. If the given ID is found in the `roundStore`, the step is updated and returned to the caller. `Play` and `Pause` are used to enable or disable receiving of events from the `Coordinator`. This is mainly used for directing incoming events to the correct component in the case of multiple listeners, and for disconnecting consensus components when a round is finalized.
 
-The consensus package exposes the function to create and initialize the most common channels reused across the whole package. The functions are defined as follows:
+#### Event propagation
 
-    - InitRoundUpdate(eventbus) (chan uint64) returns a channel whereto round updates get published
-    - InitBlockRegeneratorCollector(eventbus) (chan AsyncState) returns a channel whose messages are interpreted as the `BLOCK_REGENERATION` signal, as outlined in the SBA* documentation.
-    - InitBidListUpdate(eventBus) (chan user.BidList) returns a channel on which BidLists are sent. They contain a collection of all X values, belonging to the blind bidders in the network. Any time this BidList is updated, it is propagated to all components which use it.
+Since the `Coordinator` has full knowledge of the state, it is also responsible for signing outgoing messages. This functionality is abstracted through the `Signer` interface and exposes two methods:
+
+- `SendAuthenticated(topic, hash, payload, id)`
+- `SendWithHeader(topic, hash, payload, id)`
+
+Both methods take an id, which allows the `Coordinator` to refuse requests for sending messages from obsolete components. `SendAuthenticated` is intended for propagation to the network, while `SendWithHeader` is intended for internal propagation.

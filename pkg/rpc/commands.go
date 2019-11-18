@@ -29,10 +29,13 @@ var (
 		"publishTopic": publishTopic,
 		"sendBidTx":    sendBidTx,
 		"loadWallet":   loadWallet,
+		"transfer":     transfer,
 	}
 
 	// rpcAdminCmd holds all admin methods.
-	rpcAdminCmd = map[string]bool{}
+	rpcAdminCmd = map[string]bool{
+		"transfer": true,
+	}
 
 	// supported topics for injection into EventBus
 	supportedTopics = [2]topics.Topic{
@@ -114,6 +117,41 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 	}
 
 	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString(txid.Bytes()))
+	return result, err
+}
+
+var transfer = func(s *Server, params []string) (string, error) {
+	if len(params) < 2 {
+		return "", errors.New("not enough parameters")
+	}
+
+	amount, err := strconv.Atoi(params[0])
+	if err != nil {
+		return "", fmt.Errorf("converting amount string to an integer: %v", err)
+	}
+
+	address := params[1]
+
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, uint64(amount)); err != nil {
+		return "", fmt.Errorf("error writing amount to buffer: %v", err)
+	}
+
+	if err := encoding.WriteString(buf, address); err != nil {
+		return "", fmt.Errorf("error writing address to buffer: %v", err)
+	}
+
+	txid, err := s.rpcBus.Call(rpcbus.SendStandardTx, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	idString, err := encoding.ReadString(&txid)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString([]byte(idString)))
 	return result, err
 }
 
