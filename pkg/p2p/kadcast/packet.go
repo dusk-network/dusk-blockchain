@@ -11,6 +11,13 @@ type Packet struct {
 	payload []byte
 }
 
+func makePacket(headers [24]byte, payload []byte) Packet {
+	return Packet {
+		headers: headers,
+		payload: payload,
+	}
+}
+
 // Gets a stream of bytes and slices it between headers of Kadcast
 // protocol and the payload.
 func getPacketFromStream(stream []byte) Packet {
@@ -20,6 +27,10 @@ func getPacketFromStream(stream []byte) Packet {
 		headers: headers,
 		payload: stream[23:],
 	}
+}
+
+func (pac Packet) asBytes() []byte {
+	return append(pac.headers[:], pac.payload[:]...)
 }
 
 // Returns the headers info sliced into three pieces:
@@ -35,6 +46,29 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 	copy(peerPort[:], pac.headers[21:23])
 	return typ, senderID, nonce, peerPort
 }
+
+// Gets the Packet headers parts and puts them into the
+// header attribute of the Packet.
+func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
+	var headers []byte
+	// Add `Packet` type.
+	headers = append(headers[:], tipus)
+	// Add MyPeer ID
+	headers = append(headers[:], router.myPeerInfo.id[:]...)
+	// Attach IdNonce
+	idNonce := getBytesFromUint32(router.myPeerNonce)
+	headers = append(headers[:], idNonce[:]...)
+	// Attach Port
+	port := getBytesFromUint16(destPeer.port)
+	headers = append(headers[:], port[:]...)
+
+	// Build headers array from the slice.
+	var headersArr [24]byte
+	copy(headersArr[:], headers[0:24])
+
+	pack.headers = headersArr
+}
+
 
 // The function recieves a Packet and processes it according to
 // it's type.

@@ -4,6 +4,8 @@ import (
 	"net"
 )
 
+const K uint = 20
+
 // Router holds all of the data needed to interact with
 // the routing data and also the networking utils.
 type Router struct {
@@ -31,42 +33,41 @@ func makeRouter(externIP [4]byte, port uint16) Router {
 
 // Builds and sends a `PING` packet
 func (router Router) sendPing(reciever Peer) {
-	// `PING` Type = 0
-	packType := [1]byte{0}
-	// Build `PING` payload.
-	// Attach sender ID
-	payload := append(packType[:], router.myPeerInfo.id[:]...)
-	// Attach IdNonce
-	idNonce := getBytesFromUint32(router.myPeerNonce)
-	payload = append(payload[:], idNonce[:]...)
-	// Attach Port
-	port := getBytesFromUint16(reciever.port)
-	payload = append(payload[:], port[:]...)
+	// Build empty packet.
+	var packet Packet
+	// Fill the headers with the type, ID, Nonce and destPort.
+	packet.setHeadersInfo(0, router, reciever)
 
 	// Since return values from functions are not addressable, we need to
 	// allocate the reciever UDPAddr
 	destUDPAddr := reciever.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", destUDPAddr, payload)
+	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
 }
 
 // Builds and sends a `PONG` packet
 func (router Router) sendPong(reciever Peer) {
-	// `PONG` Type = 1
-	packType := [1]byte{1}
-	// Build `PING` payload.
-	// Attach sender ID
-	payload := append(packType[:], router.myPeerInfo.id[:]...)
-	// Attach IdNonce
-	idNonce := getBytesFromUint32(router.myPeerNonce)
-	payload = append(payload[:], idNonce[:]...)
-	// Attach Port
-	port := getBytesFromUint16(reciever.port)
-	payload = append(payload[:], port[:]...)
-	
+	// Build empty packet.
+	var packet Packet
+	// Fill the headers with the type, ID, Nonce and destPort.
+	packet.setHeadersInfo(1, router, reciever)
+
 	// Since return values from functions are not addressable, we need to
 	// allocate the reciever UDPAddr
 	destUDPAddr := reciever.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", destUDPAddr, payload)
+	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
+}
+
+func (router Router) sendFindNode(reciever Peer) {
+	// Build empty packet.
+	var packet Packet
+	// Fill the headers with the type, ID, Nonce and destPort.
+	packet.setHeadersInfo(2, router, reciever)
+	//TODO: Take clear IDtarget
+	// Since return values from functions are not addressable, we need to
+	// allocate the reciever UDPAddr
+	destUDPAddr := reciever.getUDPAddr()
+	// Send the packet
+	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
 }
