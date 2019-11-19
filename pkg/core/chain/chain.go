@@ -201,7 +201,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 1. Check that stateless and stateful checks pass
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
-		l.Warnf("verification failed: %s", err.Error())
+		l.WithError(err).Warnln("block verification failed")
 		return err
 	}
 
@@ -212,7 +212,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// FIXME: make sure we actually have only one valid certificate per block (frontrunning consensus (please follow the fucking protocol already))
 	l.Trace("verifying block certificate")
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.Warnf("verifying the certificate failed: %s", err.Error())
+		l.WithError(err).Warnln("certificate verification failed")
 		return err
 	}
 
@@ -227,7 +227,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	})
 
 	if err != nil {
-		l.Errorf("block storing failed: %s", err.Error())
+		l.WithError(err).Errorln("block storing failed")
 		return err
 	}
 
@@ -236,7 +236,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// 5. Gossip advertise block Hash
 	l.Trace("gossiping block")
 	if err := c.advertiseBlock(blk); err != nil {
-		l.Errorf("block advertising failed: %s", err.Error())
+		l.WithError(err).Errorln("block advertising failed")
 		return err
 	}
 
@@ -250,9 +250,9 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	if err != nil {
 		// Not critical enough to abort the accepting procedure
-		log.Warnf("DeleteCandidateBlocks failed with an error: %s", err.Error())
+		log.WithError(err).Warnln("deleting candidate blocks failed")
 	} else {
-		log.Infof("%d deleted candidate blocks", count)
+		log.WithField("count", count).Traceln("candidate blocks deleted")
 	}
 
 	// 7. Remove expired provisioners and bids
@@ -269,7 +269,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	l.Trace("notifying internally")
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, &blk); err != nil {
-		l.Errorf("block encoding failed: %s", err.Error())
+		l.WithError(err).Errorln("block encoding failed")
 		return err
 	}
 
@@ -281,7 +281,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// to rehydrate their state properly for the next round.
 	l.Trace("sending round update")
 	if err := c.sendRoundUpdate(blk.Header.Height+1, blk.Header.Seed, blk.Header.Hash); err != nil {
-		l.Errorf("sending round update failed: %s", err.Error())
+		l.WithError(err).Errorln("sending round update failed")
 		return err
 	}
 
