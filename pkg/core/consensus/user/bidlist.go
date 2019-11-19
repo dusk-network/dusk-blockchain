@@ -6,7 +6,6 @@ import (
 	"math/rand"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
 )
 
 // Bid is the 32 byte X value, created from a bidding transaction amount and M.
@@ -25,9 +24,9 @@ func (b Bid) Equals(bid Bid) bool {
 type BidList []Bid
 
 // ReconstructBidListSubset will turn a slice of bytes into a BidList.
-func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
+func ReconstructBidListSubset(pl []byte) (BidList, error) {
 	if len(pl)%32 != 0 {
-		return nil, prerror.New(prerror.Low, errors.New("malformed bidlist"))
+		return nil, errors.New("malformed bidlist")
 	}
 
 	numBids := len(pl) / 32
@@ -36,7 +35,7 @@ func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
 	for i := 0; i < numBids; i++ {
 		var bid Bid
 		if _, err := r.Read(bid.X[:]); err != nil {
-			return nil, prerror.New(prerror.High, err)
+			return nil, err
 		}
 
 		BidList[i] = bid
@@ -46,7 +45,7 @@ func ReconstructBidListSubset(pl []byte) (BidList, *prerror.PrError) {
 }
 
 // ValidateBids will check if the passed BidList subset contains valid bids.
-func (b BidList) ValidateBids(bidListSubset BidList) *prerror.PrError {
+func (b BidList) ValidateBids(bidListSubset BidList) error {
 loop:
 	for _, x := range bidListSubset {
 		for _, x2 := range b {
@@ -55,7 +54,7 @@ loop:
 			}
 		}
 
-		return prerror.New(prerror.Low, errors.New("invalid public list"))
+		return errors.New("invalid public list")
 	}
 
 	return nil

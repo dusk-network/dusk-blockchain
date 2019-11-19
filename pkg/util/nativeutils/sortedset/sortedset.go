@@ -51,6 +51,22 @@ func (v Set) IndexOf(b []byte) (int, bool) {
 	return v.indexOf(iPk)
 }
 
+func (v Set) OccurrencesOf(b []byte) int {
+	iPk := big.NewInt(0).SetBytes(b)
+	return v.occurrencesOf(iPk)
+}
+
+func (v Set) occurrencesOf(k *big.Int) int {
+	var n int
+	for _, pk := range v {
+		if pk.Cmp(k) == 0 {
+			n++
+		}
+	}
+
+	return n
+}
+
 // Remove an entry from the set. Return false if the entry can't be found
 func (v *Set) Remove(pubKeyBLS []byte) bool {
 	i, found := v.IndexOf(pubKeyBLS)
@@ -111,15 +127,11 @@ func (v Set) String() string {
 }
 
 // Insert a big.Int representation of a BLS key at a proper index (respectful of the VotingCommittee order). If the element is already in the VotingCommittee does nothing and returns false
-func (v *Set) Insert(b []byte) bool {
-	i, found := v.IndexOf(b)
-	if !found {
-		iRepr := &big.Int{}
-		iRepr.SetBytes(b)
-		*v = append((*v)[:i], append([]*big.Int{iRepr}, (*v)[i:]...)...)
-		return true
-	}
-	return false
+func (v *Set) Insert(b []byte) {
+	iRepr := &big.Int{}
+	iRepr.SetBytes(b)
+	*v = append(*v, iRepr)
+	sort.Sort(v)
 }
 
 func (v Set) Whole() uint64 {

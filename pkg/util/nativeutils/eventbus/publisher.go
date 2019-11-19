@@ -36,7 +36,7 @@ func (bus *EventBus) publish(topic topics.Topic, event bytes.Buffer) {
 	if listeners := bus.listeners.Load(topic); listeners != nil {
 		for _, listener := range listeners {
 			if err := listener.Notify(event); err != nil {
-				logEB.WithField("topic", topic).Warnln("listener failed to notidy buffer")
+				logEB.WithError(err).WithField("topic", topic).Warnln("listener failed to notify buffer")
 			}
 		}
 	}

@@ -1,37 +1,44 @@
 package agreement
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/ed25519"
 )
+
+// TestMockAgreementEvent tests the general layout of a mock Agreement (i.e. the BitSet)
+func TestMockAgreementEvent(t *testing.T) {
+	p, keys := consensus.MockProvisioners(50)
+	hash, _ := crypto.RandEntropy(32)
+	ev := MockAgreementEvent(hash, 1, 3, keys, p)
+	assert.NotEqual(t, 0, ev.VotesPerStep[0].BitSet)
+	assert.NotEqual(t, 0, ev.VotesPerStep[1].BitSet)
+}
 
 func TestVoteVerification(t *testing.T) {
 	// mocking voters
-	p, keys := consensus.MockProvisioners(50)
-
+	p, keys := consensus.MockProvisioners(3)
 	hash, _ := crypto.RandEntropy(32)
-	ev := MockAgreementEvent(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 50))
-	handler := newHandler(key.ConsensusKeys{})
-	handler.Handler.Provisioners = *p
-	assert.NoError(t, handler.Verify(ev))
+	ev := MockAgreementEvent(hash, 1, 3, keys, p)
+	handler := newHandler(keys[0], *p)
+	if !assert.NoError(t, handler.Verify(*ev)) {
+		assert.FailNow(t, "problems in verification logic")
+	}
 }
 
-func TestSignEd25519(t *testing.T) {
-	k, _ := key.NewRandConsensusKeys()
-	p, keys := consensus.MockProvisioners(50)
+func TestConsensusEventVerification(t *testing.T) {
+	p, keys := consensus.MockProvisioners(3)
 	hash, _ := crypto.RandEntropy(32)
-	buf := MockAgreement(hash, 1, 1, keys, p.CreateVotingCommittee(1, 1, 50))
-
-	handler := newHandler(k)
-	signed := handler.signEd25519(buf.Bytes())
-
-	signature := make([]byte, 64)
-	assert.NoError(t, encoding.Read512(signed, signature))
-	assert.True(t, ed25519.Verify(*k.EdPubKey, buf.Bytes(), signature))
+	for i := 0; i < 3; i++ {
+		ce := MockConsensusEvent(hash, 1, 3, keys, p, i)
+		ev, err := convertToAgreement(ce)
+		assert.NoError(t, err)
+		handler := newHandler(keys[0], *p)
+		if !assert.NoError(t, handler.Verify(*ev)) {
+			assert.FailNow(t, fmt.Sprintf("error at %d iteration", 0))
+		}
+	}
 }

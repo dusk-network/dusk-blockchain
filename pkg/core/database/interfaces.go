@@ -5,8 +5,8 @@ import (
 	"math"
 
 	"github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
@@ -93,6 +93,10 @@ type Transaction interface {
 	FetchDecoys(numDecoys int) []ristretto.Point
 
 	FetchOutputExists(destkey []byte) (bool, error)
+
+	SaveBidValues([]byte, []byte) error
+
+	GetBidValues() ([]byte, []byte, error)
 
 	// Atomic storage
 	Commit() error

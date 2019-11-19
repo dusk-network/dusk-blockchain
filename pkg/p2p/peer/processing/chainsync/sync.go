@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
@@ -89,7 +90,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 
 func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
 	req := rpcbus.NewRequest(bytes.Buffer{})
-	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req, 2)
+	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req, 2*time.Second)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -41,7 +42,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			payload.Write(txidBytes)
 		}
 
-		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload), 5)
+		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload), 5*time.Second)
 		if err != nil {
 			return "", err
 		}

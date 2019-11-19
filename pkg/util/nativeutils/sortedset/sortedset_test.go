@@ -73,25 +73,13 @@ func TestRemove(t *testing.T) {
 func TestInsert(t *testing.T) {
 	v := New()
 
-	assert.True(t, v.Insert(big.NewInt(45).Bytes()))
-	assert.True(t, v.Insert(big.NewInt(34).Bytes()))
-	assert.True(t, v.Insert(big.NewInt(63).Bytes()))
-	assert.False(t, v.Insert(big.NewInt(34).Bytes()))
+	v.Insert(big.NewInt(45).Bytes())
+	v.Insert(big.NewInt(34).Bytes())
+	v.Insert(big.NewInt(63).Bytes())
 
 	assert.Equal(t, 0, big.NewInt(34).Cmp(v[0]))
 	assert.Equal(t, 0, big.NewInt(45).Cmp(v[1]))
 	assert.Equal(t, 0, big.NewInt(63).Cmp(v[2]))
-
-	assert.Equal(t, 3, len(v))
-}
-
-func TestSize(t *testing.T) {
-	v := New()
-
-	assert.True(t, v.Insert(big.NewInt(45).Bytes()))
-	assert.True(t, v.Insert(big.NewInt(34).Bytes()))
-	assert.True(t, v.Insert(big.NewInt(63).Bytes()))
-	assert.False(t, v.Insert(big.NewInt(34).Bytes()))
 
 	assert.Equal(t, 3, len(v))
 }

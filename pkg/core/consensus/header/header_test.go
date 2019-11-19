@@ -11,32 +11,31 @@ import (
 
 // Test that the MarshalSignableVote and UnmarshalSignableVote functions store/retrieve
 // the passed data properly.
-func TestSignableVote(t *testing.T) {
-	red := &header.Header{}
+func TestUnMarshalFields(t *testing.T) {
+	red := header.Header{}
 	red.Round = uint64(1)
 	red.Step = uint8(2)
 	red.BlockHash, _ = crypto.RandEntropy(32)
-	test := &header.Header{}
+	test := header.Header{}
 	buf := new(bytes.Buffer)
-	assert.NoError(t, header.MarshalSignableVote(buf, red))
-	assert.NoError(t, header.UnmarshalSignableVote(buf, test))
+	assert.NoError(t, header.MarshalFields(buf, red))
+	assert.NoError(t, header.UnmarshalFields(buf, &test))
 	assert.Equal(t, red, test)
 }
 
 // This test ensures that both the Marshal and Unmarshal functions work as expected.
 // The data which is stored and retrieved by both functions should remain the same.
 func TestUnMarshal(t *testing.T) {
-	unMarshaller := header.NewUnMarshaller()
-	header1 := &header.Header{}
+	header1 := header.Header{}
 	header1.PubKeyBLS, _ = crypto.RandEntropy(129)
 	header1.Round = uint64(5)
 	header1.Step = uint8(2)
 	header1.BlockHash, _ = crypto.RandEntropy(32)
 
 	buf := new(bytes.Buffer)
-	assert.NoError(t, unMarshaller.Marshal(buf, header1))
-	header2 := &header.Header{}
-	assert.NoError(t, unMarshaller.Unmarshal(buf, header2))
+	assert.NoError(t, header.Marshal(buf, header1))
+	header2 := header.Header{}
+	assert.NoError(t, header.Unmarshal(buf, &header2))
 
 	assert.True(t, header1.Equal(header2))
 }

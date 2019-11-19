@@ -6,117 +6,159 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
-var empty struct{}
+var lg = log.WithField("process", "selector")
+var emptyScore [32]byte
 
-type eventSelector struct {
+// Selector is the component responsible for collecting score events and propagating
+// the best one after a timeout.
+type Selector struct {
 	publisher eventbus.Publisher
-	handler   ScoreEventHandler
+	handler   Handler
 	lock      sync.RWMutex
-	bestEvent wire.Event
-	state     consensus.State
-	timer     *consensus.Timer
-	running   bool
+	bestEvent *Score
+
+	timer   *timer
+	timeout time.Duration
+
+	scoreID uint32
+
+	eventPlayer consensus.EventPlayer
+	signer      consensus.Signer
 }
 
-// newEventSelector creates the Selector and returns it.
-func newEventSelector(publisher eventbus.Publisher, handler ScoreEventHandler,
-	timeOut time.Duration, state consensus.State) *eventSelector {
-	return &eventSelector{
+// NewComponent creates and launches the component which responsibility is to validate
+// and select the best score among the blind bidders. The component publishes under
+// the topic BestScoreTopic
+func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector {
+	return &Selector{
+		timeout:   timeout,
 		publisher: publisher,
-		handler:   handler,
-		timer:     consensus.NewTimer(timeOut, make(chan struct{})),
-		state:     state,
 	}
 }
 
-// StartSelection starts the selection of the best ScoreEvent.
-func (s *eventSelector) startSelection() {
-	s.lock.Lock()
-	s.running = true
-	s.lock.Unlock()
-	log.WithFields(log.Fields{
-		"process":        "selection",
-		"selector state": s.state.String(),
-	}).Debugln("starting selection")
-	go func() {
-		// propagating the best event after timeout,
-		// or stopping on reading from timeoutchan
-		timer := time.NewTimer(s.timer.TimeOut())
-		select {
-		case <-timer.C:
-			s.publishBestEvent()
-		case <-s.timer.TimeOutChan:
-		}
-		s.lock.Lock()
-		s.running = false
-		s.lock.Unlock()
-	}()
-}
+// Initialize the Selector, by creating the handler and returning the needed Listeners.
+// Implements consensus.Component.
+func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
+	s.eventPlayer = eventPlayer
+	s.signer = signer
+	s.handler = NewScoreHandler(r.BidList)
+	s.timer = &timer{s: s}
 
-func (s *eventSelector) Process(ev wire.Event) {
-	s.lock.RLock()
-	bestEvent := s.bestEvent
-	s.lock.RUnlock()
-
-	if !s.handler.Priority(bestEvent, ev) {
-		if err := s.handler.Verify(ev); err != nil {
-			log.WithField("process", "selection").Debugln(err)
-			return
-		}
-
-		s.repropagate(ev)
-		s.setBestEvent(ev)
+	scoreSubscriber := consensus.TopicListener{
+		Topic:         topics.Score,
+		Preprocessors: []eventbus.Preprocessor{&consensus.Validator{}},
+		Listener:      consensus.NewSimpleListener(s.CollectScoreEvent, consensus.LowPriority, false),
 	}
-}
+	s.scoreID = scoreSubscriber.ID()
 
-func (s *eventSelector) repropagate(ev wire.Event) {
-	buf := topics.Score.ToBuffer()
-	if err := s.handler.Marshal(&buf, ev); err != nil {
-		panic(err)
+	generationSubscriber := consensus.TopicListener{
+		Topic:    topics.Generation,
+		Listener: consensus.NewSimpleListener(s.CollectGeneration, consensus.HighPriority, false),
 	}
 
-	s.publisher.Publish(topics.Gossip, &buf)
+	return []consensus.TopicListener{scoreSubscriber, generationSubscriber}
 }
 
-func (s *eventSelector) publishBestEvent() {
-	s.lock.RLock()
-	bestEvent := s.bestEvent
-	s.lock.RUnlock()
-	buf := new(bytes.Buffer)
-	err := s.handler.Marshal(buf, bestEvent)
-	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
-			"process": "score selection",
-		}).Warnln("Error in marshalling score")
-		return
+// ID returns the ID of the Score message Listener.
+// Implements consensus.Component
+func (s *Selector) ID() uint32 {
+	return s.scoreID
+}
+
+// Finalize pauses event streaming and stops the timer.
+// Implements consensus.Component.
+func (s *Selector) Finalize() {
+	s.eventPlayer.Pause(s.scoreID)
+	s.timer.stop()
+}
+
+// CollectScoreEvent checks the score of an incoming Event and, in case
+// it has a higher score, verifies, propagates and saves it
+func (s *Selector) CollectScoreEvent(e consensus.Event) error {
+	ev := Score{}
+	if err := UnmarshalScore(&e.Payload, &ev); err != nil {
+		return err
 	}
-	s.publisher.Publish(topics.BestScore, buf)
-	s.state.IncrementStep()
-	s.setBestEvent(nil)
-}
 
-func (s *eventSelector) stopSelection() {
-	s.setBestEvent(nil)
-	select {
-	case s.timer.TimeOutChan <- empty:
-	default:
-	}
-}
-
-func (s *eventSelector) setBestEvent(ev wire.Event) {
+	// Locking here prevents the named pipe from filling up with requests to verify
+	// Score messages with a low score, as only one Score message will be verified
+	// at a time. Consequently, any lower scores are discarded.
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.bestEvent = ev
+	// Only check for priority if we already have a best event
+	if s.bestEvent != nil {
+		if s.handler.Priority(*s.bestEvent, ev) {
+			// if the current best score has priority, we return
+			return nil
+		}
+	}
+
+	if err := s.handler.Verify(ev); err != nil {
+		return err
+	}
+
+	if err := s.repropagate(e.Header, ev); err != nil {
+		return err
+	}
+
+	lg.WithFields(log.Fields{
+		"new best": ev.Score,
+	}).Debugln("swapping best score")
+	s.bestEvent = &ev
+	return nil
 }
 
-func (s *eventSelector) isRunning() bool {
+// CollectGeneration signals the selection start by triggering `EventPlayer.Play`
+func (s *Selector) CollectGeneration(e consensus.Event) error {
+	s.lock.Lock()
+	s.bestEvent = nil
+	s.lock.Unlock()
+	_ = s.eventPlayer.Forward(s.ID())
+	s.startSelection()
+	return nil
+}
+
+func (s *Selector) startSelection() {
+	// Empty queue in a goroutine to avoid letting other listeners wait
+	go s.eventPlayer.Play(s.scoreID)
+	s.timer.start(s.timeout)
+}
+
+// IncreaseTimeOut increases the timeout after a failed selection
+func (s *Selector) IncreaseTimeOut() {
+	s.timeout = s.timeout * 2
+}
+
+func (s *Selector) publishBestEvent() error {
+	s.eventPlayer.Pause(s.scoreID)
+	buf := new(bytes.Buffer)
 	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.running
+	bestEvent := s.bestEvent
+	s.lock.RUnlock()
+	// If we had no best event, we should send an empty hash
+	if bestEvent == nil {
+		s.signer.SendWithHeader(topics.BestScore, emptyScore[:], buf, s.ID())
+	} else {
+		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf, s.ID())
+	}
+
+	s.handler.LowerThreshold()
+	s.IncreaseTimeOut()
+	return nil
+}
+
+func (s *Selector) repropagate(hdr header.Header, ev Score) error {
+	buf := new(bytes.Buffer)
+	if err := MarshalScore(buf, &ev); err != nil {
+		return err
+	}
+
+	s.signer.SendAuthenticated(topics.Score, hdr, buf, s.ID())
+	return nil
 }

@@ -169,7 +169,7 @@ func TestDefaultListener(t *testing.T) {
 
 	eb.AddDefaultTopic(topics.Reject)
 	eb.AddDefaultTopic(topics.Unknown)
-	eb.SubscribeDefault(cb)
+	eb.SubscribeDefault(NewCallbackListener(cb))
 
 	eb.Publish(topics.Reject, bytes.NewBufferString("pluto"))
 	msg := <-msgChan

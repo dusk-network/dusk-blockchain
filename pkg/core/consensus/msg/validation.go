@@ -29,3 +29,17 @@ func VerifyBLSSignature(pubKeyBytes, message, signature []byte) error {
 	apk := bls.NewApk(pubKeyBLS)
 	return bls.Verify(apk, message, sig)
 }
+
+func VerifyBLSMultisig(apk, message, signature []byte) error {
+	batchPK, err := bls.UnmarshalApk(apk)
+	if err != nil {
+		return err
+	}
+
+	sig := &bls.Signature{}
+	if err := sig.Decompress(signature); err != nil {
+		return err
+	}
+
+	return bls.Verify(batchPK, message, sig)
+}

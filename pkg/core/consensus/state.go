@@ -1,33 +1,21 @@
 package consensus
 
 import (
-	"fmt"
-	"math/rand"
+	"bytes"
 	"strconv"
 	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
-var empty struct{}
-
 type (
-	// State comprises the methods to maintain a state of the consensus.
-	State interface {
-		fmt.Stringer
-		Round() uint64
-		Step() uint8
-		SubscribeStep() *StepSubscriber
-		Update(uint64)
-		IncrementStep()
-		Cmp(round uint64, step uint8) (int, int)
-	}
-
 	// SyncState is an implementation of State which can be shared by multiple processes.
 	// It also notifies subscribers of changes in the state's step.
 	SyncState struct {
-		Lock            sync.RWMutex
-		round           uint64
-		step            uint8
-		stepSubscribers []*StepSubscriber
+		Lock    sync.RWMutex
+		round   uint64
+		step    uint8
+		bufRepr bytes.Buffer
 	}
 
 	// AsyncState is a representation of the consensus state at any given point in time.
@@ -36,33 +24,27 @@ type (
 		Round uint64
 		Step  uint8
 	}
-
-	// StepSubscriber notifies its owner of a change in the state's step.
-	StepSubscriber struct {
-		StateChan chan struct{}
-		id        uint32
-	}
 )
 
 // NewState returns an initialized SyncState.
 func NewState() *SyncState {
 	return &SyncState{
-		round:           0,
-		step:            1,
-		stepSubscribers: make([]*StepSubscriber, 0),
+		round:   0,
+		step:    0,
+		bufRepr: recreate(0, 0),
 	}
 }
 
-// SubscribeStep returns a StepSubscriber which notifies its owner of a change in
-// the state's step.
-func (s *SyncState) SubscribeStep() *StepSubscriber {
-	sub := &StepSubscriber{
-		id:        rand.Uint32(),
-		StateChan: make(chan struct{}, 1),
+func recreate(round uint64, step uint8) bytes.Buffer {
+	r := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(r, round); err != nil {
+		panic(err)
 	}
 
-	s.stepSubscribers = append(s.stepSubscribers, sub)
-	return sub
+	if err := encoding.WriteUint8(r, step); err != nil {
+		panic(err)
+	}
+	return *r
 }
 
 // Round returns the round that the SyncState is on.
@@ -88,7 +70,8 @@ func (s *SyncState) String() string {
 func (s *SyncState) Update(round uint64) {
 	s.Lock.Lock()
 	s.round = round
-	s.step = 1
+	s.step = 0
+	s.bufRepr = recreate(round, s.step)
 	s.Lock.Unlock()
 }
 
@@ -96,19 +79,13 @@ func (s *SyncState) Update(round uint64) {
 // of the state change.
 func (s *SyncState) IncrementStep() {
 	s.Lock.Lock()
+	defer s.Lock.Unlock()
 	s.step++
-	s.Lock.Unlock()
-	for _, sub := range s.stepSubscribers {
-		sub.StateChan <- empty
-	}
+	s.bufRepr = recreate(s.round, s.step)
 }
 
-// Cmp returns negative number if the SyncState is in the future, 0 if they are the
-// same and positive if the SyncState is in the past.
-func (s *SyncState) Cmp(round uint64, step uint8) (int, int) {
+func (s *SyncState) ToBuffer() bytes.Buffer {
 	s.Lock.RLock()
 	defer s.Lock.RUnlock()
-	roundDiff := int(s.round) - int(round)
-	stepDiff := int(s.step) - int(step)
-	return roundDiff, stepDiff
+	return s.bufRepr
 }
