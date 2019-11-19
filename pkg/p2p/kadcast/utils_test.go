@@ -1,10 +1,17 @@
 package kadcast
 
-import "testing"
+import (
+	"encoding/binary"
+	"fmt"
+	"testing"
+)
 
-func TestStuff(t *testing.T) {
-	a := [4]byte{255, 255, 255, 255}
-	println(*getUintFromBytes(&a))
+func testConv(t *testing.T) {
+	var a uint32 = 4795984
+	c := getBytesFromUint32(a)
+	fmt.Printf("%v", c)
+	b := binary.LittleEndian.Uint32(c[:])
+	println(b)
 }
 func testPOW(t *testing.T) {
 	a := Peer{
@@ -16,15 +23,14 @@ func testPOW(t *testing.T) {
 	println(a.computePeerNonce())
 }
 
-func TestUDP(t *testing.T) {
+func testUDP(t *testing.T) {
 	var port uint16 = 25519
-	ip := [4]byte{62, 57, 153, 222}
+	ip := [4]byte{192, 168, 0, 11}
 	router := makeRouter(ip, port)
-	//lAddr := getLocalIPAddress()
 
 	go startUDPListener("udp", &router)
-
-	destPeer := makePeer(ip, port)
+	destIP := [4]byte{178, 62, 17, 199}
+	destPeer := makePeer(destIP, port)
 
 	// Send PING packet
 	router.sendPing(destPeer)
