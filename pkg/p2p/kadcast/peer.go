@@ -59,7 +59,7 @@ func (peer *Peer) addPort(port uint16) {
 
 // Computes the XOR distance between two Peers.
 func (me Peer) computePeerDistance(peer Peer) uint16 {
-	return idXor(&me.id, &peer.id)
+	return idXor(me.id, peer.id)
 }
 
 // Reads the network info of a `Peer` and returns its
@@ -77,4 +77,12 @@ func getPeerNetworkInfo(udpAddress net.UDPAddr) ([4]byte, uint16) {
 	var ip [4]byte
 	copy(ip[:], udpAddress.IP[:])
 	return ip, uint16(udpAddress.Port)
+}
+
+// PeerSort is a helper type to sort `Peers`
+type PeerSort struct {
+	ip   [4]byte
+	port uint16
+	id   [16]byte
+	xorMyPeer [16]byte
 }
