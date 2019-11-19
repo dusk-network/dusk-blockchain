@@ -12,7 +12,7 @@ walletonly = false
 level = "trace"
 # 'stdout' or file name without ext
 # result filename would be $output$network.port.log
-output = "debug"
+output = "stdout"
 [logger.monitor]
 # enabling log based monitoring
 enabled = false
@@ -88,7 +88,7 @@ enabled=true
 user=""
 pass=""
 cert=""
-port=9001
+port=8001
 
 
 [prof]

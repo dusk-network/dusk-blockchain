@@ -14,28 +14,78 @@ import (
 
 const (
 	txsFetchLimit = 10000
+
+	txidArg   = "txid"
+	txidsArg  = "txids"
+	txlastArg = "last"
+)
+
+// queryTx is a data-wrapper for all core.transaction relevant fields that
+// can be fetched via grapqhql
+type (
+	queryOutput struct {
+		PubKey []byte
+	}
+
+	queryInput struct {
+		KeyImage []byte
+	}
+
+	queryTx struct {
+		TxID    []byte
+		TxType  core.TxType
+		Outputs []queryOutput `json:"output"`
+		Inputs  []queryInput  `json:"input"`
+
+		// non-StandardTx data fields
+		BlockHash []byte
+		Size      uint64
+	}
 )
 
 type transactions struct {
 }
 
-type output struct {
-	BlockHash []byte
-	TxID      []byte
-	TxType    core.TxType
+// newQueryTx constructs query tx data from core tx and block hash
+func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
+
+	txId, err := tx.CalculateHash()
+	if err != nil {
+		return queryTx{}, err
+	}
+
+	qd := queryTx{}
+	qd.TxID = txId
+	qd.TxType = tx.StandardTx().TxType
+
+	qd.Outputs = make([]queryOutput, 0)
+	for _, output := range tx.StandardTx().Outputs {
+		pubkey := output.PubKey.P.Bytes()
+		qd.Outputs = append(qd.Outputs, queryOutput{pubkey})
+	}
+
+	qd.Inputs = make([]queryInput, 0)
+	for _, input := range tx.StandardTx().Inputs {
+		keyimage := input.KeyImage.Bytes()
+		qd.Inputs = append(qd.Inputs, queryInput{keyimage})
+	}
+
+	qd.BlockHash = blockHash
+
+	return qd, nil
 }
 
 func (t transactions) getQuery() *graphql.Field {
 	return &graphql.Field{
 		Type: graphql.NewList(Transaction),
 		Args: graphql.FieldConfigArgument{
-			"txid": &graphql.ArgumentConfig{
+			txidArg: &graphql.ArgumentConfig{
 				Type: graphql.String,
 			},
-			"txids": &graphql.ArgumentConfig{
+			txidsArg: &graphql.ArgumentConfig{
 				Type: graphql.NewList(graphql.String),
 			},
-			"last": &graphql.ArgumentConfig{
+			txlastArg: &graphql.ArgumentConfig{
 				Type: graphql.Int,
 			},
 		},
@@ -51,19 +101,19 @@ func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
 		return nil, errors.New("context does not store database conn")
 	}
 
-	txid, ok := p.Args["txid"].(interface{})
+	txid, ok := p.Args[txidArg].(interface{})
 	if ok {
 		ids := make([]interface{}, 0)
 		ids = append(ids, txid)
 		return t.fetchTxsByHash(db, ids)
 	}
 
-	ids, ok := p.Args["txids"].([]interface{})
+	ids, ok := p.Args[txidsArg].([]interface{})
 	if ok {
 		return t.fetchTxsByHash(db, ids)
 	}
 
-	count, ok := p.Args["last"].(int)
+	count, ok := p.Args[txlastArg].(int)
 	if ok {
 		if count <= 0 {
 			return nil, errors.New("invalid count")
@@ -75,9 +125,9 @@ func (t transactions) resolve(p graphql.ResolveParams) (interface{}, error) {
 	return nil, nil
 }
 
-func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]output, error) {
+func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]queryTx, error) {
 
-	txs := make([]output, 0)
+	txs := make([]queryTx, 0)
 	err := db.View(func(t database.Transaction) error {
 
 		for _, v := range txids {
@@ -95,12 +145,11 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]out
 				return err
 			}
 
-			txId, _ := tx.CalculateHash()
-			txs = append(txs, output{
-				TxID:      txId,
-				TxType:    tx.StandardTx().TxType,
-				BlockHash: hash,
-			})
+			d, err := newQueryTx(tx, hash)
+			if err == nil {
+				txs = append(txs, d)
+			}
+
 		}
 
 		return nil
@@ -110,9 +159,9 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]out
 }
 
 // Fetch #count# number of txs from lastly accepted blocks
-func (b transactions) fetchLastTxs(db database.DB, count int) ([]output, error) {
+func (b transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error) {
 
-	txs := make([]output, 0)
+	txs := make([]queryTx, 0)
 
 	if count <= 0 {
 		return txs, nil
@@ -149,12 +198,10 @@ func (b transactions) fetchLastTxs(db database.DB, count int) ([]output, error) 
 
 			for _, tx := range blockTxs {
 
-				txId, _ := tx.CalculateHash()
-				txs = append(txs, output{
-					TxID:      txId,
-					TxType:    tx.StandardTx().TxType,
-					BlockHash: hash,
-				})
+				d, err := newQueryTx(tx, hash)
+				if err == nil {
+					txs = append(txs, d)
+				}
 
 				if len(txs) >= count {
 					return nil

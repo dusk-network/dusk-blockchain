@@ -90,3 +90,5 @@ func TestLastTxs(t *testing.T) {
 	`
 	assertQuery(t, query, response)
 }
+
+// TODO: Tx Output Tx input

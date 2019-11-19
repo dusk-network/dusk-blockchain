@@ -4,11 +4,17 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/graphql-go/graphql"
+)
 
-	core "github.com/dusk-network/dusk-wallet/transactions"
+const (
+	blockHashArg   = "hash"
+	blockHashesArg = "hashes"
+	blockHeightArg = "height"
+	blockRangeArg  = "range"
+	blockLastArg   = "last"
 )
 
 // File purpose is to define all arguments and resolvers relevant to "blocks" query only
@@ -20,19 +26,19 @@ func (b blocks) getQuery() *graphql.Field {
 	return &graphql.Field{
 		Type: graphql.NewList(Block),
 		Args: graphql.FieldConfigArgument{
-			"hash": &graphql.ArgumentConfig{
+			blockHashArg: &graphql.ArgumentConfig{
 				Type: graphql.String,
 			},
-			"hashes": &graphql.ArgumentConfig{
+			blockHashesArg: &graphql.ArgumentConfig{
 				Type: graphql.NewList(graphql.String),
 			},
-			"height": &graphql.ArgumentConfig{
+			blockHeightArg: &graphql.ArgumentConfig{
 				Type: graphql.Int,
 			},
-			"range": &graphql.ArgumentConfig{
+			blockRangeArg: &graphql.ArgumentConfig{
 				Type: graphql.NewList(graphql.Int),
 			},
-			"last": &graphql.ArgumentConfig{
+			blockLastArg: &graphql.ArgumentConfig{
 				Type: graphql.Int,
 			},
 		},
@@ -48,7 +54,7 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 	}
 
 	// resolve argument hash (single block)
-	hash, ok := p.Args["hash"].(interface{})
+	hash, ok := p.Args[blockHashArg].(interface{})
 	if ok {
 		hashes := make([]interface{}, 0)
 		hashes = append(hashes, hash)
@@ -56,20 +62,20 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 	}
 
 	// resolve argument hashes (multiple blocks)
-	hashes, ok := p.Args["hashes"].([]interface{})
+	hashes, ok := p.Args[blockHashesArg].([]interface{})
 	if ok {
 		return b.fetchBlocksByHashes(db, hashes)
 	}
 
 	// resolve argument height (single block)
 	// Chain height type is uint64 whereas `resolve` can handle height values up to MaxUInt
-	height, ok := p.Args["height"].(int)
+	height, ok := p.Args[blockHeightArg].(int)
 	if ok {
 		return b.fetchBlocksByHeights(db, int64(height), int64(height))
 	}
 
 	// resolve argument range (range of blocks)
-	heightRange, ok := p.Args["range"].([]interface{})
+	heightRange, ok := p.Args[blockRangeArg].([]interface{})
 	if ok && len(heightRange) == 2 {
 		from, ok := heightRange[0].(int)
 		if !ok {
@@ -84,7 +90,7 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 		return b.fetchBlocksByHeights(db, int64(from), int64(to))
 	}
 
-	offset, ok := p.Args["last"].(int)
+	offset, ok := p.Args[blockLastArg].(int)
 	if ok {
 		if offset <= 0 {
 			return nil, errors.New("invalid offset")
@@ -97,7 +103,7 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 
 func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 
-	var txs []*core.Standard
+	txs := make([]queryTx, 0)
 	b, ok := p.Source.(*block.Block)
 	if ok {
 
@@ -114,9 +120,10 @@ func resolveTxs(p graphql.ResolveParams) (interface{}, error) {
 			}
 
 			for _, tx := range fetched {
-				sTx := tx.StandardTx()
-				sTx.TxID, _ = tx.CalculateHash()
-				txs = append(txs, sTx)
+				d, err := newQueryTx(tx, b.Header.Hash)
+				if err == nil {
+					txs = append(txs, d)
+				}
 			}
 			return nil
 		})
