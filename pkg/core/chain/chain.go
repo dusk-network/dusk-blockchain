@@ -201,7 +201,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 1. Check that stateless and stateful checks pass
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
-		l.Errorf("verification failed: %s", err.Error())
+		l.Warnf("verification failed: %s", err.Error())
 		return err
 	}
 
@@ -212,7 +212,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// FIXME: make sure we actually have only one valid certificate per block (frontrunning consensus (please follow the fucking protocol already))
 	l.Trace("verifying block certificate")
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.Errorf("verifying the certificate failed: %s", err.Error())
+		l.Warnf("verifying the certificate failed: %s", err.Error())
 		return err
 	}
 
