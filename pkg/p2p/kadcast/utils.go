@@ -13,9 +13,9 @@ import (
 )
 
 // ------------------ DISTANCE UTILS ------------------ //
-// Computes the XOR distance between 2 different
-// ids.
-func idXor(a *[16]byte, b *[16]byte) uint16 {
+
+// Computes the XOR between two [16]byte arrays.
+func xor(a [16]byte, b [16]byte) [16]byte {
 	distance := [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	i := 0
 
@@ -23,28 +23,45 @@ func idXor(a *[16]byte, b *[16]byte) uint16 {
 		distance[i] = a[i] ^ b[i]
 		i++
 	}
-	return classifyDistance(&distance)
+	return distance
+}
+// Computes the XOR distance between 2 different
+// ids and classifies it between the range 0-128.
+func idXor(a [16]byte, b [16]byte) uint16 {
+	distance := xor(a, b)
+	return classifyDistance(distance)
 }
 
 // This function gets the XOR distance as a byte-array
 // and collapses it to classify the distance on one of the
 // 128 buckets.
-func classifyDistance(arr *[16]byte) uint16 {
+func classifyDistance(arr [16]byte) uint16 {
 	var collDist uint16 = 0
 	for i := 0; i < 16; i++ {
-		collDist += countSetBits(&arr[i])
+		collDist += countSetBits(arr[i])
 	}
 	return collDist
 }
 
 // Counts the number of setted bits in the given byte.
-func countSetBits(byt *byte) uint16 {
+func countSetBits(byt byte) uint16 {
 	var count uint16 = 0
-	for *byt != 0 {
-		count += uint16(*byt & 1)
-		*byt >>= 1
+	for byt != 0 {
+		count += uint16(byt & 1)
+		byt >>= 1
 	}
 	return count
+}
+
+// Evaluates if an XOR-distance of two peers is
+// bigger than another.
+func xorIsBigger(a [16]byte, b [16]byte) bool {
+	for i := 15; i > 0; i-- {
+		if a[i] < b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // ------------------ HASH KEY UTILS ------------------ //
