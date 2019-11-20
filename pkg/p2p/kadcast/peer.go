@@ -23,6 +23,20 @@ func makePeer(ip [4]byte, port uint16) Peer {
 	return peer
 }
 
+// Serializes a `Peer` structure as an array of bytes
+// that allows to send it through a wire.
+func (peer Peer) serialize() []byte {
+	var serPeer []byte
+	// Add Peer IP.
+	serPeer = append(serPeer[:], peer.ip[:]...)
+	// Serialize and add Peer port.
+	portByt := getBytesFromUint16(peer.port)
+	serPeer = append(serPeer[:], portByt[:]...)
+	// Add Peer ID.
+	serPeer = append(serPeer[:], peer.id[:]...)
+	return serPeer
+}
+
 // The function receives the user's `Peer` and computes the
 // ID nonce in order to be able to join the network.
 //
