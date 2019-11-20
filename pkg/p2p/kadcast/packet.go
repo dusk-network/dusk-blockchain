@@ -18,6 +18,8 @@ func makePacket(headers [24]byte, payload []byte) Packet {
 	}
 }
 
+// -------- General Packet De/Serialization tools -------- //
+
 // Gets a stream of bytes and slices it between headers of Kadcast
 // protocol and the payload.
 func getPacketFromStream(stream []byte) Packet {
@@ -70,6 +72,12 @@ func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	pack.headers = headersArr
 }
 
+// -------- NODES Packet De/Serialization tools -------- //
+
+// Builds the payload of a `NODES` message by collecting,
+// deserializing and adding to the packet's payload the
+// peerInfo of the `K` closest Peers in respect to a certain
+// target Peer.
 func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 	// Get `K` closest peers to `targetPeer`.
 	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
@@ -80,8 +88,46 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 	// Serialize the Peers to get them in `wire-format`, 
 	// basically, represented as bytes.
 	for _, peer := range kClosestPeers {
-		pack.payload = append(pack.payload[:], peer.serialize()...)
+		pack.payload = append(pack.payload[:], peer.deserializePeer()...)
 	}
+}
+
+// Analyzes if the announced number of Peers included on the
+// `NODES` message payload is the same as the recieved one.
+// Returns `true` if it is correct and `false` otherways.
+func (packet Packet) checkNodesPayloadConsistency() bool {
+	// Get number of Peers announced.
+	peerNum := binary.LittleEndian.Uint16(packet.payload[0:2])
+	// Get peerSlice length
+	peerSliceLen := len(packet.payload[2:])
+	if int(peerNum) * PeerBytesSize != peerSliceLen {
+		return false
+	}
+	return true
+}
+
+// Gets a `NODES` message and returns a slice of the
+// `Peers` found inside of it 
+func (packet Packet) getNodesPayloadInfo() []Peer {
+	// Get number of Peers recieved.
+	peerNum := int(binary.LittleEndian.Uint16(packet.payload[0:2]))
+	// Create Peer-struct slice
+	var peers []Peer
+	// Slice the payload into `Peers` in bytes format and deserialize
+	// every single one of them.
+	var i, j int = 2, PeerBytesSize + 1
+	for {
+		// Get the peer structure from the payload and
+		// append the peer to the returned slice of Peer structs.
+		peers = append(peers[:], serializePeer(packet.payload[i:j]))
+
+		i += PeerBytesSize
+		j += PeerBytesSize
+		if i >= peerNum -1 {
+			break
+		}
+	}
+	return peers
 }
 
 
@@ -124,7 +170,7 @@ func processPacket(senderAddr net.UDPAddr, byteNum int, payload []byte, router *
 func treatPing(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.myPeerInfo, peerInf)
-	// Send back a `Pong` message.
+	// Send back a `PONG` message.
 	router.sendPong(peerInf)
 	return
 }
@@ -133,4 +179,29 @@ func treatPong(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.myPeerInfo, peerInf)
 	return
+}
+
+func treatFindNodes(peerInf Peer, router *Router) {
+	// Process peer addition to the tree.
+	router.tree.addPeer(router.myPeerInfo, peerInf)
+	// Send back a `NODES` message to the peer that
+	// send the `FIND_NODES` message.
+	router.sendNodes(peerInf)
+	return
+}
+
+func treatNodes(peerInf Peer, packet Packet, router *Router) {
+	// See if the packet info is consistent:
+	// peerNum announced <=> bytesPerPeer * peerNum
+	if !packet.checkNodesPayloadConsistency() {
+		// Since the packet is not consisten, we just discard it.
+		log.Println("NODES message recieved with corrupted payload. PeerNum mismatch!")
+	}
+	
+	// Process peer addition to the tree.
+	router.tree.addPeer(router.myPeerInfo, peerInf)
+
+	// Deserialize the payload to get the peerInfo of every
+	// recieved peer.
+	// TODO: finnish this!!!
 }
