@@ -48,13 +48,13 @@ func (router Router) getPeerSortDist(refPeer Peer) []PeerSort {
 	}
 	var peerListSort []PeerSort
 	for _, peer := range peerList {
-		peerListSort = append(peerListSort[:], 
-		PeerSort{
-			ip: peer.ip,
-			port: peer.port,
-			id: peer.id,
-			xorMyPeer: xor(refPeer.id, peer.id),
-		})
+		peerListSort = append(peerListSort[:],
+			PeerSort{
+				ip:        peer.ip,
+				port:      peer.port,
+				id:        peer.id,
+				xorMyPeer: xor(refPeer.id, peer.id),
+			})
 	}
 	return peerListSort
 }
@@ -75,17 +75,16 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 	var xPeers []Peer
 	peerList := router.getPeerSortDist(refPeer)
 	sort.Sort(ByXORDist(peerList))
-	for i := 0; i < peerNum; i++ {
-		xPeers = append(xPeers[:], 
-		Peer {
-			ip: xPeers[i].ip,
-			port: xPeers[i].port,
-			id: xPeers[i].id,
-		})
+
+	for _, peer := range peerList {
+		xPeers = append(xPeers[:],
+			Peer{
+				ip:   peer.ip,
+				port: peer.port,
+				id:   peer.id,
+			})
 	}
-	var res []Peer
-	copy(res[:], xPeers[:peerNum])
-	return res
+	return xPeers
 }
 
 // ------- Packet-sending utilities for the Router ------- //
