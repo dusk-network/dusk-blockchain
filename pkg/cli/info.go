@@ -19,4 +19,5 @@ var commandInfo = map[string]string{
 		Bid a set amount of DUSK, to allow participation as a block generator in consensus.`,
 	"showlogs":  "Close the shell and show the internal logs on the terminal. Press enter to return to the shell.",
 	"exit/quit": `Shut down the node and close the console`,
+	"address":   `Show loaded wallet address`,
 }
