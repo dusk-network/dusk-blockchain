@@ -29,6 +29,7 @@ func getPacketFromStream(stream []byte) Packet {
 	}
 }
 
+// Deserializes the packet into an slice of bytes.
 func (pac Packet) asBytes() []byte {
 	return append(pac.headers[:], pac.payload[:]...)
 }
@@ -67,6 +68,20 @@ func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	copy(headersArr[:], headers[0:24])
 
 	pack.headers = headersArr
+}
+
+func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
+	// Get `K` closest peers to `targetPeer`.
+	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
+	// Compute the ammount of Peers that will be sent and add it
+	// as a two-byte array.
+	count := getBytesFromUint16(uint16(len(kClosestPeers)))
+	pack.payload = append(pack.payload[:], count[:]...)
+	// Serialize the Peers to get them in `wire-format`, 
+	// basically, represented as bytes.
+	for _, peer := range kClosestPeers {
+		pack.payload = append(pack.payload[:], peer.serialize()...)
+	}
 }
 
 
