@@ -1,10 +1,13 @@
 package kadcast
 
 import (
+	"encoding/binary"
 	"net"
 
 	"golang.org/x/crypto/sha3"
 )
+
+const PeerBytesSize int = 22
 
 // Peer stores the info of a peer which consists on:
 // - IP of the peer.
@@ -23,9 +26,9 @@ func makePeer(ip [4]byte, port uint16) Peer {
 	return peer
 }
 
-// Serializes a `Peer` structure as an array of bytes
+// Deserializes a `Peer` structure as an array of bytes
 // that allows to send it through a wire.
-func (peer Peer) serialize() []byte {
+func (peer Peer) deserializePeer() []byte {
 	var serPeer []byte
 	// Add Peer IP.
 	serPeer = append(serPeer[:], peer.ip[:]...)
@@ -35,6 +38,25 @@ func (peer Peer) serialize() []byte {
 	// Add Peer ID.
 	serPeer = append(serPeer[:], peer.id[:]...)
 	return serPeer
+}
+
+// Serializes an array of bytes that contains a Peer
+// on it returning a `Peer` structure.
+func serializePeer(peerBytes []byte) Peer {
+	// Get Ip
+	var ip [4]byte
+	copy(ip[:], peerBytes[0:4])
+	// Get Port
+	port := binary.LittleEndian.Uint16(peerBytes[4:6])
+	// Get Id
+	var id [16]byte
+	copy(id[:], peerBytes[6:22])
+
+	return Peer {
+		ip: ip,
+		port: port,
+		id: id,
+	}
 }
 
 // The function receives the user's `Peer` and computes the
@@ -95,8 +117,8 @@ func getPeerNetworkInfo(udpAddress net.UDPAddr) ([4]byte, uint16) {
 
 // PeerSort is a helper type to sort `Peers`
 type PeerSort struct {
-	ip   [4]byte
-	port uint16
-	id   [16]byte
+	ip        [4]byte
+	port      uint16
+	id        [16]byte
 	xorMyPeer [16]byte
 }
