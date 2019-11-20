@@ -34,6 +34,7 @@ type Transactor struct {
 	sendStakeTxChan    chan rpcbus.Request
 	sendStandardTxChan chan rpcbus.Request
 	getBalanceChan     chan rpcbus.Request
+	getAddressChan     chan rpcbus.Request
 }
 
 // Instantiate a new Transactor struct.
@@ -61,6 +62,7 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 		sendStakeTxChan:    make(chan rpcbus.Request, 1),
 		sendStandardTxChan: make(chan rpcbus.Request, 1),
 		getBalanceChan:     make(chan rpcbus.Request, 1),
+		getAddressChan:     make(chan rpcbus.Request, 1),
 	}
 
 	if t.fetchDecoys == nil {
@@ -109,6 +111,10 @@ func (t *Transactor) registerMethods() error {
 	}
 
 	if err := t.rb.Register(rpcbus.GetBalance, t.getBalanceChan); err != nil {
+		return err
+	}
+
+	if err := t.rb.Register(rpcbus.GetAddress, t.getAddressChan); err != nil {
 		return err
 	}
 
