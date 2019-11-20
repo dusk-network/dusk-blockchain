@@ -117,6 +117,7 @@ func (router Router) sendPong(reciever Peer) {
 	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
 }
 
+// Builds and sends a `FIND_NODES` packet.
 func (router Router) sendFindNodes() {
 	// Build empty packet-array of `alpha` packets.
 	var packets [alpha]Packet
@@ -130,4 +131,15 @@ func (router Router) sendFindNodes() {
 		// Send the packet
 		sendUDPPacket("udp", destPeers[i].getUDPAddr(), packets[i].asBytes())
 	}
+}
+
+// Builds and sends a `NODES` packet.
+func (router Router) sendNodes(reciever Peer) {
+	// Build empty packet
+	var packet Packet 
+	// Set headers
+	packet.setHeadersInfo(3, router, reciever)
+	// Set payload with the `k` peers closest to reciever.
+	packet.setNodesPayload(router, reciever)
+	sendUDPPacket("udp", reciever.getUDPAddr(), packet.asBytes())
 }
