@@ -133,9 +133,9 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 
 // The function recieves a Packet and processes it according to
 // it's type.
-func processPacket(senderAddr net.UDPAddr, byteNum int, payload []byte, router *Router) {
+func processPacket(senderAddr net.UDPAddr, byteNum int, udpPayload []byte, router *Router) {
 	// Build packet struct
-	packet := getPacketFromStream(payload[:])
+	packet := getPacketFromStream(udpPayload[:])
 	// Extract headers info.
 	tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
 
@@ -158,11 +158,19 @@ func processPacket(senderAddr net.UDPAddr, byteNum int, payload []byte, router *
 	// Check packet type and process it.
 	switch tipus {
 	case 0:
-		treatPing(peerInf, router)
 		log.Printf("Recieved PING message from %v", peerInf.ip[:])
+		treatPing(peerInf, router)
 	case 1:
-		treatPong(peerInf, router)
+
 		log.Printf("Recieved PONG message from %v", peerInf.ip[:])
+		treatPong(peerInf, router)
+	
+	case 2:
+		log.Printf("Recieved FIND_NODES message from %v", peerInf.ip[:])
+		treatFindNodes(peerInf, router)
+	case 3:
+		log.Printf("Recieved NODES message from %v", peerInf.ip[:])
+		treatNodes(peerInf, packet, router)
 	}
 	return
 }
@@ -203,5 +211,11 @@ func treatNodes(peerInf Peer, packet Packet, router *Router) {
 
 	// Deserialize the payload to get the peerInfo of every
 	// recieved peer.
-	// TODO: finnish this!!!
+	peers := packet.getNodesPayloadInfo()
+
+	// Send `PING` messages to all of the peers to then
+	// add them to our buckets if they respond with a `PONG`.
+	for _, peer := range peers {
+		router.sendPing(peer)
+	}
 }
