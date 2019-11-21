@@ -45,6 +45,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
 		case r := <-t.getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
+		case r := <-t.getAddressChan:
+			handleRequest(r, t.handleAddress, "Address")
 
 		// Event list to handle
 		case b := <-t.acceptedBlockChan:
@@ -92,6 +94,25 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 
 	r.RespChan <- rpcbus.Response{*buf, nil}
 
+	return nil
+}
+
+func (t *Transactor) handleAddress(r rpcbus.Request) error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	addr, err := t.w.PublicAddress()
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	if _, err := buf.WriteString(addr); err != nil {
+		return err
+	}
+
+	r.RespChan <- rpcbus.Response{*buf, nil}
 	return nil
 }
 

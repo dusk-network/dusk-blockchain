@@ -237,6 +237,10 @@ func (t *Transactor) Balance() (uint64, uint64, error) {
 	return walletBalance, mempoolBalance, err
 }
 
+func (t *Transactor) Address() (string, error) {
+	return t.w.PublicAddress()
+}
+
 func (t *Transactor) getMempool() ([]transactions.Transaction, error) {
 	buf := new(bytes.Buffer)
 	r, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
