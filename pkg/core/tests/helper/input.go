@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	ristretto "github.com/bwesterb/go-ristretto"
-	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,6 +77,50 @@ func randomSignatureBuffer(t *testing.T) *bytes.Buffer {
 	// pubkeys
 	for i := uint32(0); i < respAmount; i++ {
 		writeRandomPoint(t, buf)
+	}
+
+	return buf
+}
+
+func fixedSignatureBuffer(t *testing.T) *bytes.Buffer {
+	buf := new(bytes.Buffer)
+	c := ristretto.Scalar{}
+	c.SetOne()
+	if _, err := buf.Write(c.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	// r
+	rBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(rBytes, 1)
+	if _, err := buf.Write(rBytes); err != nil {
+		t.Fatal(err)
+	}
+
+	respAmount := uint32(1)
+
+	// responses
+	respBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(respBytes, respAmount)
+	if _, err := buf.Write(respBytes); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := uint32(0); i < respAmount; i++ {
+		s := ristretto.Scalar{}
+		s.SetOne()
+		if _, err := buf.Write(s.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// pubkeys
+	for i := uint32(0); i < respAmount; i++ {
+		p := ristretto.Point{}
+		p.SetZero()
+		if _, err := buf.Write(p.Bytes()); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	return buf
