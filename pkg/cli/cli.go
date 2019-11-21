@@ -53,6 +53,8 @@ func (c *commandLineProcessor) runCmd(cmd string, args []string, logFile *os.Fil
 		stopNode()
 	case "showlogs":
 		showLogs(args, logFile)
+	case "address":
+		c.addressCMD(args)
 	default:
 		fmt.Fprintf(os.Stdout, "command %s not recognized\n", cmd)
 	}

@@ -84,6 +84,16 @@ func (c *commandLineProcessor) balanceCMD() {
 	fmt.Fprintf(os.Stdout, "Balance %.8f, Unlocked Balance %.8f\n", overallBalance, unlockedBalance)
 }
 
+func (c *commandLineProcessor) addressCMD(args []string) {
+	addr, err := c.rpcBus.Call(rpcbus.GetAddress, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "error retrieving wallet address: %v\n", err)
+		return
+	}
+
+	fmt.Fprintf(os.Stdout, "Public Address: %s\n", addr.String())
+}
+
 func (c *commandLineProcessor) transferCMD(args []string) {
 	if len(args) < 2 {
 		fmt.Fprintln(os.Stdout, "Please specify an amount and an address")
