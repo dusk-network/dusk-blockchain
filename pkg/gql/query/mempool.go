@@ -10,8 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"
-
-	rawtxs "github.com/dusk-network/dusk-wallet/transactions"
 )
 
 type mempool struct {
@@ -22,7 +20,7 @@ func (t mempool) getQuery() *graphql.Field {
 	return &graphql.Field{
 		Type: graphql.NewList(Transaction),
 		Args: graphql.FieldConfigArgument{
-			"txid": &graphql.ArgumentConfig{
+			txidArg: &graphql.ArgumentConfig{
 				Type: graphql.String,
 			},
 		},
@@ -32,7 +30,7 @@ func (t mempool) getQuery() *graphql.Field {
 
 func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 
-	txid, ok := p.Args["txid"].(string)
+	txid, ok := p.Args[txidArg].(string)
 	if ok {
 
 		payload := bytes.Buffer{}
@@ -54,22 +52,16 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			return "", err
 		}
 
-		var fetched []rawtxs.Transaction
+		txs := make([]queryTx, 0)
 		for i := uint64(0); i < lTxs; i++ {
 			tx, err := marshalling.UnmarshalTx(&r)
 			if err != nil {
 				return "", err
 			}
 
-			fetched = append(fetched, tx)
-		}
-
-		txs := make([]*rawtxs.Standard, 0)
-		for _, tx := range fetched {
-			sTx := tx.StandardTx()
-			sTx.TxID, err = tx.CalculateHash()
+			d, err := newQueryTx(tx, nil)
 			if err == nil {
-				txs = append(txs, sTx)
+				txs = append(txs, d)
 			}
 		}
 

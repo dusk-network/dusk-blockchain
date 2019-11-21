@@ -9,8 +9,10 @@ import (
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/mlsag"
+	"github.com/dusk-network/dusk-crypto/rangeproof"
+	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -214,4 +216,88 @@ func writeRandomPoint(t *testing.T, w io.Writer) {
 	if _, err := w.Write(p.Bytes()); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func fixedRangeProof(t *testing.T) rangeproof.Proof {
+	lenComm := uint32(1)
+	commBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(commBytes, lenComm)
+	buf := bytes.NewBuffer(commBytes)
+	comm := ristretto.Point{}
+	comm.SetZero()
+	if _, err := buf.Write(comm.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create random points
+	for i := 0; i < 4; i++ {
+		p := ristretto.Point{}
+		p.SetZero()
+		if _, err := buf.Write(p.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create random scalars
+	for i := 0; i < 5; i++ {
+		s := ristretto.Scalar{}
+		s.SetZero()
+		if _, err := buf.Write(s.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for i := 0; i < 2; i++ {
+		p := ristretto.Point{}
+		p.SetZero()
+		if _, err := buf.Write(p.Bytes()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rp := rangeproof.Proof{}
+	if err := rp.Decode(buf, true); err != nil {
+		t.Fatal(err)
+	}
+
+	return rp
+}
+
+// FixedStandardTx generates an encodable standard Tx with 1 input and 1 output
+// It guarantees that for one seed the same standard Tx (incl. TxID) is
+// always generated.
+func FixedStandardTx(t *testing.T, seed uint64) transactions.Transaction {
+
+	seedScalar := ristretto.Scalar{}
+	seedScalar.SetBigInt(big.NewInt(0).SetUint64(uint64(seed)))
+
+	seedPoint := ristretto.Point{}
+	seedPoint.ScalarMultBase(&seedScalar)
+
+	netPrefix := byte(2)
+	tx, err := transactions.NewStandard(0, netPrefix, int64(seed))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx.R = seedPoint
+	tx.RangeProof = fixedRangeProof(t)
+
+	// Add a fixed output
+	walletKeys := key.NewKeyPair([]byte{5, 0, 0})
+	output := transactions.NewOutput(seedScalar, seedScalar, 0, *walletKeys.PublicKey())
+	tx.Outputs = append(tx.Outputs, output)
+
+	privKey, _ := walletKeys.PrivateSpend()
+	in := transactions.NewInput(seedScalar, seedScalar, ristretto.Scalar(*privKey))
+
+	sigBuf := fixedSignatureBuffer(t)
+	in.Signature = &mlsag.Signature{}
+	if err := in.Signature.Decode(sigBuf, true); err != nil {
+		t.Fatal(err)
+	}
+
+	in.KeyImage = seedPoint
+	tx.Inputs = append(tx.Inputs, in)
+
+	return tx
 }

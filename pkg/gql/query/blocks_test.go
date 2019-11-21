@@ -134,22 +134,22 @@ func TestBlocksTxs(t *testing.T) {
 		`
 	response := `
 		{
-        	"data": {
-        		"blocks": [
-        			{
-        				"header": {
-        					"height": 2
-        				},
-        				"transactions": [
-        					{
-        						"txid": "6ea89ed79c970477fbac038b12bdf72a79a29977c6e2a6b6af23f450abb2f5a0",
-        						"txtype": "3"
-        					}
-        				]
-        			}
-        		]
-        	}
-        }
+			"data": {
+				"blocks": [
+					{
+						"header": {
+							"height": 2
+						},
+						"transactions": [
+							{
+								"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
+								"txtype": "3"
+							}
+						]
+					}
+				]
+			}
+		}
 	`
 	assertQuery(t, query, response)
 }
@@ -160,7 +160,7 @@ func TestLastBlocks(t *testing.T) {
 		  blocks(last: 3) {
 			header {
 			   height
-				hash
+			   hash
 			}
 		  }
 		}
@@ -190,6 +190,64 @@ func TestLastBlocks(t *testing.T) {
         		]
         	}
         }
+	`
+	assertQuery(t, query, response)
+}
+
+func TestBlocksTxsQuery(t *testing.T) {
+
+	query := `
+		{ 
+			blocks(last: 1)   
+			{  
+				header
+				{
+					height
+				}      
+				transactions
+				{
+					txid 
+					txtype 
+					output
+					{
+						pubkey
+					}         
+					input
+					{
+						keyimage
+					}
+				}
+			}
+	  	} 
+		`
+	response := `
+	{
+		"data": {
+			"blocks": [
+				{
+					"header": {
+						"height": 2
+					},
+					"transactions": [
+						{
+							"input": [
+								{
+									"keyimage": "d886641e16a1165d70fa89413c4129d56b15d5f44d2dd2b09823cd723487656a"
+								}
+							],
+							"output": [
+								{
+									"pubkey": "ea2c58c43d2ac9783a25dae2399b227fc1fd2a8bca41ca34aef74c9a3f7b435f"
+								}
+							],
+							"txid": "6adef894526715190947eee09832bc1cb5b21880a03c0518f2f52c42db77f955",
+							"txtype": "3"
+						}
+					]
+				}
+			]
+		}
+	}
 	`
 	assertQuery(t, query, response)
 }
