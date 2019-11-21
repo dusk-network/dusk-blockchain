@@ -1,6 +1,7 @@
 package kadcast
 
 import (
+	"log"
 	"net"
 	"sort"
 )
@@ -74,8 +75,10 @@ func (a ByXORDist) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 	var xPeers []Peer
 	peerList := router.getPeerSortDist(refPeer)
+	log.Printf("PeerSortList: %v", peerList)
 	sort.Sort(ByXORDist(peerList))
 
+	// Get the `peerNum` closest ones.
 	for _, peer := range peerList {
 		xPeers = append(xPeers[:],
 			Peer{
@@ -83,6 +86,9 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 				port: peer.port,
 				id:   peer.id,
 			})
+		if len(xPeers) >= peerNum {
+			break
+		}
 	}
 	return xPeers
 }
@@ -136,7 +142,7 @@ func (router Router) sendFindNodes() {
 // Builds and sends a `NODES` packet.
 func (router Router) sendNodes(reciever Peer) {
 	// Build empty packet
-	var packet Packet 
+	var packet Packet
 	// Set headers
 	packet.setHeadersInfo(3, router, reciever)
 	// Set payload with the `k` peers closest to reciever.
