@@ -94,6 +94,8 @@ type Transaction interface {
 
 	FetchOutputExists(destkey []byte) (bool, error)
 
+	FetchOutputUnlockHeight(destkey []byte) (uint64, error)
+
 	SaveBidValues([]byte, []byte) error
 
 	GetBidValues() ([]byte, []byte, error)
