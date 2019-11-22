@@ -1,7 +1,6 @@
 package kadcast
 
 import (
-	"log"
 	"net"
 	"sort"
 )
@@ -49,13 +48,15 @@ func (router Router) getPeerSortDist(refPeer Peer) []PeerSort {
 	}
 	var peerListSort []PeerSort
 	for _, peer := range peerList {
-		peerListSort = append(peerListSort[:],
-			PeerSort{
-				ip:        peer.ip,
-				port:      peer.port,
-				id:        peer.id,
-				xorMyPeer: xor(refPeer.id, peer.id),
-			})
+		if peer != refPeer {
+			peerListSort = append(peerListSort[:],
+				PeerSort{
+					ip:        peer.ip,
+					port:      peer.port,
+					id:        peer.id,
+					xorMyPeer: xor(refPeer.id, peer.id),
+				})
+		}
 	}
 	return peerListSort
 }
@@ -75,7 +76,6 @@ func (a ByXORDist) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 	var xPeers []Peer
 	peerList := router.getPeerSortDist(refPeer)
-	log.Printf("PeerSortList: %v", peerList)
 	sort.Sort(ByXORDist(peerList))
 
 	// Get the `peerNum` closest ones.
