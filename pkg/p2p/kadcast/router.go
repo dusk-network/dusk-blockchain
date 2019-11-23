@@ -48,6 +48,8 @@ func (router Router) getPeerSortDist(refPeer Peer) []PeerSort {
 	}
 	var peerListSort []PeerSort
 	for _, peer := range peerList {
+		// We don't want to return the Peer struct of the Peer
+		// that is the reference.
 		if peer != refPeer {
 			peerListSort = append(peerListSort[:],
 				PeerSort{
@@ -125,17 +127,17 @@ func (router Router) sendPong(reciever Peer) {
 
 // Builds and sends a `FIND_NODES` packet.
 func (router Router) sendFindNodes() {
-	// Build empty packet-array of `alpha` packets.
-	var packets [alpha]Packet
 	// Get `alpha` closest nodes to me.
 	destPeers := router.getXClosestPeersTo(alpha, router.myPeerInfo)
 	// Fill the headers with the type, ID, Nonce and destPort.
-	for i := 0; i < alpha; i++ {
-		packets[i].setHeadersInfo(2, router, destPeers[i])
+	for _, peer := range destPeers {
+		// Build the packet
+		var packet Packet
+		packet.setHeadersInfo(2, router, peer)
 		// We don't need to add the ID to the payload snce we already have
 		// it in the headers.
 		// Send the packet
-		sendUDPPacket("udp", destPeers[i].getUDPAddr(), packets[i].asBytes())
+		sendUDPPacket("udp", peer.getUDPAddr(), packet.asBytes())
 	}
 }
 
