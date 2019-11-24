@@ -48,7 +48,7 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	if err != nil {
 		log.Println(err)
 	} else if written == len(payload) {
-		log.Printf("Sent %v bytes", written)
+		log.Printf("Sent %v bytes to %v", written, addr.IP)
 	}
 }
 
