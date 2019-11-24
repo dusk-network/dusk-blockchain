@@ -1,7 +1,7 @@
 package kadcast
 
 import (
-	"errorss"
+	"errors"
 	"log"
 	"time"
 )
@@ -29,5 +29,26 @@ func initBootstrap(router Router, bootNodes []Peer) error {
 			return errors.New("Maximum number of attempts achieved. Please review yor connection settings.")
 		}
 		return nil
+	}
+}
+
+func startNetworkDiscovery(router Router) {
+	previousClosest := router.getXClosestPeersTo(1, router.myPeerInfo)
+	// Ask for nodes to `alpha` closest nodes to my peer.
+	router.sendFindNodes()
+	// Wait until response arrives and we query the nodes.
+	time.Sleep(time.Second*15)
+	for {
+		actualClosest := router.getXClosestPeersTo(1, router.myPeerInfo)
+		if actualClosest[0] == previousClosest[0] {
+			log.Println("Network Discovery process has finnished!.\nYou're now connected to %v", router.tree.getTotalPeers())
+			return 
+		}
+		// We get the closest actual Peer.
+		previousClosest = actualClosest
+		// Send `FIND_NODES` again.
+		router.sendFindNodes()
+		// Wait until response arrives and we query the nodes.
+		time.Sleep(time.Second*15)
 	}
 }
