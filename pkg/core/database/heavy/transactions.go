@@ -276,6 +276,8 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	var i int
 
 	for iterator.Next() {
+		// Output public key is the iterator key minus the `OutputKeyPrefix`
+		// (1 byte)
 		value := iterator.Key()[1:]
 
 		var p ristretto.Point
