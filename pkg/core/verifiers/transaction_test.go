@@ -27,8 +27,6 @@ func TestLockedInputs(t *testing.T) {
 	r := config.Registry{}
 	r.Database.Driver = heavy.DriverName
 	r.Database.Dir = "db"
-	r.Mempool.MaxSizeMB = 1
-	r.Mempool.PoolType = "hashmap"
 	r.General.Network = "testnet"
 	config.Mock(&r)
 
@@ -67,6 +65,7 @@ func TestLockedInputs(t *testing.T) {
 	// Now, set our FetchInputs function to get inputs from the db
 	alice, err = wallet.LoadFromFile(2, aliceDB, fetchDecoys, fetchInputs, "pass", "alice.dat")
 
+	// Create a standard tx, using the locked output that we sent to alice
 	tx, err := alice.NewStandardTx(100)
 	assert.NoError(t, err)
 	amount.SetBigInt(big.NewInt(1000))
@@ -74,6 +73,7 @@ func TestLockedInputs(t *testing.T) {
 	err = alice.Sign(tx)
 	assert.NoError(t, err)
 
+	// Checking the tx should fail with a specific error
 	assert.Equal(t, "transaction contains one or more locked inputs", verifiers.CheckTx(db, 0, uint64(time.Now().Unix()), tx).Error())
 }
 
