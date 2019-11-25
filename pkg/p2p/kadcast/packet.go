@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
+	"fmt"
 	"log"
 	"net"
 )
@@ -12,7 +13,7 @@ type Packet struct {
 }
 
 func makePacket(headers [24]byte, payload []byte) Packet {
-	return Packet {
+	return Packet{
 		headers: headers,
 		payload: payload,
 	}
@@ -84,8 +85,9 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 	// Compute the ammount of Peers that will be sent and add it
 	// as a two-byte array.
 	count := getBytesFromUint16(uint16(len(kClosestPeers)))
+	fmt.Printf("\nAnnounced Peers: %v", count)
 	pack.payload = append(pack.payload[:], count[:]...)
-	// Serialize the Peers to get them in `wire-format`, 
+	// Serialize the Peers to get them in `wire-format`,
 	// basically, represented as bytes.
 	for _, peer := range kClosestPeers {
 		pack.payload = append(pack.payload[:], peer.deserializePeer()...)
@@ -98,16 +100,18 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 func (packet Packet) checkNodesPayloadConsistency() bool {
 	// Get number of Peers announced.
 	peerNum := binary.LittleEndian.Uint16(packet.payload[0:2])
+	fmt.Printf("\nPeerNum announced: %v", peerNum)
 	// Get peerSlice length
 	peerSliceLen := len(packet.payload[2:])
-	if int(peerNum) * PeerBytesSize != peerSliceLen {
+	fmt.Printf("\npeerSliceLen: %v", peerSliceLen)
+	if int(peerNum)*PeerBytesSize != peerSliceLen {
 		return false
 	}
 	return true
 }
 
 // Gets a `NODES` message and returns a slice of the
-// `Peers` found inside of it 
+// `Peers` found inside of it
 func (packet Packet) getNodesPayloadInfo() []Peer {
 	// Get number of Peers recieved.
 	peerNum := int(binary.LittleEndian.Uint16(packet.payload[0:2]))
@@ -123,13 +127,12 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 
 		i += PeerBytesSize
 		j += PeerBytesSize
-		if i >= peerNum -1 {
+		if i >= peerNum-1 {
 			break
 		}
 	}
 	return peers
 }
-
 
 // The function recieves a Packet and processes it according to
 // it's type.
@@ -164,7 +167,7 @@ func processPacket(senderAddr net.UDPAddr, byteNum int, udpPayload []byte, route
 
 		log.Printf("Recieved PONG message from %v", peerInf.ip[:])
 		treatPong(peerInf, router)
-	
+
 	case 2:
 		log.Printf("Recieved FIND_NODES message from %v", peerInf.ip[:])
 		treatFindNodes(peerInf, router)
@@ -205,7 +208,7 @@ func treatNodes(peerInf Peer, packet Packet, router *Router) {
 		// Since the packet is not consisten, we just discard it.
 		log.Println("NODES message recieved with corrupted payload. PeerNum mismatch!")
 	}
-	
+
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.myPeerInfo, peerInf)
 
