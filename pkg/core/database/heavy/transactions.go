@@ -159,7 +159,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		//
 		// To make FetchOutputKey functioning
 		for _, output := range tx.StandardTx().Outputs {
-			value := make([]byte, 0, 8)
+			value := make([]byte, 8)
 			binary.LittleEndian.PutUint64(value, tx.UnlockHeight())
 			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), value)
 		}
