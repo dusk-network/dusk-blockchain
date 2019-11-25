@@ -51,7 +51,10 @@ func (b Bucket) findLruPeerIndex() (int, uint64) {
 // Remove a `Peer` from the entries set without
 // caring about the order.
 // The resulting slice of entries is then returned.
-func (b Bucket) removePeerAtIndex(index int) []Peer {
+func (b *Bucket) removePeerAtIndex(index int) []Peer {
+	// Remove peer from the lruPresent map.
+	b.lruPresent[b.entries[index]] = false
+	
 	b.entries[index] = b.entries[len(b.entries)-1]
 	// We do not need to put s[i] at the end, as it will be discarded anyway
 	return b.entries[:len(b.entries)-1]
@@ -61,13 +64,14 @@ func (b Bucket) removePeerAtIndex(index int) []Peer {
 // It also increments the peerCount all according
 // the LRU policy.
 func (b *Bucket) addPeerToBucket(peer Peer) {
-	// Check if the entries set can hold more peers
+	// Check if the entries set can hold more peers.
 	if len(b.entries) < int(MAX_BUCKET_PEERS) {
 		// Insert it into the set if not present
 		// on the current entries set.
 		if b.lruPresent[peer] == false {
 			b.entries = append(b.entries, peer)
 			b.peerCount++
+			b.lruPresent[peer] = true
 		}
 		// Store recently used peer.
 		b.lru[peer] = b.totalPeersPassed
