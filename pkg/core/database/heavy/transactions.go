@@ -276,7 +276,7 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	var i int
 
 	for iterator.Next() {
-		value := iterator.Value()
+		value := iterator.Key()[1:]
 
 		var p ristretto.Point
 		var pBytes [32]byte
