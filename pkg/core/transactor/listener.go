@@ -142,7 +142,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 		t.w.UpdateWalletHeight(0)
 		b := cfg.DecodeGenesis()
 		// call wallet.CheckBlock
-		if _, _, err := t.w.CheckWireBlock(*b, true); err != nil {
+		if _, _, err := t.w.CheckWireBlock(*b); err != nil {
 			return fmt.Errorf("error checking block: %v", err)
 		}
 	}
