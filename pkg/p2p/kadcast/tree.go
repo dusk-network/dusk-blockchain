@@ -31,10 +31,12 @@ func (tree *Tree) addPeer(myPeer Peer, otherPeer Peer) {
 }
 
 // Returns the total ammount of peers that a `Peer` is connected to.
-func (tree Tree) getTotalPeers() uint64 {
+func (tree *Tree) getTotalPeers() uint64 {
 	var count uint64 = 0
-	for _, bucket := range tree.buckets {
-		count += uint64(bucket.peerCount)
+	for i, bucket := range tree.buckets {
+		if i != 0 {
+			count += uint64(bucket.peerCount)
+		}
 	}
 	return count
 }
