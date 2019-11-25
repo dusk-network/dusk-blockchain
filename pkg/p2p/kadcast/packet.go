@@ -97,12 +97,14 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 // Analyzes if the announced number of Peers included on the
 // `NODES` message payload is the same as the recieved one.
 // Returns `true` if it is correct and `false` otherways.
-func (packet Packet) checkNodesPayloadConsistency() bool {
+func (packet Packet) checkNodesPayloadConsistency(byteNum int) bool {
 	// Get number of Peers announced.
 	peerNum := binary.LittleEndian.Uint16(packet.payload[0:2])
 	fmt.Printf("\nPeerNum announced: %v", peerNum)
 	// Get peerSlice length
-	peerSliceLen := len(packet.payload[2:])
+	peerSliceLen := byteNum - 26 
+
+	fmt.Printf("\npeerSliceLen: %v", int(peerNum)*PeerBytesSize)
 	fmt.Printf("\npeerSliceLen: %v", peerSliceLen)
 	if int(peerNum)*PeerBytesSize != peerSliceLen {
 		return false
@@ -137,6 +139,7 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 // The function recieves a Packet and processes it according to
 // it's type.
 func processPacket(senderAddr net.UDPAddr, byteNum int, udpPayload []byte, router *Router) {
+	fmt.Printf("BYTES RED: %v", byteNum)
 	// Build packet struct
 	packet := getPacketFromStream(udpPayload[:])
 	// Extract headers info.
@@ -173,7 +176,7 @@ func processPacket(senderAddr net.UDPAddr, byteNum int, udpPayload []byte, route
 		treatFindNodes(peerInf, router)
 	case 3:
 		log.Printf("Recieved NODES message from %v", peerInf.ip[:])
-		treatNodes(peerInf, packet, router)
+		treatNodes(peerInf, packet, router, byteNum)
 	}
 	return
 }
@@ -201,12 +204,13 @@ func treatFindNodes(peerInf Peer, router *Router) {
 	return
 }
 
-func treatNodes(peerInf Peer, packet Packet, router *Router) {
+func treatNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// See if the packet info is consistent:
 	// peerNum announced <=> bytesPerPeer * peerNum
-	if !packet.checkNodesPayloadConsistency() {
+	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
 		log.Println("NODES message recieved with corrupted payload. PeerNum mismatch!")
+		//return
 	}
 
 	// Process peer addition to the tree.
