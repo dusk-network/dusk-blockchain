@@ -7,12 +7,10 @@ import (
 	"testing"
 )
 
-func testConv(t *testing.T) {
-	var a uint32 = 4795984
-	c := getBytesFromUint32(a)
-	fmt.Printf("%v", c)
-	b := binary.LittleEndian.Uint32(c[:])
-	println(b)
+func TestConv(t *testing.T) {
+	var slce []byte = []byte{0, 0}
+	peerNum := binary.BigEndian.Uint16(slce)
+	fmt.Printf("%v", peerNum)
 }
 func testPOW(t *testing.T) {
 	a := Peer{
@@ -79,7 +77,7 @@ func testUDP(t *testing.T) {
 func TestProtocol(t *testing.T) {
 	// Our node info.
 	var port uint16 = 25519
-	ip := [4]byte{185, 216, 252, 121}
+	ip := [4]byte{62, 57, 180, 247}
 	router := makeRouter(ip, port)
 
 	// Launch a listener for our node.
@@ -87,20 +85,20 @@ func TestProtocol(t *testing.T) {
 
 	// Create BootstrapNodes Peer structs
 	var port1 uint16 = 25519
-	ip1 := [4]byte{178, 62, 17, 199}
+	ip1 := [4]byte{157, 230, 187, 72}
 	boot1 := makePeer(ip1, port1)
 
 	var bootstrapNodes []Peer
 	bootstrapNodes = append(bootstrapNodes[:], boot1)
 
 	// Start Bootstrapping process.
-	err := initBootstrap(router, bootstrapNodes)
+	err := initBootstrap(&router, bootstrapNodes)
 	if err != nil {
 		log.Fatal("Error during the Bootstrap Process. Job terminated.")
 	}
 
 	// Once the bootstrap succeeded, start the network discovery.
-	startNetworkDiscovery(router)
+	startNetworkDiscovery(&router)
 
 	for {
 
