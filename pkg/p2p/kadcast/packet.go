@@ -85,7 +85,6 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 	// Compute the ammount of Peers that will be sent and add it
 	// as a two-byte array.
 	count := getBytesFromUint16(uint16(len(kClosestPeers)))
-	fmt.Printf("\nAnnounced Peers: %v", count)
 	pack.payload = append(pack.payload[:], count[:]...)
 	// Serialize the Peers to get them in `wire-format`,
 	// basically, represented as bytes.
@@ -99,13 +98,11 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 // Returns `true` if it is correct and `false` otherways.
 func (packet Packet) checkNodesPayloadConsistency(byteNum int) bool {
 	// Get number of Peers announced.
-	peerNum := binary.LittleEndian.Uint16(packet.payload[0:2])
+	peerNum := binary.BigEndian.Uint16(packet.payload[0:2])
 	fmt.Printf("\nPeerNum announced: %v", peerNum)
-	// Get peerSlice length
+	// Get peerSlice length subtracting headers and count.
 	peerSliceLen := byteNum - 26 
 
-	fmt.Printf("\npeerSliceLen: %v", int(peerNum)*PeerBytesSize)
-	fmt.Printf("\npeerSliceLen: %v", peerSliceLen)
 	if int(peerNum)*PeerBytesSize != peerSliceLen {
 		return false
 	}
@@ -121,7 +118,7 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 	var peers []Peer
 	// Slice the payload into `Peers` in bytes format and deserialize
 	// every single one of them.
-	var i, j int = 2, PeerBytesSize + 1
+	var i, j int = 3, PeerBytesSize + 1
 	for {
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
@@ -139,7 +136,6 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 // The function recieves a Packet and processes it according to
 // it's type.
 func processPacket(senderAddr net.UDPAddr, byteNum int, udpPayload []byte, router *Router) {
-	fmt.Printf("BYTES RED: %v", byteNum)
 	// Build packet struct
 	packet := getPacketFromStream(udpPayload[:])
 	// Extract headers info.
