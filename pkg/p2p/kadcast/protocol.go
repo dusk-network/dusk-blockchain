@@ -1,7 +1,6 @@
 package kadcast
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -23,17 +22,17 @@ func initBootstrap(router *Router, bootNodes []Peer) error {
 		// we consider that the bootstrapping succeeded.
 		actualPeers := router.tree.getTotalPeers()
 		if actualPeers <= initPeerNum {
-			fmt.Printf("\nInitPeerCount: %v \nPost Peercount: %v\n", initPeerNum, actualPeers)
 			if i < 3 {
 				log.Printf("Bootstrapping nodes were not added on attempt nº %v\nTrying again...\n", i)
 			} else {
-				return errors.New("Maximum number of attempts achieved. Please review yor connection settings.")
+				log.Fatal("Maximum number of attempts achieved. Please review yor connection settings.")
 			}
-			
+
 		} else {
 			break
 		}
 	}
+	log.Printf("Bootstrapping process finnished. You're now connected to %v nodes", router.tree.getTotalPeers())
 	return nil
 }
 
@@ -43,18 +42,18 @@ func startNetworkDiscovery(router *Router) {
 	// Ask for nodes to `alpha` closest nodes to my peer.
 	router.sendFindNodes()
 	// Wait until response arrives and we query the nodes.
-	time.Sleep(time.Second*5)
+	time.Sleep(time.Second * 5)
 	for {
 		actualClosest := router.getXClosestPeersTo(1, router.myPeerInfo)
 		if actualClosest[0] != previousClosest[0] {
 			log.Printf("Network Discovery process has finnished!.\nYou're now connected to %v", router.tree.getTotalPeers())
-			return 
+			return
 		}
 		// We get the closest actual Peer.
 		previousClosest = actualClosest
 		// Send `FIND_NODES` again.
 		router.sendFindNodes()
 		// Wait until response arrives and we query the nodes.
-		time.Sleep(time.Second*15)
+		time.Sleep(time.Second * 15)
 	}
 }
