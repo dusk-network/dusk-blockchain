@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
 	walletdb "github.com/dusk-network/dusk-wallet/database"
 	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-wallet/transactions"
@@ -190,7 +189,7 @@ func (t *Transactor) syncWallet() error {
 		}
 
 		// call wallet.CheckBlock
-		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk, true)
+		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk)
 		if err != nil {
 			return fmt.Errorf("error checking block: %v\n", err)
 		}
@@ -216,25 +215,10 @@ func (t *Transactor) syncWallet() error {
 	return nil
 }
 
-// Balance returns both wallet balance and mempool balance that corresponds to the loaded wallet
+// Balance returns both unlocked wallet balance and locked wallet balance that corresponds to the loaded wallet
 func (t *Transactor) Balance() (uint64, uint64, error) {
-
 	// retrieve balance from wallet unspent inputs
-	walletBalance, err := t.w.Balance()
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// retrieve balance from mempool incoming inputs
-	blk := block.NewBlock()
-	blk.Txs, err = t.getMempool()
-	if err != nil {
-		return walletBalance, 0, err
-	}
-
-	_, mempoolBalance, err := t.w.CheckWireBlockReceived(*blk, false)
-
-	return walletBalance, mempoolBalance, err
+	return t.w.Balance()
 }
 
 func (t *Transactor) Address() (string, error) {

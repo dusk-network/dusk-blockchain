@@ -3,7 +3,7 @@ module github.com/dusk-network/dusk-blockchain
 require (
 	github.com/bwesterb/go-ristretto v1.1.1
 	github.com/dusk-network/dusk-crypto v0.1.0
-	github.com/dusk-network/dusk-wallet v0.1.2
+	github.com/dusk-network/dusk-wallet v1.0.0
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
 	github.com/go-chi/render v1.0.1
 	github.com/golang/protobuf v1.3.2 // indirect
