@@ -86,19 +86,32 @@ type Transaction interface {
 	// returns number of deleted candidate blocks
 	DeleteCandidateBlocks(maxHeight uint64) (uint32, error)
 
+	// FetchBlock will return a block, given a hash.
 	FetchBlock(hash []byte) (*block.Block, error)
 
+	// FetchCurrentHeight returns the height of the most recently stored
+	// block in the database.
 	FetchCurrentHeight() (uint64, error)
 
+	// FetchDecoys will return a number of decoy public keys, to be used
+	// when constructing a ring signature for a transaction.
 	FetchDecoys(numDecoys int) []ristretto.Point
 
+	// FetchOutputExists returns whether or not an output exists for the
+	// given destination public key
 	FetchOutputExists(destkey []byte) (bool, error)
 
+	// FetchOutputUnlockHeight will return the unlock height for an output
+	// given a destination public key.
 	FetchOutputUnlockHeight(destkey []byte) (uint64, error)
 
-	SaveBidValues([]byte, []byte) error
+	// StoreBidValues stores the D and K values passed by the caller in
+	// the database.
+	StoreBidValues([]byte, []byte) error
 
-	GetBidValues() ([]byte, []byte, error)
+	// FetchBidValues retrieves the last stored D and K values from
+	// the database.
+	FetchBidValues() ([]byte, []byte, error)
 
 	// Atomic storage
 	Commit() error

@@ -109,7 +109,7 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 
 			if bytes.Equal(bid.M, m.Bytes()) {
 				err := db.Update(func(t database.Transaction) error {
-					return t.SaveBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes())
+					return t.StoreBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes())
 				})
 				if err != nil {
 					panic(err)

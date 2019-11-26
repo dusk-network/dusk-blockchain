@@ -68,7 +68,7 @@ func TestLockedInputs(t *testing.T) {
 	// Create a standard tx, using the locked output that we sent to alice
 	tx, err := alice.NewStandardTx(100)
 	assert.NoError(t, err)
-	amount.SetBigInt(big.NewInt(1000))
+	amount.SetBigInt(big.NewInt(1000000))
 	tx.AddOutput(key.PublicAddress("pippo"), amount)
 	err = alice.Sign(tx)
 	assert.NoError(t, err)

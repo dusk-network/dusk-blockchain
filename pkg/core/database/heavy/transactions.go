@@ -158,9 +158,12 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Value = unlockheight
 		//
 		// To make FetchOutputKey functioning
-		for _, output := range tx.StandardTx().Outputs {
-			value := make([]byte, 8)
-			binary.LittleEndian.PutUint64(value, tx.UnlockHeight())
+		for i, output := range tx.StandardTx().Outputs {
+			// Only lock the first output, so that change outputs are
+			// not affected.
+			if i == 0 {
+				binary.LittleEndian.PutUint64(value, tx.UnlockHeight())
+			}
 			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), value)
 		}
 
@@ -612,7 +615,7 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t transaction) SaveBidValues(d, k []byte) error {
+func (t transaction) StoreBidValues(d, k []byte) error {
 	// First, delete the old values (if any)
 	key := BidValuesPrefix
 	exists, err := t.snapshot.Has(key, nil)
@@ -627,7 +630,7 @@ func (t transaction) SaveBidValues(d, k []byte) error {
 	return nil
 }
 
-func (t transaction) GetBidValues() ([]byte, []byte, error) {
+func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	key := BidValuesPrefix
 	value, err := t.snapshot.Get(key, nil)
 	if err != nil {
