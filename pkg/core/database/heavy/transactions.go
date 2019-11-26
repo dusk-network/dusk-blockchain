@@ -159,6 +159,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		//
 		// To make FetchOutputKey functioning
 		for i, output := range tx.StandardTx().Outputs {
+			value := make([]byte, 8)
 			// Only lock the first output, so that change outputs are
 			// not affected.
 			if i == 0 {
