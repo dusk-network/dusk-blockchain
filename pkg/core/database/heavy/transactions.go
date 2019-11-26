@@ -262,6 +262,10 @@ func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
 		return 0, err
 	}
 
+	if len(unlockHeightBytes) != 8 {
+		return 0, errors.New("unlock height malformed")
+	}
+
 	// output unlock height is the first 8 bytes
 	unlockHeight := binary.LittleEndian.Uint64(unlockHeightBytes[0:8])
 	return unlockHeight, err
