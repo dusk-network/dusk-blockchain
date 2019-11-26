@@ -50,6 +50,8 @@ func TestLockedInputs(t *testing.T) {
 	assert.NoError(t, err)
 	err = alice.Sign(stake)
 	assert.NoError(t, err)
+	// Rip out the change output so that the test will not randomly fail
+	stake.Outputs = stake.Outputs[0:1]
 
 	// Database setup for test
 	_, db := heavy.CreateDBConnection()
