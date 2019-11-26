@@ -163,7 +163,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 			// Only lock the first output, so that change outputs are
 			// not affected.
 			if i == 0 {
-				binary.LittleEndian.PutUint64(value, tx.UnlockHeight()+b.Header.Height)
+				binary.LittleEndian.PutUint64(value, tx.LockTime()+b.Header.Height)
 			}
 			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), value)
 		}
