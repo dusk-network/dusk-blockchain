@@ -114,7 +114,7 @@ func (packet Packet) checkNodesPayloadConsistency(byteNum int) bool {
 // `Peers` found inside of it
 func (packet Packet) getNodesPayloadInfo() []Peer {
 	// Get number of Peers recieved.
-	peerNum := int(binary.LittleEndian.Uint16(packet.payload[0:2]))
+	peerNum := int(binary.BigEndian.Uint16(packet.payload[0:2]))
 	// Create Peer-struct slice
 	var peers []Peer
 	// Slice the payload into `Peers` in bytes format and deserialize
