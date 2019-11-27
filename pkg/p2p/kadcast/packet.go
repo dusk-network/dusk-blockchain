@@ -120,7 +120,7 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 	// Slice the payload into `Peers` in bytes format and deserialize
 	// every single one of them.
 	var i, j int = 3, PeerBytesSize + 1
-	for {
+	for m := 0; m < peerNum; m ++{
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
 		peers = append(peers[:], serializePeer(packet.payload[i:j]))
@@ -164,7 +164,6 @@ func processPacket(senderAddr net.UDPAddr, byteNum int, udpPayload []byte, route
 		log.Printf("Recieved PING message from %v", peerInf.ip[:])
 		treatPing(peerInf, router)
 	case 1:
-
 		log.Printf("Recieved PONG message from %v", peerInf.ip[:])
 		treatPong(peerInf, router)
 
