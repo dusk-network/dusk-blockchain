@@ -127,9 +127,6 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 
 		i += PeerBytesSize
 		j += PeerBytesSize
-		if i >= peerNum-1 {
-			break
-		}
 	}
 	return peers
 }
