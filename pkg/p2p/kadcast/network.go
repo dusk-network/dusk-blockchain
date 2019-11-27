@@ -3,30 +3,36 @@ package kadcast
 import (
 	"log"
 	"net"
+	"time"
 )
 
-// Listens infinitely for UDP packet arrivals and 
+// Listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine.
 func startUDPListener(netw string, router *Router) {
 	lAddr := getLocalIPAddress()
 	// Set listening port.
 	lAddr.Port = int(router.myPeerInfo.port)
-	log.Printf("Currently listening to: %v", lAddr)
+	PacketConnCreation:
 	// listen to incoming udp packets
 	pc, err := net.ListenUDP(netw, &lAddr)
 	if err != nil {
-		log.Println(err)
+		log.Panic(err)
 	}
-	defer pc.Close()
-	
+	// Set initial deadline.
+	pc.SetReadDeadline(time.Now().Add(time.Minute))
+
 	for {
 		//simple read
 		buffer := make([]byte, 1024)
-		
+
 		byteNum, uAddr, err := pc.ReadFromUDP(buffer)
+
 		if err != nil {
 			log.Printf("%v", err)
+			goto PacketConnCreation
 		} else {
+			// Set a new deadline for the connection.
+			pc.SetReadDeadline(time.Now().Add(5 * time.Minute))
 			go processPacket(*uAddr, byteNum, buffer, router)
 		}
 	}
@@ -50,5 +56,3 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 		log.Printf("Sent %v bytes to %v", written, addr.IP)
 	}
 }
-
-
