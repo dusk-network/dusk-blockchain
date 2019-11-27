@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
@@ -21,15 +19,16 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		"version": version,
-		"ping":    pong,
-		"uptime":  uptime,
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
-		"publishTopic": publishTopic,
-		"sendBidTx":    sendBidTx,
-		"loadWallet":   loadWallet,
-		"transfer":     transfer,
+		"publishTopic":   publishTopic,
+		"transfer":       transfer,
+		"bid":            sendBidTx,
+		"stake":          sendStakeTx,
+		"createwallet":   createWallet,
+		"loadWallet":     loadWallet,
+		"createfromseed": createFromSeed,
+		"address":        address,
 	}
 
 	// rpcAdminCmd holds all admin methods.
@@ -43,21 +42,6 @@ var (
 		topics.Block,
 	}
 )
-
-// version will return the version of the client.
-var version = func(s *Server, params []string) (string, error) {
-	return protocol.NodeVer.String(), nil
-}
-
-// pong simply returns "pong" to let the caller know the server is up.
-var pong = func(s *Server, params []string) (string, error) {
-	return "pong", nil
-}
-
-// uptime returns the server uptime.
-var uptime = func(s *Server, params []string) (string, error) {
-	return strconv.FormatInt(time.Now().Unix()-s.startTime, 10), nil
-}
 
 var publishTopic = func(s *Server, params []string) (string, error) {
 
@@ -155,6 +139,68 @@ var transfer = func(s *Server, params []string) (string, error) {
 	return result, err
 }
 
+var sendStakeTx = func(s *Server, params []string) (string, error) {
+	if len(params) < 2 {
+		return "", errors.New("not enough parameters")
+	}
+
+	amount, err := strconv.Atoi(params[0])
+	if err != nil {
+		return "", fmt.Errorf("error converting amount string to an integer: %v", err)
+	}
+
+	lockTime, err := strconv.Atoi(params[1])
+	if err != nil {
+		return "", fmt.Errorf("error converting locktime string to an integer: %v", err)
+	}
+
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, uint64(amount)); err != nil {
+		return "", fmt.Errorf("error writing amount to buffer: %v", err)
+	}
+
+	if err := encoding.WriteUint64LE(buf, uint64(lockTime)); err != nil {
+		return "", fmt.Errorf("error writing address to buffer: %v", err)
+	}
+
+	txid, err := s.rpcBus.Call(rpcbus.SendStakeTx, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	idString, err := encoding.ReadString(&txid)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString([]byte(idString)))
+	return result, err
+}
+
+var createWallet = func(s *Server, params []string) (string, error) {
+	if len(params) < 1 {
+		return "", fmt.Errorf("missing parameter: password")
+	}
+
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteString(buf, params[0]); err != nil {
+		return "", err
+	}
+
+	pubKeyBuf, err := s.rpcBus.Call(rpcbus.CreateWallet, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	pubKey, err := encoding.ReadString(&pubKeyBuf)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	return result, err
+}
+
 var loadWallet = func(s *Server, params []string) (string, error) {
 	if len(params) < 1 {
 		return "", fmt.Errorf("missing parameter: password")
@@ -177,4 +223,43 @@ var loadWallet = func(s *Server, params []string) (string, error) {
 
 	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
 	return result, err
+}
+
+var createFromSeed = func(s *Server, params []string) (string, error) {
+	if len(params) < 2 {
+		return "", fmt.Errorf("not enough parameters provided")
+	}
+
+	buf := new(bytes.Buffer)
+	// seed
+	if err := encoding.Write512(buf, []byte(params[0])); err != nil {
+		return "", err
+	}
+
+	// password
+	if err := encoding.WriteString(buf, params[1]); err != nil {
+		return "", err
+	}
+
+	pubKeyBuf, err := s.rpcBus.Call(rpcbus.CreateFromSeed, rpcbus.NewRequest(*buf), 0)
+	if err != nil {
+		return "", err
+	}
+
+	pubKey, err := encoding.ReadString(&pubKeyBuf)
+	if err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	return result, err
+}
+
+var address = func(s *Server, params []string) (string, error) {
+	_, err := s.rpcBus.Call(rpcbus.GetBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	if err != nil {
+		return "", err
+	}
+
+	return "", nil
 }
