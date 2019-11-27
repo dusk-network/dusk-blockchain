@@ -1,5 +1,10 @@
 package kadcast
 
+import (
+	"log"
+	"sync"
+)
+
 // MAX_BUCKET_PEERS represents the maximum
 //number of peers that a `Bucket` can hold.
 const MAX_BUCKET_PEERS uint8 = 25
@@ -18,6 +23,8 @@ type Bucket struct {
 	// included on a entries set without iterating over
 	// it.
 	lruPresent map[Peer]bool
+	// Mutex for preventing data corruption across gorutines.
+	mutex sync.Mutex
 }
 
 // Allocates space for a `Bucket` and returns a instance
@@ -50,11 +57,12 @@ func (b Bucket) findLruPeerIndex() (int, uint64) {
 
 // Remove a `Peer` from the entries set without
 // caring about the order.
+// It also maps the `Peer` to false on the LRU map.
 // The resulting slice of entries is then returned.
 func (b *Bucket) removePeerAtIndex(index int) []Peer {
 	// Remove peer from the lruPresent map.
 	b.lruPresent[b.entries[index]] = false
-	
+
 	b.entries[index] = b.entries[len(b.entries)-1]
 	// We do not need to put s[i] at the end, as it will be discarded anyway
 	return b.entries[:len(b.entries)-1]
@@ -64,6 +72,7 @@ func (b *Bucket) removePeerAtIndex(index int) []Peer {
 // It also increments the peerCount all according
 // the LRU policy.
 func (b *Bucket) addPeerToBucket(peer Peer) {
+	b.mutex.Lock()
 	// Check if the entries set can hold more peers.
 	if len(b.entries) < int(MAX_BUCKET_PEERS) {
 		// Insert it into the set if not present
@@ -85,12 +94,16 @@ func (b *Bucket) addPeerToBucket(peer Peer) {
 		if b.lruPresent[peer] == false {
 			// Search for the least recently used peer.
 			var index, _ = b.findLruPeerIndex()
-			// Remove it from the entries set.
+			// Remove it from the entries set and from
+			// the lruPresent map.
 			b.entries = b.removePeerAtIndex(index)
 			// Add the new peer to the entries set.
 			b.entries = append(b.entries, peer)
+			b.lruPresent[peer] = true
 			b.totalPeersPassed++
 		}
 		b.lru[peer] = b.totalPeersPassed
 	}
+	log.Printf("\nPeercount: %v\nID: %v", b.peerCount, b.idLength)
+	b.mutex.Unlock()
 }
