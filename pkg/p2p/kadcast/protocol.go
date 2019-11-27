@@ -1,7 +1,6 @@
 package kadcast
 
 import (
-	"fmt"
 	"log"
 	"time"
 )
@@ -37,14 +36,14 @@ func initBootstrap(router *Router, bootNodes []Peer) error {
 }
 
 func startNetworkDiscovery(router *Router) {
+	var actualClosest []Peer
 	previousClosest := router.getXClosestPeersTo(1, router.myPeerInfo)
-	fmt.Printf("\nClosest node: %v", previousClosest[0])
 	// Ask for nodes to `alpha` closest nodes to my peer.
 	router.sendFindNodes()
 	// Wait until response arrives and we query the nodes.
 	time.Sleep(time.Second * 5)
 	for {
-		actualClosest := router.getXClosestPeersTo(1, router.myPeerInfo)
+		actualClosest = router.getXClosestPeersTo(1, router.myPeerInfo)
 		if actualClosest[0] != previousClosest[0] {
 			log.Printf("Network Discovery process has finnished!.\nYou're now connected to %v", router.tree.getTotalPeers())
 			return
