@@ -79,7 +79,7 @@ func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 // deserializing and adding to the packet's payload the
 // peerInfo of the `K` closest Peers in respect to a certain
 // target Peer.
-func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
+func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 	// Get `K` closest peers to `targetPeer`.
 	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
 	// Compute the ammount of Peers that will be sent and add it
@@ -91,6 +91,7 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) {
 	for _, peer := range kClosestPeers {
 		pack.payload = append(pack.payload[:], peer.deserializePeer()...)
 	}
+	return len(kClosestPeers)
 }
 
 // Analyzes if the announced number of Peers included on the

@@ -148,6 +148,11 @@ func (router Router) sendNodes(reciever Peer) {
 	// Set headers
 	packet.setHeadersInfo(3, router, reciever)
 	// Set payload with the `k` peers closest to reciever.
-	packet.setNodesPayload(router, reciever)
+	peersToSend := packet.setNodesPayload(router, reciever)
+	// If we don't have any peers to announce, we just skip sending
+	// the `NODES` messsage.
+	if peersToSend == 0 {
+		return
+	}
 	sendUDPPacket("udp", reciever.getUDPAddr(), packet.asBytes())
 }
