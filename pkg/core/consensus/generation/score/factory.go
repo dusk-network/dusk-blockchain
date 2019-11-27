@@ -37,7 +37,7 @@ func (f *Factory) Instantiate() consensus.Component {
 	var d, k []byte
 	err := f.db.View(func(t database.Transaction) error {
 		var err error
-		d, k, err = t.GetBidValues()
+		d, k, err = t.FetchBidValues()
 		return err
 	})
 
