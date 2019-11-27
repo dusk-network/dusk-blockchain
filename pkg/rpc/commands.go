@@ -26,14 +26,19 @@ var (
 		"bid":            sendBidTx,
 		"stake":          sendStakeTx,
 		"createwallet":   createWallet,
-		"loadWallet":     loadWallet,
+		"loadwallet":     loadWallet,
 		"createfromseed": createFromSeed,
 		"address":        address,
 	}
 
 	// rpcAdminCmd holds all admin methods.
 	rpcAdminCmd = map[string]bool{
-		"transfer": true,
+		"transfer":       true,
+		"bid":            true,
+		"stake":          true,
+		"createwallet":   true,
+		"loadwallet":     true,
+		"createFromSeed": true,
 	}
 
 	// supported topics for injection into EventBus
