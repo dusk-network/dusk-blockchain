@@ -85,7 +85,7 @@ func TestProtocol(t *testing.T) {
 
 	// Create BootstrapNodes Peer structs
 	var port1 uint16 = 25519
-	ip1 := [4]byte{157, 230, 187, 72}
+	ip1 := [4]byte{157, 230, 219, 77}
 	boot1 := makePeer(ip1, port1)
 
 	var bootstrapNodes []Peer
