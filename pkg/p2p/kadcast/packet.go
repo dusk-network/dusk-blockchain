@@ -205,8 +205,8 @@ func treatNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
-		log.Println("NODES message recieved with corrupted payload. PeerNum mismatch!")
-		//return
+		log.Println("NODES message recieved with corrupted payload. PeerNum mismatch!\nIgnoring the packet.")
+		return
 	}
 
 	// Process peer addition to the tree.

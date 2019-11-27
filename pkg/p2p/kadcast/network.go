@@ -11,7 +11,7 @@ func startUDPListener(netw string, router *Router) {
 	lAddr := getLocalIPAddress()
 	// Set listening port.
 	lAddr.Port = int(router.myPeerInfo.port)
-	log.Printf("%v", lAddr)
+	log.Printf("Currently listening to: %v", lAddr)
 	// listen to incoming udp packets
 	pc, err := net.ListenUDP(netw, &lAddr)
 	if err != nil {
@@ -27,7 +27,6 @@ func startUDPListener(netw string, router *Router) {
 		if err != nil {
 			log.Printf("%v", err)
 		} else {
-			log.Println("Packet recieved!")
 			go processPacket(*uAddr, byteNum, buffer, router)
 		}
 	}

@@ -1,7 +1,6 @@
 package kadcast
 
 import (
-	"encoding/binary"
 	"errors"
 	"log"
 	"net"
@@ -25,6 +24,7 @@ func xor(a [16]byte, b [16]byte) [16]byte {
 	}
 	return distance
 }
+
 // Computes the XOR distance between 2 different
 // ids and classifies it between the range 0-128.
 func idXor(a [16]byte, b [16]byte) uint16 {
@@ -79,7 +79,6 @@ func computePeerID(externIP [4]byte) [16]byte {
 // This function is a middleware that allows the peer to verify
 // other Peers nonce's and validate them if they are correct.
 func verifyIDNonce(id [16]byte, nonce [4]byte) error {
-	log.Printf("Received nonce: %v", binary.LittleEndian.Uint32(nonce[:]))
 	hash := sha3.Sum256(append(id[:], nonce[:]...))
 	if (hash[31] | hash[30] | hash[29]) == 0 {
 		return nil

@@ -31,7 +31,7 @@ func initBootstrap(router *Router, bootNodes []Peer) error {
 			break
 		}
 	}
-	log.Printf("Bootstrapping process finnished. You're now connected to %v nodes", router.tree.getTotalPeers())
+	log.Printf("Bootstrapping process finnished. \nYou're now connected to %v nodes", router.tree.getTotalPeers())
 	return nil
 }
 
