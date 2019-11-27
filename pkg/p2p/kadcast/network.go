@@ -29,11 +29,13 @@ func startUDPListener(netw string, router *Router) {
 
 		if err != nil {
 			log.Printf("%v", err)
+			pc.Close()
 			goto PacketConnCreation
 		} else {
 			// Set a new deadline for the connection.
 			pc.SetReadDeadline(time.Now().Add(5 * time.Minute))
 			go processPacket(*uAddr, byteNum, buffer, router)
+			
 		}
 	}
 }
@@ -45,9 +47,9 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	conn, err := net.DialUDP(netw, &localAddr, &addr)
 	if err != nil {
 		log.Println(err)
+		return
 	}
-	defer conn.Close()
-
+	
 	// Simple write
 	written, err := conn.Write(payload)
 	if err != nil {
@@ -55,4 +57,5 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	} else if written == len(payload) {
 		log.Printf("Sent %v bytes to %v", written, addr.IP)
 	}
+	conn.Close()
 }
