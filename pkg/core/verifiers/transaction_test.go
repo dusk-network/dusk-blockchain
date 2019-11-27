@@ -50,6 +50,8 @@ func TestLockedInputs(t *testing.T) {
 	assert.NoError(t, err)
 	err = alice.Sign(stake)
 	assert.NoError(t, err)
+	// Rip out the change output so that the test will not randomly fail
+	stake.Outputs = stake.Outputs[0:1]
 
 	// Database setup for test
 	_, db := heavy.CreateDBConnection()
@@ -68,7 +70,7 @@ func TestLockedInputs(t *testing.T) {
 	// Create a standard tx, using the locked output that we sent to alice
 	tx, err := alice.NewStandardTx(100)
 	assert.NoError(t, err)
-	amount.SetBigInt(big.NewInt(1000))
+	amount.SetBigInt(big.NewInt(1000000))
 	tx.AddOutput(key.PublicAddress("pippo"), amount)
 	err = alice.Sign(tx)
 	assert.NoError(t, err)

@@ -325,13 +325,13 @@ func (t *transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t *transaction) SaveBidValues(d, k []byte) error {
+func (t *transaction) StoreBidValues(d, k []byte) error {
 	bidKey := toKey([]byte("bidvalues"))
 	t.batch[bidValuesInd][bidKey] = append(d, k...)
 	return nil
 }
 
-func (t *transaction) GetBidValues() ([]byte, []byte, error) {
+func (t *transaction) FetchBidValues() ([]byte, []byte, error) {
 	bidKey := toKey([]byte("bidvalues"))
 	return t.db.storage[bidValuesInd][bidKey][0:32], t.db.storage[bidValuesInd][bidKey][32:64], nil
 }
