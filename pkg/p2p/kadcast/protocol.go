@@ -44,7 +44,7 @@ func startNetworkDiscovery(router *Router) {
 	time.Sleep(time.Second * 5)
 	for {
 		actualClosest = router.getXClosestPeersTo(1, router.myPeerInfo)
-		if actualClosest[0] != previousClosest[0] {
+		if actualClosest[0] == previousClosest[0] {
 			log.Printf("Network Discovery process has finnished!.\nYou're now connected to %v", router.tree.getTotalPeers())
 			return
 		}
