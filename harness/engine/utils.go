@@ -26,7 +26,7 @@ func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 
 	targetNode := n.Nodes[nodeIndex]
 	addr := "http://127.0.0.1:" + targetNode.Cfg.RPC.Address
-	request := &rpc.JSONRequest{Method: "publishTopic", Id: 1}
+	request := &rpc.JSONRequest{Method: "publishTopic"}
 	request.Params = []string{topic, payload}
 
 	data, err := json.Marshal(request)
@@ -88,7 +88,6 @@ func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([
 	req := rpc.JSONRequest{
 		Method: method,
 		Params: params,
-		Id:     1,
 	}
 
 	var data []byte
