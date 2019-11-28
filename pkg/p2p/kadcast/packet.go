@@ -2,7 +2,6 @@ package kadcast
 
 import (
 	"encoding/binary"
-	"fmt"
 	"log"
 	"net"
 )
@@ -100,9 +99,8 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 func (packet Packet) checkNodesPayloadConsistency(byteNum int) bool {
 	// Get number of Peers announced.
 	peerNum := binary.BigEndian.Uint16(packet.payload[0:2])
-	fmt.Printf("\nPeerNum announced: %v", peerNum)
 	// Get peerSlice length subtracting headers and count.
-	peerSliceLen := byteNum - 26 
+	peerSliceLen := byteNum - 26
 
 	if int(peerNum)*PeerBytesSize != peerSliceLen {
 		return false
@@ -120,7 +118,7 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 	// Slice the payload into `Peers` in bytes format and deserialize
 	// every single one of them.
 	var i, j int = 3, PeerBytesSize + 1
-	for m := 0; m < peerNum; m ++{
+	for m := 0; m < peerNum; m++ {
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
 		peers = append(peers[:], serializePeer(packet.payload[i:j]))
