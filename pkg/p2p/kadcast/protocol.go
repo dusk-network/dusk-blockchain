@@ -1,6 +1,7 @@
 package kadcast
 
 import (
+	"errors"
 	"log"
 	"time"
 )
@@ -24,7 +25,7 @@ func initBootstrap(router *Router, bootNodes []Peer) error {
 			if i < 3 {
 				log.Printf("Bootstrapping nodes were not added on attempt nº %v\nTrying again...\n", i)
 			} else {
-				log.Fatal("Maximum number of attempts achieved. Please review yor connection settings.")
+				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
 			}
 
 		} else {
