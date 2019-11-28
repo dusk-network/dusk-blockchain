@@ -19,9 +19,6 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		// Publish Topic (experimental). Injects an event directly into EventBus system.
-		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
-		"publishTopic":   publishTopic,
 		"transfer":       transfer,
 		"bid":            sendBidTx,
 		"stake":          sendStakeTx,
@@ -29,6 +26,10 @@ var (
 		"loadwallet":     loadWallet,
 		"createfromseed": createFromSeed,
 		"address":        address,
+
+		// Publish Topic (experimental). Injects an event directly into EventBus system.
+		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
+		"publishTopic": publishTopic,
 	}
 
 	// rpcAdminCmd holds all admin methods.
