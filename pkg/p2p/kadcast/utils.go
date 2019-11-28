@@ -1,6 +1,7 @@
 package kadcast
 
 import (
+	"encoding/binary"
 	"errors"
 	"log"
 	"net"
@@ -123,4 +124,36 @@ func getBytesFromUint16(num uint16) [2]byte {
 		num = num >> 8
 	}
 	return res
+}
+
+// Encode a received packet to send it through the
+// Ring to the packetProcess rutine.
+func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
+	var enc []byte
+	// Get numBytes as slice of bytes.
+	bytenum := getBytesFromUint16(byteNum)
+	// Append it to the resulting slice.
+	enc = append(enc[:], bytenum[:]...)
+	// Append Peer IP.
+	enc = append(enc[:], peerAddr.IP[:]...)
+	// Append Port
+	port := getBytesFromUint16(uint16(peerAddr.Port))
+	enc = append(enc[:], port[:]...)
+	// Append Payload
+	enc = append(enc[:], payload[:]...)
+	return enc
+}
+
+func decodeRedPacket(packet []byte) (byteNum uint16, peerAddr *net.UDPAddr, payload []byte, err error) {
+	redPackLen := len(packet)
+	byteNum = binary.BigEndian.Uint16(packet[0:2])
+	if uint16(redPackLen) != (byteNum + 8) {
+		return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
+	}
+	// Build the structs to return.
+	peerAddr.IP = packet[2:6]
+	peerAddr.Port = int(binary.BigEndian.Uint16(packet[6:8]))
+	peerAddr.Zone = "N/A"
+	payload = packet[8:]
+	return
 }
