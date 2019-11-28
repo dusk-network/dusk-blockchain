@@ -1,10 +1,5 @@
 package kadcast
 
-import (
-	"log"
-	"sync"
-)
-
 // MAX_BUCKET_PEERS represents the maximum
 //number of peers that a `Bucket` can hold.
 const MAX_BUCKET_PEERS uint8 = 25
@@ -23,8 +18,6 @@ type Bucket struct {
 	// included on a entries set without iterating over
 	// it.
 	lruPresent map[Peer]bool
-	// Mutex for preventing data corruption across gorutines.
-	mutex sync.Mutex
 }
 
 // Allocates space for a `Bucket` and returns a instance
@@ -72,7 +65,6 @@ func (b *Bucket) removePeerAtIndex(index int) []Peer {
 // It also increments the peerCount all according
 // the LRU policy.
 func (b *Bucket) addPeerToBucket(peer Peer) {
-	b.mutex.Lock()
 	// Check if the entries set can hold more peers.
 	if len(b.entries) < int(MAX_BUCKET_PEERS) {
 		// Insert it into the set if not present
@@ -104,6 +96,4 @@ func (b *Bucket) addPeerToBucket(peer Peer) {
 		}
 		b.lru[peer] = b.totalPeersPassed
 	}
-	log.Printf("\nPeercount: %v\nID: %v", b.peerCount, b.idLength)
-	b.mutex.Unlock()
 }
