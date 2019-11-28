@@ -10,7 +10,7 @@ import (
 
 // Listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine.
-func startUDPListener(netw string, queue *ring.Buffer, router *Router) {
+func startUDPListener(netw string, queue *ring.Buffer, router Router) {
 
 	lAddr := getLocalIPAddress()
 	// Set listening port.
