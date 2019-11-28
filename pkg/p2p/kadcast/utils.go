@@ -144,10 +144,12 @@ func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byt
 	return enc
 }
 
-func decodeRedPacket(packet []byte) (byteNum uint16, peerAddr *net.UDPAddr, payload []byte, err error) {
+// Decode a CircularQueue packet and return the
+// elements of the original received packet.
+func decodeRedPacket(packet []byte) (byteNum int, peerAddr *net.UDPAddr, payload []byte, err error) {
 	redPackLen := len(packet)
-	byteNum = binary.BigEndian.Uint16(packet[0:2])
-	if uint16(redPackLen) != (byteNum + 8) {
+	byteNum = int(binary.BigEndian.Uint16(packet[0:2]))
+	if (redPackLen) != (byteNum + 8) {
 		return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
 	}
 	// Build the structs to return.

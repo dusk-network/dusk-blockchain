@@ -4,15 +4,18 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
 
 // Listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine.
-func startUDPListener(netw string, router *Router) {
+func startUDPListener(netw string, queue *ring.Buffer, router *Router) {
+
 	lAddr := getLocalIPAddress()
 	// Set listening port.
 	lAddr.Port = int(router.myPeerInfo.port)
-	PacketConnCreation:
+PacketConnCreation:
 	// listen to incoming udp packets
 	pc, err := net.ListenUDP(netw, &lAddr)
 	if err != nil {
@@ -21,10 +24,11 @@ func startUDPListener(netw string, router *Router) {
 	// Set initial deadline.
 	pc.SetReadDeadline(time.Now().Add(time.Minute))
 
+	// Instanciate the buffer
+	buffer := make([]byte, 1024)
 	for {
-		//simple read
-		buffer := make([]byte, 1024)
 
+		// Read UDP packet.
 		byteNum, uAddr, err := pc.ReadFromUDP(buffer)
 
 		if err != nil {
@@ -34,8 +38,10 @@ func startUDPListener(netw string, router *Router) {
 		} else {
 			// Set a new deadline for the connection.
 			pc.SetReadDeadline(time.Now().Add(5 * time.Minute))
-			go processPacket(*uAddr, byteNum, buffer, router)
-			
+			// Serialize the packet.
+			encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
+			// Send the packet to the Consumer putting it on the queue.
+			queue.Put(encodedPack)
 		}
 	}
 }
@@ -49,7 +55,7 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 		log.Println(err)
 		return
 	}
-	
+
 	// Simple write
 	written, err := conn.Write(payload)
 	if err != nil {
