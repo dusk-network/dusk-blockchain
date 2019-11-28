@@ -146,13 +146,15 @@ func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.Timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
-	r.timeOut = r.timeOut * 2
 	buf := new(bytes.Buffer)
 	if len(svs) > 0 {
 		if err := agreement.MarshalStepVotes(buf, svs[0]); err != nil {
 			lg.WithField("category", "BUG").WithError(err).Errorln("error in marshalling StepVotes")
 			return
 		}
+	} else {
+		// Increase timeout if we did not have a good result
+		r.timeOut = r.timeOut * 2
 	}
 
 	r.signer.SendWithHeader(topics.StepVotes, hash, buf, r.ID())
