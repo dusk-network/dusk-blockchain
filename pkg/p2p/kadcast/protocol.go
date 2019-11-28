@@ -27,7 +27,6 @@ func initBootstrap(router *Router, bootNodes []Peer) error {
 			} else {
 				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
 			}
-
 		} else {
 			break
 		}
