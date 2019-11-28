@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
@@ -35,6 +36,7 @@ const (
 // current chain state and can be included in the next block.
 type Mempool struct {
 	getMempoolTxsChan <-chan rpcbus.Request
+	sendTxChan        <-chan rpcbus.Request
 
 	// transactions emitted by RPC and Peer subsystems
 	// pending to be verified before adding them to verified pool
@@ -83,12 +85,17 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 	rpcBus.Register(rpcbus.GetMempoolTxs, getMempoolTxsChan)
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
+	sendTxChan := make(chan rpcbus.Request, 1)
+	// TODO: add rpcbus.SendMempoolTx
+	rpcBus.Register(rpcbus.SendMempoolTx, sendTxChan)
+
 	m := &Mempool{
 		eventBus:             eventBus,
 		latestBlockTimestamp: math.MinInt32,
 		quitChan:             make(chan struct{}),
 		acceptedBlockChan:    acceptedBlockChan,
 		getMempoolTxsChan:    getMempoolTxsChan,
+		sendTxChan:           sendTxChan,
 	}
 
 	if verifyTx != nil {
@@ -116,18 +123,25 @@ func (m *Mempool) Run() {
 	go func() {
 		for {
 			select {
+			case r := <-m.sendTxChan:
+				m.onSendTx(r)
 			case r := <-m.getMempoolTxsChan:
 				m.onGetMempoolTxs(r)
 			// Mempool input channels
 			case b := <-m.acceptedBlockChan:
 				m.onAcceptedBlock(b)
 			case tx := <-m.pending:
-				m.onPendingTx(tx)
+				txid, err := m.onPendingTx(tx)
+				if err != nil {
+					log := logEntry("tx", toHex(txid[:]))
+					log.Errorf("%v", err)
+				}
 			case <-time.After(20 * time.Second):
 				m.onIdle()
 			// Mempool terminating
 			case <-m.quitChan:
 				return
+
 			}
 		}
 	}()
@@ -135,40 +149,33 @@ func (m *Mempool) Run() {
 
 // onPendingTx ensures all transaction rules are satisfied before adding the tx
 // into the verified pool
-func (m *Mempool) onPendingTx(t TxDesc) {
+func (m *Mempool) onPendingTx(t TxDesc) ([]byte, error) {
 	// stats to log
 	log.Tracef("pending txs count %d", len(m.pending))
 
-	txID, err := t.tx.CalculateHash()
+	txid, err := t.tx.CalculateHash()
 	if err != nil {
-		log.Tracef("calculate tx hash failed: %s", err.Error())
-		return
+		return txid, fmt.Errorf("calculate tx hash failed: %s", err.Error())
 	}
-
-	log := logEntry("tx", toHex(txID[:]))
 
 	if t.tx.Type() == transactions.CoinbaseType {
 		// coinbase tx should be built by block generator only
-		log.Warnf("coinbase tx not allowed")
-		return
+		return txid, fmt.Errorf("coinbase tx not allowed")
 	}
 
 	// expect it is not already a verified tx
-	if m.verified.Contains(txID) {
-		log.Warnf("already exists")
-		return
+	if m.verified.Contains(txid) {
+		return txid, fmt.Errorf("already exists")
 	}
 
 	// expect it is not already spent from mempool verified txs
 	if err := m.checkTXDoubleSpent(t.tx); err != nil {
-		log.Warnf("double-spending: %v", err)
-		return
+		return txid, fmt.Errorf("double-spending: %v", err)
 	}
 
 	// execute tx verification procedure
 	if err := m.checkTx(t.tx); err != nil {
-		log.Errorf("verification: %v", err)
-		return
+		return txid, fmt.Errorf("verification: %v", err)
 	}
 
 	// if consumer's verification passes, mark it as verified
@@ -176,15 +183,15 @@ func (m *Mempool) onPendingTx(t TxDesc) {
 
 	// we've got a valid transaction pushed
 	if err := m.verified.Put(t); err != nil {
-		log.Errorf("store: %v", err)
-		return
+		return txid, fmt.Errorf("store: %v", err)
 	}
 
 	// advertise the hash of the verified Tx to the P2P network
-	if err := m.advertiseTx(txID); err != nil {
-		log.Errorf("advertise: %v", err)
-		return
+	if err := m.advertiseTx(txid); err != nil {
+		return txid, fmt.Errorf("advertise: %v", err)
 	}
+
+	return txid, nil
 }
 
 func (m *Mempool) onAcceptedBlock(b block.Block) {
@@ -364,11 +371,30 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) {
 	r.RespChan <- rpcbus.Response{*w, nil}
 }
 
-// checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes
-// all checks against mempool verified txs but not blockchain db.
-func (m *Mempool) checkTXDoubleSpent(tx transactions.Transaction) error {
+// onSendMempoolTx utilizes rpcbus to allow submitting a tx to mempool with
+func (m Mempool) onSendMempoolTx(r rpcbus.Request) {
 
+	tx, err := marshalling.UnmarshalTx(&r.Params)
+	if err != nil {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		return
+	}
+
+	t := TxDesc{tx: tx, received: time.Now()}
+
+	// Process request
+	txid, err := m.onPendingTx(t)
+
+	result := bytes.Buffer{}
+	result.Write(txid)
+	r.RespChan <- rpcbus.Response{result, err}
+}
+
+// checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executeson
+// all checks against mempool verified txs but not blockchain db.on
+func (m *Mempool) checkTXDoubleSpent(tx transactions.Transaction) error {
 	for _, input := range tx.StandardTx().Inputs {
+
 		exists := m.verified.ContainsKeyImage(input.KeyImage.Bytes())
 		if exists {
 			return errors.New("tx already spent")
