@@ -144,9 +144,13 @@ func processPacket(queue *ring.Buffer, router *Router) {
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
-		for _, item := range queuePackets {
+		NextItem: for _, item := range queuePackets {
 			// Get items from the queue packet taken.
 			byteNum, senderAddr, udpPayload, err = decodeRedPacket(item)
+			if err != nil {
+				log.Println(err)
+				break NextItem
+			}
 			// Build packet struct
 			packet = getPacketFromStream(udpPayload[:])
 			// Extract headers info.
@@ -157,7 +161,8 @@ func processPacket(queue *ring.Buffer, router *Router) {
 			// If we get an error, we just skip the whole process since the
 			// Peer was not validated.
 			if err != nil {
-				log.Printf("%s", err)
+				log.Println(err)
+				break NextItem
 			}
 
 			// Build Peer info and put the right port on it subsituting the one
