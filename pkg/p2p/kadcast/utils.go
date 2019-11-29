@@ -146,16 +146,21 @@ func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byt
 
 // Decode a CircularQueue packet and return the
 // elements of the original received packet.
-func decodeRedPacket(packet []byte) (byteNum int, peerAddr *net.UDPAddr, payload []byte, err error) {
+func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)
-	byteNum = int(binary.LittleEndian.Uint16(packet[0:2]))
+	byteNum := int(binary.LittleEndian.Uint16(packet[0:2]))
+	log.Printf("redPackLen: %v\n bytenumTotal: %v", redPackLen, byteNum+8)
 	if (redPackLen) != (byteNum + 8) {
-		return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
+					return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
 	}
-	// Build the structs to return.
-	peerAddr.IP = packet[2:6]
-	peerAddr.Port = int(binary.LittleEndian.Uint16(packet[6:8]))
-	peerAddr.Zone = "N/A"
-	payload = packet[8:]
-	return
+	ip := packet[2:6]
+	port := int(binary.LittleEndian.Uint16(packet[6:8]))
+	payload := packet[8:]
+	
+	peerAddr := net.UDPAddr {
+			IP: ip,
+			Port: port,
+			Zone: "N/A",
+	}
+	return byteNum, &peerAddr, payload, nil
 }
