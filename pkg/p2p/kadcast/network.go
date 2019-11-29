@@ -10,11 +10,11 @@ import (
 
 // Listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine.
-func startUDPListener(netw string, queue *ring.Buffer, router Router) {
+func startUDPListener(netw string, queue *ring.Buffer, myPeerInfo Peer, ) {
 
 	lAddr := getLocalIPAddress()
 	// Set listening port.
-	lAddr.Port = int(router.myPeerInfo.port)
+	lAddr.Port = int(myPeerInfo.port)
 PacketConnCreation:
 	// listen to incoming udp packets
 	pc, err := net.ListenUDP(netw, &lAddr)
