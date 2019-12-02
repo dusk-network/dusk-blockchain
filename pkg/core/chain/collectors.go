@@ -10,15 +10,9 @@ import (
 	"github.com/dusk-network/dusk-wallet/block"
 )
 
-type (
-	candidateCollector struct {
-		blockChan chan<- *block.Block
-	}
-	certMsg struct {
-		hash []byte
-		cert *block.Certificate
-	}
-)
+type candidateCollector struct {
+	blockChan chan<- *block.Block
+}
 
 func initCandidateCollector(eventBus *eventbus.EventBus) chan *block.Block {
 	blockChan := make(chan *block.Block, 1)
