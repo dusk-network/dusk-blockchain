@@ -57,7 +57,7 @@ type ComponentFactory interface {
 // Component is an ephemeral instance that lives solely for a round
 type Component interface {
 	// Initialize a Component with data relevant to the current Round
-	Initialize(EventPlayer, Signer, RoundUpdate) []TopicListener
+	Initialize(EventPlayer, Signer, RoundState) []TopicListener
 	// Finalize allows a Component to perform cleanup operations before begin garbage collected
 	Finalize()
 	// ID allows the Coordinator to differentiate between components and

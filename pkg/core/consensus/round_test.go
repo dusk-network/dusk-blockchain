@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
@@ -128,7 +129,7 @@ func TestEventFilter(t *testing.T) {
 
 // Initialize a coordinator with a single component.
 func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Component) {
-	bus := eventbus.New()
+	bus, rpcBus := eventbus.New(), rpcbus.New()
 	keys, err := key.NewRandConsensusKeys()
 	if err != nil {
 		t.Fatal(err)
@@ -139,10 +140,13 @@ func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Co
 		factories[i] = &mockFactory{topic}
 	}
 
-	c := Start(bus, keys, factories...)
-	ruBuf := MockRoundUpdateBuffer(1, nil, nil)
-	// Collect the round update to initialize the state
-	c.CollectRoundUpdate(*ruBuf)
+	c := Start(bus, rpcBus, keys, factories...)
+	// Initialize it manually, to avoid complications with the round
+	// update
+	ru := MockRoundUpdate(1, nil, nil)
+	c.Update(1)
+	c.onNewRound(ru, true)
+	c.unsynced = false
 
 	return c, c.store.components
 }

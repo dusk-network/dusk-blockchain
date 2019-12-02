@@ -54,6 +54,6 @@ func (c *ConsensusFactory) StartConsensus() {
 	redSecondStep := secondstep.NewFactory(c.eventBus, c.rpcBus, c.ConsensusKeys, c.timerLength)
 	agr := agreement.NewFactory(c.eventBus, c.ConsensusKeys)
 
-	consensus.Start(c.eventBus, c.ConsensusKeys, cgen, sgen, sel, redFirstStep, redSecondStep, agr, gen)
+	consensus.Start(c.eventBus, c.rpcBus, c.ConsensusKeys, cgen, sgen, sel, redFirstStep, redSecondStep, agr, gen)
 	log.WithField("process", "factory").Info("Consensus Started")
 }
