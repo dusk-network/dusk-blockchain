@@ -45,8 +45,7 @@ type Chain struct {
 	mu sync.RWMutex
 
 	// collector channels
-	candidateChan   <-chan *block.Block
-	certificateChan <-chan certMsg
+	candidateChan <-chan *block.Block
 
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
