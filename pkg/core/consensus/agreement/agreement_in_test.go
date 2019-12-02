@@ -14,7 +14,13 @@ func TestCollectAgreementEvent(t *testing.T) {
 	eb := eventbus.New()
 	hlp, hash := ProduceWinningHash(eb, 3)
 
-	certificateBuf := <-hlp.CertificateChan
+	certificateBuf := <-hlp.FinalizeChan
+	// read off the round
+	var round uint64
+	if err := encoding.ReadUint64LE(&certificateBuf, &round); err != nil {
+		t.Fatal(err)
+	}
+
 	certHash := make([]byte, 32)
 	if err := encoding.Read256(&certificateBuf, certHash); err != nil {
 		t.Fatal(err)
@@ -27,13 +33,13 @@ func TestFinalize(t *testing.T) {
 	eb := eventbus.New()
 	hlp, _ := ProduceWinningHash(eb, 3)
 
-	<-hlp.CertificateChan
+	<-hlp.FinalizeChan
 	hlp.Aggro.Finalize()
 	hash, _ := crypto.RandEntropy(32)
 	hlp.Spawn(hash)
 
 	select {
-	case <-hlp.CertificateChan:
+	case <-hlp.FinalizeChan:
 		assert.FailNow(t, "there should be no activity on a finalized component")
 	case <-time.After(100 * time.Millisecond):
 		//all good

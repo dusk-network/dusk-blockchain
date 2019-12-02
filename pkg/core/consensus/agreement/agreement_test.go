@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,13 @@ func TestAgreement(t *testing.T) {
 		hlp.Bus.Publish(topics.Agreement, aev)
 	}
 
-	res := <-hlp.CertificateChan
+	res := <-hlp.FinalizeChan
+	// discard round
+	var round uint64
+	if err := encoding.ReadUint64LE(&res, &round); err != nil {
+		t.Fatal(err)
+	}
+
 	winningHash := make([]byte, 32)
 	if err := encoding.Read256(&res, winningHash); err != nil {
 		t.Fatal(err)
@@ -54,10 +61,10 @@ func TestFinalize(t *testing.T) {
 }
 
 func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helper) {
-	eb := eventbus.New()
+	eb, rpc := eventbus.New(), rpcbus.New()
 	h := agreement.NewHelper(eb, nrProvisioners)
 	factory := agreement.NewFactory(eb, h.Keys[0])
-	coordinator := consensus.Start(eb, h.Keys[0], factory)
+	coordinator := consensus.Start(eb, rpc, h.Keys[0], factory)
 	// starting up the coordinator
 	ru := *consensus.MockRoundUpdateBuffer(1, h.P, nil)
 	if err := coordinator.CollectRoundUpdate(ru); err != nil {

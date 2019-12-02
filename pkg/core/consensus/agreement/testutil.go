@@ -13,12 +13,12 @@ import (
 
 // Helper is a struct that facilitates sending semi-real Events with minimum effort
 type Helper struct {
-	Bus             *eventbus.EventBus
-	P               *user.Provisioners
-	Keys            []key.ConsensusKeys
-	Aggro           *agreement
-	CertificateChan chan bytes.Buffer
-	nr              int
+	Bus          *eventbus.EventBus
+	P            *user.Provisioners
+	Keys         []key.ConsensusKeys
+	Aggro        *agreement
+	FinalizeChan chan bytes.Buffer
+	nr           int
 }
 
 // NewHelper creates a Helper
@@ -34,8 +34,8 @@ func NewHelper(eb *eventbus.EventBus, provisioners int) *Helper {
 
 // CreateResultChan is used by tests (internal and external) to quickly wire the agreement results to a channel to listen to
 func (hlp *Helper) createResultChan() {
-	chanListener := eventbus.NewChanListener(hlp.CertificateChan)
-	hlp.Bus.Subscribe(topics.Certificate, chanListener)
+	chanListener := eventbus.NewChanListener(hlp.FinalizeChan)
+	hlp.Bus.Subscribe(topics.Finalize, chanListener)
 }
 
 // SendBatch let agreement collect  additional batches of consensus events
