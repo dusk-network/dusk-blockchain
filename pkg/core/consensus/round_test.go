@@ -67,8 +67,10 @@ func TestQueuedDispatch(t *testing.T) {
 	assert.Equal(t, 1, len(c.eventqueue.entries[2][0]))
 
 	// Update to round 2. The queued event should be dispatched
-	ruBuf := MockRoundUpdateBuffer(2, nil, nil)
-	c.CollectRoundUpdate(*ruBuf)
+	c.finalizeConsensus(nil, nil)
+	rs := MockRoundState(2, nil, nil)
+	c.Update(2)
+	c.onNewRound(rs, false)
 	// Update our reference to `comp`, as it was swapped out.
 	comp = c.store.components[0].(*mockComponent)
 	c.Pause(comp.ID())
@@ -143,9 +145,9 @@ func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Co
 	c := Start(bus, rpcBus, keys, factories...)
 	// Initialize it manually, to avoid complications with the round
 	// update
-	ru := MockRoundUpdate(1, nil, nil)
+	rs := MockRoundState(1, nil, nil)
 	c.Update(1)
-	c.onNewRound(ru, true)
+	c.onNewRound(rs, true)
 	c.unsynced = false
 
 	return c, c.store.components
@@ -191,7 +193,7 @@ func newMockComponent(topic topics.Topic) *mockComponent {
 	}
 }
 
-func (m *mockComponent) Initialize(EventPlayer, Signer, RoundUpdate) []TopicListener {
+func (m *mockComponent) Initialize(EventPlayer, Signer, RoundState) []TopicListener {
 	listener := TopicListener{
 		Topic:    m.topic,
 		Listener: NewSimpleListener(m.Collect, LowPriority, false),

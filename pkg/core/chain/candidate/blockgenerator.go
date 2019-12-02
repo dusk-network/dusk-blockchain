@@ -36,7 +36,7 @@ type Generator struct {
 	rpcBus    *rpcbus.RPCBus
 	signer    consensus.Signer
 
-	roundInfo    consensus.RoundUpdate
+	roundInfo    consensus.RoundState
 	scoreEventID uint32
 }
 
@@ -52,8 +52,8 @@ func NewComponent(publisher eventbus.Publisher, genPubKey *key.PublicKey, rpcBus
 // Initialize the Generator, by populating the fields needed to generate candidate
 // blocks, and returns a Listener for ScoreEvents.
 // Implements consensus.Component.
-func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
-	bg.roundInfo = ru
+func (bg *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, rs consensus.RoundState) []consensus.TopicListener {
+	bg.roundInfo = rs
 	bg.signer = signer
 
 	scoreEventListener := consensus.TopicListener{
@@ -93,7 +93,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		Proof:         sev.Proof.Proof,
 		Z:             sev.Proof.Z,
 		BidListSubset: sev.Proof.BinaryBidList,
-		PrevHash:      bg.roundInfo.Hash,
+		PrevHash:      bg.roundInfo.BlockHash,
 		Seed:          sev.Seed,
 		VoteHash:      blk.Header.Hash,
 	}
@@ -125,7 +125,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 }
 
 func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {
-	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof.Proof, sev.Proof.Score, bg.roundInfo.Hash)
+	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof.Proof, sev.Proof.Score, bg.roundInfo.BlockHash)
 }
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it

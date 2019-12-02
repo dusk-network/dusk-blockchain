@@ -22,7 +22,7 @@ func TestSelection(t *testing.T) {
 	// Sub to BestScore, to observe the outcome of the Selector
 	bestScoreChan := make(chan bytes.Buffer, 1)
 	bus.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
-	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+	hlp.Initialize(consensus.MockRoundState(1, nil, hlp.BidList))
 
 	// Make sure to replace the handler, to avoid zkproof verification
 	hlp.SetHandler(newMockHandler())
@@ -51,7 +51,7 @@ func TestSwapHeader(t *testing.T) {
 	// Sub to gossip, so we can catch any outgoing events
 	gossipChan := make(chan bytes.Buffer, 1)
 	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
-	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+	hlp.Initialize(consensus.MockRoundState(1, nil, hlp.BidList))
 
 	// Make sure to replace the handler, to avoid zkproof verification
 	hlp.SetHandler(newMockHandler())
@@ -84,7 +84,7 @@ func TestMultipleVerification(t *testing.T) {
 	// Sub to gossip, so we can catch any outgoing events
 	gossipChan := make(chan bytes.Buffer, 10)
 	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
-	hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+	hlp.Initialize(consensus.MockRoundState(1, nil, hlp.BidList))
 
 	// Make sure to replace the handler, to avoid zkproof verification
 	hlp.SetHandler(newMockHandler())
@@ -127,7 +127,7 @@ func TestCollectNoGeneration(t *testing.T) {
 	assert.NotPanics(t, func() {
 		bus := eventbus.New()
 		hlp := selection.NewHelper(bus)
-		hlp.Initialize(consensus.MockRoundUpdate(1, nil, hlp.BidList))
+		hlp.Initialize(consensus.MockRoundState(1, nil, hlp.BidList))
 
 		// Make sure to replace the handler, to avoid zkproof verification
 		hlp.SetHandler(newMockHandler())

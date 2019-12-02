@@ -36,7 +36,7 @@ func NewComponent(publisher eventbus.Publisher, consensusKeys key.ConsensusKeys,
 // message.
 type Generator struct {
 	publisher eventbus.Publisher
-	roundInfo consensus.RoundUpdate
+	roundInfo consensus.RoundState
 	seed      []byte
 	d, k      ristretto.Scalar
 	key.ConsensusKeys
@@ -49,10 +49,10 @@ type Generator struct {
 // Initialize the Generator, by creating the round seed and returning the Listener
 // for the Generation topic, which triggers the Generator.
 // Implements consensus.Component.
-func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, rs consensus.RoundState) []consensus.TopicListener {
 	g.signer = signer
-	g.roundInfo = ru
-	signedSeed, err := g.sign(ru.Seed)
+	g.roundInfo = rs
+	signedSeed, err := g.sign(rs.Seed)
 	if err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("could not sign seed")
 		return nil

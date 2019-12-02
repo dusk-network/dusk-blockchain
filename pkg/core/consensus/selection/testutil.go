@@ -2,8 +2,9 @@ package selection
 
 import (
 	"bytes"
-	"golang.org/x/crypto/ed25519"
 	"time"
+
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
@@ -112,8 +113,8 @@ func (h *Helper) createResultChan() {
 }
 
 // Initialize the selector with the given round update.
-func (h *Helper) Initialize(ru consensus.RoundUpdate) {
-	h.Selector.Initialize(h, h.signer, ru)
+func (h *Helper) Initialize(rs consensus.RoundState) {
+	h.Selector.Initialize(h, h.signer, rs)
 }
 
 // Spawn a set of score events.

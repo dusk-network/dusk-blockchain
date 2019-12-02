@@ -52,12 +52,12 @@ func NewComponent(broker eventbus.Broker, rpcBus *rpcbus.RPCBus, keys key.Consen
 // Initialize the reduction component, by instantiating the handler and creating
 // the topic subscribers.
 // Implements consensus.Component
-func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, ru consensus.RoundUpdate) []consensus.TopicListener {
+func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, rs consensus.RoundState) []consensus.TopicListener {
 	r.eventPlayer = eventPlayer
 	r.signer = signer
-	r.handler = reduction.NewHandler(r.keys, ru.P)
+	r.handler = reduction.NewHandler(r.keys, rs.P)
 	r.Timer = reduction.NewTimer(r.Halt)
-	r.round = ru.Round
+	r.round = rs.Round
 
 	bestScoreSubscriber := consensus.TopicListener{
 		Topic:    topics.BestScore,

@@ -7,8 +7,22 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
 )
+
+func MockRoundState(round uint64, p *user.Provisioners, bidList user.BidList) RoundState {
+	ru := MockRoundUpdate(round, p, bidList)
+	seed, _ := crypto.RandEntropy(33)
+	hash, _ := crypto.RandEntropy(32)
+
+	return RoundState{
+		RoundUpdate: ru,
+		Seed:        seed,
+		BlockHash:   hash,
+		Certificate: *block.EmptyCertificate(),
+	}
+}
 
 func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) RoundUpdate {
 	var provisioners = p

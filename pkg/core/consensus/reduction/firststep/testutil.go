@@ -87,8 +87,8 @@ func (hlp *Helper) NextBatch() []byte {
 // Kickstart a Helper without sending any reduction event
 func Kickstart(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, nr int, timeOut time.Duration) (*Helper, []byte) {
 	h := NewHelper(eb, rpcbus, nr, timeOut)
-	roundUpdate := consensus.MockRoundUpdate(h.Round, h.P, nil)
-	h.Initialize(roundUpdate)
+	roundState := consensus.MockRoundState(h.Round, h.P, nil)
+	h.Initialize(roundState)
 	hash, _ := crypto.RandEntropy(32)
 	h.ActivateReduction(hash)
 	return h, hash

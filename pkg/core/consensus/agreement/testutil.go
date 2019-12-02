@@ -58,14 +58,14 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 }
 
 // Initialize the Agreement with a Round update
-func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.Aggro.Initialize(consensus.NewSimplePlayer(), nil, ru)
+func (hlp *Helper) Initialize(rs consensus.RoundState) {
+	hlp.Aggro.Initialize(consensus.NewSimplePlayer(), nil, rs)
 }
 
 func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	hlp := NewHelper(eb, nr)
-	roundUpdate := consensus.MockRoundUpdate(1, hlp.P, nil)
-	hlp.Initialize(roundUpdate)
+	roundState := consensus.MockRoundState(1, hlp.P, nil)
+	hlp.Initialize(roundState)
 	hash, _ := crypto.RandEntropy(32)
 	return hlp, hash
 }

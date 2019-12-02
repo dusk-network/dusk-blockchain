@@ -44,7 +44,7 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector
 
 // Initialize the Selector, by creating the handler and returning the needed Listeners.
 // Implements consensus.Component.
-func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
+func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundState) []consensus.TopicListener {
 	s.eventPlayer = eventPlayer
 	s.signer = signer
 	s.handler = NewScoreHandler(r.BidList)

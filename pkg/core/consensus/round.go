@@ -8,6 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -30,8 +31,9 @@ var lg = log.WithField("process", "coordinator")
 // to do it's job in a given round
 type RoundState struct {
 	RoundUpdate
-	Seed      []byte
-	BlockHash []byte
+	Seed        []byte
+	BlockHash   []byte
+	Certificate block.Certificate
 }
 
 // roundStore is the central registry for all consensus components and listeners.
@@ -45,13 +47,13 @@ type roundStore struct {
 	intermediateBlock *block.Block
 }
 
-func newStore(c *Coordinator, cert *block.Certificate, winningCandidate *block.Block) *roundStore {
+func newStore(c *Coordinator, cert *block.Certificate, intermediate *block.Block) *roundStore {
 	s := &roundStore{
 		subscribers:       make(map[topics.Topic][]Listener),
 		components:        make([]Component, 0),
 		coordinator:       c,
 		certificate:       cert,
-		intermediateBlock: winningCandidate,
+		intermediateBlock: intermediate,
 	}
 
 	return s
@@ -264,7 +266,19 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		return nil
 	}
 	c.Update(r.Round)
-	rs := RoundState{r, c.store.intermediateBlock.Header.Seed, c.store.intermediateBlock.Header.Hash}
+	rs := RoundState{
+		RoundUpdate: r,
+	}
+
+	if c.store.intermediateBlock != nil {
+		rs.Seed = c.store.intermediateBlock.Header.Seed
+		rs.BlockHash = c.store.intermediateBlock.Header.Hash
+	}
+
+	if c.store.certificate != nil {
+		rs.Certificate = *c.store.certificate
+	}
+
 	c.onNewRound(rs, c.unsynced)
 	c.unsynced = false
 
@@ -288,13 +302,29 @@ func (c *Coordinator) doze(r RoundUpdate) {
 	// finalization
 	c.FinalizeRound()
 	c.reinstantiateStore(nil, nil)
-	c.onNewRound(r, c.unsynced)
+	rs := RoundState{r, nil, nil, *block.EmptyCertificate()}
+	c.onNewRound(rs, c.unsynced)
 	// We can't skip ahead to the latest round as we are missing the
 	// agreement messages for the previous one, so we will go to the
 	// one before it.
 	c.Update(r.Round - 1)
 	c.unsynced = false
 	// Query for Agreement messages belonging to this round
+	c.requestAgreementMessages(c.Round())
+}
+
+func (c *Coordinator) requestAgreementMessages(round uint64) {
+	msg := &peermsg.GetAgreements{round}
+	buf := new(bytes.Buffer)
+	if err := msg.Encode(buf); err != nil {
+		panic(err)
+	}
+
+	if err := topics.Prepend(buf, topics.GetAgreements); err != nil {
+		panic(err)
+	}
+
+	c.eventBus.Publish(topics.Gossip, buf)
 }
 
 // CollectFinalize is triggered when the Agreement reaches quorum, and pre-emptively
@@ -330,9 +360,9 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 		panic("not supposed to get a Finalize message for a future round")
 	}
 
-	// If we have one, finalize current candidate, and send to chain
+	// If we have one, finalize current intermediate block, and send to chain
 	if c.store.intermediateBlock != nil {
-		if err := c.finalizeCandidate(cert); err != nil {
+		if err := c.finalizeIntermediateBlock(cert); err != nil {
 			return err
 		}
 	}
@@ -346,7 +376,7 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 	winningCandidateBuf, err := c.rpcBus.Call(rpcbus.GetCandidate, req, 0)
 	if err != nil {
 		// If we don't have it, request it from peers
-		winningCandidateBuf = c.requestWinningCandidate(winningBlockHash)
+		winningCandidateBuf = c.requestIntermediateBlock(winningBlockHash)
 	}
 
 	if err := marshalling.UnmarshalBlock(&winningCandidateBuf, winningCandidate); err != nil {
@@ -357,7 +387,7 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 	return nil
 }
 
-func (c *Coordinator) requestWinningCandidate(blockHash []byte) bytes.Buffer {
+func (c *Coordinator) requestIntermediateBlock(blockHash []byte) bytes.Buffer {
 	return bytes.Buffer{}
 }
 
@@ -368,7 +398,7 @@ func (c *Coordinator) finalizeConsensus(cert *block.Certificate, blk *block.Bloc
 	c.reinstantiateStore(cert, blk)
 }
 
-func (c *Coordinator) finalizeCandidate(cert *block.Certificate) error {
+func (c *Coordinator) finalizeIntermediateBlock(cert *block.Certificate) error {
 	candidate := c.store.intermediateBlock
 	candidate.Header.Certificate = cert
 	buf := new(bytes.Buffer)
@@ -381,8 +411,8 @@ func (c *Coordinator) finalizeCandidate(cert *block.Certificate) error {
 }
 
 // Create a new roundStore and instantiate all Components.
-func (c *Coordinator) reinstantiateStore(cert *block.Certificate, winningCandidate *block.Block) {
-	store := newStore(c, cert, winningCandidate)
+func (c *Coordinator) reinstantiateStore(cert *block.Certificate, intermediate *block.Block) {
+	store := newStore(c, cert, intermediate)
 	for _, factory := range c.factories {
 		component := factory.Instantiate()
 		store.addComponent(component)

@@ -57,8 +57,8 @@ func (hlp *Helper) ActivateReduction(hash []byte, sv *agreement.StepVotes) error
 func Kickstart(nr int, timeOut time.Duration) (*Helper, []byte) {
 	eb, rpcbus := eventbus.New(), rpcbus.New()
 	h := NewHelper(eb, rpcbus, nr, timeOut)
-	roundUpdate := consensus.MockRoundUpdate(1, h.P, nil)
-	h.Initialize(roundUpdate)
+	roundState := consensus.MockRoundState(1, h.P, nil)
+	h.Initialize(roundState)
 	hash, _ := crypto.RandEntropy(32)
 	return h, hash
 }

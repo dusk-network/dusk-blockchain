@@ -45,7 +45,7 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 // Initialize the agreement component, by creating the handler and the accumulator, and
 // return a listener for Agreement messages.
 // Implements consensus.Component.
-func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
+func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundState) []consensus.TopicListener {
 	a.eventPlayer = eventPlayer
 	a.handler = newHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)

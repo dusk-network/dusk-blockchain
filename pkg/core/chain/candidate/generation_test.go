@@ -23,8 +23,8 @@ func TestGeneration(t *testing.T) {
 	txBatchCount := uint16(2)
 	round := uint64(25)
 	h := candidate.NewHelper(t, bus, rBus, txBatchCount)
-	ru := consensus.MockRoundUpdate(round, nil, nil)
-	h.Initialize(ru)
+	rs := consensus.MockRoundState(round, nil, nil)
+	h.Initialize(rs)
 
 	h.TriggerBlockGeneration()
 

@@ -115,6 +115,6 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 }
 
 // Initialize the reducer with a Round update
-func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
-	hlp.Reducer.Initialize(hlp, hlp.signer, ru)
+func (hlp *Helper) Initialize(rs consensus.RoundState) {
+	hlp.Reducer.Initialize(hlp, hlp.signer, rs)
 }

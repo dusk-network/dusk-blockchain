@@ -85,8 +85,8 @@ func (h *Helper) createResultChans() {
 }
 
 // Initialize the generator with the given round update.
-func (h *Helper) Initialize(ru consensus.RoundUpdate) {
-	h.Generator.Initialize(h, h.signer, ru)
+func (h *Helper) Initialize(rs consensus.RoundState) {
+	h.Generator.Initialize(h, h.signer, rs)
 }
 
 // TriggerBlockGeneration creates a random ScoreEvent and triggers block generation
