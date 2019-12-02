@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/requesting"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
@@ -19,9 +20,9 @@ type messageRouter struct {
 	dupeMap   *dupemap.DupeMap
 
 	// 1-to-1 components
-	blockHashBroker *processing.BlockHashBroker
-	dataRequestor   *processing.DataRequestor
-	dataBroker      *processing.DataBroker
+	blockHashBroker *requesting.BlockHashBroker
+	dataRequestor   *requesting.DataRequestor
+	dataBroker      *requesting.DataBroker
 	synchronizer    *chainsync.ChainSynchronizer
 	ponger          processing.Ponger
 

@@ -29,6 +29,8 @@ const (
 	MemPool
 	Inv
 	Certificate
+	GetAgreements
+	Agreements
 
 	// Consensus topics
 	Candidate
@@ -68,6 +70,7 @@ const (
 	Generation
 	Finalize
 	Restart
+	AddAgreements
 )
 
 type topicBuf struct {
@@ -93,6 +96,8 @@ var Topics = [...]topicBuf{
 	topicBuf{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
 	topicBuf{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
 	topicBuf{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
+	topicBuf{GetAgreements, *(bytes.NewBuffer([]byte{byte(GetAgreements)})), "getagreements"},
+	topicBuf{Agreements, *(bytes.NewBuffer([]byte{byte(Agreements)})), "agreements"},
 	topicBuf{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
 	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
 	topicBuf{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
@@ -124,6 +129,7 @@ var Topics = [...]topicBuf{
 	topicBuf{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
 	topicBuf{Finalize, *(bytes.NewBuffer([]byte{byte(Finalize)})), "finalize"},
 	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
+	topicBuf{AddAgreements, *(bytes.NewBuffer([]byte{byte(AddAgreements)})), "addagreements"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {

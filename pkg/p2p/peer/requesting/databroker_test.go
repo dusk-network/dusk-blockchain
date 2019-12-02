@@ -1,4 +1,4 @@
-package processing_test
+package requesting_test
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/requesting"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-wallet/block"
 )
@@ -25,7 +25,7 @@ func TestSendData(t *testing.T) {
 
 	// Set up DataBroker
 	responseChan := make(chan *bytes.Buffer, 100)
-	dataBroker := processing.NewDataBroker(db, nil, responseChan)
+	dataBroker := requesting.NewDataBroker(db, nil, responseChan)
 
 	// Make a GetData and give it to the dataBroker
 	msg := createGetDataBuffer(hashes...)
