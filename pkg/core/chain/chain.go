@@ -65,7 +65,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 
 	// set up collectors
 	candidateChan := initCandidateCollector(eventBus)
-	certificateChan := initCertificateCollector(eventBus)
 
 	// set up rpcbus channels
 	getLastBlockChan := make(chan rpcbus.Request, 1)
@@ -83,7 +82,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 		candidateChan:            candidateChan,
 		p:                        user.NewProvisioners(),
 		bidList:                  &user.BidList{},
-		certificateChan:          certificateChan,
 		getLastBlockChan:         getLastBlockChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getCandidateChan:         getCandidateChan,
@@ -105,9 +103,6 @@ func (c *Chain) Listen() {
 
 		case b := <-c.candidateChan:
 			_ = c.handleCandidateBlock(*b)
-		case certMsg := <-c.certificateChan:
-			c.addCertificate(certMsg.hash, certMsg.cert)
-
 		// wire.RPCBus requests handlers
 		case r := <-c.getLastBlockChan:
 
@@ -564,15 +559,4 @@ func (c *Chain) removeExpiredBids(round uint64) {
 			c.removeBid(bid)
 		}
 	}
-}
-
-func (c *Chain) addCertificate(blockHash []byte, cert *block.Certificate) {
-	candidate, err := c.fetchCandidateBlock(blockHash)
-	if err != nil {
-		log.Warnf("could not fetch candidate block to add certificate: %s", err.Error())
-		return
-	}
-
-	candidate.Header.Certificate = cert
-	c.AcceptBlock(*candidate)
 }
