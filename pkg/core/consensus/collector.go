@@ -27,8 +27,6 @@ type (
 		Round   uint64
 		P       user.Provisioners
 		BidList user.BidList
-		Seed    []byte
-		Hash    []byte
 	}
 )
 
@@ -48,21 +46,9 @@ func DecodeRound(rb *bytes.Buffer, update *RoundUpdate) error {
 		return err
 	}
 
-	seed := make([]byte, 33)
-	if err := encoding.ReadBLS(rb, seed); err != nil {
-		return err
-	}
-
-	hash := make([]byte, 32)
-	if err := encoding.Read256(rb, hash); err != nil {
-		return err
-	}
-
 	update.P = provisioners
 	update.Round = round
 	update.BidList = bidList
-	update.Seed = seed
-	update.Hash = hash
 	return nil
 }
 

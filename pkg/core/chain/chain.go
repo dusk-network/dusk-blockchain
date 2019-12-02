@@ -22,7 +22,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"golang.org/x/crypto/ed25519"
@@ -52,6 +51,7 @@ type Chain struct {
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
+	getCandidateChan         <-chan rpcbus.Request
 }
 
 // New returns a new chain object
@@ -70,8 +70,10 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	// set up rpcbus channels
 	getLastBlockChan := make(chan rpcbus.Request, 1)
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
+	getCandidateChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
 	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
+	rpcBus.Register(rpcbus.GetCandidate, getCandidateChan)
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -84,6 +86,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 		certificateChan:          certificateChan,
 		getLastBlockChan:         getLastBlockChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
+		getCandidateChan:         getCandidateChan,
 	}
 
 	chain.restoreConsensusData()
@@ -120,7 +123,6 @@ func (c *Chain) Listen() {
 			}
 
 			r.RespChan <- rpcbus.Response{*buf, nil}
-
 		case r := <-c.verifyCandidateBlockChan:
 			if err := c.verifyCandidateBlock(r.Params.Bytes()); err != nil {
 				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
@@ -128,6 +130,20 @@ func (c *Chain) Listen() {
 			}
 
 			r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		case r := <-c.getCandidateChan:
+			blk, err := c.fetchCandidateBlock(r.Params.Bytes())
+			if err != nil {
+				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+				continue
+			}
+
+			buf := new(bytes.Buffer)
+			if err := marshalling.MarshalBlock(buf, blk); err != nil {
+				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+				continue
+			}
+
+			r.RespChan <- rpcbus.Response{*buf, nil}
 		}
 	}
 }
@@ -141,7 +157,9 @@ func (c *Chain) LaunchConsensus() {
 	<-initChan
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	c.sendRoundUpdate(c.prevBlock.Header.Height+1, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
+	// height + 2 is the new round, since blocks are finalized after
+	// 2 rounds.
+	c.sendRoundUpdate(c.prevBlock.Header.Height + 2)
 	c.eventBus.Unsubscribe(topics.Initialization, id)
 }
 
@@ -209,7 +227,6 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// This check should avoid a possible race condition between accepting two blocks
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
-	// FIXME: make sure we actually have only one valid certificate per block (frontrunning consensus (please follow the fucking protocol already))
 	l.Trace("verifying block certificate")
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
 		l.WithError(err).Warnln("certificate verification failed")
@@ -259,8 +276,8 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// We remove provisioners and bids from accepted block height + 1,
 	// to set up our committee correctly for the next block.
 	l.Trace("removing expired consensus transactions")
-	c.removeExpiredProvisioners(blk.Header.Height + 1)
-	c.removeExpiredBids(blk.Header.Height + 1)
+	c.removeExpiredProvisioners(blk.Header.Height + 2)
+	c.removeExpiredBids(blk.Header.Height + 2)
 
 	// 8. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
@@ -280,7 +297,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// a set of provisioners, and a bidlist. This allows the consensus components
 	// to rehydrate their state properly for the next round.
 	l.Trace("sending round update")
-	if err := c.sendRoundUpdate(blk.Header.Height+1, blk.Header.Seed, blk.Header.Hash); err != nil {
+	if err := c.sendRoundUpdate(blk.Header.Height + 2); err != nil {
 		l.WithError(err).Errorln("sending round update failed")
 		return err
 	}
@@ -289,7 +306,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
+func (c *Chain) sendRoundUpdate(round uint64) error {
 	buf := new(bytes.Buffer)
 	roundBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(roundBytes, round)
@@ -306,14 +323,6 @@ func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
 	}
 
 	if err := user.MarshalBidList(buf, *c.bidList); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteBLS(buf, seed); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(buf, hash); err != nil {
 		return err
 	}
 
