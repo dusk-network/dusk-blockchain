@@ -71,6 +71,10 @@ func MarshalHashable(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
+	if err := MarshalCertificate(r, h.Certificate); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -80,10 +84,6 @@ func MarshalHeader(r *bytes.Buffer, h *block.Header) error {
 	}
 
 	if err := encoding.Write256(r, h.TxRoot); err != nil {
-		return err
-	}
-
-	if err := MarshalCertificate(r, h.Certificate); err != nil {
 		return err
 	}
 
@@ -119,12 +119,12 @@ func UnmarshalHeader(r *bytes.Buffer, h *block.Header) error {
 		return err
 	}
 
-	h.TxRoot = make([]byte, 32)
-	if err := encoding.Read256(r, h.TxRoot); err != nil {
+	if err := UnmarshalCertificate(r, h.Certificate); err != nil {
 		return err
 	}
 
-	if err := UnmarshalCertificate(r, h.Certificate); err != nil {
+	h.TxRoot = make([]byte, 32)
+	if err := encoding.Read256(r, h.TxRoot); err != nil {
 		return err
 	}
 
