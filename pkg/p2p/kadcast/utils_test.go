@@ -25,7 +25,7 @@ func testPOW(t *testing.T) {
 	println(a.computePeerNonce())
 }
 
-func TestProtocol(t *testing.T) {
+func testProtocol(t *testing.T) {
 	// Our node info.
 	var port uint16 = 25519
 	ip := [4]byte{62, 57, 180, 247}
