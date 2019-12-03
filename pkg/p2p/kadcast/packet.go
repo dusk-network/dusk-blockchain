@@ -8,11 +8,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
 
+// Packet represents a Kadcast packet which is
+// the payload of the TCP or UDP packet received.
 type Packet struct {
 	headers [24]byte
 	payload []byte
 }
 
+// Builds a `Packet` from the headers and the payload.
 func makePacket(headers [24]byte, payload []byte) Packet {
 	return Packet{
 		headers: headers,
@@ -54,7 +57,7 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 
 // Gets the Packet headers parts and puts them into the
 // header attribute of the Packet.
-func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
+func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	var headers []byte
 	// Add `Packet` type.
 	headers = append(headers[:], tipus)
@@ -71,7 +74,7 @@ func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	var headersArr [24]byte
 	copy(headersArr[:], headers[0:24])
 
-	pack.headers = headersArr
+	pac.headers = headersArr
 }
 
 // -------- NODES Packet De/Serialization tools -------- //
@@ -80,17 +83,17 @@ func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 // deserializing and adding to the packet's payload the
 // peerInfo of the `K` closest Peers in respect to a certain
 // target Peer.
-func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) int {
+func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 	// Get `K` closest peers to `targetPeer`.
 	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
 	// Compute the ammount of Peers that will be sent and add it
 	// as a two-byte array.
 	count := getBytesFromUint16(uint16(len(kClosestPeers)))
-	pack.payload = append(pack.payload[:], count[:]...)
+	pac.payload = append(pac.payload[:], count[:]...)
 	// Serialize the Peers to get them in `wire-format`,
 	// basically, represented as bytes.
 	for _, peer := range kClosestPeers {
-		pack.payload = append(pack.payload[:], peer.deserializePeer()...)
+		pac.payload = append(pac.payload[:], peer.deserializePeer()...)
 	}
 	return len(kClosestPeers)
 }
@@ -98,9 +101,9 @@ func (pack *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 // Analyzes if the announced number of Peers included on the
 // `NODES` message payload is the same as the recieved one.
 // Returns `true` if it is correct and `false` otherways.
-func (packet Packet) checkNodesPayloadConsistency(byteNum int) bool {
+func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 	// Get number of Peers announced.
-	peerNum := binary.BigEndian.Uint16(packet.payload[0:2])
+	peerNum := binary.BigEndian.Uint16(pac.payload[0:2])
 	// Get peerSlice length subtracting headers and count.
 	peerSliceLen := byteNum - 26
 
@@ -112,9 +115,9 @@ func (packet Packet) checkNodesPayloadConsistency(byteNum int) bool {
 
 // Gets a `NODES` message and returns a slice of the
 // `Peers` found inside of it
-func (packet Packet) getNodesPayloadInfo() []Peer {
+func (pac Packet) getNodesPayloadInfo() []Peer {
 	// Get number of Peers recieved.
-	peerNum := int(binary.BigEndian.Uint16(packet.payload[0:2]))
+	peerNum := int(binary.BigEndian.Uint16(pac.payload[0:2]))
 	// Create Peer-struct slice
 	var peers []Peer
 	// Slice the payload into `Peers` in bytes format and deserialize
@@ -123,7 +126,7 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 	for m := 0; m < peerNum; m++ {
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
-		peers = append(peers[:], serializePeer(packet.payload[i:j]))
+		peers = append(peers[:], serializePeer(pac.payload[i:j]))
 
 		i += PeerBytesSize
 		j += PeerBytesSize
@@ -131,8 +134,9 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 	return peers
 }
 
-// The function recieves a Packet and processes it according to
-// it's type.
+// ProcessPacket recieves a Packet and processes it according to
+// it's type. It gets the packets from the circularqueue that 
+// connects the listeners with the packet processor.
 func ProcessPacket(queue *ring.Buffer, router *Router) {
 	// Instanciate now the variables to not pollute
 	// the stack.
@@ -192,6 +196,8 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 	}
 }
 
+// Processes the `PING` packet info sending back a 
+// `PONG` message and adding the sender to the buckets.
 func treatPing(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
@@ -200,12 +206,16 @@ func treatPing(peerInf Peer, router *Router) {
 	return
 }
 
+// Processes the `PONG` packet info and
+// adds the sender to the buckets.
 func treatPong(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 	return
 }
 
+// Processes the `FIND_NODES` packet info sending back a 
+// `NODES` message and adding the sender to the buckets.
 func treatFindNodes(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
@@ -215,6 +225,9 @@ func treatFindNodes(peerInf Peer, router *Router) {
 	return
 }
 
+// Processes the `NODES` packet info sending back a 
+// `PING` message to all of the Peers announced on the packet
+// and adding the sender to the buckets.
 func treatNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// See if the packet info is consistent:
 	// peerNum announced <=> bytesPerPeer * peerNum

@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+// InitBootstrap inits the Bootstrapping process by sending 
+// a `PING` message to every bootstrapping node repeatedly.
+// If it tried 3 or more times and no new `Peers` were added,
+// it panics. 
+// Otherways, it returns `nil` and logs the Number of peers 
+// the node is connected to at the end of the process.
 func InitBootstrap(router *Router, bootNodes []Peer) error {
 	log.Println("Bootstrapping process started.")
 	// Get PeerList ordered by distance so we can compare it
@@ -35,6 +41,15 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 	return nil
 }
 
+// StartNetworkDiscovery triggers the network discovery process.
+// The node basically sends `FIND_NODES` messages to the nodes it
+// is currently connected to and evaluates the `Peers` that were added 
+// on each iteration. 
+// If the closest peer to ours is the same during two iterations of the
+// `FIND_NODES` message, we finnish the process logging the ammout of peers
+// we are currently connected to.
+// Otherways, if the closest Peer on two consecutive iterations changes, we 
+// keep queriyng the `alpha` closest nodes with `FIND_NODES` messages.
 func StartNetworkDiscovery(router *Router) {
 	var actualClosest []Peer
 	previousClosest := router.getXClosestPeersTo(1, router.MyPeerInfo)

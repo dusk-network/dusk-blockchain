@@ -19,7 +19,8 @@ type Peer struct {
 	id   [16]byte
 }
 
-// Constructs a Peer with it's fields values as inputs.
+// MakePeer constructs a `Peer` by setting it's IP, Port
+// and computing and setting it's ID.
 func MakePeer(ip [4]byte, port uint16) Peer {
 	id := computePeerID(ip)
 	peer := Peer{ip, port, id}
@@ -94,8 +95,8 @@ func (peer *Peer) addPort(port uint16) {
 }
 
 // Computes the XOR distance between two Peers.
-func (me Peer) computePeerDistance(peer Peer) uint16 {
-	return idXor(me.id, peer.id)
+func (peer Peer) computePeerDistance(otherPeer Peer) uint16 {
+	return idXor(peer.id, otherPeer.id)
 }
 
 // Reads the network info of a `Peer` and returns its

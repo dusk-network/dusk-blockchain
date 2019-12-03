@@ -165,7 +165,6 @@ func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byt
 func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)
 	byteNum := int(binary.LittleEndian.Uint16(packet[0:2]))
-	log.Printf("redPackLen: %v\n bytenumTotal: %v", redPackLen, byteNum+8)
 	if (redPackLen) != (byteNum + 8) {
 					return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
 	}

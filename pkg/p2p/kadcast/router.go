@@ -5,8 +5,12 @@ import (
 	"sort"
 )
 
+// K is the number of peers that a node will send on
+// a `NODES` message.
 const K int = 20
-const alpha int = 3
+// Alpha is the number of nodes to which a node will
+// ask for new nodes with `FIND_NODES` messages.
+const Alpha int = 3
 
 // Router holds all of the data needed to interact with
 // the routing data and also the networking utils.
@@ -23,7 +27,7 @@ type Router struct {
 	myPeerNonce uint32
 }
 
-// Allows to create a router which holds the peerInfo and
+// MakeRouter allows to create a router which holds the peerInfo and
 // also the routing tree information.
 func MakeRouter(externIP [4]byte, port uint16) Router {
 	myPeer := MakePeer(externIP, port)
@@ -35,10 +39,12 @@ func MakeRouter(externIP [4]byte, port uint16) Router {
 	}
 }
 
-// Tools to get sorted Peers in respect to a certain
-// PeerID in terms of XOR-distance.
-//
-//
+// --------------------------------------------------//
+//													 //
+// Tools to get sorted Peers in respect to a certain //
+// PeerID in terms of XOR-distance.				     //
+//													 //
+// --------------------------------------------------//
 
 
 // Returns the complete list of Peers in order to be sorted
@@ -132,8 +138,8 @@ func (router Router) sendPong(reciever Peer) {
 
 // Builds and sends a `FIND_NODES` packet.
 func (router Router) sendFindNodes() {
-	// Get `alpha` closest nodes to me.
-	destPeers := router.getXClosestPeersTo(alpha, router.MyPeerInfo)
+	// Get `Alpha` closest nodes to me.
+	destPeers := router.getXClosestPeersTo(Alpha, router.MyPeerInfo)
 	// Fill the headers with the type, ID, Nonce and destPort.
 	for _, peer := range destPeers {
 		// Build the packet
