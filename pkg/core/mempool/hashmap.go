@@ -2,7 +2,7 @@ package mempool
 
 import (
 	"fmt"
-	"unsafe"
+	"sort"
 
 	"github.com/dusk-network/dusk-wallet/transactions"
 )
@@ -12,14 +12,22 @@ const (
 )
 
 type (
-	key      [32]byte
 	keyImage [keyImageSize]byte
+
+	keyFee struct {
+		k txHash
+		f uint64
+	}
 
 	// HashMap represents a pool implementation based on golang map. The generic
 	// solution to bench against.
 	HashMap struct {
 		// transactions pool
-		data map[key]TxDesc
+		data map[txHash]TxDesc
+
+		// data keys sorted by Fee in a descending order
+		sorted []keyFee
+
 		// spent key images from the transactions in the pool
 		spentkeyImages map[keyImage]bool
 		Capacity       uint32
@@ -32,7 +40,7 @@ type (
 func (m *HashMap) Put(t TxDesc) error {
 
 	if m.data == nil {
-		m.data = make(map[key]TxDesc, m.Capacity)
+		m.data = make(map[txHash]TxDesc, m.Capacity)
 	}
 
 	if m.spentkeyImages == nil {
@@ -46,11 +54,19 @@ func (m *HashMap) Put(t TxDesc) error {
 		return err
 	}
 
-	var k key
+	var k txHash
 	copy(k[:], txID)
 	m.data[k] = t
 
-	m.txsSize += uint64(unsafe.Sizeof(t.tx))
+	m.txsSize += uint64(t.size)
+
+	// sort keys by Fee
+	fee := t.tx.StandardTx().Fee.BigInt().Uint64()
+	m.sorted = append(m.sorted, keyFee{k: k, f: fee})
+
+	sort.SliceStable(m.sorted, func(i, j int) bool {
+		return m.sorted[i].f > m.sorted[j].f
+	})
 
 	// store all tx key images, if provided
 	for i, input := range t.tx.StandardTx().Inputs {
@@ -81,7 +97,7 @@ func (m HashMap) Clone() []transactions.Transaction {
 
 // Contains returns true if the given key is in the pool.
 func (m *HashMap) Contains(txID []byte) bool {
-	var k key
+	var k txHash
 	copy(k[:], txID)
 	_, ok := m.data[k]
 	return ok
@@ -98,9 +114,23 @@ func (m *HashMap) Len() int {
 }
 
 // Range iterates through all tx entries
-func (m *HashMap) Range(fn func(k key, t TxDesc) error) error {
+func (m *HashMap) Range(fn func(k txHash, t TxDesc) error) error {
+
 	for k, v := range m.data {
 		err := fn(k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RangeSort iterates through all tx entries sorted by Fee
+// in a descending order
+func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) error) error {
+
+	for _, value := range m.sorted {
+		err := fn(value.k, m.data[value.k])
 		if err != nil {
 			return err
 		}

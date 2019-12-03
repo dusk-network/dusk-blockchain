@@ -6,6 +6,8 @@ import (
 	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
+type txHash [32]byte
+
 // TxDesc encapsulates both tx raw and meta data
 type TxDesc struct {
 	tx transactions.Transaction
@@ -16,6 +18,7 @@ type TxDesc struct {
 	verified time.Time
 	// the point in time, tx was accepted by this node
 	// accepted time.Time
+	size uint
 }
 
 // Pool represents a transaction pool of the verified txs only.
@@ -38,5 +41,9 @@ type Pool interface {
 	Len() int
 
 	// Range iterates through all tx entries
-	Range(fn func(k key, t TxDesc) error) error
+	Range(fn func(k txHash, t TxDesc) error) error
+
+	// RangeSort iterates through all tx entries sorted by Fee
+	// in a descending order
+	RangeSort(fn func(k txHash, t TxDesc) error) error
 }
