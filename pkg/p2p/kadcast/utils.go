@@ -93,7 +93,7 @@ func verifyIDNonce(id [16]byte, nonce [4]byte) error {
 // the node is running in `net.UDPAddr` format.
 //
 // Panics if it there's not connection.
-func getLocalIPAddress() net.UDPAddr {
+func getLocalUDPAddress() net.UDPAddr {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
@@ -103,6 +103,22 @@ func getLocalIPAddress() net.UDPAddr {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return *localAddr
 }
+
+// Gets the local IP address of the machine where
+// the node is running in `net.UDPAddr` format.
+//
+// Panics if it there's not connection.
+func getLocalTCPAddress() net.TCPAddr {
+	conn, err := net.Dial("tcp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.TCPAddr)
+	return *localAddr
+}
+
 
 // ------------------ ENC/DEC UTILS ------------------ //
 

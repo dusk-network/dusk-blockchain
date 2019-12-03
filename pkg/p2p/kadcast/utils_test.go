@@ -64,7 +64,7 @@ func testProtocol(t *testing.T) {
 
 func testUDPConn(t *testing.T) {
 	//go func () {
-		lAddr := getLocalIPAddress()
+		lAddr := getLocalUDPAddress()
 		pc, err := net.ListenUDP("udp", &lAddr)
 		if err != nil {
 			log.Println(err)
