@@ -58,7 +58,6 @@ const (
 	BlockAgreement
 	Quit
 	BidList
-	WinningBlockHash
 	Absentees
 	RemoveProvisioner
 	AgreementEvent
@@ -71,6 +70,7 @@ const (
 	Finalize
 	Restart
 	AddAgreements
+	WinningCandidate
 )
 
 type topicBuf struct {
@@ -117,7 +117,6 @@ var Topics = [...]topicBuf{
 	topicBuf{BlockAgreement, *(bytes.NewBuffer([]byte{byte(BlockAgreement)})), "blockagreement"},
 	topicBuf{Quit, *(bytes.NewBuffer([]byte{byte(Quit)})), "quit"},
 	topicBuf{BidList, *(bytes.NewBuffer([]byte{byte(BidList)})), "bidlist"},
-	topicBuf{WinningBlockHash, *(bytes.NewBuffer([]byte{byte(WinningBlockHash)})), "winningblockhash"},
 	topicBuf{Absentees, *(bytes.NewBuffer([]byte{byte(Absentees)})), "absentees"},
 	topicBuf{RemoveProvisioner, *(bytes.NewBuffer([]byte{byte(RemoveProvisioner)})), "removeprovisioner"},
 	topicBuf{AgreementEvent, *(bytes.NewBuffer([]byte{byte(AgreementEvent)})), "agreementevent"},
@@ -130,6 +129,7 @@ var Topics = [...]topicBuf{
 	topicBuf{Finalize, *(bytes.NewBuffer([]byte{byte(Finalize)})), "finalize"},
 	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
 	topicBuf{AddAgreements, *(bytes.NewBuffer([]byte{byte(AddAgreements)})), "addagreements"},
+	topicBuf{WinningCandidate, *(bytes.NewBuffer([]byte{byte(WinningCandidate)})), "winningcandidate"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {
