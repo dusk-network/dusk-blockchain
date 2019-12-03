@@ -51,5 +51,7 @@ func TestProvideAgreements(t *testing.T) {
 	assert.NoError(t, a.SendAgreements(reqBuf))
 
 	resp := <-respChan
+	// resp should be equal to buf, if we cut off the first 8 bytes
+	// from buf
 	assert.Equal(t, buf.Bytes()[8:], resp.Bytes())
 }
