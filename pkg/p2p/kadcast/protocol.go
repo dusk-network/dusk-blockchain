@@ -37,13 +37,13 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 
 func StartNetworkDiscovery(router *Router) {
 	var actualClosest []Peer
-	previousClosest := router.getXClosestPeersTo(1, router.myPeerInfo)
+	previousClosest := router.getXClosestPeersTo(1, router.MyPeerInfo)
 	// Ask for nodes to `alpha` closest nodes to my peer.
 	router.sendFindNodes()
 	// Wait until response arrives and we query the nodes.
 	time.Sleep(time.Second * 5)
 	for {
-		actualClosest = router.getXClosestPeersTo(1, router.myPeerInfo)
+		actualClosest = router.getXClosestPeersTo(1, router.MyPeerInfo)
 		if actualClosest[0] == previousClosest[0] {
 			log.Printf("Network Discovery process has finnished!.\nYou're now connected to %v", router.tree.getTotalPeers())
 			return

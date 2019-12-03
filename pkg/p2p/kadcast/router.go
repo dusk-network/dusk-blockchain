@@ -18,7 +18,7 @@ type Router struct {
 	// Since we only store one tree on the application, it's worth
 	// to keep both in order to avoid convert the types continuously.
 	myPeerUDPAddr net.UDPAddr
-	myPeerInfo    Peer
+	MyPeerInfo    Peer
 	// Holds the Nonce that satisfies: `H(ID || Nonce) < Tdiff`.
 	myPeerNonce uint32
 }
@@ -30,7 +30,7 @@ func MakeRouter(externIP [4]byte, port uint16) Router {
 	return Router{
 		tree:          makeTree(myPeer),
 		myPeerUDPAddr: myPeer.getUDPAddr(),
-		myPeerInfo:    myPeer,
+		MyPeerInfo:    myPeer,
 		myPeerNonce:   myPeer.computePeerNonce(),
 	}
 }
@@ -133,7 +133,7 @@ func (router Router) sendPong(reciever Peer) {
 // Builds and sends a `FIND_NODES` packet.
 func (router Router) sendFindNodes() {
 	// Get `alpha` closest nodes to me.
-	destPeers := router.getXClosestPeersTo(alpha, router.myPeerInfo)
+	destPeers := router.getXClosestPeersTo(alpha, router.MyPeerInfo)
 	// Fill the headers with the type, ID, Nonce and destPort.
 	for _, peer := range destPeers {
 		// Build the packet

@@ -11,11 +11,11 @@ import (
 // Listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
-func StartUDPListener(netw string, queue *ring.Buffer, myPeerInfo Peer, ) {
+func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer, ) {
 
 	lAddr := getLocalUDPAddress()
 	// Set listening port.
-	lAddr.Port = int(myPeerInfo.port)
+	lAddr.Port = int(MyPeerInfo.port)
 PacketConnCreation:
 	// listen to incoming udp packets
 	pc, err := net.ListenUDP(netw, &lAddr)
@@ -23,12 +23,11 @@ PacketConnCreation:
 		log.Panic(err)
 	}
 	// Set initial deadline.
-	pc.SetReadDeadline(time.Now().Add(time.Minute))
+	pc.SetDeadline(time.Now().Add(time.Minute))
 
 	// Instanciate the buffer
 	buffer := make([]byte, 1024)
 	for {
-
 		// Read UDP packet.
 		byteNum, uAddr, err := pc.ReadFromUDP(buffer)
 
@@ -38,7 +37,7 @@ PacketConnCreation:
 			goto PacketConnCreation
 		} else {
 			// Set a new deadline for the connection.
-			pc.SetReadDeadline(time.Now().Add(2 * time.Minute))
+			pc.SetDeadline(time.Now().Add(2 * time.Minute))
 			// Serialize the packet.
 			encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 			// Send the packet to the Consumer putting it on the queue.
@@ -70,11 +69,11 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 // Listens infinitely for TCP packet arrivals and
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
-func startTCPListener(netw string, queue *ring.Buffer, myPeerInfo Peer) {
+func startTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 
 	lAddr := getLocalTCPAddress()
 	// Set listening port.
-	lAddr.Port = int(myPeerInfo.port)
+	lAddr.Port = int(MyPeerInfo.port)
 PacketConnCreation:
 	// listen to incoming udp packets
 	pc, err := net.ListenTCP(netw, &lAddr)

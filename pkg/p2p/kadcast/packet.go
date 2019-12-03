@@ -59,7 +59,7 @@ func (pack *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	// Add `Packet` type.
 	headers = append(headers[:], tipus)
 	// Add MyPeer ID
-	headers = append(headers[:], router.myPeerInfo.id[:]...)
+	headers = append(headers[:], router.MyPeerInfo.id[:]...)
 	// Attach IdNonce
 	idNonce := getBytesFromUint32(router.myPeerNonce)
 	headers = append(headers[:], idNonce[:]...)
@@ -194,7 +194,7 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 
 func treatPing(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
-	router.tree.addPeer(router.myPeerInfo, peerInf)
+	router.tree.addPeer(router.MyPeerInfo, peerInf)
 	// Send back a `PONG` message.
 	router.sendPong(peerInf)
 	return
@@ -202,13 +202,13 @@ func treatPing(peerInf Peer, router *Router) {
 
 func treatPong(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
-	router.tree.addPeer(router.myPeerInfo, peerInf)
+	router.tree.addPeer(router.MyPeerInfo, peerInf)
 	return
 }
 
 func treatFindNodes(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
-	router.tree.addPeer(router.myPeerInfo, peerInf)
+	router.tree.addPeer(router.MyPeerInfo, peerInf)
 	// Send back a `NODES` message to the peer that
 	// send the `FIND_NODES` message.
 	router.sendNodes(peerInf)
@@ -225,7 +225,7 @@ func treatNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	}
 
 	// Process peer addition to the tree.
-	router.tree.addPeer(router.myPeerInfo, peerInf)
+	router.tree.addPeer(router.MyPeerInfo, peerInf)
 
 	// Deserialize the payload to get the peerInfo of every
 	// recieved peer.

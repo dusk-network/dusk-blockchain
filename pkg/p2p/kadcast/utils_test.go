@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"net"
 	"testing"
 	"time"
 
@@ -26,29 +25,6 @@ func testPOW(t *testing.T) {
 	println(a.computePeerNonce())
 }
 
-func testUDPConn(t *testing.T) {
-	//go func () {
-	lAddr := getLocalUDPAddress()
-	pc, err := net.ListenUDP("udp", &lAddr)
-	if err != nil {
-		log.Println(err)
-	}
-
-	//simple read
-	buffer := make([]byte, 1024)
-	pc.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-	_, _, er := pc.ReadFromUDP(buffer)
-
-	if er != nil {
-		log.Printf("%v", er)
-	}
-	//}()
-	for {
-
-	}
-}
-
 func TestProtocol(t *testing.T) {
 	// Our node info.
 	var port uint16 = 25519
@@ -62,25 +38,25 @@ func TestProtocol(t *testing.T) {
 	go ProcessPacket(queue, &router)
 
 	// Launch a listener for our node.
-	go StartUDPListener("udp", queue, router.myPeerInfo)
+	go StartUDPListener("udp", queue, router.MyPeerInfo)
 
-	/*// Create BootstrapNodes Peer structs
+	// Create BootstrapNodes Peer structs
 	var port1 uint16 = 25519
 	ip1 := [4]byte{157, 230, 219, 77}
-	boot1 := makePeer(ip1, port1)
+	boot1 := MakePeer(ip1, port1)
 	var bootstrapNodes []Peer
 	bootstrapNodes = append(bootstrapNodes[:], boot1)
 
 	// Start Bootstrapping process.
-	err := initBootstrap(&router, bootstrapNodes)
+	err := InitBootstrap(&router, bootstrapNodes)
 	if err != nil {
 		log.Fatal("Error during the Bootstrap Process. Job terminated.")
 	}
 
 	// Once the bootstrap succeeded, start the network discovery.
-	startNetworkDiscovery(&router)
-	*/
-	for {
+	StartNetworkDiscovery(&router)
 
+	for {
+		time.Sleep(time.Second * 15)
 	}
 }
