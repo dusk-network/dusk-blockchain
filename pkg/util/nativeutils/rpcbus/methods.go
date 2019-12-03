@@ -21,6 +21,7 @@ const (
 	GetBalance
 	GetAddress
 	GetCandidate
+	GetIntermediateBlock
 )
 
 func MarshalConsensusTxRequest(buf *bytes.Buffer, amount, lockTime uint64) error {

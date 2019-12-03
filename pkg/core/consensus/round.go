@@ -376,7 +376,7 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 	winningCandidateBuf, err := c.rpcBus.Call(rpcbus.GetCandidate, req, 0)
 	if err != nil {
 		// If we don't have it, request it from peers
-		winningCandidateBuf = c.requestIntermediateBlock(winningBlockHash)
+		winningCandidateBuf = c.requestIntermediateBlockBuffer(winningBlockHash)
 	}
 
 	if err := marshalling.UnmarshalBlock(&winningCandidateBuf, winningCandidate); err != nil {
@@ -387,8 +387,18 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 	return nil
 }
 
-func (c *Coordinator) requestIntermediateBlock(blockHash []byte) bytes.Buffer {
-	return bytes.Buffer{}
+func (c *Coordinator) requestIntermediateBlockBuffer(blockHash []byte) bytes.Buffer {
+	req := rpcbus.Request{
+		Params:   *bytes.NewBuffer(blockHash),
+		RespChan: make(chan rpcbus.Response, 1),
+	}
+
+	blockBuf, err := c.rpcBus.Call(rpcbus.GetIntermediateBlock, req, 5)
+	if err != nil {
+		return bytes.Buffer{}
+	}
+
+	return blockBuf
 }
 
 func (c *Coordinator) finalizeConsensus(cert *block.Certificate, blk *block.Block) {
