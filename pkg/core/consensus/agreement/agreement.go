@@ -104,23 +104,42 @@ func (a *agreement) listen() {
 	select {
 	case evs := <-a.accumulator.CollectedVotesChan:
 		lg.WithField("id", a.agreementID).Debugln("quorum reached")
+		a.cacheAgreements(evs)
 		cert := a.generateCertificate(evs[0])
-		go a.sendFinalize(cert, evs[0].BlockHash)
+		go func(cert *block.Certificate, evs []Agreement) {
+			a.sendFinalize(cert)
+			a.sendWinningCandidate(evs[0].BlockHash)
+		}(cert, evs)
 	case <-a.quitChan:
 	}
 }
 
+// Send agreements to the AgreementsCache
+func (a *agreement) cacheAgreements(agreements []Agreement) {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, a.round); err != nil {
+		panic(err)
+	}
+
+	if err := encoding.WriteVarInt(buf, uint64(len(agreements))); err != nil {
+		panic(err)
+	}
+
+	for _, ag := range agreements {
+		if err := Marshal(buf, ag); err != nil {
+			panic(err)
+		}
+	}
+
+	a.publisher.Publish(topics.AddAgreements, buf)
+}
+
 // Send the certificate over to the Coordinator, signalling that the
 // round has finished.
-func (a *agreement) sendFinalize(cert *block.Certificate, blockHash []byte) {
+func (a *agreement) sendFinalize(cert *block.Certificate) {
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, a.round); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling round")
-		return
-	}
-
-	if err := encoding.Write256(buf, blockHash); err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling block hash")
 		return
 	}
 
@@ -130,6 +149,10 @@ func (a *agreement) sendFinalize(cert *block.Certificate, blockHash []byte) {
 	}
 
 	a.publisher.Publish(topics.Finalize, buf)
+}
+
+func (a *agreement) sendWinningCandidate(blockHash []byte) {
+	a.publisher.Publish(topics.WinningCandidate, bytes.NewBuffer(blockHash))
 }
 
 // Finalize the agreement component, by pausing event streaming, and shutting down
