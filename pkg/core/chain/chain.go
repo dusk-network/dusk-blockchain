@@ -44,13 +44,14 @@ type Chain struct {
 	// TODO: Consider if mutex can be removed
 	mu sync.RWMutex
 
+	intermediateBlock *block.Block
+
 	// collector channels
-	candidateChan <-chan *block.Block
+	candidateChan <-chan candidateMsg
 
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
-	getCandidateChan         <-chan rpcbus.Request
 }
 
 // New returns a new chain object
@@ -68,10 +69,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	// set up rpcbus channels
 	getLastBlockChan := make(chan rpcbus.Request, 1)
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
-	getCandidateChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
 	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
-	rpcBus.Register(rpcbus.GetCandidate, getCandidateChan)
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -83,7 +82,6 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 		bidList:                  &user.BidList{},
 		getLastBlockChan:         getLastBlockChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
-		getCandidateChan:         getCandidateChan,
 	}
 
 	chain.restoreConsensusData()
@@ -91,6 +89,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	// Hook the chain up to the required topics
 	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
 	eventBus.Subscribe(topics.Block, cbListener)
+	listener := eventbus.NewCallbackListener(chain.onWinningCandidate)
+	eventBus.Subscribe(topics.WinningCandidate, listener)
 	eventBus.Register(topics.Candidate, consensus.NewRepublisher(eventBus, topics.Candidate), &consensus.Validator{})
 	return chain, nil
 }
@@ -100,8 +100,8 @@ func (c *Chain) Listen() {
 	for {
 		select {
 
-		case b := <-c.candidateChan:
-			_ = c.handleCandidateBlock(*b)
+		case candidateMsg := <-c.candidateChan:
+			_ = c.handleCandidateMessage(candidateMsg)
 		// wire.RPCBus requests handlers
 		case r := <-c.getLastBlockChan:
 
@@ -124,20 +124,6 @@ func (c *Chain) Listen() {
 			}
 
 			r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
-		case r := <-c.getCandidateChan:
-			blk, err := c.fetchCandidateBlock(r.Params.Bytes())
-			if err != nil {
-				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
-				continue
-			}
-
-			buf := new(bytes.Buffer)
-			if err := marshalling.MarshalBlock(buf, blk); err != nil {
-				r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
-				continue
-			}
-
-			r.RespChan <- rpcbus.Response{*buf, nil}
 		}
 	}
 }
@@ -255,7 +241,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	l.Trace("cleaning obsolete candidate blocks")
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
-		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
+		count, err = t.DeleteCandidateMessages(blk.Header.Height)
 		return err
 	})
 
@@ -342,38 +328,54 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight ui
 	}
 }
 
-func (c *Chain) handleCandidateBlock(candidate block.Block) error {
+func (c *Chain) handleCandidateMessage(cnd candidateMsg) error {
 	// Save it into persistent storage
 	err := c.db.Update(func(t database.Transaction) error {
-		return t.StoreCandidateBlock(&candidate)
+		return t.StoreCandidateMessage(cnd.Block, cnd.Certificate)
 	})
 
 	if err != nil {
-		log.Errorf("storing the candidate block failed: %s", err.Error())
+		log.Errorf("storing the candidate block and certificate failed: %s", err.Error())
 		return err
 	}
 
 	return nil
 }
 
-func (c *Chain) fetchCandidateBlock(hash []byte) (*block.Block, error) {
+func (c *Chain) fetchCandidateMessage(hash []byte) (*block.Block, *block.Certificate, error) {
 	var candidate *block.Block
+	var cert *block.Certificate
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
-		candidate, err = t.FetchCandidateBlock(hash)
+		candidate, cert, err = t.FetchCandidateMessage(hash)
 		return err
 	})
 
-	return candidate, err
+	return candidate, cert, err
 }
 
 func (c *Chain) verifyCandidateBlock(hash []byte) error {
-	candidate, err := c.fetchCandidateBlock(hash)
+	candidate, _, err := c.fetchCandidateMessage(hash)
 	if err != nil {
 		return err
 	}
 
-	return verifiers.CheckBlock(c.db, c.prevBlock, *candidate)
+	return verifiers.CheckBlock(c.db, *c.intermediateBlock, *candidate)
+}
+
+func (c *Chain) onWinningCandidate(b bytes.Buffer) error {
+	candidate, cert, err := c.fetchCandidateMessage(b.Bytes())
+	if err != nil {
+		return err
+	}
+
+	c.intermediateBlock.Header.Certificate = cert
+	if err := c.AcceptBlock(*c.intermediateBlock); err != nil {
+		panic(fmt.Errorf("should never panic on accepting a finalized block - %v\n", err))
+	}
+
+	c.intermediateBlock = candidate
+	return nil
 }
 
 // Send Inventory message to all peers

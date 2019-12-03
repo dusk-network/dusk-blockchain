@@ -10,12 +10,19 @@ import (
 	"github.com/dusk-network/dusk-wallet/block"
 )
 
-type candidateCollector struct {
-	blockChan chan<- *block.Block
-}
+type (
+	candidateCollector struct {
+		blockChan chan<- candidateMsg
+	}
 
-func initCandidateCollector(eventBus *eventbus.EventBus) chan *block.Block {
-	blockChan := make(chan *block.Block, 1)
+	candidateMsg struct {
+		*block.Block
+		*block.Certificate
+	}
+)
+
+func initCandidateCollector(eventBus *eventbus.EventBus) chan candidateMsg {
+	blockChan := make(chan candidateMsg, 1)
 	collector := &candidateCollector{blockChan}
 	eventbus.NewTopicListener(eventBus, collector, topics.Candidate, eventbus.ChannelType)
 	return blockChan
@@ -32,6 +39,11 @@ func (c *candidateCollector) Collect(message bytes.Buffer) error {
 		return err
 	}
 
-	c.blockChan <- blk
+	cert := block.EmptyCertificate()
+	if err := marshalling.UnmarshalCertificate(&message, cert); err != nil {
+		return err
+	}
+
+	c.blockChan <- candidateMsg{blk, cert}
 	return nil
 }

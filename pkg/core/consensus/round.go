@@ -31,29 +31,23 @@ var lg = log.WithField("process", "coordinator")
 // to do it's job in a given round
 type RoundState struct {
 	RoundUpdate
-	Seed        []byte
-	BlockHash   []byte
 	Certificate block.Certificate
 }
 
 // roundStore is the central registry for all consensus components and listeners.
 // It is used for message dispatching and controlling the stream of events.
 type roundStore struct {
-	lock              sync.RWMutex
-	subscribers       map[topics.Topic][]Listener
-	components        []Component
-	coordinator       *Coordinator
-	certificate       *block.Certificate
-	intermediateBlock *block.Block
+	lock        sync.RWMutex
+	subscribers map[topics.Topic][]Listener
+	components  []Component
+	coordinator *Coordinator
 }
 
-func newStore(c *Coordinator, cert *block.Certificate, intermediate *block.Block) *roundStore {
+func newStore(c *Coordinator) *roundStore {
 	s := &roundStore{
-		subscribers:       make(map[topics.Topic][]Listener),
-		components:        make([]Component, 0),
-		coordinator:       c,
-		certificate:       cert,
-		intermediateBlock: intermediate,
+		subscribers: make(map[topics.Topic][]Listener),
+		components:  make([]Component, 0),
+		coordinator: c,
 	}
 
 	return s
@@ -191,6 +185,8 @@ type Coordinator struct {
 	lock     sync.RWMutex
 	store    *roundStore
 	unsynced bool
+
+	certificate *block.Certificate
 }
 
 // Start the coordinator by wiring the listener to the RoundUpdate
@@ -268,15 +264,11 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	c.Update(r.Round)
 	rs := RoundState{
 		RoundUpdate: r,
+		Certificate: *block.EmptyCertificate(),
 	}
 
-	if c.store.intermediateBlock != nil {
-		rs.Seed = c.store.intermediateBlock.Header.Seed
-		rs.BlockHash = c.store.intermediateBlock.Header.Hash
-	}
-
-	if c.store.certificate != nil {
-		rs.Certificate = *c.store.certificate
+	if c.certificate != nil {
+		rs.Certificate = *c.certificate
 	}
 
 	c.onNewRound(rs, c.unsynced)
@@ -301,8 +293,8 @@ func (c *Coordinator) doze(r RoundUpdate) {
 	// Agreement messages without possibly accidentally triggering
 	// finalization
 	c.FinalizeRound()
-	c.reinstantiateStore(nil, nil)
-	rs := RoundState{r, nil, nil, *block.EmptyCertificate()}
+	c.reinstantiateStore()
+	rs := RoundState{r, *block.EmptyCertificate()}
 	c.onNewRound(rs, c.unsynced)
 	// We can't skip ahead to the latest round as we are missing the
 	// agreement messages for the previous one, so we will go to the
@@ -338,11 +330,6 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 		return err
 	}
 
-	winningBlockHash := make([]byte, 32)
-	if err := encoding.Read256(&m, winningBlockHash); err != nil {
-		return err
-	}
-
 	cert := &block.Certificate{}
 	if err := marshalling.UnmarshalCertificate(&m, cert); err != nil {
 		return err
@@ -352,6 +339,8 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 		"message round":     round,
 	}).Debugln("received Finalize message")
 
+	c.certificate = cert
+
 	if round < c.Round() {
 		return nil
 	}
@@ -360,69 +349,20 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 		panic("not supposed to get a Finalize message for a future round")
 	}
 
-	// If we have one, finalize current intermediate block, and send to chain
-	if c.store.intermediateBlock != nil {
-		if err := c.finalizeIntermediateBlock(cert); err != nil {
-			return err
-		}
-	}
-
-	// Fetch the winning candidate
-	winningCandidate := block.NewBlock()
-	req := rpcbus.Request{
-		Params:   *bytes.NewBuffer(winningBlockHash),
-		RespChan: make(chan rpcbus.Response, 1),
-	}
-	winningCandidateBuf, err := c.rpcBus.Call(rpcbus.GetCandidate, req, 0)
-	if err != nil {
-		// If we don't have it, request it from peers
-		winningCandidateBuf = c.requestIntermediateBlockBuffer(winningBlockHash)
-	}
-
-	if err := marshalling.UnmarshalBlock(&winningCandidateBuf, winningCandidate); err != nil {
-		return err
-	}
-
-	c.finalizeConsensus(cert, winningCandidate)
+	c.finalizeConsensus()
 	return nil
 }
 
-func (c *Coordinator) requestIntermediateBlockBuffer(blockHash []byte) bytes.Buffer {
-	req := rpcbus.Request{
-		Params:   *bytes.NewBuffer(blockHash),
-		RespChan: make(chan rpcbus.Response, 1),
-	}
-
-	blockBuf, err := c.rpcBus.Call(rpcbus.GetIntermediateBlock, req, 5)
-	if err != nil {
-		return bytes.Buffer{}
-	}
-
-	return blockBuf
-}
-
-func (c *Coordinator) finalizeConsensus(cert *block.Certificate, blk *block.Block) {
+func (c *Coordinator) finalizeConsensus() {
 	lg.Traceln("finalizing consensus")
 	// reinstantiating the store prevents the need for locking
 	c.FinalizeRound()
-	c.reinstantiateStore(cert, blk)
-}
-
-func (c *Coordinator) finalizeIntermediateBlock(cert *block.Certificate) error {
-	candidate := c.store.intermediateBlock
-	candidate.Header.Certificate = cert
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, candidate); err != nil {
-		return err
-	}
-
-	c.eventBus.Publish(topics.Block, buf)
-	return nil
+	c.reinstantiateStore()
 }
 
 // Create a new roundStore and instantiate all Components.
-func (c *Coordinator) reinstantiateStore(cert *block.Certificate, intermediate *block.Block) {
-	store := newStore(c, cert, intermediate)
+func (c *Coordinator) reinstantiateStore() {
+	store := newStore(c)
 	for _, factory := range c.factories {
 		component := factory.Instantiate()
 		store.addComponent(component)
@@ -507,8 +447,9 @@ func (c *Coordinator) dispatchQueuedEvents() {
 }
 
 // XXX: adjust the signature verification on reduction (and agreement)
-// Sign uses the blockhash (which is lost when decoupling the Header and the Payload) to recompose the Header and sign the Payload
-// by adding it to the signature. Argument packet can be nil
+// Sign uses the blockhash (which is lost when decoupling the Header
+// and the Payload) to recompose the Header and sign the Payload
+// by adding it to the signature.
 func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 	preimage := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(preimage, h); err != nil {

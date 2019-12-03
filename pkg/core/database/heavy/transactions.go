@@ -39,15 +39,16 @@ var (
 	// Key values prefixes to provide prefix-based sorting mechanism
 	// Refer to README.md for overview idea
 
-	HeaderPrefix         = []byte{0x01}
-	TxPrefix             = []byte{0x02}
-	HeightPrefix         = []byte{0x03}
-	TxIDPrefix           = []byte{0x04}
-	KeyImagePrefix       = []byte{0x05}
-	CandidateBlockPrefix = []byte{0x06}
-	StatePrefix          = []byte{0x07}
-	OutputKeyPrefix      = []byte{0x08}
-	BidValuesPrefix      = []byte{0x09}
+	HeaderPrefix               = []byte{0x01}
+	TxPrefix                   = []byte{0x02}
+	HeightPrefix               = []byte{0x03}
+	TxIDPrefix                 = []byte{0x04}
+	KeyImagePrefix             = []byte{0x05}
+	CandidateBlockPrefix       = []byte{0x06}
+	StatePrefix                = []byte{0x07}
+	OutputKeyPrefix            = []byte{0x08}
+	BidValuesPrefix            = []byte{0x09}
+	CandidateCertificatePrefix = []byte{0x0A}
 )
 
 type transaction struct {
@@ -481,9 +482,9 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	return true, txID, nil
 }
 
-// StoreCandidateBlock stores a candidate block to be proposed in next consensus
+// StoreCandidateMessage stores a candidate block to be proposed in next consensus
 // round. it overwrites an entry of block with same height
-func (t transaction) StoreCandidateBlock(b *block.Block) error {
+func (t transaction) StoreCandidateMessage(b *block.Block, cert *block.Certificate) error {
 
 	// Schema Key = CandidateBlockPrefix + block.header.Hash + block.header.height
 	//
@@ -507,13 +508,17 @@ func (t transaction) StoreCandidateBlock(b *block.Block) error {
 		return err
 	}
 
+	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
+		return err
+	}
+
 	t.put(key, buf.Bytes())
 
 	return nil
 }
 
-// FetchCandidateBlock fetches a candidate block by hash
-func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
+// FetchCandidateMessage fetches a candidate message by hash
+func (t transaction) FetchCandidateMessage(hash []byte) (*block.Block, *block.Certificate, error) {
 
 	// Fetch all stored candidate blocks
 	scanFilter := append(CandidateBlockPrefix, hash...)
@@ -524,21 +529,26 @@ func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
 	defer iterator.Release()
 
 	if iterator.First() {
+		buf := bytes.NewBuffer(iterator.Value())
 		b := block.NewBlock()
-		if err := marshalling.UnmarshalBlock(bytes.NewBuffer(iterator.Value()), b); err != nil {
-			return nil, err
+		if err := marshalling.UnmarshalBlock(buf, b); err != nil {
+			return nil, nil, err
 		}
 
-		return b, nil
+		cert := block.EmptyCertificate()
+		if err := marshalling.UnmarshalCertificate(buf, cert); err != nil {
+			return nil, nil, err
+		}
+		return b, cert, nil
 	}
 
-	return nil, database.ErrBlockNotFound
+	return nil, nil, database.ErrBlockNotFound
 }
 
-// DeleteCandidateBlocks deletes all candidate blocks if maxHeight is not 0, it
+// DeleteCandidateMessages deletes all candidate blocks if maxHeight is not 0, it
 // deletes only blocks with a height lower than maxHeight or equal.
 // Returns number of deleted candidate blocks
-func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
+func (t transaction) DeleteCandidateMessages(maxHeight uint64) (uint32, error) {
 
 	// Fetch all stored candidate blocks
 	scanFilter := append(CandidateBlockPrefix)
