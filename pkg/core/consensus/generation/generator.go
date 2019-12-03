@@ -18,7 +18,7 @@ var emptyHash [32]byte
 type Generator struct {
 	signer      consensus.Signer
 	restartID   uint32
-	certificate block.Certificate
+	certificate *block.Certificate
 }
 
 // NewComponent instantiates a new Generator
@@ -30,6 +30,7 @@ func NewComponent() *Generator {
 // marked as LowPriority to allow for the `Selector` to be notified first
 func (g *Generator) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, rs consensus.RoundState) []consensus.TopicListener {
 	g.signer = signer
+	g.certificate = &rs.Certificate
 
 	restartListener := consensus.TopicListener{
 		Topic:    topics.Restart,
@@ -50,10 +51,14 @@ func (g *Generator) ID() uint32 {
 
 // Collect `Restart` events and triggers a Generation event
 func (g *Generator) Collect(ev consensus.Event) error {
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalCertificate(buf, &g.certificate); err != nil {
-		return err
+	if g.certificate != nil {
+		buf := new(bytes.Buffer)
+		if err := marshalling.MarshalCertificate(buf, g.certificate); err != nil {
+			return err
+		}
+
+		return g.signer.SendWithHeader(topics.Generation, emptyHash[:], buf, g.ID())
 	}
 
-	return g.signer.SendWithHeader(topics.Generation, emptyHash[:], buf, g.ID())
+	return nil
 }
