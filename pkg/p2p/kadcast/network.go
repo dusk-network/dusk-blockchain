@@ -11,7 +11,7 @@ import (
 // Listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
-func startUDPListener(netw string, queue *ring.Buffer, myPeerInfo Peer, ) {
+func StartUDPListener(netw string, queue *ring.Buffer, myPeerInfo Peer, ) {
 
 	lAddr := getLocalUDPAddress()
 	// Set listening port.

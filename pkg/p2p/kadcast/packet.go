@@ -133,7 +133,7 @@ func (packet Packet) getNodesPayloadInfo() []Peer {
 
 // The function recieves a Packet and processes it according to
 // it's type.
-func processPacket(queue *ring.Buffer, router *Router) {
+func ProcessPacket(queue *ring.Buffer, router *Router) {
 	// Instanciate now the variables to not pollute
 	// the stack.
 	var err error
@@ -170,7 +170,7 @@ func processPacket(queue *ring.Buffer, router *Router) {
 			// the messages.
 			ip, _ := getPeerNetworkInfo(*senderAddr)
 			port := binary.LittleEndian.Uint16(peerRecepPort[:])
-			peerInf := makePeer(ip, port)
+			peerInf := MakePeer(ip, port)
 
 			// Check packet type and process it.
 			switch tipus {

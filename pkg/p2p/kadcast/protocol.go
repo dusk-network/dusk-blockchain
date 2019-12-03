@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func initBootstrap(router *Router, bootNodes []Peer) error {
+func InitBootstrap(router *Router, bootNodes []Peer) error {
 	log.Println("Bootstrapping process started.")
 	// Get PeerList ordered by distance so we can compare it
 	// after the `PONG` arrivals.
@@ -35,7 +35,7 @@ func initBootstrap(router *Router, bootNodes []Peer) error {
 	return nil
 }
 
-func startNetworkDiscovery(router *Router) {
+func StartNetworkDiscovery(router *Router) {
 	var actualClosest []Peer
 	previousClosest := router.getXClosestPeersTo(1, router.myPeerInfo)
 	// Ask for nodes to `alpha` closest nodes to my peer.

@@ -23,8 +23,10 @@ type Router struct {
 	myPeerNonce uint32
 }
 
-func makeRouter(externIP [4]byte, port uint16) Router {
-	myPeer := makePeer(externIP, port)
+// Allows to create a router which holds the peerInfo and
+// also the routing tree information.
+func MakeRouter(externIP [4]byte, port uint16) Router {
+	myPeer := MakePeer(externIP, port)
 	return Router{
 		tree:          makeTree(myPeer),
 		myPeerUDPAddr: myPeer.getUDPAddr(),
@@ -35,6 +37,9 @@ func makeRouter(externIP [4]byte, port uint16) Router {
 
 // Tools to get sorted Peers in respect to a certain
 // PeerID in terms of XOR-distance.
+//
+//
+
 
 // Returns the complete list of Peers in order to be sorted
 // as they have the xor distance in respec to a Peer as a parameter.
