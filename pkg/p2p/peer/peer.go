@@ -2,12 +2,14 @@ package peer
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
@@ -245,8 +247,31 @@ func (p *Reader) ReadLoop() {
 			return
 		}
 
-		p.router.Collect(bytes.NewBuffer(b))
+		message, err := verifyChecksum(b)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"process": "peer",
+				"error":   err,
+			}).Warnln("error reading message")
+			return
+		}
+
+		p.router.Collect(bytes.NewBuffer(message))
 	}
+}
+
+func verifyChecksum(m []byte) ([]byte, error) {
+	// Last 4 bytes are the checksum
+	message := m[:len(m)-4]
+	checksum := m[len(m)-4:]
+
+	digest := sha3.Sum256(message)
+
+	if !bytes.Equal(checksum, digest[0:4]) {
+		return nil, errors.New("checksum mismatch")
+	}
+
+	return message, nil
 }
 
 // Write a message to the connection.
