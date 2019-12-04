@@ -48,5 +48,5 @@ func (g *Generator) ID() uint32 {
 
 // Collect `Restart` events and triggers a Generation event
 func (g *Generator) Collect(ev consensus.Event) error {
-	return g.signer.SendWithHeader(topics.Generation, emptyHash[:], emptyPayload, g.ID())
+	return g.signer.SendInternally(topics.Generation, emptyHash[:], emptyPayload, g.ID())
 }

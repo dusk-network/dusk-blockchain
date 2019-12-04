@@ -111,7 +111,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		BlockHash: blk.Header.Hash,
 	}
 
-	if err := bg.signer.SendAuthenticated(topics.Score, hdr, scoreBuf, bg.ID()); err != nil {
+	if err := bg.signer.Gossip(topics.Score, hdr, scoreBuf, bg.ID()); err != nil {
 		return err
 	}
 
@@ -121,7 +121,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	lg.Debugln("sending candidate")
-	return bg.signer.SendAuthenticated(topics.Candidate, hdr, buf, bg.ID())
+	return bg.signer.Gossip(topics.Candidate, hdr, buf, bg.ID())
 }
 
 func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {

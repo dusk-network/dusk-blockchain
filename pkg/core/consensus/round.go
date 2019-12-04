@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ed25519"
 )
 
 var _ EventPlayer = (*Coordinator)(nil)
@@ -386,8 +385,9 @@ func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 	return signedHash.Compress(), nil
 }
 
-// SendAuthenticated sign the payload with Ed25519 and publishes it to the Gossip topic
-func (c *Coordinator) SendAuthenticated(topic topics.Topic, hdr header.Header, payload *bytes.Buffer, id uint32) error {
+// Gossip concatenates the topic, the header and the payload,
+// and gossips it to the rest of the network.
+func (c *Coordinator) Gossip(topic topics.Topic, hdr header.Header, payload *bytes.Buffer, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
@@ -401,37 +401,19 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, hdr header.Header, p
 		return err
 	}
 
-	edSigned := ed25519.Sign(*c.keys.EdSecretKey, buf.Bytes())
-
-	// messages start from the signature
-	whole := new(bytes.Buffer)
-	if err := encoding.Write512(whole, edSigned); err != nil {
-		return err
-	}
-
-	// adding Ed public key
-	if err := encoding.Write256(whole, c.keys.EdPubKeyBytes); err != nil {
-		return err
-	}
-
-	// adding marshalled header+payload
-	if _, err := whole.ReadFrom(buf); err != nil {
-		return err
-	}
-
 	// prepending topic
-	if err := topics.Prepend(whole, topic); err != nil {
+	if err := topics.Prepend(buf, topic); err != nil {
 		return err
 	}
 
 	// gossip away
-	c.eventBus.Publish(topics.Gossip, whole)
+	c.eventBus.Publish(topics.Gossip, buf)
 	return nil
 }
 
-// SendWithHeader prepends a header to the given payload, and publishes it on the
-// desired topic.
-func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer, id uint32) error {
+// SendInternally prepends a header to the given payload, and publishes
+// it on the desired topic.
+func (c *Coordinator) SendInternally(topic topics.Topic, hash []byte, payload *bytes.Buffer, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}

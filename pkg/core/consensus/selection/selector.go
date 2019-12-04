@@ -51,9 +51,8 @@ func (s *Selector) Initialize(eventPlayer consensus.EventPlayer, signer consensu
 	s.timer = &timer{s: s}
 
 	scoreSubscriber := consensus.TopicListener{
-		Topic:         topics.Score,
-		Preprocessors: []eventbus.Preprocessor{&consensus.Validator{}},
-		Listener:      consensus.NewSimpleListener(s.CollectScoreEvent, consensus.LowPriority, false),
+		Topic:    topics.Score,
+		Listener: consensus.NewSimpleListener(s.CollectScoreEvent, consensus.LowPriority, false),
 	}
 	s.scoreID = scoreSubscriber.ID()
 
@@ -143,9 +142,9 @@ func (s *Selector) publishBestEvent() error {
 	s.lock.RUnlock()
 	// If we had no best event, we should send an empty hash
 	if bestEvent == nil {
-		s.signer.SendWithHeader(topics.BestScore, emptyScore[:], buf, s.ID())
+		s.signer.SendInternally(topics.BestScore, emptyScore[:], buf, s.ID())
 	} else {
-		s.signer.SendWithHeader(topics.BestScore, bestEvent.VoteHash, buf, s.ID())
+		s.signer.SendInternally(topics.BestScore, bestEvent.VoteHash, buf, s.ID())
 	}
 
 	s.handler.LowerThreshold()
@@ -159,6 +158,6 @@ func (s *Selector) repropagate(hdr header.Header, ev Score) error {
 		return err
 	}
 
-	s.signer.SendAuthenticated(topics.Score, hdr, buf, s.ID())
+	s.signer.Gossip(topics.Score, hdr, buf, s.ID())
 	return nil
 }

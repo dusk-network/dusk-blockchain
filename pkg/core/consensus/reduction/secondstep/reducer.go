@@ -135,7 +135,7 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) error {
 		return err
 	}
 
-	return r.signer.SendAuthenticated(topics.Reduction, hdr, payload, r.ID())
+	return r.signer.Gossip(topics.Reduction, hdr, payload, r.ID())
 }
 
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
@@ -153,7 +153,7 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 		r.sendAgreement(step, hash, b)
 	}
 
-	r.signer.SendWithHeader(topics.Restart, emptyHash[:], regenerationPackage, r.ID())
+	r.signer.SendInternally(topics.Restart, emptyHash[:], regenerationPackage, r.ID())
 }
 
 // CollectStepVotes is triggered when the first StepVotes get published by the
@@ -202,7 +202,7 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*agreement.StepVo
 	}
 
 	// then we forward the marshalled Agreement to the store to be sent
-	if err := r.signer.SendAuthenticated(topics.Agreement, hdr, eventBuf, r.ID()); err != nil {
+	if err := r.signer.Gossip(topics.Agreement, hdr, eventBuf, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in Ed25519 signing and gossip the agreement")
 	}
 }
