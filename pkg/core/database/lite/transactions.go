@@ -207,61 +207,6 @@ func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
 	return 0, nil
 }
 
-func (t *transaction) StoreCandidateBlock(b *block.Block) error {
-	if !t.writable {
-		return errors.New("read-only transaction")
-	}
-
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
-		return err
-	}
-	t.batch[candidatesTableInd][toKey(b.Header.Hash)] = buf.Bytes()
-
-	return nil
-}
-
-// FetchCandidateBlock fetches a candidate block by hash
-func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
-
-	var data []byte
-	var exists bool
-	if data, exists = t.db.storage[candidatesTableInd][toKey(hash)]; !exists {
-		return nil, database.ErrBlockNotFound
-	}
-
-	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
-
-	var count uint32
-	for key, data := range t.db.storage[candidatesTableInd] {
-
-		b := block.NewBlock()
-		if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
-			return count, err
-		}
-
-		if maxHeight != 0 {
-			if b.Header.Height <= maxHeight {
-				delete(t.db.storage[candidatesTableInd], key)
-				count++
-			}
-		} else {
-			delete(t.db.storage[candidatesTableInd], key)
-			count++
-		}
-	}
-
-	return count, nil
-}
-
 func (t transaction) FetchState() (*database.State, error) {
 
 	var hash []byte
