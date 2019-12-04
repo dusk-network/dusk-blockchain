@@ -12,8 +12,7 @@ import (
 
 // Handshake with another peer.
 func (p *Writer) Handshake() error {
-
-	if err := p.writeLocalMsgVersion(); err != nil {
+	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
 		return err
 	}
 
@@ -25,7 +24,7 @@ func (p *Writer) Handshake() error {
 		return err
 	}
 
-	return p.writeVerAck()
+	return p.writeVerAck(p.gossip)
 }
 
 // Handshake with another peer.
@@ -34,18 +33,18 @@ func (p *Reader) Handshake() error {
 		return err
 	}
 
-	if err := p.writeVerAck(); err != nil {
+	if err := p.writeVerAck(p.gossip); err != nil {
 		return err
 	}
 
-	if err := p.writeLocalMsgVersion(); err != nil {
+	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
 		return err
 	}
 
 	return p.readVerAck()
 }
 
-func (p *Connection) writeLocalMsgVersion() error {
+func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
 	message, err := p.createVersionBuffer()
 	if err != nil {
 		return err
@@ -55,17 +54,11 @@ func (p *Connection) writeLocalMsgVersion() error {
 		return err
 	}
 
-	if err := processing.WriteFrame(message); err != nil {
+	if err := g.Process(message); err != nil {
 		return err
 	}
 
-	magic := protocol.MagicFromConfig()
-	buf := magic.ToBuffer()
-	if _, err := buf.ReadFrom(message); err != nil {
-		return err
-	}
-
-	_, err = p.Write(buf.Bytes())
+	_, err = p.Write(message.Bytes())
 	return err
 }
 
@@ -75,9 +68,12 @@ func (p *Connection) readRemoteMsgVersion() error {
 		return err
 	}
 
-	decodedMsg := new(bytes.Buffer)
-	decodedMsg.Write(msgBytes)
+	msg, err := verifyChecksum(msgBytes)
+	if err != nil {
+		return err
+	}
 
+	decodedMsg := bytes.NewBuffer(msg)
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -102,9 +98,12 @@ func (p *Connection) readVerAck() error {
 		return err
 	}
 
-	decodedMsg := new(bytes.Buffer)
-	decodedMsg.Write(msgBytes)
+	msg, err := verifyChecksum(msgBytes)
+	if err != nil {
+		return err
+	}
 
+	decodedMsg := bytes.NewBuffer(msg)
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -118,23 +117,17 @@ func (p *Connection) readVerAck() error {
 	return nil
 }
 
-func (p *Connection) writeVerAck() error {
+func (p *Connection) writeVerAck(g *processing.Gossip) error {
 	verAckMsg := new(bytes.Buffer)
 	if err := topics.Prepend(verAckMsg, topics.VerAck); err != nil {
 		return err
 	}
 
-	if err := processing.WriteFrame(verAckMsg); err != nil {
+	if err := g.Process(verAckMsg); err != nil {
 		return err
 	}
 
-	magic := protocol.MagicFromConfig()
-	buf := magic.ToBuffer()
-	if _, err := buf.ReadFrom(verAckMsg); err != nil {
-		return err
-	}
-
-	if _, err := p.Write(buf.Bytes()); err != nil {
+	if _, err := p.Write(verAckMsg.Bytes()); err != nil {
 		return err
 	}
 

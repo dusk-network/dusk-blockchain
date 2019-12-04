@@ -19,8 +19,6 @@ func TestProcess(t *testing.T) {
 		assert.FailNow(t, "error in processing buffer")
 	}
 
-	// Remove magic bytes first, as ReadFrame only reads the length
-	_, _ = protocol.Extract(m)
 	length, err := processing.ReadFrame(m)
 	if !assert.NoError(t, err) {
 		assert.FailNow(t, "error in reading frame")
@@ -33,7 +31,8 @@ func TestProcess(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	_, _ = buf.Write([]byte("pippo"))
-	assert.Equal(t, buf.Bytes(), msg[0:len(msg)-4])
+	// First 8 bytes of `msg` are the magic and checksum
+	assert.Equal(t, buf.Bytes(), msg[8:])
 }
 
 func TestUnpackLength(t *testing.T) {

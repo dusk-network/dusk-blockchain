@@ -107,7 +107,6 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 
 // ReadMessage reads from the connection
 func (c *Connection) ReadMessage() ([]byte, error) {
-	// COBS  c.reader.ReadBytes(0x00)
 	length, err := c.gossip.UnpackLength(c.Conn)
 	if err != nil {
 		return nil, err
@@ -261,13 +260,13 @@ func (p *Reader) ReadLoop() {
 }
 
 func verifyChecksum(m []byte) ([]byte, error) {
-	// Last 4 bytes are the checksum
-	message := m[:len(m)-4]
-	checksum := m[len(m)-4:]
+	// First 4 bytes are the checksum
+	checksum := m[:processing.ChecksumLength]
+	message := m[processing.ChecksumLength:]
 
 	digest := sha3.Sum256(message)
 
-	if !bytes.Equal(checksum, digest[0:4]) {
+	if !bytes.Equal(checksum, digest[0:processing.ChecksumLength]) {
 		return nil, errors.New("checksum mismatch")
 	}
 

@@ -107,7 +107,10 @@ func TestWriteLoop(t *testing.T) {
 	_, err = io.ReadFull(srv, decoded)
 	assert.NoError(t, err)
 
-	assert.Equal(t, decoded[:len(decoded)-4], buf.Bytes())
+	// Remove checksum
+	decoded = decoded[4:]
+
+	assert.Equal(t, decoded, buf.Bytes())
 }
 
 // Test that the 'ping' message is sent correctly, and that a 'pong' message will result.
