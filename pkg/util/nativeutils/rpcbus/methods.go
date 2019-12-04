@@ -20,6 +20,8 @@ const (
 	SendStandardTx
 	GetBalance
 	GetAddress
+	GetLastCertificate
+	GetCandidate
 )
 
 func MarshalConsensusTxRequest(buf *bytes.Buffer, amount, lockTime uint64) error {

@@ -29,6 +29,9 @@ const (
 	MemPool
 	Inv
 	Certificate
+	GetAgreements
+	Agreements
+	GetCandidate
 
 	// Consensus topics
 	Candidate
@@ -48,25 +51,14 @@ const (
 	//Internal
 	Initialization
 	RoundUpdate
-	BlockSelection
-	ReductionResult
-	NewProvisioner
-	ProvisionerAdded
 	BestScore
-	BlockAgreement
 	Quit
-	BidList
-	WinningBlockHash
-	Absentees
-	RemoveProvisioner
-	AgreementEvent
 	Log
 	Monitor
 	Test
 	StepVotes
 	ScoreEvent
 	Generation
-	Finalize
 	Restart
 )
 
@@ -93,6 +85,9 @@ var Topics = [...]topicBuf{
 	topicBuf{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
 	topicBuf{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
 	topicBuf{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
+	topicBuf{GetAgreements, *(bytes.NewBuffer([]byte{byte(GetAgreements)})), "getagreements"},
+	topicBuf{Agreements, *(bytes.NewBuffer([]byte{byte(Agreements)})), "agreements"},
+	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	topicBuf{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
 	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
 	topicBuf{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
@@ -104,25 +99,14 @@ var Topics = [...]topicBuf{
 	topicBuf{Reject, *(bytes.NewBuffer([]byte{byte(Reject)})), "reject"},
 	topicBuf{Initialization, *(bytes.NewBuffer([]byte{byte(Initialization)})), "initialization"},
 	topicBuf{RoundUpdate, *(bytes.NewBuffer([]byte{byte(RoundUpdate)})), "roundupdate"},
-	topicBuf{BlockSelection, *(bytes.NewBuffer([]byte{byte(BlockSelection)})), "blockselection"},
-	topicBuf{ReductionResult, *(bytes.NewBuffer([]byte{byte(ReductionResult)})), "reductionresult"},
-	topicBuf{NewProvisioner, *(bytes.NewBuffer([]byte{byte(NewProvisioner)})), "newprovisioner"},
-	topicBuf{ProvisionerAdded, *(bytes.NewBuffer([]byte{byte(ProvisionerAdded)})), "provisioneradded"},
 	topicBuf{BestScore, *(bytes.NewBuffer([]byte{byte(BestScore)})), "bestscore"},
-	topicBuf{BlockAgreement, *(bytes.NewBuffer([]byte{byte(BlockAgreement)})), "blockagreement"},
 	topicBuf{Quit, *(bytes.NewBuffer([]byte{byte(Quit)})), "quit"},
-	topicBuf{BidList, *(bytes.NewBuffer([]byte{byte(BidList)})), "bidlist"},
-	topicBuf{WinningBlockHash, *(bytes.NewBuffer([]byte{byte(WinningBlockHash)})), "winningblockhash"},
-	topicBuf{Absentees, *(bytes.NewBuffer([]byte{byte(Absentees)})), "absentees"},
-	topicBuf{RemoveProvisioner, *(bytes.NewBuffer([]byte{byte(RemoveProvisioner)})), "removeprovisioner"},
-	topicBuf{AgreementEvent, *(bytes.NewBuffer([]byte{byte(AgreementEvent)})), "agreementevent"},
 	topicBuf{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
 	topicBuf{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
 	topicBuf{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
 	topicBuf{StepVotes, *(bytes.NewBuffer([]byte{byte(StepVotes)})), "stepvotes"},
 	topicBuf{ScoreEvent, *(bytes.NewBuffer([]byte{byte(ScoreEvent)})), "scoreevent"},
 	topicBuf{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
-	topicBuf{Finalize, *(bytes.NewBuffer([]byte{byte(Finalize)})), "finalize"},
 	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
 }
 
