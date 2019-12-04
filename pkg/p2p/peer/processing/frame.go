@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -15,6 +16,14 @@ const (
 
 //WriteFrame mutates a buffer by adding a length-prefixing wire message frame at the beginning of the message
 func WriteFrame(buf *bytes.Buffer) error {
+	// Compute digest
+	digest := sha3.Sum256(buf.Bytes())
+
+	// Append checksum
+	if _, err := buf.Write(digest[0:4]); err != nil {
+		return err
+	}
+
 	ln := uint64(buf.Len())
 	if ln > MaxFrameSize {
 		return fmt.Errorf("message size exceeds MaxFrameSize (%d)", MaxFrameSize)
@@ -33,7 +42,6 @@ func WriteFrame(buf *bytes.Buffer) error {
 	}
 
 	*buf = *msg
-	// TODO: Append Checksum
 	return nil
 }
 

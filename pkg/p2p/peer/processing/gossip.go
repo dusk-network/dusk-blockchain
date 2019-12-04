@@ -22,15 +22,16 @@ func NewGossip(magic protocol.Magic) *Gossip {
 	}
 }
 
-// Process a message that is passing through, by prepending the network magic to the
-// buffer, and then COBS encoding it.
+// Process a message that is passing through, by appending the checksum
+// of the payload, prepending the packet length, and finally prepending
+// the magic bytes.
 func (g *Gossip) Process(m *bytes.Buffer) error {
-	buf := g.Magic.ToBuffer()
-	if _, err := buf.ReadFrom(m); err != nil {
+	if err := WriteFrame(m); err != nil {
 		return err
 	}
 
-	if err := WriteFrame(&buf); err != nil {
+	buf := g.Magic.ToBuffer()
+	if _, err := buf.ReadFrom(m); err != nil {
 		return err
 	}
 
@@ -40,13 +41,7 @@ func (g *Gossip) Process(m *bytes.Buffer) error {
 
 // UnpackLength unwraps the incoming packet (likely from a net.Conn struct) and returns the length of the packet without reading the payload (which is left to the user of this method)
 func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
-	var magic protocol.Magic
-	packetLength, err := ReadFrame(r)
-	if err != nil {
-		return 0, err
-	}
-
-	magic, err = protocol.Extract(r)
+	magic, err := protocol.Extract(r)
 	if err != nil {
 		return 0, err
 	}
@@ -55,5 +50,10 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 		return 0, errors.New("magic mismatch")
 	}
 
-	return packetLength - uint64(magic.Len()), nil
+	packetLength, err := ReadFrame(r)
+	if err != nil {
+		return 0, err
+	}
+
+	return packetLength, nil
 }
