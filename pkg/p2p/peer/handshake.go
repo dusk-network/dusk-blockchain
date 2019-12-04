@@ -51,7 +51,7 @@ func (p *Connection) writeLocalMsgVersion() error {
 		return err
 	}
 
-	if err := p.addHeader(message, topics.Version); err != nil {
+	if err := topics.Prepend(message, topics.Version); err != nil {
 		return err
 	}
 
@@ -59,7 +59,13 @@ func (p *Connection) writeLocalMsgVersion() error {
 		return err
 	}
 
-	_, err = p.Write(message.Bytes())
+	magic := protocol.MagicFromConfig()
+	buf := magic.ToBuffer()
+	if _, err := buf.ReadFrom(message); err != nil {
+		return err
+	}
+
+	_, err = p.Write(buf.Bytes())
 	return err
 }
 
@@ -90,22 +96,7 @@ func (p *Connection) readRemoteMsgVersion() error {
 	return verifyVersion(version.Version)
 }
 
-func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) error {
-	buf := p.gossip.Magic.ToBuffer()
-	if err := topics.Write(&buf, topic); err != nil {
-		return err
-	}
-
-	if _, err := buf.ReadFrom(m); err != nil {
-		return err
-	}
-
-	*m = buf
-	return nil
-}
-
 func (p *Connection) readVerAck() error {
-
 	msgBytes, err := p.ReadMessage()
 	if err != nil {
 		return err
@@ -129,7 +120,7 @@ func (p *Connection) readVerAck() error {
 
 func (p *Connection) writeVerAck() error {
 	verAckMsg := new(bytes.Buffer)
-	if err := p.addHeader(verAckMsg, topics.VerAck); err != nil {
+	if err := topics.Prepend(verAckMsg, topics.VerAck); err != nil {
 		return err
 	}
 
@@ -137,7 +128,13 @@ func (p *Connection) writeVerAck() error {
 		return err
 	}
 
-	if _, err := p.Write(verAckMsg.Bytes()); err != nil {
+	magic := protocol.MagicFromConfig()
+	buf := magic.ToBuffer()
+	if _, err := buf.ReadFrom(verAckMsg); err != nil {
+		return err
+	}
+
+	if _, err := p.Write(buf.Bytes()); err != nil {
 		return err
 	}
 

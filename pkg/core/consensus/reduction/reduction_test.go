@@ -71,12 +71,6 @@ func retrieveHeader(t *testing.T, r bytes.Buffer) header.Header {
 		t.Fatal(err)
 	}
 
-	// Discard Ed25519 fields
-	buf := make([]byte, 96)
-	if _, err := r.Read(buf); err != nil {
-		t.Fatal(err)
-	}
-
 	hdr := header.Header{}
 	if err := header.Unmarshal(&r, &hdr); err != nil {
 		t.Fatal(err)

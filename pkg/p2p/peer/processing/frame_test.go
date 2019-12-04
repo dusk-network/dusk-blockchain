@@ -15,5 +15,5 @@ func TestWriteReadFrame(t *testing.T) {
 	buf := make([]byte, length)
 	b.Read(buf)
 
-	assert.Equal(t, "pippo", string(buf))
+	assert.Equal(t, "pippo", string(buf[:len(buf)-4]))
 }

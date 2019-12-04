@@ -19,6 +19,8 @@ func TestProcess(t *testing.T) {
 		assert.FailNow(t, "error in processing buffer")
 	}
 
+	// Remove magic bytes first, as ReadFrame only reads the length
+	_, _ = protocol.Extract(m)
 	length, err := processing.ReadFrame(m)
 	if !assert.NoError(t, err) {
 		assert.FailNow(t, "error in reading frame")
@@ -29,9 +31,9 @@ func TestProcess(t *testing.T) {
 		assert.FailNow(t, fmt.Sprintf("error in reading the message with length %d", length))
 	}
 
-	buf := protocol.DevNet.ToBuffer()
-	buf.Write([]byte("pippo"))
-	assert.Equal(t, buf.Bytes(), msg)
+	buf := new(bytes.Buffer)
+	_, _ = buf.Write([]byte("pippo"))
+	assert.Equal(t, buf.Bytes(), msg[0:len(msg)-4])
 }
 
 func TestUnpackLength(t *testing.T) {
@@ -44,5 +46,6 @@ func TestUnpackLength(t *testing.T) {
 	length, err := g.UnpackLength(b)
 	assert.NoError(t, err)
 
-	assert.Equal(t, len(test), int(length))
+	// Checksum was added, so we remove 4 from int(length)
+	assert.Equal(t, len(test), int(length)-4)
 }
