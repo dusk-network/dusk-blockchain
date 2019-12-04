@@ -200,10 +200,9 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	l := eventbus.NewCallbackListener(c.CollectRoundUpdate)
 	c.eventBus.Subscribe(topics.RoundUpdate, l)
 
-	finalizeListener := eventbus.NewCallbackListener(c.CollectFinalize)
-	c.eventBus.Subscribe(topics.Finalize, finalizeListener)
-
 	c.reinstantiateStore()
+
+	// TODO: catch-up protocol
 	return c
 }
 
@@ -218,9 +217,10 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 }
 
 // CollectRoundUpdate is triggered when the Chain propagates a new round update.
-// If the Finalize message was not seen earlier, it will finalize all components,
-// reinstantiate a new store, and swap it with the current one. The consensus
-// components are then initialized, and the state will be updated to the new round.
+// If consensus is finalized, we will initialize the re-instantiated
+// components, and kickstart consensus.
+// If consensus was not finalized, we will consider ourselves to be
+// behind, and start following the catch-up protocol.
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lg.Debugln("received round update")
 	c.lock.Lock()
@@ -230,17 +230,14 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		return err
 	}
 
-	// TODO: when the new certificate creation procedure is implemented, this won't make
-	// much sense anymore, so we might want to remove this part afterwards
-	c.store.lock.RLock()
-	lenSubs := len(c.store.subscribers)
-	c.store.lock.RUnlock()
-	if lenSubs > 0 {
-		lg.Traceln("finalizing consensus")
-		c.FinalizeRound()
-		c.reinstantiateStore()
+	// Discard obsolete round updates
+	if r.Round < c.Round() {
+		return nil
 	}
 
+	// reinstantiating the store prevents the need for locking
+	c.FinalizeRound()
+	c.reinstantiateStore()
 	c.onNewRound(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
@@ -250,37 +247,32 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		Topic: topics.Generation,
 		Event: Event{},
 	})
+
+	if r.Round == c.Round() {
+		// This means we received a finalized block from a peer, and were
+		// not able to update our intermediate block internally.
+		// Since we have no way of knowing the correct information for
+		// this consensus round, we will enter catch-up mode.
+		c.queryAgreements()
+	}
+
 	return nil
 }
 
-// CollectFinalize is triggered when the Agreement reaches quorum, and pre-emptively
-// finalizes all consensus components, as they are no longer needed after this point.
-func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	// Ensure that we should take this message seriously
-	var round uint64
-	if err := encoding.ReadUint64LE(&m, &round); err != nil {
-		return err
-	}
-	lg.WithFields(log.Fields{
-		"coordinator round": c.Round(),
-		"message round":     round,
-	}).Debugln("received Finalize message")
-
-	if round < c.Round() {
-		return nil
+func (c *Coordinator) queryAgreements() {
+	// Send out a query for agreement messages.
+	// Create a buffer holding only the round for which we would like
+	// to request agreement messages.
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, c.Round()); err != nil {
+		panic(err)
 	}
 
-	if round > c.Round() {
-		panic("not supposed to get a Finalize message for a future round")
+	if err := topics.Prepend(buf, topics.GetAgreements); err != nil {
+		panic(err)
 	}
 
-	lg.Traceln("finalizing consensus")
-	// reinstantiating the store prevents the need for locking
-	c.FinalizeRound()
-	c.reinstantiateStore()
-	return nil
+	c.eventBus.Publish(topics.Gossip, buf)
 }
 
 // Create a new roundStore and instantiate all Components.
