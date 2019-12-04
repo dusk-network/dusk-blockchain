@@ -1,16 +1,16 @@
-package processing_test
+package responding_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/dusk-network/dusk-wallet/block"
 )
 
 // Test the behaviour of the block hash broker, upon receiving a GetBlocks message.
@@ -27,7 +27,7 @@ func TestAdvertiseBlocks(t *testing.T) {
 
 	// Set up the BlockHashBroker
 	responseChan := make(chan *bytes.Buffer, 100)
-	blockHashBroker := processing.NewBlockHashBroker(db, responseChan)
+	blockHashBroker := responding.NewBlockHashBroker(db, responseChan)
 
 	// Make a GetBlocks, with the genesis block as the locator.
 	msg := createGetBlocksBuffer(hashes[0])

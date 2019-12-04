@@ -1,4 +1,4 @@
-package processing_test
+package responding_test
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -17,7 +17,7 @@ func TestRequestData(t *testing.T) {
 	defer db.Close()
 
 	responseChan := make(chan *bytes.Buffer, 100)
-	dataRequestor := processing.NewDataRequestor(db, nil, responseChan)
+	dataRequestor := responding.NewDataRequestor(db, nil, responseChan)
 
 	// Send topics.Inv
 	hash, buf, err := createInvBuffer()
