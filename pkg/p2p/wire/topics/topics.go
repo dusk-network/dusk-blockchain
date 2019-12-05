@@ -29,7 +29,8 @@ const (
 	MemPool
 	Inv
 	Certificate
-	GetAgreements
+	GetRoundResults
+	RoundResults
 	GetCandidate
 
 	// Consensus topics
@@ -59,6 +60,7 @@ const (
 	ScoreEvent
 	Generation
 	Restart
+	StopConsensus
 )
 
 type topicBuf struct {
@@ -84,7 +86,8 @@ var Topics = [...]topicBuf{
 	topicBuf{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
 	topicBuf{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
 	topicBuf{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
-	topicBuf{GetAgreements, *(bytes.NewBuffer([]byte{byte(GetAgreements)})), "getagreements"},
+	topicBuf{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
+	topicBuf{RoundResults, *(bytes.NewBuffer([]byte{byte(RoundResults)})), "roundresults"},
 	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	topicBuf{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
 	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
@@ -106,6 +109,7 @@ var Topics = [...]topicBuf{
 	topicBuf{ScoreEvent, *(bytes.NewBuffer([]byte{byte(ScoreEvent)})), "scoreevent"},
 	topicBuf{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
 	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
+	topicBuf{StopConsensus, *(bytes.NewBuffer([]byte{byte(StopConsensus)})), "stopconsensus"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {
