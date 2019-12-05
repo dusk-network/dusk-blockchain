@@ -3,7 +3,7 @@ package kadcast
 import (
 	"encoding/binary"
 	"errors"
-	"logrus"
+	"github.com/sirupsen/logrus"
 	"net"
 
 	"golang.org/x/crypto/sha3"

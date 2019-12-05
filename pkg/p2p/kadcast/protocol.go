@@ -2,7 +2,7 @@ package kadcast
 
 import (
 	"errors"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -13,7 +13,7 @@ import (
 // Otherways, it returns `nil` and logs the Number of peers 
 // the node is connected to at the end of the process.
 func InitBootstrap(router *Router, bootNodes []Peer) error {
-	log.Println("Bootstrapping process started.")
+	log.Info("Bootstrapping process started.")
 	// Get PeerList ordered by distance so we can compare it
 	// after the `PONG` arrivals.
 	initPeerNum := router.tree.getTotalPeers()
@@ -31,11 +31,11 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 			if i >= 3 {
 				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")	
 			} 
-			log.Printf("Bootstrapping nodes were not added on attempt nº %v\nTrying again...\n", i)
+			log.Warning("Bootstrapping nodes were not added on attempt nº %v\nTrying again...\n", i)
 		}
 		break
 	}
-	log.Printf("Bootstrapping process finished. \nYou're now connected to %v nodes", router.tree.getTotalPeers())
+	log.Info("Bootstrapping process finished. \nYou're now connected to %v nodes", router.tree.getTotalPeers())
 	return nil
 }
 
@@ -58,7 +58,7 @@ func StartNetworkDiscovery(router *Router) {
 	for {
 		actualClosest = router.getXClosestPeersTo(1, router.MyPeerInfo)
 		if actualClosest[0] == previousClosest[0] {
-			log.Printf("Network Discovery process has finished!.\nYou're now connected to %v", router.tree.getTotalPeers())
+			log.Info("Network Discovery process has finished!.\nYou're now connected to %v", router.tree.getTotalPeers())
 			return
 		}
 		// We get the closest actual Peer.

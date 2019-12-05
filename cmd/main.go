@@ -1,7 +1,7 @@
 package main
 
 import (
-	"logrus"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -32,7 +32,7 @@ func main() {
 	// Start Bootstrapping process.
 	err := kadcast.InitBootstrap(&router, bootstrapNodes)
 	if err != nil {
-		logrus.WithError("Error during the Bootstrap Process. Job terminated.")
+		log.Info("Error during the Bootstrap Process. Job terminated.")
 	}
 
 	// Once the bootstrap succeeded, start the network discovery.

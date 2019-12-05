@@ -2,7 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
-	"logrus"
+	log "github.com/sirupsen/logrus"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -154,7 +154,7 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			// Get items from the queue packet taken.
 			byteNum, senderAddr, udpPayload, err = decodeRedPacket(item)
 			if err != nil {
-				logrus.WithError(err).Warn("Error decoding the packet taken from the ring.")
+				log.WithError(err).Warn("Error decoding the packet taken from the ring.")
 				break NextItem
 			}
 			// Build packet struct
@@ -167,7 +167,7 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			// If we get an error, we just skip the whole process since the
 			// Peer was not validated.
 			if err := verifyIDNonce(senderID, nonce); err != nil {
-				logrus.WithError(err).Warn("Incorrect packet sender ID. Skipping its processing.")
+				log.WithError(err).Warn("Incorrect packet sender ID. Skipping its processing.")
 				break NextItem
 			} 
 
@@ -181,17 +181,17 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			// Check packet type and process it.
 			switch tipus {
 			case 0:
-				logrus.Info("Recieved PING message from %v", peerInf.ip[:])
+				log.Info("Recieved PING message from %v", peerInf.ip[:])
 				handlePing(peerInf, router)
 			case 1:
-				logrus.Info("Recieved PONG message from %v", peerInf.ip[:])
+				log.Info("Recieved PONG message from %v", peerInf.ip[:])
 				handlePong(peerInf, router)
 
 			case 2:
-				logrus.Info("Recieved FIND_NODES message from %v", peerInf.ip[:])
+				log.Info("Recieved FIND_NODES message from %v", peerInf.ip[:])
 				handleFindNodes(peerInf, router)
 			case 3:
-				logrus.Info("Recieved NODES message from %v", peerInf.ip[:])
+				log.Info("Recieved NODES message from %v", peerInf.ip[:])
 				handleNodes(peerInf, packet, router, byteNum)
 			}
 		}
@@ -232,7 +232,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
-		logrus.Info("NODES message recieved with corrupted payload. PeerNum mismatch!\nIgnoring the packet.")
+		log.Info("NODES message recieved with corrupted payload. PeerNum mismatch!\nIgnoring the packet.")
 		return
 	}
 

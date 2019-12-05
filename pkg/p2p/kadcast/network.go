@@ -1,7 +1,7 @@
 package kadcast
 
 import (
-	"logrus"
+	log "github.com/sirupsen/logrus"
 	"net"
 	"time"
 
