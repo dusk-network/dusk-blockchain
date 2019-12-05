@@ -173,6 +173,8 @@ type Coordinator struct {
 	lock     sync.RWMutex
 	store    *roundStore
 	unsynced bool
+
+	stopped bool
 }
 
 // Start the coordinator by wiring the listener to the RoundUpdate
@@ -191,6 +193,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 		eventqueue: NewQueue(),
 		pubkeyBuf:  *pkBuf,
 		unsynced:   true,
+		stopped:    true,
 	}
 
 	// completing the initialization
@@ -200,8 +203,27 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	l := eventbus.NewCallbackListener(c.CollectRoundUpdate)
 	c.eventBus.Subscribe(topics.RoundUpdate, l)
 
+	stopListener := eventbus.NewCallbackListener(c.StopConsensus)
+	c.eventBus.Subscribe(topics.StopConsensus, stopListener)
+
 	c.reinstantiateStore()
 	return c
+}
+
+func (c *Coordinator) StopConsensus(bytes.Buffer) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if !c.stopped {
+		c.stopConsensus()
+		c.stopped = true
+	}
+
+	return nil
+}
+
+func (c *Coordinator) stopConsensus() {
+	c.FinalizeRound()
+	c.reinstantiateStore()
 }
 
 func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
@@ -215,10 +237,8 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 }
 
 // CollectRoundUpdate is triggered when the Chain propagates a new round update.
-// If consensus is finalized, we will initialize the re-instantiated
-// components, and kickstart consensus.
-// If consensus was not finalized, we will consider ourselves to be
-// behind, and start following the catch-up protocol.
+// The consensus components are swapped out, initialized, and the
+// state will be updated to the new round.
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lg.Debugln("received round update")
 	c.lock.Lock()
@@ -228,12 +248,11 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		return err
 	}
 
-	// reinstantiating the store prevents the need for locking
-	c.FinalizeRound()
-	c.reinstantiateStore()
+	c.stopConsensus()
 	c.onNewRound(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
+	c.stopped = false
 
 	// TODO: the Coordinator should not send events. someone else should kickstart the
 	// consensus loop
@@ -243,22 +262,6 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	})
 
 	return nil
-}
-
-func (c *Coordinator) queryAgreements() {
-	// Send out a query for agreement messages.
-	// Create a buffer holding only the round for which we would like
-	// to request agreement messages.
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, c.Round()); err != nil {
-		panic(err)
-	}
-
-	if err := topics.Prepend(buf, topics.GetAgreements); err != nil {
-		panic(err)
-	}
-
-	c.eventBus.Publish(topics.Gossip, buf)
 }
 
 // Create a new roundStore and instantiate all Components.
