@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -65,7 +66,7 @@ func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys
 func TestFetchTip(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	chain, err := New(eb, rpc)
+	chain, err := New(eb, rpc, nil)
 
 	assert.Nil(t, err)
 	defer chain.Close()
@@ -86,7 +87,8 @@ func TestFetchTip(t *testing.T) {
 func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	chain, err := New(eb, rpc)
+	counter := chainsync.NewCounter(eb)
+	chain, err := New(eb, rpc, counter)
 	assert.Nil(t, err)
 	defer chain.Close()
 
@@ -115,7 +117,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 func TestAddAndRemoveBid(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	c, err := New(eb, rpc)
+	c, err := New(eb, rpc, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +217,8 @@ func createBid(t *testing.T) user.Bid {
 func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	c, err := New(eb, rpc)
+	counter := chainsync.NewCounter(eb)
+	c, err := New(eb, rpc, counter)
 	if err != nil {
 		t.Fatal(err)
 	}

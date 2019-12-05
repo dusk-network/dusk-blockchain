@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
@@ -88,6 +89,18 @@ func (h *Helper) createResultChans() {
 // Initialize the generator with the given round update.
 func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 	h.Generator.Initialize(h, h.signer, ru)
+	go provideCertificate(h.RBus)
+}
+
+func provideCertificate(rpcBus *rpcbus.RPCBus) {
+	c := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastCertificate, c)
+
+	r := <-c
+	buf := new(bytes.Buffer)
+	cert := block.EmptyCertificate()
+	marshalling.MarshalCertificate(buf, cert)
+	r.RespChan <- rpcbus.Response{*buf, nil}
 }
 
 // TriggerBlockGeneration creates a random ScoreEvent and triggers block generation
