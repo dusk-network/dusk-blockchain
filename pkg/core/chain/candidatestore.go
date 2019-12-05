@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
@@ -91,20 +92,26 @@ func (c *candidateStore) requestCandidateMessage(hash []byte) (*candidateMsg, er
 	c.broker.Publish(topics.Gossip, buf)
 
 	// Listen until we receive the requested candidate
-	// NOTE: currently this could loop infinitely if nobody responds.
+	// Use a timeout of 5 seconds
+	timer := time.NewTimer(5 * time.Second)
 	for {
-		b := <-candidateChan
-		cm, err := decodeCandidateMessage(b)
-		if err != nil {
-			return nil, err
-		}
+		select {
+		case <-timer.C:
+			return nil, errors.New("request timeout")
 
-		hash := cm.blk.Header.Hash
-		if err := c.checkHash(hash, cm.blk); err != nil {
-			return nil, err
-		}
+		case b := <-candidateChan:
+			cm, err := decodeCandidateMessage(b)
+			if err != nil {
+				return nil, err
+			}
 
-		return cm, nil
+			hash := cm.blk.Header.Hash
+			if err := c.checkHash(hash, cm.blk); err != nil {
+				return nil, err
+			}
+
+			return cm, nil
+		}
 	}
 }
 
