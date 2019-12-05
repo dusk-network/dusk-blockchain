@@ -120,12 +120,12 @@ func (c *candidateStore) checkHash(hash []byte, blk *block.Block) error {
 	return nil
 }
 
-// Clear removes all candidate messages from a given round.
+// Clear removes all candidate messages from or before a given round.
 // Returns the amount of messages deleted.
 func (c *candidateStore) Clear(round uint64) int {
 	deletedCount := 0
 	for h, m := range c.messages {
-		if m.blk.Header.Height == round {
+		if m.blk.Header.Height <= round {
 			delete(c.messages, h)
 			deletedCount++
 		}
