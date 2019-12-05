@@ -120,8 +120,16 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
+	// Since the Candidate message goes straight to the Chain, there is
+	// no need to use `SendAuthenticated`, as the header is irrelevant.
+	// Thus, we will instead gossip it directly.
 	lg.Debugln("sending candidate")
-	return bg.signer.SendAuthenticated(topics.Candidate, hdr, buf, bg.ID())
+	if err := topics.Prepend(buf, topics.Candidate); err != nil {
+		return err
+	}
+
+	bg.publisher.Publish(topics.Gossip, buf)
+	return nil
 }
 
 func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {
