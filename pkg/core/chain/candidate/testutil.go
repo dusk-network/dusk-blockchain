@@ -80,8 +80,9 @@ func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBat
 func (h *Helper) createResultChans() {
 	scoreListener := eventbus.NewChanListener(h.ScoreChan)
 	h.Bus.Subscribe(topics.Score, scoreListener)
+	// Candidate messages go on the gossip topic
 	candidateListener := eventbus.NewChanListener(h.CandidateChan)
-	h.Bus.Subscribe(topics.Candidate, candidateListener)
+	h.Bus.Subscribe(topics.Gossip, candidateListener)
 }
 
 // Initialize the generator with the given round update.
