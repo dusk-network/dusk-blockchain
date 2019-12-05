@@ -39,6 +39,8 @@ func Setup() *Server {
 	// creating the eventbus
 	eventBus := eventbus.New()
 
+	counter := chainsync.NewCounter(eventBus)
+
 	// creating the rpcbus
 	rpcBus := rpcbus.New()
 
@@ -46,12 +48,11 @@ func Setup() *Server {
 	m.Run()
 
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus, rpcBus)
+	chain, err := chain.New(eventBus, rpcBus, counter)
 	if err != nil {
 		panic(err)
 	}
 	go chain.Listen()
-	go chain.LaunchConsensus()
 
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
@@ -86,7 +87,7 @@ func Setup() *Server {
 		rpcBus:   rpcBus,
 		chain:    chain,
 		dupeMap:  dupeBlacklist,
-		counter:  chainsync.NewCounter(eventBus),
+		counter:  counter,
 		gossip:   processing.NewGossip(protocol.TestNet),
 	}
 
