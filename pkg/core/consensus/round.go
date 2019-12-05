@@ -332,6 +332,19 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		return nil
 	case header.After:
 		lg.WithField("topic", topic).Debugln("storing future event")
+
+		// If it is a future agreement event, we store it on the
+		// corresponding round for step 1. This would mean that the
+		// queued agreement events for that round will be dispatched
+		// at the start of the first selection.
+		if topic == topics.Agreement {
+			c.eventqueue.PutEvent(hdr.Round, 1, NewTopicEvent(topic, hdr, m))
+			c.lock.RUnlock()
+			return nil
+		}
+
+		// Otherwise, we just queue it according to the header round
+		// and step.
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
 		c.lock.RUnlock()
 		return nil
