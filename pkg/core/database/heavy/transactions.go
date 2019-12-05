@@ -47,6 +47,7 @@ var (
 	CandidateBlockPrefix = []byte{0x06}
 	StatePrefix          = []byte{0x07}
 	OutputKeyPrefix      = []byte{0x08}
+	BidValuesPrefix      = []byte{0x09}
 )
 
 type transaction struct {
@@ -154,11 +155,17 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		// Schema
 		//
 		// Key = OutputKeyPrefix + tx.output.PublicKey
-		// Value = tx.output.PublicKey
+		// Value = unlockheight
 		//
 		// To make FetchOutputKey functioning
-		for _, output := range tx.StandardTx().Outputs {
-			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), output.PubKey.P.Bytes())
+		for i, output := range tx.StandardTx().Outputs {
+			value := make([]byte, 8)
+			// Only lock the first output, so that change outputs are
+			// not affected.
+			if i == 0 {
+				binary.LittleEndian.PutUint64(value, tx.LockTime()+b.Header.Height)
+			}
+			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), value)
 		}
 
 	}
@@ -248,6 +255,23 @@ func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
 	return exists, err
 }
 
+// FetchOutputUnlockHeight returns the unlockheight of an output
+func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
+	key := append(OutputKeyPrefix, destkey...)
+	unlockHeightBytes, err := t.snapshot.Get(key, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(unlockHeightBytes) != 8 {
+		return 0, errors.New("unlock height malformed")
+	}
+
+	// output unlock height is the first 8 bytes
+	unlockHeight := binary.LittleEndian.Uint64(unlockHeightBytes[0:8])
+	return unlockHeight, err
+}
+
 // FetchDecoys iterates over the outputs and fetches `numDecoys` amount
 // of output public keys
 func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
@@ -260,7 +284,9 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	var i int
 
 	for iterator.Next() {
-		value := iterator.Value()
+		// Output public key is the iterator key minus the `OutputKeyPrefix`
+		// (1 byte)
+		value := iterator.Key()[1:]
 
 		var p ristretto.Point
 		var pBytes [32]byte
@@ -592,4 +618,34 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	}
 
 	return header.Height, nil
+}
+
+func (t transaction) StoreBidValues(d, k []byte) error {
+	// First, delete the old values (if any)
+	key := BidValuesPrefix
+	exists, err := t.snapshot.Has(key, nil)
+	if exists && err == nil {
+		t.batch.Delete(key)
+	}
+	if err != nil {
+		return err
+	}
+
+	t.put(key, append(d, k...))
+	return nil
+}
+
+func (t transaction) FetchBidValues() ([]byte, []byte, error) {
+	key := BidValuesPrefix
+	value, err := t.snapshot.Get(key, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Let's avoid any runtime panics by doing a sanity check on the value length before
+	if len(value) != 64 {
+		return nil, nil, errors.New("bid values non-existant or incorrectly encoded")
+	}
+
+	return value[0:32], value[32:64], nil
 }

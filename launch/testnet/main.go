@@ -15,13 +15,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	// name (wihtout ext) for the config file to look for
+	configFileName = "dusk"
+)
+
 func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
 	fmt.Fprintln(os.Stdout, "initializing node...")
 	// Loading all node configurations. Fail-fast if critical error occurs
-	err := cfg.Load()
+	err := cfg.Load(configFileName, nil, nil)
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)

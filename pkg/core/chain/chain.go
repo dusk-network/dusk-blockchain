@@ -64,7 +64,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	}
 
 	// set up collectors
-	candidateChan := initBlockCollector(eventBus, topics.Candidate)
+	candidateChan := initCandidateCollector(eventBus)
 	certificateChan := initCertificateCollector(eventBus)
 
 	// set up rpcbus channels
@@ -91,7 +91,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	// Hook the chain up to the required topics
 	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
 	eventBus.Subscribe(topics.Block, cbListener)
-	eventBus.Register(topics.Candidate, consensus.NewRepublisher(eventBus, topics.Candidate))
+	eventBus.Register(topics.Candidate, consensus.NewRepublisher(eventBus, topics.Candidate), &consensus.Validator{})
 	return chain, nil
 }
 
@@ -197,11 +197,11 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	field := logger.Fields{"process": "accept block"}
 	l := log.WithFields(field)
 
-	l.Trace("procedure started")
+	l.Trace("verifying block")
 
 	// 1. Check that stateless and stateful checks pass
 	if err := verifiers.CheckBlock(c.db, c.prevBlock, blk); err != nil {
-		l.Errorf("verification failed: %s", err.Error())
+		l.WithError(err).Warnln("block verification failed")
 		return err
 	}
 
@@ -210,33 +210,38 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// at the same height, as the probability of the committee creating two valid certificates
 	// for the same round is negligible.
 	// FIXME: make sure we actually have only one valid certificate per block (frontrunning consensus (please follow the fucking protocol already))
+	l.Trace("verifying block certificate")
 	if err := verifiers.CheckBlockCertificate(*c.p, blk); err != nil {
-		l.Errorf("verifying the certificate failed: %s", err.Error())
+		l.WithError(err).Warnln("certificate verification failed")
 		return err
 	}
 
 	// 3. Add provisioners and block generators
+	l.Trace("adding consensus nodes")
 	c.addConsensusNodes(blk.Txs, blk.Header.Height)
 
 	// 4. Store block in database
+	l.Trace("storing block in db")
 	err := c.db.Update(func(t database.Transaction) error {
 		return t.StoreBlock(&blk)
 	})
 
 	if err != nil {
-		l.Errorf("block storing failed: %s", err.Error())
+		l.WithError(err).Errorln("block storing failed")
 		return err
 	}
 
 	c.prevBlock = blk
 
 	// 5. Gossip advertise block Hash
+	l.Trace("gossiping block")
 	if err := c.advertiseBlock(blk); err != nil {
-		l.Errorf("block advertising failed: %s", err.Error())
+		l.WithError(err).Errorln("block advertising failed")
 		return err
 	}
 
 	// 6. Cleanup obsolete candidate blocks
+	l.Trace("cleaning obsolete candidate blocks")
 	var count uint32
 	err = c.db.Update(func(t database.Transaction) error {
 		count, err = t.DeleteCandidateBlocks(blk.Header.Height)
@@ -245,14 +250,15 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	if err != nil {
 		// Not critical enough to abort the accepting procedure
-		log.Warnf("DeleteCandidateBlocks failed with an error: %s", err.Error())
+		log.WithError(err).Warnln("deleting candidate blocks failed")
 	} else {
-		log.Infof("%d deleted candidate blocks", count)
+		log.WithField("count", count).Traceln("candidate blocks deleted")
 	}
 
 	// 7. Remove expired provisioners and bids
 	// We remove provisioners and bids from accepted block height + 1,
 	// to set up our committee correctly for the next block.
+	l.Trace("removing expired consensus transactions")
 	c.removeExpiredProvisioners(blk.Header.Height + 1)
 	c.removeExpiredBids(blk.Header.Height + 1)
 
@@ -260,9 +266,10 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// Subsystems listening for this topic:
 	// mempool.Mempool
 	// consensus.generation.broker
+	l.Trace("notifying internally")
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, &blk); err != nil {
-		l.Errorf("block encoding failed: %s", err.Error())
+		l.WithError(err).Errorln("block encoding failed")
 		return err
 	}
 
@@ -272,8 +279,9 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// We send a round update after accepting a new block, which should include
 	// a set of provisioners, and a bidlist. This allows the consensus components
 	// to rehydrate their state properly for the next round.
+	l.Trace("sending round update")
 	if err := c.sendRoundUpdate(blk.Header.Height+1, blk.Header.Seed, blk.Header.Hash); err != nil {
-		l.Errorf("sending round update failed: %s", err.Error())
+		l.WithError(err).Errorln("sending round update failed")
 		return err
 	}
 
@@ -383,7 +391,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	return nil
 }
 
-// TODO: consensus data should be persisted to disk, to increase
+// TODO: consensus data should be persisted to disk, to decrease
 // startup times
 func (c *Chain) restoreConsensusData() {
 	var currentHeight uint64
@@ -473,14 +481,15 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, endHeight uin
 	stake := user.Stake{amount, endHeight}
 
 	// Check for duplicates
-	inserted := c.p.Set.Insert(pubKeyBLS)
-	if !inserted {
+	_, inserted := c.p.Set.IndexOf(pubKeyBLS)
+	if inserted {
 		// If they already exist, just add their new stake
 		c.p.Members[i].AddStake(stake)
 		return nil
 	}
 
 	// This is a new provisioner, so let's initialize the Member struct and add them to the list
+	c.p.Set.Insert(pubKeyBLS)
 	m := &user.Member{}
 	m.PublicKeyEd = ed25519.PublicKey(pubKeyEd)
 

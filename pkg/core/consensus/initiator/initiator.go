@@ -5,19 +5,20 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
@@ -26,7 +27,7 @@ import (
 
 var l = log.WithField("process", "consensus initiator")
 
-func LaunchConsensus(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
+func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// TODO: sync first
 	startBlockGenerator(eventBroker, rpcBus, w)
 	startProvisioner(eventBroker, rpcBus, w, counter)
@@ -35,14 +36,15 @@ func LaunchConsensus(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wall
 	}
 }
 
-func startProvisioner(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
+func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// Setting up the consensus factory
-	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, w.ConsensusKeys())
+	pubKey := w.PublicKey()
+	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, &pubKey, w.ConsensusKeys())
 	f.StartConsensus()
 
 	// Get current height
 	req := rpcbus.NewRequest(bytes.Buffer{})
-	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req, 1)
+	resultBuf, err := rpcBus.Call(rpcbus.GetLastBlock, req, 1*time.Second)
 	if err != nil {
 		l.WithError(err).Warnln("could not retrieve current height, starting from 1")
 		sendInitMessage(eventBroker, 1)
@@ -67,30 +69,54 @@ func startProvisioner(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wal
 	sendInitMessage(eventBroker, 1)
 }
 
+// XXX: clean this up ASAP
 func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
-	// make some random keys to sign the seed with
-	keys, err := key.NewRandConsensusKeys()
-	if err != nil {
-		l.WithError(err).Warnln("could not start block generation component - problem generating keys")
-		return
-	}
-
-	// reconstruct k
 	k, err := w.ReconstructK()
 	if err != nil {
-		l.WithError(err).Warnln("could not start block generation component - problem reconstructing K")
-		return
+		panic(err)
 	}
 
-	// get public key that the rewards should go to
-	publicKey := w.PublicKey()
+	m := zkproof.CalculateM(k)
+	_, db := heavy.CreateDBConnection()
+	for i := 0; ; i++ {
+		var hash []byte
+		err := db.View(func(t database.Transaction) error {
+			var err error
+			hash, err = t.FetchBlockHashByHeight(uint64(i))
+			return err
+		})
 
-	go func() {
-		// launch generation component
-		if err := generation.Launch(eventBroker, rpcBus, k, keys, &publicKey, nil, nil, nil); err != nil {
-			l.WithError(err).Warnln("error launching block generation component")
+		// We hit the end of the chain, so we should just exit here
+		if err != nil {
+			return
 		}
-	}()
+
+		var txs []transactions.Transaction
+		err = db.View(func(t database.Transaction) error {
+			var err error
+			txs, err = t.FetchBlockTxs(hash)
+			return err
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		for _, tx := range txs {
+			bid, ok := tx.(*transactions.Bid)
+			if !ok {
+				continue
+			}
+
+			if bytes.Equal(bid.M, m.Bytes()) {
+				err := db.Update(func(t database.Transaction) error {
+					return t.StoreBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes())
+				})
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	}
 }
 
 func getStartingRound(eventBroker eventbus.Broker, counter *chainsync.Counter) uint64 {
@@ -136,7 +162,9 @@ func syncToTip(acceptedBlockChan <-chan block.Block, counter *chainsync.Counter)
 
 func launchMaintainer(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
 	r := cfg.Get()
-	amount := r.Consensus.DefaultAmount
+	// default amount is denoted in whole units of DUSK, so we should convert it to
+	// atomic units.
+	amount := r.Consensus.DefaultAmount * wallet.DUSK
 	lockTime := r.Consensus.DefaultLockTime
 	if lockTime > transactions.MaxLockTime {
 		log.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)

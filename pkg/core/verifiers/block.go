@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 // CheckBlock will verify whether a block is valid according to the rules of the consensus
@@ -55,9 +56,9 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 	}
 
 	// First, lets get the actual reduction steps
-	// This would be the certificate step * 2 - 1, and certificate step * 2
-	stepOne := (blk.Header.Certificate.Step * 2) - 1
-	stepTwo := blk.Header.Certificate.Step * 2
+	// These would be the two steps preceding the one on the certificate
+	stepOne := blk.Header.Certificate.Step - 2
+	stepTwo := blk.Header.Certificate.Step - 1
 
 	// Reconstruct signatures
 	stepOneBatchedSig, err := bls.UnmarshalSignature(blk.Header.Certificate.StepOneBatchedSig)
@@ -79,15 +80,23 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 }
 
 func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash []byte) error {
-	// TODO: need real committee size here
-	committee := provisioners.CreateVotingCommittee(round, step, agreement.MaxCommitteeSize)
+	size := committeeSize(len(provisioners.Members))
+	committee := provisioners.CreateVotingCommittee(round, step, size)
 	subcommittee := committee.Intersect(bitSet)
 	apk, err := agreement.ReconstructApk(subcommittee)
 	if err != nil {
 		return err
 	}
 
-	return agreement.VerifySignatures(round, step, blockHash, apk, batchedSig)
+	return header.VerifySignatures(round, step, blockHash, apk, batchedSig)
+}
+
+func committeeSize(memberAmount int) int {
+	if memberAmount > agreement.MaxCommitteeSize {
+		return agreement.MaxCommitteeSize
+	}
+
+	return memberAmount
 }
 
 // CheckBlockHeader checks whether a block header is malformed,

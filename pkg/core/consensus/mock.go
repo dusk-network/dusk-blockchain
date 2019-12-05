@@ -18,13 +18,17 @@ func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) R
 
 	var bidders = bidList
 	if bidList == nil || len(bidList) == 0 {
-		bidders = MockBidList()
+		bidders = MockBidList(1)
 	}
 
+	seed, _ := crypto.RandEntropy(33)
+	hash, _ := crypto.RandEntropy(32)
 	return RoundUpdate{
 		Round:   round,
 		P:       *provisioners,
 		BidList: bidders,
+		Seed:    seed,
+		Hash:    hash,
 	}
 }
 
@@ -39,7 +43,7 @@ func MockRoundUpdateBuffer(round uint64, p *user.Provisioners, bidList user.BidL
 	user.MarshalProvisioners(buf, p)
 
 	if bidList == nil {
-		bidList = MockBidList()
+		bidList = MockBidList(1)
 	}
 	user.MarshalBidList(buf, bidList)
 
@@ -68,7 +72,6 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
 		p.Set.Insert(keys.BLSPubKeyBytes)
 		k[i] = keys
 	}
-
 	return p, k
 }
 
@@ -82,14 +85,16 @@ func MockMember(keys key.ConsensusKeys) *user.Member {
 	return member
 }
 
-func MockBidList() user.BidList {
-	bidList := make([]user.Bid, 1)
-	xSlice, _ := crypto.RandEntropy(32)
-	mSlice, _ := crypto.RandEntropy(32)
-	var x [32]byte
-	var m [32]byte
-	copy(x[:], xSlice)
-	copy(m[:], mSlice)
-	bidList[0] = user.Bid{x, m, 10}
+func MockBidList(amount int) user.BidList {
+	bidList := make([]user.Bid, amount)
+	for i := 0; i < amount; i++ {
+		xSlice, _ := crypto.RandEntropy(32)
+		mSlice, _ := crypto.RandEntropy(32)
+		var x [32]byte
+		var m [32]byte
+		copy(x[:], xSlice)
+		copy(m[:], mSlice)
+		bidList[i] = user.Bid{x, m, 10}
+	}
 	return bidList
 }

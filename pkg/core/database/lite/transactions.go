@@ -202,8 +202,12 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
 	return false, nil
 }
-func (t *transaction) StoreCandidateBlock(b *block.Block) error {
 
+func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
+	return 0, nil
+}
+
+func (t *transaction) StoreCandidateBlock(b *block.Block) error {
 	if !t.writable {
 		return errors.New("read-only transaction")
 	}
@@ -319,4 +323,15 @@ func (t *transaction) FetchCurrentHeight() (uint64, error) {
 	}
 
 	return header.Height, nil
+}
+
+func (t *transaction) StoreBidValues(d, k []byte) error {
+	bidKey := toKey([]byte("bidvalues"))
+	t.batch[bidValuesInd][bidKey] = append(d, k...)
+	return nil
+}
+
+func (t *transaction) FetchBidValues() ([]byte, []byte, error) {
+	bidKey := toKey([]byte("bidvalues"))
+	return t.db.storage[bidValuesInd][bidKey][0:32], t.db.storage[bidValuesInd][bidKey][32:64], nil
 }

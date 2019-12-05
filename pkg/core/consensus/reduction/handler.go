@@ -2,67 +2,61 @@ package reduction
 
 import (
 	"bytes"
+	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/committee"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
 const maxCommitteeSize = 64
 
 type (
-	// ReductionHandler is responsible for performing operations that need to know
+	// Handler is responsible for performing operations that need to know
 	// about specific event fields.
-	reductionHandler struct {
+	Handler struct {
 		*committee.Handler
-		*UnMarshaller
 	}
 )
 
-// newReductionHandler will return a ReductionHandler, injected with the passed committee
+// newHandler will return a Handler, injected with the passed committee
 // and an unmarshaller which uses the injected validation function.
-func newReductionHandler(keys key.ConsensusKeys) *reductionHandler {
-	return &reductionHandler{
-		Handler:      committee.NewHandler(keys),
-		UnMarshaller: NewUnMarshaller(),
+func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *Handler {
+	return &Handler{
+		Handler: committee.NewHandler(keys, p),
 	}
 }
 
 // AmMember checks if we are part of the committee.
-func (b *reductionHandler) AmMember(round uint64, step uint8) bool {
+func (b *Handler) AmMember(round uint64, step uint8) bool {
 	return b.Handler.AmMember(round, step, maxCommitteeSize)
 }
 
-func (b *reductionHandler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
+func (b *Handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
 	return b.Handler.IsMember(pubKeyBLS, round, step, maxCommitteeSize)
 }
 
-func (b *reductionHandler) ExtractHeader(e wire.Event) *header.Header {
-	ev := e.(*Reduction)
-	return &header.Header{
-		Round: ev.Round,
-		Step:  ev.Step,
-	}
+func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
+	return b.Handler.VotesFor(pubKeyBLS, round, step, maxCommitteeSize)
 }
 
-func (b *reductionHandler) ExtractIdentifier(e wire.Event, r *bytes.Buffer) error {
-	ev := e.(*Reduction)
-	return encoding.Write256(r, ev.BlockHash)
-}
-
-// Verify the BLS signature of the Reduction event.
-func (b *reductionHandler) Verify(e wire.Event) error {
-	ev := e.(*Reduction)
-	info := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(info, ev.Header); err != nil {
+// Verify the BLS signature of the Reduction event. Since the payload is nil, verifying the signature equates to verifying solely the Header
+func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
+	packet := new(bytes.Buffer)
+	if err := header.MarshalSignableVote(packet, hdr); err != nil {
 		return err
 	}
-	return msg.VerifyBLSSignature(ev.PubKeyBLS, info.Bytes(), ev.SignedHash)
+
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
 }
 
-func (b *reductionHandler) Quorum() int {
-	return int(float64(b.CommitteeSize(maxCommitteeSize)) * 0.75)
+func (b *Handler) Quorum() int {
+	return int(math.Ceil(float64(b.CommitteeSize(maxCommitteeSize)) * 0.75))
+}
+
+// Committee returns a VotingCommittee for a given round and step.
+func (b *Handler) Committee(round uint64, step uint8) user.VotingCommittee {
+	return b.Handler.Committee(round, step, maxCommitteeSize)
 }

@@ -7,6 +7,7 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -44,6 +45,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
 		case r := <-t.getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
+		case r := <-t.getAddressChan:
+			handleRequest(r, t.handleAddress, "Address")
 
 		// Event list to handle
 		case b := <-t.acceptedBlockChan:
@@ -63,6 +66,7 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) error, name 
 	}
 
 	log.Infof("Handled %s request", name)
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 }
 
 func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
@@ -93,6 +97,25 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 	return nil
 }
 
+func (t *Transactor) handleAddress(r rpcbus.Request) error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	addr, err := t.w.PublicAddress()
+	if err != nil {
+		return err
+	}
+
+	buf := new(bytes.Buffer)
+	if _, err := buf.WriteString(addr); err != nil {
+		return err
+	}
+
+	r.RespChan <- rpcbus.Response{*buf, nil}
+	return nil
+}
+
 func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 	if t.w != nil {
 		return errWalletAlreadyLoaded
@@ -119,7 +142,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 		t.w.UpdateWalletHeight(0)
 		b := cfg.DecodeGenesis()
 		// call wallet.CheckBlock
-		if _, _, err := t.w.CheckWireBlock(*b, true); err != nil {
+		if _, _, err := t.w.CheckWireBlock(*b); err != nil {
 			return fmt.Errorf("error checking block: %v", err)
 		}
 	}
@@ -192,6 +215,11 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 	//  Publish transaction to the mempool processing
 	txid, err := t.publishTx(tx)
 	if err != nil {
+		return err
+	}
+
+	// Save relevant values in the database for the generation component to use
+	if err := t.writeBidValues(tx); err != nil {
 		return err
 	}
 
@@ -330,4 +358,15 @@ func (t *Transactor) launchConsensus() {
 		log.Tracef("Launch consensus")
 		go initiator.LaunchConsensus(t.eb, t.rb, t.w, t.c)
 	}
+}
+
+func (t *Transactor) writeBidValues(tx transactions.Transaction) error {
+	return t.db.Update(func(tr database.Transaction) error {
+		k, err := t.w.ReconstructK()
+		if err != nil {
+			return err
+		}
+
+		return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes())
+	})
 }

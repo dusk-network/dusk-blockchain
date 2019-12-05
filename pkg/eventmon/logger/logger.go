@@ -7,10 +7,10 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -104,6 +104,12 @@ func (l *LogProcessor) Send(entry []byte) error {
 
 	if _, err := l.Out.Write(entry); err != nil {
 		return err
+	}
+
+	// Set deadline back to zero, to avoid problems with other
+	// functions that use the logger
+	if conn, ok := l.Out.(net.Conn); ok {
+		conn.SetWriteDeadline(time.Time{})
 	}
 
 	return nil

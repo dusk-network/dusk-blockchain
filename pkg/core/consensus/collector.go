@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
@@ -20,10 +19,6 @@ type (
 		roundChan chan RoundUpdate
 	}
 
-	regenerationCollector struct {
-		regenerationChan chan AsyncState
-	}
-
 	acceptedBlockCollector struct {
 		blockChan chan<- block.Block
 	}
@@ -37,29 +32,8 @@ type (
 	}
 )
 
-// UpdateRound is a shortcut for propagating a round
-func UpdateRound(bus eventbus.Publisher, round uint64) {
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, round)
-	bus.Publish(topics.RoundUpdate, bytes.NewBuffer(b))
-}
-
-// InitRoundUpdate initializes a Round update channel and fires up the TopicListener
-// as well. Its purpose is to lighten up a bit the amount of arguments in creating
-// the handler for the collectors. Also it removes the need to store subscribers on
-// the consensus process
-func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
-	roundChan := make(chan RoundUpdate, 1)
-	roundCollector := &roundCollector{roundChan}
-	eventbus.NewTopicListener(subscriber, roundCollector, topics.RoundUpdate, eventbus.ChannelType)
-	return roundChan
-}
-
-// Collect as specified in the EventCollector interface. In this case Collect simply
-// performs unmarshalling of the round event
-func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
+func DecodeRound(rb *bytes.Buffer, update *RoundUpdate) error {
 	var round uint64
-	rb := &roundBuffer
 	if err := encoding.ReadUint64LE(rb, &round); err != nil {
 		return err
 	}
@@ -84,28 +58,33 @@ func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
 		return err
 	}
 
-	r.roundChan <- RoundUpdate{round, provisioners, bidList, seed, hash}
+	update.P = provisioners
+	update.Round = round
+	update.BidList = bidList
+	update.Seed = seed
+	update.Hash = hash
 	return nil
 }
 
-// InitBlockRegenerationCollector initializes a regeneration channel, creates a
-// regenerationCollector, and subscribes this collector to the BlockRegenerationTopic.
-// The channel is then returned.
-func InitBlockRegenerationCollector(subscriber eventbus.Subscriber) chan AsyncState {
-	regenerationChan := make(chan AsyncState, 1)
-	collector := &regenerationCollector{regenerationChan}
-	eventbus.NewTopicListener(subscriber, collector, topics.BlockRegeneration, eventbus.ChannelType)
-	return regenerationChan
+// InitRoundUpdate initializes a Round update channel and fires up the TopicListener
+// as well. Its purpose is to lighten up a bit the amount of arguments in creating
+// the handler for the collectors. Also it removes the need to store subscribers on
+// the consensus process
+func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
+	roundChan := make(chan RoundUpdate, 1)
+	roundCollector := &roundCollector{roundChan}
+	eventbus.NewTopicListener(subscriber, roundCollector, topics.RoundUpdate, eventbus.ChannelType)
+	return roundChan
 }
 
-func (rg *regenerationCollector) Collect(r bytes.Buffer) error {
-	round := binary.LittleEndian.Uint64(r.Bytes()[:8])
-	step := uint8(r.Bytes()[8])
-	state := AsyncState{
-		Round: round,
-		Step:  step,
+// Collect as specified in the EventCollector interface. In this case Collect simply
+// performs unmarshalling of the round event
+func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
+	update := RoundUpdate{}
+	if err := DecodeRound(&roundBuffer, &update); err != nil {
+		return err
 	}
-	rg.regenerationChan <- state
+	r.roundChan <- update
 	return nil
 }
 

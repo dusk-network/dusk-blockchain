@@ -7,13 +7,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
-type (
-	// ScoreEvent represents the Score Message with the fields consistent with the Blind Bid data structure
-	ScoreEvent struct {
-		// Fields related to the consensus
-		Round uint64
+var _ wire.Event = (*Score)(nil)
 
-		// Fields related to the score
+type (
+	// Score represents the Score Message with the fields consistent with the Blind Bid data structure
+	Score struct {
 		Score         []byte
 		Proof         []byte
 		Z             []byte
@@ -25,34 +23,21 @@ type (
 )
 
 // Equal as specified in the Event interface
-func (e *ScoreEvent) Equal(ev wire.Event) bool {
-	other, ok := ev.(*ScoreEvent)
-	return ok && other.Round == e.Round && bytes.Equal(other.VoteHash, e.VoteHash)
+func (e Score) Equal(ev wire.Event) bool {
+	other, ok := ev.(Score)
+	return ok && bytes.Equal(other.VoteHash, e.VoteHash)
 }
 
 // Sender of a Score event is the anonymous Z
-func (e *ScoreEvent) Sender() []byte {
+func (e Score) Sender() []byte {
 	return e.Z
 }
 
-// UnmarshalScoreEvent unmarshals the buffer into a Score Event
+// UnmarshalScore unmarshals the buffer into a Score Event
 // Field order is the following:
-// * Consensus Header [Round; Step]
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash]
-func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
-	// check if the buffer has contents first
-	// if not, we did not get any messages this round
-	if r.Len() == 0 {
-		return nil
-	}
-
-	sev := ev.(*ScoreEvent)
-
-	// Decoding Round
-	if err := encoding.ReadUint64LE(r, &sev.Round); err != nil {
-		return err
-	}
-
+func UnmarshalScore(r *bytes.Buffer, ev wire.Event) error {
+	sev := ev.(*Score)
 	sev.Score = make([]byte, 32)
 	if err := encoding.Read256(r, sev.Score); err != nil {
 		return err
@@ -89,19 +74,14 @@ func UnmarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
 	return nil
 }
 
-// MarshalScoreEvent the buffer into a committee Event
+// MarshalScore the buffer into a committee Event
 // Field order is the following:
-// * Consensus Header [Round; Step]
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
-func MarshalScoreEvent(r *bytes.Buffer, ev wire.Event) error {
-	sev, ok := ev.(*ScoreEvent)
+func MarshalScore(r *bytes.Buffer, ev wire.Event) error {
+	sev, ok := ev.(*Score)
 	if !ok {
 		// sev is nil
 		return nil
-	}
-
-	if err := encoding.WriteUint64LE(r, sev.Round); err != nil {
-		return err
 	}
 
 	// Score

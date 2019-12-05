@@ -109,7 +109,10 @@ func MagicFromConfig() Magic {
 // Extract the magic from io.Reader. In case of unknown Magic, it returns DevNet
 func Extract(r io.Reader) (Magic, error) {
 	buffer := make([]byte, 4)
-	if _, err := r.Read(buffer); err != nil {
+	// `ReadFull` is used here, as using a plain `Read` call from a net.Conn could
+	// result in the read finishing before the buffer is filled. Using `ReadFull`
+	// prevents unintended 'magic mismatch' errors.
+	if _, err := io.ReadFull(r, buffer); err != nil {
 		return Magic(byte(255)), err
 	}
 

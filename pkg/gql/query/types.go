@@ -65,6 +65,34 @@ var Transaction = graphql.NewObject(
 			"blockhash": &graphql.Field{
 				Type: Hex,
 			},
+			"output": &graphql.Field{
+				Type: graphql.NewList(Output),
+			},
+			"input": &graphql.Field{
+				Type: graphql.NewList(Input),
+			},
+		},
+	},
+)
+
+var Output = graphql.NewObject(
+	graphql.ObjectConfig{
+		Name: "Output",
+		Fields: graphql.Fields{
+			"pubkey": &graphql.Field{
+				Type: Hex,
+			},
+		},
+	},
+)
+
+var Input = graphql.NewObject(
+	graphql.ObjectConfig{
+		Name: "Input",
+		Fields: graphql.Fields{
+			"keyimage": &graphql.Field{
+				Type: Hex,
+			},
 		},
 	},
 )

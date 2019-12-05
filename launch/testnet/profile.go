@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"os"
 	"runtime/pprof"
+	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -37,27 +39,60 @@ func newProfile() (*profileMngr, error) {
 
 	// Write cpu profile if requested.
 	if cfg.Get().Prof.CPUFile != "" {
-		p.cpuFile, err = os.Create(cfg.Get().Prof.CPUFile)
-		if err != nil {
-			return nil, err
-		}
+		log.Infoln("starting cpu profiler")
+		go func() {
+			// Run the CPU profiler every half hour, for a minute
+			ticker := time.NewTicker(30 * time.Minute)
+			for i := 0; ; i++ {
+				<-ticker.C
+				// Write each profile to a different file
+				p.cpuFile, err = os.Create(cfg.Get().Prof.CPUFile + strconv.Itoa(i))
+				if err != nil {
+					log.WithField("process", "cpu profiling").WithError(err).Errorln("could not create file for profiling")
+					return
+				}
 
-		if err := pprof.StartCPUProfile(p.cpuFile); err != nil {
-			p.cpuFile.Close()
-			return nil, err
-		}
+				log.WithFields(log.Fields{
+					"process": "cpu profiling",
+					"file":    p.cpuFile.Name(),
+				}).Infoln("writing profile")
+				if err := pprof.StartCPUProfile(p.cpuFile); err != nil {
+					p.cpuFile.Close()
+					log.WithField("process", "cpu profiling").WithError(err).Errorln("could not start cpu profiling")
+					return
+				}
 
-		log.Infof("CPU profiling will be written to '%s'", cfg.Get().Prof.CPUFile)
+				time.Sleep(1 * time.Minute)
+				pprof.StopCPUProfile()
+				p.cpuFile.Close()
+				p.cpuFile = nil
+			}
+		}()
 	}
 
 	// Write mem profile if requested.
 	if cfg.Get().Prof.MemFile != "" {
-		p.memFile, err = os.Create(cfg.Get().Prof.MemFile)
-		if err != nil {
-			return nil, err
-		}
+		log.Infoln("starting memory profiler")
+		go func() {
+			// Run the memory profiler every half hour
+			ticker := time.NewTicker(30 * time.Minute)
+			for i := 0; ; i++ {
+				<-ticker.C
+				p.memFile, err = os.Create(cfg.Get().Prof.MemFile + strconv.Itoa(i))
+				if err != nil {
+					log.WithField("process", "memory profiling").WithError(err).Errorln("could not create file for profiling")
+					return
+				}
 
-		log.Infof("Memory profiling will be written to '%s'", cfg.Get().Prof.MemFile)
+				log.WithFields(log.Fields{
+					"process": "memory profiling",
+					"file":    p.memFile.Name(),
+				}).Infoln("writing profile")
+				_ = pprof.WriteHeapProfile(p.memFile)
+				p.memFile.Close()
+				p.memFile = nil
+			}
+		}()
 	}
 
 	return p, nil
