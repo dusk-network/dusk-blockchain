@@ -30,7 +30,6 @@ const (
 	Inv
 	Certificate
 	GetAgreements
-	Agreements
 	GetCandidate
 
 	// Consensus topics
@@ -86,7 +85,6 @@ var Topics = [...]topicBuf{
 	topicBuf{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
 	topicBuf{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
 	topicBuf{GetAgreements, *(bytes.NewBuffer([]byte{byte(GetAgreements)})), "getagreements"},
-	topicBuf{Agreements, *(bytes.NewBuffer([]byte{byte(Agreements)})), "agreements"},
 	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	topicBuf{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
 	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
