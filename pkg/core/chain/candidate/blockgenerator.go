@@ -78,6 +78,14 @@ func (bg *Generator) Finalize() {}
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
 func (bg *Generator) Collect(e consensus.Event) error {
+	// Ensure, first and foremost, that we have a certificate to include
+	// in our candidate message. If not, there is no point in sending
+	// either message.
+	certBuf, err := bg.rpcBus.Call(rpcbus.GetLastCertificate, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5)
+	if err != nil {
+		return err
+	}
+
 	sev := &score.Event{}
 	if err := score.Unmarshal(&e.Payload, sev); err != nil {
 		return err
@@ -115,8 +123,13 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
+	// Create candidate message
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+		return err
+	}
+
+	if _, err := buf.ReadFrom(&certBuf); err != nil {
 		return err
 	}
 
