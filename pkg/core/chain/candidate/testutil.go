@@ -89,18 +89,20 @@ func (h *Helper) createResultChans() {
 // Initialize the generator with the given round update.
 func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 	h.Generator.Initialize(h, h.signer, ru)
-	go provideCertificate(h.RBus)
+	provideCertificate(h.RBus)
 }
 
 func provideCertificate(rpcBus *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetLastCertificate, c)
 
-	r := <-c
-	buf := new(bytes.Buffer)
-	cert := block.EmptyCertificate()
-	marshalling.MarshalCertificate(buf, cert)
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	go func(c chan rpcbus.Request) {
+		r := <-c
+		buf := new(bytes.Buffer)
+		cert := block.EmptyCertificate()
+		marshalling.MarshalCertificate(buf, cert)
+		r.RespChan <- rpcbus.Response{*buf, nil}
+	}(c)
 }
 
 // TriggerBlockGeneration creates a random ScoreEvent and triggers block generation
