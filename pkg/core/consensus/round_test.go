@@ -126,6 +126,31 @@ func TestEventFilter(t *testing.T) {
 	assert.Equal(t, 1, len(agComp.receivedEvents))
 }
 
+// Ensure an agreement event is queued on the correct state, and
+// dispatched on the correct state.
+func TestQueueDispatchAgreement(t *testing.T) {
+	c, _ := initCoordinatorTest(t, topics.Agreement)
+
+	// Send an Agreement event from a future round.
+	// It should be queued
+	ev := mockEventBuffer(t, topics.Agreement, 2, 3)
+	c.CollectEvent(*ev)
+	// Should be queued on round 2 step 1
+	assert.Equal(t, 1, len(c.eventqueue.entries[2][1]))
+
+	// Update the round and Forward/Play to step 1
+	ruBuf := MockRoundUpdateBuffer(2, nil, nil)
+	c.CollectRoundUpdate(*ruBuf)
+	agComp := c.store.components[0].(*mockComponent)
+	// NOTE: this would be done by the selector normally, when running
+	// the entirety of the consensus.
+	c.Forward(agComp.ID())
+	c.Play(agComp.ID())
+
+	// Should have received the agreement event
+	assert.Equal(t, 1, len(agComp.receivedEvents))
+}
+
 // Initialize a coordinator with a single component.
 func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Component) {
 	bus := eventbus.New()
