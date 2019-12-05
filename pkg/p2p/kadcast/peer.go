@@ -53,10 +53,10 @@ func serializePeer(peerBytes []byte) Peer {
 	var id [16]byte
 	copy(id[:], peerBytes[6:22])
 
-	return Peer {
-		ip: ip,
+	return Peer{
+		ip:   ip,
 		port: port,
-		id: id,
+		id:   id,
 	}
 }
 
@@ -75,7 +75,7 @@ func (peer Peer) computePeerNonce() uint32 {
 		copy(data[0:16], id[0:16])
 		copy(data[16:18], bytesUint[0:2])
 		hash = sha3.Sum256(data)
-		if (hash[31] | hash[30] | hash[29]) == 0 {
+		if (hash[31]) == 0 {
 			return nonce
 		}
 		nonce++

@@ -82,7 +82,7 @@ func verifyIDNonce(id [16]byte, nonce [4]byte) error {
 	copy(idPlusNonce[0:16], id[0:16])
 	copy(idPlusNonce[16:20], nonce[0:4])
 	hash := sha3.Sum256(idPlusNonce)
-	if (hash[31] | hash[30] | hash[29]) == 0 {
+	if (hash[31]) == 0 {
 		return nil
 	}
 	return errors.New("\nId and Nonce are not valid parameters.") //TODO: Create error type.
@@ -137,7 +137,7 @@ func getBytesFromUint32(num uint32) [4]byte {
 func getBytesFromUint16(num uint16) [2]byte {
 	res := [2]byte{0, 0}
 	for i := 0; num > 0; i++ {
-		// Cut the input to byte rabge.
+		// Cut the input to byte range.
 		res[i] = byte(num & 255)
 		// Shift it to subtract a byte from the number.
 		num = num >> 8
