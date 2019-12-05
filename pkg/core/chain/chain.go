@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"errors"
+	"time"
 
 	"encoding/binary"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -39,6 +41,7 @@ type Chain struct {
 	*candidateStore
 	p       *user.Provisioners
 	bidList *user.BidList
+	counter *chainsync.Counter
 
 	prevBlock block.Block
 	// protect prevBlock with mutex as it's touched out of the main chain loop
@@ -64,10 +67,11 @@ type Chain struct {
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getCandidateChan         <-chan rpcbus.Request
+	getRoundResultsChan      <-chan rpcbus.Request
 }
 
 // New returns a new chain object
-func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
+func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter) (*Chain, error) {
 	_, db := heavy.CreateDBConnection()
 
 	l, err := newLoader(db)
@@ -83,10 +87,12 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
 	getCandidateChan := make(chan rpcbus.Request, 1)
+	getRoundResultsChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
 	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
 	rpcBus.Register(rpcbus.GetLastCertificate, getLastCertificateChan)
 	rpcBus.Register(rpcbus.GetCandidate, getCandidateChan)
+	rpcBus.Register(rpcbus.GetRoundResults, getRoundResultsChan)
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -96,11 +102,13 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 		prevBlock:                *l.chainTip,
 		p:                        user.NewProvisioners(),
 		bidList:                  &user.BidList{},
+		counter:                  counter,
 		certificateChan:          certificateChan,
 		getLastBlockChan:         getLastBlockChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getLastCertificateChan:   getLastCertificateChan,
 		getCandidateChan:         getCandidateChan,
+		getRoundResultsChan:      getRoundResultsChan,
 	}
 
 	chain.restoreConsensusData()
@@ -125,21 +133,10 @@ func (c *Chain) Listen() {
 			c.provideLastCertificate(r)
 		case r := <-c.getCandidateChan:
 			c.provideCandidate(r)
+		case r := <-c.getRoundResultsChan:
+			c.provideRoundResults(r)
 		}
 	}
-}
-
-// LaunchConsensus will listen for an init message, and send a round update
-// once it is received.
-func (c *Chain) LaunchConsensus() {
-	initChan := make(chan bytes.Buffer, 1)
-	l := eventbus.NewChanListener(initChan)
-	id := c.eventBus.Subscribe(topics.Initialization, l)
-	<-initChan
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	c.sendRoundUpdate(c.prevBlock.Header.Height+1, c.prevBlock.Header.Seed, c.prevBlock.Header.Hash)
-	c.eventBus.Unsubscribe(topics.Initialization, id)
 }
 
 func (c *Chain) propagateBlock(blk block.Block) error {
@@ -172,21 +169,45 @@ func (c *Chain) Close() error {
 }
 
 func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
+	// Ignore blocks from peers if we are only one behind - we are most
+	// likely just about to finalize consensus.
+	// TODO: we should probably just accept it if consensus was not
+	// started yet
+	if !c.counter.IsSyncing() {
+		return nil
+	}
+
+	// If we are more than one block behind, stop the consensus
+	c.eventBus.Publish(topics.StopConsensus, new(bytes.Buffer))
+
+	// Accept the block
 	blk := block.NewBlock()
 	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
 		return err
 	}
 
+	// This will decrement the sync counter
 	if err := c.AcceptBlock(*blk); err != nil {
 		return err
 	}
 
-	// Since we received the block from the wire, we can remove our
-	// current `intermediateBlock`. We should request the next one
-	// after receiving the set of Agreements for the following round.
-	c.intermediateBlock = nil
+	// If we are no longer syncing after accepting this block,
+	// request a certificate and intermediate block for the
+	// second to last round.
+	if !c.counter.IsSyncing() {
+		blk, cert, err := c.requestRoundResults(blk.Header.Height + 1)
+		if err != nil {
+			return err
+		}
 
-	return c.sendRoundUpdate(blk.Header.Height+1, blk.Header.Seed, blk.Header.Hash)
+		c.intermediateBlock = blk
+		c.lastCertificate = cert
+
+		// Once received, we can re-start consensus.
+		return c.sendRoundUpdate()
+	}
+
+	return nil
 }
 
 // AcceptBlock will accept a block if
@@ -271,10 +292,10 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
-func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
+func (c *Chain) sendRoundUpdate() error {
 	buf := new(bytes.Buffer)
 	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, round)
+	binary.LittleEndian.PutUint64(roundBytes, c.intermediateBlock.Header.Height)
 	if _, err := buf.Write(roundBytes); err != nil {
 		return err
 	}
@@ -292,11 +313,11 @@ func (c *Chain) sendRoundUpdate(round uint64, seed, hash []byte) error {
 		return err
 	}
 
-	if err := encoding.WriteBLS(buf, seed); err != nil {
+	if err := encoding.WriteBLS(buf, c.intermediateBlock.Header.Seed); err != nil {
 		return err
 	}
 
-	if err := encoding.Write256(buf, hash); err != nil {
+	if err := encoding.Write256(buf, c.intermediateBlock.Header.Hash); err != nil {
 		return err
 	}
 
@@ -333,7 +354,7 @@ func (c *Chain) verifyCandidateBlock(r rpcbus.Request) {
 
 	candidateMsg, err := c.candidateStore.fetchCandidateMessage(r.Params.Bytes())
 	if err != nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no candidate found for given hash")}
 		return
 	}
 
@@ -532,7 +553,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	// Fetch new intermediate block and corresponding certificate
 	cm, err := c.candidateStore.fetchCandidateMessage(cMsg.hash)
 	if err != nil {
-		// if request fails, we should return and wait for a finalized block from the network instead.
+		// If we don't have the block, we should wait for the network
+		// to propagate it
 		return
 	}
 
@@ -543,12 +565,67 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	// Set new intermediate block
 	c.intermediateBlock = cm.blk
 
-	c.sendRoundUpdate(cm.blk.Header.Height+1, cm.blk.Header.Seed, cm.blk.Header.Hash)
+	c.sendRoundUpdate()
 }
 
 func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) {
 	c.intermediateBlock.Header.Certificate = cert
 	c.AcceptBlock(*c.intermediateBlock)
+}
+
+// Send out a query for agreement messages and an intermediate block.
+func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certificate, error) {
+	roundResultsChan := make(chan bytes.Buffer, 10)
+	id := c.eventBus.Subscribe(topics.RoundResults, eventbus.NewChanListener(roundResultsChan))
+	defer c.eventBus.Unsubscribe(topics.RoundResults, id)
+
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, round); err != nil {
+		panic(err)
+	}
+
+	if err := topics.Prepend(buf, topics.GetRoundResults); err != nil {
+		panic(err)
+	}
+
+	c.eventBus.Publish(topics.Gossip, buf)
+	// We wait 5 seconds for a response. We time out otherwise and
+	// attempt catching up later.
+	timer := time.NewTimer(5 * time.Second)
+
+	for {
+		select {
+		case <-timer.C:
+			return nil, nil, errors.New("request timeout")
+		case b := <-roundResultsChan:
+			blk := block.NewBlock()
+			if err := marshalling.UnmarshalBlock(&b, blk); err != nil {
+				// Prevent a malicious node from cutting us off by
+				// sending garbled data
+				continue
+			}
+
+			cert := block.EmptyCertificate()
+			if err := marshalling.UnmarshalCertificate(&b, cert); err != nil {
+				continue
+			}
+
+			// Check block and certificate for correctness
+			if err := verifiers.CheckBlock(c.db, c.prevBlock, *blk); err != nil {
+				continue
+			}
+
+			// Certificate needs to be on a block to be verified.
+			// Since this certificate is supposed to be for the
+			// intermediate block, we can just put it on there.
+			blk.Header.Certificate = cert
+			if err := verifiers.CheckBlockCertificate(*c.p, *blk); err != nil {
+				continue
+			}
+
+			return blk, cert, nil
+		}
+	}
 }
 
 func (c *Chain) provideLastBlock(r rpcbus.Request) {
@@ -576,10 +653,35 @@ func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 func (c *Chain) provideCandidate(r rpcbus.Request) {
 	cm, err := c.candidateStore.fetchCandidateMessage(r.Params.Bytes())
 	if err != nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no candidate found for provided hash")}
 	}
 
 	buf := new(bytes.Buffer)
 	err = encodeCandidateMessage(buf, cm)
 	r.RespChan <- rpcbus.Response{*buf, err}
+}
+
+func (c *Chain) provideRoundResults(r rpcbus.Request) {
+	if c.intermediateBlock == nil || c.lastCertificate == nil {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block or certificate currently known")}
+	}
+
+	round := binary.LittleEndian.Uint64(r.Params.Bytes())
+	if round != c.intermediateBlock.Header.Height {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block and certificate for the given round")}
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(buf, c.intermediateBlock); err != nil {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		return
+	}
+
+	if err := marshalling.MarshalCertificate(buf, c.lastCertificate); err != nil {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		return
+	}
+
+	r.RespChan <- rpcbus.Response{*buf, nil}
 }
