@@ -201,8 +201,6 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	c.eventBus.Subscribe(topics.RoundUpdate, l)
 
 	c.reinstantiateStore()
-
-	// TODO: catch-up protocol
 	return c
 }
 
@@ -230,31 +228,19 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		return err
 	}
 
-	// Discard obsolete round updates
-	if r.Round < c.Round() {
-		return nil
-	}
-
 	// reinstantiating the store prevents the need for locking
 	c.FinalizeRound()
 	c.reinstantiateStore()
 	c.onNewRound(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
+
 	// TODO: the Coordinator should not send events. someone else should kickstart the
 	// consensus loop
 	c.store.Dispatch(TopicEvent{
 		Topic: topics.Generation,
 		Event: Event{},
 	})
-
-	if r.Round == c.Round() {
-		// This means we received a finalized block from a peer, and were
-		// not able to update our intermediate block internally.
-		// Since we have no way of knowing the correct information for
-		// this consensus round, we will enter catch-up mode.
-		c.queryAgreements()
-	}
 
 	return nil
 }
