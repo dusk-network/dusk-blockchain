@@ -1,7 +1,7 @@
 package kadcast
 
 import (
-	"log"
+	"logrus"
 	"net"
 	"time"
 
@@ -32,17 +32,16 @@ PacketConnCreation:
 		byteNum, uAddr, err := pc.ReadFromUDP(buffer)
 
 		if err != nil {
-			log.Printf("%v", err)
+			log.WithError(err).Warn("Error on packet read")
 			pc.Close()
 			goto PacketConnCreation
-		} else {
-			// Set a new deadline for the connection.
-			pc.SetDeadline(time.Now().Add(5 * time.Minute))
-			// Serialize the packet.
-			encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
-			// Send the packet to the Consumer putting it on the queue.
-			queue.Put(encodedPack)
-		}
+		} 
+		// Set a new deadline for the connection.
+		pc.SetDeadline(time.Now().Add(5 * time.Minute))
+		// Serialize the packet.
+		encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
+		// Send the packet to the Consumer putting it on the queue.
+		queue.Put(encodedPack)
 	}
 }
 
@@ -52,15 +51,15 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	localAddr := getLocalUDPAddress()
 	conn, err := net.DialUDP(netw, &localAddr, &addr)
 	if err != nil {
-		log.Println(err)
+		log.WithError(err).Warn("Could not stablish a connection with the dest Peer.")
 		return
 	}
+	defer conn.Close()
 
 	// Simple write
-	written, err := conn.Write(payload)
+	_, err = conn.Write(payload)
 	if err != nil {
-		log.Println(err)
-	} else if written == len(payload) {
-	}
-	conn.Close()
+		log.WithError(err).Warn("Error while writting to the filedescriptor.")
+		return
+	} 
 }

@@ -28,16 +28,14 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 		// we consider that the bootstrapping succeeded.
 		actualPeers := router.tree.getTotalPeers()
 		if actualPeers <= initPeerNum {
-			if i < 3 {
-				log.Printf("Bootstrapping nodes were not added on attempt nº %v\nTrying again...\n", i)
-			} else {
-				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
-			}
-		} else {
-			break
+			if i >= 3 {
+				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")	
+			} 
+			log.Printf("Bootstrapping nodes were not added on attempt nº %v\nTrying again...\n", i)
 		}
+		break
 	}
-	log.Printf("Bootstrapping process finnished. \nYou're now connected to %v nodes", router.tree.getTotalPeers())
+	log.Printf("Bootstrapping process finished. \nYou're now connected to %v nodes", router.tree.getTotalPeers())
 	return nil
 }
 
@@ -46,7 +44,7 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 // is currently connected to and evaluates the `Peers` that were added 
 // on each iteration. 
 // If the closest peer to ours is the same during two iterations of the
-// `FIND_NODES` message, we finnish the process logging the ammout of peers
+// `FIND_NODES` message, we finish the process logging the ammout of peers
 // we are currently connected to.
 // Otherways, if the closest Peer on two consecutive iterations changes, we 
 // keep queriyng the `alpha` closest nodes with `FIND_NODES` messages.
@@ -60,7 +58,7 @@ func StartNetworkDiscovery(router *Router) {
 	for {
 		actualClosest = router.getXClosestPeersTo(1, router.MyPeerInfo)
 		if actualClosest[0] == previousClosest[0] {
-			log.Printf("Network Discovery process has finnished!.\nYou're now connected to %v", router.tree.getTotalPeers())
+			log.Printf("Network Discovery process has finished!.\nYou're now connected to %v", router.tree.getTotalPeers())
 			return
 		}
 		// We get the closest actual Peer.

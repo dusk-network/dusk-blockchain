@@ -29,15 +29,15 @@ func MakePeer(ip [4]byte, port uint16) Peer {
 
 // Deserializes a `Peer` structure as an array of bytes
 // that allows to send it through a wire.
-func (peer Peer) deserializePeer() []byte {
-	var serPeer []byte
+func (peer Peer) deserialize() []byte {
+	serPeer := make([]byte, 22)
 	// Add Peer IP.
-	serPeer = append(serPeer[:], peer.ip[:]...)
+	copy(serPeer[0:4], peer.ip[0:4])
 	// Serialize and add Peer port.
 	portByt := getBytesFromUint16(peer.port)
-	serPeer = append(serPeer[:], portByt[:]...)
+	copy(serPeer[4:6], portByt[0:2])
 	// Add Peer ID.
-	serPeer = append(serPeer[:], peer.id[:]...)
+	copy(serPeer[6:22], peer.id[0:16])
 	return serPeer
 }
 
@@ -68,10 +68,13 @@ func serializePeer(peerBytes []byte) Peer {
 func (peer Peer) computePeerNonce() uint32 {
 	var nonce uint32 = 0
 	var hash [32]byte
+	data := make([]byte, 18)
 	id := peer.id
 	for {
 		bytesUint := getBytesFromUint32(nonce)
-		hash = sha3.Sum256(append(id[:], bytesUint[:]...))
+		copy(data[0:16], id[0:16])
+		copy(data[16:18], bytesUint[0:2])
+		hash = sha3.Sum256(data)
 		if (hash[31] | hash[30] | hash[29]) == 0 {
 			return nonce
 		}
@@ -79,23 +82,8 @@ func (peer Peer) computePeerNonce() uint32 {
 	}
 }
 
-// Sets the Id sent as parameter as the Peer ID.
-func (peer *Peer) addIP(ip [4]byte) {
-	peer.ip = ip
-}
-
-// Sets the Id sent as parameter as the Peer ID.
-func (peer *Peer) addID(id [16]byte) {
-	peer.id = id
-}
-
-// Sets the port sent as parameter as the Peer port.
-func (peer *Peer) addPort(port uint16) {
-	peer.port = port
-}
-
 // Computes the XOR distance between two Peers.
-func (peer Peer) computePeerDistance(otherPeer Peer) uint16 {
+func (peer Peer) computeDistance(otherPeer Peer) uint16 {
 	return idXor(peer.id, otherPeer.id)
 }
 

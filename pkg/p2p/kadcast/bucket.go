@@ -1,12 +1,12 @@
 package kadcast
 
 // MAX_BUCKET_PEERS represents the maximum
-//number of peers that a `Bucket` can hold.
-const MAX_BUCKET_PEERS uint8 = 25
+//number of peers that a `bucket` can hold.
+var MAX_BUCKET_PEERS uint8 = 25
 
-// Bucket stores peer info of the peers that are at a certain
+// bucket stores peer info of the peers that are at a certain
 // distance range to the peer itself.
-type Bucket struct {
+type bucket struct {
 	idLength         uint8
 	peerCount        uint8
 	totalPeersPassed uint64
@@ -20,10 +20,10 @@ type Bucket struct {
 	lruPresent map[Peer]bool
 }
 
-// Allocates space for a `Bucket` and returns a instance
+// Allocates space for a `bucket` and returns a instance
 // of it with the specified `idLength`.
-func makeBucket(idlen uint8) Bucket {
-	return Bucket{
+func makeBucket(idlen uint8) bucket {
+	return bucket{
 		idLength:         idlen,
 		totalPeersPassed: 0,
 		peerCount:        0,
@@ -34,9 +34,9 @@ func makeBucket(idlen uint8) Bucket {
 }
 
 // Finds the Least Recently Used Peer on the entries set
-// of the `Bucket` and returns it's index on the entries
+// of the `bucket` and returns it's index on the entries
 // set and the `Peer` info that is hold on it.
-func (b Bucket) findLruPeerIndex() (int, uint64) {
+func (b bucket) findLRUPeerIndex() (int, uint64) {
 	var val = b.totalPeersPassed
 	i := 0
 	for index, p := range b.entries {
@@ -52,7 +52,7 @@ func (b Bucket) findLruPeerIndex() (int, uint64) {
 // caring about the order.
 // It also maps the `Peer` to false on the LRU map.
 // The resulting slice of entries is then returned.
-func (b *Bucket) removePeerAtIndex(index int) []Peer {
+func (b *bucket) removePeerAtIndex(index int) []Peer {
 	// Remove peer from the lruPresent map.
 	b.lruPresent[b.entries[index]] = false
 
@@ -61,10 +61,10 @@ func (b *Bucket) removePeerAtIndex(index int) []Peer {
 	return b.entries[:len(b.entries)-1]
 }
 
-// Adds a `Peer` to the `Bucket` entries list.
+// Adds a `Peer` to the `bucket` entries list.
 // It also increments the peerCount all according
 // the LRU policy.
-func (b *Bucket) addPeerToBucket(peer Peer) {
+func (b *bucket) addPeer(peer Peer) {
 	// Check if the entries set can hold more peers.
 	if len(b.entries) < int(MAX_BUCKET_PEERS) {
 		// Insert it into the set if not present
@@ -77,23 +77,23 @@ func (b *Bucket) addPeerToBucket(peer Peer) {
 		// Store recently used peer.
 		b.lru[peer] = b.totalPeersPassed
 		b.totalPeersPassed++
-	} else {
-		// If the entries set is full, we perform
-		// LRU and remove a peer to include the new one.
-		//
-		// Check if peer is not already present into the
-		// entries set
-		if b.lruPresent[peer] == false {
-			// Search for the least recently used peer.
-			var index, _ = b.findLruPeerIndex()
-			// Remove it from the entries set and from
-			// the lruPresent map.
-			b.entries = b.removePeerAtIndex(index)
-			// Add the new peer to the entries set.
-			b.entries = append(b.entries, peer)
-			b.lruPresent[peer] = true
-			b.totalPeersPassed++
-		}
-		b.lru[peer] = b.totalPeersPassed
+		return
+	} 
+	// If the entries set is full, we perform
+	// LRU and remove a peer to include the new one.
+	//
+	// Check if peer is not already present into the
+	// entries set
+	if b.lruPresent[peer] == false {
+		// Search for the least recently used peer.
+		var index, _ = b.findLRUPeerIndex()
+		// Remove it from the entries set and from
+		// the lruPresent map.
+		b.entries = b.removePeerAtIndex(index)
+		// Add the new peer to the entries set.
+		b.entries = append(b.entries, peer)
+		b.lruPresent[peer] = true
+		b.totalPeersPassed++
 	}
+	b.lru[peer] = b.totalPeersPassed
 }

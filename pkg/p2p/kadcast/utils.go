@@ -3,7 +3,7 @@ package kadcast
 import (
 	"encoding/binary"
 	"errors"
-	"log"
+	"logrus"
 	"net"
 
 	"golang.org/x/crypto/sha3"
@@ -17,11 +17,9 @@ import (
 // Computes the XOR between two [16]byte arrays.
 func xor(a [16]byte, b [16]byte) [16]byte {
 	distance := [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	i := 0
 
-	for i < 16 {
+	for i := 0; i < 16; i++ {
 		distance[i] = a[i] ^ b[i]
-		i++
 	}
 	return distance
 }
@@ -80,7 +78,10 @@ func computePeerID(externIP [4]byte) [16]byte {
 // This function is a middleware that allows the peer to verify
 // other Peers nonce's and validate them if they are correct.
 func verifyIDNonce(id [16]byte, nonce [4]byte) error {
-	hash := sha3.Sum256(append(id[:], nonce[:]...))
+	idPlusNonce := make([]byte, 20)
+	copy(idPlusNonce[0:16], id[0:16])
+	copy(idPlusNonce[16:20], nonce[0:4])
+	hash := sha3.Sum256(idPlusNonce)
 	if (hash[31] | hash[30] | hash[29]) == 0 {
 		return nil
 	}
@@ -96,7 +97,7 @@ func verifyIDNonce(id [16]byte, nonce [4]byte) error {
 func getLocalUDPAddress() net.UDPAddr {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		log.Fatal(err)
+		logrus.WithError(err).Warn("Network Unreachable.")
 	}
 	defer conn.Close()
 
@@ -111,7 +112,7 @@ func getLocalUDPAddress() net.UDPAddr {
 func getLocalTCPAddress() net.TCPAddr {
 	conn, err := net.Dial("tcp", "8.8.8.8:80")
 	if err != nil {
-		log.Fatal(err)
+		logrus.WithError(err).Warn("Network Unreachable.")
 	}
 	defer conn.Close()
 
@@ -136,7 +137,9 @@ func getBytesFromUint32(num uint32) [4]byte {
 func getBytesFromUint16(num uint16) [2]byte {
 	res := [2]byte{0, 0}
 	for i := 0; num > 0; i++ {
+		// Cut the input to byte rabge.
 		res[i] = byte(num & 255)
+		// Shift it to subtract a byte from the number.
 		num = num >> 8
 	}
 	return res
@@ -145,18 +148,19 @@ func getBytesFromUint16(num uint16) [2]byte {
 // Encode a received packet to send it through the
 // Ring to the packetProcess rutine.
 func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
-	var enc []byte
+	encodedLen := len(payload) + 8
+	enc := make([]byte, encodedLen)
 	// Get numBytes as slice of bytes.
-	bytenum := getBytesFromUint16(byteNum)
+	numBytes := getBytesFromUint16(byteNum)
 	// Append it to the resulting slice.
-	enc = append(enc[:], bytenum[:]...)
+	copy(enc[0:2], numBytes[0:2])
 	// Append Peer IP.
-	enc = append(enc[:], peerAddr.IP[:]...)
+	copy(enc[2:6], peerAddr.IP[0:4])
 	// Append Port
 	port := getBytesFromUint16(uint16(peerAddr.Port))
-	enc = append(enc[:], port[:]...)
+	copy(enc[6:8], port[0:2])
 	// Append Payload
-	enc = append(enc[:], payload[:]...)
+	copy(enc[8:encodedLen], payload[0:len(payload)])
 	return enc
 }
 
@@ -166,16 +170,16 @@ func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)
 	byteNum := int(binary.LittleEndian.Uint16(packet[0:2]))
 	if (redPackLen) != (byteNum + 8) {
-					return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
+		return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
 	}
 	ip := packet[2:6]
 	port := int(binary.LittleEndian.Uint16(packet[6:8]))
 	payload := packet[8:]
 	
 	peerAddr := net.UDPAddr {
-			IP: ip,
-			Port: port,
-			Zone: "N/A",
+		IP: ip,
+		Port: port,
+		Zone: "N/A",
 	}
 	return byteNum, &peerAddr, payload, nil
 }

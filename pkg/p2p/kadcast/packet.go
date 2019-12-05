@@ -2,7 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
-	"log"
+	"logrus"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -38,7 +38,12 @@ func getPacketFromStream(stream []byte) Packet {
 
 // Deserializes the packet into an slice of bytes.
 func (pac Packet) asBytes() []byte {
-	return append(pac.headers[:], pac.payload[:]...)
+	hl := len(pac.headers)
+    l := hl + len(pac.payload)
+    byteRepr := make([]byte, l)
+    copy(byteRepr, pac.headers[:])
+	copy(byteRepr[hl:], pac.payload[:])
+	return byteRepr
 }
 
 // Returns the headers info sliced into three pieces:
@@ -86,14 +91,14 @@ func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 	// Get `K` closest peers to `targetPeer`.
 	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
-	// Compute the ammount of Peers that will be sent and add it
+	// Compute the amount of Peers that will be sent and add it
 	// as a two-byte array.
 	count := getBytesFromUint16(uint16(len(kClosestPeers)))
 	pac.payload = append(pac.payload[:], count[:]...)
 	// Serialize the Peers to get them in `wire-format`,
 	// basically, represented as bytes.
 	for _, peer := range kClosestPeers {
-		pac.payload = append(pac.payload[:], peer.deserializePeer()...)
+		pac.payload = append(pac.payload[:], peer.deserialize()...)
 	}
 	return len(kClosestPeers)
 }
@@ -105,12 +110,9 @@ func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 	// Get number of Peers announced.
 	peerNum := binary.BigEndian.Uint16(pac.payload[0:2])
 	// Get peerSlice length subtracting headers and count.
-	peerSliceLen := byteNum - 26
+	peerSliceLen := byteNum - (len(pac.headers) + 2)
 
-	if int(peerNum)*PeerBytesSize != peerSliceLen {
-		return false
-	}
-	return true
+	return int(peerNum)*PeerBytesSize == peerSliceLen
 }
 
 // Gets a `NODES` message and returns a slice of the
@@ -138,7 +140,7 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 // it's type. It gets the packets from the circularqueue that 
 // connects the listeners with the packet processor.
 func ProcessPacket(queue *ring.Buffer, router *Router) {
-	// Instanciate now the variables to not pollute
+	// Instantiate now the variables to not pollute
 	// the stack.
 	var err error
 	var byteNum int
@@ -152,7 +154,7 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			// Get items from the queue packet taken.
 			byteNum, senderAddr, udpPayload, err = decodeRedPacket(item)
 			if err != nil {
-				log.Println(err)
+				logrus.WithError(err).Warn("Error decoding the packet taken from the ring.")
 				break NextItem
 			}
 			// Build packet struct
@@ -164,10 +166,10 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			err = verifyIDNonce(senderID, nonce)
 			// If we get an error, we just skip the whole process since the
 			// Peer was not validated.
-			if err != nil {
-				log.Println(err)
+			if err := verifyIDNonce(senderID, nonce); err != nil {
+				logrus.WithError(err).Warn("Incorrect packet sender ID. Skipping its processing.")
 				break NextItem
-			}
+			} 
 
 			// Build Peer info and put the right port on it subsituting the one
 			// used to send the message by the one where the peer wants to receive
@@ -179,18 +181,18 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			// Check packet type and process it.
 			switch tipus {
 			case 0:
-				log.Printf("Recieved PING message from %v", peerInf.ip[:])
-				treatPing(peerInf, router)
+				logrus.Info("Recieved PING message from %v", peerInf.ip[:])
+				handlePing(peerInf, router)
 			case 1:
-				log.Printf("Recieved PONG message from %v", peerInf.ip[:])
-				treatPong(peerInf, router)
+				logrus.Info("Recieved PONG message from %v", peerInf.ip[:])
+				handlePong(peerInf, router)
 
 			case 2:
-				log.Printf("Recieved FIND_NODES message from %v", peerInf.ip[:])
-				treatFindNodes(peerInf, router)
+				logrus.Info("Recieved FIND_NODES message from %v", peerInf.ip[:])
+				handleFindNodes(peerInf, router)
 			case 3:
-				log.Printf("Recieved NODES message from %v", peerInf.ip[:])
-				treatNodes(peerInf, packet, router, byteNum)
+				logrus.Info("Recieved NODES message from %v", peerInf.ip[:])
+				handleNodes(peerInf, packet, router, byteNum)
 			}
 		}
 	}
@@ -198,42 +200,39 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 
 // Processes the `PING` packet info sending back a 
 // `PONG` message and adding the sender to the buckets.
-func treatPing(peerInf Peer, router *Router) {
+func handlePing(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 	// Send back a `PONG` message.
 	router.sendPong(peerInf)
-	return
 }
 
 // Processes the `PONG` packet info and
 // adds the sender to the buckets.
-func treatPong(peerInf Peer, router *Router) {
+func handlePong(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
-	return
 }
 
 // Processes the `FIND_NODES` packet info sending back a 
 // `NODES` message and adding the sender to the buckets.
-func treatFindNodes(peerInf Peer, router *Router) {
+func handleFindNodes(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 	// Send back a `NODES` message to the peer that
 	// send the `FIND_NODES` message.
 	router.sendNodes(peerInf)
-	return
 }
 
 // Processes the `NODES` packet info sending back a 
 // `PING` message to all of the Peers announced on the packet
 // and adding the sender to the buckets.
-func treatNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
+func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// See if the packet info is consistent:
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
-		log.Println("NODES message recieved with corrupted payload. PeerNum mismatch!\nIgnoring the packet.")
+		logrus.Info("NODES message recieved with corrupted payload. PeerNum mismatch!\nIgnoring the packet.")
 		return
 	}
 
