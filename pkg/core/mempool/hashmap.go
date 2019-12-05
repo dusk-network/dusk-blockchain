@@ -25,7 +25,9 @@ type (
 		// transactions pool
 		data map[txHash]TxDesc
 
-		// data keys sorted by Fee in a descending order
+		// sorted is data keys sorted by Fee in a descending order
+		// sorting happens at point of accepting new entry in order to allow
+		// Block Generator to fetch highest-fee txs without delays in sorting
 		sorted []keyFee
 
 		// spent key images from the transactions in the pool
@@ -41,10 +43,10 @@ func (m *HashMap) Put(t TxDesc) error {
 
 	if m.data == nil {
 		m.data = make(map[txHash]TxDesc, m.Capacity)
+		m.sorted = make([]keyFee, 0, m.Capacity)
 	}
 
 	if m.spentkeyImages == nil {
-		// TODO: consider capacity value here
 		m.spentkeyImages = make(map[keyImage]bool)
 	}
 
@@ -61,12 +63,17 @@ func (m *HashMap) Put(t TxDesc) error {
 	m.txsSize += uint64(t.size)
 
 	// sort keys by Fee
+	// Bulk sort like (sort.Slice) performs a few times slower than
+	// a simple binarysearch&shift algorithm.
 	fee := t.tx.StandardTx().Fee.BigInt().Uint64()
-	m.sorted = append(m.sorted, keyFee{k: k, f: fee})
 
-	sort.SliceStable(m.sorted, func(i, j int) bool {
-		return m.sorted[i].f > m.sorted[j].f
+	index := sort.Search(len(m.sorted), func(i int) bool {
+		return m.sorted[i].f < fee
 	})
+
+	m.sorted = append(m.sorted, keyFee{})
+	copy(m.sorted[index+1:], m.sorted[index:])
+	m.sorted[index] = keyFee{k: k, f: fee}
 
 	// store all tx key images, if provided
 	for i, input := range t.tx.StandardTx().Inputs {

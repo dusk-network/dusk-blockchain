@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 func TestSortedKeys(t *testing.T) {
@@ -52,7 +54,7 @@ func TestSortedKeys(t *testing.T) {
 
 func TestStableSortedKeys(t *testing.T) {
 
-	pool := &HashMap{Capacity: 100}
+	pool := HashMap{Capacity: 100}
 
 	// Generate 100 random txs
 	for i := 0; i < 100; i++ {
@@ -85,4 +87,100 @@ func TestStableSortedKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
+}
+
+func BenchmarkPut(b *testing.B) {
+
+	txs := dummyTransactionsSet(50000)
+	b.ResetTimer()
+
+	// Put all transactions
+	for tN := 0; tN < b.N; tN++ {
+		pool := HashMap{Capacity: uint32(len(txs))}
+		for i := 0; i < len(txs); i++ {
+
+			td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
+			if err := pool.Put(td); err != nil {
+				b.Fatalf(err.Error())
+			}
+		}
+
+		b.Logf("Pool number of txs: %d", pool.Len())
+	}
+}
+
+func BenchmarkContains(b *testing.B) {
+
+	txs := dummyTransactionsSet(50000)
+
+	// Put all transactions
+	pool := HashMap{Capacity: uint32(len(txs))}
+	for i := 0; i < len(txs); i++ {
+
+		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
+		if err := pool.Put(td); err != nil {
+			b.Fatalf(err.Error())
+		}
+	}
+
+	b.ResetTimer()
+
+	for tN := 0; tN < b.N; tN++ {
+		for i := 0; i < len(txs); i++ {
+			if !pool.Contains(txs[i].TxID) {
+				b.Fatal("missing tx")
+			}
+		}
+	}
+
+	b.Logf("Pool number of txs: %d", pool.Len())
+}
+
+func BenchmarkRangeSort(b *testing.B) {
+
+	txs := dummyTransactionsSet(10000)
+
+	// Put all transactions
+	pool := HashMap{Capacity: uint32(len(txs))}
+	for i := 0; i < len(txs); i++ {
+
+		td := TxDesc{tx: txs[i], received: time.Now(), size: uint(i)}
+		if err := pool.Put(td); err != nil {
+			b.Fatalf(err.Error())
+		}
+	}
+
+	b.ResetTimer()
+
+	for tN := 0; tN < b.N; tN++ {
+		err := pool.RangeSort(func(k txHash, t TxDesc) error {
+			return nil
+		})
+
+		if err != nil {
+			b.Fatalf(err.Error())
+		}
+	}
+
+	b.Logf("Pool number of txs: %d", pool.Len())
+}
+
+func dummyTransactionsSet(size int) []*transactions.Standard {
+
+	txs := make([]*transactions.Standard, size)
+	// Generate N random tx
+	dummyTx, _ := transactions.NewStandard(0, 2, 0)
+	for i := 0; i < len(txs); i++ {
+
+		// change fee to enable sorting
+		randFee := big.NewInt(0).SetUint64(uint64(rand.Intn(1000000)))
+		dummyTx.Fee.SetBigInt(randFee)
+
+		clone := *dummyTx
+		clone.TxID, _ = crypto.RandEntropy(32)
+
+		txs[i] = &clone
+	}
+
+	return txs
 }
