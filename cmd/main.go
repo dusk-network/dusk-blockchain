@@ -8,10 +8,12 @@ import (
 )
 
 func main() {
+	log.Infoln("Starting Kadcast Node!")
 	// Our node info.
 	var port uint16 = 25519
 	ip := [4]byte{62, 57, 180, 247}
 	router := kadcast.MakeRouter(ip, port)
+	log.Infoln("Router was created Successfully.")
 
 	// Create buffer.
 	queue := ring.NewBuffer(500)
@@ -32,7 +34,7 @@ func main() {
 	// Start Bootstrapping process.
 	err := kadcast.InitBootstrap(&router, bootstrapNodes)
 	if err != nil {
-		log.Info("Error during the Bootstrap Process. Job terminated.")
+		log.Panic("Error during the Bootstrap Process. Job terminated.")
 	}
 
 	// Once the bootstrap succeeded, start the network discovery.
