@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -19,6 +18,8 @@ type (
 		lock     sync.RWMutex
 		messages map[string]*candidateMsg
 
+		// Needed for publishing GetCandidate messages and receiving
+		// Candidate messages in return.
 		broker eventbus.Broker
 	}
 
@@ -134,11 +135,6 @@ func (c *candidateStore) Clear(round uint64) int {
 }
 
 func decodeCandidateMessage(b bytes.Buffer) (*candidateMsg, error) {
-	hdr := header.Header{}
-	if err := header.Unmarshal(&b, &hdr); err != nil {
-		return nil, err
-	}
-
 	blk := block.NewBlock()
 	if err := marshalling.UnmarshalBlock(&b, blk); err != nil {
 		return nil, err
@@ -150,4 +146,12 @@ func decodeCandidateMessage(b bytes.Buffer) (*candidateMsg, error) {
 	}
 
 	return &candidateMsg{blk, cert}, nil
+}
+
+func encodeCandidateMessage(b *bytes.Buffer, cm *candidateMsg) error {
+	if err := marshalling.MarshalBlock(b, cm.blk); err != nil {
+		return err
+	}
+
+	return marshalling.MarshalCertificate(b, cm.cert)
 }

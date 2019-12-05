@@ -575,7 +575,11 @@ func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 
 func (c *Chain) provideCandidate(r rpcbus.Request) {
 	cm, err := c.candidateStore.fetchCandidateMessage(r.Params.Bytes())
+	if err != nil {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+	}
+
 	buf := new(bytes.Buffer)
-	// TODO: serialize
+	err = encodeCandidateMessage(buf, cm)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
