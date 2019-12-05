@@ -17,7 +17,7 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 	// Get PeerList ordered by distance so we can compare it
 	// after the `PONG` arrivals.
 	initPeerNum := router.tree.getTotalPeers()
-	for i := 0; i < 3; i++ {
+	for i := 0; i <= 3; i++ {
 		// Send `PING` to the bootstrap nodes.
 		for _, peer := range bootNodes {
 			router.sendPing(peer)
@@ -28,14 +28,19 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 		// we consider that the bootstrapping succeeded.
 		actualPeers := router.tree.getTotalPeers()
 		if actualPeers <= initPeerNum {
-			if i >= 3 {
+			if i == 3 {
 				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")	
 			} 
-			log.Warning("Bootstrapping nodes were not added on attempt nº %v\nTrying again...\n", i)
+			log.WithFields(log.Fields{
+				"Tries": i,
+			}).Warn("Bootstrapping nodes were not added.\nTrying again..")
+		} else {
+			break
 		}
-		break
 	}
-	log.Info("Bootstrapping process finished. \nYou're now connected to %v nodes", router.tree.getTotalPeers())
+	log.WithFields(log.Fields{
+		"connected_nodes": router.tree.getTotalPeers(),
+	}).Info("Bootstrapping process finished")
 	return nil
 }
 
