@@ -248,7 +248,9 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		return err
 	}
 
-	c.stopConsensus()
+	if !c.stopped {
+		c.stopConsensus()
+	}
 	c.onNewRound(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
