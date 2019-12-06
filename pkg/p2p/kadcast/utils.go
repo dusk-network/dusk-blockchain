@@ -71,7 +71,7 @@ func xorIsBigger(a [16]byte, b [16]byte) bool {
 func computePeerID(externIP [4]byte) [16]byte {
 	var halfLenID [16]byte
 	doubleLenID := sha3.Sum256(externIP[:])
-	copy(halfLenID[:], doubleLenID[0:15])
+	copy(halfLenID[:], doubleLenID[0:16])
 	return halfLenID
 }
 
