@@ -74,7 +74,7 @@ func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBat
 		txBatchCount:  txBatchCount,
 	}
 	hlp.createResultChans()
-	go hlp.ProvideTransactions(t)
+	hlp.ProvideTransactions(t)
 	return hlp
 }
 
@@ -122,24 +122,26 @@ func (h *Helper) ProvideTransactions(t *testing.T) {
 	reqChan := make(chan rpcbus.Request, 1)
 	h.RBus.Register(rpcbus.GetMempoolTxs, reqChan)
 
-	r := <-reqChan
-	txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
+	go func(reqChan chan rpcbus.Request) {
+		r := <-reqChan
+		txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
 
-	// Cut off the coinbase
-	txs = txs[1:]
-	// Encode and send
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteVarInt(buf, uint64(len(txs))); err != nil {
-		panic(err)
-	}
-
-	for _, tx := range txs {
-		if err := marshalling.MarshalTx(buf, tx); err != nil {
+		// Cut off the coinbase
+		txs = txs[1:]
+		// Encode and send
+		buf := new(bytes.Buffer)
+		if err := encoding.WriteVarInt(buf, uint64(len(txs))); err != nil {
 			panic(err)
 		}
-	}
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+		for _, tx := range txs {
+			if err := marshalling.MarshalTx(buf, tx); err != nil {
+				panic(err)
+			}
+		}
+
+		r.RespChan <- rpcbus.Response{*buf, nil}
+	}(reqChan)
 }
 
 func randomScoreEvent() score.Event {
