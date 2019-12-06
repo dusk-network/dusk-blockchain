@@ -20,11 +20,12 @@ type messageRouter struct {
 	dupeMap   *dupemap.DupeMap
 
 	// 1-to-1 components
-	blockHashBroker *responding.BlockHashBroker
-	dataRequestor   *responding.DataRequestor
-	dataBroker      *responding.DataBroker
-	synchronizer    *chainsync.ChainSynchronizer
-	ponger          processing.Ponger
+	blockHashBroker   *responding.BlockHashBroker
+	dataRequestor     *responding.DataRequestor
+	dataBroker        *responding.DataBroker
+	roundResultBroker *responding.RoundResultBroker
+	synchronizer      *chainsync.ChainSynchronizer
+	ponger            processing.Ponger
 
 	peerInfo string
 }
@@ -44,7 +45,8 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 		topics.Candidate,
 		topics.Score,
 		topics.Reduction,
-		topics.Agreement:
+		topics.Agreement,
+		topics.RoundResults:
 		return true
 	}
 
