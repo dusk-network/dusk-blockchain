@@ -68,12 +68,12 @@ func serializePeer(peerBytes []byte) Peer {
 func (peer Peer) computePeerNonce() uint32 {
 	var nonce uint32 = 0
 	var hash [32]byte
-	data := make([]byte, 18)
+	data := make([]byte, 20)
 	id := peer.id
 	for {
 		bytesUint := getBytesFromUint32(nonce)
 		copy(data[0:16], id[0:16])
-		copy(data[16:18], bytesUint[0:2])
+		copy(data[16:20], bytesUint[0:4])
 		hash = sha3.Sum256(data)
 		if (hash[31]) == 0 {
 			return nonce
