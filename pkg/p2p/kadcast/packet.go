@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
+	"sync"
 	log "github.com/sirupsen/logrus"
 	"net"
 
@@ -139,7 +140,7 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 // ProcessPacket recieves a Packet and processes it according to
 // it's type. It gets the packets from the circularqueue that 
 // connects the listeners with the packet processor.
-func ProcessPacket(queue *ring.Buffer, router *Router) {
+func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
 	// Instantiate now the variables to not pollute
 	// the stack.
 	var err error
@@ -183,6 +184,11 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			case 0:
 				log.Info("Recieved PING message from %v", peerInf.ip[:])
 				handlePing(peerInf, router)
+				// For NetwDisc we track the `PING` also since this is what
+				// introduces new `Peers` in the Buckets.
+				if isBootstrapping || isDiscoveringNetwork {
+					wg.Done()
+				}
 			case 1:
 				log.Info("Recieved PONG message from %v", peerInf.ip[:])
 				handlePong(peerInf, router)
@@ -190,6 +196,7 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			case 2:
 				log.Info("Recieved FIND_NODES message from %v", peerInf.ip[:])
 				handleFindNodes(peerInf, router)
+
 			case 3:
 				log.Info("Recieved NODES message from %v", peerInf.ip[:])
 				handleNodes(peerInf, packet, router, byteNum)

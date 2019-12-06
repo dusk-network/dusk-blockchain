@@ -2,17 +2,22 @@ package kadcast
 
 import (
 	"errors"
+	"sync"
+
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
-// InitBootstrap inits the Bootstrapping process by sending 
+var isBootstrapping = false
+var isDiscoveringNetwork = false
+
+// InitBootstrap inits the Bootstrapping process by sending
 // a `PING` message to every bootstrapping node repeatedly.
 // If it tried 3 or more times and no new `Peers` were added,
-// it panics. 
-// Otherways, it returns `nil` and logs the Number of peers 
+// it panics.
+// Otherways, it returns `nil` and logs the Number of peers
 // the node is connected to at the end of the process.
-func InitBootstrap(router *Router, bootNodes []Peer) error {
+func InitBootstrap(router *Router, bootNodes []Peer, wg *sync.WaitGroup) error {
+	isBootstrapping = true
 	log.Info("Bootstrapping process started.")
 	// Get PeerList ordered by distance so we can compare it
 	// after the `PONG` arrivals.
@@ -23,18 +28,22 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 			router.sendPing(peer)
 		}
 		// Wait for `PONG` responses.
-		time.Sleep(time.Second * 5)
+		// With one of them we have enough.
+		wg.Add(1)
+		wg.Wait()
 		// If new peers were added (the bootstrap nodes)
 		// we consider that the bootstrapping succeeded.
 		actualPeers := router.tree.getTotalPeers()
 		if actualPeers <= initPeerNum {
 			if i == 3 {
-				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")	
-			} 
+				isBootstrapping = false
+				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
+			}
 			log.WithFields(log.Fields{
 				"Tries": i,
 			}).Warn("Bootstrapping nodes were not added.\nTrying again..")
 		} else {
+			isBootstrapping = false
 			break
 		}
 	}
@@ -46,24 +55,27 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 
 // StartNetworkDiscovery triggers the network discovery process.
 // The node basically sends `FIND_NODES` messages to the nodes it
-// is currently connected to and evaluates the `Peers` that were added 
-// on each iteration. 
+// is currently connected to and evaluates the `Peers` that were added
+// on each iteration.
 // If the closest peer to ours is the same during two iterations of the
 // `FIND_NODES` message, we finish the process logging the ammout of peers
 // we are currently connected to.
-// Otherways, if the closest Peer on two consecutive iterations changes, we 
+// Otherways, if the closest Peer on two consecutive iterations changes, we
 // keep queriyng the `alpha` closest nodes with `FIND_NODES` messages.
-func StartNetworkDiscovery(router *Router) {
+func StartNetworkDiscovery(router *Router, wg *sync.WaitGroup) {
+	isDiscoveringNetwork = true
 	var actualClosest []Peer
 	previousClosest := router.getXClosestPeersTo(1, router.MyPeerInfo)
 	// Ask for nodes to `alpha` closest nodes to my peer.
 	router.sendFindNodes()
 	// Wait until response arrives and we query the nodes.
-	time.Sleep(time.Second * 5)
+	wg.Add(1)
+	wg.Wait()
 	for {
 		actualClosest = router.getXClosestPeersTo(1, router.MyPeerInfo)
 		if actualClosest[0] == previousClosest[0] {
 			log.Info("Network Discovery process has finished!.\nYou're now connected to %v", router.tree.getTotalPeers())
+			isDiscoveringNetwork = false
 			return
 		}
 		// We get the closest actual Peer.
@@ -71,6 +83,7 @@ func StartNetworkDiscovery(router *Router) {
 		// Send `FIND_NODES` again.
 		router.sendFindNodes()
 		// Wait until response arrives and we query the nodes.
-		time.Sleep(time.Second * 15)
+		wg.Add(1)
+		wg.Wait()
 	}
 }
