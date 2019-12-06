@@ -40,7 +40,7 @@ func InitBootstrap(router *Router, bootNodes []Peer, wg *sync.WaitGroup) error {
 				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
 			}
 			log.WithFields(log.Fields{
-				"Tries": i,
+				"Retries": i,
 			}).Warn("Bootstrapping nodes were not added.\nTrying again..")
 		} else {
 			isBootstrapping = false
