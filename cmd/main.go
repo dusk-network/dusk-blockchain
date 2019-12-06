@@ -2,6 +2,7 @@ package main
 
 import (
 	log "github.com/sirupsen/logrus"
+	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/kadcast"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -17,9 +18,11 @@ func main() {
 
 	// Create buffer.
 	queue := ring.NewBuffer(500)
+	// Create waitGroup
+	var wg sync.WaitGroup
 
 	// Launch PacketProcessor rutine.
-	go kadcast.ProcessPacket(queue, &router)
+	go kadcast.ProcessPacket(queue, &router, &wg)
 
 	// Launch a listener for our node.
 	go kadcast.StartUDPListener("udp", queue, router.MyPeerInfo)
@@ -32,13 +35,13 @@ func main() {
 	bootstrapNodes = append(bootstrapNodes[:], boot1)
 
 	// Start Bootstrapping process.
-	err := kadcast.InitBootstrap(&router, bootstrapNodes)
+	err := kadcast.InitBootstrap(&router, bootstrapNodes, &wg)
 	if err != nil {
 		log.Panic("Error during the Bootstrap Process. Job terminated.")
 	}
 
 	// Once the bootstrap succeeded, start the network discovery.
-	kadcast.StartNetworkDiscovery(&router)
+	kadcast.StartNetworkDiscovery(&router, &wg)
 
 	select {}
 }
