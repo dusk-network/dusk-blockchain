@@ -116,7 +116,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	// Create candidate message
-	certBuf, err := bg.rpcBus.Call(rpcbus.GetLastCertificate, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5)
+	certBuf, err := bg.rpcBus.Call(rpcbus.GetLastCertificate, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second)
 	if err != nil {
 		return err
 	}
