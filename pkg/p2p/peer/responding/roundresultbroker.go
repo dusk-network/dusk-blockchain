@@ -9,11 +9,11 @@ import (
 )
 
 type RoundResultBroker struct {
-	rpcBus       rpcbus.RPCBus
+	rpcBus       *rpcbus.RPCBus
 	responseChan chan<- *bytes.Buffer
 }
 
-func NewRoundResultBroker(rpcBus rpcbus.RPCBus, responseChan chan<- *bytes.Buffer) *RoundResultBroker {
+func NewRoundResultBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer) *RoundResultBroker {
 	return &RoundResultBroker{rpcBus, responseChan}
 }
 
