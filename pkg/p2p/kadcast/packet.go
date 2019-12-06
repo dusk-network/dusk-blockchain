@@ -64,21 +64,21 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 // Gets the Packet headers parts and puts them into the
 // header attribute of the Packet.
 func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
-	var headers []byte
+	headers := make([]byte, 24)
 	// Add `Packet` type.
-	headers = append(headers[:], tipus)
+	headers = append(headers[0:1], tipus)
 	// Add MyPeer ID
-	headers = append(headers[:], router.MyPeerInfo.id[:]...)
+	copy(headers[1:17], router.MyPeerInfo.id[0:16])
 	// Attach IdNonce
 	idNonce := getBytesFromUint32(router.myPeerNonce)
-	headers = append(headers[:], idNonce[:]...)
+	copy(headers[17:21], idNonce[0:4])
 	// Attach Port
 	port := getBytesFromUint16(destPeer.port)
-	headers = append(headers[:], port[:]...)
+	copy(headers[21:23], port[0:2])
 
 	// Build headers array from the slice.
 	var headersArr [24]byte
-	copy(headersArr[:], headers[0:24])
+	copy(headersArr[:], headers[0:23])
 
 	pac.headers = headersArr
 }
