@@ -75,6 +75,8 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		// Just here to avoid the error message, as pong is unroutable but
 		// otherwise carries no relevant information beyond the receiving
 		// of this message
+	case topics.GetRoundResults:
+		err = m.roundResultBroker.ProvideRoundResult(b)
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {
