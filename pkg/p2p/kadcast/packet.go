@@ -182,7 +182,9 @@ func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
 			// Check packet type and process it.
 			switch tipus {
 			case 0:
-				log.Info("Recieved PING message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved PING message")
 				handlePing(peerInf, router)
 				// For NetwDisc we track the `PING` also since this is what
 				// introduces new `Peers` in the Buckets.
@@ -190,15 +192,21 @@ func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
 					wg.Done()
 				}
 			case 1:
-				log.Info("Recieved PONG message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved PONG message")
 				handlePong(peerInf, router)
 
 			case 2:
-				log.Info("Recieved FIND_NODES message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved FIND_NODES message")
 				handleFindNodes(peerInf, router)
 
 			case 3:
-				log.Info("Recieved NODES message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved NODES message")
 				handleNodes(peerInf, packet, router, byteNum)
 			}
 		}
@@ -239,7 +247,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
-		log.Info("NODES message recieved with corrupted payload. PeerNum mismatch!\nIgnoring the packet.")
+		log.Info("NODES message recieved with corrupted payload. Packet ignored.")
 		return
 	}
 

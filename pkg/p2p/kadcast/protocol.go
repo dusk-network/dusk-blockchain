@@ -74,7 +74,9 @@ func StartNetworkDiscovery(router *Router, wg *sync.WaitGroup) {
 	for {
 		actualClosest = router.getXClosestPeersTo(1, router.MyPeerInfo)
 		if actualClosest[0] == previousClosest[0] {
-			log.Info("Network Discovery process has finished!.\nYou're now connected to %v", router.tree.getTotalPeers())
+			log.WithField(
+				"connected_peers", router.tree.getTotalPeers(),
+			).Info("Network Discovery process has finished!")
 			isDiscoveringNetwork = false
 			return
 		}
