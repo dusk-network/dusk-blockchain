@@ -134,12 +134,16 @@ func (m *HashMap) Range(fn func(k txHash, t TxDesc) error) error {
 
 // RangeSort iterates through all tx entries sorted by Fee
 // in a descending order
-func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) error) error {
+func (m *HashMap) RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error {
 
 	for _, value := range m.sorted {
-		err := fn(value.k, m.data[value.k])
+		done, err := fn(value.k, m.data[value.k])
 		if err != nil {
 			return err
+		}
+
+		if done {
+			return nil
 		}
 	}
 	return nil

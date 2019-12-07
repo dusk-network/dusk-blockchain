@@ -45,5 +45,5 @@ type Pool interface {
 
 	// RangeSort iterates through all tx entries sorted by Fee
 	// in a descending order
-	RangeSort(fn func(k txHash, t TxDesc) error) error
+	RangeSort(fn func(k txHash, t TxDesc) (bool, error)) error
 }

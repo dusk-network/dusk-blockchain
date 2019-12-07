@@ -36,15 +36,15 @@ func TestSortedKeys(t *testing.T) {
 	var prevVal uint64
 	prevVal = math.MaxUint64
 
-	err := pool.RangeSort(func(k txHash, t TxDesc) error {
+	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 
 		val := t.tx.StandardTx().Fee.BigInt().Uint64()
 		if prevVal < val {
-			return errors.New("keys not in a descending order")
+			return false, errors.New("keys not in a descending order")
 		}
 
 		prevVal = val
-		return nil
+		return false, nil
 	})
 
 	if err != nil {
@@ -73,15 +73,15 @@ func TestStableSortedKeys(t *testing.T) {
 	// Iterate through all tx expecting order of receiving is kept when
 	// tx has same fee
 	var prevReceived time.Time
-	err := pool.RangeSort(func(k txHash, t TxDesc) error {
+	err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 
 		val := t.received
 		if prevReceived.After(val) {
-			return errors.New("order of receiving should be kept")
+			return false, errors.New("order of receiving should be kept")
 		}
 
 		prevReceived = val
-		return nil
+		return false, nil
 	})
 
 	if err != nil {
@@ -153,8 +153,8 @@ func BenchmarkRangeSort(b *testing.B) {
 	b.ResetTimer()
 
 	for tN := 0; tN < b.N; tN++ {
-		err := pool.RangeSort(func(k txHash, t TxDesc) error {
-			return nil
+		err := pool.RangeSort(func(k txHash, t TxDesc) (bool, error) {
+			return false, nil
 		})
 
 		if err != nil {

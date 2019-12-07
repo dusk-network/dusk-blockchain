@@ -44,8 +44,9 @@ var (
 // Mempool is a storage for the chain transactions that are valid according to the
 // current chain state and can be included in the next block.
 type Mempool struct {
-	getMempoolTxsChan <-chan rpcbus.Request
-	sendTxChan        <-chan rpcbus.Request
+	getMempoolTxsChan       <-chan rpcbus.Request
+	getMempoolTxsBySizeChan <-chan rpcbus.Request
+	sendTxChan              <-chan rpcbus.Request
 
 	// transactions emitted by RPC and Peer subsystems
 	// pending to be verified before adding them to verified pool
@@ -95,6 +96,11 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 		log.Errorf("rpcbus.GetMempoolTxs err=%v", err)
 	}
 
+	getMempoolTxsBySizeChan := make(chan rpcbus.Request, 1)
+	if err := rpcBus.Register(rpcbus.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
+		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
+	}
+
 	sendTxChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(rpcbus.SendMempoolTx, sendTxChan); err != nil {
 		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
@@ -103,12 +109,13 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	m := &Mempool{
-		eventBus:             eventBus,
-		latestBlockTimestamp: math.MinInt32,
-		quitChan:             make(chan struct{}),
-		acceptedBlockChan:    acceptedBlockChan,
-		getMempoolTxsChan:    getMempoolTxsChan,
-		sendTxChan:           sendTxChan,
+		eventBus:                eventBus,
+		latestBlockTimestamp:    math.MinInt32,
+		quitChan:                make(chan struct{}),
+		acceptedBlockChan:       acceptedBlockChan,
+		getMempoolTxsChan:       getMempoolTxsChan,
+		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
+		sendTxChan:              sendTxChan,
 	}
 
 	if verifyTx != nil {
@@ -136,10 +143,13 @@ func (m *Mempool) Run() {
 	go func() {
 		for {
 			select {
+			//rpcbus methods
 			case r := <-m.sendTxChan:
 				handleRequest(r, m.onSendMempoolTx, "SendTx")
 			case r := <-m.getMempoolTxsChan:
 				handleRequest(r, m.onGetMempoolTxs, "GetMempoolTxs")
+			case r := <-m.getMempoolTxsBySizeChan:
+				handleRequest(r, m.onGetMempoolTxsBySize, "GetMempoolTxsBySize")
 			// Mempool input channels
 			case b := <-m.acceptedBlockChan:
 				m.onAcceptedBlock(b)
@@ -348,7 +358,6 @@ func (m *Mempool) Collect(message bytes.Buffer) error {
 // onGetMempoolTxs retrieves current state of the mempool of the verified but
 // still unaccepted txs.
 // Called by P2P on InvTypeMempoolTx msg
-// Called by BlockGenerator on forging a new candidate block
 func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 
 	// Read inputs
@@ -356,24 +365,20 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 
 	outputTxs := make([]transactions.Transaction, 0)
 
-	// TODO: When filterTxID is empty, mempool returns the all verified
-	// txs. Once the limit of transactions space in a block is determined,
-	// mempool should prioritize transactions by fee
-	err := m.verified.RangeSort(func(k txHash, t TxDesc) error {
+	// When filterTxID is empty, mempool returns all verified txs sorted
+	// by fee from highest to lowest
+	err := m.verified.RangeSort(func(k txHash, t TxDesc) (bool, error) {
 		if len(filterTxID) > 0 {
 			if bytes.Equal(filterTxID, k[:]) {
 				// tx found
 				outputTxs = append(outputTxs, t.tx)
-				return nil
+				return true, nil
 			}
-		} else if len(outputTxs) < 50 {
-			// Non-filter scan for max 50 transactions.
-			// TODO: this should be properly determined ASAP (maybe by adding size checks that determine
-			// the amount of kB a transaction takes up)
+		} else {
 			outputTxs = append(outputTxs, t.tx)
 		}
 
-		return nil
+		return false, nil
 	})
 
 	if err != nil {
@@ -388,6 +393,55 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 	}
 
 	for _, tx := range outputTxs {
+		if err := marshalling.MarshalTx(w, tx); err != nil {
+			return bytes.Buffer{}, err
+		}
+	}
+
+	return *w, nil
+}
+
+// onGetMempoolTxsBySize returns a subset of verified mempool txs which
+// 1. contains only highest fee txs
+// 2. has total txs size not bigger than maxTxsSize (request param)
+// Called by BlockGenerator on generating a new candidate block
+func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
+
+	// Read maxTxsSize param
+	var maxTxsSize uint32
+	if err := encoding.ReadUint32LE(&r.Params, &maxTxsSize); err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	txs := make([]transactions.Transaction, 0)
+
+	var totalSize uint32
+	err := m.verified.RangeSort(func(k txHash, t TxDesc) (bool, error) {
+
+		var done bool
+		totalSize += uint32(t.size)
+
+		if totalSize <= maxTxsSize {
+			txs = append(txs, t.tx)
+		} else {
+			done = true
+		}
+
+		return done, nil
+	})
+
+	if err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	// marshal Txs
+	w := new(bytes.Buffer)
+	lTxs := uint64(len(txs))
+	if err := encoding.WriteVarInt(w, lTxs); err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	for _, tx := range txs {
 		if err := marshalling.MarshalTx(w, tx); err != nil {
 			return bytes.Buffer{}, err
 		}

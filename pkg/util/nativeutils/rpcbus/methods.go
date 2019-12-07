@@ -11,6 +11,7 @@ type method uint8
 const (
 	GetLastBlock method = iota
 	GetMempoolTxs
+	GetMempoolTxsBySize
 	SendMempoolTx
 	VerifyCandidateBlock
 	CreateWallet

@@ -182,7 +182,15 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 4*time.Second)
+
+		// Max transaction size param
+		// TBD along with block size and MaxFrameSize
+		param := new(bytes.Buffer)
+		if err := encoding.WriteUint32LE(param, uint32(150000)); err != nil {
+			return nil, err
+		}
+
+		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxsBySize, rpcbus.NewRequest(bytes.Buffer{}), 4*time.Second)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.
 		if err != nil {
