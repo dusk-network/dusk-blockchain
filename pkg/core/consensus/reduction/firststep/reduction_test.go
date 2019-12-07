@@ -30,6 +30,8 @@ func TestFirstStep(t *testing.T) {
 	assert.NoError(t, hlp.Verify(hash, sv, 1))
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State())
+	// test that the timeout is still 1 second
+	assert.Equal(t, 1*time.Second, hlp.Reducer.(*Reducer).timeOut)
 }
 
 func TestMoreSteps(t *testing.T) {
@@ -52,6 +54,8 @@ func TestMoreSteps(t *testing.T) {
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State())
+	// test that the timeout is still 1 second
+	assert.Equal(t, 1*time.Second, hlp.Reducer.(*Reducer).timeOut)
 }
 
 func TestFirstStepTimeOut(t *testing.T) {
