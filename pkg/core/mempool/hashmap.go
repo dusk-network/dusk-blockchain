@@ -33,7 +33,7 @@ type (
 		// spent key images from the transactions in the pool
 		spentkeyImages map[keyImage]bool
 		Capacity       uint32
-		txsSize        uint64
+		txsSize        uint32
 	}
 )
 
@@ -60,7 +60,7 @@ func (m *HashMap) Put(t TxDesc) error {
 	copy(k[:], txID)
 	m.data[k] = t
 
-	m.txsSize += uint64(t.size)
+	m.txsSize += uint32(t.size)
 
 	// sort keys by Fee
 	// Bulk sort like (sort.Slice) performs a few times slower than
@@ -111,8 +111,8 @@ func (m *HashMap) Contains(txID []byte) bool {
 }
 
 // Size of the txs
-func (m *HashMap) Size() float64 {
-	return float64(m.txsSize) / (1024 * 1024)
+func (m *HashMap) Size() uint32 {
+	return m.txsSize
 }
 
 // Len returns the number of tx entries

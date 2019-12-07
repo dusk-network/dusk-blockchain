@@ -294,13 +294,15 @@ func (m *Mempool) removeAccepted(b block.Block) {
 func (m *Mempool) onIdle() {
 
 	// stats to log
-	log.Infof("Verified %d txs, overall size %.5f MB", m.verified.Len(), m.verified.Size())
+	poolSize := float32(m.verified.Size()) / 1000
+	log.Infof("Txs count %d, total size %.3f kB", m.verified.Len(), poolSize)
 
 	// trigger alarms/notifications in case of abnormal state
 
 	// trigger alarms on too much txs memory allocated
-	if m.verified.Size() > float64(config.Get().Mempool.MaxSizeMB) {
-		log.Errorf("Mempool is full")
+	maxSizeBytes := config.Get().Mempool.MaxSizeMB*1000*1000
+	if m.verified.Size() > maxSizeBytes {
+		log.Warnf("Mempool is bigger than %d MB", config.Get().Mempool.MaxSizeMB)
 	}
 
 	if log.Logger.Level == logger.TraceLevel {

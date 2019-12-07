@@ -35,8 +35,8 @@ type Pool interface {
 	// Clone the entire pool
 	Clone() []transactions.Transaction
 
-	// Pool sizing in KBs
-	Size() float64
+	// Size is total number of bytes of all txs marshalling size
+	Size() uint32
 	// Len returns the number of tx entries
 	Len() int
 

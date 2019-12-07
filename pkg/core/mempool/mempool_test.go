@@ -3,12 +3,14 @@ package mempool
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"math"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -46,53 +48,50 @@ type ctx struct {
 	rpcBus *rpcbus.RPCBus
 }
 
-func initCtx(t *testing.T) *ctx {
+func (c* ctx) reset() {
 
-	// One ctx instance per a  package testing
-	if c == nil {
-		c = &ctx{}
-		c.verifiedTx = make([]transactions.Transaction, 0)
-
-		// config
-		r := config.Registry{}
-		r.Mempool.MaxSizeMB = 1
-		r.Mempool.PoolType = "hashmap"
-		config.Mock(&r)
-		// eventBus
-		var streamer *eventbus.GossipStreamer
-		c.bus, streamer = eventbus.CreateGossipStreamer()
-		// creating the rpcbus
-		c.rpcBus = rpcbus.New()
-
-		c.propagated = make([][]byte, 0)
-
-		go func(streamer *eventbus.GossipStreamer, c *ctx) {
-			for {
-				tx, err := streamer.Read()
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				c.mu.Lock()
-				c.propagated = append(c.propagated, tx)
-				c.mu.Unlock()
-			}
-		}(streamer, c)
-
-		// initiate a mempool with custom verification function
-		c.m = NewMempool(c.bus, c.rpcBus, verifyFunc)
-	} else {
-
-		// Reset shared context state
-		c.m.Quit()
-		c.m.verified = c.m.newPool()
-		c.verifiedTx = make([]transactions.Transaction, 0)
-		c.propagated = make([][]byte, 0)
-	}
+	// Reset shared context state
+	c.m.Quit()
+	c.m.verified = c.m.newPool()
+	c.verifiedTx = make([]transactions.Transaction, 0)
+	c.propagated = make([][]byte, 0)
 
 	c.m.Run()
+}
 
-	return c
+func TestMain(m *testing.M) {
+
+	c = &ctx{}
+
+	// config
+	r := config.Registry{}
+	r.Mempool.MaxSizeMB = 1
+	r.Mempool.PoolType = "hashmap"
+	config.Mock(&r)
+
+	var streamer *eventbus.GossipStreamer
+	c.bus, streamer = eventbus.CreateGossipStreamer()
+	c.rpcBus = rpcbus.New()
+
+	go func(streamer *eventbus.GossipStreamer, c *ctx) {
+		for {
+			tx, err := streamer.Read()
+			if err != nil {
+				fmt.Errorf(err.Error())
+			}
+
+			c.mu.Lock()
+			c.propagated = append(c.propagated, tx)
+			c.mu.Unlock()
+		}
+	}(streamer, c)
+
+	// initiate a mempool with custom verification function
+	c.m = NewMempool(c.bus, c.rpcBus, verifyFunc)
+	c.m.Run()
+
+	code := m.Run()
+	os.Exit(code)
 }
 
 // adding tx in ctx means mempool is expected to store it in the verified list
@@ -160,10 +159,9 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 func TestProcessPendingTxs(t *testing.T) {
 
-	initCtx(t)
+	c.reset()
 
 	txs := randomSliceOfTxs(t, 5)
-
 	for _, tx := range txs {
 
 		// Publish valid tx
@@ -204,7 +202,7 @@ func TestProcessPendingTxs(t *testing.T) {
 
 func TestProcessPendingTxsAsync(t *testing.T) {
 
-	initCtx(t)
+	c.reset()
 
 	// A batch consists of all 4 types of Dusk transactions (excluding coinbase)
 	// The number of batches is the number of concurrent routines that will be
@@ -267,7 +265,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 
 func TestRemoveAccepted(t *testing.T) {
 
-	initCtx(t)
+	c.reset()
 
 	// Create a random block
 	b := helper.RandomBlock(t, 200, 0)
@@ -314,7 +312,7 @@ func TestRemoveAccepted(t *testing.T) {
 // already spent from other transactions in the pool.
 func TestDoubleSpent(t *testing.T) {
 
-	initCtx(t)
+	c.reset()
 
 	// generate 3*4 random txs
 	txs := randomSliceOfTxs(t, 3)
@@ -358,7 +356,7 @@ func TestDoubleSpent(t *testing.T) {
 
 func TestCoinbaseTxsNotAllowed(t *testing.T) {
 
-	initCtx(t)
+	c.reset()
 
 	// Publish a set of valid txs
 	txs := randomSliceOfTxs(t, 1)
@@ -388,6 +386,39 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 
 	// Assert that all non-coinbase txs have been verified
 	c.assert(t, true)
+}
+
+func TestSendMempoolTx(t *testing.T) {
+
+	c.reset()
+
+	txs := randomSliceOfTxs(t, 4)
+
+	var totalSize uint32
+	for _, tx := range txs {
+		buf := new(bytes.Buffer)
+		err := marshalling.MarshalTx(buf, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		totalSize += uint32(buf.Len())
+
+		txidBytes, err := c.rpcBus.Call(rpcbus.SendMempoolTx, rpcbus.NewRequest(*buf), 0)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		txid, _ := tx.CalculateHash()
+		if !bytes.Equal(txidBytes.Bytes(), txid) {
+			t.Fatal("unexpected txid retrieved")
+		}
+	}
+
+	if c.m.verified.Size() != totalSize {
+		t.Fatal("unexpected tx total size")
+	}
+
 }
 
 // Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
