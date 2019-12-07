@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/cli"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
@@ -85,12 +84,7 @@ func main() {
 		}
 	}
 
-	fmt.Fprintln(os.Stdout, "initialization complete. opening console...")
-
-	// Start interactive shell
-	if cfg.Get().Logger.Output != "stdout" {
-		go cli.Start(srv.rpcBus, logFile)
-	}
+	fmt.Fprintln(os.Stdout, "initialization complete")
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
