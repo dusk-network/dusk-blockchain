@@ -2,9 +2,9 @@ package kadcast
 
 import (
 	"encoding/binary"
-	"sync"
-	log "github.com/sirupsen/logrus"
 	"net"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
@@ -40,9 +40,9 @@ func getPacketFromStream(stream []byte) Packet {
 // Deserializes the packet into an slice of bytes.
 func (pac Packet) asBytes() []byte {
 	hl := len(pac.headers)
-    l := hl + len(pac.payload)
-    byteRepr := make([]byte, l)
-    copy(byteRepr, pac.headers[:])
+	l := hl + len(pac.payload)
+	byteRepr := make([]byte, l)
+	copy(byteRepr, pac.headers[:])
 	copy(byteRepr[hl:], pac.payload[:])
 	return byteRepr
 }
@@ -138,9 +138,9 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 }
 
 // ProcessPacket recieves a Packet and processes it according to
-// it's type. It gets the packets from the circularqueue that 
+// it's type. It gets the packets from the circularqueue that
 // connects the listeners with the packet processor.
-func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
+func ProcessPacket(queue *ring.Buffer, router *Router) {
 	// Instantiate now the variables to not pollute
 	// the stack.
 	var err error
@@ -151,12 +151,12 @@ func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
-		NextItem: for _, item := range queuePackets {
+		for _, item := range queuePackets {
 			// Get items from the queue packet taken.
 			byteNum, senderAddr, udpPayload, err = decodeRedPacket(item)
 			if err != nil {
 				log.WithError(err).Warn("Error decoding the packet taken from the ring.")
-				break NextItem
+				continue
 			}
 			// Build packet struct
 			packet = getPacketFromStream(udpPayload[:])
@@ -169,8 +169,8 @@ func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
 			// Peer was not validated.
 			if err := verifyIDNonce(senderID, nonce); err != nil {
 				log.WithError(err).Warn("Incorrect packet sender ID. Skipping its processing.")
-				break NextItem
-			} 
+				continue
+			}
 
 			// Build Peer info and put the right port on it subsituting the one
 			// used to send the message by the one where the peer wants to receive
@@ -208,7 +208,7 @@ func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
 	}
 }
 
-// Processes the `PING` packet info sending back a 
+// Processes the `PING` packet info sending back a
 // `PONG` message and adding the sender to the buckets.
 func handlePing(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
@@ -224,7 +224,7 @@ func handlePong(peerInf Peer, router *Router) {
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 }
 
-// Processes the `FIND_NODES` packet info sending back a 
+// Processes the `FIND_NODES` packet info sending back a
 // `NODES` message and adding the sender to the buckets.
 func handleFindNodes(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
@@ -234,7 +234,7 @@ func handleFindNodes(peerInf Peer, router *Router) {
 	router.sendNodes(peerInf)
 }
 
-// Processes the `NODES` packet info sending back a 
+// Processes the `NODES` packet info sending back a
 // `PING` message to all of the Peers announced on the packet
 // and adding the sender to the buckets.
 func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
