@@ -20,7 +20,7 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 	initPeerNum := router.tree.getTotalPeers()
 	for i := 0; i <= 3; i++ {
 
-		actualPeers := router.pollBootstrappingNodes(bootNodes, time.Second*3)
+		actualPeers := router.pollBootstrappingNodes(bootNodes, time.Second*5)
 		if actualPeers <= initPeerNum {
 			if i == 3 {
 				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
@@ -60,7 +60,7 @@ func StartNetworkDiscovery(router *Router) {
 	// we look for more nodes.
 	for actualClosest != previousClosest {
 		previousClosest = actualClosest
-		actualClosest = router.pollClosestPeer(10 * time.Second)
+		actualClosest = router.pollClosestPeer(5 * time.Second)
 	}
 
 	log.WithFields(log.Fields{
