@@ -66,7 +66,7 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	headers := make([]byte, 24)
 	// Add `Packet` type.
-	headers = append(headers[0:1], tipus)
+	headers[0] = tipus
 	// Add MyPeer ID
 	copy(headers[1:17], router.MyPeerInfo.id[0:16])
 	// Attach IdNonce
