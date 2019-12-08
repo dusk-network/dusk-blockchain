@@ -127,16 +127,26 @@ func (v Set) String() string {
 }
 
 // Insert a big.Int representation of a BLS key at a proper index (respectful of the VotingCommittee order). If the element is already in the VotingCommittee does nothing and returns false
-func (v *Set) Insert(b []byte) {
+func (v *Set) Insert(b []byte) bool {
 	iRepr := new(big.Int).SetBytes(b)
+	if len(*v) == 0 {
+		*v = append(*v, iRepr)
+		return true
+	}
 
 	idx := sort.Search(len(*v), func(i int) bool {
 		return (*v)[i].Cmp(iRepr) > 0
 	})
 
+	// if the element is already in the set, we do nothing and return false
+	if len(*v) >= idx && iRepr.Cmp((*v)[idx]) == 0 {
+		return false
+	}
+
 	*v = append(*v, new(big.Int))
 	copy((*v)[idx+1:], (*v)[idx:])
 	(*v)[idx] = iRepr
+	return true
 }
 
 func (v Set) Whole() uint64 {

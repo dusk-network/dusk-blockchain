@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,4 +43,26 @@ func TestConsensusEventVerification(t *testing.T) {
 			assert.FailNow(t, fmt.Sprintf("error at %d iteration", 0))
 		}
 	}
+}
+
+// BenchmarkReconstructApk benchmarks the APK reconstruction.
+// Note: the benchmark should be run with `gcflags="-l -N"` to prevent compiler
+// optimization
+func BenchmarkReconstructApk(b *testing.B) {
+
+	sortedSet := sortedset.New()
+
+	// creating a set of 100 random keys
+	for i := 0; i < 100; i++ {
+		keys, _ := key.NewRandConsensusKeys()
+		sortedSet.Insert(keys.BLSPubKeyBytes)
+	}
+
+	b.ResetTimer()
+
+	// benchmarking ReconstructApk
+	for i := 0; i < b.N; i++ {
+		_, _ = ReconstructApk(sortedSet)
+	}
+
 }
