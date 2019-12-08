@@ -115,15 +115,17 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 // buckets and returns it.
 func (router Router) pollClosestPeer(t time.Duration) Peer {
 	var wg sync.WaitGroup
+	var ps []Peer
 	wg.Add(1) 
+	router.sendFindNodes()
 
-	time.AfterFunc(t, func() {
-		router.sendFindNodes()
+	timer := time.AfterFunc(t, func() {
+		ps = router.getXClosestPeersTo(1, router.MyPeerInfo)
 		wg.Done()
 	})
 
 	wg.Wait()
-	ps:= router.getXClosestPeersTo(1, router.MyPeerInfo)
+	timer.Stop()
 	return ps[0]
 }
 
@@ -133,18 +135,21 @@ func (router Router) pollClosestPeer(t time.Duration) Peer {
 // Returns back the new number of peers the node is connected to.
 func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) uint64 {
 	var wg sync.WaitGroup
-	wg.Add(1) 
+	var peerNum uint64
 
-	time.AfterFunc(t, func() {
-		for _, peer := range bootNodes {
-			router.sendPing(peer)
-		}
+	wg.Add(1) 
+	for _, peer := range bootNodes {
+		router.sendPing(peer)
+	}
+
+	timer := time.AfterFunc(t, func() {
+		peerNum = uint64(router.tree.getTotalPeers())
 		wg.Done()
 	})
 
 	wg.Wait()
-	peerCount := router.tree.getTotalPeers()
-	return peerCount
+	timer.Stop()
+	return peerNum
 }
 
 // ------- Packet-sending utilities for the Router ------- //
