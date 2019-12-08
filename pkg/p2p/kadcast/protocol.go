@@ -3,7 +3,6 @@ package kadcast
 import (
 	"errors"
 	"time"
-	"sync"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -14,14 +13,14 @@ import (
 // it panics.
 // Otherways, it returns `nil` and logs the Number of peers
 // the node is connected to at the end of the process.
-func InitBootstrap(router *Router, bootNodes []Peer, wg *sync.WaitGroup) error {
+func InitBootstrap(router *Router, bootNodes []Peer) error {
 	log.Info("Bootstrapping process started.")
 	// Get PeerList ordered by distance so we can compare it
 	// after the `PONG` arrivals.
 	initPeerNum := router.tree.getTotalPeers()
 	for i := 0; i <= 3; i++ {
-		
-		actualPeers := router.pollBootstrappingNodes(bootNodes, time.Second * 3)
+
+		actualPeers := router.pollBootstrappingNodes(bootNodes, time.Second*3)
 		if actualPeers <= initPeerNum {
 			if i == 3 {
 				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
@@ -48,19 +47,19 @@ func InitBootstrap(router *Router, bootNodes []Peer, wg *sync.WaitGroup) error {
 // we are currently connected to.
 // Otherways, if the closest Peer on two consecutive iterations changes, we
 // keep queriyng the `alpha` closest nodes with `FIND_NODES` messages.
-func StartNetworkDiscovery(router *Router, wg *sync.WaitGroup) {
+func StartNetworkDiscovery(router *Router) {
 	// Get closest actual Peer.
 	previousClosestArr := router.getXClosestPeersTo(1, router.MyPeerInfo)
 	previousClosest := previousClosestArr[0]
 
-	// Ask for new peers, wait for `PONG` arrivals and get the 
+	// Ask for new peers, wait for `PONG` arrivals and get the
 	// new closest `Peer`.
 	actualClosest := router.pollClosestPeer(5 * time.Second)
 
 	// Until we don't get a peer closer to our node on each poll,
 	// we look for more nodes.
 	for actualClosest != previousClosest {
-		previousClosest	= actualClosest
+		previousClosest = actualClosest
 		actualClosest = router.pollClosestPeer(10 * time.Second)
 	}
 
