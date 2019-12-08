@@ -191,12 +191,6 @@ func ProcessPacket(queue *ring.Buffer, router *Router, wg *sync.WaitGroup) {
 					"Source-IP", peerInf.ip[:],
 				).Infoln("Recieved PONG message")
 				handlePong(peerInf, router)
-				// For Bootstrapping and NetwDisc we track the 
-				// `PONG` messages since this is what
-				// introduces new `Peers` in the Buckets.
-				if isBootstrapping || isDiscoveringNetwork {
-					wg.Done()
-				}
 
 			case 2:
 				log.WithField(
