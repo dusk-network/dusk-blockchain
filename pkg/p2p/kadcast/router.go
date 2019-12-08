@@ -2,7 +2,9 @@ package kadcast
 
 import (
 	"net"
+	"sync"
 	"sort"
+	"time"
 )
 
 // K is the number of peers that a node will send on
@@ -104,6 +106,45 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 		}
 	}
 	return xPeers
+}
+
+// Sends a `FIND_NODES` messages to the `alpha` closest peers
+// the node knows and waits for a certain time in order to wait 
+// for the `PONG` message arrivals.
+// Then looks for the closest peer to the node itself into the
+// buckets and returns it.
+func (router Router) pollClosestPeer(t time.Duration) Peer {
+	var wg sync.WaitGroup
+	wg.Add(1) 
+
+	time.AfterFunc(t, func() {
+		router.sendFindNodes()
+		wg.Done()
+	})
+
+	wg.Wait()
+	ps:= router.getXClosestPeersTo(1, router.MyPeerInfo)
+	return ps[0]
+}
+
+// Sends a `PING` messages to the bootstrap nodes that
+// the node knows and waits for a certain time in order to wait 
+// for the `PONG` message arrivals.
+// Returns back the new number of peers the node is connected to.
+func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) uint64 {
+	var wg sync.WaitGroup
+	wg.Add(1) 
+
+	time.AfterFunc(t, func() {
+		for _, peer := range bootNodes {
+			router.sendPing(peer)
+		}
+		wg.Done()
+	})
+
+	wg.Wait()
+	peerCount := router.tree.getTotalPeers()
+	return peerCount
 }
 
 // ------- Packet-sending utilities for the Router ------- //
