@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -68,12 +69,16 @@ func (p *Connection) readRemoteMsgVersion() error {
 		return err
 	}
 
-	msg, err := verifyChecksum(msgBytes)
+	m, cs, err := checksum.Extract(msgBytes)
 	if err != nil {
 		return err
 	}
 
-	decodedMsg := bytes.NewBuffer(msg)
+	if !checksum.Verify(m, cs) {
+		return errors.New("invalid checksum")
+	}
+
+	decodedMsg := bytes.NewBuffer(m)
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -98,12 +103,16 @@ func (p *Connection) readVerAck() error {
 		return err
 	}
 
-	msg, err := verifyChecksum(msgBytes)
+	m, cs, err := checksum.Extract(msgBytes)
 	if err != nil {
 		return err
 	}
 
-	decodedMsg := bytes.NewBuffer(msg)
+	if !checksum.Verify(m, cs) {
+		return errors.New("invalid checksum")
+	}
+
+	decodedMsg := bytes.NewBuffer(m)
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err

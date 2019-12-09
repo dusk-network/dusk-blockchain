@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"golang.org/x/crypto/sha3"
 )
 
 type (
@@ -26,8 +26,8 @@ func NewGossip(magic protocol.Magic) *Gossip {
 // Process a message that is passing through, by prepending the protocol
 // magic and the message checksum, and finally by prepending the length.
 func (g *Gossip) Process(m *bytes.Buffer) error {
-	digest := sha3.Sum256(m.Bytes())
-	return WriteFrame(m, g.Magic, digest[0:ChecksumLength])
+	cs := checksum.Generate(m.Bytes())
+	return WriteFrame(m, g.Magic, cs)
 }
 
 // UnpackLength unwraps the incoming packet (likely from a net.Conn struct) and returns the length of the packet without reading the payload (which is left to the user of this method)

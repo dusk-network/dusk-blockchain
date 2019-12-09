@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
@@ -12,7 +13,7 @@ import (
 func TestWriteReadFrame(t *testing.T) {
 	b := bytes.NewBufferString("pippo")
 	digest := sha3.Sum256(b.Bytes())
-	WriteFrame(b, protocol.TestNet, digest[0:ChecksumLength])
+	WriteFrame(b, protocol.TestNet, digest[0:checksum.Length])
 
 	length, _ := ReadFrame(b)
 	buf := make([]byte, length)
