@@ -120,7 +120,7 @@ func (h *Helper) TriggerBlockGeneration() {
 // the blockgenerator, standing in place of the mempool.
 func (h *Helper) ProvideTransactions(t *testing.T) {
 	reqChan := make(chan rpcbus.Request, 1)
-	h.RBus.Register(rpcbus.GetMempoolTxs, reqChan)
+	h.RBus.Register(rpcbus.GetMempoolTxsBySize, reqChan)
 
 	go func(reqChan chan rpcbus.Request) {
 		r := <-reqChan

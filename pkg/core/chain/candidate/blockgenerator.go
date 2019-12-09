@@ -27,6 +27,9 @@ var _ consensus.Component = (*Generator)(nil)
 
 var lg *log.Entry = log.WithField("process", "candidate generator")
 
+// TBD along with block size and processing.MaxFrameSize
+const MaxTxSetSize = 150000
+
 // Generator is responsible for generating candidate blocks, and propagating them
 // alongside received Scores. It is triggered by the ScoreEvent, sent by the score generator.
 type Generator struct {
@@ -200,7 +203,14 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 
 	// Retrieve and append the verified transactions from Mempool
 	if bg.rpcBus != nil {
-		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 4*time.Second)
+
+		// Max transaction size param
+		param := new(bytes.Buffer)
+		if err := encoding.WriteUint32LE(param, uint32(MaxTxSetSize)); err != nil {
+			return nil, err
+		}
+
+		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.
 		if err != nil {

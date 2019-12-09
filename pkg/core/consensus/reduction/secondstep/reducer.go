@@ -144,13 +144,15 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
-	r.timeOut = r.timeOut * 2
 
 	// Sending of agreement happens on it's own step
 	step := r.eventPlayer.Forward(r.ID())
 	if hash != nil && !bytes.Equal(hash, emptyHash[:]) && stepVotesAreValid(b) && r.handler.AmMember(r.round, step) {
 		lg.WithField("step", step).Debugln("sending agreement")
 		r.sendAgreement(step, hash, b)
+	} else {
+		// Increase timeout if we had no agreement
+		r.timeOut = r.timeOut * 2
 	}
 
 	r.signer.SendWithHeader(topics.Restart, emptyHash[:], regenerationPackage, r.ID())
