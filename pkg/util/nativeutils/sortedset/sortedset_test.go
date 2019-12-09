@@ -83,3 +83,14 @@ func TestInsert(t *testing.T) {
 
 	assert.Equal(t, 3, len(v))
 }
+
+func BenchmarkInsert(b *testing.B) {
+	v := New()
+
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		bytes := big.NewInt(int64(rand.Uint64())).Bytes()
+		b.StartTimer()
+		v.Insert(bytes)
+	}
+}
