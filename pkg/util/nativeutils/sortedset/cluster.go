@@ -14,6 +14,21 @@ func NewCluster() Cluster {
 	}
 }
 
+// Equal tests for equality with another Cluster
+func (c Cluster) Equal(other Cluster) bool {
+	for i, k := range c.Set {
+		if k.Cmp(other.Set[i]) != 0 {
+			return false
+		}
+
+		if c.OccurrencesOf(k.Bytes()) != other.OccurrencesOf(k.Bytes()) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Size returns the amount of elements in the cluster
 func (c Cluster) TotalOccurrences() int {
 	size := 0
@@ -21,6 +36,19 @@ func (c Cluster) TotalOccurrences() int {
 		size += v
 	}
 	return size
+}
+
+// Unravel creates a sorted array of []byte adding as many duplicates as the
+// occurrence of the various elements in ascending order
+func (c Cluster) Unravel() [][]byte {
+	pks := make([][]byte, 0)
+	for _, pk := range c.Set {
+		occurrences := c.elements[string(pk.Bytes())]
+		for i := 0; i < occurrences; i++ {
+			pks = append(pks, pk.Bytes())
+		}
+	}
+	return pks
 }
 
 // OccurrencesOf return the occurrence a []byte has been inserted in the
@@ -77,4 +105,16 @@ func (c *Cluster) Remove(b []byte) bool {
 
 	c.elements[k] = occurrences - 1
 	return true
+}
+
+func (c *Cluster) IntersectCluster(committeeSet uint64) Cluster {
+	set := c.Intersect(committeeSet)
+	elems := make(map[string]int)
+	for _, elem := range set {
+		elems[string(elem.Bytes())] = c.OccurrencesOf(elem.Bytes())
+	}
+	return Cluster{
+		Set:      set,
+		elements: elems,
+	}
 }
