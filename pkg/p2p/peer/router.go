@@ -24,6 +24,7 @@ type messageRouter struct {
 	dataRequestor     *responding.DataRequestor
 	dataBroker        *responding.DataBroker
 	roundResultBroker *responding.RoundResultBroker
+	candidateBroker   *responding.CandidateBroker
 	synchronizer      *chainsync.ChainSynchronizer
 	ponger            processing.Ponger
 
@@ -77,6 +78,8 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		// of this message
 	case topics.GetRoundResults:
 		err = m.roundResultBroker.ProvideRoundResult(b)
+	case topics.GetCandidate:
+		err = m.candidateBroker.ProvideCandidate(b)
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {

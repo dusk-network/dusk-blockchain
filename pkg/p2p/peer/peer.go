@@ -86,6 +86,7 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 			dataRequestor:     dataRequestor,
 			dataBroker:        responding.NewDataBroker(db, rpcBus, responseChan),
 			roundResultBroker: responding.NewRoundResultBroker(rpcBus, responseChan),
+			candidateBroker:   responding.NewCandidateBroker(rpcBus, responseChan),
 			ponger:            processing.NewPonger(responseChan),
 			peerInfo:          conn.RemoteAddr().String(),
 		},
