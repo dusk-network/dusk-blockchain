@@ -75,8 +75,8 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, f
 // Verify StepVotes. The step must be specified otherwise verification would be dependent on the state of the Helper
 func (hlp *Helper) Verify(hash []byte, sv *agreement.StepVotes, step uint8) error {
 	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
-	sub := vc.Intersect(sv.BitSet)
-	apk, err := agreement.ReconstructApk(sub)
+	sub := vc.IntersectCluster(sv.BitSet)
+	apk, err := agreement.ReconstructApk(sub.Set)
 	if err != nil {
 		return err
 	}
