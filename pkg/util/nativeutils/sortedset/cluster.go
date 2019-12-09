@@ -1,0 +1,80 @@
+package sortedset
+
+// Cluster is a sortedset that keeps track of duplicates
+type Cluster struct {
+	Set
+	elements map[string]int
+}
+
+// NewCluster returns a new empty Cluster
+func NewCluster() Cluster {
+	return Cluster{
+		Set:      New(),
+		elements: make(map[string]int),
+	}
+}
+
+// Size returns the amount of elements in the cluster
+func (c Cluster) TotalOccurrences() int {
+	size := 0
+	for _, v := range c.elements {
+		size += v
+	}
+	return size
+}
+
+// OccurrencesOf return the occurrence a []byte has been inserted in the
+// cluster
+func (c Cluster) OccurrencesOf(b []byte) int {
+	if n, ok := c.elements[string(b)]; ok {
+		return n
+	}
+
+	return 0
+}
+
+// Insert a []byte into the cluster and updates the element counts.
+// Returns true if the element is new, false otherwise
+func (c *Cluster) Insert(b []byte) bool {
+	k := string(b)
+	if ok := c.Set.Insert(b); !ok {
+		c.elements[k] = c.elements[k] + 1
+		return false
+	}
+
+	c.elements[k] = 1
+	return true
+}
+
+// Remove a []byte from the cluster and updates the element counts.
+// Returns the amount of occurrences that have been removed
+func (c *Cluster) RemoveAll(b []byte) int {
+	k := string(b)
+	occurrences, ok := c.elements[k]
+	if !ok {
+		return 0
+	}
+
+	c.Set.Remove(b)
+	delete(c.elements, k)
+	return occurrences
+}
+
+// Remove a []byte from the cluster and updates the element counts.
+// Returns false if the element cannot be found
+func (c *Cluster) Remove(b []byte) bool {
+	k := string(b)
+	occurrences, ok := c.elements[k]
+	if !ok {
+		return false
+	}
+
+	if occurrences == 1 {
+		c.Set.Remove(b)
+		delete(c.elements, k)
+		return true
+	}
+
+	c.elements[k] = occurrences - 1
+	return true
+}
