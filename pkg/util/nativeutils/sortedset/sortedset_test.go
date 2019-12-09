@@ -84,6 +84,14 @@ func TestInsert(t *testing.T) {
 	assert.Equal(t, 3, len(v))
 }
 
+func TestInsertDuplication(t *testing.T) {
+	v := New()
+
+	assert.True(t, v.Insert(big.NewInt(45).Bytes()))
+	assert.False(t, v.Insert(big.NewInt(45).Bytes()))
+	assert.True(t, v.Insert(big.NewInt(44).Bytes()))
+}
+
 func BenchmarkInsert(b *testing.B) {
 	v := New()
 

@@ -136,7 +136,7 @@ func (v *Set) Insert(b []byte) bool {
 	}
 
 	idx := sort.Search(len(*v), func(i int) bool {
-		return (*v)[i].Cmp(iRepr) >= 0
+		return (*v)[i].Cmp(iRepr) > 0
 	})
 
 	if idx < l && iRepr.Cmp((*v)[idx]) == 0 {
