@@ -61,6 +61,7 @@ const (
 	Generation
 	Restart
 	StopConsensus
+	IntermediateBlock
 )
 
 type topicBuf struct {
@@ -110,6 +111,7 @@ var Topics = [...]topicBuf{
 	topicBuf{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
 	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
 	topicBuf{StopConsensus, *(bytes.NewBuffer([]byte{byte(StopConsensus)})), "stopconsensus"},
+	topicBuf{IntermediateBlock, *(bytes.NewBuffer([]byte{byte(IntermediateBlock)})), "intermediateblock"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {
