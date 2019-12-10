@@ -31,6 +31,9 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("mempool.maxSizeMB", "100")
 	viper.Set("mempool.poolType", "hashmap")
 	viper.Set("mempool.preallocTxs", "100")
+	viper.Set("consensus.defaultlocktime", 1000)
+	viper.Set("consensus.defaultoffset", 10)
+	viper.Set("consensus.defaultamount", 50)
 }
 
 // Profile2 builds dusk.toml with lite driver enabled (suitable for bench testing)
