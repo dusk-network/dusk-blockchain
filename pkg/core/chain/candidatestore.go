@@ -37,7 +37,7 @@ func newCandidateStore(broker eventbus.Broker) *candidateStore {
 	}
 
 	broker.Subscribe(topics.Candidate, eventbus.NewCallbackListener(c.storeCandidateMessage))
-	broker.Register(topics.Candidate, consensus.NewRepublisher(broker, topics.Candidate), &consensus.Validator{})
+	broker.Register(topics.Candidate, consensus.NewRepublisher(broker, topics.Candidate))
 	return c
 }
 
