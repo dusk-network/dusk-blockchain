@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
@@ -55,8 +54,8 @@ type Mempool struct {
 	// verified txs to be included in next block
 	verified Pool
 
-	// the collector to listen for new accepted blocks
-	acceptedBlockChan <-chan block.Block
+	// the collector to listen for new intermediate blocks
+	intermediateBlockChan <-chan block.Block
 
 	// used by tx verification procedure
 	latestBlockTimestamp int64
@@ -106,13 +105,13 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
 	}
 
-	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
+	intermediateBlockChan := initIntermediateBlockCollector(eventBus)
 
 	m := &Mempool{
 		eventBus:                eventBus,
 		latestBlockTimestamp:    math.MinInt32,
 		quitChan:                make(chan struct{}),
-		acceptedBlockChan:       acceptedBlockChan,
+		intermediateBlockChan:   intermediateBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
 		sendTxChan:              sendTxChan,
@@ -151,8 +150,8 @@ func (m *Mempool) Run() {
 			case r := <-m.getMempoolTxsBySizeChan:
 				handleRequest(r, m.onGetMempoolTxsBySize, "GetMempoolTxsBySize")
 			// Mempool input channels
-			case b := <-m.acceptedBlockChan:
-				m.onAcceptedBlock(b)
+			case b := <-m.intermediateBlockChan:
+				m.onIntermediateBlock(b)
 			case tx := <-m.pending:
 				_, _ = m.onPendingTx(tx)
 			case <-time.After(20 * time.Second):
@@ -231,7 +230,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	return txid, nil
 }
 
-func (m *Mempool) onAcceptedBlock(b block.Block) {
+func (m *Mempool) onIntermediateBlock(b block.Block) {
 	m.latestBlockTimestamp = b.Header.Timestamp
 	m.removeAccepted(b)
 }
@@ -300,7 +299,7 @@ func (m *Mempool) onIdle() {
 	// trigger alarms/notifications in case of abnormal state
 
 	// trigger alarms on too much txs memory allocated
-	maxSizeBytes := config.Get().Mempool.MaxSizeMB*1000*1000
+	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
 	if m.verified.Size() > maxSizeBytes {
 		log.Warnf("Mempool is bigger than %d MB", config.Get().Mempool.MaxSizeMB)
 	}
