@@ -2,8 +2,9 @@ package kadcast
 
 import (
 	"encoding/binary"
-	log "github.com/sirupsen/logrus"
 	"net"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
@@ -39,9 +40,9 @@ func getPacketFromStream(stream []byte) Packet {
 // Deserializes the packet into an slice of bytes.
 func (pac Packet) asBytes() []byte {
 	hl := len(pac.headers)
-    l := hl + len(pac.payload)
-    byteRepr := make([]byte, l)
-    copy(byteRepr, pac.headers[:])
+	l := hl + len(pac.payload)
+	byteRepr := make([]byte, l)
+	copy(byteRepr, pac.headers[:])
 	copy(byteRepr[hl:], pac.payload[:])
 	return byteRepr
 }
@@ -63,21 +64,21 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 // Gets the Packet headers parts and puts them into the
 // header attribute of the Packet.
 func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
-	var headers []byte
+	headers := make([]byte, 24)
 	// Add `Packet` type.
-	headers = append(headers[:], tipus)
+	headers[0] = tipus
 	// Add MyPeer ID
-	headers = append(headers[:], router.MyPeerInfo.id[:]...)
+	copy(headers[1:17], router.MyPeerInfo.id[0:16])
 	// Attach IdNonce
 	idNonce := getBytesFromUint32(router.myPeerNonce)
-	headers = append(headers[:], idNonce[:]...)
+	copy(headers[17:21], idNonce[0:4])
 	// Attach Port
 	port := getBytesFromUint16(destPeer.port)
-	headers = append(headers[:], port[:]...)
+	copy(headers[21:23], port[0:2])
 
 	// Build headers array from the slice.
 	var headersArr [24]byte
-	copy(headersArr[:], headers[0:24])
+	copy(headersArr[:], headers[0:23])
 
 	pac.headers = headersArr
 }
@@ -137,7 +138,7 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 }
 
 // ProcessPacket recieves a Packet and processes it according to
-// it's type. It gets the packets from the circularqueue that 
+// it's type. It gets the packets from the circularqueue that
 // connects the listeners with the packet processor.
 func ProcessPacket(queue *ring.Buffer, router *Router) {
 	// Instantiate now the variables to not pollute
@@ -150,12 +151,12 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
-		NextItem: for _, item := range queuePackets {
+		for _, item := range queuePackets {
 			// Get items from the queue packet taken.
 			byteNum, senderAddr, udpPayload, err = decodeRedPacket(item)
 			if err != nil {
 				log.WithError(err).Warn("Error decoding the packet taken from the ring.")
-				break NextItem
+				continue
 			}
 			// Build packet struct
 			packet = getPacketFromStream(udpPayload[:])
@@ -168,8 +169,8 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			// Peer was not validated.
 			if err := verifyIDNonce(senderID, nonce); err != nil {
 				log.WithError(err).Warn("Incorrect packet sender ID. Skipping its processing.")
-				break NextItem
-			} 
+				continue
+			}
 
 			// Build Peer info and put the right port on it subsituting the one
 			// used to send the message by the one where the peer wants to receive
@@ -181,24 +182,33 @@ func ProcessPacket(queue *ring.Buffer, router *Router) {
 			// Check packet type and process it.
 			switch tipus {
 			case 0:
-				log.Info("Recieved PING message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved PING message")
 				handlePing(peerInf, router)
 			case 1:
-				log.Info("Recieved PONG message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved PONG message")
 				handlePong(peerInf, router)
 
 			case 2:
-				log.Info("Recieved FIND_NODES message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved FIND_NODES message")
 				handleFindNodes(peerInf, router)
+
 			case 3:
-				log.Info("Recieved NODES message from %v", peerInf.ip[:])
+				log.WithField(
+					"Source-IP", peerInf.ip[:],
+				).Infoln("Recieved NODES message")
 				handleNodes(peerInf, packet, router, byteNum)
 			}
 		}
 	}
 }
 
-// Processes the `PING` packet info sending back a 
+// Processes the `PING` packet info sending back a
 // `PONG` message and adding the sender to the buckets.
 func handlePing(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
@@ -214,7 +224,7 @@ func handlePong(peerInf Peer, router *Router) {
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 }
 
-// Processes the `FIND_NODES` packet info sending back a 
+// Processes the `FIND_NODES` packet info sending back a
 // `NODES` message and adding the sender to the buckets.
 func handleFindNodes(peerInf Peer, router *Router) {
 	// Process peer addition to the tree.
@@ -224,7 +234,7 @@ func handleFindNodes(peerInf Peer, router *Router) {
 	router.sendNodes(peerInf)
 }
 
-// Processes the `NODES` packet info sending back a 
+// Processes the `NODES` packet info sending back a
 // `PING` message to all of the Peers announced on the packet
 // and adding the sender to the buckets.
 func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
@@ -232,7 +242,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
-		log.Info("NODES message recieved with corrupted payload. PeerNum mismatch!\nIgnoring the packet.")
+		log.Info("NODES message recieved with corrupted payload. Packet ignored.")
 		return
 	}
 

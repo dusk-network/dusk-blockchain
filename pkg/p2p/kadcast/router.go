@@ -2,12 +2,15 @@ package kadcast
 
 import (
 	"net"
+	"sync"
 	"sort"
+	"time"
 )
 
 // K is the number of peers that a node will send on
 // a `NODES` message.
 const K int = 20
+
 // Alpha is the number of nodes to which a node will
 // ask for new nodes with `FIND_NODES` messages.
 const Alpha int = 3
@@ -45,7 +48,6 @@ func MakeRouter(externIP [4]byte, port uint16) Router {
 // PeerID in terms of XOR-distance.				     //
 //													 //
 // --------------------------------------------------//
-
 
 // Returns the complete list of Peers in order to be sorted
 // as they have the xor distance in respec to a Peer as a parameter.
@@ -106,32 +108,76 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 	return xPeers
 }
 
+// Sends a `FIND_NODES` messages to the `alpha` closest peers
+// the node knows and waits for a certain time in order to wait 
+// for the `PONG` message arrivals.
+// Then looks for the closest peer to the node itself into the
+// buckets and returns it.
+func (router Router) pollClosestPeer(t time.Duration) Peer {
+	var wg sync.WaitGroup
+	var ps []Peer
+	wg.Add(1) 
+	router.sendFindNodes()
+
+	timer := time.AfterFunc(t, func() {
+		ps = router.getXClosestPeersTo(1, router.MyPeerInfo)
+		wg.Done()
+	})
+
+	wg.Wait()
+	timer.Stop()
+	return ps[0]
+}
+
+// Sends a `PING` messages to the bootstrap nodes that
+// the node knows and waits for a certain time in order to wait 
+// for the `PONG` message arrivals.
+// Returns back the new number of peers the node is connected to.
+func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) uint64 {
+	var wg sync.WaitGroup
+	var peerNum uint64
+
+	wg.Add(1) 
+	for _, peer := range bootNodes {
+		router.sendPing(peer)
+	}
+
+	timer := time.AfterFunc(t, func() {
+		peerNum = uint64(router.tree.getTotalPeers())
+		wg.Done()
+	})
+
+	wg.Wait()
+	timer.Stop()
+	return peerNum
+}
+
 // ------- Packet-sending utilities for the Router ------- //
 
 // Builds and sends a `PING` packet
-func (router Router) sendPing(reciever Peer) {
+func (router Router) sendPing(receiver Peer) {
 	// Build empty packet.
 	var packet Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	packet.setHeadersInfo(0, router, reciever)
+	packet.setHeadersInfo(0, router, receiver)
 
 	// Since return values from functions are not addressable, we need to
-	// allocate the reciever UDPAddr
-	destUDPAddr := reciever.getUDPAddr()
+	// allocate the receiver UDPAddr
+	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
 	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
 }
 
 // Builds and sends a `PONG` packet
-func (router Router) sendPong(reciever Peer) {
+func (router Router) sendPong(receiver Peer) {
 	// Build empty packet.
 	var packet Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	packet.setHeadersInfo(1, router, reciever)
+	packet.setHeadersInfo(1, router, receiver)
 
 	// Since return values from functions are not addressable, we need to
-	// allocate the reciever UDPAddr
-	destUDPAddr := reciever.getUDPAddr()
+	// allocate the receiver UDPAddr
+	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
 	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
 }
@@ -153,17 +199,17 @@ func (router Router) sendFindNodes() {
 }
 
 // Builds and sends a `NODES` packet.
-func (router Router) sendNodes(reciever Peer) {
+func (router Router) sendNodes(receiver Peer) {
 	// Build empty packet
 	var packet Packet
 	// Set headers
-	packet.setHeadersInfo(3, router, reciever)
-	// Set payload with the `k` peers closest to reciever.
-	peersToSend := packet.setNodesPayload(router, reciever)
+	packet.setHeadersInfo(3, router, receiver)
+	// Set payload with the `k` peers closest to receiver.
+	peersToSend := packet.setNodesPayload(router, receiver)
 	// If we don't have any peers to announce, we just skip sending
 	// the `NODES` messsage.
 	if peersToSend == 0 {
 		return
 	}
-	sendUDPPacket("udp", reciever.getUDPAddr(), packet.asBytes())
+	sendUDPPacket("udp", receiver.getUDPAddr(), packet.asBytes())
 }
