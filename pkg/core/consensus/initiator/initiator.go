@@ -10,9 +10,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/wallet"
 	zkproof "github.com/dusk-network/dusk-zkproof"
@@ -34,9 +37,23 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	pubKey := w.PublicKey()
 	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, &pubKey, w.ConsensusKeys())
 	f.StartConsensus()
+
+	// If we are on genesis, we should kickstart the consensus
+	lastBlkBuf, err := rpcBus.Call(rpcbus.GetLastBlock, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0)
+	if err != nil {
+		panic(err)
+	}
+
+	blk := block.NewBlock()
+	if err := marshalling.UnmarshalBlock(&lastBlkBuf, blk); err != nil {
+		panic(err)
+	}
+
+	if blk.Header.Height == 0 {
+		eventBroker.Publish(topics.Initialization, new(bytes.Buffer))
+	}
 }
 
-// XXX: clean this up ASAP
 func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
 	k, err := w.ReconstructK()
 	if err != nil {
@@ -46,6 +63,7 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 	m := zkproof.CalculateM(k)
 	_, db := heavy.CreateDBConnection()
 	for i := 0; ; i++ {
+		// Get block hash for the given height
 		var hash []byte
 		err := db.View(func(t database.Transaction) error {
 			var err error
@@ -58,6 +76,7 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 			return
 		}
 
+		// Get the transactions belonging to the previously found block
 		var txs []transactions.Transaction
 		err = db.View(func(t database.Transaction) error {
 			var err error
@@ -68,6 +87,7 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 			panic(err)
 		}
 
+		// Check if we should store any of these transactions
 		for _, tx := range txs {
 			bid, ok := tx.(*transactions.Bid)
 			if !ok {
