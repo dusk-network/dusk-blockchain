@@ -7,6 +7,8 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// PeerBytesSize represents the ammount of bytes
+// necessary to represent .
 const PeerBytesSize int = 22
 
 // Peer stores the info of a peer which consists on:

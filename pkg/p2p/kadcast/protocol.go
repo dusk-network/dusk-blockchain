@@ -23,7 +23,7 @@ func InitBootstrap(router *Router, bootNodes []Peer) error {
 		actualPeers := router.pollBootstrappingNodes(bootNodes, time.Second*5)
 		if actualPeers <= initPeerNum {
 			if i == 3 {
-				return errors.New("\nMaximum number of attempts achieved. Please review yor connection settings\n")
+				return errors.New("Maximum number of attempts achieved. Please review yor connection settings")
 			}
 			log.WithFields(log.Fields{
 				"Retries": i,

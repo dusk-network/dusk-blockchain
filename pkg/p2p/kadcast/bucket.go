@@ -1,8 +1,8 @@
 package kadcast
 
-// MAX_BUCKET_PEERS represents the maximum
+// MaxBucketPeers represents the maximum
 //number of peers that a `bucket` can hold.
-var MAX_BUCKET_PEERS uint8 = 25
+var MaxBucketPeers uint8 = 25
 
 // bucket stores peer info of the peers that are at a certain
 // distance range to the peer itself.
@@ -10,7 +10,7 @@ type bucket struct {
 	idLength         uint8
 	peerCount        uint8
 	totalPeersPassed uint64
-	// Should always be less than `MAX_BUCKET_PEERS`
+	// Should always be less than `MaxBucketPeers`
 	entries []Peer
 	// This map keeps the order of arrivals for LRU
 	lru map[Peer]uint64
@@ -27,7 +27,7 @@ func makeBucket(idlen uint8) bucket {
 		idLength:         idlen,
 		totalPeersPassed: 0,
 		peerCount:        0,
-		entries:          make([]Peer, 0, MAX_BUCKET_PEERS),
+		entries:          make([]Peer, 0, MaxBucketPeers),
 		lru:              make(map[Peer]uint64),
 		lruPresent:       make(map[Peer]bool),
 	}
@@ -66,7 +66,7 @@ func (b *bucket) removePeerAtIndex(index int) []Peer {
 // the LRU policy.
 func (b *bucket) addPeer(peer Peer) {
 	// Check if the entries set can hold more peers.
-	if len(b.entries) < int(MAX_BUCKET_PEERS) {
+	if len(b.entries) < int(MaxBucketPeers) {
 		// Insert it into the set if not present
 		// on the current entries set.
 		if b.lruPresent[peer] == false {

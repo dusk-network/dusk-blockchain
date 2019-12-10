@@ -85,7 +85,7 @@ func verifyIDNonce(id [16]byte, nonce [4]byte) error {
 	if (hash[31]) == 0 {
 		return nil
 	}
-	return errors.New("\nId and Nonce are not valid parameters.") //TODO: Create error type.
+	return errors.New("Id and Nonce are not valid parameters") //TODO: Create error type.
 }
 
 // ------------------ NET UTILS ------------------ //
@@ -170,7 +170,7 @@ func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)
 	byteNum := int(binary.LittleEndian.Uint16(packet[0:2]))
 	if (redPackLen) != (byteNum + 8) {
-		return 0, nil, nil, errors.New("\nPacket's length taken from the ring differs from expected.")
+		return 0, nil, nil, errors.New("Packet's length taken from the ring differs from expected")
 	}
 	ip := packet[2:6]
 	port := int(binary.LittleEndian.Uint16(packet[6:8]))
