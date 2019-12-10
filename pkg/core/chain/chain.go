@@ -15,10 +15,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/chain/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -111,11 +113,27 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getRoundResultsChan:      getRoundResultsChan,
 	}
 
+	// If the `prevBlock` is genesis, we add an empty intermediate block.
+	genesis := cfg.DecodeGenesis()
+	if bytes.Equal(chain.prevBlock.Header.Hash, genesis.Header.Hash) {
+		// TODO: maybe it would be better to have a consensus-compatible
+		// intermediate block and certificate.
+		chain.lastCertificate = block.EmptyCertificate()
+		blk, err := mockFirstIntermediateBlock(chain.prevBlock.Header)
+		if err != nil {
+			return nil, err
+		}
+
+		chain.intermediateBlock = blk
+	}
+
 	chain.restoreConsensusData()
 
 	// Hook the chain up to the required topics
 	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
 	eventBus.Subscribe(topics.Block, cbListener)
+	initListener := eventbus.NewCallbackListener(chain.onInitialization)
+	eventBus.Subscribe(topics.Initialization, initListener)
 	return chain, nil
 }
 
@@ -292,10 +310,14 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	return nil
 }
 
+func (c *Chain) onInitialization(bytes.Buffer) error {
+	return c.sendRoundUpdate()
+}
+
 func (c *Chain) sendRoundUpdate() error {
 	buf := new(bytes.Buffer)
 	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, c.intermediateBlock.Header.Height)
+	binary.LittleEndian.PutUint64(roundBytes, c.intermediateBlock.Header.Height+1)
 	if _, err := buf.Write(roundBytes); err != nil {
 		return err
 	}
@@ -559,18 +581,28 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	}
 
 	if c.intermediateBlock != nil {
-		c.finalizeIntermediateBlock(cm.cert)
+		if err := c.finalizeIntermediateBlock(cm.cert); err != nil {
+			log.WithError(err).Warnln("could not accept intermediate block")
+		}
 	}
 
 	// Set new intermediate block
 	c.intermediateBlock = cm.blk
 
+	// Notify mempool
+	buf := new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(buf, cm.blk); err != nil {
+		panic(err)
+	}
+
+	c.eventBus.Publish(topics.IntermediateBlock, buf)
+
 	c.sendRoundUpdate()
 }
 
-func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) {
+func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
 	c.intermediateBlock.Header.Certificate = cert
-	c.AcceptBlock(*c.intermediateBlock)
+	return c.AcceptBlock(*c.intermediateBlock)
 }
 
 // Send out a query for agreement messages and an intermediate block.
@@ -684,4 +716,35 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	}
 
 	r.RespChan <- rpcbus.Response{*buf, nil}
+}
+
+// mocks an intermediate block with a coinbase attributed to a standard
+// address. For use only when bootstrapping the network.
+func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, error) {
+	blk := block.NewBlock()
+	blk.Header.Seed = make([]byte, 33)
+	blk.Header.Height = 1
+	// Something above the genesis timestamp
+	blk.Header.Timestamp = 1570000000
+	blk.SetPrevBlock(prevBlockHeader)
+
+	// Credit a coinbase to an address generated from a zero seed.
+	seed := make([]byte, 32)
+
+	keyPair := key.NewKeyPair(seed)
+	coinbaseTx, err := candidate.ConstructCoinbaseTx(keyPair.PublicKey(), make([]byte, 32), make([]byte, 32))
+	if err != nil {
+		return nil, err
+	}
+
+	blk.AddTx(coinbaseTx)
+	if err := blk.SetRoot(); err != nil {
+		return nil, err
+	}
+
+	if err := blk.SetHash(); err != nil {
+		return nil, err
+	}
+
+	return blk, nil
 }
