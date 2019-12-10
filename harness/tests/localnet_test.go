@@ -109,8 +109,14 @@ func TestSendBidTransaction(t *testing.T) {
 				"{\"query\" : \"{ transactions (txid: \\\"%s\\\") { txid blockhash } }\"}",
 				txid)
 
-			result, err := localNet.SendQuery(uint(i), query)
+			var resp map[string]map[string][]map[string]string
+			err := localNet.SendQuery(uint(i), query, &resp)
 			if err != nil {
+				return false
+			}
+
+			result, ok := resp["data"]
+			if !ok {
 				return false
 			}
 

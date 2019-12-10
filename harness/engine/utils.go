@@ -44,10 +44,10 @@ func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 }
 
 // SendQuery sends a graphql query to the specified network node
-func (n *Network) SendQuery(nodeIndex uint, query string) (map[string][]map[string]string, error) {
+func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) error {
 
 	if nodeIndex >= uint(len(n.Nodes)) {
-		return nil, errors.New("invalid node index")
+		return errors.New("invalid node index")
 	}
 
 	targetNode := n.Nodes[nodeIndex]
@@ -55,25 +55,19 @@ func (n *Network) SendQuery(nodeIndex uint, query string) (map[string][]map[stri
 
 	buf := bytes.Buffer{}
 	if _, err := buf.Write([]byte(query)); err != nil {
-		return nil, errors.New("invalid query")
+		return errors.New("invalid query")
 	}
 
 	resp, err := http.Post(addr, "application/json", &buf)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var decoded map[string]map[string][]map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return nil, err
+	if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+		return err
 	}
 
-	result, ok := decoded["data"]
-	if !ok {
-		return nil, errors.New("missing data field")
-	}
-
-	return result, nil
+	return nil
 }
 
 // SendCommand sends a jsonrpc request to the specified network node
