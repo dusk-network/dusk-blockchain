@@ -69,10 +69,10 @@ func (a *handler) Verify(ev Agreement) error {
 	for i, votes := range ev.VotesPerStep {
 		step := ev.Step - 2 + uint8(i)
 		committee := a.Committee(ev.Round, step)
-		subcommittee := committee.Intersect(votes.BitSet)
+		subcommittee := committee.IntersectCluster(votes.BitSet)
 
-		allVoters += len(subcommittee)
-		apk, err := ReconstructApk(subcommittee)
+		allVoters += subcommittee.TotalOccurrences()
+		apk, err := ReconstructApk(subcommittee.Set)
 		if err != nil {
 			return err
 		}
@@ -104,23 +104,17 @@ func ReconstructApk(subcommittee sortedset.Set) (*bls.Apk, error) {
 		return nil, errors.New("Subcommittee is empty")
 	}
 
-	// We need to avoid adding duplicates to the APK, as it will cause verification to fail.
-	duplicates := make(map[string]struct{})
-
 	for i, ipk := range subcommittee {
-		if _, ok := duplicates[string(ipk.Bytes())]; !ok {
-			duplicates[string(ipk.Bytes())] = struct{}{}
-			pk, err := bls.UnmarshalPk(ipk.Bytes())
-			if err != nil {
-				return nil, err
-			}
-			if i == 0 {
-				apk = bls.NewApk(pk)
-				continue
-			}
-			if err := apk.Aggregate(pk); err != nil {
-				return nil, err
-			}
+		pk, err := bls.UnmarshalPk(ipk.Bytes())
+		if err != nil {
+			return nil, err
+		}
+		if i == 0 {
+			apk = bls.NewApk(pk)
+			continue
+		}
+		if err := apk.Aggregate(pk); err != nil {
+			return nil, err
 		}
 	}
 
