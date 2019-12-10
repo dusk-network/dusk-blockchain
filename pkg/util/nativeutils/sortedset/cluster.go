@@ -74,7 +74,7 @@ func (c *Cluster) Insert(b []byte) bool {
 	return true
 }
 
-// Remove a []byte from the cluster and updates the element counts.
+// RemoveAll occurrences of a []byte from the cluster and updates the element counts.
 // Returns the amount of occurrences that have been removed
 func (c *Cluster) RemoveAll(b []byte) int {
 	k := string(b)
