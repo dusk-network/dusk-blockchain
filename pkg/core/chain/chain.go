@@ -259,7 +259,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	// 3. Add provisioners and block generators
 	l.Trace("adding consensus nodes")
-	c.addConsensusNodes(blk.Txs, blk.Header.Height)
+	// We set the stake start height as blk.Header.Height+2.
+	// This is because, once this block is accepted, the consensus will
+	// be 2 rounds ahead of this current block height. As a result,
+	// if we pick the start height to just be the block height, we
+	// run into some inconsistencies when accepting the next block,
+	// as the certificate could've been made with a different committee.
+	c.addConsensusNodes(blk.Txs, blk.Header.Height+2)
 
 	// 4. Store block in database
 	l.Trace("storing block in db")
@@ -287,11 +293,11 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	log.WithField("count", count).Traceln("candidate blocks deleted")
 
 	// 7. Remove expired provisioners and bids
-	// We remove provisioners and bids from accepted block height + 1,
+	// We remove provisioners and bids from accepted block height + 2,
 	// to set up our committee correctly for the next block.
 	l.Trace("removing expired consensus transactions")
-	c.removeExpiredProvisioners(blk.Header.Height + 1)
-	c.removeExpiredBids(blk.Header.Height + 1)
+	c.removeExpiredProvisioners(blk.Header.Height + 2)
+	c.removeExpiredBids(blk.Header.Height + 2)
 
 	// 8. Notify other subsystems for the accepted block
 	// Subsystems listening for this topic:
@@ -355,7 +361,7 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight ui
 		switch tx.Type() {
 		case transactions.StakeType:
 			stake := tx.(*transactions.Stake)
-			if err := c.addProvisioner(stake.PubKeyEd, stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight+stake.Lock); err != nil {
+			if err := c.addProvisioner(stake.PubKeyEd, stake.PubKeyBLS, stake.Outputs[0].EncryptedAmount.BigInt().Uint64(), startHeight, startHeight+stake.Lock-2); err != nil {
 				l.Errorf("adding provisioner failed: %s", err.Error())
 			}
 		case transactions.BidType:
@@ -443,7 +449,7 @@ func (c *Chain) restoreConsensusData() {
 				// Only add them if their stake is still valid
 				if searchingHeight+t.Lock > currentHeight {
 					amount := t.Outputs[0].EncryptedAmount.BigInt().Uint64()
-					c.addProvisioner(t.PubKeyEd, t.PubKeyBLS, amount, searchingHeight+t.Lock)
+					c.addProvisioner(t.PubKeyEd, t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock)
 				}
 			case *transactions.Bid:
 				// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
@@ -479,7 +485,7 @@ func (c *Chain) removeExpiredProvisioners(round uint64) {
 }
 
 // addProvisioner will add a Member to the Provisioners by using the bytes of a BLS public key.
-func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, endHeight uint64) error {
+func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, startHeight, endHeight uint64) error {
 	if len(pubKeyEd) != 32 {
 		return fmt.Errorf("public key is %v bytes long instead of 32", len(pubKeyEd))
 	}
@@ -489,7 +495,7 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, endHeight uin
 	}
 
 	i := string(pubKeyBLS)
-	stake := user.Stake{amount, endHeight}
+	stake := user.Stake{amount, startHeight, endHeight}
 
 	// Check for duplicates
 	_, inserted := c.p.Set.IndexOf(pubKeyBLS)
@@ -583,6 +589,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	if c.intermediateBlock != nil {
 		if err := c.finalizeIntermediateBlock(cm.cert); err != nil {
 			log.WithError(err).Warnln("could not accept intermediate block")
+			return
 		}
 	}
 
