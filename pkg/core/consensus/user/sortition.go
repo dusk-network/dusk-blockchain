@@ -78,6 +78,16 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 	members := copyMembers(p.Members)
 	p.Members = members
 
+	// Remove stakes which have not yet become active
+	for _, m := range p.Members {
+		for i, stake := range m.Stakes {
+			if stake.StartHeight > round {
+				subtractFromTotalWeight(W, stake.Amount)
+				m.RemoveStake(i)
+			}
+		}
+	}
+
 	for i := 0; votingCommittee.Size() < size; i++ {
 		if W.Uint64() == 0 {
 			// We ran out of staked DUSK, so we return the result prematurely
