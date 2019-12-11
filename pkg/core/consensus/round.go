@@ -167,6 +167,7 @@ type Coordinator struct {
 	factories  []ComponentFactory
 	components []Component
 	eventqueue *Queue
+	roundQueue *Queue
 
 	pubkeyBuf bytes.Buffer
 
@@ -189,6 +190,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 		keys:       keys,
 		factories:  factories,
 		eventqueue: NewQueue(),
+		roundQueue: NewQueue(),
 		pubkeyBuf:  *pkBuf,
 		unsynced:   true,
 	}
@@ -244,6 +246,8 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	c.onNewRound(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
+	go c.flushRoundQueue()
+
 	// TODO: the Coordinator should not send events. someone else should kickstart the
 	// consensus loop
 	c.store.Dispatch(TopicEvent{
@@ -251,6 +255,15 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		Event: Event{},
 	})
 	return nil
+}
+
+func (c *Coordinator) flushRoundQueue() {
+	evs := c.roundQueue.Flush(c.Round())
+	if evs != nil {
+		for _, ev := range evs {
+			c.store.Dispatch(ev)
+		}
+	}
 }
 
 // CollectFinalize is triggered when the Agreement reaches quorum, and pre-emptively
@@ -332,6 +345,19 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		return nil
 	case header.After:
 		lg.WithField("topic", topic).Debugln("storing future event")
+
+		// If it is a future agreement event, we store it on the
+		// `roundQueue`. This means that the event will be dispatched
+		// as soon as the Coordinator reaches the round in the event
+		// header.
+		if topic == topics.Agreement {
+			c.roundQueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
+			c.lock.RUnlock()
+			return nil
+		}
+
+		// Otherwise, we just queue it according to the header round
+		// and step.
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
 		c.lock.RUnlock()
 		return nil
