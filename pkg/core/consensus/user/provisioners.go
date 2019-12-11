@@ -24,8 +24,9 @@ type (
 	}
 
 	Stake struct {
-		Amount    uint64
-		EndHeight uint64
+		Amount      uint64
+		StartHeight uint64
+		EndHeight   uint64
 	}
 )
 
@@ -145,6 +146,10 @@ func marshalStake(r *bytes.Buffer, stake Stake) error {
 		return err
 	}
 
+	if err := encoding.WriteUint64LE(r, stake.StartHeight); err != nil {
+		return err
+	}
+
 	if err := encoding.WriteUint64LE(r, stake.EndHeight); err != nil {
 		return err
 	}
@@ -210,6 +215,10 @@ func unmarshalMember(r *bytes.Buffer) (*Member, error) {
 func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 	stake := Stake{}
 	if err := encoding.ReadUint64LE(r, &stake.Amount); err != nil {
+		return Stake{}, err
+	}
+
+	if err := encoding.ReadUint64LE(r, &stake.StartHeight); err != nil {
 		return Stake{}, err
 	}
 
