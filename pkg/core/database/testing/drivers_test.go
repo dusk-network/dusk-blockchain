@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -31,7 +32,7 @@ var (
 	drvrName string
 	db       database.DB
 	storeDir string
-	// Sample data to populate DB initially
+	// Sample chain data to populate DB
 	blocks []*block.Block
 )
 
@@ -67,6 +68,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 		db = nil
 		drvr = nil
 		storeDir = ""
+		atomic.StoreUint64(&heightCounter, 0)
 	}()
 
 	// Create a temp folder with random name
@@ -102,7 +104,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 	// Generate a few blocks to be used as sample objects
 	// Less blocks are used as we have CI out-of-memory error
 	t := &testing.T{}
-	blocks, err = generateBlocks(t, 10)
+	blocks, err = generateChainBlocks(t, 10)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -137,17 +139,14 @@ func TestStoreBlock(test *testing.T) {
 	test.Parallel()
 
 	// Generate additional blocks to store
-	genBlocks, err := generateBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(test, 2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
 
 	done := false
 	err = db.Update(func(t database.Transaction) error {
-		for i, block := range genBlocks {
-			// assume consensus time is 10sec
-			block.Header.Timestamp = int64(100 + 10*i)
-
+		for _, block := range genBlocks {
 			err := t.StoreBlock(block)
 			if err != nil {
 				return err
@@ -421,11 +420,7 @@ func TestAtomicUpdates(test *testing.T) {
 	// That said, no parallelism should be applied.
 	// test.Parallel()
 
-	genBlocks, err := generateBlocks(test, 2)
-
-	if err != nil {
-		test.Fatal(err.Error())
-	}
+	genBlocks := generateRandomBlocks(test, 2)
 
 	// Save current storage state to compare later
 	// Supported only in heavy.DB for now
@@ -438,7 +433,7 @@ func TestAtomicUpdates(test *testing.T) {
 	// Try to store all genBlocks and make it fail at last iteration of
 	// read-write Tx
 	forcedError := errors.New("force majeure situation")
-	err = db.Update(func(t database.Transaction) error {
+	err := db.Update(func(t database.Transaction) error {
 
 		for height, block := range genBlocks {
 			err := t.StoreBlock(block)
@@ -553,7 +548,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	defer dbReadOnly.Close()
 
 	// Initialize db and a slice of 10 blocks with 2 transactions.Transaction each
-	genBlocks, err := generateBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(test, 2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -758,15 +753,12 @@ func _TestPersistence() int {
 	return 0
 }
 
-func TestFetchCandidateBlock(test *testing.T) {
+func TestFetchAndDeleteCandidateBlocks(test *testing.T) {
 
 	// Generate additional blocks to store
-	candidateBlocks, err := generateBlocks(test, 3)
-	if err != nil {
-		test.Fatal(err.Error())
-	}
+	candidateBlocks := generateRandomBlocks(test, 3)
 
-	err = db.Update(func(t database.Transaction) error {
+	err := db.Update(func(t database.Transaction) error {
 		for _, b := range candidateBlocks {
 			err := t.StoreCandidateBlock(b)
 			if err != nil {
@@ -819,39 +811,6 @@ func TestFetchCandidateBlock(test *testing.T) {
 		test.Fatal(err.Error())
 	}
 
-}
-
-func TestDeleteCandidateBlocks(test *testing.T) {
-
-	// Generate additional blocks to store
-	candidateBlocks, err := generateBlocks(test, 3)
-	if err != nil {
-		test.Fatal(err.Error())
-	}
-
-	// Tamper heights
-	var counter uint64
-	for _, b := range candidateBlocks {
-		counter++
-		b.Header.Height = counter
-	}
-
-	// Store all candidate blocks
-	err = db.Update(func(t database.Transaction) error {
-		for _, b := range candidateBlocks {
-			err := t.StoreCandidateBlock(b)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		test.Fatal(err.Error())
-	}
-
 	// Delete any stored candidate block equal_to/lower than height 2
 	err = db.Update(func(t database.Transaction) error {
 		count, err := t.DeleteCandidateBlocks(2)
@@ -894,52 +853,40 @@ func TestDeleteCandidateBlocks(test *testing.T) {
 	if err != nil {
 		test.Fatal(err.Error())
 	}
+
 }
 
 func TestFetchBlockSince(test *testing.T) {
 
-	if drvrName == lite.DriverName {
-		// TODO: This should be enabled for all drivers
-		// To be handled with separate issue
-		test.Skip()
-	}
+	// Fetch target timestamp to look for
+	var targetHeight uint64 = 5
+	err := db.View(func(t database.Transaction) error {
 
-	test.Parallel()
-
-	var offset uint64
-	for offset = 2; offset < 8; offset++ {
-		var sinceUnixTime int64
-
-		// Fetch target timestamp to look for
-		const targetHeight = 6
-		err := db.View(func(t database.Transaction) error {
-
-			hash, err := t.FetchBlockHashByHeight(targetHeight)
-			if err != nil {
-				return err
-			}
-
-			header, err := t.FetchBlockHeader(hash)
-			if err != nil {
-				return err
-			}
-
-			sinceUnixTime = header.Timestamp
-
-			foundHeight, err := t.FetchBlockHeightSince(sinceUnixTime, offset)
-			if err != nil {
-				return err
-			}
-
-			if foundHeight != targetHeight {
-				test.Fatalf("wrong height value fetched")
-			}
-
-			return nil
-		})
-
+		hash, err := t.FetchBlockHashByHeight(targetHeight)
 		if err != nil {
-			test.Fatal(err.Error())
+			return err
 		}
+
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return err
+		}
+
+		sinceUnixTime := header.Timestamp
+		foundHeight, err := t.FetchBlockHeightSince(sinceUnixTime, 100000)
+		if err != nil {
+			return fmt.Errorf("FetchBlockHeightSince failed: %v", err)
+		}
+
+		if foundHeight != targetHeight {
+			test.Fatalf("expecting height %d but fetched %d", targetHeight, foundHeight)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err.Error())
 	}
+
 }

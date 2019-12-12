@@ -76,8 +76,8 @@ func storeBlocksAsync(test *testing.T, db database.DB, blocks []*block.Block, ti
 	return nil
 }
 
-// A helper function to generate a set of blocks as mock objects
-func generateBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
+// A helper function to generate a set of blocks that can be chained
+func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
 
 	overallBlockTxs := (1 + 4*int(sampleTxsBatchCount))
 	overallTxsCount := blocksCount * overallBlockTxs
@@ -86,25 +86,28 @@ func generateBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
 	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
 		b := helper.RandomBlock(test, atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
-
 		// assume consensus time is 10sec
 		b.Header.Timestamp = int64(10 * b.Header.Height)
 
-		newBlocks[i] = b
-	}
-
-	// Make all txs calculate and cache hash value.
-	for _, b := range newBlocks {
 		for _, tx := range b.Txs {
 			_, err := tx.CalculateHash()
-
 			if err != nil {
 				return nil, err
 			}
 		}
+
+		newBlocks[i] = b
 	}
 
 	return newBlocks, nil
+}
+
+func generateRandomBlocks(test *testing.T, blocksCount int) []*block.Block {
+	newBlocks := make([]*block.Block, blocksCount)
+	for i := 0; i < blocksCount; i++ {
+		newBlocks[i] = helper.RandomBlock(test, uint64(i+1), sampleTxsBatchCount)
+	}
+	return newBlocks
 }
 
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
