@@ -40,6 +40,9 @@ type (
 		// non-StandardTx data fields
 		BlockHash []byte
 		Size      uint64
+
+		// Coinbase Tx fields
+		Score []byte
 	}
 )
 
@@ -71,6 +74,14 @@ func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 	}
 
 	qd.BlockHash = blockHash
+
+	// Populate Score value if available
+	if tx.Type() == core.CoinbaseType {
+		x, ok := tx.(*core.Coinbase)
+		if ok {
+			qd.Score = x.Score
+		}
+	}
 
 	return qd, nil
 }
