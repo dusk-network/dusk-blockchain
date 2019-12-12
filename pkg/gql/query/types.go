@@ -74,6 +74,9 @@ var Transaction = graphql.NewObject(
 			"score": &graphql.Field{
 				Type: Hex,
 			},
+			"size": &graphql.Field{
+				Type: graphql.Int,
+			},
 		},
 	},
 )

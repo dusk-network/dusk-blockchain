@@ -1,10 +1,12 @@
 package query
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
@@ -39,7 +41,7 @@ type (
 
 		// non-StandardTx data fields
 		BlockHash []byte
-		Size      uint64
+		Size      int
 
 		// Coinbase Tx fields
 		Score []byte
@@ -82,6 +84,14 @@ func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 			qd.Score = x.Score
 		}
 	}
+
+	// Populate marshalling size
+	buf := new(bytes.Buffer)
+	if err := marshalling.MarshalTx(buf, tx); err != nil {
+		return queryTx{}, err
+	}
+
+	qd.Size = buf.Len()
 
 	return qd, nil
 }
