@@ -191,13 +191,30 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-- Fetch last/latest 100 transactions
+- Fetch last/latest 100 transactions (type and size fetched)
 ```graphql
 { 
   transactions(last: 100) 
   { 
-    txid 
-    txtype 
+    txid
+    txtype
+    size
   }
+}
+```
+
+- Calculate count of blocks (tip - old height) since 1970-01-01T00:00:20+00:00
+```graphql
+{
+	tip: blocks(height: -1) {
+		header {
+			height
+		}
+	}
+	old: blocks(since: "1970-01-01T00:00:20+00:00") {
+		header {
+			height
+		}
+	}
 }
 ```

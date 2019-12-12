@@ -75,6 +75,7 @@ type Transaction interface {
 	// Read-write transactions
 	// Store the next chain block in a append-only manner
 	// Overwrites only if block with same hash already stored
+	// Not to be called concurrently, as it updates chain tip
 	StoreBlock(block *block.Block) error
 
 	// StoreCandidateBlock stores a candidate block to be proposed in next
@@ -112,6 +113,10 @@ type Transaction interface {
 	// FetchBidValues retrieves the last stored D and K values from
 	// the database.
 	FetchBidValues() ([]byte, []byte, error)
+
+	// FetchBlockHeightSince try to find height of a block generated around
+	// sinceUnixTime starting the search from height (tip - offset)
+	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
 
 	// Atomic storage
 	Commit() error
