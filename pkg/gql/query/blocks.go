@@ -3,6 +3,7 @@ package query
 import (
 	"encoding/hex"
 	"errors"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -15,6 +16,7 @@ const (
 	blockHeightArg = "height"
 	blockRangeArg  = "range"
 	blockLastArg   = "last"
+	blockSinceArg  = "since"
 )
 
 // File purpose is to define all arguments and resolvers relevant to "blocks" query only
@@ -40,6 +42,9 @@ func (b blocks) getQuery() *graphql.Field {
 			},
 			blockLastArg: &graphql.ArgumentConfig{
 				Type: graphql.Int,
+			},
+			blockSinceArg: &graphql.ArgumentConfig{
+				Type: graphql.DateTime,
 			},
 		},
 		Resolve: b.resolve,
@@ -96,6 +101,11 @@ func (b blocks) resolve(p graphql.ResolveParams) (interface{}, error) {
 			return nil, errors.New("invalid offset")
 		}
 		return b.fetchBlocksByHeights(db, int64(offset)*-1, -1)
+	}
+
+	date, ok := p.Args[blockSinceArg].(time.Time)
+	if ok {
+		return b.fetchBlocksByDate(db, date)
 	}
 
 	return nil, nil
@@ -222,4 +232,44 @@ func (b blocks) fetchBlocksByHeights(db database.DB, from, to int64) ([]*block.B
 	})
 
 	return blocks, err
+}
+
+// Fetch block headers by a range of heights
+func (b blocks) fetchBlocksByDate(db database.DB, sinceDate time.Time) ([]*block.Block, error) {
+
+	blocks := make([]*block.Block, 0)
+	err := db.View(func(t database.Transaction) error {
+
+		const offset = 24 * 3600
+		height, err := t.FetchBlockHeightSince(sinceDate.Unix(), offset)
+		if err != nil {
+			return err
+		}
+
+		hash, err := t.FetchBlockHashByHeight(uint64(height))
+		if err != nil {
+			return err
+		}
+
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return err
+		}
+
+		// Reconstructing block with header only
+		b := &block.Block{
+			Header: header,
+			Txs:    nil,
+		}
+
+		blocks = append(blocks, b)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return blocks, err
+
 }
