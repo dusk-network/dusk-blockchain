@@ -22,6 +22,8 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Set("rpc.network", node.Cfg.RPC.Network)
 	viper.Set("rpc.address", node.Cfg.RPC.Address)
 	viper.Set("rpc.enabled", "true")
+	viper.Set("rpc.user", "default")
+	viper.Set("rpc.pass", "default")
 	viper.Set("database.driver", heavy.DriverName)
 	viper.Set("database.dir", node.Dir+"/chain/")
 	viper.Set("wallet.store", node.Dir+"/walletDB/")
