@@ -20,7 +20,6 @@ import (
 	"math"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -117,8 +116,8 @@ func _TestDriver(m *testing.M, driverName string) int {
 		return 1
 	}
 
-	// Try to store all blocks in concurrent manner for less than 20 seconds
-	err = storeBlocksAsync(nil, db, blocks, time.Duration(20*time.Second))
+	// Try to store all blocks in append-only manner
+	err = storeBlocks(nil, db, blocks)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -135,8 +134,6 @@ func _TestDriver(m *testing.M, driverName string) int {
 }
 
 func TestStoreBlock(test *testing.T) {
-
-	test.Parallel()
 
 	// Generate additional blocks to store
 	genBlocks, err := generateChainBlocks(test, 2)
@@ -518,8 +515,6 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	if drvrName == lite.DriverName {
 		test.Skip()
 	}
-
-	test.Parallel()
 
 	// Create database in read-write mode
 	readonly := false

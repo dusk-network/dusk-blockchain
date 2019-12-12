@@ -1,9 +1,7 @@
 package test
 
 import (
-	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -23,57 +21,22 @@ var (
 	sampleTxsBatchCount uint16 = 2
 )
 
-// storeBlocksAsync is a helper function to store a slice of blocks in a
-// concurrent manner.
-func storeBlocksAsync(test *testing.T, db database.DB, blocks []*block.Block, timeoutDuration time.Duration) error {
-
-	routinesCount := runtime.NumCPU()
-	blocksCount := len(blocks)
-	var wg sync.WaitGroup
-	// For each slice of N blocks build a batch to be performed concurrently
-	for batchIndex := 0; batchIndex <= blocksCount/routinesCount; batchIndex++ {
-
-		// get a slice of all blocks
-		from := routinesCount * batchIndex
-		to := from + routinesCount
-
-		if to > blocksCount {
-			// half-open interval reslicing
-			to = blocksCount
+// storeBlocks is a helper function to store a slice of blocks in a
+// sequential manner.
+func storeBlocks(test *testing.T, db database.DB, blocks []*block.Block) error {
+	err := db.Update(func(t database.Transaction) error {
+		for _, block := range blocks {
+			// Store block
+			err := t.StoreBlock(block)
+			if err != nil {
+				fmt.Print(err.Error())
+				return err
+			}
 		}
+		return nil
+	})
 
-		// Start a separate unit to perform a DB tx with multiple StoreBlock
-		// calls
-		wg.Add(1)
-		go func(blocks []*block.Block, wg *sync.WaitGroup) {
-
-			defer wg.Done()
-			_ = db.Update(func(t database.Transaction) error {
-
-				for _, block := range blocks {
-					// Store block
-					err := t.StoreBlock(block)
-					if err != nil {
-						fmt.Print(err.Error())
-						return err
-					}
-				}
-				return nil
-			})
-
-		}(blocks[from:to], &wg)
-	}
-
-	// Wait here for all updates to complete or just timeout in case of a
-	// deadlock.
-	timeouted := waitTimeout(&wg, timeoutDuration)
-
-	if timeouted {
-		// Also it might be due to too slow write call
-		return errors.New("Seems like we've got a deadlock situation on storing blocks in concurrent way")
-	}
-
-	return nil
+	return err
 }
 
 // A helper function to generate a set of blocks that can be chained

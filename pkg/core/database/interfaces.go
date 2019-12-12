@@ -75,6 +75,7 @@ type Transaction interface {
 	// Read-write transactions
 	// Store the next chain block in a append-only manner
 	// Overwrites only if block with same hash already stored
+	// Not to be called concurrently, as it updates chain tip
 	StoreBlock(block *block.Block) error
 
 	// StoreCandidateBlock stores a candidate block to be proposed in next
