@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-wallet/block"
 )
 
 var (
@@ -50,7 +50,11 @@ func storeBlocksAsync(test *testing.T, db database.DB, blocks []*block.Block, ti
 			defer wg.Done()
 			_ = db.Update(func(t database.Transaction) error {
 
-				for _, block := range blocks {
+				for i, block := range blocks {
+					// assume consensus time is 10sec
+					block.Header.Timestamp = int64(10 * i)
+
+					// Store block
 					err := t.StoreBlock(block)
 					if err != nil {
 						fmt.Print(err.Error())

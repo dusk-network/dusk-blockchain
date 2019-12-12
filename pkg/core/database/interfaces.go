@@ -113,6 +113,10 @@ type Transaction interface {
 	// the database.
 	FetchBidValues() ([]byte, []byte, error)
 
+	// FetchBlockHeightSince try to find height of a block generated around
+	// sinceUnixTime starting the search from height (tip - offset)
+	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
+
 	// Atomic storage
 	Commit() error
 	Rollback() error

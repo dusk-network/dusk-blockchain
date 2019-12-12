@@ -649,3 +649,36 @@ func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 
 	return value[0:32], value[32:64], nil
 }
+
+// FetchBlockHeightSince uses binary search to find a block height
+func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error) {
+
+	tip, err := t.FetchCurrentHeight()
+	if err != nil {
+		return 0, err
+	}
+
+	n := uint64(math.Min(float64(tip), float64(offset)))
+
+	pos, err := utils.Search(n, func(pos uint64) (bool, error) {
+		height := tip - uint64(n) + uint64(pos)
+		hash, err := t.FetchBlockHashByHeight(height)
+		if err != nil {
+			return false, err
+		}
+
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return false, err
+		}
+
+		return header.Timestamp >= sinceUnixTime, nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return tip - uint64(n) + uint64(pos), nil
+
+}

@@ -47,6 +47,7 @@ func TestMain(m *testing.M) {
 	var code int
 	// Run on all registered drivers.
 	for _, driverName := range database.Drivers() {
+
 		code = _TestDriver(m, driverName)
 		// the exit code might be needed on proper CI execution
 		if code != 0 {
@@ -143,7 +144,10 @@ func TestStoreBlock(test *testing.T) {
 
 	done := false
 	err = db.Update(func(t database.Transaction) error {
-		for _, block := range genBlocks {
+		for i, block := range genBlocks {
+			// assume consensus time is 10sec
+			block.Header.Timestamp = int64(100 + 10*i)
+
 			err := t.StoreBlock(block)
 			if err != nil {
 				return err
@@ -889,5 +893,51 @@ func TestDeleteCandidateBlocks(test *testing.T) {
 
 	if err != nil {
 		test.Fatal(err.Error())
+	}
+}
+
+func TestFetchBlockSince(test *testing.T) {
+
+	if drvrName == lite.DriverName {
+		// TODO: This should be enabled for all drivers
+		// To be handled with separate issue
+		test.Skip()
+	}
+
+	var offset uint64
+	for offset = 2; offset < 8; offset++ {
+		var sinceUnixTime int64
+
+		// Fetch target timestamp to look for
+		const targetHeight = 6
+		err := db.View(func(t database.Transaction) error {
+
+			hash, err := t.FetchBlockHashByHeight(targetHeight)
+			if err != nil {
+				return err
+			}
+
+			header, err := t.FetchBlockHeader(hash)
+			if err != nil {
+				return err
+			}
+
+			sinceUnixTime = header.Timestamp
+
+			foundHeight, err := t.FetchBlockHeightSince(sinceUnixTime, offset)
+			if err != nil {
+				return err
+			}
+
+			if foundHeight != targetHeight {
+				test.Fatalf("wrong height value fetched")
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			test.Fatal(err.Error())
+		}
 	}
 }
