@@ -165,7 +165,7 @@ func TestRemove(t *testing.T) {
 	_, _, c := setupChainTest(t, false)
 
 	keys, _ := key.NewRandConsensusKeys()
-	if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 1000); err != nil {
+	if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 		t.Fatal(err)
 	}
 
@@ -184,7 +184,7 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		keys, _ := key.NewRandConsensusKeys()
-		if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 1000); err != nil {
+		if err := c.addProvisioner(keys.EdPubKeyBytes, keys.BLSPubKeyBytes, 500, 0, 1000); err != nil {
 			t.Fatal(err)
 		}
 	}
