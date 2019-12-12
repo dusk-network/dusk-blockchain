@@ -282,7 +282,18 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
 	var i int
 
+	currentHeight, err := t.FetchCurrentHeight()
+	if err != nil {
+		panic(err)
+	}
+
 	for iterator.Next() {
+		// We only take unlocked decoys
+		unlockHeight := binary.LittleEndian.Uint64(iterator.Value())
+		if unlockHeight > currentHeight {
+			continue
+		}
+
 		// Output public key is the iterator key minus the `OutputKeyPrefix`
 		// (1 byte)
 		value := iterator.Key()[1:]
