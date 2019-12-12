@@ -50,10 +50,7 @@ func storeBlocksAsync(test *testing.T, db database.DB, blocks []*block.Block, ti
 			defer wg.Done()
 			_ = db.Update(func(t database.Transaction) error {
 
-				for i, block := range blocks {
-					// assume consensus time is 10sec
-					block.Header.Timestamp = int64(10 * i)
-
+				for _, block := range blocks {
 					// Store block
 					err := t.StoreBlock(block)
 					if err != nil {
@@ -89,6 +86,10 @@ func generateBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
 	newBlocks := make([]*block.Block, blocksCount)
 	for i := 0; i < blocksCount; i++ {
 		b := helper.RandomBlock(test, atomic.AddUint64(&heightCounter, 1), sampleTxsBatchCount)
+
+		// assume consensus time is 10sec
+		b.Header.Timestamp = int64(10 * b.Header.Height)
+
 		newBlocks[i] = b
 	}
 

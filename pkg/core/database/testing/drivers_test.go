@@ -904,6 +904,8 @@ func TestFetchBlockSince(test *testing.T) {
 		test.Skip()
 	}
 
+	test.Parallel()
+
 	var offset uint64
 	for offset = 2; offset < 8; offset++ {
 		var sinceUnixTime int64
