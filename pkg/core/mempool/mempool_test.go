@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"math"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -48,7 +49,7 @@ type ctx struct {
 	rpcBus *rpcbus.RPCBus
 }
 
-func (c* ctx) reset() {
+func (c *ctx) reset() {
 
 	// Reset shared context state
 	c.m.Quit()
@@ -303,7 +304,7 @@ func TestRemoveAccepted(t *testing.T) {
 	buf := new(bytes.Buffer)
 	_ = marshalling.MarshalBlock(buf, b)
 
-	c.bus.Publish(topics.AcceptedBlock, buf)
+	c.bus.Publish(topics.IntermediateBlock, buf)
 
 	c.assert(t, false)
 }
