@@ -69,7 +69,7 @@ Each method takes in a specific identifier, which should correspond to one of th
 
 Since the `Coordinator` has full knowledge of the state, it is also responsible for signing outgoing messages. This functionality is abstracted through the `Signer` interface and exposes two methods:
 
-- `SendAuthenticated(topic, hash, payload, id)`
-- `SendWithHeader(topic, hash, payload, id)`
+- `Gossip(topic, hash, payload, id)`
+- `SendInternally(topic, hash, payload, id)`
 
-Both methods take an id, which allows the `Coordinator` to refuse requests for sending messages from obsolete components. `SendAuthenticated` is intended for propagation to the network, while `SendWithHeader` is intended for internal propagation.
+Both methods take an id, which allows the `Coordinator` to refuse requests for sending messages from obsolete components. `Gossip` is intended for propagation to the network, while `SendInternally` is intended for internal propagation.

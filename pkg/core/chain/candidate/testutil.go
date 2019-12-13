@@ -26,12 +26,12 @@ func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, hdr header.Header, b *bytes.Buffer, id uint32) error {
+func (m *mockSigner) Gossip(topic topics.Topic, hdr header.Header, b *bytes.Buffer, id uint32) error {
 	m.bus.Publish(topic, b)
 	return nil
 }
 
-func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
+func (m *mockSigner) SendInternally(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
 	// Because the buffer in a BestScore message is empty, we will write the hash to it.
 	// This way, we can check for correctness during tests.
 	if err := encoding.Write256(b, hash); err != nil {

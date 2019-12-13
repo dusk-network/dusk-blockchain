@@ -144,7 +144,8 @@ func TestStreamer(t *testing.T) {
 		assert.FailNow(t, "error in reading from the subscribed stream")
 	}
 
-	assert.Equal(t, "pluto", string(packet))
+	// first 4 bytes of packet are the checksum
+	assert.Equal(t, "pluto", string(packet[4:]))
 }
 
 //******************

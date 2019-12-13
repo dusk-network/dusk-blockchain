@@ -117,7 +117,7 @@ func (g *Generator) generateScore() error {
 		return err
 	}
 
-	return g.signer.SendWithHeader(topics.ScoreEvent, emptyHash[:], buf, g.ID())
+	return g.signer.SendInternally(topics.ScoreEvent, emptyHash[:], buf, g.ID())
 }
 
 func (g *Generator) createScoreEvent(seed []byte, proof zkproof.ZkProof) Event {

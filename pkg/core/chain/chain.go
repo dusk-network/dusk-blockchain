@@ -91,7 +91,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Chain, error) {
 	// Hook the chain up to the required topics
 	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
 	eventBus.Subscribe(topics.Block, cbListener)
-	eventBus.Register(topics.Candidate, consensus.NewRepublisher(eventBus, topics.Candidate), &consensus.Validator{})
+	eventBus.Register(topics.Candidate, consensus.NewRepublisher(eventBus, topics.Candidate))
 	return chain, nil
 }
 
