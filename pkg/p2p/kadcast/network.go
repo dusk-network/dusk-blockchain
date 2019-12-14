@@ -11,7 +11,7 @@ import (
 // StartUDPListener listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
-func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer, ) {
+func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 
 	lAddr := getLocalUDPAddress()
 	// Set listening port.
@@ -62,4 +62,44 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 		log.WithError(err).Warn("Error while writting to the filedescriptor.")
 		return
 	} 
+}
+
+// StartUDPListener listens infinitely for UDP packet arrivals and
+// executes it's processing inside a gorutine by sending
+// the packets to the circularQueue.
+func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
+
+	lAddr := getLocalTCPAddress()
+	// Set listening port.
+	lAddr.Port = int(MyPeerInfo.port)
+PacketConnCreation:
+	// listen to incoming udp packets
+	listener, err := net.ListenTCP(netw, &lAddr)
+	if err != nil {
+		log.Panic(err)
+	}
+	// Set initial deadline.
+	listener.SetDeadline(time.Now().Add(time.Minute))
+
+	// Instanciate the buffer
+	//buffer := make([]byte, 5000000)
+	for {
+		// Read UDP packet.
+		pc, err := listener.AcceptTCP()
+		//uAddr := pc.RemoteAddr()
+		//byteNum, err := pc.Read(buffer)
+		if err != nil {
+			log.WithError(err).Warn("Error on packet read")
+			pc.Close()
+			goto PacketConnCreation
+		} 
+		// Set a new deadline for the connection.
+		pc.SetDeadline(time.Now().Add(5 * time.Minute))
+		// Serialize the packet.
+		//TODO: Create methods for encoding packets.
+		//encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
+		// Send the packet to the Consumer putting it on the queue.
+		// TODO: Receive a second queue to process Broadcast packets.
+		//queue.Put(encodedPack)
+	}
 }
