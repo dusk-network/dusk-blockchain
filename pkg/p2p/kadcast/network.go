@@ -39,7 +39,7 @@ PacketConnCreation:
 		// Set a new deadline for the connection.
 		pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
-		encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
+		encodedPack := encodeRedUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
 	}
@@ -64,7 +64,7 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	} 
 }
 
-// StartUDPListener listens infinitely for UDP packet arrivals and
+// StartTCPListener listens infinitely for TCP packet arrivals and
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
 func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
@@ -73,7 +73,7 @@ func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 	// Set listening port.
 	lAddr.Port = int(MyPeerInfo.port)
 PacketConnCreation:
-	// listen to incoming udp packets
+	// listen to incoming TCP packets
 	listener, err := net.ListenTCP(netw, &lAddr)
 	if err != nil {
 		log.Panic(err)
@@ -82,12 +82,12 @@ PacketConnCreation:
 	listener.SetDeadline(time.Now().Add(time.Minute))
 
 	// Instanciate the buffer
-	//buffer := make([]byte, 5000000)
+	buffer := make([]byte, 5000000)
 	for {
-		// Read UDP packet.
+		// Read TCP packet.
 		pc, err := listener.AcceptTCP()
-		//uAddr := pc.RemoteAddr()
-		//byteNum, err := pc.Read(buffer)
+		uAddr := pc.RemoteAddr()
+		byteNum, err := pc.Read(buffer)
 		if err != nil {
 			log.WithError(err).Warn("Error on packet read")
 			pc.Close()
@@ -96,10 +96,9 @@ PacketConnCreation:
 		// Set a new deadline for the connection.
 		pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
-		//TODO: Create methods for encoding packets.
-		//encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
+		encodedPack := encodeRedTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		// TODO: Receive a second queue to process Broadcast packets.
-		//queue.Put(encodedPack)
+		queue.Put(encodedPack)
 	}
 }
