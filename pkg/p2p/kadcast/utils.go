@@ -145,9 +145,9 @@ func getBytesFromUint16(num uint16) [2]byte {
 	return res
 }
 
-// Encode a received packet to send it through the
+// Encodes received UDP packets to send it through the
 // Ring to the packetProcess rutine.
-func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
+func encodeRedUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
 	encodedLen := len(payload) + 8
 	enc := make([]byte, encodedLen)
 	// Get numBytes as slice of bytes.
@@ -158,6 +158,26 @@ func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byt
 	copy(enc[2:6], peerAddr.IP[0:4])
 	// Append Port
 	port := getBytesFromUint16(uint16(peerAddr.Port))
+	copy(enc[6:8], port[0:2])
+	// Append Payload
+	copy(enc[8:encodedLen], payload[0:len(payload)])
+	return enc
+}
+
+// Encodes received TCP packets to send it through the
+// Ring to the packetProcess rutine.
+func encodeRedTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
+	peerDataStr := peerAddr.String()
+	encodedLen := len(payload) + 8
+	enc := make([]byte, encodedLen)
+	// Get numBytes as slice of bytes.
+	numBytes := getBytesFromUint16(byteNum)
+	// Append it to the resulting slice.
+	copy(enc[0:2], numBytes[0:2])
+	// Append Peer IP.
+	copy(enc[2:6], peerDataStr[0:4])
+	// Append Port
+	port := peerDataStr[4:6]
 	copy(enc[6:8], port[0:2])
 	// Append Payload
 	copy(enc[8:encodedLen], payload[0:len(payload)])
