@@ -68,7 +68,9 @@ func TestAcceptFromPeer(t *testing.T) {
 	}
 
 	go func() {
-		assert.NoError(t, c.onAcceptBlock(*buf))
+		if err := c.onAcceptBlock(*buf); err.Error() != "request timeout" {
+			t.Fatal(err)
+		}
 	}()
 
 	// Should receive a StopConsensus message
@@ -92,13 +94,68 @@ func TestAcceptFromPeer(t *testing.T) {
 	}
 
 	assert.Equal(t, uint64(2), round)
+
 }
 
 // This test ensures the correct behaviour when accepting a block
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
-	// eb, _, c := setupChainTest(t, false)
+	eb, _, c := setupChainTest(t, false)
+	go c.Listen()
+	intermediateChan := make(chan bytes.Buffer, 1)
+	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
+	roundUpdateChan := make(chan bytes.Buffer, 1)
+	eb.Subscribe(topics.RoundUpdate, eventbus.NewChanListener(roundUpdateChan))
 
+	// Make a 'winning' candidate message
+	blk := helper.RandomBlock(t, 2, 1)
+	cert := block.EmptyCertificate()
+	buf := new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Store it
+	eb.Publish(topics.Candidate, buf)
+
+	// Now send a `Certificate` message with this block's hash
+	// Make a certificate with a different step, to do a proper equality
+	// check later
+	cert = block.EmptyCertificate()
+	cert.Step = 5
+
+	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
+
+	// Should have `blk` as intermediate block now
+	assert.True(t, blk.Equals(c.intermediateBlock))
+
+	// lastCertificate should be `cert`
+	assert.True(t, cert.Equals(c.lastCertificate))
+
+	// Should have gotten `blk` over topics.IntermediateBlock
+	blkBuf := <-intermediateChan
+	decodedBlk := block.NewBlock()
+	if err := marshalling.UnmarshalBlock(&blkBuf, decodedBlk); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.True(t, blk.Equals(decodedBlk))
+
+	// Should have gotten a round update with proper info
+	ruBuf := <-roundUpdateChan
+	ru := &consensus.RoundUpdate{}
+	if err := consensus.DecodeRound(&ruBuf, ru); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should coincide with the new intermediate block
+	assert.Equal(t, blk.Header.Height+1, ru.Round)
+	assert.Equal(t, blk.Header.Hash, ru.Hash)
+	assert.Equal(t, blk.Header.Seed, ru.Seed)
 }
 
 // If a candidate block is missing to be set as the next intermediate
