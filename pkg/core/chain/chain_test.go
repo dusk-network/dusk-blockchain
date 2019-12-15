@@ -1,15 +1,21 @@
 package chain
 
 import (
+	"bytes"
 	"testing"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -20,37 +26,86 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-/*
-func TestDemoSaveFunctionality(t *testing.T) {
+// This test ensures the correct behaviour from the Chain, when
+// accepting a block from a peer.
+func TestAcceptFromPeer(t *testing.T) {
+	eb, _, c := setupChainTest(t, false)
+	stopConsensusChan := make(chan bytes.Buffer, 1)
+	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
-	eb := eventbus.New()
-	rpc := rpcbus.New()
-	c, keys := agreement.MockCommittee(2, true, 2)
-	chain, err := New(eb, rpc, c)
+	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
 
-	assert.Nil(t, err)
-
-	defer chain.Close()
-
-	for i := 1; i < 5; i++ {
-		nextBlock := helper.RandomBlock(t, 200, 10)
-		nextBlock.Header.PrevBlockHash = chain.prevBlock.Header.Hash
-		nextBlock.Header.Height = uint64(i)
-
-		// mock certificate to pass test
-		cert := createMockedCertificate(nextBlock.Header.Hash, nextBlock.Header.Height, keys)
-		nextBlock.Header.Certificate = cert
-		err = chain.AcceptBlock(*nextBlock)
-		assert.NoError(t, err)
-		// Do this to avoid errors with the timestamp when accepting blocks
-		time.Sleep(1 * time.Second)
+	// First, test accepting a block when the counter is set to not syncing.
+	blk := helper.RandomBlock(t, 1, 1)
+	buf := new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+		t.Fatal(err)
 	}
 
-	err = chain.AcceptBlock(chain.prevBlock)
-	assert.Error(t, err)
+	assert.NoError(t, c.onAcceptBlock(*buf))
+
+	// Function should return before sending the `StopConsensus` message
+	select {
+	case <-stopConsensusChan:
+		t.Fatal("not supposed to get a StopConsensus message")
+	case <-time.After(1 * time.Second):
+	}
+
+	// Now, test accepting a block with 1 on the sync counter
+	c.counter.StartSyncing(1)
+
+	blk = helper.RandomBlock(t, 1, 1)
+	blk.SetPrevBlock(c.prevBlock.Header)
+	// Strip all but coinbase tx, to avoid unwanted errors
+	blk.Txs = blk.Txs[0:1]
+	blk.SetRoot()
+	blk.SetHash()
+	buf = new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		assert.NoError(t, c.onAcceptBlock(*buf))
+	}()
+
+	// Should receive a StopConsensus message
+	<-stopConsensusChan
+
+	// Discard block gossip
+	if _, err := streamer.Read(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should get a request for round results for round 2
+	m, err := streamer.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, topics.GetRoundResults, streamer.SeenTopics()[1])
+	var round uint64
+	if err := encoding.ReadUint64LE(bytes.NewBuffer(m), &round); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, uint64(2), round)
+}
+
+// This test ensures the correct behaviour when accepting a block
+// directly from the consensus.
+func TestAcceptIntermediate(t *testing.T) {
+	// eb, _, c := setupChainTest(t, false)
 
 }
-*/
+
+// If a candidate block is missing to be set as the next intermediate
+// block, the Chain should request it.
+func TestRequestMissingCandidate(t *testing.T) {
+
+}
 
 func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
 	votes := agreement.GenVotes(hash, round, 3, keys, p)
