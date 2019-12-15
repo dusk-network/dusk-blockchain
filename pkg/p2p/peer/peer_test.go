@@ -1,8 +1,8 @@
 package peer_test
 
 import (
-	"bufio"
 	"bytes"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -88,33 +88,29 @@ func TestWriteLoop(t *testing.T) {
 	bus := eventbus.New()
 	client, srv := net.Pipe()
 
+	g := processing.NewGossip(protocol.TestNet)
 	buf := makeAgreementBuffer(10)
-	go func() {
+	go func(g *processing.Gossip) {
 		responseChan := make(chan *bytes.Buffer)
-		g := processing.NewGossip(protocol.TestNet)
 		writer := peer.NewWriter(client, g, bus)
 		go writer.Serve(responseChan, make(chan struct{}, 1))
 
 		bufCopy := *buf
 		responseChan <- &bufCopy
-	}()
-
-	r := bufio.NewReader(srv)
-	length, err := processing.ReadFrame(r)
-	if err != nil {
-		t.Fatal(err)
-	}
+	}(g)
 
 	// Decode and remove magic
-	bs := make([]byte, length)
-	_, err = r.Read(bs)
+	length, err := g.UnpackLength(srv)
+	assert.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	decoded := make([]byte, length)
+	_, err = io.ReadFull(srv, decoded)
+	assert.NoError(t, err)
 
-	decoded := bytes.NewBuffer(bs)
-	assert.Equal(t, decoded.Bytes()[4:], buf.Bytes())
+	// Remove checksum
+	decoded = decoded[4:]
+
+	assert.Equal(t, decoded, buf.Bytes())
 }
 
 // Test that the 'ping' message is sent correctly, and that a 'pong' message will result.

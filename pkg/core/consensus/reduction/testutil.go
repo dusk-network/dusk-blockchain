@@ -25,12 +25,12 @@ func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) SendAuthenticated(topic topics.Topic, hdr header.Header, b *bytes.Buffer, id uint32) error {
+func (m *mockSigner) Gossip(topic topics.Topic, hdr header.Header, b *bytes.Buffer, id uint32) error {
 	m.bus.Publish(topic, b)
 	return nil
 }
 
-func (m *mockSigner) SendWithHeader(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
+func (m *mockSigner) SendInternally(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
 	m.bus.Publish(topic, b)
 	return nil
 }
@@ -75,8 +75,8 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, f
 // Verify StepVotes. The step must be specified otherwise verification would be dependent on the state of the Helper
 func (hlp *Helper) Verify(hash []byte, sv *agreement.StepVotes, step uint8) error {
 	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
-	sub := vc.Intersect(sv.BitSet)
-	apk, err := agreement.ReconstructApk(sub)
+	sub := vc.IntersectCluster(sv.BitSet)
+	apk, err := agreement.ReconstructApk(sub.Set)
 	if err != nil {
 		return err
 	}

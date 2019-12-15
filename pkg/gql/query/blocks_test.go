@@ -251,3 +251,33 @@ func TestBlocksTxsQuery(t *testing.T) {
 	`
 	assertQuery(t, query, response)
 }
+
+func TestBlocksByDate(t *testing.T) {
+
+	query := `
+	{
+	   blocks (since:  "1970-01-01T00:00:20+00:00" )     
+		{
+			 header
+			 {
+				height
+			 }
+	  }
+    }
+	`
+
+	response := `
+	{
+        	"data": {
+        		"blocks": [
+        			{
+        				"header": {
+        					"height": 1
+        				}
+        			}
+        		]
+        	}
+        }
+	`
+	assertQuery(t, query, response)
+}

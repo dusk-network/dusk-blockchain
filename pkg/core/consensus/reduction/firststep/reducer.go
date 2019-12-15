@@ -66,7 +66,7 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 
 	reductionSubscriber := consensus.TopicListener{
 		Topic:         topics.Reduction,
-		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(r.broker, topics.Reduction), &consensus.Validator{}},
+		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(r.broker, topics.Reduction)},
 		Listener:      consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority, true),
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
@@ -135,7 +135,7 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) {
 		return
 	}
 
-	if err := r.signer.SendAuthenticated(topics.Reduction, hdr, payload, r.ID()); err != nil {
+	if err := r.signer.Gossip(topics.Reduction, hdr, payload, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")
 	}
 }
@@ -157,7 +157,7 @@ func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
 		r.timeOut = r.timeOut * 2
 	}
 
-	r.signer.SendWithHeader(topics.StepVotes, hash, buf, r.ID())
+	r.signer.SendInternally(topics.StepVotes, hash, buf, r.ID())
 }
 
 // CollectBestScore activates the 2-step reduction cycle.

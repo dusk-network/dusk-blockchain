@@ -121,7 +121,7 @@ func (ms *SimpleStreamer) Read() ([]byte, error) {
 	}
 
 	packet := make([]byte, length)
-	if read, err := ms.Reader.Read(packet); err != nil {
+	if read, err := io.ReadFull(ms.Reader, packet); err != nil {
 		return nil, err
 	} else if uint64(read) != length {
 		return nil, io.EOF

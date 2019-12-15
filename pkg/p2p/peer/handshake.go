@@ -6,14 +6,14 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 // Handshake with another peer.
 func (p *Writer) Handshake() error {
-
-	if err := p.writeLocalMsgVersion(); err != nil {
+	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
 		return err
 	}
 
@@ -25,7 +25,7 @@ func (p *Writer) Handshake() error {
 		return err
 	}
 
-	return p.writeVerAck()
+	return p.writeVerAck(p.gossip)
 }
 
 // Handshake with another peer.
@@ -34,28 +34,28 @@ func (p *Reader) Handshake() error {
 		return err
 	}
 
-	if err := p.writeVerAck(); err != nil {
+	if err := p.writeVerAck(p.gossip); err != nil {
 		return err
 	}
 
-	if err := p.writeLocalMsgVersion(); err != nil {
+	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
 		return err
 	}
 
 	return p.readVerAck()
 }
 
-func (p *Connection) writeLocalMsgVersion() error {
+func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
 	message, err := p.createVersionBuffer()
 	if err != nil {
 		return err
 	}
 
-	if err := p.addHeader(message, topics.Version); err != nil {
+	if err := topics.Prepend(message, topics.Version); err != nil {
 		return err
 	}
 
-	if err := processing.WriteFrame(message); err != nil {
+	if err := g.Process(message); err != nil {
 		return err
 	}
 
@@ -69,9 +69,16 @@ func (p *Connection) readRemoteMsgVersion() error {
 		return err
 	}
 
-	decodedMsg := new(bytes.Buffer)
-	decodedMsg.Write(msgBytes)
+	m, cs, err := checksum.Extract(msgBytes)
+	if err != nil {
+		return err
+	}
 
+	if !checksum.Verify(m, cs) {
+		return errors.New("invalid checksum")
+	}
+
+	decodedMsg := bytes.NewBuffer(m)
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -90,30 +97,22 @@ func (p *Connection) readRemoteMsgVersion() error {
 	return verifyVersion(version.Version)
 }
 
-func (p *Connection) addHeader(m *bytes.Buffer, topic topics.Topic) error {
-	buf := p.gossip.Magic.ToBuffer()
-	if err := topics.Write(&buf, topic); err != nil {
-		return err
-	}
-
-	if _, err := buf.ReadFrom(m); err != nil {
-		return err
-	}
-
-	*m = buf
-	return nil
-}
-
 func (p *Connection) readVerAck() error {
-
 	msgBytes, err := p.ReadMessage()
 	if err != nil {
 		return err
 	}
 
-	decodedMsg := new(bytes.Buffer)
-	decodedMsg.Write(msgBytes)
+	m, cs, err := checksum.Extract(msgBytes)
+	if err != nil {
+		return err
+	}
 
+	if !checksum.Verify(m, cs) {
+		return errors.New("invalid checksum")
+	}
+
+	decodedMsg := bytes.NewBuffer(m)
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
 		return err
@@ -127,13 +126,13 @@ func (p *Connection) readVerAck() error {
 	return nil
 }
 
-func (p *Connection) writeVerAck() error {
+func (p *Connection) writeVerAck(g *processing.Gossip) error {
 	verAckMsg := new(bytes.Buffer)
-	if err := p.addHeader(verAckMsg, topics.VerAck); err != nil {
+	if err := topics.Prepend(verAckMsg, topics.VerAck); err != nil {
 		return err
 	}
 
-	if err := processing.WriteFrame(verAckMsg); err != nil {
+	if err := g.Process(verAckMsg); err != nil {
 		return err
 	}
 

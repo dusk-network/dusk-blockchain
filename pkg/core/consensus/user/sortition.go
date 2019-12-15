@@ -14,37 +14,33 @@ import (
 // point in the consensus. The set is sorted by the int value of the public key in
 // increasing order (higher last)
 type VotingCommittee struct {
-	sortedset.Set
+	sortedset.Cluster
 }
 
 func newCommittee() *VotingCommittee {
 	return &VotingCommittee{
-		Set: sortedset.New(),
+		Cluster: sortedset.NewCluster(),
 	}
 }
 
 // Size returns how many members there are in a VotingCommittee.
 func (v VotingCommittee) Size() int {
-	return len(v.Set)
+	return v.TotalOccurrences()
 }
 
 // Remove a member from the VotingCommittee by its BLS public key.
 func (v *VotingCommittee) Remove(pk []byte) bool {
-	return v.Set.Remove(pk)
+	return v.Remove(pk)
 }
 
 // MemberKeys returns the BLS public keys of all the members in a VotingCommittee.
 func (v VotingCommittee) MemberKeys() [][]byte {
-	pks := make([][]byte, 0)
-	for _, pk := range v.Set {
-		pks = append(pks, pk.Bytes())
-	}
-	return pks
+	return v.Unravel()
 }
 
 // Equal checks if two VotingCommittees are the same.
 func (v VotingCommittee) Equal(other *VotingCommittee) bool {
-	return v.Set.Equal(other.Set)
+	return v.Cluster.Equal(other.Cluster)
 }
 
 // IsMember checks if `pubKeyBLS` is within the VotingCommittee.

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -19,7 +20,6 @@ import (
 	"math"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -31,7 +31,7 @@ var (
 	drvrName string
 	db       database.DB
 	storeDir string
-	// Sample data to populate DB initially
+	// Sample chain data to populate DB
 	blocks []*block.Block
 )
 
@@ -47,6 +47,7 @@ func TestMain(m *testing.M) {
 	var code int
 	// Run on all registered drivers.
 	for _, driverName := range database.Drivers() {
+
 		code = _TestDriver(m, driverName)
 		// the exit code might be needed on proper CI execution
 		if code != 0 {
@@ -66,6 +67,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 		db = nil
 		drvr = nil
 		storeDir = ""
+		atomic.StoreUint64(&heightCounter, 0)
 	}()
 
 	// Create a temp folder with random name
@@ -101,7 +103,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 	// Generate a few blocks to be used as sample objects
 	// Less blocks are used as we have CI out-of-memory error
 	t := &testing.T{}
-	blocks, err = generateBlocks(t, 10)
+	blocks, err = generateChainBlocks(t, 10)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -114,8 +116,8 @@ func _TestDriver(m *testing.M, driverName string) int {
 		return 1
 	}
 
-	// Try to store all blocks in concurrent manner for less than 20 seconds
-	err = storeBlocksAsync(nil, db, blocks, time.Duration(20*time.Second))
+	// Try to store all blocks in append-only manner
+	err = storeBlocks(nil, db, blocks)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -133,10 +135,8 @@ func _TestDriver(m *testing.M, driverName string) int {
 
 func TestStoreBlock(test *testing.T) {
 
-	test.Parallel()
-
 	// Generate additional blocks to store
-	genBlocks, err := generateBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(test, 2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -417,11 +417,7 @@ func TestAtomicUpdates(test *testing.T) {
 	// That said, no parallelism should be applied.
 	// test.Parallel()
 
-	genBlocks, err := generateBlocks(test, 2)
-
-	if err != nil {
-		test.Fatal(err.Error())
-	}
+	genBlocks := generateRandomBlocks(test, 2)
 
 	// Save current storage state to compare later
 	// Supported only in heavy.DB for now
@@ -434,7 +430,7 @@ func TestAtomicUpdates(test *testing.T) {
 	// Try to store all genBlocks and make it fail at last iteration of
 	// read-write Tx
 	forcedError := errors.New("force majeure situation")
-	err = db.Update(func(t database.Transaction) error {
+	err := db.Update(func(t database.Transaction) error {
 
 		for height, block := range genBlocks {
 			err := t.StoreBlock(block)
@@ -520,8 +516,6 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 		test.Skip()
 	}
 
-	test.Parallel()
-
 	// Create database in read-write mode
 	readonly := false
 	dbReadWrite, err := drvr.Open(storeDir, protocol.DevNet, readonly)
@@ -549,7 +543,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	defer dbReadOnly.Close()
 
 	// Initialize db and a slice of 10 blocks with 2 transactions.Transaction each
-	genBlocks, err := generateBlocks(test, 2)
+	genBlocks, err := generateChainBlocks(test, 2)
 	if err != nil {
 		test.Fatal(err.Error())
 	}

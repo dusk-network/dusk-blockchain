@@ -16,7 +16,7 @@ import (
 // Test if removing members from the VotingCommittee works properly.
 func TestRemove(t *testing.T) {
 	nr := 5
-	committee := &user.VotingCommittee{sortedset.New()}
+	committee := &user.VotingCommittee{sortedset.NewCluster()}
 	for i := 0; i < nr; i++ {
 		k, _ := key.NewRandConsensusKeys()
 		bk := (&big.Int{}).SetBytes(k.BLSPubKeyBytes)

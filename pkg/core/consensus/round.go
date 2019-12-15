@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/dusk-network/dusk-wallet/key"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ed25519"
 )
 
 var _ EventPlayer = (*Coordinator)(nil)
@@ -167,6 +166,7 @@ type Coordinator struct {
 	factories  []ComponentFactory
 	components []Component
 	eventqueue *Queue
+	roundQueue *Queue
 
 	pubkeyBuf bytes.Buffer
 
@@ -191,6 +191,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 		keys:       keys,
 		factories:  factories,
 		eventqueue: NewQueue(),
+		roundQueue: NewQueue(),
 		pubkeyBuf:  *pkBuf,
 		unsynced:   true,
 		stopped:    true,
@@ -255,6 +256,7 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	c.Update(r.Round)
 	c.unsynced = false
 	c.stopped = false
+	go c.flushRoundQueue()
 
 	// TODO: the Coordinator should not send events. someone else should kickstart the
 	// consensus loop
@@ -262,6 +264,32 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		Topic: topics.Generation,
 		Event: Event{},
 	})
+	return nil
+}
+
+func (c *Coordinator) flushRoundQueue() {
+	evs := c.roundQueue.Flush(c.Round())
+	if evs != nil {
+		for _, ev := range evs {
+			c.store.Dispatch(ev)
+		}
+	}
+}
+
+// CollectFinalize is triggered when the Agreement reaches quorum, and pre-emptively
+// finalizes all consensus components, as they are no longer needed after this point.
+func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	// Ensure that we should take this message seriously
+	var round uint64
+	if err := encoding.ReadUint64LE(&m, &round); err != nil {
+		return err
+	}
+	lg.WithFields(log.Fields{
+		"coordinator round": c.Round(),
+		"message round":     round,
+	}).Debugln("received Finalize message")
 
 	return nil
 }
@@ -315,6 +343,19 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 		return nil
 	case header.After:
 		lg.WithField("topic", topic).Debugln("storing future event")
+
+		// If it is a future agreement event, we store it on the
+		// `roundQueue`. This means that the event will be dispatched
+		// as soon as the Coordinator reaches the round in the event
+		// header.
+		if topic == topics.Agreement {
+			c.roundQueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
+			c.lock.RUnlock()
+			return nil
+		}
+
+		// Otherwise, we just queue it according to the header round
+		// and step.
 		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
 		c.lock.RUnlock()
 		return nil
@@ -369,8 +410,9 @@ func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 	return signedHash.Compress(), nil
 }
 
-// SendAuthenticated sign the payload with Ed25519 and publishes it to the Gossip topic
-func (c *Coordinator) SendAuthenticated(topic topics.Topic, hdr header.Header, payload *bytes.Buffer, id uint32) error {
+// Gossip concatenates the topic, the header and the payload,
+// and gossips it to the rest of the network.
+func (c *Coordinator) Gossip(topic topics.Topic, hdr header.Header, payload *bytes.Buffer, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
@@ -384,37 +426,19 @@ func (c *Coordinator) SendAuthenticated(topic topics.Topic, hdr header.Header, p
 		return err
 	}
 
-	edSigned := ed25519.Sign(*c.keys.EdSecretKey, buf.Bytes())
-
-	// messages start from the signature
-	whole := new(bytes.Buffer)
-	if err := encoding.Write512(whole, edSigned); err != nil {
-		return err
-	}
-
-	// adding Ed public key
-	if err := encoding.Write256(whole, c.keys.EdPubKeyBytes); err != nil {
-		return err
-	}
-
-	// adding marshalled header+payload
-	if _, err := whole.ReadFrom(buf); err != nil {
-		return err
-	}
-
 	// prepending topic
-	if err := topics.Prepend(whole, topic); err != nil {
+	if err := topics.Prepend(buf, topic); err != nil {
 		return err
 	}
 
 	// gossip away
-	c.eventBus.Publish(topics.Gossip, whole)
+	c.eventBus.Publish(topics.Gossip, buf)
 	return nil
 }
 
-// SendWithHeader prepends a header to the given payload, and publishes it on the
-// desired topic.
-func (c *Coordinator) SendWithHeader(topic topics.Topic, hash []byte, payload *bytes.Buffer, id uint32) error {
+// SendInternally prepends a header to the given payload, and publishes
+// it on the desired topic.
+func (c *Coordinator) SendInternally(topic topics.Topic, hash []byte, payload *bytes.Buffer, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}

@@ -31,46 +31,65 @@ func (v Set) Equal(other Set) bool {
 	return true
 }
 
-func (v Set) indexOf(k *big.Int) (int, bool) {
-	cmp := 0
-	found := false
-
-	i := sort.Search(len(v), func(i int) bool {
-		cmp = v[i].Cmp(k)
-		if cmp == 0 {
-			found = true
-		}
-		return cmp >= 0
-	})
-	return i, found
-}
-
+// IndexOf returns the index at which a byte slice should be inserted and
+// whether the element is actually found or otherwise. Internally uses big.Int
+// representation
 func (v Set) IndexOf(b []byte) (int, bool) {
-	iPk := &big.Int{}
-	iPk.SetBytes(b)
+	// trivially handle the case of an empty set
+	if len(v) == 0 {
+		return 0, false
+	}
+
+	// turn the []byte into a big.Int
+	iPk := new(big.Int).SetBytes(b)
 	return v.indexOf(iPk)
 }
 
-func (v Set) OccurrencesOf(b []byte) int {
-	iPk := big.NewInt(0).SetBytes(b)
-	return v.occurrencesOf(iPk)
-}
+// indexOf returns the index at which a big.Int representation of a BLS key
+// should be inserted and whether the
+// key is actually present or otherwise
+func (v Set) indexOf(iPk *big.Int) (int, bool) {
 
-func (v Set) occurrencesOf(k *big.Int) int {
-	var n int
-	for _, pk := range v {
-		if pk.Cmp(k) == 0 {
-			n++
-		}
+	// use binary search to get the index of the element
+	idx := sort.Search(len(v), func(i int) bool {
+		return v[i].Cmp(iPk) >= 0
+	})
+
+	if idx < len(v) && iPk.Cmp(v[idx]) == 0 {
+		// the element is actually found at the index
+		return idx, true
 	}
 
-	return n
+	// the element wasn't found
+	return idx, false
+}
+
+// Insert a big.Int representation of a BLS key at a proper index (respectful of the VotingCommittee order).
+// If the element is already in the VotingCommittee does nothing and returns false
+func (v *Set) Insert(b []byte) bool {
+	iRepr := new(big.Int).SetBytes(b)
+	l := len(*v)
+	if l == 0 {
+		*v = append(*v, iRepr)
+		return true
+	}
+
+	idx, found := v.indexOf(iRepr)
+	if found {
+		return false
+	}
+
+	*v = append(*v, new(big.Int))
+	copy((*v)[idx+1:], (*v)[idx:])
+	(*v)[idx] = iRepr
+	return true
 }
 
 // Remove an entry from the set. Return false if the entry can't be found
 func (v *Set) Remove(pubKeyBLS []byte) bool {
 	i, found := v.IndexOf(pubKeyBLS)
 	if found {
+		// TODO: this is inefficient
 		*v = append((*v)[:i], (*v)[i+1:]...)
 		return true
 	}
@@ -124,19 +143,6 @@ func (v Set) String() string {
 		str.WriteString("\n")
 	}
 	return str.String()
-}
-
-// Insert a big.Int representation of a BLS key at a proper index (respectful of the VotingCommittee order). If the element is already in the VotingCommittee does nothing and returns false
-func (v *Set) Insert(b []byte) {
-	iRepr := new(big.Int).SetBytes(b)
-
-	idx := sort.Search(len(*v), func(i int) bool {
-		return (*v)[i].Cmp(iRepr) > 0
-	})
-
-	*v = append(*v, new(big.Int))
-	copy((*v)[idx+1:], (*v)[idx:])
-	(*v)[idx] = iRepr
 }
 
 func (v Set) Whole() uint64 {

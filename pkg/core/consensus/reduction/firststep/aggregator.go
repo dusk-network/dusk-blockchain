@@ -65,7 +65,6 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 		sv.StepVotes = agreement.NewStepVotes()
 		sv.Set = sortedset.New()
 	}
-
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
 		return err
 	}

@@ -24,14 +24,15 @@ const (
 type Signer interface {
 	// Sign a payload. The first is parameter is a block hash
 	Sign(header.Header) ([]byte, error)
-	// SendAuthenticated performs a ED25519 signature on a message before forwarding
+	// Gossip concatenates all information before gossiping it to the
+	// rest of the network.
 	// It accepts a topic, a blockhash, a payload and the ID of the requesting
 	// component
-	SendAuthenticated(topics.Topic, header.Header, *bytes.Buffer, uint32) error
-	// SendWithHeader is used for internal forwarding. It exposes the same
-	// parameters as SendAuthenticated but does not perform a ED25519 signature
+	Gossip(topics.Topic, header.Header, *bytes.Buffer, uint32) error
+	// SendInternally is used for internal forwarding. It exposes the same
+	// parameters as Gossip but does not perform a ED25519 signature
 	// on the Event (and neither forwards it to the Gossip topic
-	SendWithHeader(topics.Topic, []byte, *bytes.Buffer, uint32) error
+	SendInternally(topics.Topic, []byte, *bytes.Buffer, uint32) error
 }
 
 // EventPlayer is the interface used by Components to signal their intention to

@@ -3,9 +3,9 @@ package factory
 import (
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/chain/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"

@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net"
 	"sync"
@@ -14,12 +15,15 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer
+
+var l *log.Entry = log.WithField("process", "peer")
 
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 // The `net.Conn` is guarded by a mutex, to allow both multicast and one-to-one
@@ -96,10 +100,7 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 	// txs from the new peer
 	go func() {
 		if err := dataRequestor.RequestMempoolItems(); err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error sending topics.Mempool message")
+			l.WithError(err).Warnln("error sending topics.Mempool message")
 		}
 	}()
 
@@ -108,7 +109,6 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 
 // ReadMessage reads from the connection
 func (c *Connection) ReadMessage() ([]byte, error) {
-	// COBS  c.reader.ReadBytes(0x00)
 	length, err := c.gossip.UnpackLength(c.Conn)
 	if err != nil {
 		return nil, err
@@ -174,10 +174,7 @@ func (w *Writer) pingLoop() {
 	for {
 		<-ticker.C
 		if err := w.ping(); err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error pinging peer")
+			l.WithError(err).Warnln("error pinging peer")
 			// Clean up ticker
 			ticker.Stop()
 			return
@@ -205,19 +202,12 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 		select {
 		case buf := <-writeQueueChan:
 			if err := w.gossip.Process(buf); err != nil {
-				log.WithFields(log.Fields{
-					"process": "peer",
-					"error":   err,
-				}).Warnln("error processing outgoing message")
+				l.WithError(err).Warnln("error processing outgoing message")
 				continue
 			}
 
 			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
-				log.WithFields(log.Fields{
-					"process": "peer",
-					"queue":   "writequeue",
-					"error":   err,
-				}).Warnln("error writing message")
+				l.WithField("queue", "writequeue").WithError(err).Warnln("error writing message")
 				exitChan <- struct{}{}
 			}
 		case <-exitChan:
@@ -241,14 +231,22 @@ func (p *Reader) ReadLoop() {
 
 		b, err := p.ReadMessage()
 		if err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error reading message")
+			l.WithError(err).Warnln("error reading message")
 			return
 		}
 
-		p.router.Collect(bytes.NewBuffer(b))
+		message, cs, err := checksum.Extract(b)
+		if err != nil {
+			l.WithError(err).Warnln("error reading message")
+			return
+		}
+
+		if !checksum.Verify(message, cs) {
+			l.WithError(errors.New("invalid checksum")).Warnln("error reading message")
+			return
+		}
+
+		p.router.Collect(bytes.NewBuffer(message))
 	}
 }
 

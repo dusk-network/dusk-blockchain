@@ -126,6 +126,27 @@ func TestEventFilter(t *testing.T) {
 	assert.Equal(t, 1, len(agComp.receivedEvents))
 }
 
+// Ensure an agreement event is queued on the correct state, and
+// dispatched on the correct state.
+func TestQueueDispatchAgreement(t *testing.T) {
+	c, _ := initCoordinatorTest(t, topics.Agreement)
+
+	// Send an Agreement event from a future round.
+	// It should be queued
+	ev := mockEventBuffer(t, topics.Agreement, 2, 3)
+	c.CollectEvent(*ev)
+	// Should be queued on round 2
+	assert.Equal(t, 1, len(c.roundQueue.entries[2][3]))
+
+	// Update the round to dispatch the event
+	ruBuf := MockRoundUpdateBuffer(2, nil, nil)
+	c.CollectRoundUpdate(*ruBuf)
+	agComp := c.store.components[0].(*mockComponent)
+
+	// Should receive the agreement event
+	<-agComp.receivedEvents
+}
+
 // Initialize a coordinator with a single component.
 func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Component) {
 	bus := eventbus.New()
@@ -176,14 +197,14 @@ func (m *mockFactory) Instantiate() Component {
 // does it's job correctly.
 type mockComponent struct {
 	topic          topics.Topic
-	receivedEvents []Event
+	receivedEvents chan Event
 	id             uint32
 }
 
 func newMockComponent(topic topics.Topic) *mockComponent {
 	return &mockComponent{
 		topic:          topic,
-		receivedEvents: make([]Event, 0),
+		receivedEvents: make(chan Event, 100),
 	}
 }
 
@@ -202,7 +223,7 @@ func (m *mockComponent) ID() uint32 {
 }
 
 func (m *mockComponent) Collect(ev Event) error {
-	m.receivedEvents = append(m.receivedEvents, ev)
+	m.receivedEvents <- ev
 	return nil
 }
 
