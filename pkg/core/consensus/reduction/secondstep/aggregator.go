@@ -70,7 +70,7 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 		sv.Cluster.Insert(hdr.PubKeyBLS)
 	}
 	a.voteSets[hash] = sv
-	if len(sv.Set) >= a.handler.Quorum() {
+	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum() {
 		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 		a.requestHalt(hdr.BlockHash, a.firstStepVotes, sv.StepVotes)
