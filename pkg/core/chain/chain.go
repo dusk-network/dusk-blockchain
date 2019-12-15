@@ -581,16 +581,20 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	// Fetch new intermediate block and corresponding certificate
 	cm, err := c.candidateStore.fetchCandidateMessage(cMsg.hash)
 	if err != nil {
-		// If we don't have the block, we should wait for the network
-		// to propagate it
+		// If the network doesn't provide us the block, we will fall
+		// back and catch up later.
 		return
 	}
 
-	if c.intermediateBlock != nil {
-		if err := c.finalizeIntermediateBlock(cm.cert); err != nil {
-			log.WithError(err).Warnln("could not accept intermediate block")
-			return
-		}
+	if c.intermediateBlock == nil {
+		// If we're missing the intermediate block, we will also fall
+		// back and catch up later.
+		return
+	}
+
+	if err := c.finalizeIntermediateBlock(cm.cert); err != nil {
+		log.WithError(err).Warnln("could not accept intermediate block")
+		return
 	}
 
 	// Set new intermediate block
