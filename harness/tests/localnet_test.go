@@ -142,8 +142,8 @@ func TestSendBidTransaction(t *testing.T) {
 			return true
 		}
 
-		// asserts that given condition will be met in 1024 seconds, by checking condition function each second.
-		if !assert.Eventuallyf(t, condition, 1024*time.Second, time.Second, "failed node %s", node.Id) {
+		// asserts that given condition will be met in 1 minute, by checking condition function each second.
+		if !assert.Eventuallyf(t, condition, 1*time.Minute, time.Second, "failed node %s", node.Id) {
 			break
 		}
 	}
