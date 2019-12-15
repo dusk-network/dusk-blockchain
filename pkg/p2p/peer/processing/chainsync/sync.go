@@ -71,7 +71,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 		}
 
 		s.responseChan <- buf
-		s.startSyncing(uint64(diff))
+		s.StartSyncing(uint64(diff))
 		return nil
 	}
 

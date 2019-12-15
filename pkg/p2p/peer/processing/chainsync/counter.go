@@ -53,7 +53,7 @@ func (s *Counter) IsSyncing() bool {
 	return s.blocksRemaining > 0
 }
 
-func (s *Counter) startSyncing(heightDiff uint64) {
+func (s *Counter) StartSyncing(heightDiff uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
