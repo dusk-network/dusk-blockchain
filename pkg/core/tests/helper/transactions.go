@@ -18,7 +18,7 @@ import (
 
 const (
 	lockTime = uint64(2000000000)
-	fee      = int64(20)
+	fee      = int64(200)
 )
 
 var numInputs, numOutputs = 23, 16
