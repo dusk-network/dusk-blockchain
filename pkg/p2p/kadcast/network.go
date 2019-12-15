@@ -1,9 +1,10 @@
 package kadcast
 
 import (
-	log "github.com/sirupsen/logrus"
 	"net"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
@@ -35,7 +36,7 @@ PacketConnCreation:
 			log.WithError(err).Warn("Error on packet read")
 			pc.Close()
 			goto PacketConnCreation
-		} 
+		}
 		// Set a new deadline for the connection.
 		pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
@@ -61,7 +62,7 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	if err != nil {
 		log.WithError(err).Warn("Error while writting to the filedescriptor.")
 		return
-	} 
+	}
 }
 
 // StartTCPListener listens infinitely for TCP packet arrivals and
@@ -91,12 +92,29 @@ PacketConnCreation:
 			log.WithError(err).Warn("Error on packet read")
 			pc.Close()
 			goto PacketConnCreation
-		} 
+		}
 		// Set a new deadline for the connection.
 		pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
 		encodedPack := encodeRedTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
+	}
+}
+
+// Opens a TCP connection with the peer sent on the params and transmits
+// a stream of bytes. Once transmited, closes the connection.
+func sendTCPStream(addr net.UDPAddr, payload []byte) {
+	conn, err := net.Dial("tcp", string(addr.IP)+":"+string(addr.Port))
+	if err != nil {
+		log.WithError(err).Warn("Could not stablish a connection with the dest Peer.")
+		return
+	}
+	defer conn.Close()
+	// Write our message to the connection.
+	_, err = conn.Write(payload)
+	if err != nil {
+		log.WithError(err).Warn("Error while writting to the filedescriptor.")
+		return
 	}
 }
