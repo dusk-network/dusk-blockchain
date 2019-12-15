@@ -161,7 +161,26 @@ func TestAcceptIntermediate(t *testing.T) {
 // If a candidate block is missing to be set as the next intermediate
 // block, the Chain should request it.
 func TestRequestMissingCandidate(t *testing.T) {
+	eb, _, c := setupChainTest(t, false)
+	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
+	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
+	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
 
+	// Make a 'winning' candidate message. No storing it though
+	blk := helper.RandomBlock(t, 2, 1)
+	cert := block.EmptyCertificate()
+
+	// Pretend we finalized on it
+	go c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
+
+	// Should now get a GetCandidate message with this block's hash.
+	m, err := streamer.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, topics.GetCandidate, streamer.SeenTopics()[0])
+	assert.Equal(t, blk.Header.Hash, m)
 }
 
 func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
