@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -39,19 +40,19 @@ func (s storedAgreements) String() string {
 
 type store struct {
 	sync.RWMutex
-	collected map[string]storedAgreements
+	collected map[uint8]storedAgreements
 }
 
 func newStore() *store {
 	return &store{
-		collected: make(map[string]storedAgreements),
+		collected: make(map[uint8]storedAgreements),
 	}
 }
 
 func (s *store) String() string {
 	var sb strings.Builder
 	for k, v := range s.collected {
-		sb.WriteString(k)
+		sb.WriteString(strconv.Itoa(int(k)))
 		sb.WriteString(": ")
 		sb.WriteString(v.String())
 		sb.WriteString("\n")
@@ -71,7 +72,7 @@ func (s *store) Size() int {
 func (s *store) Insert(a Agreement, weight int) int {
 	s.Lock()
 	defer s.Unlock()
-	blockHash := hex.EncodeToString(a.Header.BlockHash)
+
 	idx := s.find(a)
 	if idx == -1 {
 		agreements := make([]Agreement, weight)
@@ -79,11 +80,11 @@ func (s *store) Insert(a Agreement, weight int) int {
 			agreements[i] = a
 		}
 
-		s.collected[blockHash] = storedAgreements(agreements)
+		s.collected[a.Step] = storedAgreements(agreements)
 		return weight
 	}
 
-	stored := s.collected[blockHash]
+	stored := s.collected[a.Step]
 	// if the Agreement is already in the store we do not add it
 	if s.contains(idx, a) {
 		return len(stored)
@@ -97,15 +98,14 @@ func (s *store) Insert(a Agreement, weight int) int {
 		stored[idx] = a
 	}
 
-	s.collected[blockHash] = stored
+	s.collected[a.Step] = stored
 	return len(stored)
 }
 
-func (s *store) Get(hash []byte) []Agreement {
-	blockHash := hex.EncodeToString(hash)
+func (s *store) Get(step uint8) []Agreement {
 	s.RLock()
 	defer s.RUnlock()
-	return s.collected[blockHash]
+	return s.collected[step]
 }
 
 func (s *store) Find(a Agreement) int {
@@ -117,8 +117,7 @@ func (s *store) Find(a Agreement) int {
 // Find returns the index of an Agreement in the stored collection or, if the Agreement has not been stored, the index at which it would be stored.
 // In case no Agreement is stored for the blockHash specified, it returns -1
 func (s *store) find(a Agreement) int {
-	hash := hex.EncodeToString(a.Header.BlockHash)
-	stored := s.collected[hash]
+	stored := s.collected[a.Step]
 	if stored == nil {
 		return -1
 	}
@@ -136,8 +135,7 @@ func (s *store) Contains(a Agreement) bool {
 }
 
 func (s *store) contains(idx int, a Agreement) bool {
-	hash := hex.EncodeToString(a.Header.BlockHash)
-	stored := s.collected[hash]
+	stored := s.collected[a.Step]
 	if idx == -1 {
 		return false
 	}

@@ -69,9 +69,9 @@ func TestAccumulation(t *testing.T) {
 
 	createAgreement := newAggroFactory(10)
 
-	// Send two mock events to the accumulator (they must be different otherwise the store is gonna ignore them)
-	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 2))
+	// Send two mock events to the accumulator
+	accumulator.Process(createAgreement(1, 1, 1))
+	accumulator.Process(createAgreement(1, 1, 2))
 	// Should get something back on CollectedVotesChan
 	events := <-accumulator.CollectedVotesChan
 	// Should have two events
@@ -87,10 +87,10 @@ func TestStop(t *testing.T) {
 	createAgreement := newAggroFactory(10)
 
 	// Send two mock events to the accumulator
-	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 2))
+	accumulator.Process(createAgreement(1, 1, 1))
+	accumulator.Process(createAgreement(1, 1, 2))
 	accumulator.Stop()
-	accumulator.Process(createAgreement(1, 3))
+	accumulator.Process(createAgreement(1, 1, 3))
 
 	// Should NOT get something back on CollectedVotesChan
 	select {
@@ -111,8 +111,8 @@ func TestFailedVerification(t *testing.T) {
 	createAgreement := newAggroFactory(10)
 
 	// Send two mock events to the accumulator
-	accumulator.Process(createAgreement(1, 1))
-	accumulator.Process(createAgreement(1, 2))
+	accumulator.Process(createAgreement(1, 1, 1))
+	accumulator.Process(createAgreement(1, 1, 2))
 	// We should not get anything from the CollectedVotesChan
 	timer := time.After(100 * time.Millisecond)
 	select {
@@ -132,7 +132,7 @@ func TestNotInCommittee(t *testing.T) {
 	createAgreement := newAggroFactory(10)
 
 	// Send two mock events to the accumulator
-	accumulator.Process(createAgreement(1, 1))
+	accumulator.Process(createAgreement(1, 1, 1))
 	// We should not get anything from the CollectedVotesChan
 	timer := time.After(100 * time.Millisecond)
 	select {
@@ -201,12 +201,12 @@ func (m *mockAccumulatorHandler) IsMember(pubKeyBLS []byte, round uint64, step u
 }
 */
 
-func newAggroFactory(provisionersNr int) func(uint64, uint8) Agreement {
+func newAggroFactory(provisionersNr int) func(uint64, uint8, int) Agreement {
 	hash, _ := crypto.RandEntropy(32)
 	p, ks := consensus.MockProvisioners(provisionersNr)
 
-	return func(round uint64, step uint8) Agreement {
-		a := MockAgreementEvent(hash, round, step, ks, p)
+	return func(round uint64, step uint8, idx int) Agreement {
+		a := MockAgreementEvent(hash, round, step, ks, p, idx)
 		return *a
 	}
 }

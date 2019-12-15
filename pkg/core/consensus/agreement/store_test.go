@@ -10,22 +10,17 @@ import (
 )
 
 var hdr header.Header
+var blsPubKey, _ = crypto.RandEntropy(32)
 
-func init() {
-
-	blsPubKey, _ := crypto.RandEntropy(32)
-	hdr = header.Header{
-		Round:     uint64(1),
-		Step:      uint8(1),
-		PubKeyBLS: blsPubKey,
-	}
-}
-
-func mockAgreement(id string, blockHash []byte) Agreement {
+func mockAgreement(id string, blockHash []byte, step uint8) Agreement {
 	h := hdr
 	h.BlockHash = blockHash
 	a := Agreement{
-		Header: h,
+		Header: header.Header{
+			Round:     uint64(1),
+			Step:      step,
+			PubKeyBLS: blsPubKey,
+		},
 	}
 	a.SetSignature([]byte(id))
 	return a
@@ -34,36 +29,37 @@ func mockAgreement(id string, blockHash []byte) Agreement {
 var test = []struct {
 	sig              string
 	hash             []byte
+	step             uint8
 	storedAgreements int
 }{
-	{"pippo", []byte("hash1"), 1},
-	{"pluto", []byte("hash2"), 1},
-	{"pippo", []byte("hash1"), 1},
-	{"paperino", []byte("hash2"), 2},
-	{"pippo", []byte("hash2"), 3},
+	{"pippo", []byte("hash1"), 1, 1},
+	{"pluto", []byte("hash2"), 2, 1},
+	{"pippo", []byte("hash1"), 1, 1},
+	{"paperino", []byte("hash2"), 2, 2},
+	{"pippo", []byte("hash2"), 2, 3},
 }
 
 func TestStore(t *testing.T) {
 	s := newStore()
-	hashes := make([][]byte, 0)
+	steps := make([]uint8, 0)
 	for i, tt := range test {
-		hashes = append(hashes, tt.hash)
-		mock := mockAgreement(tt.sig, tt.hash)
+		steps = append(steps, tt.step)
+		mock := mockAgreement(tt.sig, tt.hash, tt.step)
 		if !assert.Equal(t, tt.storedAgreements, s.Insert(mock, 1)) {
 			assert.FailNow(t, fmt.Sprintf("store.Insertion failed at row: %d", i))
 		}
 		if !assert.True(t, s.Contains(mock)) {
 			assert.FailNow(t, fmt.Sprintf("store.Contains failed at row: %d", i))
 		}
-		if !assert.Equal(t, tt.storedAgreements, len(s.Get(tt.hash))) {
+		if !assert.Equal(t, tt.storedAgreements, len(s.Get(tt.step))) {
 			assert.FailNow(t, fmt.Sprintf("store.Get failed at row: %d", i))
 		}
 	}
 
 	s.Clear()
-	for _, hh := range hashes {
-		if !assert.Nil(t, s.Get(hh)) {
-			assert.FailNow(t, fmt.Sprintf("store.Clear failed to clean 0x%x", hh))
+	for _, step := range steps {
+		if !assert.Nil(t, s.Get(step)) {
+			assert.FailNow(t, fmt.Sprintf("store.Clear failed to clean 0x%x", step))
 		}
 	}
 }
