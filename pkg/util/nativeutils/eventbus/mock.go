@@ -8,6 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -147,7 +148,14 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 
 	decoded := bytes.NewBuffer(b)
 
+	// remove checksum
+	m, _, err := checksum.Extract(decoded.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
 	// check the topic
+	decoded = bytes.NewBuffer(m)
 	topic, err := topics.Extract(decoded)
 	if err != nil {
 		return nil, err
