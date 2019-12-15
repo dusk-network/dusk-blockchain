@@ -1,5 +1,10 @@
 package kadcast
 
+import (
+	"errors"
+	"math/rand"
+)
+
 // MaxBucketPeers represents the maximum
 //number of peers that a `bucket` can hold.
 var MaxBucketPeers uint8 = 25
@@ -61,6 +66,16 @@ func (b *bucket) removePeerAtIndex(index int) []Peer {
 	return b.entries[:len(b.entries)-1]
 }
 
+// Picks a random Peer from the bucket and returns it.
+func (b bucket) getRandomPeer() (*Peer, error) {
+	if b.peerCount == 0 {
+		// If the bucket has no nodes inside, we return an error.
+		return nil, errors.New("bucket empty")
+	}
+	maxVal := len(b.entries)
+	return &b.entries[rand.Intn(maxVal)], nil
+}
+
 // Adds a `Peer` to the `bucket` entries list.
 // It also increments the peerCount all according
 // the LRU policy.
@@ -78,7 +93,7 @@ func (b *bucket) addPeer(peer Peer) {
 		b.lru[peer] = b.totalPeersPassed
 		b.totalPeersPassed++
 		return
-	} 
+	}
 	// If the entries set is full, we perform
 	// LRU and remove a peer to include the new one.
 	//
