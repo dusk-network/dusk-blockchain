@@ -183,6 +183,39 @@ func TestRequestMissingCandidate(t *testing.T) {
 	assert.Equal(t, blk.Header.Hash, m)
 }
 
+func TestReturnOnNilIntermediateBlock(t *testing.T) {
+	eb, _, c := setupChainTest(t, false)
+	intermediateChan := make(chan bytes.Buffer, 1)
+	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
+
+	// Make a 'winning' candidate message
+	blk := helper.RandomBlock(t, 2, 1)
+	cert := block.EmptyCertificate()
+	buf := new(bytes.Buffer)
+	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
+		t.Fatal(err)
+	}
+
+	// Store it
+	eb.Publish(topics.Candidate, buf)
+
+	// Save current prevBlock
+	currPrevBlock := c.prevBlock
+	// set intermediate block to nil
+	c.intermediateBlock = nil
+
+	// Now pretend we finalized on it
+	c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
+
+	// Ensure everything is still the same
+	assert.True(t, currPrevBlock.Equals(&c.prevBlock))
+	assert.Nil(t, c.intermediateBlock)
+}
+
 func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
 	votes := agreement.GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{
