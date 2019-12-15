@@ -68,7 +68,6 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
 func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
-
 	lAddr := getLocalTCPAddress()
 	// Set listening port.
 	lAddr.Port = int(MyPeerInfo.port)
@@ -98,7 +97,6 @@ PacketConnCreation:
 		// Serialize the packet.
 		encodedPack := encodeRedTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
-		// TODO: Receive a second queue to process Broadcast packets.
 		queue.Put(encodedPack)
 	}
 }

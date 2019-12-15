@@ -19,7 +19,7 @@ func main() {
 	queue := ring.NewBuffer(500)
 
 	// Launch PacketProcessor rutine.
-	go kadcast.ProcessPacket(queue, &router)
+	go kadcast.ProcessUDPPacket(queue, &router)
 
 	// Launch a listener for our node.
 	go kadcast.StartUDPListener("udp", queue, router.MyPeerInfo)

@@ -184,7 +184,7 @@ func encodeRedTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byt
 	return enc
 }
 
-// Decode a CircularQueue packet and return the
+// Decodes a CircularQueue packet and returns the
 // elements of the original received packet.
 func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)
