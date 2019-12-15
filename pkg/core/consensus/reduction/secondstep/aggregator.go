@@ -24,7 +24,7 @@ type aggregator struct {
 	lock     sync.RWMutex
 	voteSets map[string]struct {
 		*agreement.StepVotes
-		sortedset.Set
+		sortedset.Cluster
 	}
 }
 
@@ -40,7 +40,7 @@ func newAggregator(
 		firstStepVotes: firstStepVotes,
 		voteSets: make(map[string]struct {
 			*agreement.StepVotes
-			sortedset.Set
+			sortedset.Cluster
 		}),
 	}
 }
@@ -58,7 +58,7 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 	sv, found := a.voteSets[hash]
 	if !found {
 		sv.StepVotes = agreement.NewStepVotes()
-		sv.Set = sortedset.New()
+		sv.Cluster = sortedset.NewCluster()
 	}
 
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
@@ -67,18 +67,18 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 
 	votes := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 	for i := 0; i < votes; i++ {
-		sv.Set.Insert(hdr.PubKeyBLS)
+		sv.Cluster.Insert(hdr.PubKeyBLS)
 	}
 	a.voteSets[hash] = sv
 	if len(sv.Set) >= a.handler.Quorum() {
 		a.finished = true
-		a.addBitSet(sv.StepVotes, sv.Set, hdr.Round, hdr.Step)
+		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 		a.requestHalt(hdr.BlockHash, a.firstStepVotes, sv.StepVotes)
 	}
 	return nil
 }
 
-func (a *aggregator) addBitSet(sv *agreement.StepVotes, set sortedset.Set, round uint64, step uint8) {
+func (a *aggregator) addBitSet(sv *agreement.StepVotes, cluster sortedset.Cluster, round uint64, step uint8) {
 	committee := a.handler.Committee(round, step)
-	sv.BitSet = committee.Bits(set)
+	sv.BitSet = committee.Bits(cluster.Set)
 }
