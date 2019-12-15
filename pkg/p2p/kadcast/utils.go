@@ -88,6 +88,15 @@ func verifyIDNonce(id [16]byte, nonce [4]byte) error {
 	return errors.New("Id and Nonce are not valid parameters") //TODO: Create error type.
 }
 
+// Returns the ID associated to the chunk sent.
+// The ID is the half of the result of the hash of the chunk.
+func computeChunkID(chunk []byte) [16]byte {
+	var halfLenID [16]byte
+	fullID := sha3.Sum256(chunk)
+	copy(halfLenID[0:16], fullID[0:16])
+	return halfLenID
+}
+
 // ------------------ NET UTILS ------------------ //
 
 // Gets the local IP address of the machine where
