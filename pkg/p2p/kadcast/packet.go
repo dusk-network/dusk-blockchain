@@ -135,7 +135,20 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 }
 
 // -------- CHUNKS Packet De/Serialization tools -------- //
-// TODO: Implement serde for CHUNKS packet.S
+func (pac *Packet) setChunksPayloadInfo(payload []byte) {
+	payloadLen := len(payload)
+	packPayload := make([]byte, payloadLen+17)
+	// Set packet height.
+	packPayload[0] = InitHeight
+	// Set packet ChunkID.
+	chunkID := computeChunkID(payload)
+	copy(packPayload[1:17], chunkID[0:16])
+	// Set the rest of the payload.
+	copy(packPayload[17:], payload[0:payloadLen])
+	pac.payload = packPayload
+}
+	
+// TODO: Implement serde for CHUNKS packet.
 
 // ----------- Message Handlers ----------- //
 
