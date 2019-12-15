@@ -20,7 +20,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/chain/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
