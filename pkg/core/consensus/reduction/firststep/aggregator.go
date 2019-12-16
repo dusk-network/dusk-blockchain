@@ -79,10 +79,12 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
 		blockHash := hdr.BlockHash
 
-		if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
-			blockHash = emptyHash[:]
-			a.requestHalt(emptyHash[:])
-			return nil
+		if !bytes.Equal(blockHash, emptyHash[:]) {
+			if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
+				blockHash = emptyHash[:]
+				a.requestHalt(emptyHash[:])
+				return nil
+			}
 		}
 
 		a.requestHalt(blockHash, sv.StepVotes)
