@@ -27,14 +27,15 @@ type Transactor struct {
 	acceptedBlockChan <-chan block.Block
 
 	// rpcbus channels
-	createWalletChan   chan rpcbus.Request
-	createFromSeedChan chan rpcbus.Request
-	loadWalletChan     chan rpcbus.Request
-	sendBidTxChan      chan rpcbus.Request
-	sendStakeTxChan    chan rpcbus.Request
-	sendStandardTxChan chan rpcbus.Request
-	getBalanceChan     chan rpcbus.Request
-	getAddressChan     chan rpcbus.Request
+	createWalletChan          chan rpcbus.Request
+	createFromSeedChan        chan rpcbus.Request
+	loadWalletChan            chan rpcbus.Request
+	sendBidTxChan             chan rpcbus.Request
+	sendStakeTxChan           chan rpcbus.Request
+	sendStandardTxChan        chan rpcbus.Request
+	getBalanceChan            chan rpcbus.Request
+	getUnconfirmedBalanceChan chan rpcbus.Request
+	getAddressChan            chan rpcbus.Request
 }
 
 // Instantiate a new Transactor struct.
@@ -55,14 +56,15 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 		fetchInputs: finputs,
 		walletOnly:  walletOnly,
 
-		createWalletChan:   make(chan rpcbus.Request, 1),
-		createFromSeedChan: make(chan rpcbus.Request, 1),
-		loadWalletChan:     make(chan rpcbus.Request, 1),
-		sendBidTxChan:      make(chan rpcbus.Request, 1),
-		sendStakeTxChan:    make(chan rpcbus.Request, 1),
-		sendStandardTxChan: make(chan rpcbus.Request, 1),
-		getBalanceChan:     make(chan rpcbus.Request, 1),
-		getAddressChan:     make(chan rpcbus.Request, 1),
+		createWalletChan:          make(chan rpcbus.Request, 1),
+		createFromSeedChan:        make(chan rpcbus.Request, 1),
+		loadWalletChan:            make(chan rpcbus.Request, 1),
+		sendBidTxChan:             make(chan rpcbus.Request, 1),
+		sendStakeTxChan:           make(chan rpcbus.Request, 1),
+		sendStandardTxChan:        make(chan rpcbus.Request, 1),
+		getBalanceChan:            make(chan rpcbus.Request, 1),
+		getUnconfirmedBalanceChan: make(chan rpcbus.Request, 1),
+		getAddressChan:            make(chan rpcbus.Request, 1),
 	}
 
 	if t.fetchDecoys == nil {
@@ -111,6 +113,10 @@ func (t *Transactor) registerMethods() error {
 	}
 
 	if err := t.rb.Register(rpcbus.GetBalance, t.getBalanceChan); err != nil {
+		return err
+	}
+
+	if err := t.rb.Register(rpcbus.GetUnconfirmedBalance, t.getUnconfirmedBalanceChan); err != nil {
 		return err
 	}
 

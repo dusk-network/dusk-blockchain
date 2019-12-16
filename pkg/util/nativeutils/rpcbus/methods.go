@@ -21,6 +21,7 @@ const (
 	SendStakeTx
 	SendStandardTx
 	GetBalance
+	GetUnconfirmedBalance
 	GetAddress
 )
 
