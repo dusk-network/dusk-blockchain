@@ -31,6 +31,7 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, t
 		failOnVerification: false,
 	}
 
+	go hlp.provideCandidateBlock()
 	go hlp.verifyCandidateBlock()
 	hlp.createResultChan()
 	return hlp
@@ -48,6 +49,15 @@ func (hlp *Helper) shouldFail() bool {
 	defer hlp.lock.RUnlock()
 	f := hlp.failOnVerification
 	return f
+}
+
+func (hlp *Helper) provideCandidateBlock() {
+	c := make(chan rpcbus.Request, 1)
+	hlp.RBus.Register(rpcbus.GetCandidate, c)
+	for {
+		r := <-c
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	}
 }
 
 func (hlp *Helper) verifyCandidateBlock() {

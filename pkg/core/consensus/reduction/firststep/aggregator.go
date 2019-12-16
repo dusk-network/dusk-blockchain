@@ -96,10 +96,21 @@ func (a *aggregator) addBitSet(sv *agreement.StepVotes, cluster sortedset.Cluste
 }
 
 func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
+	// Fetch the candidate block first.
+	req := rpcbus.NewRequest(*bytes.NewBuffer(blockHash))
+	blkBuf, err := rpcBus.Call(rpcbus.GetCandidate, req, 5*time.Second)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"process": "reduction",
+			"error":   err,
+		}).Errorln("fetching the candidate block failed")
+		return err
+	}
+
 	// If our result was not a zero value hash, we should first verify it
 	// before voting on it again
 	if !bytes.Equal(blockHash, emptyHash[:]) {
-		req := rpcbus.NewRequest(*(bytes.NewBuffer(blockHash)))
+		req := rpcbus.NewRequest(blkBuf)
 		if _, err := rpcBus.Call(rpcbus.VerifyCandidateBlock, req, 5*time.Second); err != nil {
 			log.WithFields(log.Fields{
 				"process": "reduction",
