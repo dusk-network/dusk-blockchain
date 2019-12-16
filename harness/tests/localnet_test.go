@@ -177,7 +177,6 @@ func TestCatchup(t *testing.T) {
 			return false
 		}
 
-		fmt.Println(result["data"]["blocks"][0]["header"]["height"])
 		if result["data"]["blocks"][0]["header"]["height"] >= waitHeight {
 			return true
 		}
@@ -195,7 +194,7 @@ func TestCatchup(t *testing.T) {
 
 	// Wait for two more blocks
 	waitHeight += 2
-	assert.Eventually(t, waitUntil, 50*time.Second, 5*time.Second)
+	assert.Eventually(t, waitUntil, 100*time.Second, 5*time.Second)
 
 	// Ensure node syncs up
 	ensureSynced := func() bool {
