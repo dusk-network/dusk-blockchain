@@ -43,7 +43,7 @@ func TestStoreFetchClear(t *testing.T) {
 func TestRequestCandidate(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
-	b := newBroker(eb, rpc)
+	b := NewBroker(eb, rpc)
 	go b.Listen()
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)

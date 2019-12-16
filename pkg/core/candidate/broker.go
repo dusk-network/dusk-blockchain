@@ -21,7 +21,7 @@ type Broker struct {
 	getCandidateChan  <-chan rpcbus.Request
 }
 
-func newBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
+func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetCandidate, getCandidateChan)
@@ -78,7 +78,7 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 
 	b.publisher.Publish(topics.Gossip, buf)
 
-	timer := time.NewTimer(5 * time.Second)
+	timer := time.NewTimer(2 * time.Second)
 	for {
 		select {
 		case <-timer.C:
