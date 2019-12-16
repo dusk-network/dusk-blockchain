@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/chain"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/mempool"
@@ -53,6 +54,10 @@ func Setup() *Server {
 		panic(err)
 	}
 	go chain.Listen()
+
+	// Setting up the candidate broker
+	candidateBroker := candidate.NewBroker(eventBus, rpcBus)
+	go candidateBroker.Listen()
 
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
