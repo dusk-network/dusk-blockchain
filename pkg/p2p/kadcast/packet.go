@@ -166,11 +166,16 @@ func (pac Packet) getChunksPayloadInfo() (byte, []byte, []byte, error) {
 	return height, chunkID, payload, nil
 }
 
-/*
-func (pac *Packet) decreaseChunksHeight() {
-
+// Gets a packet and decreases by one the `CHUNKS`
+// message height.
+func (pac *Packet) decreaseChunksHeight() error {
+	if len(pac.payload) > 0 {
+		return errors.New("payload length insuficient")
+	}
+	pac.payload[0] = pac.payload[0] - 1
+	return nil
 }
-*/
+
 
 // ----------- Message Handlers ----------- //
 
