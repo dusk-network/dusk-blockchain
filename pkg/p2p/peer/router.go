@@ -79,7 +79,11 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	case topics.GetRoundResults:
 		err = m.roundResultBroker.ProvideRoundResult(b)
 	case topics.GetCandidate:
-		err = m.candidateBroker.ProvideCandidate(b)
+		// We only accept a certain request once, to avoid infinitely
+		// requesting the same block
+		if m.dupeMap.CanFwd(b) {
+			err = m.candidateBroker.ProvideCandidate(b)
+		}
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {
