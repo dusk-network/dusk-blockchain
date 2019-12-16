@@ -105,7 +105,7 @@ func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
 	evs := make([]consensus.Event, 0, hlp.nr)
 	step := hlp.Step()
 	i := 0
-	for count := 0; count < hlp.Handler.Quorum(); {
+	for count := 0; count < hlp.Handler.Quorum(hlp.Round); {
 		ev := MockConsensusEvent(hash, round, step, hlp.Keys, i)
 		i++
 		evs = append(evs, ev)

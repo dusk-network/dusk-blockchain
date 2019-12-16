@@ -36,7 +36,7 @@ func (m *MockHandler) Committee(round uint64, step uint8) user.VotingCommittee {
 	return m.committee
 }
 
-func (m *MockHandler) Quorum() int {
+func (m *MockHandler) Quorum(uint64) int {
 	return m.quorum
 }
 

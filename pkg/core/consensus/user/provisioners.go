@@ -63,6 +63,21 @@ func NewProvisioners() *Provisioners {
 	}
 }
 
+// SizeAt returns the amount of provisioners active on a given round.
+func (p Provisioners) SizeAt(round uint64) int {
+	var size int
+	for _, member := range p.Members {
+		for _, stake := range member.Stakes {
+			if stake.StartHeight <= round {
+				size++
+				break
+			}
+		}
+	}
+
+	return size
+}
+
 // MemberAt returns the Member at a certain index.
 func (p Provisioners) MemberAt(i int) *Member {
 	bigI := p.Set[i]

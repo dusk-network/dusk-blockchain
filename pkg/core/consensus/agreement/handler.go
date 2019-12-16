@@ -22,7 +22,7 @@ type Handler interface {
 	AmMember(uint64, uint8) bool
 	IsMember([]byte, uint64, uint8) bool
 	Committee(uint64, uint8) user.VotingCommittee
-	Quorum() int
+	Quorum(uint64) int
 	VotesFor([]byte, uint64, uint8) int
 	Verify(Agreement) error
 }
@@ -55,8 +55,8 @@ func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 	return a.Handler.VotesFor(pubKeyBLS, round, step, MaxCommitteeSize)
 }
 
-func (a *handler) Quorum() int {
-	return int(math.Ceil(float64(a.CommitteeSize(MaxCommitteeSize)) * 0.75))
+func (a *handler) Quorum(round uint64) int {
+	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.75))
 }
 
 // Verify checks the signature of the set.
@@ -82,8 +82,8 @@ func (a *handler) Verify(ev Agreement) error {
 		}
 	}
 
-	if allVoters < a.Quorum() {
-		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum())
+	if allVoters < a.Quorum(ev.Round) {
+		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(ev.Round))
 	}
 	return nil
 }

@@ -59,9 +59,9 @@ func (a *Accumulator) Accumulate() {
 
 		lg.WithFields(log.Fields{
 			"count":  count,
-			"quorum": a.handler.Quorum(),
+			"quorum": a.handler.Quorum(ev.Round),
 		}).Debugln("collected agreement")
-		if count >= a.handler.Quorum() {
+		if count >= a.handler.Quorum(ev.Round) {
 			votes := a.store.Get(ev.Step)
 			a.CollectedVotesChan <- votes
 			return
