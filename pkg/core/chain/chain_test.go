@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -100,7 +101,7 @@ func TestAcceptFromPeer(t *testing.T) {
 // This test ensures the correct behaviour when accepting a block
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
-	eb, _, c := setupChainTest(t, false)
+	eb, rpc, c := setupChainTest(t, false)
 	go c.Listen()
 	intermediateChan := make(chan bytes.Buffer, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
@@ -110,17 +111,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(t, 2, 1)
 	cert := block.EmptyCertificate()
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
-		t.Fatal(err)
-	}
-
-	// Store it
-	eb.Publish(topics.Candidate, buf)
+	provideCandidate(rpc, &candidate.Candidate{blk, cert})
 
 	// Now send a `Certificate` message with this block's hash
 	// Make a certificate with a different step, to do a proper equality
@@ -158,31 +149,6 @@ func TestAcceptIntermediate(t *testing.T) {
 	assert.Equal(t, blk.Header.Seed, ru.Seed)
 }
 
-// If a candidate block is missing to be set as the next intermediate
-// block, the Chain should request it.
-func TestRequestMissingCandidate(t *testing.T) {
-	eb, _, c := setupChainTest(t, false)
-	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
-	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
-	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
-
-	// Make a 'winning' candidate message. No storing it though
-	blk := helper.RandomBlock(t, 2, 1)
-	cert := block.EmptyCertificate()
-
-	// Pretend we finalized on it
-	go c.handleCertificateMessage(certMsg{blk.Header.Hash, cert})
-
-	// Should now get a GetCandidate message with this block's hash.
-	m, err := streamer.Read()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, topics.GetCandidate, streamer.SeenTopics()[0])
-	assert.Equal(t, blk.Header.Hash, m)
-}
-
 func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	eb, _, c := setupChainTest(t, false)
 	intermediateChan := make(chan bytes.Buffer, 1)
@@ -214,6 +180,20 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	// Ensure everything is still the same
 	assert.True(t, currPrevBlock.Equals(&c.prevBlock))
 	assert.Nil(t, c.intermediateBlock)
+}
+
+func provideCandidate(rpc *rpcbus.RPCBus, cm *candidate.Candidate) {
+	c := make(chan rpcbus.Request, 1)
+	rpc.Register(rpcbus.GetCandidate, c)
+	buf := new(bytes.Buffer)
+	if err := candidate.Encode(buf, cm); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		r := <-c
+		r.RespChan <- rpcbus.Response{*buf, nil}
+	}()
 }
 
 func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
