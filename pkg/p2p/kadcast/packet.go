@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -135,6 +136,9 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 }
 
 // -------- CHUNKS Packet De/Serialization tools -------- //
+
+// Sets the payload of a `CHUNKS` message by setting the
+// initial height, chunk ID and finally the payload.
 func (pac *Packet) setChunksPayloadInfo(payload []byte) {
 	payloadLen := len(payload)
 	packPayload := make([]byte, payloadLen+17)
@@ -147,8 +151,26 @@ func (pac *Packet) setChunksPayloadInfo(payload []byte) {
 	copy(packPayload[17:], payload[0:payloadLen])
 	pac.payload = packPayload
 }
-	
-// TODO: Implement serde for CHUNKS packet.
+
+// Gets the payload of a `CHUNKS` message and deserializes
+// it returning height, chunkID and the payload.
+func (pac Packet) getChunksPayloadInfo() (byte, []byte, []byte, error) {
+	// Get payload length.
+	payloadLen := len(pac.payload)
+	if payloadLen < 17 {
+		return 0, nil, nil, errors.New("payload length insuficient")
+	}
+	height := pac.payload[0]
+	chunkID := pac.payload[1:17]
+	payload := pac.payload[17:]
+	return height, chunkID, payload, nil
+}
+
+/*
+func (pac *Packet) decreaseChunksHeight() {
+
+}
+*/
 
 // ----------- Message Handlers ----------- //
 
