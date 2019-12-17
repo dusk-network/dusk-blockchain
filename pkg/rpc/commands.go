@@ -260,7 +260,7 @@ var createFromSeed = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	result := fmt.Sprintf("{ \"pubkey\": \"%s\" }", pubKey)
 	return result, err
 }
 
@@ -270,7 +270,7 @@ var address = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	return addressBuf.String(), nil
+	return fmt.Sprintf("{ \"pubkey\": \"%s\" }", addressBuf.String()), nil
 }
 
 var balance = func(s *Server, params []string) (string, error) {
