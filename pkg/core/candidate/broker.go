@@ -12,6 +12,14 @@ import (
 	"github.com/dusk-network/dusk-wallet/block"
 )
 
+// Broker is the entry point for the candidate component. It manages
+// an in-memory store of `Candidate` messages, and allows for the
+// fetching of these messages through the `RPCBus`. It listens
+// for incoming `Candidate` messages and puts them on the store.
+// In case an internal component requests an absent `Candidate`
+// message, the Broker can make a `GetCandidate` request to the rest
+// of the network, and will attempt to provide the requesting component
+// with it's needed `Candidate`.
 type Broker struct {
 	publisher eventbus.Publisher
 	*store
@@ -21,6 +29,8 @@ type Broker struct {
 	getCandidateChan  <-chan rpcbus.Request
 }
 
+// NewBroker returns an initialized Broker struct. It will still need
+// to be started by calling `Listen`.
 func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
@@ -39,6 +49,8 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	return b
 }
 
+// Listen for incoming `Candidate` messages, and internal requests.
+// Should be run in a goroutine.
 func (b *Broker) Listen() {
 	for {
 		select {
