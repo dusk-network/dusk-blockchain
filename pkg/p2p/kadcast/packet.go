@@ -154,16 +154,17 @@ func (pac *Packet) setChunksPayloadInfo(height byte, payload []byte) {
 
 // Gets the payload of a `CHUNKS` message and deserializes
 // it returning height, chunkID and the payload.
-func (pac Packet) getChunksPayloadInfo() (byte, []byte, []byte, error) {
+func (pac Packet) getChunksPayloadInfo() (byte, *[16]byte, []byte, error) {
 	// Get payload length.
 	payloadLen := len(pac.payload)
 	if payloadLen < 17 {
 		return 0, nil, nil, errors.New("payload length insuficient")
 	}
 	height := pac.payload[0]
-	chunkID := pac.payload[1:17]
+	var chunkID [16]byte 
+	copy(chunkID[0:16], pac.payload[1:17])
 	payload := pac.payload[17:]
-	return height, chunkID, payload, nil
+	return height, &chunkID, payload, nil
 }
 
 // Gets a packet and decreases by one the `CHUNKS`
@@ -231,15 +232,23 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	}
 }
 
-func handleChunks(peerInf Peer, packet Packet, router *Router, byteNum int) {
+func handleChunks(chunkMap map[[16]byte]bool, peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// Deserialize the packet.
 	height, chunkID, payload, err := packet.getChunksPayloadInfo()
 	if err != nil {
 		log.Info("Empty CHUNKS payload. Packet ignored.")
 		return
 	}
-	// Verify chunkID on the memmoryMap
-	// TODO: Implement a mapping that tracks already red packets.
+	// Verify chunkID on the memmoryMap. If we already have it stored,+
+	// means that the packet is repeated and we just ignore it.
+	if chunkMap[*chunkID] == true {
+		log.WithFields(log.Fields{
+			"chunk_id": *chunkID,
+		}).Warn("Chunk ID already registered. Ignoring packet.")
+		return
+	}
+	// Set chunkID to true on the map.
+	chunkMap[*chunkID] = true
 
 	// Verify height, if != 0, decrease it by one and broadcast the
 	// packet again.
@@ -248,5 +257,5 @@ func handleChunks(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	}
 
 	// HERE WE SHOULD SEND THE PAYLOAD TO THE `EVENTBUS`.
-	
+
 }
