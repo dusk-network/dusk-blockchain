@@ -2,7 +2,6 @@ package candidate
 
 import (
 	"bytes"
-	"errors"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
@@ -33,16 +32,8 @@ func newStore() *store {
 
 func (c *store) storeCandidateMessage(cm Candidate) error {
 	// TODO: ensure we can't become a victim of memory overflow attacks
-
-	// Make sure the hash is correct, to avoid malicious nodes from
-	// overwriting the candidate block for a specific hash
-	hash := cm.Block.Header.Hash
-	if err := c.checkHash(hash, cm.Block); err != nil {
-		return err
-	}
-
 	c.lock.Lock()
-	c.messages[string(hash)] = &cm
+	c.messages[string(cm.Block.Header.Hash)] = &cm
 	c.lock.Unlock()
 	return nil
 }
@@ -52,18 +43,6 @@ func (c *store) fetchCandidateMessage(hash []byte) *Candidate {
 	cm := c.messages[string(hash)]
 	c.lock.RUnlock()
 	return cm
-}
-
-func (c *store) checkHash(hash []byte, blk *block.Block) error {
-	if err := blk.SetHash(); err != nil {
-		return err
-	}
-
-	if !bytes.Equal(hash, blk.Header.Hash) {
-		return errors.New("invalid block hash")
-	}
-
-	return nil
 }
 
 // Clear removes all candidate messages from or before a given round.

@@ -34,7 +34,7 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		getCandidateChan:  getCandidateChan,
 	}
 
-	broker.Register(topics.Candidate, consensus.NewRepublisher(broker, topics.Candidate))
+	broker.Register(topics.Candidate, newValidator(broker))
 
 	return b
 }
