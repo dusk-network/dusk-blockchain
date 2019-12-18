@@ -19,6 +19,8 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 	var senderAddr *net.UDPAddr
 	var tcpPayload []byte
 	var packet Packet
+	chunkIDmap := make(map[[16]byte]bool)
+	
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
@@ -52,7 +54,7 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 
 			switch tipus {
 			case 0: {
-				handleChunks(peerInf, packet, router, byteNum)
+				handleChunks(chunkIDmap, peerInf, packet, router, byteNum)
 				log.WithField(
 					"Source-IP", peerInf.ip[:],
 				).Infoln("Recieved CHUNKS message")
