@@ -281,10 +281,8 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	}
 
 	// 6. Remove expired provisioners and bids
-	// We remove provisioners and bids from accepted block height + 2,
-	// to set up our committee correctly for the next block.
 	l.Trace("removing expired consensus transactions")
-	c.removeExpiredProvisioners(blk.Header.Height + 2)
+	c.removeExpiredProvisioners(blk.Header.Height)
 	c.removeExpiredBids(blk.Header.Height + 2)
 
 	// 7. Notify other subsystems for the accepted block
