@@ -20,6 +20,7 @@ type Helper struct {
 	*reduction.Helper
 	StepVotesChan      chan bytes.Buffer
 	lock               sync.RWMutex
+	failOnFetching     bool
 	failOnVerification bool
 }
 
@@ -28,6 +29,7 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, t
 	hlp := &Helper{
 		Helper:             reduction.NewHelper(eb, rpcbus, provisioners, CreateReducer, timeOut),
 		StepVotesChan:      make(chan bytes.Buffer, 1),
+		failOnFetching:     false,
 		failOnVerification: false,
 	}
 
@@ -44,7 +46,20 @@ func (hlp *Helper) FailOnVerification(flag bool) {
 	hlp.failOnVerification = flag
 }
 
-func (hlp *Helper) shouldFail() bool {
+func (hlp *Helper) FailOnFetching(flag bool) {
+	hlp.lock.Lock()
+	defer hlp.lock.Unlock()
+	hlp.failOnFetching = flag
+}
+
+func (hlp *Helper) shouldFailFetching() bool {
+	hlp.lock.RLock()
+	defer hlp.lock.RUnlock()
+	f := hlp.failOnFetching
+	return f
+}
+
+func (hlp *Helper) shouldFailVerification() bool {
 	hlp.lock.RLock()
 	defer hlp.lock.RUnlock()
 	f := hlp.failOnVerification
@@ -56,6 +71,11 @@ func (hlp *Helper) provideCandidateBlock() {
 	hlp.RBus.Register(rpcbus.GetCandidate, c)
 	for {
 		r := <-c
+		if hlp.shouldFailFetching() {
+			r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("could not get candidate block")}
+			continue
+		}
+
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 	}
 }
@@ -65,11 +85,12 @@ func (hlp *Helper) verifyCandidateBlock() {
 	hlp.RBus.Register(rpcbus.VerifyCandidateBlock, v)
 	for {
 		r := <-v
-		if hlp.shouldFail() {
+		if hlp.shouldFailVerification() {
 			r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("verification failed")}
-		} else {
-			r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+			continue
 		}
+
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 	}
 }
 
