@@ -215,7 +215,11 @@ func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 		c.lastCertificate = cert
 
 		// Once received, we can re-start consensus.
-		return c.sendRoundUpdate()
+		// This sets off a chain of processing which goes from sending the
+		// round update, to reinstantiating the consensus, to setting off
+		// the first consensus loop. So, we do this in a goroutine to
+		// avoid blocking other requests to the chain.
+		go c.sendRoundUpdate()
 	}
 
 	return nil
@@ -599,7 +603,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 	c.eventBus.Publish(topics.IntermediateBlock, buf)
 
-	c.sendRoundUpdate()
+	go c.sendRoundUpdate()
 }
 
 func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
