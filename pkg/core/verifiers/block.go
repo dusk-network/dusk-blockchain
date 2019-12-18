@@ -80,7 +80,7 @@ func CheckBlockCertificate(provisioners user.Provisioners, blk block.Block) erro
 }
 
 func checkBlockCertificateForStep(batchedSig *bls.Signature, bitSet uint64, round uint64, step uint8, provisioners user.Provisioners, blockHash []byte) error {
-	size := committeeSize(provisioners.SizeAt(round))
+	size := committeeSize(provisioners.SubsetSizeAt(round))
 	committee := provisioners.CreateVotingCommittee(round, step, size)
 	subcommittee := committee.IntersectCluster(bitSet)
 	apk, err := agreement.ReconstructApk(subcommittee.Set)

@@ -63,14 +63,14 @@ func NewProvisioners() *Provisioners {
 	}
 }
 
-// NumActive returns how many provisioners are active on a given round.
+// SubsetSizeAt returns how many provisioners are active on a given round.
 // This function is used to determine the correct committee size for
 // sortition in the case where one or more provisioner stakes have not
 // yet become active, or have just expired. Note that this function will
 // only give an accurate result if the round given is either identical
 // or close to the current block height, as stakes are removed soon
 // after they expire.
-func (p Provisioners) NumActive(round uint64) int {
+func (p Provisioners) SubsetSizeAt(round uint64) int {
 	var size int
 	for _, member := range p.Members {
 		for _, stake := range member.Stakes {
