@@ -67,7 +67,7 @@ func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
 // how many provisioners are in the set.
 func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 	b.lock.RLock()
-	size := b.Provisioners.SizeAt(round)
+	size := b.Provisioners.NumActive(round)
 	b.lock.RUnlock()
 	if size > maxSize {
 		return maxSize

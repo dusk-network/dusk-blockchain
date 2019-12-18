@@ -74,10 +74,10 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 	members := copyMembers(p.Members)
 	p.Members = members
 
-	// Remove stakes which have not yet become active
+	// Remove stakes which have not yet become active, or have expired
 	for _, m := range p.Members {
 		for i, stake := range m.Stakes {
-			if stake.StartHeight > round {
+			if stake.StartHeight > round || stake.EndHeight < round {
 				subtractFromTotalWeight(W, stake.Amount)
 				m.RemoveStake(i)
 			}
