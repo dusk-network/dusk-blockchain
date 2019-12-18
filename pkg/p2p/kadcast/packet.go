@@ -59,7 +59,7 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 	return typ, senderID, nonce, peerPort
 }
 
-// Gets the Packet headers parts and puts them into the
+// Gets the Packet headers items and puts them into the
 // header attribute of the Packet.
 func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	headers := make([]byte, 24)
@@ -139,11 +139,11 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 
 // Sets the payload of a `CHUNKS` message by setting the
 // initial height, chunk ID and finally the payload.
-func (pac *Packet) setChunksPayloadInfo(payload []byte) {
+func (pac *Packet) setChunksPayloadInfo(height byte, payload []byte) {
 	payloadLen := len(payload)
 	packPayload := make([]byte, payloadLen+17)
 	// Set packet height.
-	packPayload[0] = InitHeight
+	packPayload[0] = height
 	// Set packet ChunkID.
 	chunkID := computeChunkID(payload)
 	copy(packPayload[1:17], chunkID[0:16])
@@ -232,5 +232,21 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 }
 
 func handleChunks(peerInf Peer, packet Packet, router *Router, byteNum int) {
-	panic("Not implemented yet")
+	// Deserialize the packet.
+	height, chunkID, payload, err := packet.getChunksPayloadInfo()
+	if err != nil {
+		log.Info("Empty CHUNKS payload. Packet ignored.")
+		return
+	}
+	// Verify chunkID on the memmoryMap
+	// TODO: Implement a mapping that tracks already red packets.
+
+	// Verify height, if != 0, decrease it by one and broadcast the
+	// packet again.
+	if height > 0 {
+		router.broadcastPacket(height-1, 0, payload)
+	}
+
+	// HERE WE SHOULD SEND THE PAYLOAD TO THE `EVENTBUS`.
+	
 }
