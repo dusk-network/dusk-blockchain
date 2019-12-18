@@ -41,6 +41,10 @@ func DecodeGenesis() *block.Block {
 		if err := marshalling.UnmarshalBlock(&buf, b); err != nil {
 			panic(err)
 		}
+
+		// For some reason, the testnet genesis block root hash
+		// is not correctly set.
+		_ = b.SetRoot()
 	}
 	return b
 }
