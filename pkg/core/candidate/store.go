@@ -30,12 +30,11 @@ func newStore() *store {
 	}
 }
 
-func (c *store) storeCandidateMessage(cm Candidate) error {
+func (c *store) storeCandidateMessage(cm Candidate) {
 	// TODO: ensure we can't become a victim of memory overflow attacks
 	c.lock.Lock()
 	c.messages[string(cm.Block.Header.Hash)] = &cm
 	c.lock.Unlock()
-	return nil
 }
 
 func (c *store) fetchCandidateMessage(hash []byte) *Candidate {

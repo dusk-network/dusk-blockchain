@@ -43,7 +43,7 @@ func (b *Broker) Listen() {
 	for {
 		select {
 		case cm := <-b.candidateChan:
-			_ = b.storeCandidateMessage(cm)
+			b.storeCandidateMessage(cm)
 		case r := <-b.getCandidateChan:
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
@@ -90,17 +90,10 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 		// be through `Listen`. Any incoming candidates which don't match
 		// our request will be passed down to the store.
 		case cm := <-b.candidateChan:
-			if !bytes.Equal(cm.Block.Header.Hash, hash) {
-				_ = b.storeCandidateMessage(cm)
+			b.storeCandidateMessage(cm)
+			if bytes.Equal(cm.Block.Header.Hash, hash) {
+				return &cm, nil
 			}
-
-			// Store it, and ensure the hash is correct before we return
-			// it.
-			if err := b.storeCandidateMessage(cm); err != nil {
-				continue
-			}
-
-			return &cm, nil
 		}
 	}
 }

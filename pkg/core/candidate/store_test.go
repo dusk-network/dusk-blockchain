@@ -21,7 +21,7 @@ func TestStoreFetchClear(t *testing.T) {
 
 	// Store a candidate
 	candidate := mockCandidateMessage(t)
-	assert.NoError(t, c.storeCandidateMessage(*candidate))
+	c.storeCandidateMessage(*candidate)
 
 	// Fetch it now
 	// Hash is genesis hash
