@@ -219,8 +219,8 @@ func (router Router) sendNodes(receiver Peer) {
 }
 
 // BroadcastPacket sends a `CHUNKS` message across the network
-// following the Kadcast broadcasting rules.
-func (router Router) BroadcastPacket(tipus byte, payload []byte) {
+// following the Kadcast broadcasting rules with the specified height.
+func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 	// Get `Beta` random peers from each Bucket.
 	for _, bucket := range router.tree.buckets {
 		// Skip first bucket from the iteration (it contains our peer).
@@ -234,7 +234,13 @@ func (router Router) BroadcastPacket(tipus byte, payload []byte) {
 		// Set headers info. 
 		packet.setHeadersInfo(tipus, router, *destPeer)
 		// Set payload. 
-		packet.setChunksPayloadInfo(payload)
+		packet.setChunksPayloadInfo(height, payload)
 		sendTCPStream(destPeer.getUDPAddr(), packet.asBytes())
 	}
+}
+
+// StartPacketBroadcast sends a `CHUNKS` message across the network
+// following the Kadcast broadcasting rules with the InitHeight.
+func (router Router) StartPacketBroadcast(tipus byte, payload []byte) {
+	router.broadcastPacket(InitHeight, tipus, payload)
 }
