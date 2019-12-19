@@ -74,7 +74,7 @@ func (p Provisioners) SubsetSizeAt(round uint64) int {
 	var size int
 	for _, member := range p.Members {
 		for _, stake := range member.Stakes {
-			if stake.StartHeight <= round && stake.EndHeight >= round {
+			if stake.StartHeight <= round && round <= stake.EndHeight {
 				size++
 				break
 			}
