@@ -111,7 +111,7 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString(txid.Bytes()))
+	result := fmt.Sprintf("Success! TxID: %s", hex.EncodeToString(txid.Bytes()))
 	return result, err
 }
 
@@ -146,7 +146,7 @@ var transfer = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString([]byte(idString)))
+	result := fmt.Sprintf("Success! TxID: %s", hex.EncodeToString([]byte(idString)))
 	return result, err
 }
 
@@ -184,7 +184,7 @@ var sendStakeTx = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"txid\": \"%s\"}", hex.EncodeToString([]byte(idString)))
+	result := fmt.Sprintf("Success! TxID: %s", hex.EncodeToString([]byte(idString)))
 	return result, err
 }
 
@@ -208,7 +208,7 @@ var createWallet = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	result := fmt.Sprintf("Wallet created.\nYour address is %s", pubKey)
 	return result, err
 }
 
@@ -232,7 +232,7 @@ var loadWallet = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	result := fmt.Sprintf("Wallet loaded.\nYour address is %s", pubKey)
 	return result, err
 }
 
@@ -262,7 +262,7 @@ var createFromSeed = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"pubkey\": \"%s\" }", pubKey)
+	result := fmt.Sprintf("Wallet created! Your address is %s", pubKey)
 	return result, err
 }
 
@@ -272,7 +272,7 @@ var address = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("{ \"pubkey\": \"%s\" }", addressBuf.String()), nil
+	return fmt.Sprintf("Your address is %s", addressBuf.String()), nil
 }
 
 var balance = func(s *Server, params []string) (string, error) {
@@ -290,7 +290,7 @@ var balance = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"Unlocked balance\": %.8f, \"Locked balance\": %.8f }", float64(unlockedBalance)/float64(wallet.DUSK), float64(lockedBalance)/float64(wallet.DUSK))
+	result := fmt.Sprintf("Unlocked balance: %.8f\nLocked balance: %.8f", float64(unlockedBalance)/float64(wallet.DUSK), float64(lockedBalance)/float64(wallet.DUSK))
 	return result, nil
 }
 
@@ -305,6 +305,6 @@ var unconfirmedBalance = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"Unconfirmed balance\": %.8f }", float64(unconfirmedBalance)/float64(wallet.DUSK))
+	result := fmt.Sprintf("Unconfirmed balance: %.8f", float64(unconfirmedBalance)/float64(wallet.DUSK))
 	return result, nil
 }

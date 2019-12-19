@@ -15,8 +15,8 @@ type JSONRequest struct {
 
 // JSONResponse defines a JSON-RPC response to a method call.
 type JSONResponse struct {
-	Result *json.RawMessage `json:"result"`
-	Error  string           `json:"error"`
+	Result string `json:"result"`
+	Error  string `json:"error"`
 }
 
 // handleRequest takes a JSON-RPC request and parses it, then returns the result to the
@@ -57,8 +57,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r http.Request, isAdmin bo
 		result = "{}"
 	}
 
-	rawMessage := json.RawMessage([]byte(result))
-	resp := JSONResponse{Result: &rawMessage, Error: errorDesc}
+	resp := JSONResponse{Result: result, Error: errorDesc}
 	resultData, err := json.MarshalIndent(resp, "", "\t")
 	if err != nil {
 		log.Errorf("marshal response: %v", err)
