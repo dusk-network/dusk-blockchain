@@ -173,6 +173,8 @@ type Coordinator struct {
 	lock     sync.RWMutex
 	store    *roundStore
 	unsynced bool
+
+	stopped bool
 }
 
 // Start the coordinator by wiring the listener to the RoundUpdate
@@ -192,6 +194,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 		roundQueue: NewQueue(),
 		pubkeyBuf:  *pkBuf,
 		unsynced:   true,
+		stopped:    true,
 	}
 
 	// completing the initialization
@@ -201,11 +204,27 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	l := eventbus.NewCallbackListener(c.CollectRoundUpdate)
 	c.eventBus.Subscribe(topics.RoundUpdate, l)
 
-	finalizeListener := eventbus.NewCallbackListener(c.CollectFinalize)
-	c.eventBus.Subscribe(topics.Finalize, finalizeListener)
+	stopListener := eventbus.NewCallbackListener(c.StopConsensus)
+	c.eventBus.Subscribe(topics.StopConsensus, stopListener)
 
 	c.reinstantiateStore()
 	return c
+}
+
+func (c *Coordinator) StopConsensus(bytes.Buffer) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if !c.stopped {
+		c.stopConsensus()
+		c.stopped = true
+	}
+
+	return nil
+}
+
+func (c *Coordinator) stopConsensus() {
+	c.FinalizeRound()
+	c.reinstantiateStore()
 }
 
 func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
@@ -219,9 +238,8 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 }
 
 // CollectRoundUpdate is triggered when the Chain propagates a new round update.
-// If the Finalize message was not seen earlier, it will finalize all components,
-// reinstantiate a new store, and swap it with the current one. The consensus
-// components are then initialized, and the state will be updated to the new round.
+// The consensus components are swapped out, initialized, and the
+// state will be updated to the new round.
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lg.Debugln("received round update")
 	c.lock.Lock()
@@ -231,20 +249,13 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 		return err
 	}
 
-	// TODO: when the new certificate creation procedure is implemented, this won't make
-	// much sense anymore, so we might want to remove this part afterwards
-	c.store.lock.RLock()
-	lenSubs := len(c.store.subscribers)
-	c.store.lock.RUnlock()
-	if lenSubs > 0 {
-		lg.Traceln("finalizing consensus")
-		c.FinalizeRound()
-		c.reinstantiateStore()
+	if !c.stopped {
+		c.stopConsensus()
 	}
-
 	c.onNewRound(r, c.unsynced)
 	c.Update(r.Round)
 	c.unsynced = false
+	c.stopped = false
 	go c.flushRoundQueue()
 
 	// TODO: the Coordinator should not send events. someone else should kickstart the
@@ -280,18 +291,6 @@ func (c *Coordinator) CollectFinalize(m bytes.Buffer) error {
 		"message round":     round,
 	}).Debugln("received Finalize message")
 
-	if round < c.Round() {
-		return nil
-	}
-
-	if round > c.Round() {
-		panic("not supposed to get a Finalize message for a future round")
-	}
-
-	lg.Traceln("finalizing consensus")
-	// reinstantiating the store prevents the need for locking
-	c.FinalizeRound()
-	c.reinstantiateStore()
 	return nil
 }
 

@@ -40,12 +40,14 @@ var (
 		"createwallet":   true,
 		"loadwallet":     true,
 		"createFromSeed": true,
+		"publishTopic":   true,
 	}
 
 	// supported topics for injection into EventBus
-	supportedTopics = [2]topics.Topic{
+	supportedTopics = [3]topics.Topic{
 		topics.Tx,
 		topics.Block,
+		topics.StopConsensus,
 	}
 )
 

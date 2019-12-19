@@ -49,7 +49,7 @@ func (a *Accumulator) Process(ev Agreement) {
 // Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
-		collected := a.store.Get(ev.BlockHash)
+		collected := a.store.Get(ev.Step)
 		weight := a.handler.VotesFor(ev.PubKeyBLS, ev.Round, ev.Step)
 		count := a.store.Insert(ev, weight)
 		if count == len(collected) {
@@ -59,10 +59,10 @@ func (a *Accumulator) Accumulate() {
 
 		lg.WithFields(log.Fields{
 			"count":  count,
-			"quorum": a.handler.Quorum(),
+			"quorum": a.handler.Quorum(ev.Round),
 		}).Debugln("collected agreement")
-		if count >= a.handler.Quorum() {
-			votes := a.store.Get(ev.Header.BlockHash)
+		if count >= a.handler.Quorum(ev.Round) {
+			votes := a.store.Get(ev.Step)
 			a.CollectedVotesChan <- votes
 			return
 		}

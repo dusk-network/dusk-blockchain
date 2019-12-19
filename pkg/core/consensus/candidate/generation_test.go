@@ -31,6 +31,10 @@ func TestGeneration(t *testing.T) {
 	// Should receive a Score and Candidate message from the generator
 	_ = <-h.ScoreChan
 	candidateBuf := <-h.CandidateChan
+	// Remove topic byte from candidateBuf
+	if _, err := candidateBuf.ReadByte(); err != nil {
+		t.Fatal(err)
+	}
 
 	c := block.NewBlock()
 	if err := marshalling.UnmarshalBlock(&candidateBuf, c); err != nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -76,20 +77,22 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 
 	_, db := heavy.CreateDBConnection()
 
-	dataRequestor := processing.NewDataRequestor(db, rpcBus, responseChan)
+	dataRequestor := responding.NewDataRequestor(db, rpcBus, responseChan)
 
 	reader := &Reader{
 		Connection: pconn,
 		exitChan:   exitChan,
 		router: &messageRouter{
-			publisher:       publisher,
-			dupeMap:         dupeMap,
-			blockHashBroker: processing.NewBlockHashBroker(db, responseChan),
-			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:   dataRequestor,
-			dataBroker:      processing.NewDataBroker(db, rpcBus, responseChan),
-			ponger:          processing.NewPonger(responseChan),
-			peerInfo:        conn.RemoteAddr().String(),
+			publisher:         publisher,
+			dupeMap:           dupeMap,
+			blockHashBroker:   responding.NewBlockHashBroker(db, responseChan),
+			synchronizer:      chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
+			dataRequestor:     dataRequestor,
+			dataBroker:        responding.NewDataBroker(db, rpcBus, responseChan),
+			roundResultBroker: responding.NewRoundResultBroker(rpcBus, responseChan),
+			candidateBroker:   responding.NewCandidateBroker(rpcBus, responseChan),
+			ponger:            processing.NewPonger(responseChan),
+			peerInfo:          conn.RemoteAddr().String(),
 		},
 	}
 

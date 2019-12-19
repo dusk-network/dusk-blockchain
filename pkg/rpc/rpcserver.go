@@ -112,6 +112,11 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 
 // checkAuth checks whether supplied credentials match the server credentials.
 func (s *Server) checkAuth(r *http.Request) bool {
+	// If no authentication is set, disallow admin outright.
+	if s.authSHA == nil {
+		return false
+	}
+
 	authHeader := r.Header["Authorization"]
 	if len(authHeader) <= 0 {
 		return false

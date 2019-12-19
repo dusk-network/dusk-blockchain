@@ -69,23 +69,11 @@ type Transaction interface {
 	// also txID the input belongs to
 	FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error)
 
-	// Fetch a candidate block by hash
-	FetchCandidateBlock(hash []byte) (*block.Block, error)
-
 	// Read-write transactions
 	// Store the next chain block in a append-only manner
 	// Overwrites only if block with same hash already stored
 	// Not to be called concurrently, as it updates chain tip
 	StoreBlock(block *block.Block) error
-
-	// StoreCandidateBlock stores a candidate block to be proposed in next
-	// consensus round.
-	StoreCandidateBlock(block *block.Block) error
-
-	// DeleteCandidateBlocks deletes all candidate blocks. If maxHeight is not
-	// 0, it deletes only blocks with a height lower than maxHeight or equal. It
-	// returns number of deleted candidate blocks
-	DeleteCandidateBlocks(maxHeight uint64) (uint32, error)
 
 	// FetchBlock will return a block, given a hash.
 	FetchBlock(hash []byte) (*block.Block, error)

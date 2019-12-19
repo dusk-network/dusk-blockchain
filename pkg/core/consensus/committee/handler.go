@@ -53,7 +53,7 @@ func (b *Handler) Committee(round uint64, step uint8, maxSize int) user.VotingCo
 }
 
 func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
-	size := b.CommitteeSize(maxSize)
+	size := b.CommitteeSize(round, maxSize)
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -65,9 +65,9 @@ func (b *Handler) generateCommittees(round uint64, step uint8, maxSize int) {
 
 // CommitteeSize returns the size of a VotingCommittee, depending on
 // how many provisioners are in the set.
-func (b *Handler) CommitteeSize(maxSize int) int {
+func (b *Handler) CommitteeSize(round uint64, maxSize int) int {
 	b.lock.RLock()
-	size := len(b.Provisioners.Members)
+	size := b.Provisioners.SubsetSizeAt(round)
 	b.lock.RUnlock()
 	if size > maxSize {
 		return maxSize

@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
@@ -19,11 +20,13 @@ type messageRouter struct {
 	dupeMap   *dupemap.DupeMap
 
 	// 1-to-1 components
-	blockHashBroker *processing.BlockHashBroker
-	dataRequestor   *processing.DataRequestor
-	dataBroker      *processing.DataBroker
-	synchronizer    *chainsync.ChainSynchronizer
-	ponger          processing.Ponger
+	blockHashBroker   *responding.BlockHashBroker
+	dataRequestor     *responding.DataRequestor
+	dataBroker        *responding.DataBroker
+	roundResultBroker *responding.RoundResultBroker
+	candidateBroker   *responding.CandidateBroker
+	synchronizer      *chainsync.ChainSynchronizer
+	ponger            processing.Ponger
 
 	peerInfo string
 }
@@ -43,7 +46,8 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 		topics.Candidate,
 		topics.Score,
 		topics.Reduction,
-		topics.Agreement:
+		topics.Agreement,
+		topics.RoundResults:
 		return true
 	}
 
@@ -72,6 +76,14 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		// Just here to avoid the error message, as pong is unroutable but
 		// otherwise carries no relevant information beyond the receiving
 		// of this message
+	case topics.GetRoundResults:
+		err = m.roundResultBroker.ProvideRoundResult(b)
+	case topics.GetCandidate:
+		// We only accept a certain request once, to avoid infinitely
+		// requesting the same block
+		if m.dupeMap.CanFwd(b) {
+			err = m.candidateBroker.ProvideCandidate(b)
+		}
 	default:
 		if m.CanRoute(topic) {
 			if m.dupeMap.CanFwd(b) {

@@ -45,7 +45,6 @@ func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 
 // SendQuery sends a graphql query to the specified network node
 func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) error {
-
 	if nodeIndex >= uint(len(n.Nodes)) {
 		return errors.New("invalid node index")
 	}
@@ -111,7 +110,14 @@ func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([
 		url = "http://unix" + addr
 	}
 
-	resp, err := httpc.Post(url, "application/json", &buf)
+	request, err := http.NewRequest("POST", url, &buf)
+	if err != nil {
+		return nil, err
+	}
+
+	request.SetBasicAuth(targetNode.Cfg.RPC.User, targetNode.Cfg.RPC.Pass)
+
+	resp, err := httpc.Do(request)
 	if err != nil {
 		return nil, err
 	}

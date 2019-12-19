@@ -52,8 +52,8 @@ func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
 }
 
-func (b *Handler) Quorum() int {
-	return int(math.Ceil(float64(b.CommitteeSize(maxCommitteeSize)) * 0.75))
+func (b *Handler) Quorum(round uint64) int {
+	return int(math.Ceil(float64(b.CommitteeSize(round, maxCommitteeSize)) * 0.75))
 }
 
 // Committee returns a VotingCommittee for a given round and step.

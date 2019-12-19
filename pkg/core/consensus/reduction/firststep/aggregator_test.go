@@ -63,3 +63,31 @@ func TestInvalidBlock(t *testing.T) {
 
 	<-res
 }
+
+// Test that a valid stepvotes is produced when a candidate block for
+// a given hash is not found.
+func TestCandidateNotFound(t *testing.T) {
+	eb, rbus := eventbus.New(), rpcbus.New()
+	hlp, hash := Kickstart(eb, rbus, 10, 1*time.Second)
+	hlp.FailOnFetching(true)
+	evs := hlp.Spawn(hash)
+
+	res := make(chan struct{}, 1)
+	test := func(hash []byte, svs ...*agreement.StepVotes) {
+		assert.Equal(t, emptyHash[:], hash)
+		assert.Equal(t, 0, len(svs))
+		res <- struct{}{}
+	}
+
+	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
+
+	for _, ev := range evs {
+		r := reduction.Reduction{}
+		_ = reduction.Unmarshal(&ev.Payload, &r)
+		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
+			assert.FailNow(t, "error in collecting votes")
+		}
+	}
+
+	<-res
+}

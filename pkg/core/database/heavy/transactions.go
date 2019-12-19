@@ -39,15 +39,14 @@ var (
 	// Key values prefixes to provide prefix-based sorting mechanism
 	// Refer to README.md for overview idea
 
-	HeaderPrefix         = []byte{0x01}
-	TxPrefix             = []byte{0x02}
-	HeightPrefix         = []byte{0x03}
-	TxIDPrefix           = []byte{0x04}
-	KeyImagePrefix       = []byte{0x05}
-	CandidateBlockPrefix = []byte{0x06}
-	StatePrefix          = []byte{0x07}
-	OutputKeyPrefix      = []byte{0x08}
-	BidValuesPrefix      = []byte{0x09}
+	HeaderPrefix    = []byte{0x01}
+	TxPrefix        = []byte{0x02}
+	HeightPrefix    = []byte{0x03}
+	TxIDPrefix      = []byte{0x04}
+	KeyImagePrefix  = []byte{0x05}
+	StatePrefix     = []byte{0x06}
+	OutputKeyPrefix = []byte{0x07}
+	BidValuesPrefix = []byte{0x08}
 )
 
 type transaction struct {
@@ -283,7 +282,18 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
 	var i int
 
+	currentHeight, err := t.FetchCurrentHeight()
+	if err != nil {
+		panic(err)
+	}
+
 	for iterator.Next() {
+		// We only take unlocked decoys
+		unlockHeight := binary.LittleEndian.Uint64(iterator.Value())
+		if unlockHeight > currentHeight {
+			continue
+		}
+
 		// Output public key is the iterator key minus the `OutputKeyPrefix`
 		// (1 byte)
 		value := iterator.Key()[1:]
@@ -479,99 +489,6 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	}
 
 	return true, txID, nil
-}
-
-// StoreCandidateBlock stores a candidate block to be proposed in next consensus
-// round. it overwrites an entry of block with same height
-func (t transaction) StoreCandidateBlock(b *block.Block) error {
-
-	// Schema Key = CandidateBlockPrefix + block.header.Hash + block.header.height
-	//
-	// Value = block.Encoded()
-
-	// Append height value
-	heightBuf := new(bytes.Buffer)
-	if err := utils.WriteUint64(heightBuf, b.Header.Height); err != nil {
-		return err
-	}
-
-	if heightBuf.Len() != block.HeightSize {
-		panic("invalid height buffer")
-	}
-
-	key := append(CandidateBlockPrefix, b.Header.Hash...)
-	key = append(key, heightBuf.Bytes()...)
-
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
-		return err
-	}
-
-	t.put(key, buf.Bytes())
-
-	return nil
-}
-
-// FetchCandidateBlock fetches a candidate block by hash
-func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
-
-	// Fetch all stored candidate blocks
-	scanFilter := append(CandidateBlockPrefix, hash...)
-
-	// as the key is composed of CandidateBlockPrefix + blockHash + blockHeight,
-	// here it's needed to use a search by prefix
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
-	defer iterator.Release()
-
-	if iterator.First() {
-		b := block.NewBlock()
-		if err := marshalling.UnmarshalBlock(bytes.NewBuffer(iterator.Value()), b); err != nil {
-			return nil, err
-		}
-
-		return b, nil
-	}
-
-	return nil, database.ErrBlockNotFound
-}
-
-// DeleteCandidateBlocks deletes all candidate blocks if maxHeight is not 0, it
-// deletes only blocks with a height lower than maxHeight or equal.
-// Returns number of deleted candidate blocks
-func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
-
-	// Fetch all stored candidate blocks
-	scanFilter := append(CandidateBlockPrefix)
-
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
-	defer iterator.Release()
-
-	var count uint32
-	for iterator.Next() {
-
-		// Extract height from the key to avoid the need of block decoding
-		if maxHeight != 0 {
-			reader := bytes.NewReader(iterator.Key())
-			buf := make([]byte, block.HeightSize)
-
-			offset := int64(len(scanFilter) + block.HeaderHashSize)
-			if _, err := reader.ReadAt(buf[:], offset); err != nil {
-				return count, fmt.Errorf("malformed height data: %s", err.Error())
-			}
-
-			height := byteOrder.Uint64(buf[:])
-
-			if height <= maxHeight {
-				t.batch.Delete(iterator.Key())
-				count++
-			}
-		} else {
-			t.batch.Delete(iterator.Key())
-			count++
-		}
-	}
-
-	return count, nil
 }
 
 func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {

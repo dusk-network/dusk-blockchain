@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
@@ -73,20 +74,35 @@ func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBat
 		txBatchCount:  txBatchCount,
 	}
 	hlp.createResultChans()
-	go hlp.ProvideTransactions(t)
+	hlp.ProvideTransactions(t)
 	return hlp
 }
 
 func (h *Helper) createResultChans() {
 	scoreListener := eventbus.NewChanListener(h.ScoreChan)
 	h.Bus.Subscribe(topics.Score, scoreListener)
+	// Candidate messages go on the gossip topic
 	candidateListener := eventbus.NewChanListener(h.CandidateChan)
-	h.Bus.Subscribe(topics.Candidate, candidateListener)
+	h.Bus.Subscribe(topics.Gossip, candidateListener)
 }
 
 // Initialize the generator with the given round update.
 func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 	h.Generator.Initialize(h, h.signer, ru)
+	provideCertificate(h.RBus)
+}
+
+func provideCertificate(rpcBus *rpcbus.RPCBus) {
+	c := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.GetLastCertificate, c)
+
+	go func(c chan rpcbus.Request) {
+		r := <-c
+		buf := new(bytes.Buffer)
+		cert := block.EmptyCertificate()
+		marshalling.MarshalCertificate(buf, cert)
+		r.RespChan <- rpcbus.Response{*buf, nil}
+	}(c)
 }
 
 // TriggerBlockGeneration creates a random ScoreEvent and triggers block generation
@@ -106,24 +122,26 @@ func (h *Helper) ProvideTransactions(t *testing.T) {
 	reqChan := make(chan rpcbus.Request, 1)
 	h.RBus.Register(rpcbus.GetMempoolTxsBySize, reqChan)
 
-	r := <-reqChan
-	txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
+	go func(reqChan chan rpcbus.Request) {
+		r := <-reqChan
+		txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
 
-	// Cut off the coinbase
-	txs = txs[1:]
-	// Encode and send
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteVarInt(buf, uint64(len(txs))); err != nil {
-		panic(err)
-	}
-
-	for _, tx := range txs {
-		if err := marshalling.MarshalTx(buf, tx); err != nil {
+		// Cut off the coinbase
+		txs = txs[1:]
+		// Encode and send
+		buf := new(bytes.Buffer)
+		if err := encoding.WriteVarInt(buf, uint64(len(txs))); err != nil {
 			panic(err)
 		}
-	}
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+		for _, tx := range txs {
+			if err := marshalling.MarshalTx(buf, tx); err != nil {
+				panic(err)
+			}
+		}
+
+		r.RespChan <- rpcbus.Response{*buf, nil}
+	}(reqChan)
 }
 
 func randomScoreEvent() score.Event {

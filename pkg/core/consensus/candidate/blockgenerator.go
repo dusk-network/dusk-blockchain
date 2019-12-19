@@ -118,13 +118,31 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
+	// Create candidate message
+	certBuf, err := bg.rpcBus.Call(rpcbus.GetLastCertificate, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	if err != nil {
+		return err
+	}
+
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, blk); err != nil {
 		return err
 	}
 
+	if _, err := buf.ReadFrom(&certBuf); err != nil {
+		return err
+	}
+
+	// Since the Candidate message goes straight to the Chain, there is
+	// no need to use `SendAuthenticated`, as the header is irrelevant.
+	// Thus, we will instead gossip it directly.
 	lg.Debugln("sending candidate")
-	return bg.signer.Gossip(topics.Candidate, hdr, buf, bg.ID())
+	if err := topics.Prepend(buf, topics.Candidate); err != nil {
+		return err
+	}
+
+	bg.publisher.Publish(topics.Gossip, buf)
+	return nil
 }
 
 func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {
@@ -176,7 +194,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 	txs := make([]transactions.Transaction, 0)
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx, err := bg.constructCoinbaseTx(bg.genPubKey, proof, score)
+	coinbaseTx, err := ConstructCoinbaseTx(bg.genPubKey, proof, score)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +238,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func (bg *Generator) constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) (*transactions.Coinbase, error) {
+func ConstructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) (*transactions.Coinbase, error) {
 	// The rewards for both the Generator and the Provisioners are disclosed.
 	// Provisioner reward addresses do not require obfuscation
 	// The Generator address rewards do.

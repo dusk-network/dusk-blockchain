@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	localNetSize = 4
+	localNetSize = 10
 )
 
 var localNet engine.Network
@@ -78,16 +78,16 @@ func TestSendBidTransaction(t *testing.T) {
 		t.Logf("Empty DUSK_WALLET_PASS")
 	}
 
+	// Send request to all nodes to loadWallet
 	for i := 0; i < localNetSize; i++ {
-		// Send request to node 0 to loadWallet
-		_, err := localNet.SendCommand(uint(i), "loadWallet", []string{walletsPass})
+		_, err := localNet.SendCommand(uint(i), "loadwallet", []string{walletsPass})
 		if err != nil {
 			t.Fatal(err.Error())
 		}
 	}
 
 	// Send request to node 0 to generate and process a Bid transaction
-	data, err := localNet.SendCommand(0, "sendBidTx", []string{"10", "10"})
+	data, err := localNet.SendCommand(0, "bid", []string{"10", "10"})
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -142,9 +142,82 @@ func TestSendBidTransaction(t *testing.T) {
 			return true
 		}
 
-		// asserts that given condition will be met in 1024 seconds, by checking condition function each second.
-		if !assert.Eventuallyf(t, condition, 1024*time.Second, time.Second, "failed node %s", node.Id) {
+		// asserts that given condition will be met in 1 minute, by checking condition function each second.
+		if !assert.Eventuallyf(t, condition, 1*time.Minute, time.Second, "failed node %s", node.Id) {
 			break
 		}
 	}
+}
+
+// TestCatchup tests that a node which falls behind during consensus
+// will properly catch up and re-join the consensus execution trace.
+func TestCatchup(t *testing.T) {
+	walletsPass := os.Getenv("DUSK_WALLET_PASS")
+	if len(walletsPass) == 0 {
+		t.Logf("Empty DUSK_WALLET_PASS")
+	}
+
+	// Send request to all nodes to loadWallet
+	for i := 0; i < localNetSize; i++ {
+		_, err := localNet.SendCommand(uint(i), "loadwallet", []string{walletsPass})
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+	}
+
+	waitHeight := 6
+	waitUntil := func() bool {
+		// Construct query to fetch block height
+		query := fmt.Sprintf(
+			"{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}",
+		)
+
+		var result map[string]map[string][]map[string]map[string]int
+		if err := localNet.SendQuery(1, query, &result); err != nil {
+			return false
+		}
+
+		if result["data"]["blocks"][0]["header"]["height"] >= waitHeight {
+			return true
+		}
+
+		return false
+	}
+
+	// Wait till we are at height 6
+	assert.Eventually(t, waitUntil, 200*time.Second, 5*time.Second)
+
+	// Stop consensus for node 0
+	if _, err := localNet.SendCommand(0, "publishTopic", []string{"stopconsensus", ""}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for two more blocks
+	waitHeight += 2
+	assert.Eventually(t, waitUntil, 100*time.Second, 5*time.Second)
+
+	// Ensure node syncs up
+	ensureSynced := func() bool {
+		// Construct query to fetch block height
+		query := fmt.Sprintf(
+			"{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}",
+		)
+
+		var result map[string]map[string][]map[string]map[string]int
+		if err := localNet.SendQuery(0, query, &result); err != nil {
+			return false
+		}
+
+		heightNode0 := result["data"]["blocks"][0]["header"]["height"]
+		var result2 map[string]map[string][]map[string]map[string]int
+		if err := localNet.SendQuery(1, query, &result2); err != nil {
+			return false
+		}
+
+		heightNode1 := result2["data"]["blocks"][0]["header"]["height"]
+
+		return heightNode0 == heightNode1
+	}
+
+	assert.Eventually(t, ensureSynced, 200*time.Second, 1*time.Second)
 }

@@ -104,7 +104,8 @@ func (a *agreement) listen() {
 	select {
 	case evs := <-a.accumulator.CollectedVotesChan:
 		lg.WithField("id", a.agreementID).Debugln("quorum reached")
-		go a.sendFinalize()
+		// Start a goroutine here to release the lock held by
+		// Coordinator.CollectEvent
 		go a.sendCertificate(evs[0])
 	case <-a.quitChan:
 	}
@@ -122,15 +123,6 @@ func (a *agreement) sendCertificate(ag Agreement) {
 	}
 
 	a.publisher.Publish(topics.Certificate, buf)
-}
-
-func (a *agreement) sendFinalize() {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, a.round); err != nil {
-		lg.WithError(err).Errorln("what the fuck")
-	}
-
-	a.publisher.Publish(topics.Finalize, buf)
 }
 
 // Finalize the agreement component, by pausing event streaming, and shutting down

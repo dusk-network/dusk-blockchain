@@ -24,8 +24,9 @@ type (
 	}
 
 	Stake struct {
-		Amount    uint64
-		EndHeight uint64
+		Amount      uint64
+		StartHeight uint64
+		EndHeight   uint64
 	}
 )
 
@@ -60,6 +61,27 @@ func NewProvisioners() *Provisioners {
 		Set:     sortedset.New(),
 		Members: make(map[string]*Member),
 	}
+}
+
+// SubsetSizeAt returns how many provisioners are active on a given round.
+// This function is used to determine the correct committee size for
+// sortition in the case where one or more provisioner stakes have not
+// yet become active, or have just expired. Note that this function will
+// only give an accurate result if the round given is either identical
+// or close to the current block height, as stakes are removed soon
+// after they expire.
+func (p Provisioners) SubsetSizeAt(round uint64) int {
+	var size int
+	for _, member := range p.Members {
+		for _, stake := range member.Stakes {
+			if stake.StartHeight <= round && round <= stake.EndHeight {
+				size++
+				break
+			}
+		}
+	}
+
+	return size
 }
 
 // MemberAt returns the Member at a certain index.
@@ -145,6 +167,10 @@ func marshalStake(r *bytes.Buffer, stake Stake) error {
 		return err
 	}
 
+	if err := encoding.WriteUint64LE(r, stake.StartHeight); err != nil {
+		return err
+	}
+
 	if err := encoding.WriteUint64LE(r, stake.EndHeight); err != nil {
 		return err
 	}
@@ -210,6 +236,10 @@ func unmarshalMember(r *bytes.Buffer) (*Member, error) {
 func unmarshalStake(r *bytes.Buffer) (Stake, error) {
 	stake := Stake{}
 	if err := encoding.ReadUint64LE(r, &stake.Amount); err != nil {
+		return Stake{}, err
+	}
+
+	if err := encoding.ReadUint64LE(r, &stake.StartHeight); err != nil {
 		return Stake{}, err
 	}
 
