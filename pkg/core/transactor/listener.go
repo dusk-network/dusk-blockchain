@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
@@ -45,6 +46,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
 		case r := <-t.getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
+		case r := <-t.getUnconfirmedBalanceChan:
+			handleRequest(r, t.handleUnconfirmedBalance, "UnconfirmedBalance")
 		case r := <-t.getAddressChan:
 			handleRequest(r, t.handleAddress, "Address")
 
@@ -305,19 +308,61 @@ func (t *Transactor) handleBalance(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	walletBalance, mempoolBalance, err := t.Balance()
+	unlockedBalance, lockedBalance, err := t.Balance()
 	if err != nil {
 		return err
 	}
 
-	log.Tracef("wallet balance: %d, mempool balance: %d", walletBalance, mempoolBalance)
+	log.Tracef("wallet balance: %d, mempool balance: %d", unlockedBalance, lockedBalance)
 
 	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, uint64(walletBalance)); err != nil {
+	if err := encoding.WriteUint64LE(buf, uint64(unlockedBalance)); err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64LE(buf, uint64(mempoolBalance)); err != nil {
+	if err := encoding.WriteUint64LE(buf, uint64(lockedBalance)); err != nil {
+		return err
+	}
+
+	r.RespChan <- rpcbus.Response{*buf, nil}
+	return nil
+}
+
+func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	// Retrieve mempool txs
+	txsBuf, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		return err
+	}
+
+	lTxs, err := encoding.ReadVarInt(&txsBuf)
+	if err != nil {
+		return err
+	}
+
+	txs := make([]transactions.Transaction, lTxs)
+	for i := range txs {
+		tx, err := marshalling.UnmarshalTx(&txsBuf)
+		if err != nil {
+			return err
+		}
+
+		txs[i] = tx
+	}
+
+	unconfirmedBalance, err := t.w.CheckUnconfirmedBalance(txs)
+	if err != nil {
+		return err
+	}
+
+	log.Tracef("unconfirmed wallet balance: %d", unconfirmedBalance)
+
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, uint64(unconfirmedBalance)); err != nil {
 		return err
 	}
 

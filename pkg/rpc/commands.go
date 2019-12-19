@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/wallet"
 )
 
 // handler defines a method bound to an RPC command.
@@ -19,13 +20,15 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		"transfer":       transfer,
-		"bid":            sendBidTx,
-		"stake":          sendStakeTx,
-		"createwallet":   createWallet,
-		"loadwallet":     loadWallet,
-		"createfromseed": createFromSeed,
-		"address":        address,
+		"transfer":           transfer,
+		"bid":                sendBidTx,
+		"stake":              sendStakeTx,
+		"createwallet":       createWallet,
+		"loadwallet":         loadWallet,
+		"createfromseed":     createFromSeed,
+		"address":            address,
+		"balance":            balance,
+		"unconfirmedbalance": unconfirmedBalance,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
@@ -259,15 +262,49 @@ var createFromSeed = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	result := fmt.Sprintf("{ \"pubkey\": \"%s\"}", pubKey)
+	result := fmt.Sprintf("{ \"pubkey\": \"%s\" }", pubKey)
 	return result, err
 }
 
 var address = func(s *Server, params []string) (string, error) {
-	_, err := s.rpcBus.Call(rpcbus.GetBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	addressBuf, err := s.rpcBus.Call(rpcbus.GetAddress, rpcbus.NewRequest(bytes.Buffer{}), 0)
 	if err != nil {
 		return "", err
 	}
 
-	return "", nil
+	return fmt.Sprintf("{ \"pubkey\": \"%s\" }", addressBuf.String()), nil
+}
+
+var balance = func(s *Server, params []string) (string, error) {
+	balanceBuf, err := s.rpcBus.Call(rpcbus.GetBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	if err != nil {
+		return "", err
+	}
+
+	var unlockedBalance, lockedBalance uint64
+	if err := encoding.ReadUint64LE(&balanceBuf, &unlockedBalance); err != nil {
+		return "", err
+	}
+
+	if err := encoding.ReadUint64LE(&balanceBuf, &lockedBalance); err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"Unlocked balance\": %.8f, \"Locked balance\": %.8f }", float64(unlockedBalance)/float64(wallet.DUSK), float64(lockedBalance)/float64(wallet.DUSK))
+	return result, nil
+}
+
+var unconfirmedBalance = func(s *Server, params []string) (string, error) {
+	balanceBuf, err := s.rpcBus.Call(rpcbus.GetUnconfirmedBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	if err != nil {
+		return "", err
+	}
+
+	var unconfirmedBalance uint64
+	if err := encoding.ReadUint64LE(&balanceBuf, &unconfirmedBalance); err != nil {
+		return "", err
+	}
+
+	result := fmt.Sprintf("{ \"Unconfirmed balance\": %.8f }", float64(unconfirmedBalance)/float64(wallet.DUSK))
+	return result, nil
 }
