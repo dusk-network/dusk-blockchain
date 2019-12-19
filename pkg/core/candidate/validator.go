@@ -20,7 +20,7 @@ func newValidator(pub eventbus.Publisher) *validator {
 }
 
 func (v *validator) Process(b *bytes.Buffer) error {
-	if err := checkHashAndRoot(*b); err != nil {
+	if err := check(*b); err != nil {
 		return err
 	}
 
@@ -38,7 +38,7 @@ func (v *validator) republish(b bytes.Buffer) error {
 
 // Make sure the hash and root are correct, to avoid malicious nodes from
 // overwriting the candidate block for a specific hash
-func checkHashAndRoot(b bytes.Buffer) error {
+func check(b bytes.Buffer) error {
 	cm := &Candidate{block.NewBlock(), block.EmptyCertificate()}
 	if err := Decode(&b, cm); err != nil {
 		return err
