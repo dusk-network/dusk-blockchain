@@ -1,6 +1,7 @@
 package kadcast
 
 import (
+	"io"
 	"net"
 	"time"
 
@@ -87,7 +88,7 @@ PacketConnCreation:
 		// Read TCP packet.
 		pc, err := listener.AcceptTCP()
 		uAddr := pc.RemoteAddr()
-		byteNum, err := pc.Read(buffer)
+		byteNum, err := io.ReadFull(pc, buffer)
 		if err != nil {
 			log.WithError(err).Warn("Error on packet read")
 			pc.Close()
@@ -99,6 +100,8 @@ PacketConnCreation:
 		encodedPack := encodeReadTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
+		// Empty the buffer to read again.
+		buffer = make([]byte, 5000000)
 	}
 }
 
