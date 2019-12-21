@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -15,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/wallet"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -50,6 +53,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleUnconfirmedBalance, "UnconfirmedBalance")
 		case r := <-t.getAddressChan:
 			handleRequest(r, t.handleAddress, "Address")
+		case r := <-t.getTxHistoryChan:
+			handleRequest(r, t.handleGetTxHistory, "GetTxHistory")
 
 		// Event list to handle
 		case b := <-t.acceptedBlockChan:
@@ -116,6 +121,47 @@ func (t *Transactor) handleAddress(r rpcbus.Request) error {
 	}
 
 	r.RespChan <- rpcbus.Response{*buf, nil}
+	return nil
+}
+
+func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	records, err := t.w.FetchTxHistory()
+	if err != nil {
+		return err
+	}
+
+	if records == nil {
+		r.RespChan <- rpcbus.Response{*bytes.NewBufferString("No records found."), nil}
+		return nil
+	}
+
+	s := &strings.Builder{}
+	for _, record := range records {
+		// Direction
+		if record.Direction == txrecords.In {
+			s.WriteString("IN / ")
+		} else {
+			s.WriteString("OUT / ")
+		}
+		// Height
+		s.WriteString(strconv.FormatUint(record.Height, 10) + " / ")
+		// Time
+		s.WriteString(time.Unix(record.Timestamp, 0).Format(time.UnixDate) + " / ")
+		// Amount
+		s.WriteString(fmt.Sprintf("%.8f DUSK ", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
+		// Unlock height
+		s.WriteString("Unlocks at " + strconv.Itoa(record.UnlockHeight) + " / ")
+		// Recipient
+		s.WriteString("Recipient: " + record.Recipient)
+
+		s.WriteString("\n")
+	}
+
+	r.RespChan <- rpcbus.Response{*bytes.NewBufferString(s.String()), nil}
 	return nil
 }
 

@@ -45,6 +45,7 @@ An overview of the bare response object:
 | `createfromseed` | \<seed\>, \<password\> | Creates a wallet file using a given \<seed\>, encrypted with \<password\> | no wallet loaded |
 | `balance` | | Returns the unlocked and locked balance of the loaded wallet. | wallet loaded |
 | `unconfirmedbalance` | | Returns the amount of DUSK that is in the mempool for the loaded wallet. | wallet loaded |
+| `txhistory` | | Returns the transaction history for the loaded wallet. | wallet loaded |
 
 #### Extended functionality (full nodes only)
 

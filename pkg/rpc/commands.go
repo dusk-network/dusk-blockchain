@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -29,6 +30,7 @@ var (
 		"address":            address,
 		"balance":            balance,
 		"unconfirmedbalance": unconfirmedBalance,
+		"txhistory":          txHistory,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
@@ -307,4 +309,13 @@ var unconfirmedBalance = func(s *Server, params []string) (string, error) {
 
 	result := fmt.Sprintf("Unconfirmed balance: %.8f", float64(unconfirmedBalance)/float64(wallet.DUSK))
 	return result, nil
+}
+
+var txHistory = func(s *Server, params []string) (string, error) {
+	txRecordsBuf, err := s.rpcBus.Call(rpcbus.GetTxHistory, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return txRecordsBuf.String(), nil
 }
