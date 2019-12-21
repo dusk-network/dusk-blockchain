@@ -186,8 +186,7 @@ func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []by
 	// Append Peer IP.
 	copy(enc[2:6], peerDataStr[0:4])
 	// Append Port
-	port := peerDataStr[4:6]
-	copy(enc[6:8], port[0:2])
+	copy(enc[6:8], peerDataStr[4:6])
 	// Append Payload
 	copy(enc[8:encodedLen], payload[0:len(payload)])
 	return enc
