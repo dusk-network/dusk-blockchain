@@ -17,6 +17,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/txrecords"
 	"github.com/dusk-network/dusk-wallet/wallet"
 	logger "github.com/sirupsen/logrus"
 )
@@ -154,7 +155,7 @@ func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
 		// Amount
 		s.WriteString(fmt.Sprintf("%.8f DUSK ", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
 		// Unlock height
-		s.WriteString("Unlocks at " + strconv.Itoa(record.UnlockHeight) + " / ")
+		s.WriteString("Unlocks at " + strconv.FormatUint(record.UnlockHeight, 10) + " / ")
 		// Recipient
 		s.WriteString("Recipient: " + record.Recipient)
 
