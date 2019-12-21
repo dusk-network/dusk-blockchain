@@ -40,7 +40,7 @@ PacketConnCreation:
 		// Set a new deadline for the connection.
 		pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
-		encodedPack := encodeRedUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
+		encodedPack := encodeReadUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
 	}
@@ -96,7 +96,7 @@ PacketConnCreation:
 		// Set a new deadline for the connection.
 		pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
-		encodedPack := encodeRedTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
+		encodedPack := encodeReadTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
 	}

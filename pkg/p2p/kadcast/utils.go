@@ -156,7 +156,7 @@ func getBytesFromUint16(num uint16) [2]byte {
 
 // Encodes received UDP packets to send it through the
 // Ring to the packetProcess rutine.
-func encodeRedUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
+func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
 	encodedLen := len(payload) + 8
 	enc := make([]byte, encodedLen)
 	// Get numBytes as slice of bytes.
@@ -175,7 +175,7 @@ func encodeRedUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []
 
 // Encodes received TCP packets to send it through the
 // Ring to the packetProcess rutine.
-func encodeRedTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
+func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
 	peerDataStr := peerAddr.String()
 	encodedLen := len(payload) + 8
 	enc := make([]byte, encodedLen)
