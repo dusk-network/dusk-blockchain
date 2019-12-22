@@ -69,11 +69,12 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	return nil
 }
 
-// SendCommand sends a jsonrpc request to the specified network node
-func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([]byte, error) {
+// SendCommand sends a jsonrpc request to the specified network node.
+// Returns a string with the response of the json-rpc server.
+func (n *Network) SendCommand(nodeIndex uint, method string, params []string) (string, error) {
 
 	if nodeIndex >= uint(len(n.Nodes)) {
-		return nil, errors.New("invalid node index")
+		return "", errors.New("invalid node index")
 	}
 
 	targetNode := n.Nodes[nodeIndex]
@@ -86,12 +87,12 @@ func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([
 	var data []byte
 	data, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	buf := bytes.Buffer{}
-	if _, err := buf.Write([]byte(data)); err != nil {
-		return nil, err
+	if _, err := buf.Write(data); err != nil {
+		return "", err
 	}
 
 	addr := targetNode.Cfg.RPC.Address
@@ -112,35 +113,29 @@ func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([
 
 	request, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	request.SetBasicAuth(targetNode.Cfg.RPC.User, targetNode.Cfg.RPC.Pass)
 
 	resp, err := httpc.Do(request)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	var jsonResp rpc.JSONResponse
 	if err := json.Unmarshal(body, &jsonResp); err != nil {
-		return nil, err
+		return "", err
 	}
 
-	// TODO: Simplify
-	data, err = jsonResp.Result.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return jsonResp.Result, nil
 }
 
 // SendWireMsg sends a P2P message to the specified network node

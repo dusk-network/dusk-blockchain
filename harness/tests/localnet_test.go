@@ -1,12 +1,12 @@
 package tests
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,12 +92,7 @@ func TestSendBidTransaction(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	resp := struct{ Txid string }{}
-	if err := json.Unmarshal(data, &resp); err != nil {
-		t.Fatal(err.Error())
-	}
-
-	txid := resp.Txid
+	txid := strings.Trim(data, "Success! TxID: ")
 	t.Logf("Bid transaction id: %s", txid)
 
 	// Ensure all nodes have accepted this transaction at the same height

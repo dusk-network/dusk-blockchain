@@ -23,6 +23,7 @@ const (
 	GetBalance
 	GetUnconfirmedBalance
 	GetAddress
+	GetTxHistory
 	GetLastCertificate
 	GetCandidate
 	GetRoundResults
