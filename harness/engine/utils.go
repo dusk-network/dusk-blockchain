@@ -69,7 +69,8 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	return nil
 }
 
-// SendCommand sends a jsonrpc request to the specified network node
+// SendCommand sends a jsonrpc request to the specified network node.
+// Returns a string with the response of the json-rpc server.
 func (n *Network) SendCommand(nodeIndex uint, method string, params []string) (string, error) {
 
 	if nodeIndex >= uint(len(n.Nodes)) {
