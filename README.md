@@ -47,7 +47,7 @@ OPTIONAL: If you wish to participate in consensus, it is necessary that you also
 
 And finally, to start your node, type:
 ```bash
-./testnet
+./start-node.sh
 ```
 
 ## Features
