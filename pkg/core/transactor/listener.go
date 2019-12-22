@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
@@ -429,7 +428,10 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 
-	t.eb.Publish(topics.Tx, buf)
+	_, err = t.rb.Call(rpcbus.SendMempoolTx, rpcbus.Request{*buf, make(chan rpcbus.Response, 1)}, 0)
+	if err != nil {
+		return nil, err
+	}
 
 	return hash, nil
 }
