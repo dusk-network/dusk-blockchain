@@ -31,12 +31,15 @@ const pass = "password"
 // Test that the maintainer will properly send new stake and bid transactions, when
 // one is about to expire, or if none exist.
 func TestMaintainStakesAndBids(t *testing.T) {
-	bus, txChan, p, keys, m := setupMaintainerTest(t)
+	bus, c, p, keys, m := setupMaintainerTest(t)
 	defer os.Remove("wallet.dat")
 	defer os.RemoveAll("walletDB")
 
+	// Send round update, to start the maintainer.
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+
 	// receive first txs
-	txs := receiveTxs(t, txChan)
+	txs := receiveTxs(t, c)
 	// Check correctness
 	// We get the bid first
 	assert.True(t, txs[0].Type() == transactions.BidType)
@@ -62,7 +65,7 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(6, p, bl))
 
 	// We should get another set of two txs
-	txs = receiveTxs(t, txChan)
+	txs = receiveTxs(t, c)
 	// Check correctness
 	assert.True(t, txs[0].Type() == transactions.BidType)
 	assert.True(t, txs[1].Type() == transactions.StakeType)
@@ -71,25 +74,28 @@ func TestMaintainStakesAndBids(t *testing.T) {
 // Ensure the maintainer does not keep sending bids and stakes until they are included.
 func TestSendOnce(t *testing.T) {
 
-	bus, txChan, p, _, _ := setupMaintainerTest(t)
+	bus, c, p, _, _ := setupMaintainerTest(t)
 	defer os.Remove("wallet.dat")
 	defer os.RemoveAll("walletDB")
 
+	// Send round update, to start the maintainer.
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+
 	// receive first txs
-	_ = receiveTxs(t, txChan)
+	_ = receiveTxs(t, c)
 
 	// Update round
 	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, nil))
 
 	select {
-	case <-txChan:
+	case <-c:
 		t.Fatal("was not supposed to get another tx in txChan")
 	case <-time.After(2 * time.Second):
 		// success
 	}
 }
 
-func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *user.Provisioners, key.ConsensusKeys, ristretto.Scalar) {
+func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request, *user.Provisioners, key.ConsensusKeys, ristretto.Scalar) {
 	// Initial setup
 	bus := eventbus.New()
 	rpcBus := rpcbus.New()
@@ -99,10 +105,6 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *
 		panic(err)
 	}
 	go tr.Listen()
-
-	txChan := make(chan bytes.Buffer, 2)
-	l := eventbus.NewChanListener(txChan)
-	bus.Subscribe(topics.Tx, l)
 
 	os.Remove(cfg.Get().Wallet.File)
 	assert.NoError(t, createWallet(rpcBus, pass))
@@ -130,19 +132,20 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan bytes.Buffer, *
 	p, _ := consensus.MockProvisioners(10)
 	// Note: we don't need to mock the bidlist as we should not be included if we want to trigger a bid transaction
 
-	// Send round update, to start the maintainer.
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+	c := make(chan rpcbus.Request, 1)
+	rpcBus.Register(rpcbus.SendMempoolTx, c)
 
-	return bus, txChan, p, w.ConsensusKeys(), mScalar
+	return bus, c, p, w.ConsensusKeys(), mScalar
 }
 
-func receiveTxs(t *testing.T, txChan chan bytes.Buffer) []transactions.Transaction {
+func receiveTxs(t *testing.T, c chan rpcbus.Request) []transactions.Transaction {
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
-		txBuf := <-txChan
-		tx, err := marshalling.UnmarshalTx(&txBuf)
+		r := <-c
+		tx, err := marshalling.UnmarshalTx(&r.Params)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 	}
 
 	return txs
