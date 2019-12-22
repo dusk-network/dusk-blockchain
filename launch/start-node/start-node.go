@@ -18,5 +18,6 @@ func main() {
 	nodeCmd := exec.Command("./testnet")
 	if err := nodeCmd.Start(); err != nil {
 		fmt.Printf("could not start node binary - %v\n", err)
+		os.Exit(1)
 	}
 }
