@@ -419,12 +419,11 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 }
 
 func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
-	if t.w == nil {
-		r.RespChan <- rpcbus.Response{*bytes.NewBufferString("not loaded"), nil}
-		return nil
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteBool(buf, t.w != nil); err != nil {
+		return err
 	}
-
-	r.RespChan <- rpcbus.Response{*bytes.NewBufferString("loaded"), nil}
+	r.RespChan <- rpcbus.Response{*buf, nil}
 	return nil
 }
 
