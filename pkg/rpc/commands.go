@@ -327,5 +327,10 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	return walletStatusBuf.String(), nil
+	var status bool
+	if err := encoding.ReadBool(&walletStatusBuf, &status); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%v", status), nil
 }
