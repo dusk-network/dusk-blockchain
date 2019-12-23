@@ -741,6 +741,13 @@ func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 
 	progressPercentage := (float64(prevBlockHeight) / float64(c.highestSeen)) * 100
 
+	// Avoiding strange output when the chain can be ahead of the highest
+	// seen block, as in most cases, consensus terminates before we see
+	// the new block from other peers.
+	if progressPercentage > 100 {
+		progressPercentage = 100
+	}
+
 	r.RespChan <- rpcbus.Response{*bytes.NewBufferString(fmt.Sprintf("%.2f", progressPercentage)), nil}
 }
 
