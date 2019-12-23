@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -27,6 +29,11 @@ type ChainSynchronizer struct {
 	rpcBus    *rpcbus.RPCBus
 	*Counter
 	responseChan chan<- *bytes.Buffer
+
+	lock sync.RWMutex
+	// Highest block we've seen. We keep track of it, so that we do not
+	// spam the `Chain` with messages during a sync.
+	highestSeen uint64
 }
 
 // NewChainSynchronizer returns an initialized ChainSynchronizer. The passed responseChan
@@ -47,6 +54,12 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 	height, err := peekBlockHeight(r)
 	if err != nil {
 		return err
+	}
+
+	// Notify `Chain` of our highest seen block
+	if s.getHighestSeen() < height {
+		s.setHighestSeen(height)
+		s.publishHighestSeen(height)
 	}
 
 	blk, err := s.getLastBlock()
@@ -101,6 +114,28 @@ func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
 	}
 
 	return blk, nil
+}
+
+func (s *ChainSynchronizer) getHighestSeen() uint64 {
+	s.lock.RLock()
+	height := s.highestSeen
+	s.lock.RUnlock()
+	return height
+}
+
+func (s *ChainSynchronizer) setHighestSeen(height uint64) {
+	s.lock.Lock()
+	s.highestSeen = height
+	s.lock.Unlock()
+}
+
+func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteUint64LE(buf, height); err != nil {
+		panic(err)
+	}
+
+	s.publisher.Publish(topics.HighestSeen, buf)
 }
 
 func compareHeights(ourHeight, theirHeight uint64) int64 {

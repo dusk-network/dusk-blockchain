@@ -7,6 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -16,10 +17,14 @@ import (
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
 // are sufficiently behind the chain tip.
 func TestSynchronizeBehind(t *testing.T) {
-	cs, _, responseChan := setupSynchronizer(t)
+	cs, eb, responseChan := setupSynchronizer(t)
+	// Create a listener for HighestSeen topic
+	highestSeenChan := make(chan bytes.Buffer, 1)
+	eb.Subscribe(topics.HighestSeen, eventbus.NewChanListener(highestSeenChan))
 
 	// Create a block that is a few rounds in the future
-	blk := randomBlockBuffer(t, 5, 20)
+	height := uint64(5)
+	blk := randomBlockBuffer(t, height, 20)
 
 	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
@@ -33,6 +38,12 @@ func TestSynchronizeBehind(t *testing.T) {
 	if topic != topics.GetBlocks {
 		t.Fatal("did not receive expected GetBlocks message")
 	}
+
+	// Check highest seen
+	m := <-highestSeenChan
+	var highestSeenHeight uint64
+	assert.NoError(t, encoding.ReadUint64LE(&m, &highestSeenHeight))
+	assert.Equal(t, highestSeenHeight, height)
 }
 
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we

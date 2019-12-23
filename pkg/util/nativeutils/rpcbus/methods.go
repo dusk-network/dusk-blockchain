@@ -28,6 +28,7 @@ const (
 	GetCandidate
 	GetRoundResults
 	AutomateConsensusTxs
+	GetSyncProgress
 	IsWalletLoaded
 )
 

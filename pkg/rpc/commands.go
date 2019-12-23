@@ -31,6 +31,7 @@ var (
 		"balance":              balance,
 		"unconfirmedbalance":   unconfirmedBalance,
 		"txhistory":            txHistory,
+		"syncprogress":         syncProgress,
 		"automateconsensustxs": automateConsensusTxs,
 		"walletstatus":         walletStatus,
 
@@ -328,6 +329,15 @@ var automateConsensusTxs = func(s *Server, params []string) (string, error) {
 	}
 
 	return "Consensus transactions are now being automated -- you can update your settings in the dusk.toml config file", nil
+}
+
+var syncProgress = func(s *Server, params []string) (string, error) {
+	percentageBuf, err := s.rpcBus.Call(rpcbus.GetSyncProgress, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return percentageBuf.String(), nil
 }
 
 var walletStatus = func(s *Server, params []string) (string, error) {
