@@ -37,7 +37,7 @@ type StakeAutomaton struct {
 // renewed.
 const renewalOffset = 100
 
-func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar) (*StakeAutomaton, error) {
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar) *StakeAutomaton {
 	return &StakeAutomaton{
 		eventBroker:    eventBroker,
 		rpcBus:         rpcBus,
@@ -46,7 +46,7 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m
 		m:              m,
 		bidEndHeight:   1,
 		stakeEndHeight: 1,
-	}, nil
+	}
 }
 
 func (m *StakeAutomaton) Listen() {
