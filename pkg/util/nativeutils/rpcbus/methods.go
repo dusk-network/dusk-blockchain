@@ -27,6 +27,7 @@ const (
 	GetLastCertificate
 	GetCandidate
 	GetRoundResults
+	AutomateConsensusTxs
 )
 
 func MarshalConsensusTxRequest(buf *bytes.Buffer, amount, lockTime uint64) error {
