@@ -1,19 +1,21 @@
 # Dusk Network Testnet [![Build Status](https://travis-ci.org/dusk-network/dusk-blockchain.svg?branch=testnet)](https://travis-ci.com/dusk-network/dusk-blockchain)
 
-## Shin (殉星) Release
+## Rei (レイ) Release
 
 |Table of Contents|
 |---|
-|[What is the Dusk Network Testnet Shin (殉星)?](#what-is-the-dusk-network-testnet-shin)|
+|[What is Dusk Network Testnet Rei (レイ)?](#what-is-dusk-network-testnet-rei)|
 |[Specification Requirements](#specification-requirements)|
 |[Installation Guide](#installation-guide)|
 |[Features](#features)|
 |[Upcoming Features](#upcoming-features)|
 |[How to use the wallet?](#how-to-use-the-wallet)|
 
-## What is the Dusk Network Testnet Shin (殉星) ?
+## What is Dusk Network Testnet Rei (レイ)?
 
-Dusk Network Testnet Shin (殉星) is the first publicly-available implementation of the Dusk Network protocol. Dusk Network is a privacy-oriented blockchain protocol, that anyone can use to create zero-knowledge dApps. The Dusk Network protocol is secured via Segregated Byzantine Agreement consensus protocol. Segregated Byzantine Agreement is a permission-less consensus protocol with statistical block finality. Segregated Byzantine Agreement also includes Proof of Blind Bid, a novel Private Proof-of-Stake implementation, that enables Block Generators to stake anonymously.
+Dusk Network Testnet Rei (レイ) is the second iteration of the publicly-available implementation of the Dusk Network protocol. This iteration addresses stability issues and refines the user experience for node operators. It features an all-new upgraded design for the consensus implementation, as well as a more user-friendly way of managing the node and using the wallet.
+
+Dusk Network is a privacy-oriented blockchain protocol, that anyone can use to create zero-knowledge dApps. The Dusk Network protocol is secured via Segregated Byzantine Agreement consensus protocol. Segregated Byzantine Agreement is a permission-less consensus protocol with statistical block finality. Segregated Byzantine Agreement also includes Proof of Blind Bid, a novel Private Proof-of-Stake implementation, that enables Block Generators to stake anonymously.
 
 ## Specification Requirements
 
@@ -31,7 +33,7 @@ Dusk Network Testnet Shin (殉星) is the first publicly-available implementatio
 
 ## Installation Guide
 
-This guide is for building the node from source. If you would like to just download the compiled program, head over to the [releases](https://github.com/dusk-network/dusk-blockchain/releases) page, which should include both a pre-built DUSK node, and a pre-built blind bid executable.
+This guide is for building the node from source. If you would like to just download the compiled program, head over to the [releases](https://github.com/dusk-network/dusk-blockchain/releases) page, which should include a pre-built DUSK node, a pre-built blind bid executable, and a pre-built wallet executable.
 
 NOTE: This guide assumes you are building and running from a UNIX-like operating system. The node is not tested on Windows.
 
@@ -68,7 +70,7 @@ Finally, to start your node, type:
 1. Cryptography Module - Includes an implementation of SHA-3 and LongsightL hash functions, Ristretto and BN-256 elliptic curves, Ed25519, BLS, bLSAG and MLSAG signature schemes, Bulletproofs zero-knowledge proof scheme.
 2. Consensus Module - Includes a complete implementation of the latest version of Segregated Byzantine Agreement (v2.1) consensus protocol, which contains three phases - Block Generation, Block Reduction and Block Agreement as well as the Blind Bid proof protocol utilized in the Block Generation phase.
 3. Networking and Database Module - Includes the blockchain storage and related logic, as well as the implementation of P2P gossip protocol utilized by the Dusk Network protocol.
-4. CLI Wallet - Includes an functionality enabling the user to create/load a wallet, transfer/bid/stake DUSK tokens. The instructions on each of the aforementioned functionalities will be listed below. 
+4. CLI Wallet - Includes an functionality enabling the user to create/load a wallet, transfer/bid/stake DUSK tokens, and managing the node. 
 
 ## Upcoming Features
 
@@ -83,7 +85,7 @@ These features will be introduced in the later iterations of the Testnet (starti
 
 The wallet is hosted in a separate repo, [found here](https://github.com/dusk-network/dusk-wallet-cli). Please refer to that repository for build instructions.
 
-After building ensure you move the `dusk-wallet-cli` executable into the same folder as your `testnet`, `blindbid` and `dusk.toml` files. You can start the wallet after launching the node.
+After building, ensure you move the `dusk-wallet-cli` executable into the same folder as your `testnet`, `blindbid` and `dusk.toml` files. You can start the wallet after launching the node.
 
 ```bash
 ./dusk-wallet-cli
