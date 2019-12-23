@@ -39,6 +39,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleCreateFromSeed, "CreateWalletFromSeed")
 		case r := <-t.loadWalletChan:
 			handleRequest(r, t.handleLoadWallet, "LoadWallet")
+		case r := <-t.automateConsensusTxsChan:
+			handleRequest(r, t.handleAutomateConsensusTxs, "AutomateConsensusTxs")
 
 		// Transaction requests to respond to
 		case r := <-t.sendBidTxChan:
@@ -47,6 +49,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleSendStakeTx, "StakeTx")
 		case r := <-t.sendStandardTxChan:
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
+
+		// Information requests to respond to
 		case r := <-t.getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
 		case r := <-t.getUnconfirmedBalanceChan:
@@ -416,6 +420,15 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 	return nil
 }
 
+func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
+	if err := t.launchMaintainer(); err != nil {
+		return err
+	}
+
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	return nil
+}
+
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalTx(buf, tx); err != nil {
@@ -437,7 +450,6 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 }
 
 func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
-
 	if t.w == nil {
 		return
 	}
