@@ -2,13 +2,15 @@ package maintainer
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 
 	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,20 +31,19 @@ type StakeAutomaton struct {
 
 	bidEndHeight   uint64
 	stakeEndHeight uint64
-
-	amount, lockTime, offset uint64
 }
 
-func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar, amount, lockTime, offset uint64) (*StakeAutomaton, error) {
+// How many blocks away from expiration the transactions should be
+// renewed.
+const renewalOffset = 100
+
+func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar) (*StakeAutomaton, error) {
 	return &StakeAutomaton{
 		eventBroker:    eventBroker,
 		rpcBus:         rpcBus,
 		roundChan:      consensus.InitRoundUpdate(eventBroker),
 		pubKeyBLS:      pubKeyBLS,
 		m:              m,
-		amount:         amount,
-		lockTime:       lockTime,
-		offset:         offset,
 		bidEndHeight:   1,
 		stakeEndHeight: 1,
 	}, nil
@@ -57,7 +58,7 @@ func (m *StakeAutomaton) Listen() {
 			m.bidList = roundUpdate.BidList
 
 			// TODO: handle new provisioners and bidlist coming from roundupdate
-			if roundUpdate.Round+m.offset >= m.bidEndHeight {
+			if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
 				endHeight := m.findMostRecentBid()
 
 				// Only send bid if this is the first time we notice it's about to expire
@@ -73,7 +74,7 @@ func (m *StakeAutomaton) Listen() {
 				}
 			}
 
-			if roundUpdate.Round+m.offset >= m.stakeEndHeight {
+			if roundUpdate.Round+renewalOffset >= m.stakeEndHeight {
 				endHeight := m.findMostRecentStake()
 
 				// Only send stake if this is the first time we notice it's about to expire
@@ -118,17 +119,17 @@ func (m *StakeAutomaton) findMostRecentStake() uint64 {
 }
 
 func (m *StakeAutomaton) sendBid() error {
-	if m.amount == 0 {
-		return errors.New("zero amount")
+	amount, lockTime := m.getTxSettings()
+	if amount == 0 || lockTime == 0 {
+		return fmt.Errorf("invalid settings: amount: %v / locktime: %v", amount, lockTime)
 	}
 
-	if m.lockTime == 0 {
-		return errors.New("zero lockTime")
-	}
-
-	l.Tracef("Sending bid tx (%d,%d)", m.amount, m.lockTime)
+	l.WithFields(log.Fields{
+		"amount":   amount,
+		"locktime": lockTime,
+	}).Tracef("Sending bid tx")
 	buf := new(bytes.Buffer)
-	if err := rpcbus.MarshalConsensusTxRequest(buf, m.amount, m.lockTime); err != nil {
+	if err := rpcbus.MarshalConsensusTxRequest(buf, amount, lockTime); err != nil {
 		return err
 	}
 
@@ -141,20 +142,32 @@ func (m *StakeAutomaton) sendBid() error {
 }
 
 func (m *StakeAutomaton) sendStake() error {
-	if m.amount == 0 {
-		return errors.New("zero amount")
+	amount, lockTime := m.getTxSettings()
+	if amount == 0 || lockTime == 0 {
+		return fmt.Errorf("invalid settings: amount: %v / locktime: %v", amount, lockTime)
 	}
 
-	if m.lockTime == 0 {
-		return errors.New("zero lockTime")
-	}
-
-	l.Tracef("Sending stake tx (%d,%d)", m.amount, m.lockTime)
+	l.WithFields(log.Fields{
+		"amount":   amount,
+		"locktime": lockTime,
+	}).Tracef("Sending stake tx")
 	buf := new(bytes.Buffer)
-	if err := rpcbus.MarshalConsensusTxRequest(buf, m.amount, m.lockTime); err != nil {
+	if err := rpcbus.MarshalConsensusTxRequest(buf, amount, lockTime); err != nil {
 		return err
 	}
 
 	_, err := m.rpcBus.Call(rpcbus.SendStakeTx, rpcbus.NewRequest(*buf), 0)
 	return err
+}
+
+func (m *StakeAutomaton) getTxSettings() (uint64, uint64) {
+	settings := config.Get().Consensus
+	amount := settings.DefaultAmount
+	lockTime := settings.DefaultLockTime
+	if lockTime > transactions.MaxLockTime {
+		l.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
+		lockTime = transactions.MaxLockTime
+	}
+
+	return amount, lockTime
 }
