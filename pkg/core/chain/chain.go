@@ -732,6 +732,11 @@ func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 	prevBlockHeight := c.prevBlock.Header.Height
 	c.mu.RUnlock()
 
+	if prevBlockHeight == 0 {
+		r.RespChan <- rpcbus.Response{*bytes.NewBufferString("0"), nil}
+		return
+	}
+
 	progressPercentage := (float64(c.highestSeen) / float64(prevBlockHeight)) * 100
 
 	r.RespChan <- rpcbus.Response{*bytes.NewBufferString(fmt.Sprintf("%.2f", progressPercentage)), nil}
