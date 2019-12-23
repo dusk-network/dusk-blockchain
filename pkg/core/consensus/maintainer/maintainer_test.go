@@ -62,7 +62,7 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, bl))
 
 	// Send another round update that is within the 'offset', to trigger sending a new pair of txs
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(6, p, bl))
+	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(950, p, bl))
 
 	// We should get another set of two txs
 	txs = receiveTxs(t, c)
@@ -73,7 +73,6 @@ func TestMaintainStakesAndBids(t *testing.T) {
 
 // Ensure the maintainer does not keep sending bids and stakes until they are included.
 func TestSendOnce(t *testing.T) {
-
 	bus, c, p, _, _ := setupMaintainerTest(t)
 	defer os.Remove("wallet.dat")
 	defer os.RemoveAll("walletDB")
@@ -124,8 +123,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	k, err := w.ReconstructK()
 	assert.NoError(t, err)
 	mScalar := zkproof.CalculateM(k)
-	m, err := maintainer.New(bus, rpcBus, w.ConsensusKeys().BLSPubKeyBytes, mScalar, 10, 10, 5)
-	assert.NoError(t, err)
+	m := maintainer.New(bus, rpcBus, w.ConsensusKeys().BLSPubKeyBytes, mScalar)
 	go m.Listen()
 
 	// Mock provisioners, and insert our wallet values
