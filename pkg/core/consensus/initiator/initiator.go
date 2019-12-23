@@ -61,9 +61,11 @@ func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *walle
 	_, db := heavy.CreateDBConnection()
 	for i := uint64(0); ; i++ {
 		hash, err := getBlockHashForHeight(db, i)
-		if err != nil {
+		if err == database.ErrBlockNotFound {
 			// We hit the end of the chain, so just exit here
 			return
+		} else if err != nil {
+			panic(err)
 		}
 
 		txs, err := getTxsForBlock(db, hash)
