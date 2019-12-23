@@ -55,6 +55,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleAddress, "Address")
 		case r := <-t.getTxHistoryChan:
 			handleRequest(r, t.handleGetTxHistory, "GetTxHistory")
+		case r := <-t.isWalletLoadedChan:
+			handleRequest(r, t.handleIsWalletLoaded, "IsWalletLoaded")
 
 		// Event list to handle
 		case b := <-t.acceptedBlockChan:
@@ -412,6 +414,15 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 		return err
 	}
 
+	r.RespChan <- rpcbus.Response{*buf, nil}
+	return nil
+}
+
+func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
+	buf := new(bytes.Buffer)
+	if err := encoding.WriteBool(buf, t.w != nil); err != nil {
+		return err
+	}
 	r.RespChan <- rpcbus.Response{*buf, nil}
 	return nil
 }
