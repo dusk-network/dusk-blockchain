@@ -2,12 +2,9 @@ package initiator
 
 import (
 	"bytes"
-	"fmt"
-	"os"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/factory"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
@@ -25,11 +22,8 @@ import (
 var l = log.WithField("process", "consensus initiator")
 
 func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
-	startBlockGenerator(eventBroker, rpcBus, w)
+	storeBidValues(eventBroker, rpcBus, w)
 	startProvisioner(eventBroker, rpcBus, w, counter)
-	if err := launchMaintainer(eventBroker, rpcBus, w); err != nil {
-		fmt.Fprintf(os.Stdout, "could not launch maintainer - consensus transactions will not be automated: %v\n", err)
-	}
 }
 
 func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
@@ -54,7 +48,10 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	}
 }
 
-func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
+// storeBidValues finds the most recent bid belonging to the given
+// wallet, and stores the relevant values needed by the consensus.
+// This allows the components for block generation to properly function.
+func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
 	k, err := w.ReconstructK()
 	if err != nil {
 		panic(err)
@@ -62,27 +59,16 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 
 	m := zkproof.CalculateM(k)
 	_, db := heavy.CreateDBConnection()
-	for i := 0; ; i++ {
-		// Get block hash for the given height
-		var hash []byte
-		err := db.View(func(t database.Transaction) error {
-			var err error
-			hash, err = t.FetchBlockHashByHeight(uint64(i))
-			return err
-		})
-
-		// We hit the end of the chain, so we should just exit here
-		if err != nil {
+	for i := uint64(0); ; i++ {
+		hash, err := getBlockHashForHeight(db, i)
+		if err == database.ErrBlockNotFound {
+			// We hit the end of the chain, so just exit here
 			return
+		} else if err != nil {
+			panic(err)
 		}
 
-		// Get the transactions belonging to the previously found block
-		var txs []transactions.Transaction
-		err = db.View(func(t database.Transaction) error {
-			var err error
-			txs, err = t.FetchBlockTxs(hash)
-			return err
-		})
+		txs, err := getTxsForBlock(db, hash)
 		if err != nil {
 			panic(err)
 		}
@@ -106,28 +92,22 @@ func startBlockGenerator(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *
 	}
 }
 
-func launchMaintainer(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
-	r := cfg.Get()
-	// default amount is denoted in whole units of DUSK, so we should convert it to
-	// atomic units.
-	amount := r.Consensus.DefaultAmount * wallet.DUSK
-	lockTime := r.Consensus.DefaultLockTime
-	if lockTime > transactions.MaxLockTime {
-		log.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
-		lockTime = transactions.MaxLockTime
-	}
-
-	offset := r.Consensus.DefaultOffset
-	k, err := w.ReconstructK()
-	if err != nil {
+func getBlockHashForHeight(db database.DB, height uint64) ([]byte, error) {
+	var hash []byte
+	err := db.View(func(t database.Transaction) error {
+		var err error
+		hash, err = t.FetchBlockHashByHeight(height)
 		return err
-	}
+	})
+	return hash, err
+}
 
-	log.Infof("maintainer is starting with amount,locktime (%v,%v)", amount, lockTime)
-	m, err := maintainer.New(eventBroker, rpcBus, w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k), amount, lockTime, offset)
-	if err != nil {
+func getTxsForBlock(db database.DB, hash []byte) ([]transactions.Transaction, error) {
+	var txs []transactions.Transaction
+	err := db.View(func(t database.Transaction) error {
+		var err error
+		txs, err = t.FetchBlockTxs(hash)
 		return err
-	}
-	go m.Listen()
-	return nil
+	})
+	return txs, err
 }

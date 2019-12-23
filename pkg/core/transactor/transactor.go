@@ -1,7 +1,10 @@
 package transactor
 
 import (
+	"errors"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
@@ -10,17 +13,19 @@ import (
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/dusk-network/dusk-wallet/wallet"
+	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 // TODO: rename
 type Transactor struct {
-	w           *wallet.Wallet
-	db          database.DB
-	eb          *eventbus.EventBus
-	rb          *rpcbus.RPCBus
-	fetchDecoys transactions.FetchDecoys
-	fetchInputs wallet.FetchInputs
-	walletOnly  bool
+	w                 *wallet.Wallet
+	db                database.DB
+	eb                *eventbus.EventBus
+	rb                *rpcbus.RPCBus
+	fetchDecoys       transactions.FetchDecoys
+	fetchInputs       wallet.FetchInputs
+	walletOnly        bool
+	maintainerStarted bool
 
 	// Passed to the consensus component startup
 	c                 *chainsync.Counter
@@ -37,6 +42,7 @@ type Transactor struct {
 	getUnconfirmedBalanceChan chan rpcbus.Request
 	getAddressChan            chan rpcbus.Request
 	getTxHistoryChan          chan rpcbus.Request
+	automateConsensusTxsChan  chan rpcbus.Request
 	isWalletLoadedChan        chan rpcbus.Request
 }
 
@@ -68,6 +74,7 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 		getUnconfirmedBalanceChan: make(chan rpcbus.Request, 1),
 		getAddressChan:            make(chan rpcbus.Request, 1),
 		getTxHistoryChan:          make(chan rpcbus.Request, 1),
+		automateConsensusTxsChan:  make(chan rpcbus.Request, 1),
 		isWalletLoadedChan:        make(chan rpcbus.Request, 1),
 	}
 
@@ -91,7 +98,6 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 
 // registers all rpcBus channels
 func (t *Transactor) registerMethods() error {
-
 	if err := t.rb.Register(rpcbus.LoadWallet, t.loadWalletChan); err != nil {
 		return err
 	}
@@ -132,14 +138,38 @@ func (t *Transactor) registerMethods() error {
 		return err
 	}
 
+	if err := t.rb.Register(rpcbus.AutomateConsensusTxs, t.automateConsensusTxsChan); err != nil {
+		return err
+	}
+
 	return t.rb.Register(rpcbus.IsWalletLoaded, t.isWalletLoadedChan)
 }
 
 func (t *Transactor) Wallet() (*wallet.Wallet, error) {
-
 	if t.w == nil {
 		return nil, errWalletNotLoaded
 	}
 
 	return t.w, nil
+}
+
+func (t *Transactor) launchMaintainer() error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	if t.maintainerStarted {
+		return errors.New("consensus transactions are already being automated")
+	}
+
+	k, err := t.w.ReconstructK()
+	if err != nil {
+		return err
+	}
+
+	log.Infof("maintainer is starting")
+	m := maintainer.New(t.eb, t.rb, t.w.ConsensusKeys().BLSPubKeyBytes, zkproof.CalculateM(k))
+	go m.Listen()
+	t.maintainerStarted = true
+	return nil
 }

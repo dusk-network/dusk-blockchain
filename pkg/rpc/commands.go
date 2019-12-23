@@ -21,18 +21,19 @@ var (
 
 	// rpcCmd maps method names to their actual functions.
 	rpcCmd = map[string]handler{
-		"transfer":           transfer,
-		"bid":                sendBidTx,
-		"stake":              sendStakeTx,
-		"createwallet":       createWallet,
-		"loadwallet":         loadWallet,
-		"createfromseed":     createFromSeed,
-		"address":            address,
-		"balance":            balance,
-		"unconfirmedbalance": unconfirmedBalance,
-		"txhistory":          txHistory,
-		"syncprogress":       syncProgress,
-		"walletstatus":       walletStatus,
+		"transfer":             transfer,
+		"bid":                  sendBidTx,
+		"stake":                sendStakeTx,
+		"createwallet":         createWallet,
+		"loadwallet":           loadWallet,
+		"createfromseed":       createFromSeed,
+		"address":              address,
+		"balance":              balance,
+		"unconfirmedbalance":   unconfirmedBalance,
+		"txhistory":            txHistory,
+		"syncprogress":         syncProgress,
+		"automateconsensustxs": automateConsensusTxs,
+		"walletstatus":         walletStatus,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
@@ -320,6 +321,14 @@ var txHistory = func(s *Server, params []string) (string, error) {
 	}
 
 	return txRecordsBuf.String(), nil
+}
+
+var automateConsensusTxs = func(s *Server, params []string) (string, error) {
+	if _, err := s.rpcBus.Call(rpcbus.AutomateConsensusTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
+		return "", err
+	}
+
+	return "Consensus transactions are now being automated -- you can update your settings in the dusk.toml config file", nil
 }
 
 var syncProgress = func(s *Server, params []string) (string, error) {

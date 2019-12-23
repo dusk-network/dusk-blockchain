@@ -234,4 +234,6 @@ func init() {
 	r.General.Network = "testnet"
 	r.Wallet.File = "wallet.dat"
 	r.Wallet.Store = "walletDB"
+	r.Consensus.DefaultLockTime = 1000
+	r.Consensus.DefaultAmount = 10
 }
