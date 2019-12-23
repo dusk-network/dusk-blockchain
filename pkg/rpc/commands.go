@@ -31,6 +31,7 @@ var (
 		"balance":            balance,
 		"unconfirmedbalance": unconfirmedBalance,
 		"txhistory":          txHistory,
+		"syncprogress":       syncProgress,
 		"walletstatus":       walletStatus,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
@@ -319,6 +320,15 @@ var txHistory = func(s *Server, params []string) (string, error) {
 	}
 
 	return txRecordsBuf.String(), nil
+}
+
+var syncProgress = func(s *Server, params []string) (string, error) {
+	percentageBuf, err := s.rpcBus.Call(rpcbus.GetSyncProgress, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return percentageBuf.String(), nil
 }
 
 var walletStatus = func(s *Server, params []string) (string, error) {

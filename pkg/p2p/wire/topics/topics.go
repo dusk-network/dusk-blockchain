@@ -62,6 +62,7 @@ const (
 	Restart
 	StopConsensus
 	IntermediateBlock
+	HighestSeen
 )
 
 type topicBuf struct {
@@ -112,6 +113,7 @@ var Topics = [...]topicBuf{
 	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
 	topicBuf{StopConsensus, *(bytes.NewBuffer([]byte{byte(StopConsensus)})), "stopconsensus"},
 	topicBuf{IntermediateBlock, *(bytes.NewBuffer([]byte{byte(IntermediateBlock)})), "intermediateblock"},
+	topicBuf{HighestSeen, *(bytes.NewBuffer([]byte{byte(HighestSeen)})), "highestseen"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {

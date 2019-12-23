@@ -19,6 +19,10 @@ type (
 		hash []byte
 		cert *block.Certificate
 	}
+
+	highestSeenCollector struct {
+		highestSeenChan chan<- uint64
+	}
 )
 
 func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
@@ -40,5 +44,22 @@ func (c *certificateCollector) Collect(m bytes.Buffer) error {
 	}
 
 	c.certificateChan <- certMsg{hash, cert}
+	return nil
+}
+
+func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
+	highestSeenChan := make(chan uint64, 1)
+	collector := &highestSeenCollector{highestSeenChan}
+	eventbus.NewTopicListener(sub, collector, topics.HighestSeen, eventbus.ChannelType)
+	return highestSeenChan
+}
+
+func (h *highestSeenCollector) Collect(m bytes.Buffer) error {
+	var height uint64
+	if err := encoding.ReadUint64LE(&m, &height); err != nil {
+		return err
+	}
+
+	h.highestSeenChan <- height
 	return nil
 }

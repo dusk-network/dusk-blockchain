@@ -27,6 +27,7 @@ const (
 	GetLastCertificate
 	GetCandidate
 	GetRoundResults
+	GetSyncProgress
 	IsWalletLoaded
 )
 
