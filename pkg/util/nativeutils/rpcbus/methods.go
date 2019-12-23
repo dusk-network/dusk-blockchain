@@ -28,6 +28,7 @@ const (
 	GetCandidate
 	GetRoundResults
 	AutomateConsensusTxs
+	IsWalletLoaded
 )
 
 func MarshalConsensusTxRequest(buf *bytes.Buffer, amount, lockTime uint64) error {
