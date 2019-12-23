@@ -92,3 +92,7 @@ After building ensure you move the `dusk-wallet-cli` executable into the same fo
 The wallet will show you a menu with available options, that you can navigate with the arrow keys and the enter key.
 
 Note that the wallet is a seperate process from the node, and thus closing the wallet does not stop the node from running.
+
+### How to claim Testnet DUSK?
+
+To claim Testnet DUSK (tDUSK), the user is required to make a Twitter post containing his/her wallet address ([example](https://twitter.com/ellie12496641/status/1147604746280361984)). Following the post on Twitter, the user should go to the faucet [webpage](https://faucet.dusk.network/) and paste the Twitter post link into the empty box and click the `Send Dusk!` button. The tDUSK will be deposited onto the aforementioned address within a minute. The user can claim tDUSK for the same address once per 24 hours.
