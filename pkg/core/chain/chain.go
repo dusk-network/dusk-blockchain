@@ -61,14 +61,21 @@ type Chain struct {
 	// for including it with the candidate message.
 	lastCertificate *block.Certificate
 
+	// The highest block we've seen from the network. This is updated
+	// by the synchronizer, and used to calculate our synchronization
+	// progress.
+	highestSeen uint64
+
 	// collector channels
 	certificateChan <-chan certMsg
+	highestSeenChan <-chan uint64
 
 	// rpcbus channels
 	getLastBlockChan         <-chan rpcbus.Request
 	verifyCandidateBlockChan <-chan rpcbus.Request
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
+	getSyncProgressChan      <-chan rpcbus.Request
 }
 
 // New returns a new chain object
@@ -88,10 +95,12 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	verifyCandidateBlockChan := make(chan rpcbus.Request, 1)
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
 	getRoundResultsChan := make(chan rpcbus.Request, 1)
+	getSyncProgressChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
 	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
 	rpcBus.Register(rpcbus.GetLastCertificate, getLastCertificateChan)
 	rpcBus.Register(rpcbus.GetRoundResults, getRoundResultsChan)
+	rpcBus.Register(rpcbus.GetSyncProgress, getSyncProgressChan)
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -106,6 +115,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getLastCertificateChan:   getLastCertificateChan,
 		getRoundResultsChan:      getRoundResultsChan,
+		getSyncProgressChan:      getSyncProgressChan,
 	}
 
 	// If the `prevBlock` is genesis, we add an empty intermediate block.
@@ -138,6 +148,8 @@ func (c *Chain) Listen() {
 		select {
 		case certMsg := <-c.certificateChan:
 			c.handleCertificateMessage(certMsg)
+		case height := <-c.highestSeenChan:
+			c.highestSeen = height
 		case r := <-c.getLastBlockChan:
 			c.provideLastBlock(r)
 		case r := <-c.verifyCandidateBlockChan:
@@ -146,6 +158,8 @@ func (c *Chain) Listen() {
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
 			c.provideRoundResults(r)
+		case r := <-c.getSyncProgressChan:
+			c.provideSyncProgress(r)
 		}
 	}
 }
@@ -711,6 +725,16 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	}
 
 	r.RespChan <- rpcbus.Response{*buf, nil}
+}
+
+func (c *Chain) provideSyncProgress(r rpcbus.Request) {
+	c.mu.RLock()
+	prevBlockHeight := c.prevBlock.Header.Height
+	c.mu.RUnlock()
+
+	progressPercentage := (float64(c.highestSeen) / float64(prevBlockHeight)) * 100
+
+	r.RespChan <- rpcbus.Response{*bytes.NewBufferString(fmt.Sprintf("%.2f", progressPercentage)), nil}
 }
 
 // mocks an intermediate block with a coinbase attributed to a standard
