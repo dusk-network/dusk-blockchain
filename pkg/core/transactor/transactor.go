@@ -37,6 +37,7 @@ type Transactor struct {
 	getUnconfirmedBalanceChan chan rpcbus.Request
 	getAddressChan            chan rpcbus.Request
 	getTxHistoryChan          chan rpcbus.Request
+	isWalletLoadedChan        chan rpcbus.Request
 }
 
 // Instantiate a new Transactor struct.
@@ -67,6 +68,7 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 		getUnconfirmedBalanceChan: make(chan rpcbus.Request, 1),
 		getAddressChan:            make(chan rpcbus.Request, 1),
 		getTxHistoryChan:          make(chan rpcbus.Request, 1),
+		isWalletLoadedChan:        make(chan rpcbus.Request, 1),
 	}
 
 	if t.fetchDecoys == nil {
@@ -126,7 +128,11 @@ func (t *Transactor) registerMethods() error {
 		return err
 	}
 
-	return t.rb.Register(rpcbus.GetTxHistory, t.getTxHistoryChan)
+	if err := t.rb.Register(rpcbus.GetTxHistory, t.getTxHistoryChan); err != nil {
+		return err
+	}
+
+	return t.rb.Register(rpcbus.IsWalletLoaded, t.isWalletLoadedChan)
 }
 
 func (t *Transactor) Wallet() (*wallet.Wallet, error) {

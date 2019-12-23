@@ -32,6 +32,7 @@ var (
 		"unconfirmedbalance": unconfirmedBalance,
 		"txhistory":          txHistory,
 		"syncprogress":       syncProgress,
+		"walletstatus":       walletStatus,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
@@ -328,4 +329,18 @@ var syncProgress = func(s *Server, params []string) (string, error) {
 	}
 
 	return percentageBuf.String(), nil
+}
+
+var walletStatus = func(s *Server, params []string) (string, error) {
+	walletStatusBuf, err := s.rpcBus.Call(rpcbus.IsWalletLoaded, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	var status bool
+	if err := encoding.ReadBool(&walletStatusBuf, &status); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%v", status), nil
 }
