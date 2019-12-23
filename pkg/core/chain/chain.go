@@ -89,6 +89,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 
 	// set up collectors
 	certificateChan := initCertificateCollector(eventBus)
+	highestSeenChan := initHighestSeenCollector(eventBus)
 
 	// set up rpcbus channels
 	getLastBlockChan := make(chan rpcbus.Request, 1)
@@ -111,6 +112,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		bidList:                  &user.BidList{},
 		counter:                  counter,
 		certificateChan:          certificateChan,
+		highestSeenChan:          highestSeenChan,
 		getLastBlockChan:         getLastBlockChan,
 		verifyCandidateBlockChan: verifyCandidateBlockChan,
 		getLastCertificateChan:   getLastCertificateChan,
