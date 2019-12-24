@@ -158,7 +158,7 @@ func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
 		// Time
 		s.WriteString(time.Unix(record.Timestamp, 0).Format(time.UnixDate) + " / ")
 		// Amount
-		s.WriteString(fmt.Sprintf("%.8f DUSK ", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
+		s.WriteString(fmt.Sprintf("%.8f DUSK", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
 		// Unlock height
 		s.WriteString("Unlocks at " + strconv.FormatUint(record.UnlockHeight, 10) + " / ")
 		// Recipient

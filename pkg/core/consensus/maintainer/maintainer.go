@@ -11,6 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/wallet"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -168,6 +169,9 @@ func (m *StakeAutomaton) getTxSettings() (uint64, uint64) {
 		l.Warnf("default locktime was configured to be greater than the maximum (%v) - defaulting to %v", lockTime, transactions.MaxLockTime)
 		lockTime = transactions.MaxLockTime
 	}
+
+	// Convert amount from atomic units to whole units of DUSK
+	amount = amount * wallet.DUSK
 
 	return amount, lockTime
 }
