@@ -64,10 +64,7 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 	case topics.MemPool:
 		err = m.dataBroker.SendTxsItems()
 	case topics.Inv:
-		// We only accept an advertisement once
-		if m.dupeMap.CanFwd(b) {
-			err = m.dataRequestor.RequestMissingItems(b)
-		}
+		err = m.dataRequestor.RequestMissingItems(b)
 	case topics.Block:
 		err = m.synchronizer.Synchronize(b, m.peerInfo)
 	case topics.Ping:
