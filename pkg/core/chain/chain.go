@@ -707,6 +707,12 @@ func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	if c.intermediateBlock == nil || c.lastCertificate == nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block or certificate currently known")}
+		return
+	}
+
+	if r.Params.Len() < 8 {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("round cannot be read from request param")}
+		return
 	}
 
 	round := binary.LittleEndian.Uint64(r.Params.Bytes())
