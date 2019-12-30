@@ -46,6 +46,8 @@ An overview of the bare response object:
 | `balance` | | Returns the unlocked and locked balance of the loaded wallet. | wallet loaded |
 | `unconfirmedbalance` | | Returns the amount of DUSK that is in the mempool for the loaded wallet. | wallet loaded |
 | `txhistory` | | Returns the transaction history for the loaded wallet. | wallet loaded |
+| `walletstatus` | | Returns whether or not the wallet is loaded, as a "boolean" (0 or 1) | none |
+| `syncprogress` | | Returns to what degree the node is synced up with the rest of its peers, as a percentage. | none |
 
 #### Extended functionality (full nodes only)
 
@@ -53,4 +55,4 @@ An overview of the bare response object:
 | ------ | ------ | ----------- | -------------- |
 | `bid` | \<amount\>, \<locktime\> | Sends a bid transaction of \<amount\> DUSK to self. The transaction will be locked for \<locktime\> blocks after being accepted into a block. Returns a TXID on success. | wallet loaded |
 | `stake` | \<amount\> \<locktime\> | Sends a stake transaction of \<amount\> DUSK to self. The transaction will be locked for \<locktime\> blocks after being accepted into a block. Returns a TXID on success. | wallet loaded |
-
+| `automateconsensustxs` | | Tells the node to automatically renew stakes and bids, to save the user the trouble. Values and locktimes are inferred from configuration file. Returns a string indicating success or failure. | wallet loaded |
