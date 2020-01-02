@@ -194,7 +194,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 	txs := make([]transactions.Transaction, 0)
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx, err := ConstructCoinbaseTx(bg.genPubKey, proof, score)
+	coinbaseTx, err := constructCoinbaseTx(bg.genPubKey, proof, score)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +238,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func ConstructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) (*transactions.Coinbase, error) {
+func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) (*transactions.Coinbase, error) {
 	// The rewards for both the Generator and the Provisioners are disclosed.
 	// Provisioner reward addresses do not require obfuscation
 	// The Generator address rewards do.
