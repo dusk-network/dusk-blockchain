@@ -58,13 +58,8 @@ func CheckStandardTx(db database.DB, tx *transactions.Standard) error {
 	}
 
 	// Inputs - should be unlocked
-	containsLockedInputs, err := checkInputsLocked(db, tx.Inputs)
-	if err != nil {
+	if err := checkInputsLocked(db, tx.Inputs); err != nil {
 		return err
-	}
-
-	if containsLockedInputs {
-		return errors.New("transaction contains one or more locked inputs")
 	}
 
 	// Outputs - must contain atleast one
@@ -218,7 +213,7 @@ func checkTXDoubleSpent(db database.DB, inputs transactions.Inputs) error {
 	})
 }
 
-func checkInputsLocked(db database.DB, inputs transactions.Inputs) (bool, error) {
+func checkInputsLocked(db database.DB, inputs transactions.Inputs) error {
 	var currentHeight uint64
 	err := db.View(func(t database.Transaction) error {
 		var err error
@@ -226,28 +221,25 @@ func checkInputsLocked(db database.DB, inputs transactions.Inputs) (bool, error)
 		return err
 	})
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	for _, input := range inputs {
-		for _, keyV := range input.Signature.PubKeys {
-			var unlockHeight uint64
-			err := db.View(func(t database.Transaction) error {
+	return db.View(func(t database.Transaction) error {
+		for _, input := range inputs {
+			for _, keyV := range input.Signature.PubKeys {
 				key := keyV.OutputKey()
-				var err error
-				unlockHeight, err = t.FetchOutputUnlockHeight(key.Bytes())
-				return err
-			})
-			if err != nil {
-				return false, err
-			}
+				unlockHeight, err := t.FetchOutputUnlockHeight(key.Bytes())
+				if err != nil {
+					return err
+				}
 
-			// Found an input which is still locked
-			if unlockHeight > currentHeight {
-				return true, nil
+				// Found an input which is still locked
+				if unlockHeight > currentHeight {
+					return errors.New("found a locked input")
+				}
 			}
 		}
-	}
 
-	return false, nil
+		return nil
+	})
 }
