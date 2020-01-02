@@ -235,7 +235,7 @@ func checkInputsLocked(db database.DB, inputs transactions.Inputs) error {
 
 				// Found an input which is still locked
 				if unlockHeight > currentHeight {
-					return errors.New("found a locked input")
+					return errors.New("transaction contains one or more locked inputs")
 				}
 			}
 		}
