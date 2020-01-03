@@ -2,8 +2,10 @@ package peermsg
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
@@ -29,6 +31,10 @@ type Inv struct {
 }
 
 func (i *Inv) Encode(w *bytes.Buffer) error {
+	if uint32(len(i.InvList)) > config.Get().Mempool.MaxInvItems {
+		return errors.New("inv message is too large")
+	}
+
 	if err := encoding.WriteVarInt(w, uint64(len(i.InvList))); err != nil {
 		return err
 	}
@@ -60,9 +66,12 @@ func (inv *Inv) Decode(r *bytes.Buffer) error {
 		return err
 	}
 
+	if lenVect > uint64(config.Get().Mempool.MaxInvItems) {
+		return errors.New("inv message is too large")
+	}
+
 	inv.InvList = make([]InvVect, lenVect)
 	for i := uint64(0); i < lenVect; i++ {
-
 		var invType uint8
 		if err := encoding.ReadUint8(r, &invType); err != nil {
 			return err
