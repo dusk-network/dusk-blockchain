@@ -13,7 +13,6 @@ import (
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -36,7 +35,6 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
-	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
 
 	// First, test accepting a block when the counter is set to not syncing.
 	blk := helper.RandomBlock(t, 1, 1)
