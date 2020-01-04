@@ -23,7 +23,7 @@ func NewGossip(magic protocol.Magic) *Gossip {
 	}
 }
 
-// Process a message that is passing through, by prepending the protocol
+// Process a message that is passing through, by prepending
 // magic and the message checksum, and finally by prepending the length.
 func (g *Gossip) Process(m *bytes.Buffer) error {
 	cs := checksum.Generate(m.Bytes())

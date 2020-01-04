@@ -65,8 +65,8 @@ func TestReader(t *testing.T) {
 // Test the functionality of the peer.Writer through the use of the ring buffer.
 func TestWriteRingBuffer(t *testing.T) {
 	bus := eventbus.New()
-	g := processing.NewGossip(protocol.TestNet)
-	bus.Register(topics.Gossip, g)
+	//g := processing.NewGossip(protocol.TestNet)
+	//bus.Register(topics.Gossip, g)
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
@@ -147,8 +147,8 @@ func TestPingLoop(t *testing.T) {
 
 func BenchmarkWriter(b *testing.B) {
 	bus := eventbus.New()
-	g := processing.NewGossip(protocol.TestNet)
-	bus.Register(topics.Gossip, g)
+	// g := processing.NewGossip(protocol.TestNet)
+	// bus.Register(topics.Gossip, g)
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
