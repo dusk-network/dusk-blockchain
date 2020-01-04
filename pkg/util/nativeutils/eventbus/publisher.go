@@ -20,11 +20,6 @@ func (bus *EventBus) Publish(topic topics.Topic, messageBuffer *bytes.Buffer) {
 		return
 	}
 
-	if err := bus.Preprocess(topic, messageBuffer); err != nil {
-		logEB.WithField("topic", topic.String()).WithError(err).Errorln("preprocessor error")
-		return
-	}
-
 	bus.publish(topic, *messageBuffer)
 }
 
