@@ -7,18 +7,22 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
+type Validator func(bytes.Buffer) error
+
 // Republisher handles the repropagation of Agreement messages
 type Republisher struct {
-	tpc    topics.Topic
-	broker eventbus.Broker
-	id     uint32
+	tpc        topics.Topic
+	broker     eventbus.Broker
+	id         uint32
+	validators []Validator
 }
 
 // New creates a Republisher
-func New(eb eventbus.Broker, tpc topics.Topic) *Republisher {
+func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
 	r := &Republisher{
-		broker: eb,
-		tpc:    tpc,
+		broker:     eb,
+		tpc:        tpc,
+		validators: v,
 	}
 	r.id = r.Activate()
 	return r
@@ -42,7 +46,14 @@ func (r *Republisher) Activate() uint32 {
 }
 
 // Republish intercepts an Agreement message and repropagates it immediately
+// after applying any eventual validation logic
 func (r *Republisher) Republish(b bytes.Buffer) error {
+	for _, v := range r.validators {
+		if err := v(b); err != nil {
+			return err
+		}
+	}
+
 	if err := topics.Prepend(&b, r.tpc); err != nil {
 		return err
 	}
