@@ -232,7 +232,6 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 	if fromScratch && subs != nil {
 		for _, sub := range subs {
 			c.eventBus.AddDefaultTopic(sub.Topic)
-			c.eventBus.Register(sub.Topic, sub.Preprocessors...)
 		}
 	}
 }
