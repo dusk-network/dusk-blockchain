@@ -37,24 +37,6 @@ func (m *Collector) Collect(b bytes.Buffer) error {
 	return m.f(b)
 }
 
-var _ Preprocessor = (*Adder)(nil)
-
-// Adder is a very simple Preprocessor for test purposes
-type Adder struct {
-	token string
-}
-
-// NewAdder creates a new Adder
-func NewAdder(tkn string) *Adder {
-	return &Adder{tkn}
-}
-
-// Process a buffer by appending a string to it
-func (a *Adder) Process(buf *bytes.Buffer) error {
-	buf.WriteString(a.token)
-	return nil
-}
-
 // CreateGossipStreamer sets up and event bus, subscribes a SimpleStreamer to the
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
