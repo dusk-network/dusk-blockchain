@@ -27,5 +27,4 @@ func TestRepublisher(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, topics.Agreement, tpc)
 	assert.Equal(t, []byte{1}, packet.Bytes())
-
 }
