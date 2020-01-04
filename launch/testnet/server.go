@@ -18,7 +18,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	log "github.com/sirupsen/logrus"
 
@@ -107,8 +106,6 @@ func Setup() *Server {
 	if err := ConnectToLogMonitor(eventBus); err != nil {
 		panic(err)
 	}
-
-	eventBus.Register(topics.Gossip, srv.gossip)
 
 	return srv
 }
