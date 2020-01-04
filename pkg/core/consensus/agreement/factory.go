@@ -9,16 +9,16 @@ import (
 
 // Factory creates the agreement component.
 type Factory struct {
-	publisher    eventbus.Publisher
+	broker       eventbus.Broker
 	keys         key.ConsensusKeys
 	workerAmount int
 }
 
 // NewFactory instantiates a Factory.
-func NewFactory(publisher eventbus.Publisher, keys key.ConsensusKeys) *Factory {
+func NewFactory(broker eventbus.Broker, keys key.ConsensusKeys) *Factory {
 	amount := cfg.Get().Performance.AccumulatorWorkers
 	return &Factory{
-		publisher,
+		broker,
 		keys,
 		amount,
 	}
@@ -27,5 +27,5 @@ func NewFactory(publisher eventbus.Publisher, keys key.ConsensusKeys) *Factory {
 // Instantiate an agreement component and return it.
 // Implements consensus.ComponentFactory.
 func (f *Factory) Instantiate() consensus.Component {
-	return newComponent(f.publisher, f.keys, f.workerAmount)
+	return newComponent(f.broker, f.keys, f.workerAmount)
 }
