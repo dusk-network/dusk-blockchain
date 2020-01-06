@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/wallet"
+	log "github.com/sirupsen/logrus"
 )
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
@@ -92,7 +93,7 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 
 		hash, err := createSortitionHash(round, step, i)
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 
 		score := generateSortitionScore(hash, W)
@@ -127,7 +128,7 @@ func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 			// If we get an error from GetStake, it means we either got a public key of a
 			// provisioner who is no longer in the set, or we got a malformed public key.
 			// We can't repair our committee on the fly, so we have to panic.
-			panic(err)
+			log.Panic(err)
 		}
 
 		if stake >= score {

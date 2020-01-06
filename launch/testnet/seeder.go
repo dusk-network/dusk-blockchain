@@ -31,12 +31,12 @@ func ConnectToSeeder() []string {
 
 	conn, err := net.Dial("tcp", seeders[0])
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	log.WithField("prefix", "main").Debugln("connected to voucher seeder")
 
 	if err := completeChallenge(conn); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	log.WithField("prefix", "main").Debugln("voucher seeder challenge completed")
 

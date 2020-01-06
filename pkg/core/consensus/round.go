@@ -182,7 +182,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	pkBuf := new(bytes.Buffer)
 
 	if err := encoding.WriteVarBytes(pkBuf, keys.BLSPubKeyBytes); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	c := &Coordinator{

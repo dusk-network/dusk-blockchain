@@ -13,6 +13,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
+	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -284,7 +285,7 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 
 	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	for iterator.Next() {
@@ -412,7 +413,7 @@ func (t transaction) put(key []byte, value []byte) {
 		t.batch.Put(key, value)
 	} else {
 		// fail-fast when a writable transaction is not capable of storing data
-		panic("leveldb batch is unreachable")
+		log.Panic("leveldb batch is unreachable")
 	}
 }
 
