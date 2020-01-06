@@ -2,7 +2,9 @@ package marshalling
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -222,6 +224,12 @@ func UnmarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 		return err
 	}
 
+	// Maximum amount of inputs we can decode at once is
+	// math.MaxInt32 / 8, since they are pointers (uint64)
+	if lInputs > (math.MaxInt32 / 8) {
+		return errors.New("input count too large")
+	}
+
 	s.Inputs = make(transactions.Inputs, lInputs)
 	for i := range s.Inputs {
 		s.Inputs[i] = &transactions.Input{Proof: mlsag.NewDualKey(), Signature: &mlsag.Signature{}}
@@ -233,6 +241,11 @@ func UnmarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	lOutputs, err := encoding.ReadVarInt(w)
 	if err != nil {
 		return err
+	}
+
+	// Same for outputs
+	if lOutputs > (math.MaxInt32 / 8) {
+		return errors.New("output count too large")
 	}
 
 	s.Outputs = make(transactions.Outputs, lOutputs)
@@ -320,6 +333,12 @@ func UnmarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	lRewards, err := encoding.ReadVarInt(w)
 	if err != nil {
 		return err
+	}
+
+	// Maximum amount of rewards is math.MaxInt32 / 8, as they are
+	// pointers to outputs.
+	if lRewards > (math.MaxInt32 / 8) {
+		return errors.New("too many rewards in coinbase tx")
 	}
 
 	c.Rewards = make(transactions.Outputs, lRewards)
