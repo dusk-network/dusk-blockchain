@@ -102,6 +102,10 @@ func (s *Selector) CollectScoreEvent(e consensus.Event) error {
 		return err
 	}
 
+	// Tell the candidate broker to allow a candidate block with this
+	// hash through.
+	s.publisher.Publish(topics.ValidCandidateHash, bytes.NewBuffer(ev.VoteHash))
+
 	if err := s.repropagate(e.Header, ev); err != nil {
 		return err
 	}

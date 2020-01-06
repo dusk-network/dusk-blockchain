@@ -63,6 +63,7 @@ const (
 	StopConsensus
 	IntermediateBlock
 	HighestSeen
+	ValidCandidateHash
 )
 
 type topicBuf struct {
@@ -114,6 +115,7 @@ var Topics = [...]topicBuf{
 	topicBuf{StopConsensus, *(bytes.NewBuffer([]byte{byte(StopConsensus)})), "stopconsensus"},
 	topicBuf{IntermediateBlock, *(bytes.NewBuffer([]byte{byte(IntermediateBlock)})), "intermediateblock"},
 	topicBuf{HighestSeen, *(bytes.NewBuffer([]byte{byte(HighestSeen)})), "highestseen"},
+	topicBuf{ValidCandidateHash, *(bytes.NewBuffer([]byte{byte(ValidCandidateHash)})), "validcandidatehash"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {
