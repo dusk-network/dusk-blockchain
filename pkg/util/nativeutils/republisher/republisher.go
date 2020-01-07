@@ -9,7 +9,8 @@ import (
 
 type Validator func(bytes.Buffer) error
 
-// Republisher handles the repropagation of Agreement messages
+// Republisher handles the repropagation of messages propagated with a
+// specified topic
 type Republisher struct {
 	tpc        topics.Topic
 	broker     eventbus.Broker
@@ -33,7 +34,7 @@ func (r *Republisher) Stop() {
 	r.broker.Unsubscribe(r.tpc, r.id)
 }
 
-// Activate the Republisher by listening to Agreement messages through a
+// Activate the Republisher by listening to topic through a
 // callback listener
 func (r *Republisher) Activate() uint32 {
 	if r.id != 0 {
@@ -45,7 +46,7 @@ func (r *Republisher) Activate() uint32 {
 	return r.id
 }
 
-// Republish intercepts an Agreement message and repropagates it immediately
+// Republish intercepts a topic and repropagates it immediately
 // after applying any eventual validation logic
 func (r *Republisher) Republish(b bytes.Buffer) error {
 	for _, v := range r.validators {
