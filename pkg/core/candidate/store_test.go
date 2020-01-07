@@ -6,7 +6,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -48,8 +47,6 @@ func TestRequestCandidate(t *testing.T) {
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
 	eb.Subscribe(topics.Gossip, eventbus.NewStreamListener(streamer))
-	gossip := processing.NewGossip(protocol.TestNet)
-	eb.Register(topics.Gossip, gossip)
 
 	// Fetch a candidate we don't have
 	doneChan := make(chan struct{}, 1)

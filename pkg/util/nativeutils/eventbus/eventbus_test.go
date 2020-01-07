@@ -19,58 +19,6 @@ func TestNewEventBus(t *testing.T) {
 	assert.NotNil(t, eb)
 }
 
-//*******************
-// PREPROCESSOR TESTS
-//*******************
-func TestProcessor(t *testing.T) {
-	topic := topics.Test
-	bus := New()
-
-	resultChan := make(chan bytes.Buffer, 1)
-	collector := NewSimpleCollector(resultChan, nil)
-
-	ids := bus.Register(topic, NewAdder("pippo"), NewAdder("pippo"))
-	NewTopicListener(bus, collector, topic, ChannelType)
-
-	expected := *(bytes.NewBufferString("pippopippo"))
-	bus.Publish(topic, bytes.NewBufferString(""))
-	bus.Publish(topic, bytes.NewBufferString(""))
-
-	result1 := <-resultChan
-	result2 := <-resultChan
-	assert.Equal(t, expected, result1)
-	assert.Equal(t, expected, result2)
-
-	// testing RemoveProcessor
-	bus.RemoveProcessor(topic, ids[0])
-
-	expected = *(bytes.NewBufferString("pippo"))
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res := <-resultChan
-	assert.Equal(t, expected, res)
-
-	// removing the same preprocessor does not yield any different result
-	bus.RemoveProcessor(topic, ids[0])
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res = <-resultChan
-	assert.Equal(t, expected, res)
-
-	// adding a preprocessor
-	expected = *(bytes.NewBufferString("pippopappo"))
-	otherID := bus.Register(topic, NewAdder("pappo"))
-	assert.Equal(t, 1, len(otherID))
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res = <-resultChan
-	assert.Equal(t, expected, res)
-
-	// removing another
-	expected = *(bytes.NewBufferString("pappo"))
-	bus.RemoveProcessor(topic, ids[1])
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res = <-resultChan
-	assert.Equal(t, expected, res)
-}
-
 //******************
 // SUBSCRIBER TESTS
 //******************
