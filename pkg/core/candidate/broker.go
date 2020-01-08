@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
@@ -25,6 +26,8 @@ type Broker struct {
 	publisher   eventbus.Publisher
 	republisher *republisher.Republisher
 	*store
+	// List of block hashes for which a valid Score message was seen.
+	validHashes map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
 	candidateChan     <-chan Candidate
@@ -41,11 +44,13 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	b := &Broker{
 		publisher:         broker,
 		store:             newStore(),
+		validHashes:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
 		getCandidateChan:  getCandidateChan,
 	}
 
+	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
 	b.republisher = republisher.New(broker, topics.Candidate, Validate)
 	return b
 }
@@ -56,13 +61,26 @@ func (b *Broker) Listen() {
 	for {
 		select {
 		case cm := <-b.candidateChan:
-			b.storeCandidateMessage(cm)
+			if _, ok := b.validHashes[string(cm.Block.Header.Hash)]; ok {
+				b.storeCandidateMessage(cm)
+			}
 		case r := <-b.getCandidateChan:
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
+			b.clearEligibleBlocks()
 			b.Clear(blk.Header.Height)
 		}
 	}
+}
+
+func (b *Broker) AddValidHash(m bytes.Buffer) error {
+	hash := make([]byte, 32)
+	if err := encoding.Read256(&m, hash); err != nil {
+		return err
+	}
+
+	b.validHashes[string(hash)] = struct{}{}
+	return nil
 }
 
 func (b *Broker) provideCandidate(r rpcbus.Request) {
@@ -103,10 +121,20 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 		// be through `Listen`. Any incoming candidates which don't match
 		// our request will be passed down to the store.
 		case cm := <-b.candidateChan:
+			// We don't check if this is an eligible candidate block,
+			// as we most likely did not get the Score message for it.
+			// However, as we are only interested in one specific block,
+			// we should not be in danger of memory overflow.
 			b.storeCandidateMessage(cm)
 			if bytes.Equal(cm.Block.Header.Hash, hash) {
 				return &cm, nil
 			}
 		}
+	}
+}
+
+func (b *Broker) clearEligibleBlocks() {
+	for h := range b.validHashes {
+		delete(b.validHashes, h)
 	}
 }
