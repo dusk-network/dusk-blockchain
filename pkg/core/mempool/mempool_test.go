@@ -68,6 +68,7 @@ func TestMain(m *testing.M) {
 	r := config.Registry{}
 	r.Mempool.MaxSizeMB = 1
 	r.Mempool.PoolType = "hashmap"
+	r.Mempool.MaxInvItems = 10000
 	config.Mock(&r)
 
 	var streamer *eventbus.GossipStreamer
