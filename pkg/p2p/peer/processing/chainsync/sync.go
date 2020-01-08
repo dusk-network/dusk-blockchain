@@ -132,7 +132,7 @@ func (s *ChainSynchronizer) setHighestSeen(height uint64) {
 func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, height); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	s.publisher.Publish(topics.HighestSeen, buf)
@@ -151,7 +151,7 @@ func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
 func marshalGetBlocks(msg *peermsg.GetBlocks) (*bytes.Buffer, error) {
 	buf := topics.GetBlocks.ToBuffer()
 	if err := msg.Encode(&buf); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	return &buf, nil

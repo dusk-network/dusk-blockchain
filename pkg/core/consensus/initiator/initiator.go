@@ -35,12 +35,12 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	// If we are on genesis, we should kickstart the consensus
 	lastBlkBuf, err := rpcBus.Call(rpcbus.GetLastBlock, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	blk := block.NewBlock()
 	if err := marshalling.UnmarshalBlock(&lastBlkBuf, blk); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if blk.Header.Height == 0 {
@@ -54,7 +54,7 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
 	k, err := w.ReconstructK()
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	m := zkproof.CalculateM(k)
@@ -65,12 +65,12 @@ func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *walle
 			// We hit the end of the chain, so just exit here
 			return
 		} else if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 
 		txs, err := getTxsForBlock(db, hash)
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 
 		// Check if we should store any of these transactions
@@ -85,7 +85,7 @@ func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *walle
 					return t.StoreBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes())
 				})
 				if err != nil {
-					panic(err)
+					log.Panic(err)
 				}
 			}
 		}

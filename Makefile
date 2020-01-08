@@ -10,9 +10,9 @@ all: build
 lint: ## Lint the files
 	@golint -set_exit_status ${PKG_LIST}
 test: ## Run unittests
-	@go test  -v  -p 1 -short ${TEST_LIST}
+	@go test $(TFLAGS) -p 1 -short ${TEST_LIST}
 race: dep ## Run data race detector
-	@go test ${TEST_FLAGS} -race -v ${TEST_LIST}
+	@go test $(TFLAGS) -race -v ${TEST_LIST}
 coverage: ## Generate global code coverage report
 	chmod u+x coverage.sh
 	./coverage.sh;

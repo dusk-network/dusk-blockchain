@@ -3,6 +3,7 @@ package lite
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -29,19 +30,19 @@ func init() {
 	driver := driver{}
 	err := database.Register(&driver)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
 
 func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(DriverName)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	db, err := drvr.Open("", protocol.TestNet, false)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	return drvr, db

@@ -182,7 +182,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	pkBuf := new(bytes.Buffer)
 
 	if err := encoding.WriteVarBytes(pkBuf, keys.BLSPubKeyBytes); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	c := &Coordinator{
@@ -232,7 +232,6 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 	if fromScratch && subs != nil {
 		for _, sub := range subs {
 			c.eventBus.AddDefaultTopic(sub.Topic)
-			c.eventBus.Register(sub.Topic, sub.Preprocessors...)
 		}
 	}
 }

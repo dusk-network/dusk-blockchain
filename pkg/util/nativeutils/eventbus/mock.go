@@ -37,30 +37,10 @@ func (m *Collector) Collect(b bytes.Buffer) error {
 	return m.f(b)
 }
 
-var _ Preprocessor = (*Adder)(nil)
-
-// Adder is a very simple Preprocessor for test purposes
-type Adder struct {
-	token string
-}
-
-// NewAdder creates a new Adder
-func NewAdder(tkn string) *Adder {
-	return &Adder{tkn}
-}
-
-// Process a buffer by appending a string to it
-func (a *Adder) Process(buf *bytes.Buffer) error {
-	buf.WriteString(a.token)
-	return nil
-}
-
 // CreateGossipStreamer sets up and event bus, subscribes a SimpleStreamer to the
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	eb := New()
-	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
-	// subscribe to gossip topic
 	streamer := NewGossipStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, streamListener)
@@ -72,8 +52,6 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 	eb := New()
-	eb.Register(topic, processing.NewGossip(protocol.TestNet))
-	// subscribe to gossip topic
 	streamer := NewSimpleStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topic, streamListener)
@@ -106,8 +84,15 @@ func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 	}
 }
 
+// Write receives the packets from the ringbuffer. It performs a Gossip.Process
+// (since there is no longer a preprocessor) before writing to the internal pipe
 func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
-	n, err = ms.Writer.Write(p)
+	b := bytes.NewBuffer(p)
+	if err := ms.gossip.Process(b); err != nil {
+		return 0, err
+	}
+
+	n, err = ms.Writer.Write(b.Bytes())
 	if err != nil {
 		return n, err
 	}

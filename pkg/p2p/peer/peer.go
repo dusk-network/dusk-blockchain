@@ -34,6 +34,23 @@ type Connection struct {
 	gossip *processing.Gossip
 }
 
+// GossipConnector calls Gossip.Process on the message stream incoming from the
+// ringbuffer
+// It absolves the function previously carried over by the Gossip preprocessor.
+type GossipConnector struct {
+	gossip *processing.Gossip
+	*Connection
+}
+
+func (g *GossipConnector) Write(b []byte) (int, error) {
+	buf := bytes.NewBuffer(b)
+	if err := g.gossip.Process(buf); err != nil {
+		return 0, err
+	}
+
+	return g.Connection.Write(buf.Bytes())
+}
+
 // Writer abstracts all of the logic and fields needed to write messages to
 // other network nodes.
 type Writer struct {
@@ -151,7 +168,8 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(w.Connection))
+	g := &GossipConnector{w.gossip, w.Connection}
+	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
 	// Ping loop - ensures connection stays alive during quiet periods
 	go w.pingLoop()
@@ -188,7 +206,7 @@ func (w *Writer) ping() error {
 		return err
 	}
 
-	if err := w.Connection.gossip.Process(buf); err != nil {
+	if err := w.gossip.Process(buf); err != nil {
 		return err
 	}
 

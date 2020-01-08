@@ -41,7 +41,7 @@ func main() {
 	if cfg.Get().Logger.Output != "stdout" {
 		logFile, err = os.Create(output + port + ".log")
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 		defer logFile.Close()
 	} else {

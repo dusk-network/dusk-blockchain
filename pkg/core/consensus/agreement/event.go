@@ -2,6 +2,7 @@ package agreement
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -176,6 +177,12 @@ func UnmarshalVotes(r *bytes.Buffer, votes []*StepVotes) error {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
+	}
+
+	// Agreement can only ever have two StepVotes, for the two
+	// reduction steps.
+	if length != 2 {
+		return errors.New("malformed Agreement message")
 	}
 
 	for i := uint64(0); i < length; i++ {

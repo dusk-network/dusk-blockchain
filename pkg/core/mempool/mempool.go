@@ -334,7 +334,7 @@ func (m *Mempool) newPool() Pool {
 	case "hashmap":
 		p = &HashMap{Capacity: preallocTxs}
 	case "syncpool":
-		panic("syncpool not supported")
+		log.Panic("syncpool not supported")
 	default:
 		p = &HashMap{Capacity: preallocTxs}
 	}
@@ -496,7 +496,7 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	// TODO: can we simply encode the message directly on a topic carrying buffer?
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.Inv); err != nil {

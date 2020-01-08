@@ -402,7 +402,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.Inv); err != nil {
@@ -614,7 +614,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	// Notify mempool
 	buf := new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, cm.Block); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	c.eventBus.Publish(topics.IntermediateBlock, buf)
@@ -635,11 +635,11 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(buf, round); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.GetRoundResults); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	c.eventBus.Publish(topics.Gossip, buf)

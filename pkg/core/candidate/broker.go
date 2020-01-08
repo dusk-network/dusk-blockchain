@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
 )
@@ -22,7 +23,8 @@ import (
 // of the network, and will attempt to provide the requesting component
 // with it's needed `Candidate`.
 type Broker struct {
-	publisher eventbus.Publisher
+	publisher   eventbus.Publisher
+	republisher *republisher.Republisher
 	*store
 	// List of block hashes for which a valid Score message was seen.
 	validHashes map[string]struct{}
@@ -48,9 +50,8 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		getCandidateChan:  getCandidateChan,
 	}
 
-	broker.Register(topics.Candidate, newValidator(broker))
 	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
-
+	b.republisher = republisher.New(broker, topics.Candidate, Validate)
 	return b
 }
 

@@ -18,7 +18,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	log "github.com/sirupsen/logrus"
 
@@ -51,7 +50,7 @@ func Setup() *Server {
 	// creating and firing up the chain process
 	chain, err := chain.New(eventBus, rpcBus, counter)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	go chain.Listen()
 
@@ -99,16 +98,14 @@ func Setup() *Server {
 	// Setting up the transactor component
 	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil, cfg.Get().General.WalletOnly)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	go transactor.Listen()
 
 	// Connecting to the log based monitoring system
 	if err := ConnectToLogMonitor(eventBus); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
-
-	eventBus.Register(topics.Gossip, srv.gossip)
 
 	return srv
 }
@@ -132,7 +129,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 	exitChan := make(chan struct{}, 1)
 	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if err := peerReader.Accept(); err != nil {
@@ -173,7 +170,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	exitChan := make(chan struct{}, 1)
 	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	go peerReader.ReadLoop()

@@ -28,7 +28,7 @@ func NewConnMgr(cfg CmgrConfig) *connmgr {
 		addrPort := ":" + cfg.Port
 		listener, err := net.Listen("tcp", addrPort)
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 
 		defer func() {

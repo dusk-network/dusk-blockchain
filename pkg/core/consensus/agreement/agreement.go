@@ -51,9 +51,8 @@ func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consens
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	a.round = r.Round
 	agreementSubscriber := consensus.TopicListener{
-		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(a.publisher, topics.Agreement)},
-		Topic:         topics.Agreement,
-		Listener:      consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter, consensus.LowPriority, false),
+		Topic:    topics.Agreement,
+		Listener: consensus.NewFilteringListener(a.CollectAgreementEvent, a.Filter, consensus.LowPriority, false),
 	}
 	a.agreementID = agreementSubscriber.Listener.ID()
 
