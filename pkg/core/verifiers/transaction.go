@@ -214,17 +214,12 @@ func checkTXDoubleSpent(db database.DB, inputs transactions.Inputs) error {
 }
 
 func checkInputsLocked(db database.DB, inputs transactions.Inputs) error {
-	var currentHeight uint64
-	err := db.View(func(t database.Transaction) error {
-		var err error
-		currentHeight, err = t.FetchCurrentHeight()
-		return err
-	})
-	if err != nil {
-		return err
-	}
-
 	return db.View(func(t database.Transaction) error {
+		currentHeight, err := t.FetchCurrentHeight()
+		if err != nil {
+			return err
+		}
+
 		for _, input := range inputs {
 			for _, keyV := range input.Signature.PubKeys {
 				key := keyV.OutputKey()
