@@ -3,6 +3,7 @@ package chain
 import (
 	"bytes"
 	"errors"
+	"math/big"
 	"time"
 
 	"encoding/binary"
@@ -10,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/bwesterb/go-ristretto"
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -21,7 +23,6 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
-	consensuscandidate "github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -767,16 +768,8 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 	blk.Header.Timestamp = 1570000000
 	blk.SetPrevBlock(prevBlockHeader)
 
-	// Credit a coinbase to an address generated from a zero seed.
-	seed := make([]byte, 32)
-
-	keyPair := key.NewKeyPair(seed)
-	coinbaseTx, err := consensuscandidate.ConstructCoinbaseTx(keyPair.PublicKey(), make([]byte, 32), make([]byte, 32))
-	if err != nil {
-		return nil, err
-	}
-
-	blk.AddTx(coinbaseTx)
+	tx := mockDeterministicCoinbase()
+	blk.AddTx(tx)
 	if err := blk.SetRoot(); err != nil {
 		return nil, err
 	}
@@ -786,4 +779,20 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 	}
 
 	return blk, nil
+}
+
+func mockDeterministicCoinbase() transactions.Transaction {
+	seed := make([]byte, 32)
+
+	keyPair := key.NewKeyPair(seed)
+	tx := transactions.NewCoinbase(make([]byte, 32), make([]byte, 32), 2)
+	var r ristretto.Scalar
+	r.SetZero()
+	tx.SetTxPubKey(r)
+
+	var reward ristretto.Scalar
+	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
+
+	tx.AddReward(*keyPair.PublicKey(), reward)
+	return tx
 }
