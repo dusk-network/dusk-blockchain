@@ -65,9 +65,8 @@ func (r *Reducer) Initialize(eventPlayer consensus.EventPlayer, signer consensus
 	}
 
 	reductionSubscriber := consensus.TopicListener{
-		Topic:         topics.Reduction,
-		Preprocessors: []eventbus.Preprocessor{consensus.NewRepublisher(r.broker, topics.Reduction)},
-		Listener:      consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority, true),
+		Topic:    topics.Reduction,
+		Listener: consensus.NewFilteringListener(r.Collect, r.Filter, consensus.LowPriority, true),
 	}
 	r.reductionID = reductionSubscriber.Listener.ID()
 

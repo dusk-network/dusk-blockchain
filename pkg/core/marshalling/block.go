@@ -2,6 +2,8 @@ package marshalling
 
 import (
 	"bytes"
+	"errors"
+	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -36,6 +38,12 @@ func UnmarshalBlock(r *bytes.Buffer, b *block.Block) error {
 	lTxs, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
+	}
+
+	// Maximum amount of transactions we can decode at once is
+	// math.MaxInt32 / 8, since they are pointers (uint64)
+	if lTxs > (math.MaxInt32 / 8) {
+		return errors.New("block tx count too large")
 	}
 
 	b.Txs = make([]transactions.Transaction, lTxs)

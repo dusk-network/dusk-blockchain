@@ -121,8 +121,5 @@ func wireReduction(t *testing.T, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) 
 	if err := c.CollectRoundUpdate(ru); err != nil {
 		t.Fatal(err)
 	}
-	// Remove the republisher and ed25519 verification
-	bus.RemoveAllProcessors()
-
 	return c, hlp
 }

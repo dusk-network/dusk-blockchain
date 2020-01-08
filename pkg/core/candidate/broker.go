@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
 )
@@ -21,7 +22,8 @@ import (
 // of the network, and will attempt to provide the requesting component
 // with it's needed `Candidate`.
 type Broker struct {
-	publisher eventbus.Publisher
+	publisher   eventbus.Publisher
+	republisher *republisher.Republisher
 	*store
 
 	acceptedBlockChan <-chan block.Block
@@ -44,8 +46,7 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		getCandidateChan:  getCandidateChan,
 	}
 
-	broker.Register(topics.Candidate, newValidator(broker))
-
+	b.republisher = republisher.New(broker, topics.Candidate, Validate)
 	return b
 }
 

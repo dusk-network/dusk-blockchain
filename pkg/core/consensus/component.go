@@ -7,7 +7,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 // Priority indicates a rough order among components subscribed to the same topic
@@ -146,6 +145,5 @@ func (cb *FilteringListener) NotifyPayload(ev Event) error {
 // TopicListener is Listener carrying a Topic
 type TopicListener struct {
 	Listener
-	Preprocessors []eventbus.Preprocessor
-	Topic         topics.Topic
+	Topic topics.Topic
 }
