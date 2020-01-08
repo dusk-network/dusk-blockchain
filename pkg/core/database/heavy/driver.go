@@ -4,6 +4,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -30,19 +31,19 @@ func init() {
 	driver := driver{}
 	err := database.Register(&driver)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
 
 func CreateDBConnection() (database.Driver, database.DB) {
 	drvr, err := database.From(cfg.Get().Database.Driver)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	db, err := drvr.Open(cfg.Get().Database.Dir, protocol.MagicFromConfig(), false)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	return drvr, db

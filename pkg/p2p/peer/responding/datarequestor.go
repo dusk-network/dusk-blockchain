@@ -11,6 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/transactions"
+	log "github.com/sirupsen/logrus"
 )
 
 // DataRequestor is a processing unit which handles inventory messages received from peers
@@ -104,7 +105,7 @@ func (d *DataRequestor) RequestMempoolItems() error {
 func marshalGetData(getData *peermsg.Inv) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	if err := getData.Encode(buf); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.GetData); err != nil {

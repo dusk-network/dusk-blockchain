@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/wallet"
+	log "github.com/sirupsen/logrus"
 )
 
 // A signle point of constants definition
@@ -33,13 +34,13 @@ func DecodeGenesis() *block.Block {
 
 		blob, err := hex.DecodeString(TestNetGenesisBlob)
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 
 		var buf bytes.Buffer
 		buf.Write(blob)
 		if err := marshalling.UnmarshalBlock(&buf, b); err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 
 		// For some reason, the testnet genesis block root hash

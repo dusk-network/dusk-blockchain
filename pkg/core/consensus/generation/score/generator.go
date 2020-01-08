@@ -158,7 +158,7 @@ func convertBidListToScalars(bidList user.BidList) []ristretto.Scalar {
 		err := bidScalar.UnmarshalBinary(bid.X[:])
 		if err != nil {
 			log.WithError(err).WithField("process", "proofgenerator").Errorln("Error in converting Bid List to scalar")
-			panic(err)
+			log.Panic(err)
 		}
 		scalarList[i] = bidScalar
 	}

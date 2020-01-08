@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	log "github.com/sirupsen/logrus"
 )
 
 type (
@@ -38,11 +39,11 @@ func NewState() *SyncState {
 func recreate(round uint64, step uint8) bytes.Buffer {
 	r := new(bytes.Buffer)
 	if err := encoding.WriteUint64LE(r, round); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if err := encoding.WriteUint8(r, step); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return *r
 }
