@@ -29,12 +29,12 @@ type (
 	LogProcessor struct {
 		*log.Logger
 		lastBlock         *block.Block
-		p                 eventbus.Publisher
+		p                 eventbus.Broker
 		entry             *log.Entry
 		acceptedBlockChan <-chan block.Block
 		EntryChan         chan []byte
 		quitChan          chan struct{}
-		listener          eventbus.TopicListener
+		idBlockSub        uint32
 	}
 )
 
@@ -48,7 +48,7 @@ func New(p eventbus.Broker, w io.WriteCloser, formatter log.Formatter) *LogProce
 	entry := logger.WithFields(log.Fields{
 		"process": "monitor",
 	})
-	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(p)
+	acceptedBlockChan, id := consensus.InitAcceptedBlockUpdate(p)
 	return &LogProcessor{
 		p:                 p,
 		Logger:            logger,
@@ -56,7 +56,7 @@ func New(p eventbus.Broker, w io.WriteCloser, formatter log.Formatter) *LogProce
 		acceptedBlockChan: acceptedBlockChan,
 		EntryChan:         make(chan []byte, 100),
 		quitChan:          make(chan struct{}, 1),
-		listener:          listener,
+		idBlockSub:        id,
 	}
 }
 
@@ -90,7 +90,7 @@ func (l *LogProcessor) logNumGoroutine() {
 
 // Close the listener and the Writer
 func (l *LogProcessor) Close() error {
-	l.listener.Quit()
+	l.p.Unsubscribe(topics.AcceptedBlock, l.idBlockSub)
 	l.quitChan <- struct{}{}
 	return l.Out.(io.WriteCloser).Close()
 }

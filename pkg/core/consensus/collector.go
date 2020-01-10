@@ -73,7 +73,8 @@ func DecodeRound(rb *bytes.Buffer, update *RoundUpdate) error {
 func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 	roundChan := make(chan RoundUpdate, 1)
 	roundCollector := &roundCollector{roundChan}
-	eventbus.NewTopicListener(subscriber, roundCollector, topics.RoundUpdate, eventbus.ChannelType)
+	l := eventbus.NewCallbackListener(roundCollector.Collect)
+	subscriber.Subscribe(topics.RoundUpdate, l)
 	return roundChan
 }
 
@@ -89,11 +90,12 @@ func (r *roundCollector) Collect(roundBuffer bytes.Buffer) error {
 }
 
 // InitAcceptedBlockUpdate init listener to get updates about lastly accepted block in the chain
-func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, eventbus.TopicListener) {
+func InitAcceptedBlockUpdate(subscriber eventbus.Subscriber) (chan block.Block, uint32) {
 	acceptedBlockChan := make(chan block.Block)
 	collector := &acceptedBlockCollector{acceptedBlockChan}
-	tl := eventbus.NewTopicListener(subscriber, collector, topics.AcceptedBlock, eventbus.ChannelType)
-	return acceptedBlockChan, tl
+	l := eventbus.NewCallbackListener(collector.Collect)
+	id := subscriber.Subscribe(topics.AcceptedBlock, l)
+	return acceptedBlockChan, id
 }
 
 // Collect as defined in the EventCollector interface. It reconstructs the bidList and notifies about it

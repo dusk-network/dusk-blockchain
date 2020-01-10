@@ -14,7 +14,8 @@ type candidateCollector struct {
 func initCandidateCollector(sub eventbus.Subscriber) <-chan Candidate {
 	candidateChan := make(chan Candidate, 100)
 	collector := &candidateCollector{candidateChan}
-	eventbus.NewTopicListener(sub, collector, topics.Candidate, eventbus.ChannelType)
+	l := eventbus.NewCallbackListener(collector.Collect)
+	sub.Subscribe(topics.Candidate, l)
 	return candidateChan
 }
 

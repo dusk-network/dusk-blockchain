@@ -16,7 +16,8 @@ type intermediateBlockCollector struct {
 func initIntermediateBlockCollector(sub eventbus.Subscriber) chan block.Block {
 	blkChan := make(chan block.Block, 1)
 	coll := &intermediateBlockCollector{blkChan}
-	eventbus.NewTopicListener(sub, coll, topics.IntermediateBlock, eventbus.ChannelType)
+	l := eventbus.NewCallbackListener(coll.Collect)
+	sub.Subscribe(topics.IntermediateBlock, l)
 	return blkChan
 }
 
