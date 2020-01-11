@@ -12,9 +12,9 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -122,7 +122,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	txs := make([]transactions.Transaction, lTxs)
 	for i := uint64(0); i < lTxs; i++ {
-		tx, err := marshalling.UnmarshalTx(&r)
+		tx, err := message.UnmarshalTx(&r)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -168,7 +168,7 @@ func TestProcessPendingTxs(t *testing.T) {
 
 		// Publish valid tx
 		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
+		err := message.MarshalTx(buf, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -183,7 +183,7 @@ func TestProcessPendingTxs(t *testing.T) {
 		}
 		tx.Version++
 		buf = new(bytes.Buffer)
-		err = marshalling.MarshalTx(buf, tx)
+		err = message.MarshalTx(buf, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestProcessPendingTxs(t *testing.T) {
 
 		// Publish a duplicated tx
 		buf = new(bytes.Buffer)
-		_ = marshalling.MarshalTx(buf, tx)
+		_ = message.MarshalTx(buf, tx)
 		c.addTx(tx)
 		c.bus.Publish(topics.Tx, buf)
 	}
@@ -236,7 +236,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		go func(txs []transactions.Transaction) {
 			for _, tx := range txs {
 				buf := new(bytes.Buffer)
-				_ = marshalling.MarshalTx(buf, tx)
+				_ = message.MarshalTx(buf, tx)
 				c.bus.Publish(topics.Tx, buf)
 			}
 			wg.Done()
@@ -251,7 +251,7 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 				buf := new(bytes.Buffer)
 				tx := helper.RandomStandardTx(t, false)
 				tx.Version++
-				_ = marshalling.MarshalTx(buf, tx)
+				_ = message.MarshalTx(buf, tx)
 
 				c.bus.Publish(topics.Tx, buf)
 			}
@@ -280,7 +280,7 @@ func TestRemoveAccepted(t *testing.T) {
 
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
+		err := message.MarshalTx(buf, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -303,7 +303,7 @@ func TestRemoveAccepted(t *testing.T) {
 
 	_ = b.SetRoot()
 	buf := new(bytes.Buffer)
-	_ = marshalling.MarshalBlock(buf, b)
+	_ = message.MarshalBlock(buf, b)
 
 	c.bus.Publish(topics.IntermediateBlock, buf)
 
@@ -321,7 +321,7 @@ func TestDoubleSpent(t *testing.T) {
 
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
+		err := message.MarshalTx(buf, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func TestDoubleSpent(t *testing.T) {
 	tx.Outputs = txs[0].StandardTx().Outputs
 
 	buf := new(bytes.Buffer)
-	err := marshalling.MarshalTx(buf, tx)
+	err := message.MarshalTx(buf, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
+		err := message.MarshalTx(buf, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -377,7 +377,7 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	// Publish a coinbase txs
 	tx := helper.RandomCoinBaseTx(t, false)
 	buf := new(bytes.Buffer)
-	err := marshalling.MarshalTx(buf, tx)
+	err := message.MarshalTx(buf, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +399,7 @@ func TestSendMempoolTx(t *testing.T) {
 	var totalSize uint32
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
+		err := message.MarshalTx(buf, tx)
 		if err != nil {
 			t.Fatal(err)
 		}

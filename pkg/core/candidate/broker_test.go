@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -26,11 +26,11 @@ func TestValidHashes(t *testing.T) {
 	cert := block.EmptyCertificate()
 	blk.SetHash()
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
+	if err := message.MarshalCertificate(buf, cert); err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,7 +54,7 @@ func TestValidHashes(t *testing.T) {
 	}
 
 	decoded := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&blkBuf, decoded); err != nil {
+	if err := message.UnmarshalBlock(&blkBuf, decoded); err != nil {
 		t.Fatal(err)
 	}
 

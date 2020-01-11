@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -56,7 +56,7 @@ func TestRequestCandidate(t *testing.T) {
 		assert.NoError(t, err)
 
 		blk := block.NewBlock()
-		assert.NoError(t, marshalling.UnmarshalBlock(&blkBuf, blk))
+		assert.NoError(t, message.UnmarshalBlock(&blkBuf, blk))
 		assert.True(t, blk.Equals(genesis))
 		doneChan <- struct{}{}
 	}()

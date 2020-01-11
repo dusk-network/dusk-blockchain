@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/dusk-network/dusk-wallet/key"
@@ -24,7 +25,7 @@ type Handler interface {
 	Committee(uint64, uint8) user.VotingCommittee
 	Quorum(uint64) int
 	VotesFor([]byte, uint64, uint8) int
-	Verify(Agreement) error
+	Verify(message.Agreement) error
 }
 
 type handler struct {
@@ -60,7 +61,7 @@ func (a *handler) Quorum(round uint64) int {
 }
 
 // Verify checks the signature of the set.
-func (a *handler) Verify(ev Agreement) error {
+func (a *handler) Verify(ev message.Agreement) error {
 	if err := verifyWhole(ev); err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func (a *handler) Verify(ev Agreement) error {
 	return nil
 }
 
-func verifyWhole(a Agreement) error {
+func verifyWhole(a message.Agreement) error {
 	r := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(r, a.Header); err != nil {
 		return err

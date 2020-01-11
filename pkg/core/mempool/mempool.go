@@ -11,10 +11,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -400,7 +400,7 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 	}
 
 	for _, tx := range outputTxs {
-		if err := marshalling.MarshalTx(w, tx); err != nil {
+		if err := message.MarshalTx(w, tx); err != nil {
 			return bytes.Buffer{}, err
 		}
 	}
@@ -449,7 +449,7 @@ func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
 	}
 
 	for _, tx := range txs {
-		if err := marshalling.MarshalTx(w, tx); err != nil {
+		if err := message.MarshalTx(w, tx); err != nil {
 			return bytes.Buffer{}, err
 		}
 	}
@@ -518,16 +518,16 @@ func toHex(id []byte) string {
 	return enc
 }
 
-func unmarshalTxDesc(message bytes.Buffer) (TxDesc, error) {
+func unmarshalTxDesc(m bytes.Buffer) (TxDesc, error) {
 
-	bufSize := message.Len()
-	tx, err := marshalling.UnmarshalTx(&message)
+	bufSize := m.Len()
+	tx, err := message.UnmarshalTx(&m)
 	if err != nil {
 		return TxDesc{}, err
 	}
 
 	// txSize is number of unmarshaled bytes
-	txSize := bufSize - message.Len()
+	txSize := bufSize - m.Len()
 
 	return TxDesc{tx: tx, received: time.Now(), size: uint(txSize)}, nil
 }

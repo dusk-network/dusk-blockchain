@@ -9,7 +9,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
 )
@@ -36,7 +36,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map header.Hash to block.Block
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
+	if err := message.MarshalBlock(buf, b); err != nil {
 		return err
 	}
 
@@ -118,7 +118,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -157,7 +157,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 

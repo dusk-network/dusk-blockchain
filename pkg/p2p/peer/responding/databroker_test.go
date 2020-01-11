@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-wallet/block"
 )
@@ -46,7 +46,7 @@ func TestSendData(t *testing.T) {
 
 		// Decode block
 		blk := block.NewBlock()
-		if err := marshalling.UnmarshalBlock(buf, blk); err != nil {
+		if err := message.UnmarshalBlock(buf, blk); err != nil {
 			t.Fatal(err)
 		}
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
@@ -87,7 +87,7 @@ func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 
 	// Populate marshalling size
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalTx(buf, tx); err != nil {
+	if err := message.MarshalTx(buf, tx); err != nil {
 		return queryTx{}, err
 	}
 

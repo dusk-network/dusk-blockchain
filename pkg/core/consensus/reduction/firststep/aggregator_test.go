@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +18,7 @@ func TestSuccessfulAggro(t *testing.T) {
 	evs := hlp.Spawn(hash)
 
 	res := make(chan error, 1)
-	test := func(hash []byte, svs ...*agreement.StepVotes) {
+	test := func(hash []byte, svs ...*message.StepVotes) {
 		assert.Equal(t, hlp.Step(), svs[0].Step)
 		res <- hlp.Verify(hash, svs[0], hlp.Step())
 	}
@@ -45,7 +45,7 @@ func TestInvalidBlock(t *testing.T) {
 	evs := hlp.Spawn(hash)
 
 	res := make(chan struct{}, 1)
-	test := func(hash []byte, svs ...*agreement.StepVotes) {
+	test := func(hash []byte, svs ...*message.StepVotes) {
 		assert.Equal(t, emptyHash[:], hash)
 		assert.Equal(t, 0, len(svs))
 		res <- struct{}{}
@@ -73,7 +73,7 @@ func TestCandidateNotFound(t *testing.T) {
 	evs := hlp.Spawn(hash)
 
 	res := make(chan struct{}, 1)
-	test := func(hash []byte, svs ...*agreement.StepVotes) {
+	test := func(hash []byte, svs ...*message.StepVotes) {
 		assert.Equal(t, emptyHash[:], hash)
 		assert.Equal(t, 0, len(svs))
 		res <- struct{}{}

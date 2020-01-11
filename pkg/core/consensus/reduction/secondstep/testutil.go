@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -41,10 +41,10 @@ func (hlp *Helper) createResultChan() {
 }
 
 // ActivateReduction starts/resumes the secondstep reduction by sending a StepVotes to Reducer.CollectStepVotes
-func (hlp *Helper) ActivateReduction(hash []byte, sv *agreement.StepVotes) error {
+func (hlp *Helper) ActivateReduction(hash []byte, sv *message.StepVotes) error {
 	buf := new(bytes.Buffer)
 	if sv != nil {
-		if err := agreement.MarshalStepVotes(buf, sv); err != nil {
+		if err := message.MarshalStepVotes(buf, sv); err != nil {
 			return err
 		}
 	}

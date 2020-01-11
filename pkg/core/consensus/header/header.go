@@ -1,5 +1,7 @@
 package header
 
+//TODO: consider moving this into the message package
+
 import (
 	"bytes"
 

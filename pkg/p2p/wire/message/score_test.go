@@ -1,10 +1,11 @@
-package selection_test
+package message_test
 
 import (
 	"bytes"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,9 +17,9 @@ func TestUnMarshal(t *testing.T) {
 	se := selection.MockSelectionEvent(hash)
 
 	buf := new(bytes.Buffer)
-	assert.NoError(t, selection.MarshalScore(buf, se))
+	assert.NoError(t, message.MarshalScore(buf, se))
 
-	other := &selection.Score{}
-	assert.NoError(t, selection.UnmarshalScore(buf, other))
+	other := &message.Score{}
+	assert.NoError(t, message.UnmarshalScore(buf, other))
 	assert.True(t, other.Equal(*se))
 }

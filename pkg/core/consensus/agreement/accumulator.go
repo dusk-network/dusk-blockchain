@@ -3,6 +3,7 @@ package agreement
 import (
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -10,9 +11,9 @@ import (
 // reaches a certain threshold.
 type Accumulator struct {
 	handler            Handler
-	verificationChan   chan Agreement
-	eventChan          chan Agreement
-	CollectedVotesChan chan []Agreement
+	verificationChan   chan message.Agreement
+	eventChan          chan message.Agreement
+	CollectedVotesChan chan []message.Agreement
 	store              *store
 }
 
@@ -21,9 +22,9 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 	// create accumulator
 	a := &Accumulator{
 		handler:            handler,
-		verificationChan:   make(chan Agreement, 100),
-		eventChan:          make(chan Agreement, 100),
-		CollectedVotesChan: make(chan []Agreement, 1),
+		verificationChan:   make(chan message.Agreement, 100),
+		eventChan:          make(chan message.Agreement, 100),
+		CollectedVotesChan: make(chan []message.Agreement, 1),
 		store:              newStore(),
 	}
 
@@ -34,7 +35,7 @@ func newAccumulator(handler Handler, workerAmount int) *Accumulator {
 
 // Process a received Event, by passing it to a worker in the worker pool (if the event
 // sender is part of the voting committee).
-func (a *Accumulator) Process(ev Agreement) {
+func (a *Accumulator) Process(ev message.Agreement) {
 	defer func() {
 		// we recover from panic in case of a late Process call which would attempt to write to the closed verificationChan
 		// the alternative would be to never close the verificationChan and either use a multitude of channels to  stop the workers or a shared boolean set in the Accumulator.Stop
@@ -87,7 +88,7 @@ func (a *Accumulator) CreateWorkers(amount int) {
 	}()
 }
 
-func verify(verificationChan <-chan Agreement, eventChan chan<- Agreement, verifyFunc func(Agreement) error, wg *sync.WaitGroup) {
+func verify(verificationChan <-chan message.Agreement, eventChan chan<- message.Agreement, verifyFunc func(message.Agreement) error, wg *sync.WaitGroup) {
 	for ev := range verificationChan {
 
 		if err := verifyFunc(ev); err != nil {

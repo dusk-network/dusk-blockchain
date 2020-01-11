@@ -5,7 +5,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -37,7 +37,7 @@ func TestGeneration(t *testing.T) {
 	}
 
 	c := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&candidateBuf, c); err != nil {
+	if err := message.UnmarshalBlock(&candidateBuf, c); err != nil {
 		t.Fatal(err)
 	}
 

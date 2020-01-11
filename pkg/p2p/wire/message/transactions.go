@@ -1,4 +1,4 @@
-package marshalling
+package message
 
 import (
 	"bytes"
@@ -11,6 +11,17 @@ import (
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-wallet/transactions"
 )
+
+/*
+func UnmarshalTxMessage(r *bytes.Buffer, m *Message) error {
+	tx, err := UnmarshalTx(r)
+	if err != nil {
+		return err
+	}
+	m.Payload = tx
+	return nil
+}
+*/
 
 func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
 	var txType uint8

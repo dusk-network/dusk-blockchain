@@ -13,10 +13,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/logger"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/assert"
@@ -232,7 +232,7 @@ func TestDeadline(t *testing.T) {
 func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, 4)
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		panic(err)
 	}
 

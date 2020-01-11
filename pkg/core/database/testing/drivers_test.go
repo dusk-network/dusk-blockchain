@@ -10,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/syndtr/goleveldb/leveldb"
 
@@ -21,6 +20,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 )
@@ -229,11 +229,11 @@ func TestFetchBlockHeader(test *testing.T) {
 
 			// Get bytes of the fetched block.Header
 			fetchedBuf := new(bytes.Buffer)
-			_ = marshalling.MarshalHeader(fetchedBuf, fheader)
+			_ = message.MarshalHeader(fetchedBuf, fheader)
 
 			// Get bytes of the origin block.Header
 			originBuf := new(bytes.Buffer)
-			_ = marshalling.MarshalHeader(originBuf, b.Header)
+			_ = message.MarshalHeader(originBuf, b.Header)
 
 			// Ensure the fetched header is what the original header bytes are
 			if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
@@ -289,7 +289,7 @@ func TestFetchBlockTxs(test *testing.T) {
 				// Get bytes of the fetched transactions.Transaction
 				fblockTx := fblockTxs[index]
 				fetchedBuf := new(bytes.Buffer)
-				_ = marshalling.MarshalTx(fetchedBuf, fblockTx)
+				_ = message.MarshalTx(fetchedBuf, fblockTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
@@ -297,7 +297,7 @@ func TestFetchBlockTxs(test *testing.T) {
 
 				// Get bytes of the origin transactions.Transaction to compare with
 				originBuf := new(bytes.Buffer)
-				_ = marshalling.MarshalTx(originBuf, oBlockTx)
+				_ = message.MarshalTx(originBuf, oBlockTx)
 
 				if !bytes.Equal(originBuf.Bytes(), fetchedBuf.Bytes()) {
 					return errors.New("transactions.Transaction not retrieved properly from storage")
@@ -629,14 +629,14 @@ func TestFetchBlockTxByHash(test *testing.T) {
 				}
 
 				fetchedBuf := new(bytes.Buffer)
-				_ = marshalling.MarshalTx(fetchedBuf, fetchedTx)
+				_ = message.MarshalTx(fetchedBuf, fetchedTx)
 
 				if len(fetchedBuf.Bytes()) == 0 {
 					test.Fatal("Empty tx fetched")
 				}
 
 				originBuf := new(bytes.Buffer)
-				_ = marshalling.MarshalTx(originBuf, originTx)
+				_ = message.MarshalTx(originBuf, originTx)
 
 				if !bytes.Equal(fetchedBuf.Bytes(), originBuf.Bytes()) {
 					test.Fatal("Invalid tx fetched")

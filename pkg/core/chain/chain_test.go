@@ -11,10 +11,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -39,7 +39,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	// First, test accepting a block when the counter is set to not syncing.
 	blk := helper.RandomBlock(t, 1, 1)
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -62,7 +62,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	blk.SetRoot()
 	blk.SetHash()
 	buf = new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -128,7 +128,7 @@ func TestAcceptIntermediate(t *testing.T) {
 	// Should have gotten `blk` over topics.IntermediateBlock
 	blkBuf := <-intermediateChan
 	decodedBlk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&blkBuf, decodedBlk); err != nil {
+	if err := message.UnmarshalBlock(&blkBuf, decodedBlk); err != nil {
 		t.Fatal(err)
 	}
 
@@ -156,11 +156,11 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	blk := helper.RandomBlock(t, 2, 1)
 	cert := block.EmptyCertificate()
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
+	if err := message.MarshalCertificate(buf, cert); err != nil {
 		t.Fatal(err)
 	}
 

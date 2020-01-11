@@ -2,8 +2,9 @@ package selection
 
 import (
 	"bytes"
-	"golang.org/x/crypto/ed25519"
 	"time"
+
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"

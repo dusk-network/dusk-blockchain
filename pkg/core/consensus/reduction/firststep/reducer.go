@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -141,13 +141,13 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) {
 
 // Halt will end the first step of reduction, and forwards whatever result it received
 // on the StepVotes topic.
-func (r *Reducer) Halt(hash []byte, svs ...*agreement.StepVotes) {
+func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.Timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 	buf := new(bytes.Buffer)
 	if len(svs) > 0 {
-		if err := agreement.MarshalStepVotes(buf, svs[0]); err != nil {
+		if err := message.MarshalStepVotes(buf, svs[0]); err != nil {
 			lg.WithField("category", "BUG").WithError(err).Errorln("error in marshalling StepVotes")
 			return
 		}

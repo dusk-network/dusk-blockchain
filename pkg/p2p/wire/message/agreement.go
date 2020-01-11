@@ -1,4 +1,4 @@
-package agreement
+package message
 
 import (
 	"bytes"
@@ -34,16 +34,16 @@ type (
 		header.Header
 		signedVotes  []byte
 		VotesPerStep []*StepVotes
-		intRepr      *big.Int
+		Repr      *big.Int
 	}
 )
 
 func (a Agreement) Cmp(other Agreement) int {
-	return a.intRepr.Cmp(other.intRepr)
+	return a.Repr.Cmp(other.Repr)
 }
 
 func (a *Agreement) SetSignature(signedVotes []byte) {
-	a.intRepr = new(big.Int).SetBytes(signedVotes)
+	a.Repr = new(big.Int).SetBytes(signedVotes)
 	a.signedVotes = signedVotes
 }
 
@@ -61,7 +61,7 @@ func (a Agreement) Equal(ev wire.Event) bool {
 		return false
 	}
 
-	return a.Header.Equal(aev.Header) && a.intRepr.Cmp(aev.intRepr) == 0
+	return a.Header.Equal(aev.Header) && a.Repr.Cmp(aev.Repr) == 0
 }
 
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash
@@ -111,8 +111,8 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 	return nil
 }
 
-// Marshal an Agreement event into a buffer.
-func Marshal(r *bytes.Buffer, a Agreement) error {
+// MarshalAgreement marshals an Agreement event into a buffer.
+func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
 	// Marshal BLS Signature of VoteSet
 	if err := encoding.WriteBLS(r, a.SignedVotes()); err != nil {
 		return err
@@ -130,7 +130,7 @@ func Marshal(r *bytes.Buffer, a Agreement) error {
 // Field order is the following:
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
-func Unmarshal(r *bytes.Buffer, a *Agreement) error {
+func UnmarshalAgreement(r *bytes.Buffer, a *Agreement) error {
 	signedVotes := make([]byte, 33)
 	if err := encoding.ReadBLS(r, signedVotes); err != nil {
 		return err
@@ -146,12 +146,12 @@ func Unmarshal(r *bytes.Buffer, a *Agreement) error {
 	return nil
 }
 
-// New returns an empty Agreement event.
-func New(h header.Header) *Agreement {
+// NewAgreement returns an empty Agreement event.
+func NewAgreement(h header.Header) *Agreement {
 	return &Agreement{
 		VotesPerStep: make([]*StepVotes, 2),
 		signedVotes:  make([]byte, 33),
-		intRepr:      new(big.Int),
+		Repr:      new(big.Int),
 		Header:       h,
 	}
 }

@@ -26,9 +26,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"golang.org/x/crypto/ed25519"
@@ -169,7 +169,7 @@ func (c *Chain) Listen() {
 
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := topics.Block.ToBuffer()
-	if err := marshalling.MarshalBlock(&buffer, &blk); err != nil {
+	if err := message.MarshalBlock(&buffer, &blk); err != nil {
 		return err
 	}
 
@@ -210,7 +210,7 @@ func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 
 	// Accept the block
 	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
+	if err := message.UnmarshalBlock(&m, blk); err != nil {
 		return err
 	}
 
@@ -312,7 +312,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// consensus.generation.broker
 	l.Trace("notifying internally")
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, &blk); err != nil {
+	if err := message.MarshalBlock(buf, &blk); err != nil {
 		l.WithError(err).Errorln("block encoding failed")
 		return err
 	}
@@ -388,7 +388,7 @@ func (c *Chain) verifyCandidateBlock(r rpcbus.Request) {
 	}
 
 	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&r.Params, blk); err != nil {
+	if err := message.UnmarshalBlock(&r.Params, blk); err != nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 	}
 
@@ -614,7 +614,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 
 	// Notify mempool
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, cm.Block); err != nil {
+	if err := message.MarshalBlock(buf, cm.Block); err != nil {
 		log.Panic(err)
 	}
 
@@ -654,14 +654,14 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 			return nil, nil, errors.New("request timeout")
 		case b := <-roundResultsChan:
 			blk := block.NewBlock()
-			if err := marshalling.UnmarshalBlock(&b, blk); err != nil {
+			if err := message.UnmarshalBlock(&b, blk); err != nil {
 				// Prevent a malicious node from cutting us off by
 				// sending garbled data
 				continue
 			}
 
 			cert := block.EmptyCertificate()
-			if err := marshalling.UnmarshalCertificate(&b, cert); err != nil {
+			if err := message.UnmarshalCertificate(&b, cert); err != nil {
 				continue
 			}
 
@@ -690,7 +690,7 @@ func (c *Chain) provideLastBlock(r rpcbus.Request) {
 	prevBlock := c.prevBlock
 	c.mu.RUnlock()
 
-	err := marshalling.MarshalBlock(buf, &prevBlock)
+	err := message.MarshalBlock(buf, &prevBlock)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
 
@@ -701,7 +701,7 @@ func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := marshalling.MarshalCertificate(buf, c.lastCertificate)
+	err := message.MarshalCertificate(buf, c.lastCertificate)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
 
@@ -723,12 +723,12 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, c.intermediateBlock); err != nil {
+	if err := message.MarshalBlock(buf, c.intermediateBlock); err != nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}
 
-	if err := marshalling.MarshalCertificate(buf, c.lastCertificate); err != nil {
+	if err := message.MarshalCertificate(buf, c.lastCertificate); err != nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}

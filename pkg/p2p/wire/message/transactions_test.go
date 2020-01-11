@@ -1,11 +1,11 @@
-package marshalling_test
+package message_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,11 +19,11 @@ func TestEncodeDecodeStandard(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err := marshalling.MarshalTx(buf, tx)
+	err := message.MarshalTx(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a standard TX struct
-	decTX, err := marshalling.UnmarshalTx(buf)
+	decTX, err := message.UnmarshalTx(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -65,11 +65,11 @@ func TestEncodeDecodeBid(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err = marshalling.MarshalTx(buf, tx)
+	err = message.MarshalTx(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a bid TX struct
-	decTX, err := marshalling.UnmarshalTx(buf)
+	decTX, err := message.UnmarshalTx(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -113,11 +113,11 @@ func TestEncodeDecodeStake(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err = marshalling.MarshalTx(buf, tx)
+	err = message.MarshalTx(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a Stake TX struct
-	decTX, err := marshalling.UnmarshalTx(buf)
+	decTX, err := message.UnmarshalTx(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -160,11 +160,11 @@ func TestEncodeDecodeCoinbase(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err := marshalling.MarshalTx(buf, tx)
+	err := message.MarshalTx(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a coinbase TX struct
-	decTX, err := marshalling.UnmarshalTx(buf)
+	decTX, err := message.UnmarshalTx(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -202,11 +202,11 @@ func TestEncodeDecodeTLock(t *testing.T) {
 
 	// Encode TX into a buffer
 	buf := new(bytes.Buffer)
-	err := marshalling.MarshalTx(buf, tx)
+	err := message.MarshalTx(buf, tx)
 	assert.Nil(err)
 
 	// Decode buffer into a TimeLock TX struct
-	decTX, err := marshalling.UnmarshalTx(buf)
+	decTX, err := message.UnmarshalTx(buf)
 	assert.Nil(err)
 
 	// Check both structs are equal
@@ -286,7 +286,7 @@ func TestDecodeTransactions(t *testing.T) {
 
 	decTxs := make([]transactions.Transaction, len(txs))
 	for i := 0; i < len(txs); i++ {
-		tx, err := marshalling.UnmarshalTx(r)
+		tx, err := message.UnmarshalTx(r)
 		assert.Nil(t, err)
 		decTxs[i] = tx
 	}

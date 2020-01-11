@@ -10,13 +10,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-wallet/key"
 	"github.com/dusk-network/dusk-wallet/transactions"
@@ -91,7 +90,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
-	score := &selection.Score{
+	score := &message.Score{
 		Score:         sev.Proof.Score,
 		Proof:         sev.Proof.Proof,
 		Z:             sev.Proof.Z,
@@ -102,7 +101,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	scoreBuf := new(bytes.Buffer)
-	if err := selection.MarshalScore(scoreBuf, score); err != nil {
+	if err := message.MarshalScore(scoreBuf, score); err != nil {
 		return err
 	}
 
@@ -125,7 +124,7 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		return err
 	}
 
@@ -223,7 +222,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 		}
 
 		for i := uint64(0); i < lTxs; i++ {
-			tx, err := marshalling.UnmarshalTx(&r)
+			tx, err := message.UnmarshalTx(&r)
 			if err != nil {
 				return nil, err
 			}

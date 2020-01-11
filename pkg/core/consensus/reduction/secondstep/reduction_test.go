@@ -6,6 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,8 +31,8 @@ func TestSecondStep(t *testing.T) {
 	<-hlp.RestartChan
 
 	// Retrieve Agreement
-	ag := agreement.New(header.Header{})
-	assert.NoError(t, agreement.Unmarshal(&agBuf, ag))
+	ag := message.NewAgreement(header.Header{})
+	assert.NoError(t, message.UnmarshalAgreement(&agBuf, ag))
 
 	// StepVotes should be valid
 	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[0], 0))

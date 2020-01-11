@@ -13,9 +13,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -140,7 +140,7 @@ func receiveTxs(t *testing.T, c chan rpcbus.Request) []transactions.Transaction 
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		r := <-c
-		tx, err := marshalling.UnmarshalTx(&r.Params)
+		tx, err := message.UnmarshalTx(&r.Params)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}

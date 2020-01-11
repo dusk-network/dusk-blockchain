@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -23,7 +23,7 @@ func TestFirstStep(t *testing.T) {
 	svBuf := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes
-	sv, err := agreement.UnmarshalStepVotes(&svBuf)
+	sv, err := message.UnmarshalStepVotes(&svBuf)
 	assert.NoError(t, err)
 
 	// StepVotes should be valid
@@ -45,7 +45,7 @@ func TestMoreSteps(t *testing.T) {
 	svBuf := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes
-	sv, err := agreement.UnmarshalStepVotes(&svBuf)
+	sv, err := message.UnmarshalStepVotes(&svBuf)
 	assert.NoError(t, err)
 
 	// StepVotes should be valid

@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -142,10 +143,10 @@ func TestCollectNoGeneration(t *testing.T) {
 
 func sortEventsByScore(t *testing.T, evs []consensus.Event) []consensus.Event {
 	// Retrieve message from payload
-	scoreEvs := make([]selection.Score, 0, len(evs))
+	scoreEvs := make([]message.Score, 0, len(evs))
 	for _, ev := range evs {
-		score := selection.Score{}
-		if err := selection.UnmarshalScore(&ev.Payload, &score); err != nil {
+		score := message.Score{}
+		if err := message.UnmarshalScore(&ev.Payload, &score); err != nil {
 			t.Fatal(err)
 		}
 
@@ -159,7 +160,7 @@ func sortEventsByScore(t *testing.T, evs []consensus.Event) []consensus.Event {
 	sortedEvs := make([]consensus.Event, 0, len(evs))
 	for i, ev := range evs {
 		buf := new(bytes.Buffer)
-		if err := selection.MarshalScore(buf, &scoreEvs[i]); err != nil {
+		if err := message.MarshalScore(buf, &scoreEvs[i]); err != nil {
 			t.Fatal(err)
 		}
 
@@ -179,7 +180,7 @@ func newMockHandler() *mockHandler {
 	return &mockHandler{}
 }
 
-func (m *mockHandler) Verify(selection.Score) error {
+func (m *mockHandler) Verify(message.Score) error {
 	time.Sleep(500 * time.Millisecond)
 	return nil
 }
@@ -187,6 +188,6 @@ func (m *mockHandler) Verify(selection.Score) error {
 func (m *mockHandler) LowerThreshold() {}
 func (m *mockHandler) ResetThreshold() {}
 
-func (m *mockHandler) Priority(first, second selection.Score) bool {
+func (m *mockHandler) Priority(first, second message.Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }

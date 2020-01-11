@@ -8,7 +8,7 @@ import (
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
@@ -35,7 +35,7 @@ func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) 
 	}
 
 	// Write transactions.Transaction bytes
-	err := marshalling.MarshalTx(buf, tx)
+	err := message.MarshalTx(buf, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Tr
 		return nil, txIndex, err
 	}
 
-	tx, err = marshalling.UnmarshalTx(reader)
+	tx, err = message.UnmarshalTx(reader)
 	return tx, txIndex, err
 }
 

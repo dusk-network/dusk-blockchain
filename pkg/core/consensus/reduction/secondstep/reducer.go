@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -118,7 +118,7 @@ func (r *Reducer) Filter(hdr header.Header) bool {
 	return !r.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
-func (r *Reducer) startReduction(sv *agreement.StepVotes) {
+func (r *Reducer) startReduction(sv *message.StepVotes) {
 	r.timer.Start(r.timeOut)
 	r.aggregator = newAggregator(r.Halt, r.handler, sv)
 }
@@ -140,7 +140,7 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) error {
 
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
-func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
+func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
@@ -162,13 +162,13 @@ func (r *Reducer) Halt(hash []byte, b ...*agreement.StepVotes) {
 // first step Reducer, and starts the second step of reduction.
 func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
-	var sv *agreement.StepVotes
+	var sv *message.StepVotes
 
 	// If the first step did not have a winning block, we should get an empty buffer
 	if e.Payload.Len() > 0 {
 		// Otherwise though, we should retrieve the information
 		var err error
-		sv, err = agreement.UnmarshalStepVotes(&e.Payload)
+		sv, err = message.UnmarshalStepVotes(&e.Payload)
 		if err != nil {
 			return err
 		}
@@ -184,7 +184,7 @@ func (r *Reducer) CollectStepVotes(e consensus.Event) error {
 	return nil
 }
 
-func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*agreement.StepVotes) {
+func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVotes) {
 	hdr := r.constructHeader(step, hash)
 	sig, err := r.signer.Sign(hdr)
 	if err != nil {
@@ -193,12 +193,12 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*agreement.StepVo
 	}
 
 	// then we create the full BLS signed Agreement
-	ev := agreement.Agreement{}
+	ev := message.Agreement{}
 	ev.SetSignature(sig)
 	ev.VotesPerStep = svs
 
 	eventBuf := new(bytes.Buffer)
-	if err := agreement.Marshal(eventBuf, ev); err != nil {
+	if err := message.MarshalAgreement(eventBuf, ev); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("cannot marshal the agreement")
 		return
 	}
@@ -218,6 +218,6 @@ func (r *Reducer) constructHeader(step uint8, hash []byte) header.Header {
 	}
 }
 
-func stepVotesAreValid(svs []*agreement.StepVotes) bool {
+func stepVotesAreValid(svs []*message.StepVotes) bool {
 	return len(svs) == 2 && svs[0] != nil && svs[1] != nil
 }

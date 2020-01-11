@@ -8,6 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -41,7 +42,7 @@ func (m *MockHandler) Quorum(uint64) int {
 }
 
 // Verify checks the signature of the set.
-func (m *MockHandler) Verify(ev Agreement) error {
+func (m *MockHandler) Verify(ev message.Agreement) error {
 	if !m.verify {
 		return errors.New("dog told me to")
 	}
@@ -201,11 +202,11 @@ func (m *mockAccumulatorHandler) IsMember(pubKeyBLS []byte, round uint64, step u
 }
 */
 
-func newAggroFactory(provisionersNr int) func(uint64, uint8, int) Agreement {
+func newAggroFactory(provisionersNr int) func(uint64, uint8, int) message.Agreement {
 	hash, _ := crypto.RandEntropy(32)
 	p, ks := consensus.MockProvisioners(provisionersNr)
 
-	return func(round uint64, step uint8, idx int) Agreement {
+	return func(round uint64, step uint8, idx int) message.Agreement {
 		a := MockAgreementEvent(hash, round, step, ks, p, idx)
 		return *a
 	}

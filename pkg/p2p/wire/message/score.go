@@ -1,4 +1,4 @@
-package selection
+package message
 
 import (
 	"bytes"

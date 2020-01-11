@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/block"
 )
 
@@ -59,17 +59,17 @@ func (c *store) Clear(round uint64) int {
 }
 
 func Decode(b *bytes.Buffer, cMsg *Candidate) error {
-	if err := marshalling.UnmarshalBlock(b, cMsg.Block); err != nil {
+	if err := message.UnmarshalBlock(b, cMsg.Block); err != nil {
 		return err
 	}
 
-	return marshalling.UnmarshalCertificate(b, cMsg.Certificate)
+	return message.UnmarshalCertificate(b, cMsg.Certificate)
 }
 
 func Encode(b *bytes.Buffer, cm *Candidate) error {
-	if err := marshalling.MarshalBlock(b, cm.Block); err != nil {
+	if err := message.MarshalBlock(b, cm.Block); err != nil {
 		return err
 	}
 
-	return marshalling.MarshalCertificate(b, cm.Certificate)
+	return message.MarshalCertificate(b, cm.Certificate)
 }

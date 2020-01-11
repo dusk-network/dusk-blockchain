@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
@@ -21,7 +22,7 @@ type Selector struct {
 	publisher eventbus.Publisher
 	handler   Handler
 	lock      sync.RWMutex
-	bestEvent *Score
+	bestEvent *message.Score
 
 	timer   *timer
 	timeout time.Duration
@@ -80,8 +81,8 @@ func (s *Selector) Finalize() {
 // CollectScoreEvent checks the score of an incoming Event and, in case
 // it has a higher score, verifies, propagates and saves it
 func (s *Selector) CollectScoreEvent(e consensus.Event) error {
-	ev := Score{}
-	if err := UnmarshalScore(&e.Payload, &ev); err != nil {
+	ev := message.Score{}
+	if err := message.UnmarshalScore(&e.Payload, &ev); err != nil {
 		return err
 	}
 
@@ -156,9 +157,10 @@ func (s *Selector) publishBestEvent() error {
 	return nil
 }
 
-func (s *Selector) repropagate(hdr header.Header, ev Score) error {
+// TODO: Deprecated - marshalling should be done by the Peer (so after the gossip)
+func (s *Selector) repropagate(hdr header.Header, ev message.Score) error {
 	buf := new(bytes.Buffer)
-	if err := MarshalScore(buf, &ev); err != nil {
+	if err := message.MarshalScore(buf, &ev); err != nil {
 		return err
 	}
 

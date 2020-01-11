@@ -6,8 +6,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -90,9 +90,9 @@ func (a *agreement) CollectAgreementEvent(event consensus.Event) error {
 	return nil
 }
 
-func convertToAgreement(event consensus.Event) (*Agreement, error) {
-	ev := New(event.Header)
-	if err := Unmarshal(&event.Payload, ev); err != nil {
+func convertToAgreement(event consensus.Event) (*message.Agreement, error) {
+	ev := message.NewAgreement(event.Header)
+	if err := message.UnmarshalAgreement(&event.Payload, ev); err != nil {
 		return nil, err
 	}
 	return ev, nil
@@ -110,14 +110,14 @@ func (a *agreement) listen() {
 	}
 }
 
-func (a *agreement) sendCertificate(ag Agreement) {
+func (a *agreement) sendCertificate(ag message.Agreement) {
 	cert := a.generateCertificate(ag)
 	buf := new(bytes.Buffer)
 	if err := encoding.Write256(buf, ag.Header.BlockHash); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling block hash")
 	}
 
-	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
+	if err := message.MarshalCertificate(buf, cert); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling certificate")
 	}
 
@@ -138,7 +138,7 @@ func (a *agreement) Finalize() {
 }
 
 // Generate a block certificate from an agreement message.
-func (a *agreement) generateCertificate(ag Agreement) *block.Certificate {
+func (a *agreement) generateCertificate(ag message.Agreement) *block.Certificate {
 	return &block.Certificate{
 		StepOneBatchedSig: ag.VotesPerStep[0].Signature.Compress(),
 		StepTwoBatchedSig: ag.VotesPerStep[1].Signature.Compress(),

@@ -7,9 +7,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -100,7 +100,7 @@ func provideCertificate(rpcBus *rpcbus.RPCBus) {
 		r := <-c
 		buf := new(bytes.Buffer)
 		cert := block.EmptyCertificate()
-		marshalling.MarshalCertificate(buf, cert)
+		message.MarshalCertificate(buf, cert)
 		r.RespChan <- rpcbus.Response{*buf, nil}
 	}(c)
 }
@@ -135,7 +135,7 @@ func (h *Helper) ProvideTransactions(t *testing.T) {
 		}
 
 		for _, tx := range txs {
-			if err := marshalling.MarshalTx(buf, tx); err != nil {
+			if err := message.MarshalTx(buf, tx); err != nil {
 				panic(err)
 			}
 		}

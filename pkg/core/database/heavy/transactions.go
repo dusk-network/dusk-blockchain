@@ -10,7 +10,7 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	log "github.com/sirupsen/logrus"
@@ -90,7 +90,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := marshalling.MarshalHeader(blockHeaderFields, b.Header); err != nil {
+	if err := message.MarshalHeader(blockHeaderFields, b.Header); err != nil {
 		return err
 	}
 
@@ -329,7 +329,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	header := block.NewHeader()
-	err = marshalling.UnmarshalHeader(bytes.NewBuffer(value), header)
+	err = message.UnmarshalHeader(bytes.NewBuffer(value), header)
 
 	if err != nil {
 		return nil, err

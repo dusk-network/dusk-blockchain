@@ -3,7 +3,7 @@ package mempool
 import (
 	"bytes"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -23,7 +23,7 @@ func initIntermediateBlockCollector(sub eventbus.Subscriber) chan block.Block {
 
 func (i *intermediateBlockCollector) Collect(m bytes.Buffer) error {
 	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
+	if err := message.UnmarshalBlock(&m, blk); err != nil {
 		return err
 	}
 

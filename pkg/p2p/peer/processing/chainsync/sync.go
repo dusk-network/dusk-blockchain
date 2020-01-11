@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -109,7 +109,7 @@ func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
 	}
 
 	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&blkBuf, blk); err != nil {
+	if err := message.UnmarshalBlock(&blkBuf, blk); err != nil {
 		return nil, err
 	}
 

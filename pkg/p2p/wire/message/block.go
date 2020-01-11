@@ -1,4 +1,4 @@
-package marshalling
+package message
 
 import (
 	"bytes"

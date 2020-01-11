@@ -1,4 +1,4 @@
-package agreement
+package message
 
 import (
 	"bytes"
