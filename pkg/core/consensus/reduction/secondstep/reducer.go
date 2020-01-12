@@ -93,8 +93,8 @@ func (r *Reducer) Finalize() {
 }
 
 func (r *Reducer) Collect(e consensus.Event) error {
-	ev := reduction.New()
-	if err := reduction.Unmarshal(&e.Payload, ev); err != nil {
+	ev := message.NewReduction()
+	if err := message.UnmarshalReduction(&e.Payload, ev); err != nil {
 		return err
 	}
 

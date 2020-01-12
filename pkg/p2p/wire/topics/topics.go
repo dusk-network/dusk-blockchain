@@ -48,7 +48,6 @@ const (
 	Reject
 
 	//Internal
-	//StartConsensus
 	Initialization
 	RoundUpdate
 	BestScore
@@ -96,7 +95,6 @@ var Topics = [...]topicBuf{
 	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
 	topicBuf{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
 	topicBuf{Agreement, *(bytes.NewBuffer([]byte{byte(Agreement)})), "agreement"},
-	//topicBuf{StartConsensus, *(bytes.NewBuffer([]byte{byte(StartConsensus)})), "startconsensus"},
 	topicBuf{Gossip, *(bytes.NewBuffer([]byte{byte(Gossip)})), "gossip"},
 	topicBuf{NotFound, *(bytes.NewBuffer([]byte{byte(NotFound)})), "notfound"},
 	topicBuf{Unknown, *(bytes.NewBuffer([]byte{byte(Unknown)})), "unknown"},

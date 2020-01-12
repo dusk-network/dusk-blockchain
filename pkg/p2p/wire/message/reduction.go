@@ -1,4 +1,4 @@
-package reduction
+package message
 
 import (
 	"bytes"
@@ -15,14 +15,14 @@ type (
 )
 
 // New returns and empty Reduction event.
-func New() *Reduction {
+func NewReduction() *Reduction {
 	return &Reduction{
 		SignedHash: make([]byte, 33),
 	}
 }
 
 // Unmarshal unmarshals the buffer into a Reduction event.
-func Unmarshal(r *bytes.Buffer, bev *Reduction) error {
+func UnmarshalReduction(r *bytes.Buffer, bev *Reduction) error {
 	bev.SignedHash = make([]byte, 33)
 	if err := encoding.ReadBLS(r, bev.SignedHash); err != nil {
 		return err
@@ -32,7 +32,7 @@ func Unmarshal(r *bytes.Buffer, bev *Reduction) error {
 }
 
 // Marshal a Reduction event into a buffer.
-func Marshal(r *bytes.Buffer, bev Reduction) error {
+func MarshalReduction(r *bytes.Buffer, bev Reduction) error {
 	if err := encoding.WriteBLS(r, bev.SignedHash); err != nil {
 		return err
 	}
@@ -48,8 +48,8 @@ func UnmarshalVoteSet(r *bytes.Buffer) ([]Reduction, error) {
 
 	evs := make([]Reduction, length)
 	for i := uint64(0); i < length; i++ {
-		rev := New()
-		if err := Unmarshal(r, rev); err != nil {
+		rev := NewReduction()
+		if err := UnmarshalReduction(r, rev); err != nil {
 			return nil, err
 		}
 
@@ -66,7 +66,7 @@ func MarshalVoteSet(r *bytes.Buffer, evs []Reduction) error {
 	}
 
 	for _, event := range evs {
-		if err := Marshal(r, event); err != nil {
+		if err := MarshalReduction(r, event); err != nil {
 			return err
 		}
 	}

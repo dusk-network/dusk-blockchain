@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,8 +22,8 @@ func TestSuccessfulAggro(t *testing.T) {
 
 	go func() {
 		for _, ev := range evs {
-			r := reduction.Reduction{}
-			_ = reduction.Unmarshal(&ev.Payload, &r)
+			r := message.Reduction{}
+			_ = message.UnmarshalReduction(&ev.Payload, &r)
 			if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
 				assert.FailNow(t, "error in collecting votes")
 			}

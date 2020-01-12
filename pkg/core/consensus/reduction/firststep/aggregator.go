@@ -52,7 +52,7 @@ func newAggregator(
 // StepVotes/Set kept under the corresponding block hash. If the Set reaches or exceeds
 // quorum, the candidate block for the given block hash is first verified before
 // propagating the information to the Reducer.
-func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) error {
+func (a *aggregator) collectVote(ev message.Reduction, hdr header.Header) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.finished {

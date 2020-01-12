@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -26,8 +25,8 @@ func TestSuccessfulAggro(t *testing.T) {
 	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
-		r := reduction.Reduction{}
-		_ = reduction.Unmarshal(&ev.Payload, &r)
+		r := message.Reduction{}
+		_ = message.UnmarshalReduction(&ev.Payload, &r)
 		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
 			assert.FailNow(t, "error in collecting votes")
 		}
@@ -54,8 +53,8 @@ func TestInvalidBlock(t *testing.T) {
 	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
-		r := reduction.Reduction{}
-		_ = reduction.Unmarshal(&ev.Payload, &r)
+		r := message.Reduction{}
+		_ = message.UnmarshalReduction(&ev.Payload, &r)
 		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
 			assert.FailNow(t, "error in collecting votes")
 		}
@@ -82,8 +81,8 @@ func TestCandidateNotFound(t *testing.T) {
 	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
-		r := reduction.Reduction{}
-		_ = reduction.Unmarshal(&ev.Payload, &r)
+		r := message.Reduction{}
+		_ = message.UnmarshalReduction(&ev.Payload, &r)
 		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
 			assert.FailNow(t, "error in collecting votes")
 		}

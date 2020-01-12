@@ -47,7 +47,7 @@ func newAggregator(
 
 // Collect a Reduction message, and add it's sender public key and signature to the
 // StepVotes/Set kept under the corresponding block hash.
-func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) error {
+func (a *aggregator) collectVote(ev message.Reduction, hdr header.Header) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.finished {

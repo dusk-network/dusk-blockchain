@@ -5,13 +5,14 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
 // MockEvent mocks a Reduction event and returns it.
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing
-func MockEvent(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, iterativeIdx ...int) (Reduction, header.Header) {
+func MockEvent(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, iterativeIdx ...int) (message.Reduction, header.Header) {
 	idx := 0
 	if len(iterativeIdx) != 0 {
 		idx = iterativeIdx[0]
@@ -22,7 +23,7 @@ func MockEvent(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, 
 	}
 
 	hdr := header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: keys[idx].BLSPubKeyBytes}
-	red := New()
+	red := message.NewReduction()
 
 	r := new(bytes.Buffer)
 	_ = header.MarshalSignableVote(r, hdr)
@@ -37,7 +38,7 @@ func MockWire(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, i
 	ev, hdr := MockEvent(hash, round, step, keys, iterativeIdx...)
 	buf := new(bytes.Buffer)
 	_ = header.Marshal(buf, hdr)
-	_ = Marshal(buf, ev)
+	_ = message.MarshalReduction(buf, ev)
 	return buf
 }
 
@@ -46,7 +47,7 @@ func MockConsensusEvent(hash []byte, round uint64, step uint8, keys []key.Consen
 	rev, hdr := MockEvent(hash, round, step, keys, iterativeIdx...)
 
 	buf := new(bytes.Buffer)
-	_ = Marshal(buf, rev)
+	_ = message.MarshalReduction(buf, rev)
 
 	return consensus.Event{
 		Header:  hdr,
@@ -59,7 +60,7 @@ func MockConsensusEvent(hash []byte, round uint64, step uint8, keys []key.Consen
 func MockVoteSetBuffer(hash []byte, round uint64, step uint8, amount int, keys []key.ConsensusKeys) *bytes.Buffer {
 	voteSet := MockVoteSet(hash, round, step, keys, amount)
 	buf := new(bytes.Buffer)
-	if err := MarshalVoteSet(buf, voteSet); err != nil {
+	if err := message.MarshalVoteSet(buf, voteSet); err != nil {
 		panic(err)
 	}
 
@@ -68,7 +69,7 @@ func MockVoteSetBuffer(hash []byte, round uint64, step uint8, amount int, keys [
 
 // MockVoteSet mocks a slice of Reduction events for two adjacent steps,
 // and returns it.
-func MockVoteSet(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, amount int) []Reduction {
+func MockVoteSet(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, amount int) []message.Reduction {
 	if step < uint8(2) {
 		panic("Need at least 2 steps to create an Agreement")
 	}
@@ -80,8 +81,8 @@ func MockVoteSet(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys
 }
 
 // MockVotes mocks a slice of Reduction events and returns it.
-func MockVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, amount int) []Reduction {
-	var voteSet []Reduction
+func MockVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, amount int) []message.Reduction {
+	var voteSet []message.Reduction
 	for i := 0; i < amount; i++ {
 		r, _ := MockEvent(hash, round, step, keys, i)
 		voteSet = append(voteSet, r)
