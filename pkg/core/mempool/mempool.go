@@ -436,10 +436,10 @@ func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 	} else {
 		// In other cases, we will range through the hash map and pick out
 		// what we want depending on the filter.
-		txs := m.verified.Clone()
+		txs = m.verified.Clone()
 
 		if len(r.Params.Bytes()) == 1 {
-			filterTxsByType(txs, transactions.TxType(r.Params.Bytes()[0]))
+			txs = filterTxsByType(txs, transactions.TxType(r.Params.Bytes()[0]))
 		}
 	}
 
@@ -453,13 +453,21 @@ func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 	return *buf, nil
 }
 
-func filterTxsByType(txs []transactions.Transaction, txType transactions.TxType) {
-	for i, tx := range txs {
-		if tx.Type() != txType {
-			txs[i], txs[len(txs)-1] = txs[len(txs)-1], txs[i]
-			txs = txs[:len(txs)-1]
+func filterTxsByType(txs []transactions.Transaction, txType transactions.TxType) []transactions.Transaction {
+	i := 0
+	for {
+		if txs[i].Type() != txType {
+			txs = append(txs[:i], txs[i+1:]...)
+			continue
+		}
+
+		i++
+		if i == len(txs) {
+			break
 		}
 	}
+
+	return txs
 }
 
 // onGetMempoolTxsBySize returns a subset of verified mempool txs which
