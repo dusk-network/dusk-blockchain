@@ -66,6 +66,9 @@ type Mempool struct {
 	// the magic function that knows best what is valid chain Tx
 	verifyTx func(tx transactions.Transaction) error
 	quitChan chan struct{}
+
+	// ID of subscription to the TX topic on the EventBus
+	txSubscriberID uint32
 }
 
 // checkTx is responsible to determine if a tx is valid or not
@@ -127,8 +130,8 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, maxPendingLen)
-	eventbus.NewTopicListener(m.eventBus, m, topics.Tx, eventbus.ChannelType)
-
+	l := eventbus.NewCallbackListener(m.CollectPending)
+	m.txSubscriberID = m.eventBus.Subscribe(topics.Tx, l)
 	return m
 }
 
@@ -153,11 +156,15 @@ func (m *Mempool) Run() {
 			case b := <-m.intermediateBlockChan:
 				m.onIntermediateBlock(b)
 			case tx := <-m.pending:
+				// TODO: the m.pending channel looks a bit wasteful. Consider
+				// removing it and call onPendingTx directly within
+				// CollectPending
 				_, _ = m.onPendingTx(tx)
 			case <-time.After(20 * time.Second):
 				m.onIdle()
 			// Mempool terminating
 			case <-m.quitChan:
+				//m.eventBus.Unsubscribe(topics.Tx, m.txSubscriberID)
 				return
 			}
 		}
@@ -342,11 +349,10 @@ func (m *Mempool) newPool() Pool {
 	return p
 }
 
-// Collect process the emitted transactions.
+// CollectPending process the emitted transactions.
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
-func (m *Mempool) Collect(message bytes.Buffer) error {
-
+func (m *Mempool) CollectPending(message bytes.Buffer) error {
 	txDesc, err := unmarshalTxDesc(message)
 	if err != nil {
 		return err

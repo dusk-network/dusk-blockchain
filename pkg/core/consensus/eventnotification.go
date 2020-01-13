@@ -10,7 +10,8 @@ import (
 
 func LaunchNotification(subscriber eventbus.Subscriber, deserializer wire.EventDeserializer, topic topics.Topic) <-chan wire.Event {
 	notification := newNotification(deserializer)
-	eventbus.NewTopicListener(subscriber, notification, topic, eventbus.ChannelType)
+	l := eventbus.NewCallbackListener(notification.Collect)
+	subscriber.Subscribe(topic, l)
 	return notification.reduChan
 }
 

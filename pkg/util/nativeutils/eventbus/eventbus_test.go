@@ -54,34 +54,8 @@ func TestUnsubscribe(t *testing.T) {
 }
 
 //*********************
-// TOPIC LISTENER TESTS
+// STREAMER TESTS
 //*********************
-func TestLameSubscriber(t *testing.T) {
-	bus := New()
-	resultChan := make(chan bytes.Buffer, 1)
-
-	collector := NewSimpleCollector(resultChan, nil)
-	tbuf := ranbuf()
-
-	sub := NewTopicListener(bus, collector, topics.Test, ChannelType)
-
-	bus.Publish(topics.Test, tbuf)
-	bus.Publish(topics.Test, tbuf)
-
-	assert.Equal(t, <-resultChan, *tbuf)
-	assert.Equal(t, <-resultChan, *tbuf)
-
-	sub.Quit()
-	bus.Publish(topics.Test, tbuf)
-
-	select {
-	case <-resultChan:
-		assert.FailNow(t, "unexpected message published after quitting a topic listener")
-	case <-time.After(50 * time.Millisecond):
-		//
-	}
-}
-
 func TestStreamer(t *testing.T) {
 	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)

@@ -28,7 +28,8 @@ type (
 func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
 	certificateChan := make(chan certMsg, 10)
 	collector := &certificateCollector{certificateChan}
-	eventbus.NewTopicListener(subscriber, collector, topics.Certificate, eventbus.ChannelType)
+	l := eventbus.NewCallbackListener(collector.Collect)
+	subscriber.Subscribe(topics.Certificate, l)
 	return certificateChan
 }
 
@@ -50,7 +51,8 @@ func (c *certificateCollector) Collect(m bytes.Buffer) error {
 func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
 	highestSeenChan := make(chan uint64, 1)
 	collector := &highestSeenCollector{highestSeenChan}
-	eventbus.NewTopicListener(sub, collector, topics.HighestSeen, eventbus.ChannelType)
+	l := eventbus.NewCallbackListener(collector.Collect)
+	sub.Subscribe(topics.HighestSeen, l)
 	return highestSeenChan
 }
 
