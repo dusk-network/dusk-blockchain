@@ -56,3 +56,4 @@ An overview of the bare response object:
 | `bid` | \<amount\>, \<locktime\> | Sends a bid transaction of \<amount\> DUSK to self. The transaction will be locked for \<locktime\> blocks after being accepted into a block. Returns a TXID on success. | wallet loaded |
 | `stake` | \<amount\> \<locktime\> | Sends a stake transaction of \<amount\> DUSK to self. The transaction will be locked for \<locktime\> blocks after being accepted into a block. Returns a TXID on success. | wallet loaded |
 | `automateconsensustxs` | | Tells the node to automatically renew stakes and bids, to save the user the trouble. Values and locktimes are inferred from configuration file. Returns a string indicating success or failure. | wallet loaded |
+| `viewmempool` | (optional) \<txtype or txid\> | Returns an overview of the mempool. Optionally, a caller can supply either a txtype (1 byte), or a txid(32 bytes) in order to filter for specific items. | none |
