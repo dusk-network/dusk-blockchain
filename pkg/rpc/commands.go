@@ -34,6 +34,7 @@ var (
 		"syncprogress":         syncProgress,
 		"automateconsensustxs": automateConsensusTxs,
 		"walletstatus":         walletStatus,
+		"viewmempool":          viewMempool,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
@@ -352,4 +353,19 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 	}
 
 	return fmt.Sprintf("%v", status), nil
+}
+
+var viewMempool = func(s *Server, params []string) (string, error) {
+	// Encode filtering information
+	var buf bytes.Buffer
+	if len(params) > 1 {
+		buf = *bytes.NewBuffer([]byte(params[0]))
+	}
+
+	txsBuf, err := s.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{buf, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return txsBuf.String(), nil
 }
