@@ -22,6 +22,7 @@ const (
 	heightInd
 	stateInd
 	bidValuesInd
+	outputKeyInd
 	maxInd
 )
 
