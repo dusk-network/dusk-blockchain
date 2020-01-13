@@ -2,10 +2,12 @@ package mempool
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -421,6 +423,61 @@ func TestSendMempoolTx(t *testing.T) {
 		t.Fatal("unexpected tx total size")
 	}
 
+}
+
+func TestMempoolView(t *testing.T) {
+	c.reset()
+
+	numTxs := 4
+	txs := randomSliceOfTxs(t, uint16(numTxs))
+
+	for _, tx := range txs {
+		buf := new(bytes.Buffer)
+		err := marshalling.MarshalTx(buf, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		c.addTx(tx)
+		c.bus.Publish(topics.Tx, buf)
+	}
+
+	// First, let's just get the entire view
+	buf, err := c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// There should be 16 txs, so 16 lines
+	n := strings.Count(buf.String(), "\n")
+	if n != numTxs*4 {
+		t.Fatalf("did not have the required amount of lines in mempool view - %v/%v", n, numTxs*4)
+	}
+
+	// Now, we single out one hash from the bunch
+	hash := txs[7].StandardTx().TxID
+	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBuffer(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should give us info about said tx
+	if !strings.Contains(buf.String(), hex.EncodeToString(hash)) {
+		t.Fatal("should have gotten info about requested tx")
+	}
+
+	// Let's filter for just stakes
+	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBuffer([]byte{2}), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should have `numTxs` lines, as there is one tx per type
+	// per batch.
+	n = strings.Count(buf.String(), "\n")
+	if n != numTxs {
+		t.Fatalf("did not have required amount of lines when fetching stake txs - %v/%v", n, numTxs)
+	}
 }
 
 // Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
