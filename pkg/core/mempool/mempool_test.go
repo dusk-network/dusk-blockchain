@@ -54,10 +54,12 @@ type ctx struct {
 func (c *ctx) reset() {
 
 	// Reset shared context state
+	c.mu.Lock()
 	c.m.Quit()
 	c.m.verified = c.m.newPool()
 	c.verifiedTx = make([]transactions.Transaction, 0)
 	c.propagated = make([][]byte, 0)
+	c.mu.Unlock()
 
 	c.m.Run()
 }
