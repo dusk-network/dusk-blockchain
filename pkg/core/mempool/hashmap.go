@@ -110,6 +110,13 @@ func (m *HashMap) Contains(txID []byte) bool {
 	return ok
 }
 
+// Get returns a tx for a given txID if it exists.
+func (m *HashMap) Get(txID []byte) transactions.Transaction {
+	var k txHash
+	copy(k[:], txID)
+	return m.data[k].tx
+}
+
 // Size of the txs
 func (m *HashMap) Size() uint32 {
 	return m.txsSize
