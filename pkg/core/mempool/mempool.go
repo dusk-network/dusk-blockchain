@@ -456,15 +456,16 @@ func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 func filterTxsByType(txs []transactions.Transaction, txType transactions.TxType) []transactions.Transaction {
 	i := 0
 	for {
+		if i == len(txs) {
+			break
+		}
+
 		if txs[i].Type() != txType {
 			txs = append(txs[:i], txs[i+1:]...)
 			continue
 		}
 
 		i++
-		if i == len(txs) {
-			break
-		}
 	}
 
 	return txs
