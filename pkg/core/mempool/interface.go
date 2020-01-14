@@ -37,6 +37,9 @@ type Pool interface {
 	// Clone the entire pool
 	Clone() []transactions.Transaction
 
+	// FilterByType returns all verified transactions for a specific type.
+	FilterByType(transactions.TxType) []transactions.Transaction
+
 	// Size is total number of bytes of all txs marshalling size
 	Size() uint32
 	// Len returns the number of tx entries

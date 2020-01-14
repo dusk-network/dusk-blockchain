@@ -102,6 +102,19 @@ func (m HashMap) Clone() []transactions.Transaction {
 	return r
 }
 
+// FilterByType returns all transactions for a specific type that are
+// currently in the HashMap.
+func (m HashMap) FilterByType(filterType transactions.TxType) []transactions.Transaction {
+	txs := make([]transactions.Transaction, 0)
+	for _, t := range m.data {
+		if t.tx.Type() == filterType {
+			txs = append(txs, t.tx)
+		}
+	}
+
+	return txs
+}
+
 // Contains returns true if the given key is in the pool.
 func (m *HashMap) Contains(txID []byte) bool {
 	var k txHash

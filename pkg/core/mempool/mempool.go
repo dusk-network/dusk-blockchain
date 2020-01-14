@@ -418,10 +418,11 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 }
 
 func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
-	// If we want a tx with a certain ID, we can simply look it up
-	// directly
 	txs := make([]transactions.Transaction, 0)
-	if len(r.Params.Bytes()) == 32 {
+	switch len(r.Params.Bytes()) {
+	case 32:
+		// If we want a tx with a certain ID, we can simply look it up
+		// directly
 		hash, err := hex.DecodeString(string(r.Params.Bytes()))
 		if err != nil {
 			return bytes.Buffer{}, err
@@ -433,14 +434,10 @@ func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 		}
 
 		txs = append(txs, tx)
-	} else {
-		// In other cases, we will range through the hash map and pick out
-		// what we want depending on the filter.
+	case 1:
+		txs = m.verified.FilterByType(transactions.TxType(r.Params.Bytes()[0]))
+	default:
 		txs = m.verified.Clone()
-
-		if len(r.Params.Bytes()) == 1 {
-			txs = filterTxsByType(txs, transactions.TxType(r.Params.Bytes()[0]))
-		}
 	}
 
 	buf := new(bytes.Buffer)
@@ -451,24 +448,6 @@ func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 	}
 
 	return *buf, nil
-}
-
-func filterTxsByType(txs []transactions.Transaction, txType transactions.TxType) []transactions.Transaction {
-	i := 0
-	for {
-		if i == len(txs) {
-			break
-		}
-
-		if txs[i].Type() != txType {
-			txs = append(txs[:i], txs[i+1:]...)
-			continue
-		}
-
-		i++
-	}
-
-	return txs
 }
 
 // onGetMempoolTxsBySize returns a subset of verified mempool txs which
