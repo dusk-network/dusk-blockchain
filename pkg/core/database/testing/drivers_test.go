@@ -153,8 +153,6 @@ func TestStoreBlock(test *testing.T) {
 		done = true
 		return nil
 	})
-	// Ensure these blocks are globally available for other tests
-	blocks = append(blocks, genBlocks...)
 
 	if err != nil {
 		test.Fatal(err.Error())
@@ -562,9 +560,6 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 		return nil
 	})
 
-	// Add blocks to global variables too
-	blocks = append(blocks, genBlocks...)
-
 	if err != nil {
 		test.Fatal(err.Error())
 	}
@@ -764,19 +759,23 @@ func TestFetchDecoys(test *testing.T) {
 		// Make sure these decoy points belong to transactions in
 		// our db, which are unlocked.
 		for _, decoy := range decoys {
-			for _, block := range blocks {
-				for _, tx := range block.Txs {
-					for _, output := range tx.StandardTx().Outputs {
-						unlockHeight, err := t.FetchOutputUnlockHeight(output.PubKey.P.Bytes())
-						if err != nil {
-							return err
-						}
+			// Make sure it's a real output
+			exists, err := t.FetchOutputExists(decoy.Bytes())
+			if err != nil {
+				return err
+			}
 
-						if bytes.Equal(output.PubKey.P.Bytes(), decoy.Bytes()) && unlockHeight == 0 {
-							hits++
-						}
-					}
-				}
+			if !exists {
+				return errors.New("fetched a decoy for which there is no output entry")
+			}
+
+			unlockHeight, err := t.FetchOutputUnlockHeight(decoy.Bytes())
+			if err != nil {
+				return err
+			}
+
+			if unlockHeight == 0 {
+				hits++
 			}
 		}
 
