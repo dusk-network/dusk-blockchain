@@ -752,6 +752,9 @@ func TestFetchDecoys(test *testing.T) {
 	hits := 0
 	err := db.View(func(t database.Transaction) error {
 		decoys := t.FetchDecoys(numDecoys)
+		// We should have at least 90 txs in our database, so plenty of
+		// decoys to choose from, and under no circumstance should we
+		// come up short.
 		if len(decoys) != numDecoys {
 			return errors.New("did not receive requested amount of decoys")
 		}

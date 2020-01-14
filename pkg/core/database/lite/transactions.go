@@ -210,6 +210,12 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	points := make([]ristretto.Point, 0, numDecoys)
 	for key := range t.db.storage[outputKeyInd] {
+		// Ignore locked outputs
+		unlockHeight := binary.LittleEndian.Uint64(t.db.storage[outputKeyInd][key])
+		if unlockHeight != 0 {
+			continue
+		}
+
 		var p ristretto.Point
 		var pBytes [32]byte
 		copy(pBytes[:], key[:])
