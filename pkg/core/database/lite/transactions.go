@@ -206,8 +206,10 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 
 	return true, txID, nil
 }
+
 func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	points := make([]ristretto.Point, 0, numDecoys)
+	i := 0
 	for key := range t.db.storage[outputKeyInd] {
 		var p ristretto.Point
 		var pBytes [32]byte
@@ -215,6 +217,10 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 		p.SetBytes(&pBytes)
 
 		points = append(points, p)
+		i++
+		if i == numDecoys {
+			break
+		}
 	}
 
 	return points

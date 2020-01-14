@@ -305,10 +305,10 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 		p.SetBytes(&pBytes)
 
 		decoysPubKeys = append(decoysPubKeys, p)
+		i++
 		if i == numDecoys {
 			break
 		}
-		i++
 	}
 
 	return decoysPubKeys
