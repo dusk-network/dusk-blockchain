@@ -114,7 +114,11 @@ func (m *HashMap) Contains(txID []byte) bool {
 func (m *HashMap) Get(txID []byte) transactions.Transaction {
 	var k txHash
 	copy(k[:], txID)
-	return m.data[k].tx
+	txd, ok := m.data[k]
+	if !ok {
+		return nil
+	}
+	return txd.tx
 }
 
 // Size of the txs
