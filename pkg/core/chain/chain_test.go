@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -345,6 +346,63 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 	assert.Equal(t, 5, len(c.p.Members))
 }
 
+func TestRebuildChain(t *testing.T) {
+	_, rb, c := setupChainTest(t, true)
+	catchClearWalletDatabaseRequest(rb)
+	go c.Listen()
+
+	// Add a block so that we have a bit of chain state
+	// to check against.
+	blk := helper.RandomBlock(t, uint64(1), 2)
+	blk.Txs = blk.Txs[0:1]
+	blk.SetRoot()
+	blk.SetHash()
+	// Add cert and prev hash
+	blk.Header.Certificate = block.EmptyCertificate()
+	blk.Header.PrevBlockHash = c.prevBlock.Header.Hash
+	assert.NoError(t, c.AcceptBlock(*blk))
+
+	// Chain prevBlock should now no longer be genesis
+	genesis := cfg.DecodeGenesis()
+	assert.False(t, genesis.Equals(&c.prevBlock))
+
+	// Let's manually update some of the in-memory state, as it is
+	// difficult to do this through mocked blocks in a test.
+	p, ks := consensus.MockProvisioners(5)
+	for _, k := range ks {
+		assert.NoError(t, c.addProvisioner(k.EdPubKeyBytes, k.BLSPubKeyBytes, 50000, 1, 2000))
+	}
+
+	c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
+	c.intermediateBlock = helper.RandomBlock(t, 2, 2)
+	bids := make(user.BidList, 0)
+	for i := 0; i < 3; i++ {
+		bid := createBid(t)
+		bids = append(bids, bid)
+		*c.bidList = append(*c.bidList, bid)
+	}
+
+	// Now, send a request to rebuild the chain
+	if _, err := rb.Call(rpcbus.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	// We should be back at the genesis chain state
+	assert.True(t, genesis.Equals(&c.prevBlock))
+	for _, k := range ks {
+		assert.Nil(t, c.p.GetMember(k.BLSPubKeyBytes))
+	}
+
+	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
+	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
+	assert.NoError(t, err)
+	assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
+
+	for _, bid := range bids {
+		assert.False(t, c.bidList.Contains(bid))
+	}
+}
+
 func createBid(t *testing.T) user.Bid {
 	b, err := crypto.RandEntropy(32)
 	if err != nil {
@@ -354,6 +412,15 @@ func createBid(t *testing.T) user.Bid {
 	var arr [32]byte
 	copy(arr[:], b)
 	return user.Bid{arr, arr, 1000}
+}
+
+func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
+	c := make(chan rpcbus.Request, 1)
+	rb.Register(rpcbus.ClearWalletDatabase, c)
+	go func() {
+		r := <-c
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	}()
 }
 
 func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
