@@ -45,6 +45,7 @@ var (
 type Mempool struct {
 	getMempoolTxsChan       <-chan rpcbus.Request
 	getMempoolTxsBySizeChan <-chan rpcbus.Request
+	getMempoolViewChan      <-chan rpcbus.Request
 	sendTxChan              <-chan rpcbus.Request
 
 	// transactions emitted by RPC and Peer subsystems
@@ -103,6 +104,11 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
 	}
 
+	getMempoolViewChan := make(chan rpcbus.Request, 1)
+	if err := rpcBus.Register(rpcbus.GetMempoolView, getMempoolViewChan); err != nil {
+		log.WithError(err).Errorf("error registering getMempoolView")
+	}
+
 	sendTxChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(rpcbus.SendMempoolTx, sendTxChan); err != nil {
 		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
@@ -117,6 +123,7 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 		intermediateBlockChan:   intermediateBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
+		getMempoolViewChan:      getMempoolViewChan,
 		sendTxChan:              sendTxChan,
 	}
 
@@ -152,6 +159,8 @@ func (m *Mempool) Run() {
 				handleRequest(r, m.onGetMempoolTxs, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
 				handleRequest(r, m.onGetMempoolTxsBySize, "GetMempoolTxsBySize")
+			case r := <-m.getMempoolViewChan:
+				handleRequest(r, m.onGetMempoolView, "GetMempoolView")
 			// Mempool input channels
 			case b := <-m.intermediateBlockChan:
 				m.onIntermediateBlock(b)
@@ -406,6 +415,39 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 	}
 
 	return *w, nil
+}
+
+func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
+	txs := make([]transactions.Transaction, 0)
+	switch len(r.Params.Bytes()) {
+	case 32:
+		// If we want a tx with a certain ID, we can simply look it up
+		// directly
+		hash, err := hex.DecodeString(string(r.Params.Bytes()))
+		if err != nil {
+			return bytes.Buffer{}, err
+		}
+
+		tx := m.verified.Get(hash)
+		if tx == nil {
+			return bytes.Buffer{}, errors.New("tx not found")
+		}
+
+		txs = append(txs, tx)
+	case 1:
+		txs = m.verified.FilterByType(transactions.TxType(r.Params.Bytes()[0]))
+	default:
+		txs = m.verified.Clone()
+	}
+
+	buf := new(bytes.Buffer)
+	for _, tx := range txs {
+		if _, err := buf.WriteString(fmt.Sprintf("Type: %v / Hash: %s / Locktime: %v\n", tx.Type(), hex.EncodeToString(tx.StandardTx().TxID), tx.LockTime())); err != nil {
+			return bytes.Buffer{}, err
+		}
+	}
+
+	return *buf, nil
 }
 
 // onGetMempoolTxsBySize returns a subset of verified mempool txs which

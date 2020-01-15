@@ -89,6 +89,41 @@ func TestStableSortedKeys(t *testing.T) {
 	}
 }
 
+func TestGet(t *testing.T) {
+	pool := HashMap{Capacity: 100}
+
+	// Generate 100 random txs
+	hashes := make([][]byte, 100)
+	for i := 0; i < 100; i++ {
+
+		tx := helper.RandomStandardTx(t, false)
+		tx.CalculateHash()
+		hashes[i] = tx.TxID
+
+		constFee := big.NewInt(0).SetUint64(20)
+		tx.Fee.SetBigInt(constFee)
+
+		td := TxDesc{tx: tx, received: time.Now()}
+		if err := pool.Put(td); err != nil {
+			t.Fatal(err.Error())
+		}
+	}
+
+	// Get a random tx from the pool
+	n := rand.Intn(100)
+	tx := pool.Get(hashes[n])
+	if tx == nil {
+		t.Fatal("tx is not supposed to be nil")
+	}
+
+	// Now get a tx for a hash that is not in the pool
+	hash, _ := crypto.RandEntropy(32)
+	tx = pool.Get(hash)
+	if tx != nil {
+		t.Fatal("should not have gotten a tx")
+	}
+}
+
 func BenchmarkPut(b *testing.B) {
 
 	txs := dummyTransactionsSet(50000)
