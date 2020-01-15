@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"math/big"
-	"os"
 	"time"
 
 	"encoding/binary"
@@ -808,6 +807,9 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Halt consensus
+	c.eventBus.Publish(topics.StopConsensus, new(bytes.Buffer))
+
 	// Remove EVERYTHING from the database. This includes the genesis
 	// block, so we need to add it afterwards.
 	err := c.db.Update(func(t database.Transaction) error {
@@ -842,22 +844,9 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	c.restoreConsensusData()
 
 	// Clear walletDB
-	// First, look up if the wallet is loaded
-	status, err := c.rpcBus.Call(rpcbus.IsWalletLoaded, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second)
-	if err != nil {
+	if _, err := c.rpcBus.Call(rpcbus.ClearWalletDatabase, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
 		log.Panic(err)
 	}
 
-	// Do it cleanly if a wallet is loaded
-	if status.String() == "loaded" {
-		if _, err := c.rpcBus.Call(rpcbus.ClearWalletDatabase, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
-			log.Panic(err)
-		}
-
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
-		return
-	}
-
-	// If no wallet is loaded, we can just delete it and be done with it
-	r.RespChan <- rpcbus.Response{bytes.Buffer{}, os.RemoveAll(cfg.Get().Wallet.Store)}
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 }
