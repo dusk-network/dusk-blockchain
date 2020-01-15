@@ -77,7 +77,7 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 		getTxHistoryChan:          make(chan rpcbus.Request, 1),
 		automateConsensusTxsChan:  make(chan rpcbus.Request, 1),
 		isWalletLoadedChan:        make(chan rpcbus.Request, 1),
-		clearWalletDatabaseChan:   make(chan rpcbus.Reqest, 1),
+		clearWalletDatabaseChan:   make(chan rpcbus.Request, 1),
 	}
 
 	if t.fetchDecoys == nil {
