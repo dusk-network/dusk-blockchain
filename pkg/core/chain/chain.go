@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"math/big"
+	"os"
 	"time"
 
 	"encoding/binary"
@@ -77,6 +78,7 @@ type Chain struct {
 	getLastCertificateChan   <-chan rpcbus.Request
 	getRoundResultsChan      <-chan rpcbus.Request
 	getSyncProgressChan      <-chan rpcbus.Request
+	rebuildChainChan         <-chan rpcbus.Request
 }
 
 // New returns a new chain object
@@ -98,11 +100,13 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	getLastCertificateChan := make(chan rpcbus.Request, 1)
 	getRoundResultsChan := make(chan rpcbus.Request, 1)
 	getSyncProgressChan := make(chan rpcbus.Request, 1)
+	rebuildChainChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
 	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
 	rpcBus.Register(rpcbus.GetLastCertificate, getLastCertificateChan)
 	rpcBus.Register(rpcbus.GetRoundResults, getRoundResultsChan)
 	rpcBus.Register(rpcbus.GetSyncProgress, getSyncProgressChan)
+	rpcBus.Register(rpcbus.RebuildChain, rebuildChainChan)
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -119,6 +123,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		getLastCertificateChan:   getLastCertificateChan,
 		getRoundResultsChan:      getRoundResultsChan,
 		getSyncProgressChan:      getSyncProgressChan,
+		rebuildChainChan:         rebuildChainChan,
 	}
 
 	// If the `prevBlock` is genesis, we add an empty intermediate block.
@@ -163,6 +168,8 @@ func (c *Chain) Listen() {
 			c.provideRoundResults(r)
 		case r := <-c.getSyncProgressChan:
 			c.provideSyncProgress(r)
+		case r := <-c.rebuildChainChan:
+			c.rebuild(r)
 		}
 	}
 }
@@ -795,4 +802,62 @@ func mockDeterministicCoinbase() transactions.Transaction {
 
 	tx.AddReward(*keyPair.PublicKey(), reward)
 	return tx
+}
+
+func (c *Chain) rebuild(r rpcbus.Request) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Remove EVERYTHING from the database. This includes the genesis
+	// block, so we need to add it afterwards.
+	err := c.db.Update(func(t database.Transaction) error {
+		return t.ClearDatabase()
+	})
+	if err != nil {
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		return
+	}
+
+	// Note that, beyond this point, an error in reconstructing our
+	// state is unrecoverable, as it deems the node totally useless.
+	// Therefore, any error encountered from now on is answered by
+	// a panic.
+
+	// Load genesis into database and set the chain tip
+	l, err := newLoader(c.db)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// Reset in-memory values
+	c.prevBlock = *l.chainTip
+	c.p = user.NewProvisioners()
+	c.bidList = &user.BidList{}
+	c.intermediateBlock, err = mockFirstIntermediateBlock(c.prevBlock.Header)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	c.lastCertificate = block.EmptyCertificate()
+	c.restoreConsensusData()
+
+	// Clear walletDB
+	// First, look up if the wallet is loaded
+	status, err := c.rpcBus.Call(rpcbus.IsWalletLoaded, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	// Do it cleanly if a wallet is loaded
+	if status.String() == "loaded" {
+		if _, err := c.rpcBus.Call(rpcbus.ClearWalletDatabase, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
+			log.Panic(err)
+		}
+
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		return
+	}
+
+	// If no wallet is loaded, we can just delete it and be done with it
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, os.RemoveAll(cfg.Get().Wallet.Store)}
 }
