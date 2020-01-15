@@ -48,6 +48,7 @@ An overview of the bare response object:
 | `txhistory` | | Returns the transaction history for the loaded wallet. | wallet loaded |
 | `walletstatus` | | Returns whether or not the wallet is loaded, as a "boolean" (0 or 1) | none |
 | `syncprogress` | | Returns to what degree the node is synced up with the rest of its peers, as a percentage. | none |
+| `rebuildchain` | | Wipes all of the data (except for the genesis block) from the chain and wallet databases, to allow for a full re-sync. | none |
 
 #### Extended functionality (full nodes only)
 
