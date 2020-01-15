@@ -34,7 +34,7 @@ var (
 		"syncprogress":         syncProgress,
 		"automateconsensustxs": automateConsensusTxs,
 		"walletstatus":         walletStatus,
-		"rebuildchain":         rebuildChan,
+		"rebuildchain":         rebuildChain,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
@@ -355,7 +355,7 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 	return fmt.Sprintf("%v", status), nil
 }
 
-var rebuildchan = func(s *Server, params []string) (string, error) {
+var rebuildChain = func(s *Server, params []string) (string, error) {
 	if _, err := s.rpcBus.Call(rpcbus.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
 		return "", err
 	}
