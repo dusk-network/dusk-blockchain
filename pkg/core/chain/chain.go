@@ -830,18 +830,12 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	if err != nil {
 		log.Panic(err)
 	}
+	c.prevBlock = *l.chainTip
 
 	// Reset in-memory values
-	c.prevBlock = *l.chainTip
-	c.p = user.NewProvisioners()
-	c.bidList = &user.BidList{}
-	c.intermediateBlock, err = mockFirstIntermediateBlock(c.prevBlock.Header)
-	if err != nil {
+	if err := c.resetState(); err != nil {
 		log.Panic(err)
 	}
-
-	c.lastCertificate = block.EmptyCertificate()
-	c.restoreConsensusData()
 
 	// Clear walletDB
 	if _, err := c.rpcBus.Call(rpcbus.ClearWalletDatabase, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
@@ -849,4 +843,18 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	}
 
 	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+}
+
+func (c *Chain) resetState() error {
+	c.p = user.NewProvisioners()
+	c.bidList = &user.BidList{}
+	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
+	if err != nil {
+		return err
+	}
+	c.intermediateBlock = intermediateBlock
+
+	c.lastCertificate = block.EmptyCertificate()
+	c.restoreConsensusData()
+	return nil
 }
