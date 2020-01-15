@@ -106,6 +106,9 @@ type Transaction interface {
 	// sinceUnixTime starting the search from height (tip - offset)
 	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
 
+	// ClearDatabase will remove all information from the database.
+	ClearDatabase() error
+
 	// Atomic storage
 	Commit() error
 	Rollback() error

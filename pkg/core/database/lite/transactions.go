@@ -314,3 +314,11 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 	return tip - uint64(n) + uint64(pos), nil
 
 }
+
+func (t transaction) ClearDatabase() error {
+	for key := range t.db.storage {
+		t.db.storage[key] = make(table)
+	}
+
+	return nil
+}
