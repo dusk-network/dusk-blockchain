@@ -56,12 +56,8 @@ func TestAcceptFromPeer(t *testing.T) {
 	// Now, test accepting a block with 1 on the sync counter
 	c.counter.StartSyncing(1)
 
-	blk = helper.RandomBlock(t, 1, 1)
-	blk.SetPrevBlock(c.prevBlock.Header)
-	// Strip all but coinbase tx, to avoid unwanted errors
-	blk.Txs = blk.Txs[0:1]
-	blk.SetRoot()
-	blk.SetHash()
+	blk = mockAcceptableBlock(t, c.prevBlock)
+
 	buf = new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, blk); err != nil {
 		t.Fatal(err)
@@ -254,7 +250,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	// Accept it
 	assert.NoError(t, chain.AcceptBlock(*blk))
 	// Provisioner with k3 should no longer be in the committee now
-	// assert.False(t, c.IsMember(k3.BLSPubKeyBytes, 2, 1))
+	assert.False(t, chain.p.GetMember(k[0].BLSPubKeyBytes) == nil)
 }
 
 func TestAddAndRemoveBid(t *testing.T) {
@@ -347,19 +343,18 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 }
 
 func TestRebuildChain(t *testing.T) {
-	_, rb, c := setupChainTest(t, true)
+	eb, rb, c := setupChainTest(t, true)
 	catchClearWalletDatabaseRequest(rb)
 	go c.Listen()
 
+	// Listen for `StopConsensus` messages
+	stopConsensusChan := make(chan bytes.Buffer, 1)
+	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
+
 	// Add a block so that we have a bit of chain state
 	// to check against.
-	blk := helper.RandomBlock(t, uint64(1), 2)
-	blk.Txs = blk.Txs[0:1]
-	blk.SetRoot()
-	blk.SetHash()
-	// Add cert and prev hash
-	blk.Header.Certificate = block.EmptyCertificate()
-	blk.Header.PrevBlockHash = c.prevBlock.Header.Hash
+	blk := mockAcceptableBlock(t, c.prevBlock)
+
 	assert.NoError(t, c.AcceptBlock(*blk))
 
 	// Chain prevBlock should now no longer be genesis
@@ -401,6 +396,9 @@ func TestRebuildChain(t *testing.T) {
 	for _, bid := range bids {
 		assert.False(t, c.bidList.Contains(bid))
 	}
+
+	// Ensure we got a `StopConsensus` message
+	<-stopConsensusChan
 }
 
 func createBid(t *testing.T) user.Bid {
@@ -421,6 +419,23 @@ func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
 		r := <-c
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
 	}()
+}
+
+// mock a block which can be accepted by the chain.
+// note that this is only valid for height 1, as the certificate
+// is not checked on height 1 (for network bootstrapping)
+func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
+	// Create block 1
+	blk := helper.RandomBlock(t, 1, 1)
+	// Remove all txs except coinbase, as the helper transactions do not pass verification
+	blk.Txs = blk.Txs[0:1]
+	blk.SetRoot()
+	blk.SetHash()
+	// Add cert and prev hash
+	blk.Header.Certificate = block.EmptyCertificate()
+	blk.Header.PrevBlockHash = prevBlock.Header.Hash
+
+	return blk
 }
 
 func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {
