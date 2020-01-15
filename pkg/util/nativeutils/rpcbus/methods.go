@@ -12,6 +12,7 @@ const (
 	GetLastBlock method = iota
 	GetMempoolTxs
 	GetMempoolTxsBySize
+	GetMempoolView
 	SendMempoolTx
 	VerifyCandidateBlock
 	CreateWallet
