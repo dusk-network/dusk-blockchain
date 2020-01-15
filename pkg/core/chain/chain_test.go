@@ -223,6 +223,8 @@ func TestFetchTip(t *testing.T) {
 }
 
 // Make sure that certificates can still be properly verified when a provisioner is removed on round update.
+// TODO: this test currently doesn't test anything meaningful, and
+// should be refactored or removed.
 func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
