@@ -441,6 +441,7 @@ func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
 		}
 
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		return nil
 	}
 
 	if err := t.w.ClearDatabase(); err != nil {
