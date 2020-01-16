@@ -375,25 +375,28 @@ func (m *Mempool) CollectPending(message bytes.Buffer) error {
 // still unaccepted txs.
 // Called by P2P on InvTypeMempoolTx msg
 func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
-
 	// Read inputs
 	filterTxID := r.Params.Bytes()
 
 	outputTxs := make([]transactions.Transaction, 0)
+	w := new(bytes.Buffer)
+
+	// If we are looking for a specific tx, just look it up by key.
+	if len(filterTxID) == 32 {
+		tx := m.verified.Get(filterTxID)
+		if tx == nil {
+			return bytes.Buffer{}, errors.New("tx not found")
+		}
+
+		outputTxs = append(outputTxs, tx)
+		err := marshalTxs(w, outputTxs)
+		return *w, err
+	}
 
 	// When filterTxID is empty, mempool returns all verified txs sorted
 	// by fee from highest to lowest
 	err := m.verified.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		if len(filterTxID) > 0 {
-			if bytes.Equal(filterTxID, k[:]) {
-				// tx found
-				outputTxs = append(outputTxs, t.tx)
-				return true, nil
-			}
-		} else {
-			outputTxs = append(outputTxs, t.tx)
-		}
-
+		outputTxs = append(outputTxs, t.tx)
 		return false, nil
 	})
 
@@ -401,20 +404,8 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 		return bytes.Buffer{}, err
 	}
 
-	// marshal Txs
-	w := new(bytes.Buffer)
-	lTxs := uint64(len(outputTxs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	for _, tx := range outputTxs {
-		if err := marshalling.MarshalTx(w, tx); err != nil {
-			return bytes.Buffer{}, err
-		}
-	}
-
-	return *w, nil
+	err = marshalTxs(w, outputTxs)
+	return *w, err
 }
 
 func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
@@ -483,20 +474,9 @@ func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
 		return bytes.Buffer{}, err
 	}
 
-	// marshal Txs
 	w := new(bytes.Buffer)
-	lTxs := uint64(len(txs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	for _, tx := range txs {
-		if err := marshalling.MarshalTx(w, tx); err != nil {
-			return bytes.Buffer{}, err
-		}
-	}
-
-	return *w, nil
+	err = marshalTxs(w, txs)
+	return *w, err
 }
 
 // onSendMempoolTx utilizes rpcbus to allow submitting a tx to mempool with
@@ -588,4 +568,19 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (bytes.Buffe
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
 
 	log.Tracef("Handled %s request", name)
+}
+
+func marshalTxs(w *bytes.Buffer, txs []transactions.Transaction) error {
+	lTxs := uint64(len(txs))
+	if err := encoding.WriteVarInt(w, lTxs); err != nil {
+		return err
+	}
+
+	for _, tx := range txs {
+		if err := marshalling.MarshalTx(w, tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
