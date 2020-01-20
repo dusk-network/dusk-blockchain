@@ -137,6 +137,50 @@ func TestPingLoop(t *testing.T) {
 	assert.Equal(t, topics.Pong.String(), topic.String())
 }
 
+// Test that peers with a LightNode service flag only get specific
+// messages, and can only send specific messages.
+func TestServiceFlagGuard(t *testing.T) {
+	bus := eventbus.New()
+	client, srv := net.Pipe()
+	agChan := make(chan bytes.Buffer, 1)
+	bus.Subscribe(topics.Agreement, eventbus.NewChanListener(agChan))
+
+	responseChan := make(chan *bytes.Buffer, 10)
+	writer := peer.NewWriter(client, processing.NewGossip(protocol.TestNet), bus)
+	go writer.Serve(responseChan, make(chan struct{}, 1), protocol.LightNode)
+
+	// Give the goroutine some time to start
+	time.Sleep(100 * time.Millisecond)
+
+	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
+	go reader.Listen(bus, dupemap.NewDupeMap(0), rpcbus.New(), &chainsync.Counter{}, responseChan, protocol.LightNode)
+
+	// Send an agreement buffer from the peer. This should not be routed
+	g := processing.NewGossip(protocol.TestNet)
+	buf := makeAgreementBuffer(15)
+	assert.NoError(t, g.Process(buf))
+
+	_, err := srv.Write(buf.Bytes())
+	assert.NoError(t, err)
+
+	// Should not get anything on the agChan
+	select {
+	case <-agChan:
+		t.Fatal("should not have gotten any message on agChan")
+	case <-time.After(1 * time.Second):
+		// Success
+	}
+
+	// Now, attempt to send an agreement buffer to the peer. It should
+	// never arrive.
+	buf = makeAgreementBuffer(15)
+	bus.Publish(topics.Gossip, buf)
+
+	srv.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, err = srv.Read([]byte{0})
+	assert.Error(t, err)
+}
+
 func BenchmarkWriter(b *testing.B) {
 	bus := eventbus.New()
 
