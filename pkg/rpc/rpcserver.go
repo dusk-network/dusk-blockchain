@@ -29,14 +29,17 @@ type Server struct {
 	listener net.Listener // RPC Server listener
 
 	startTime int64
+
+	commands map[string]handler
 }
 
 // NewRPCServer instantiates a new RPCServer.
-func NewRPCServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server, error) {
+func NewRPCServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, commands map[string]handler) (*Server, error) {
 
 	srv := Server{
 		eventBus: eventBus,
 		rpcBus:   rpcBus,
+		commands: commands,
 	}
 
 	user := cfg.Get().RPC.User
