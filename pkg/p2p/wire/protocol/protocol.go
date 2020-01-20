@@ -20,7 +20,7 @@ const (
 	FullNode ServiceFlag = 1
 
 	// LightNode indicates that a user is running a Dusk light node
-	// LightNode ServiceFlag = 2 // Not implemented
+	LightNode ServiceFlag = 2
 )
 
 // NodeVer is the current node version.

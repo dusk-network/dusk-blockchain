@@ -14,8 +14,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -57,7 +57,7 @@ type Writer struct {
 	*Connection
 	subscriber eventbus.Subscriber
 	gossipID   uint32
-	// TODO: add service flag
+	protocol.ServiceFlag
 }
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -66,19 +66,19 @@ type Reader struct {
 	*Connection
 	router   *messageRouter
 	exitChan chan<- struct{} // Way to kill the WriteLoop
-	// TODO: add service flag
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber) *Writer {
+func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, serviceFlag protocol.ServiceFlag) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:   conn,
 			gossip: gossip,
 		},
-		subscriber: subscriber,
+		subscriber:  subscriber,
+		ServiceFlag: serviceFlag,
 	}
 
 	return pw
@@ -86,37 +86,23 @@ func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Sub
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
+func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}, serviceFlag protocol.ServiceFlag) (*Reader, error) {
+	_, db := heavy.CreateDBConnection()
 	pconn := &Connection{
 		Conn:   conn,
 		gossip: gossip,
 	}
 
-	_, db := heavy.CreateDBConnection()
-
-	dataRequestor := responding.NewDataRequestor(db, rpcBus, responseChan)
-
 	reader := &Reader{
 		Connection: pconn,
+		router:     newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, pconn.RemoteAddr().String(), serviceFlag),
 		exitChan:   exitChan,
-		router: &messageRouter{
-			publisher:         publisher,
-			dupeMap:           dupeMap,
-			blockHashBroker:   responding.NewBlockHashBroker(db, responseChan),
-			synchronizer:      chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:     dataRequestor,
-			dataBroker:        responding.NewDataBroker(db, rpcBus, responseChan),
-			roundResultBroker: responding.NewRoundResultBroker(rpcBus, responseChan),
-			candidateBroker:   responding.NewCandidateBroker(rpcBus, responseChan),
-			ponger:            processing.NewPonger(responseChan),
-			peerInfo:          conn.RemoteAddr().String(),
-		},
 	}
 
 	// On each new connection the node sends topics.Mempool to retrieve mempool
 	// txs from the new peer
 	go func() {
-		if err := dataRequestor.RequestMempoolItems(); err != nil {
+		if err := reader.router.dataRequestor.RequestMempoolItems(); err != nil {
 			l.WithError(err).Warnln("error sending topics.Mempool message")
 		}
 	}()
