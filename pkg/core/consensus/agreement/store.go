@@ -28,12 +28,13 @@ func (s storedAgreements) Less(i, j int) bool {
 func (s storedAgreements) String() string {
 	var sb strings.Builder
 	for i, aggro := range s {
+		hdr := aggro.State()
 		if i == 0 {
 			sb.WriteString("[\n")
 		}
 		sb.WriteString("\t")
 		sb.WriteString(hex.EncodeToString(aggro.SignedVotes()))
-		sb.WriteString(fmt.Sprintf(" round: %d step: %d sender: %s", aggro.Round, aggro.Step, hex.EncodeToString(aggro.Header.Sender())))
+		sb.WriteString(fmt.Sprintf(" round: %d step: %d sender: %s", hdr.Round, hdr.Step, hex.EncodeToString(hdr.Sender())))
 		sb.WriteString("\n")
 	}
 	sb.WriteString("]")
@@ -75,6 +76,7 @@ func (s *store) Insert(a message.Agreement, weight int) int {
 	s.Lock()
 	defer s.Unlock()
 
+	hdr := a.State()
 	idx := s.find(a)
 	if idx == -1 {
 		agreements := make([]message.Agreement, weight)
@@ -82,11 +84,11 @@ func (s *store) Insert(a message.Agreement, weight int) int {
 			agreements[i] = a
 		}
 
-		s.collected[a.Step] = storedAgreements(agreements)
+		s.collected[hdr.Step] = storedAgreements(agreements)
 		return weight
 	}
 
-	stored := s.collected[a.Step]
+	stored := s.collected[hdr.Step]
 	// if the Agreement is already in the store we do not add it
 	if s.contains(idx, a) {
 		return len(stored)
@@ -100,7 +102,7 @@ func (s *store) Insert(a message.Agreement, weight int) int {
 		stored[idx] = a
 	}
 
-	s.collected[a.Step] = stored
+	s.collected[hdr.Step] = stored
 	return len(stored)
 }
 
@@ -119,7 +121,8 @@ func (s *store) Find(a message.Agreement) int {
 // Find returns the index of an Agreement in the stored collection or, if the Agreement has not been stored, the index at which it would be stored.
 // In case no Agreement is stored for the blockHash specified, it returns -1
 func (s *store) find(a message.Agreement) int {
-	stored := s.collected[a.Step]
+	hdr := a.State()
+	stored := s.collected[hdr.Step]
 	if stored == nil {
 		return -1
 	}
@@ -137,7 +140,8 @@ func (s *store) Contains(a message.Agreement) bool {
 }
 
 func (s *store) contains(idx int, a message.Agreement) bool {
-	stored := s.collected[a.Step]
+	hdr := a.State()
+	stored := s.collected[hdr.Step]
 	if idx == -1 {
 		return false
 	}

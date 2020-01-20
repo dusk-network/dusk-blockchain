@@ -4,17 +4,13 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/block"
 )
 
 // Make sure the hash and root are correct, to avoid malicious nodes from
 // overwriting the candidate block for a specific hash
-func Validate(b bytes.Buffer) error {
-	cm := &Candidate{block.NewBlock(), block.EmptyCertificate()}
-	if err := Decode(&b, cm); err != nil {
-		return err
-	}
-
+func Validate(cm message.Candidate) error {
 	if err := checkHash(cm.Block); err != nil {
 		return err
 	}

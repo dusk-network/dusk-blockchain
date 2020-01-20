@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -16,43 +15,59 @@ import (
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
-	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
 type mockSigner struct {
-	bus *eventbus.EventBus
+	bus    *eventbus.EventBus
+	pubkey []byte
 }
 
 func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 	return make([]byte, 33), nil
 }
 
-func (m *mockSigner) Gossip(topic topics.Topic, hdr header.Header, b *bytes.Buffer, id uint32) error {
-	m.bus.Publish(topic, b)
+func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacket {
+	return pf.Create(m.pubkey, 0, 1)
+}
+
+func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
+	// TODO: interface - uncomment in case the test needs a buffer
+	/*
+		// message.Marshal takes care of prepending the topic, marshalling the
+		// header, etc
+		buf, err := message.Marshal(msg)
+		if err != nil {
+			return err
+		}
+
+		// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
+		// is performed where it is supposed to (i.e. after the Gossip)
+		serialized := message.New(msg.Category(), buf)
+
+		// gossip away
+		m.bus.Publish(topics.Gossip, serialized)
+		return nil
+	*/
+	m.bus.Publish(msg.Category(), msg)
 	return nil
 }
 
-func (m *mockSigner) SendInternally(topic topics.Topic, hash []byte, b *bytes.Buffer, id uint32) error {
-	// Because the buffer in a BestScore message is empty, we will write the hash to it.
-	// This way, we can check for correctness during tests.
-	if err := encoding.Write256(b, hash); err != nil {
-		return err
-	}
-
-	m.bus.Publish(topic, b)
+func (m *mockSigner) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
+	m.bus.Publish(topic, msg)
 	return nil
 }
 
 // Helper for reducing generation test boilerplate
 type Helper struct {
-	Bus  *eventbus.EventBus
-	RBus *rpcbus.RPCBus
+	PubKeyBLS []byte
+	Bus       *eventbus.EventBus
+	RBus      *rpcbus.RPCBus
 	*Factory
 	Generator *Generator
 	*consensus.SimplePlayer
 	signer consensus.Signer
 
-	ScoreChan, CandidateChan chan bytes.Buffer
+	ScoreChan, CandidateChan chan message.Message
 	txBatchCount             uint16
 }
 
@@ -62,15 +77,17 @@ func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBat
 	factory := NewFactory(eb, rpcBus, walletKeys.PublicKey())
 	g := factory.Instantiate()
 	gen := g.(*Generator)
+	pubkey, _ := crypto.RandEntropy(32)
 	hlp := &Helper{
+		PubKeyBLS:     pubkey,
 		Bus:           eb,
 		RBus:          rpcBus,
 		Factory:       factory,
 		Generator:     gen,
 		SimplePlayer:  consensus.NewSimplePlayer(),
-		signer:        &mockSigner{eb},
-		ScoreChan:     make(chan bytes.Buffer, 1),
-		CandidateChan: make(chan bytes.Buffer, 1),
+		signer:        &mockSigner{eb, pubkey},
+		ScoreChan:     make(chan message.Message, 1),
+		CandidateChan: make(chan message.Message, 1),
 		txBatchCount:  txBatchCount,
 	}
 	hlp.createResultChans()
@@ -108,12 +125,7 @@ func provideCertificate(rpcBus *rpcbus.RPCBus) {
 // TriggerBlockGeneration creates a random ScoreEvent and triggers block generation
 func (h *Helper) TriggerBlockGeneration() {
 	sev := randomScoreEvent()
-	buf := new(bytes.Buffer)
-	if err := score.Marshal(buf, sev); err != nil {
-		panic(err)
-	}
-
-	h.Generator.Collect(consensus.Event{header.Header{}, *buf})
+	h.Generator.Collect(sev)
 }
 
 // ProvideTransactions sends a set of transactions upon the request of
@@ -144,19 +156,12 @@ func (h *Helper) ProvideTransactions(t *testing.T) {
 	}(reqChan)
 }
 
-func randomScoreEvent() score.Event {
-	s, _ := crypto.RandEntropy(32)
-	proof, _ := crypto.RandEntropy(1477)
-	z, _ := crypto.RandEntropy(32)
-	subset, _ := crypto.RandEntropy(32)
-	seed, _ := crypto.RandEntropy(33)
-	return score.Event{
-		Proof: zkproof.ZkProof{
-			Proof:         proof,
-			Score:         s,
-			Z:             z,
-			BinaryBidList: subset,
-		},
-		Seed: seed,
+func randomScoreEvent() message.ScoreProposal {
+	//we don't really care about setting a right Header here
+	hdr := header.Header{
+		Round:     uint64(0),
+		Step:      uint8(1),
+		PubKeyBLS: []byte{},
 	}
+	return message.MockScoreProposal(hdr)
 }

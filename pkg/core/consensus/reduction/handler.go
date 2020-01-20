@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/key"
 )
 
@@ -43,13 +44,14 @@ func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 }
 
 // Verify the BLS signature of the Reduction event. Since the payload is nil, verifying the signature equates to verifying solely the Header
-func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
+func (b *Handler) VerifySignature(red message.Reduction) error {
 	packet := new(bytes.Buffer)
+	hdr := red.State()
 	if err := header.MarshalSignableVote(packet, hdr); err != nil {
 		return err
 	}
 
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), red.SignedHash)
 }
 
 func (b *Handler) Quorum(round uint64) int {

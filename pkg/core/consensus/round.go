@@ -8,6 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -17,7 +18,6 @@ import (
 
 var _ EventPlayer = (*Coordinator)(nil)
 var _ Signer = (*Coordinator)(nil)
-var emptyHash [32]byte
 var emptyPayload = new(bytes.Buffer)
 
 var lg = log.WithField("process", "coordinator")
@@ -112,16 +112,16 @@ func (s *roundStore) resume(id uint32) bool {
 }
 
 // Dispatch an event to listeners for the designated Topic.
-func (s *roundStore) Dispatch(ev TopicEvent) {
-	subscribers := s.createSubscriberQueue(ev.Topic)
+func (s *roundStore) Dispatch(m message.Message) {
+	subscribers := s.createSubscriberQueue(m.Category())
 	lg.WithFields(log.Fields{
 		"recipients": len(subscribers),
-		"topic":      ev.Topic,
+		"topic":      m.Category,
 	}).Traceln("notifying subscribers")
 	for _, sub := range subscribers {
-		if err := sub.NotifyPayload(ev.Event); err != nil {
+		if err := sub.NotifyPayload(m.Payload().(Packet)); err != nil {
 			lg.WithFields(log.Fields{
-				"topic": ev.Topic.String(),
+				"topic": m.Category().String(),
 				"id":    sub.ID(),
 			}).WithError(err).Warnln("notifying subscriber failed")
 		}
@@ -211,7 +211,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	return c
 }
 
-func (c *Coordinator) StopConsensus(bytes.Buffer) error {
+func (c *Coordinator) StopConsensus(m message.Message) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if !c.stopped {
@@ -236,9 +236,11 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 	}
 }
 
+// TODO: interface - delete
 // CollectRoundUpdate is triggered when the Chain propagates a new round update.
 // The consensus components are swapped out, initialized, and the
 // state will be updated to the new round.
+/*
 func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 	lg.Debugln("received round update")
 	c.lock.Lock()
@@ -259,10 +261,36 @@ func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
 
 	// TODO: the Coordinator should not send events. someone else should kickstart the
 	// consensus loop
-	c.store.Dispatch(TopicEvent{
-		Topic: topics.Generation,
-		Event: Event{},
+	// TODO: interface - check this
+	c.store.Dispatch(message.Message{
+		Topic:   topics.Generation,
+		Payload: nil,
 	})
+	return nil
+}
+*/
+
+// CollectRoundUpdate is triggered when the Chain propagates a new round update.
+// The consensus components are swapped out, initialized, and the
+// state will be updated to the new round.
+func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	r := m.Payload().(RoundUpdate)
+
+	if !c.stopped {
+		c.stopConsensus()
+	}
+	c.onNewRound(r, c.unsynced)
+	c.Update(r.Round)
+	c.unsynced = false
+	c.stopped = false
+	go c.flushRoundQueue()
+
+	// TODO: the Coordinator should not send events. someone else should kickstart the
+	// consensus loop
+	// TODO: interface - check this
+	c.store.Dispatch(message.New(topics.Generation, nil))
 	return nil
 }
 
@@ -304,32 +332,26 @@ func (c *Coordinator) reinstantiateStore() {
 	c.swapStore(store)
 }
 
-func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
+func (c *Coordinator) CollectEvent(m message.Message) error {
 	// NOTE: RUnlock is not deferred here, for performance reasons.
 	// https://medium.com/i0exception/runtime-overhead-of-using-defer-in-go-7140d5c40e32
 	// TODO: once go 1.14 is out, re-examine the overhead of using `defer`.
-	c.lock.RLock()
-	topic, err := topics.Extract(&m)
-	if err != nil {
-		c.lock.RUnlock()
-		return err
+	msg, ok := m.Payload().(Packet)
+	if !ok {
+		log.Panic("trying to feed the Coordinator a screwed up message from the EventBus")
 	}
 
-	// check header
-	hdr := header.Header{}
-	if err := header.Unmarshal(&m, &hdr); err != nil {
-		c.lock.RUnlock()
-		return err
-	}
+	hdr := msg.State()
 
 	lg.WithFields(log.Fields{
-		"topic": topic.String(),
+		"topic": m.Category().String(),
 		"round": hdr.Round,
 		"step":  hdr.Step,
 	}).Traceln("collected event")
 
 	var comparison header.Phase
-	if topic == topics.Agreement {
+	c.lock.RLock()
+	if m.Category() == topics.Agreement {
 		comparison = hdr.CompareRound(c.Round())
 	} else {
 		comparison = hdr.CompareRoundAndStep(c.Round(), c.Step())
@@ -337,30 +359,30 @@ func (c *Coordinator) CollectEvent(m bytes.Buffer) error {
 
 	switch comparison {
 	case header.Before:
-		lg.WithField("topic", topic).Debugln("discarding obsolete event")
+		lg.WithField("topic", m.Category).Debugln("discarding obsolete event")
 		c.lock.RUnlock()
 		return nil
 	case header.After:
-		lg.WithField("topic", topic).Debugln("storing future event")
+		lg.WithField("topic", m.Category).Debugln("storing future event")
 
 		// If it is a future agreement event, we store it on the
 		// `roundQueue`. This means that the event will be dispatched
 		// as soon as the Coordinator reaches the round in the event
 		// header.
-		if topic == topics.Agreement {
-			c.roundQueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
+		if m.Category() == topics.Agreement {
+			c.roundQueue.PutEvent(hdr.Round, hdr.Step, m)
 			c.lock.RUnlock()
 			return nil
 		}
 
 		// Otherwise, we just queue it according to the header round
 		// and step.
-		c.eventqueue.PutEvent(hdr.Round, hdr.Step, NewTopicEvent(topic, hdr, m))
+		c.eventqueue.PutEvent(hdr.Round, hdr.Step, m)
 		c.lock.RUnlock()
 		return nil
 	}
 
-	c.store.Dispatch(NewTopicEvent(topic, hdr, m))
+	c.store.Dispatch(m)
 	c.lock.RUnlock()
 	return nil
 }
@@ -411,30 +433,43 @@ func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 
 // Gossip concatenates the topic, the header and the payload,
 // and gossips it to the rest of the network.
-func (c *Coordinator) Gossip(topic topics.Topic, hdr header.Header, payload *bytes.Buffer, id uint32) error {
+// TODO: interface - marshalling should actually be done after the Gossip to
+// respect the simmetry of the architecture
+func (c *Coordinator) Gossip(msg message.Message, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
 
-	buf := new(bytes.Buffer)
-	if err := header.Marshal(buf, hdr); err != nil {
+	// message.Marshal takes care of prepending the topic, marshalling the
+	// header, etc
+	buf, err := message.Marshal(msg)
+	if err != nil {
 		return err
 	}
 
-	if _, err := buf.ReadFrom(payload); err != nil {
-		return err
-	}
-
-	// prepending topic
-	if err := topics.Prepend(buf, topic); err != nil {
-		return err
-	}
+	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
+	// is performed where it is supposed to (i.e. after the Gossip)
+	serialized := message.New(msg.Category(), buf)
 
 	// gossip away
-	c.eventBus.Publish(topics.Gossip, buf)
+	c.eventBus.Publish(topics.Gossip, serialized)
 	return nil
 }
 
+func (c *Coordinator) Compose(pf PacketFactory) InternalPacket {
+	return pf.Create(c.keys.BLSPubKeyBytes, c.Round(), c.Step())
+}
+
+func (c *Coordinator) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
+	if !c.store.hasComponent(id) {
+		return fmt.Errorf("caller with ID %d is unregistered", id)
+	}
+
+	c.eventBus.Publish(topic, msg)
+	return nil
+}
+
+/*
 // SendInternally prepends a header to the given payload, and publishes
 // it on the desired topic.
 func (c *Coordinator) SendInternally(topic topics.Topic, hash []byte, payload *bytes.Buffer, id uint32) error {
@@ -457,6 +492,7 @@ func (c *Coordinator) SendInternally(topic topics.Topic, hash []byte, payload *b
 	c.eventBus.Publish(topic, &buf)
 	return nil
 }
+*/
 
 // Pause event streaming for the listener with the specified ID.
 func (c *Coordinator) Pause(id uint32) {

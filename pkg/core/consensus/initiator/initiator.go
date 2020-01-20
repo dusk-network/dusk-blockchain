@@ -44,7 +44,8 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	}
 
 	if blk.Header.Height == 0 {
-		eventBroker.Publish(topics.Initialization, new(bytes.Buffer))
+		msg := message.New(topics.Initialization, bytes.Buffer{})
+		eventBroker.Publish(topics.Initialization, msg)
 	}
 }
 

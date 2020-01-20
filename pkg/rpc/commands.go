@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/wallet"
@@ -82,7 +83,9 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 	payload, _ := hex.DecodeString(params[1])
 	rpcTopic := topics.StringToTopic(jsonrpcTopic)
-	s.eventBus.Publish(rpcTopic, bytes.NewBuffer(payload))
+	buf := bytes.NewBuffer(payload)
+	m := message.New(rpcTopic, *buf)
+	s.eventBus.Publish(rpcTopic, m)
 
 	result :=
 		`{ 
@@ -96,7 +99,7 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 		return "", fmt.Errorf("missing parameters: amount/locktime")
 	}
 
-	amount, err := strconv.Atoi(params[0])
+	amount, err := strconv.Atoi(params[1])
 	if err != nil {
 		return "", fmt.Errorf("converting amount string to an integer: %v", err)
 	}

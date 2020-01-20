@@ -1,13 +1,13 @@
+// TODO: interface - work with message.Message
 package republisher
 
 import (
-	"bytes"
-
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-type Validator func(bytes.Buffer) error
+type Validator func(message.Message) error
 
 // Republisher handles the repropagation of messages propagated with a
 // specified topic
@@ -48,17 +48,13 @@ func (r *Republisher) Activate() uint32 {
 
 // Republish intercepts a topic and repropagates it immediately
 // after applying any eventual validation logic
-func (r *Republisher) Republish(b bytes.Buffer) error {
+func (r *Republisher) Republish(m message.Message) error {
 	for _, v := range r.validators {
-		if err := v(b); err != nil {
+		if err := v(m); err != nil {
 			return err
 		}
 	}
 
-	if err := topics.Prepend(&b, r.tpc); err != nil {
-		return err
-	}
-
-	r.broker.Publish(topics.Gossip, &b)
+	r.broker.Publish(topics.Gossip, m)
 	return nil
 }

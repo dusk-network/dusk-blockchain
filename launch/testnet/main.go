@@ -9,6 +9,7 @@ import (
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 	log "github.com/sirupsen/logrus"
@@ -92,7 +93,8 @@ func main() {
 	<-interrupt
 
 	// Graceful shutdown of listening components
-	srv.eventBus.Publish(topics.Quit, new(bytes.Buffer))
+	msg := message.New(topics.Quit, bytes.Buffer{})
+	srv.eventBus.Publish(topics.Quit, msg)
 
 	log.WithField("prefix", "main").Info("Terminated")
 }

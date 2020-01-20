@@ -22,7 +22,6 @@ import (
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -167,13 +166,16 @@ func (c *Chain) Listen() {
 	}
 }
 
+// TODO: interface - solve the inconsistencies of unmarshalling the topic
+// internally in the Marshal, or externally
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := topics.Block.ToBuffer()
 	if err := message.MarshalBlock(&buffer, &blk); err != nil {
 		return err
 	}
 
-	c.eventBus.Publish(topics.Gossip, &buffer)
+	msg := message.New(topics.Block, blk)
+	c.eventBus.Publish(topics.Gossip, msg)
 	return nil
 }
 
@@ -196,7 +198,7 @@ func (c *Chain) Close() error {
 	return drvr.Close()
 }
 
-func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
+func (c *Chain) onAcceptBlock(m message.Message) error {
 	// Ignore blocks from peers if we are only one behind - we are most
 	// likely just about to finalize consensus.
 	// TODO: we should probably just accept it if consensus was not
@@ -206,13 +208,10 @@ func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	}
 
 	// If we are more than one block behind, stop the consensus
-	c.eventBus.Publish(topics.StopConsensus, new(bytes.Buffer))
+	c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
 
 	// Accept the block
-	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&m, blk); err != nil {
-		return err
-	}
+	blk := m.Payload().(*block.Block)
 
 	// This will decrement the sync counter
 	if err := c.AcceptBlock(*blk); err != nil {
@@ -311,19 +310,15 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// mempool.Mempool
 	// consensus.generation.broker
 	l.Trace("notifying internally")
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, &blk); err != nil {
-		l.WithError(err).Errorln("block encoding failed")
-		return err
-	}
 
-	c.eventBus.Publish(topics.AcceptedBlock, buf)
+	msg := message.New(topics.AcceptedBlock, blk)
+	c.eventBus.Publish(topics.AcceptedBlock, msg)
 
 	l.Trace("procedure ended")
 	return nil
 }
 
-func (c *Chain) onInitialization(bytes.Buffer) error {
+func (c *Chain) onInitialization(message.Message) error {
 	return c.sendRoundUpdate()
 }
 
@@ -356,7 +351,10 @@ func (c *Chain) sendRoundUpdate() error {
 		return err
 	}
 
-	c.eventBus.Publish(topics.RoundUpdate, buf)
+	// TODO: interface - RoundUpdate should be a struct as it is an internal
+	// message
+	msg := message.New(topics.RoundUpdate, buf)
+	c.eventBus.Publish(topics.RoundUpdate, msg)
 	return nil
 }
 
@@ -406,11 +404,8 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 		log.Panic(err)
 	}
 
-	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		return err
-	}
-
-	c.eventBus.Publish(topics.Gossip, buf)
+	m := message.New(topics.Inv, *buf)
+	c.eventBus.Publish(topics.Gossip, m)
 	return nil
 }
 
@@ -592,8 +587,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		return
 	}
 
-	cm := candidate.NewCandidate()
-	if err := candidate.Decode(&candidateBuf, cm); err != nil {
+	cm := message.NewCandidate()
+	if err := message.UnmarshalCandidate(&candidateBuf, cm); err != nil {
 		log.WithError(err).Warnln("could not decode candidate message")
 		return
 	}
@@ -613,12 +608,15 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	c.intermediateBlock = cm.Block
 
 	// Notify mempool
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, cm.Block); err != nil {
-		log.Panic(err)
-	}
+	/*
+		buf := new(bytes.Buffer)
+		if err := message.MarshalBlock(buf, cm.Block); err != nil {
+			log.Panic(err)
+		}
+	*/
 
-	c.eventBus.Publish(topics.IntermediateBlock, buf)
+	msg := message.New(topics.IntermediateBlock, cm.Block)
+	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
 	go c.sendRoundUpdate()
 }
@@ -630,7 +628,7 @@ func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
 
 // Send out a query for agreement messages and an intermediate block.
 func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certificate, error) {
-	roundResultsChan := make(chan bytes.Buffer, 10)
+	roundResultsChan := make(chan message.Message, 10)
 	id := c.eventBus.Subscribe(topics.RoundResults, eventbus.NewChanListener(roundResultsChan))
 	defer c.eventBus.Unsubscribe(topics.RoundResults, id)
 
@@ -639,11 +637,8 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		log.Panic(err)
 	}
 
-	if err := topics.Prepend(buf, topics.GetRoundResults); err != nil {
-		log.Panic(err)
-	}
-
-	c.eventBus.Publish(topics.Gossip, buf)
+	msg := message.New(topics.GetRoundResults, buf)
+	c.eventBus.Publish(topics.Gossip, msg)
 	// We wait 5 seconds for a response. We time out otherwise and
 	// attempt catching up later.
 	timer := time.NewTimer(5 * time.Second)
@@ -652,8 +647,9 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		select {
 		case <-timer.C:
 			return nil, nil, errors.New("request timeout")
-		case b := <-roundResultsChan:
+		case m := <-roundResultsChan:
 			blk := block.NewBlock()
+			b := m.Payload().(bytes.Buffer)
 			if err := message.UnmarshalBlock(&b, blk); err != nil {
 				// Prevent a malicious node from cutting us off by
 				// sending garbled data

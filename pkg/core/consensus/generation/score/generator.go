@@ -1,12 +1,13 @@
 package score
 
 import (
-	"bytes"
 	"errors"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-crypto/bls"
@@ -44,6 +45,36 @@ type Generator struct {
 
 	signer       consensus.Signer
 	generationID uint32
+}
+
+// scoreFactory is used to compose the Score message before propagating it
+// internally. It is meant to be instantiated every time a new score needs to
+// be created
+type scoreFactory struct {
+	seed  []byte
+	proof zkproof.ZkProof
+}
+
+func newFactory(seed []byte, proof zkproof.ZkProof) scoreFactory {
+	return scoreFactory{seed, proof}
+}
+
+// Create complies with the consensus.PacketFactory interface
+func (sf scoreFactory) Create(sender []byte, round uint64, step uint8) consensus.InternalPacket {
+	hdr := header.Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: emptyHash[:],
+		PubKeyBLS: sender,
+	}
+
+	proof := zkproof.ZkProof{
+		Score:         sf.proof.Score,
+		Proof:         sf.proof.Proof,
+		Z:             sf.proof.Z,
+		BinaryBidList: sf.proof.BinaryBidList,
+	}
+	return message.NewScoreProposal(hdr, sf.seed, proof)
 }
 
 // Initialize the Generator, by creating the round seed and returning the Listener
@@ -100,7 +131,7 @@ func (g *Generator) Prove(seed []byte, bidList user.BidList) zkproof.ZkProof {
 	return zkproof.Prove(g.d, g.k, seedScalar, bidListScalars)
 }
 
-func (g *Generator) Collect(e consensus.Event) error {
+func (g *Generator) Collect(e consensus.InternalPacket) error {
 	defer g.threshold.Lower()
 	return g.generateScore()
 }
@@ -111,25 +142,9 @@ func (g *Generator) generateScore() error {
 		return errors.New("proof score is below threshold")
 	}
 
-	sev := g.createScoreEvent(g.seed, proof)
-	buf := new(bytes.Buffer)
-	if err := Marshal(buf, sev); err != nil {
-		return err
-	}
-
-	return g.signer.SendInternally(topics.ScoreEvent, emptyHash[:], buf, g.ID())
-}
-
-func (g *Generator) createScoreEvent(seed []byte, proof zkproof.ZkProof) Event {
-	return Event{
-		Proof: zkproof.ZkProof{
-			Score:         proof.Score,
-			Proof:         proof.Proof,
-			Z:             proof.Z,
-			BinaryBidList: proof.BinaryBidList,
-		},
-		Seed: seed,
-	}
+	score := g.signer.Compose(newFactory(g.seed, proof))
+	msg := message.New(topics.ScoreEvent, score)
+	return g.signer.SendInternally(topics.ScoreEvent, msg, g.ID())
 }
 
 // bidsToScalars will take a global public list, take a subset from it, and then

@@ -37,8 +37,15 @@ const (
 	After
 )
 
+// State returns the Header struct itself. It is mandate by the
+// consensus.InternalPacket interface
+func (h Header) State() Header {
+	return h
+}
+
 // Sender implements wire.Event.
 // Returns the BLS public key of the event sender.
+// It is part of the consensus.Packet interface
 func (h Header) Sender() []byte {
 	return h.PubKeyBLS
 }

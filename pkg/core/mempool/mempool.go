@@ -352,8 +352,9 @@ func (m *Mempool) newPool() Pool {
 // CollectPending process the emitted transactions.
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
-func (m *Mempool) CollectPending(message bytes.Buffer) error {
-	txDesc, err := unmarshalTxDesc(message)
+func (m *Mempool) CollectPending(msg message.Message) error {
+	tx := msg.Payload().(bytes.Buffer)
+	txDesc, err := unmarshalTxDesc(tx)
 	if err != nil {
 		return err
 	}
@@ -505,11 +506,9 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 		log.Panic(err)
 	}
 
-	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		return err
-	}
-
-	m.eventBus.Publish(topics.Gossip, buf)
+	// TODO: interface - marshalling should done after the Gossip, not before
+	packet := message.New(topics.Inv, *buf)
+	m.eventBus.Publish(topics.Gossip, packet)
 	return nil
 }
 

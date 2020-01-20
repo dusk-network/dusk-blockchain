@@ -3,7 +3,6 @@ package secondstep
 import (
 	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
@@ -47,7 +46,8 @@ func newAggregator(
 
 // Collect a Reduction message, and add it's sender public key and signature to the
 // StepVotes/Set kept under the corresponding block hash.
-func (a *aggregator) collectVote(ev message.Reduction, hdr header.Header) error {
+func (a *aggregator) collectVote(ev message.Reduction) error {
+	hdr := ev.State()
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.finished {

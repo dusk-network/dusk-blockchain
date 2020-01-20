@@ -7,25 +7,23 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-var _ wire.EventCollector = (*Collector)(nil)
-
 // Collector is a very stupid implementation of the wire.EventCollector interface
 // in case no function would be supplied, it would use a channel to publish the collected packets
 type Collector struct {
-	f func(bytes.Buffer) error
+	f func(message.Message) error
 }
 
 // NewSimpleCollector is a simple wrapper around a callback that redirects collected buffers into a channel
-func NewSimpleCollector(rChan chan bytes.Buffer, f func(bytes.Buffer) error) *Collector {
+func NewSimpleCollector(rChan chan message.Message, f func(message.Message) error) *Collector {
 	if f == nil {
-		f = func(b bytes.Buffer) error {
-			rChan <- b
+		f = func(m message.Message) error {
+			rChan <- m
 			return nil
 		}
 	}
@@ -33,7 +31,7 @@ func NewSimpleCollector(rChan chan bytes.Buffer, f func(bytes.Buffer) error) *Co
 }
 
 // Collect redirects a buffer copy to a channel
-func (m *Collector) Collect(b bytes.Buffer) error {
+func (m *Collector) Collect(b message.Message) error {
 	return m.f(b)
 }
 

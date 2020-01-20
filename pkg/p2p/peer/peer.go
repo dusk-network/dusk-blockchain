@@ -266,7 +266,7 @@ func (p *Reader) ReadLoop() {
 
 		// TODO: error here should be checked in order to decrease reputation
 		// or blacklist spammers
-		_ = p.router.Collect(bytes.NewBuffer(message))
+		_ = p.router.Collect(message)
 	}
 }
 

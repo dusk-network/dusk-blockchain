@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
@@ -30,7 +30,7 @@ type Broker struct {
 	validHashes map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
-	candidateChan     <-chan Candidate
+	candidateChan     <-chan message.Candidate
 	getCandidateChan  <-chan rpcbus.Request
 }
 
@@ -51,7 +51,8 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	}
 
 	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
-	b.republisher = republisher.New(broker, topics.Candidate, Validate)
+	// TODO: interface - uncomment and change into interface/message
+	//b.republisher = republisher.New(broker, topics.Candidate, Validate)
 	return b
 }
 
@@ -73,16 +74,13 @@ func (b *Broker) Listen() {
 	}
 }
 
-func (b *Broker) AddValidHash(m bytes.Buffer) error {
-	hash := make([]byte, 32)
-	if err := encoding.Read256(&m, hash); err != nil {
-		return err
-	}
-
-	b.validHashes[string(hash)] = struct{}{}
+func (b *Broker) AddValidHash(m message.Message) error {
+	score := m.Payload().(message.Score)
+	b.validHashes[string(score.VoteHash)] = struct{}{}
 	return nil
 }
 
+// TODO: interface - get rid of encoding if not needed
 func (b *Broker) provideCandidate(r rpcbus.Request) {
 	cm := b.store.fetchCandidateMessage(r.Params.Bytes())
 	if cm == nil {
@@ -96,18 +94,17 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := Encode(buf, cm)
+	err := message.MarshalCandidate(buf, *cm)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
 
-func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
+// requestCandidate from peers around this node. The candidate can only be
+// requested for 2 rounds (which provides some protection from keeping to
+// request bulky stuff)
+func (b *Broker) requestCandidate(hash []byte) (*message.Candidate, error) {
 	// Send a request for this specific candidate
-	buf := bytes.NewBuffer(hash)
-	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
-		return nil, err
-	}
-
-	b.publisher.Publish(topics.Gossip, buf)
+	msg := message.New(topics.GetCandidate, bytes.NewBuffer(hash))
+	b.publisher.Publish(topics.Gossip, msg)
 
 	timer := time.NewTimer(2 * time.Second)
 	for {

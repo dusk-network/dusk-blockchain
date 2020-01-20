@@ -7,13 +7,13 @@ import (
 	"math/big"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
+	"github.com/dusk-network/dusk-wallet/block"
 	"github.com/dusk-network/dusk-wallet/key"
 )
-
-var _ wire.Event = (*Agreement)(nil)
 
 type (
 	// StepVotes represents the aggregated votes for one reduction step.
@@ -28,15 +28,57 @@ type (
 		Step      uint8
 	}
 
+	// StepVotesMsg is the internal message exchanged by the consensus
+	// components (through the signer.SendInternally method). It is not meant for
+	// external communications and therefore it does not have a
+	// Marshal/Unmarshal methods associated
+	StepVotesMsg struct {
+		hdr header.Header
+		StepVotes
+	}
+
 	// Agreement is the Event created at the end of the Reduction process. It includes
 	// the aggregated compressed signatures of all voters
 	Agreement struct {
-		header.Header
+		hdr          header.Header
 		signedVotes  []byte
 		VotesPerStep []*StepVotes
-		Repr      *big.Int
+		Repr         *big.Int
 	}
 )
+
+func NewStepVotesMsg(round uint64, hash []byte, sv StepVotes) StepVotesMsg {
+	return StepVotesMsg{
+		hdr: header.Header{
+			Step:      sv.Step,
+			Round:     round,
+			BlockHash: hash,
+		},
+		StepVotes: sv,
+	}
+}
+
+// State returns the Header without information about Sender (as this is only
+// for internal communications)
+func (s StepVotesMsg) State() header.Header {
+	return s.hdr
+}
+
+// IsEmpty returns whether the StepVotesMsg represents a failed convergence
+// attempt at consensus over a Reduction message
+func (s StepVotes) IsEmpty() bool {
+	return s.Apk == nil
+}
+
+// Header returns the message header. This is to comply to the
+// consensus.Message interface
+func (a Agreement) State() header.Header {
+	return a.hdr
+}
+
+func (a Agreement) Sender() []byte {
+	return a.hdr.Sender()
+}
 
 func (a Agreement) Cmp(other Agreement) int {
 	return a.Repr.Cmp(other.Repr)
@@ -51,17 +93,34 @@ func (a Agreement) SignedVotes() []byte {
 	return a.signedVotes
 }
 
-func (a Agreement) Sender() []byte {
-	return a.Header.Sender()
+func (a Agreement) Equal(aev Agreement) bool {
+	return a.Repr.Cmp(aev.Repr) == 0
 }
 
-func (a Agreement) Equal(ev wire.Event) bool {
-	aev, ok := ev.(Agreement)
-	if !ok {
-		return false
+// GenerateCertificate is used by the Chain component
+func (a Agreement) GenerateCertificate() *block.Certificate {
+	return &block.Certificate{
+		StepOneBatchedSig: a.VotesPerStep[0].Signature.Compress(),
+		StepTwoBatchedSig: a.VotesPerStep[1].Signature.Compress(),
+		Step:              a.State().Step,
+		StepOneCommittee:  a.VotesPerStep[0].BitSet,
+		StepTwoCommittee:  a.VotesPerStep[1].BitSet,
+	}
+}
+
+// UnmarshalAgreementMessage unmarshal a network inbound Agreement
+func UnmarshalAgreementMessage(r *bytes.Buffer, m SerializableMessage) error {
+	aggro := newAgreement()
+	if err := header.Unmarshal(r, &aggro.hdr); err != nil {
+		return err
 	}
 
-	return a.Header.Equal(aev.Header) && a.Repr.Cmp(aev.Repr) == 0
+	if err := UnmarshalAgreement(r, aggro); err != nil {
+		return err
+	}
+
+	m.SetPayload(aggro)
+	return nil
 }
 
 // NewStepVotes returns a new StepVotes structure for a given round, step and block hash
@@ -113,6 +172,10 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 
 // MarshalAgreement marshals an Agreement event into a buffer.
 func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
+	if err := header.Marshal(r, a.State()); err != nil {
+		return err
+	}
+
 	// Marshal BLS Signature of VoteSet
 	if err := encoding.WriteBLS(r, a.SignedVotes()); err != nil {
 		return err
@@ -146,18 +209,28 @@ func UnmarshalAgreement(r *bytes.Buffer, a *Agreement) error {
 	return nil
 }
 
-// NewAgreement returns an empty Agreement event.
-func NewAgreement(h header.Header) *Agreement {
+// NewAgreement returns an empty Agreement event. It is supposed to be used by
+// the (secondstep reducer) for creating Agreement messages
+func NewAgreement(hdr header.Header) *Agreement {
+	aggro := newAgreement()
+	aggro.hdr = hdr
+	return aggro
+}
+
+// newAgreement returns an empty Agreement event. It is used within the
+// UnmarshalAgreement function
+func newAgreement() *Agreement {
 	return &Agreement{
+		hdr:          header.Header{},
 		VotesPerStep: make([]*StepVotes, 2),
 		signedVotes:  make([]byte, 33),
-		Repr:      new(big.Int),
-		Header:       h,
+		Repr:         new(big.Int),
 	}
 }
 
-// Sign signs an aggregated agreement event
-func Sign(a *Agreement, keys key.ConsensusKeys) error {
+// SignAgreement signs an aggregated agreement event
+// XXX: either use this function or delete it!! Right now it is not used
+func SignAgreement(a *Agreement, keys key.ConsensusKeys) error {
 	buffer := new(bytes.Buffer)
 	if err := MarshalVotes(buffer, a.VotesPerStep); err != nil {
 		return err
@@ -264,4 +337,120 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 		return err
 	}
 	return nil
+}
+
+// MockAgreementEvent returns a mocked Agreement Event, to be used for testing purposes.
+// It includes a vararg iterativeIdx to help avoiding duplicates when testing
+func MockAgreement(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, p *user.Provisioners, iterativeIdx ...int) Agreement {
+	// Make sure we create an event made by an actual voting committee member
+	c := p.CreateVotingCommittee(round, step, len(keys))
+	cKeys := createCommitteeKeySet(c, keys)
+
+	idx := 0
+	if len(iterativeIdx) != 0 {
+		idx = iterativeIdx[0]
+	}
+
+	if idx > len(keys) {
+		panic("wrong iterative index: cannot iterate more than there are keys")
+	}
+
+	hdr := header.Header{Round: round, Step: step, BlockHash: hash, PubKeyBLS: cKeys[idx].BLSPubKeyBytes}
+	a := NewAgreement(hdr)
+
+	// generating reduction events (votes) and signing them
+	steps := GenVotes(hash, round, step, keys, p)
+
+	whole := new(bytes.Buffer)
+	if err := header.MarshalSignableVote(whole, a.State()); err != nil {
+		panic(err)
+	}
+
+	sig, _ := bls.Sign(cKeys[idx].BLSSecretKey, cKeys[idx].BLSPubKey, whole.Bytes())
+	a.VotesPerStep = steps
+	a.SetSignature(sig.Compress())
+	return *a
+}
+
+func MockCommitteeVoteSet(p *user.Provisioners, k []key.ConsensusKeys, hash []byte, committeeSize int, round uint64, step uint8) []Reduction {
+	c1 := p.CreateVotingCommittee(round, step-2, len(k))
+	c2 := p.CreateVotingCommittee(round, step-1, len(k))
+	cKeys1 := createCommitteeKeySet(c1, k)
+	cKeys2 := createCommitteeKeySet(c2, k)
+	events := createVoteSet(cKeys1, cKeys2, hash, len(cKeys1), round, step)
+	return events
+}
+
+// GenVotes randomly generates a slice of StepVotes with the indicated lenght.
+// Albeit random, the generation is consistent with the rules of Votes
+func GenVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, p *user.Provisioners) []*StepVotes {
+	if len(keys) < 2 {
+		panic("At least two votes are required to mock an Agreement")
+	}
+
+	// Create committee key sets
+	keySet1 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-2, len(keys)), keys)
+	keySet2 := createCommitteeKeySet(p.CreateVotingCommittee(round, step-1, len(keys)), keys)
+
+	stepVotes1, set1 := createStepVotesAndSet(hash, round, step-2, keySet1)
+	stepVotes2, set2 := createStepVotesAndSet(hash, round, step-1, keySet2)
+
+	bitSet1 := createBitSet(set1, round, step-2, len(keySet1), p)
+	stepVotes1.BitSet = bitSet1
+	bitSet2 := createBitSet(set2, round, step-1, len(keySet2), p)
+	stepVotes2.BitSet = bitSet2
+
+	return []*StepVotes{stepVotes1, stepVotes2}
+}
+
+func createBitSet(set sortedset.Set, round uint64, step uint8, size int, p *user.Provisioners) uint64 {
+	committee := p.CreateVotingCommittee(round, step, size)
+	return committee.Bits(set)
+}
+
+func createCommitteeKeySet(c user.VotingCommittee, k []key.ConsensusKeys) (keys []key.ConsensusKeys) {
+	committeeKeys := c.MemberKeys()
+
+	for _, cKey := range committeeKeys {
+		for _, key := range k {
+			if bytes.Equal(cKey, key.BLSPubKeyBytes) {
+				keys = append(keys, key)
+				break
+			}
+		}
+	}
+
+	return keys
+}
+
+func createStepVotesAndSet(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys) (*StepVotes, sortedset.Set) {
+	set := sortedset.New()
+	stepVotes := NewStepVotes()
+	for _, k := range keys {
+
+		// We should not aggregate any given key more than once.
+		_, inserted := set.IndexOf(k.BLSPubKeyBytes)
+		if !inserted {
+			h := header.Header{
+				BlockHash: hash,
+				Round:     round,
+				Step:      step,
+				PubKeyBLS: k.BLSPubKeyBytes,
+			}
+
+			r := new(bytes.Buffer)
+			if err := header.MarshalSignableVote(r, h); err != nil {
+				panic(err)
+			}
+
+			sigma, _ := bls.Sign(k.BLSSecretKey, k.BLSPubKey, r.Bytes())
+			if err := stepVotes.Add(sigma.Compress(), k.BLSPubKeyBytes, step); err != nil {
+				panic(err)
+			}
+		}
+
+		set.Insert(k.BLSPubKeyBytes)
+	}
+
+	return stepVotes, set
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
@@ -31,12 +32,13 @@ type messageRouter struct {
 	peerInfo string
 }
 
-func (m *messageRouter) Collect(b *bytes.Buffer) error {
-	topic, err := topics.Extract(b)
+func (m *messageRouter) Collect(packet []byte) error {
+	b := bytes.NewBuffer(packet)
+	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
 	}
-	m.route(topic, b)
+	m.route(*b, msg)
 	return nil
 }
 
@@ -54,40 +56,57 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
+// route accepts a message
+// TODO: interface - the re-marshalling and extraction of the Category is a distortion that will
+// go away as soon as using messages with struct Payload, instead of Buffer,
+// for internal communications
+func (m *messageRouter) route(b bytes.Buffer, msg message.Message) {
 	var err error
-	switch topic {
+	category := msg.Category()
+	switch category {
 	case topics.GetBlocks:
-		err = m.blockHashBroker.AdvertiseMissingBlocks(b)
+		topics.Extract(&b)
+		err = m.blockHashBroker.AdvertiseMissingBlocks(&b)
 	case topics.GetData:
-		err = m.dataBroker.SendItems(b)
+		topics.Extract(&b)
+		err = m.dataBroker.SendItems(&b)
 	case topics.MemPool:
+		topics.Extract(&b)
 		err = m.dataBroker.SendTxsItems()
 	case topics.Inv:
-		err = m.dataRequestor.RequestMissingItems(b)
+		topics.Extract(&b)
+		err = m.dataRequestor.RequestMissingItems(&b)
 	case topics.Block:
-		err = m.synchronizer.Synchronize(b, m.peerInfo)
+		topics.Extract(&b)
+		err = m.synchronizer.Synchronize(&b, m.peerInfo)
 	case topics.Ping:
+		topics.Extract(&b)
 		m.ponger.Pong()
 	case topics.Pong:
 		// Just here to avoid the error message, as pong is unroutable but
 		// otherwise carries no relevant information beyond the receiving
 		// of this message
 	case topics.GetRoundResults:
-		err = m.roundResultBroker.ProvideRoundResult(b)
+		topics.Extract(&b)
+		err = m.roundResultBroker.ProvideRoundResult(&b)
 	case topics.GetCandidate:
 		// We only accept a certain request once, to avoid infinitely
+		topics.Extract(&b)
 		// requesting the same block
-		if m.dupeMap.CanFwd(b) {
-			err = m.candidateBroker.ProvideCandidate(b)
+		// TODO: interface - buffer should be immutable. Change the dupemap to
+		// deal with values rather than reference
+		topics.Extract(&b)
+		if m.dupeMap.CanFwd(&b) {
+			err = m.candidateBroker.ProvideCandidate(&b)
 		}
 	default:
-		if m.CanRoute(topic) {
-			if m.dupeMap.CanFwd(b) {
-				m.publisher.Publish(topic, b)
+		topics.Extract(&b)
+		if m.CanRoute(category) {
+			if m.dupeMap.CanFwd(&b) {
+				m.publisher.Publish(category, msg)
 			}
 		} else {
-			err = fmt.Errorf("%s topic not routable", topic.String())
+			err = fmt.Errorf("%s topic not routable", category.String())
 		}
 	}
 
@@ -95,6 +114,6 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		log.WithFields(log.Fields{
 			"process": "peer",
 			"error":   err,
-		}).Errorf("problem handling message %s", topic.String())
+		}).Errorf("problem handling message %s", category.String())
 	}
 }

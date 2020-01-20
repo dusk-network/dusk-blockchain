@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -11,6 +12,10 @@ var _ consensus.Component = (*Generator)(nil)
 
 var emptyHash [32]byte
 var emptyPayload = new(bytes.Buffer)
+
+var genMessage = message.New(topics.Generation, nil)
+
+var restartFactory = consensus.Restarter{}
 
 // Generator is the component that signals a restart of score generation and selection
 // after a Restart Event is detected
@@ -47,6 +52,8 @@ func (g *Generator) ID() uint32 {
 }
 
 // Collect `Restart` events and triggers a Generation event
-func (g *Generator) Collect(ev consensus.Event) error {
-	return g.signer.SendInternally(topics.Generation, emptyHash[:], emptyPayload, g.ID())
+func (g *Generator) Collect(_ consensus.InternalPacket) error {
+	packet := g.signer.Compose(restartFactory)
+	msg := message.New(topics.Restart, packet)
+	return g.signer.SendInternally(topics.Generation, msg, g.ID())
 }

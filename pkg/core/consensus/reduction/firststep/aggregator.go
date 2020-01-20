@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -52,13 +51,14 @@ func newAggregator(
 // StepVotes/Set kept under the corresponding block hash. If the Set reaches or exceeds
 // quorum, the candidate block for the given block hash is first verified before
 // propagating the information to the Reducer.
-func (a *aggregator) collectVote(ev message.Reduction, hdr header.Header) error {
+func (a *aggregator) collectVote(ev message.Reduction) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.finished {
 		return nil
 	}
 
+	hdr := ev.State()
 	hash := string(hdr.BlockHash)
 	sv, found := a.voteSets[hash]
 	if !found {

@@ -1,8 +1,6 @@
 package mempool
 
 import (
-	"bytes"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -21,12 +19,8 @@ func initIntermediateBlockCollector(sub eventbus.Subscriber) chan block.Block {
 	return blkChan
 }
 
-func (i *intermediateBlockCollector) Collect(m bytes.Buffer) error {
-	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&m, blk); err != nil {
-		return err
-	}
-
+func (i *intermediateBlockCollector) Collect(blockMsg message.Message) error {
+	blk := blockMsg.Payload().(*block.Block)
 	i.blkChan <- *blk
 	return nil
 }

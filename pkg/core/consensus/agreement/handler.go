@@ -62,14 +62,15 @@ func (a *handler) Quorum(round uint64) int {
 
 // Verify checks the signature of the set.
 func (a *handler) Verify(ev message.Agreement) error {
+	hdr := ev.State()
 	if err := verifyWhole(ev); err != nil {
 		return err
 	}
 
 	allVoters := 0
 	for i, votes := range ev.VotesPerStep {
-		step := ev.Step - 2 + uint8(i)
-		committee := a.Committee(ev.Round, step)
+		step := hdr.Step - 2 + uint8(i)
+		committee := a.Committee(hdr.Round, step)
 		subcommittee := committee.IntersectCluster(votes.BitSet)
 
 		allVoters += subcommittee.TotalOccurrences()
@@ -78,24 +79,25 @@ func (a *handler) Verify(ev message.Agreement) error {
 			return err
 		}
 
-		if err := header.VerifySignatures(ev.Round, step, ev.BlockHash, apk, votes.Signature); err != nil {
+		if err := header.VerifySignatures(hdr.Round, step, hdr.BlockHash, apk, votes.Signature); err != nil {
 			return err
 		}
 	}
 
-	if allVoters < a.Quorum(ev.Round) {
-		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(ev.Round))
+	if allVoters < a.Quorum(hdr.Round) {
+		return fmt.Errorf("vote set too small - %v/%v", allVoters, a.Quorum(hdr.Round))
 	}
 	return nil
 }
 
 func verifyWhole(a message.Agreement) error {
+	hdr := a.State()
 	r := new(bytes.Buffer)
-	if err := header.MarshalSignableVote(r, a.Header); err != nil {
+	if err := header.MarshalSignableVote(r, hdr); err != nil {
 		return err
 	}
 
-	return msg.VerifyBLSSignature(a.Header.PubKeyBLS, r.Bytes(), a.SignedVotes())
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, r.Bytes(), a.SignedVotes())
 }
 
 // ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.

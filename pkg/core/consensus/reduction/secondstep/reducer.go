@@ -8,7 +8,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -92,24 +91,22 @@ func (r *Reducer) Finalize() {
 	r.timer.Stop()
 }
 
-func (r *Reducer) Collect(e consensus.Event) error {
-	ev := message.NewReduction()
-	if err := message.UnmarshalReduction(&e.Payload, ev); err != nil {
-		return err
-	}
+func (r *Reducer) Collect(e consensus.InternalPacket) error {
+	ev := e.(message.Reduction)
+	hdr := ev.State()
 
-	if err := r.handler.VerifySignature(e.Header, ev.SignedHash); err != nil {
+	if err := r.handler.VerifySignature(ev); err != nil {
 		return err
 	}
 
 	lg.WithFields(log.Fields{
-		"round":  e.Header.Round,
-		"step":   e.Header.Step,
-		"sender": hex.EncodeToString(e.Header.Sender()),
+		"round":  hdr.Round,
+		"step":   hdr.Step,
+		"sender": hex.EncodeToString(ev.Sender()),
 		"id":     r.reductionID,
-		"hash":   hex.EncodeToString(e.Header.BlockHash),
+		"hash":   hex.EncodeToString(hdr.BlockHash),
 	}).Debugln("received event")
-	return r.aggregator.collectVote(*ev, e.Header)
+	return r.aggregator.collectVote(ev)
 }
 
 // Filter an incoming Reduction message, by checking whether or not it was sent
@@ -118,25 +115,39 @@ func (r *Reducer) Filter(hdr header.Header) bool {
 	return !r.handler.IsMember(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 }
 
-func (r *Reducer) startReduction(sv *message.StepVotes) {
+func (r *Reducer) startReduction(sv message.StepVotesMsg) {
 	r.timer.Start(r.timeOut)
-	r.aggregator = newAggregator(r.Halt, r.handler, sv)
+	r.aggregator = newAggregator(r.Halt, r.handler, &sv.StepVotes)
 }
 
+// sendReduction creates a new Reduction message and Gossip it externally
+// TODO: interface - consider moving this function into the reduction/reducer
+// package
 func (r *Reducer) sendReduction(step uint8, hash []byte) error {
 	hdr := r.constructHeader(step, hash)
 	sig, err := r.signer.Sign(hdr)
 	if err != nil {
 		return err
 	}
+	red := message.NewReduction(hdr)
+	red.SignedHash = sig
 
 	payload := new(bytes.Buffer)
-	if err := encoding.WriteBLS(payload, sig); err != nil {
+	message.MarshalReduction(payload, *red)
+	// if err := encoding.WriteBLS(payload, sig); err != nil {
+	// 	lg.WithField("category", "BUG").WithError(err).Errorln("error in encoding BLS signature")
+	// 	return
+	// }
+
+	msg := message.New(topics.Reduction, payload)
+
+	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		return err
 	}
-
-	return r.signer.Gossip(topics.Reduction, hdr, payload, r.ID())
+	return nil
 }
+
+var restartFactory = consensus.Restarter{}
 
 // Halt is used by either the Aggregator in case of succesful reduction or the timer in case of a timeout.
 // In the latter case no agreement message is pushed forward
@@ -155,31 +166,29 @@ func (r *Reducer) Halt(hash []byte, b ...*message.StepVotes) {
 		r.timeOut = r.timeOut * 2
 	}
 
-	r.signer.SendInternally(topics.Restart, emptyHash[:], regenerationPackage, r.ID())
+	restart := r.signer.Compose(restartFactory)
+	msg := message.New(topics.Restart, restart)
+
+	r.signer.SendInternally(topics.Restart, msg, r.ID())
 }
 
 // CollectStepVotes is triggered when the first StepVotes get published by the
 // first step Reducer, and starts the second step of reduction.
-func (r *Reducer) CollectStepVotes(e consensus.Event) error {
+// If the first step did not have a winning block, we should get an empty
+// StepVotesMsg and run with it anyway (to keep the security assumptions of the
+// protocol right).
+func (r *Reducer) CollectStepVotes(e consensus.InternalPacket) error {
 	lg.WithField("id", r.reductionID).Traceln("starting reduction")
-	var sv *message.StepVotes
-
-	// If the first step did not have a winning block, we should get an empty buffer
-	if e.Payload.Len() > 0 {
-		// Otherwise though, we should retrieve the information
-		var err error
-		sv, err = message.UnmarshalStepVotes(&e.Payload)
-		if err != nil {
-			return err
-		}
-	}
-
+	sv := e.(message.StepVotesMsg)
+	hdr := sv.State()
 	r.startReduction(sv)
+	// fetch the right step
 	step := r.eventPlayer.Forward(r.ID())
 	r.eventPlayer.Play(r.reductionID)
 
 	if r.handler.AmMember(r.round, step) {
-		r.sendReduction(step, e.Header.BlockHash)
+		// propagating a new StepVoteMsg with the right step
+		r.sendReduction(step, hdr.BlockHash)
 	}
 	return nil
 }
@@ -193,19 +202,17 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVote
 	}
 
 	// then we create the full BLS signed Agreement
-	ev := message.Agreement{}
+	// XXX: the StepVotes are NOT signed (i.e. the message.SignAgreement is not used).
+	// This exposes the Agreement to some malleability attack. Double check
+	// this!!
+	ev := message.NewAgreement(hdr)
 	ev.SetSignature(sig)
 	ev.VotesPerStep = svs
 
-	eventBuf := new(bytes.Buffer)
-	if err := message.MarshalAgreement(eventBuf, ev); err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("cannot marshal the agreement")
-		return
-	}
-
+	msg := message.New(topics.Agreement, ev)
 	// then we forward the marshalled Agreement to the store to be sent
-	if err := r.signer.Gossip(topics.Agreement, hdr, eventBuf, r.ID()); err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("error in Ed25519 signing and gossip the agreement")
+	if err := r.signer.Gossip(msg, r.ID()); err != nil {
+		lg.WithField("category", "BUG").WithError(err).Errorln("error in gossiping the agreement")
 	}
 }
 

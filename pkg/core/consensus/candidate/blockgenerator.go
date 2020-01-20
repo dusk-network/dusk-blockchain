@@ -8,8 +8,6 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -76,44 +74,37 @@ func (bg *Generator) ID() uint32 {
 // Finalize implements consensus.Component
 func (bg *Generator) Finalize() {}
 
-// Collect a ScoreEvent, which triggers generation of a candidate block.
+type ScoreFactory struct {
+	sp       message.ScoreProposal
+	prevHash []byte
+	voteHash []byte
+}
+
+func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus.InternalPacket {
+	hdr := sf.sp.State()
+	if hdr.Round != round || hdr.Step != step {
+		lg.Panicf("mismatche of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
+	}
+	return message.NewScore(sf.sp, sender, sf.prevHash, sf.voteHash)
+}
+
+// Collect a `ScoreProposal`, which triggers generation of a `Score` and a
+// candidate `block.Block`
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *Generator) Collect(e consensus.Event) error {
-	sev := &score.Event{}
-	if err := score.Unmarshal(&e.Payload, sev); err != nil {
-		return err
-	}
+func (bg *Generator) Collect(e consensus.InternalPacket) error {
+	sev := e.(message.ScoreProposal)
 
-	blk, err := bg.Generate(*sev)
+	blk, err := bg.Generate(sev)
 	if err != nil {
 		return err
 	}
 
-	score := &message.Score{
-		Score:         sev.Proof.Score,
-		Proof:         sev.Proof.Proof,
-		Z:             sev.Proof.Z,
-		BidListSubset: sev.Proof.BinaryBidList,
-		PrevHash:      bg.roundInfo.Hash,
-		Seed:          sev.Seed,
-		VoteHash:      blk.Header.Hash,
-	}
-
-	scoreBuf := new(bytes.Buffer)
-	if err := message.MarshalScore(scoreBuf, score); err != nil {
-		return err
-	}
-
+	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, blk.Header.Hash}
+	score := bg.signer.Compose(scoreFactory)
 	lg.Debugln("sending score")
-	hdr := header.Header{
-		Round:     e.Header.Round,
-		Step:      e.Header.Step,
-		PubKeyBLS: e.Header.PubKeyBLS,
-		BlockHash: blk.Header.Hash,
-	}
-
-	if err := bg.signer.Gossip(topics.Score, hdr, scoreBuf, bg.ID()); err != nil {
+	msg := message.New(topics.Score, score)
+	if err := bg.signer.Gossip(msg, bg.ID()); err != nil {
 		return err
 	}
 
@@ -140,12 +131,12 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
-	bg.publisher.Publish(topics.Gossip, buf)
-	return nil
+	candidateMsg := message.New(topics.Candidate, buf)
+	return bg.signer.Gossip(candidateMsg, bg.ID())
 }
 
-func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {
-	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof.Proof, sev.Proof.Score, bg.roundInfo.Hash)
+func (bg *Generator) Generate(sev message.ScoreProposal) (*block.Block, error) {
+	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof, sev.Score, bg.roundInfo.Hash)
 }
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it

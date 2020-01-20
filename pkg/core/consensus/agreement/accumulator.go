@@ -50,8 +50,9 @@ func (a *Accumulator) Process(ev message.Agreement) {
 // Accumulate agreements per block hash until a quorum is reached or a stop is detected (by closing the internal event channel). Supposed to run in a goroutine
 func (a *Accumulator) Accumulate() {
 	for ev := range a.eventChan {
-		collected := a.store.Get(ev.Step)
-		weight := a.handler.VotesFor(ev.PubKeyBLS, ev.Round, ev.Step)
+		hdr := ev.State()
+		collected := a.store.Get(hdr.Step)
+		weight := a.handler.VotesFor(hdr.PubKeyBLS, hdr.Round, hdr.Step)
 		count := a.store.Insert(ev, weight)
 		if count == len(collected) {
 			lg.Warnln("Agreement was not accumulated since it is a duplicate")
@@ -60,10 +61,10 @@ func (a *Accumulator) Accumulate() {
 
 		lg.WithFields(log.Fields{
 			"count":  count,
-			"quorum": a.handler.Quorum(ev.Round),
+			"quorum": a.handler.Quorum(hdr.Round),
 		}).Debugln("collected agreement")
-		if count >= a.handler.Quorum(ev.Round) {
-			votes := a.store.Get(ev.Step)
+		if count >= a.handler.Quorum(hdr.Round) {
+			votes := a.store.Get(hdr.Step)
 			a.CollectedVotesChan <- votes
 			return
 		}

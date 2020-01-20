@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -118,7 +119,8 @@ func (l *LogProcessor) Send(entry []byte) error {
 // ReportError publishes an error on the MonitorTopic
 func (l *LogProcessor) ReportError(bErr byte, err error) {
 	b := bytes.NewBuffer([]byte{bErr})
-	l.p.Publish(topics.Monitor, b)
+	msg := message.New(topics.Monitor, b)
+	l.p.Publish(topics.Monitor, msg)
 }
 
 // WithTime decorates the log with time info
