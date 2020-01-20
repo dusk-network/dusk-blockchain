@@ -71,14 +71,13 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, serviceFlag protocol.ServiceFlag) *Writer {
+func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber) *Writer {
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:   conn,
 			gossip: gossip,
 		},
-		subscriber:  subscriber,
-		ServiceFlag: serviceFlag,
+		subscriber: subscriber,
 	}
 
 	return pw
@@ -86,28 +85,14 @@ func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Sub
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}, serviceFlag protocol.ServiceFlag) (*Reader, error) {
-	_, db := heavy.CreateDBConnection()
-	pconn := &Connection{
-		Conn:   conn,
-		gossip: gossip,
+func NewReader(conn net.Conn, gossip *processing.Gossip, exitChan chan<- struct{}) *Reader {
+	return &Reader{
+		Connection: &Connection{
+			Conn:   conn,
+			gossip: gossip,
+		},
+		exitChan: exitChan,
 	}
-
-	reader := &Reader{
-		Connection: pconn,
-		router:     newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, pconn.RemoteAddr().String(), serviceFlag),
-		exitChan:   exitChan,
-	}
-
-	// On each new connection the node sends topics.Mempool to retrieve mempool
-	// txs from the new peer
-	go func() {
-		if err := reader.router.dataRequestor.RequestMempoolItems(); err != nil {
-			l.WithError(err).Warnln("error sending topics.Mempool message")
-		}
-	}()
-
-	return reader, nil
 }
 
 // ReadMessage reads from the connection
@@ -128,27 +113,30 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
-func (p *Writer) Connect() error {
-	if err := p.Handshake(); err != nil {
+func (p *Writer) Connect() (protocol.ServiceFlag, error) {
+	serviceFlag, err := p.Handshake()
+	if err != nil {
 		p.Conn.Close()
-		return err
+		return 0, err
 	}
 
-	return nil
+	return serviceFlag, nil
 }
 
 // Accept will perform the protocol handshake with the peer.
-func (p *Reader) Accept() error {
-	if err := p.Handshake(); err != nil {
+func (p *Reader) Accept() (protocol.ServiceFlag, error) {
+	serviceFlag, err := p.Handshake()
+	if err != nil {
 		p.Conn.Close()
-		return err
+		return 0, err
 	}
 
-	return nil
+	return serviceFlag, nil
 }
 
 // Serve utilizes two different methods for writing to the open connection
-func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
+func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}, serviceFlag protocol.ServiceFlag) {
+	w.ServiceFlag = serviceFlag
 
 	defer w.onDisconnect()
 
@@ -218,6 +206,23 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 			return
 		}
 	}
+}
+
+func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, serviceFlag protocol.ServiceFlag) {
+	_, db := heavy.CreateDBConnection()
+	p.router = newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String(), serviceFlag)
+
+	// On each new connection the node sends topics.Mempool to retrieve mempool
+	// txs from the new peer
+	if serviceFlag == protocol.FullNode {
+		go func() {
+			if err := p.router.dataRequestor.RequestMempoolItems(); err != nil {
+				l.WithError(err).Warnln("error sending topics.Mempool message")
+			}
+		}()
+	}
+
+	p.ReadLoop()
 }
 
 // ReadLoop will block on the read until a message is read, or until the deadline

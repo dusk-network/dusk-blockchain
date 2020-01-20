@@ -46,17 +46,14 @@ func TestReader(t *testing.T) {
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
-	peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, chainsync.NewCounter(eb), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	peerReader := helper.StartPeerReader(srv)
 
 	// Our message should come in on the agreement topic
 	agreementChan := make(chan bytes.Buffer, 1)
 	l := eventbus.NewChanListener(agreementChan)
 	eb.Subscribe(topics.Agreement, l)
 
-	go peerReader.ReadLoop()
+	go peerReader.Listen(eb, dupemap.NewDupeMap(0), rpcBus, chainsync.NewCounter(eb), nil, protocol.FullNode)
 
 	// We should get the message through this channel
 	<-agreementChan
@@ -91,7 +88,7 @@ func TestWriteLoop(t *testing.T) {
 	go func(g *processing.Gossip) {
 		responseChan := make(chan *bytes.Buffer)
 		writer := peer.NewWriter(client, g, bus)
-		go writer.Serve(responseChan, make(chan struct{}, 1))
+		go writer.Serve(responseChan, make(chan struct{}, 1), protocol.FullNode)
 
 		bufCopy := *buf
 		responseChan <- &bufCopy
@@ -118,20 +115,17 @@ func TestPingLoop(t *testing.T) {
 
 	responseChan := make(chan *bytes.Buffer, 10)
 	writer := peer.NewWriter(client, processing.NewGossip(protocol.TestNet), bus)
-	go writer.Serve(responseChan, make(chan struct{}, 1))
+	go writer.Serve(responseChan, make(chan struct{}, 1), protocol.FullNode)
 
 	// Set up the other end of the exchange
 	responseChan2 := make(chan *bytes.Buffer, 10)
 	writer2 := peer.NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
-	go writer2.Serve(responseChan2, make(chan struct{}, 1))
+	go writer2.Serve(responseChan2, make(chan struct{}, 1), protocol.FullNode)
 	// Give the goroutine some time to start
 	time.Sleep(100 * time.Millisecond)
 
-	reader, err := peer.NewReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan2, make(chan struct{}, 1))
-	if err != nil {
-		t.Fatal(err)
-	}
-	go reader.ReadLoop()
+	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
+	go reader.Listen(bus, dupemap.NewDupeMap(0), rpcbus.New(), &chainsync.Counter{}, responseChan2, protocol.FullNode)
 
 	// We should eventually get a pong message out of responseChan2
 	buf := <-responseChan2
