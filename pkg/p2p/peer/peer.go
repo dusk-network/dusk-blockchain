@@ -40,9 +40,16 @@ type Connection struct {
 type GossipConnector struct {
 	gossip *processing.Gossip
 	*Connection
+	protocol.ServiceFlag
 }
 
 func (g *GossipConnector) Write(b []byte) (int, error) {
+	// Preliminary check, to ensure we don't send messages to
+	// nodes who aren't interested in them.
+	if !g.canSend(b[0]) {
+		return 0, nil
+	}
+
 	buf := bytes.NewBuffer(b)
 	if err := g.gossip.Process(buf); err != nil {
 		return 0, err
@@ -51,13 +58,25 @@ func (g *GossipConnector) Write(b []byte) (int, error) {
 	return g.Connection.Write(buf.Bytes())
 }
 
+func (g *GossipConnector) canSend(topicByte byte) bool {
+	if g.ServiceFlag == protocol.FullNode {
+		return true
+	}
+
+	switch topics.Topic(topicByte) {
+	case topics.Block, topics.Inv:
+		return true
+	default:
+		return false
+	}
+}
+
 // Writer abstracts all of the logic and fields needed to write messages to
 // other network nodes.
 type Writer struct {
 	*Connection
 	subscriber eventbus.Subscriber
 	gossipID   uint32
-	protocol.ServiceFlag
 }
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -136,8 +155,6 @@ func (p *Reader) Accept() (protocol.ServiceFlag, error) {
 
 // Serve utilizes two different methods for writing to the open connection
 func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}, serviceFlag protocol.ServiceFlag) {
-	w.ServiceFlag = serviceFlag
-
 	defer w.onDisconnect()
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
