@@ -159,7 +159,7 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	g := &GossipConnector{w.gossip, w.Connection}
+	g := &GossipConnector{w.gossip, w.Connection, serviceFlag}
 	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
 	// Ping loop - ensures connection stays alive during quiet periods
