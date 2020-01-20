@@ -19,8 +19,8 @@ type handler func(*Server, []string) (string, error)
 
 var (
 
-	// rpcCmd maps method names to their actual functions.
-	rpcCmd = map[string]handler{
+	// Commands maps method names to their actual functions.
+	Commands = map[string]handler{
 		"transfer":             transfer,
 		"bid":                  sendBidTx,
 		"stake":                sendStakeTx,
