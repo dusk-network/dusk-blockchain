@@ -278,7 +278,12 @@ func (t *transaction) StoreBidValues(d, k []byte) error {
 
 func (t *transaction) FetchBidValues() ([]byte, []byte, error) {
 	bidKey := toKey([]byte("bidvalues"))
-	return t.db.storage[bidValuesInd][bidKey][0:32], t.db.storage[bidValuesInd][bidKey][32:64], nil
+	values, ok := t.db.storage[bidValuesInd][bidKey]
+	if !ok || len(values) == 0 {
+		return nil, nil, errors.New("no bid values")
+	}
+
+	return values[0:32], values[32:64], nil
 }
 
 // FetchBlockHeightSince uses binary search to find a block height
