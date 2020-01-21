@@ -197,11 +197,14 @@ func TestLightNode(t *testing.T) {
 	bus, rb := eventbus.New(), rpcbus.New()
 	respondToGetLastBlock(rb)
 	client, srv := net.Pipe()
+
+	// Channels for monitoring the event bus
 	agChan := make(chan bytes.Buffer, 1)
 	bus.Subscribe(topics.Agreement, eventbus.NewChanListener(agChan))
 	blkChan := make(chan bytes.Buffer, 1)
 	bus.Subscribe(topics.Block, eventbus.NewChanListener(blkChan))
 
+	// Setting up the peer
 	responseChan := make(chan *bytes.Buffer, 10)
 	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
 	go reader.Listen(bus, dupemap.NewDupeMap(0), rb, &chainsync.Counter{}, responseChan, protocol.FullNode)
