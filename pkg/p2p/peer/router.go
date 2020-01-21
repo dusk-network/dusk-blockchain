@@ -38,8 +38,7 @@ func (m *messageRouter) Collect(packet []byte) error {
 	if err != nil {
 		return err
 	}
-	m.route(*b, msg)
-	return nil
+	return m.route(*b, msg)
 }
 
 func (m *messageRouter) CanRoute(topic topics.Topic) bool {
@@ -56,11 +55,7 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-// route accepts a message
-// TODO: interface - the re-marshalling and extraction of the Category is a distortion that will
-// go away as soon as using messages with struct Payload, instead of Buffer,
-// for internal communications
-func (m *messageRouter) route(b bytes.Buffer, msg message.Message) {
+func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 	var err error
 	category := msg.Category()
 	switch category {
@@ -91,7 +86,6 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) {
 		err = m.roundResultBroker.ProvideRoundResult(&b)
 	case topics.GetCandidate:
 		// We only accept a certain request once, to avoid infinitely
-		topics.Extract(&b)
 		// requesting the same block
 		// TODO: interface - buffer should be immutable. Change the dupemap to
 		// deal with values rather than reference
@@ -115,5 +109,7 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) {
 			"process": "peer",
 			"error":   err,
 		}).Errorf("problem handling message %s", category.String())
+		return err
 	}
+	return nil
 }
