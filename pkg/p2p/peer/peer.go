@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
@@ -24,6 +25,13 @@ import (
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer
 
 var l *log.Entry = log.WithField("process", "peer")
+
+// Router is an abstraction over the message router used by a
+// peer.Reader.
+type Router interface {
+	// Collect a message and route it to the proper component.
+	Collect(*bytes.Buffer) error
+}
 
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 // The `net.Conn` is guarded by a mutex, to allow both multicast and one-to-one
@@ -83,7 +91,7 @@ type Writer struct {
 // other network nodes.
 type Reader struct {
 	*Connection
-	router   *messageRouter
+	router   Router
 	exitChan chan<- struct{} // Way to kill the WriteLoop
 }
 
@@ -225,26 +233,34 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 	}
 }
 
+// Listen will set up the correct router for the peer, and starts
+// listening for messages.
+// Should be called in a go-routine, after a successful handshake with
+// a peer.
 func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, serviceFlag protocol.ServiceFlag) {
 	_, db := heavy.CreateDBConnection()
-	p.router = newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String(), serviceFlag)
+	if !config.Get().General.WalletOnly {
+		router := newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String(), serviceFlag)
+		p.router = router
 
-	// On each new connection the node sends topics.Mempool to retrieve mempool
-	// txs from the new peer
-	if serviceFlag == protocol.FullNode {
-		go func() {
-			if err := p.router.dataRequestor.RequestMempoolItems(); err != nil {
-				l.WithError(err).Warnln("error sending topics.Mempool message")
-			}
-		}()
+		// On each new connection the node sends topics.Mempool to
+		// retrieve mempool txs from the new peer
+		if serviceFlag == protocol.FullNode {
+			go func() {
+				if err := router.dataRequestor.RequestMempoolItems(); err != nil {
+					l.WithError(err).Warnln("error sending topics.Mempool message")
+				}
+			}()
+		}
+	} else {
+		p.router = newLightRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String())
 	}
 
 	p.ReadLoop()
 }
 
 // ReadLoop will block on the read until a message is read, or until the deadline
-// is reached. Should be called in a go-routine, after a successful handshake with
-// a peer. Eventual duplicated messages are silently discarded.
+// is reached. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
 	defer p.Conn.Close()
 	defer func() {
