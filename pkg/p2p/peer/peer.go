@@ -253,7 +253,7 @@ func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, 
 			}()
 		}
 	} else {
-		p.router = newLightRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String())
+		p.router = newLightRouter(publisher, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String())
 	}
 
 	p.ReadLoop()

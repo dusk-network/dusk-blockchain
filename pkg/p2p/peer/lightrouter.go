@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
@@ -17,7 +16,6 @@ import (
 
 type lightRouter struct {
 	publisher eventbus.Publisher
-	dupeMap   *dupemap.DupeMap
 
 	dataRequestor *responding.DataRequestor
 	synchronizer  *chainsync.ChainSynchronizer
@@ -26,10 +24,9 @@ type lightRouter struct {
 	peerInfo string
 }
 
-func newLightRouter(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, db database.DB, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, peerInfo string) *lightRouter {
+func newLightRouter(publisher eventbus.Publisher, db database.DB, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, peerInfo string) *lightRouter {
 	return &lightRouter{
 		publisher:     publisher,
-		dupeMap:       dupeMap,
 		dataRequestor: responding.NewDataRequestor(db, rpcBus, responseChan),
 		synchronizer:  chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
 		ponger:        processing.NewPonger(responseChan),
