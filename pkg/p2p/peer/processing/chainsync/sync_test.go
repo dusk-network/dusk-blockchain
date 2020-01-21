@@ -6,7 +6,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -19,7 +18,7 @@ import (
 func TestSynchronizeBehind(t *testing.T) {
 	cs, eb, responseChan := setupSynchronizer(t)
 	// Create a listener for HighestSeen topic
-	highestSeenChan := make(chan bytes.Buffer, 1)
+	highestSeenChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.HighestSeen, eventbus.NewChanListener(highestSeenChan))
 
 	// Create a block that is a few rounds in the future
@@ -40,9 +39,9 @@ func TestSynchronizeBehind(t *testing.T) {
 	}
 
 	// Check highest seen
-	m := <-highestSeenChan
-	var highestSeenHeight uint64
-	assert.NoError(t, encoding.ReadUint64LE(&m, &highestSeenHeight))
+	highestSeenHeightMsg := <-highestSeenChan
+	highestSeenHeight := highestSeenHeightMsg.Payload().(uint64)
+
 	assert.Equal(t, highestSeenHeight, height)
 }
 
@@ -52,7 +51,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	cs, eb, _ := setupSynchronizer(t)
 
 	// subscribe to topics.Block
-	blockChan := make(chan bytes.Buffer, 1)
+	blockChan := make(chan message.Message, 1)
 	listener := eventbus.NewChanListener(blockChan)
 	_ = eb.Subscribe(topics.Block, listener)
 
