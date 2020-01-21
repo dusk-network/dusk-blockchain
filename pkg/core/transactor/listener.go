@@ -26,6 +26,7 @@ var (
 
 	errWalletNotLoaded     = errors.New("wallet is not loaded yet")
 	errWalletAlreadyLoaded = errors.New("wallet is already loaded")
+	errNotAvailable        = errors.New("command not available in light-node mode")
 )
 
 func (t *Transactor) Listen() {
@@ -248,6 +249,10 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
+	if t.walletOnly {
+		return errNotAvailable
+	}
+
 	// read tx parameters
 	var amount uint64
 	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
@@ -286,6 +291,10 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 
 	if t.w == nil {
 		return errWalletNotLoaded
+	}
+
+	if t.walletOnly {
+		return errNotAvailable
 	}
 
 	// read tx parameters
@@ -385,6 +394,10 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
+	if t.walletOnly {
+		return errNotAvailable
+	}
+
 	// Retrieve mempool txs
 	txsBuf, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
@@ -423,6 +436,14 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 }
 
 func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	if t.walletOnly {
+		return errNotAvailable
+	}
+
 	if err := t.launchMaintainer(); err != nil {
 		return err
 	}

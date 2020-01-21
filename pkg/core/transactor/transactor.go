@@ -154,10 +154,6 @@ func (t *Transactor) Wallet() (*wallet.Wallet, error) {
 }
 
 func (t *Transactor) launchMaintainer() error {
-	if t.w == nil {
-		return errWalletNotLoaded
-	}
-
 	if t.maintainerStarted {
 		return errors.New("consensus transactions are already being automated")
 	}
