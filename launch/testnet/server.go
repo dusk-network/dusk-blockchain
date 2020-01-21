@@ -44,8 +44,11 @@ func Setup() *Server {
 	// creating the rpcbus
 	rpcBus := rpcbus.New()
 
-	m := mempool.NewMempool(eventBus, rpcBus, nil)
-	m.Run()
+	// Light nodes don't need to keep a mempool
+	if !cfg.Get().General.WalletOnly {
+		m := mempool.NewMempool(eventBus, rpcBus, nil)
+		m.Run()
+	}
 
 	// creating and firing up the chain process
 	chain, err := chain.New(eventBus, rpcBus, counter)
@@ -54,9 +57,11 @@ func Setup() *Server {
 	}
 	go chain.Listen()
 
-	// Setting up the candidate broker
-	candidateBroker := candidate.NewBroker(eventBus, rpcBus)
-	go candidateBroker.Listen()
+	if !cfg.Get().General.WalletOnly {
+		// Setting up the candidate broker
+		candidateBroker := candidate.NewBroker(eventBus, rpcBus)
+		go candidateBroker.Listen()
+	}
 
 	// Setting up a dupemap
 	dupeBlacklist := launchDupeMap(eventBus)
