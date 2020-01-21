@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
@@ -64,6 +65,10 @@ func (d *DataRequestor) RequestMissingItems(m *bytes.Buffer) error {
 			}
 
 		case peermsg.InvTypeMempoolTx:
+			// Light nodes don't care about transactions
+			if config.Get().General.WalletOnly {
+				return nil
+			}
 
 			txs, _ := GetMempoolTxs(d.rpcBus, obj.Hash)
 			if len(txs) == 0 {
