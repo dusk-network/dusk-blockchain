@@ -197,11 +197,10 @@ func (c *Chain) Close() error {
 }
 
 func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
-	// Ignore blocks from peers if we are only one behind - we are most
-	// likely just about to finalize consensus.
-	// TODO: we should probably just accept it if consensus was not
-	// started yet
-	if !c.counter.IsSyncing() {
+	// Ignore blocks from peers if we are only one behind, and in
+	// full-node mode - we are most likely just about to finalize
+	// consensus.
+	if !cfg.Get().General.WalletOnly && !c.counter.IsSyncing() {
 		return nil
 	}
 
@@ -219,10 +218,10 @@ func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 		return err
 	}
 
-	// If we are no longer syncing after accepting this block,
-	// request a certificate and intermediate block for the
-	// second to last round.
-	if !c.counter.IsSyncing() {
+	// If we are no longer syncing after accepting this block, and
+	// we are in full-node mode, request a certificate and
+	// intermediate block for the second to last round.
+	if !cfg.Get().General.WalletOnly && !c.counter.IsSyncing() {
 		blk, cert, err := c.requestRoundResults(blk.Header.Height + 1)
 		if err != nil {
 			return err
