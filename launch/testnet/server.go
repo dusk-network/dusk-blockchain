@@ -57,8 +57,8 @@ func Setup() *Server {
 	}
 	go chain.Listen()
 
+	// Light nodes don't need a candidate broker either
 	if !cfg.Get().General.WalletOnly {
-		// Setting up the candidate broker
 		candidateBroker := candidate.NewBroker(eventBus, rpcBus)
 		go candidateBroker.Listen()
 	}
