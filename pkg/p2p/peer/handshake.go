@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
@@ -146,7 +147,12 @@ func (p *Connection) writeVerAck(g *processing.Gossip) error {
 
 func (p *Connection) createVersionBuffer() (*bytes.Buffer, error) {
 	version := protocol.NodeVer
-	message, err := newVersionMessageBuffer(version, protocol.FullNode)
+	serviceFlag := protocol.FullNode
+	if config.Get().General.WalletOnly {
+		serviceFlag = protocol.LightNode
+	}
+
+	message, err := newVersionMessageBuffer(version, serviceFlag)
 	if err != nil {
 		return nil, err
 	}
