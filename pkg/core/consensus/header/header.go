@@ -4,10 +4,14 @@ package header
 
 import (
 	"bytes"
+	"encoding/binary"
+	"math/rand"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/bls"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
+	"github.com/dusk-network/dusk-wallet/key"
 )
 
 type (
@@ -36,6 +40,15 @@ const (
 	// After indicates that the header indicates a future event
 	After
 )
+
+func New() Header {
+	return Header{
+		PubKeyBLS: make([]byte, 33),
+		Round:     uint64(0),
+		Step:      uint8(0),
+		BlockHash: make([]byte, 32),
+	}
+}
 
 // State returns the Header struct itself. It is mandate by the
 // consensus.InternalPacket interface
@@ -90,13 +103,12 @@ func (h Header) Equal(e wire.Event) bool {
 }
 
 // Marshal a Header into a Buffer.
-func Marshal(r *bytes.Buffer, ev wire.Event) error {
-	consensusEv := ev.(Header)
-	if err := encoding.WriteVarBytes(r, consensusEv.PubKeyBLS); err != nil {
+func Marshal(r *bytes.Buffer, ev Header) error {
+	if err := encoding.WriteVarBytes(r, ev.PubKeyBLS); err != nil {
 		return err
 	}
 
-	return MarshalFields(r, consensusEv)
+	return MarshalFields(r, ev)
 }
 
 // Compose is useful when header information is cached and there is an opportunity to avoid unnecessary allocations
@@ -113,15 +125,13 @@ func Compose(blsPubKey bytes.Buffer, phase bytes.Buffer, hash []byte) (bytes.Buf
 }
 
 // Unmarshal unmarshals the buffer into a Header.
-func Unmarshal(r *bytes.Buffer, ev wire.Event) error {
-	consensusEv := ev.(*Header)
-
+func Unmarshal(r *bytes.Buffer, ev *Header) error {
 	// Decoding PubKey BLS
-	if err := encoding.ReadVarBytes(r, &consensusEv.PubKeyBLS); err != nil {
+	if err := encoding.ReadVarBytes(r, &ev.PubKeyBLS); err != nil {
 		return err
 	}
 
-	return UnmarshalFields(r, consensusEv)
+	return UnmarshalFields(r, ev)
 }
 
 // MarshalFields marshals the core field of the Header (i.e. Round, Step and BlockHash)
@@ -173,4 +183,21 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 	}
 
 	return bls.Verify(apk, signed.Bytes(), sig)
+}
+
+func Mock() Header {
+	hash, _ := crypto.RandEntropy(32)
+	k, _ := key.NewRandConsensusKeys()
+	pubkey := k.BLSPubKeyBytes
+	buf := make([]byte, 8)
+	rand.Read(buf)
+	round := binary.LittleEndian.Uint64(buf)
+	step := rand.Intn(8)
+
+	return Header{
+		BlockHash: hash,
+		Round:     round,
+		Step:      uint8(step),
+		PubKeyBLS: pubkey,
+	}
 }
