@@ -67,7 +67,7 @@ func (d *DataRequestor) RequestMissingItems(m *bytes.Buffer) error {
 		case peermsg.InvTypeMempoolTx:
 			// Light nodes don't care about transactions
 			if config.Get().General.WalletOnly {
-				return nil
+				continue
 			}
 
 			txs, _ := GetMempoolTxs(d.rpcBus, obj.Hash)
