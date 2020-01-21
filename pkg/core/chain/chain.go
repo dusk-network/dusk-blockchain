@@ -293,11 +293,13 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 
 	c.prevBlock = blk
 
-	// 5. Gossip advertise block Hash
-	l.Trace("gossiping block")
-	if err := c.advertiseBlock(blk); err != nil {
-		l.WithError(err).Errorln("block advertising failed")
-		return err
+	// 5. Gossip advertise block Hash -- Only in full-node mode
+	if !cfg.Get().General.WalletOnly {
+		l.Trace("gossiping block")
+		if err := c.advertiseBlock(blk); err != nil {
+			l.WithError(err).Errorln("block advertising failed")
+			return err
+		}
 	}
 
 	// 6. Remove expired provisioners and bids
