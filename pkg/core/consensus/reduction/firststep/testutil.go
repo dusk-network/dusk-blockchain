@@ -105,7 +105,6 @@ func (hlp *Helper) createResultChan() {
 func (hlp *Helper) ActivateReduction(hash []byte) {
 	hlp.CollectionWaitGroup.Wait()
 	hdr := header.Header{BlockHash: hash, Round: hlp.Round, Step: hlp.Step(), PubKeyBLS: hlp.PubKeyBLS}
-	// TODO: interface - CONTINUE FROM HERE!
 	hlp.Reducer.(*Reducer).CollectBestScore(hdr)
 }
 

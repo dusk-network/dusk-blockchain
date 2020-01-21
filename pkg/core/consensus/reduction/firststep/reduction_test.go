@@ -2,6 +2,7 @@ package firststep
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,14 +21,20 @@ func TestFirstStep(t *testing.T) {
 	assert.Equal(t, uint8(1), hlp.Step())
 
 	// Wait for resulting StepVotes
-	svBuf := <-hlp.StepVotesChan
+	svMsg := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes
-	sv, err := message.UnmarshalStepVotes(&svBuf)
-	assert.NoError(t, err)
+	svm := svMsg.Payload().(message.StepVotesMsg)
 
+	if !assert.True(t, bytes.Equal(hash, svm.State().BlockHash)) {
+		t.FailNow()
+	}
+
+	fmt.Println(svm.State())
 	// StepVotes should be valid
-	assert.NoError(t, hlp.Verify(hash, sv, 1))
+	if !assert.NoError(t, hlp.Verify(hash, svm.StepVotes, 1)) {
+		t.FailNow()
+	}
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State())
 	// test that the timeout is still 1 second
@@ -42,11 +49,10 @@ func TestMoreSteps(t *testing.T) {
 	<-hlp.StepVotesChan
 
 	hash = hlp.NextBatch()
-	svBuf := <-hlp.StepVotesChan
+	svMsg := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes
-	sv, err := message.UnmarshalStepVotes(&svBuf)
-	assert.NoError(t, err)
+	sv := svMsg.Payload().(message.StepVotes)
 
 	// StepVotes should be valid
 	assert.NoError(t, hlp.Verify(hash, sv, 2))
@@ -64,9 +70,13 @@ func TestFirstStepTimeOut(t *testing.T) {
 	hlp, _ := Kickstart(bus, rpcBus, 50, timeOut)
 
 	// Wait for resulting StepVotes
-	svBuf := <-hlp.StepVotesChan
-	// test we get an empty buffer
-	assert.Equal(t, bytes.Buffer{}, svBuf)
+	svMsg := <-hlp.StepVotesChan
+	svm := svMsg.Payload().(message.StepVotesMsg)
+
+	if !assert.True(t, svm.IsEmpty()) {
+		t.FailNow()
+	}
+
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(1), hlp.Step())
 	// test that the Player is PAUSED

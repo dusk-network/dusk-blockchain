@@ -157,7 +157,7 @@ func (s StepVotesMsgFactory) Create(sender []byte, round uint64, step uint8) con
 	if s.sv.Step == 0 {
 		s.sv.Step = step
 	}
-	return message.NewStepVotesMsg(round, s.hash, s.sv)
+	return message.NewStepVotesMsg(round, s.hash, sender, s.sv)
 }
 
 // Halt will end the first step of reduction, and forwards whatever result it received

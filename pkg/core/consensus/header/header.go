@@ -5,7 +5,10 @@ package header
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -91,6 +94,13 @@ func (h Header) CompareRound(round uint64) Phase {
 	}
 
 	return After
+}
+
+func (h Header) String() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("round: %d step: %d\nsender: %s\nhash: %s\n", h.Round, h.Step, hex.EncodeToString(h.Sender()), hex.EncodeToString(h.BlockHash)))
+	return sb.String()
+
 }
 
 // Equal implements wire.Event.

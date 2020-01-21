@@ -1,6 +1,7 @@
 package reduction
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -27,7 +28,7 @@ func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 }
 
 func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacket {
-	return pf.Create(m.pubkey, 0, 1)
+	return pf.Create(m.pubkey, 1, 1)
 }
 
 func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
@@ -98,7 +99,8 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, f
 }
 
 // Verify StepVotes. The step must be specified otherwise verification would be dependent on the state of the Helper
-func (hlp *Helper) Verify(hash []byte, sv *message.StepVotes, step uint8) error {
+func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, step uint8) error {
+	fmt.Println(sv)
 	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
 	sub := vc.IntersectCluster(sv.BitSet)
 	apk, err := agreement.ReconstructApk(sub.Set)
@@ -112,6 +114,7 @@ func (hlp *Helper) Verify(hash []byte, sv *message.StepVotes, step uint8) error 
 // SendBatch of consensus events to the reducer callback CollectReductionEvent
 func (hlp *Helper) SendBatch(hash []byte) {
 	hlp.CollectionWaitGroup.Wait()
+	// creating a batch of Reduction events
 	batch := hlp.Spawn(hash)
 	hlp.CollectionWaitGroup.Add(len(batch))
 	for _, ev := range batch {

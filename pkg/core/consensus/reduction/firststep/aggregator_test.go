@@ -19,16 +19,14 @@ func TestSuccessfulAggro(t *testing.T) {
 	res := make(chan error, 1)
 	test := func(hash []byte, svs ...*message.StepVotes) {
 		assert.Equal(t, hlp.Step(), svs[0].Step)
-		res <- hlp.Verify(hash, svs[0], hlp.Step())
+		res <- hlp.Verify(hash, *svs[0], hlp.Step())
 	}
 
 	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
-		r := message.Reduction{}
-		_ = message.UnmarshalReduction(&ev.Payload, &r)
-		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
-			assert.FailNow(t, "error in collecting votes")
+		if !assert.NoError(t, aggregator.collectVote(ev)) {
+			t.FailNow()
 		}
 	}
 
@@ -53,10 +51,8 @@ func TestInvalidBlock(t *testing.T) {
 	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
-		r := message.Reduction{}
-		_ = message.UnmarshalReduction(&ev.Payload, &r)
-		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
-			assert.FailNow(t, "error in collecting votes")
+		if !assert.NoError(t, aggregator.collectVote(ev)) {
+			t.FailNow()
 		}
 	}
 
@@ -81,10 +77,8 @@ func TestCandidateNotFound(t *testing.T) {
 	aggregator := newAggregator(test, hlp.Handler, hlp.RBus)
 
 	for _, ev := range evs {
-		r := message.Reduction{}
-		_ = message.UnmarshalReduction(&ev.Payload, &r)
-		if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
-			assert.FailNow(t, "error in collecting votes")
+		if !assert.NoError(t, aggregator.collectVote(ev)) {
+			t.FailNow()
 		}
 	}
 

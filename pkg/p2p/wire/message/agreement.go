@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
@@ -47,12 +48,14 @@ type (
 	}
 )
 
-func NewStepVotesMsg(round uint64, hash []byte, sv StepVotes) StepVotesMsg {
+func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
+	fmt.Println(sv)
 	return StepVotesMsg{
 		hdr: header.Header{
 			Step:      sv.Step,
 			Round:     round,
 			BlockHash: hash,
+			PubKeyBLS: sender,
 		},
 		StepVotes: sv,
 	}
@@ -68,6 +71,13 @@ func (s StepVotesMsg) State() header.Header {
 // attempt at consensus over a Reduction message
 func (s StepVotes) IsEmpty() bool {
 	return s.Apk == nil
+}
+
+// String representation
+func (s StepVotes) String() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("BitSet: %d Step: %d\n Sig: %v\n Apk: %v\n", s.BitSet, s.Step, s.Signature, s.Apk))
+	return sb.String()
 }
 
 // Header returns the message header. This is to comply to the
