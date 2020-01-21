@@ -71,9 +71,8 @@ func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash []byte) *Score 
 	return score
 }
 
-func (e Score) Equal(m Message) bool {
-	s, ok := m.Payload().(Score)
-	return ok && e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash, s.VoteHash)
+func (e Score) Equal(s Score) bool {
+	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash, s.VoteHash)
 }
 
 func makeScore() *Score {
@@ -86,9 +85,6 @@ func makeScore() *Score {
 
 func UnmarshalScoreMessage(r *bytes.Buffer, m SerializableMessage) error {
 	sc := makeScore()
-	if err := header.Unmarshal(r, &sc.hdr); err != nil {
-		return err
-	}
 
 	if err := UnmarshalScore(r, sc); err != nil {
 		return err
@@ -101,6 +97,10 @@ func UnmarshalScoreMessage(r *bytes.Buffer, m SerializableMessage) error {
 // Field order is the following:
 // * Score Payload [score, proof, Z, BidList, Seed, Block Candidate Hash]
 func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
+	if err := header.Unmarshal(r, &sev.hdr); err != nil {
+		return err
+	}
+
 	sev.Score = make([]byte, 32)
 	if err := encoding.Read256(r, sev.Score); err != nil {
 		return err
@@ -141,7 +141,8 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 // Field order is the following:
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
 func MarshalScore(r *bytes.Buffer, sev Score) error {
-	if err := header.Marshal(r, sev.State()); err != nil {
+	// Marshalling header first
+	if err := header.Marshal(r, sev.hdr); err != nil {
 		return err
 	}
 
@@ -188,6 +189,7 @@ func MockScoreProposal(hdr header.Header) ScoreProposal {
 	subset, _ := crypto.RandEntropy(32)
 	seed, _ := crypto.RandEntropy(33)
 	return ScoreProposal{
+		hdr:           hdr,
 		Score:         score,
 		Proof:         proof,
 		Z:             z,
