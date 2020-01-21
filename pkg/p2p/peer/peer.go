@@ -14,8 +14,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -40,9 +40,16 @@ type Connection struct {
 type GossipConnector struct {
 	gossip *processing.Gossip
 	*Connection
+	protocol.ServiceFlag
 }
 
 func (g *GossipConnector) Write(b []byte) (int, error) {
+	// Preliminary check, to ensure we don't send messages to
+	// nodes who aren't interested in them.
+	if !g.canSend(b[0]) {
+		return 0, nil
+	}
+
 	buf := bytes.NewBuffer(b)
 	if err := g.gossip.Process(buf); err != nil {
 		return 0, err
@@ -51,13 +58,25 @@ func (g *GossipConnector) Write(b []byte) (int, error) {
 	return g.Connection.Write(buf.Bytes())
 }
 
+func (g *GossipConnector) canSend(topicByte byte) bool {
+	if g.ServiceFlag == protocol.FullNode {
+		return true
+	}
+
+	switch topics.Topic(topicByte) {
+	case topics.Block, topics.Inv:
+		return true
+	default:
+		return false
+	}
+}
+
 // Writer abstracts all of the logic and fields needed to write messages to
 // other network nodes.
 type Writer struct {
 	*Connection
 	subscriber eventbus.Subscriber
 	gossipID   uint32
-	// TODO: add service flag
 }
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -66,7 +85,6 @@ type Reader struct {
 	*Connection
 	router   *messageRouter
 	exitChan chan<- struct{} // Way to kill the WriteLoop
-	// TODO: add service flag
 }
 
 // NewWriter returns a Writer. It will still need to be initialized by
@@ -86,42 +104,14 @@ func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Sub
 
 // NewReader returns a Reader. It will still need to be initialized by
 // running ReadLoop in a goroutine.
-func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMap, publisher eventbus.Publisher, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, exitChan chan<- struct{}) (*Reader, error) {
-	pconn := &Connection{
-		Conn:   conn,
-		gossip: gossip,
-	}
-
-	_, db := heavy.CreateDBConnection()
-
-	dataRequestor := responding.NewDataRequestor(db, rpcBus, responseChan)
-
-	reader := &Reader{
-		Connection: pconn,
-		exitChan:   exitChan,
-		router: &messageRouter{
-			publisher:         publisher,
-			dupeMap:           dupeMap,
-			blockHashBroker:   responding.NewBlockHashBroker(db, responseChan),
-			synchronizer:      chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:     dataRequestor,
-			dataBroker:        responding.NewDataBroker(db, rpcBus, responseChan),
-			roundResultBroker: responding.NewRoundResultBroker(rpcBus, responseChan),
-			candidateBroker:   responding.NewCandidateBroker(rpcBus, responseChan),
-			ponger:            processing.NewPonger(responseChan),
-			peerInfo:          conn.RemoteAddr().String(),
+func NewReader(conn net.Conn, gossip *processing.Gossip, exitChan chan<- struct{}) *Reader {
+	return &Reader{
+		Connection: &Connection{
+			Conn:   conn,
+			gossip: gossip,
 		},
+		exitChan: exitChan,
 	}
-
-	// On each new connection the node sends topics.Mempool to retrieve mempool
-	// txs from the new peer
-	go func() {
-		if err := dataRequestor.RequestMempoolItems(); err != nil {
-			l.WithError(err).Warnln("error sending topics.Mempool message")
-		}
-	}()
-
-	return reader, nil
 }
 
 // ReadMessage reads from the connection
@@ -142,33 +132,34 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
-func (p *Writer) Connect() error {
-	if err := p.Handshake(); err != nil {
+func (p *Writer) Connect() (protocol.ServiceFlag, error) {
+	serviceFlag, err := p.Handshake()
+	if err != nil {
 		p.Conn.Close()
-		return err
+		return 0, err
 	}
 
-	return nil
+	return serviceFlag, nil
 }
 
 // Accept will perform the protocol handshake with the peer.
-func (p *Reader) Accept() error {
-	if err := p.Handshake(); err != nil {
+func (p *Reader) Accept() (protocol.ServiceFlag, error) {
+	serviceFlag, err := p.Handshake()
+	if err != nil {
 		p.Conn.Close()
-		return err
+		return 0, err
 	}
 
-	return nil
+	return serviceFlag, nil
 }
 
 // Serve utilizes two different methods for writing to the open connection
-func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
-
+func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}, serviceFlag protocol.ServiceFlag) {
 	defer w.onDisconnect()
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	g := &GossipConnector{w.gossip, w.Connection}
+	g := &GossipConnector{w.gossip, w.Connection, serviceFlag}
 	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
 	// Ping loop - ensures connection stays alive during quiet periods
@@ -232,6 +223,23 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 			return
 		}
 	}
+}
+
+func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, serviceFlag protocol.ServiceFlag) {
+	_, db := heavy.CreateDBConnection()
+	p.router = newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String(), serviceFlag)
+
+	// On each new connection the node sends topics.Mempool to retrieve mempool
+	// txs from the new peer
+	if serviceFlag == protocol.FullNode {
+		go func() {
+			if err := p.router.dataRequestor.RequestMempoolItems(); err != nil {
+				l.WithError(err).Warnln("error sending topics.Mempool message")
+			}
+		}()
+	}
+
+	p.ReadLoop()
 }
 
 // ReadLoop will block on the read until a message is read, or until the deadline

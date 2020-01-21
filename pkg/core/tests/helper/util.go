@@ -8,12 +8,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/transactions"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,8 +36,8 @@ func RandomSlice(t *testing.T, size uint32) []byte {
 	return randSlice
 }
 
-func StartPeerReader(conn net.Conn, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*peer.Reader, error) {
-	dupeMap := dupemap.NewDupeMap(5)
+func StartPeerReader(conn net.Conn) *peer.Reader {
 	exitChan := make(chan struct{}, 1)
-	return peer.NewReader(conn, processing.NewGossip(protocol.TestNet), dupeMap, bus, rpcBus, counter, responseChan, exitChan)
+	r := peer.NewReader(conn, processing.NewGossip(protocol.TestNet), exitChan)
+	return r
 }

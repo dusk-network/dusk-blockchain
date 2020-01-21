@@ -9,26 +9,19 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 func TestHandshake(t *testing.T) {
 
 	eb := eventbus.New()
-	rpcBus := rpcbus.New()
-	counter := chainsync.NewCounter(eb)
 	client, srv := net.Pipe()
 
 	go func() {
-		peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, counter, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		peerReader := helper.StartPeerReader(srv)
 
-		if err := peerReader.Accept(); err != nil {
+		if _, err := peerReader.Accept(); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -37,7 +30,7 @@ func TestHandshake(t *testing.T) {
 	g := processing.NewGossip(protocol.TestNet)
 	pw := peer.NewWriter(client, g, eb)
 	defer pw.Conn.Close()
-	if err := pw.Handshake(); err != nil {
+	if _, err := pw.Handshake(); err != nil {
 		t.Fatal(err)
 	}
 }

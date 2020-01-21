@@ -132,12 +132,10 @@ func launchDupeMap(eventBus eventbus.Broker) *dupemap.DupeMap {
 func (s *Server) OnAccept(conn net.Conn) {
 	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
-	if err != nil {
-		log.Panic(err)
-	}
+	peerReader := peer.NewReader(conn, s.gossip, exitChan)
 
-	if err := peerReader.Accept(); err != nil {
+	serviceFlag, err := peerReader.Accept()
+	if err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -149,10 +147,10 @@ func (s *Server) OnAccept(conn net.Conn) {
 		"address": peerReader.Addr(),
 	}).Debugln("connection established")
 
-	go peerReader.ReadLoop()
+	go peerReader.Listen(s.eventBus, s.dupeMap, s.rpcBus, s.counter, writeQueueChan, serviceFlag)
 
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
-	go peerWriter.Serve(writeQueueChan, exitChan)
+	go peerWriter.Serve(writeQueueChan, exitChan, serviceFlag)
 }
 
 // OnConnection is the callback for writing to the peers
@@ -160,7 +158,8 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	writeQueueChan := make(chan *bytes.Buffer, 1000)
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 
-	if err := peerWriter.Connect(); err != nil {
+	serviceFlag, err := peerWriter.Connect()
+	if err != nil {
 		log.WithFields(log.Fields{
 			"process": "server",
 			"error":   err,
@@ -173,13 +172,9 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	}).Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)
-	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	go peerReader.ReadLoop()
-	go peerWriter.Serve(writeQueueChan, exitChan)
+	peerReader := peer.NewReader(conn, s.gossip, exitChan)
+	go peerReader.Listen(s.eventBus, s.dupeMap, s.rpcBus, s.counter, writeQueueChan, serviceFlag)
+	go peerWriter.Serve(writeQueueChan, exitChan, serviceFlag)
 }
 
 // Close the chain and the connections created through the RPC bus

@@ -12,37 +12,39 @@ import (
 )
 
 // Handshake with another peer.
-func (p *Writer) Handshake() error {
+func (p *Writer) Handshake() (protocol.ServiceFlag, error) {
 	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
-		return err
+		return 0, err
 	}
 
 	if err := p.readVerAck(); err != nil {
-		return err
+		return 0, err
 	}
 
-	if err := p.readRemoteMsgVersion(); err != nil {
-		return err
+	serviceFlag, err := p.readRemoteMsgVersion()
+	if err != nil {
+		return 0, err
 	}
 
-	return p.writeVerAck(p.gossip)
+	return serviceFlag, p.writeVerAck(p.gossip)
 }
 
 // Handshake with another peer.
-func (p *Reader) Handshake() error {
-	if err := p.readRemoteMsgVersion(); err != nil {
-		return err
+func (p *Reader) Handshake() (protocol.ServiceFlag, error) {
+	serviceFlag, err := p.readRemoteMsgVersion()
+	if err != nil {
+		return 0, err
 	}
 
 	if err := p.writeVerAck(p.gossip); err != nil {
-		return err
+		return 0, err
 	}
 
 	if err := p.writeLocalMsgVersion(p.gossip); err != nil {
-		return err
+		return 0, err
 	}
 
-	return p.readVerAck()
+	return serviceFlag, p.readVerAck()
 }
 
 func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
@@ -63,38 +65,37 @@ func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
 	return err
 }
 
-func (p *Connection) readRemoteMsgVersion() error {
+func (p *Connection) readRemoteMsgVersion() (protocol.ServiceFlag, error) {
 	msgBytes, err := p.ReadMessage()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	m, cs, err := checksum.Extract(msgBytes)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if !checksum.Verify(m, cs) {
-		return errors.New("invalid checksum")
+		return 0, errors.New("invalid checksum")
 	}
 
 	decodedMsg := bytes.NewBuffer(m)
 	topic, err := topics.Extract(decodedMsg)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if topic != topics.Version {
-		return fmt.Errorf("did not receive the expected '%s' message - got %s",
-			topics.Version, topic)
+		return 0, fmt.Errorf("did not receive the expected '%s' message - got %s", topics.Version, topic)
 	}
 
 	version, err := decodeVersionMessage(decodedMsg)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return verifyVersion(version.Version)
+	return version.Services, verifyVersion(version.Version)
 }
 
 func (p *Connection) readVerAck() error {
