@@ -339,7 +339,7 @@ func MarshalStepVotes(r *bytes.Buffer, vote *StepVotes) error {
 	return nil
 }
 
-// MockAgreementEvent returns a mocked Agreement Event, to be used for testing purposes.
+// MockAgreement returns a mocked Agreement Event, to be used for testing purposes.
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing
 func MockAgreement(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, p *user.Provisioners, iterativeIdx ...int) Agreement {
 	// Make sure we create an event made by an actual voting committee member
