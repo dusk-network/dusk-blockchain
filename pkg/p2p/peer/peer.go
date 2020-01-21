@@ -57,6 +57,7 @@ type Writer struct {
 	*Connection
 	subscriber eventbus.Subscriber
 	gossipID   uint32
+	keepAlive  time.Duration
 	// TODO: add service flag
 }
 
@@ -72,13 +73,18 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber) *Writer {
+func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
+	kas := 30 * time.Second
+	if len(keepAlive) > 0 {
+		kas = keepAlive[0]
+	}
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:   conn,
 			gossip: gossip,
 		},
 		subscriber: subscriber,
+		keepAlive:  kas,
 	}
 
 	return pw
@@ -186,8 +192,8 @@ func (w *Writer) onDisconnect() {
 }
 
 func (w *Writer) pingLoop() {
-	// We ping every 30 seconds to keep the connection alive
-	ticker := time.NewTicker(30 * time.Second)
+	// We ping every so often to keep the connection alive
+	ticker := time.NewTicker(w.keepAlive)
 
 	for {
 		<-ticker.C
@@ -201,12 +207,8 @@ func (w *Writer) pingLoop() {
 }
 
 func (w *Writer) ping() error {
-	buf := new(bytes.Buffer)
-	if err := topics.Prepend(buf, topics.Ping); err != nil {
-		return err
-	}
-
-	if err := w.gossip.Process(buf); err != nil {
+	buf := topics.Ping.ToBuffer()
+	if err := w.gossip.Process(&buf); err != nil {
 		return err
 	}
 
