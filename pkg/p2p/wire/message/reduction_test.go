@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-crypto/bls"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -22,7 +23,7 @@ func TestReductionUnMarshal(t *testing.T) {
 	assert.NoError(t, message.MarshalReduction(buf, ev))
 
 	// Now Unmarshal it
-	ev2 := message.NewReduction()
+	ev2 := message.NewReduction(header.New())
 	assert.NoError(t, message.UnmarshalReduction(buf, ev2))
 
 	// The two events should be the exact same
@@ -59,6 +60,14 @@ func newReductionEvent(round uint64, step uint8) message.Reduction {
 	if err != nil {
 		panic(err)
 	}
+	hdr := header.Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: blockHash,
+		PubKeyBLS: k.BLSPubKeyBytes,
+	}
 
-	return message.Reduction{sig.Compress()}
+	r := message.NewReduction(hdr)
+	r.SignedHash = sig.Compress()
+	return *r
 }
