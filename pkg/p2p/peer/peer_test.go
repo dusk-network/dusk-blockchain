@@ -2,22 +2,27 @@ package peer_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"io"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -149,9 +154,6 @@ func TestServiceFlagGuard(t *testing.T) {
 	writer := peer.NewWriter(client, processing.NewGossip(protocol.TestNet), bus)
 	go writer.Serve(responseChan, make(chan struct{}, 1), protocol.LightNode)
 
-	// Give the goroutine some time to start
-	time.Sleep(100 * time.Millisecond)
-
 	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
 	go reader.Listen(bus, dupemap.NewDupeMap(0), rpcbus.New(), &chainsync.Counter{}, responseChan, protocol.LightNode)
 
@@ -181,6 +183,110 @@ func TestServiceFlagGuard(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// Test that, when in light-node mode, all functionality works as
+// expected.
+func TestLightNode(t *testing.T) {
+	// Mock config to go into light node mode
+	r := new(config.Registry)
+	r.Database.Driver = "lite_v0.1.0"
+	r.General.Network = "testnet"
+	r.General.WalletOnly = true
+	r.Mempool.MaxInvItems = 10000
+	config.Mock(r)
+
+	bus, rb := eventbus.New(), rpcbus.New()
+	respondToGetLastBlock(rb)
+	client, srv := net.Pipe()
+	agChan := make(chan bytes.Buffer, 1)
+	bus.Subscribe(topics.Agreement, eventbus.NewChanListener(agChan))
+	blkChan := make(chan bytes.Buffer, 1)
+	bus.Subscribe(topics.Block, eventbus.NewChanListener(blkChan))
+
+	responseChan := make(chan *bytes.Buffer, 10)
+	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
+	go reader.Listen(bus, dupemap.NewDupeMap(0), rb, &chainsync.Counter{}, responseChan, protocol.FullNode)
+
+	// Should not attempt to send a `mempool` message
+	select {
+	case <-responseChan:
+		t.Fatal("should not have gotten anything on the responseChan")
+	case <-time.After(1 * time.Second):
+		// success
+	}
+
+	// Should not send a `getdata` on a tx `inv`
+	g := processing.NewGossip(protocol.TestNet)
+	message := &peermsg.Inv{}
+	hash, _ := crypto.RandEntropy(32)
+	message.AddItem(peermsg.InvTypeMempoolTx, hash)
+	buf := new(bytes.Buffer)
+	assert.NoError(t, message.Encode(buf))
+	assert.NoError(t, topics.Prepend(buf, topics.Inv))
+	assert.NoError(t, g.Process(buf))
+
+	_, err := srv.Write(buf.Bytes())
+	assert.NoError(t, err)
+
+	select {
+	case <-responseChan:
+		t.Fatal("should not have gotten anything on the responseChan")
+	case <-time.After(1 * time.Second):
+		// success
+	}
+
+	// Should not respond to consensus messages
+	buf = makeAgreementBuffer(15)
+	assert.NoError(t, g.Process(buf))
+
+	_, err = srv.Write(buf.Bytes())
+	assert.NoError(t, err)
+
+	select {
+	case <-agChan:
+		t.Fatal("should not have gotten anything on the agChan")
+	case <-time.After(1 * time.Second):
+		// success
+	}
+
+	// Should be able to ask for and receive blocks
+	message = &peermsg.Inv{}
+	hash, _ = crypto.RandEntropy(32)
+	message.AddItem(peermsg.InvTypeBlock, hash)
+	buf = new(bytes.Buffer)
+	assert.NoError(t, message.Encode(buf))
+	assert.NoError(t, topics.Prepend(buf, topics.Inv))
+	assert.NoError(t, g.Process(buf))
+
+	_, err = srv.Write(buf.Bytes())
+	assert.NoError(t, err)
+
+	// Should get a `getdata` on the responseChan
+	select {
+	case m := <-responseChan:
+		assert.Equal(t, topics.GetData, topics.Topic(m.Bytes()[0]))
+	case <-time.After(1 * time.Second):
+		t.Fatal("should have gotten a getdata message on the responseChan")
+	}
+
+	// Let's give a block back
+	blk := helper.RandomBlock(t, 1, 1)
+	buf = new(bytes.Buffer)
+	assert.NoError(t, marshalling.MarshalBlock(buf, blk))
+	assert.NoError(t, topics.Prepend(buf, topics.Block))
+	assert.NoError(t, g.Process(buf))
+
+	_, err = srv.Write(buf.Bytes())
+	assert.NoError(t, err)
+
+	// Should be broadcast on the event bus
+	select {
+	case <-blkChan:
+		// success
+	case <-time.After(1 * time.Second):
+		t.Fatal("should have gotten a block on the event bus")
+	}
+}
+
 func BenchmarkWriter(b *testing.B) {
 	bus := eventbus.New()
 
@@ -198,6 +304,22 @@ func BenchmarkWriter(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		bus.Publish(topics.Gossip, ev)
 	}
+}
+
+func respondToGetLastBlock(rb *rpcbus.RPCBus) {
+	c := make(chan rpcbus.Request, 1)
+	rb.Register(rpcbus.GetLastBlock, c)
+
+	go func(c chan rpcbus.Request) {
+		r := <-c
+
+		blob, err := hex.DecodeString(config.TestNetGenesisBlob)
+		if err != nil {
+			panic(err)
+		}
+
+		r.RespChan <- rpcbus.Response{*bytes.NewBuffer(blob), nil}
+	}(c)
 }
 
 func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
