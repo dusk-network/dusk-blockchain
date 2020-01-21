@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -356,6 +357,10 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 }
 
 var viewMempool = func(s *Server, params []string) (string, error) {
+	if config.Get().General.WalletOnly {
+		return "command not available in light-node mode", nil
+	}
+
 	// Encode filtering information
 	var buf bytes.Buffer
 	if len(params) > 1 {
