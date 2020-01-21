@@ -45,7 +45,7 @@ func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
 	eb.Unsubscribe(topics.Test, id)
 	msg := message.New(topics.Test, *(bytes.NewBufferString("whatever2")))
-	eb.Publish(topics.Test, *msg)
+	eb.Publish(topics.Test, msg)
 
 	select {
 	case <-myChan:
@@ -62,7 +62,7 @@ func TestStreamer(t *testing.T) {
 	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)
 	msg := message.New(topics.Test, *(bytes.NewBufferString("pluto")))
-	bus.Publish(topic, *msg)
+	bus.Publish(topic, msg)
 
 	packet, err := streamer.(*SimpleStreamer).Read()
 	if !assert.NoError(t, err) {
@@ -80,29 +80,27 @@ func TestDefaultListener(t *testing.T) {
 	eb := New()
 	msgChan := make(chan message.Message)
 
-	cb := func(r message.Message) error {
-		msgChan <- *(message.New(r.Category, r.Buffer))
-		return nil
-	}
-
 	eb.AddDefaultTopic(topics.Reject)
 	eb.AddDefaultTopic(topics.Unknown)
-	eb.SubscribeDefault(NewCallbackListener(cb))
+	eb.SubscribeDefault(NewChanListener(msgChan))
 
 	m := message.New(topics.Reject, *(bytes.NewBufferString("pluto")))
-	eb.Publish(topics.Reject, *m)
+	eb.Publish(topics.Reject, m)
 	msg := <-msgChan
-	assert.Equal(t, topics.Reject, msg.Category)
-	assert.Equal(t, []byte("pluto"), msg.Buffer.Bytes())
+	assert.Equal(t, topics.Reject, msg.Category())
+
+	payload := msg.Payload().(bytes.Buffer)
+	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
 	m = message.New(topics.Unknown, *(bytes.NewBufferString("pluto")))
-	eb.Publish(topics.Unknown, *m)
+	eb.Publish(topics.Unknown, m)
 	msg = <-msgChan
-	assert.Equal(t, topics.Unknown, msg.Category)
-	assert.Equal(t, []byte("pluto"), msg.Buffer.Bytes())
+	assert.Equal(t, topics.Unknown, msg.Category())
+	payload = msg.Payload().(bytes.Buffer)
+	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
 	m = message.New(topics.Gossip, *(bytes.NewBufferString("pluto")))
-	eb.Publish(topics.Gossip, *m)
+	eb.Publish(topics.Gossip, m)
 	select {
 	case <-msgChan:
 		t.FailNow()
@@ -122,11 +120,12 @@ func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	assert.NotNil(t, id)
 	b := bytes.NewBufferString("whatever")
 	m := message.New(topics.Test, *b)
-	eb.Publish(topics.Test, *m)
+	eb.Publish(topics.Test, m)
 
 	select {
 	case received := <-myChan:
-		assert.Equal(t, "whatever", received.Buffer.String())
+		payload := received.Payload().(bytes.Buffer)
+		assert.Equal(t, "whatever", (&payload).String())
 	case <-time.After(50 * time.Millisecond):
 		assert.FailNow(t, "We should have received a message by now")
 	}
@@ -145,7 +144,7 @@ func TestExitChan(t *testing.T) {
 	val := new(bytes.Buffer)
 	val.Write([]byte{0})
 	m := message.New(topic, *val)
-	eb.Publish(topic, *m)
+	eb.Publish(topic, m)
 	// Wait for event to be handled
 	// NB: 'Writer' must return error to force consumer termination
 	time.Sleep(100 * time.Millisecond)
