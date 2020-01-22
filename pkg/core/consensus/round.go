@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -119,7 +120,7 @@ func (s *roundStore) Dispatch(m message.Message) {
 		"topic":      m.Category,
 	}).Traceln("notifying subscribers")
 	for _, sub := range subscribers {
-		if err := sub.NotifyPayload(m.Payload().(Packet)); err != nil {
+		if err := sub.NotifyPayload(m.Payload().(InternalPacket)); err != nil {
 			lg.WithFields(log.Fields{
 				"topic": m.Category().String(),
 				"id":    sub.ID(),
@@ -333,22 +334,28 @@ func (c *Coordinator) reinstantiateStore() {
 }
 
 func (c *Coordinator) CollectEvent(m message.Message) error {
-	// NOTE: RUnlock is not deferred here, for performance reasons.
-	// https://medium.com/i0exception/runtime-overhead-of-using-defer-in-go-7140d5c40e32
-	// TODO: once go 1.14 is out, re-examine the overhead of using `defer`.
-	msg, ok := m.Payload().(Packet)
-	if !ok {
-		log.Panic("trying to feed the Coordinator a screwed up message from the EventBus")
+	var msg InternalPacket
+	switch m.Payload().(type) {
+	case bytes.Buffer:
+		p := m.Payload().(bytes.Buffer)
+		topics.Extract(&p)
+		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category())
+	case InternalPacket:
+		msg = m.Payload().(InternalPacket)
+	default:
+		return errors.New("trying to feed the Coordinator a screwed up message from the EventBus")
 	}
 
 	hdr := msg.State()
-
 	lg.WithFields(log.Fields{
 		"topic": m.Category().String(),
 		"round": hdr.Round,
 		"step":  hdr.Step,
 	}).Traceln("collected event")
 
+	// NOTE: RUnlock is not deferred here, for performance reasons.
+	// https://medium.com/i0exception/runtime-overhead-of-using-defer-in-go-7140d5c40e32
+	// TODO: once go 1.14 is out, re-examine the overhead of using `defer`.
 	var comparison header.Phase
 	c.lock.RLock()
 	if m.Category() == topics.Agreement {
