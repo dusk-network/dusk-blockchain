@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
@@ -55,12 +56,8 @@ func TestAcceptFromPeer(t *testing.T) {
 	// Now, test accepting a block with 1 on the sync counter
 	c.counter.StartSyncing(1)
 
-	blk = helper.RandomBlock(t, 1, 1)
-	blk.SetPrevBlock(c.prevBlock.Header)
-	// Strip all but coinbase tx, to avoid unwanted errors
-	blk.Txs = blk.Txs[0:1]
-	blk.SetRoot()
-	blk.SetHash()
+	blk = mockAcceptableBlock(t, c.prevBlock)
+
 	buf = new(bytes.Buffer)
 	if err := marshalling.MarshalBlock(buf, blk); err != nil {
 		t.Fatal(err)
@@ -226,6 +223,8 @@ func TestFetchTip(t *testing.T) {
 }
 
 // Make sure that certificates can still be properly verified when a provisioner is removed on round update.
+// TODO: this test currently doesn't test anything meaningful, and
+// should be refactored or removed.
 func TestCertificateExpiredProvisioner(t *testing.T) {
 	eb := eventbus.New()
 	rpc := rpcbus.New()
@@ -253,7 +252,7 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	// Accept it
 	assert.NoError(t, chain.AcceptBlock(*blk))
 	// Provisioner with k3 should no longer be in the committee now
-	// assert.False(t, c.IsMember(k3.BLSPubKeyBytes, 2, 1))
+	// assert.False(t, chain.p.GetMember(k[0].BLSPubKeyBytes) == nil)
 }
 
 func TestAddAndRemoveBid(t *testing.T) {
@@ -345,6 +344,65 @@ func TestRemoveExpiredProvisioners(t *testing.T) {
 	assert.Equal(t, 5, len(c.p.Members))
 }
 
+func TestRebuildChain(t *testing.T) {
+	eb, rb, c := setupChainTest(t, true)
+	catchClearWalletDatabaseRequest(rb)
+	go c.Listen()
+
+	// Listen for `StopConsensus` messages
+	stopConsensusChan := make(chan bytes.Buffer, 1)
+	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
+
+	// Add a block so that we have a bit of chain state
+	// to check against.
+	blk := mockAcceptableBlock(t, c.prevBlock)
+
+	assert.NoError(t, c.AcceptBlock(*blk))
+
+	// Chain prevBlock should now no longer be genesis
+	genesis := cfg.DecodeGenesis()
+	assert.False(t, genesis.Equals(&c.prevBlock))
+
+	// Let's manually update some of the in-memory state, as it is
+	// difficult to do this through mocked blocks in a test.
+	p, ks := consensus.MockProvisioners(5)
+	for _, k := range ks {
+		assert.NoError(t, c.addProvisioner(k.EdPubKeyBytes, k.BLSPubKeyBytes, 50000, 1, 2000))
+	}
+
+	c.lastCertificate = createMockedCertificate(c.intermediateBlock.Header.Hash, 2, ks, p)
+	c.intermediateBlock = helper.RandomBlock(t, 2, 2)
+	bids := make(user.BidList, 0)
+	for i := 0; i < 3; i++ {
+		bid := createBid(t)
+		bids = append(bids, bid)
+		*c.bidList = append(*c.bidList, bid)
+	}
+
+	// Now, send a request to rebuild the chain
+	if _, err := rb.Call(rpcbus.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	// We should be back at the genesis chain state
+	assert.True(t, genesis.Equals(&c.prevBlock))
+	for _, k := range ks {
+		assert.Nil(t, c.p.GetMember(k.BLSPubKeyBytes))
+	}
+
+	assert.True(t, c.lastCertificate.Equals(block.EmptyCertificate()))
+	intermediateBlock, err := mockFirstIntermediateBlock(c.prevBlock.Header)
+	assert.NoError(t, err)
+	assert.True(t, c.intermediateBlock.Equals(intermediateBlock))
+
+	for _, bid := range bids {
+		assert.False(t, c.bidList.Contains(bid))
+	}
+
+	// Ensure we got a `StopConsensus` message
+	<-stopConsensusChan
+}
+
 func createBid(t *testing.T) user.Bid {
 	b, err := crypto.RandEntropy(32)
 	if err != nil {
@@ -354,6 +412,32 @@ func createBid(t *testing.T) user.Bid {
 	var arr [32]byte
 	copy(arr[:], b)
 	return user.Bid{arr, arr, 1000}
+}
+
+func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
+	c := make(chan rpcbus.Request, 1)
+	rb.Register(rpcbus.ClearWalletDatabase, c)
+	go func() {
+		r := <-c
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	}()
+}
+
+// mock a block which can be accepted by the chain.
+// note that this is only valid for height 1, as the certificate
+// is not checked on height 1 (for network bootstrapping)
+func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
+	// Create block 1
+	blk := helper.RandomBlock(t, 1, 1)
+	// Remove all txs except coinbase, as the helper transactions do not pass verification
+	blk.Txs = blk.Txs[0:1]
+	blk.SetRoot()
+	blk.SetHash()
+	// Add cert and prev hash
+	blk.Header.Certificate = block.EmptyCertificate()
+	blk.Header.PrevBlockHash = prevBlock.Header.Hash
+
+	return blk
 }
 
 func setupChainTest(t *testing.T, includeGenesis bool) (*eventbus.EventBus, *rpcbus.RPCBus, *Chain) {

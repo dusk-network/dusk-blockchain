@@ -34,6 +34,7 @@ var (
 		"syncprogress":         syncProgress,
 		"automateconsensustxs": automateConsensusTxs,
 		"walletstatus":         walletStatus,
+		"rebuildchain":         rebuildChain,
 		"viewmempool":          viewMempool,
 
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
@@ -353,6 +354,14 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 	}
 
 	return fmt.Sprintf("%v", status), nil
+}
+
+var rebuildChain = func(s *Server, params []string) (string, error) {
+	if _, err := s.rpcBus.Call(rpcbus.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
+		return "", err
+	}
+
+	return "Chain reset complete. Starting sync...", nil
 }
 
 var viewMempool = func(s *Server, params []string) (string, error) {

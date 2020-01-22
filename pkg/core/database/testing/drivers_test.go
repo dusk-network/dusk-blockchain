@@ -686,6 +686,33 @@ func TestFetchBlockTxByHash(test *testing.T) {
 	})
 }
 
+func TestClearDatabase(test *testing.T) {
+	err := db.Update(func(t database.Transaction) error {
+		return t.ClearDatabase()
+	})
+
+	if err != nil {
+		test.Fatal(err)
+	}
+
+	err = db.View(func(t database.Transaction) error {
+		// All lookups should now fail
+		for _, block := range blocks {
+			blk, err := t.FetchBlock(block.Header.Hash)
+			if err == nil && blk != nil {
+				return errors.New("database was not empty")
+			}
+		}
+
+		return nil
+	})
+
+	// repopulate db for the other tests
+	if err := storeBlocks(test, db, blocks); err != nil {
+		test.Fatal(err)
+	}
+}
+
 func TestFetchOutputExists(test *testing.T) {
 	test.Parallel()
 
