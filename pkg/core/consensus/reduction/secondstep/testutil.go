@@ -39,9 +39,10 @@ func (hlp *Helper) createResultChan() {
 }
 
 // ActivateReduction starts/resumes the secondstep reduction by sending a StepVotes to Reducer.CollectStepVotes
-func (hlp *Helper) ActivateReduction(hash []byte, sv *message.StepVotes) error {
+func (hlp *Helper) ActivateReduction(hash []byte, sv message.StepVotes) error {
 	// e := consensus.Event{header.Header{Round: hlp.Round, Step: hlp.Step(), PubKeyBLS: hlp.PubKeyBLS, BlockHash: hash}, *buf}
-	msg := message.NewStepVotesMsg(hlp.Round, hash, *sv)
+	msg := message.NewStepVotesMsg(hlp.Round, hlp.PubKeyBLS, hash, sv)
+
 	hlp.Reducer.(*Reducer).CollectStepVotes(msg)
 	return nil
 }

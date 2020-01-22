@@ -131,15 +131,7 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) error {
 	}
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
-
-	payload := new(bytes.Buffer)
-	message.MarshalReduction(payload, *red)
-	// if err := encoding.WriteBLS(payload, sig); err != nil {
-	// 	lg.WithField("category", "BUG").WithError(err).Errorln("error in encoding BLS signature")
-	// 	return
-	// }
-
-	msg := message.New(topics.Reduction, payload)
+	msg := message.New(topics.Reduction, *red)
 
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		return err
@@ -209,7 +201,7 @@ func (r *Reducer) sendAgreement(step uint8, hash []byte, svs []*message.StepVote
 	ev.SetSignature(sig)
 	ev.VotesPerStep = svs
 
-	msg := message.New(topics.Agreement, ev)
+	msg := message.New(topics.Agreement, *ev)
 	// then we forward the marshalled Agreement to the store to be sent
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in gossiping the agreement")
@@ -226,5 +218,5 @@ func (r *Reducer) constructHeader(step uint8, hash []byte) header.Header {
 }
 
 func stepVotesAreValid(svs []*message.StepVotes) bool {
-	return len(svs) == 2 && svs[0] != nil && svs[1] != nil
+	return len(svs) == 2 && !svs[0].IsEmpty() && !svs[1].IsEmpty()
 }

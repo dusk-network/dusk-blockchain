@@ -126,7 +126,7 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) {
 	}
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
-	msg := message.New(topics.Reduction, red)
+	msg := message.New(topics.Reduction, *red)
 
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")

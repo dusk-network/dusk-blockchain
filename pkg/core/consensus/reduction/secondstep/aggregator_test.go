@@ -14,17 +14,15 @@ func TestSuccessfulAggro(t *testing.T) {
 
 	res := make(chan error, 1)
 	test := func(hash []byte, svs ...*message.StepVotes) {
-		res <- hlp.Verify(hash, svs[1], hlp.Step())
+		res <- hlp.Verify(hash, *svs[1], hlp.Step())
 	}
 
 	var sv *message.StepVotes
 	aggregator := newAggregator(test, hlp.Handler, sv)
 
 	go func() {
-		for _, ev := range evs {
-			r := message.Reduction{}
-			_ = message.UnmarshalReduction(&ev.Payload, &r)
-			if !assert.NoError(t, aggregator.collectVote(r, ev.Header)) {
+		for _, r := range evs {
+			if !assert.NoError(t, aggregator.collectVote(r)) {
 				assert.FailNow(t, "error in collecting votes")
 			}
 		}
