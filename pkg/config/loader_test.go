@@ -32,7 +32,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 		t.Error("Invalid general/network value")
 	}
 
-	if Get().Logger.Level != "trace" {
+	if Get().Logger.Level != "debug" {
 		t.Error("Invalid logger level")
 	}
 }
@@ -116,14 +116,14 @@ func TestReadOnly(t *testing.T) {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().Logger.Level != "trace" {
+	if Get().Logger.Level != "debug" {
 		t.Error("Invalid logger level")
 	}
 
 	r := Get()
 	r.Logger.Level = "MODIFIED_level"
 
-	if Get().Logger.Level != "trace" {
+	if Get().Logger.Level != "debug" {
 		t.Errorf("Invalid config %s", Get().Logger.Level)
 	}
 }

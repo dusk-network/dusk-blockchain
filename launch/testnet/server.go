@@ -63,7 +63,7 @@ func Setup() *Server {
 
 	// Instantiate RPC server
 	if cfg.Get().RPC.Enabled {
-		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus)
+		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus, rpc.Commands)
 		if err != nil {
 			log.Errorf("RPC http server error: %s", err.Error())
 		}

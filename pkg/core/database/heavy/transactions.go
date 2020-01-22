@@ -281,7 +281,6 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	defer iterator.Release()
 
 	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
-	var i int
 
 	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
@@ -305,10 +304,9 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 		p.SetBytes(&pBytes)
 
 		decoysPubKeys = append(decoysPubKeys, p)
-		if i == numDecoys {
+		if len(decoysPubKeys) == numDecoys {
 			break
 		}
-		i++
 	}
 
 	return decoysPubKeys

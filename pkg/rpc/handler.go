@@ -74,7 +74,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r http.Request, isAdmin bo
 func (s *Server) runCmd(r *JSONRequest, isAdmin bool) (string, error) {
 
 	// Get method
-	fn, ok := rpcCmd[r.Method]
+	fn, ok := s.commands[r.Method]
 	if !ok {
 		return "", fmt.Errorf("method %s unrecognized", r.Method)
 	}

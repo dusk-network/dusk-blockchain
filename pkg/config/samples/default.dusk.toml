@@ -9,7 +9,7 @@ walletonly = false
 # logger configs
 [logger]
 # log levels can be any of error, warn, trace
-level = "trace"
+level = "debug"
 # 'stdout' or file name without ext
 # result filename would be $output$network.port.log
 output = "debug"
