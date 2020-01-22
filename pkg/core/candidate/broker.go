@@ -3,6 +3,7 @@ package candidate
 import (
 	"bytes"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -27,6 +28,7 @@ type Broker struct {
 	republisher *republisher.Republisher
 	*store
 	// List of block hashes for which a valid Score message was seen.
+	lock        sync.RWMutex
 	validHashes map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
@@ -61,7 +63,10 @@ func (b *Broker) Listen() {
 	for {
 		select {
 		case cm := <-b.candidateChan:
-			if _, ok := b.validHashes[string(cm.Block.Header.Hash)]; ok {
+			b.lock.RLock()
+			_, ok := b.validHashes[string(cm.Block.Header.Hash)]
+			b.lock.RUnlock()
+			if ok {
 				b.storeCandidateMessage(cm)
 			}
 		case r := <-b.getCandidateChan:
@@ -79,7 +84,9 @@ func (b *Broker) AddValidHash(m bytes.Buffer) error {
 		return err
 	}
 
+	b.lock.Lock()
 	b.validHashes[string(hash)] = struct{}{}
+	b.lock.Unlock()
 	return nil
 }
 
@@ -134,7 +141,9 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 }
 
 func (b *Broker) clearEligibleBlocks() {
+	b.lock.Lock()
 	for h := range b.validHashes {
 		delete(b.validHashes, h)
 	}
+	b.lock.Unlock()
 }
