@@ -49,7 +49,6 @@ type (
 )
 
 func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
-	fmt.Println(sv)
 	return StepVotesMsg{
 		hdr: header.Header{
 			Step:      sv.Step,
@@ -229,6 +228,7 @@ func NewAgreement(hdr header.Header) *Agreement {
 
 // newAgreement returns an empty Agreement event. It is used within the
 // UnmarshalAgreement function
+// TODO: interface - []*StepVotes should not be references, but values
 func newAgreement() *Agreement {
 	return &Agreement{
 		hdr:          header.Header{},

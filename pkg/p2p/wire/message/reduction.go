@@ -2,6 +2,8 @@ package message
 
 import (
 	"bytes"
+	"encoding/hex"
+	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -24,6 +26,21 @@ func NewReduction(hdr header.Header) *Reduction {
 		hdr:        hdr,
 		SignedHash: make([]byte, 33),
 	}
+}
+
+func (r Reduction) String() string {
+	var sb strings.Builder
+	sb.WriteString(r.hdr.String())
+	sb.WriteString("signature: ")
+	if r.SignedHash != nil && len(r.SignedHash) > 0 {
+		sb.WriteString(hex.EncodeToString(r.SignedHash[0:6]))
+		sb.WriteString("...")
+		sb.WriteString(hex.EncodeToString(r.SignedHash[len(r.SignedHash)-6:]))
+	} else {
+		sb.WriteString("empty")
+	}
+	sb.WriteString("\n")
+	return sb.String()
 }
 
 // Header is used to comply to consensus.Message

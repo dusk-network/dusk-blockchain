@@ -3,12 +3,14 @@ package message
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-wallet/transactions"
 )
 
 type Message interface {
+	//fmt.Stringer
 	Category() topics.Topic
 	Payload() interface{}
 	Equal(Message) bool
@@ -37,6 +39,28 @@ type simple struct {
 	payload interface{}
 	// cached marshalled form with Category
 	marshalled *bytes.Buffer
+}
+
+func (m simple) String() string {
+	var sb strings.Builder
+	sb.WriteString("category: ")
+	sb.WriteString(m.category.String())
+	sb.WriteString("\n")
+	sb.WriteString("payload: [\n")
+	if m.payload == nil {
+		sb.WriteString("<payload is nil>")
+	} else {
+		str, ok := m.payload.(fmt.Stringer)
+		if ok {
+			sb.WriteString(str.String())
+		} else {
+			sb.WriteString("<payload is non-empty but not a Stringer>")
+		}
+	}
+	sb.WriteString("\n]\n")
+	sb.WriteString("\n")
+	return sb.String()
+
 }
 
 func (m simple) setPayload(i interface{}) {
