@@ -1,7 +1,6 @@
 package reduction
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -32,23 +31,6 @@ func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacke
 }
 
 func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
-	// TODO: interface - uncomment in case the test needs a buffer
-	/*
-		// message.Marshal takes care of prepending the topic, marshalling the
-		// header, etc
-		buf, err := message.Marshal(msg)
-		if err != nil {
-			return err
-		}
-
-		// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
-		// is performed where it is supposed to (i.e. after the Gossip)
-		serialized := message.New(msg.Category(), buf)
-
-		// gossip away
-		m.bus.Publish(topics.Gossip, serialized)
-		return nil
-	*/
 	m.bus.Publish(msg.Category(), msg)
 	return nil
 }
@@ -100,7 +82,6 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, f
 
 // Verify StepVotes. The step must be specified otherwise verification would be dependent on the state of the Helper
 func (hlp *Helper) Verify(hash []byte, sv message.StepVotes, step uint8) error {
-	fmt.Println(sv)
 	vc := hlp.P.CreateVotingCommittee(round, step, hlp.nr)
 	sub := vc.IntersectCluster(sv.BitSet)
 	apk, err := agreement.ReconstructApk(sub.Set)
