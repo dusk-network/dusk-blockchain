@@ -47,7 +47,7 @@ func newAggregator(
 	}
 }
 
-// Collect a Reduction message, and add it's sender public key and signature to the
+// Collect a Reduction message, and add its sender public key and signature to the
 // StepVotes/Set kept under the corresponding block hash. If the Set reaches or exceeds
 // quorum, the candidate block for the given block hash is first verified before
 // propagating the information to the Reducer.
@@ -77,8 +77,11 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
 		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
+
 		blockHash := hdr.BlockHash
 
+		// if the votes converged for an empty hash we invoke halt with no
+		// StepVotes
 		if !bytes.Equal(blockHash, emptyHash[:]) {
 			if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
 				blockHash = emptyHash[:]

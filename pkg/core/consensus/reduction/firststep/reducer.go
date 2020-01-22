@@ -90,12 +90,12 @@ func (r *Reducer) Finalize() {
 // Collect forwards Reduction to the aggregator
 func (r *Reducer) Collect(e consensus.InternalPacket) error {
 	red := e.(message.Reduction)
-	hdr := red.State()
 
 	if err := r.handler.VerifySignature(red); err != nil {
 		return err
 	}
 
+	hdr := red.State()
 	lg.WithFields(log.Fields{
 		"round":  hdr.Round,
 		"step":   hdr.Step,
@@ -126,15 +126,7 @@ func (r *Reducer) sendReduction(step uint8, hash []byte) {
 	}
 	red := message.NewReduction(hdr)
 	red.SignedHash = sig
-
-	payload := new(bytes.Buffer)
-	message.MarshalReduction(payload, *red)
-	// if err := encoding.WriteBLS(payload, sig); err != nil {
-	// 	lg.WithField("category", "BUG").WithError(err).Errorln("error in encoding BLS signature")
-	// 	return
-	// }
-
-	msg := message.New(topics.Reduction, payload)
+	msg := message.New(topics.Reduction, red)
 
 	if err := r.signer.Gossip(msg, r.ID()); err != nil {
 		lg.WithField("category", "BUG").WithError(err).Errorln("error in sending authenticated Reduction")
@@ -163,29 +155,27 @@ func (s StepVotesMsgFactory) Create(sender []byte, round uint64, step uint8) con
 // Halt will end the first step of reduction, and forwards whatever result it received
 // on the StepVotes topic.
 func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
-	var factory StepVotesMsgFactory
+	var svm message.StepVotesMsg
 	lg.WithField("id", r.reductionID).Traceln("halted")
 	r.Timer.Stop()
 	r.eventPlayer.Pause(r.reductionID)
 
 	if len(svs) > 0 {
-		//create a factory for the StepVotesMsg
-		factory = StepVotesMsgFactory{
-			sv:   *svs[0],
-			hash: hash,
-		}
+		sv := *svs[0]
+		svm = message.NewStepVotesMsg(r.round, hash, r.keys.BLSPubKeyBytes, sv)
 	} else {
-		//create a factory for empty StepVotes
-		factory = StepVotesMsgFactory{
+		//create a factory for empty StepVotes (necessary since we cannot get
+		//the Step from the StepVotes and we likely need a valid Header)
+		factory := StepVotesMsgFactory{
 			sv:   message.StepVotes{},
 			hash: hash,
 		}
 		// Increase timeout if we did not have a good result
 		r.timeOut = r.timeOut * 2
+		svm = r.signer.Compose(factory).(message.StepVotesMsg)
 	}
 
-	packet := r.signer.Compose(factory)
-	msg := message.New(topics.StepVotes, packet)
+	msg := message.New(topics.StepVotes, svm)
 	r.signer.SendInternally(topics.StepVotes, msg, r.ID())
 }
 
