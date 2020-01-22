@@ -51,7 +51,12 @@ func (b *Handler) VerifySignature(red message.Reduction) error {
 		return err
 	}
 
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), red.SignedHash)
+	// we make a copy of the signature because the crypto package apparently mutates the byte array when
+	// Compressing/Decompressing a point
+	// see https://github.com/dusk-network/dusk-crypto/issues/16
+	sig := make([]byte, len(red.SignedHash))
+	copy(sig, red.SignedHash)
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
 }
 
 func (b *Handler) Quorum(round uint64) int {
