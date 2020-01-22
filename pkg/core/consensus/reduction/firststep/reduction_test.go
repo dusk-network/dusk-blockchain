@@ -2,7 +2,6 @@ package firststep
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
@@ -30,7 +29,6 @@ func TestFirstStep(t *testing.T) {
 		t.FailNow()
 	}
 
-	fmt.Println(svm.State())
 	// StepVotes should be valid
 	if !assert.NoError(t, hlp.Verify(hash, svm.StepVotes, 1)) {
 		t.FailNow()
@@ -52,10 +50,10 @@ func TestMoreSteps(t *testing.T) {
 	svMsg := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes
-	sv := svMsg.Payload().(message.StepVotes)
+	svm := svMsg.Payload().(message.StepVotesMsg)
 
 	// StepVotes should be valid
-	assert.NoError(t, hlp.Verify(hash, sv, 2))
+	assert.NoError(t, hlp.Verify(hash, svm.StepVotes, 2))
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
