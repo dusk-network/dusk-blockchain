@@ -98,9 +98,26 @@ func (h Header) CompareRound(round uint64) Phase {
 
 func (h Header) String() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("round: %d step: %d\nsender: %s\nhash: %s\n", h.Round, h.Step, hex.EncodeToString(h.Sender()), hex.EncodeToString(h.BlockHash)))
+	sb.WriteString(fmt.Sprintf("round: %d step: %d\n", h.Round, h.Step))
+	sb.WriteString("sender: ")
+	if h.PubKeyBLS != nil && len(h.PubKeyBLS) > 0 {
+		sb.WriteString(hex.EncodeToString(h.PubKeyBLS[0:6]))
+		sb.WriteString("...")
+		sb.WriteString(hex.EncodeToString(h.PubKeyBLS[len(h.PubKeyBLS)-6:]))
+	} else {
+		sb.WriteString("empty")
+	}
+	sb.WriteString("\n")
+	sb.WriteString("block hash: ")
+	if h.BlockHash != nil && len(h.BlockHash) > 0 {
+		sb.WriteString(hex.EncodeToString(h.BlockHash[0:6]))
+		sb.WriteString("...")
+		sb.WriteString(hex.EncodeToString(h.BlockHash[len(h.BlockHash)-6:]))
+	} else {
+		sb.WriteString("empty")
+	}
+	sb.WriteString("\n")
 	return sb.String()
-
 }
 
 // Equal implements wire.Event.
