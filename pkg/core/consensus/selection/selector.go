@@ -21,7 +21,7 @@ type Selector struct {
 	publisher eventbus.Publisher
 	handler   Handler
 	lock      sync.RWMutex
-	bestEvent *message.Score
+	bestEvent message.Score
 
 	timer   *timer
 	timeout time.Duration
@@ -42,7 +42,7 @@ func (e emptyScoreFactory) Create(pubkey []byte, round uint64, step uint8) conse
 		PubKeyBLS: pubkey,
 		BlockHash: emptyScore[:],
 	}
-	return message.EmptyScore(hdr)
+	return message.EmptyScoreProposal(hdr)
 }
 
 // NewComponent creates and launches the component which responsibility is to validate
@@ -52,6 +52,7 @@ func NewComponent(publisher eventbus.Publisher, timeout time.Duration) *Selector
 	return &Selector{
 		timeout:   timeout,
 		publisher: publisher,
+		bestEvent: message.EmptyScore(),
 	}
 }
 
@@ -101,8 +102,8 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	// Only check for priority if we already have a best event
-	if s.bestEvent != nil {
-		if s.handler.Priority(*s.bestEvent, score) {
+	if !s.bestEvent.IsEmpty() {
+		if s.handler.Priority(s.bestEvent, score) {
 			// if the current best score has priority, we return
 			return nil
 		}
@@ -124,14 +125,14 @@ func (s *Selector) CollectScoreEvent(packet consensus.InternalPacket) error {
 	lg.WithFields(log.Fields{
 		"new best": score.Score,
 	}).Debugln("swapping best score")
-	s.bestEvent = &score
+	s.bestEvent = score
 	return nil
 }
 
 // CollectGeneration signals the selection start by triggering `EventPlayer.Play`
 func (s *Selector) CollectGeneration(packet consensus.InternalPacket) error {
 	s.lock.Lock()
-	s.bestEvent = nil
+	s.bestEvent = message.EmptyScore()
 	s.lock.Unlock()
 	_ = s.eventPlayer.Forward(s.ID())
 	s.startSelection()
@@ -149,7 +150,7 @@ func (s *Selector) IncreaseTimeOut() {
 	s.timeout = s.timeout * 2
 }
 
-func (s *Selector) publishBestEvent() error {
+func (s *Selector) sendBestEvent() error {
 	var bestEvent consensus.InternalPacket
 	s.eventPlayer.Pause(s.scoreID)
 	s.lock.RLock()

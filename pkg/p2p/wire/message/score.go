@@ -31,7 +31,9 @@ type (
 	}
 )
 
-func EmptyScore(hdr header.Header) ScoreProposal {
+// EmptyScoreProposal is used to initialize a ScoreProposal. It is used
+// primarily by the internal Score generator
+func EmptyScoreProposal(hdr header.Header) ScoreProposal {
 	return ScoreProposal{
 		hdr: hdr,
 	}
@@ -47,6 +49,10 @@ func NewScoreProposal(hdr header.Header, seed []byte, proof zkproof.ZkProof) Sco
 		BidListSubset: proof.BinaryBidList,
 		Seed:          seed,
 	}
+}
+
+func (e ScoreProposal) IsEmpty() bool {
+	return e.Score == nil
 }
 
 // Header is used to comply to the consensus.Message interface
@@ -69,6 +75,14 @@ func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash []byte) *Score 
 	score.ScoreProposal.hdr.PubKeyBLS = pubkey
 	score.ScoreProposal.hdr.BlockHash = voteHash
 	return score
+}
+
+// EmptyScore is used primarily to initialize the Score,
+// since empty scores should not be propagated externally
+func EmptyScore() Score {
+	return Score{
+		ScoreProposal: EmptyScoreProposal(header.Header{}),
+	}
 }
 
 func (e Score) Equal(s Score) bool {
