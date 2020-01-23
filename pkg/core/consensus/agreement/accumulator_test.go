@@ -207,7 +207,6 @@ func newAggroFactory(provisionersNr int) func(uint64, uint8, int) message.Agreem
 	p, ks := consensus.MockProvisioners(provisionersNr)
 
 	return func(round uint64, step uint8, idx int) message.Agreement {
-		a := MockAgreementEvent(hash, round, step, ks, p, idx)
-		return *a
+		return message.MockAgreement(hash, round, step, ks, p, idx)
 	}
 }
