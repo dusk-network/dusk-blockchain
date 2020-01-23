@@ -117,7 +117,7 @@ func (s *roundStore) Dispatch(m message.Message) {
 	subscribers := s.createSubscriberQueue(m.Category())
 	lg.WithFields(log.Fields{
 		"recipients": len(subscribers),
-		"topic":      m.Category,
+		"topic":      m.Category(),
 	}).Traceln("notifying subscribers")
 	for _, sub := range subscribers {
 		if err := sub.NotifyPayload(m.Payload().(InternalPacket)); err != nil {
@@ -237,40 +237,6 @@ func (c *Coordinator) onNewRound(roundUpdate RoundUpdate, fromScratch bool) {
 	}
 }
 
-// TODO: interface - delete
-// CollectRoundUpdate is triggered when the Chain propagates a new round update.
-// The consensus components are swapped out, initialized, and the
-// state will be updated to the new round.
-/*
-func (c *Coordinator) CollectRoundUpdate(m bytes.Buffer) error {
-	lg.Debugln("received round update")
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	r := RoundUpdate{}
-	if err := DecodeRound(&m, &r); err != nil {
-		return err
-	}
-
-	if !c.stopped {
-		c.stopConsensus()
-	}
-	c.onNewRound(r, c.unsynced)
-	c.Update(r.Round)
-	c.unsynced = false
-	c.stopped = false
-	go c.flushRoundQueue()
-
-	// TODO: the Coordinator should not send events. someone else should kickstart the
-	// consensus loop
-	// TODO: interface - check this
-	c.store.Dispatch(message.Message{
-		Topic:   topics.Generation,
-		Payload: nil,
-	})
-	return nil
-}
-*/
-
 // CollectRoundUpdate is triggered when the Chain propagates a new round update.
 // The consensus components are swapped out, initialized, and the
 // state will be updated to the new round.
@@ -288,7 +254,7 @@ func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
 	c.stopped = false
 	go c.flushRoundQueue()
 
-	// TODO: the Coordinator should not send events. someone else should kickstart the
+	// TODO: the Coordinator should not send events. Someone else should kickstart the
 	// consensus loop
 	// TODO: interface - check this
 	c.store.Dispatch(message.New(topics.Generation, nil))
@@ -366,11 +332,11 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 
 	switch comparison {
 	case header.Before:
-		lg.WithField("topic", m.Category).Debugln("discarding obsolete event")
+		lg.WithField("topic", m.Category()).Debugln("discarding obsolete event")
 		c.lock.RUnlock()
 		return nil
 	case header.After:
-		lg.WithField("topic", m.Category).Debugln("storing future event")
+		lg.WithField("topic", m.Category()).Debugln("storing future event")
 
 		// If it is a future agreement event, we store it on the
 		// `roundQueue`. This means that the event will be dispatched
