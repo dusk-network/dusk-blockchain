@@ -1,8 +1,6 @@
 package agreement
 
 import (
-	"encoding/hex"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -44,7 +42,7 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 // Implements consensus.Component.
 func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	a.eventPlayer = eventPlayer
-	a.handler = newHandler(a.keys, r.P)
+	a.handler = NewHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	a.round = r.Round
 	agreementSubscriber := consensus.TopicListener{
@@ -71,17 +69,13 @@ func (a *agreement) Filter(hdr header.Header) bool {
 
 // CollectAgreementEvent is the callback to get Events from the Coordinator. It forwards
 // the events to the accumulator until Quorum is reached
-// TODO: CONTINUE FROM HERE!!!
 func (a *agreement) CollectAgreementEvent(packet consensus.InternalPacket) error {
-	hdr := packet.State()
 	// casting to Agreement
 	aggro := packet.(message.Agreement)
 
 	lg.WithFields(log.Fields{
-		"round":  hdr.Round,
-		"step":   hdr.Step,
-		"sender": hex.EncodeToString(aggro.Sender()),
-		"id":     a.agreementID,
+		"agreement": aggro,
+		"id":        a.agreementID,
 	}).Debugln("received event")
 	a.accumulator.Process(aggro)
 	return nil
