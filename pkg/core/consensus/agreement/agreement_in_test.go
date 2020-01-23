@@ -4,23 +4,38 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
+// TestMockValidity ensures that we don't go into a wild goose chase if our
+// mock system gets screwed up
+func TestAccumulatorProcessing(t *testing.T) {
+	nr := 50
+	_, hlp := WireAgreement(nr)
+	hash, _ := crypto.RandEntropy(32)
+	handler := NewHandler(hlp.Keys[0], *hlp.P)
+	accumulator := newAccumulator(handler, 4)
+
+	for i := 0; i < nr; i++ {
+		a := message.MockAgreement(hash, 1, 3, hlp.Keys, hlp.P, i)
+		accumulator.Process(a)
+	}
+
+	accumulatedAggros := <-accumulator.CollectedVotesChan
+	assert.Equal(t, 38, len(accumulatedAggros))
+}
+
 func TestCollectAgreementEvent(t *testing.T) {
 	eb := eventbus.New()
 	hlp, hash := ProduceWinningHash(eb, 3)
 
-	certificateBuf := <-hlp.CertificateChan
-	certHash := make([]byte, 32)
-	if err := encoding.Read256(&certificateBuf, certHash); err != nil {
-		t.Fatal(err)
-	}
+	certMsg := <-hlp.CertificateChan
+	aggro := certMsg.Payload().(message.Agreement)
 
-	assert.Equal(t, hash, certHash)
+	assert.Equal(t, hash, aggro.State().BlockHash)
 }
 
 func TestFinalize(t *testing.T) {
