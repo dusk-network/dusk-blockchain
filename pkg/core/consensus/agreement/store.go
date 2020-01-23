@@ -1,8 +1,6 @@
 package agreement
 
 import (
-	"encoding/hex"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,16 +25,14 @@ func (s storedAgreements) Less(i, j int) bool {
 
 func (s storedAgreements) String() string {
 	var sb strings.Builder
+	sb.WriteString("[\n")
 	for i, aggro := range s {
-		hdr := aggro.State()
-		if i == 0 {
-			sb.WriteString("[\n")
+		if i > 0 {
+			sb.WriteString("\n")
 		}
-		sb.WriteString("\t")
-		sb.WriteString(hex.EncodeToString(aggro.SignedVotes()))
-		sb.WriteString(fmt.Sprintf(" round: %d step: %d sender: %s", hdr.Round, hdr.Step, hex.EncodeToString(hdr.Sender())))
-		sb.WriteString("\n")
+		sb.WriteString(aggro.String())
 	}
+	sb.WriteString("\n")
 	sb.WriteString("]")
 	return sb.String()
 }

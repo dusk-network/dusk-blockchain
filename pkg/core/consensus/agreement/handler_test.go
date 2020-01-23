@@ -1,10 +1,10 @@
 package agreement
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,7 +13,7 @@ import (
 func TestMockAgreementEvent(t *testing.T) {
 	p, keys := consensus.MockProvisioners(50)
 	hash, _ := crypto.RandEntropy(32)
-	ev := MockAgreementEvent(hash, 1, 3, keys, p)
+	ev := message.MockAgreement(hash, 1, 3, keys, p)
 	assert.NotEqual(t, 0, ev.VotesPerStep[0].BitSet)
 	assert.NotEqual(t, 0, ev.VotesPerStep[1].BitSet)
 }
@@ -22,13 +22,14 @@ func TestVoteVerification(t *testing.T) {
 	// mocking voters
 	p, keys := consensus.MockProvisioners(3)
 	hash, _ := crypto.RandEntropy(32)
-	ev := MockAgreementEvent(hash, 1, 3, keys, p)
-	handler := newHandler(keys[0], *p)
-	if !assert.NoError(t, handler.Verify(*ev)) {
+	ev := message.MockAgreement(hash, 1, 3, keys, p)
+	handler := NewHandler(keys[0], *p)
+	if !assert.NoError(t, handler.Verify(ev)) {
 		assert.FailNow(t, "problems in verification logic")
 	}
 }
 
+/*
 func TestConsensusEventVerification(t *testing.T) {
 	p, keys := consensus.MockProvisioners(3)
 	hash, _ := crypto.RandEntropy(32)
@@ -42,3 +43,4 @@ func TestConsensusEventVerification(t *testing.T) {
 		}
 	}
 }
+*/

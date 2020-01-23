@@ -32,8 +32,8 @@ type handler struct {
 	*committee.Handler
 }
 
-// newHandler returns an initialized handler.
-func newHandler(keys key.ConsensusKeys, p user.Provisioners) *handler {
+// NewHandler returns an initialized handler.
+func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *handler {
 	return &handler{
 		Handler: committee.NewHandler(keys, p),
 	}

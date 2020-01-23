@@ -20,6 +20,24 @@ type Helper struct {
 	nr              int
 }
 
+func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
+	eb := eventbus.New()
+	h := NewHelper(eb, nrProvisioners)
+	factory := NewFactory(eb, h.Keys[0])
+	coordinator := consensus.Start(eb, h.Keys[0], factory)
+	// starting up the coordinator
+	ru := consensus.MockRoundUpdate(1, h.P, nil)
+	msg := message.New(topics.RoundUpdate, ru)
+	if err := coordinator.CollectRoundUpdate(msg); err != nil {
+		panic(err)
+	}
+	// Play to step 3, as agreements can only be made on step 3 or later
+	// This prevents the mocked events from getting queued
+	coordinator.Play(h.Aggro.ID())
+	coordinator.Play(h.Aggro.ID())
+	return coordinator, h
+}
+
 // NewHelper creates a Helper
 func NewHelper(eb *eventbus.EventBus, provisioners int) *Helper {
 	p, keys := consensus.MockProvisioners(provisioners)
