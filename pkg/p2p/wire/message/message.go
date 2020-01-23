@@ -14,6 +14,7 @@ type Message interface {
 	Category() topics.Topic
 	Payload() interface{}
 	Equal(Message) bool
+	Id() []byte
 }
 
 type Serializable interface {
@@ -61,6 +62,17 @@ func (m simple) String() string {
 	sb.WriteString("\n")
 	return sb.String()
 
+}
+
+func (m simple) Id() []byte {
+	if m.marshalled == nil {
+		buf, err := Marshal(m)
+		if err != nil {
+			panic(err)
+		}
+		m.marshalled = &buf
+	}
+	return m.marshalled.Bytes()
 }
 
 func (m simple) setPayload(i interface{}) {

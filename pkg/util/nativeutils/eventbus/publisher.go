@@ -1,6 +1,8 @@
 package eventbus
 
 import (
+	"fmt"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -13,7 +15,11 @@ type Publisher interface {
 // Publish executes callback defined for a topic.
 // topic is explicitly set as it might be different from the message Category
 // (i.e. in the Gossip case)
+var count = 0
+
 func (bus *EventBus) Publish(topic topics.Topic, m message.Message) {
+	fmt.Println("count publish", count)
+	count++
 	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
 	go bus.defaultListener.Notify(m)
 

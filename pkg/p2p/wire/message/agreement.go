@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -47,6 +48,17 @@ type (
 		Repr         *big.Int
 	}
 )
+
+// String representation of the Agreement
+func (a Agreement) String() string {
+	var sb strings.Builder
+	sb.WriteString(a.hdr.String())
+	sb.WriteString(" signature='")
+	sb.WriteString(util.StringifyBytes(a.signedVotes))
+	sb.WriteString(" repr='")
+	sb.WriteString(util.StringifyBytes(a.Repr.Bytes()))
+	return sb.String()
+}
 
 func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
 	return StepVotesMsg{
