@@ -36,7 +36,9 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	defer os.RemoveAll("walletDB")
 
 	// Send round update, to start the maintainer.
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+	ru := consensus.MockRoundUpdate(1, p, nil)
+	ruMsg := message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// receive first txs
 	txs := receiveTxs(t, c)
@@ -59,10 +61,14 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bid := user.Bid{mArr, mArr, 10}
 	bl[0] = bid
 	// Then, send a round update to update the values on the maintainer
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, bl))
+	ru = consensus.MockRoundUpdate(2, p, bl)
+	ruMsg = message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// Send another round update that is within the 'offset', to trigger sending a new pair of txs
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(950, p, bl))
+	ru = consensus.MockRoundUpdate(950, p, bl)
+	ruMsg = message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// We should get another set of two txs
 	txs = receiveTxs(t, c)
@@ -78,13 +84,17 @@ func TestSendOnce(t *testing.T) {
 	defer os.RemoveAll("walletDB")
 
 	// Send round update, to start the maintainer.
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+	ru := consensus.MockRoundUpdate(1, p, nil)
+	ruMsg := message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// receive first txs
 	_ = receiveTxs(t, c)
 
 	// Update round
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, nil))
+	ru = consensus.MockRoundUpdate(2, p, nil)
+	ruMsg = message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	select {
 	case <-c:
