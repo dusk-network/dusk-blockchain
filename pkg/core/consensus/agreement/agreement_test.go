@@ -1,7 +1,6 @@
 package agreement_test
 
 import (
-	"fmt"
 	"runtime"
 	"testing"
 
@@ -9,13 +8,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
-
-func init() {
-	logrus.SetLevel(logrus.FatalLevel)
-}
 
 // TestMockValidity ensures that we don't go into a wild goose chase if our
 // mock system gets screwed up
@@ -35,6 +29,7 @@ func TestMockValidity(t *testing.T) {
 
 // Test the accumulation of agreement events. It should result in the agreement component
 // publishing a round update.
+// TODO: trap eventual errors
 func TestAgreement(t *testing.T) {
 	nr := 50
 	_, hlp := agreement.WireAgreement(nr)
@@ -42,7 +37,6 @@ func TestAgreement(t *testing.T) {
 	for i := 0; i < nr; i++ {
 		a := message.MockAgreement(hash, 1, 3, hlp.Keys, hlp.P, i)
 		msg := message.New(topics.Agreement, a)
-		fmt.Println("count test", i)
 		hlp.Bus.Publish(topics.Agreement, msg)
 	}
 
@@ -52,6 +46,7 @@ func TestAgreement(t *testing.T) {
 }
 
 // Test that we properly clean up after calling Finalize.
+// TODO: trap eventual errors
 func TestFinalize(t *testing.T) {
 	numGRBefore := runtime.NumGoroutine()
 	// Create a set of 100 agreement components, and finalize them immediately
