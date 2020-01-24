@@ -15,10 +15,8 @@ import (
 
 // Listener publishes a byte array that subscribers of the EventBus can use
 type Listener interface {
-	// Notify a listener of a new message. The topic is redundant in most
-	// cases, except for the multilistener
-	// TODO: explore the possibility to use a different interface for it
-	Notify(topics.Topic, message.Message) error
+	// Notify a listener of a new message
+	Notify(message.Message) error
 	// Close the listener
 	Close()
 }
@@ -29,7 +27,7 @@ type CallbackListener struct {
 }
 
 // Notify the copy of a message as a parameter to a callback
-func (c *CallbackListener) Notify(_ topics.Topic, m message.Message) error {
+func (c *CallbackListener) Notify(m message.Message) error {
 	return c.callback(m)
 }
 
@@ -62,7 +60,7 @@ func NewStreamListener(w io.WriteCloser) Listener {
 }
 
 // Notify puts a message to the Listener's ringbuffer
-func (s *StreamListener) Notify(_ topics.Topic, m message.Message) error {
+func (s *StreamListener) Notify(m message.Message) error {
 	if s.ringbuffer == nil {
 		return errors.New("no ringbuffer specified")
 	}
@@ -105,7 +103,7 @@ func NewChanListener(msgChan chan<- message.Message) Listener {
 }
 
 // Notify sends a message to the internal dispatcher channel
-func (c *ChanListener) Notify(_ topics.Topic, m message.Message) error {
+func (c *ChanListener) Notify(m message.Message) error {
 	select {
 	case c.messageChannel <- m:
 	default:
@@ -119,6 +117,8 @@ func (c *ChanListener) Notify(_ topics.Topic, m message.Message) error {
 func (c *ChanListener) Close() {
 }
 
+// multilistener does not implement the Listener interface since the topic and
+// the message category will likely differ
 type multiListener struct {
 	sync.RWMutex
 	*hashset.Set
@@ -132,8 +132,6 @@ func newMultiListener() *multiListener {
 	}
 }
 
-// Notify the listeners based on the topic used (and not the category, to
-// prevent Gossiped messages to re-enter the dispatcher)
 func (m *multiListener) Notify(topic topics.Topic, msg message.Message) {
 	if !m.Has([]byte{byte(topic)}) {
 		// TODO: maybe log this
@@ -142,7 +140,7 @@ func (m *multiListener) Notify(topic topics.Topic, msg message.Message) {
 
 	m.RLock()
 	for _, dispatcher := range m.dispatchers {
-		dispatcher.Notify(topic, msg)
+		dispatcher.Notify(msg)
 	}
 	m.RUnlock()
 }

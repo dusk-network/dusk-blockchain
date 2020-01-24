@@ -32,8 +32,6 @@ type (
 // New returns new EventBus with empty listeners.
 func New() *EventBus {
 	return &EventBus{
-		//ProcessorRegistry: NewSafeProcessorRegistry(),
-
 		busLock:         sync.RWMutex{},
 		listeners:       newListenerMap(),
 		defaultListener: newMultiListener(),

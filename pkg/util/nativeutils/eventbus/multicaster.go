@@ -6,7 +6,6 @@ import (
 
 // Multicaster allows for a single Listener to listen to multiple topics
 type Multicaster interface {
-
 	AddDefaultTopic(topics.Topic)
 	SubscribeDefault(Listener) uint32
 }

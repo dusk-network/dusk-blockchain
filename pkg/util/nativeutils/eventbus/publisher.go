@@ -19,7 +19,7 @@ func (bus *EventBus) Publish(topic topics.Topic, m message.Message) {
 
 	if listeners := bus.listeners.Load(topic); listeners != nil {
 		for _, listener := range listeners {
-			if err := listener.Notify(topic, m); err != nil {
+			if err := listener.Notify(m); err != nil {
 				logEB.WithError(err).WithField("topic", topic).Warnln("listener failed to notify buffer")
 			}
 		}
