@@ -31,23 +31,6 @@ func (m *mockSigner) Compose(pf consensus.PacketFactory) consensus.InternalPacke
 }
 
 func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
-	// TODO: interface - uncomment in case the test needs a buffer
-	/*
-		// message.Marshal takes care of prepending the topic, marshalling the
-		// header, etc
-		buf, err := message.Marshal(msg)
-		if err != nil {
-			return err
-		}
-
-		// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
-		// is performed where it is supposed to (i.e. after the Gossip)
-		serialized := message.New(msg.Category(), buf)
-
-		// gossip away
-		m.bus.Publish(topics.Gossip, serialized)
-		return nil
-	*/
 	m.bus.Publish(msg.Category(), msg)
 	return nil
 }
@@ -98,9 +81,11 @@ func NewHelper(t *testing.T, eb *eventbus.EventBus, rpcBus *rpcbus.RPCBus, txBat
 func (h *Helper) createResultChans() {
 	scoreListener := eventbus.NewChanListener(h.ScoreChan)
 	h.Bus.Subscribe(topics.Score, scoreListener)
-	// Candidate messages go on the gossip topic
+	// Candidate messages go on the gossip topic. However, since the signer is
+	// manipulated to forward gossip to its original category, we listen to
+	// Candidate topic
 	candidateListener := eventbus.NewChanListener(h.CandidateChan)
-	h.Bus.Subscribe(topics.Gossip, candidateListener)
+	h.Bus.Subscribe(topics.Candidate, candidateListener)
 }
 
 // Initialize the generator with the given round update.

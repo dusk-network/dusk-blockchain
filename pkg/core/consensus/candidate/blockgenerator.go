@@ -74,18 +74,21 @@ func (bg *Generator) ID() uint32 {
 // Finalize implements consensus.Component
 func (bg *Generator) Finalize() {}
 
+// ScoreFactory is the PacketFactory implementation to let the signer  scores
 type ScoreFactory struct {
 	sp       message.ScoreProposal
 	prevHash []byte
 	voteHash []byte
 }
 
+// Create
 func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus.InternalPacket {
 	hdr := sf.sp.State()
 	if hdr.Round != round || hdr.Step != step {
-		lg.Panicf("mismatche of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
+		lg.Panicf("mismatch of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
 	}
-	return message.NewScore(sf.sp, sender, sf.prevHash, sf.voteHash)
+	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.voteHash)
+	return *score
 }
 
 // Collect a `ScoreProposal`, which triggers generation of a `Score` and a
@@ -114,12 +117,8 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, blk); err != nil {
-		return err
-	}
-
-	if _, err := buf.ReadFrom(&certBuf); err != nil {
+	cert := block.EmptyCertificate()
+	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
 		return err
 	}
 
@@ -127,12 +126,9 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
 	lg.Debugln("sending candidate")
-	if err := topics.Prepend(buf, topics.Candidate); err != nil {
-		return err
-	}
-
-	candidateMsg := message.New(topics.Candidate, buf)
-	return bg.signer.Gossip(candidateMsg, bg.ID())
+	candidateMsg := message.MakeCandidate(score.(message.Score).ScoreProposal, blk, cert)
+	msg = message.New(topics.Candidate, candidateMsg)
+	return bg.signer.Gossip(msg, bg.ID())
 }
 
 func (bg *Generator) Generate(sev message.ScoreProposal) (*block.Block, error) {

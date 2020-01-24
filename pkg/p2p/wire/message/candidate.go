@@ -13,6 +13,7 @@ type Candidate struct {
 	*block.Certificate
 }
 
+// NewCandidate is used to initialize a new candidate
 func NewCandidate() *Candidate {
 	return &Candidate{
 		hdr:         header.Header{},
@@ -21,7 +22,16 @@ func NewCandidate() *Candidate {
 	}
 }
 
-// Header is for complying to the consensus.Message interface
+// MakeCandidate is used to create a full candidate with all fields filled
+func MakeCandidate(score ScoreProposal, blk *block.Block, cert *block.Certificate) Candidate {
+	return Candidate{
+		hdr:         score.State(),
+		Block:       blk,
+		Certificate: cert,
+	}
+}
+
+// State is for complying to the consensus.Message interface
 func (c Candidate) State() header.Header {
 	return c.hdr
 }
