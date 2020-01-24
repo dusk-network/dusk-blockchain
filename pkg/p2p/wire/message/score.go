@@ -2,9 +2,11 @@ package message
 
 import (
 	"bytes"
+	"strings"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
@@ -65,6 +67,16 @@ func (e ScoreProposal) Sender() []byte {
 	return e.Z
 }
 
+func (e ScoreProposal) String() string {
+	var sb strings.Builder
+	sb.WriteString(e.hdr.String())
+	sb.WriteString(" score='")
+	sb.WriteString(util.StringifyBytes(e.Score))
+	sb.WriteString(" seed='")
+	sb.WriteString(util.StringifyBytes(e.Seed))
+	return sb.String()
+}
+
 // NewScore creates a new Score from a proposal
 func NewScore(proposal ScoreProposal, pubkey, prevHash, voteHash []byte) *Score {
 	score := &Score{
@@ -87,6 +99,16 @@ func EmptyScore() Score {
 
 func (e Score) Equal(s Score) bool {
 	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash, s.VoteHash)
+}
+
+func (e Score) String() string {
+	var sb strings.Builder
+	sb.WriteString(e.ScoreProposal.String())
+	sb.WriteString(" prev_hash='")
+	sb.WriteString(util.StringifyBytes(e.PrevHash))
+	sb.WriteString(" vote_hash='")
+	sb.WriteString(util.StringifyBytes(e.VoteHash))
+	return sb.String()
 }
 
 func makeScore() *Score {

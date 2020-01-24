@@ -15,7 +15,7 @@ type Publisher interface {
 // (i.e. in the Gossip case)
 func (bus *EventBus) Publish(topic topics.Topic, m message.Message) {
 	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
-	go bus.defaultListener.Notify(topic, m)
+	go bus.defaultListener.Forward(topic, m)
 
 	if listeners := bus.listeners.Load(topic); listeners != nil {
 		for _, listener := range listeners {

@@ -132,7 +132,7 @@ func newMultiListener() *multiListener {
 	}
 }
 
-func (m *multiListener) Notify(topic topics.Topic, msg message.Message) {
+func (m *multiListener) Forward(topic topics.Topic, msg message.Message) {
 	if !m.Has([]byte{byte(topic)}) {
 		// TODO: maybe log this
 		return
