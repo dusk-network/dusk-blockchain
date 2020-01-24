@@ -10,7 +10,12 @@ import (
 
 // Make sure the hash and root are correct, to avoid malicious nodes from
 // overwriting the candidate block for a specific hash
-func Validate(cm message.Candidate) error {
+func Validate(m message.Message) error {
+	cm := m.Payload().(message.Candidate)
+	return ValidateCandidate(cm)
+}
+
+func ValidateCandidate(cm message.Candidate) error {
 	if err := checkHash(cm.Block); err != nil {
 		return err
 	}

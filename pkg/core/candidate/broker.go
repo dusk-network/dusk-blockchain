@@ -3,6 +3,7 @@ package candidate
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -51,8 +52,7 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	}
 
 	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
-	// TODO: interface - uncomment and change into interface/message
-	//b.republisher = republisher.New(broker, topics.Candidate, Validate)
+	b.republisher = republisher.New(broker, topics.Candidate, Validate)
 	return b
 }
 
@@ -76,11 +76,12 @@ func (b *Broker) Listen() {
 
 func (b *Broker) AddValidHash(m message.Message) error {
 	score := m.Payload().(message.Score)
+	fmt.Println(score)
 	b.validHashes[string(score.VoteHash)] = struct{}{}
 	return nil
 }
 
-// TODO: interface - get rid of encoding if not needed
+// TODO: interface - rpcBus encoding will be removed
 func (b *Broker) provideCandidate(r rpcbus.Request) {
 	cm := b.store.fetchCandidateMessage(r.Params.Bytes())
 	if cm == nil {
