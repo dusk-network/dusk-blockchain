@@ -1,8 +1,6 @@
 package eventbus
 
 import (
-	"fmt"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
@@ -15,17 +13,13 @@ type Publisher interface {
 // Publish executes callback defined for a topic.
 // topic is explicitly set as it might be different from the message Category
 // (i.e. in the Gossip case)
-var count = 0
-
 func (bus *EventBus) Publish(topic topics.Topic, m message.Message) {
-	fmt.Println("count publish", count)
-	count++
 	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
-	go bus.defaultListener.Notify(m)
+	go bus.defaultListener.Notify(topic, m)
 
 	if listeners := bus.listeners.Load(topic); listeners != nil {
 		for _, listener := range listeners {
-			if err := listener.Notify(m); err != nil {
+			if err := listener.Notify(topic, m); err != nil {
 				logEB.WithError(err).WithField("topic", topic).Warnln("listener failed to notify buffer")
 			}
 		}
