@@ -9,9 +9,9 @@ import (
 
 // Make sure the hash and root are correct, to avoid malicious nodes from
 // overwriting the candidate block for a specific hash
-func Validate(b bytes.Buffer) error {
+func Validate(buf bytes.Buffer) error {
 	cm := &Candidate{block.NewBlock(), block.EmptyCertificate()}
-	if err := Decode(&b, cm); err != nil {
+	if err := Decode(&buf, cm); err != nil {
 		return err
 	}
 

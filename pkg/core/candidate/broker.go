@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
@@ -27,13 +26,14 @@ type Broker struct {
 	publisher   eventbus.Publisher
 	republisher *republisher.Republisher
 	*store
-	// List of block hashes for which a valid Score message was seen.
 	lock        sync.RWMutex
+	queue       map[string]*Candidate
 	validHashes map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
 	candidateChan     <-chan Candidate
 	getCandidateChan  <-chan rpcbus.Request
+	bestScoreChan     <-chan bytes.Buffer
 }
 
 // NewBroker returns an initialized Broker struct. It will still need
@@ -42,18 +42,22 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetCandidate, getCandidateChan)
+	bestScoreChan := make(chan bytes.Buffer, 1)
+	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 
 	b := &Broker{
 		publisher:         broker,
 		store:             newStore(),
+		queue:             make(map[string]*Candidate),
 		validHashes:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
 		getCandidateChan:  getCandidateChan,
+		bestScoreChan:     bestScoreChan,
 	}
 
-	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
-	b.republisher = republisher.New(broker, topics.Candidate, Validate)
+	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.addValidHash))
+	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
 
@@ -63,35 +67,47 @@ func (b *Broker) Listen() {
 	for {
 		select {
 		case cm := <-b.candidateChan:
-			b.lock.RLock()
-			_, ok := b.validHashes[string(cm.Block.Header.Hash)]
-			b.lock.RUnlock()
-			if ok {
-				b.storeCandidateMessage(cm)
-			}
+			b.lock.Lock()
+			b.queue[string(cm.Block.Header.Hash)] = &cm
+			b.lock.Unlock()
 		case r := <-b.getCandidateChan:
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
-			b.clearEligibleBlocks()
+			b.clearEligibleHashes()
 			b.Clear(blk.Header.Height)
+		case <-b.bestScoreChan:
+			b.filterWinningCandidates()
 		}
 	}
 }
 
-func (b *Broker) AddValidHash(m bytes.Buffer) error {
-	hash := make([]byte, 32)
-	if err := encoding.Read256(&m, hash); err != nil {
-		return err
-	}
-
+// Filter through the queue with the valid hashes, storing the Candidate
+// messages which for which a hash is known, and deleting
+// everything else.
+func (b *Broker) filterWinningCandidates() {
 	b.lock.Lock()
-	b.validHashes[string(hash)] = struct{}{}
+	for k, cm := range b.queue {
+		if _, ok := b.validHashes[string(k)]; ok {
+			b.storeCandidateMessage(*cm)
+		}
+
+		delete(b.queue, k)
+	}
 	b.lock.Unlock()
-	return nil
 }
 
 func (b *Broker) provideCandidate(r rpcbus.Request) {
-	cm := b.store.fetchCandidateMessage(r.Params.Bytes())
+	b.lock.RLock()
+	cm, ok := b.queue[string(r.Params.Bytes())]
+	b.lock.RUnlock()
+	if ok {
+		buf := new(bytes.Buffer)
+		err := Encode(buf, cm)
+		r.RespChan <- rpcbus.Response{*buf, err}
+		return
+	}
+
+	cm = b.store.fetchCandidateMessage(r.Params.Bytes())
 	if cm == nil {
 		// If we don't have the candidate message, we should ask the network for it.
 		var err error
@@ -126,24 +142,45 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 		// candidates. There should be no race condition in reading from
 		// the channel, as the only way this function can be called would
 		// be through `Listen`. Any incoming candidates which don't match
-		// our request will be passed down to the store.
+		// our request will be passed down to the queue.
 		case cm := <-b.candidateChan:
-			// We don't check if this is an eligible candidate block,
-			// as we most likely did not get the Score message for it.
-			// However, as we are only interested in one specific block,
-			// we should not be in danger of memory overflow.
-			b.storeCandidateMessage(cm)
 			if bytes.Equal(cm.Block.Header.Hash, hash) {
 				return &cm, nil
 			}
+
+			b.lock.Lock()
+			b.queue[string(cm.Block.Header.Hash)] = &cm
+			b.lock.Unlock()
 		}
 	}
 }
 
-func (b *Broker) clearEligibleBlocks() {
+func (b *Broker) Validate(buf bytes.Buffer) error {
+	cm := &Candidate{block.NewBlock(), block.EmptyCertificate()}
+	if err := Decode(&buf, cm); err != nil {
+		return err
+	}
+
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+	if _, ok := b.queue[string(cm.Block.Header.Hash)]; ok {
+		return errors.New("already exists")
+	}
+
+	return nil
+}
+
+func (b *Broker) addValidHash(buf bytes.Buffer) error {
 	b.lock.Lock()
-	for h := range b.validHashes {
-		delete(b.validHashes, h)
+	b.validHashes[string(buf.Bytes())] = struct{}{}
+	b.lock.Unlock()
+	return nil
+}
+
+func (b *Broker) clearEligibleHashes() {
+	b.lock.Lock()
+	for k := range b.validHashes {
+		delete(b.validHashes, k)
 	}
 	b.lock.Unlock()
 }
