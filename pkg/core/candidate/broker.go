@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/block"
@@ -155,16 +156,16 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 	}
 }
 
-func (b *Broker) Validate(buf bytes.Buffer) error {
+func (b *Broker) Validate(buf bytes.Buffer) *prerror.PrError {
 	cm := &Candidate{block.NewBlock(), block.EmptyCertificate()}
 	if err := Decode(&buf, cm); err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 	if _, ok := b.queue[string(cm.Block.Header.Hash)]; ok {
-		return errors.New("already exists")
+		return prerror.New(prerror.Low, errors.New("already exists"))
 	}
 
 	return nil

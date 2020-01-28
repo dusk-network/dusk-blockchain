@@ -4,22 +4,27 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
 	"github.com/dusk-network/dusk-wallet/block"
 )
 
 // Make sure the hash and root are correct, to avoid malicious nodes from
 // overwriting the candidate block for a specific hash
-func Validate(buf bytes.Buffer) error {
+func Validate(buf bytes.Buffer) *prerror.PrError {
 	cm := &Candidate{block.NewBlock(), block.EmptyCertificate()}
 	if err := Decode(&buf, cm); err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
 	if err := checkHash(cm.Block); err != nil {
-		return err
+		return prerror.New(prerror.High, err)
 	}
 
-	return checkRoot(cm.Block)
+	if err := checkRoot(cm.Block); err != nil {
+		return prerror.New(prerror.High, err)
+	}
+
+	return nil
 }
 
 func checkHash(blk *block.Block) error {

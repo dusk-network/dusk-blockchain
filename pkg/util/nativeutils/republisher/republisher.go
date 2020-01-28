@@ -5,9 +5,10 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
 )
 
-type Validator func(bytes.Buffer) error
+type Validator func(bytes.Buffer) *prerror.PrError
 
 // Republisher handles the repropagation of messages propagated with a
 // specified topic
@@ -50,8 +51,15 @@ func (r *Republisher) Activate() uint32 {
 // after applying any eventual validation logic
 func (r *Republisher) Republish(b bytes.Buffer) error {
 	for _, v := range r.validators {
-		if err := v(b); err != nil {
+		err := v(b)
+		if err != nil && err.Priority == prerror.High {
 			return err
+		}
+
+		// On low priority errors, we don't return anything, but we skip
+		// the republishing.
+		if err != nil {
+			return nil
 		}
 	}
 
