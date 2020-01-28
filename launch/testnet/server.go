@@ -45,7 +45,7 @@ func Setup() *Server {
 	rpcBus := rpcbus.New()
 
 	// Light nodes don't need to keep a mempool
-	if !cfg.Get().General.WalletOnly {
+	if !cfg.Get().General.LightNode {
 		m := mempool.NewMempool(eventBus, rpcBus, nil)
 		m.Run()
 	}
@@ -58,7 +58,7 @@ func Setup() *Server {
 	go chain.Listen()
 
 	// Light nodes don't need a candidate broker either
-	if !cfg.Get().General.WalletOnly {
+	if !cfg.Get().General.LightNode {
 		candidateBroker := candidate.NewBroker(eventBus, rpcBus)
 		go candidateBroker.Listen()
 	}
@@ -101,7 +101,7 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil, cfg.Get().General.WalletOnly)
+	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil, cfg.Get().General.LightNode)
 	if err != nil {
 		log.Panic(err)
 	}

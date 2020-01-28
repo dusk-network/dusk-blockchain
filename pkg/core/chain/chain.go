@@ -200,7 +200,7 @@ func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	// Ignore blocks from peers if we are only one behind, and in
 	// full-node mode - we are most likely just about to finalize
 	// consensus.
-	if !cfg.Get().General.WalletOnly && !c.counter.IsSyncing() {
+	if !cfg.Get().General.LightNode && !c.counter.IsSyncing() {
 		return nil
 	}
 
@@ -221,7 +221,7 @@ func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	// If we are no longer syncing after accepting this block, and
 	// we are in full-node mode, request a certificate and
 	// intermediate block for the second to last round.
-	if !cfg.Get().General.WalletOnly && !c.counter.IsSyncing() {
+	if !cfg.Get().General.LightNode && !c.counter.IsSyncing() {
 		blk, cert, err := c.requestRoundResults(blk.Header.Height + 1)
 		if err != nil {
 			return err
@@ -294,7 +294,7 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	c.prevBlock = blk
 
 	// 5. Gossip advertise block Hash -- Only in full-node mode
-	if !cfg.Get().General.WalletOnly {
+	if !cfg.Get().General.LightNode {
 		l.Trace("gossiping block")
 		if err := c.advertiseBlock(blk); err != nil {
 			l.WithError(err).Errorln("block advertising failed")

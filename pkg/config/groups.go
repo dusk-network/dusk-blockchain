@@ -2,7 +2,7 @@ package config
 
 type generalConfiguration struct {
 	Network    string
-	WalletOnly bool
+	LightNode bool
 }
 
 type loggerConfiguration struct {

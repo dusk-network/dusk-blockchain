@@ -239,7 +239,7 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // a peer.
 func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, serviceFlag protocol.ServiceFlag) {
 	_, db := heavy.CreateDBConnection()
-	if !config.Get().General.WalletOnly {
+	if !config.Get().General.LightNode {
 		router := newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String(), serviceFlag)
 		p.router = router
 

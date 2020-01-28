@@ -190,7 +190,7 @@ func TestLightNode(t *testing.T) {
 	r := new(config.Registry)
 	r.Database.Driver = "lite_v0.1.0"
 	r.General.Network = "testnet"
-	r.General.WalletOnly = true
+	r.General.LightNode = true
 	r.Mempool.MaxInvItems = 10000
 	config.Mock(r)
 

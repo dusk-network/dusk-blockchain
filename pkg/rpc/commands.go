@@ -357,7 +357,7 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 }
 
 var viewMempool = func(s *Server, params []string) (string, error) {
-	if config.Get().General.WalletOnly {
+	if config.Get().General.LightNode {
 		return "command not available in light-node mode", nil
 	}
 

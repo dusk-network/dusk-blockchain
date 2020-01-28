@@ -148,7 +148,7 @@ func (p *Connection) writeVerAck(g *processing.Gossip) error {
 func (p *Connection) createVersionBuffer() (*bytes.Buffer, error) {
 	version := protocol.NodeVer
 	serviceFlag := protocol.FullNode
-	if config.Get().General.WalletOnly {
+	if config.Get().General.LightNode {
 		serviceFlag = protocol.LightNode
 	}
 
