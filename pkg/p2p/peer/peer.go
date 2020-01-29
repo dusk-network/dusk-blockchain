@@ -249,7 +249,7 @@ func (p *Reader) ReadLoop() {
 func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
 	timer := time.NewTimer(keepAliveTime)
 	quitChan := make(chan struct{}, 1)
-	go func(p *Reader, t *time.Timer) {
+	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
 		for {
 			select {
 			case <-t.C:
@@ -259,7 +259,7 @@ func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
 				return
 			}
 		}
-	}(p, timer)
+	}(p, timer, quitChan)
 
 	return timer, quitChan
 }
