@@ -47,7 +47,8 @@ func (r *Republisher) Activate() uint32 {
 }
 
 // Republish intercepts a topic and repropagates it immediately
-// after applying any eventual validation logic
+// after applying any eventual validation logic.
+// Note: the logic for marshalling should be moved after the Gossip
 func (r *Republisher) Republish(m message.Message) error {
 	for _, v := range r.validators {
 		if err := v(m); err != nil {
@@ -55,6 +56,20 @@ func (r *Republisher) Republish(m message.Message) error {
 		}
 	}
 
-	r.broker.Publish(topics.Gossip, m)
+	// message.Marshal takes care of prepending the topic, marshalling the
+	// header, etc
+	buf, err := message.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
+	// is performed where it is supposed to (i.e. after the Gossip)
+	serialized := message.New(m.Category(), buf)
+
+	// gossip away
+	r.broker.Publish(topics.Gossip, serialized)
 	return nil
+	//r.broker.Publish(topics.Gossip, m)
+	//return nil
 }
