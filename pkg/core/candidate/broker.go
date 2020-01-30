@@ -3,7 +3,6 @@ package candidate
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -62,12 +61,16 @@ func (b *Broker) Listen() {
 	for {
 		select {
 		case cm := <-b.candidateChan:
+			// candidate notification coming from the EventBus are Candidate
+			// structs
 			if _, ok := b.validHashes[string(cm.Block.Header.Hash)]; ok {
 				b.storeCandidateMessage(cm)
 			}
 		case r := <-b.getCandidateChan:
+			// candidate requests from the RPCBus
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
+			// accepted blocks come from the consensus
 			b.clearEligibleBlocks()
 			b.Clear(blk.Header.Height)
 		}
@@ -76,7 +79,6 @@ func (b *Broker) Listen() {
 
 func (b *Broker) AddValidHash(m message.Message) error {
 	score := m.Payload().(message.Score)
-	fmt.Println(score)
 	b.validHashes[string(score.VoteHash)] = struct{}{}
 	return nil
 }
@@ -102,9 +104,17 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 // requestCandidate from peers around this node. The candidate can only be
 // requested for 2 rounds (which provides some protection from keeping to
 // request bulky stuff)
+// TODO: encoding the category within the packet and specifying it as category
+// is ugly af
 func (b *Broker) requestCandidate(hash []byte) (*message.Candidate, error) {
 	// Send a request for this specific candidate
-	msg := message.New(topics.GetCandidate, bytes.NewBuffer(hash))
+	buf := bytes.NewBuffer(hash)
+	// Ugh! Move encoding after the Gossip ffs
+	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
+		return nil, err
+	}
+
+	msg := message.New(topics.GetCandidate, *buf)
 	b.publisher.Publish(topics.Gossip, msg)
 
 	timer := time.NewTimer(2 * time.Second)

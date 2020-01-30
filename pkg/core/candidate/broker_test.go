@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -25,17 +26,16 @@ func TestValidHashes(t *testing.T) {
 	blk := helper.RandomBlock(t, 1, 3)
 	cert := block.EmptyCertificate()
 	blk.SetHash()
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, blk); err != nil {
-		t.Fatal(err)
-	}
 
-	if err := message.MarshalCertificate(buf, cert); err != nil {
-		t.Fatal(err)
-	}
+	// mocking a header with consistent hash with the block
+	hdr := header.Mock()
+	hdr.BlockHash = blk.Header.Hash
 
 	// First, attempt to store it without a `ValidCandidateHash` message.
-	eb.Publish(topics.Candidate, buf)
+	cm := message.MakeCandidate(blk, cert)
+	msg := message.New(topics.Candidate, cm)
+	eb.Publish(topics.Candidate, msg)
+
 	// Stupid channels take a while to send something
 	time.Sleep(1000 * time.Millisecond)
 
@@ -44,9 +44,12 @@ func TestValidHashes(t *testing.T) {
 	assert.Equal(t, "request timeout", err.Error())
 
 	// Now, add the hash to validHashes
-	eb.Publish(topics.ValidCandidateHash, bytes.NewBuffer(blk.Header.Hash))
+	score := message.MockScore(hdr, blk.Header.Hash)
+	vchMsg := message.New(topics.ValidCandidateHash, score)
+	eb.Publish(topics.ValidCandidateHash, vchMsg)
+
 	// And try again.
-	eb.Publish(topics.Candidate, buf)
+	eb.Publish(topics.Candidate, msg)
 
 	blkBuf, err := rb.Call(rpcbus.GetCandidate, rpcbus.Request{*bytes.NewBuffer(blk.Header.Hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
 	if err != nil {
