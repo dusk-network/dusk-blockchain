@@ -22,6 +22,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
@@ -211,10 +212,10 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 	c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
 
 	// Accept the block
-	blk := m.Payload().(*block.Block)
+	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(*blk); err != nil {
+	if err := c.AcceptBlock(blk); err != nil {
 		return err
 	}
 
@@ -323,37 +324,15 @@ func (c *Chain) onInitialization(message.Message) error {
 }
 
 func (c *Chain) sendRoundUpdate() error {
-	buf := new(bytes.Buffer)
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, c.intermediateBlock.Header.Height+1)
-	if _, err := buf.Write(roundBytes); err != nil {
-		return err
+	hdr := c.intermediateBlock.Header
+	ru := consensus.RoundUpdate{
+		Round:   hdr.Height + 1,
+		P:       *c.p,
+		BidList: *c.bidList,
+		Seed:    hdr.Seed,
+		Hash:    hdr.Hash,
 	}
-
-	membersBuf, err := c.marshalProvisioners()
-	if err != nil {
-		return err
-	}
-
-	if _, err := buf.ReadFrom(membersBuf); err != nil {
-		return err
-	}
-
-	if err := user.MarshalBidList(buf, *c.bidList); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteBLS(buf, c.intermediateBlock.Header.Seed); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(buf, c.intermediateBlock.Header.Hash); err != nil {
-		return err
-	}
-
-	// TODO: interface - RoundUpdate should be a struct as it is an internal
-	// message
-	msg := message.New(topics.RoundUpdate, buf)
+	msg := message.New(topics.RoundUpdate, ru)
 	c.eventBus.Publish(topics.RoundUpdate, msg)
 	return nil
 }
@@ -608,14 +587,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	c.intermediateBlock = cm.Block
 
 	// Notify mempool
-	/*
-		buf := new(bytes.Buffer)
-		if err := message.MarshalBlock(buf, cm.Block); err != nil {
-			log.Panic(err)
-		}
-	*/
-
-	msg := message.New(topics.IntermediateBlock, cm.Block)
+	msg := message.New(topics.IntermediateBlock, *cm.Block)
 	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
 	go c.sendRoundUpdate()
@@ -637,7 +609,12 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		log.Panic(err)
 	}
 
-	msg := message.New(topics.GetRoundResults, buf)
+	// TODO: prepending the topic should be done at the recipient end of the
+	// Gossip (together with all the other encoding)
+	if err := topics.Prepend(buf, topics.GetRoundResults); err != nil {
+		log.Panic(err)
+	}
+	msg := message.New(topics.GetRoundResults, *buf)
 	c.eventBus.Publish(topics.Gossip, msg)
 	// We wait 5 seconds for a response. We time out otherwise and
 	// attempt catching up later.
