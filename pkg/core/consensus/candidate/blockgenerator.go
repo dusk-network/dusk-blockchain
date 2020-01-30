@@ -126,7 +126,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
 	lg.Debugln("sending candidate")
-	candidateMsg := message.MakeCandidate(score.(message.Score).ScoreProposal, blk, cert)
+	candidateMsg := message.MakeCandidate(blk, cert)
 	msg = message.New(topics.Candidate, candidateMsg)
 	return bg.signer.Gossip(msg, bg.ID())
 }

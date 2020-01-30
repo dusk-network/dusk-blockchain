@@ -98,7 +98,7 @@ func (h Header) CompareRound(round uint64) Phase {
 
 func (h Header) String() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("round=%d step=%d", h.Round, h.Step))
+	sb.WriteString(fmt.Sprintf("round='%d' step='%d'", h.Round, h.Step))
 	sb.WriteString(" sender='")
 	sb.WriteString(util.StringifyBytes(h.PubKeyBLS))
 	sb.WriteString("' block hash='")

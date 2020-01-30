@@ -1,10 +1,7 @@
 package consensus
 
 import (
-	"bytes"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -31,40 +28,6 @@ type (
 		Hash    []byte
 	}
 )
-
-func DecodeRound(rb *bytes.Buffer, update *RoundUpdate) error {
-	var round uint64
-	if err := encoding.ReadUint64LE(rb, &round); err != nil {
-		return err
-	}
-
-	provisioners, err := user.UnmarshalProvisioners(rb)
-	if err != nil {
-		return err
-	}
-
-	bidList, err := user.UnmarshalBidList(rb)
-	if err != nil {
-		return err
-	}
-
-	seed := make([]byte, 33)
-	if err := encoding.ReadBLS(rb, seed); err != nil {
-		return err
-	}
-
-	hash := make([]byte, 32)
-	if err := encoding.Read256(rb, hash); err != nil {
-		return err
-	}
-
-	update.P = provisioners
-	update.Round = round
-	update.BidList = bidList
-	update.Seed = seed
-	update.Hash = hash
-	return nil
-}
 
 // InitRoundUpdate initializes a Round update channel and fires up the TopicListener
 // as well. Its purpose is to lighten up a bit the amount of arguments in creating
