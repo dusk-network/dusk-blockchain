@@ -49,9 +49,10 @@ func TestSupervisor(t *testing.T) {
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
-	testBuf := mockBlockBuf(t, 23)
+	testBlk := helper.RandomBlock(t, 23, 4)
 	// testing that we can receive messages
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	msg := message.New(topics.AcceptedBlock, *testBlk)
+	eb.Publish(topics.AcceptedBlock, msg)
 	result := <-msgChan
 
 	assert.Equal(t, "monitor", result["process"])
@@ -66,16 +67,20 @@ func TestSupervisorReconnect(t *testing.T) {
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
-	testBuf := mockBlockBuf(t, 23)
+	testBlk := helper.RandomBlock(t, 23, 4)
 	// testing that we can receive messages
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	msg := message.New(topics.AcceptedBlock, *testBlk)
+	eb.Publish(topics.AcceptedBlock, msg)
 	<-msgChan
 
 	assert.NoError(t, supervisor.Stop())
 	wg.Wait()
 
-	testBuf = mockBlockBuf(t, 24)
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	testBlk = helper.RandomBlock(t, 24, 4)
+	// testing that we can receive messages
+	msg = message.New(topics.AcceptedBlock, *testBlk)
+	eb.Publish(topics.AcceptedBlock, msg)
+
 	select {
 	case <-msgChan:
 		assert.FailNow(t, "Expected the supervised LogProcessor to be closed")
@@ -88,7 +93,7 @@ func TestSupervisorReconnect(t *testing.T) {
 	// reconnecting the supervised process
 	assert.NoError(t, supervisor.Reconnect())
 	// messages streamed when the process is down are lost, so we need to send another message
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	eb.Publish(topics.AcceptedBlock, msg)
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(24), result["round"])
@@ -103,8 +108,11 @@ func TestResumeRight(t *testing.T) {
 	supervisor, err := monitor.Launch(eb, unixSoc)
 	assert.NoError(t, err)
 
-	testBuf := mockBlockBuf(t, 23)
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	testBlk := helper.RandomBlock(t, 23, 4)
+	// testing that we can receive messages
+	msg := message.New(topics.AcceptedBlock, *testBlk)
+	eb.Publish(topics.AcceptedBlock, msg)
+
 	round1 := <-msgChan
 	if _, ok := round1["blockTime"]; ok {
 		assert.FailNow(t, "First round should not really have a block time. Instead found %d", round1["blockTime"])
@@ -113,8 +121,10 @@ func TestResumeRight(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Publish next block
-	testBuf = mockBlockBuf(t, 24)
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	testBlk = helper.RandomBlock(t, 24, 4)
+	// testing that we can receive messages
+	msg = message.New(topics.AcceptedBlock, *testBlk)
+	eb.Publish(topics.AcceptedBlock, msg)
 	var round2 map[string]interface{}
 	for {
 		// If we get a message, discard it if it is not a block event message
@@ -148,8 +158,10 @@ func TestNotifyErrors(t *testing.T) {
 		endChan <- struct{}{}
 	}()
 
-	testBuf := mockBlockBuf(t, 23)
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	testBlk := helper.RandomBlock(t, 23, 4)
+	// testing that we can receive messages
+	msg := message.New(topics.AcceptedBlock, *testBlk)
+	eb.Publish(topics.AcceptedBlock, msg)
 	result := <-msgChan
 	assert.Equal(t, "monitor", result["process"])
 	<-endChan
@@ -212,8 +224,9 @@ func TestDeadline(t *testing.T) {
 	// The write deadline is 3 seconds, so let's wait for that to expire
 	time.Sleep(3 * time.Second)
 
-	testBuf := mockBlockBuf(t, 23)
-	eb.Publish(topics.AcceptedBlock, testBuf)
+	blk := helper.RandomBlock(t, 23, 4)
+	msgBlk := message.New(topics.AcceptedBlock, *blk)
+	eb.Publish(topics.AcceptedBlock, msgBlk)
 
 	// Should get the accepted block message on the msgchan
 	for {
@@ -227,16 +240,6 @@ func TestDeadline(t *testing.T) {
 
 	_ = supervisor.Stop()
 	wg.Wait()
-}
-
-func mockBlockBuf(t *testing.T, height uint64) *bytes.Buffer {
-	blk := helper.RandomBlock(t, height, 4)
-	buf := new(bytes.Buffer)
-	if err := message.MarshalBlock(buf, blk); err != nil {
-		panic(err)
-	}
-
-	return buf
 }
 
 func initTest() (<-chan map[string]interface{}, string, *sync.WaitGroup) {
