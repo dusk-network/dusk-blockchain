@@ -3,6 +3,8 @@ package eventbus
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"sync"
 
@@ -59,6 +61,60 @@ func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 
 // SimpleStreamer is a WriteCloser
 var _ io.WriteCloser = (*SimpleStreamer)(nil)
+var _ io.WriteCloser = (*StupidStreamer)(nil)
+
+// StupidStreamer is a streamer meant for using when testing internal
+// forwarding of binary packets through the ring buffer. It does *not* add
+// magic, frames or other wraps on the forwarded packet
+type StupidStreamer struct {
+	*bufio.Reader
+	*bufio.Writer
+}
+
+// NewStupidStreamer returns an initialized SimpleStreamer.
+func NewStupidStreamer() *StupidStreamer {
+	r, w := io.Pipe()
+	return &StupidStreamer{
+		Reader: bufio.NewReader(r),
+		Writer: bufio.NewWriter(w),
+	}
+}
+
+// Write receives the packets from the ringbuffer and writes it on the internal
+// pipe immediatelyh
+func (sss *StupidStreamer) Write(p []byte) (n int, err error) {
+	lg := make([]byte, 4)
+	binary.LittleEndian.PutUint16(lg, uint16(len(p)))
+	b := bytes.NewBuffer(lg)
+	b.Write(p)
+
+	n, err = sss.Writer.Write(b.Bytes())
+	if err != nil {
+		return n, err
+	}
+
+	return n, sss.Writer.Flush()
+}
+
+func (sss *StupidStreamer) Read() ([]byte, error) {
+	length := make([]byte, 4)
+	if _, err := io.ReadFull(sss.Reader, length); err != nil {
+		return nil, err
+	}
+
+	l := binary.LittleEndian.Uint16(length)
+	payload := make([]byte, l)
+	if _, err := io.ReadFull(sss.Reader, payload); err != nil {
+		return nil, err
+	}
+
+	return payload, nil
+}
+
+// Close implements io.WriteCloser.
+func (sss *StupidStreamer) Close() error {
+	return nil
+}
 
 // SimpleStreamer is a test helper which can capture information that gets gossiped
 // by the node. It can read from the gossip stream, and stores the topics that it has
@@ -82,8 +138,8 @@ func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 	}
 }
 
-// Write receives the packets from the ringbuffer. It performs a Gossip.Process
-// (since there is no longer a preprocessor) before writing to the internal pipe
+// Write receives the packets from the ringbuffer and writes it on the internal
+// pipe immediatelyh
 func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
 	b := bytes.NewBuffer(p)
 	if err := ms.gossip.Process(b); err != nil {
@@ -143,6 +199,7 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(topic)
 
 	ms.lock.Lock()
 	ms.seenTopics = append(ms.seenTopics, topic)

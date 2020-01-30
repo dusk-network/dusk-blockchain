@@ -3,6 +3,7 @@ package eventbus
 import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
+	"github.com/sirupsen/logrus"
 )
 
 // Publisher publishes serialized messages on a specific topic
@@ -14,7 +15,12 @@ type Publisher interface {
 // topic is explicitly set as it might be different from the message Category
 // (i.e. in the Gossip case)
 func (bus *EventBus) Publish(topic topics.Topic, m message.Message) {
-	// first serve the default topic listeners as they are most likely to need more time to (pre-)process topics
+	logEB.WithFields(logrus.Fields{
+		"topic":    topic,
+		"category": m.Category(),
+	}).Traceln("publishing on the eventbus")
+
+	// first serve the default topic listeners as they are most likely to need more time to process topics
 	go bus.defaultListener.Forward(topic, m)
 
 	if listeners := bus.listeners.Load(topic); listeners != nil {
