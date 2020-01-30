@@ -20,7 +20,7 @@ func initIntermediateBlockCollector(sub eventbus.Subscriber) chan block.Block {
 }
 
 func (i *intermediateBlockCollector) Collect(blockMsg message.Message) error {
-	blk := blockMsg.Payload().(*block.Block)
-	i.blkChan <- *blk
+	blk := blockMsg.Payload().(block.Block)
+	i.blkChan <- blk
 	return nil
 }

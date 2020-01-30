@@ -159,6 +159,14 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 	}
 }
 
+func prepTx(tx transactions.Transaction) message.Message {
+	buf := new(bytes.Buffer)
+	if err := message.MarshalTx(buf, tx); err != nil {
+		panic(err)
+	}
+	return message.New(topics.Tx, *buf)
+}
+
 func TestProcessPendingTxs(t *testing.T) {
 
 	c.reset()
@@ -167,39 +175,23 @@ func TestProcessPendingTxs(t *testing.T) {
 	for _, tx := range txs {
 
 		// Publish valid tx
-		buf := new(bytes.Buffer)
-		err := message.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		txMsg := prepTx(tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		tx := helper.RandomStandardTx(t, false)
-		if err != nil {
-			t.Fatal(err)
-		}
 		tx.Version++
-		buf = new(bytes.Buffer)
-		err = message.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		txMsg = prepTx(tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 
 		// Publish a duplicated tx
-		buf = new(bytes.Buffer)
-		_ = message.MarshalTx(buf, tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 	}
 
 	c.assert(t, true)
-
 }
 
 func TestProcessPendingTxsAsync(t *testing.T) {
@@ -235,9 +227,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		wg.Add(1)
 		go func(txs []transactions.Transaction) {
 			for _, tx := range txs {
-				buf := new(bytes.Buffer)
-				_ = message.MarshalTx(buf, tx)
-				c.bus.Publish(topics.Tx, buf)
+				txMsg := prepTx(tx)
+				c.bus.Publish(topics.Tx, txMsg)
 			}
 			wg.Done()
 		}(c.verifiedTx[from:to])
@@ -248,12 +239,10 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		// Publish invalid txs
 		go func() {
 			for y := 0; y <= 5; y++ {
-				buf := new(bytes.Buffer)
 				tx := helper.RandomStandardTx(t, false)
 				tx.Version++
-				_ = message.MarshalTx(buf, tx)
-
-				c.bus.Publish(topics.Tx, buf)
+				txMsg := prepTx(tx)
+				c.bus.Publish(topics.Tx, txMsg)
 			}
 			wg.Done()
 		}()
@@ -279,14 +268,10 @@ func TestRemoveAccepted(t *testing.T) {
 	txs := randomSliceOfTxs(t, 3)
 
 	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		err := message.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
+		txMsg := prepTx(tx)
 
 		// Publish valid tx
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 
 		// Simulate a situation where the block has accepted each 2th tx
 		counter++
@@ -302,10 +287,8 @@ func TestRemoveAccepted(t *testing.T) {
 	c.wait()
 
 	_ = b.SetRoot()
-	buf := new(bytes.Buffer)
-	_ = message.MarshalBlock(buf, b)
-
-	c.bus.Publish(topics.IntermediateBlock, buf)
+	blockMsg := message.New(topics.IntermediateBlock, *b)
+	c.bus.Publish(topics.IntermediateBlock, blockMsg)
 
 	c.assert(t, false)
 }
@@ -320,14 +303,10 @@ func TestDoubleSpent(t *testing.T) {
 	txs := randomSliceOfTxs(t, 3)
 
 	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		err := message.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
+		txMsg := prepTx(tx)
 
 		// Publish valid tx
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 		c.addTx(tx)
 	}
 
@@ -340,15 +319,10 @@ func TestDoubleSpent(t *testing.T) {
 
 	// Outputs
 	tx.Outputs = txs[0].StandardTx().Outputs
-
-	buf := new(bytes.Buffer)
-	err := message.MarshalTx(buf, tx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	txMsg := prepTx(tx)
 
 	// Publish valid tx
-	c.bus.Publish(topics.Tx, buf)
+	c.bus.Publish(topics.Tx, txMsg)
 	// c.addTx(tx) do not add it into the expected list
 
 	c.wait()
@@ -364,25 +338,15 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	txs := randomSliceOfTxs(t, 1)
 
 	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		err := message.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		txMsg := prepTx(tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 	}
 
 	// Publish a coinbase txs
 	tx := helper.RandomCoinBaseTx(t, false)
-	buf := new(bytes.Buffer)
-	err := message.MarshalTx(buf, tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c.bus.Publish(topics.Tx, buf)
+	txMsg := prepTx(tx)
+	c.bus.Publish(topics.Tx, txMsg)
 
 	c.wait()
 
