@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestMockValidity ensures that we don't go into a wild goose chase if our
-// mock system gets screwed up
 func TestAccumulatorProcessing(t *testing.T) {
 	nr := 50
 	_, hlp := WireAgreement(nr)
