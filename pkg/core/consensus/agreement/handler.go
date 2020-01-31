@@ -97,7 +97,12 @@ func verifyWhole(a message.Agreement) error {
 		return err
 	}
 
-	return msg.VerifyBLSSignature(hdr.PubKeyBLS, r.Bytes(), a.SignedVotes())
+	// we make a copy of the signature because the crypto package apparently mutates the byte array when
+	// Compressing/Decompressing a point
+	// see https://github.com/dusk-network/dusk-crypto/issues/16
+	sig := make([]byte, len(a.SignedVotes()))
+	copy(sig, a.SignedVotes())
+	return msg.VerifyBLSSignature(hdr.PubKeyBLS, r.Bytes(), sig)
 }
 
 // ReconstructApk reconstructs an aggregated BLS public key from a subcommittee.
