@@ -12,6 +12,7 @@ const (
 	GetLastBlock method = iota
 	GetMempoolTxs
 	GetMempoolTxsBySize
+	GetMempoolView
 	SendMempoolTx
 	VerifyCandidateBlock
 	CreateWallet
@@ -30,6 +31,8 @@ const (
 	AutomateConsensusTxs
 	GetSyncProgress
 	IsWalletLoaded
+	RebuildChain
+	ClearWalletDatabase
 )
 
 func MarshalConsensusTxRequest(buf *bytes.Buffer, amount, lockTime uint64) error {

@@ -45,6 +45,7 @@ var (
 type Mempool struct {
 	getMempoolTxsChan       <-chan rpcbus.Request
 	getMempoolTxsBySizeChan <-chan rpcbus.Request
+	getMempoolViewChan      <-chan rpcbus.Request
 	sendTxChan              <-chan rpcbus.Request
 
 	// transactions emitted by RPC and Peer subsystems
@@ -103,6 +104,11 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
 	}
 
+	getMempoolViewChan := make(chan rpcbus.Request, 1)
+	if err := rpcBus.Register(rpcbus.GetMempoolView, getMempoolViewChan); err != nil {
+		log.WithError(err).Errorf("error registering getMempoolView")
+	}
+
 	sendTxChan := make(chan rpcbus.Request, 1)
 	if err := rpcBus.Register(rpcbus.SendMempoolTx, sendTxChan); err != nil {
 		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
@@ -117,6 +123,7 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 		intermediateBlockChan:   intermediateBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
+		getMempoolViewChan:      getMempoolViewChan,
 		sendTxChan:              sendTxChan,
 	}
 
@@ -152,6 +159,8 @@ func (m *Mempool) Run() {
 				handleRequest(r, m.onGetMempoolTxs, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
 				handleRequest(r, m.onGetMempoolTxsBySize, "GetMempoolTxsBySize")
+			case r := <-m.getMempoolViewChan:
+				handleRequest(r, m.onGetMempoolView, "GetMempoolView")
 			// Mempool input channels
 			case b := <-m.intermediateBlockChan:
 				m.onIntermediateBlock(b)
@@ -367,25 +376,28 @@ func (m *Mempool) CollectPending(msg message.Message) error {
 // still unaccepted txs.
 // Called by P2P on InvTypeMempoolTx msg
 func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
-
 	// Read inputs
 	filterTxID := r.Params.Bytes()
 
 	outputTxs := make([]transactions.Transaction, 0)
+	w := new(bytes.Buffer)
+
+	// If we are looking for a specific tx, just look it up by key.
+	if len(filterTxID) == 32 {
+		tx := m.verified.Get(filterTxID)
+		if tx == nil {
+			return bytes.Buffer{}, errors.New("tx not found")
+		}
+
+		outputTxs = append(outputTxs, tx)
+		err := marshalTxs(w, outputTxs)
+		return *w, err
+	}
 
 	// When filterTxID is empty, mempool returns all verified txs sorted
 	// by fee from highest to lowest
 	err := m.verified.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		if len(filterTxID) > 0 {
-			if bytes.Equal(filterTxID, k[:]) {
-				// tx found
-				outputTxs = append(outputTxs, t.tx)
-				return true, nil
-			}
-		} else {
-			outputTxs = append(outputTxs, t.tx)
-		}
-
+		outputTxs = append(outputTxs, t.tx)
 		return false, nil
 	})
 
@@ -393,20 +405,41 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 		return bytes.Buffer{}, err
 	}
 
-	// marshal Txs
-	w := new(bytes.Buffer)
-	lTxs := uint64(len(outputTxs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return bytes.Buffer{}, err
+	err = marshalTxs(w, outputTxs)
+	return *w, err
+}
+
+func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
+	txs := make([]transactions.Transaction, 0)
+	switch len(r.Params.Bytes()) {
+	case 32:
+		// If we want a tx with a certain ID, we can simply look it up
+		// directly
+		hash, err := hex.DecodeString(string(r.Params.Bytes()))
+		if err != nil {
+			return bytes.Buffer{}, err
+		}
+
+		tx := m.verified.Get(hash)
+		if tx == nil {
+			return bytes.Buffer{}, errors.New("tx not found")
+		}
+
+		txs = append(txs, tx)
+	case 1:
+		txs = m.verified.FilterByType(transactions.TxType(r.Params.Bytes()[0]))
+	default:
+		txs = m.verified.Clone()
 	}
 
-	for _, tx := range outputTxs {
-		if err := message.MarshalTx(w, tx); err != nil {
+	buf := new(bytes.Buffer)
+	for _, tx := range txs {
+		if _, err := buf.WriteString(fmt.Sprintf("Type: %v / Hash: %s / Locktime: %v\n", tx.Type(), hex.EncodeToString(tx.StandardTx().TxID), tx.LockTime())); err != nil {
 			return bytes.Buffer{}, err
 		}
 	}
 
-	return *w, nil
+	return *buf, nil
 }
 
 // onGetMempoolTxsBySize returns a subset of verified mempool txs which
@@ -442,20 +475,9 @@ func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
 		return bytes.Buffer{}, err
 	}
 
-	// marshal Txs
 	w := new(bytes.Buffer)
-	lTxs := uint64(len(txs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	for _, tx := range txs {
-		if err := message.MarshalTx(w, tx); err != nil {
-			return bytes.Buffer{}, err
-		}
-	}
-
-	return *w, nil
+	err = marshalTxs(w, txs)
+	return *w, err
 }
 
 // onSendMempoolTx utilizes rpcbus to allow submitting a tx to mempool with
@@ -545,4 +567,19 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (bytes.Buffe
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
 
 	log.Tracef("Handled %s request", name)
+}
+
+func marshalTxs(w *bytes.Buffer, txs []transactions.Transaction) error {
+	lTxs := uint64(len(txs))
+	if err := encoding.WriteVarInt(w, lTxs); err != nil {
+		return err
+	}
+
+	for _, tx := range txs {
+		if err := message.MarshalTx(w, tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant
@@ -683,6 +684,141 @@ func TestFetchBlockTxByHash(test *testing.T) {
 		}
 		return nil
 	})
+}
+
+func TestClearDatabase(test *testing.T) {
+	err := db.Update(func(t database.Transaction) error {
+		return t.ClearDatabase()
+	})
+
+	if err != nil {
+		test.Fatal(err)
+	}
+
+	err = db.View(func(t database.Transaction) error {
+		// All lookups should now fail
+		for _, block := range blocks {
+			blk, err := t.FetchBlock(block.Header.Hash)
+			if err == nil && blk != nil {
+				return errors.New("database was not empty")
+			}
+		}
+
+		return nil
+	})
+
+	// repopulate db for the other tests
+	if err := storeBlocks(test, db, blocks); err != nil {
+		test.Fatal(err)
+	}
+}
+
+func TestFetchOutputExists(test *testing.T) {
+	test.Parallel()
+
+	err := db.View(func(t database.Transaction) error {
+		for _, block := range blocks {
+			for _, tx := range block.Txs {
+				for _, output := range tx.StandardTx().Outputs {
+					exists, err := t.FetchOutputExists(output.PubKey.P.Bytes())
+					if err != nil {
+						return err
+					}
+
+					if !exists {
+						test.Fatal("output key missing")
+					}
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err)
+	}
+}
+
+func TestFetchOutputUnlockHeight(test *testing.T) {
+	test.Parallel()
+
+	err := db.View(func(t database.Transaction) error {
+		for _, block := range blocks {
+			for _, tx := range block.Txs {
+				for i, output := range tx.StandardTx().Outputs {
+					unlockHeight, err := t.FetchOutputUnlockHeight(output.PubKey.P.Bytes())
+					if err != nil {
+						return err
+					}
+
+					// If it's a bid or a stake, the unlockheight should
+					// be non-zero for the first output
+					if i == 0 && (tx.Type() == transactions.BidType || tx.Type() == transactions.StakeType) {
+						if unlockHeight == 0 {
+							test.Fatal("found bid or stake with 0 unlockheight")
+						}
+					}
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err)
+	}
+}
+
+func TestFetchDecoys(test *testing.T) {
+	test.Parallel()
+
+	// 7 is the standard number of decoys
+	numDecoys := 7
+	hits := 0
+	err := db.View(func(t database.Transaction) error {
+		decoys := t.FetchDecoys(numDecoys)
+		// We should have at least 90 txs in our database, so plenty of
+		// decoys to choose from, and under no circumstance should we
+		// come up short.
+		if len(decoys) != numDecoys {
+			return errors.New("did not receive requested amount of decoys")
+		}
+
+		// Make sure these decoy points belong to transactions in
+		// our db, which are unlocked.
+		for _, decoy := range decoys {
+			// Make sure it's a real output
+			exists, err := t.FetchOutputExists(decoy.Bytes())
+			if err != nil {
+				return err
+			}
+
+			if !exists {
+				return errors.New("fetched a decoy for which there is no output entry")
+			}
+
+			unlockHeight, err := t.FetchOutputUnlockHeight(decoy.Bytes())
+			if err != nil {
+				return err
+			}
+
+			if unlockHeight == 0 {
+				hits++
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		test.Fatal(err)
+	}
+
+	if hits != numDecoys {
+		test.Fatalf("incorrect amount of hits - %v/%v", hits, numDecoys)
+	}
 }
 
 // _TestPersistence tries to ensure if driver provides persistence storage.

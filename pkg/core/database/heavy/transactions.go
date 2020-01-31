@@ -281,7 +281,6 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	defer iterator.Release()
 
 	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
-	var i int
 
 	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
@@ -305,10 +304,9 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 		p.SetBytes(&pBytes)
 
 		decoysPubKeys = append(decoysPubKeys, p)
-		if i == numDecoys {
+		if len(decoysPubKeys) == numDecoys {
 			break
 		}
-		i++
 	}
 
 	return decoysPubKeys
@@ -599,4 +597,16 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - uint64(n) + uint64(pos), nil
 
+}
+
+// ClearDatabase will wipe all of the data currently in the database.
+func (t transaction) ClearDatabase() error {
+	iter := t.snapshot.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		t.batch.Delete(iter.Key())
+	}
+
+	return iter.Error()
 }

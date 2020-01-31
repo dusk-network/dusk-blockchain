@@ -48,6 +48,7 @@ An overview of the bare response object:
 | `txhistory` | | Returns the transaction history for the loaded wallet. | wallet loaded |
 | `walletstatus` | | Returns whether or not the wallet is loaded, as a "boolean" (0 or 1) | none |
 | `syncprogress` | | Returns to what degree the node is synced up with the rest of its peers, as a percentage. | none |
+| `rebuildchain` | | Wipes all of the data (except for the genesis block) from the chain and wallet databases, to allow for a full re-sync. | none |
 
 #### Extended functionality (full nodes only)
 
@@ -56,3 +57,4 @@ An overview of the bare response object:
 | `bid` | \<amount\>, \<locktime\> | Sends a bid transaction of \<amount\> DUSK to self. The transaction will be locked for \<locktime\> blocks after being accepted into a block. Returns a TXID on success. | wallet loaded |
 | `stake` | \<amount\> \<locktime\> | Sends a stake transaction of \<amount\> DUSK to self. The transaction will be locked for \<locktime\> blocks after being accepted into a block. Returns a TXID on success. | wallet loaded |
 | `automateconsensustxs` | | Tells the node to automatically renew stakes and bids, to save the user the trouble. Values and locktimes are inferred from configuration file. Returns a string indicating success or failure. | wallet loaded |
+| `viewmempool` | (optional) \<txtype or txid\> | Returns an overview of the mempool. Optionally, a caller can supply either a txtype (1 byte), or a txid(32 bytes) in order to filter for specific items. | none |
