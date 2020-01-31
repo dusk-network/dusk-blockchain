@@ -8,8 +8,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 // Candidate is the composition of block and certificates

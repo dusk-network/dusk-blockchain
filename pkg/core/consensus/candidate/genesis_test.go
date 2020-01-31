@@ -8,9 +8,9 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 func TestGenerateGenesis(t *testing.T) {

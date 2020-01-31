@@ -12,7 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,7 +25,8 @@ func TestValidHashes(t *testing.T) {
 
 	blk := helper.RandomBlock(t, 1, 3)
 	cert := block.EmptyCertificate()
-	blk.SetHash()
+	hash, _ := blk.CalculateHash()
+	blk.Header.Hash = hash
 
 	// mocking a header with consistent hash with the block
 	hdr := header.Mock()

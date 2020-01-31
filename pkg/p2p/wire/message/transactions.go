@@ -9,7 +9,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/mlsag"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 func UnmarshalTxMessage(r *bytes.Buffer, m SerializableMessage) error {

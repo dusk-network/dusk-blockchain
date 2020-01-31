@@ -10,7 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant

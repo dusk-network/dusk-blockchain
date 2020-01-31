@@ -6,8 +6,8 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 var (

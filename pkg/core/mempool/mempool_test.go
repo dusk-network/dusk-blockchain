@@ -18,7 +18,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -286,7 +286,8 @@ func TestRemoveAccepted(t *testing.T) {
 
 	c.wait()
 
-	_ = b.SetRoot()
+	root, _ := b.CalculateRoot()
+	b.Header.TxRoot = root
 	blockMsg := message.New(topics.IntermediateBlock, *b)
 	c.bus.Publish(topics.IntermediateBlock, blockMsg)
 

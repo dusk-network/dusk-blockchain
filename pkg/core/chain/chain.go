@@ -16,8 +16,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
@@ -30,7 +30,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -743,13 +743,17 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 
 	tx := mockDeterministicCoinbase()
 	blk.AddTx(tx)
-	if err := blk.SetRoot(); err != nil {
+	root, err := blk.CalculateRoot()
+	if err != nil {
 		return nil, err
 	}
+	blk.Header.TxRoot = root
 
-	if err := blk.SetHash(); err != nil {
+	hash, err := blk.CalculateHash()
+	if err != nil {
 		return nil, err
 	}
+	blk.Header.Hash = hash
 
 	return blk, nil
 }

@@ -5,7 +5,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 // roundCollector is a simple wrapper over a channel to get round notifications.

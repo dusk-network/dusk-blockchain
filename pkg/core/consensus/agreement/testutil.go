@@ -7,7 +7,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 // Helper is a struct that facilitates sending semi-real Events with minimum effort

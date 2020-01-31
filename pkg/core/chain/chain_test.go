@@ -18,9 +18,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,8 +54,10 @@ func TestAcceptFromPeer(t *testing.T) {
 	blk.SetPrevBlock(c.prevBlock.Header)
 	// Strip all but coinbase tx, to avoid unwanted errors
 	blk.Txs = blk.Txs[0:1]
-	blk.SetRoot()
-	blk.SetHash()
+	root, _ := blk.CalculateRoot()
+	blk.Header.TxRoot = root
+	hash, _ := blk.CalculateHash()
+	blk.Header.Hash = hash
 
 	msg = message.New(topics.AcceptedBlock, *blk)
 
@@ -217,8 +219,10 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	blk := helper.RandomBlock(t, 1, 1)
 	// Remove all txs except coinbase, as the helper transactions do not pass verification
 	blk.Txs = blk.Txs[0:1]
-	blk.SetRoot()
-	blk.SetHash()
+	root, _ := blk.CalculateRoot()
+	blk.Header.TxRoot = root
+	hash, _ := blk.CalculateHash()
+	blk.Header.Hash = hash
 	// Add cert and prev hash
 	blk.Header.Certificate = message.MockCertificate(blk.Header.Hash, 1, k, p)
 	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash

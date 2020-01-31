@@ -6,7 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 

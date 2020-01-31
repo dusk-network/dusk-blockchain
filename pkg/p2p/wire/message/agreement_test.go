@@ -6,7 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/stretchr/testify/assert"
 )
 

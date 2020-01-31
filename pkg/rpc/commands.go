@@ -12,7 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 )
 
 // handler defines a method bound to an RPC command.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 // GenerateGenesisBlock is a developer utility for regenerating the genesis block

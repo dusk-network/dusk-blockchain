@@ -15,10 +15,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	walletdb "github.com/dusk-network/dusk-wallet/database"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 )
 
 var testnet = byte(2)

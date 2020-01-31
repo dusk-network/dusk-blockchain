@@ -14,10 +14,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
-	"github.com/dusk-network/dusk-wallet/txrecords"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/txrecords"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	logger "github.com/sirupsen/logrus"
 )
 

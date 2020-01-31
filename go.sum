@@ -30,8 +30,8 @@ github.com/dusk-network/bn256 v0.5.0-lattices h1:3PWpy5mxJI7UNPdfjHzI3Mw2MhbZbHt
 github.com/dusk-network/bn256 v0.5.0-lattices/go.mod h1:KGkfDyf8GXeworEpuKRRfPGQa/CzezrYUGaaABueUhg=
 github.com/dusk-network/dusk-crypto v0.1.0 h1:HUwtbA00D2WH8xBd1xvKSIUlJtu4ulBSte+yyKO8tZg=
 github.com/dusk-network/dusk-crypto v0.1.0/go.mod h1:Hgr/7jihizg4T/om70iCt4p0uon2asf/9AAzeegu9CU=
-github.com/dusk-network/dusk-wallet v1.1.3 h1:vKn5WRtpKhhgJ/1fQCDFmhpgjG6k6VRuIbszqQTGVf0=
-github.com/dusk-network/dusk-wallet v1.1.3/go.mod h1:MqjZmkfz5ISQ2LSLjpDjyX+o449Ps5luMFINxYan6eM=
+github.com/dusk-network/dusk-wallet/v2 v2.0.0 h1:Br8tYAFXh2POOEPYmNcRPD15Mn/xBZcd2iD7/aHNBbY=
+github.com/dusk-network/dusk-wallet/v2 v2.0.0/go.mod h1:iweGXUe9XLFWh04TgfBfUu4hkhp4WNsrPWPYt2AHNwY=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee/go.mod h1:PpPxJzdlQ023fALM5AGWeFrIaIU2igVmxr3QiRaf+ks=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=

@@ -11,7 +11,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	log "github.com/sirupsen/logrus"
 )

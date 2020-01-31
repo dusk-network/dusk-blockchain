@@ -10,13 +10,13 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -161,14 +161,18 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 	}
 
 	// Update TxRoot
-	if err := candidateBlock.SetRoot(); err != nil {
+	root, err := candidateBlock.CalculateRoot()
+	if err != nil {
 		return nil, err
 	}
+	candidateBlock.Header.TxRoot = root
 
 	// Generate the block hash
-	if err := candidateBlock.SetHash(); err != nil {
+	hash, err := candidateBlock.CalculateHash()
+	if err != nil {
 		return nil, err
 	}
+	candidateBlock.Header.Hash = hash
 
 	return candidateBlock, nil
 }
@@ -248,7 +252,7 @@ func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []by
 	tx.AddReward(*rewardReceiver, reward)
 
 	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
-	// This could be achieved with a request to dusk-wallet
+	// This could be achieved with a request to dusk-wallet/v2
 
 	return tx, nil
 }

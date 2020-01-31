@@ -6,7 +6,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -58,7 +58,8 @@ func TestEncodeDecodeHeader(t *testing.T) {
 
 	// Create a random header
 	hdr := helper.RandomHeader(t, 200)
-	err := hdr.SetHash()
+	hash, err := hdr.CalculateHash()
+	hdr.Hash = hash
 	assert.Nil(err)
 
 	// Encode header into a buffer

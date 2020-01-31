@@ -14,7 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-crypto/bls"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 type (

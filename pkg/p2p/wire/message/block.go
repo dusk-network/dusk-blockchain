@@ -6,8 +6,8 @@ import (
 	"math"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 func MarshalBlock(r *bytes.Buffer, b *block.Block) error {

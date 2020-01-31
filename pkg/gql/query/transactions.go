@@ -10,7 +10,7 @@ import (
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
-	core "github.com/dusk-network/dusk-wallet/transactions"
+	core "github.com/dusk-network/dusk-wallet/v2/transactions"
 	log "github.com/sirupsen/logrus"
 )
 

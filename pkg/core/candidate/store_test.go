@@ -12,7 +12,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/stretchr/testify/assert"
 )
 
