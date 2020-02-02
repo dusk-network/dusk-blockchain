@@ -101,7 +101,7 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 		return "", fmt.Errorf("missing parameters: amount/locktime")
 	}
 
-	amount, err := strconv.Atoi(params[1])
+	amount, err := strconv.Atoi(params[0])
 	if err != nil {
 		return "", fmt.Errorf("converting amount string to an integer: %v", err)
 	}
