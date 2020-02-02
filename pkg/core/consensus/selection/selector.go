@@ -162,7 +162,7 @@ func (s *Selector) sendBestEvent() error {
 		bestEvent = s.signer.Compose(emptyScoreFactory{}).(message.Score)
 	}
 
-	msg := message.New(topics.Score, bestEvent)
+	msg := message.New(topics.BestScore, bestEvent)
 	s.signer.SendInternally(topics.BestScore, msg, s.ID())
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
