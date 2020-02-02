@@ -84,7 +84,7 @@ func NewStupidStreamer() *StupidStreamer {
 // pipe immediatelyh
 func (sss *StupidStreamer) Write(p []byte) (n int, err error) {
 	lg := make([]byte, 4)
-	binary.LittleEndian.PutUint16(lg, uint16(len(p)))
+	binary.LittleEndian.PutUint32(lg, uint32(len(p)))
 	b := bytes.NewBuffer(lg)
 	b.Write(p)
 
@@ -102,7 +102,7 @@ func (sss *StupidStreamer) Read() ([]byte, error) {
 		return nil, err
 	}
 
-	l := binary.LittleEndian.Uint16(length)
+	l := binary.LittleEndian.Uint32(length)
 	payload := make([]byte, l)
 	if _, err := io.ReadFull(sss.Reader, payload); err != nil {
 		return nil, err
