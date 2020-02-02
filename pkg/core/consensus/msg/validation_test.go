@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/stretchr/testify/assert"
 )
 
