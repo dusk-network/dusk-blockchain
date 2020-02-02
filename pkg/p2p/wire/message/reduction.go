@@ -12,10 +12,11 @@ import (
 )
 
 type (
-	// the consensus.
+	// Reduction is one of the messages used in the consensus algorithms. As
+	// such it encapsulates a header.Header to allow the Coordinator to
+	// correctly enforce the sequence of state changes expressed through the algorithm
 	Reduction struct {
-		hdr header.Header
-
+		hdr        header.Header
 		SignedHash []byte
 	}
 )
