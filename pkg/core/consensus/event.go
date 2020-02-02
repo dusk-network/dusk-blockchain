@@ -15,6 +15,16 @@ type InternalPacket interface {
 	State() header.Header
 }
 
+type empty struct{}
+
+func (e empty) State() header.Header {
+	return header.Header{}
+}
+
+func EmptyPacket() InternalPacket {
+	return empty{}
+}
+
 // Packet is a consensus message payload with a full Header
 type Packet interface {
 	InternalPacket

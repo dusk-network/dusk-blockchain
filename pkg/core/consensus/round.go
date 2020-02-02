@@ -256,8 +256,7 @@ func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
 
 	// TODO: the Coordinator should not send events. Someone else should kickstart the
 	// consensus loop
-	// TODO: interface - check this
-	c.store.Dispatch(message.New(topics.Generation, nil))
+	c.store.Dispatch(message.New(topics.Generation, EmptyPacket()))
 	return nil
 }
 
