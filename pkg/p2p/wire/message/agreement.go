@@ -140,7 +140,7 @@ func UnmarshalAgreementMessage(r *bytes.Buffer, m SerializableMessage) error {
 		return err
 	}
 
-	m.SetPayload(aggro)
+	m.SetPayload(*aggro)
 	return nil
 }
 
