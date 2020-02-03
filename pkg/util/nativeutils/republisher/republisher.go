@@ -60,8 +60,11 @@ func (r *Republisher) Activate() uint32 {
 func (r *Republisher) Republish(b bytes.Buffer) error {
 	for _, v := range r.validators {
 		err := v(b)
-		if err != nil && (err == InvalidError || err == EncodingError) {
+		switch err {
+		case InvalidError, EncodingError:
 			return err
+		case DuplicatePayloadError:
+			return nil
 		}
 	}
 
