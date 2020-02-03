@@ -2,22 +2,30 @@ package republisher
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/prerror"
 )
 
-type Validator func(bytes.Buffer) *prerror.PrError
+var (
+	DuplicatePayloadError = errors.New("duplicate payload")
+	InvalidError          = errors.New("invalid payload")
+	EncodingError         = errors.New("encoding failed")
+)
 
-// Republisher handles the repropagation of messages propagated with a
-// specified topic
-type Republisher struct {
-	tpc        topics.Topic
-	broker     eventbus.Broker
-	id         uint32
-	validators []Validator
-}
+type (
+	Validator func(bytes.Buffer) error
+
+	// Republisher handles the repropagation of messages propagated with a
+	// specified topic
+	Republisher struct {
+		tpc        topics.Topic
+		broker     eventbus.Broker
+		id         uint32
+		validators []Validator
+	}
+)
 
 // New creates a Republisher
 func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
@@ -52,14 +60,8 @@ func (r *Republisher) Activate() uint32 {
 func (r *Republisher) Republish(b bytes.Buffer) error {
 	for _, v := range r.validators {
 		err := v(b)
-		if err != nil && err.Priority == prerror.High {
+		if err != nil && (err == InvalidError || err == EncodingError) {
 			return err
-		}
-
-		// On low priority errors, we don't return anything, but we skip
-		// the republishing.
-		if err != nil {
-			return nil
 		}
 	}
 
