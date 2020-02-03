@@ -151,15 +151,15 @@ func (s *Selector) IncreaseTimeOut() {
 }
 
 func (s *Selector) sendBestEvent() error {
-	var bestEvent message.Score
+	var bestEvent consensus.InternalPacket
 	s.eventPlayer.Pause(s.scoreID)
 	s.lock.RLock()
 	bestEvent = s.bestEvent
 	s.lock.RUnlock()
 
 	// If we had no best event, we should send an empty hash
-	if bestEvent.IsEmpty() {
-		bestEvent = s.signer.Compose(emptyScoreFactory{}).(message.Score)
+	if bestEvent.(message.Score).IsEmpty() {
+		bestEvent = s.signer.Compose(emptyScoreFactory{})
 	}
 
 	msg := message.New(topics.BestScore, bestEvent)
