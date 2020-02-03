@@ -1,12 +1,14 @@
-package main
+package diagnostics
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
 	"strconv"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -38,18 +40,67 @@ type ProfileSet struct {
 	quit     chan struct{}
 }
 
-func NewProfileSet(profiles map[string]profSettings) ProfileSet {
+// NewProfileSet creates and starts ProfileSet from a set of configurations
+//
+// Examples config entries:
+// "cpu, 1800, 30"
+// "heap, 1800, 1800, 1"
+// "memstats, 1800, 1"
+func NewProfileSet(profiles []string) (ProfileSet, error) {
 
 	p := ProfileSet{
-		quit: make(chan struct{}),
+		quit:     make(chan struct{}),
+		profiles: make(map[string]profSettings, 0),
 	}
 
-	p.profiles = profiles
-	for name, item := range p.profiles {
-		go loop(name, item.n, item.d, item.start, p.quit)
+	for _, entry := range profiles {
+
+		name, item, err := parse(entry)
+		if err != nil {
+			return p, err
+		}
+
+		_, ok := p.profiles[name]
+		if !ok {
+			p.profiles[name] = item
+			go loop(name, item.n, item.d, item.start, p.quit)
+		} else {
+			return p, fmt.Errorf("duplicated entry %s", name)
+		}
 	}
 
-	return p
+	return p, nil
+}
+
+func parse(conf string) (string, profSettings, error) {
+
+	w := strings.SplitN(conf, ",", 4)
+	if len(w) < 3 {
+		return "", profSettings{}, errors.New("invalid settings")
+	}
+
+	var s profSettings
+	var err error
+
+	s.n, err = strconv.Atoi(w[1])
+	if err != nil {
+		return "", s, err
+	}
+
+	s.d, err = strconv.Atoi(w[2])
+	if err != nil {
+		return "", s, err
+	}
+
+	if len(w) > 3 {
+		v, err := strconv.Atoi(w[3])
+		if err != nil {
+			return "", s, err
+		}
+		s.start = (v > 0)
+	}
+
+	return w[0], s, nil
 }
 
 func (p ProfileSet) Close() {

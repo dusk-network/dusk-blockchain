@@ -12,6 +12,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 )
 
 const (
@@ -54,14 +56,14 @@ func main() {
 	log.Infof("Selected network  %s", cfg.Get().General.Network)
 
 	// Set up profiling tools.
-	profile, err := newProfile()
+	profileSet, err := diagnostics.NewProfileSet(cfg.Get().Prof.Profile)
 	if err != nil {
 		// Assume here if tools are enabled but they fail on loading then it's better
 		// to fix the error or just disable them.
 		log.Errorf("Profiling tools error: %s", err.Error())
 		return
 	}
-	defer profile.close()
+	defer profileSet.Close()
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup()
