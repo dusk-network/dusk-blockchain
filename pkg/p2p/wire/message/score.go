@@ -125,7 +125,7 @@ func UnmarshalScoreMessage(r *bytes.Buffer, m SerializableMessage) error {
 	if err := UnmarshalScore(r, sc); err != nil {
 		return err
 	}
-	m.SetPayload(sc)
+	m.SetPayload(*sc)
 	return nil
 }
 
