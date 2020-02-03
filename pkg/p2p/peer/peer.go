@@ -84,7 +84,7 @@ func (l *LightConnector) Write(b []byte) (int, error) {
 
 func (l *LightConnector) canSend(topicByte byte) bool {
 	switch topics.Topic(topicByte) {
-	case topics.Block, topics.Inv:
+	case topics.Block, topics.Inv, topics.Ping, topics.Pong:
 		return true
 	default:
 		return false

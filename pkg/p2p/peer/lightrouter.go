@@ -51,6 +51,8 @@ func (l *lightRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		l.ponger.Pong()
 	case topics.Block:
 		err = l.synchronizer.Synchronize(b, l.peerInfo)
+	case topics.Pong:
+		// Just here to avoid the error. We don't do anything with Pong
 	default:
 		err = fmt.Errorf("topic unroutable: %s", topic.String())
 	}
