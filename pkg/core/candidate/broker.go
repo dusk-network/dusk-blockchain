@@ -28,7 +28,7 @@ type Broker struct {
 	republisher *republisher.Republisher
 	*store
 	lock        sync.RWMutex
-	queue       map[string]*Candidate
+	queue       map[string]Candidate
 	validHashes map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
@@ -49,7 +49,7 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	b := &Broker{
 		publisher:         broker,
 		store:             newStore(),
-		queue:             make(map[string]*Candidate),
+		queue:             make(map[string]Candidate),
 		validHashes:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
@@ -69,7 +69,7 @@ func (b *Broker) Listen() {
 		select {
 		case cm := <-b.candidateChan:
 			b.lock.Lock()
-			b.queue[string(cm.Block.Header.Hash)] = &cm
+			b.queue[string(cm.Block.Header.Hash)] = cm
 			b.lock.Unlock()
 		case r := <-b.getCandidateChan:
 			b.provideCandidate(r)
@@ -89,7 +89,7 @@ func (b *Broker) filterWinningCandidates() {
 	b.lock.Lock()
 	for k, cm := range b.queue {
 		if _, ok := b.validHashes[string(k)]; ok {
-			b.storeCandidateMessage(*cm)
+			b.storeCandidateMessage(cm)
 		}
 
 		delete(b.queue, k)
@@ -103,13 +103,13 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 	b.lock.RUnlock()
 	if ok {
 		buf := new(bytes.Buffer)
-		err := Encode(buf, cm)
+		err := Encode(buf, &cm)
 		r.RespChan <- rpcbus.Response{*buf, err}
 		return
 	}
 
 	cm = b.store.fetchCandidateMessage(r.Params.Bytes())
-	if cm == nil {
+	if cm.Block == nil {
 		// If we don't have the candidate message, we should ask the network for it.
 		var err error
 		cm, err = b.requestCandidate(r.Params.Bytes())
@@ -120,15 +120,15 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := Encode(buf, cm)
+	err := Encode(buf, &cm)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
 
-func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
+func (b *Broker) requestCandidate(hash []byte) (Candidate, error) {
 	// Send a request for this specific candidate
 	buf := bytes.NewBuffer(hash)
 	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
-		return nil, err
+		return Candidate{}, err
 	}
 
 	b.publisher.Publish(topics.Gossip, buf)
@@ -137,7 +137,7 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 	for {
 		select {
 		case <-timer.C:
-			return nil, errors.New("request timeout")
+			return Candidate{}, errors.New("request timeout")
 
 		// We take control of `candidateChan`, to monitor incoming
 		// candidates. There should be no race condition in reading from
@@ -146,11 +146,11 @@ func (b *Broker) requestCandidate(hash []byte) (*Candidate, error) {
 		// our request will be passed down to the queue.
 		case cm := <-b.candidateChan:
 			if bytes.Equal(cm.Block.Header.Hash, hash) {
-				return &cm, nil
+				return cm, nil
 			}
 
 			b.lock.Lock()
-			b.queue[string(cm.Block.Header.Hash)] = &cm
+			b.queue[string(cm.Block.Header.Hash)] = cm
 			b.lock.Unlock()
 		}
 	}
