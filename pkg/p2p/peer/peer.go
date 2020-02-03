@@ -45,19 +45,16 @@ type Connection struct {
 // GossipConnector calls Gossip.Process on the message stream incoming from the
 // ringbuffer
 // It absolves the function previously carried over by the Gossip preprocessor.
-type GossipConnector struct {
-	gossip *processing.Gossip
-	*Connection
-	protocol.ServiceFlag
+type GossipConnector interface {
+	io.WriteCloser
 }
 
-func (g *GossipConnector) Write(b []byte) (int, error) {
-	// Preliminary check, to ensure we don't send messages to
-	// nodes who aren't interested in them.
-	if !g.canSend(b[0]) {
-		return 0, nil
-	}
+type FullConnector struct {
+	gossip *processing.Gossip
+	*Connection
+}
 
+func (g *FullConnector) Write(b []byte) (int, error) {
 	buf := bytes.NewBuffer(b)
 	if err := g.gossip.Process(buf); err != nil {
 		return 0, err
@@ -66,11 +63,25 @@ func (g *GossipConnector) Write(b []byte) (int, error) {
 	return g.Connection.Write(buf.Bytes())
 }
 
-func (g *GossipConnector) canSend(topicByte byte) bool {
-	if g.ServiceFlag == protocol.FullNode {
-		return true
+type LightConnector struct {
+	gossip *processing.Gossip
+	*Connection
+}
+
+func (l *LightConnector) Write(b []byte) (int, error) {
+	if !l.canSend(b[0]) {
+		return 0, nil
 	}
 
+	buf := bytes.NewBuffer(b)
+	if err := l.gossip.Process(buf); err != nil {
+		return 0, err
+	}
+
+	return l.Connection.Write(buf.Bytes())
+}
+
+func (l *LightConnector) canSend(topicByte byte) bool {
 	switch topics.Topic(topicByte) {
 	case topics.Block, topics.Inv:
 		return true
@@ -167,7 +178,14 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	g := &GossipConnector{w.gossip, w.Connection, serviceFlag}
+	var g GossipConnector
+
+	if serviceFlag == protocol.FullNode {
+		g = &FullConnector{w.gossip, w.Connection}
+	} else {
+		g = &LightConnector{w.gossip, w.Connection}
+	}
+
 	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
 	// Ping loop - ensures connection stays alive during quiet periods
