@@ -54,6 +54,6 @@ func (g *Generator) ID() uint32 {
 // Collect `Restart` events and triggers a Generation event
 func (g *Generator) Collect(_ consensus.InternalPacket) error {
 	packet := g.signer.Compose(restartFactory)
-	msg := message.New(topics.Restart, packet)
+	msg := message.New(topics.Generation, packet)
 	return g.signer.SendInternally(topics.Generation, msg, g.ID())
 }
