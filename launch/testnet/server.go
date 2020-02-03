@@ -147,7 +147,7 @@ func (s *Server) OnAccept(conn net.Conn) {
 		"address": peerReader.Addr(),
 	}).Debugln("connection established")
 
-	go peerReader.Listen(s.eventBus, s.dupeMap, s.rpcBus, s.counter, writeQueueChan, serviceFlag)
+	go peerReader.Listen(s.eventBus, s.dupeMap, s.rpcBus, s.counter, writeQueueChan, serviceFlag, peer.KeepAliveTime)
 
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 	go peerWriter.Serve(writeQueueChan, exitChan, serviceFlag)
@@ -173,7 +173,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 
 	exitChan := make(chan struct{}, 1)
 	peerReader := peer.NewReader(conn, s.gossip, exitChan)
-	go peerReader.Listen(s.eventBus, s.dupeMap, s.rpcBus, s.counter, writeQueueChan, serviceFlag)
+	go peerReader.Listen(s.eventBus, s.dupeMap, s.rpcBus, s.counter, writeQueueChan, serviceFlag, peer.KeepAliveTime)
 	go peerWriter.Serve(writeQueueChan, exitChan, serviceFlag)
 }
 

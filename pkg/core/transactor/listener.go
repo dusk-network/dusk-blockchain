@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +43,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleLoadWallet, "LoadWallet")
 		case r := <-t.automateConsensusTxsChan:
 			handleRequest(r, t.handleAutomateConsensusTxs, "AutomateConsensusTxs")
+		case r := <-t.clearWalletDatabaseChan:
+			handleRequest(r, t.handleClearWalletDatabase, "ClearWalletDatabase")
 
 		// Transaction requests to respond to
 		case r := <-t.sendBidTxChan:
@@ -445,6 +448,24 @@ func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
 	}
 
 	if err := t.launchMaintainer(); err != nil {
+		return err
+	}
+
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	return nil
+}
+
+func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
+	if t.w == nil {
+		if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
+			return err
+		}
+
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		return nil
+	}
+
+	if err := t.w.ClearDatabase(); err != nil {
 		return err
 	}
 

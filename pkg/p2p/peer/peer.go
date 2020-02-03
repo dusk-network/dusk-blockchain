@@ -23,6 +23,7 @@ import (
 )
 
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer
+const KeepAliveTime = 30 * time.Second  // Send keepalive message after inactivity for this amount of time
 
 var l *log.Entry = log.WithField("process", "peer")
 
@@ -188,9 +189,6 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
-	// Ping loop - ensures connection stays alive during quiet periods
-	go w.pingLoop()
-
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
 	w.writeLoop(writeQueueChan, exitChan)
@@ -200,35 +198,6 @@ func (w *Writer) onDisconnect() {
 	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
 	w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
-}
-
-func (w *Writer) pingLoop() {
-	// We ping every 30 seconds to keep the connection alive
-	ticker := time.NewTicker(30 * time.Second)
-
-	for {
-		<-ticker.C
-		if err := w.ping(); err != nil {
-			l.WithError(err).Warnln("error pinging peer")
-			// Clean up ticker
-			ticker.Stop()
-			return
-		}
-	}
-}
-
-func (w *Writer) ping() error {
-	buf := new(bytes.Buffer)
-	if err := topics.Prepend(buf, topics.Ping); err != nil {
-		return err
-	}
-
-	if err := w.gossip.Process(buf); err != nil {
-		return err
-	}
-
-	_, err := w.Connection.Write(buf.Bytes())
-	return err
 }
 
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
@@ -255,7 +224,7 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // listening for messages.
 // Should be called in a go-routine, after a successful handshake with
 // a peer.
-func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, serviceFlag protocol.ServiceFlag) {
+func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer, serviceFlag protocol.ServiceFlag, keepAliveTime time.Duration) {
 	_, db := heavy.CreateDBConnection()
 	if !config.Get().General.LightNode {
 		router := newRouter(publisher, dupeMap, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String(), serviceFlag)
@@ -274,15 +243,21 @@ func (p *Reader) Listen(publisher eventbus.Publisher, dupeMap *dupemap.DupeMap, 
 		p.router = newLightRouter(publisher, db, rpcBus, counter, responseChan, p.Conn.RemoteAddr().String())
 	}
 
-	p.ReadLoop()
+	p.ReadLoop(keepAliveTime)
 }
 
 // ReadLoop will block on the read until a message is read, or until the deadline
 // is reached. Eventual duplicated messages are silently discarded.
-func (p *Reader) ReadLoop() {
+func (p *Reader) ReadLoop(keepAliveTime time.Duration) {
 	defer p.Conn.Close()
+
+	// Set up a timer, which triggers the sending of a `keepalive` message
+	// when fired.
+	timer, quitChan := p.keepAliveLoop(keepAliveTime)
+
 	defer func() {
 		p.exitChan <- struct{}{}
+		quitChan <- struct{}{}
 	}()
 
 	for {
@@ -307,7 +282,42 @@ func (p *Reader) ReadLoop() {
 		}
 
 		p.router.Collect(bytes.NewBuffer(message))
+
+		// Reset the keepalive timer
+		timer.Reset(keepAliveTime)
 	}
+}
+
+func (p *Reader) keepAliveLoop(keepAliveTime time.Duration) (*time.Timer, chan struct{}) {
+	timer := time.NewTimer(keepAliveTime)
+	quitChan := make(chan struct{}, 1)
+	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
+		for {
+			select {
+			case <-t.C:
+				p.Connection.keepAlive()
+			case <-quitChan:
+				t.Stop()
+				return
+			}
+		}
+	}(p, timer, quitChan)
+
+	return timer, quitChan
+}
+
+func (c *Connection) keepAlive() error {
+	buf := new(bytes.Buffer)
+	if err := topics.Prepend(buf, topics.Ping); err != nil {
+		return err
+	}
+
+	if err := c.gossip.Process(buf); err != nil {
+		return err
+	}
+
+	_, err := c.Write(buf.Bytes())
+	return err
 }
 
 // Write a message to the connection.

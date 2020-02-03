@@ -58,7 +58,7 @@ func TestReader(t *testing.T) {
 	l := eventbus.NewChanListener(agreementChan)
 	eb.Subscribe(topics.Agreement, l)
 
-	go peerReader.Listen(eb, dupemap.NewDupeMap(0), rpcBus, chainsync.NewCounter(eb), nil, protocol.FullNode)
+	go peerReader.Listen(eb, dupemap.NewDupeMap(0), rpcBus, chainsync.NewCounter(eb), nil, protocol.FullNode, 30*time.Second)
 
 	// We should get the message through this channel
 	<-agreementChan
@@ -113,35 +113,6 @@ func TestWriteLoop(t *testing.T) {
 	assert.Equal(t, decoded, buf.Bytes())
 }
 
-// Test that the 'ping' message is sent correctly, and that a 'pong' message will result.
-func TestPingLoop(t *testing.T) {
-	bus := eventbus.New()
-	client, srv := net.Pipe()
-
-	responseChan := make(chan *bytes.Buffer, 10)
-	writer := peer.NewWriter(client, processing.NewGossip(protocol.TestNet), bus)
-	go writer.Serve(responseChan, make(chan struct{}, 1), protocol.FullNode)
-
-	// Set up the other end of the exchange
-	responseChan2 := make(chan *bytes.Buffer, 10)
-	writer2 := peer.NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
-	go writer2.Serve(responseChan2, make(chan struct{}, 1), protocol.FullNode)
-	// Give the goroutine some time to start
-	time.Sleep(100 * time.Millisecond)
-
-	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
-	go reader.Listen(bus, dupemap.NewDupeMap(0), rpcbus.New(), &chainsync.Counter{}, responseChan2, protocol.FullNode)
-
-	// We should eventually get a pong message out of responseChan2
-	buf := <-responseChan2
-	topic, err := topics.Extract(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, topics.Pong.String(), topic.String())
-}
-
 // Test that peers with a LightNode service flag only get specific
 // messages, and can only send specific messages.
 func TestServiceFlagGuard(t *testing.T) {
@@ -155,7 +126,7 @@ func TestServiceFlagGuard(t *testing.T) {
 	go writer.Serve(responseChan, make(chan struct{}, 1), protocol.LightNode)
 
 	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
-	go reader.Listen(bus, dupemap.NewDupeMap(0), rpcbus.New(), &chainsync.Counter{}, responseChan, protocol.LightNode)
+	go reader.Listen(bus, dupemap.NewDupeMap(0), rpcbus.New(), &chainsync.Counter{}, responseChan, protocol.LightNode, 30*time.Second)
 
 	// Send an agreement buffer from the peer. This should not be routed
 	g := processing.NewGossip(protocol.TestNet)
@@ -207,7 +178,7 @@ func TestLightNode(t *testing.T) {
 	// Setting up the peer
 	responseChan := make(chan *bytes.Buffer, 10)
 	reader := peer.NewReader(client, processing.NewGossip(protocol.TestNet), make(chan struct{}, 1))
-	go reader.Listen(bus, dupemap.NewDupeMap(0), rb, &chainsync.Counter{}, responseChan, protocol.FullNode)
+	go reader.Listen(bus, dupemap.NewDupeMap(0), rb, &chainsync.Counter{}, responseChan, protocol.FullNode, 30*time.Second)
 
 	// Should not attempt to send a `mempool` message
 	select {

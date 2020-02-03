@@ -44,6 +44,7 @@ type Transactor struct {
 	getTxHistoryChan          chan rpcbus.Request
 	automateConsensusTxsChan  chan rpcbus.Request
 	isWalletLoadedChan        chan rpcbus.Request
+	clearWalletDatabaseChan   chan rpcbus.Request
 }
 
 // Instantiate a new Transactor struct.
@@ -76,6 +77,7 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 		getTxHistoryChan:          make(chan rpcbus.Request, 1),
 		automateConsensusTxsChan:  make(chan rpcbus.Request, 1),
 		isWalletLoadedChan:        make(chan rpcbus.Request, 1),
+		clearWalletDatabaseChan:   make(chan rpcbus.Request, 1),
 	}
 
 	if t.fetchDecoys == nil {
@@ -142,7 +144,11 @@ func (t *Transactor) registerMethods() error {
 		return err
 	}
 
-	return t.rb.Register(rpcbus.IsWalletLoaded, t.isWalletLoadedChan)
+	if err := t.rb.Register(rpcbus.IsWalletLoaded, t.isWalletLoadedChan); err != nil {
+		return err
+	}
+
+	return t.rb.Register(rpcbus.ClearWalletDatabase, t.clearWalletDatabaseChan)
 }
 
 func (t *Transactor) Wallet() (*wallet.Wallet, error) {

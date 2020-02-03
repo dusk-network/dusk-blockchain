@@ -2,6 +2,7 @@ package lite
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -67,6 +68,16 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 		// Map KeyImage to Transaction
 		for _, input := range tx.StandardTx().Inputs {
 			t.batch[keyImagesInd][toKey(input.KeyImage.Bytes())] = txID
+		}
+
+		for i, output := range tx.StandardTx().Outputs {
+			value := make([]byte, 8)
+			// Only lock the first output, so that change outputs are
+			// not affected.
+			if i == 0 {
+				binary.LittleEndian.PutUint64(value, tx.LockTime()+b.Header.Height)
+			}
+			t.batch[outputKeyInd][toKey(output.PubKey.P.Bytes())] = value
 		}
 	}
 
@@ -195,16 +206,42 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 
 	return true, txID, nil
 }
+
 func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
-	return nil
+	points := make([]ristretto.Point, 0, numDecoys)
+	for key := range t.db.storage[outputKeyInd] {
+		// Ignore locked outputs
+		unlockHeight := binary.LittleEndian.Uint64(t.db.storage[outputKeyInd][key])
+		if unlockHeight != 0 {
+			continue
+		}
+
+		var p ristretto.Point
+		var pBytes [32]byte
+		copy(pBytes[:], key[:])
+		p.SetBytes(&pBytes)
+
+		points = append(points, p)
+		if len(points) == numDecoys {
+			break
+		}
+	}
+
+	return points
 }
 
 func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
-	return false, nil
+	_, exists := t.db.storage[outputKeyInd][toKey(destkey)]
+	return exists, nil
 }
 
 func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
-	return 0, nil
+	unlockHeight, exists := t.db.storage[outputKeyInd][toKey(destkey)]
+	if !exists {
+		return 0, errors.New("this output does not exist")
+	}
+
+	return binary.LittleEndian.Uint64(unlockHeight), nil
 }
 
 func (t transaction) FetchState() (*database.State, error) {
@@ -318,4 +355,12 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - uint64(n) + uint64(pos), nil
 
+}
+
+func (t transaction) ClearDatabase() error {
+	for key := range t.db.storage {
+		t.db.storage[key] = make(table)
+	}
+
+	return nil
 }
