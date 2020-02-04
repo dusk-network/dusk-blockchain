@@ -64,22 +64,14 @@ func UnmarshalReductionMessage(r *bytes.Buffer, m SerializableMessage) error {
 		return err
 	}
 
-	m.SetPayload(bev)
+	m.SetPayload(*bev)
 	return nil
 }
 
 // Unmarshal unmarshals the buffer into a Reduction event.
 func UnmarshalReduction(r *bytes.Buffer, bev *Reduction) error {
-	if err := header.Unmarshal(r, &bev.hdr); err != nil {
-		return err
-	}
-
 	bev.SignedHash = make([]byte, 33)
-	if err := encoding.ReadBLS(r, bev.SignedHash); err != nil {
-		return err
-	}
-
-	return nil
+	return encoding.ReadBLS(r, bev.SignedHash)
 }
 
 // Marshal a Reduction event into a buffer.
