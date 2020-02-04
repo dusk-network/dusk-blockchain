@@ -128,7 +128,7 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 	switch topic {
 	case topics.Tx:
 		err = UnmarshalTxMessage(b, msg)
-	case topics.Candidate:
+	case topics.Candidate, topics.RoundResults:
 		err = UnmarshalCandidateMessage(b, msg)
 	case topics.Score:
 		err = UnmarshalScoreMessage(b, msg)
@@ -136,8 +136,6 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 		err = UnmarshalReductionMessage(b, msg)
 	case topics.Agreement:
 		err = UnmarshalAgreementMessage(b, msg)
-		//case RoundResults:
-		//err = unmarshalRoundResultMessage(b, msg)
 	}
 
 	if err != nil {
@@ -212,7 +210,7 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 	case topics.Tx:
 		tx := payload.(transactions.Transaction)
 		err = MarshalTx(buf, tx)
-	case topics.Candidate:
+	case topics.Candidate, topics.RoundResults:
 		candidate := payload.(Candidate)
 		err = MarshalCandidate(buf, candidate)
 	case topics.Score:
@@ -224,8 +222,6 @@ func marshalMessage(topic topics.Topic, payload interface{}, buf *bytes.Buffer) 
 	case topics.Agreement:
 		agreement := payload.(Agreement)
 		err = MarshalAgreement(buf, agreement)
-		//case RoundResults:
-		//err = unmarshalRoundResultMessage(b, msg)
 	default:
 		return fmt.Errorf("unsupported marshalling of message type: %v", topic.String())
 	}
