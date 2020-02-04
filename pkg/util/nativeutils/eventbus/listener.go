@@ -139,7 +139,9 @@ func (m *multiListener) Forward(topic topics.Topic, msg message.Message) {
 
 	m.RLock()
 	for _, dispatcher := range m.dispatchers {
-		dispatcher.Notify(msg)
+		if err := dispatcher.Notify(msg); err != nil {
+			logEB.WithError(err).WithField("type", "multilistener").Warnln("notifying subscriber failed")
+		}
 	}
 	m.RUnlock()
 }
