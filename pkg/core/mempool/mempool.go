@@ -368,13 +368,8 @@ func (m *Mempool) newPool() Pool {
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
 func (m *Mempool) CollectPending(msg message.Message) error {
-	tx := msg.Payload().(bytes.Buffer)
-	txDesc, err := unmarshalTxDesc(tx)
-	if err != nil {
-		return err
-	}
-
-	m.pending <- txDesc
+	tx := msg.Payload().(transactions.Transaction)
+	m.pending <- TxDesc{tx: tx, received: time.Now(), size: uint(len(msg.Id()))}
 	return nil
 }
 
@@ -531,6 +526,10 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	// TODO: can we simply encode the message directly on a topic carrying buffer?
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
+		log.Panic(err)
+	}
+
+	if err := topics.Prepend(buf, topics.Inv); err != nil {
 		log.Panic(err)
 	}
 
