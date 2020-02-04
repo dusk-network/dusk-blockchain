@@ -389,6 +389,10 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 		log.Panic(err)
 	}
 
+	if err := topics.Prepend(buf, topics.Inv); err != nil {
+		log.Panic(err)
+	}
+
 	m := message.New(topics.Inv, *buf)
 	c.eventBus.Publish(topics.Gossip, m)
 	return nil
