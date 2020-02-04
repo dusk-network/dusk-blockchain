@@ -64,7 +64,7 @@ func (m simple) String() string {
 
 }
 
-func (m *simple) Id() []byte {
+func (m simple) Id() []byte {
 	if m.marshalled == nil {
 		buf, err := Marshal(m)
 		if err != nil {
@@ -144,7 +144,7 @@ func Unmarshal(b *bytes.Buffer) (Message, error) {
 		return nil, err
 	}
 
-	return msg, nil
+	return *msg, nil
 }
 
 // Marshal a Message into a buffer. The buffer *does* include its Category (so
@@ -156,7 +156,7 @@ func Marshal(s Message) (bytes.Buffer, error) {
 	var buf bytes.Buffer
 	// if it is a simple message, first we check if this message carries a
 	// cache of its marshalled form first
-	m, ok := s.(*simple)
+	m, ok := s.(simple)
 
 	if !ok { // it is not a cacheable message. We simply marshal without caring for any optimization
 		if err := marshal(s, &buf); err != nil {
