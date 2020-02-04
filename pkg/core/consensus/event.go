@@ -1,48 +1,51 @@
 package consensus
 
 import (
-	"bytes"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-var _ wire.Event = (*Event)(nil)
+var emptyHash [32]byte
 
-// TopicEvent is the concatenation of a consensus Event, and it's designated Topic.
-type TopicEvent struct {
-	Event
-	Topic topics.Topic
+// Message is a specialization of the Payload of message.Message. It is used to
+// unify messages used by the consensus, which need to carry the header.Header
+// for consensus specific operations
+// TODO: interface - consider breaking the Header down into
+// AsyncState/SignedState/Header
+type InternalPacket interface {
+	State() header.Header
 }
 
-func NewTopicEvent(topic topics.Topic, hdr header.Header, payload bytes.Buffer) TopicEvent {
-	return TopicEvent{
-		Event{hdr, payload},
-		topic,
+type empty struct{}
+
+func (e empty) State() header.Header {
+	return header.Header{}
+}
+
+func EmptyPacket() InternalPacket {
+	return empty{}
+}
+
+// Packet is a consensus message payload with a full Header
+type Packet interface {
+	InternalPacket
+	Sender() []byte
+}
+
+// InternalMsgFactory is used by the signer/coordinator to create internal
+// messages
+type PacketFactory interface {
+	Create([]byte, uint64, uint8) InternalPacket
+}
+
+// Restarter creates the Restart message used by the Generator and the
+// Reduction
+type Restarter struct{}
+
+func (r Restarter) Create(sender []byte, round uint64, step uint8) InternalPacket {
+	return header.Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: emptyHash[:],
+		PubKeyBLS: sender,
 	}
-}
-
-// Event is the collection of a consensus message header and it's payload.
-// Its primary purpose is to group all of the common fields in a consensus message
-// together, and allow for consensus components to process the topic-specific payload
-// on its own, while retaining the general information if needed.
-type Event struct {
-	Header  header.Header
-	Payload bytes.Buffer
-}
-
-// Sender returns the BLS public key of the event sender.
-func (e Event) Sender() []byte {
-	return e.Header.Sender()
-}
-
-// Equal checks if an Event is equal to another.
-func (e Event) Equal(ev wire.Event) bool {
-	ce, ok := ev.(Event)
-	if !ok {
-		return false
-	}
-
-	return e.Header.Equal(&ce.Header) && bytes.Equal(e.Payload.Bytes(), ce.Payload.Bytes())
 }

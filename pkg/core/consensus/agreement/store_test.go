@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,18 +13,15 @@ import (
 var hdr header.Header
 var blsPubKey, _ = crypto.RandEntropy(32)
 
-func mockAgreement(id string, blockHash []byte, step uint8) Agreement {
-	h := hdr
+func mockAgreement(id string, blockHash []byte, step uint8) message.Agreement {
+	h := header.New()
 	h.BlockHash = blockHash
-	a := Agreement{
-		Header: header.Header{
-			Round:     uint64(1),
-			Step:      step,
-			PubKeyBLS: blsPubKey,
-		},
-	}
+	h.Round = uint64(1)
+	h.Step = step
+	h.PubKeyBLS = blsPubKey
+	a := message.NewAgreement(h)
 	a.SetSignature([]byte(id))
-	return a
+	return *a
 }
 
 var test = []struct {

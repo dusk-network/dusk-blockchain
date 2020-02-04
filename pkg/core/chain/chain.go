@@ -16,21 +16,21 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 	logger "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -173,13 +173,16 @@ func (c *Chain) Listen() {
 	}
 }
 
+// TODO: interface - solve the inconsistencies of unmarshalling the topic
+// internally in the Marshal, or externally
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := topics.Block.ToBuffer()
-	if err := marshalling.MarshalBlock(&buffer, &blk); err != nil {
+	if err := message.MarshalBlock(&buffer, &blk); err != nil {
 		return err
 	}
 
-	c.eventBus.Publish(topics.Gossip, &buffer)
+	msg := message.New(topics.Block, blk)
+	c.eventBus.Publish(topics.Gossip, msg)
 	return nil
 }
 
@@ -202,7 +205,7 @@ func (c *Chain) Close() error {
 	return drvr.Close()
 }
 
-func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
+func (c *Chain) onAcceptBlock(m message.Message) error {
 	// Ignore blocks from peers if we are only one behind, and in
 	// full-node mode - we are most likely just about to finalize
 	// consensus.
@@ -211,16 +214,13 @@ func (c *Chain) onAcceptBlock(m bytes.Buffer) error {
 	}
 
 	// If we are more than one block behind, stop the consensus
-	c.eventBus.Publish(topics.StopConsensus, new(bytes.Buffer))
+	c.eventBus.Publish(topics.StopConsensus, message.New(topics.StopConsensus, nil))
 
 	// Accept the block
-	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
-		return err
-	}
+	blk := m.Payload().(block.Block)
 
 	// This will decrement the sync counter
-	if err := c.AcceptBlock(*blk); err != nil {
+	if err := c.AcceptBlock(blk); err != nil {
 		return err
 	}
 
@@ -318,52 +318,29 @@ func (c *Chain) AcceptBlock(blk block.Block) error {
 	// mempool.Mempool
 	// consensus.generation.broker
 	l.Trace("notifying internally")
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, &blk); err != nil {
-		l.WithError(err).Errorln("block encoding failed")
-		return err
-	}
 
-	c.eventBus.Publish(topics.AcceptedBlock, buf)
+	msg := message.New(topics.AcceptedBlock, blk)
+	c.eventBus.Publish(topics.AcceptedBlock, msg)
 
 	l.Trace("procedure ended")
 	return nil
 }
 
-func (c *Chain) onInitialization(bytes.Buffer) error {
+func (c *Chain) onInitialization(message.Message) error {
 	return c.sendRoundUpdate()
 }
 
 func (c *Chain) sendRoundUpdate() error {
-	buf := new(bytes.Buffer)
-	roundBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(roundBytes, c.intermediateBlock.Header.Height+1)
-	if _, err := buf.Write(roundBytes); err != nil {
-		return err
+	hdr := c.intermediateBlock.Header
+	ru := consensus.RoundUpdate{
+		Round:   hdr.Height + 1,
+		P:       *c.p,
+		BidList: *c.bidList,
+		Seed:    hdr.Seed,
+		Hash:    hdr.Hash,
 	}
-
-	membersBuf, err := c.marshalProvisioners()
-	if err != nil {
-		return err
-	}
-
-	if _, err := buf.ReadFrom(membersBuf); err != nil {
-		return err
-	}
-
-	if err := user.MarshalBidList(buf, *c.bidList); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteBLS(buf, c.intermediateBlock.Header.Seed); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(buf, c.intermediateBlock.Header.Hash); err != nil {
-		return err
-	}
-
-	c.eventBus.Publish(topics.RoundUpdate, buf)
+	msg := message.New(topics.RoundUpdate, ru)
+	c.eventBus.Publish(topics.RoundUpdate, msg)
 	return nil
 }
 
@@ -395,7 +372,7 @@ func (c *Chain) verifyCandidateBlock(r rpcbus.Request) {
 	}
 
 	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&r.Params, blk); err != nil {
+	if err := message.UnmarshalBlock(&r.Params, blk); err != nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 	}
 
@@ -414,10 +391,11 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 	}
 
 	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		return err
+		log.Panic(err)
 	}
 
-	c.eventBus.Publish(topics.Gossip, buf)
+	m := message.New(topics.Inv, *buf)
+	c.eventBus.Publish(topics.Gossip, m)
 	return nil
 }
 
@@ -599,8 +577,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		return
 	}
 
-	cm := candidate.NewCandidate()
-	if err := candidate.Decode(&candidateBuf, cm); err != nil {
+	cm := message.NewCandidate()
+	if err := message.UnmarshalCandidate(&candidateBuf, cm); err != nil {
 		log.WithError(err).Warnln("could not decode candidate message")
 		return
 	}
@@ -620,12 +598,8 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	c.intermediateBlock = cm.Block
 
 	// Notify mempool
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, cm.Block); err != nil {
-		log.Panic(err)
-	}
-
-	c.eventBus.Publish(topics.IntermediateBlock, buf)
+	msg := message.New(topics.IntermediateBlock, *cm.Block)
+	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
 	go c.sendRoundUpdate()
 }
@@ -637,7 +611,7 @@ func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {
 
 // Send out a query for agreement messages and an intermediate block.
 func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certificate, error) {
-	roundResultsChan := make(chan bytes.Buffer, 10)
+	roundResultsChan := make(chan message.Message, 10)
 	id := c.eventBus.Subscribe(topics.RoundResults, eventbus.NewChanListener(roundResultsChan))
 	defer c.eventBus.Unsubscribe(topics.RoundResults, id)
 
@@ -646,11 +620,13 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		log.Panic(err)
 	}
 
+	// TODO: prepending the topic should be done at the recipient end of the
+	// Gossip (together with all the other encoding)
 	if err := topics.Prepend(buf, topics.GetRoundResults); err != nil {
 		log.Panic(err)
 	}
-
-	c.eventBus.Publish(topics.Gossip, buf)
+	msg := message.New(topics.GetRoundResults, *buf)
+	c.eventBus.Publish(topics.Gossip, msg)
 	// We wait 5 seconds for a response. We time out otherwise and
 	// attempt catching up later.
 	timer := time.NewTimer(5 * time.Second)
@@ -659,16 +635,17 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		select {
 		case <-timer.C:
 			return nil, nil, errors.New("request timeout")
-		case b := <-roundResultsChan:
+		case m := <-roundResultsChan:
 			blk := block.NewBlock()
-			if err := marshalling.UnmarshalBlock(&b, blk); err != nil {
+			b := m.Payload().(bytes.Buffer)
+			if err := message.UnmarshalBlock(&b, blk); err != nil {
 				// Prevent a malicious node from cutting us off by
 				// sending garbled data
 				continue
 			}
 
 			cert := block.EmptyCertificate()
-			if err := marshalling.UnmarshalCertificate(&b, cert); err != nil {
+			if err := message.UnmarshalCertificate(&b, cert); err != nil {
 				continue
 			}
 
@@ -697,7 +674,7 @@ func (c *Chain) provideLastBlock(r rpcbus.Request) {
 	prevBlock := c.prevBlock
 	c.mu.RUnlock()
 
-	err := marshalling.MarshalBlock(buf, &prevBlock)
+	err := message.MarshalBlock(buf, &prevBlock)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
 
@@ -708,7 +685,7 @@ func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := marshalling.MarshalCertificate(buf, c.lastCertificate)
+	err := message.MarshalCertificate(buf, c.lastCertificate)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
 
@@ -730,12 +707,12 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, c.intermediateBlock); err != nil {
+	if err := message.MarshalBlock(buf, c.intermediateBlock); err != nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}
 
-	if err := marshalling.MarshalCertificate(buf, c.lastCertificate); err != nil {
+	if err := message.MarshalCertificate(buf, c.lastCertificate); err != nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 		return
 	}
@@ -777,13 +754,17 @@ func mockFirstIntermediateBlock(prevBlockHeader *block.Header) (*block.Block, er
 
 	tx := mockDeterministicCoinbase()
 	blk.AddTx(tx)
-	if err := blk.SetRoot(); err != nil {
+	root, err := blk.CalculateRoot()
+	if err != nil {
 		return nil, err
 	}
+	blk.Header.TxRoot = root
 
-	if err := blk.SetHash(); err != nil {
+	hash, err := blk.CalculateHash()
+	if err != nil {
 		return nil, err
 	}
+	blk.Header.Hash = hash
 
 	return blk, nil
 }
@@ -809,7 +790,8 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	defer c.mu.Unlock()
 
 	// Halt consensus
-	c.eventBus.Publish(topics.StopConsensus, new(bytes.Buffer))
+	msg := message.New(topics.StopConsensus, nil)
+	c.eventBus.Publish(topics.StopConsensus, msg)
 
 	// Remove EVERYTHING from the database. This includes the genesis
 	// block, so we need to add it afterwards.

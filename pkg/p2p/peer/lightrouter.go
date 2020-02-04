@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -33,34 +34,36 @@ func newLightRouter(publisher eventbus.Publisher, db database.DB, rpcBus *rpcbus
 	}
 }
 
-func (l *lightRouter) Collect(b *bytes.Buffer) error {
-	topic, err := topics.Extract(b)
+func (l *lightRouter) Collect(packet []byte) error {
+	b := bytes.NewBuffer(packet)
+	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
 	}
-	l.route(topic, b)
+	l.route(*b, msg)
 	return nil
 }
 
-func (l *lightRouter) route(topic topics.Topic, b *bytes.Buffer) {
+func (l *lightRouter) route(b bytes.Buffer, msg message.Message) {
 	var err error
-	switch topic {
+	category := msg.Category()
+	switch category {
 	case topics.Inv:
-		err = l.dataRequestor.RequestMissingItems(b)
+		err = l.dataRequestor.RequestMissingItems(&b)
 	case topics.Ping:
 		l.ponger.Pong()
 	case topics.Block:
-		err = l.synchronizer.Synchronize(b, l.peerInfo)
+		err = l.synchronizer.Synchronize(&b, l.peerInfo)
 	case topics.Pong:
 		// Just here to avoid the error. We don't do anything with Pong
 	default:
-		err = fmt.Errorf("topic unroutable: %s", topic.String())
+		err = fmt.Errorf("topic unroutable: %s", category.String())
 	}
 
 	if err != nil {
 		log.WithFields(log.Fields{
 			"process": "peer",
 			"error":   err,
-		}).Errorf("problem handling message %s", topic.String())
+		}).Errorf("problem handling message %s", category.String())
 	}
 }

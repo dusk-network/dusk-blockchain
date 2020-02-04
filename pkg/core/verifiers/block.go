@@ -9,8 +9,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-crypto/bls"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 // CheckBlock will verify whether a block is valid according to the rules of the consensus
@@ -124,12 +124,12 @@ func CheckBlockHeader(prevBlock block.Block, blk block.Block) error {
 	}
 
 	// Merkle tree check -- Check is here as the root is not calculated on decode
-	tR := blk.Header.TxRoot
-	if err := blk.SetRoot(); err != nil {
+	root, err := blk.CalculateRoot()
+	if err != nil {
 		return errors.New("could not calculate the merkle tree root for this header")
 	}
 
-	if !bytes.Equal(tR, blk.Header.TxRoot) {
+	if !bytes.Equal(root, blk.Header.TxRoot) {
 		return errors.New("merkle root mismatch")
 	}
 

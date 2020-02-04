@@ -7,7 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	log "github.com/sirupsen/logrus"
 )
 

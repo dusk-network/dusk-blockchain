@@ -13,10 +13,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,7 +29,9 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	defer os.RemoveAll("walletDB")
 
 	// Send round update, to start the maintainer.
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+	ru := consensus.MockRoundUpdate(1, p, nil)
+	ruMsg := message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// receive first txs
 	receiveTxs(t, c)
@@ -47,10 +50,14 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bid := user.Bid{mArr, mArr, 10}
 	bl[0] = bid
 	// Then, send a round update to update the values on the maintainer
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, bl))
+	ru = consensus.MockRoundUpdate(2, p, bl)
+	ruMsg = message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// Send another round update that is within the 'offset', to trigger sending a new pair of txs
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(950, p, bl))
+	ru = consensus.MockRoundUpdate(950, p, bl)
+	ruMsg = message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// We should get another set of two txs
 	receiveTxs(t, c)
@@ -64,13 +71,17 @@ func TestSendOnce(t *testing.T) {
 	defer os.RemoveAll("walletDB")
 
 	// Send round update, to start the maintainer.
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(1, p, nil))
+	ru := consensus.MockRoundUpdate(1, p, nil)
+	ruMsg := message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// receive first txs
 	receiveTxs(t, c)
 
 	// Update round
-	bus.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, nil))
+	ru = consensus.MockRoundUpdate(2, p, nil)
+	ruMsg = message.New(topics.RoundUpdate, ru)
+	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	select {
 	case <-c:

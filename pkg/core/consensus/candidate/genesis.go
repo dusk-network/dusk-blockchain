@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 // GenerateGenesisBlock is a developer utility for regenerating the genesis block
@@ -29,7 +29,7 @@ func GenerateGenesisBlock(generatorPubKey *key.PublicKey) (string, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
+	if err := message.MarshalBlock(buf, b); err != nil {
 		return "", err
 	}
 

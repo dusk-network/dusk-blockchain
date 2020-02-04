@@ -1,13 +1,14 @@
-package reduction_test
+package message_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-crypto/bls"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,11 +20,11 @@ func TestReductionUnMarshal(t *testing.T) {
 
 	// Marshal it
 	buf := new(bytes.Buffer)
-	assert.NoError(t, reduction.Marshal(buf, ev))
+	assert.NoError(t, message.MarshalReduction(buf, ev))
 
 	// Now Unmarshal it
-	ev2 := reduction.New()
-	assert.NoError(t, reduction.Unmarshal(buf, ev2))
+	ev2 := message.NewReduction(header.Header{})
+	assert.NoError(t, message.UnmarshalReduction(buf, ev2))
 
 	// The two events should be the exact same
 	assert.Equal(t, ev, *ev2)
@@ -33,7 +34,7 @@ func TestReductionUnMarshal(t *testing.T) {
 // Reduction events.
 func TestVoteSetUnMarshal(t *testing.T) {
 	// Mock a slice of Reduction events
-	var evs []reduction.Reduction
+	var evs []message.Reduction
 	for i := 0; i < 5; i++ {
 		ev := newReductionEvent(1, 1)
 		evs = append(evs, ev)
@@ -41,10 +42,10 @@ func TestVoteSetUnMarshal(t *testing.T) {
 
 	// Marshal it
 	buf := new(bytes.Buffer)
-	assert.NoError(t, reduction.MarshalVoteSet(buf, evs))
+	assert.NoError(t, message.MarshalVoteSet(buf, evs))
 
 	// Now Unmarshal it
-	evs2, err := reduction.UnmarshalVoteSet(buf)
+	evs2, err := message.UnmarshalVoteSet(buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,13 +53,21 @@ func TestVoteSetUnMarshal(t *testing.T) {
 	assert.Equal(t, evs, evs2)
 }
 
-func newReductionEvent(round uint64, step uint8) reduction.Reduction {
+func newReductionEvent(round uint64, step uint8) message.Reduction {
 	k, _ := key.NewRandConsensusKeys()
 	blockHash, _ := crypto.RandEntropy(32)
 	sig, err := bls.Sign(k.BLSSecretKey, k.BLSPubKey, blockHash)
 	if err != nil {
 		panic(err)
 	}
+	hdr := header.Header{
+		Round:     round,
+		Step:      step,
+		BlockHash: blockHash,
+		PubKeyBLS: k.BLSPubKeyBytes,
+	}
 
-	return reduction.Reduction{sig.Compress()}
+	r := message.NewReduction(hdr)
+	r.SignedHash = sig.Compress()
+	return *r
 }

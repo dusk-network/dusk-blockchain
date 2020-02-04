@@ -1,12 +1,10 @@
 package mempool
 
 import (
-	"bytes"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 type intermediateBlockCollector struct {
@@ -21,12 +19,8 @@ func initIntermediateBlockCollector(sub eventbus.Subscriber) chan block.Block {
 	return blkChan
 }
 
-func (i *intermediateBlockCollector) Collect(m bytes.Buffer) error {
-	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&m, blk); err != nil {
-		return err
-	}
-
-	i.blkChan <- *blk
+func (i *intermediateBlockCollector) Collect(blockMsg message.Message) error {
+	blk := blockMsg.Payload().(block.Block)
+	i.blkChan <- blk
 	return nil
 }

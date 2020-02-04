@@ -1,10 +1,10 @@
 package chainsync
 
 import (
-	"bytes"
 	"sync"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
@@ -28,7 +28,7 @@ func NewCounter(subscriber eventbus.Subscriber) *Counter {
 	return sc
 }
 
-func (s *Counter) decrement(b bytes.Buffer) error {
+func (s *Counter) decrement(m message.Message) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if s.blocksRemaining > 0 {

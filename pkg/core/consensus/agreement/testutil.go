@@ -1,14 +1,13 @@
 package agreement
 
 import (
-	"bytes"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 // Helper is a struct that facilitates sending semi-real Events with minimum effort
@@ -17,8 +16,26 @@ type Helper struct {
 	P               *user.Provisioners
 	Keys            []key.ConsensusKeys
 	Aggro           *agreement
-	CertificateChan chan bytes.Buffer
+	CertificateChan chan message.Message
 	nr              int
+}
+
+func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
+	eb := eventbus.New()
+	h := NewHelper(eb, nrProvisioners)
+	factory := NewFactory(eb, h.Keys[0])
+	coordinator := consensus.Start(eb, h.Keys[0], factory)
+	// starting up the coordinator
+	ru := consensus.MockRoundUpdate(1, h.P, nil)
+	msg := message.New(topics.RoundUpdate, ru)
+	if err := coordinator.CollectRoundUpdate(msg); err != nil {
+		panic(err)
+	}
+	// Play to step 3, as agreements can only be made on step 3 or later
+	// This prevents the mocked events from getting queued
+	coordinator.Play(h.Aggro.ID())
+	coordinator.Play(h.Aggro.ID())
+	return coordinator, h
 }
 
 // NewHelper creates a Helper
@@ -27,7 +44,7 @@ func NewHelper(eb *eventbus.EventBus, provisioners int) *Helper {
 	factory := NewFactory(eb, keys[0])
 	a := factory.Instantiate()
 	aggro := a.(*agreement)
-	hlp := &Helper{eb, p, keys, aggro, make(chan bytes.Buffer, 1), provisioners}
+	hlp := &Helper{eb, p, keys, aggro, make(chan message.Message, 1), provisioners}
 	hlp.createResultChan()
 	return hlp
 }
@@ -47,10 +64,10 @@ func (hlp *Helper) SendBatch(hash []byte) {
 }
 
 // Spawn a number of different valid events to the Agreement component bypassing the EventBus
-func (hlp *Helper) Spawn(hash []byte) []consensus.Event {
-	evs := make([]consensus.Event, hlp.nr)
+func (hlp *Helper) Spawn(hash []byte) []message.Agreement {
+	evs := make([]message.Agreement, hlp.nr)
 	for i := 0; i < hlp.nr; i++ {
-		ev := MockConsensusEvent(hash, 1, 3, hlp.Keys, hlp.P, i)
+		ev := message.MockAgreement(hash, 1, 3, hlp.Keys, hlp.P, i)
 		evs[i] = ev
 	}
 

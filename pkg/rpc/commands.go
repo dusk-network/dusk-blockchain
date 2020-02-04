@@ -10,9 +10,10 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 )
 
 // handler defines a method bound to an RPC command.
@@ -85,7 +86,9 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 	payload, _ := hex.DecodeString(params[1])
 	rpcTopic := topics.StringToTopic(jsonrpcTopic)
-	s.eventBus.Publish(rpcTopic, bytes.NewBuffer(payload))
+	buf := bytes.NewBuffer(payload)
+	m := message.New(rpcTopic, *buf)
+	s.eventBus.Publish(rpcTopic, m)
 
 	result :=
 		`{ 

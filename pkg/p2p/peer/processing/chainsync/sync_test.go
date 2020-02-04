@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -19,7 +18,7 @@ import (
 func TestSynchronizeBehind(t *testing.T) {
 	cs, eb, responseChan := setupSynchronizer(t)
 	// Create a listener for HighestSeen topic
-	highestSeenChan := make(chan bytes.Buffer, 1)
+	highestSeenChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.HighestSeen, eventbus.NewChanListener(highestSeenChan))
 
 	// Create a block that is a few rounds in the future
@@ -40,9 +39,9 @@ func TestSynchronizeBehind(t *testing.T) {
 	}
 
 	// Check highest seen
-	m := <-highestSeenChan
-	var highestSeenHeight uint64
-	assert.NoError(t, encoding.ReadUint64LE(&m, &highestSeenHeight))
+	highestSeenHeightMsg := <-highestSeenChan
+	highestSeenHeight := highestSeenHeightMsg.Payload().(uint64)
+
 	assert.Equal(t, highestSeenHeight, height)
 }
 
@@ -52,7 +51,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	cs, eb, _ := setupSynchronizer(t)
 
 	// subscribe to topics.Block
-	blockChan := make(chan bytes.Buffer, 1)
+	blockChan := make(chan message.Message, 1)
 	listener := eventbus.NewChanListener(blockChan)
 	_ = eb.Subscribe(topics.Block, listener)
 
@@ -71,7 +70,7 @@ func TestSynchronizeSynced(t *testing.T) {
 func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, txBatchCount)
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		panic(err)
 	}
 

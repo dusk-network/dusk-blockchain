@@ -1,17 +1,12 @@
 package agreement
 
 import (
-	"bytes"
-	"encoding/hex"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,7 +42,7 @@ func newComponent(publisher eventbus.Publisher, keys key.ConsensusKeys, workerAm
 // Implements consensus.Component.
 func (a *agreement) Initialize(eventPlayer consensus.EventPlayer, signer consensus.Signer, r consensus.RoundUpdate) []consensus.TopicListener {
 	a.eventPlayer = eventPlayer
-	a.handler = newHandler(a.keys, r.P)
+	a.handler = NewHandler(a.keys, r.P)
 	a.accumulator = newAccumulator(a.handler, a.workerAmount)
 	a.round = r.Round
 	agreementSubscriber := consensus.TopicListener{
@@ -74,28 +69,16 @@ func (a *agreement) Filter(hdr header.Header) bool {
 
 // CollectAgreementEvent is the callback to get Events from the Coordinator. It forwards
 // the events to the accumulator until Quorum is reached
-func (a *agreement) CollectAgreementEvent(event consensus.Event) error {
-	ev, err := convertToAgreement(event)
-	if err != nil {
-		return err
-	}
+func (a *agreement) CollectAgreementEvent(packet consensus.InternalPacket) error {
+	// casting to Agreement
+	aggro := packet.(message.Agreement)
 
 	lg.WithFields(log.Fields{
-		"round":  event.Header.Round,
-		"step":   event.Header.Step,
-		"sender": hex.EncodeToString(event.Header.Sender()),
-		"id":     a.agreementID,
+		"agreement": aggro,
+		"id":        a.agreementID,
 	}).Debugln("received event")
-	a.accumulator.Process(*ev)
+	a.accumulator.Process(aggro)
 	return nil
-}
-
-func convertToAgreement(event consensus.Event) (*Agreement, error) {
-	ev := New(event.Header)
-	if err := Unmarshal(&event.Payload, ev); err != nil {
-		return nil, err
-	}
-	return ev, nil
 }
 
 // Listen for results coming from the accumulator.
@@ -105,23 +88,15 @@ func (a *agreement) listen() {
 		lg.WithField("id", a.agreementID).Debugln("quorum reached")
 		// Start a goroutine here to release the lock held by
 		// Coordinator.CollectEvent
+		// Send the Agreement to the Certificate Collector within the Chain
 		go a.sendCertificate(evs[0])
 	case <-a.quitChan:
 	}
 }
 
-func (a *agreement) sendCertificate(ag Agreement) {
-	cert := a.generateCertificate(ag)
-	buf := new(bytes.Buffer)
-	if err := encoding.Write256(buf, ag.Header.BlockHash); err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling block hash")
-	}
-
-	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
-		lg.WithField("category", "BUG").WithError(err).Errorln("error marshalling certificate")
-	}
-
-	a.publisher.Publish(topics.Certificate, buf)
+func (a *agreement) sendCertificate(ag message.Agreement) {
+	msg := message.New(topics.Agreement, ag)
+	a.publisher.Publish(topics.Certificate, msg)
 }
 
 // Finalize the agreement component, by pausing event streaming, and shutting down
@@ -134,16 +109,5 @@ func (a *agreement) Finalize() {
 	select {
 	case a.quitChan <- struct{}{}:
 	default:
-	}
-}
-
-// Generate a block certificate from an agreement message.
-func (a *agreement) generateCertificate(ag Agreement) *block.Certificate {
-	return &block.Certificate{
-		StepOneBatchedSig: ag.VotesPerStep[0].Signature.Compress(),
-		StepTwoBatchedSig: ag.VotesPerStep[1].Signature.Compress(),
-		Step:              ag.Header.Step,
-		StepOneCommittee:  ag.VotesPerStep[0].BitSet,
-		StepTwoCommittee:  ag.VotesPerStep[1].BitSet,
 	}
 }

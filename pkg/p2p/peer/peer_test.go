@@ -10,14 +10,13 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -41,9 +40,12 @@ func TestReader(t *testing.T) {
 	g := processing.NewGossip(protocol.TestNet)
 	client, srv := net.Pipe()
 	go func() {
-		buf := makeAgreementBuffer(10)
-		err := g.Process(buf)
+		msg := makeAgreementGossip(10)
+		buf, err := message.Marshal(msg)
 		if err != nil {
+			t.Fatal(err)
+		}
+		if err := g.Process(&buf); err != nil {
 			t.Fatal(err)
 		}
 		client.Write(buf.Bytes())
@@ -54,7 +56,7 @@ func TestReader(t *testing.T) {
 	peerReader := helper.StartPeerReader(srv)
 
 	// Our message should come in on the agreement topic
-	agreementChan := make(chan bytes.Buffer, 1)
+	agreementChan := make(chan message.Message, 1)
 	l := eventbus.NewChanListener(agreementChan)
 	eb.Subscribe(topics.Agreement, l)
 
@@ -73,13 +75,11 @@ func TestWriteRingBuffer(t *testing.T) {
 		defer p.Conn.Close()
 	}
 
-	ev := makeAgreementBuffer(10)
-	if err := topics.Prepend(ev, topics.Agreement); err != nil {
-		panic(err)
-	}
+	ev := makeAgreementGossip(10)
+	msg := message.New(topics.Agreement, ev)
 
 	for i := 0; i < 1000; i++ {
-		bus.Publish(topics.Gossip, ev)
+		bus.Publish(topics.Gossip, msg)
 	}
 }
 
@@ -89,13 +89,18 @@ func TestWriteLoop(t *testing.T) {
 	client, srv := net.Pipe()
 
 	g := processing.NewGossip(protocol.TestNet)
-	buf := makeAgreementBuffer(10)
+	msg := makeAgreementGossip(10)
+	buf, err := message.Marshal(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	go func(g *processing.Gossip) {
 		responseChan := make(chan *bytes.Buffer)
-		writer := peer.NewWriter(client, g, bus)
+		writer := peer.NewWriter(client, g, bus, 30*time.Millisecond)
 		go writer.Serve(responseChan, make(chan struct{}, 1), protocol.FullNode)
 
-		bufCopy := *buf
+		bufCopy := buf
 		responseChan <- &bufCopy
 	}(g)
 
@@ -110,7 +115,7 @@ func TestWriteLoop(t *testing.T) {
 	// Remove checksum
 	decoded = decoded[4:]
 
-	assert.Equal(t, decoded, buf.Bytes())
+	assert.Equal(t, decoded, (&buf).Bytes())
 }
 
 // Test that peers with a LightNode service flag only get specific
@@ -118,7 +123,7 @@ func TestWriteLoop(t *testing.T) {
 func TestServiceFlagGuard(t *testing.T) {
 	bus := eventbus.New()
 	client, srv := net.Pipe()
-	agChan := make(chan bytes.Buffer, 1)
+	agChan := make(chan message.Message, 1)
 	bus.Subscribe(topics.Agreement, eventbus.NewChanListener(agChan))
 
 	responseChan := make(chan *bytes.Buffer, 10)
@@ -130,10 +135,11 @@ func TestServiceFlagGuard(t *testing.T) {
 
 	// Send an agreement buffer from the peer. This should not be routed
 	g := processing.NewGossip(protocol.TestNet)
-	buf := makeAgreementBuffer(15)
-	assert.NoError(t, g.Process(buf))
+	msg := makeAgreementGossip(15)
+	buf, err := message.Marshal(msg)
+	assert.NoError(t, g.Process(&buf))
 
-	_, err := srv.Write(buf.Bytes())
+	_, err = srv.Write(buf.Bytes())
 	assert.NoError(t, err)
 
 	// Should not get anything on the agChan
@@ -146,8 +152,10 @@ func TestServiceFlagGuard(t *testing.T) {
 
 	// Now, attempt to send an agreement buffer to the peer. It should
 	// never arrive.
-	buf = makeAgreementBuffer(15)
-	bus.Publish(topics.Gossip, buf)
+	msg = makeAgreementGossip(15)
+	buf, err = message.Marshal(msg)
+	msg = message.New(topics.Agreement, buf)
+	bus.Publish(topics.Gossip, msg)
 
 	srv.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, err = srv.Read([]byte{0})
@@ -170,9 +178,9 @@ func TestLightNode(t *testing.T) {
 	client, srv := net.Pipe()
 
 	// Channels for monitoring the event bus
-	agChan := make(chan bytes.Buffer, 1)
+	agChan := make(chan message.Message, 1)
 	bus.Subscribe(topics.Agreement, eventbus.NewChanListener(agChan))
-	blkChan := make(chan bytes.Buffer, 1)
+	blkChan := make(chan message.Message, 1)
 	bus.Subscribe(topics.Block, eventbus.NewChanListener(blkChan))
 
 	// Setting up the peer
@@ -190,11 +198,11 @@ func TestLightNode(t *testing.T) {
 
 	// Should not send a `getdata` on a tx `inv`
 	g := processing.NewGossip(protocol.TestNet)
-	message := &peermsg.Inv{}
+	msg := &peermsg.Inv{}
 	hash, _ := crypto.RandEntropy(32)
-	message.AddItem(peermsg.InvTypeMempoolTx, hash)
+	msg.AddItem(peermsg.InvTypeMempoolTx, hash)
 	buf := new(bytes.Buffer)
-	assert.NoError(t, message.Encode(buf))
+	assert.NoError(t, msg.Encode(buf))
 	assert.NoError(t, topics.Prepend(buf, topics.Inv))
 	assert.NoError(t, g.Process(buf))
 
@@ -209,8 +217,9 @@ func TestLightNode(t *testing.T) {
 	}
 
 	// Should not respond to consensus messages
-	buf = makeAgreementBuffer(15)
-	assert.NoError(t, g.Process(buf))
+	agMsg := makeAgreementGossip(15)
+	agBuf, err := message.Marshal(agMsg)
+	assert.NoError(t, g.Process(&agBuf))
 
 	_, err = srv.Write(buf.Bytes())
 	assert.NoError(t, err)
@@ -223,11 +232,11 @@ func TestLightNode(t *testing.T) {
 	}
 
 	// Should be able to ask for and receive blocks
-	message = &peermsg.Inv{}
+	msg = &peermsg.Inv{}
 	hash, _ = crypto.RandEntropy(32)
-	message.AddItem(peermsg.InvTypeBlock, hash)
+	msg.AddItem(peermsg.InvTypeBlock, hash)
 	buf = new(bytes.Buffer)
-	assert.NoError(t, message.Encode(buf))
+	assert.NoError(t, msg.Encode(buf))
 	assert.NoError(t, topics.Prepend(buf, topics.Inv))
 	assert.NoError(t, g.Process(buf))
 
@@ -245,7 +254,7 @@ func TestLightNode(t *testing.T) {
 	// Let's give a block back
 	blk := helper.RandomBlock(t, 1, 1)
 	buf = new(bytes.Buffer)
-	assert.NoError(t, marshalling.MarshalBlock(buf, blk))
+	assert.NoError(t, message.MarshalBlock(buf, blk))
 	assert.NoError(t, topics.Prepend(buf, topics.Block))
 	assert.NoError(t, g.Process(buf))
 
@@ -269,14 +278,11 @@ func BenchmarkWriter(b *testing.B) {
 		defer p.Conn.Close()
 	}
 
-	ev := makeAgreementBuffer(10)
-	if err := topics.Prepend(ev, topics.Agreement); err != nil {
-		panic(err)
-	}
+	msg := makeAgreementGossip(10)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bus.Publish(topics.Gossip, ev)
+		bus.Publish(topics.Gossip, msg)
 	}
 }
 
@@ -296,15 +302,10 @@ func respondToGetLastBlock(rb *rpcbus.RPCBus) {
 	}(c)
 }
 
-func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
+func makeAgreementGossip(keyAmount int) message.Message {
 	p, keys := consensus.MockProvisioners(keyAmount)
-
-	buf := agreement.MockAgreement(make([]byte, 32), 1, 1, keys, p)
-	if err := topics.Prepend(buf, topics.Agreement); err != nil {
-		panic(err)
-	}
-
-	return buf
+	aggro := message.MockAgreement(make([]byte, 32), 1, 1, keys, p)
+	return message.New(topics.Agreement, aggro)
 }
 
 func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *peer.Writer {

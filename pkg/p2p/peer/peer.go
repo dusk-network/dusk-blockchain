@@ -31,7 +31,7 @@ var l *log.Entry = log.WithField("process", "peer")
 // peer.Reader.
 type Router interface {
 	// Collect a message and route it to the proper component.
-	Collect(*bytes.Buffer) error
+	Collect([]byte) error
 }
 
 // Connection holds the TCP connection to another node, and it's known protocol magic.
@@ -97,6 +97,8 @@ type Writer struct {
 	*Connection
 	subscriber eventbus.Subscriber
 	gossipID   uint32
+	keepAlive  time.Duration
+	// TODO: add service flag
 }
 
 // Reader abstracts all of the logic and fields needed to receive messages from
@@ -110,13 +112,18 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber) *Writer {
+func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
+	kas := 30 * time.Second
+	if len(keepAlive) > 0 {
+		kas = keepAlive[0]
+	}
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:   conn,
 			gossip: gossip,
 		},
 		subscriber: subscriber,
+		keepAlive:  kas,
 	}
 
 	return pw
@@ -281,7 +288,12 @@ func (p *Reader) ReadLoop(keepAliveTime time.Duration) {
 			return
 		}
 
-		p.router.Collect(bytes.NewBuffer(message))
+		// TODO: error here should be checked in order to decrease reputation
+		// or blacklist spammers
+		err = p.router.Collect(message)
+		if err != nil {
+			log.WithError(err).Errorln("error routing message")
+		}
 
 		// Reset the keepalive timer
 		timer.Reset(keepAliveTime)

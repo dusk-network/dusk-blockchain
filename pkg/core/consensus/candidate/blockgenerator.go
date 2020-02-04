@@ -8,18 +8,15 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/generation/score"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/selection"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -77,44 +74,40 @@ func (bg *Generator) ID() uint32 {
 // Finalize implements consensus.Component
 func (bg *Generator) Finalize() {}
 
-// Collect a ScoreEvent, which triggers generation of a candidate block.
+// ScoreFactory is the PacketFactory implementation to let the signer  scores
+type ScoreFactory struct {
+	sp       message.ScoreProposal
+	prevHash []byte
+	voteHash []byte
+}
+
+// Create
+func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus.InternalPacket {
+	hdr := sf.sp.State()
+	if hdr.Round != round || hdr.Step != step {
+		lg.Panicf("mismatch of Header round and step in score creation. ScoreProposal has a different Round and Step (%d, %d) than the Coordinator (%d, %d)", hdr.Round, hdr.Step, round, step)
+	}
+	score := message.NewScore(sf.sp, sender, sf.prevHash, sf.voteHash)
+	return *score
+}
+
+// Collect a `ScoreProposal`, which triggers generation of a `Score` and a
+// candidate `block.Block`
 // The Generator will propagate both the Score and Candidate messages at the end
 // of this function call.
-func (bg *Generator) Collect(e consensus.Event) error {
-	sev := &score.Event{}
-	if err := score.Unmarshal(&e.Payload, sev); err != nil {
-		return err
-	}
+func (bg *Generator) Collect(e consensus.InternalPacket) error {
+	sev := e.(message.ScoreProposal)
 
-	blk, err := bg.Generate(*sev)
+	blk, err := bg.Generate(sev)
 	if err != nil {
 		return err
 	}
 
-	score := &selection.Score{
-		Score:         sev.Proof.Score,
-		Proof:         sev.Proof.Proof,
-		Z:             sev.Proof.Z,
-		BidListSubset: sev.Proof.BinaryBidList,
-		PrevHash:      bg.roundInfo.Hash,
-		Seed:          sev.Seed,
-		VoteHash:      blk.Header.Hash,
-	}
-
-	scoreBuf := new(bytes.Buffer)
-	if err := selection.MarshalScore(scoreBuf, score); err != nil {
-		return err
-	}
-
+	scoreFactory := ScoreFactory{sev, bg.roundInfo.Hash, blk.Header.Hash}
+	score := bg.signer.Compose(scoreFactory)
 	lg.Debugln("sending score")
-	hdr := header.Header{
-		Round:     e.Header.Round,
-		Step:      e.Header.Step,
-		PubKeyBLS: e.Header.PubKeyBLS,
-		BlockHash: blk.Header.Hash,
-	}
-
-	if err := bg.signer.Gossip(topics.Score, hdr, scoreBuf, bg.ID()); err != nil {
+	msg := message.New(topics.Score, score)
+	if err := bg.signer.Gossip(msg, bg.ID()); err != nil {
 		return err
 	}
 
@@ -124,12 +117,8 @@ func (bg *Generator) Collect(e consensus.Event) error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
-		return err
-	}
-
-	if _, err := buf.ReadFrom(&certBuf); err != nil {
+	cert := block.EmptyCertificate()
+	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
 		return err
 	}
 
@@ -137,16 +126,13 @@ func (bg *Generator) Collect(e consensus.Event) error {
 	// no need to use `SendAuthenticated`, as the header is irrelevant.
 	// Thus, we will instead gossip it directly.
 	lg.Debugln("sending candidate")
-	if err := topics.Prepend(buf, topics.Candidate); err != nil {
-		return err
-	}
-
-	bg.publisher.Publish(topics.Gossip, buf)
-	return nil
+	candidateMsg := message.MakeCandidate(blk, cert)
+	msg = message.New(topics.Candidate, candidateMsg)
+	return bg.signer.Gossip(msg, bg.ID())
 }
 
-func (bg *Generator) Generate(sev score.Event) (*block.Block, error) {
-	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof.Proof, sev.Proof.Score, bg.roundInfo.Hash)
+func (bg *Generator) Generate(sev message.ScoreProposal) (*block.Block, error) {
+	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof, sev.Score, bg.roundInfo.Hash)
 }
 
 // GenerateBlock generates a candidate block, by constructing the header and filling it
@@ -175,14 +161,18 @@ func (bg *Generator) GenerateBlock(round uint64, seed, proof, score, prevBlockHa
 	}
 
 	// Update TxRoot
-	if err := candidateBlock.SetRoot(); err != nil {
+	root, err := candidateBlock.CalculateRoot()
+	if err != nil {
 		return nil, err
 	}
+	candidateBlock.Header.TxRoot = root
 
 	// Generate the block hash
-	if err := candidateBlock.SetHash(); err != nil {
+	hash, err := candidateBlock.CalculateHash()
+	if err != nil {
 		return nil, err
 	}
+	candidateBlock.Header.Hash = hash
 
 	return candidateBlock, nil
 }
@@ -223,7 +213,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 		}
 
 		for i := uint64(0); i < lTxs; i++ {
-			tx, err := marshalling.UnmarshalTx(&r)
+			tx, err := message.UnmarshalTx(&r)
 			if err != nil {
 				return nil, err
 			}
@@ -262,7 +252,7 @@ func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []by
 	tx.AddReward(*rewardReceiver, reward)
 
 	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
-	// This could be achieved with a request to dusk-wallet
+	// This could be achieved with a request to dusk-wallet/v2
 
 	return tx, nil
 }

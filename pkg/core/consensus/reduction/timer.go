@@ -4,19 +4,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	log "github.com/sirupsen/logrus"
 )
 
 var emptyHash [32]byte
 
 type Timer struct {
-	requestHalt func([]byte, ...*agreement.StepVotes)
+	requestHalt func([]byte, ...*message.StepVotes)
 	lock        sync.RWMutex
 	t           *time.Timer
 }
 
-func NewTimer(requestHalt func([]byte, ...*agreement.StepVotes)) *Timer {
+func NewTimer(requestHalt func([]byte, ...*message.StepVotes)) *Timer {
 	return &Timer{
 		requestHalt: requestHalt,
 	}

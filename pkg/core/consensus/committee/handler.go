@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 var PregenerationAmount uint8 = 8

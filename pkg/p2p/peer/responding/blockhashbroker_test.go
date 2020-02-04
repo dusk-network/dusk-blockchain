@@ -10,7 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 // Test the behaviour of the block hash broker, upon receiving a GetBlocks message.

@@ -4,46 +4,54 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
-func init() {
-	logrus.SetLevel(logrus.TraceLevel)
+// TestMockValidity ensures that we don't go into a wild goose chase if our
+// mock system gets screwed up
+func TestMockValidity(t *testing.T) {
+	nr := 50
+	_, hlp := agreement.WireAgreement(nr)
+	hash, _ := crypto.RandEntropy(32)
+	handler := agreement.NewHandler(hlp.Keys[0], *hlp.P)
+
+	for i := 0; i < nr; i++ {
+		a := message.MockAgreement(hash, 1, 3, hlp.Keys, hlp.P, i)
+		if !assert.NoError(t, handler.Verify(a)) {
+			t.FailNow()
+		}
+	}
 }
 
 // Test the accumulation of agreement events. It should result in the agreement component
 // publishing a round update.
+// TODO: trap eventual errors
 func TestAgreement(t *testing.T) {
 	nr := 50
-	_, hlp := wireAgreement(nr)
+	_, hlp := agreement.WireAgreement(nr)
 	hash, _ := crypto.RandEntropy(32)
 	for i := 0; i < nr; i++ {
-		aev := agreement.MockWire(hash, 1, 3, hlp.Keys, hlp.P, i)
-		hlp.Bus.Publish(topics.Agreement, aev)
+		a := message.MockAgreement(hash, 1, 3, hlp.Keys, hlp.P, i)
+		msg := message.New(topics.Agreement, a)
+		hlp.Bus.Publish(topics.Agreement, msg)
 	}
 
 	res := <-hlp.CertificateChan
-	winningHash := make([]byte, 32)
-	if err := encoding.Read256(&res, winningHash); err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, hash, winningHash)
+	cert := res.Payload().(message.Agreement)
+	assert.Equal(t, hash, cert.State().BlockHash)
 }
 
 // Test that we properly clean up after calling Finalize.
+// TODO: trap eventual errors
 func TestFinalize(t *testing.T) {
 	numGRBefore := runtime.NumGoroutine()
 	// Create a set of 100 agreement components, and finalize them immediately
 	for i := 0; i < 100; i++ {
-		c, _ := wireAgreement(50)
+		c, _ := agreement.WireAgreement(50)
 		c.FinalizeRound()
 	}
 
@@ -51,21 +59,4 @@ func TestFinalize(t *testing.T) {
 	numGRAfter := runtime.NumGoroutine()
 	// We should have roughly the same amount of goroutines
 	assert.InDelta(t, numGRBefore, numGRAfter, 10.0)
-}
-
-func wireAgreement(nrProvisioners int) (*consensus.Coordinator, *agreement.Helper) {
-	eb := eventbus.New()
-	h := agreement.NewHelper(eb, nrProvisioners)
-	factory := agreement.NewFactory(eb, h.Keys[0])
-	coordinator := consensus.Start(eb, h.Keys[0], factory)
-	// starting up the coordinator
-	ru := *consensus.MockRoundUpdateBuffer(1, h.P, nil)
-	if err := coordinator.CollectRoundUpdate(ru); err != nil {
-		panic(err)
-	}
-	// Play to step 3, as agreements can only be made on step 3 or later
-	// This prevents the mocked events from getting queued
-	coordinator.Play(h.Aggro.ID())
-	coordinator.Play(h.Aggro.ID())
-	return coordinator, h
 }
