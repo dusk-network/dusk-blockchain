@@ -81,12 +81,12 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 		// requesting the same block
 		// TODO: interface - buffer should be immutable. Change the dupemap to
 		// deal with values rather than reference
-		if m.dupeMap.CanFwd(&b) {
+		if m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
 			err = m.candidateBroker.ProvideCandidate(&b)
 		}
 	default:
 		if m.CanRoute(category) {
-			if m.dupeMap.CanFwd(&b) {
+			if m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
 				m.publisher.Publish(category, msg)
 			}
 		} else {
