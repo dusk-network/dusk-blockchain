@@ -8,12 +8,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-var (
-	DuplicatePayloadError = errors.New("duplicate payload")
-	InvalidError          = errors.New("invalid payload")
-	EncodingError         = errors.New("encoding failed")
-)
-
 type (
 	Validator func(bytes.Buffer) error
 
@@ -25,7 +19,20 @@ type (
 		id         uint32
 		validators []Validator
 	}
+
+	repuberr              struct{ err error }
+	duplicatePayloadError struct{ *repuberr }
+	invalidError          struct{ *repuberr }
+	encodingError         struct{ *repuberr }
 )
+
+func (rerr *repuberr) Error() string {
+	return rerr.err.Error()
+}
+
+var DuplicatePayloadError = &duplicatePayloadError{&repuberr{errors.New("duplicatePayloadError")}}
+var EncodingError = &encodingError{&repuberr{errors.New("encoding failed")}}
+var InvalidError = &invalidError{&repuberr{errors.New("invalid payload")}}
 
 // New creates a Republisher
 func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
@@ -59,12 +66,15 @@ func (r *Republisher) Activate() uint32 {
 // after applying any eventual validation logic
 func (r *Republisher) Republish(b bytes.Buffer) error {
 	for _, v := range r.validators {
-		err := v(b)
-		switch err {
-		case InvalidError, EncodingError:
-			return err
-		case DuplicatePayloadError:
-			return nil
+		if err := v(b); err != nil {
+			switch err {
+			case InvalidError, EncodingError:
+				return err
+			case DuplicatePayloadError:
+				return nil
+			default:
+				return err
+			}
 		}
 	}
 
