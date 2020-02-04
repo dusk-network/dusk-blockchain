@@ -84,6 +84,12 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 		if m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
 			err = m.candidateBroker.ProvideCandidate(&b)
 		}
+	case topics.Candidate:
+		// We don't use the dupe map to prevent infinite dissemination,
+		// as it could deprive of us receiving a candidate we might
+		// need later, but which was discarded initially.
+		// The candidate component will use it's own repropagation rules.
+		m.publisher.Publish(category, msg)
 	default:
 		if m.CanRoute(category) {
 			if m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {

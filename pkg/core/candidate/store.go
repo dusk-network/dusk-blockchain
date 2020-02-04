@@ -9,24 +9,24 @@ import (
 type (
 	store struct {
 		lock     sync.RWMutex
-		messages map[string]*message.Candidate
+		messages map[string]message.Candidate
 	}
 )
 
 func newStore() *store {
 	return &store{
-		messages: make(map[string]*message.Candidate),
+		messages: make(map[string]message.Candidate),
 	}
 }
 
 func (c *store) storeCandidateMessage(cm message.Candidate) {
 	// TODO: ensure we can't become a victim of memory overflow attacks
 	c.lock.Lock()
-	c.messages[string(cm.Block.Header.Hash)] = &cm
+	c.messages[string(cm.Block.Header.Hash)] = cm
 	c.lock.Unlock()
 }
 
-func (c *store) fetchCandidateMessage(hash []byte) *message.Candidate {
+func (c *store) fetchCandidateMessage(hash []byte) message.Candidate {
 	c.lock.RLock()
 	cm := c.messages[string(hash)]
 	c.lock.RUnlock()

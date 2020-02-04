@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
@@ -17,10 +18,14 @@ func Validate(m message.Message) error {
 
 func ValidateCandidate(cm message.Candidate) error {
 	if err := checkHash(cm.Block); err != nil {
-		return err
+		return republisher.InvalidError
 	}
 
-	return checkRoot(cm.Block)
+	if err := checkRoot(cm.Block); err != nil {
+		return republisher.InvalidError
+	}
+
+	return nil
 }
 
 func checkHash(blk *block.Block) error {
