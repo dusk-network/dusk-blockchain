@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -132,7 +132,7 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 
 	mempoolTxs := make([]transactions.Transaction, lTxs)
 	for i := uint64(0); i < lTxs; i++ {
-		tx, err := marshalling.UnmarshalTx(&r)
+		tx, err := message.UnmarshalTx(&r)
 		if err != nil {
 			return nil, err
 		}

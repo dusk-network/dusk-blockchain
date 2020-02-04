@@ -6,6 +6,8 @@ import (
 
 var defaultTolerance uint64 = 3
 
+// TODO: DupeMap should deal with value bytes.Buffer rather than pointers as it
+// is not supposed to mutate the struct
 type DupeMap struct {
 	round     uint64
 	tmpMap    *TmpMap

@@ -10,7 +10,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 func TestSortedKeys(t *testing.T) {
@@ -90,18 +90,21 @@ func TestStableSortedKeys(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	pool := HashMap{Capacity: 100}
+	txsCount := 10
+	pool := HashMap{Capacity: uint32(txsCount)}
 
-	// Generate 100 random txs
-	hashes := make([][]byte, 100)
-	for i := 0; i < 100; i++ {
+	// Generate 10 random txs
+	hashes := make([][]byte, txsCount)
+	for i := 0; i < txsCount; i++ {
 
 		tx := helper.RandomStandardTx(t, false)
-		tx.CalculateHash()
-		hashes[i] = tx.TxID
 
 		constFee := big.NewInt(0).SetUint64(20)
 		tx.Fee.SetBigInt(constFee)
+
+		hash, _ := tx.CalculateHash()
+		tx.TxID = hash
+		hashes[i] = tx.TxID
 
 		td := TxDesc{tx: tx, received: time.Now()}
 		if err := pool.Put(td); err != nil {
@@ -110,7 +113,7 @@ func TestGet(t *testing.T) {
 	}
 
 	// Get a random tx from the pool
-	n := rand.Intn(100)
+	n := rand.Intn(txsCount)
 	tx := pool.Get(hashes[n])
 	if tx == nil {
 		t.Fatal("tx is not supposed to be nil")

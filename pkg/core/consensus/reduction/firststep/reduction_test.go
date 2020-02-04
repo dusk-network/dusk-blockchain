@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
@@ -20,14 +20,19 @@ func TestFirstStep(t *testing.T) {
 	assert.Equal(t, uint8(1), hlp.Step())
 
 	// Wait for resulting StepVotes
-	svBuf := <-hlp.StepVotesChan
+	svMsg := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes
-	sv, err := agreement.UnmarshalStepVotes(&svBuf)
-	assert.NoError(t, err)
+	svm := svMsg.Payload().(message.StepVotesMsg)
+
+	if !assert.True(t, bytes.Equal(hash, svm.State().BlockHash)) {
+		t.FailNow()
+	}
 
 	// StepVotes should be valid
-	assert.NoError(t, hlp.Verify(hash, sv, 1))
+	if !assert.NoError(t, hlp.Verify(hash, svm.StepVotes, 1)) {
+		t.FailNow()
+	}
 	// test that the Player is PAUSED
 	assert.Equal(t, consensus.PAUSED, hlp.State())
 	// test that the timeout is still 1 second
@@ -42,14 +47,13 @@ func TestMoreSteps(t *testing.T) {
 	<-hlp.StepVotesChan
 
 	hash = hlp.NextBatch()
-	svBuf := <-hlp.StepVotesChan
+	svMsg := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes
-	sv, err := agreement.UnmarshalStepVotes(&svBuf)
-	assert.NoError(t, err)
+	svm := svMsg.Payload().(message.StepVotesMsg)
 
 	// StepVotes should be valid
-	assert.NoError(t, hlp.Verify(hash, sv, 2))
+	assert.NoError(t, hlp.Verify(hash, svm.StepVotes, 2))
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(2), hlp.Step())
 	// test that the Player is PAUSED
@@ -64,9 +68,13 @@ func TestFirstStepTimeOut(t *testing.T) {
 	hlp, _ := Kickstart(bus, rpcBus, 50, timeOut)
 
 	// Wait for resulting StepVotes
-	svBuf := <-hlp.StepVotesChan
-	// test we get an empty buffer
-	assert.Equal(t, bytes.Buffer{}, svBuf)
+	svMsg := <-hlp.StepVotesChan
+	svm := svMsg.Payload().(message.StepVotesMsg)
+
+	if !assert.True(t, svm.IsEmpty()) {
+		t.FailNow()
+	}
+
 	// test that EventPlayer.Play has been called
 	assert.Equal(t, uint8(1), hlp.Step())
 	// test that the Player is PAUSED

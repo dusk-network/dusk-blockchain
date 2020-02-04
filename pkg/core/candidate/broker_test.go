@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,35 +27,32 @@ func TestValidHashes(t *testing.T) {
 	blk := helper.RandomBlock(t, 1, 3)
 	blk2 := helper.RandomBlock(t, 1, 3)
 	cert := block.EmptyCertificate()
-	blk.SetHash()
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
-		t.Fatal(err)
-	}
+	hash, _ := blk.CalculateHash()
+	blk.Header.Hash = hash
 
-	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
-		t.Fatal(err)
-	}
+	// mocking a header with consistent hash with the block
+	hdr := header.Mock()
+	hdr.BlockHash = blk.Header.Hash
 
-	buf2 := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf2, blk2); err != nil {
-		t.Fatal(err)
-	}
+	cm := message.MakeCandidate(blk, cert)
+	msg := message.New(topics.Candidate, cm)
+	eb.Publish(topics.Candidate, msg)
 
-	if err := marshalling.MarshalCertificate(buf2, cert); err != nil {
-		t.Fatal(err)
-	}
+	cm2 := message.MakeCandidate(blk2, cert)
+	msg2 := message.New(topics.Candidate, cm2)
+	eb.Publish(topics.Candidate, msg2)
 
-	eb.Publish(topics.Candidate, buf)
-	eb.Publish(topics.Candidate, buf2)
 	// Stupid channels take a while to send something
 	time.Sleep(1000 * time.Millisecond)
 
-	// Only send a valid hash message for the first one
-	eb.Publish(topics.ValidCandidateHash, bytes.NewBuffer(blk.Header.Hash))
+	// Now, add the hash to validHashes
+	score := message.MockScore(hdr, blk.Header.Hash)
+	vchMsg := message.New(topics.ValidCandidateHash, score)
+	eb.Publish(topics.ValidCandidateHash, vchMsg)
 
 	// Now filter the queue
-	eb.Publish(topics.BestScore, new(bytes.Buffer))
+	msg3 := message.New(topics.BestScore, nil)
+	eb.Publish(topics.BestScore, msg3)
 
 	// Broker should now be able to provide us with `blk`
 	blkBuf, err := rb.Call(rpcbus.GetCandidate, rpcbus.Request{*bytes.NewBuffer(blk.Header.Hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
@@ -63,7 +61,7 @@ func TestValidHashes(t *testing.T) {
 	}
 
 	decoded := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&blkBuf, decoded); err != nil {
+	if err := message.UnmarshalBlock(&blkBuf, decoded); err != nil {
 		t.Fatal(err)
 	}
 

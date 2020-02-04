@@ -8,13 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -95,7 +94,8 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 			return err
 		}
 
-		s.publisher.Publish(topics.Block, buf)
+		msg := message.New(topics.Block, buf)
+		s.publisher.Publish(topics.Block, msg)
 	}
 
 	return nil
@@ -109,7 +109,7 @@ func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
 	}
 
 	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&blkBuf, blk); err != nil {
+	if err := message.UnmarshalBlock(&blkBuf, blk); err != nil {
 		return nil, err
 	}
 
@@ -129,13 +129,10 @@ func (s *ChainSynchronizer) setHighestSeen(height uint64) {
 	s.lock.Unlock()
 }
 
+// TODO: interface - get rid of the marshalling
 func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, height); err != nil {
-		log.Panic(err)
-	}
-
-	s.publisher.Publish(topics.HighestSeen, buf)
+	msg := message.New(topics.HighestSeen, height)
+	s.publisher.Publish(topics.HighestSeen, msg)
 }
 
 func compareHeights(ourHeight, theirHeight uint64) int64 {

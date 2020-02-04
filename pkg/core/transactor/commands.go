@@ -12,13 +12,13 @@ import (
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	walletdb "github.com/dusk-network/dusk-wallet/database"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 )
 
 var testnet = byte(2)
@@ -239,7 +239,7 @@ func (t *Transactor) getMempool() ([]transactions.Transaction, error) {
 
 	mempoolTxs := make([]transactions.Transaction, lTxs)
 	for i := uint64(0); i < lTxs; i++ {
-		tx, err := marshalling.UnmarshalTx(&r)
+		tx, err := message.UnmarshalTx(&r)
 		if err != nil {
 			return nil, err
 		}

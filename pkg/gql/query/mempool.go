@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/graphql-go/graphql"
 )
@@ -54,7 +54,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 
 		txs := make([]queryTx, 0)
 		for i := uint64(0); i < lTxs; i++ {
-			tx, err := marshalling.UnmarshalTx(&r)
+			tx, err := message.UnmarshalTx(&r)
 			if err != nil {
 				return "", err
 			}

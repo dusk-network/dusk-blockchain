@@ -1,13 +1,13 @@
 package consensus
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,8 +29,8 @@ func TestCollectEvent(t *testing.T) {
 	comp := cmps[0].(*mockComponent)
 
 	for _, tt := range collectEventTable {
-		ev := mockEventBuffer(t, topics.Reduction, tt.eventRound, tt.eventStep)
-		c.CollectEvent(*ev)
+		ev := mockMessage(t, topics.Reduction, tt.eventRound, tt.eventStep)
+		c.CollectEvent(ev)
 		assert.Equal(t, tt.receivedEventsLen, len(comp.receivedEvents))
 		assert.Equal(t, tt.queuedEventsLen, len(c.eventqueue.entries[tt.eventRound][tt.eventStep]))
 	}
@@ -43,8 +43,8 @@ func TestQueuedDispatch(t *testing.T) {
 	comp := cmps[0].(*mockComponent)
 
 	// Send an event which should get queued
-	ev := mockEventBuffer(t, topics.Reduction, 1, 1)
-	c.CollectEvent(*ev)
+	ev := mockMessage(t, topics.Reduction, 1, 1)
+	c.CollectEvent(ev)
 
 	// Mock component should have no events saved
 	assert.Equal(t, 0, len(comp.receivedEvents))
@@ -60,14 +60,15 @@ func TestQueuedDispatch(t *testing.T) {
 	assert.Equal(t, 0, len(c.eventqueue.entries[1][1]))
 
 	// Send another event which should get queued for the next round
-	ev = mockEventBuffer(t, topics.Reduction, 2, 0)
-	c.CollectEvent(*ev)
+	ev = mockMessage(t, topics.Reduction, 2, 0)
+	c.CollectEvent(ev)
 	// Queue should now hold one event on round 2, step 0
 	assert.Equal(t, 1, len(c.eventqueue.entries[2][0]))
 
 	// Update to round 2. The queued event should be dispatched
-	ruBuf := MockRoundUpdateBuffer(2, nil, nil)
-	c.CollectRoundUpdate(*ruBuf)
+	ru := MockRoundUpdate(2, nil, nil)
+	msg := message.New(topics.RoundUpdate, ru)
+	c.CollectRoundUpdate(msg)
 	// Update our reference to `comp`, as it was swapped out.
 	comp = c.store.components[0].(*mockComponent)
 	c.Pause(comp.ID())
@@ -85,22 +86,22 @@ func TestPausePlay(t *testing.T) {
 	comp := cmps[0].(*mockComponent)
 
 	// Send an event with the correct state. It should be received
-	ev := mockEventBuffer(t, topics.Reduction, 1, 0)
-	c.CollectEvent(*ev)
+	ev := mockMessage(t, topics.Reduction, 1, 0)
+	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 
 	c.Pause(comp.id)
 
 	// Send another event with the correct state. It should not be received
-	ev = mockEventBuffer(t, topics.Reduction, 1, 0)
-	c.CollectEvent(*ev)
+	ev = mockMessage(t, topics.Reduction, 1, 0)
+	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 
 	c.Play(comp.id)
 
 	// Send one more event, which should be received.
-	ev = mockEventBuffer(t, topics.Reduction, 1, 0)
-	c.CollectEvent(*ev)
+	ev = mockMessage(t, topics.Reduction, 1, 0)
+	c.CollectEvent(ev)
 	assert.Equal(t, 2, len(comp.receivedEvents))
 }
 
@@ -111,18 +112,18 @@ func TestEventFilter(t *testing.T) {
 	agComp := comp[1].(*mockComponent)
 
 	// Send a Reduction event with the correct state. It should be received
-	ev := mockEventBuffer(t, topics.Reduction, 1, 0)
-	c.CollectEvent(*ev)
+	ev := mockMessage(t, topics.Reduction, 1, 0)
+	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(redComp.receivedEvents))
 
 	// Send a Reduction event with future state. It should be queued
-	ev = mockEventBuffer(t, topics.Reduction, 1, 1)
-	c.CollectEvent(*ev)
+	ev = mockMessage(t, topics.Reduction, 1, 1)
+	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(c.eventqueue.entries[1][1]))
 
 	// Send an Agreement event with future state. It should be received
-	ev = mockEventBuffer(t, topics.Agreement, 1, 1)
-	c.CollectEvent(*ev)
+	ev = mockMessage(t, topics.Agreement, 1, 1)
+	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(agComp.receivedEvents))
 }
 
@@ -133,14 +134,15 @@ func TestQueueDispatchAgreement(t *testing.T) {
 
 	// Send an Agreement event from a future round.
 	// It should be queued
-	ev := mockEventBuffer(t, topics.Agreement, 2, 3)
-	c.CollectEvent(*ev)
+	ev := mockMessage(t, topics.Agreement, 2, 3)
+	c.CollectEvent(ev)
 	// Should be queued on round 2
 	assert.Equal(t, 1, len(c.roundQueue.entries[2][3]))
 
 	// Update the round to dispatch the event
-	ruBuf := MockRoundUpdateBuffer(2, nil, nil)
-	c.CollectRoundUpdate(*ruBuf)
+	ru := MockRoundUpdate(2, nil, nil)
+	msg := message.New(topics.RoundUpdate, ru)
+	c.CollectRoundUpdate(msg)
 	agComp := c.store.components[0].(*mockComponent)
 
 	// Should receive the agreement event
@@ -161,28 +163,23 @@ func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Co
 	}
 
 	c := Start(bus, keys, factories...)
-	ruBuf := MockRoundUpdateBuffer(1, nil, nil)
+	ru := MockRoundUpdate(1, nil, nil)
+	msg := message.New(topics.RoundUpdate, ru)
+
 	// Collect the round update to initialize the state
-	c.CollectRoundUpdate(*ruBuf)
+	c.CollectRoundUpdate(msg)
 
 	return c, c.store.components
 }
 
-func mockEventBuffer(t *testing.T, topic topics.Topic, round uint64, step uint8) *bytes.Buffer {
+func mockMessage(t *testing.T, topic topics.Topic, round uint64, step uint8) message.Message {
 	h := header.Header{
 		Round:     round,
 		Step:      step,
 		BlockHash: make([]byte, 32),
 		PubKeyBLS: make([]byte, 129),
 	}
-
-	buf := new(bytes.Buffer)
-	if err := header.Marshal(buf, h); err != nil {
-		t.Fatal(err)
-	}
-
-	topics.Prepend(buf, topic)
-	return buf
+	return message.New(topic, h)
 }
 
 type mockFactory struct {
@@ -197,14 +194,14 @@ func (m *mockFactory) Instantiate() Component {
 // does it's job correctly.
 type mockComponent struct {
 	topic          topics.Topic
-	receivedEvents chan Event
+	receivedEvents chan InternalPacket
 	id             uint32
 }
 
 func newMockComponent(topic topics.Topic) *mockComponent {
 	return &mockComponent{
 		topic:          topic,
-		receivedEvents: make(chan Event, 100),
+		receivedEvents: make(chan InternalPacket, 100),
 	}
 }
 
@@ -222,7 +219,7 @@ func (m *mockComponent) ID() uint32 {
 	return m.id
 }
 
-func (m *mockComponent) Collect(ev Event) error {
+func (m *mockComponent) Collect(ev InternalPacket) error {
 	m.receivedEvents <- ev
 	return nil
 }

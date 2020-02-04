@@ -1,4 +1,4 @@
-package marshalling
+package message
 
 import (
 	"bytes"
@@ -9,8 +9,17 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-crypto/mlsag"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
+
+func UnmarshalTxMessage(r *bytes.Buffer, m SerializableMessage) error {
+	tx, err := UnmarshalTx(r)
+	if err != nil {
+		return err
+	}
+	m.SetPayload(tx)
+	return nil
+}
 
 func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
 	var txType uint8
@@ -118,7 +127,7 @@ func marshalStandard(w *bytes.Buffer, s *transactions.Standard, encodeSignature 
 	// This is because Rangeproof.Decode uses `buf.ReadFrom`, which can cause issues
 	// when trying to unmarshal a block with multiple txs.
 	// It also ensures backwards-compatibility with the current testnet.
-	buf := new(bytes.Buffer)
+	buf := &bytes.Buffer{}
 	if err := s.RangeProof.Encode(buf, true); err != nil {
 		return err
 	}

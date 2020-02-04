@@ -13,11 +13,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-crypto/mlsag"
-	"github.com/dusk-network/dusk-wallet/block"
-	walletdb "github.com/dusk-network/dusk-wallet/database"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"github.com/stretchr/testify/assert"
 )
 

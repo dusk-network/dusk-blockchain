@@ -1,11 +1,11 @@
 package consensus
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
@@ -23,15 +23,20 @@ const (
 type Signer interface {
 	// Sign a payload. The first is parameter is a block hash
 	Sign(header.Header) ([]byte, error)
+
 	// Gossip concatenates all information before gossiping it to the
 	// rest of the network.
 	// It accepts a topic, a blockhash, a payload and the ID of the requesting
 	// component
-	Gossip(topics.Topic, header.Header, *bytes.Buffer, uint32) error
-	// SendInternally is used for internal forwarding. It exposes the same
-	// parameters as Gossip but does not perform a ED25519 signature
-	// on the Event (and neither forwards it to the Gossip topic
-	SendInternally(topics.Topic, []byte, *bytes.Buffer, uint32) error
+	Gossip(message.Message, uint32) error
+
+	// Compose is used to inject authentication data to a component specific
+	// packet. It is supposed to be used whenever a component needs to create a
+	// **new** Packet for internal propagation
+	Compose(PacketFactory) InternalPacket
+
+	// SendInternally is used for internal forwarding
+	SendInternally(topics.Topic, message.Message, uint32) error
 }
 
 // EventPlayer is the interface used by Components to signal their intention to
@@ -68,7 +73,7 @@ type Component interface {
 // Listener subscribes to the Coordinator and forwards consensus events to the components
 type Listener interface {
 	// NotifyPayload forwards consensus events to the component
-	NotifyPayload(Event) error
+	NotifyPayload(InternalPacket) error
 	// ID is used to later unsubscribe from the Coordinator. This is useful for components active throughout
 	// multiple steps
 	ID() uint32
@@ -81,20 +86,20 @@ type Listener interface {
 
 // SimpleListener implements Listener and uses a callback for notifying events
 type SimpleListener struct {
-	callback func(Event) error
+	callback func(InternalPacket) error
 	id       uint32
 	priority Priority
 	paused   bool
 }
 
 // NewSimpleListener creates a SimpleListener
-func NewSimpleListener(callback func(Event) error, priority Priority, paused bool) Listener {
+func NewSimpleListener(callback func(InternalPacket) error, priority Priority, paused bool) Listener {
 	id := rand.Uint32()
 	return &SimpleListener{callback, id, priority, paused}
 }
 
 // NotifyPayload triggers the callback specified during instantiation
-func (s *SimpleListener) NotifyPayload(ev Event) error {
+func (s *SimpleListener) NotifyPayload(ev InternalPacket) error {
 	return s.callback(ev)
 }
 
@@ -129,15 +134,16 @@ type FilteringListener struct {
 }
 
 // NewFilteringListener creates a FilteringListener
-func NewFilteringListener(callback func(Event) error, filter func(header.Header) bool, priority Priority, paused bool) Listener {
+func NewFilteringListener(callback func(InternalPacket) error, filter func(header.Header) bool, priority Priority, paused bool) Listener {
 	id := rand.Uint32()
 	return &FilteringListener{&SimpleListener{callback, id, priority, paused}, filter}
 }
 
 // NotifyPayload uses the filtering function to let only relevant events through
-func (cb *FilteringListener) NotifyPayload(ev Event) error {
-	if cb.filter(ev.Header) {
-		return fmt.Errorf("event has been filtered and won't be forwarded to the component - round: %d / step: %d", ev.Header.Round, ev.Header.Step)
+func (cb *FilteringListener) NotifyPayload(ev InternalPacket) error {
+	hdr := ev.State()
+	if cb.filter(hdr) {
+		return fmt.Errorf("event has been filtered and won't be forwarded to the component - round: %d / step: %d", hdr.Round, hdr.Step)
 	}
 	return cb.SimpleListener.NotifyPayload(ev)
 }

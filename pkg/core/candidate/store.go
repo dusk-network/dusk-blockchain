@@ -1,43 +1,32 @@
 package candidate
 
 import (
-	"bytes"
 	"sync"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
 type (
 	store struct {
 		lock     sync.RWMutex
-		messages map[string]Candidate
-	}
-
-	Candidate struct {
-		*block.Block
-		*block.Certificate
+		messages map[string]message.Candidate
 	}
 )
 
-func NewCandidate() *Candidate {
-	return &Candidate{block.NewBlock(), block.EmptyCertificate()}
-}
-
 func newStore() *store {
 	return &store{
-		messages: make(map[string]Candidate),
+		messages: make(map[string]message.Candidate),
 	}
 }
 
-func (c *store) storeCandidateMessage(cm Candidate) {
+func (c *store) storeCandidateMessage(cm message.Candidate) {
 	// TODO: ensure we can't become a victim of memory overflow attacks
 	c.lock.Lock()
 	c.messages[string(cm.Block.Header.Hash)] = cm
 	c.lock.Unlock()
 }
 
-func (c *store) fetchCandidateMessage(hash []byte) Candidate {
+func (c *store) fetchCandidateMessage(hash []byte) message.Candidate {
 	c.lock.RLock()
 	cm := c.messages[string(hash)]
 	c.lock.RUnlock()
@@ -56,20 +45,4 @@ func (c *store) Clear(round uint64) int {
 	}
 
 	return deletedCount
-}
-
-func Decode(b *bytes.Buffer, cMsg *Candidate) error {
-	if err := marshalling.UnmarshalBlock(b, cMsg.Block); err != nil {
-		return err
-	}
-
-	return marshalling.UnmarshalCertificate(b, cMsg.Certificate)
-}
-
-func Encode(b *bytes.Buffer, cm *Candidate) error {
-	if err := marshalling.MarshalBlock(b, cm.Block); err != nil {
-		return err
-	}
-
-	return marshalling.MarshalCertificate(b, cm.Certificate)
 }

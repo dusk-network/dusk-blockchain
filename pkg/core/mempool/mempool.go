@@ -12,16 +12,16 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-crypto/merkletree"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -285,11 +285,6 @@ func (m *Mempool) removeAccepted(b block.Block) {
 
 	if err == nil && tree != nil {
 
-		if !bytes.Equal(tree.MerkleRoot, b.Header.TxRoot) {
-			log.Errorf("block %s has invalid txroot", blockHash)
-			return
-		}
-
 		s := m.newPool()
 		// Check if mempool verified tx is part of merkle tree of this block
 		// if not, then keep it in the mempool for the next block
@@ -367,13 +362,9 @@ func (m *Mempool) newPool() Pool {
 // CollectPending process the emitted transactions.
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
-func (m *Mempool) CollectPending(message bytes.Buffer) error {
-	txDesc, err := unmarshalTxDesc(message)
-	if err != nil {
-		return err
-	}
-
-	m.pending <- txDesc
+func (m *Mempool) CollectPending(msg message.Message) error {
+	tx := msg.Payload().(transactions.Transaction)
+	m.pending <- TxDesc{tx: tx, received: time.Now(), size: uint(len(msg.Id()))}
 	return nil
 }
 
@@ -534,10 +525,12 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	}
 
 	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		return err
+		log.Panic(err)
 	}
 
-	m.eventBus.Publish(topics.Gossip, buf)
+	// TODO: interface - marshalling should done after the Gossip, not before
+	packet := message.New(topics.Inv, *buf)
+	m.eventBus.Publish(topics.Gossip, packet)
 	return nil
 }
 
@@ -546,16 +539,16 @@ func toHex(id []byte) string {
 	return enc
 }
 
-func unmarshalTxDesc(message bytes.Buffer) (TxDesc, error) {
+func unmarshalTxDesc(m bytes.Buffer) (TxDesc, error) {
 
-	bufSize := message.Len()
-	tx, err := marshalling.UnmarshalTx(&message)
+	bufSize := m.Len()
+	tx, err := message.UnmarshalTx(&m)
 	if err != nil {
 		return TxDesc{}, err
 	}
 
 	// txSize is number of unmarshaled bytes
-	txSize := bufSize - message.Len()
+	txSize := bufSize - m.Len()
 
 	return TxDesc{tx: tx, received: time.Now(), size: uint(txSize)}, nil
 }
@@ -583,7 +576,7 @@ func marshalTxs(w *bytes.Buffer, txs []transactions.Transaction) error {
 	}
 
 	for _, tx := range txs {
-		if err := marshalling.MarshalTx(w, tx); err != nil {
+		if err := message.MarshalTx(w, tx); err != nil {
 			return err
 		}
 	}

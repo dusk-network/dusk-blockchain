@@ -14,13 +14,13 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -126,7 +126,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	txs := make([]transactions.Transaction, lTxs)
 	for i := uint64(0); i < lTxs; i++ {
-		tx, err := marshalling.UnmarshalTx(&r)
+		tx, err := message.UnmarshalTx(&r)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -163,6 +163,10 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 	}
 }
 
+func prepTx(tx transactions.Transaction) message.Message {
+	return message.New(topics.Tx, tx)
+}
+
 func TestProcessPendingTxs(t *testing.T) {
 
 	c.reset()
@@ -171,39 +175,23 @@ func TestProcessPendingTxs(t *testing.T) {
 	for _, tx := range txs {
 
 		// Publish valid tx
-		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		txMsg := prepTx(tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 
 		// Publish invalid/valid txs (ones that do not pass verifyTx and ones that do)
 		tx := helper.RandomStandardTx(t, false)
-		if err != nil {
-			t.Fatal(err)
-		}
 		tx.Version++
-		buf = new(bytes.Buffer)
-		err = marshalling.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		txMsg = prepTx(tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 
 		// Publish a duplicated tx
-		buf = new(bytes.Buffer)
-		_ = marshalling.MarshalTx(buf, tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 	}
 
 	c.assert(t, true)
-
 }
 
 func TestProcessPendingTxsAsync(t *testing.T) {
@@ -239,9 +227,8 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		wg.Add(1)
 		go func(txs []transactions.Transaction) {
 			for _, tx := range txs {
-				buf := new(bytes.Buffer)
-				_ = marshalling.MarshalTx(buf, tx)
-				c.bus.Publish(topics.Tx, buf)
+				txMsg := prepTx(tx)
+				c.bus.Publish(topics.Tx, txMsg)
 			}
 			wg.Done()
 		}(c.verifiedTx[from:to])
@@ -252,12 +239,10 @@ func TestProcessPendingTxsAsync(t *testing.T) {
 		// Publish invalid txs
 		go func() {
 			for y := 0; y <= 5; y++ {
-				buf := new(bytes.Buffer)
 				tx := helper.RandomStandardTx(t, false)
 				tx.Version++
-				_ = marshalling.MarshalTx(buf, tx)
-
-				c.bus.Publish(topics.Tx, buf)
+				txMsg := prepTx(tx)
+				c.bus.Publish(topics.Tx, txMsg)
 			}
 			wg.Done()
 		}()
@@ -283,14 +268,21 @@ func TestRemoveAccepted(t *testing.T) {
 	txs := randomSliceOfTxs(t, 3)
 
 	for _, tx := range txs {
+		// We avoid sharing this pointer between the mempool and the block
+		// by marshalling and unmarshalling the tx
 		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
-		if err != nil {
+		if err := message.MarshalTx(buf, tx); err != nil {
 			t.Fatal(err)
 		}
 
+		txCopy, err := message.UnmarshalTx(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txMsg := prepTx(txCopy)
+
 		// Publish valid tx
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 
 		// Simulate a situation where the block has accepted each 2th tx
 		counter++
@@ -305,11 +297,10 @@ func TestRemoveAccepted(t *testing.T) {
 
 	c.wait()
 
-	_ = b.SetRoot()
-	buf := new(bytes.Buffer)
-	_ = marshalling.MarshalBlock(buf, b)
-
-	c.bus.Publish(topics.IntermediateBlock, buf)
+	root, _ := b.CalculateRoot()
+	b.Header.TxRoot = root
+	blockMsg := message.New(topics.IntermediateBlock, *b)
+	c.bus.Publish(topics.IntermediateBlock, blockMsg)
 
 	c.assert(t, false)
 }
@@ -324,14 +315,10 @@ func TestDoubleSpent(t *testing.T) {
 	txs := randomSliceOfTxs(t, 3)
 
 	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
+		txMsg := prepTx(tx)
 
 		// Publish valid tx
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 		c.addTx(tx)
 	}
 
@@ -344,15 +331,10 @@ func TestDoubleSpent(t *testing.T) {
 
 	// Outputs
 	tx.Outputs = txs[0].StandardTx().Outputs
-
-	buf := new(bytes.Buffer)
-	err := marshalling.MarshalTx(buf, tx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	txMsg := prepTx(tx)
 
 	// Publish valid tx
-	c.bus.Publish(topics.Tx, buf)
+	c.bus.Publish(topics.Tx, txMsg)
 	// c.addTx(tx) do not add it into the expected list
 
 	c.wait()
@@ -368,25 +350,15 @@ func TestCoinbaseTxsNotAllowed(t *testing.T) {
 	txs := randomSliceOfTxs(t, 1)
 
 	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		txMsg := prepTx(tx)
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		c.bus.Publish(topics.Tx, txMsg)
 	}
 
 	// Publish a coinbase txs
 	tx := helper.RandomCoinBaseTx(t, false)
-	buf := new(bytes.Buffer)
-	err := marshalling.MarshalTx(buf, tx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c.bus.Publish(topics.Tx, buf)
+	txMsg := prepTx(tx)
+	c.bus.Publish(topics.Tx, txMsg)
 
 	c.wait()
 
@@ -403,7 +375,7 @@ func TestSendMempoolTx(t *testing.T) {
 	var totalSize uint32
 	for _, tx := range txs {
 		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
+		err := message.MarshalTx(buf, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -434,14 +406,9 @@ func TestMempoolView(t *testing.T) {
 	txs := randomSliceOfTxs(t, uint16(numTxs))
 
 	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		err := marshalling.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		c.addTx(tx)
-		c.bus.Publish(topics.Tx, buf)
+		msg := message.New(topics.Tx, tx)
+		c.bus.Publish(topics.Tx, msg)
 	}
 
 	// First, let's just get the entire view
@@ -457,14 +424,14 @@ func TestMempoolView(t *testing.T) {
 	}
 
 	// Now, we single out one hash from the bunch
-	hash := txs[7].StandardTx().TxID
-	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBuffer(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	hash := hex.EncodeToString(txs[7].StandardTx().TxID)
+	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBufferString(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Should give us info about said tx
-	if !strings.Contains(buf.String(), hex.EncodeToString(hash)) {
+	if !strings.Contains(buf.String(), hash) {
 		t.Fatal("should have gotten info about requested tx")
 	}
 

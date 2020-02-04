@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/republisher"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 // Broker is the entry point for the candidate component. It manages
@@ -27,13 +28,13 @@ type Broker struct {
 	republisher *republisher.Republisher
 	*store
 	lock        sync.RWMutex
-	queue       map[string]Candidate
+	queue       map[string]message.Candidate
 	validHashes map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
-	candidateChan     <-chan Candidate
+	candidateChan     <-chan message.Candidate
 	getCandidateChan  <-chan rpcbus.Request
-	bestScoreChan     <-chan bytes.Buffer
+	bestScoreChan     <-chan message.Message
 }
 
 // NewBroker returns an initialized Broker struct. It will still need
@@ -42,13 +43,13 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
 	rpcBus.Register(rpcbus.GetCandidate, getCandidateChan)
-	bestScoreChan := make(chan bytes.Buffer, 1)
+	bestScoreChan := make(chan message.Message, 1)
 	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 
 	b := &Broker{
 		publisher:         broker,
 		store:             newStore(),
-		queue:             make(map[string]Candidate),
+		queue:             make(map[string]message.Candidate),
 		validHashes:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
@@ -71,14 +72,22 @@ func (b *Broker) Listen() {
 			b.queue[string(cm.Block.Header.Hash)] = cm
 			b.lock.Unlock()
 		case r := <-b.getCandidateChan:
+			// candidate requests from the RPCBus
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
+			// accepted blocks come from the consensus
 			b.clearEligibleHashes()
 			b.Clear(blk.Header.Height)
 		case <-b.bestScoreChan:
 			b.filterWinningCandidates()
 		}
 	}
+}
+
+func (b *Broker) AddValidHash(m message.Message) error {
+	score := m.Payload().(message.Score)
+	b.validHashes[string(score.VoteHash)] = struct{}{}
+	return nil
 }
 
 // Filter through the queue with the valid hashes, storing the Candidate
@@ -96,13 +105,14 @@ func (b *Broker) filterWinningCandidates() {
 	b.lock.Unlock()
 }
 
+// TODO: interface - rpcBus encoding will be removed
 func (b *Broker) provideCandidate(r rpcbus.Request) {
 	b.lock.RLock()
 	cm, ok := b.queue[string(r.Params.Bytes())]
 	b.lock.RUnlock()
 	if ok {
 		buf := new(bytes.Buffer)
-		err := Encode(buf, &cm)
+		err := message.MarshalCandidate(buf, cm)
 		r.RespChan <- rpcbus.Response{*buf, err}
 		return
 	}
@@ -119,24 +129,31 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 	}
 
 	buf := new(bytes.Buffer)
-	err := Encode(buf, &cm)
+	err := message.MarshalCandidate(buf, cm)
 	r.RespChan <- rpcbus.Response{*buf, err}
 }
 
-func (b *Broker) requestCandidate(hash []byte) (Candidate, error) {
+// requestCandidate from peers around this node. The candidate can only be
+// requested for 2 rounds (which provides some protection from keeping to
+// request bulky stuff)
+// TODO: encoding the category within the packet and specifying it as category
+// is ugly af
+func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	// Send a request for this specific candidate
 	buf := bytes.NewBuffer(hash)
+	// Ugh! Move encoding after the Gossip ffs
 	if err := topics.Prepend(buf, topics.GetCandidate); err != nil {
-		return Candidate{}, err
+		return message.Candidate{}, err
 	}
 
-	b.publisher.Publish(topics.Gossip, buf)
+	msg := message.New(topics.GetCandidate, *buf)
+	b.publisher.Publish(topics.Gossip, msg)
 
 	timer := time.NewTimer(2 * time.Second)
 	for {
 		select {
 		case <-timer.C:
-			return Candidate{}, errors.New("request timeout")
+			return message.Candidate{}, errors.New("request timeout")
 
 		// We take control of `candidateChan`, to monitor incoming
 		// candidates. There should be no race condition in reading from
@@ -155,12 +172,8 @@ func (b *Broker) requestCandidate(hash []byte) (Candidate, error) {
 	}
 }
 
-func (b *Broker) Validate(buf bytes.Buffer) error {
-	cm := &Candidate{block.NewBlock(), block.EmptyCertificate()}
-	if err := Decode(&buf, cm); err != nil {
-		return republisher.EncodingError
-	}
-
+func (b *Broker) Validate(m message.Message) error {
+	cm := m.Payload().(message.Candidate)
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 	if _, ok := b.queue[string(cm.Block.Header.Hash)]; ok {
@@ -170,9 +183,10 @@ func (b *Broker) Validate(buf bytes.Buffer) error {
 	return nil
 }
 
-func (b *Broker) addValidHash(buf bytes.Buffer) error {
+func (b *Broker) addValidHash(m message.Message) error {
+	s := m.Payload().(message.Score)
 	b.lock.Lock()
-	b.validHashes[string(buf.Bytes())] = struct{}{}
+	b.validHashes[string(s.VoteHash)] = struct{}{}
 	b.lock.Unlock()
 	return nil
 }

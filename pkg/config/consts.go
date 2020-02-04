@@ -5,9 +5,9 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,13 +39,14 @@ func DecodeGenesis() *block.Block {
 
 		var buf bytes.Buffer
 		buf.Write(blob)
-		if err := marshalling.UnmarshalBlock(&buf, b); err != nil {
+		if err := message.UnmarshalBlock(&buf, b); err != nil {
 			log.Panic(err)
 		}
 
 		// For some reason, the testnet genesis block root hash
 		// is not correctly set.
-		_ = b.SetRoot()
+		root, _ := b.CalculateRoot()
+		b.Header.TxRoot = root
 	}
 	return b
 }

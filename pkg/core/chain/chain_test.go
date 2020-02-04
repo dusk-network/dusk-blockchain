@@ -6,24 +6,22 @@ import (
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/candidate"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	_ "github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +29,7 @@ import (
 // accepting a block from a peer.
 func TestAcceptFromPeer(t *testing.T) {
 	eb, _, c := setupChainTest(t, false)
-	stopConsensusChan := make(chan bytes.Buffer, 1)
+	stopConsensusChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
 	streamer := eventbus.NewGossipStreamer(protocol.TestNet)
@@ -39,12 +37,9 @@ func TestAcceptFromPeer(t *testing.T) {
 
 	// First, test accepting a block when the counter is set to not syncing.
 	blk := helper.RandomBlock(t, 1, 1)
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
-		t.Fatal(err)
-	}
+	msg := message.New(topics.AcceptedBlock, *blk)
 
-	assert.NoError(t, c.onAcceptBlock(*buf))
+	assert.NoError(t, c.onAcceptBlock(msg))
 
 	// Function should return before sending the `StopConsensus` message
 	select {
@@ -57,14 +52,10 @@ func TestAcceptFromPeer(t *testing.T) {
 	c.counter.StartSyncing(1)
 
 	blk = mockAcceptableBlock(t, c.prevBlock)
-
-	buf = new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
-		t.Fatal(err)
-	}
+	msg = message.New(topics.AcceptedBlock, *blk)
 
 	go func() {
-		if err := c.onAcceptBlock(*buf); err.Error() != "request timeout" {
+		if err := c.onAcceptBlock(msg); err.Error() != "request timeout" {
 			t.Fatal(err)
 		}
 	}()
@@ -83,14 +74,16 @@ func TestAcceptFromPeer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, topics.GetRoundResults, streamer.SeenTopics()[1])
+	if !assert.Equal(t, topics.GetRoundResults, streamer.SeenTopics()[1]) {
+		t.FailNow()
+	}
+
 	var round uint64
 	if err := encoding.ReadUint64LE(bytes.NewBuffer(m), &round); err != nil {
 		t.Fatal(err)
 	}
 
 	assert.Equal(t, uint64(2), round)
-
 }
 
 // This test ensures the correct behaviour when accepting a block
@@ -98,15 +91,15 @@ func TestAcceptFromPeer(t *testing.T) {
 func TestAcceptIntermediate(t *testing.T) {
 	eb, rpc, c := setupChainTest(t, false)
 	go c.Listen()
-	intermediateChan := make(chan bytes.Buffer, 1)
+	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
-	roundUpdateChan := make(chan bytes.Buffer, 1)
+	roundUpdateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.RoundUpdate, eventbus.NewChanListener(roundUpdateChan))
 
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(t, 2, 1)
 	cert := block.EmptyCertificate()
-	provideCandidate(rpc, &candidate.Candidate{blk, cert})
+	provideCandidate(rpc, message.MakeCandidate(blk, cert))
 
 	// Now send a `Certificate` message with this block's hash
 	// Make a certificate with a different step, to do a proper equality
@@ -123,21 +116,14 @@ func TestAcceptIntermediate(t *testing.T) {
 	assert.True(t, cert.Equals(c.lastCertificate))
 
 	// Should have gotten `blk` over topics.IntermediateBlock
-	blkBuf := <-intermediateChan
-	decodedBlk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&blkBuf, decodedBlk); err != nil {
-		t.Fatal(err)
-	}
+	blkMsg := <-intermediateChan
+	decodedBlk := blkMsg.Payload().(block.Block)
 
-	assert.True(t, blk.Equals(decodedBlk))
+	assert.True(t, decodedBlk.Equals(blk))
 
 	// Should have gotten a round update with proper info
-	ruBuf := <-roundUpdateChan
-	ru := &consensus.RoundUpdate{}
-	if err := consensus.DecodeRound(&ruBuf, ru); err != nil {
-		t.Fatal(err)
-	}
-
+	ruMsg := <-roundUpdateChan
+	ru := ruMsg.Payload().(consensus.RoundUpdate)
 	// Should coincide with the new intermediate block
 	assert.Equal(t, blk.Header.Height+1, ru.Round)
 	assert.Equal(t, blk.Header.Hash, ru.Hash)
@@ -146,23 +132,17 @@ func TestAcceptIntermediate(t *testing.T) {
 
 func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	eb, _, c := setupChainTest(t, false)
-	intermediateChan := make(chan bytes.Buffer, 1)
+	intermediateChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.IntermediateBlock, eventbus.NewChanListener(intermediateChan))
 
 	// Make a 'winning' candidate message
 	blk := helper.RandomBlock(t, 2, 1)
 	cert := block.EmptyCertificate()
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
-		t.Fatal(err)
-	}
 
-	if err := marshalling.MarshalCertificate(buf, cert); err != nil {
-		t.Fatal(err)
-	}
+	cm := message.MakeCandidate(blk, cert)
 
 	// Store it
-	eb.Publish(topics.Candidate, buf)
+	eb.Publish(topics.Candidate, message.New(topics.Candidate, cm))
 
 	// Save current prevBlock
 	currPrevBlock := c.prevBlock
@@ -177,11 +157,11 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 	assert.Nil(t, c.intermediateBlock)
 }
 
-func provideCandidate(rpc *rpcbus.RPCBus, cm *candidate.Candidate) {
+func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	c := make(chan rpcbus.Request, 1)
 	rpc.Register(rpcbus.GetCandidate, c)
 	buf := new(bytes.Buffer)
-	if err := candidate.Encode(buf, cm); err != nil {
+	if err := message.MarshalCandidate(buf, cm); err != nil {
 		panic(err)
 	}
 
@@ -192,7 +172,7 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm *candidate.Candidate) {
 }
 
 func createMockedCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
-	votes := agreement.GenVotes(hash, round, 3, keys, p)
+	votes := message.GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{
 		StepOneBatchedSig: votes[0].Signature.Compress(),
 		StepTwoBatchedSig: votes[1].Signature.Compress(),
@@ -236,18 +216,21 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	// Add some provisioners to our chain, including one that is just about to expire
 	p, k := consensus.MockProvisioners(3)
 	p.Members[string(k[0].BLSPubKeyBytes)].Stakes[0].EndHeight = 1
-
+	ru := consensus.MockRoundUpdate(2, p, nil)
+	msg := message.New(topics.RoundUpdate, ru)
 	// Update round. This should not remove the third provisioner from our committee
-	eb.Publish(topics.RoundUpdate, consensus.MockRoundUpdateBuffer(2, p, nil))
+	eb.Publish(topics.RoundUpdate, msg)
 
 	// Create block 1
 	blk := helper.RandomBlock(t, 1, 1)
 	// Remove all txs except coinbase, as the helper transactions do not pass verification
 	blk.Txs = blk.Txs[0:1]
-	blk.SetRoot()
-	blk.SetHash()
+	root, _ := blk.CalculateRoot()
+	blk.Header.TxRoot = root
+	hash, _ := blk.CalculateHash()
+	blk.Header.Hash = hash
 	// Add cert and prev hash
-	blk.Header.Certificate = createMockedCertificate(blk.Header.Hash, 1, k, p)
+	blk.Header.Certificate = message.MockCertificate(blk.Header.Hash, 1, k, p)
 	blk.Header.PrevBlockHash = chain.prevBlock.Header.Hash
 	// Accept it
 	assert.NoError(t, chain.AcceptBlock(*blk))
@@ -350,7 +333,7 @@ func TestRebuildChain(t *testing.T) {
 	go c.Listen()
 
 	// Listen for `StopConsensus` messages
-	stopConsensusChan := make(chan bytes.Buffer, 1)
+	stopConsensusChan := make(chan message.Message, 1)
 	eb.Subscribe(topics.StopConsensus, eventbus.NewChanListener(stopConsensusChan))
 
 	// Add a block so that we have a bit of chain state
@@ -431,8 +414,10 @@ func mockAcceptableBlock(t *testing.T, prevBlock block.Block) *block.Block {
 	blk := helper.RandomBlock(t, 1, 1)
 	// Remove all txs except coinbase, as the helper transactions do not pass verification
 	blk.Txs = blk.Txs[0:1]
-	blk.SetRoot()
-	blk.SetHash()
+	root, _ := blk.CalculateRoot()
+	blk.Header.TxRoot = root
+	hash, _ := blk.CalculateHash()
+	blk.Header.Hash = hash
 	// Add cert and prev hash
 	blk.Header.Certificate = block.EmptyCertificate()
 	blk.Header.PrevBlockHash = prevBlock.Header.Hash

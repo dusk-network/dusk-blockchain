@@ -1,15 +1,17 @@
+// TODO: interface - work with message.Message
 package republisher
 
 import (
-	"bytes"
 	"errors"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
 type (
-	Validator func(bytes.Buffer) error
+	Validator func(message.Message) error
 
 	// Republisher handles the repropagation of messages propagated with a
 	// specified topic
@@ -63,10 +65,11 @@ func (r *Republisher) Activate() uint32 {
 }
 
 // Republish intercepts a topic and repropagates it immediately
-// after applying any eventual validation logic
-func (r *Republisher) Republish(b bytes.Buffer) error {
+// after applying any eventual validation logic.
+// Note: the logic for marshalling should be moved after the Gossip
+func (r *Republisher) Republish(m message.Message) error {
 	for _, v := range r.validators {
-		if err := v(b); err != nil {
+		if err := v(m); err != nil {
 			switch err {
 			case InvalidError, EncodingError:
 				return err
@@ -78,10 +81,20 @@ func (r *Republisher) Republish(b bytes.Buffer) error {
 		}
 	}
 
-	if err := topics.Prepend(&b, r.tpc); err != nil {
+	// message.Marshal takes care of prepending the topic, marshalling the
+	// header, etc
+	buf, err := message.Marshal(m)
+	if err != nil {
 		return err
 	}
 
-	r.broker.Publish(topics.Gossip, &b)
+	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
+	// is performed where it is supposed to (i.e. after the Gossip)
+	serialized := message.New(m.Category(), buf)
+
+	// gossip away
+	r.broker.Publish(topics.Gossip, serialized)
 	return nil
+	//r.broker.Publish(topics.Gossip, m)
+	//return nil
 }
