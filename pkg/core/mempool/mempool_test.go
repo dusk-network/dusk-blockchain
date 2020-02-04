@@ -164,11 +164,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 }
 
 func prepTx(tx transactions.Transaction) message.Message {
-	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
-		panic(err)
-	}
-	return message.New(topics.Tx, *buf)
+	return message.New(topics.Tx, tx)
 }
 
 func TestProcessPendingTxs(t *testing.T) {
@@ -272,7 +268,18 @@ func TestRemoveAccepted(t *testing.T) {
 	txs := randomSliceOfTxs(t, 3)
 
 	for _, tx := range txs {
-		txMsg := prepTx(tx)
+		// We avoid sharing this pointer between the mempool and the block
+		// by marshalling and unmarshalling the tx
+		buf := new(bytes.Buffer)
+		if err := message.MarshalTx(buf, tx); err != nil {
+			t.Fatal(err)
+		}
+
+		txCopy, err := message.UnmarshalTx(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txMsg := prepTx(txCopy)
 
 		// Publish valid tx
 		c.bus.Publish(topics.Tx, txMsg)
@@ -399,14 +406,8 @@ func TestMempoolView(t *testing.T) {
 	txs := randomSliceOfTxs(t, uint16(numTxs))
 
 	for _, tx := range txs {
-		buf := new(bytes.Buffer)
-		err := message.MarshalTx(buf, tx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		c.addTx(tx)
-		msg := message.New(topics.Tx, *buf)
+		msg := message.New(topics.Tx, tx)
 		c.bus.Publish(topics.Tx, msg)
 	}
 
@@ -423,14 +424,14 @@ func TestMempoolView(t *testing.T) {
 	}
 
 	// Now, we single out one hash from the bunch
-	hash := txs[7].StandardTx().TxID
-	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBuffer(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	hash := hex.EncodeToString(txs[7].StandardTx().TxID)
+	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBufferString(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Should give us info about said tx
-	if !strings.Contains(buf.String(), hex.EncodeToString(hash)) {
+	if !strings.Contains(buf.String(), hash) {
 		t.Fatal("should have gotten info about requested tx")
 	}
 
