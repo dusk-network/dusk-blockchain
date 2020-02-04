@@ -23,7 +23,7 @@ func TestReductionUnMarshal(t *testing.T) {
 	assert.NoError(t, message.MarshalReduction(buf, ev))
 
 	// Now Unmarshal it
-	ev2 := message.NewReduction(header.New())
+	ev2 := message.NewReduction(header.Header{})
 	assert.NoError(t, message.UnmarshalReduction(buf, ev2))
 
 	// The two events should be the exact same

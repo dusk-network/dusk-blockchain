@@ -56,10 +56,6 @@ func (r Reduction) Equal(msg Message) bool {
 
 func UnmarshalReductionMessage(r *bytes.Buffer, m SerializableMessage) error {
 	bev := NewReduction(header.Header{})
-	if err := header.Unmarshal(r, &bev.hdr); err != nil {
-		return err
-	}
-
 	if err := UnmarshalReduction(r, bev); err != nil {
 		return err
 	}
@@ -70,6 +66,10 @@ func UnmarshalReductionMessage(r *bytes.Buffer, m SerializableMessage) error {
 
 // Unmarshal unmarshals the buffer into a Reduction event.
 func UnmarshalReduction(r *bytes.Buffer, bev *Reduction) error {
+	if err := header.Unmarshal(r, &bev.hdr); err != nil {
+		return err
+	}
+
 	bev.SignedHash = make([]byte, 33)
 	return encoding.ReadBLS(r, bev.SignedHash)
 }
