@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
@@ -57,6 +58,7 @@ type Mempool struct {
 
 	// the collector to listen for new intermediate blocks
 	intermediateBlockChan <-chan block.Block
+	acceptedBlockChan     <-chan block.Block
 
 	// used by tx verification procedure
 	latestBlockTimestamp int64
@@ -115,12 +117,14 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 	}
 
 	intermediateBlockChan := initIntermediateBlockCollector(eventBus)
+	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	m := &Mempool{
 		eventBus:                eventBus,
 		latestBlockTimestamp:    math.MinInt32,
 		quitChan:                make(chan struct{}),
 		intermediateBlockChan:   intermediateBlockChan,
+		acceptedBlockChan:       acceptedBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
 		getMempoolViewChan:      getMempoolViewChan,
@@ -163,7 +167,9 @@ func (m *Mempool) Run() {
 				handleRequest(r, m.onGetMempoolView, "GetMempoolView")
 			// Mempool input channels
 			case b := <-m.intermediateBlockChan:
-				m.onIntermediateBlock(b)
+				m.onBlock(b)
+			case b := <-m.acceptedBlockChan:
+				m.onBlock(b)
 			case tx := <-m.pending:
 				// TODO: the m.pending channel looks a bit wasteful. Consider
 				// removing it and call onPendingTx directly within
@@ -246,7 +252,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	return txid, nil
 }
 
-func (m *Mempool) onIntermediateBlock(b block.Block) {
+func (m *Mempool) onBlock(b block.Block) {
 	m.latestBlockTimestamp = b.Header.Timestamp
 	m.removeAccepted(b)
 }

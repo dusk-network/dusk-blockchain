@@ -2,21 +2,37 @@ package republisher
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 )
 
-type Validator func(bytes.Buffer) error
+type (
+	Validator func(bytes.Buffer) error
 
-// Republisher handles the repropagation of messages propagated with a
-// specified topic
-type Republisher struct {
-	tpc        topics.Topic
-	broker     eventbus.Broker
-	id         uint32
-	validators []Validator
+	// Republisher handles the repropagation of messages propagated with a
+	// specified topic
+	Republisher struct {
+		tpc        topics.Topic
+		broker     eventbus.Broker
+		id         uint32
+		validators []Validator
+	}
+
+	repuberr              struct{ err error }
+	duplicatePayloadError struct{ *repuberr }
+	invalidError          struct{ *repuberr }
+	encodingError         struct{ *repuberr }
+)
+
+func (rerr *repuberr) Error() string {
+	return rerr.err.Error()
 }
+
+var DuplicatePayloadError = &duplicatePayloadError{&repuberr{errors.New("duplicatePayloadError")}}
+var EncodingError = &encodingError{&repuberr{errors.New("encoding failed")}}
+var InvalidError = &invalidError{&repuberr{errors.New("invalid payload")}}
 
 // New creates a Republisher
 func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
@@ -51,7 +67,14 @@ func (r *Republisher) Activate() uint32 {
 func (r *Republisher) Republish(b bytes.Buffer) error {
 	for _, v := range r.validators {
 		if err := v(b); err != nil {
-			return err
+			switch err {
+			case InvalidError, EncodingError:
+				return err
+			case DuplicatePayloadError:
+				return nil
+			default:
+				return err
+			}
 		}
 	}
 
