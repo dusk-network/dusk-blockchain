@@ -64,7 +64,7 @@ func (m simple) String() string {
 
 }
 
-func (m simple) Id() []byte {
+func (m *simple) Id() []byte {
 	if m.marshalled == nil {
 		buf, err := Marshal(m)
 		if err != nil {
@@ -75,7 +75,7 @@ func (m simple) Id() []byte {
 	return m.marshalled.Bytes()
 }
 
-func (m simple) setPayload(i interface{}) {
+func (m *simple) setPayload(i interface{}) {
 	m.payload = i
 }
 
@@ -87,12 +87,12 @@ func (m simple) Payload() interface{} {
 	return m.payload
 }
 
-func (m simple) SetPayload(payload interface{}) {
+func (m *simple) SetPayload(payload interface{}) {
 	m.payload = payload
 }
 
 func (m simple) Equal(other Message) bool {
-	msg, ok := other.(simple)
+	msg, ok := other.(*simple)
 	return ok && bytes.Equal(msg.marshalled.Bytes(), msg.marshalled.Bytes())
 }
 
@@ -116,13 +116,15 @@ func (m *simple) initPayloadBuffer(b bytes.Buffer) {
 // It also caches the serialized form within the message
 func Unmarshal(b *bytes.Buffer) (Message, error) {
 	var err error
+	msg := &simple{}
+	msg.initPayloadBuffer(*b)
+
 	topic, err := topics.Extract(b)
 	if err != nil {
 		return nil, err
 	}
+	msg.category = topic
 
-	msg := newMsg(topic)
-	msg.initPayloadBuffer(*b)
 	switch topic {
 	case topics.Tx:
 		err = UnmarshalTxMessage(b, msg)
@@ -154,7 +156,7 @@ func Marshal(s Message) (bytes.Buffer, error) {
 	var buf bytes.Buffer
 	// if it is a simple message, first we check if this message carries a
 	// cache of its marshalled form first
-	m, ok := s.(simple)
+	m, ok := s.(*simple)
 
 	if !ok { // it is not a cacheable message. We simply marshal without caring for any optimization
 		if err := marshal(s, &buf); err != nil {
@@ -197,8 +199,7 @@ func marshal(s Message, b *bytes.Buffer) error {
 		}
 	}
 
-	topics.Prepend(b, s.Category())
-	return nil
+	return topics.Prepend(b, s.Category())
 }
 
 // marshalMessage marshals a Message carrying a payload different than a Buffer
