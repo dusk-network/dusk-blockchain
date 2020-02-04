@@ -285,11 +285,6 @@ func (m *Mempool) removeAccepted(b block.Block) {
 
 	if err == nil && tree != nil {
 
-		if !bytes.Equal(tree.MerkleRoot, b.Header.TxRoot) {
-			log.Errorf("block %s has invalid txroot", blockHash)
-			return
-		}
-
 		s := m.newPool()
 		// Check if mempool verified tx is part of merkle tree of this block
 		// if not, then keep it in the mempool for the next block
