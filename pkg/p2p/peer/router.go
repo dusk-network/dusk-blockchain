@@ -11,7 +11,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	log "github.com/sirupsen/logrus"
 )
 
 // The messageRouter is connected to all of the processing units that are tied to the peer.
@@ -60,41 +59,32 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 	category := msg.Category()
 	switch category {
 	case topics.GetBlocks:
-		topics.Extract(&b)
 		err = m.blockHashBroker.AdvertiseMissingBlocks(&b)
 	case topics.GetData:
-		topics.Extract(&b)
 		err = m.dataBroker.SendItems(&b)
 	case topics.MemPool:
-		topics.Extract(&b)
 		err = m.dataBroker.SendTxsItems()
 	case topics.Inv:
-		topics.Extract(&b)
 		err = m.dataRequestor.RequestMissingItems(&b)
 	case topics.Block:
-		topics.Extract(&b)
 		err = m.synchronizer.Synchronize(&b, m.peerInfo)
 	case topics.Ping:
-		topics.Extract(&b)
 		m.ponger.Pong()
 	case topics.Pong:
 		// Just here to avoid the error message, as pong is unroutable but
 		// otherwise carries no relevant information beyond the receiving
 		// of this message
 	case topics.GetRoundResults:
-		topics.Extract(&b)
 		err = m.roundResultBroker.ProvideRoundResult(&b)
 	case topics.GetCandidate:
 		// We only accept a certain request once, to avoid infinitely
 		// requesting the same block
 		// TODO: interface - buffer should be immutable. Change the dupemap to
 		// deal with values rather than reference
-		topics.Extract(&b)
 		if m.dupeMap.CanFwd(&b) {
 			err = m.candidateBroker.ProvideCandidate(&b)
 		}
 	default:
-		topics.Extract(&b)
 		if m.CanRoute(category) {
 			if m.dupeMap.CanFwd(&b) {
 				m.publisher.Publish(category, msg)
@@ -104,12 +94,5 @@ func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 		}
 	}
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "peer",
-			"error":   err,
-		}).Errorf("problem handling message %s", category.String())
-		return err
-	}
-	return nil
+	return err
 }
