@@ -87,7 +87,7 @@ func UnmarshalCandidateMessage(b *bytes.Buffer, m SerializableMessage) error {
 		return err
 	}
 
-	m.SetPayload(cm)
+	m.SetPayload(*cm)
 	return nil
 }
 
