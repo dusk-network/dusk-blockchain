@@ -31,6 +31,8 @@ const (
 	AutomateConsensusTxs
 	GetSyncProgress
 	IsWalletLoaded
+	StartProfile
+	StopProfile
 )
 
 func MarshalConsensusTxRequest(buf *bytes.Buffer, amount, lockTime uint64) error {

@@ -22,90 +22,19 @@ const (
 	mutexProfileRate = 1
 )
 
-type profSettings struct {
+type profile struct {
+	name  string
 	n, d  int
 	start bool
+	quit  chan struct{}
 }
 
-// ProfileSet allows fetching program samples of different types.
-// It could be handful if node user observe problematic situation or any type of inefficiency.
-// In most cases, it will allow a developer to catch a perf issue (Memory, CPU or concurrency inefficiency) at development phase.
-// As support for periodical sample fetching is added, the tool could enable 'continuous profiling' with negligible overhead.
-//
-// See also func loop() for a few examples of use
-//
-// TBD: Enable/Disable profiles on demand (via rpc or cli command)
-type ProfileSet struct {
-	profiles map[string]profSettings
-	quit     chan struct{}
-}
-
-// NewProfileSet creates and starts ProfileSet from a set of configurations
-//
-// Examples config entries:
-// "cpu, 1800, 30"
-// "heap, 1800, 1800, 1"
-// "memstats, 1800, 1"
-func NewProfileSet(profiles []string) (ProfileSet, error) {
-
-	p := ProfileSet{
-		quit:     make(chan struct{}),
-		profiles: make(map[string]profSettings, 0),
-	}
-
-	for _, entry := range profiles {
-
-		name, item, err := parse(entry)
-		if err != nil {
-			return p, err
-		}
-
-		_, ok := p.profiles[name]
-		if !ok {
-			p.profiles[name] = item
-			go loop(name, item.n, item.d, item.start, p.quit)
-		} else {
-			return p, fmt.Errorf("duplicated entry %s", name)
-		}
-	}
-
-	return p, nil
-}
-
-func parse(conf string) (string, profSettings, error) {
-
-	w := strings.SplitN(conf, ",", 4)
-	if len(w) < 3 {
-		return "", profSettings{}, errors.New("invalid settings")
-	}
-
-	var s profSettings
-	var err error
-
-	s.n, err = strconv.Atoi(w[1])
-	if err != nil {
-		return "", s, err
-	}
-
-	s.d, err = strconv.Atoi(w[2])
-	if err != nil {
-		return "", s, err
-	}
-
-	if len(w) > 3 {
-		v, err := strconv.Atoi(w[3])
-		if err != nil {
-			return "", s, err
-		}
-		s.start = (v > 0)
-	}
-
-	return w[0], s, nil
-}
-
-func (p ProfileSet) Close() {
-	// Signal all profile loops that it's time to terminate
-	close(p.quit)
+// Examples of settings strings:
+// - "cpu, 1800, 30"
+// - "heap, 1800, 1800, 1"
+// - "memstats, 1800, 1"
+func newProfile(settings string) (profile, error) {
+	return parse(settings)
 }
 
 // loop runs a loop for periodical (CPU, Heap etc .. ) samples fetching
@@ -148,21 +77,21 @@ func (p ProfileSet) Close() {
 // (suitable in development)
 // output: mutex_$timestamp.prof file
 
-func loop(name string, n, d int, s bool, quit chan struct{}) {
+func (p *profile) loop() {
 
 	var err error
-	t := time.NewTicker(time.Duration(n) * time.Second)
+	t := time.NewTicker(time.Duration(p.n) * time.Second)
 
 	// Trigger sampling at startup
 	var f *os.File
-	if s {
-		f, err = startProfiling(name)
+	if p.start {
+		f, err = startProfiling(p.name)
 		if err != nil {
 			// not supported type
 			return
 		}
 	}
-	defer stopProfiling(f, name)
+	defer stopProfiling(f, p.name)
 
 	// Restart the sampling each #interval minutes
 	for {
@@ -170,24 +99,24 @@ func loop(name string, n, d int, s bool, quit chan struct{}) {
 		case <-t.C:
 
 			/// Close previous sampling and start a new one
-			stopProfiling(f, name)
-			f, err = startProfiling(name)
+			stopProfiling(f, p.name)
+			f, err = startProfiling(p.name)
 			if err != nil {
 				return
 			}
 
 			// Sampling lasts not more than Duration seconds
-			t2 := time.NewTicker(time.Duration(d) * time.Second)
+			t2 := time.NewTicker(time.Duration(p.d) * time.Second)
 
 			select {
 			case <-t2.C:
-				stopProfiling(f, name)
+				stopProfiling(f, p.name)
 				f = nil
-			case <-quit:
+			case <-p.quit:
 				return
 			}
 
-		case <-quit:
+		case <-p.quit:
 			return
 		}
 	}
@@ -337,4 +266,37 @@ func logMemstatsSample() {
 		}
 	}
 
+}
+
+func parse(settings string) (profile, error) {
+
+	w := strings.SplitN(settings, ",", 4)
+	if len(w) < 3 {
+		return profile{}, errors.New("invalid settings")
+	}
+
+	p := profile{quit: make(chan struct{})}
+	var err error
+
+	p.n, err = strconv.Atoi(w[1])
+	if err != nil {
+		return p, err
+	}
+
+	p.d, err = strconv.Atoi(w[2])
+	if err != nil {
+		return p, err
+	}
+
+	if len(w) > 3 {
+		v, err := strconv.Atoi(w[3])
+		if err != nil {
+			return p, err
+		}
+		p.start = (v > 0)
+	}
+
+	p.name = w[0]
+
+	return p, nil
 }

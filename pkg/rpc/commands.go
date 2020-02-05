@@ -36,6 +36,9 @@ var (
 		"walletstatus":         walletStatus,
 		"viewmempool":          viewMempool,
 
+		// APIs for node diagnostics.
+		"startprofile": startProfile,
+		"stopprofile":  stopProfile,
 		// Publish Topic (experimental). Injects an event directly into EventBus system.
 		// Would be useful on E2E testing. Mind the supportedTopics list when sends it
 		"publishTopic": publishTopic,
@@ -363,6 +366,44 @@ var viewMempool = func(s *Server, params []string) (string, error) {
 	}
 
 	txsBuf, err := s.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{buf, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return txsBuf.String(), nil
+}
+
+var startProfile = func(s *Server, params []string) (string, error) {
+	var bufSettings bytes.Buffer
+	if len(params) > 1 {
+		bufSettings = *bytes.NewBufferString(params[0])
+	}
+
+	req := rpcbus.Request{
+		Params:   bufSettings,
+		RespChan: make(chan rpcbus.Response, 1),
+	}
+
+	txsBuf, err := s.rpcBus.Call(rpcbus.StartProfile, req, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return txsBuf.String(), nil
+}
+
+var stopProfile = func(s *Server, params []string) (string, error) {
+	var bufName bytes.Buffer
+	if len(params) > 1 {
+		bufName = *bytes.NewBufferString(params[0])
+	}
+
+	req := rpcbus.Request{
+		Params:   bufName,
+		RespChan: make(chan rpcbus.Response, 1),
+	}
+
+	txsBuf, err := s.rpcBus.Call(rpcbus.StopProfile, req, 2*time.Second)
 	if err != nil {
 		return "", err
 	}
