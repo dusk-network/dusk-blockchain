@@ -141,7 +141,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	// Note: we don't need to mock the bidlist as we should not be included if we want to trigger a bid transaction
 
 	c := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.SendMempoolTx, c)
+	rpcBus.Register(topics.SendMempoolTx, c)
 
 	return bus, c, p, w.ConsensusKeys(), mScalar
 }
@@ -150,7 +150,8 @@ func receiveTxs(t *testing.T, c chan rpcbus.Request) []transactions.Transaction 
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		r := <-c
-		tx, err := message.UnmarshalTx(&r.Params)
+		params := r.Params.(bytes.Buffer)
+		tx, err := message.UnmarshalTx(&params)
 		assert.NoError(t, err)
 		txs = append(txs, tx)
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
@@ -165,6 +166,6 @@ func createWallet(rpcBus *rpcbus.RPCBus, password string) error {
 		return err
 	}
 
-	_, err := rpcBus.Call(rpcbus.CreateWallet, rpcbus.NewRequest(*buf), 0)
+	_, err := rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(*buf), 0)
 	return err
 }

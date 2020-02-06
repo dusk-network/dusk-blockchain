@@ -18,10 +18,11 @@ func NewRoundResultBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buff
 }
 
 func (r *RoundResultBroker) ProvideRoundResult(m *bytes.Buffer) error {
-	roundResultBuf, err := r.rpcBus.Call(rpcbus.GetRoundResults, rpcbus.Request{*m, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := r.rpcBus.Call(topics.GetRoundResults, rpcbus.Request{*m, make(chan rpcbus.Response, 1)}, 5*time.Second)
 	if err != nil {
 		return err
 	}
+	roundResultBuf := resp.(bytes.Buffer)
 
 	if err := topics.Prepend(&roundResultBuf, topics.RoundResults); err != nil {
 		return err

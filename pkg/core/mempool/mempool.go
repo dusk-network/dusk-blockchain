@@ -97,22 +97,22 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 	log.Infof("Create instance")
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(rpcbus.GetMempoolTxs, getMempoolTxsChan); err != nil {
+	if err := rpcBus.Register(topics.GetMempoolTxs, getMempoolTxsChan); err != nil {
 		log.Errorf("rpcbus.GetMempoolTxs err=%v", err)
 	}
 
 	getMempoolTxsBySizeChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(rpcbus.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
+	if err := rpcBus.Register(topics.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
 		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
 	}
 
 	getMempoolViewChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(rpcbus.GetMempoolView, getMempoolViewChan); err != nil {
+	if err := rpcBus.Register(topics.GetMempoolView, getMempoolViewChan); err != nil {
 		log.WithError(err).Errorf("error registering getMempoolView")
 	}
 
 	sendTxChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(rpcbus.SendMempoolTx, sendTxChan); err != nil {
+	if err := rpcBus.Register(topics.SendMempoolTx, sendTxChan); err != nil {
 		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
 	}
 
@@ -373,7 +373,8 @@ func (m *Mempool) CollectPending(msg message.Message) error {
 // Called by P2P on InvTypeMempoolTx msg
 func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 	// Read inputs
-	filterTxID := r.Params.Bytes()
+	params := r.Params.(bytes.Buffer)
+	filterTxID := params.Bytes()
 
 	outputTxs := make([]transactions.Transaction, 0)
 	w := new(bytes.Buffer)
@@ -407,11 +408,12 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 
 func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 	txs := make([]transactions.Transaction, 0)
-	switch len(r.Params.Bytes()) {
+	params := r.Params.(bytes.Buffer)
+	switch len(params.Bytes()) {
 	case 32:
 		// If we want a tx with a certain ID, we can simply look it up
 		// directly
-		hash, err := hex.DecodeString(string(r.Params.Bytes()))
+		hash, err := hex.DecodeString(string(params.Bytes()))
 		if err != nil {
 			return bytes.Buffer{}, err
 		}
@@ -423,7 +425,7 @@ func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 
 		txs = append(txs, tx)
 	case 1:
-		txs = m.verified.FilterByType(transactions.TxType(r.Params.Bytes()[0]))
+		txs = m.verified.FilterByType(transactions.TxType(params.Bytes()[0]))
 	default:
 		txs = m.verified.Clone()
 	}
@@ -446,7 +448,8 @@ func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
 
 	// Read maxTxsSize param
 	var maxTxsSize uint32
-	if err := encoding.ReadUint32LE(&r.Params, &maxTxsSize); err != nil {
+	params := r.Params.(bytes.Buffer)
+	if err := encoding.ReadUint32LE(&params, &maxTxsSize); err != nil {
 		return bytes.Buffer{}, err
 	}
 
@@ -478,8 +481,8 @@ func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
 
 // onSendMempoolTx utilizes rpcbus to allow submitting a tx to mempool with
 func (m Mempool) onSendMempoolTx(r rpcbus.Request) (bytes.Buffer, error) {
-
-	txDesc, err := unmarshalTxDesc(r.Params)
+	params := r.Params.(bytes.Buffer)
+	txDesc, err := unmarshalTxDesc(params)
 	if err != nil {
 		return bytes.Buffer{}, err
 	}

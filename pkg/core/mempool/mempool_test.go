@@ -120,7 +120,8 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 
 	c.wait()
 
-	r, _ := c.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
+	resp, _ := c.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
+	r := resp.(bytes.Buffer)
 
 	lTxs, _ := encoding.ReadVarInt(&r)
 
@@ -382,10 +383,11 @@ func TestSendMempoolTx(t *testing.T) {
 
 		totalSize += uint32(buf.Len())
 
-		txidBytes, err := c.rpcBus.Call(rpcbus.SendMempoolTx, rpcbus.NewRequest(*buf), 0)
+		resp, err := c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(*buf), 0)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
+		txidBytes := resp.(bytes.Buffer)
 
 		txid, _ := tx.CalculateHash()
 		if !bytes.Equal(txidBytes.Bytes(), txid) {
@@ -412,10 +414,11 @@ func TestMempoolView(t *testing.T) {
 	}
 
 	// First, let's just get the entire view
-	buf, err := c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
+	buf := resp.(bytes.Buffer)
 
 	// There should be 16 txs, so 16 lines
 	n := strings.Count(buf.String(), "\n")
@@ -425,10 +428,11 @@ func TestMempoolView(t *testing.T) {
 
 	// Now, we single out one hash from the bunch
 	hash := hex.EncodeToString(txs[7].StandardTx().TxID)
-	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBufferString(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{*bytes.NewBufferString(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
+	buf = resp.(bytes.Buffer)
 
 	// Should give us info about said tx
 	if !strings.Contains(buf.String(), hash) {
@@ -436,10 +440,11 @@ func TestMempoolView(t *testing.T) {
 	}
 
 	// Let's filter for just stakes
-	buf, err = c.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{*bytes.NewBuffer([]byte{2}), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{*bytes.NewBuffer([]byte{2}), make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
+	buf = resp.(bytes.Buffer)
 
 	// Should have `numTxs` lines, as there is one tx per type
 	// per batch.

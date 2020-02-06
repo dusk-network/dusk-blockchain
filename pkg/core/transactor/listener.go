@@ -14,6 +14,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -91,8 +92,9 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
+	params := r.Params.(bytes.Buffer)
 	var password string
-	password, err := encoding.ReadString(&r.Params)
+	password, err := encoding.ReadString(&params)
 	if err != nil {
 		return err
 	}
@@ -179,8 +181,9 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
+	params := r.Params.(bytes.Buffer)
 	var password string
-	password, err := encoding.ReadString(&r.Params)
+	password, err := encoding.ReadString(&params)
 	if err != nil {
 		return err
 	}
@@ -217,14 +220,15 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
+	params := r.Params.(bytes.Buffer)
 	var seed string
-	seed, err := encoding.ReadString(&r.Params)
+	seed, err := encoding.ReadString(&params)
 	if err != nil {
 		return err
 	}
 
 	var password string
-	password, err = encoding.ReadString(&r.Params)
+	password, err = encoding.ReadString(&params)
 	if err != nil {
 		return err
 	}
@@ -251,14 +255,15 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
+	params := r.Params.(bytes.Buffer)
 	// read tx parameters
 	var amount uint64
-	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
+	if err := encoding.ReadUint64LE(&params, &amount); err != nil {
 		return err
 	}
 
 	var lockTime uint64
-	if err := encoding.ReadUint64LE(&r.Params, &lockTime); err != nil {
+	if err := encoding.ReadUint64LE(&params, &lockTime); err != nil {
 		return err
 	}
 
@@ -291,14 +296,15 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
+	params := r.Params.(bytes.Buffer)
 	// read tx parameters
 	var amount uint64
-	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
+	if err := encoding.ReadUint64LE(&params, &amount); err != nil {
 		return err
 	}
 
 	var lockTime uint64
-	if err := encoding.ReadUint64LE(&r.Params, &lockTime); err != nil {
+	if err := encoding.ReadUint64LE(&params, &lockTime); err != nil {
 		return err
 	}
 
@@ -327,13 +333,14 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
+	params := r.Params.(bytes.Buffer)
 	var amount uint64
-	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
+	if err := encoding.ReadUint64LE(&params, &amount); err != nil {
 		return err
 	}
 
 	var destPubKey string
-	destPubKey, err := encoding.ReadString(&r.Params)
+	destPubKey, err := encoding.ReadString(&params)
 	if err != nil {
 		return err
 	}
@@ -389,10 +396,11 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 	}
 
 	// Retrieve mempool txs
-	txsBuf, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := t.rb.Call(topics.GetMempoolTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		return err
 	}
+	txsBuf := resp.(bytes.Buffer)
 
 	lTxs, err := encoding.ReadVarInt(&txsBuf)
 	if err != nil {
@@ -473,7 +481,7 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 
-	_, err = t.rb.Call(rpcbus.SendMempoolTx, rpcbus.Request{*buf, make(chan rpcbus.Response, 1)}, 0)
+	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{*buf, make(chan rpcbus.Response, 1)}, 0)
 	if err != nil {
 		return nil, err
 	}

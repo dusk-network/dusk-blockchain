@@ -120,10 +120,11 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 
 	buf := new(bytes.Buffer)
 	buf.Write(txID)
-	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
+	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
 	if err != nil {
 		return nil, err
 	}
+	r := resp.(bytes.Buffer)
 
 	lTxs, err := encoding.ReadVarInt(&r)
 	if err != nil {

@@ -100,12 +100,12 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	getRoundResultsChan := make(chan rpcbus.Request, 1)
 	getSyncProgressChan := make(chan rpcbus.Request, 1)
 	rebuildChainChan := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.GetLastBlock, getLastBlockChan)
-	rpcBus.Register(rpcbus.VerifyCandidateBlock, verifyCandidateBlockChan)
-	rpcBus.Register(rpcbus.GetLastCertificate, getLastCertificateChan)
-	rpcBus.Register(rpcbus.GetRoundResults, getRoundResultsChan)
-	rpcBus.Register(rpcbus.GetSyncProgress, getSyncProgressChan)
-	rpcBus.Register(rpcbus.RebuildChain, rebuildChainChan)
+	rpcBus.Register(topics.GetLastBlock, getLastBlockChan)
+	rpcBus.Register(topics.VerifyCandidateBlock, verifyCandidateBlockChan)
+	rpcBus.Register(topics.GetLastCertificate, getLastCertificateChan)
+	rpcBus.Register(topics.GetRoundResults, getRoundResultsChan)
+	rpcBus.Register(topics.GetSyncProgress, getSyncProgressChan)
+	rpcBus.Register(topics.RebuildChain, rebuildChainChan)
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -369,9 +369,10 @@ func (c *Chain) verifyCandidateBlock(r rpcbus.Request) {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block hash known")}
 		return
 	}
+	params := r.Params.(bytes.Buffer)
 
 	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&r.Params, blk); err != nil {
+	if err := message.UnmarshalBlock(&params, blk); err != nil {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
 	}
 
@@ -569,12 +570,13 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	c.lastCertificate = cMsg.cert
 
 	// Fetch new intermediate block and corresponding certificate
-	candidateBuf, err := c.rpcBus.Call(rpcbus.GetCandidate, rpcbus.Request{*bytes.NewBuffer(cMsg.hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.Request{*bytes.NewBuffer(cMsg.hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
 		return
 	}
+	candidateBuf := resp.(bytes.Buffer)
 
 	cm := message.NewCandidate()
 	if err := message.UnmarshalCandidate(&candidateBuf, cm); err != nil {
@@ -693,13 +695,14 @@ func (c *Chain) provideRoundResults(r rpcbus.Request) {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block or certificate currently known")}
 		return
 	}
+	params := r.Params.(bytes.Buffer)
 
-	if r.Params.Len() < 8 {
+	if params.Len() < 8 {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("round cannot be read from request param")}
 		return
 	}
 
-	round := binary.LittleEndian.Uint64(r.Params.Bytes())
+	round := binary.LittleEndian.Uint64(params.Bytes())
 	if round != c.intermediateBlock.Header.Height {
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block and certificate for the given round")}
 		return
@@ -820,7 +823,7 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	}
 
 	// Clear walletDB
-	if _, err := c.rpcBus.Call(rpcbus.ClearWalletDatabase, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
+	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
 		log.Panic(err)
 	}
 

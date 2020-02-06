@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -134,7 +135,7 @@ func (m *StakeAutomaton) sendBid() error {
 		return err
 	}
 
-	_, err := m.rpcBus.Call(rpcbus.SendBidTx, rpcbus.NewRequest(*buf), 0)
+	_, err := m.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return err
 	}
@@ -157,7 +158,7 @@ func (m *StakeAutomaton) sendStake() error {
 		return err
 	}
 
-	_, err := m.rpcBus.Call(rpcbus.SendStakeTx, rpcbus.NewRequest(*buf), 0)
+	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(*buf), 0)
 	return err
 }
 

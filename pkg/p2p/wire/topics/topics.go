@@ -16,7 +16,7 @@ const (
 	Ping
 	Pong
 
-	// Data exchange topics (RPCBus)
+	// Data exchange topics
 	Addr
 	GetAddr
 	GetData
@@ -29,9 +29,7 @@ const (
 	MemPool
 	Inv
 	Certificate
-	GetRoundResults
 	RoundResults
-	GetCandidate
 
 	// Gossiped topics
 	Candidate
@@ -63,6 +61,37 @@ const (
 	IntermediateBlock
 	HighestSeen
 	ValidCandidateHash
+
+	// RPCBus topics
+	GetLastBlock
+	GetMempoolTxs
+	GetMempoolTxsBySize
+	VerifyCandidateBlock
+	GetLastCertificate
+
+	// Cross-process RPCBus topics
+	// Wallet
+	GetMempoolView
+	SendMempoolTx
+	CreateWallet
+	CreateFromSeed
+	LoadWallet
+	SendBidTx
+	SendStakeTx
+	SendStandardTx
+	GetBalance
+	GetUnconfirmedBalance
+	GetAddress
+	GetTxHistory
+	AutomateConsensusTxs
+	GetSyncProgress
+	IsWalletLoaded
+	RebuildChain
+	ClearWalletDatabase
+
+	// Cross-network RPCBus topics
+	GetRoundResults
+	GetCandidate
 )
 
 type topicBuf struct {
@@ -71,6 +100,7 @@ type topicBuf struct {
 	str string
 }
 
+// NOTE: this needs to be in the same order in which the topics are declared
 var Topics = [...]topicBuf{
 	topicBuf{Version, *(bytes.NewBuffer([]byte{byte(Version)})), "version"},
 	topicBuf{VerAck, *(bytes.NewBuffer([]byte{byte(VerAck)})), "verack"},
@@ -88,9 +118,7 @@ var Topics = [...]topicBuf{
 	topicBuf{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
 	topicBuf{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
 	topicBuf{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
-	topicBuf{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	topicBuf{RoundResults, *(bytes.NewBuffer([]byte{byte(RoundResults)})), "roundresults"},
-	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 	topicBuf{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
 	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
 	topicBuf{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
@@ -114,6 +142,30 @@ var Topics = [...]topicBuf{
 	topicBuf{IntermediateBlock, *(bytes.NewBuffer([]byte{byte(IntermediateBlock)})), "intermediateblock"},
 	topicBuf{HighestSeen, *(bytes.NewBuffer([]byte{byte(HighestSeen)})), "highestseen"},
 	topicBuf{ValidCandidateHash, *(bytes.NewBuffer([]byte{byte(ValidCandidateHash)})), "validcandidatehash"},
+	topicBuf{GetLastBlock, *(bytes.NewBuffer([]byte{byte(GetLastBlock)})), "getlastblock"},
+	topicBuf{GetMempoolTxs, *(bytes.NewBuffer([]byte{byte(GetMempoolTxs)})), "getmempooltxs"},
+	topicBuf{GetMempoolTxsBySize, *(bytes.NewBuffer([]byte{byte(GetMempoolTxsBySize)})), "getmempooltxsbysize"},
+	topicBuf{VerifyCandidateBlock, *(bytes.NewBuffer([]byte{byte(VerifyCandidateBlock)})), "verifycandidateblock"},
+	topicBuf{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
+	topicBuf{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
+	topicBuf{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
+	topicBuf{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
+	topicBuf{CreateFromSeed, *(bytes.NewBuffer([]byte{byte(CreateFromSeed)})), "createfromseed"},
+	topicBuf{LoadWallet, *(bytes.NewBuffer([]byte{byte(LoadWallet)})), "loadwallet"},
+	topicBuf{SendBidTx, *(bytes.NewBuffer([]byte{byte(SendBidTx)})), "sendbidtx"},
+	topicBuf{SendStakeTx, *(bytes.NewBuffer([]byte{byte(SendStakeTx)})), "sendstaketx"},
+	topicBuf{SendStandardTx, *(bytes.NewBuffer([]byte{byte(SendStandardTx)})), "sendstandardtx"},
+	topicBuf{GetBalance, *(bytes.NewBuffer([]byte{byte(GetBalance)})), "getbalance"},
+	topicBuf{GetUnconfirmedBalance, *(bytes.NewBuffer([]byte{byte(GetUnconfirmedBalance)})), "getunconfirmedbalance"},
+	topicBuf{GetAddress, *(bytes.NewBuffer([]byte{byte(GetAddress)})), "getaddress"},
+	topicBuf{GetTxHistory, *(bytes.NewBuffer([]byte{byte(GetTxHistory)})), "gettxhistory"},
+	topicBuf{AutomateConsensusTxs, *(bytes.NewBuffer([]byte{byte(AutomateConsensusTxs)})), "automateconsensustxs"},
+	topicBuf{GetSyncProgress, *(bytes.NewBuffer([]byte{byte(GetSyncProgress)})), "getsyncprogress"},
+	topicBuf{IsWalletLoaded, *(bytes.NewBuffer([]byte{byte(IsWalletLoaded)})), "iswalletloaded"},
+	topicBuf{RebuildChain, *(bytes.NewBuffer([]byte{byte(RebuildChain)})), "rebuildchain"},
+	topicBuf{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
+	topicBuf{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
+	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 }
 
 func (t Topic) ToBuffer() bytes.Buffer {

@@ -159,7 +159,7 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 
 func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	c := make(chan rpcbus.Request, 1)
-	rpc.Register(rpcbus.GetCandidate, c)
+	rpc.Register(topics.GetCandidate, c)
 	buf := new(bytes.Buffer)
 	if err := message.MarshalCandidate(buf, cm); err != nil {
 		panic(err)
@@ -363,7 +363,7 @@ func TestRebuildChain(t *testing.T) {
 	}
 
 	// Now, send a request to rebuild the chain
-	if _, err := rb.Call(rpcbus.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
+	if _, err := rb.Call(topics.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -399,7 +399,7 @@ func createBid(t *testing.T) user.Bid {
 
 func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
-	rb.Register(rpcbus.ClearWalletDatabase, c)
+	rb.Register(topics.ClearWalletDatabase, c)
 	go func() {
 		r := <-c
 		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}

@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/v2/block"
@@ -100,55 +101,55 @@ func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 
 // registers all rpcBus channels
 func (t *Transactor) registerMethods() error {
-	if err := t.rb.Register(rpcbus.LoadWallet, t.loadWalletChan); err != nil {
+	if err := t.rb.Register(topics.LoadWallet, t.loadWalletChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.CreateWallet, t.createWalletChan); err != nil {
+	if err := t.rb.Register(topics.CreateWallet, t.createWalletChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.CreateFromSeed, t.createFromSeedChan); err != nil {
+	if err := t.rb.Register(topics.CreateFromSeed, t.createFromSeedChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.SendBidTx, t.sendBidTxChan); err != nil {
+	if err := t.rb.Register(topics.SendBidTx, t.sendBidTxChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.SendStakeTx, t.sendStakeTxChan); err != nil {
+	if err := t.rb.Register(topics.SendStakeTx, t.sendStakeTxChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.SendStandardTx, t.sendStandardTxChan); err != nil {
+	if err := t.rb.Register(topics.SendStandardTx, t.sendStandardTxChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.GetBalance, t.getBalanceChan); err != nil {
+	if err := t.rb.Register(topics.GetBalance, t.getBalanceChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.GetUnconfirmedBalance, t.getUnconfirmedBalanceChan); err != nil {
+	if err := t.rb.Register(topics.GetUnconfirmedBalance, t.getUnconfirmedBalanceChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.GetAddress, t.getAddressChan); err != nil {
+	if err := t.rb.Register(topics.GetAddress, t.getAddressChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.GetTxHistory, t.getTxHistoryChan); err != nil {
+	if err := t.rb.Register(topics.GetTxHistory, t.getTxHistoryChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.AutomateConsensusTxs, t.automateConsensusTxsChan); err != nil {
+	if err := t.rb.Register(topics.AutomateConsensusTxs, t.automateConsensusTxsChan); err != nil {
 		return err
 	}
 
-	if err := t.rb.Register(rpcbus.IsWalletLoaded, t.isWalletLoadedChan); err != nil {
+	if err := t.rb.Register(topics.IsWalletLoaded, t.isWalletLoadedChan); err != nil {
 		return err
 	}
 
-	return t.rb.Register(rpcbus.ClearWalletDatabase, t.clearWalletDatabaseChan)
+	return t.rb.Register(topics.ClearWalletDatabase, t.clearWalletDatabaseChan)
 }
 
 func (t *Transactor) Wallet() (*wallet.Wallet, error) {

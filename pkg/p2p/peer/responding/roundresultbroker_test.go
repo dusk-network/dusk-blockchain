@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,7 +46,7 @@ func provideRoundResult(rb *rpcbus.RPCBus, correctRound uint64) chan struct{} {
 	quitChan := make(chan struct{}, 1)
 	reqChan := make(chan rpcbus.Request, 1)
 
-	if err := rb.Register(rpcbus.GetRoundResults, reqChan); err != nil {
+	if err := rb.Register(topics.GetRoundResults, reqChan); err != nil {
 		panic(err)
 	}
 
@@ -53,8 +54,9 @@ func provideRoundResult(rb *rpcbus.RPCBus, correctRound uint64) chan struct{} {
 		for {
 			select {
 			case r := <-reqChan:
+				params := r.Params.(bytes.Buffer)
 				var round uint64
-				if err := encoding.ReadUint64LE(&r.Params, &round); err != nil {
+				if err := encoding.ReadUint64LE(&params, &round); err != nil {
 					panic(err)
 				}
 

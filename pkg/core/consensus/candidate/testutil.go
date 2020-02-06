@@ -96,7 +96,7 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 
 func provideCertificate(rpcBus *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.GetLastCertificate, c)
+	rpcBus.Register(topics.GetLastCertificate, c)
 
 	go func(c chan rpcbus.Request) {
 		r := <-c
@@ -117,7 +117,7 @@ func (h *Helper) TriggerBlockGeneration() {
 // the blockgenerator, standing in place of the mempool.
 func (h *Helper) ProvideTransactions(t *testing.T) {
 	reqChan := make(chan rpcbus.Request, 1)
-	h.RBus.Register(rpcbus.GetMempoolTxsBySize, reqChan)
+	h.RBus.Register(topics.GetMempoolTxsBySize, reqChan)
 
 	go func(reqChan chan rpcbus.Request) {
 		r := <-reqChan

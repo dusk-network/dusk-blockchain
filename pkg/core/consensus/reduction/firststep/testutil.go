@@ -69,7 +69,7 @@ func (hlp *Helper) shouldFailVerification() bool {
 
 func (hlp *Helper) provideCandidateBlock() {
 	c := make(chan rpcbus.Request, 1)
-	hlp.RBus.Register(rpcbus.GetCandidate, c)
+	hlp.RBus.Register(topics.GetCandidate, c)
 	for {
 		r := <-c
 		if hlp.shouldFailFetching() {
@@ -83,7 +83,7 @@ func (hlp *Helper) provideCandidateBlock() {
 
 func (hlp *Helper) verifyCandidateBlock() {
 	v := make(chan rpcbus.Request, 1)
-	hlp.RBus.Register(rpcbus.VerifyCandidateBlock, v)
+	hlp.RBus.Register(topics.VerifyCandidateBlock, v)
 	for {
 		r := <-v
 		if hlp.shouldFailVerification() {

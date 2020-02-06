@@ -116,10 +116,12 @@ var sendBidTx = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	txid, err := s.rpcBus.Call(rpcbus.SendBidTx, rpcbus.NewRequest(*buf), 0)
+	resp, err := s.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return "", err
 	}
+	// TODO: get rid of typecasting
+	txid := resp.(bytes.Buffer)
 
 	result := fmt.Sprintf("Success! TxID: %s", hex.EncodeToString(txid.Bytes()))
 	return result, err
@@ -146,10 +148,11 @@ var transfer = func(s *Server, params []string) (string, error) {
 		return "", fmt.Errorf("error writing address to buffer: %v", err)
 	}
 
-	txid, err := s.rpcBus.Call(rpcbus.SendStandardTx, rpcbus.NewRequest(*buf), 0)
+	resp, err := s.rpcBus.Call(topics.SendStandardTx, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return "", err
 	}
+	txid := resp.(bytes.Buffer)
 
 	idString, err := encoding.ReadString(&txid)
 	if err != nil {
@@ -184,10 +187,12 @@ var sendStakeTx = func(s *Server, params []string) (string, error) {
 		return "", fmt.Errorf("error writing address to buffer: %v", err)
 	}
 
-	txid, err := s.rpcBus.Call(rpcbus.SendStakeTx, rpcbus.NewRequest(*buf), 0)
+	resp, err := s.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return "", err
 	}
+	// TODO: get rid of typecasting
+	txid := resp.(bytes.Buffer)
 
 	idString, err := encoding.ReadString(&txid)
 	if err != nil {
@@ -208,10 +213,11 @@ var createWallet = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	pubKeyBuf, err := s.rpcBus.Call(rpcbus.CreateWallet, rpcbus.NewRequest(*buf), 0)
+	resp, err := s.rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return "", err
 	}
+	pubKeyBuf := resp.(bytes.Buffer)
 
 	pubKey, err := encoding.ReadString(&pubKeyBuf)
 	if err != nil {
@@ -232,10 +238,11 @@ var loadWallet = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	pubKeyBuf, err := s.rpcBus.Call(rpcbus.LoadWallet, rpcbus.NewRequest(*buf), 0)
+	resp, err := s.rpcBus.Call(topics.LoadWallet, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return "", err
 	}
+	pubKeyBuf := resp.(bytes.Buffer)
 
 	pubKey, err := encoding.ReadString(&pubKeyBuf)
 	if err != nil {
@@ -262,10 +269,11 @@ var createFromSeed = func(s *Server, params []string) (string, error) {
 		return "", err
 	}
 
-	pubKeyBuf, err := s.rpcBus.Call(rpcbus.CreateFromSeed, rpcbus.NewRequest(*buf), 0)
+	resp, err := s.rpcBus.Call(topics.CreateFromSeed, rpcbus.NewRequest(*buf), 0)
 	if err != nil {
 		return "", err
 	}
+	pubKeyBuf := resp.(bytes.Buffer)
 
 	pubKey, err := encoding.ReadString(&pubKeyBuf)
 	if err != nil {
@@ -277,19 +285,21 @@ var createFromSeed = func(s *Server, params []string) (string, error) {
 }
 
 var address = func(s *Server, params []string) (string, error) {
-	addressBuf, err := s.rpcBus.Call(rpcbus.GetAddress, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	resp, err := s.rpcBus.Call(topics.GetAddress, rpcbus.NewRequest(bytes.Buffer{}), 0)
 	if err != nil {
 		return "", err
 	}
+	addressBuf := resp.(bytes.Buffer)
 
 	return fmt.Sprintf("Your address is %s", addressBuf.String()), nil
 }
 
 var balance = func(s *Server, params []string) (string, error) {
-	balanceBuf, err := s.rpcBus.Call(rpcbus.GetBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	resp, err := s.rpcBus.Call(topics.GetBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
 	if err != nil {
 		return "", err
 	}
+	balanceBuf := resp.(bytes.Buffer)
 
 	var unlockedBalance, lockedBalance uint64
 	if err := encoding.ReadUint64LE(&balanceBuf, &unlockedBalance); err != nil {
@@ -305,10 +315,11 @@ var balance = func(s *Server, params []string) (string, error) {
 }
 
 var unconfirmedBalance = func(s *Server, params []string) (string, error) {
-	balanceBuf, err := s.rpcBus.Call(rpcbus.GetUnconfirmedBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
+	resp, err := s.rpcBus.Call(topics.GetUnconfirmedBalance, rpcbus.NewRequest(bytes.Buffer{}), 0)
 	if err != nil {
 		return "", err
 	}
+	balanceBuf := resp.(bytes.Buffer)
 
 	var unconfirmedBalance uint64
 	if err := encoding.ReadUint64LE(&balanceBuf, &unconfirmedBalance); err != nil {
@@ -320,16 +331,17 @@ var unconfirmedBalance = func(s *Server, params []string) (string, error) {
 }
 
 var txHistory = func(s *Server, params []string) (string, error) {
-	txRecordsBuf, err := s.rpcBus.Call(rpcbus.GetTxHistory, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := s.rpcBus.Call(topics.GetTxHistory, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second)
 	if err != nil {
 		return "", err
 	}
+	txRecordsBuf := resp.(bytes.Buffer)
 
 	return txRecordsBuf.String(), nil
 }
 
 var automateConsensusTxs = func(s *Server, params []string) (string, error) {
-	if _, err := s.rpcBus.Call(rpcbus.AutomateConsensusTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
+	if _, err := s.rpcBus.Call(topics.AutomateConsensusTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
 		return "", err
 	}
 
@@ -337,19 +349,21 @@ var automateConsensusTxs = func(s *Server, params []string) (string, error) {
 }
 
 var syncProgress = func(s *Server, params []string) (string, error) {
-	percentageBuf, err := s.rpcBus.Call(rpcbus.GetSyncProgress, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := s.rpcBus.Call(topics.GetSyncProgress, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		return "", err
 	}
+	percentageBuf := resp.(bytes.Buffer)
 
 	return percentageBuf.String(), nil
 }
 
 var walletStatus = func(s *Server, params []string) (string, error) {
-	walletStatusBuf, err := s.rpcBus.Call(rpcbus.IsWalletLoaded, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := s.rpcBus.Call(topics.IsWalletLoaded, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		return "", err
 	}
+	walletStatusBuf := resp.(bytes.Buffer)
 
 	var status bool
 	if err := encoding.ReadBool(&walletStatusBuf, &status); err != nil {
@@ -360,7 +374,7 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 }
 
 var rebuildChain = func(s *Server, params []string) (string, error) {
-	if _, err := s.rpcBus.Call(rpcbus.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
+	if _, err := s.rpcBus.Call(topics.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
 		return "", err
 	}
 
@@ -374,10 +388,11 @@ var viewMempool = func(s *Server, params []string) (string, error) {
 		buf = *bytes.NewBuffer([]byte(params[0]))
 	}
 
-	txsBuf, err := s.rpcBus.Call(rpcbus.GetMempoolView, rpcbus.Request{buf, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := s.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{buf, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		return "", err
 	}
+	txsBuf := resp.(bytes.Buffer)
 
 	return txsBuf.String(), nil
 }

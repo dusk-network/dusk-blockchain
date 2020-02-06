@@ -91,7 +91,7 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.Ev
 // requests the last block.
 func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
 	g := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.GetLastBlock, g)
+	rpcBus.Register(topics.GetLastBlock, g)
 	r := <-g
 	r.RespChan <- rpcbus.Response{*randomBlockBuffer(t, 0, 1), nil}
 }
