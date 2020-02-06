@@ -476,19 +476,16 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 
 // processSendMempoolTxRequest utilizes rpcbus to allow submitting a tx to mempool with
 func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, error) {
-	params := r.Params.(bytes.Buffer)
-	txDesc, err := unmarshalTxDesc(params)
-	if err != nil {
-		return bytes.Buffer{}, err
+	tx := r.Params.(transactions.Transaction)
+	buf := new(bytes.Buffer)
+	if err := message.MarshalTx(buf, tx); err != nil {
+		return nil, err
 	}
 
+	txDesc := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len())}
+
 	// Process request
-	txid, err := m.onPendingTx(txDesc)
-
-	result := bytes.Buffer{}
-	result.Write(txid)
-
-	return result, err
+	return m.onPendingTx(txDesc)
 }
 
 // checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes on
@@ -535,20 +532,6 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 func toHex(id []byte) string {
 	enc := hex.EncodeToString(id[:])
 	return enc
-}
-
-func unmarshalTxDesc(m bytes.Buffer) (TxDesc, error) {
-
-	bufSize := m.Len()
-	tx, err := message.UnmarshalTx(&m)
-	if err != nil {
-		return TxDesc{}, err
-	}
-
-	// txSize is number of unmarshaled bytes
-	txSize := bufSize - m.Len()
-
-	return TxDesc{tx: tx, received: time.Now(), size: uint(txSize)}, nil
 }
 
 // TODO: handlers should just return []transactions.Transaction, and the

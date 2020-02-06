@@ -13,7 +13,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/v2/block"
@@ -455,18 +454,13 @@ func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
 }
 
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := message.MarshalTx(buf, tx); err != nil {
-		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
-	}
-
 	hash, err := tx.CalculateHash()
 	if err != nil {
 		// If we found a valid bid tx, we should under no circumstance have issues marshalling it
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 
-	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{*buf, make(chan rpcbus.Response, 1)}, 0)
+	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{tx, make(chan rpcbus.Response, 1)}, 0)
 	if err != nil {
 		return nil, err
 	}

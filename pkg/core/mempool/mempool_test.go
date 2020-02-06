@@ -371,14 +371,14 @@ func TestSendMempoolTx(t *testing.T) {
 
 		totalSize += uint32(buf.Len())
 
-		resp, err := c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(*buf), 0)
+		resp, err := c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 0)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		txidBytes := resp.(bytes.Buffer)
+		txidBytes := resp.([]byte)
 
 		txid, _ := tx.CalculateHash()
-		if !bytes.Equal(txidBytes.Bytes(), txid) {
+		if !bytes.Equal(txidBytes, txid) {
 			t.Fatal("unexpected txid retrieved")
 		}
 	}

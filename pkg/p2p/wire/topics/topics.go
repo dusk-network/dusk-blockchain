@@ -68,11 +68,11 @@ const (
 	GetMempoolTxsBySize
 	VerifyCandidateBlock
 	GetLastCertificate
+	SendMempoolTx
 
 	// Cross-process RPCBus topics
 	// Wallet
 	GetMempoolView
-	SendMempoolTx
 	CreateWallet
 	CreateFromSeed
 	LoadWallet
@@ -147,8 +147,8 @@ var Topics = [...]topicBuf{
 	topicBuf{GetMempoolTxsBySize, *(bytes.NewBuffer([]byte{byte(GetMempoolTxsBySize)})), "getmempooltxsbysize"},
 	topicBuf{VerifyCandidateBlock, *(bytes.NewBuffer([]byte{byte(VerifyCandidateBlock)})), "verifycandidateblock"},
 	topicBuf{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
-	topicBuf{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
 	topicBuf{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
+	topicBuf{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
 	topicBuf{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
 	topicBuf{CreateFromSeed, *(bytes.NewBuffer([]byte{byte(CreateFromSeed)})), "createfromseed"},
 	topicBuf{LoadWallet, *(bytes.NewBuffer([]byte{byte(LoadWallet)})), "loadwallet"},
