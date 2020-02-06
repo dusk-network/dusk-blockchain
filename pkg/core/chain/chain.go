@@ -664,14 +664,10 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 }
 
 func (c *Chain) provideLastBlock(r rpcbus.Request) {
-	buf := new(bytes.Buffer)
-
 	c.mu.RLock()
 	prevBlock := c.prevBlock
 	c.mu.RUnlock()
-
-	err := message.MarshalBlock(buf, &prevBlock)
-	r.RespChan <- rpcbus.Response{*buf, err}
+	r.RespChan <- rpcbus.Response{prevBlock, nil}
 }
 
 func (c *Chain) provideLastCertificate(r rpcbus.Request) {
