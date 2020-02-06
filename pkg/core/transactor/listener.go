@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -11,13 +12,13 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
-	"github.com/dusk-network/dusk-wallet/txrecords"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/txrecords"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -41,6 +42,8 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleLoadWallet, "LoadWallet")
 		case r := <-t.automateConsensusTxsChan:
 			handleRequest(r, t.handleAutomateConsensusTxs, "AutomateConsensusTxs")
+		case r := <-t.clearWalletDatabaseChan:
+			handleRequest(r, t.handleClearWalletDatabase, "ClearWalletDatabase")
 
 		// Transaction requests to respond to
 		case r := <-t.sendBidTxChan:
@@ -398,7 +401,7 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 
 	txs := make([]transactions.Transaction, lTxs)
 	for i := range txs {
-		tx, err := marshalling.UnmarshalTx(&txsBuf)
+		tx, err := message.UnmarshalTx(&txsBuf)
 		if err != nil {
 			return err
 		}
@@ -431,6 +434,24 @@ func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
 	return nil
 }
 
+func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
+	if t.w == nil {
+		if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
+			return err
+		}
+
+		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		return nil
+	}
+
+	if err := t.w.ClearDatabase(); err != nil {
+		return err
+	}
+
+	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	return nil
+}
+
 func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteBool(buf, t.w != nil); err != nil {
@@ -442,7 +463,7 @@ func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
 
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalTx(buf, tx); err != nil {
+	if err := message.MarshalTx(buf, tx); err != nil {
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 

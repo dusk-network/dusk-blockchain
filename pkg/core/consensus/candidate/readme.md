@@ -20,7 +20,7 @@ For more information on block generation, please refer to the [generation packag
 | Block hash          | []byte (32 bytes)               |
 | Transactions        | []Transaction\* (variable size) |
 
-\* For schemas of these items, please refer to [the dusk-wallet repo](https://github.com/dusk-network/dusk-wallet).
+\* For schemas of these items, please refer to [the dusk-wallet/v2 repo](https://github.com/dusk-network/dusk-wallet/v2).
 
 ### Architecture
 

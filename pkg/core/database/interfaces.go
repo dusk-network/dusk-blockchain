@@ -6,8 +6,8 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 var (
@@ -105,6 +105,9 @@ type Transaction interface {
 	// FetchBlockHeightSince try to find height of a block generated around
 	// sinceUnixTime starting the search from height (tip - offset)
 	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
+
+	// ClearDatabase will remove all information from the database.
+	ClearDatabase() error
 
 	// Atomic storage
 	Commit() error

@@ -7,32 +7,32 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/hashset"
-	log "github.com/sirupsen/logrus"
 )
 
 // Listener publishes a byte array that subscribers of the EventBus can use
 type Listener interface {
 	// Notify a listener of a new message
-	Notify(bytes.Buffer) error
+	Notify(message.Message) error
 	// Close the listener
 	Close()
 }
 
 // CallbackListener subscribes using callbacks
 type CallbackListener struct {
-	callback func(bytes.Buffer) error
+	callback func(message.Message) error
 }
 
 // Notify the copy of a message as a parameter to a callback
-func (c *CallbackListener) Notify(m bytes.Buffer) error {
+func (c *CallbackListener) Notify(m message.Message) error {
 	return c.callback(m)
 }
 
 // NewCallbackListener creates a callback based dispatcher
-func NewCallbackListener(callback func(bytes.Buffer) error) Listener {
+func NewCallbackListener(callback func(message.Message) error) Listener {
 	return &CallbackListener{callback}
 }
 
@@ -60,11 +60,16 @@ func NewStreamListener(w io.WriteCloser) Listener {
 }
 
 // Notify puts a message to the Listener's ringbuffer
-func (s *StreamListener) Notify(m bytes.Buffer) error {
+func (s *StreamListener) Notify(m message.Message) error {
 	if s.ringbuffer == nil {
 		return errors.New("no ringbuffer specified")
 	}
-	s.ringbuffer.Put(m.Bytes())
+
+	// TODO: interface - the ring buffer should be able to handle interface
+	// payloads rather than restricting solely to buffers
+	// TODO: interface - This panics in case payload is not a buffer
+	buf := m.Payload().(bytes.Buffer)
+	s.ringbuffer.Put(buf.Bytes())
 	return nil
 }
 
@@ -89,16 +94,16 @@ func Consume(items [][]byte, w io.WriteCloser) bool {
 
 // ChanListener dispatches a message using a channel
 type ChanListener struct {
-	messageChannel chan<- bytes.Buffer
+	messageChannel chan<- message.Message
 }
 
 // NewChanListener creates a channel based dispatcher
-func NewChanListener(msgChan chan<- bytes.Buffer) Listener {
+func NewChanListener(msgChan chan<- message.Message) Listener {
 	return &ChanListener{msgChan}
 }
 
 // Notify sends a message to the internal dispatcher channel
-func (c *ChanListener) Notify(m bytes.Buffer) error {
+func (c *ChanListener) Notify(m message.Message) error {
 	select {
 	case c.messageChannel <- m:
 	default:
@@ -112,6 +117,8 @@ func (c *ChanListener) Notify(m bytes.Buffer) error {
 func (c *ChanListener) Close() {
 }
 
+// multilistener does not implement the Listener interface since the topic and
+// the message category will likely differ
 type multiListener struct {
 	sync.RWMutex
 	*hashset.Set
@@ -125,21 +132,18 @@ func newMultiListener() *multiListener {
 	}
 }
 
-func (m *multiListener) Notify(topic topics.Topic, r bytes.Buffer) {
-	if m.Has([]byte{byte(topic)}) {
-		// creating a new Buffer carrying also the topic
-		tpcMsg := topic.ToBuffer()
-		if _, err := tpcMsg.ReadFrom(&r); err != nil {
-			log.WithField("topic", topic.String()).WithError(err).Warnln("error in writing topic to a multi-dispatched packet")
-			return
-		}
-
-		m.RLock()
-		for _, dispatcher := range m.dispatchers {
-			dispatcher.Notify(tpcMsg)
-		}
-		m.RUnlock()
+func (m *multiListener) Forward(topic topics.Topic, msg message.Message) {
+	if !m.Has([]byte{byte(topic)}) {
+		return
 	}
+
+	m.RLock()
+	for _, dispatcher := range m.dispatchers {
+		if err := dispatcher.Notify(msg); err != nil {
+			logEB.WithError(err).WithField("type", "multilistener").Warnln("notifying subscriber failed")
+		}
+	}
+	m.RUnlock()
 }
 
 func (m *multiListener) Store(value Listener) uint32 {

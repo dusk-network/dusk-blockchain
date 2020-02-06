@@ -8,12 +8,11 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -36,9 +35,12 @@ func TestReader(t *testing.T) {
 	g := processing.NewGossip(protocol.TestNet)
 	client, srv := net.Pipe()
 	go func() {
-		buf := makeAgreementBuffer(10)
-		err := g.Process(buf)
+		msg := makeAgreementGossip(10)
+		buf, err := message.Marshal(msg)
 		if err != nil {
+			t.Fatal(err)
+		}
+		if err := g.Process(&buf); err != nil {
 			t.Fatal(err)
 		}
 		client.Write(buf.Bytes())
@@ -52,7 +54,7 @@ func TestReader(t *testing.T) {
 	}
 
 	// Our message should come in on the agreement topic
-	agreementChan := make(chan bytes.Buffer, 1)
+	agreementChan := make(chan message.Message, 1)
 	l := eventbus.NewChanListener(agreementChan)
 	eb.Subscribe(topics.Agreement, l)
 
@@ -71,13 +73,11 @@ func TestWriteRingBuffer(t *testing.T) {
 		defer p.Conn.Close()
 	}
 
-	ev := makeAgreementBuffer(10)
-	if err := topics.Prepend(ev, topics.Agreement); err != nil {
-		panic(err)
-	}
+	ev := makeAgreementGossip(10)
+	msg := message.New(topics.Agreement, ev)
 
 	for i := 0; i < 1000; i++ {
-		bus.Publish(topics.Gossip, ev)
+		bus.Publish(topics.Gossip, msg)
 	}
 }
 
@@ -87,13 +87,18 @@ func TestWriteLoop(t *testing.T) {
 	client, srv := net.Pipe()
 
 	g := processing.NewGossip(protocol.TestNet)
-	buf := makeAgreementBuffer(10)
+	msg := makeAgreementGossip(10)
+	buf, err := message.Marshal(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	go func(g *processing.Gossip) {
 		responseChan := make(chan *bytes.Buffer)
-		writer := peer.NewWriter(client, g, bus)
+		writer := peer.NewWriter(client, g, bus, 30*time.Millisecond)
 		go writer.Serve(responseChan, make(chan struct{}, 1))
 
-		bufCopy := *buf
+		bufCopy := buf
 		responseChan <- &bufCopy
 	}(g)
 
@@ -108,39 +113,7 @@ func TestWriteLoop(t *testing.T) {
 	// Remove checksum
 	decoded = decoded[4:]
 
-	assert.Equal(t, decoded, buf.Bytes())
-}
-
-// Test that the 'ping' message is sent correctly, and that a 'pong' message will result.
-func TestPingLoop(t *testing.T) {
-	bus := eventbus.New()
-	client, srv := net.Pipe()
-
-	responseChan := make(chan *bytes.Buffer, 10)
-	writer := peer.NewWriter(client, processing.NewGossip(protocol.TestNet), bus)
-	go writer.Serve(responseChan, make(chan struct{}, 1))
-
-	// Set up the other end of the exchange
-	responseChan2 := make(chan *bytes.Buffer, 10)
-	writer2 := peer.NewWriter(srv, processing.NewGossip(protocol.TestNet), bus)
-	go writer2.Serve(responseChan2, make(chan struct{}, 1))
-	// Give the goroutine some time to start
-	time.Sleep(100 * time.Millisecond)
-
-	reader, err := peer.NewReader(client, processing.NewGossip(protocol.TestNet), dupemap.NewDupeMap(0), bus, rpcbus.New(), &chainsync.Counter{}, responseChan2, make(chan struct{}, 1))
-	if err != nil {
-		t.Fatal(err)
-	}
-	go reader.ReadLoop()
-
-	// We should eventually get a pong message out of responseChan2
-	buf := <-responseChan2
-	topic, err := topics.Extract(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, topics.Pong.String(), topic.String())
+	assert.Equal(t, decoded, (&buf).Bytes())
 }
 
 func BenchmarkWriter(b *testing.B) {
@@ -151,26 +124,18 @@ func BenchmarkWriter(b *testing.B) {
 		defer p.Conn.Close()
 	}
 
-	ev := makeAgreementBuffer(10)
-	if err := topics.Prepend(ev, topics.Agreement); err != nil {
-		panic(err)
-	}
+	msg := makeAgreementGossip(10)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bus.Publish(topics.Gossip, ev)
+		bus.Publish(topics.Gossip, msg)
 	}
 }
 
-func makeAgreementBuffer(keyAmount int) *bytes.Buffer {
+func makeAgreementGossip(keyAmount int) message.Message {
 	p, keys := consensus.MockProvisioners(keyAmount)
-
-	buf := agreement.MockAgreement(make([]byte, 32), 1, 1, keys, p)
-	if err := topics.Prepend(buf, topics.Agreement); err != nil {
-		panic(err)
-	}
-
-	return buf
+	aggro := message.MockAgreement(make([]byte, 32), 1, 1, keys, p)
+	return message.New(topics.Agreement, aggro)
 }
 
 func addPeer(bus *eventbus.EventBus, receiveFunc func(net.Conn)) *peer.Writer {

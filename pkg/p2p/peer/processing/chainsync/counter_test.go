@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/stretchr/testify/assert"
@@ -21,9 +22,10 @@ func TestStopTimerGoroutine(t *testing.T) {
 
 	c.StartSyncing(1)
 
+	msg := message.New(topics.AcceptedBlock, bytes.Buffer{})
 	// Decrement to 0. This should stop the running `listenForTimer` goroutine
 	// that's related to the current sync session.
-	bus.Publish(topics.AcceptedBlock, new(bytes.Buffer))
+	bus.Publish(topics.AcceptedBlock, msg)
 
 	// Set syncTime back to original value, so we can easily check the effects of the previous timer
 	syncTime = 30 * time.Second

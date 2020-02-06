@@ -22,6 +22,7 @@ import (
 )
 
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer
+var keepAliveTime = 30 * time.Second    // Send keepalive message after inactivity for this amount of time
 
 var l *log.Entry = log.WithField("process", "peer")
 
@@ -57,6 +58,7 @@ type Writer struct {
 	*Connection
 	subscriber eventbus.Subscriber
 	gossipID   uint32
+	keepAlive  time.Duration
 	// TODO: add service flag
 }
 
@@ -72,13 +74,18 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber) *Writer {
+func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
+	kas := 30 * time.Second
+	if len(keepAlive) > 0 {
+		kas = keepAlive[0]
+	}
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:   conn,
 			gossip: gossip,
 		},
 		subscriber: subscriber,
+		keepAlive:  kas,
 	}
 
 	return pw
@@ -171,9 +178,6 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 	g := &GossipConnector{w.gossip, w.Connection}
 	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
-	// Ping loop - ensures connection stays alive during quiet periods
-	go w.pingLoop()
-
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
 	w.writeLoop(writeQueueChan, exitChan)
@@ -183,35 +187,6 @@ func (w *Writer) onDisconnect() {
 	log.Infof("Connection to %s terminated", w.Connection.RemoteAddr().String())
 	w.Conn.Close()
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
-}
-
-func (w *Writer) pingLoop() {
-	// We ping every 30 seconds to keep the connection alive
-	ticker := time.NewTicker(30 * time.Second)
-
-	for {
-		<-ticker.C
-		if err := w.ping(); err != nil {
-			l.WithError(err).Warnln("error pinging peer")
-			// Clean up ticker
-			ticker.Stop()
-			return
-		}
-	}
-}
-
-func (w *Writer) ping() error {
-	buf := new(bytes.Buffer)
-	if err := topics.Prepend(buf, topics.Ping); err != nil {
-		return err
-	}
-
-	if err := w.gossip.Process(buf); err != nil {
-		return err
-	}
-
-	_, err := w.Connection.Write(buf.Bytes())
-	return err
 }
 
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
@@ -239,8 +214,14 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
 	defer p.Conn.Close()
+
+	// Set up a timer, which triggers the sending of a `keepalive` message
+	// when fired.
+	timer, quitChan := p.keepAliveLoop()
+
 	defer func() {
 		p.exitChan <- struct{}{}
+		quitChan <- struct{}{}
 	}()
 
 	for {
@@ -264,8 +245,48 @@ func (p *Reader) ReadLoop() {
 			return
 		}
 
-		p.router.Collect(bytes.NewBuffer(message))
+		// TODO: error here should be checked in order to decrease reputation
+		// or blacklist spammers
+		err = p.router.Collect(message)
+		if err != nil {
+			log.WithError(err).Errorln("error routing message")
+		}
+
+		// Reset the keepalive timer
+		timer.Reset(keepAliveTime)
 	}
+}
+
+func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
+	timer := time.NewTimer(keepAliveTime)
+	quitChan := make(chan struct{}, 1)
+	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
+		for {
+			select {
+			case <-t.C:
+				p.Connection.keepAlive()
+			case <-quitChan:
+				t.Stop()
+				return
+			}
+		}
+	}(p, timer, quitChan)
+
+	return timer, quitChan
+}
+
+func (c *Connection) keepAlive() error {
+	buf := new(bytes.Buffer)
+	if err := topics.Prepend(buf, topics.Ping); err != nil {
+		return err
+	}
+
+	if err := c.gossip.Process(buf); err != nil {
+		return err
+	}
+
+	_, err := c.Write(buf.Bytes())
+	return err
 }
 
 // Write a message to the connection.

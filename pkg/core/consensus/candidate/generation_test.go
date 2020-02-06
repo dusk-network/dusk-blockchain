@@ -5,13 +5,17 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/candidate"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	logrus.SetLevel(logrus.TraceLevel)
+}
 
 // Test that all of the functionality around score/block generation works as intended.
 // Note that the proof generator is mocked here, so the actual validity of the data
@@ -30,16 +34,8 @@ func TestGeneration(t *testing.T) {
 
 	// Should receive a Score and Candidate message from the generator
 	_ = <-h.ScoreChan
-	candidateBuf := <-h.CandidateChan
-	// Remove topic byte from candidateBuf
-	if _, err := candidateBuf.ReadByte(); err != nil {
-		t.Fatal(err)
-	}
-
-	c := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&candidateBuf, c); err != nil {
-		t.Fatal(err)
-	}
+	candidateMsg := <-h.CandidateChan
+	c := candidateMsg.Payload().(message.Candidate)
 
 	// Check correctness for candidate
 	// Note that we skip the score, since that message is mostly mocked.

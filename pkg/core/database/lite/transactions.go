@@ -2,6 +2,7 @@ package lite
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -9,9 +10,9 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 type transaction struct {
@@ -36,7 +37,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map header.Hash to block.Block
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
+	if err := message.MarshalBlock(buf, b); err != nil {
 		return err
 	}
 
@@ -67,6 +68,16 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 		// Map KeyImage to Transaction
 		for _, input := range tx.StandardTx().Inputs {
 			t.batch[keyImagesInd][toKey(input.KeyImage.Bytes())] = txID
+		}
+
+		for i, output := range tx.StandardTx().Outputs {
+			value := make([]byte, 8)
+			// Only lock the first output, so that change outputs are
+			// not affected.
+			if i == 0 {
+				binary.LittleEndian.PutUint64(value, tx.LockTime()+b.Header.Height)
+			}
+			t.batch[outputKeyInd][toKey(output.PubKey.P.Bytes())] = value
 		}
 	}
 
@@ -118,7 +129,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +145,7 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -157,7 +168,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -195,16 +206,42 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 
 	return true, txID, nil
 }
+
 func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
-	return nil
+	points := make([]ristretto.Point, 0, numDecoys)
+	for key := range t.db.storage[outputKeyInd] {
+		// Ignore locked outputs
+		unlockHeight := binary.LittleEndian.Uint64(t.db.storage[outputKeyInd][key])
+		if unlockHeight != 0 {
+			continue
+		}
+
+		var p ristretto.Point
+		var pBytes [32]byte
+		copy(pBytes[:], key[:])
+		p.SetBytes(&pBytes)
+
+		points = append(points, p)
+		if len(points) == numDecoys {
+			break
+		}
+	}
+
+	return points
 }
 
 func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
-	return false, nil
+	_, exists := t.db.storage[outputKeyInd][toKey(destkey)]
+	return exists, nil
 }
 
 func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
-	return 0, nil
+	unlockHeight, exists := t.db.storage[outputKeyInd][toKey(destkey)]
+	if !exists {
+		return 0, errors.New("this output does not exist")
+	}
+
+	return binary.LittleEndian.Uint64(unlockHeight), nil
 }
 
 func (t transaction) FetchState() (*database.State, error) {
@@ -313,4 +350,12 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - uint64(n) + uint64(pos), nil
 
+}
+
+func (t transaction) ClearDatabase() error {
+	for key := range t.db.storage {
+		t.db.storage[key] = make(table)
+	}
+
+	return nil
 }

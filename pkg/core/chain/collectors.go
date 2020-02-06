@@ -1,13 +1,10 @@
 package chain
 
 import (
-	"bytes"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
 type (
@@ -33,18 +30,10 @@ func initCertificateCollector(subscriber eventbus.Subscriber) <-chan certMsg {
 	return certificateChan
 }
 
-func (c *certificateCollector) Collect(m bytes.Buffer) error {
-	hash := make([]byte, 32)
-	if err := encoding.Read256(&m, hash); err != nil {
-		return err
-	}
-
-	cert := block.EmptyCertificate()
-	if err := marshalling.UnmarshalCertificate(&m, cert); err != nil {
-		return err
-	}
-
-	c.certificateChan <- certMsg{hash, cert}
+func (c *certificateCollector) Collect(m message.Message) error {
+	aggro := m.Payload().(message.Agreement)
+	cert := aggro.GenerateCertificate()
+	c.certificateChan <- certMsg{aggro.State().BlockHash, cert}
 	return nil
 }
 
@@ -56,12 +45,8 @@ func initHighestSeenCollector(sub eventbus.Subscriber) <-chan uint64 {
 	return highestSeenChan
 }
 
-func (h *highestSeenCollector) Collect(m bytes.Buffer) error {
-	var height uint64
-	if err := encoding.ReadUint64LE(&m, &height); err != nil {
-		return err
-	}
-
+func (h *highestSeenCollector) Collect(m message.Message) error {
+	height := m.Payload().(uint64)
 	h.highestSeenChan <- height
 	return nil
 }

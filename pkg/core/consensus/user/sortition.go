@@ -7,7 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -77,11 +77,19 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 
 	// Remove stakes which have not yet become active, or have expired
 	for _, m := range p.Members {
-		for i, stake := range m.Stakes {
-			if stake.StartHeight > round || stake.EndHeight < round {
-				subtractFromTotalWeight(W, stake.Amount)
-				m.RemoveStake(i)
+		i := 0
+		for {
+			if i == len(m.Stakes) {
+				break
 			}
+
+			if m.Stakes[i].StartHeight > round || m.Stakes[i].EndHeight < round {
+				subtractFromTotalWeight(W, m.Stakes[i].Amount)
+				m.RemoveStake(i)
+				continue
+			}
+
+			i++
 		}
 	}
 

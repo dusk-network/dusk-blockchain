@@ -10,9 +10,9 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -90,7 +90,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := marshalling.MarshalHeader(blockHeaderFields, b.Header); err != nil {
+	if err := message.MarshalHeader(blockHeaderFields, b.Header); err != nil {
 		return err
 	}
 
@@ -281,7 +281,6 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	defer iterator.Release()
 
 	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
-	var i int
 
 	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
@@ -305,10 +304,9 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 		p.SetBytes(&pBytes)
 
 		decoysPubKeys = append(decoysPubKeys, p)
-		if i == numDecoys {
+		if len(decoysPubKeys) == numDecoys {
 			break
 		}
-		i++
 	}
 
 	return decoysPubKeys
@@ -329,7 +327,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	header := block.NewHeader()
-	err = marshalling.UnmarshalHeader(bytes.NewBuffer(value), header)
+	err = message.UnmarshalHeader(bytes.NewBuffer(value), header)
 
 	if err != nil {
 		return nil, err
@@ -599,4 +597,16 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	return tip - uint64(n) + uint64(pos), nil
 
+}
+
+// ClearDatabase will wipe all of the data currently in the database.
+func (t transaction) ClearDatabase() error {
+	iter := t.snapshot.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		t.batch.Delete(iter.Key())
+	}
+
+	return iter.Error()
 }

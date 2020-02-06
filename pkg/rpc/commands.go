@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 )
 
 // handler defines a method bound to an RPC command.
@@ -34,6 +35,7 @@ var (
 		"syncprogress":         syncProgress,
 		"automateconsensustxs": automateConsensusTxs,
 		"walletstatus":         walletStatus,
+		"rebuildchain":         rebuildChain,
 		"viewmempool":          viewMempool,
 
 		// APIs for node diagnostics.
@@ -86,7 +88,9 @@ var publishTopic = func(s *Server, params []string) (string, error) {
 
 	payload, _ := hex.DecodeString(params[1])
 	rpcTopic := topics.StringToTopic(jsonrpcTopic)
-	s.eventBus.Publish(rpcTopic, bytes.NewBuffer(payload))
+	buf := bytes.NewBuffer(payload)
+	m := message.New(rpcTopic, *buf)
+	s.eventBus.Publish(rpcTopic, m)
 
 	result :=
 		`{ 
@@ -356,6 +360,14 @@ var walletStatus = func(s *Server, params []string) (string, error) {
 	}
 
 	return fmt.Sprintf("%v", status), nil
+}
+
+var rebuildChain = func(s *Server, params []string) (string, error) {
+	if _, err := s.rpcBus.Call(rpcbus.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
+		return "", err
+	}
+
+	return "Chain reset complete. Starting sync...", nil
 }
 
 var viewMempool = func(s *Server, params []string) (string, error) {

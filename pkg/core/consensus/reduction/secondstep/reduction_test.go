@@ -4,8 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,10 +12,10 @@ func TestSecondStep(t *testing.T) {
 	hlp, hash := Kickstart(50, 1*time.Second)
 
 	// Generate first StepVotes
-	svs := agreement.GenVotes(hash, 1, 2, hlp.Keys, hlp.P)
+	svs := message.GenVotes(hash, 1, 2, hlp.Keys, hlp.P)
 
 	// Start the first step
-	if err := hlp.ActivateReduction(hash, svs[0]); err != nil {
+	if err := hlp.ActivateReduction(hash, *svs[0]); err != nil {
 		t.Fatal(err)
 	}
 
@@ -24,18 +23,15 @@ func TestSecondStep(t *testing.T) {
 	hlp.SendBatch(hash)
 
 	// Wait for resulting Agreement
-	agBuf := <-hlp.AgreementChan
+	agMsg := <-hlp.AgreementChan
+	ag := agMsg.Payload().(message.Agreement)
 
 	// Ensure we get a regeneration message
 	<-hlp.RestartChan
 
-	// Retrieve Agreement
-	ag := agreement.New(header.Header{})
-	assert.NoError(t, agreement.Unmarshal(&agBuf, ag))
-
 	// StepVotes should be valid
-	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[0], 0))
-	assert.NoError(t, hlp.Verify(hash, ag.VotesPerStep[1], 1))
+	assert.NoError(t, hlp.Verify(hash, *ag.VotesPerStep[0], 0))
+	assert.NoError(t, hlp.Verify(hash, *ag.VotesPerStep[1], 1))
 
 	// Timeout should be the same
 	assert.Equal(t, 1*time.Second, hlp.Reducer.(*Reducer).timeOut)
@@ -46,7 +42,7 @@ func TestSecondStepAfterFailure(t *testing.T) {
 	hlp, hash := Kickstart(50, timeOut)
 
 	// Start the first step
-	if err := hlp.ActivateReduction(hash, nil); err != nil {
+	if err := hlp.ActivateReduction(hash, message.StepVotes{}); err != nil {
 		t.Fatal(err)
 	}
 

@@ -8,9 +8,9 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	log "github.com/sirupsen/logrus"
 )
 
 // The messageRouter is connected to all of the processing units that are tied to the peer.
@@ -31,13 +31,13 @@ type messageRouter struct {
 	peerInfo string
 }
 
-func (m *messageRouter) Collect(b *bytes.Buffer) error {
-	topic, err := topics.Extract(b)
+func (m *messageRouter) Collect(packet []byte) error {
+	b := bytes.NewBuffer(packet)
+	msg, err := message.Unmarshal(b)
 	if err != nil {
 		return err
 	}
-	m.route(topic, b)
-	return nil
+	return m.route(*b, msg)
 }
 
 func (m *messageRouter) CanRoute(topic topics.Topic) bool {
@@ -54,19 +54,20 @@ func (m *messageRouter) CanRoute(topic topics.Topic) bool {
 	return false
 }
 
-func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
+func (m *messageRouter) route(b bytes.Buffer, msg message.Message) error {
 	var err error
-	switch topic {
+	category := msg.Category()
+	switch category {
 	case topics.GetBlocks:
-		err = m.blockHashBroker.AdvertiseMissingBlocks(b)
+		err = m.blockHashBroker.AdvertiseMissingBlocks(&b)
 	case topics.GetData:
-		err = m.dataBroker.SendItems(b)
+		err = m.dataBroker.SendItems(&b)
 	case topics.MemPool:
 		err = m.dataBroker.SendTxsItems()
 	case topics.Inv:
-		err = m.dataRequestor.RequestMissingItems(b)
+		err = m.dataRequestor.RequestMissingItems(&b)
 	case topics.Block:
-		err = m.synchronizer.Synchronize(b, m.peerInfo)
+		err = m.synchronizer.Synchronize(&b, m.peerInfo)
 	case topics.Ping:
 		m.ponger.Pong()
 	case topics.Pong:
@@ -74,27 +75,30 @@ func (m *messageRouter) route(topic topics.Topic, b *bytes.Buffer) {
 		// otherwise carries no relevant information beyond the receiving
 		// of this message
 	case topics.GetRoundResults:
-		err = m.roundResultBroker.ProvideRoundResult(b)
+		err = m.roundResultBroker.ProvideRoundResult(&b)
 	case topics.GetCandidate:
 		// We only accept a certain request once, to avoid infinitely
 		// requesting the same block
-		if m.dupeMap.CanFwd(b) {
-			err = m.candidateBroker.ProvideCandidate(b)
+		// TODO: interface - buffer should be immutable. Change the dupemap to
+		// deal with values rather than reference
+		if m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
+			err = m.candidateBroker.ProvideCandidate(&b)
 		}
+	case topics.Candidate:
+		// We don't use the dupe map to prevent infinite dissemination,
+		// as it could deprive of us receiving a candidate we might
+		// need later, but which was discarded initially.
+		// The candidate component will use it's own repropagation rules.
+		m.publisher.Publish(category, msg)
 	default:
-		if m.CanRoute(topic) {
-			if m.dupeMap.CanFwd(b) {
-				m.publisher.Publish(topic, b)
+		if m.CanRoute(category) {
+			if m.dupeMap.CanFwd(bytes.NewBuffer(msg.Id())) {
+				m.publisher.Publish(category, msg)
 			}
 		} else {
-			err = fmt.Errorf("%s topic not routable", topic.String())
+			err = fmt.Errorf("%s topic not routable", category.String())
 		}
 	}
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"process": "peer",
-			"error":   err,
-		}).Errorf("problem handling message %s", topic.String())
-	}
+	return err
 }

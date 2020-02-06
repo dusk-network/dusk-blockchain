@@ -40,12 +40,13 @@ func WriteFrame(buf *bytes.Buffer, magic protocol.Magic, cs []byte) error {
 	}
 
 	// Append payload
-	_, err := msg.ReadFrom(buf)
+	_, err := buf.WriteTo(msg)
 	if err != nil {
 		return err
 	}
 
 	*buf = *msg
+
 	return nil
 }
 

@@ -8,7 +8,8 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/msg"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
 const maxCommitteeSize = 64
@@ -43,12 +44,18 @@ func (b *Handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 }
 
 // Verify the BLS signature of the Reduction event. Since the payload is nil, verifying the signature equates to verifying solely the Header
-func (b *Handler) VerifySignature(hdr header.Header, sig []byte) error {
+func (b *Handler) VerifySignature(red message.Reduction) error {
 	packet := new(bytes.Buffer)
+	hdr := red.State()
 	if err := header.MarshalSignableVote(packet, hdr); err != nil {
 		return err
 	}
 
+	// we make a copy of the signature because the crypto package apparently mutates the byte array when
+	// Compressing/Decompressing a point
+	// see https://github.com/dusk-network/dusk-crypto/issues/16
+	sig := make([]byte, len(red.SignedHash))
+	copy(sig, red.SignedHash)
 	return msg.VerifyBLSSignature(hdr.PubKeyBLS, packet.Bytes(), sig)
 }
 

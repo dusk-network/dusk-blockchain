@@ -5,9 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/agreement"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	log "github.com/sirupsen/logrus"
@@ -20,21 +19,21 @@ import (
 // An aggregator should be instantiated on a per-step basis and is no longer usable
 // after reaching quorum and calling `requestHalt`.
 type aggregator struct {
-	requestHalt func([]byte, ...*agreement.StepVotes)
+	requestHalt func([]byte, ...*message.StepVotes)
 	handler     *reduction.Handler
 	rpcBus      *rpcbus.RPCBus
 	finished    bool
 
 	lock     sync.RWMutex
 	voteSets map[string]struct {
-		*agreement.StepVotes
+		*message.StepVotes
 		sortedset.Cluster
 	}
 }
 
 // newAggregator returns an instantiated aggregator, ready for use.
 func newAggregator(
-	requestHalt func([]byte, ...*agreement.StepVotes),
+	requestHalt func([]byte, ...*message.StepVotes),
 	handler *reduction.Handler,
 	rpcBus *rpcbus.RPCBus) *aggregator {
 	return &aggregator{
@@ -42,27 +41,28 @@ func newAggregator(
 		handler:     handler,
 		rpcBus:      rpcBus,
 		voteSets: make(map[string]struct {
-			*agreement.StepVotes
+			*message.StepVotes
 			sortedset.Cluster
 		}),
 	}
 }
 
-// Collect a Reduction message, and add it's sender public key and signature to the
+// Collect a Reduction message, and add its sender public key and signature to the
 // StepVotes/Set kept under the corresponding block hash. If the Set reaches or exceeds
 // quorum, the candidate block for the given block hash is first verified before
 // propagating the information to the Reducer.
-func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) error {
+func (a *aggregator) collectVote(ev message.Reduction) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	if a.finished {
 		return nil
 	}
 
+	hdr := ev.State()
 	hash := string(hdr.BlockHash)
 	sv, found := a.voteSets[hash]
 	if !found {
-		sv.StepVotes = agreement.NewStepVotes()
+		sv.StepVotes = message.NewStepVotes()
 		sv.Cluster = sortedset.NewCluster()
 	}
 	if err := sv.StepVotes.Add(ev.SignedHash, hdr.PubKeyBLS, hdr.Step); err != nil {
@@ -77,8 +77,11 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 	if sv.Cluster.TotalOccurrences() >= a.handler.Quorum(hdr.Round) {
 		a.finished = true
 		a.addBitSet(sv.StepVotes, sv.Cluster, hdr.Round, hdr.Step)
+
 		blockHash := hdr.BlockHash
 
+		// if the votes converged for an empty hash we invoke halt with no
+		// StepVotes
 		if !bytes.Equal(blockHash, emptyHash[:]) {
 			if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
 				blockHash = emptyHash[:]
@@ -92,7 +95,7 @@ func (a *aggregator) collectVote(ev reduction.Reduction, hdr header.Header) erro
 	return nil
 }
 
-func (a *aggregator) addBitSet(sv *agreement.StepVotes, cluster sortedset.Cluster, round uint64, step uint8) {
+func (a *aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster, round uint64, step uint8) {
 	committee := a.handler.Committee(round, step)
 	sv.BitSet = committee.Bits(cluster.Set)
 }
