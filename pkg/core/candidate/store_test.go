@@ -59,13 +59,7 @@ func TestRequestCandidate(t *testing.T) {
 			doneChan <- err
 			return
 		}
-		candidateBuf := resp.(bytes.Buffer)
-
-		c := message.NewCandidate()
-		if err := message.UnmarshalCandidate(&candidateBuf, c); err != nil {
-			doneChan <- err
-			return
-		}
+		c := resp.(message.Candidate)
 
 		if !assert.True(t, c.Block.Equals(genesis)) {
 			var err error

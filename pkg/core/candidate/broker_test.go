@@ -59,14 +59,9 @@ func TestValidHashes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	blkBuf := resp.(bytes.Buffer)
+	cm = resp.(message.Candidate)
 
-	decoded := block.NewBlock()
-	if err := message.UnmarshalBlock(&blkBuf, decoded); err != nil {
-		t.Fatal(err)
-	}
-
-	assert.True(t, blk.Equals(decoded))
+	assert.True(t, blk.Equals(cm.Block))
 
 	// When requesting blk2, we should get an error.
 	_, err = rb.Call(topics.GetCandidate, rpcbus.Request{*bytes.NewBuffer(blk2.Header.Hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
