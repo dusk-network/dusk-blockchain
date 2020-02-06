@@ -42,7 +42,7 @@ type Response struct {
 }
 
 // NewRequest builds a new request with params
-func NewRequest(p bytes.Buffer) Request {
+func NewRequest(p interface{}) Request {
 	return Request{
 		Params:   p,
 		RespChan: make(chan Response, 1),

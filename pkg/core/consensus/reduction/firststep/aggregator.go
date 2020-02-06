@@ -112,12 +112,12 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 		}).Errorln("fetching the candidate block failed")
 		return err
 	}
-	blkBuf := resp.(bytes.Buffer)
+	cm := resp.(message.Candidate)
 
 	// If our result was not a zero value hash, we should first verify it
 	// before voting on it again
 	if !bytes.Equal(blockHash, emptyHash[:]) {
-		req := rpcbus.NewRequest(blkBuf)
+		req := rpcbus.NewRequest(cm)
 		if _, err := rpcBus.Call(topics.VerifyCandidateBlock, req, 5*time.Second); err != nil {
 			log.WithFields(log.Fields{
 				"process": "reduction",

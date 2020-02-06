@@ -160,7 +160,7 @@ func (c *Chain) Listen() {
 		case r := <-c.getLastBlockChan:
 			c.provideLastBlock(r)
 		case r := <-c.verifyCandidateBlockChan:
-			c.verifyCandidateBlock(r)
+			c.processCandidateVerificationRequest(r)
 		case r := <-c.getLastCertificateChan:
 			c.provideLastCertificate(r)
 		case r := <-c.getRoundResultsChan:
@@ -361,23 +361,18 @@ func (c *Chain) addConsensusNodes(txs []transactions.Transaction, startHeight ui
 	}
 }
 
-func (c *Chain) verifyCandidateBlock(r rpcbus.Request) {
+func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 	// We need to verify the candidate block against the newest
 	// intermediate block. The intermediate block would be the most
 	// recent block before the candidate.
 	if c.intermediateBlock == nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block hash known")}
+		r.RespChan <- rpcbus.Response{nil, errors.New("no intermediate block hash known")}
 		return
 	}
-	params := r.Params.(bytes.Buffer)
+	cm := r.Params.(message.Candidate)
 
-	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&params, blk); err != nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
-	}
-
-	err := verifiers.CheckBlock(c.db, *c.intermediateBlock, *blk)
-	r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+	err := verifiers.CheckBlock(c.db, *c.intermediateBlock, *cm.Block)
+	r.RespChan <- rpcbus.Response{nil, err}
 }
 
 // Send Inventory message to all peers

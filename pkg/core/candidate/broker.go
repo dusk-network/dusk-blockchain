@@ -112,9 +112,7 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 	cm, ok := b.queue[string(params.Bytes())]
 	b.lock.RUnlock()
 	if ok {
-		buf := new(bytes.Buffer)
-		err := message.MarshalCandidate(buf, cm)
-		r.RespChan <- rpcbus.Response{*buf, err}
+		r.RespChan <- rpcbus.Response{cm, nil}
 		return
 	}
 
@@ -124,14 +122,12 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 		var err error
 		cm, err = b.requestCandidate(params.Bytes())
 		if err != nil {
-			r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+			r.RespChan <- rpcbus.Response{nil, err}
 			return
 		}
 	}
 
-	buf := new(bytes.Buffer)
-	err := message.MarshalCandidate(buf, cm)
-	r.RespChan <- rpcbus.Response{*buf, err}
+	r.RespChan <- rpcbus.Response{cm, nil}
 }
 
 // requestCandidate from peers around this node. The candidate can only be

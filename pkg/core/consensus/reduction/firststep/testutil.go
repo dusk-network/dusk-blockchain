@@ -35,7 +35,7 @@ func NewHelper(eb *eventbus.EventBus, rpcbus *rpcbus.RPCBus, provisioners int, t
 	}
 
 	go hlp.provideCandidateBlock()
-	go hlp.verifyCandidateBlock()
+	go hlp.processCandidateVerificationRequest()
 	hlp.createResultChan()
 	return hlp
 }
@@ -77,21 +77,21 @@ func (hlp *Helper) provideCandidateBlock() {
 			continue
 		}
 
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		r.RespChan <- rpcbus.Response{message.Candidate{}, nil}
 	}
 }
 
-func (hlp *Helper) verifyCandidateBlock() {
+func (hlp *Helper) processCandidateVerificationRequest() {
 	v := make(chan rpcbus.Request, 1)
 	hlp.RBus.Register(topics.VerifyCandidateBlock, v)
 	for {
 		r := <-v
 		if hlp.shouldFailVerification() {
-			r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("verification failed")}
+			r.RespChan <- rpcbus.Response{nil, errors.New("verification failed")}
 			continue
 		}
 
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		r.RespChan <- rpcbus.Response{nil, nil}
 	}
 }
 
