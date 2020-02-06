@@ -15,7 +15,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -121,18 +120,7 @@ func (c *ctx) assert(t *testing.T, checkPropagated bool) {
 	c.wait()
 
 	resp, _ := c.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(bytes.Buffer{}), 1*time.Second)
-	r := resp.(bytes.Buffer)
-
-	lTxs, _ := encoding.ReadVarInt(&r)
-
-	txs := make([]transactions.Transaction, lTxs)
-	for i := uint64(0); i < lTxs; i++ {
-		tx, err := message.UnmarshalTx(&r)
-		if err != nil {
-			t.Fatal(err)
-		}
-		txs[i] = tx
-	}
+	txs := resp.([]transactions.Transaction)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

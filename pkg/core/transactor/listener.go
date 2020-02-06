@@ -400,22 +400,7 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 	if err != nil {
 		return err
 	}
-	txsBuf := resp.(bytes.Buffer)
-
-	lTxs, err := encoding.ReadVarInt(&txsBuf)
-	if err != nil {
-		return err
-	}
-
-	txs := make([]transactions.Transaction, lTxs)
-	for i := range txs {
-		tx, err := message.UnmarshalTx(&txsBuf)
-		if err != nil {
-			return err
-		}
-
-		txs[i] = tx
-	}
+	txs := resp.([]transactions.Transaction)
 
 	unconfirmedBalance, err := t.w.CheckUnconfirmedBalance(txs)
 	if err != nil {

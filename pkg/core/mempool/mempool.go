@@ -158,13 +158,13 @@ func (m *Mempool) Run() {
 			select {
 			//rpcbus methods
 			case r := <-m.sendTxChan:
-				handleRequest(r, m.onSendMempoolTx, "SendTx")
+				handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
 			case r := <-m.getMempoolTxsChan:
-				handleRequest(r, m.onGetMempoolTxs, "GetMempoolTxs")
+				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
-				handleRequest(r, m.onGetMempoolTxsBySize, "GetMempoolTxsBySize")
+				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
 			case r := <-m.getMempoolViewChan:
-				handleRequest(r, m.onGetMempoolView, "GetMempoolView")
+				handleRequest(r, m.processGetMempoolViewRequest, "GetMempoolView")
 			// Mempool input channels
 			case b := <-m.intermediateBlockChan:
 				m.onBlock(b)
@@ -368,27 +368,25 @@ func (m *Mempool) CollectPending(msg message.Message) error {
 	return nil
 }
 
-// onGetMempoolTxs retrieves current state of the mempool of the verified but
+// processGetMempoolTxsRequest retrieves current state of the mempool of the verified but
 // still unaccepted txs.
 // Called by P2P on InvTypeMempoolTx msg
-func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
+func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, error) {
 	// Read inputs
 	params := r.Params.(bytes.Buffer)
 	filterTxID := params.Bytes()
 
 	outputTxs := make([]transactions.Transaction, 0)
-	w := new(bytes.Buffer)
 
 	// If we are looking for a specific tx, just look it up by key.
 	if len(filterTxID) == 32 {
 		tx := m.verified.Get(filterTxID)
 		if tx == nil {
-			return bytes.Buffer{}, errors.New("tx not found")
+			return nil, errors.New("tx not found")
 		}
 
 		outputTxs = append(outputTxs, tx)
-		err := marshalTxs(w, outputTxs)
-		return *w, err
+		return outputTxs, nil
 	}
 
 	// When filterTxID is empty, mempool returns all verified txs sorted
@@ -399,14 +397,13 @@ func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
 	})
 
 	if err != nil {
-		return bytes.Buffer{}, err
+		return nil, err
 	}
 
-	err = marshalTxs(w, outputTxs)
-	return *w, err
+	return outputTxs, err
 }
 
-func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
+func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, error) {
 	txs := make([]transactions.Transaction, 0)
 	params := r.Params.(bytes.Buffer)
 	switch len(params.Bytes()) {
@@ -440,11 +437,11 @@ func (m Mempool) onGetMempoolView(r rpcbus.Request) (bytes.Buffer, error) {
 	return *buf, nil
 }
 
-// onGetMempoolTxsBySize returns a subset of verified mempool txs which
+// processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
 // 1. contains only highest fee txs
 // 2. has total txs size not bigger than maxTxsSize (request param)
 // Called by BlockGenerator on generating a new candidate block
-func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
+func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{}, error) {
 
 	// Read maxTxsSize param
 	var maxTxsSize uint32
@@ -479,8 +476,8 @@ func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
 	return *w, err
 }
 
-// onSendMempoolTx utilizes rpcbus to allow submitting a tx to mempool with
-func (m Mempool) onSendMempoolTx(r rpcbus.Request) (bytes.Buffer, error) {
+// processSendMempoolTxRequest utilizes rpcbus to allow submitting a tx to mempool with
+func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, error) {
 	params := r.Params.(bytes.Buffer)
 	txDesc, err := unmarshalTxDesc(params)
 	if err != nil {
@@ -556,7 +553,9 @@ func unmarshalTxDesc(m bytes.Buffer) (TxDesc, error) {
 	return TxDesc{tx: tx, received: time.Now(), size: uint(txSize)}, nil
 }
 
-func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (bytes.Buffer, error), name string) {
+// TODO: handlers should just return []transactions.Transaction, and the
+// caller should be left to format the data however they wish
+func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}, error), name string) {
 
 	log.Tracef("Handling %s request", name)
 
