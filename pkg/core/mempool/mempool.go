@@ -471,9 +471,7 @@ func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{
 		return bytes.Buffer{}, err
 	}
 
-	w := new(bytes.Buffer)
-	err = marshalTxs(w, txs)
-	return *w, err
+	return txs, err
 }
 
 // processSendMempoolTxRequest utilizes rpcbus to allow submitting a tx to mempool with

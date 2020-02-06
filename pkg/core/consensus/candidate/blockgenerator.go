@@ -207,21 +207,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 		if err != nil {
 			return nil, err
 		}
-		r := resp.(bytes.Buffer)
-
-		lTxs, err := encoding.ReadVarInt(&r)
-		if err != nil {
-			return nil, err
-		}
-
-		for i := uint64(0); i < lTxs; i++ {
-			tx, err := message.UnmarshalTx(&r)
-			if err != nil {
-				return nil, err
-			}
-
-			txs = append(txs, tx)
-		}
+		txs = resp.([]transactions.Transaction)
 	}
 
 	// TODO Append Provisioners rewards
