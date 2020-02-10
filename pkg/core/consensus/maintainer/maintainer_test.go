@@ -150,11 +150,9 @@ func receiveTxs(t *testing.T, c chan rpcbus.Request) []transactions.Transaction 
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		r := <-c
-		params := r.Params.(bytes.Buffer)
-		tx, err := message.UnmarshalTx(&params)
-		assert.NoError(t, err)
+		tx := r.Params.(transactions.Transaction)
 		txs = append(txs, tx)
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		r.RespChan <- rpcbus.Response{nil, nil}
 	}
 
 	return txs
