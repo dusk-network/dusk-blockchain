@@ -2,6 +2,7 @@ package topics
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 )
 
@@ -168,12 +169,25 @@ var Topics = [...]topicBuf{
 	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 }
 
+func checkConsistency(topics []topicBuf) {
+	for i, topic := range topics {
+		if uint8(topic.Topic) != uint8(i) {
+			panic(fmt.Errorf("mismatch detected between a topic and its index. Please check the `topicBuf` array at index: %d", i))
+		}
+	}
+}
+
+func init() {
+	checkConsistency(Topics[:])
+}
+
 func (t Topic) ToBuffer() bytes.Buffer {
 	var buf bytes.Buffer
 	if len(Topics) < int(t) {
 		buf = *(new(bytes.Buffer))
 	}
 
+	// XXX: this looks like a bug. The buf is reassigned no matter what
 	buf = Topics[int(t)].Buffer
 	return buf
 }
