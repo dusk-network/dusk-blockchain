@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -402,44 +403,39 @@ func TestMempoolView(t *testing.T) {
 	}
 
 	// First, let's just get the entire view
-	resp, err := c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err := c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{&node.SelectRequest{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	buf := resp.(bytes.Buffer)
+	s := resp.(*node.SelectResponse)
 
-	// There should be 16 txs, so 16 lines
-	n := strings.Count(buf.String(), "\n")
-	if n != numTxs*4 {
-		t.Fatalf("did not have the required amount of lines in mempool view - %v/%v", n, numTxs*4)
-	}
+	// There should be 16 txs
+	assert.Equal(t, numTxs*4, len(s.Result))
 
 	// Now, we single out one hash from the bunch
 	hash := hex.EncodeToString(txs[7].StandardTx().TxID)
-	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{*bytes.NewBufferString(hash), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{&node.SelectRequest{Id: hash}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	buf = resp.(bytes.Buffer)
+	s = resp.(*node.SelectResponse)
 
 	// Should give us info about said tx
-	if !strings.Contains(buf.String(), hash) {
+	assert.Equal(t, 1, len(s.Result))
+	if !strings.Contains(s.Result[0].Id, hash) {
 		t.Fatal("should have gotten info about requested tx")
 	}
 
 	// Let's filter for just stakes
-	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{*bytes.NewBuffer([]byte{2}), make(chan rpcbus.Response, 1)}, 2*time.Second)
+	resp, err = c.rpcBus.Call(topics.GetMempoolView, rpcbus.Request{&node.SelectRequest{Types: []node.TxType{node.TxType(2)}}, make(chan rpcbus.Response, 1)}, 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	buf = resp.(bytes.Buffer)
+	s = resp.(*node.SelectResponse)
 
 	// Should have `numTxs` lines, as there is one tx per type
 	// per batch.
-	n = strings.Count(buf.String(), "\n")
-	if n != numTxs {
-		t.Fatalf("did not have required amount of lines when fetching stake txs - %v/%v", n, numTxs)
-	}
+	assert.Equal(t, numTxs, len(s.Result))
 }
 
 // Only difference with helper.RandomSliceOfTxs is lack of appending a coinbase tx
