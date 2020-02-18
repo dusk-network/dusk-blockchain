@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
@@ -25,8 +26,9 @@ type nodeServer struct {
 // gRPC service running until the process is killed, thus we do not
 // need to return the server itself.
 func StartgRPCServer(rpcBus *rpcbus.RPCBus) error {
-	// Currently hard-coded on UDS
-	l, err := net.Listen("unix", "/tmp/dusk-grpc.sock")
+	network := config.Get().RPC.Network
+	addr := config.Get().RPC.Address
+	l, err := net.Listen(network, addr)
 	if err != nil {
 		return err
 	}
@@ -35,6 +37,7 @@ func StartgRPCServer(rpcBus *rpcbus.RPCBus) error {
 	node.RegisterNodeServer(grpcServer, &nodeServer{rpcBus})
 	// This function is blocking, so we run it in a goroutine
 	go grpcServer.Serve(l)
+	// TODO: incorporate TLS
 	return nil
 }
 
