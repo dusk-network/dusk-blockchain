@@ -2,7 +2,6 @@ package transactor
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -183,7 +182,7 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 	}
 
 	req := r.Params.(*node.CreateRequest)
-	pubKey, err := t.createFromSeed(hex.EncodeToString(req.Seed), req.Password)
+	pubKey, err := t.createFromSeed(string(req.Seed), req.Password)
 	if err != nil {
 		return err
 	}
@@ -258,9 +257,9 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 
 	req := r.Params.(*node.TransferRequest)
 	// create and sign transaction
-	log.Tracef("Create a standard tx (%d,%s)", req.Amount, hex.EncodeToString(req.Address))
+	log.Tracef("Create a standard tx (%d,%s)", req.Amount, string(req.Address))
 
-	tx, err := t.CreateStandardTx(req.Amount, hex.EncodeToString(req.Address))
+	tx, err := t.CreateStandardTx(req.Amount, string(req.Address))
 	if err != nil {
 		return err
 	}
