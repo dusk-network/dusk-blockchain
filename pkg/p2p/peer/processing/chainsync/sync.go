@@ -95,7 +95,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 			return err
 		}
 
-		if err := message.UnmarshalBlock(buf, blk); err != nil {
+		if err := message.UnmarshalBlock(buf, &blk); err != nil {
 			return err
 		}
 
