@@ -2,23 +2,20 @@ package transactor
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
-	"github.com/dusk-network/dusk-wallet/v2/txrecords"
-	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -91,26 +88,22 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
-	params := r.Params.(bytes.Buffer)
-	var password string
-	password, err := encoding.ReadString(&params)
-	if err != nil {
-		return err
-	}
+	req := r.Params.(*node.CreateRequest)
 
-	pubKey, err := t.createWallet(password)
+	pubKey, err := t.createWallet(req.Password)
 	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	pubKeyBytes, err := hex.DecodeString(pubKey)
+	if err != nil {
+		return err
+	}
+
+	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: pubKeyBytes}}
+	r.RespChan <- rpcbus.Response{resp, nil}
 
 	return nil
 }
@@ -125,12 +118,13 @@ func (t *Transactor) handleAddress(r rpcbus.Request) error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if _, err := buf.WriteString(addr); err != nil {
+	addrBytes, err := hex.DecodeString(addr)
+	if err != nil {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: addrBytes}}
+	r.RespChan <- rpcbus.Response{resp, nil}
 	return nil
 }
 
@@ -149,29 +143,19 @@ func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
 		return nil
 	}
 
-	s := &strings.Builder{}
-	for _, record := range records {
-		// Direction
-		if record.Direction == txrecords.In {
-			s.WriteString("IN / ")
-		} else {
-			s.WriteString("OUT / ")
+	resp := &node.TxHistoryResponse{Records: make([]*node.TxRecord, len(records))}
+	for i, record := range records {
+		resp.Records[i] = &node.TxRecord{
+			Direction:    node.Direction(record.Direction),
+			Timestamp:    record.Timestamp,
+			Height:       record.Height,
+			Type:         node.TxType(record.TxType),
+			Amount:       record.Amount,
+			UnlockHeight: record.UnlockHeight,
 		}
-		// Height
-		s.WriteString(strconv.FormatUint(record.Height, 10) + " / ")
-		// Time
-		s.WriteString(time.Unix(record.Timestamp, 0).Format(time.UnixDate) + " / ")
-		// Amount
-		s.WriteString(fmt.Sprintf("%.8f DUSK", float64(record.Amount)/float64(wallet.DUSK)) + " / ")
-		// Unlock height
-		s.WriteString("Unlocks at " + strconv.FormatUint(record.UnlockHeight, 10) + " / ")
-		// Recipient
-		s.WriteString("Recipient: " + record.Recipient)
-
-		s.WriteString("\n")
 	}
 
-	r.RespChan <- rpcbus.Response{*bytes.NewBufferString(s.String()), nil}
+	r.RespChan <- rpcbus.Response{resp, nil}
 	return nil
 }
 
@@ -180,24 +164,18 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
-	params := r.Params.(bytes.Buffer)
-	var password string
-	password, err := encoding.ReadString(&params)
+	req := r.Params.(*node.LoadRequest)
+	pubKey, err := t.loadWallet(req.Password)
 	if err != nil {
 		return err
 	}
 
-	pubKey, err := t.loadWallet(password)
+	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, pubKey); err != nil {
-		return err
-	}
-
-	// Sync with genesis
+	// Sync with genesis if this is a new wallet
 	if _, err := t.w.GetSavedHeight(); err != nil {
 		t.w.UpdateWalletHeight(0)
 		b := cfg.DecodeGenesis()
@@ -209,7 +187,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: pubKeyBytes}}, nil}
 
 	return nil
 }
@@ -219,32 +197,20 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
-	params := r.Params.(bytes.Buffer)
-	var seed string
-	seed, err := encoding.ReadString(&params)
+	req := r.Params.(*node.CreateRequest)
+	pubKey, err := t.createFromSeed(hex.EncodeToString(req.Seed), req.Password)
 	if err != nil {
 		return err
 	}
 
-	var password string
-	password, err = encoding.ReadString(&params)
+	pubKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
-		return err
-	}
-
-	pubKey, err := t.createFromSeed(seed, password)
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: pubKeyBytes}}, nil}
 
 	return nil
 }
@@ -254,22 +220,11 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	params := r.Params.(bytes.Buffer)
-	// read tx parameters
-	var amount uint64
-	if err := encoding.ReadUint64LE(&params, &amount); err != nil {
-		return err
-	}
-
-	var lockTime uint64
-	if err := encoding.ReadUint64LE(&params, &lockTime); err != nil {
-		return err
-	}
-
+	req := r.Params.(*node.ConsensusTxRequest)
 	// create and sign transaction
-	log.Tracef("Create a bid tx (%d,%d)", amount, lockTime)
+	log.Tracef("Create a bid tx (%d,%d)", req.Amount, req.LockTime)
 
-	tx, err := t.CreateBidTx(amount, lockTime)
+	tx, err := t.CreateBidTx(req.Amount, req.LockTime)
 	if err != nil {
 		return err
 	}
@@ -285,7 +240,7 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
+	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
 	return nil
 }
 
@@ -295,22 +250,11 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	params := r.Params.(bytes.Buffer)
-	// read tx parameters
-	var amount uint64
-	if err := encoding.ReadUint64LE(&params, &amount); err != nil {
-		return err
-	}
-
-	var lockTime uint64
-	if err := encoding.ReadUint64LE(&params, &lockTime); err != nil {
-		return err
-	}
-
+	req := r.Params.(*node.ConsensusTxRequest)
 	// create and sign transaction
-	log.Tracef("Create a stake tx (%d,%d)", amount, lockTime)
+	log.Tracef("Create a stake tx (%d,%d)", req.Amount, req.LockTime)
 
-	tx, err := t.CreateStakeTx(amount, lockTime)
+	tx, err := t.CreateStakeTx(req.Amount, req.LockTime)
 	if err != nil {
 		return err
 	}
@@ -321,7 +265,7 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
+	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
 
 	return nil
 }
@@ -332,22 +276,11 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	params := r.Params.(bytes.Buffer)
-	var amount uint64
-	if err := encoding.ReadUint64LE(&params, &amount); err != nil {
-		return err
-	}
-
-	var destPubKey string
-	destPubKey, err := encoding.ReadString(&params)
-	if err != nil {
-		return err
-	}
-
+	req := r.Params.(*node.TransferRequest)
 	// create and sign transaction
-	log.Tracef("Create a standard tx (%d,%s)", amount, destPubKey)
+	log.Tracef("Create a standard tx (%d,%s)", req.Amount, hex.EncodeToString(req.Address))
 
-	tx, err := t.CreateStandardTx(amount, destPubKey)
+	tx, err := t.CreateStandardTx(req.Amount, hex.EncodeToString(req.Address))
 	if err != nil {
 		return err
 	}
@@ -358,7 +291,7 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
+	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
 
 	return nil
 }
@@ -376,16 +309,7 @@ func (t *Transactor) handleBalance(r rpcbus.Request) error {
 
 	log.Tracef("wallet balance: %d, mempool balance: %d", unlockedBalance, lockedBalance)
 
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, uint64(unlockedBalance)); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint64LE(buf, uint64(lockedBalance)); err != nil {
-		return err
-	}
-
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{&node.BalanceResponse{UnlockedBalance: unlockedBalance, LockedBalance: lockedBalance}, nil}
 	return nil
 }
 
@@ -408,12 +332,7 @@ func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
 
 	log.Tracef("unconfirmed wallet balance: %d", unconfirmedBalance)
 
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, uint64(unconfirmedBalance)); err != nil {
-		return err
-	}
-
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{&node.BalanceResponse{UnlockedBalance: unconfirmedBalance}, nil}
 	return nil
 }
 
@@ -422,7 +341,7 @@ func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Consensus transactions are now being automated."}, nil}
 	return nil
 }
 
@@ -432,7 +351,7 @@ func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
 			return err
 		}
 
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Wallet database deleted."}, nil}
 		return nil
 	}
 
@@ -440,16 +359,12 @@ func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+	r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Wallet database deleted."}, nil}
 	return nil
 }
 
 func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteBool(buf, t.w != nil); err != nil {
-		return err
-	}
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{&node.WalletStatusResponse{Loaded: t.w != nil}, nil}
 	return nil
 }
 

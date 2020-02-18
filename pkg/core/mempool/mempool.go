@@ -20,6 +20,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-crypto/merkletree"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	logger "github.com/sirupsen/logrus"
@@ -405,12 +406,12 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 
 func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, error) {
 	txs := make([]transactions.Transaction, 0)
-	params := r.Params.(bytes.Buffer)
-	switch len(params.Bytes()) {
-	case 32:
+	req := r.Params.(*node.SelectRequest)
+	switch {
+	case len(req.Id) == 32:
 		// If we want a tx with a certain ID, we can simply look it up
 		// directly
-		hash, err := hex.DecodeString(string(params.Bytes()))
+		hash, err := hex.DecodeString(req.Id)
 		if err != nil {
 			return bytes.Buffer{}, err
 		}
@@ -421,20 +422,24 @@ func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, er
 		}
 
 		txs = append(txs, tx)
-	case 1:
-		txs = m.verified.FilterByType(transactions.TxType(params.Bytes()[0]))
+	case len(req.Types) > 0:
+		for _, t := range req.Types {
+			txs = append(txs, m.verified.FilterByType(transactions.TxType(t))...)
+		}
 	default:
 		txs = m.verified.Clone()
 	}
 
-	buf := new(bytes.Buffer)
-	for _, tx := range txs {
-		if _, err := buf.WriteString(fmt.Sprintf("Type: %v / Hash: %s / Locktime: %v\n", tx.Type(), hex.EncodeToString(tx.StandardTx().TxID), tx.LockTime())); err != nil {
-			return bytes.Buffer{}, err
+	resp := &node.SelectResponse{Result: make([]*node.Tx, len(txs))}
+	for i, tx := range txs {
+		resp.Result[i] = &node.Tx{
+			Type:     node.TxType(tx.Type()),
+			Id:       hex.EncodeToString(tx.StandardTx().TxID),
+			LockTime: tx.LockTime(),
 		}
 	}
 
-	return *buf, nil
+	return resp, nil
 }
 
 // processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
