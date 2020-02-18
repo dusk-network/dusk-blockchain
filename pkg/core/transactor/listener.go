@@ -97,12 +97,7 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	pubKeyBytes, err := hex.DecodeString(pubKey)
-	if err != nil {
-		return err
-	}
-
-	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: pubKeyBytes}}
+	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}
 	r.RespChan <- rpcbus.Response{resp, nil}
 
 	return nil
@@ -118,12 +113,7 @@ func (t *Transactor) handleAddress(r rpcbus.Request) error {
 		return err
 	}
 
-	addrBytes, err := hex.DecodeString(addr)
-	if err != nil {
-		return err
-	}
-
-	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: addrBytes}}
+	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(addr)}}
 	r.RespChan <- rpcbus.Response{resp, nil}
 	return nil
 }
@@ -170,11 +160,6 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 		return err
 	}
 
-	pubKeyBytes, err := hex.DecodeString(pubKey)
-	if err != nil {
-		return err
-	}
-
 	// Sync with genesis if this is a new wallet
 	if _, err := t.w.GetSavedHeight(); err != nil {
 		t.w.UpdateWalletHeight(0)
@@ -187,7 +172,7 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: pubKeyBytes}}, nil}
+	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}, nil}
 
 	return nil
 }
@@ -203,14 +188,9 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 		return err
 	}
 
-	pubKeyBytes, err := hex.DecodeString(pubKey)
-	if err != nil {
-		return err
-	}
-
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: pubKeyBytes}}, nil}
+	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}, nil}
 
 	return nil
 }
