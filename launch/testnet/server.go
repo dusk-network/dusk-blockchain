@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	log "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -62,15 +62,19 @@ func Setup() *Server {
 	dupeBlacklist := launchDupeMap(eventBus)
 
 	// Instantiate RPC server
-	if cfg.Get().RPC.Enabled {
-		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus, rpc.Commands)
-		if err != nil {
-			log.Errorf("RPC http server error: %s", err.Error())
-		}
+	// if cfg.Get().RPC.Enabled {
+	// 	rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus, rpc.Commands)
+	// 	if err != nil {
+	// 		log.Errorf("RPC http server error: %s", err.Error())
+	// 	}
 
-		if err := rpcServ.Start(); err != nil {
-			log.Errorf("RPC failed to start: %s", err.Error())
-		}
+	// 	if err := rpcServ.Start(); err != nil {
+	// 		log.Errorf("RPC failed to start: %s", err.Error())
+	// 	}
+	// }
+
+	if err := rpc.StartgRPCServer(rpcBus); err != nil {
+		log.WithError(err).Errorln("could not start gRPC server")
 	}
 
 	// Instantiate GraphQL server
