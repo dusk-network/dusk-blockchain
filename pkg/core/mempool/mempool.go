@@ -408,7 +408,7 @@ func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, er
 	txs := make([]transactions.Transaction, 0)
 	req := r.Params.(*node.SelectRequest)
 	switch {
-	case len(req.Id) == 32:
+	case len(req.Id) == 64:
 		// If we want a tx with a certain ID, we can simply look it up
 		// directly
 		hash, err := hex.DecodeString(req.Id)
