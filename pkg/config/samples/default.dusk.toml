@@ -90,6 +90,12 @@ pass=""
 cert=""
 port=9001
 
+[gql.notification]
+# Number of pub/sub brokers to broadcast new blocks. 
+# 0 brokersNum disables notifications system
+brokersNum = 0
+clientsPerBroker = 1000
+
 
 [prof]
 # profiling service address

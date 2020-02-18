@@ -8,9 +8,11 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
+	"github.com/dusk-network/dusk-blockchain/pkg/gql/notifications"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql/query"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/gorilla/websocket"
 	"github.com/graphql-go/graphql"
 
 	logger "github.com/sirupsen/logrus"
@@ -21,17 +23,27 @@ import (
 
 var log *logger.Entry = logger.WithFields(logger.Fields{"process": "gql"})
 
+const (
+	endpointWS  = "/ws"
+	endpointGQL = "/graphql"
+)
+
 // Server defines the HTTP server of the GraphQL service node.
 type Server struct {
-	started   bool // Indicates whether or not server has started
-	eventBus  *eventbus.EventBus
-	rpcBus    *rpcbus.RPCBus
-	db        database.DB
-	authSHA   []byte
-	listener  net.Listener
-	startTime int64
+	started  bool // Indicates whether or not server has started
+	authSHA  []byte
+	listener net.Listener
 
+	// Graphql utility
 	schema *graphql.Schema
+
+	// Websocket connections pool
+	pool *notifications.BrokerPool
+
+	// Node components
+	eventBus *eventbus.EventBus
+	rpcBus   *rpcbus.RPCBus
+	db       database.DB
 }
 
 // NewHTTPServer instantiates a new NewHTTPServer to handle GraphQL queries.
@@ -57,52 +69,33 @@ func NewHTTPServer(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) (*Server,
 
 // Start the GraphQL HTTP Server and begin listening on specified port.
 func (s *Server) Start() error {
-	ServeMux := http.NewServeMux()
+	mux := http.NewServeMux()
 	httpServer := &http.Server{
-		Handler:     ServeMux,
+		Handler:     mux,
 		ReadTimeout: time.Second * 10,
 	}
 
-	// GraphQL serving over HTTP
-	ServeMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-
-		w.Header().Set("Connection", "close")
-		w.Header().Set("Content-Type", "application/json")
-		r.Close = true
-
-		if s.started {
-			handleQuery(s.schema, w, r, s.db)
-		} else {
-			log.Warn("HTTP service is not running")
-		}
-	})
-
-	//  Setup graphQL
-	rootQuery := query.NewRoot(s.rpcBus)
-	sc, err := graphql.NewSchema(
-		graphql.SchemaConfig{Query: rootQuery.Query},
-	)
-
-	if err != nil {
+	if err := s.EnableGraphQL(mux); err != nil {
 		return err
 	}
 
-	s.schema = &sc
-	_, s.db = heavy.CreateDBConnection()
+	nc := cfg.Get().Gql.Notification
+	if nc.BrokersNum > 0 {
+		if err := s.EnableNotifications(mux); err != nil {
+			return err
+		}
+	}
 
-	// Set up listener
+	// Set up HTTP Server over TCP
 	l, err := net.Listen("tcp", "localhost:"+cfg.Get().Gql.Port)
 	if err != nil {
 		return err
 	}
 
-	// Assign to Server
 	s.listener = l
-
 	go s.listenOnHTTPServer(httpServer)
 
 	s.started = true
-	s.startTime = time.Now().Unix()
 
 	return nil
 }
@@ -119,9 +112,79 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 	}
 }
 
+func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
+
+	// GraphQL service
+	serverMux.HandleFunc(endpointGQL, func(w http.ResponseWriter, r *http.Request) {
+
+		if !s.started {
+			return
+		}
+
+		w.Header().Set("Connection", "close")
+		w.Header().Set("Content-Type", "application/json")
+		r.Close = true
+
+		handleQuery(s.schema, w, r, s.db)
+	})
+
+	//  Setup graphQL
+	rootQuery := query.NewRoot(s.rpcBus)
+	sconf := graphql.SchemaConfig{Query: rootQuery.Query}
+
+	sc, err := graphql.NewSchema(sconf)
+	if err != nil {
+		return err
+	}
+
+	s.schema = &sc
+	_, s.db = heavy.CreateDBConnection()
+
+	return nil
+}
+
+func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
+
+	nc := cfg.Get().Gql.Notification
+
+	upgrader := &websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true
+	}
+
+	var clientsPerBroker uint = 100
+	if nc.ClientsPerBroker > 0 {
+		clientsPerBroker = nc.ClientsPerBroker
+	}
+
+	s.pool = notifications.NewPool(s.eventBus, nc.BrokersNum, clientsPerBroker)
+
+	serverMux.HandleFunc(endpointWS, func(w http.ResponseWriter, r *http.Request) {
+
+		if !s.started {
+			return
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Errorf("Failed to set websocket upgrade: %v", err)
+			return
+		}
+		s.pool.PushConn(conn)
+	})
+
+	return nil
+}
+
 // Stop the server
 func (s *Server) Stop() error {
+
 	s.started = false
+	s.pool.Close()
 	if err := s.listener.Close(); err != nil {
 		log.Errorf("error shutting down, %v\n", err)
 		return err

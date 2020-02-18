@@ -67,10 +67,16 @@ type rpcConfiguration struct {
 }
 
 type gqlConfiguration struct {
-	Port    string
-	Enabled bool
-	User    string
-	Pass    string
+	Port         string
+	Enabled      bool
+	User         string
+	Pass         string
+	Notification notificationConfiguration
+}
+
+type notificationConfiguration struct {
+	BrokersNum       uint
+	ClientsPerBroker uint
 }
 
 // Performance parameters
