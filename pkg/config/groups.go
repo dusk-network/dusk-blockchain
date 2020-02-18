@@ -62,8 +62,8 @@ type rpcConfiguration struct {
 	Network string
 	Address string
 	Enabled bool
-	User    string
-	Pass    string
+	// User    string
+	// Pass    string
 }
 
 type gqlConfiguration struct {
