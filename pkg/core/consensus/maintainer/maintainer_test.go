@@ -1,7 +1,6 @@
 package maintainer_test
 
 import (
-	"bytes"
 	"os"
 	"testing"
 	"time"
@@ -14,11 +13,11 @@ import (
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
@@ -159,11 +158,6 @@ func receiveTxs(t *testing.T, c chan rpcbus.Request) []transactions.Transaction 
 }
 
 func createWallet(rpcBus *rpcbus.RPCBus, password string) error {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, password); err != nil {
-		return err
-	}
-
-	_, err := rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(*buf), 0)
+	_, err := rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(&node.CreateRequest{Password: password}), 0)
 	return err
 }
