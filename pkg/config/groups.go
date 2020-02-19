@@ -67,13 +67,16 @@ type rpcConfiguration struct {
 }
 
 type gqlConfiguration struct {
-	Port         string
-	Enabled      bool
-	User         string
-	Pass         string
-	Notification notificationConfiguration
+	Enabled bool
+	Address string
+
+	EnableTLS bool
+	CertFile  string
+	KeyFile   string
 
 	MaxRequestLimit uint
+
+	Notification notificationConfiguration
 }
 
 type notificationConfiguration struct {

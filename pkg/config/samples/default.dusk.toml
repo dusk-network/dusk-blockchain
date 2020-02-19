@@ -85,10 +85,14 @@ cert=""
 [gql]
 # enable graphql service
 enabled=true
-user=""
-pass=""
-cert=""
-port=9001
+address="127.0.0.1:9001"
+
+# enable/disable both HTTPS and WSS
+enableTLS = false
+# cert file path
+certFile = ""
+# key file path
+keyFile = ""
 
 # maximum requests per second 
 # uniqueness of a request is based on: 

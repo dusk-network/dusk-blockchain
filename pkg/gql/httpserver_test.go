@@ -20,7 +20,7 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	// Set up HTTP server with notifications enabled
 	// config
-	s, eb := setupServer(t, "22222")
+	s, eb := setupServer(t, "127.0.0.1:22222")
 	defer s.Stop()
 
 	// Set up a websocket client
@@ -68,11 +68,11 @@ func TestWebsocketEndpoint(t *testing.T) {
 	}
 }
 
-func setupServer(t *testing.T, port string) (*Server, *eventbus.EventBus) {
+func setupServer(t *testing.T, addr string) (*Server, *eventbus.EventBus) {
 	// Set up HTTP server with notifications enabled
 	// config
 	r := config.Registry{}
-	r.Gql.Port = port
+	r.Gql.Address = addr
 	r.Gql.Enabled = true
 	r.Gql.Notification.BrokersNum = 1
 	r.Database.Driver = lite.DriverName
