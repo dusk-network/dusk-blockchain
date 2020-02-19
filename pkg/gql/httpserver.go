@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/didip/tollbooth"
+	"github.com/didip/tollbooth/limiter"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/gql/notifications"
@@ -33,6 +35,7 @@ type Server struct {
 	started  bool // Indicates whether or not server has started
 	authSHA  []byte
 	listener net.Listener
+	lmt      *limiter.Limiter
 
 	// Graphql utility
 	schema *graphql.Schema
@@ -75,6 +78,9 @@ func (s *Server) Start() error {
 		ReadTimeout: time.Second * 10,
 	}
 
+	max := float64(cfg.Get().Gql.MaxRequestLimit)
+	s.lmt = tollbooth.NewLimiter(max, nil)
+
 	if err := s.EnableGraphQL(mux); err != nil {
 		return err
 	}
@@ -115,7 +121,7 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 
 	// GraphQL service
-	serverMux.HandleFunc(endpointGQL, func(w http.ResponseWriter, r *http.Request) {
+	gqlHandler := func(w http.ResponseWriter, r *http.Request) {
 
 		if !s.started {
 			return
@@ -126,7 +132,10 @@ func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 		r.Close = true
 
 		handleQuery(s.schema, w, r, s.db)
-	})
+	}
+
+	middleware := tollbooth.LimitFuncHandler(s.lmt, gqlHandler)
+	serverMux.Handle(endpointGQL, middleware)
 
 	//  Setup graphQL
 	rootQuery := query.NewRoot(s.rpcBus)
@@ -163,7 +172,7 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 
 	s.pool = notifications.NewPool(s.eventBus, nc.BrokersNum, clientsPerBroker)
 
-	serverMux.HandleFunc(endpointWS, func(w http.ResponseWriter, r *http.Request) {
+	wsHandler := func(w http.ResponseWriter, r *http.Request) {
 
 		if !s.started {
 			return
@@ -175,7 +184,10 @@ func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 			return
 		}
 		s.pool.PushConn(conn)
-	})
+	}
+
+	middleware := tollbooth.LimitFuncHandler(s.lmt, wsHandler)
+	serverMux.Handle(endpointWS, middleware)
 
 	return nil
 }

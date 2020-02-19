@@ -72,6 +72,8 @@ type gqlConfiguration struct {
 	User         string
 	Pass         string
 	Notification notificationConfiguration
+
+	MaxRequestLimit uint
 }
 
 type notificationConfiguration struct {

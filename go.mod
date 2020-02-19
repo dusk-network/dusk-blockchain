@@ -2,6 +2,7 @@ module github.com/dusk-network/dusk-blockchain
 
 require (
 	github.com/bwesterb/go-ristretto v1.1.1
+	github.com/didip/tollbooth v4.0.2+incompatible
 	github.com/dusk-network/dusk-crypto v0.1.1
 	github.com/dusk-network/dusk-wallet/v2 v2.0.0
 	github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee
@@ -15,6 +16,7 @@ require (
 	github.com/matryer/is v1.2.0 // indirect
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
+	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pelletier/go-toml v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2

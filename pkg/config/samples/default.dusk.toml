@@ -90,6 +90,11 @@ pass=""
 cert=""
 port=9001
 
+# maximum requests per second 
+# uniqueness of a request is based on: 
+# Remote IP, Request method and path
+maxRequestLimit = 20
+
 [gql.notification]
 # Number of pub/sub brokers to broadcast new blocks. 
 # 0 brokersNum disables notifications system
