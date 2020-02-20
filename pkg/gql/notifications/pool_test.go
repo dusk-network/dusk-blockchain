@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 )
 
 type mockWebsocketConn struct {
+	mu     sync.RWMutex
 	msgBuf map[string]bool
 }
 
@@ -24,7 +26,9 @@ func (c *mockWebsocketConn) WriteMessage(messageType int, data []byte) error {
 	// Mimic connection consuming the json msg
 	var p BlockMsg
 	if err := json.Unmarshal(data, &p); err == nil {
+		c.mu.Lock()
 		c.msgBuf[p.Hash] = true
+		c.mu.Unlock()
 	}
 
 	return nil
@@ -60,8 +64,10 @@ func (m *mockAddr) String() string {
 func TestPoolBasicScenario(t *testing.T) {
 
 	eb := eventbus.New()
-	pool := NewPool(eb, 10, 100)
-	ctxActiveConn := make([]*mockWebsocketConn, 100)
+	pool := NewPool(eb, 10, 51)
+	defer pool.Close()
+
+	ctxActiveConn := make([]*mockWebsocketConn, 50)
 
 	// Simulate HTTP server pushing new websocket connections
 	for i := 0; i < len(ctxActiveConn); i++ {
@@ -76,7 +82,7 @@ func TestPoolBasicScenario(t *testing.T) {
 
 	// Simulate eventBus publishing sample acceptedBlocks
 	ctxSentMsgs := make([]string, 0)
-	for height := 0; height < 20; height++ {
+	for height := 0; height < 5; height++ {
 
 		blk := helper.RandomBlock(t, uint64(height), 3)
 		hash, _ := blk.CalculateHash()
@@ -87,7 +93,7 @@ func TestPoolBasicScenario(t *testing.T) {
 		ctxSentMsgs = append(ctxSentMsgs, hex.EncodeToString(blk.Header.Hash))
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(3 * time.Second)
 
 	// Ensure all clients have received all published blocks
 	for i := 0; i < len(ctxSentMsgs); i++ {
@@ -96,7 +102,9 @@ func TestPoolBasicScenario(t *testing.T) {
 		// Ensure sentMsg is received by each conn
 		for cInd := 0; cInd < len(ctxActiveConn); cInd++ {
 			conn := ctxActiveConn[cInd]
+			conn.mu.RLock()
 			_, ok := conn.msgBuf[sentMsg]
+			conn.mu.RUnlock()
 			if !ok {
 				t.Fatalf("Not all messages have been received by all clients")
 			}

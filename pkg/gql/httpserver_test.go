@@ -48,6 +48,8 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	// Simulate eventBus publishing a acceptedBlocks message
 
+	time.Sleep(time.Second)
+
 	blk := helper.RandomBlock(t, uint64(0), 4)
 	hash, _ := blk.CalculateHash()
 	blk.Header.Hash = hash

@@ -26,12 +26,10 @@ func MarshalBlockMsg(blk block.Block) (string, error) {
 		return "", err
 	}
 
-	blk.Header.Hash = hash
-
 	var p BlockMsg
 	p.Height = blk.Header.Height
 	p.Timestamp = blk.Header.Timestamp
-	p.Hash = hex.EncodeToString(blk.Header.Hash)
+	p.Hash = hex.EncodeToString(hash)
 	p.Txs = make([]string, 0)
 
 	// Get a limited set of block txs hashes
