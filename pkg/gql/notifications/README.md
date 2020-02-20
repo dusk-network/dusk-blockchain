@@ -9,7 +9,7 @@ Each Broker is capable of receiving updates from the eventBus (e.g topics. accep
 
 ### Messages
 
-Currently, the only notification sent is intended to satisfy Block Explorer UI needs.
+Currently, the only notification sent is intended to satisfy Block Explorer UI needs. (pending to revise the format of the message)
 
 #### On block accepted
 ```json
@@ -23,3 +23,18 @@ Currently, the only notification sent is intended to satisfy Block Explorer UI n
     "BlocksGeneratedCount":58794
 }
 ```
+
+#### Configuration
+
+```toml
+[gql.notification]
+# Number of pub/sub brokers to broadcast new blocks. 
+# 0 brokersNum disables notifications system
+brokersNum = 10
+clientsPerBroker = 1000
+```
+
+#### Examples
+
+`TestWebsocketEndpoint` introduces a sample websocket client connecting to `ws://127.0.0.1:9001/ws` and consuming notifications
+

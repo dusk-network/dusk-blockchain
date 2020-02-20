@@ -30,8 +30,8 @@ const (
 
 // Server defines the HTTP server of the GraphQL service node.
 type Server struct {
-	started  bool // Indicates whether or not server has started
-	authSHA  []byte
+	started bool // Indicates whether or not server has started
+
 	listener net.Listener
 	lmt      *limiter.Limiter
 
