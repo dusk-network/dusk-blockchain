@@ -786,6 +786,11 @@ func TestFetchDecoys(test *testing.T) {
 			return errors.New("did not receive requested amount of decoys")
 		}
 
+		currentHeight, err := t.FetchCurrentHeight()
+		if err != nil {
+			return err
+		}
+
 		// Make sure these decoy points belong to transactions in
 		// our db, which are unlocked.
 		for _, decoy := range decoys {
@@ -804,7 +809,9 @@ func TestFetchDecoys(test *testing.T) {
 				return err
 			}
 
-			if unlockHeight == 0 {
+			// Unlock height should be equal to or lower than the current
+			// height for it to be considered unlocked.
+			if unlockHeight <= currentHeight {
 				hits++
 			}
 		}
