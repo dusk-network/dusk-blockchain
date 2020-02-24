@@ -21,24 +21,33 @@ type nodeServer struct {
 	rpcBus *rpcbus.RPCBus
 }
 
+type RPCSrvWrapper struct {
+	grpcServer *grpc.Server
+}
+
+func (r *RPCSrvWrapper) Shutdown() {
+	r.grpcServer.GracefulStop()
+}
+
 // StartgRPCServer starts the gRPC server for the node, to interact with
 // the rust process. It only returns an error, as we want to keep the
 // gRPC service running until the process is killed, thus we do not
 // need to return the server itself.
-func StartgRPCServer(rpcBus *rpcbus.RPCBus) error {
+func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
 	network := config.Get().RPC.Network
 	addr := config.Get().RPC.Address
 	l, err := net.Listen(network, addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	grpcServer := grpc.NewServer()
 	node.RegisterNodeServer(grpcServer, &nodeServer{rpcBus})
+	wrapper := &RPCSrvWrapper{grpcServer}
 	// This function is blocking, so we run it in a goroutine
 	go grpcServer.Serve(l)
 	// TODO: incorporate TLS
-	return nil
+	return wrapper, nil
 }
 
 func (n *nodeServer) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {

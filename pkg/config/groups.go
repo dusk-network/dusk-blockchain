@@ -61,7 +61,7 @@ type profConfiguration struct {
 type rpcConfiguration struct {
 	Network string
 	Address string
-	Enabled bool
+	// Enabled bool
 	// User    string
 	// Pass    string
 }

@@ -25,6 +25,11 @@ var (
 	errWalletAlreadyLoaded = errors.New("wallet is already loaded")
 )
 
+func loadResponse(pubKey []byte) *node.LoadResponse {
+	pk := &node.PubKey{PublicKey: pubKey}
+	return &node.LoadResponse{Key: pk}
+}
+
 func (t *Transactor) Listen() {
 	for {
 		select {
@@ -96,8 +101,7 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 
 	t.launchConsensus()
 
-	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}
-	r.RespChan <- rpcbus.Response{resp, nil}
+	r.RespChan <- rpcbus.Response{loadResponse([]byte(pubKey)), nil}
 
 	return nil
 }
@@ -170,8 +174,8 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 	}
 
 	t.launchConsensus()
-
-	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}, nil}
+	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}
+	r.RespChan <- rpcbus.Response{resp, nil}
 
 	return nil
 }

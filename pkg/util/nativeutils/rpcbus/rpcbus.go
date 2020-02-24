@@ -41,6 +41,10 @@ type Response struct {
 	Err  error
 }
 
+func EmptyRequest() Request {
+	return NewRequest(bytes.Buffer{})
+}
+
 // NewRequest builds a new request with params
 func NewRequest(p interface{}) Request {
 	return Request{

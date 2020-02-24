@@ -75,8 +75,7 @@ network="unix"
 # in case the network is tcp*,
 # address must be in form of a IP address (e.g 127.0.0.1:9000)
 address="/tmp/dusk-grpc.sock"
-# enable rpc service
-enabled=true
+#enabled=true
 #user="default"
 #pass="default"
 #cert=""

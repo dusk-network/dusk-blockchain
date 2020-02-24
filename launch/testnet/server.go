@@ -26,12 +26,13 @@ import (
 
 // Server is the main process of the node
 type Server struct {
-	eventBus *eventbus.EventBus
-	rpcBus   *rpcbus.RPCBus
-	chain    *chain.Chain
-	dupeMap  *dupemap.DupeMap
-	counter  *chainsync.Counter
-	gossip   *processing.Gossip
+	eventBus   *eventbus.EventBus
+	rpcBus     *rpcbus.RPCBus
+	chain      *chain.Chain
+	dupeMap    *dupemap.DupeMap
+	counter    *chainsync.Counter
+	gossip     *processing.Gossip
+	rpcWrapper *rpc.RPCSrvWrapper
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
@@ -73,7 +74,8 @@ func Setup() *Server {
 	// 	}
 	// }
 
-	if err := rpc.StartgRPCServer(rpcBus); err != nil {
+	rpcWrapper, err := rpc.StartgRPCServer(rpcBus)
+	if err != nil {
 		log.WithError(err).Errorln("could not start gRPC server")
 	}
 
@@ -91,12 +93,13 @@ func Setup() *Server {
 
 	// creating the Server
 	srv := &Server{
-		eventBus: eventBus,
-		rpcBus:   rpcBus,
-		chain:    chain,
-		dupeMap:  dupeBlacklist,
-		counter:  counter,
-		gossip:   processing.NewGossip(protocol.TestNet),
+		eventBus:   eventBus,
+		rpcBus:     rpcBus,
+		chain:      chain,
+		dupeMap:    dupeBlacklist,
+		counter:    counter,
+		gossip:     processing.NewGossip(protocol.TestNet),
+		rpcWrapper: rpcWrapper,
 	}
 
 	// Setting up the transactor component
@@ -186,4 +189,5 @@ func (s *Server) Close() {
 	// TODO: disconnect peers
 	s.chain.Close()
 	s.rpcBus.Close()
+	s.rpcWrapper.Shutdown()
 }
