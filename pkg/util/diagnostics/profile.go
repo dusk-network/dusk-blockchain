@@ -212,7 +212,7 @@ func stopProfiling(f *os.File, name string) {
 		log.WithFields(log.Fields{
 			"process": "profile",
 			"file":    f.Name,
-		}).Infof("% profile saved", name)
+		}).Infof("%s profile saved", name)
 	default:
 		log.Errorf("Unsupported profile name %s", name)
 		return
