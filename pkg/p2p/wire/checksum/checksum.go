@@ -2,6 +2,7 @@ package checksum
 
 import (
 	"bytes"
+	"errors"
 
 	"golang.org/x/crypto/blake2b"
 )
@@ -15,6 +16,10 @@ func Generate(m []byte) []byte {
 
 func Extract(m []byte) ([]byte, []byte, error) {
 	// First 4 bytes are the checksum
+	if len(m) < Length {
+		return nil, nil, errors.New("malformed checksum")
+	}
+
 	checksum := m[:Length]
 	message := m[Length:]
 	return message, checksum, nil
