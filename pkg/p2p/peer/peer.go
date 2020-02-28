@@ -213,6 +213,20 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
+
+	// As the peer ReadLoop is at the front-line of P2P network, receiving a
+	// malformed frame by an adversary node could lead to a panic.
+	// In such situation, the node should survive but adversary conn gets dropped
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
+		}
+	}()
+
+	p.readLoop()
+}
+
+func (p *Reader) readLoop() {
 	defer p.Conn.Close()
 
 	// Set up a timer, which triggers the sending of a `keepalive` message
@@ -226,7 +240,10 @@ func (p *Reader) ReadLoop() {
 
 	for {
 		// Refresh the read deadline
-		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+		err := p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+		if err != nil {
+			l.WithError(err).Warnf("write timeout err: %v", err)
+		}
 
 		b, err := p.ReadMessage()
 		if err != nil {
