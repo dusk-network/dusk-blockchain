@@ -91,7 +91,6 @@ cert=""
 port=9001
 
 [[profile]]
-name = "cpuuu"
 # An array of profiling tasks
 # types: cpu, heap, memstats, block, goroutine, mutex
 #
