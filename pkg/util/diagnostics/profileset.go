@@ -1,15 +1,11 @@
 package diagnostics
 
 import (
-	"bytes"
 	"errors"
-	"fmt"
 
 	_ "net/http/pprof"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -24,31 +20,17 @@ var (
 // See also func profile.loop() for a few examples of use
 //
 type ProfileSet struct {
-	profiles map[string]profile
+	profiles map[string]Profile
 	quit     chan struct{}
 }
 
 // NewProfileSet creates and starts ProfileSet from a set of settings strings
-func NewProfileSet(profiles []string) (ProfileSet, error) {
+func NewProfileSet() ProfileSet {
 
-	p := ProfileSet{
-		profiles: make(map[string]profile),
+	return ProfileSet{
+		profiles: make(map[string]Profile),
 		quit:     make(chan struct{}),
 	}
-
-	for _, settings := range profiles {
-
-		item, err := newProfile(settings)
-		if err != nil {
-			return p, err
-		}
-
-		if err := p.spawn(item); err == errAlreadyStarted {
-			return p, fmt.Errorf("duplicated entry %s", item.name)
-		}
-	}
-
-	return p, nil
 }
 
 func (s *ProfileSet) drop(name string) {
@@ -60,13 +42,21 @@ func (s *ProfileSet) drop(name string) {
 	}
 }
 
-func (ps *ProfileSet) spawn(item profile) error {
+func (ps *ProfileSet) Spawn(p Profile) error {
 
-	_, ok := ps.profiles[item.name]
+	if err := isSupported(p.name); err != nil {
+		return err
+	}
+
+	if p.n == 0 || p.d == 0 {
+		return errors.New("invalid settings")
+	}
+
+	_, ok := ps.profiles[p.name]
 	if !ok {
-		ps.profiles[item.name] = item
+		ps.profiles[p.name] = p
 		// Start profile lifecycle
-		go item.loop()
+		go p.loop()
 
 	} else {
 		return errAlreadyStarted
@@ -79,52 +69,54 @@ func (ps *ProfileSet) spawn(item profile) error {
 // any profile in runtime (e.g via rpc)
 func (s *ProfileSet) Listen(rpc *rpcbus.RPCBus) {
 
-	startCmdChan := make(chan rpcbus.Request, 1)
-	if err := rpc.Register(rpcbus.StartProfile, startCmdChan); err != nil {
-		log.Error(err)
-		return
-	}
-
-	stopCmdChan := make(chan rpcbus.Request, 1)
-	if err := rpc.Register(rpcbus.StopProfile, stopCmdChan); err != nil {
-		log.Error(err)
-		return
-	}
-
-	for {
-		select {
-		case r := <-startCmdChan:
-			settings, err := encoding.ReadString(&r.Params)
-			if err != nil {
-				r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
-				continue
-			}
-
-			item, err := newProfile(settings)
-			if err == nil {
-				err = s.spawn(item)
-			}
-
-			r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
-
-		case r := <-stopCmdChan:
-
-			name, err := encoding.ReadString(&r.Params)
-			if err == nil {
-				s.drop(name)
-			}
-
-			r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
-		case <-s.quit:
-
-			// Signal all profile loops that it's time to terminate
-			for name := range s.profiles {
-				s.drop(name)
-			}
+	/*
+		startCmdChan := make(chan rpcbus.Request, 1)
+		if err := rpc.Register(rpcbus.StartProfile, startCmdChan); err != nil {
+			log.Error(err)
 			return
 		}
 
-	}
+		stopCmdChan := make(chan rpcbus.Request, 1)
+		if err := rpc.Register(rpcbus.StopProfile, stopCmdChan); err != nil {
+			log.Error(err)
+			return
+		}
+
+		for {
+			select {
+			case r := <-startCmdChan:
+				settings, err := encoding.ReadString(&r.Params)
+				if err != nil {
+					r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
+					continue
+				}
+
+				item, err := newProfile(settings)
+				if err == nil {
+					err = s.spawn(item)
+				}
+
+				r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
+
+			case r := <-stopCmdChan:
+
+				name, err := encoding.ReadString(&r.Params)
+				if err == nil {
+					s.drop(name)
+				}
+
+				r.RespChan <- rpcbus.Response{Resp: bytes.Buffer{}, Err: err}
+			case <-s.quit:
+
+				// Signal all profile loops that it's time to terminate
+				for name := range s.profiles {
+					s.drop(name)
+				}
+				return
+			}
+
+		}
+	*/
 }
 
 func (p ProfileSet) Close() {

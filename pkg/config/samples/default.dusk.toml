@@ -90,16 +90,27 @@ pass=""
 cert=""
 port=9001
 
-
-[prof]
-# profiling service address
-# reachable at http://localhost:5050/debug/pprof
-# address="localhost:5050"
-
-# cpu.prof
-cpuFile=""
-# mem.prof
-memFile=""
+[[profile]]
+name = "cpuuu"
+# An array of profiling tasks
+# types: cpu, heap, memstats, block, goroutine, mutex
+#
+# Examples:
+#
+# Continuous CPU profiling (cpu_$timestamp.prof)
+# Start CPU profiling each hour and fetch samples for 60 sec
+# 
+# [[profile]]
+# name = "cpu"
+# interval = 3600
+# duration = 60
+#
+# Continuous Memory profiling (heap_$timestamp.prof)
+# Records complete memory profile each 30 mins
+# name = "heap", interval = 1800, duration = 1800
+#
+# Log Memory and GC stats into log each 10 sec
+# name = "memstats", interval = 10, duration = 1
 
 [performance]
 # Number of workers to spawn on an accumulator component

@@ -11,10 +11,10 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
+	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -56,21 +56,13 @@ func main() {
 	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
 	log.Infof("Selected network  %s", cfg.Get().General.Network)
 
-	// Set up profiling tools.
-	profiles, err := diagnostics.NewProfileSet(cfg.Get().Prof.Profile)
-	if err != nil {
-		// Assume here if tools are enabled but they fail on loading then it's better
-		// to fix the error or just disable them.
-		log.Errorf("Profiling tools error: %s", err.Error())
-		return
-	}
-	defer profiles.Close()
-
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup()
 	defer srv.Close()
 
-	go profiles.Listen(srv.rpcBus)
+	// Setting up profiling tools, if enabled
+	s := setupProfiles(srv.rpcBus)
+	defer s.Close()
 
 	//start the connection manager
 	connMgr := NewConnMgr(CmgrConfig{
@@ -101,4 +93,30 @@ func main() {
 	srv.eventBus.Publish(topics.Quit, msg)
 
 	log.WithField("prefix", "main").Info("Terminated")
+}
+
+func setupProfiles(r *rpcbus.RPCBus) *diagnostics.ProfileSet {
+
+	s := diagnostics.NewProfileSet()
+	profiles := cfg.Get().Profile
+	// Expecting an array of profiles.
+	// Add empty [[profile]] to enable the listener
+	if len(profiles) > 0 {
+
+		for _, i := range profiles {
+
+			if len(i.Name) == 0 {
+				continue
+			}
+
+			p := diagnostics.NewProfile(i.Name, i.Interval, i.Duration, i.Start)
+			if err := s.Spawn(p); err != nil {
+				log.Panicf("Profiling task error: %s", err.Error())
+			}
+		}
+
+		go s.Listen(r)
+	}
+
+	return &s
 }

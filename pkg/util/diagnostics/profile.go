@@ -1,14 +1,12 @@
 package diagnostics
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -22,19 +20,21 @@ const (
 	mutexProfileRate = 1
 )
 
-type profile struct {
+type Profile struct {
 	name  string
-	n, d  int
+	n, d  uint
 	start bool
 	quit  chan struct{}
 }
 
-// Examples of settings strings:
-// - "cpu, 1800, 30"
-// - "heap, 1800, 1800, 1"
-// - "memstats, 1800, 1"
-func newProfile(settings string) (profile, error) {
-	return parse(settings)
+func NewProfile(name string, n, d uint, start bool) Profile {
+	return Profile{
+		name:  name,
+		n:     n,
+		d:     d,
+		start: start,
+		quit:  make(chan struct{}),
+	}
 }
 
 // loop runs a loop for periodical (CPU, Heap etc .. ) samples fetching
@@ -77,7 +77,7 @@ func newProfile(settings string) (profile, error) {
 // (suitable in development)
 // output: mutex_$timestamp.prof file
 
-func (p *profile) loop() {
+func (p *Profile) loop() {
 
 	var err error
 	t := time.NewTicker(time.Duration(p.n) * time.Second)
@@ -268,35 +268,10 @@ func logMemstatsSample() {
 
 }
 
-func parse(settings string) (profile, error) {
-
-	w := strings.SplitN(settings, ",", 4)
-	if len(w) < 3 {
-		return profile{}, errors.New("invalid settings")
+func isSupported(name string) error {
+	switch name {
+	case "mutex", "block", "heap", "goroutine", "memstats", "cpu":
+		return nil
 	}
-
-	p := profile{quit: make(chan struct{})}
-	var err error
-
-	p.n, err = strconv.Atoi(w[1])
-	if err != nil {
-		return p, err
-	}
-
-	p.d, err = strconv.Atoi(w[2])
-	if err != nil {
-		return p, err
-	}
-
-	if len(w) > 3 {
-		v, err := strconv.Atoi(w[3])
-		if err != nil {
-			return p, err
-		}
-		p.start = (v > 0)
-	}
-
-	p.name = w[0]
-
-	return p, nil
+	return fmt.Errorf("unsupported profile name %s", name)
 }

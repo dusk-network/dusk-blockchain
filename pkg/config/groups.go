@@ -47,12 +47,12 @@ type walletConfiguration struct {
 }
 
 // pprof configs
-type profConfiguration struct {
-	Address string
-
-	// string is in form of "type, interval, duration, startFlag"
-	// see also utils/diagnostics/ProfileSet
-	Profile []string
+// See also utils/diagnostics/ProfileSet
+type profileConfiguration struct {
+	Name     string
+	Interval uint
+	Duration uint
+	Start    bool
 }
 
 // pkg/rpc package configs
