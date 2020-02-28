@@ -63,9 +63,8 @@ func TestPingLoop(t *testing.T) {
 func TestMalformedFrame(t *testing.T) {
 
 	fn := func() {
-		peer, r, w, _ := dummyReader()
-		defer r.Close()
-		defer w.Close()
+		peer, _, w, _ := dummyReader()
+		defer peer.Close()
 
 		// Run the non-recover readLoop to watch for panics
 		go peer.readLoop()
@@ -103,7 +102,6 @@ func dummyReader() (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer) {
 	rpcbus := rpcbus.New()
 	d := dupemap.NewDupeMap(0)
 	r, w := net.Pipe()
-	keepAliveTime = 30 * time.Second
 
 	respChan := make(chan *bytes.Buffer, 10)
 	g := processing.NewGossip(protocol.TestNet)
