@@ -96,6 +96,37 @@ func TestMalformedFrame(t *testing.T) {
 	assert.NotPanics(t, fn)
 }
 
+func TestZeroLength(t *testing.T) {
+
+	fn := func() {
+		peer, _, w, _ := dummyReader()
+		defer peer.Close()
+
+		// Run the non-recover readLoop to watch for panics
+		go peer.readLoop()
+
+		time.Sleep(time.Second)
+
+		// Construct an invalid frame
+		frame := new(bytes.Buffer)
+		// Add 0 length (any value smaller than 4)
+		if err := encoding.WriteUint64LE(frame, 0); err != nil {
+			t.Error(err)
+		}
+
+		// Add correct magic value
+		mBuf := protocol.TestNet.ToBuffer()
+		if _, err := frame.Write(mBuf.Bytes()); err != nil {
+			t.Error(err)
+		}
+
+		_, _ = w.Write(frame.Bytes())
+		time.Sleep(1 * time.Second)
+	}
+
+	assert.NotPanics(t, fn)
+}
+
 func dummyReader() (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer) {
 
 	bus := eventbus.New()

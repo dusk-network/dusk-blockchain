@@ -3,6 +3,7 @@ package processing
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
@@ -46,5 +47,13 @@ func (g *Gossip) UnpackLength(r io.Reader) (uint64, error) {
 		return 0, errors.New("magic mismatch")
 	}
 
-	return packetLength - uint64(magic.Len()), nil
+	// If packetLength is less than magic.Len(), ln is close to MaxUint64
+	// due to integer overflow
+	ln := packetLength - uint64(magic.Len())
+
+	if ln > MaxFrameSize {
+		return 0, fmt.Errorf("invalid packet length %d", packetLength)
+	}
+
+	return ln, nil
 }
