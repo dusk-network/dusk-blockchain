@@ -93,6 +93,15 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 	// Map stateKey to chain state (tip)
 	t.batch[stateInd][toKey(stateKey)] = b.Header.Hash
 
+	// Remove expired bid values
+	for k := range t.db.storage[bidValuesInd] {
+		heightBytes := k[9:]
+		height := binary.LittleEndian.Uint64(heightBytes)
+		if height < b.Header.Height {
+			delete(t.db.storage[bidValuesInd], k)
+		}
+	}
+
 	return nil
 }
 
@@ -322,8 +331,19 @@ func (t *transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
 }
 
 func (t *transaction) FetchBidValues() ([]byte, []byte, error) {
-	bidKey := toKey([]byte("bidvalues"))
-	return t.db.storage[bidValuesInd][bidKey][0:32], t.db.storage[bidValuesInd][bidKey][32:64], nil
+	// Get bid values with lowest expiry height
+	lowestSeen := uint64(1<<64 - 1)
+	var values []byte
+	for k, v := range t.db.storage[bidValuesInd] {
+		heightBytes := k[9:]
+		height := binary.LittleEndian.Uint64(heightBytes)
+		if height < lowestSeen {
+			lowestSeen = height
+			values = v
+		}
+	}
+
+	return values[0:32], values[32:], nil
 }
 
 // FetchBlockHeightSince uses binary search to find a block height
