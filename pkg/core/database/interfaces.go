@@ -101,8 +101,8 @@ type Transaction interface {
 	// on its own.
 	StoreBidValues([]byte, []byte, uint64) error
 
-	// FetchBidValues retrieves the last stored D and K values from
-	// the database.
+	// FetchBidValues retrieves the D and K values with the lowest
+	// expiry height from the database.
 	FetchBidValues() ([]byte, []byte, error)
 
 	// FetchBlockHeightSince try to find height of a block generated around
