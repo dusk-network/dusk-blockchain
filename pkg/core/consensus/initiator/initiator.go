@@ -83,7 +83,7 @@ func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *walle
 
 			if bytes.Equal(bid.M, m.Bytes()) {
 				err := db.Update(func(t database.Transaction) error {
-					return t.StoreBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes())
+					return t.StoreBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes(), bid.Lock)
 				})
 				if err != nil {
 					log.Panic(err)

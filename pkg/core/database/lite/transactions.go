@@ -307,8 +307,16 @@ func (t *transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t *transaction) StoreBidValues(d, k []byte) error {
-	bidKey := toKey([]byte("bidvalues"))
+func (t *transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
+	currentHeight, err := t.FetchCurrentHeight()
+	if err != nil {
+		return err
+	}
+
+	heightBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
+	key := append([]byte("bidvalues"), heightBytes...)
+	bidKey := toKey(key)
 	t.batch[bidValuesInd][bidKey] = append(d, k...)
 	return nil
 }
