@@ -1,7 +1,6 @@
 package eventbus
 
 import (
-	"sync"
 	"time"
 
 	lg "github.com/sirupsen/logrus"
@@ -23,7 +22,6 @@ type (
 
 	// EventBus - box for listeners and callbacks.
 	EventBus struct {
-		busLock         sync.RWMutex
 		listeners       *listenerMap
 		defaultListener *multiListener
 	}
@@ -32,7 +30,6 @@ type (
 // New returns new EventBus with empty listeners.
 func New() *EventBus {
 	return &EventBus{
-		busLock:         sync.RWMutex{},
 		listeners:       newListenerMap(),
 		defaultListener: newMultiListener(),
 	}
