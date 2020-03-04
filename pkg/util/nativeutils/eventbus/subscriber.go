@@ -13,8 +13,6 @@ type Subscriber interface {
 
 // Subscribe subscribes to a topic with a channel.
 func (bus *EventBus) Subscribe(topic topics.Topic, listener Listener) uint32 {
-	bus.busLock.Lock()
-	defer bus.busLock.Unlock()
 	return bus.listeners.Store(topic, listener)
 }
 
