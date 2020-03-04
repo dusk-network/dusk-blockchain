@@ -197,6 +197,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Delete expired bid values
 	key = BidValuesPrefix
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
+	defer iterator.Release()
 
 	for iterator.Next() {
 		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
@@ -567,6 +568,7 @@ func (t transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
 func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	key := BidValuesPrefix
 	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
+	defer iterator.Release()
 
 	// Let's always return the bid values with the lowest height as
 	// those are most likely to be valid.
