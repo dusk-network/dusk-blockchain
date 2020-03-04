@@ -200,6 +200,19 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	defer iterator.Release()
 
 	for iterator.Next() {
+		if len(iterator.Key()) != 9 {
+			// Malformed key found, however we should not abort the entire
+			// operation just because of it.
+			log.WithFields(log.Fields{
+				"process": "database",
+				"key":     iterator.Key(),
+			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
+			// Let's remove it though, so that we don't keep logging errors
+			// for the same entry.
+			t.batch.Delete(iterator.Key())
+			continue
+		}
+
 		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
 		if height < b.Header.Height {
 			t.batch.Delete(iterator.Key())
@@ -575,6 +588,16 @@ func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	lowestSeen := uint64(1<<64 - 1)
 	var value []byte
 	for iterator.Next() {
+		if len(iterator.Key()) != 9 {
+			// Malformed key found, however we should not abort the entire
+			// operation just because of it.
+			log.WithFields(log.Fields{
+				"process": "database",
+				"key":     iterator.Key(),
+			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
+			continue
+		}
+
 		// height is the last 8 bytes
 		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
 
