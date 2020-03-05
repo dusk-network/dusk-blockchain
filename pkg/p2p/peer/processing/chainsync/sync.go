@@ -99,7 +99,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 			return err
 		}
 
-		msg := message.New(topics.Block, buf)
+		msg := message.New(topics.Block, blk)
 		s.publisher.Publish(topics.Block, msg)
 	}
 
