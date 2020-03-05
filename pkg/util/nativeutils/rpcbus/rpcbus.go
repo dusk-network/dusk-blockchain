@@ -124,13 +124,12 @@ func (bus *RPCBus) getReqChan(t topics.Topic) (chan<- Request, error) {
 	return nil, ErrMethodNotExists
 }
 
-// Close all open channels
 func (bus *RPCBus) Close() {
 	bus.mu.Lock()
-	defer bus.mu.Unlock()
-	for _, m := range bus.registry {
-		close(m)
-	}
 
+	// Channels should be closed only by the goroutines/components
+	// that make them
 	bus.registry = nil
+
+	bus.mu.Unlock()
 }
