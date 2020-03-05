@@ -129,7 +129,9 @@ func (bus *RPCBus) Close() {
 
 	// Channels should be closed only by the goroutines/components
 	// that make them
-	bus.registry = nil
+
+	// Reset registry
+	bus.registry = make(map[topics.Topic]chan<- Request)
 
 	bus.mu.Unlock()
 }
