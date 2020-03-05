@@ -95,7 +95,7 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 			return err
 		}
 
-		if err := message.UnmarshalBlock(buf, blk); err != nil {
+		if err := message.UnmarshalBlock(buf, &blk); err != nil {
 			return err
 		}
 
@@ -106,18 +106,13 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 	return nil
 }
 
-func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
-	req := rpcbus.NewRequest(bytes.Buffer{})
-	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req, 2*time.Second)
+func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
+	req := rpcbus.NewRequest(nil)
+	resp, err := s.rpcBus.Call(topics.GetLastBlock, req, 2*time.Second)
 	if err != nil {
-		return nil, err
+		return block.Block{}, err
 	}
-
-	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&blkBuf, blk); err != nil {
-		return nil, err
-	}
-
+	blk := resp.(block.Block)
 	return blk, nil
 }
 

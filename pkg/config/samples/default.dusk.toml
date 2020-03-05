@@ -65,21 +65,20 @@ preallocTxs = 100
 # To disable topics.Mempool handling, set it to 0
 maxInvItems = 10000
 
-# RPC API service
+# gRPC API service
 [rpc]
 
 # network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
-network="tcp"
+network="unix"
 # in case the network is unix, 
 # address must be a path to a unix socket (e.g /tmp/file.sock)
 # in case the network is tcp*,
 # address must be in form of a IP address (e.g 127.0.0.1:9000)
-address="127.0.0.1:9000"
-# enable rpc service
-enabled=true
-user="default"
-pass="default"
-cert=""
+address="/tmp/dusk-grpc.sock"
+#enabled=true
+#user="default"
+#pass="default"
+#cert=""
 
 # GraphQL API service
 [gql]

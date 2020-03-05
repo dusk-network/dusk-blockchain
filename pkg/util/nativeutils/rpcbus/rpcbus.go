@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
 var (
@@ -26,21 +28,25 @@ var (
 // "chan chan" technique.
 type RPCBus struct {
 	mu       sync.RWMutex
-	registry map[method]chan<- Request
+	registry map[topics.Topic]chan<- Request
 }
 
 type Request struct {
-	Params   bytes.Buffer
+	Params   interface{}
 	RespChan chan Response
 }
 
 type Response struct {
-	Resp bytes.Buffer
+	Resp interface{}
 	Err  error
 }
 
+func EmptyRequest() Request {
+	return NewRequest(bytes.Buffer{})
+}
+
 // NewRequest builds a new request with params
-func NewRequest(p bytes.Buffer) Request {
+func NewRequest(p interface{}) Request {
 	return Request{
 		Params:   p,
 		RespChan: make(chan Response, 1),
@@ -49,31 +55,31 @@ func NewRequest(p bytes.Buffer) Request {
 
 func New() *RPCBus {
 	return &RPCBus{
-		registry: make(map[method]chan<- Request),
+		registry: make(map[topics.Topic]chan<- Request),
 	}
 }
 
 // Register registers a method and binds it to a handler channel. methodName
 // must be unique per node instance. if not, returns err
-func (bus *RPCBus) Register(m method, req chan<- Request) error {
+func (bus *RPCBus) Register(t topics.Topic, req chan<- Request) error {
 	bus.mu.Lock()
 	defer bus.mu.Unlock()
 	if req == nil {
 		return ErrInvalidRequestChan
 	}
 
-	if _, ok := bus.registry[m]; ok {
+	if _, ok := bus.registry[t]; ok {
 		return ErrMethodExists
 	}
 
-	bus.registry[m] = req
+	bus.registry[t] = req
 	return nil
 }
 
 // Call runs a long-polling technique to request from the method Consumer to
 // run the corresponding procedure and return a result or timeout
-func (bus *RPCBus) Call(m method, req Request, timeOut time.Duration) (bytes.Buffer, error) {
-	reqChan, err := bus.getReqChan(m)
+func (bus *RPCBus) Call(t topics.Topic, req Request, timeOut time.Duration) (interface{}, error) {
+	reqChan, err := bus.getReqChan(t)
 	if err != nil {
 		return bytes.Buffer{}, err
 	}
@@ -85,7 +91,7 @@ func (bus *RPCBus) Call(m method, req Request, timeOut time.Duration) (bytes.Buf
 	return bus.callNoTimeout(reqChan, req)
 }
 
-func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time.Duration) (bytes.Buffer, error) {
+func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time.Duration) (interface{}, error) {
 	select {
 	case reqChan <- req:
 	case <-time.After(timeOut):
@@ -102,16 +108,16 @@ func (bus *RPCBus) callTimeout(reqChan chan<- Request, req Request, timeOut time
 	return resp.Resp, resp.Err
 }
 
-func (bus *RPCBus) callNoTimeout(reqChan chan<- Request, req Request) (bytes.Buffer, error) {
+func (bus *RPCBus) callNoTimeout(reqChan chan<- Request, req Request) (interface{}, error) {
 	reqChan <- req
 	resp := <-req.RespChan
 	return resp.Resp, resp.Err
 }
 
-func (bus *RPCBus) getReqChan(m method) (chan<- Request, error) {
+func (bus *RPCBus) getReqChan(t topics.Topic) (chan<- Request, error) {
 	bus.mu.RLock()
 	defer bus.mu.RUnlock()
-	if reqChan, ok := bus.registry[m]; ok {
+	if reqChan, ok := bus.registry[t]; ok {
 		return reqChan, nil
 	}
 

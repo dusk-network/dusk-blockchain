@@ -1,7 +1,6 @@
 package maintainer_test
 
 import (
-	"bytes"
 	"os"
 	"testing"
 	"time"
@@ -14,11 +13,11 @@ import (
 	litedb "github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/transactor"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
@@ -141,7 +140,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	// Note: we don't need to mock the bidlist as we should not be included if we want to trigger a bid transaction
 
 	c := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.SendMempoolTx, c)
+	rpcBus.Register(topics.SendMempoolTx, c)
 
 	return bus, c, p, w.ConsensusKeys(), mScalar
 }
@@ -150,21 +149,15 @@ func receiveTxs(t *testing.T, c chan rpcbus.Request) []transactions.Transaction 
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		r := <-c
-		tx, err := message.UnmarshalTx(&r.Params)
-		assert.NoError(t, err)
+		tx := r.Params.(transactions.Transaction)
 		txs = append(txs, tx)
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		r.RespChan <- rpcbus.Response{nil, nil}
 	}
 
 	return txs
 }
 
 func createWallet(rpcBus *rpcbus.RPCBus, password string) error {
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, password); err != nil {
-		return err
-	}
-
-	_, err := rpcBus.Call(rpcbus.CreateWallet, rpcbus.NewRequest(*buf), 0)
+	_, err := rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(&node.CreateRequest{Password: password}), 0)
 	return err
 }

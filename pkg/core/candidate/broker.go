@@ -42,7 +42,7 @@ type Broker struct {
 func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.GetCandidate, getCandidateChan)
+	rpcBus.Register(topics.GetCandidate, getCandidateChan)
 	bestScoreChan := make(chan message.Message, 1)
 	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 
@@ -108,29 +108,26 @@ func (b *Broker) filterWinningCandidates() {
 // TODO: interface - rpcBus encoding will be removed
 func (b *Broker) provideCandidate(r rpcbus.Request) {
 	b.lock.RLock()
-	cm, ok := b.queue[string(r.Params.Bytes())]
+	params := r.Params.(bytes.Buffer)
+	cm, ok := b.queue[string(params.Bytes())]
 	b.lock.RUnlock()
 	if ok {
-		buf := new(bytes.Buffer)
-		err := message.MarshalCandidate(buf, cm)
-		r.RespChan <- rpcbus.Response{*buf, err}
+		r.RespChan <- rpcbus.Response{cm, nil}
 		return
 	}
 
-	cm = b.store.fetchCandidateMessage(r.Params.Bytes())
+	cm = b.store.fetchCandidateMessage(params.Bytes())
 	if cm.Block == nil {
 		// If we don't have the candidate message, we should ask the network for it.
 		var err error
-		cm, err = b.requestCandidate(r.Params.Bytes())
+		cm, err = b.requestCandidate(params.Bytes())
 		if err != nil {
-			r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+			r.RespChan <- rpcbus.Response{nil, err}
 			return
 		}
 	}
 
-	buf := new(bytes.Buffer)
-	err := message.MarshalCandidate(buf, cm)
-	r.RespChan <- rpcbus.Response{*buf, err}
+	r.RespChan <- rpcbus.Response{cm, nil}
 }
 
 // requestCandidate from peers around this node. The candidate can only be

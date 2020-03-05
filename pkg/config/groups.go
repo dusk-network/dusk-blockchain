@@ -61,9 +61,9 @@ type profConfiguration struct {
 type rpcConfiguration struct {
 	Network string
 	Address string
-	Enabled bool
-	User    string
-	Pass    string
+	// Enabled bool
+	// User    string
+	// Pass    string
 }
 
 type gqlConfiguration struct {
