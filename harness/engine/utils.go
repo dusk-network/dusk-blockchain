@@ -50,7 +50,7 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	}
 
 	targetNode := n.Nodes[nodeIndex]
-	addr := "http://127.0.0.1:" + targetNode.Cfg.Gql.Port
+	addr := "http://" + targetNode.Cfg.Gql.Address
 
 	buf := bytes.Buffer{}
 	if _, err := buf.Write([]byte(query)); err != nil {

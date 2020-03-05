@@ -17,7 +17,7 @@ func Profile1(index int, node *DuskNode, walletPath string) {
 	viper.Reset()
 	viper.Set("general.network", "testnet")
 	viper.Set("logger.output", node.Dir+"/dusk")
-	viper.Set("gql.port", node.Cfg.Gql.Port)
+	viper.Set("gql.address", node.Cfg.Gql.Address)
 	viper.Set("gql.enabled", "true")
 	viper.Set("rpc.network", node.Cfg.RPC.Network)
 	viper.Set("rpc.address", node.Cfg.RPC.Address)
