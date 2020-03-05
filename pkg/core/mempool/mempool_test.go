@@ -398,13 +398,8 @@ func TestMempoolView(t *testing.T) {
 
 	for _, tx := range txs {
 		c.addTx(tx)
-		// We send it over the RPCBus to ensure synchronous processing
-		buf := new(bytes.Buffer)
-		if err := message.MarshalTx(buf, tx); err != nil {
-			t.Fatal(err)
-		}
 
-		c.rpcBus.Call(rpcbus.SendMempoolTx, rpcbus.NewRequest(*buf), 5*time.Second)
+		c.rpcBus.Call(topics.SendMempoolTx, rpcbus.NewRequest(tx), 5*time.Second)
 	}
 
 	// First, let's just get the entire view
