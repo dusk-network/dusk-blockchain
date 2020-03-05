@@ -126,7 +126,7 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
 	for i := 0; ; i++ {
 		// make sure we wrap around the provisioners array
-		if i >= len(p.Members) {
+		if i >= len(p.Set) {
 			i = 0
 		}
 
