@@ -37,12 +37,7 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	if err != nil {
 		log.Panic(err)
 	}
-	lastBlkBuf := resp.(bytes.Buffer)
-
-	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&lastBlkBuf, blk); err != nil {
-		log.Panic(err)
-	}
+	blk := resp.(block.Block)
 
 	if blk.Header.Height == 0 {
 		msg := message.New(topics.Initialization, bytes.Buffer{})
