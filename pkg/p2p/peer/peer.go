@@ -242,7 +242,7 @@ func (p *Reader) readLoop() {
 		// Refresh the read deadline
 		err := p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
 		if err != nil {
-			l.WithError(err).Warnf("write timeout err: %v", err)
+			l.WithError(err).Warnf("error setting read timeout")
 		}
 
 		b, err := p.ReadMessage()
