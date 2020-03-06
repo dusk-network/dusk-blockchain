@@ -2,6 +2,7 @@ package responding
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
@@ -79,6 +80,11 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 
 // Determine a peer's height from his locator hash.
 func (b *BlockHashBroker) fetchLocatorHeight(msg *peermsg.GetBlocks) (uint64, error) {
+
+	if len(msg.Locators) == 0 {
+		return 0, errors.New("empty locators array")
+	}
+
 	var height uint64
 	err := b.db.View(func(t database.Transaction) error {
 		header, err := t.FetchBlockHeader(msg.Locators[0])
