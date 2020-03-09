@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
@@ -22,12 +23,17 @@ func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
 	if err != nil {
 		return err
 	}
-	candidateBytes := resp.(bytes.Buffer)
+	cm := resp.(message.Candidate)
 
-	if err := topics.Prepend(&candidateBytes, topics.Candidate); err != nil {
+	candidateBytes := new(bytes.Buffer)
+	if err := message.MarshalCandidate(candidateBytes, cm); err != nil {
 		return err
 	}
 
-	c.responseChan <- &candidateBytes
+	if err := topics.Prepend(candidateBytes, topics.Candidate); err != nil {
+		return err
+	}
+
+	c.responseChan <- candidateBytes
 	return nil
 }
