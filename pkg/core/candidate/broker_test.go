@@ -55,19 +55,15 @@ func TestValidHashes(t *testing.T) {
 	eb.Publish(topics.BestScore, msg3)
 
 	// Broker should now be able to provide us with `blk`
-	blkBuf, err := rb.Call(rpcbus.GetCandidate, rpcbus.Request{*bytes.NewBuffer(blk.Header.Hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := rb.Call(topics.GetCandidate, rpcbus.Request{*bytes.NewBuffer(blk.Header.Hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
+	cm = resp.(message.Candidate)
 
-	decoded := block.NewBlock()
-	if err := message.UnmarshalBlock(&blkBuf, decoded); err != nil {
-		t.Fatal(err)
-	}
-
-	assert.True(t, blk.Equals(decoded))
+	assert.True(t, blk.Equals(cm.Block))
 
 	// When requesting blk2, we should get an error.
-	_, err = rb.Call(rpcbus.GetCandidate, rpcbus.Request{*bytes.NewBuffer(blk2.Header.Hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
+	_, err = rb.Call(topics.GetCandidate, rpcbus.Request{*bytes.NewBuffer(blk2.Header.Hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
 	assert.Equal(t, "request timeout", err.Error())
 }

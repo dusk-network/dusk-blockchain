@@ -18,10 +18,11 @@ func NewCandidateBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buffer
 }
 
 func (c *CandidateBroker) ProvideCandidate(m *bytes.Buffer) error {
-	candidateBytes, err := c.rpcBus.Call(rpcbus.GetCandidate, rpcbus.Request{*m, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.Request{*m, make(chan rpcbus.Response, 1)}, 5*time.Second)
 	if err != nil {
 		return err
 	}
+	candidateBytes := resp.(bytes.Buffer)
 
 	if err := topics.Prepend(&candidateBytes, topics.Candidate); err != nil {
 		return err

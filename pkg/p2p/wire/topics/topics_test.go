@@ -39,3 +39,17 @@ func TestTopicRepr(t *testing.T) {
 		assert.Equal(t, tt.topic, topic)
 	}
 }
+
+func TestCheckConsistency(t *testing.T) {
+	tpcs := make([]topicBuf, 0)
+	tpcs = append(tpcs, Topics[0])
+	tpcs = append(tpcs, Topics[1])
+
+	// consistency check should not trigger if the order of topicBuf array is
+	// consistent with that of Topic enum
+	assert.NotPanics(t, func() { checkConsistency(tpcs) })
+
+	// skipping an index will result in a panic
+	tpcs = append(tpcs, Topics[3])
+	assert.Panics(t, func() { checkConsistency(tpcs) })
+}

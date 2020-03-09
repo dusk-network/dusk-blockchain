@@ -112,10 +112,11 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	// Create candidate message
-	certBuf, err := bg.rpcBus.Call(rpcbus.GetLastCertificate, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), 5*time.Second)
 	if err != nil {
 		return err
 	}
+	certBuf := resp.(bytes.Buffer)
 
 	cert := block.EmptyCertificate()
 	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
@@ -200,26 +201,13 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 			return nil, err
 		}
 
-		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
+		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.
 		if err != nil {
 			return nil, err
 		}
-
-		lTxs, err := encoding.ReadVarInt(&r)
-		if err != nil {
-			return nil, err
-		}
-
-		for i := uint64(0); i < lTxs; i++ {
-			tx, err := message.UnmarshalTx(&r)
-			if err != nil {
-				return nil, err
-			}
-
-			txs = append(txs, tx)
-		}
+		txs = resp.([]transactions.Transaction)
 	}
 
 	// TODO Append Provisioners rewards

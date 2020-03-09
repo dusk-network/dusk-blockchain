@@ -53,7 +53,13 @@ func TestSupervisor(t *testing.T) {
 	// testing that we can receive messages
 	msg := message.New(topics.AcceptedBlock, *testBlk)
 	eb.Publish(topics.AcceptedBlock, msg)
-	result := <-msgChan
+	var result map[string]interface{}
+	for {
+		result = <-msgChan
+		if result["code"] == "round" {
+			break
+		}
+	}
 
 	assert.Equal(t, "monitor", result["process"])
 	assert.Equal(t, float64(23), result["round"])

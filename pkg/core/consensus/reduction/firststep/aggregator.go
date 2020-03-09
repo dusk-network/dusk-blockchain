@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	log "github.com/sirupsen/logrus"
@@ -103,7 +104,7 @@ func (a *aggregator) addBitSet(sv *message.StepVotes, cluster sortedset.Cluster,
 func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 	// Fetch the candidate block first.
 	req := rpcbus.NewRequest(*bytes.NewBuffer(blockHash))
-	blkBuf, err := rpcBus.Call(rpcbus.GetCandidate, req, 5*time.Second)
+	resp, err := rpcBus.Call(topics.GetCandidate, req, 5*time.Second)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"process": "reduction",
@@ -111,12 +112,13 @@ func verifyCandidateBlock(rpcBus *rpcbus.RPCBus, blockHash []byte) error {
 		}).Errorln("fetching the candidate block failed")
 		return err
 	}
+	cm := resp.(message.Candidate)
 
 	// If our result was not a zero value hash, we should first verify it
 	// before voting on it again
 	if !bytes.Equal(blockHash, emptyHash[:]) {
-		req := rpcbus.NewRequest(blkBuf)
-		if _, err := rpcBus.Call(rpcbus.VerifyCandidateBlock, req, 5*time.Second); err != nil {
+		req := rpcbus.NewRequest(cm)
+		if _, err := rpcBus.Call(topics.VerifyCandidateBlock, req, 5*time.Second); err != nil {
 			log.WithFields(log.Fields{
 				"process": "reduction",
 				"error":   err,

@@ -33,10 +33,11 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus
-	lastBlkBuf, err := rpcBus.Call(rpcbus.GetLastBlock, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0)
+	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.EmptyRequest(), 0)
 	if err != nil {
 		log.Panic(err)
 	}
+	lastBlkBuf := resp.(bytes.Buffer)
 
 	blk := block.NewBlock()
 	if err := message.UnmarshalBlock(&lastBlkBuf, blk); err != nil {

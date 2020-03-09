@@ -5,16 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	"math/big"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
-	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
 	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -223,28 +219,4 @@ func (t *Transactor) Balance() (uint64, uint64, error) {
 
 func (t *Transactor) Address() (string, error) {
 	return t.w.PublicAddress()
-}
-
-func (t *Transactor) getMempool() ([]transactions.Transaction, error) {
-	buf := new(bytes.Buffer)
-	r, err := t.rb.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	lTxs, err := encoding.ReadVarInt(&r)
-	if err != nil {
-		return nil, err
-	}
-
-	mempoolTxs := make([]transactions.Transaction, lTxs)
-	for i := uint64(0); i < lTxs; i++ {
-		tx, err := message.UnmarshalTx(&r)
-		if err != nil {
-			return nil, err
-		}
-		mempoolTxs[i] = tx
-	}
-
-	return mempoolTxs, nil
 }

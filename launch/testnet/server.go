@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
+	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 
@@ -18,7 +19,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
 	log "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -26,12 +26,13 @@ import (
 
 // Server is the main process of the node
 type Server struct {
-	eventBus *eventbus.EventBus
-	rpcBus   *rpcbus.RPCBus
-	chain    *chain.Chain
-	dupeMap  *dupemap.DupeMap
-	counter  *chainsync.Counter
-	gossip   *processing.Gossip
+	eventBus   *eventbus.EventBus
+	rpcBus     *rpcbus.RPCBus
+	chain      *chain.Chain
+	dupeMap    *dupemap.DupeMap
+	counter    *chainsync.Counter
+	gossip     *processing.Gossip
+	rpcWrapper *rpc.RPCSrvWrapper
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
@@ -67,15 +68,20 @@ func Setup() *Server {
 	dupeBlacklist := launchDupeMap(eventBus)
 
 	// Instantiate RPC server
-	if cfg.Get().RPC.Enabled {
-		rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus, rpc.Commands)
-		if err != nil {
-			log.Errorf("RPC http server error: %s", err.Error())
-		}
+	// if cfg.Get().RPC.Enabled {
+	// 	rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus, rpc.Commands)
+	// 	if err != nil {
+	// 		log.Errorf("RPC http server error: %s", err.Error())
+	// 	}
 
-		if err := rpcServ.Start(); err != nil {
-			log.Errorf("RPC failed to start: %s", err.Error())
-		}
+	// 	if err := rpcServ.Start(); err != nil {
+	// 		log.Errorf("RPC failed to start: %s", err.Error())
+	// 	}
+	// }
+
+	rpcWrapper, err := rpc.StartgRPCServer(rpcBus)
+	if err != nil {
+		log.WithError(err).Errorln("could not start gRPC server")
 	}
 
 	// Instantiate GraphQL server
@@ -92,12 +98,13 @@ func Setup() *Server {
 
 	// creating the Server
 	srv := &Server{
-		eventBus: eventBus,
-		rpcBus:   rpcBus,
-		chain:    chain,
-		dupeMap:  dupeBlacklist,
-		counter:  counter,
-		gossip:   processing.NewGossip(protocol.TestNet),
+		eventBus:   eventBus,
+		rpcBus:     rpcBus,
+		chain:      chain,
+		dupeMap:    dupeBlacklist,
+		counter:    counter,
+		gossip:     processing.NewGossip(protocol.TestNet),
+		rpcWrapper: rpcWrapper,
 	}
 
 	// Setting up the transactor component
@@ -182,4 +189,5 @@ func (s *Server) Close() {
 	// TODO: disconnect peers
 	s.chain.Close()
 	s.rpcBus.Close()
+	s.rpcWrapper.Shutdown()
 }

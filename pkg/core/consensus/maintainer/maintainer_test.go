@@ -128,8 +128,8 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan struct{}, *user
 func startFakeTransactor(rb *rpcbus.RPCBus, txChan chan struct{}) chan struct{} {
 	exitChan := make(chan struct{}, 1)
 	c := make(chan rpcbus.Request, 10)
-	rb.Register(rpcbus.SendBidTx, c)
-	rb.Register(rpcbus.SendStakeTx, c)
+	rb.Register(topics.SendBidTx, c)
+	rb.Register(topics.SendStakeTx, c)
 
 	go func(c chan rpcbus.Request, exitChan chan struct{}) {
 		for {

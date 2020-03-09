@@ -2,7 +2,6 @@ package peer_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"io"
 	"net"
 	"testing"
@@ -39,17 +38,6 @@ var receiveFn = func(c net.Conn) {
 func TestReader(t *testing.T) {
 	g := processing.NewGossip(protocol.TestNet)
 	client, srv := net.Pipe()
-	go func() {
-		msg := makeAgreementGossip(10)
-		buf, err := message.Marshal(msg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := g.Process(&buf); err != nil {
-			t.Fatal(err)
-		}
-		client.Write(buf.Bytes())
-	}()
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
@@ -61,6 +49,18 @@ func TestReader(t *testing.T) {
 	eb.Subscribe(topics.Agreement, l)
 
 	go peerReader.Listen(eb, dupemap.NewDupeMap(0), rpcBus, chainsync.NewCounter(eb), nil, protocol.FullNode, 30*time.Second)
+
+	go func() {
+		msg := makeAgreementGossip(10)
+		buf, err := message.Marshal(msg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := g.Process(&buf); err != nil {
+			t.Fatal(err)
+		}
+		client.Write(buf.Bytes())
+	}()
 
 	// We should get the message through this channel
 	<-agreementChan
@@ -288,17 +288,12 @@ func BenchmarkWriter(b *testing.B) {
 
 func respondToGetLastBlock(rb *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
-	rb.Register(rpcbus.GetLastBlock, c)
+	rb.Register(topics.GetLastBlock, c)
 
 	go func(c chan rpcbus.Request) {
 		r := <-c
-
-		blob, err := hex.DecodeString(config.TestNetGenesisBlob)
-		if err != nil {
-			panic(err)
-		}
-
-		r.RespChan <- rpcbus.Response{*bytes.NewBuffer(blob), nil}
+		blk := config.DecodeGenesis()
+		r.RespChan <- rpcbus.Response{*blk, nil}
 	}(c)
 }
 

@@ -87,10 +87,15 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 		return nil
 	}
 
+	// Does the block come directly after our most recent one?
 	if diff == 1 {
-		// Write bufio.Reader into a bytes.Buffer so we can send it over the event bus.
+		// Write bufio.Reader into a bytes.Buffer and unmarshal it so we can send it over the event bus.
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r); err != nil {
+			return err
+		}
+
+		if err := message.UnmarshalBlock(buf, &blk); err != nil {
 			return err
 		}
 
@@ -101,18 +106,13 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 	return nil
 }
 
-func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
-	req := rpcbus.NewRequest(bytes.Buffer{})
-	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req, 2*time.Second)
+func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
+	//req := rpcbus.NewRequest(nil) // TODO check if this is an empty request
+	resp, err := s.rpcBus.Call(topics.GetLastBlock, rpcbus.EmptyRequest(), 2*time.Second)
 	if err != nil {
-		return nil, err
+		return block.Block{}, err
 	}
-
-	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&blkBuf, blk); err != nil {
-		return nil, err
-	}
-
+	blk := resp.(block.Block)
 	return blk, nil
 }
 

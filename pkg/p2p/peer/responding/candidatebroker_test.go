@@ -7,6 +7,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
@@ -41,14 +42,15 @@ func provideCandidate(rb *rpcbus.RPCBus, correctHash []byte) chan struct{} {
 	quitChan := make(chan struct{}, 1)
 	reqChan := make(chan rpcbus.Request, 1)
 
-	rb.Register(rpcbus.GetCandidate, reqChan)
+	rb.Register(topics.GetCandidate, reqChan)
 
 	go func(reqChan chan rpcbus.Request, quitChan chan struct{}, correctHash []byte) {
 		for {
 			select {
 			case r := <-reqChan:
+				params := r.Params.(bytes.Buffer)
 				hash := make([]byte, 32)
-				if err := encoding.Read256(&r.Params, hash); err != nil {
+				if err := encoding.Read256(&params, hash); err != nil {
 					panic(err)
 				}
 

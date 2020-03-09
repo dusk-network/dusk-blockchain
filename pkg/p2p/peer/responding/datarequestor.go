@@ -7,8 +7,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -125,24 +123,11 @@ func GetMempoolTxs(bus *rpcbus.RPCBus, txID []byte) ([]transactions.Transaction,
 
 	buf := new(bytes.Buffer)
 	buf.Write(txID)
-	r, err := bus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
+	resp, err := bus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(*buf), 3*time.Second)
 	if err != nil {
 		return nil, err
 	}
-
-	lTxs, err := encoding.ReadVarInt(&r)
-	if err != nil {
-		return nil, err
-	}
-
-	mempoolTxs := make([]transactions.Transaction, lTxs)
-	for i := uint64(0); i < lTxs; i++ {
-		tx, err := message.UnmarshalTx(&r)
-		if err != nil {
-			return nil, err
-		}
-		mempoolTxs[i] = tx
-	}
+	mempoolTxs := resp.([]transactions.Transaction)
 
 	return mempoolTxs, nil
 }
