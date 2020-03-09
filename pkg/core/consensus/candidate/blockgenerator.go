@@ -185,10 +185,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 	txs := make([]transactions.Transaction, 0)
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx, err := constructCoinbaseTx(bg.genPubKey, proof, score)
-	if err != nil {
-		return nil, err
-	}
+	coinbaseTx := constructCoinbaseTx(bg.genPubKey, proof, score)
 
 	txs = append(txs, coinbaseTx)
 
@@ -207,7 +204,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 		if err != nil {
 			return nil, err
 		}
-		txs = resp.([]transactions.Transaction)
+		txs = append(txs, resp.([]transactions.Transaction)...)
 	}
 
 	// TODO Append Provisioners rewards
@@ -216,7 +213,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) (*transactions.Coinbase, error) {
+func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) *transactions.Coinbase {
 	// The rewards for both the Generator and the Provisioners are disclosed.
 	// Provisioner reward addresses do not require obfuscation
 	// The Generator address rewards do.
@@ -242,5 +239,5 @@ func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []by
 	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
 	// This could be achieved with a request to dusk-wallet/v2
 
-	return tx, nil
+	return tx
 }
