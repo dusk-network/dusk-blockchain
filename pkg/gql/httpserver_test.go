@@ -42,7 +42,7 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	// Unblock test if no response sent for N seconds
 	go func() {
-		time.Sleep(5 * time.Second)
+		time.Sleep(7 * time.Second)
 		response <- "no response"
 	}()
 
@@ -63,6 +63,10 @@ func TestWebsocketEndpoint(t *testing.T) {
 	expMsg, err := notifications.MarshalBlockMsg(*blk)
 	if err != nil {
 		t.Errorf("marshalling failed")
+	}
+
+	if message == "no response" {
+		t.Fatalf("no response received")
 	}
 
 	if expMsg != message {
@@ -89,7 +93,7 @@ func setupServer(t *testing.T, addr string) (*Server, *eventbus.EventBus) {
 	}
 
 	s.Start()
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	return s, eb
 }
