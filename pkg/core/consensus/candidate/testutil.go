@@ -121,6 +121,8 @@ func (h *Helper) ProvideTransactions(t *testing.T) {
 	go func(reqChan chan rpcbus.Request) {
 		r := <-reqChan
 		txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
+		// Remove coinbase
+		txs = txs[1:]
 		r.RespChan <- rpcbus.Response{txs, nil}
 	}(reqChan)
 }
