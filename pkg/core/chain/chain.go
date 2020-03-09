@@ -633,33 +633,22 @@ func (c *Chain) requestRoundResults(round uint64) (*block.Block, *block.Certific
 		case <-timer.C:
 			return nil, nil, errors.New("request timeout")
 		case m := <-roundResultsChan:
-			blk := block.NewBlock()
-			b := m.Payload().(bytes.Buffer)
-			if err := message.UnmarshalBlock(&b, blk); err != nil {
-				// Prevent a malicious node from cutting us off by
-				// sending garbled data
-				continue
-			}
-
-			cert := block.EmptyCertificate()
-			if err := message.UnmarshalCertificate(&b, cert); err != nil {
-				continue
-			}
+			cm := m.Payload().(message.Candidate)
 
 			// Check block and certificate for correctness
-			if err := verifiers.CheckBlock(c.db, c.prevBlock, *blk); err != nil {
+			if err := verifiers.CheckBlock(c.db, c.prevBlock, *cm.Block); err != nil {
 				continue
 			}
 
 			// Certificate needs to be on a block to be verified.
 			// Since this certificate is supposed to be for the
 			// intermediate block, we can just put it on there.
-			blk.Header.Certificate = cert
-			if err := verifiers.CheckBlockCertificate(*c.p, *blk); err != nil {
+			cm.Block.Header.Certificate = cm.Certificate
+			if err := verifiers.CheckBlockCertificate(*c.p, *cm.Block); err != nil {
 				continue
 			}
 
-			return blk, cert, nil
+			return cm.Block, cm.Certificate, nil
 		}
 	}
 }
