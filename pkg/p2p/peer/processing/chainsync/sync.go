@@ -61,22 +61,22 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 		s.publishHighestSeen(height)
 	}
 
-	blk, err := s.getLastBlock()
+	lastBlk, err := s.getLastBlock()
 	if err != nil {
 		return err
 	}
 
-	log.WithField("our height", blk.Header.Height).WithField("received block height", height).Debugln("block received")
+	log.WithField("our height", lastBlk.Header.Height).WithField("received block height", height).Debugln("block received")
 	// Only ask for missing blocks if we are not currently syncing, to prevent
 	// asking many peers for (generally) the same blocks.
-	diff := compareHeights(blk.Header.Height, height)
+	diff := compareHeights(lastBlk.Header.Height, height)
 	if !s.IsSyncing() && diff > 1 {
 
-		hash := base64.StdEncoding.EncodeToString(blk.Header.Hash)
+		hash := base64.StdEncoding.EncodeToString(lastBlk.Header.Hash)
 		log.Debugf("Start syncing from %s", peerInfo)
-		log.Debugf("Local tip: height %d [%s]", blk.Header.Height, hash)
+		log.Debugf("Local tip: height %d [%s]", lastBlk.Header.Height, hash)
 
-		msg := createGetBlocksMsg(blk.Header.Hash)
+		msg := createGetBlocksMsg(lastBlk.Header.Hash)
 		buf, err := marshalGetBlocks(msg)
 		if err != nil {
 			return err
@@ -95,11 +95,12 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 			return err
 		}
 
-		if err := message.UnmarshalBlock(buf, &blk); err != nil {
+		blk := block.NewBlock()
+		if err := message.UnmarshalBlock(buf, blk); err != nil {
 			return err
 		}
 
-		msg := message.New(topics.Block, blk)
+		msg := message.New(topics.Block, *blk)
 		s.publisher.Publish(topics.Block, msg)
 	}
 
