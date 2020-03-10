@@ -142,11 +142,15 @@ func (s *Selector) CollectGeneration(packet consensus.InternalPacket) error {
 func (s *Selector) startSelection() {
 	// Empty queue in a goroutine to avoid letting other listeners wait
 	go s.eventPlayer.Play(s.scoreID)
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	s.timer.start(s.timeout)
 }
 
 // IncreaseTimeOut increases the timeout after a failed selection
 func (s *Selector) IncreaseTimeOut() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.timeout = s.timeout * 2
 }
 

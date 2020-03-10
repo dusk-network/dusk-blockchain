@@ -2,6 +2,7 @@ package score
 
 import (
 	"errors"
+	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -41,6 +42,7 @@ type Generator struct {
 	seed      []byte
 	d, k      ristretto.Scalar
 	key.ConsensusKeys
+	lock      sync.RWMutex
 	threshold *consensus.Threshold
 
 	signer       consensus.Signer
@@ -132,12 +134,18 @@ func (g *Generator) Prove(seed []byte, bidList user.BidList) zkproof.ZkProof {
 }
 
 func (g *Generator) Collect(e consensus.InternalPacket) error {
-	defer g.threshold.Lower()
+	defer func() {
+		g.lock.Lock()
+		defer g.lock.Unlock()
+		g.threshold.Lower()
+	}()
 	return g.generateScore()
 }
 
 func (g *Generator) generateScore() error {
 	proof := g.Prove(g.seed, g.roundInfo.BidList)
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	if g.threshold.Exceeds(proof.Score) {
 		return errors.New("proof score is below threshold")
 	}
