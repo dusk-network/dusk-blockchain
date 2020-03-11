@@ -572,13 +572,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 		// back and catch up later.
 		return
 	}
-	candidateBuf := resp.(bytes.Buffer)
-
-	cm := message.NewCandidate()
-	if err := message.UnmarshalCandidate(&candidateBuf, cm); err != nil {
-		log.WithError(err).Warnln("could not decode candidate message")
-		return
-	}
+	cm := resp.(message.Candidate)
 
 	if c.intermediateBlock == nil {
 		// If we're missing the intermediate block, we will also fall

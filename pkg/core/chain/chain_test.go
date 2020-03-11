@@ -160,14 +160,10 @@ func TestReturnOnNilIntermediateBlock(t *testing.T) {
 func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 	c := make(chan rpcbus.Request, 1)
 	rpc.Register(topics.GetCandidate, c)
-	buf := new(bytes.Buffer)
-	if err := message.MarshalCandidate(buf, cm); err != nil {
-		panic(err)
-	}
 
 	go func() {
 		r := <-c
-		r.RespChan <- rpcbus.Response{*buf, nil}
+		r.RespChan <- rpcbus.Response{cm, nil}
 	}()
 }
 
