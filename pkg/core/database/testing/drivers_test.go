@@ -10,8 +10,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb"
 
 	// Import here any supported drivers to verify if they are fully compliant
@@ -826,6 +828,54 @@ func TestFetchDecoys(test *testing.T) {
 	if hits != numDecoys {
 		test.Fatalf("incorrect amount of hits - %v/%v", hits, numDecoys)
 	}
+}
+
+func TestStoreFetchBidValues(test *testing.T) {
+	test.Parallel()
+
+	d1, _ := crypto.RandEntropy(32)
+	k1, _ := crypto.RandEntropy(32)
+	d2, _ := crypto.RandEntropy(32)
+	k2, _ := crypto.RandEntropy(32)
+
+	// Store bid values at different heights
+	assert.NoError(test, db.Update(func(t database.Transaction) error {
+		if err := t.StoreBidValues(d1, k1, 1000); err != nil {
+			return err
+		}
+
+		return t.StoreBidValues(d2, k2, 2000)
+	}))
+
+	// Fetching bid values should give us d1 and k1 right now
+	assert.NoError(test, db.View(func(t database.Transaction) error {
+		d, k, err := t.FetchBidValues()
+		if err != nil {
+			return err
+		}
+
+		assert.Equal(test, d1, d)
+		assert.Equal(test, k1, k)
+		return nil
+	}))
+
+	// Update state to after 1000
+	blk := helper.RandomBlock(test, 1200, 1)
+	assert.NoError(test, db.Update(func(t database.Transaction) error {
+		return t.StoreBlock(blk)
+	}))
+
+	// Fetching bid values now should give us d2 and k2
+	assert.NoError(test, db.View(func(t database.Transaction) error {
+		d, k, err := t.FetchBidValues()
+		if err != nil {
+			return err
+		}
+
+		assert.Equal(test, d2, d)
+		assert.Equal(test, k2, k)
+		return nil
+	}))
 }
 
 // _TestPersistence tries to ensure if driver provides persistence storage.

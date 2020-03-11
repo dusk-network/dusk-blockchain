@@ -194,7 +194,32 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	value = b.Header.Hash
 	t.put(key, value)
 
-	return nil
+	// Delete expired bid values
+	key = BidValuesPrefix
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
+	defer iterator.Release()
+
+	for iterator.Next() {
+		if len(iterator.Key()) != 9 {
+			// Malformed key found, however we should not abort the entire
+			// operation just because of it.
+			log.WithFields(log.Fields{
+				"process": "database",
+				"key":     iterator.Key(),
+			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
+			// Let's remove it though, so that we don't keep logging errors
+			// for the same entry.
+			t.batch.Delete(iterator.Key())
+			continue
+		}
+
+		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
+		if height < b.Header.Height {
+			t.batch.Delete(iterator.Key())
+		}
+	}
+
+	return iterator.Error()
 }
 
 // Commit writes a batch to LevelDB storage. See also fsyncEnabled variable
@@ -536,25 +561,53 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t transaction) StoreBidValues(d, k []byte) error {
+func (t transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
 	// First, delete the old values (if any)
-	key := BidValuesPrefix
-	exists, err := t.snapshot.Has(key, nil)
-	if exists && err == nil {
-		t.batch.Delete(key)
-	}
+	heightBytes := make([]byte, 8)
+	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
 		return err
 	}
 
+	// NOTE: this expiry height is not accurate, and is just an
+	// approximation. On average, it will vary only a few blocks, but
+	// we can not know beforehand when a bid transaction is accepted.
+	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
+	key := append(BidValuesPrefix, heightBytes...)
 	t.put(key, append(d, k...))
 	return nil
 }
 
 func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	key := BidValuesPrefix
-	value, err := t.snapshot.Get(key, nil)
-	if err != nil {
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
+	defer iterator.Release()
+
+	// Let's always return the bid values with the lowest height as
+	// those are most likely to be valid.
+	lowestSeen := uint64(1<<64 - 1)
+	var value []byte
+	for iterator.Next() {
+		if len(iterator.Key()) != 9 {
+			// Malformed key found, however we should not abort the entire
+			// operation just because of it.
+			log.WithFields(log.Fields{
+				"process": "database",
+				"key":     iterator.Key(),
+			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
+			continue
+		}
+
+		// height is the last 8 bytes
+		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
+
+		if height < lowestSeen {
+			lowestSeen = height
+			value = iterator.Value()
+		}
+	}
+
+	if err := iterator.Error(); err != nil {
 		return nil, nil, err
 	}
 

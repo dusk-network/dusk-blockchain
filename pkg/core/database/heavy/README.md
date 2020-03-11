@@ -28,3 +28,9 @@ Table notation
 - TxID - a calculated hash of transaction
 - \'+' operation - denotes concatenation of byte arrays
 - Tx.Encode() - Encoded binary form of all Tx fields without TxID
+
+### K/V storage schema to store block generator bid values
+
+| Prefix | KEY | VALUE | Count | Used by |
+| :----: | :-: | :--:  | :---: | :-----: |
+| 0x08   | ExpiryHeight | D + K | 1 per bidding transaction made by user | FetchBidValues |

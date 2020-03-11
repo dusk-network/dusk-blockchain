@@ -390,6 +390,6 @@ func (t *Transactor) writeBidValues(tx transactions.Transaction) error {
 			return err
 		}
 
-		return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes())
+		return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes(), tx.LockTime())
 	})
 }

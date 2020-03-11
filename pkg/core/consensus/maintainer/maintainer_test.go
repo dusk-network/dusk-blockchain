@@ -108,7 +108,14 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	bus := eventbus.New()
 	rpcBus := rpcbus.New()
 
-	tr, err := transactor.New(bus, rpcBus, nil, nil, wallet.GenerateDecoys, wallet.GenerateInputs, true)
+	_, db := lite.CreateDBConnection()
+	// Ensure we have a genesis block
+	genesisBlock := cfg.DecodeGenesis()
+	assert.NoError(t, db.Update(func(t litedb.Transaction) error {
+		return t.StoreBlock(genesisBlock)
+	}))
+
+	tr, err := transactor.New(bus, rpcBus, db, nil, wallet.GenerateDecoys, wallet.GenerateInputs, true)
 	if err != nil {
 		panic(err)
 	}
@@ -121,13 +128,6 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 
 	w, err := tr.Wallet()
 	assert.NoError(t, err)
-
-	_, db := lite.CreateDBConnection()
-	// Ensure we have a genesis block
-	genesisBlock := cfg.DecodeGenesis()
-	assert.NoError(t, db.Update(func(t litedb.Transaction) error {
-		return t.StoreBlock(genesisBlock)
-	}))
 
 	k, err := w.ReconstructK()
 	assert.NoError(t, err)
