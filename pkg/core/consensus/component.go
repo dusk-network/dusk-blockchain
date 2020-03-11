@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -89,13 +90,14 @@ type SimpleListener struct {
 	callback func(InternalPacket) error
 	id       uint32
 	priority Priority
+	lock     sync.RWMutex
 	paused   bool
 }
 
 // NewSimpleListener creates a SimpleListener
 func NewSimpleListener(callback func(InternalPacket) error, priority Priority, paused bool) Listener {
 	id := rand.Uint32()
-	return &SimpleListener{callback, id, priority, paused}
+	return &SimpleListener{callback, id, priority, sync.RWMutex{}, paused}
 }
 
 // NotifyPayload triggers the callback specified during instantiation
@@ -114,14 +116,20 @@ func (s *SimpleListener) Priority() Priority {
 }
 
 func (s *SimpleListener) Paused() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	return s.paused
 }
 
 func (s *SimpleListener) Pause() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.paused = true
 }
 
 func (s *SimpleListener) Resume() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.paused = false
 }
 
@@ -136,7 +144,7 @@ type FilteringListener struct {
 // NewFilteringListener creates a FilteringListener
 func NewFilteringListener(callback func(InternalPacket) error, filter func(header.Header) bool, priority Priority, paused bool) Listener {
 	id := rand.Uint32()
-	return &FilteringListener{&SimpleListener{callback, id, priority, paused}, filter}
+	return &FilteringListener{&SimpleListener{callback, id, priority, sync.RWMutex{}, paused}, filter}
 }
 
 // NotifyPayload uses the filtering function to let only relevant events through

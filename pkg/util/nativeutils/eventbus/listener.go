@@ -132,18 +132,24 @@ func newMultiListener() *multiListener {
 	}
 }
 
+func (m *multiListener) Add(topic topics.Topic) {
+	m.RWMutex.Lock()
+	defer m.RWMutex.Unlock()
+	m.Set.Add([]byte{byte(topic)})
+}
+
 func (m *multiListener) Forward(topic topics.Topic, msg message.Message) {
+	m.RLock()
+	defer m.RUnlock()
 	if !m.Has([]byte{byte(topic)}) {
 		return
 	}
 
-	m.RLock()
 	for _, dispatcher := range m.dispatchers {
 		if err := dispatcher.Notify(msg); err != nil {
 			logEB.WithError(err).WithField("type", "multilistener").Warnln("notifying subscriber failed")
 		}
 	}
-	m.RUnlock()
 }
 
 func (m *multiListener) Store(value Listener) uint32 {
@@ -152,8 +158,8 @@ func (m *multiListener) Store(value Listener) uint32 {
 		id:       rand.Uint32(),
 	}
 	m.Lock()
+	defer m.Unlock()
 	m.dispatchers = append(m.dispatchers, h)
-	m.Unlock()
 	return h.id
 }
 
