@@ -79,8 +79,17 @@ func TestRemoveStake(t *testing.T) {
 	p, _ := consensus.MockProvisioners(10)
 
 	// Let's add two stakes which are not yet active to one of the provisioners.
-	p.MemberAt(2).AddStake(user.Stake{500, 1000, 10000})
-	p.MemberAt(2).AddStake(user.Stake{500, 1000, 10000})
+	m, err := p.MemberAt(2)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	m.AddStake(user.Stake{500, 1000, 10000})
+
+	m, err = p.MemberAt(2)
+	if !assert.NoError(t, err) {
+		t.FailNow()
+	}
+	m.AddStake(user.Stake{500, 1000, 10000})
 
 	// Now, extract a committee for round 1 step 1
 	assert.NotPanics(t, func() { p.CreateVotingCommittee(1, 1, 10) })

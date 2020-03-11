@@ -124,13 +124,17 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a hexadecimal string.
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
+	var m *Member
+	var e error
 	for i := 0; ; i++ {
-		// make sure we wrap around the provisioners array
-		if i >= len(p.Set) {
-			i = 0
+		if m, e = p.MemberAt(i); e != nil {
+			// handling the eventuality of an out of bound error
+			m, e = p.MemberAt(0)
+			if e != nil {
+				log.Panic(e)
+			}
 		}
 
-		m := p.MemberAt(i)
 		stake, err := p.GetStake(m.PublicKeyBLS)
 		if err != nil {
 			// If we get an error from GetStake, it means we either got a public key of a

@@ -49,7 +49,10 @@ func TestMemberAt(t *testing.T) {
 	sort.Sort(ks)
 
 	for i := 0; i < nr; i++ {
-		m := p.MemberAt(i)
+		m, err := p.MemberAt(i)
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
 		assert.True(t, bytes.Equal(m.PublicKeyBLS, ks[i].BLSPubKeyBytes))
 	}
 }
