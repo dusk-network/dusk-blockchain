@@ -383,7 +383,7 @@ func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, err
 	if len(filterTxID) == 32 {
 		tx := m.verified.Get(filterTxID)
 		if tx == nil {
-			return nil, errors.New("tx not found")
+			return outputTxs, nil
 		}
 
 		outputTxs = append(outputTxs, tx)
