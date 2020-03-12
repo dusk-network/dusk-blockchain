@@ -89,6 +89,8 @@ const (
 	IsWalletLoaded
 	RebuildChain
 	ClearWalletDatabase
+	StartProfile
+	StopProfile
 
 	// Cross-network RPCBus topics
 	GetRoundResults
@@ -165,6 +167,8 @@ var Topics = [...]topicBuf{
 	topicBuf{IsWalletLoaded, *(bytes.NewBuffer([]byte{byte(IsWalletLoaded)})), "iswalletloaded"},
 	topicBuf{RebuildChain, *(bytes.NewBuffer([]byte{byte(RebuildChain)})), "rebuildchain"},
 	topicBuf{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
+	topicBuf{StartProfile, *(bytes.NewBuffer([]byte{byte(StartProfile)})), "startprofile"},
+	topicBuf{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
 	topicBuf{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
 }

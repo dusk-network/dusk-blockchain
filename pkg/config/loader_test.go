@@ -156,6 +156,15 @@ func TestSecondaryRegistry(t *testing.T) {
 	if r2.Custom.Key != "value" {
 		t.Errorf("Invalid Custom Key value: %s", r2.Custom.Key)
 	}
+
+	if Get().Profile[0].Name != "heap" {
+		t.Errorf("Invalid Profile [0]: %s", Get().Profile[0].Name)
+	}
+
+	if Get().Profile[1].Name != "cpu" {
+		t.Errorf("Invalid Profile [1]: %s", Get().Profile[1].Name)
+	}
+
 }
 
 func Reset() {

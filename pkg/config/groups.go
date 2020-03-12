@@ -47,14 +47,12 @@ type walletConfiguration struct {
 }
 
 // pprof configs
-type profConfiguration struct {
-	Address string
-
-	// enables CPU profiling for the current process.
-	// While profiling, the profile will be buffered and written to CPUProf file.
-	CPUFile string
-	// Write mem profile to the specified file
-	MemFile string
+// See also utils/diagnostics/ProfileSet
+type profileConfiguration struct {
+	Name     string
+	Interval uint
+	Duration uint
+	Start    bool
 }
 
 // pkg/rpc package configs

@@ -42,17 +42,19 @@ type Registry struct {
 	Base
 
 	// All configuration groups
-	General     generalConfiguration
-	Database    databaseConfiguration
-	Wallet      walletConfiguration
-	Network     networkConfiguration
-	Logger      loggerConfiguration
-	Prof        profConfiguration
-	RPC         rpcConfiguration
+	General   generalConfiguration
+	Database  databaseConfiguration
+	Wallet    walletConfiguration
+	Network   networkConfiguration
+	Mempool   mempoolConfiguration
+	Consensus consensusConfiguration
+
+	RPC rpcConfiguration
+	Gql gqlConfiguration
+
 	Performance performanceConfiguration
-	Mempool     mempoolConfiguration
-	Consensus   consensusConfiguration
-	Gql         gqlConfiguration
+	Logger      loggerConfiguration
+	Profile     []profileConfiguration
 }
 
 // Load makes an attempt to read and unmarshal any configs from flag, env and

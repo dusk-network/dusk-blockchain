@@ -50,6 +50,8 @@ func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
 	return wrapper, nil
 }
 
+// TODO: add profiling methods here?
+
 func (n *nodeServer) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
 	txs, err := n.rpcBus.Call(topics.GetMempoolView, rpcbus.NewRequest(req), 5*time.Second)
 	if err != nil {

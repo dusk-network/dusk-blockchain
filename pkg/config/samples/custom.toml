@@ -6,3 +6,9 @@ walletonly = false
 
 [custom]
 key = "value"
+
+[[profile]]
+name = "heap"
+
+[[profile]]
+name = "cpu"
