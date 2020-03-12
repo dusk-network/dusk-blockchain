@@ -65,30 +65,44 @@ preallocTxs = 100
 # To disable topics.Mempool handling, set it to 0
 maxInvItems = 10000
 
-# RPC API service
+# gRPC API service
 [rpc]
 
 # network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
-network="tcp"
+network="unix"
 # in case the network is unix, 
 # address must be a path to a unix socket (e.g /tmp/file.sock)
 # in case the network is tcp*,
 # address must be in form of a IP address (e.g 127.0.0.1:9000)
-address="127.0.0.1:9000"
-# enable rpc service
-enabled=true
-user="default"
-pass="default"
-cert=""
+address="/tmp/dusk-grpc.sock"
+#enabled=true
+#user="default"
+#pass="default"
+#cert=""
 
 # GraphQL API service
 [gql]
 # enable graphql service
 enabled=true
-user=""
-pass=""
-cert=""
-port=9001
+address="127.0.0.1:9001"
+
+# enable/disable both HTTPS and WSS
+enableTLS = false
+# cert file path
+certFile = ""
+# key file path
+keyFile = ""
+
+# maximum requests per second 
+# uniqueness of a request is based on: 
+# Remote IP, Request method and path
+maxRequestLimit = 20
+
+[gql.notification]
+# Number of pub/sub brokers to broadcast new blocks. 
+# 0 brokersNum disables notifications system
+brokersNum = 0
+clientsPerBroker = 1000
 
 [[profile]]
 # An array of profiling tasks

@@ -34,17 +34,6 @@ var receiveFn = func(c net.Conn) {
 func TestReader(t *testing.T) {
 	g := processing.NewGossip(protocol.TestNet)
 	client, srv := net.Pipe()
-	go func() {
-		msg := makeAgreementGossip(10)
-		buf, err := message.Marshal(msg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := g.Process(&buf); err != nil {
-			t.Fatal(err)
-		}
-		client.Write(buf.Bytes())
-	}()
 
 	eb := eventbus.New()
 	rpcBus := rpcbus.New()
@@ -59,6 +48,18 @@ func TestReader(t *testing.T) {
 	eb.Subscribe(topics.Agreement, l)
 
 	go peerReader.ReadLoop()
+
+	go func() {
+		msg := makeAgreementGossip(10)
+		buf, err := message.Marshal(msg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := g.Process(&buf); err != nil {
+			t.Fatal(err)
+		}
+		client.Write(buf.Bytes())
+	}()
 
 	// We should get the message through this channel
 	<-agreementChan

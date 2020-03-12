@@ -54,17 +54,12 @@ func TestRequestCandidate(t *testing.T) {
 	// Fetch a candidate we don't have
 	genesis := config.DecodeGenesis()
 	go func() {
-		candidateBuf, err := rpc.Call(rpcbus.GetCandidate, rpcbus.Request{*bytes.NewBuffer(genesis.Header.Hash), make(chan rpcbus.Response, 1)}, 0)
+		resp, err := rpc.Call(topics.GetCandidate, rpcbus.Request{*bytes.NewBuffer(genesis.Header.Hash), make(chan rpcbus.Response, 1)}, 0)
 		if err != nil {
 			doneChan <- err
 			return
 		}
-
-		c := message.NewCandidate()
-		if err := message.UnmarshalCandidate(&candidateBuf, c); err != nil {
-			doneChan <- err
-			return
-		}
+		c := resp.(message.Candidate)
 
 		if !assert.True(t, c.Block.Equals(genesis)) {
 			var err error

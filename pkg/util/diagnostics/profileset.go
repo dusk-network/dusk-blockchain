@@ -35,8 +35,7 @@ func NewProfileSet() ProfileSet {
 
 func (s *ProfileSet) drop(name string) {
 
-	item, ok := s.profiles[name]
-	if ok {
+	if item, ok := s.profiles[name]; ok {
 		close(item.quit)
 		delete(s.profiles, name)
 	}
@@ -52,18 +51,55 @@ func (ps *ProfileSet) Spawn(p Profile) error {
 		return errors.New("invalid settings")
 	}
 
-	_, ok := ps.profiles[p.name]
-	if !ok {
-		ps.profiles[p.name] = p
-		// Start profile lifecycle
-		go p.loop()
-
-	} else {
+	if _, ok := ps.profiles[p.name]; ok {
 		return errAlreadyStarted
 	}
 
+	ps.profiles[p.name] = p
+	// Start profile lifecycle
+	go p.loop()
 	return nil
 }
+
+/*
+var startProfile = func(s *Server, params []string) (string, error) {
+	var bufSettings bytes.Buffer
+	if len(params) > 1 {
+		bufSettings = *bytes.NewBufferString(params[0])
+	}
+
+	req := rpcbus.Request{
+		Params:   bufSettings,
+		RespChan: make(chan rpcbus.Response, 1),
+	}
+
+	txsBuf, err := s.rpcBus.Call(rpcbus.StartProfile, req, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return txsBuf.String(), nil
+}
+
+var stopProfile = func(s *Server, params []string) (string, error) {
+	var bufName bytes.Buffer
+	if len(params) > 1 {
+		bufName = *bytes.NewBufferString(params[0])
+	}
+
+	req := rpcbus.Request{
+		Params:   bufName,
+		RespChan: make(chan rpcbus.Response, 1),
+	}
+
+	txsBuf, err := s.rpcBus.Call(rpcbus.StopProfile, req, 2*time.Second)
+	if err != nil {
+		return "", err
+	}
+
+	return txsBuf.String(), nil
+}
+*/
 
 // Listen listens rpcbus commands to allow enabling/disabling
 // any profile in runtime (e.g via rpc)
@@ -71,13 +107,13 @@ func (s *ProfileSet) Listen(rpc *rpcbus.RPCBus) {
 
 	/*
 		startCmdChan := make(chan rpcbus.Request, 1)
-		if err := rpc.Register(rpcbus.StartProfile, startCmdChan); err != nil {
+		if err := rpc.Register(topics.StartProfile, startCmdChan); err != nil {
 			log.Error(err)
 			return
 		}
 
 		stopCmdChan := make(chan rpcbus.Request, 1)
-		if err := rpc.Register(rpcbus.StopProfile, stopCmdChan); err != nil {
+		if err := rpc.Register(topics.StopProfile, stopCmdChan); err != nil {
 			log.Error(err)
 			return
 		}

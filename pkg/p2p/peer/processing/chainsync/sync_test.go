@@ -10,6 +10,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,7 +64,10 @@ func TestSynchronizeSynced(t *testing.T) {
 	}
 
 	// The synchronizer should put this block on the blockChan
-	<-blockChan
+	msg := <-blockChan
+
+	// Payload should be of type block.Block
+	assert.NotPanics(t, func() { _ = msg.Payload().(block.Block) })
 }
 
 // Returns an encoded representation of a `helper.RandomBlock`.
@@ -91,7 +95,7 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.Ev
 // requests the last block.
 func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
 	g := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.GetLastBlock, g)
+	rpcBus.Register(topics.GetLastBlock, g)
 	r := <-g
-	r.RespChan <- rpcbus.Response{*randomBlockBuffer(t, 0, 1), nil}
+	r.RespChan <- rpcbus.Response{*helper.RandomBlock(t, 0, 1), nil}
 }

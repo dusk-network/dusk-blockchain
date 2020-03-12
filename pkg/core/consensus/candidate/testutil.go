@@ -7,7 +7,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
@@ -96,7 +95,7 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 
 func provideCertificate(rpcBus *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.GetLastCertificate, c)
+	rpcBus.Register(topics.GetLastCertificate, c)
 
 	go func(c chan rpcbus.Request) {
 		r := <-c
@@ -117,27 +116,14 @@ func (h *Helper) TriggerBlockGeneration() {
 // the blockgenerator, standing in place of the mempool.
 func (h *Helper) ProvideTransactions(t *testing.T) {
 	reqChan := make(chan rpcbus.Request, 1)
-	h.RBus.Register(rpcbus.GetMempoolTxsBySize, reqChan)
+	h.RBus.Register(topics.GetMempoolTxsBySize, reqChan)
 
 	go func(reqChan chan rpcbus.Request) {
 		r := <-reqChan
 		txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
-
-		// Cut off the coinbase
+		// Remove coinbase
 		txs = txs[1:]
-		// Encode and send
-		buf := new(bytes.Buffer)
-		if err := encoding.WriteVarInt(buf, uint64(len(txs))); err != nil {
-			panic(err)
-		}
-
-		for _, tx := range txs {
-			if err := message.MarshalTx(buf, tx); err != nil {
-				panic(err)
-			}
-		}
-
-		r.RespChan <- rpcbus.Response{*buf, nil}
+		r.RespChan <- rpcbus.Response{txs, nil}
 	}(reqChan)
 }
 

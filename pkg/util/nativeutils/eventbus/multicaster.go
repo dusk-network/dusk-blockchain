@@ -12,7 +12,7 @@ type Multicaster interface {
 
 // AddDefaultTopic adds a topic to the default multiListener
 func (bus *EventBus) AddDefaultTopic(topic topics.Topic) {
-	bus.defaultListener.Add([]byte{byte(topic)})
+	bus.defaultListener.Add(topic)
 }
 
 // SubscribeDefault subscribes a Listener to the default multiListener.

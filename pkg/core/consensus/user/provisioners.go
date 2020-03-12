@@ -2,6 +2,7 @@ package user
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -85,9 +86,12 @@ func (p Provisioners) SubsetSizeAt(round uint64) int {
 }
 
 // MemberAt returns the Member at a certain index.
-func (p Provisioners) MemberAt(i int) *Member {
+func (p Provisioners) MemberAt(i int) (*Member, error) {
+	if i > len(p.Set) {
+		return nil, errors.New("index out of bound")
+	}
 	bigI := p.Set[i]
-	return p.Members[string(bigI.Bytes())]
+	return p.Members[string(bigI.Bytes())], nil
 }
 
 // GetMember returns a member of the provisioners from its BLS public key.

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-const m = GetLastBlock
+const m = topics.GetLastBlock
 
 var errInvalidParams = errors.New("invalid params")
 
@@ -21,12 +23,13 @@ func TestRPCall(t *testing.T) {
 	buf.WriteString("input params")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(m, d, 10*time.Second)
+	resp, err := bus.Call(m, d, 10*time.Second)
 	if err != nil {
 		t.Error(err.Error())
 	}
+	result := resp.(bytes.Buffer)
 
-	if responseResult.String() != "output params" {
+	if result.String() != "output params" {
 		t.Errorf("expecting to retrieve response data")
 	}
 }
@@ -41,12 +44,13 @@ func TestRPCallWithError(t *testing.T) {
 	buf.WriteString("")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(m, d, 10*time.Second)
+	resp, err := bus.Call(m, d, 10*time.Second)
 	if err != errInvalidParams {
 		t.Errorf("expecting a specific error here but get %v", err)
 	}
+	result := resp.(bytes.Buffer)
 
-	if responseResult.String() != "" {
+	if result.String() != "" {
 		t.Errorf("expecting to empty response data")
 	}
 }
@@ -61,12 +65,13 @@ func TestTimeoutCalls(t *testing.T) {
 	buf.WriteString("input params")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(m, d, 1*time.Second)
+	resp, err := bus.Call(m, d, 1*time.Second)
 	if err != ErrRequestTimeout {
 		t.Errorf("expecting timeout error but get %v", err)
 	}
+	result := resp.(bytes.Buffer)
 
-	if responseResult.Len() > 0 {
+	if result.Len() > 0 {
 		t.Error("expecting empty result")
 	}
 }
@@ -94,11 +99,11 @@ func TestNonExistingMethod(t *testing.T) {
 	buf.WriteString("input params")
 
 	d := NewRequest(buf)
-	responseResult, err := bus.Call(0xff, d, 2*time.Second)
-
+	resp, err := bus.Call(0xff, d, 2*time.Second)
 	if err != ErrMethodNotExists {
 		t.Error("expecting methodNotExists error")
 	}
+	responseResult := resp.(bytes.Buffer)
 
 	if responseResult.Len() > 0 {
 		t.Error("expecting empty result")
@@ -120,7 +125,8 @@ func setupConsumer(rpcBus *RPCBus, respond bool) {
 
 	if respond {
 		r := <-reqChan
-		if r.Params.Len() == 0 {
+		params := r.Params.(bytes.Buffer)
+		if params.Len() == 0 {
 			r.RespChan <- Response{bytes.Buffer{}, errInvalidParams}
 			return
 		}

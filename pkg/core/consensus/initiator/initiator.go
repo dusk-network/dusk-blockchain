@@ -33,15 +33,11 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus
-	lastBlkBuf, err := rpcBus.Call(rpcbus.GetLastBlock, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0)
+	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0)
 	if err != nil {
 		log.Panic(err)
 	}
-
-	blk := block.NewBlock()
-	if err := message.UnmarshalBlock(&lastBlkBuf, blk); err != nil {
-		log.Panic(err)
-	}
+	blk := resp.(block.Block)
 
 	if blk.Header.Height == 0 {
 		msg := message.New(topics.Initialization, bytes.Buffer{})
@@ -83,7 +79,7 @@ func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *walle
 
 			if bytes.Equal(bid.M, m.Bytes()) {
 				err := db.Update(func(t database.Transaction) error {
-					return t.StoreBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes())
+					return t.StoreBidValues(bid.Outputs[0].Commitment.Bytes(), k.Bytes(), bid.Lock)
 				})
 				if err != nil {
 					log.Panic(err)

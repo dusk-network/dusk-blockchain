@@ -3,6 +3,7 @@ package selection
 import (
 	"bytes"
 	"errors"
+	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -20,6 +21,7 @@ type (
 		// Threshold number that a score needs to be greater than in order to be considered
 		// for selection. Messages with scores lower than this threshold should not be
 		// repropagated.
+		lock      sync.RWMutex
 		threshold *consensus.Threshold
 	}
 
@@ -41,10 +43,14 @@ func NewScoreHandler(bidList user.BidList) *ScoreHandler {
 }
 
 func (sh *ScoreHandler) ResetThreshold() {
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
 	sh.threshold.Reset()
 }
 
 func (sh *ScoreHandler) LowerThreshold() {
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
 	sh.threshold.Lower()
 }
 
@@ -55,6 +61,8 @@ func (sh *ScoreHandler) Priority(first, second message.Score) bool {
 
 func (sh *ScoreHandler) Verify(m message.Score) error {
 	// Check threshold
+	sh.lock.RLock()
+	defer sh.lock.RUnlock()
 	if sh.threshold.Exceeds(m.Score) {
 		return errors.New("threshold exceeds score")
 	}

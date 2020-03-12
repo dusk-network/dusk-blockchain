@@ -8,8 +8,10 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	log "github.com/sirupsen/logrus"
@@ -129,12 +131,9 @@ func (m *StakeAutomaton) sendBid() error {
 		"amount":   amount,
 		"locktime": lockTime,
 	}).Tracef("Sending bid tx")
-	buf := new(bytes.Buffer)
-	if err := rpcbus.MarshalConsensusTxRequest(buf, amount, lockTime); err != nil {
-		return err
-	}
 
-	_, err := m.rpcBus.Call(rpcbus.SendBidTx, rpcbus.NewRequest(*buf), 0)
+	req := &node.ConsensusTxRequest{Amount: amount, LockTime: lockTime}
+	_, err := m.rpcBus.Call(topics.SendBidTx, rpcbus.NewRequest(req), 0)
 	if err != nil {
 		return err
 	}
@@ -152,12 +151,9 @@ func (m *StakeAutomaton) sendStake() error {
 		"amount":   amount,
 		"locktime": lockTime,
 	}).Tracef("Sending stake tx")
-	buf := new(bytes.Buffer)
-	if err := rpcbus.MarshalConsensusTxRequest(buf, amount, lockTime); err != nil {
-		return err
-	}
 
-	_, err := m.rpcBus.Call(rpcbus.SendStakeTx, rpcbus.NewRequest(*buf), 0)
+	req := &node.ConsensusTxRequest{Amount: amount, LockTime: lockTime}
+	_, err := m.rpcBus.Call(topics.SendStakeTx, rpcbus.NewRequest(req), 0)
 	return err
 }
 

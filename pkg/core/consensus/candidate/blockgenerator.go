@@ -112,10 +112,11 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	}
 
 	// Create candidate message
-	certBuf, err := bg.rpcBus.Call(rpcbus.GetLastCertificate, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := bg.rpcBus.Call(topics.GetLastCertificate, rpcbus.EmptyRequest(), 5*time.Second)
 	if err != nil {
 		return err
 	}
+	certBuf := resp.(bytes.Buffer)
 
 	cert := block.EmptyCertificate()
 	if err := message.UnmarshalCertificate(&certBuf, cert); err != nil {
@@ -184,10 +185,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 	txs := make([]transactions.Transaction, 0)
 
 	// Construct and append coinbase Tx to reward the generator
-	coinbaseTx, err := constructCoinbaseTx(bg.genPubKey, proof, score)
-	if err != nil {
-		return nil, err
-	}
+	coinbaseTx := constructCoinbaseTx(bg.genPubKey, proof, score)
 
 	txs = append(txs, coinbaseTx)
 
@@ -200,26 +198,13 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 			return nil, err
 		}
 
-		r, err := bg.rpcBus.Call(rpcbus.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
+		resp, err := bg.rpcBus.Call(topics.GetMempoolTxsBySize, rpcbus.NewRequest(*param), 4*time.Second)
 		// TODO: GetVerifiedTxs should ensure once again that none of the txs have been
 		// already accepted in the chain.
 		if err != nil {
 			return nil, err
 		}
-
-		lTxs, err := encoding.ReadVarInt(&r)
-		if err != nil {
-			return nil, err
-		}
-
-		for i := uint64(0); i < lTxs; i++ {
-			tx, err := message.UnmarshalTx(&r)
-			if err != nil {
-				return nil, err
-			}
-
-			txs = append(txs, tx)
-		}
+		txs = append(txs, resp.([]transactions.Transaction)...)
 	}
 
 	// TODO Append Provisioners rewards
@@ -228,7 +213,7 @@ func (bg *Generator) ConstructBlockTxs(proof, score []byte) ([]transactions.Tran
 }
 
 // ConstructCoinbaseTx forges the transaction to reward the block generator.
-func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) (*transactions.Coinbase, error) {
+func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []byte) *transactions.Coinbase {
 	// The rewards for both the Generator and the Provisioners are disclosed.
 	// Provisioner reward addresses do not require obfuscation
 	// The Generator address rewards do.
@@ -254,5 +239,5 @@ func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []by
 	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
 	// This could be achieved with a request to dusk-wallet/v2
 
-	return tx, nil
+	return tx
 }
