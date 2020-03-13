@@ -30,6 +30,7 @@ type Broker struct {
 	lock        sync.RWMutex
 	queue       map[string]message.Candidate
 	validHashes map[string]struct{}
+	republished map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
 	candidateChan     <-chan message.Candidate
@@ -51,6 +52,7 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		store:             newStore(),
 		queue:             make(map[string]message.Candidate),
 		validHashes:       make(map[string]struct{}),
+		republished:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
 		getCandidateChan:  getCandidateChan,
@@ -77,6 +79,7 @@ func (b *Broker) Listen() {
 		case blk := <-b.acceptedBlockChan:
 			// accepted blocks come from the consensus
 			b.clearEligibleHashes()
+			b.clearRepublishedHashes()
 			b.Clear(blk.Header.Height)
 		case <-b.bestScoreChan:
 			b.filterWinningCandidates()
@@ -171,12 +174,13 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 
 func (b *Broker) Validate(m message.Message) error {
 	cm := m.Payload().(message.Candidate)
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-	if _, ok := b.queue[string(cm.Block.Header.Hash)]; ok {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	if _, ok := b.republished[string(cm.Block.Header.Hash)]; ok {
 		return republisher.DuplicatePayloadError
 	}
 
+	b.republished[string(cm.Block.Header.Hash)] = struct{}{}
 	return nil
 }
 
@@ -194,4 +198,12 @@ func (b *Broker) clearEligibleHashes() {
 		delete(b.validHashes, k)
 	}
 	b.lock.Unlock()
+}
+
+func (b *Broker) clearRepublishedHashes() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	for k := range b.republished {
+		delete(b.republished, k)
+	}
 }
