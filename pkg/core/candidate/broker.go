@@ -59,7 +59,7 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		bestScoreChan:     bestScoreChan,
 	}
 
-	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.addValidHash))
+	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
 	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
@@ -87,12 +87,6 @@ func (b *Broker) Listen() {
 			b.filterWinningCandidates()
 		}
 	}
-}
-
-func (b *Broker) AddValidHash(m message.Message) error {
-	score := m.Payload().(message.Score)
-	b.validHashes[string(score.VoteHash)] = struct{}{}
-	return nil
 }
 
 // Filter through the queue with the valid hashes, storing the Candidate
@@ -186,7 +180,7 @@ func (b *Broker) Validate(m message.Message) error {
 	return nil
 }
 
-func (b *Broker) addValidHash(m message.Message) error {
+func (b *Broker) AddValidHash(m message.Message) error {
 	s := m.Payload().(message.Score)
 	b.lock.Lock()
 	b.validHashes[string(s.VoteHash)] = struct{}{}
