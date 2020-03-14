@@ -78,8 +78,10 @@ func (b *Broker) Listen() {
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
 			// accepted blocks come from the consensus
+			b.lock.Lock()
 			b.clearEligibleHashes()
 			b.clearRepublishedHashes()
+			b.lock.Unlock()
 			b.Clear(blk.Header.Height)
 		case <-b.bestScoreChan:
 			b.filterWinningCandidates()
@@ -193,16 +195,12 @@ func (b *Broker) addValidHash(m message.Message) error {
 }
 
 func (b *Broker) clearEligibleHashes() {
-	b.lock.Lock()
 	for k := range b.validHashes {
 		delete(b.validHashes, k)
 	}
-	b.lock.Unlock()
 }
 
 func (b *Broker) clearRepublishedHashes() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
 	for k := range b.republished {
 		delete(b.republished, k)
 	}
