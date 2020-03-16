@@ -570,6 +570,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
+		log.WithError(err).Warnln("could not find winning candidate block")
 		return
 	}
 	cm := resp.(message.Candidate)
@@ -577,6 +578,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	if c.intermediateBlock == nil {
 		// If we're missing the intermediate block, we will also fall
 		// back and catch up later.
+		log.Warnln("intermediate block is missing")
 		return
 	}
 

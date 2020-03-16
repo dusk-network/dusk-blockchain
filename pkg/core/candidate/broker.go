@@ -30,6 +30,7 @@ type Broker struct {
 	lock        sync.RWMutex
 	queue       map[string]message.Candidate
 	validHashes map[string]struct{}
+	republished map[string]struct{}
 
 	acceptedBlockChan <-chan block.Block
 	candidateChan     <-chan message.Candidate
@@ -51,13 +52,14 @@ func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 		store:             newStore(),
 		queue:             make(map[string]message.Candidate),
 		validHashes:       make(map[string]struct{}),
+		republished:       make(map[string]struct{}),
 		acceptedBlockChan: acceptedBlockChan,
 		candidateChan:     initCandidateCollector(broker),
 		getCandidateChan:  getCandidateChan,
 		bestScoreChan:     bestScoreChan,
 	}
 
-	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.addValidHash))
+	broker.Subscribe(topics.ValidCandidateHash, eventbus.NewCallbackListener(b.AddValidHash))
 	b.republisher = republisher.New(broker, topics.Candidate, Validate, b.Validate)
 	return b
 }
@@ -76,18 +78,15 @@ func (b *Broker) Listen() {
 			b.provideCandidate(r)
 		case blk := <-b.acceptedBlockChan:
 			// accepted blocks come from the consensus
+			b.lock.Lock()
 			b.clearEligibleHashes()
+			b.clearRepublishedHashes()
+			b.lock.Unlock()
 			b.Clear(blk.Header.Height)
 		case <-b.bestScoreChan:
 			b.filterWinningCandidates()
 		}
 	}
-}
-
-func (b *Broker) AddValidHash(m message.Message) error {
-	score := m.Payload().(message.Score)
-	b.validHashes[string(score.VoteHash)] = struct{}{}
-	return nil
 }
 
 // Filter through the queue with the valid hashes, storing the Candidate
@@ -171,16 +170,17 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 
 func (b *Broker) Validate(m message.Message) error {
 	cm := m.Payload().(message.Candidate)
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-	if _, ok := b.queue[string(cm.Block.Header.Hash)]; ok {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	if _, ok := b.republished[string(cm.Block.Header.Hash)]; ok {
 		return republisher.DuplicatePayloadError
 	}
 
+	b.republished[string(cm.Block.Header.Hash)] = struct{}{}
 	return nil
 }
 
-func (b *Broker) addValidHash(m message.Message) error {
+func (b *Broker) AddValidHash(m message.Message) error {
 	s := m.Payload().(message.Score)
 	b.lock.Lock()
 	b.validHashes[string(s.VoteHash)] = struct{}{}
@@ -189,9 +189,13 @@ func (b *Broker) addValidHash(m message.Message) error {
 }
 
 func (b *Broker) clearEligibleHashes() {
-	b.lock.Lock()
 	for k := range b.validHashes {
 		delete(b.validHashes, k)
 	}
-	b.lock.Unlock()
+}
+
+func (b *Broker) clearRepublishedHashes() {
+	for k := range b.republished {
+		delete(b.republished, k)
+	}
 }

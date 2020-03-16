@@ -36,6 +36,8 @@ func (c *store) fetchCandidateMessage(hash []byte) message.Candidate {
 // Clear removes all candidate messages from or before a given round.
 // Returns the amount of messages deleted.
 func (c *store) Clear(round uint64) int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	deletedCount := 0
 	for h, m := range c.messages {
 		if m.Block.Header.Height <= round {
