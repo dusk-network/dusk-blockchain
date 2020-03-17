@@ -63,21 +63,14 @@ func Setup() *Server {
 	dupeBlacklist := launchDupeMap(eventBus)
 
 	// Instantiate RPC server
-	// if cfg.Get().RPC.Enabled {
-	// 	rpcServ, err := rpc.NewRPCServer(eventBus, rpcBus, rpc.Commands)
-	// 	if err != nil {
-	// 		log.Errorf("RPC http server error: %s", err.Error())
-	// 	}
-
-	// 	if err := rpcServ.Start(); err != nil {
-	// 		log.Errorf("RPC failed to start: %s", err.Error())
-	// 	}
-	// }
-
 	rpcWrapper, err := rpc.StartgRPCServer(rpcBus)
 	if err != nil {
 		log.WithError(err).Errorln("could not start gRPC server")
 	}
+
+	// Instantiate gRPC client
+	// TODO: get address from config
+	rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
