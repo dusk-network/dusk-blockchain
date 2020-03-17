@@ -37,6 +37,8 @@ github.com/dusk-network/dusk-crypto v0.1.1 h1:o9CIDb/YrcMAmGQVfdNfets0hJrIsEQbka
 github.com/dusk-network/dusk-crypto v0.1.1/go.mod h1:XEU09/mHLIAg9cS0m/6Hu2+wvJPxybfoXYSCrveHh3U=
 github.com/dusk-network/dusk-protobuf v0.0.0-20200218123426-a625ae2bcd3d h1:onnx4SCIxySLj3/8oRm4lgQJ0g7IFk2ypkzj3h65knM=
 github.com/dusk-network/dusk-protobuf v0.0.0-20200218123426-a625ae2bcd3d/go.mod h1:5ujn0G6+LD0vNpyM/vmY68aFwA1is8wYgyw4aGwAMAg=
+github.com/dusk-network/dusk-protobuf v0.0.0-20200316131725-414cb70e04f9 h1:reRBHduIzSCXNFLDaxA2gOIW4iuSNlodIjiLog1pK0E=
+github.com/dusk-network/dusk-protobuf v0.0.0-20200316131725-414cb70e04f9/go.mod h1:5ujn0G6+LD0vNpyM/vmY68aFwA1is8wYgyw4aGwAMAg=
 github.com/dusk-network/dusk-wallet/v2 v2.0.2 h1:t/nH//N6eUjfwh05im44ncx1Z+auLyTeieNtL3EvNzg=
 github.com/dusk-network/dusk-wallet/v2 v2.0.2/go.mod h1:iweGXUe9XLFWh04TgfBfUu4hkhp4WNsrPWPYt2AHNwY=
 github.com/dusk-network/dusk-zkproof v0.0.0-20190727103229-8b0c008561ee h1:etA5E8o7AM8hxSvMiqxxRIaQ5Ke7zWZRM65ZkqsnAVU=
