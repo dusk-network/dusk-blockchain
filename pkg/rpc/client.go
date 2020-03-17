@@ -3,12 +3,17 @@ package rpc
 import (
 	"context"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"gitlab.dusk.network/dusk-core/dusk-go/pkg/core/transactions"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/phoenix"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
+// Client is a wrapper for a gRPC client. It establishes connection with
+// the server on startup, and then handles requests from other components
+// over the RPCBus.
 type Client struct {
-	rusk.RuskClient
+	phoenix.RuskClient
 	validateSTChan chan rpcbus.Request
 	executeSTChan  chan rpcbus.Request
 }
@@ -26,7 +31,7 @@ func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) {
 		panic(err)
 	}
 
-	c := Client{RuskClient: rusk.NewRuskClient(conn)}
+	c := Client{RuskClient: phoenix.NewRuskClient(conn)}
 	if err := registerMethod(rpcBus, topics.ValidateStateTransition, c.validateSTChan); err != nil {
 		panic(err)
 	}
@@ -46,11 +51,9 @@ func (c Client) listen() {
 	for {
 		select {
 		case r := <-c.validateSTChan:
-			resp, err := c.ValidateStateTransition(context.Background(), &rusk.ValidateStateTransitionRequest{Txs: r.Params.([]transactions.Transaction)})
+			resp, err := c.ValidateStateTransition(context.Background(), &phoenix.ValidateStateTransitionRequest{Txs: r.Params.([]transactions.Transaction)})
 			r.RespChan <- rpcbus.Response{resp, err}
-		case r := <-c.executeSTChan:
-			resp, err := c.ExecuteStateTransition(context.Background(), &rusk.ExecuteStateTransition{Txs: r.Params.([]transactions.Transaction)})
-			r.RespChan <- rpcbus.Response{resp, err}
+			// TODO: add case for execute state transition
 		}
 	}
 }
