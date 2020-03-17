@@ -6,7 +6,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/phoenix"
-	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"google.golang.org/grpc"
 )
 
 // Client is a wrapper for a gRPC client. It establishes connection with
@@ -26,7 +26,7 @@ type Client struct {
 // this function will panic if the connection can not be established
 // successfully.
 func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) {
-	conn, err := grpc.Dial(address)
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		panic(err)
 	}
@@ -51,7 +51,7 @@ func (c Client) listen() {
 	for {
 		select {
 		case r := <-c.validateSTChan:
-			resp, err := c.ValidateStateTransition(context.Background(), &phoenix.ValidateStateTransitionRequest{Txs: r.Params.([]transactions.Transaction)})
+			resp, err := c.ValidateStateTransition(context.Background(), &phoenix.ValidateStateTransitionRequest{Txs: r.Params.([]*phoenix.Transaction)})
 			r.RespChan <- rpcbus.Response{resp, err}
 			// TODO: add case for execute state transition
 		}
