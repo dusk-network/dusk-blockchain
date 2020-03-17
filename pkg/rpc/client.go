@@ -26,25 +26,26 @@ type Client struct {
 // this function will panic if the connection can not be established
 // successfully.
 func InitRuskClient(address string, rpcBus *rpcbus.RPCBus) {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		panic(err)
 	}
 
 	c := Client{RuskClient: phoenix.NewRuskClient(conn)}
-	if err := registerMethod(rpcBus, topics.ValidateStateTransition, c.validateSTChan); err != nil {
+	if err := registerMethod(rpcBus, topics.ValidateStateTransition, &c.validateSTChan); err != nil {
 		panic(err)
 	}
-	if err := registerMethod(rpcBus, topics.ExecuteStateTransition, c.executeSTChan); err != nil {
+	if err := registerMethod(rpcBus, topics.ExecuteStateTransition, &c.executeSTChan); err != nil {
 		panic(err)
 	}
 
 	go c.listen()
 }
 
-func registerMethod(rpcBus *rpcbus.RPCBus, topic topics.Topic, c chan rpcbus.Request) error {
-	c = make(chan rpcbus.Request, 1)
-	return rpcBus.Register(topic, c)
+// re-usable function to register channels to RPCBus topics
+func registerMethod(rpcBus *rpcbus.RPCBus, topic topics.Topic, c *chan rpcbus.Request) error {
+	*c = make(chan rpcbus.Request, 1)
+	return rpcBus.Register(topic, *c)
 }
 
 func (c Client) listen() {
