@@ -12,15 +12,14 @@ A common structure of such test is:
 4. Perform checks to ensure proper state/result has been achieved
 
 
-###### Utilities to manipulate a running node
+##### Utilities to manipulate a running node
 
-- `engine.PublishTopic` - injects a message into the eventBus of a specified node
-- `engine.SendCommand` - sends a rpc command to a specified node for state-changing/data-mutation
-- `engine.SendWireMsg` - send a message to P2P layer of a specified node (pending)
+- `engine.*Cmd` - a set of gRPC calls to node gRPC server
+- `engine.PublishTopicCmd` - a gRPC call to inject a message into the eventBus (pending)
+- `engine.SendWireMsg` - send a message to P2P layer
 
-###### Utilities to monitor a running node 
+##### Utilities to monitor a running node 
 - `engine.SendQuery` - send graphql query to a specified node to fetch node data
-- `engine.GetMetrics` - send graphql query to a specified node to fetch node Performance metrics/stats (pending)
  
 
 #### Directory structure
@@ -34,7 +33,7 @@ node-9000  node-9001  node-9002  node-9003
 `Node directory` - a temporary folder that hosts all data relevant to the running node
 ```bash
 $ ls /tmp/localnet-429879163/node-9001/
-chain  dusk7001.log  dusk.toml  pipe-channel  walletDB
+chain  dusk7001.log  dusk-grpc.sock dusk.toml  pipe-channel  walletDB
 ``` 
 
 
