@@ -2,23 +2,27 @@ package grpc
 
 import (
 	"context"
-	"fmt"
+	"net"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/monitor"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	g "google.golang.org/grpc"
 )
 
 type Client struct {
-	tgt string
+	tgt       string
+	lastBlock *block.Block
 }
 
+// New creates a Client
+// TODO: add TLS certificates
 func New(host, port string) *Client {
-	return &Client{fmt.Sprintf("%s:%s", host, port)}
+	addr := net.JoinHostPort(host, port)
+	return &Client{addr, nil}
 }
 
-func (c *Client) Hello() error {
+func (c *Client) sendOnce(callback func(pb.MonitorClient, context.Context) error) error {
 	conn, err := g.Dial(c.tgt, g.WithInsecure(), g.WithBlock())
 	if err != nil {
 		return err
@@ -29,16 +33,5 @@ func (c *Client) Hello() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 
 	defer cancel()
-
-	ver := &pb.SemverRequest{
-		Major: uint32(protocol.NodeVer.Major),
-		Minor: uint32(protocol.NodeVer.Minor),
-		Patch: uint32(protocol.NodeVer.Patch),
-	}
-
-	if _, err := mon.Hello(ctx, ver); err != nil {
-		return err
-	}
-
-	return nil
+	return callback(mon, ctx)
 }
