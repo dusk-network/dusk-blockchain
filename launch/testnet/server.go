@@ -70,7 +70,7 @@ func Setup() *Server {
 
 	// Instantiate gRPC client
 	// TODO: get address from config
-	rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
+	// rpc.InitRuskClient("127.0.0.1:8080", rpcBus)
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
