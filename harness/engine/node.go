@@ -27,6 +27,7 @@ func NewDuskNode(graphqlPort, nodeId int, profileID string) *DuskNode {
 
 	node.Cfg = config.Registry{}
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
+	node.Cfg.Gql.Network = "tcp"
 
 	if *RPCNetworkType == "unix" {
 		node.Cfg.RPC.Network = "unix"
