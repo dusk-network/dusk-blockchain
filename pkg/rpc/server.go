@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"encoding/base64"
 	"net"
 	"time"
 
@@ -9,8 +10,12 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	logger "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
+
+var log = logger.WithFields(logger.Fields{"prefix": "grpc"})
 
 // Ensure `nodeServer` implements `node.NodeServer`
 var _ node.NodeServer = (*nodeServer)(nil)
@@ -34,23 +39,54 @@ func (r *RPCSrvWrapper) Shutdown() {
 // gRPC service running until the process is killed, thus we do not
 // need to return the server itself.
 func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
-	network := config.Get().RPC.Network
-	addr := config.Get().RPC.Address
-	l, err := net.Listen(network, addr)
+
+	conf := config.Get().RPC
+	l, err := net.Listen(conf.Network, conf.Address)
 	if err != nil {
 		return nil, err
 	}
 
-	grpcServer := grpc.NewServer()
+	// Build basic auth token, if configured
+	if len(conf.User) > 0 && len(conf.Pass) > 0 {
+		msg := conf.User + ":" + conf.Pass
+		token = base64.StdEncoding.EncodeToString([]byte(msg))
+	} else {
+		if conf.Network != "unix" {
+			log.WithError(err).Panicf("basic auth is disabled on %s network", conf.Network)
+		}
+	}
+
+	// Add default interceptors to provide basic authentication and error logging
+	// for both unary and stream RPC calls
+	serverOpt := make([]grpc.ServerOption, 0)
+	serverOpt = append(serverOpt, grpc.StreamInterceptor(streamInterceptor))
+	serverOpt = append(serverOpt, grpc.UnaryInterceptor(unaryInterceptor))
+
+	// Enable TLS if configured
+	opt, tlsVer := loadTLSFiles(conf.EnableTLS, conf.CertFile, conf.KeyFile, conf.Network)
+	if opt != nil {
+		serverOpt = append(serverOpt, opt)
+	}
+
+	grpcServer := grpc.NewServer(serverOpt...)
+	grpc.EnableTracing = false
+
 	node.RegisterNodeServer(grpcServer, &nodeServer{rpcBus})
 	wrapper := &RPCSrvWrapper{grpcServer}
+
 	// This function is blocking, so we run it in a goroutine
-	go grpcServer.Serve(l)
-	// TODO: incorporate TLS
+	go func() {
+		log.WithField("net", conf.Network).
+			WithField("addr", conf.Address).
+			WithField("tls", tlsVer).Infof("gRPC HTTP server listening")
+
+		if err := grpcServer.Serve(l); err != nil {
+			log.WithError(err).Warn("Serve returned err")
+		}
+	}()
+
 	return wrapper, nil
 }
-
-// TODO: add profiling methods here?
 
 func (n *nodeServer) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
 	txs, err := n.rpcBus.Call(topics.GetMempoolView, rpcbus.NewRequest(req), 5*time.Second)
@@ -194,4 +230,56 @@ func (n *nodeServer) RebuildChain(ctx context.Context, e *node.EmptyRequest) (*n
 	}
 
 	return resp.(*node.GenericResponse), nil
+}
+
+func (n *nodeServer) StopProfile(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+
+	resp, err := n.rpcBus.Call(topics.StopProfile, rpcbus.NewRequest(e), 5*time.Second)
+	if err != nil {
+		log.WithError(err).Warnln("StopProfile gRPC request failed", err)
+		return nil, err
+	}
+
+	return resp.(*node.GenericResponse), nil
+}
+
+func (n *nodeServer) StartProfile(ctx context.Context, e *node.EmptyRequest) (*node.GenericResponse, error) {
+	resp, err := n.rpcBus.Call(topics.StartProfile, rpcbus.NewRequest(e), 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.(*node.GenericResponse), nil
+}
+
+func loadTLSFiles(enable bool, certFile, keyFile, network string) (grpc.ServerOption, string) {
+
+	tlsVersion := "disabled"
+	if !enable {
+		if network != "unix" {
+			// Running gRPC over tcp would require TLS
+			log.Warn("Running over insecure HTTP")
+		}
+
+		return nil, tlsVersion
+	}
+
+	creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
+	if err != nil {
+		// If TLS is explicitly enabled, any error here should cause panic
+		log.WithError(err).Panic("could not enable TLS")
+	}
+
+	i := creds.Info()
+	if i.SecurityProtocol == "ssl" {
+		log.WithError(err).Panic("SSL is insecure")
+	}
+
+	recommendedVer := "1.3"
+	if i.SecurityVersion != recommendedVer {
+		log.Warnf("Recommended TLS version is %s", recommendedVer)
+	}
+
+	tlsVersion = i.SecurityVersion
+	return grpc.Creds(creds), tlsVersion
 }

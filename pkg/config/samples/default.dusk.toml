@@ -75,22 +75,31 @@ network="unix"
 # in case the network is tcp*,
 # address must be in form of a IP address (e.g 127.0.0.1:9000)
 address="/tmp/dusk-grpc.sock"
-#enabled=true
-#user="default"
-#pass="default"
-#cert=""
+
+# Basic HTTP Authentication credentials
+# if empty, auth is disabled
+user=""
+pass=""
+
+enableTLS=false
+# server TLS certificate file
+certFile=""
+# server TLS key file
+keyFile=""
 
 # GraphQL API service
 [gql]
 # enable graphql service
 enabled=true
+# network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
+network="tcp"
 address="127.0.0.1:9001"
 
 # enable/disable both HTTPS and WSS
 enableTLS = false
-# cert file path
+# server TLS certificate file
 certFile = ""
-# key file path
+# server TLS key file
 keyFile = ""
 
 # maximum requests per second 

@@ -59,13 +59,19 @@ type profileConfiguration struct {
 type rpcConfiguration struct {
 	Network string
 	Address string
-	// Enabled bool
-	// User    string
-	// Pass    string
+
+	EnableTLS bool
+	CertFile  string
+	KeyFile   string
+
+	User string
+	Pass string
 }
 
 type gqlConfiguration struct {
+	// TODO: Keep 'Enabled' option?
 	Enabled bool
+	Network string
 	Address string
 
 	EnableTLS bool

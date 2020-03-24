@@ -1,6 +1,7 @@
 package gql
 
 import (
+	"context"
 	"net/url"
 	"testing"
 	"time"
@@ -20,12 +21,18 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	// Set up HTTP server with notifications enabled
 	// config
-	s, eb := setupServer(t, "127.0.0.1:22222")
+	s, eb, err := setupServer(t, "127.0.0.1:22222")
+	if err != nil {
+		t.Error(err)
+	}
 	defer s.Stop()
+
+	dialCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
 	// Set up a websocket client
 	u := url.URL{Scheme: "ws", Host: "127.0.0.1:22222", Path: "/ws"}
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	c, _, err := websocket.DefaultDialer.DialContext(dialCtx, u.String(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,12 +81,14 @@ func TestWebsocketEndpoint(t *testing.T) {
 	}
 }
 
-func setupServer(t *testing.T, addr string) (*Server, *eventbus.EventBus) {
+func setupServer(t *testing.T, addr string) (*Server, *eventbus.EventBus, error) {
 	// Set up HTTP server with notifications enabled
 	// config
 	r := config.Registry{}
+	r.Gql.Network = "tcp"
 	r.Gql.Address = addr
 	r.Gql.Enabled = true
+	r.Gql.EnableTLS = false
 	r.Gql.Notification.BrokersNum = 1
 	r.Database.Driver = lite.DriverName
 	r.General.Network = "testnet"
@@ -92,8 +101,7 @@ func setupServer(t *testing.T, addr string) (*Server, *eventbus.EventBus) {
 		t.Fatal(err)
 	}
 
-	s.Start()
-	time.Sleep(100 * time.Millisecond)
+	err = s.Start()
 
-	return s, eb
+	return s, eb, err
 }
