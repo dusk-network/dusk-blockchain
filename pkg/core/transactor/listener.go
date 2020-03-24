@@ -131,11 +131,6 @@ func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
 		return err
 	}
 
-	if len(records) == 0 {
-		r.RespChan <- rpcbus.Response{*bytes.NewBufferString("No records found."), nil}
-		return nil
-	}
-
 	resp := &node.TxHistoryResponse{Records: make([]*node.TxRecord, len(records))}
 	for i, record := range records {
 		resp.Records[i] = &node.TxRecord{
