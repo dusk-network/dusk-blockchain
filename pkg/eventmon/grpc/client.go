@@ -30,7 +30,7 @@ func (c *Client) sendOnce(callback func(pb.MonitorClient, context.Context) error
 
 	defer conn.Close()
 	mon := pb.NewMonitorClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
 	defer cancel()
 	return callback(mon, ctx)

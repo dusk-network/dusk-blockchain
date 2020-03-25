@@ -2,6 +2,7 @@
 package grpc_test
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -16,8 +17,10 @@ type helloSrv struct {
 	srv         *g.Server
 }
 
-type clientMethod = func() error
-type tester = func(interface{}) error
+type callTest struct{
+	clientMethod  func() error
+	tester func(interface{}) error
+}
 
 var emptyFunc = func(_ interface{}) error {
 	return nil
@@ -38,17 +41,26 @@ func newSrv(network, addr string) *helloSrv {
 	return hs
 }
 
-func Suite(t *testing.T, callback clientMethod, test tester) {
+// Suite automates testing of BlockUpdates received through the grpc call. It
+// accepts a clientMethod to prep the test, and a varargs of tester functions
+// which apply to the payload received. Each tester is supposed to test a
+// correspondent payload
+func Suite(t *testing.T, timeoutMillis time.Duration, calls ...callTest) {
 	semverSrv := newSrv("tcp", ":7878")
 	defer semverSrv.srv.Stop()
 	time.Sleep(10 * time.Millisecond)
 
-	if !assert.NoError(t, callback()) {
-		t.FailNow()
-	}
-
-	response := <-semverSrv.requestChan
-	if !assert.NoError(t, test(response)) {
-		t.FailNow()
+	for i, call := range calls {
+		if !assert.NoError(t, call.clientMethod()) {
+			t.FailNow()
+		}
+		select {
+		case response := <-semverSrv.requestChan:
+			if !assert.NoError(t, call.tester(response)) {
+				t.FailNow()
+			}
+		case <-time.After(timeoutMillis * time.Millisecond):
+			assert.FailNow(t, fmt.Sprintf("timeout in receiving packet #%d", i))
+		}
 	}
 }

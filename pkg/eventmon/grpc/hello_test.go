@@ -26,29 +26,30 @@ func (h *helloSrv) Bye(ctx context.Context, req *monitor.EmptyRequest) (*monitor
 func TestHello(t *testing.T) {
 
 	client := grpc.New("", "7878")
-	method := client.Hello
-	tester := func(response interface{}) error {
-		ver, ok := response.(*monitor.SemverRequest)
-		if !ok {
-			return fmt.Errorf("unexpected request type %v", ver)
-		}
+	call := callTest{
+		clientMethod: client.Hello,
+		tester: func(response interface{}) error {
+			ver, ok := response.(*monitor.SemverRequest)
+			if !ok {
+				return fmt.Errorf("unexpected request type %v", ver)
+			}
 
-		if !assert.Equal(t, uint32(protocol.NodeVer.Major), ver.Major) {
-			return errors.New("unexpected major version")
-		}
-		if !assert.Equal(t, uint32(protocol.NodeVer.Minor), ver.Minor) {
-			return errors.New("unexpected minor version")
-		}
-		if !assert.Equal(t, uint32(protocol.NodeVer.Patch), ver.Patch) {
-			return errors.New("unexpected patch version")
-		}
-		return nil
+			if !assert.Equal(t, uint32(protocol.NodeVer.Major), ver.Major) {
+				return errors.New("unexpected major version")
+			}
+			if !assert.Equal(t, uint32(protocol.NodeVer.Minor), ver.Minor) {
+				return errors.New("unexpected minor version")
+			}
+			if !assert.Equal(t, uint32(protocol.NodeVer.Patch), ver.Patch) {
+				return errors.New("unexpected patch version")
+			}
+			return nil
+		},
 	}
-
-	Suite(t, method, tester)
+	Suite(t, 100, call)
 }
 
 func TestBye(t *testing.T) {
 	client := grpc.New("", "7878")
-	Suite(t, client.Bye, emptyFunc)
+	Suite(t, 100, callTest{client.Bye, emptyFunc})
 }
