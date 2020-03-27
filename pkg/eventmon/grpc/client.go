@@ -2,7 +2,7 @@ package grpc
 
 import (
 	"context"
-	"net"
+	"net/url"
 	"time"
 
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/monitor"
@@ -11,19 +11,20 @@ import (
 )
 
 type Client struct {
-	tgt       string
+	tgt       *url.URL
 	lastBlock *block.Block
 }
 
 // New creates a Client
 // TODO: add TLS certificates
-func New(host, port string) *Client {
-	addr := net.JoinHostPort(host, port)
-	return &Client{addr, nil}
+// TODO: subscribe to all relevant topics
+func New(uri *url.URL) *Client {
+	return &Client{uri, nil}
 }
 
 func (c *Client) sendOnce(callback func(pb.MonitorClient, context.Context) error) error {
-	conn, err := g.Dial(c.tgt, g.WithInsecure(), g.WithBlock())
+	// URL.Host returns hostname:port
+	conn, err := g.Dial(c.tgt.Host, g.WithInsecure(), g.WithBlock())
 	if err != nil {
 		return err
 	}

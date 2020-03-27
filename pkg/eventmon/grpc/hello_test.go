@@ -24,8 +24,7 @@ func (h *helloSrv) Bye(ctx context.Context, req *monitor.EmptyRequest) (*monitor
 }
 
 func TestHello(t *testing.T) {
-
-	client := grpc.New("", "7878")
+	client := grpc.New(testUrl)
 	call := callTest{
 		clientMethod: client.Hello,
 		tester: func(response interface{}) error {
@@ -50,6 +49,6 @@ func TestHello(t *testing.T) {
 }
 
 func TestBye(t *testing.T) {
-	client := grpc.New("", "7878")
+	client := grpc.New(testUrl)
 	Suite(t, 100, callTest{client.Bye, emptyFunc})
 }

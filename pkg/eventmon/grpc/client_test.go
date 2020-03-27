@@ -4,6 +4,7 @@ package grpc_test
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"testing"
 	"time"
 
@@ -12,14 +13,24 @@ import (
 	g "google.golang.org/grpc"
 )
 
+var testUrl *url.URL
+
+func init() {
+	var err error
+	testUrl, err = url.Parse("tcp://:7878")
+	if err != nil {
+		panic(err)
+	}
+}
+
 type helloSrv struct {
 	requestChan chan interface{}
 	srv         *g.Server
 }
 
-type callTest struct{
-	clientMethod  func() error
-	tester func(interface{}) error
+type callTest struct {
+	clientMethod func() error
+	tester       func(interface{}) error
 }
 
 var emptyFunc = func(_ interface{}) error {
@@ -41,18 +52,22 @@ func newSrv(network, addr string) *helloSrv {
 	return hs
 }
 
-// Suite automates testing of BlockUpdates received through the grpc call. It
+// TestMain automates testing of BlockUpdates received through the grpc call. It
 // accepts a clientMethod to prep the test, and a varargs of tester functions
 // which apply to the payload received. Each tester is supposed to test a
 // correspondent payload
 func Suite(t *testing.T, timeoutMillis time.Duration, calls ...callTest) {
-	semverSrv := newSrv("tcp", ":7878")
+	semverSrv := newSrv(testUrl.Scheme, testUrl.Host)
 	defer semverSrv.srv.Stop()
 	time.Sleep(10 * time.Millisecond)
 
 	for i, call := range calls {
-		if !assert.NoError(t, call.clientMethod()) {
-			t.FailNow()
+		// if clientMethod is nil, it means the test relies on some other way
+		// to trigger the rpc call
+		if call.clientMethod != nil {
+			if !assert.NoError(t, call.clientMethod()) {
+				t.FailNow()
+			}
 		}
 		select {
 		case response := <-semverSrv.requestChan:
