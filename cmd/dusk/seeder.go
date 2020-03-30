@@ -10,7 +10,6 @@ import (
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
-	log "github.com/sirupsen/logrus"
 )
 
 // ConnectToSeeder initializes the connection with the Voucher Seeder
@@ -33,21 +32,18 @@ func ConnectToSeeder() []string {
 	if err != nil {
 		log.Panic(err)
 	}
-	log.WithField("prefix", "main").Debugln("connected to voucher seeder")
+	log.Debugln("connected to voucher seeder")
 
 	if err := completeChallenge(conn); err != nil {
 		log.Panic(err)
 	}
-	log.WithField("prefix", "main").Debugln("voucher seeder challenge completed")
+	log.Debugln("voucher seeder challenge completed")
 
 	// get IP list
 	buf := make([]byte, 2048)
 	if _, err := conn.Read(buf); err != nil {
 		// panic(err) <- if the seeder return error == EOF,  return nil, dont panic
-		log.WithFields(log.Fields{
-			"process": "main",
-			"error":   err,
-		}).Errorln("error reading IPs from voucher seeder")
+		log.WithError(err).Errorln("error reading IPs from voucher seeder")
 		return nil
 	}
 
@@ -57,10 +53,7 @@ func ConnectToSeeder() []string {
 			time.Sleep(4 * time.Second)
 			_, err := conn.Write([]byte{1})
 			if err != nil {
-				log.WithFields(log.Fields{
-					"process": "main",
-					"error":   err,
-				}).Warnln("error pinging voucher seeder")
+				log.WithError(err).Warnln("error pinging voucher seeder")
 				return
 			}
 		}
