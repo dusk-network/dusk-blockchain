@@ -62,7 +62,7 @@ Next up, we build the rust part of the node. Instructions for building the `blin
 
 Finally, to start your node, type:
 ```bash
-./bin/dusk 
+./bin/dusk --config=dusk.toml
 ```
 
 ## Features
