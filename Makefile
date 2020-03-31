@@ -10,6 +10,8 @@ lint: ## Lint the files
 	@golint -set_exit_status ${PKG_LIST}
 test: ## Run unittests
 	@go test $(TFLAGS) -p 1 -short ${PKG_LIST}
+test-harness: ## Run harness tests
+	@go test -v --count=1 --test.timeout=0 ./harness/... -args -enable
 race: dep ## Run data race detector
 	@go test $(TFLAGS) -race -v ${PKG_LIST}
 coverage: ## Generate global code coverage report
