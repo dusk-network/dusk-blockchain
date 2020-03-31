@@ -34,16 +34,15 @@ func (c *Client) NotifyBlockSlowdown() error {
 		if c.lastBlock != nil {
 			t := time.Now().Sub(time.Unix(c.lastBlock.Header.Timestamp, int64(0)))
 			alert := &pb.SlowdownAlert{
-				// TODO: TimeSinceLastBlockSec
-				// TODO: LastKnownHash
-				// TODO: LastKnownHeight
-				TimeSinceLastBlock: uint32(t.Seconds()),
+				LastKnownHash:         c.lastBlock.Header.Hash,
+				LastKnownHeight:       c.lastBlock.Header.Height,
+				TimeSinceLastBlockSec: uint32(t.Seconds()),
 			}
 			_, err := mon.NotifySlowdown(ctx, alert)
 			return err
 		}
 
-		_, err := mon.NotifySlowdown(ctx, &pb.SlowdownAlert{TimeSinceLastBlock: uint32(0)})
+		_, err := mon.NotifySlowdown(ctx, &pb.SlowdownAlert{})
 		return err
 	})
 }

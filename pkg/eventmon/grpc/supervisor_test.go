@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/grpc"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-protobuf/autogen/go/monitor"
@@ -26,7 +27,7 @@ func (h *helloSrv) NotifySlowdown(ctx context.Context, req *monitor.SlowdownAler
 
 func TestNotifyError(t *testing.T) {
 	eb := eventbus.New()
-	s := grpc.NewSupervisor(eb, testUrl)
+	s := grpc.NewSupervisor(eb, testUrl, 20*time.Second)
 	log.AddHook(s)
 
 	call := callTest{
@@ -50,13 +51,49 @@ func TestNotifyError(t *testing.T) {
 	}
 
 	Suite(t, 100, call)
+	s.Stop()
 }
 
 func TestNotifySlowdown(t *testing.T) {
 	eb := eventbus.New()
-	s := grpc.NewSupervisor(eb, testUrl)
+	s := grpc.NewSupervisor(eb, testUrl, 200*time.Millisecond)
 	log.AddHook(s)
-	s.SetSlowTimeout(50 * time.Millisecond)
+	height := uint64(200)
+	testData := helper.RandomBlock(t, height, 2)
+	callBlockSetup := callTest{
+		clientMethod: func() error {
+			return s.Client.NotifyBlockUpdate(*testData)
+		},
+
+		tester: emptyFunc,
+	}
+
+	callSlowdown := callTest{
+		tester: func(response interface{}) error {
+			alert, ok := response.(*monitor.SlowdownAlert)
+
+			if !ok {
+				return fmt.Errorf("unexpected request type %v", alert)
+			}
+
+			if !assert.Equal(t, testData.Header.Hash, alert.LastKnownHash) {
+				return errors.New("wrong last known hash")
+			}
+			if !assert.Equal(t, testData.Header.Height, alert.LastKnownHeight) {
+				return errors.New("wrong last known heigth")
+			}
+			return nil
+		},
+	}
+
+	Suite(t, 200, callBlockSetup, callSlowdown)
+	s.Stop()
+}
+
+func TestNotifySlowdownAtStart(t *testing.T) {
+	eb := eventbus.New()
+	s := grpc.NewSupervisor(eb, testUrl, 50*time.Millisecond)
+	log.AddHook(s)
 
 	call := callTest{
 		tester: func(response interface{}) error {
@@ -66,12 +103,19 @@ func TestNotifySlowdown(t *testing.T) {
 				return fmt.Errorf("unexpected request type %v", alert)
 			}
 
-			if !assert.Equal(t, uint32(0), alert.TimeSinceLastBlock) {
+			if !assert.Equal(t, uint32(0), alert.TimeSinceLastBlockSec) {
 				return errors.New("wrong time since last block")
+			}
+			if !assert.Nil(t, alert.LastKnownHash) {
+				return errors.New("wrong last known hash")
+			}
+			if !assert.Equal(t, uint64(0), alert.LastKnownHeight) {
+				return errors.New("wrong last known heigth")
 			}
 			return nil
 		},
 	}
 
 	Suite(t, 100, call)
+	s.Stop()
 }

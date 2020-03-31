@@ -12,24 +12,26 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var defaultTimeout = 20 * time.Second
+var lg = log.WithField("process", "grpc-supervisor")
 
 type Supervisor struct {
+	Client       *Client
 	timeoutBlock time.Duration
 	broker       eventbus.Broker
-	client       *Client
+	stopChan     chan struct{}
 
 	lock          sync.RWMutex
 	idBlockUpdate uint32 // id of the subscription channel for the block updates
 }
 
-func NewSupervisor(broker eventbus.Broker, uri *url.URL) *Supervisor {
+func NewSupervisor(broker eventbus.Broker, uri *url.URL, timeout time.Duration) *Supervisor {
 	c := New(uri)
 	s := &Supervisor{
+		Client:       c,
 		broker:       broker,
+		stopChan:     make(chan struct{}, 1),
 		lock:         sync.RWMutex{},
-		client:       c,
-		timeoutBlock: defaultTimeout,
+		timeoutBlock: timeout,
 	}
 
 	blockChan, id := consensus.InitAcceptedBlockUpdate(broker)
@@ -37,22 +39,6 @@ func NewSupervisor(broker eventbus.Broker, uri *url.URL) *Supervisor {
 	go s.listenAcceptedBlock(blockChan)
 
 	return s
-}
-
-func (s *Supervisor) SlowTimeout() time.Duration {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	return s.timeoutBlock
-}
-
-func (s *Supervisor) SetSlowTimeout(t time.Duration) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	s.timeoutBlock = t
-}
-
-func (s *Supervisor) Hello() error {
-	return s.client.Hello()
 }
 
 func (_ *Supervisor) Levels() []log.Level {
@@ -64,38 +50,40 @@ func (_ *Supervisor) Levels() []log.Level {
 }
 
 func (s *Supervisor) Fire(entry *log.Entry) error {
-	return s.client.NotifyError(entry)
+	return s.Client.NotifyError(entry)
 }
 
 func (s *Supervisor) Stop() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	s.broker.Unsubscribe(topics.AcceptedBlock, s.idBlockUpdate)
-
-	// TODO: close the client streams if any
-	return s.client.Bye()
+	s.stopChan <- struct{}{}
+	return nil
 }
 
 func (s *Supervisor) listenAcceptedBlock(blockChan <-chan block.Block) {
-	initialTimeoutBlockAcceptance := s.SlowTimeout()
+	initialTimeoutBlockAcceptance := s.timeoutBlock
 	for {
-		timer := time.NewTimer(s.SlowTimeout())
+		timer := time.NewTimer(s.timeoutBlock)
+		lg.WithField("timeout", s.timeoutBlock.Milliseconds()).Traceln("slowdown timeout (re)created")
 		select {
 		case blk := <-blockChan:
-			s.SetSlowTimeout(initialTimeoutBlockAcceptance)
+			s.timeoutBlock = initialTimeoutBlockAcceptance
 			timer.Stop()
-			// get block
-			// send block
-			if err := s.client.NotifyBlockUpdate(blk); err != nil {
-				log.WithError(err).Warnln("could not send block to monitoring")
+			lg.WithField("timeout", s.timeoutBlock.Milliseconds()).Traceln("slowdown timeout reset")
+			if err := s.Client.NotifyBlockUpdate(blk); err != nil {
+				lg.WithError(err).Warnln("could not send block to monitoring")
 			}
 		case <-timer.C:
-			// relaxing the timeout so
-			currentTimeout := s.SlowTimeout()
-			s.SetSlowTimeout(currentTimeout * 2)
-			if err := s.client.NotifyBlockSlowdown(); err != nil {
-				log.WithError(err).Warnln("could not send slowdown alert to monitoring")
+			// relaxing the timeout
+			s.timeoutBlock = s.timeoutBlock * 2
+			lg.WithField("timeout", s.timeoutBlock.Milliseconds()).Traceln("doubling the slowdown timeout")
+			if err := s.Client.NotifyBlockSlowdown(); err != nil {
+				lg.WithError(err).Warnln("could not send slowdown alert to monitoring")
+				continue
 			}
+			lg.Traceln("slowdown alert sent")
+		case <-s.stopChan:
+			lg.Traceln("supervisor stopped")
+			return
 		}
 	}
 }

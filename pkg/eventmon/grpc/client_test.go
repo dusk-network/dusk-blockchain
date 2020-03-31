@@ -75,7 +75,7 @@ func Suite(t *testing.T, timeoutMillis time.Duration, calls ...callTest) {
 				t.FailNow()
 			}
 		case <-time.After(timeoutMillis * time.Millisecond):
-			assert.FailNow(t, fmt.Sprintf("timeout in receiving packet #%d", i))
+			assert.FailNow(t, fmt.Sprintf("timeout in receiving packet #%d", i+1))
 		}
 	}
 }
