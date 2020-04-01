@@ -12,8 +12,8 @@ import (
 
 //NotifyError opens a connection to the monitoring server any time there
 //is an error happening within the node
-func (c *Client) NotifyError(entry *log.Entry) error {
-	return c.sendOnce(func(mon pb.MonitorClient, ctx context.Context) error {
+func (c *Client) NotifyError(parent context.Context, entry *log.Entry) error {
+	return c.send(parent, func(mon pb.MonitorClient, ctx context.Context) error {
 		alert := &pb.ErrorAlert{
 			Level:           convertLevel(entry.Level),
 			Msg:             entry.Message,

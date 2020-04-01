@@ -15,14 +15,15 @@ type Client struct {
 	lastBlock *block.Block
 }
 
+type sendCB func(pb.MonitorClient, context.Context) error
+
 // New creates a Client
 // TODO: add TLS certificates
-// TODO: subscribe to all relevant topics
 func New(uri *url.URL) *Client {
 	return &Client{uri, nil}
 }
 
-func (c *Client) sendOnce(callback func(pb.MonitorClient, context.Context) error) error {
+func (c *Client) send(parentCtx context.Context, callback sendCB) error {
 	// URL.Host returns hostname:port
 	conn, err := g.Dial(c.tgt.Host, g.WithInsecure(), g.WithBlock())
 	if err != nil {
@@ -31,8 +32,12 @@ func (c *Client) sendOnce(callback func(pb.MonitorClient, context.Context) error
 
 	defer conn.Close()
 	mon := pb.NewMonitorClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 2*time.Second)
 
 	defer cancel()
 	return callback(mon, ctx)
+}
+
+func (c *Client) sendUnlinked(callback func(pb.MonitorClient, context.Context) error) error {
+	return c.send(context.Background(), callback)
 }

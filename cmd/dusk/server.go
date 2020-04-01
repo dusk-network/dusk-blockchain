@@ -29,13 +29,14 @@ var logServer = logrus.WithField("process", "server")
 
 // Server is the main process of the node
 type Server struct {
-	eventBus   *eventbus.EventBus
-	rpcBus     *rpcbus.RPCBus
-	chain      *chain.Chain
-	dupeMap    *dupemap.DupeMap
-	counter    *chainsync.Counter
-	gossip     *processing.Gossip
-	rpcWrapper *rpc.RPCSrvWrapper
+	eventBus      *eventbus.EventBus
+	rpcBus        *rpcbus.RPCBus
+	chain         *chain.Chain
+	dupeMap       *dupemap.DupeMap
+	counter       *chainsync.Counter
+	gossip        *processing.Gossip
+	rpcWrapper    *rpc.RPCSrvWrapper
+	cancelMonitor StopFunc
 }
 
 // Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
@@ -104,9 +105,11 @@ func Setup() *Server {
 	go transactorComponent.Listen()
 
 	// Connecting to the log based monitoring system
-	if err := LaunchMonitor(eventBus); err != nil {
+	stopFunc, err := LaunchMonitor(eventBus)
+	if err != nil {
 		log.Panic(err)
 	}
+	srv.cancelMonitor = stopFunc
 
 	return srv
 }
@@ -173,4 +176,5 @@ func (s *Server) Close() {
 	_ = s.chain.Close()
 	s.rpcBus.Close()
 	s.rpcWrapper.Shutdown()
+	s.cancelMonitor()
 }

@@ -10,8 +10,8 @@ import (
 
 //NotifyBlockUpdate opens a connection to the monitoring server any time there
 //is an update. It is questionable whether this should be a stream instead
-func (c *Client) NotifyBlockUpdate(blk block.Block) error {
-	return c.sendOnce(func(mon pb.MonitorClient, ctx context.Context) error {
+func (c *Client) NotifyBlockUpdate(parent context.Context, blk block.Block) error {
+	return c.send(parent, func(mon pb.MonitorClient, ctx context.Context) error {
 		blockUpdate := &pb.BlockUpdate{
 			Height:    blk.Header.Height,
 			Hash:      blk.Header.Hash,
@@ -29,8 +29,8 @@ func (c *Client) NotifyBlockUpdate(blk block.Block) error {
 	})
 }
 
-func (c *Client) NotifyBlockSlowdown() error {
-	return c.sendOnce(func(mon pb.MonitorClient, ctx context.Context) error {
+func (c *Client) NotifyBlockSlowdown(parent context.Context) error {
+	return c.send(parent, func(mon pb.MonitorClient, ctx context.Context) error {
 		if c.lastBlock != nil {
 			t := time.Now().Sub(time.Unix(c.lastBlock.Header.Timestamp, int64(0)))
 			alert := &pb.SlowdownAlert{

@@ -27,7 +27,7 @@ func TestNotifyBlockUpdate(t *testing.T) {
 	testData := helper.RandomBlock(t, height, 2)
 	call := callTest{
 		clientMethod: func() error {
-			return client.NotifyBlockUpdate(*testData)
+			return client.NotifyBlockUpdate(context.Background(), *testData)
 		},
 
 		tester: func(response interface{}) error {
@@ -72,7 +72,7 @@ func TestBlockTime(t *testing.T) {
 	firstCall := callTest{
 		// sending first block
 		clientMethod: func() error {
-			return client.NotifyBlockUpdate(*firstBlock)
+			return client.NotifyBlockUpdate(context.Background(), *firstBlock)
 		},
 
 		// nothing to test here
@@ -84,7 +84,7 @@ func TestBlockTime(t *testing.T) {
 		clientMethod: func() error {
 			// adding 2 seconds to test block time
 			secondBlock.Header.Timestamp = firstBlock.Header.Timestamp + 2
-			return client.NotifyBlockUpdate(*secondBlock)
+			return client.NotifyBlockUpdate(context.Background(), *secondBlock)
 		},
 
 		tester: func(response interface{}) error {

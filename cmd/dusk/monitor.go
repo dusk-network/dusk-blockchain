@@ -12,45 +12,56 @@ import (
 
 var lg = log.WithField("process", "monitoring")
 
+type StopFunc func()
+
 // LaunchMonitor creates a Supervisor if the configuration demands it, and starts it
-func LaunchMonitor(bus eventbus.Broker) error {
+func LaunchMonitor(bus eventbus.Broker) (StopFunc, error) {
 	supervisor, err := NewSupervisor(bus)
 	if err != nil {
-		return err
+		return func() {}, err
 	}
 
 	if supervisor == nil {
-		return nil
+		return func() {}, nil
 	}
 
 	if err := supervisor.Start(); err != nil {
-		return err
+		return func() {}, err
 	}
 
-	return nil
+	return func() {
+		_ = supervisor.Stop()
+	}, nil
+}
+
+// ParseMonitorConfiguration collects parameters of the monitoring client
+func ParseMonitorConfiguration() (rpcType, target string, streamErrors bool) {
+	mon := cfg.Get().Logger.Monitor
+	rpcType = strings.ToLower(mon.Rpc)
+	transport := strings.ToLower(mon.Transport)
+	addr := strings.ToLower(mon.Address)
+
+	target = transport + "://" + addr
+	lg.WithField("process", "monitoring").Info("Monitor configuration parsed: sending data to", target)
+
+	streamErrors = cfg.Get().Logger.Monitor.StreamErrors
+	return
 }
 
 // NewSupervisor creates a new monitor.Supervisor which notifies a remote monitoring server with alerts and data
 func NewSupervisor(bus eventbus.Broker) (monitor.Supervisor, error) {
 	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
-		mon := cfg.Get().Logger.Monitor
-		rpcType := strings.ToLower(mon.Rpc)
-		transport := strings.ToLower(mon.Transport)
-		addr := strings.ToLower(mon.Address)
-
-		monitorURL := transport + "://" + addr
-		lg.WithField("process", "monitoring").Info("Monitor configuration parsed: sending data to", monitorURL)
+		rpc, target, streamErrors := ParseMonitorConfiguration()
 
 		blockTimeThreshold := 20 * time.Second
-
-		supervisor, err := monitor.New(bus, blockTimeThreshold, rpcType, monitorURL)
+		supervisor, err := monitor.New(bus, blockTimeThreshold, rpc, target)
 		if err != nil {
 			lg.WithError(err).Errorln("Monitoring could not get started")
 			return nil, err
 		}
 
-		if cfg.Get().Logger.Monitor.StreamErrors {
-			lg.Infoln("adding supervisor as logrus hook so to send errors to", monitorURL)
+		if streamErrors {
+			lg.Infoln("adding supervisor as logrus hook so to send errors to", target)
 			l.AddHook(supervisor)
 		}
 

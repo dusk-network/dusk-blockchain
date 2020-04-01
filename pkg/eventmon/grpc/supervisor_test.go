@@ -62,7 +62,7 @@ func TestNotifySlowdown(t *testing.T) {
 	testData := helper.RandomBlock(t, height, 2)
 	callBlockSetup := callTest{
 		clientMethod: func() error {
-			return s.Client().NotifyBlockUpdate(*testData)
+			return s.Client().NotifyBlockUpdate(context.Background(), *testData)
 		},
 
 		tester: emptyFunc,
