@@ -4,6 +4,8 @@ package encoding
 
 import (
 	"bytes"
+	"errors"
+	"math"
 )
 
 // ReadVarBytes will read a CompactSize int denoting the length, then
@@ -12,6 +14,12 @@ func ReadVarBytes(r *bytes.Buffer, b *[]byte) error {
 	c, err := ReadVarInt(r)
 	if err != nil {
 		return err
+	}
+
+	// We reject reading any data that has a length greater than
+	// math.MaxInt32, to avoid out of memory errors.
+	if c > math.MaxInt32 {
+		return errors.New("attempting to decode data which is too large")
 	}
 
 	*b = make([]byte, c)

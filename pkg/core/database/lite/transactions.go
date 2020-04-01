@@ -2,6 +2,7 @@ package lite
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -9,9 +10,9 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 type transaction struct {
@@ -36,7 +37,7 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map header.Hash to block.Block
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
+	if err := message.MarshalBlock(buf, b); err != nil {
 		return err
 	}
 
@@ -68,6 +69,16 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 		for _, input := range tx.StandardTx().Inputs {
 			t.batch[keyImagesInd][toKey(input.KeyImage.Bytes())] = txID
 		}
+
+		for i, output := range tx.StandardTx().Outputs {
+			value := make([]byte, 8)
+			// Only lock the first output, so that change outputs are
+			// not affected.
+			if i == 0 {
+				binary.LittleEndian.PutUint64(value, tx.LockTime()+b.Header.Height)
+			}
+			t.batch[outputKeyInd][toKey(output.PubKey.P.Bytes())] = value
+		}
 	}
 
 	// Map height to buffer bytes
@@ -81,6 +92,15 @@ func (t *transaction) StoreBlock(b *block.Block) error {
 
 	// Map stateKey to chain state (tip)
 	t.batch[stateInd][toKey(stateKey)] = b.Header.Hash
+
+	// Remove expired bid values
+	for k := range t.db.storage[bidValuesInd] {
+		heightBytes := k[9:]
+		height := binary.LittleEndian.Uint64(heightBytes)
+		if height < b.Header.Height {
+			delete(t.db.storage[bidValuesInd], k)
+		}
+	}
 
 	return nil
 }
@@ -118,7 +138,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +154,7 @@ func (t transaction) FetchBlockTxs(hash []byte) ([]transactions.Transaction, err
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -157,7 +177,7 @@ func (t transaction) FetchBlockHashByHeight(height uint64) ([]byte, error) {
 	}
 
 	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
+	if err := message.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
 		return nil, err
 	}
 
@@ -195,71 +215,42 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 
 	return true, txID, nil
 }
+
 func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
-	return nil
+	points := make([]ristretto.Point, 0, numDecoys)
+	for key := range t.db.storage[outputKeyInd] {
+		// Ignore locked outputs
+		unlockHeight := binary.LittleEndian.Uint64(t.db.storage[outputKeyInd][key])
+		if unlockHeight != 0 {
+			continue
+		}
+
+		var p ristretto.Point
+		var pBytes [32]byte
+		copy(pBytes[:], key[:])
+		p.SetBytes(&pBytes)
+
+		points = append(points, p)
+		if len(points) == numDecoys {
+			break
+		}
+	}
+
+	return points
 }
 
 func (t transaction) FetchOutputExists(destkey []byte) (bool, error) {
-	return false, nil
+	_, exists := t.db.storage[outputKeyInd][toKey(destkey)]
+	return exists, nil
 }
 
 func (t transaction) FetchOutputUnlockHeight(destkey []byte) (uint64, error) {
-	return 0, nil
-}
-
-func (t *transaction) StoreCandidateBlock(b *block.Block) error {
-	if !t.writable {
-		return errors.New("read-only transaction")
+	unlockHeight, exists := t.db.storage[outputKeyInd][toKey(destkey)]
+	if !exists {
+		return 0, errors.New("this output does not exist")
 	}
 
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
-		return err
-	}
-	t.batch[candidatesTableInd][toKey(b.Header.Hash)] = buf.Bytes()
-
-	return nil
-}
-
-// FetchCandidateBlock fetches a candidate block by hash
-func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
-
-	var data []byte
-	var exists bool
-	if data, exists = t.db.storage[candidatesTableInd][toKey(hash)]; !exists {
-		return nil, database.ErrBlockNotFound
-	}
-
-	b := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
-
-	var count uint32
-	for key, data := range t.db.storage[candidatesTableInd] {
-
-		b := block.NewBlock()
-		if err := marshalling.UnmarshalBlock(bytes.NewBuffer(data), b); err != nil {
-			return count, err
-		}
-
-		if maxHeight != 0 {
-			if b.Header.Height <= maxHeight {
-				delete(t.db.storage[candidatesTableInd], key)
-				count++
-			}
-		} else {
-			delete(t.db.storage[candidatesTableInd], key)
-			count++
-		}
-	}
-
-	return count, nil
+	return binary.LittleEndian.Uint64(unlockHeight), nil
 }
 
 func (t transaction) FetchState() (*database.State, error) {
@@ -325,13 +316,74 @@ func (t *transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t *transaction) StoreBidValues(d, k []byte) error {
-	bidKey := toKey([]byte("bidvalues"))
+func (t *transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
+	currentHeight, err := t.FetchCurrentHeight()
+	if err != nil {
+		return err
+	}
+
+	heightBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
+	key := append([]byte("bidvalues"), heightBytes...)
+	bidKey := toKey(key)
 	t.batch[bidValuesInd][bidKey] = append(d, k...)
 	return nil
 }
 
 func (t *transaction) FetchBidValues() ([]byte, []byte, error) {
-	bidKey := toKey([]byte("bidvalues"))
-	return t.db.storage[bidValuesInd][bidKey][0:32], t.db.storage[bidValuesInd][bidKey][32:64], nil
+	// Get bid values with lowest expiry height
+	lowestSeen := uint64(1<<64 - 1)
+	var values []byte
+	for k, v := range t.db.storage[bidValuesInd] {
+		heightBytes := k[9:]
+		height := binary.LittleEndian.Uint64(heightBytes)
+		if height < lowestSeen {
+			lowestSeen = height
+			values = v
+		}
+	}
+
+	return values[0:32], values[32:], nil
+}
+
+// FetchBlockHeightSince uses binary search to find a block height
+// NB: Duplicates FetchBlockHeightSince heavy driver
+func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error) {
+
+	tip, err := t.FetchCurrentHeight()
+	if err != nil {
+		return 0, err
+	}
+
+	n := uint64(math.Min(float64(tip), float64(offset)))
+
+	pos, err := utils.Search(n, func(pos uint64) (bool, error) {
+		height := tip - uint64(n) + uint64(pos)
+		hash, err := t.FetchBlockHashByHeight(height)
+		if err != nil {
+			return false, err
+		}
+
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return false, err
+		}
+
+		return header.Timestamp >= sinceUnixTime, nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return tip - uint64(n) + uint64(pos), nil
+
+}
+
+func (t transaction) ClearDatabase() error {
+	for key := range t.db.storage {
+		t.db.storage[key] = make(table)
+	}
+
+	return nil
 }

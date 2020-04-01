@@ -1,14 +1,15 @@
 package agreement
 
 import (
-	"encoding/hex"
-	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 )
 
-type storedAgreements []Agreement
+type storedAgreements []message.Agreement
 
 func (s storedAgreements) Len() int {
 	return len(s)
@@ -19,39 +20,38 @@ func (s storedAgreements) Swap(i, j int) {
 }
 
 func (s storedAgreements) Less(i, j int) bool {
-	return s[i].intRepr.Cmp(s[j].intRepr) <= 0
+	return s[i].Repr.Cmp(s[j].Repr) <= 0
 }
 
 func (s storedAgreements) String() string {
 	var sb strings.Builder
+	sb.WriteString("[\n")
 	for i, aggro := range s {
-		if i == 0 {
-			sb.WriteString("[\n")
+		if i > 0 {
+			sb.WriteString("\n")
 		}
-		sb.WriteString("\t")
-		sb.WriteString(hex.EncodeToString(aggro.signedVotes))
-		sb.WriteString(fmt.Sprintf(" round: %d step: %d sender: %s", aggro.Round, aggro.Step, hex.EncodeToString(aggro.Header.Sender())))
-		sb.WriteString("\n")
+		sb.WriteString(aggro.String())
 	}
+	sb.WriteString("\n")
 	sb.WriteString("]")
 	return sb.String()
 }
 
 type store struct {
 	sync.RWMutex
-	collected map[string]storedAgreements
+	collected map[uint8]storedAgreements
 }
 
 func newStore() *store {
 	return &store{
-		collected: make(map[string]storedAgreements),
+		collected: make(map[uint8]storedAgreements),
 	}
 }
 
 func (s *store) String() string {
 	var sb strings.Builder
 	for k, v := range s.collected {
-		sb.WriteString(k)
+		sb.WriteString(strconv.Itoa(int(k)))
 		sb.WriteString(": ")
 		sb.WriteString(v.String())
 		sb.WriteString("\n")
@@ -68,22 +68,23 @@ func (s *store) Size() int {
 }
 
 // Put collects the Agreement and returns the number of agreement stored for a blockhash
-func (s *store) Insert(a Agreement, weight int) int {
+func (s *store) Insert(a message.Agreement, weight int) int {
 	s.Lock()
 	defer s.Unlock()
-	blockHash := hex.EncodeToString(a.Header.BlockHash)
+
+	hdr := a.State()
 	idx := s.find(a)
 	if idx == -1 {
-		agreements := make([]Agreement, weight)
+		agreements := make([]message.Agreement, weight)
 		for i := range agreements {
 			agreements[i] = a
 		}
 
-		s.collected[blockHash] = storedAgreements(agreements)
+		s.collected[hdr.Step] = storedAgreements(agreements)
 		return weight
 	}
 
-	stored := s.collected[blockHash]
+	stored := s.collected[hdr.Step]
 	// if the Agreement is already in the store we do not add it
 	if s.contains(idx, a) {
 		return len(stored)
@@ -92,23 +93,22 @@ func (s *store) Insert(a Agreement, weight int) int {
 	// efficient insertion with minimal element copy and no additional allocation
 	// github.com/golang.go/wiki/SliceTricks
 	for i := 0; i < weight; i++ {
-		stored = append(stored, Agreement{})
+		stored = append(stored, message.Agreement{})
 		copy(stored[idx+1:], stored[idx:])
 		stored[idx] = a
 	}
 
-	s.collected[blockHash] = stored
+	s.collected[hdr.Step] = stored
 	return len(stored)
 }
 
-func (s *store) Get(hash []byte) []Agreement {
-	blockHash := hex.EncodeToString(hash)
+func (s *store) Get(step uint8) []message.Agreement {
 	s.RLock()
 	defer s.RUnlock()
-	return s.collected[blockHash]
+	return s.collected[step]
 }
 
-func (s *store) Find(a Agreement) int {
+func (s *store) Find(a message.Agreement) int {
 	s.RLock()
 	defer s.RUnlock()
 	return s.find(a)
@@ -116,9 +116,9 @@ func (s *store) Find(a Agreement) int {
 
 // Find returns the index of an Agreement in the stored collection or, if the Agreement has not been stored, the index at which it would be stored.
 // In case no Agreement is stored for the blockHash specified, it returns -1
-func (s *store) find(a Agreement) int {
-	hash := hex.EncodeToString(a.Header.BlockHash)
-	stored := s.collected[hash]
+func (s *store) find(a message.Agreement) int {
+	hdr := a.State()
+	stored := s.collected[hdr.Step]
 	if stored == nil {
 		return -1
 	}
@@ -128,16 +128,16 @@ func (s *store) find(a Agreement) int {
 	})
 }
 
-func (s *store) Contains(a Agreement) bool {
+func (s *store) Contains(a message.Agreement) bool {
 	s.RLock()
 	defer s.RUnlock()
 	idx := s.find(a)
 	return s.contains(idx, a)
 }
 
-func (s *store) contains(idx int, a Agreement) bool {
-	hash := hex.EncodeToString(a.Header.BlockHash)
-	stored := s.collected[hash]
+func (s *store) contains(idx int, a message.Agreement) bool {
+	hdr := a.State()
+	stored := s.collected[hdr.Step]
 	if idx == -1 {
 		return false
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-wallet/key"
+	"github.com/dusk-network/dusk-wallet/v2/key"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,7 +49,10 @@ func TestMemberAt(t *testing.T) {
 	sort.Sort(ks)
 
 	for i := 0; i < nr; i++ {
-		m := p.MemberAt(i)
+		m, err := p.MemberAt(i)
+		if !assert.NoError(t, err) {
+			t.FailNow()
+		}
 		assert.True(t, bytes.Equal(m.PublicKeyBLS, ks[i].BLSPubKeyBytes))
 	}
 }

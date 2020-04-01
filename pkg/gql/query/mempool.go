@@ -6,9 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	txs "github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/graphql-go/graphql"
 )
 
@@ -42,24 +42,15 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			payload.Write(txidBytes)
 		}
 
-		r, err := t.rpcBus.Call(rpcbus.GetMempoolTxs, rpcbus.NewRequest(payload), 5*time.Second)
+		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), 5*time.Second)
 		if err != nil {
 			return "", err
 		}
-
-		lTxs, err := encoding.ReadVarInt(&r)
-		if err != nil {
-			return "", err
-		}
+		r := resp.([]txs.Transaction)
 
 		txs := make([]queryTx, 0)
-		for i := uint64(0); i < lTxs; i++ {
-			tx, err := marshalling.UnmarshalTx(&r)
-			if err != nil {
-				return "", err
-			}
-
-			d, err := newQueryTx(tx, nil)
+		for i := 0; i < len(r); i++ {
+			d, err := newQueryTx(r[i], nil)
 			if err == nil {
 				txs = append(txs, d)
 			}

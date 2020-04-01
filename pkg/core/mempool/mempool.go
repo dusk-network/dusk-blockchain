@@ -12,16 +12,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/dusk-network/dusk-crypto/merkletree"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -46,6 +47,7 @@ var (
 type Mempool struct {
 	getMempoolTxsChan       <-chan rpcbus.Request
 	getMempoolTxsBySizeChan <-chan rpcbus.Request
+	getMempoolViewChan      <-chan rpcbus.Request
 	sendTxChan              <-chan rpcbus.Request
 
 	// transactions emitted by RPC and Peer subsystems
@@ -55,8 +57,9 @@ type Mempool struct {
 	// verified txs to be included in next block
 	verified Pool
 
-	// the collector to listen for new accepted blocks
-	acceptedBlockChan <-chan block.Block
+	// the collector to listen for new intermediate blocks
+	intermediateBlockChan <-chan block.Block
+	acceptedBlockChan     <-chan block.Block
 
 	// used by tx verification procedure
 	latestBlockTimestamp int64
@@ -67,6 +70,9 @@ type Mempool struct {
 	// the magic function that knows best what is valid chain Tx
 	verifyTx func(tx transactions.Transaction) error
 	quitChan chan struct{}
+
+	// ID of subscription to the TX topic on the EventBus
+	txSubscriberID uint32
 }
 
 // checkTx is responsible to determine if a tx is valid or not
@@ -92,29 +98,37 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 	log.Infof("Create instance")
 
 	getMempoolTxsChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(rpcbus.GetMempoolTxs, getMempoolTxsChan); err != nil {
+	if err := rpcBus.Register(topics.GetMempoolTxs, getMempoolTxsChan); err != nil {
 		log.Errorf("rpcbus.GetMempoolTxs err=%v", err)
 	}
 
 	getMempoolTxsBySizeChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(rpcbus.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
+	if err := rpcBus.Register(topics.GetMempoolTxsBySize, getMempoolTxsBySizeChan); err != nil {
 		log.Errorf("rpcbus.getMempoolTxsBySize err=%v", err)
 	}
 
+	getMempoolViewChan := make(chan rpcbus.Request, 1)
+	if err := rpcBus.Register(topics.GetMempoolView, getMempoolViewChan); err != nil {
+		log.WithError(err).Errorf("error registering getMempoolView")
+	}
+
 	sendTxChan := make(chan rpcbus.Request, 1)
-	if err := rpcBus.Register(rpcbus.SendMempoolTx, sendTxChan); err != nil {
+	if err := rpcBus.Register(topics.SendMempoolTx, sendTxChan); err != nil {
 		log.Errorf("rpcbus.SendMempoolTx err=%v", err)
 	}
 
+	intermediateBlockChan := initIntermediateBlockCollector(eventBus)
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(eventBus)
 
 	m := &Mempool{
 		eventBus:                eventBus,
 		latestBlockTimestamp:    math.MinInt32,
 		quitChan:                make(chan struct{}),
+		intermediateBlockChan:   intermediateBlockChan,
 		acceptedBlockChan:       acceptedBlockChan,
 		getMempoolTxsChan:       getMempoolTxsChan,
 		getMempoolTxsBySizeChan: getMempoolTxsBySizeChan,
+		getMempoolViewChan:      getMempoolViewChan,
 		sendTxChan:              sendTxChan,
 	}
 
@@ -128,8 +142,8 @@ func NewMempool(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, verifyTx fun
 
 	// topics.Tx will be published by RPC subsystem or Peer subsystem (deserialized from gossip msg)
 	m.pending = make(chan TxDesc, maxPendingLen)
-	eventbus.NewTopicListener(m.eventBus, m, topics.Tx, eventbus.ChannelType)
-
+	l := eventbus.NewCallbackListener(m.CollectPending)
+	m.txSubscriberID = m.eventBus.Subscribe(topics.Tx, l)
 	return m
 }
 
@@ -145,20 +159,28 @@ func (m *Mempool) Run() {
 			select {
 			//rpcbus methods
 			case r := <-m.sendTxChan:
-				handleRequest(r, m.onSendMempoolTx, "SendTx")
+				handleRequest(r, m.processSendMempoolTxRequest, "SendTx")
 			case r := <-m.getMempoolTxsChan:
-				handleRequest(r, m.onGetMempoolTxs, "GetMempoolTxs")
+				handleRequest(r, m.processGetMempoolTxsRequest, "GetMempoolTxs")
 			case r := <-m.getMempoolTxsBySizeChan:
-				handleRequest(r, m.onGetMempoolTxsBySize, "GetMempoolTxsBySize")
+				handleRequest(r, m.processGetMempoolTxsBySizeRequest, "GetMempoolTxsBySize")
+			case r := <-m.getMempoolViewChan:
+				handleRequest(r, m.processGetMempoolViewRequest, "GetMempoolView")
 			// Mempool input channels
+			case b := <-m.intermediateBlockChan:
+				m.onBlock(b)
 			case b := <-m.acceptedBlockChan:
-				m.onAcceptedBlock(b)
+				m.onBlock(b)
 			case tx := <-m.pending:
+				// TODO: the m.pending channel looks a bit wasteful. Consider
+				// removing it and call onPendingTx directly within
+				// CollectPending
 				_, _ = m.onPendingTx(tx)
 			case <-time.After(20 * time.Second):
 				m.onIdle()
 			// Mempool terminating
 			case <-m.quitChan:
+				//m.eventBus.Unsubscribe(topics.Tx, m.txSubscriberID)
 				return
 			}
 		}
@@ -231,7 +253,7 @@ func (m *Mempool) processTx(t TxDesc) ([]byte, error) {
 	return txid, nil
 }
 
-func (m *Mempool) onAcceptedBlock(b block.Block) {
+func (m *Mempool) onBlock(b block.Block) {
 	m.latestBlockTimestamp = b.Header.Timestamp
 	m.removeAccepted(b)
 }
@@ -264,11 +286,6 @@ func (m *Mempool) removeAccepted(b block.Block) {
 
 	if err == nil && tree != nil {
 
-		if !bytes.Equal(tree.MerkleRoot, b.Header.TxRoot) {
-			log.Errorf("block %s has invalid txroot", blockHash)
-			return
-		}
-
 		s := m.newPool()
 		// Check if mempool verified tx is part of merkle tree of this block
 		// if not, then keep it in the mempool for the next block
@@ -300,7 +317,7 @@ func (m *Mempool) onIdle() {
 	// trigger alarms/notifications in case of abnormal state
 
 	// trigger alarms on too much txs memory allocated
-	maxSizeBytes := config.Get().Mempool.MaxSizeMB*1000*1000
+	maxSizeBytes := config.Get().Mempool.MaxSizeMB * 1000 * 1000
 	if m.verified.Size() > maxSizeBytes {
 		log.Warnf("Mempool is bigger than %d MB", config.Get().Mempool.MaxSizeMB)
 	}
@@ -335,7 +352,7 @@ func (m *Mempool) newPool() Pool {
 	case "hashmap":
 		p = &HashMap{Capacity: preallocTxs}
 	case "syncpool":
-		panic("syncpool not supported")
+		log.Panic("syncpool not supported")
 	default:
 		p = &HashMap{Capacity: preallocTxs}
 	}
@@ -343,75 +360,98 @@ func (m *Mempool) newPool() Pool {
 	return p
 }
 
-// Collect process the emitted transactions.
+// CollectPending process the emitted transactions.
 // Fast-processing and simple impl to avoid locking here.
 // NB This is always run in a different than main mempool routine
-func (m *Mempool) Collect(message bytes.Buffer) error {
-
-	txDesc, err := unmarshalTxDesc(message)
-	if err != nil {
-		return err
-	}
-
-	m.pending <- txDesc
+func (m *Mempool) CollectPending(msg message.Message) error {
+	tx := msg.Payload().(transactions.Transaction)
+	m.pending <- TxDesc{tx: tx, received: time.Now(), size: uint(len(msg.Id()))}
 	return nil
 }
 
-// onGetMempoolTxs retrieves current state of the mempool of the verified but
+// processGetMempoolTxsRequest retrieves current state of the mempool of the verified but
 // still unaccepted txs.
 // Called by P2P on InvTypeMempoolTx msg
-func (m Mempool) onGetMempoolTxs(r rpcbus.Request) (bytes.Buffer, error) {
-
+func (m Mempool) processGetMempoolTxsRequest(r rpcbus.Request) (interface{}, error) {
 	// Read inputs
-	filterTxID := r.Params.Bytes()
+	params := r.Params.(bytes.Buffer)
+	filterTxID := params.Bytes()
 
 	outputTxs := make([]transactions.Transaction, 0)
+
+	// If we are looking for a specific tx, just look it up by key.
+	if len(filterTxID) == 32 {
+		tx := m.verified.Get(filterTxID)
+		if tx == nil {
+			return outputTxs, nil
+		}
+
+		outputTxs = append(outputTxs, tx)
+		return outputTxs, nil
+	}
 
 	// When filterTxID is empty, mempool returns all verified txs sorted
 	// by fee from highest to lowest
 	err := m.verified.RangeSort(func(k txHash, t TxDesc) (bool, error) {
-		if len(filterTxID) > 0 {
-			if bytes.Equal(filterTxID, k[:]) {
-				// tx found
-				outputTxs = append(outputTxs, t.tx)
-				return true, nil
-			}
-		} else {
-			outputTxs = append(outputTxs, t.tx)
-		}
-
+		outputTxs = append(outputTxs, t.tx)
 		return false, nil
 	})
 
 	if err != nil {
-		return bytes.Buffer{}, err
+		return nil, err
 	}
 
-	// marshal Txs
-	w := new(bytes.Buffer)
-	lTxs := uint64(len(outputTxs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return bytes.Buffer{}, err
-	}
+	return outputTxs, err
+}
 
-	for _, tx := range outputTxs {
-		if err := marshalling.MarshalTx(w, tx); err != nil {
+func (m Mempool) processGetMempoolViewRequest(r rpcbus.Request) (interface{}, error) {
+	txs := make([]transactions.Transaction, 0)
+	req := r.Params.(*node.SelectRequest)
+	switch {
+	case len(req.Id) == 64:
+		// If we want a tx with a certain ID, we can simply look it up
+		// directly
+		hash, err := hex.DecodeString(req.Id)
+		if err != nil {
 			return bytes.Buffer{}, err
+		}
+
+		tx := m.verified.Get(hash)
+		if tx == nil {
+			return bytes.Buffer{}, errors.New("tx not found")
+		}
+
+		txs = append(txs, tx)
+	case len(req.Types) > 0:
+		for _, t := range req.Types {
+			txs = append(txs, m.verified.FilterByType(transactions.TxType(t))...)
+		}
+	default:
+		txs = m.verified.Clone()
+	}
+
+	resp := &node.SelectResponse{Result: make([]*node.Tx, len(txs))}
+	for i, tx := range txs {
+		resp.Result[i] = &node.Tx{
+			Type:     node.TxType(tx.Type()),
+			Id:       hex.EncodeToString(tx.StandardTx().TxID),
+			LockTime: tx.LockTime(),
 		}
 	}
 
-	return *w, nil
+	return resp, nil
 }
 
-// onGetMempoolTxsBySize returns a subset of verified mempool txs which
+// processGetMempoolTxsBySizeRequest returns a subset of verified mempool txs which
 // 1. contains only highest fee txs
 // 2. has total txs size not bigger than maxTxsSize (request param)
 // Called by BlockGenerator on generating a new candidate block
-func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
+func (m Mempool) processGetMempoolTxsBySizeRequest(r rpcbus.Request) (interface{}, error) {
 
 	// Read maxTxsSize param
 	var maxTxsSize uint32
-	if err := encoding.ReadUint32LE(&r.Params, &maxTxsSize); err != nil {
+	params := r.Params.(bytes.Buffer)
+	if err := encoding.ReadUint32LE(&params, &maxTxsSize); err != nil {
 		return bytes.Buffer{}, err
 	}
 
@@ -436,37 +476,21 @@ func (m Mempool) onGetMempoolTxsBySize(r rpcbus.Request) (bytes.Buffer, error) {
 		return bytes.Buffer{}, err
 	}
 
-	// marshal Txs
-	w := new(bytes.Buffer)
-	lTxs := uint64(len(txs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	for _, tx := range txs {
-		if err := marshalling.MarshalTx(w, tx); err != nil {
-			return bytes.Buffer{}, err
-		}
-	}
-
-	return *w, nil
+	return txs, err
 }
 
-// onSendMempoolTx utilizes rpcbus to allow submitting a tx to mempool with
-func (m Mempool) onSendMempoolTx(r rpcbus.Request) (bytes.Buffer, error) {
-
-	txDesc, err := unmarshalTxDesc(r.Params)
-	if err != nil {
-		return bytes.Buffer{}, err
+// processSendMempoolTxRequest utilizes rpcbus to allow submitting a tx to mempool with
+func (m Mempool) processSendMempoolTxRequest(r rpcbus.Request) (interface{}, error) {
+	tx := r.Params.(transactions.Transaction)
+	buf := new(bytes.Buffer)
+	if err := message.MarshalTx(buf, tx); err != nil {
+		return nil, err
 	}
 
+	txDesc := TxDesc{tx: tx, received: time.Now(), size: uint(buf.Len())}
+
 	// Process request
-	txid, err := m.onPendingTx(txDesc)
-
-	result := bytes.Buffer{}
-	result.Write(txid)
-
-	return result, err
+	return m.onPendingTx(txDesc)
 }
 
 // checkTXDoubleSpent differs from verifiers.checkTXDoubleSpent as it executes on
@@ -497,14 +521,16 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 	// TODO: can we simply encode the message directly on a topic carrying buffer?
 	buf := new(bytes.Buffer)
 	if err := msg.Encode(buf); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if err := topics.Prepend(buf, topics.Inv); err != nil {
-		return err
+		log.Panic(err)
 	}
 
-	m.eventBus.Publish(topics.Gossip, buf)
+	// TODO: interface - marshalling should done after the Gossip, not before
+	packet := message.New(topics.Inv, *buf)
+	m.eventBus.Publish(topics.Gossip, packet)
 	return nil
 }
 
@@ -513,21 +539,9 @@ func toHex(id []byte) string {
 	return enc
 }
 
-func unmarshalTxDesc(message bytes.Buffer) (TxDesc, error) {
-
-	bufSize := message.Len()
-	tx, err := marshalling.UnmarshalTx(&message)
-	if err != nil {
-		return TxDesc{}, err
-	}
-
-	// txSize is number of unmarshaled bytes
-	txSize := bufSize - message.Len()
-
-	return TxDesc{tx: tx, received: time.Now(), size: uint(txSize)}, nil
-}
-
-func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (bytes.Buffer, error), name string) {
+// TODO: handlers should just return []transactions.Transaction, and the
+// caller should be left to format the data however they wish
+func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}, error), name string) {
 
 	log.Tracef("Handling %s request", name)
 
@@ -541,4 +555,19 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (bytes.Buffe
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
 
 	log.Tracef("Handled %s request", name)
+}
+
+func marshalTxs(w *bytes.Buffer, txs []transactions.Transaction) error {
+	lTxs := uint64(len(txs))
+	if err := encoding.WriteVarInt(w, lTxs); err != nil {
+		return err
+	}
+
+	for _, tx := range txs {
+		if err := message.MarshalTx(w, tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

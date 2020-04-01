@@ -11,14 +11,14 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-crypto/rangeproof"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
 	lockTime = uint64(2000000000)
-	fee      = int64(20)
+	fee      = int64(200)
 )
 
 var numInputs, numOutputs = 23, 16
@@ -69,6 +69,14 @@ func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
 	// Outputs
 	tx.Outputs = RandomOutputs(t, numOutputs)
 
+	// Set TxID
+	hash, err := tx.CalculateHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx.TxID = hash
+
 	return tx, err
 }
 
@@ -80,6 +88,14 @@ func RandomCoinBaseTx(t *testing.T, malformed bool) *transactions.Coinbase {
 	tx := transactions.NewCoinbase(proof, score, 2)
 	tx.Rewards = RandomOutputs(t, 1)
 	tx.Rewards[0].EncryptedAmount.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
+
+	// Set TxID
+	hash, err := tx.CalculateHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx.TxID = hash
 	return tx
 }
 
@@ -97,6 +113,14 @@ func RandomTLockTx(t *testing.T, malformed bool) *transactions.Timelock {
 
 	// Outputs
 	tx.Outputs = RandomOutputs(t, numOutputs)
+
+	// Set TxID
+	hash, err := tx.CalculateHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx.TxID = hash
 
 	return tx
 }
@@ -118,6 +142,14 @@ func RandomStandardTx(t *testing.T, malformed bool) *transactions.Standard {
 	// Outputs
 	tx.Outputs = RandomOutputs(t, numOutputs)
 
+	// Set TxID
+	hash, err := tx.CalculateHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx.TxID = hash
+
 	return tx
 }
 
@@ -138,6 +170,14 @@ func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
 
 	// Outputs
 	tx.Outputs = RandomOutputs(t, numOutputs)
+
+	// Set TxID
+	hash, err := tx.CalculateHash()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx.TxID = hash
 
 	return tx, nil
 }

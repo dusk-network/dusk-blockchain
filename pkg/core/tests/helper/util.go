@@ -6,15 +6,15 @@ import (
 	"net"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +23,7 @@ func TxsToBuffer(t *testing.T, txs []transactions.Transaction) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 
 	for _, tx := range txs {
-		err := marshalling.MarshalTx(buf, tx)
+		err := message.MarshalTx(buf, tx)
 		if err != nil {
 			assert.Nil(t, err)
 		}

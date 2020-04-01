@@ -3,10 +3,12 @@ package selection
 import (
 	"bytes"
 	"errors"
+	"sync"
 
 	ristretto "github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
@@ -19,16 +21,17 @@ type (
 		// Threshold number that a score needs to be greater than in order to be considered
 		// for selection. Messages with scores lower than this threshold should not be
 		// repropagated.
+		lock      sync.RWMutex
 		threshold *consensus.Threshold
 	}
 
 	// Handler is an abstraction of the selection component event handler.
 	// It is primarily used for testing purposes, to bypass the zkproof verification.
 	Handler interface {
-		Verify(Score) error
+		Verify(message.Score) error
 		ResetThreshold()
 		LowerThreshold()
-		Priority(Score, Score) bool
+		Priority(message.Score, message.Score) bool
 	}
 )
 
@@ -40,20 +43,26 @@ func NewScoreHandler(bidList user.BidList) *ScoreHandler {
 }
 
 func (sh *ScoreHandler) ResetThreshold() {
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
 	sh.threshold.Reset()
 }
 
 func (sh *ScoreHandler) LowerThreshold() {
+	sh.lock.Lock()
+	defer sh.lock.Unlock()
 	sh.threshold.Lower()
 }
 
 // Priority returns true if the first element has priority over the second, false otherwise
-func (sh *ScoreHandler) Priority(first, second Score) bool {
+func (sh *ScoreHandler) Priority(first, second message.Score) bool {
 	return bytes.Compare(second.Score, first.Score) != 1
 }
 
-func (sh *ScoreHandler) Verify(m Score) error {
+func (sh *ScoreHandler) Verify(m message.Score) error {
 	// Check threshold
+	sh.lock.RLock()
+	defer sh.lock.RUnlock()
 	if sh.threshold.Exceeds(m.Score) {
 		return errors.New("threshold exceeds score")
 	}

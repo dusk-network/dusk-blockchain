@@ -3,7 +3,7 @@ package mempool
 import (
 	"time"
 
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 type txHash [32]byte
@@ -27,6 +27,8 @@ type Pool interface {
 	// Put sets the value for the given key. It overwrites any previous value
 	// for that key;
 	Put(t TxDesc) error
+	// Get retrieves a transaction for a given txID, if it exists.
+	Get(txID []byte) transactions.Transaction
 	// Contains returns true if the given key is in the pool.
 	Contains(key []byte) bool
 	// ContainsKeyImage returns true if txpool includes a input that contains
@@ -34,6 +36,9 @@ type Pool interface {
 	ContainsKeyImage(keyImage []byte) bool
 	// Clone the entire pool
 	Clone() []transactions.Transaction
+
+	// FilterByType returns all verified transactions for a specific type.
+	FilterByType(transactions.TxType) []transactions.Transaction
 
 	// Size is total number of bytes of all txs marshalling size
 	Size() uint32

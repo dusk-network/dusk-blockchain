@@ -1,12 +1,6 @@
-# Use Ubuntu 18.04
 dist: xenial
 
 language: go
-
-# Force-enable Go modules. Also force go to use the code in vendor/
-# These will both be unnecessary when Go 1.13 lands.
-env:
-  - GO111MODULE=on
 
 go:
   - 1.13.x
@@ -15,17 +9,20 @@ go:
 git:
   depth: 1
 
-before_script:
-  - go get ./...
-  - go get -u golang.org/x/lint/golint
+matrix:
+  include:
+    - name: "Tests"
+      before_script:
+        - go get ./...
+        - go get -u golang.org/x/lint/golint
 
-# Send a notification to the Dusk build Status Telegram channel once the CI build completes
-after_script:
-  - bash <(curl -s https://raw.githubusercontent.com/dusk-network/tools/master/bash/telegram_ci_notifications.sh)
+      # Send a notification to the Dusk build Status Telegram channel once the CI build completes
+      after_script:
+        - bash <(curl -s https://raw.githubusercontent.com/dusk-network/tools/master/bash/telegram_ci_notifications.sh)
 
-script:
-  - golint ./...
-  - go test -p 1 -race -coverprofile=coverage.txt -covermode=atomic ./... # Run all the tests with the race detector enabled
+      script:
+        - golint ./...
+        - go test -v -p 1 -race -coverprofile=coverage.txt -covermode=atomic ./... # Run all the tests with the race detector enabled
 
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
+      after_success:
+        - bash <(curl -s https://codecov.io/bash)

@@ -1,11 +1,15 @@
-##### Overview
+##### Intro
 GraphQL package is here to provide a read-only access to any persistent/non-persistent node data.
 It should allow fetching:
 
 - chain data (block header and transactions)
 - mempool state information
-- wallet/account information (pending)
 - node status (pending)
+
+##### API Endpoints
+
+- `/graphql` - Support data fetching
+- `/ws` - Support websocket notifications
 
 ##### Scenarios
 
@@ -15,22 +19,30 @@ Scenarios where it's supposed to be useful:
 - Test Harness ensuring chain state after a set of actions executed
 - User retrieving data in curl-request manner
 
-Package should not be used for any data mutations or node commanding.
-
-##### Transport
-
-Currently, it's over HTTP but later WebSocket support could be added to enable data fetching in publish-subscribe manner.
-(e.g graphql service capable of sending updates on newly accepted block)
+The utility should not be used for any data mutations or node commanding.
 
 #### Configuration
 ```toml
+# GraphQL API service
 [gql]
 # enable graphql service
 enabled=true
-port=9001
+address="127.0.0.1:9001"
+
+# enable/disable both HTTPS and WSS
+enableTLS = false
+# cert file path
+certFile = ""
+# key file path
+keyFile = ""
+
+# maximum requests per second 
+# uniqueness of a request is based on: 
+# Remote IP, Request method and path
+maxRequestLimit = 20
 ```
 
-##### Example queries that can be sent as message body of a HTTP POST request
+##### Example queries that can be sent as message body of a HTTP POST request to endpoint /graphql
 
 NB: The examples from below represent only query structures. To send a query as a http request the following schema must be used:
 
@@ -191,13 +203,30 @@ NB: The examples from below represent only query structures. To send a query as 
 }
 ```
 
-- Fetch last/latest 100 transactions
+- Fetch last/latest 100 transactions (type and size fetched)
 ```graphql
 { 
   transactions(last: 100) 
   { 
-    txid 
-    txtype 
+    txid
+    txtype
+    size
   }
+}
+```
+
+- Calculate count of blocks (tip - old height) since 1970-01-01T00:00:20+00:00
+```graphql
+{
+	tip: blocks(height: -1) {
+		header {
+			height
+		}
+	}
+	old: blocks(since: "1970-01-01T00:00:20+00:00") {
+		header {
+			height
+		}
+	}
 }
 ```

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,10 +16,12 @@ func RandomBlock(t *testing.T, height uint64, txBatchCount uint16) *block.Block 
 		Header: RandomHeader(t, height),
 		Txs:    RandomSliceOfTxs(t, txBatchCount),
 	}
-	err := b.SetHash()
+	hash, err := b.CalculateHash()
 	assert.NoError(t, err)
-	err = b.SetRoot()
+	b.Header.Hash = hash
+	root, err := b.CalculateRoot()
 	assert.NoError(t, err)
+	b.Header.TxRoot = root
 	return b
 }
 
@@ -29,8 +31,9 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 		Header: RandomHeader(t, 200),
 		Txs:    RandomSliceOfTxs(t, 20),
 	}
-	err := blk0.SetHash()
+	hash, err := blk0.CalculateHash()
 	assert.Nil(t, err)
+	blk0.Header.Hash = hash
 
 	blk1 := &block.Block{
 		Header: RandomHeader(t, 200),
@@ -40,10 +43,12 @@ func TwoLinkedBlocks(t *testing.T) (*block.Block, *block.Block) {
 	blk1.Header.PrevBlockHash = blk0.Header.Hash
 	blk1.Header.Height = blk0.Header.Height + 1
 	blk1.Header.Timestamp = blk0.Header.Timestamp + 100
-	err = blk1.SetRoot()
+	root, err := blk1.CalculateRoot()
 	assert.Nil(t, err)
-	err = blk1.SetHash()
+	blk1.Header.TxRoot = root
+	hash, err = blk1.CalculateHash()
 	assert.Nil(t, err)
+	blk1.Header.Hash = hash
 
 	return blk0, blk1
 }

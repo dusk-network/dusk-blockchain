@@ -6,8 +6,8 @@ import (
 
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 var (
@@ -69,22 +69,11 @@ type Transaction interface {
 	// also txID the input belongs to
 	FetchKeyImageExists(keyImage []byte) (exists bool, txID []byte, err error)
 
-	// Fetch a candidate block by hash
-	FetchCandidateBlock(hash []byte) (*block.Block, error)
-
 	// Read-write transactions
 	// Store the next chain block in a append-only manner
 	// Overwrites only if block with same hash already stored
+	// Not to be called concurrently, as it updates chain tip
 	StoreBlock(block *block.Block) error
-
-	// StoreCandidateBlock stores a candidate block to be proposed in next
-	// consensus round.
-	StoreCandidateBlock(block *block.Block) error
-
-	// DeleteCandidateBlocks deletes all candidate blocks. If maxHeight is not
-	// 0, it deletes only blocks with a height lower than maxHeight or equal. It
-	// returns number of deleted candidate blocks
-	DeleteCandidateBlocks(maxHeight uint64) (uint32, error)
 
 	// FetchBlock will return a block, given a hash.
 	FetchBlock(hash []byte) (*block.Block, error)
@@ -106,12 +95,22 @@ type Transaction interface {
 	FetchOutputUnlockHeight(destkey []byte) (uint64, error)
 
 	// StoreBidValues stores the D and K values passed by the caller in
-	// the database.
-	StoreBidValues([]byte, []byte) error
+	// the database, as well as the expiry height. It should be passed
+	// the transaction locktime as a third argument, as the database
+	// can infer the current height and consequently, the expiry height,
+	// on its own.
+	StoreBidValues([]byte, []byte, uint64) error
 
-	// FetchBidValues retrieves the last stored D and K values from
-	// the database.
+	// FetchBidValues retrieves the D and K values with the lowest
+	// expiry height from the database.
 	FetchBidValues() ([]byte, []byte, error)
+
+	// FetchBlockHeightSince try to find height of a block generated around
+	// sinceUnixTime starting the search from height (tip - offset)
+	FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error)
+
+	// ClearDatabase will remove all information from the database.
+	ClearDatabase() error
 
 	// Atomic storage
 	Commit() error

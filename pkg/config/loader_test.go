@@ -32,7 +32,7 @@ func TestDefaultConfigTOML(t *testing.T) {
 		t.Error("Invalid general/network value")
 	}
 
-	if Get().Logger.Level != "trace" {
+	if Get().Logger.Level != "debug" {
 		t.Error("Invalid logger level")
 	}
 }
@@ -116,14 +116,14 @@ func TestReadOnly(t *testing.T) {
 		t.Errorf("Failed parse: %v", err)
 	}
 
-	if Get().Logger.Level != "trace" {
+	if Get().Logger.Level != "debug" {
 		t.Error("Invalid logger level")
 	}
 
 	r := Get()
 	r.Logger.Level = "MODIFIED_level"
 
-	if Get().Logger.Level != "trace" {
+	if Get().Logger.Level != "debug" {
 		t.Errorf("Invalid config %s", Get().Logger.Level)
 	}
 }
@@ -156,6 +156,15 @@ func TestSecondaryRegistry(t *testing.T) {
 	if r2.Custom.Key != "value" {
 		t.Errorf("Invalid Custom Key value: %s", r2.Custom.Key)
 	}
+
+	if Get().Profile[0].Name != "heap" {
+		t.Errorf("Invalid Profile [0]: %s", Get().Profile[0].Name)
+	}
+
+	if Get().Profile[1].Name != "cpu" {
+		t.Errorf("Invalid Profile [1]: %s", Get().Profile[1].Name)
+	}
+
 }
 
 func Reset() {

@@ -47,7 +47,7 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	initProfiles()
 
-	blockchainExec, blindBidExec, seederExec, err := n.getExec()
+	_, _, seederExec, err := n.getExec()
 	if err != nil {
 		return err
 	}
@@ -64,34 +64,8 @@ func (n *Network) Bootstrap(workspace string) error {
 
 	// Foreach node read localNet.Nodes, configure and run new nodes
 	for i, node := range n.Nodes {
-
-		// create node folder
-		nodeDir := workspace + "/node-" + node.Id
-		err := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm)
+		err := n.StartNode(i, node, workspace)
 		if err != nil {
-			return err
-		}
-
-		node.Dir = nodeDir
-
-		// Load wallet path as walletX.dat are hard-coded for now
-		// Later they could be generated on the fly per each test execution
-		walletsPath, _ := os.Getwd()
-		walletsPath += "/../data/"
-
-		// Generate node default config file
-		tomlFilePath, err := n.generateConfig(i, walletsPath)
-		if err != nil {
-			return err
-		}
-
-		// Run dusk-blockchain node process
-		if err := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); err != nil {
-			return err
-		}
-
-		// Run blindbid node process
-		if err := n.start(nodeDir, blindBidExec); err != nil {
 			return err
 		}
 	}
@@ -105,9 +79,50 @@ func (n *Network) Bootstrap(workspace string) error {
 }
 
 func (n *Network) Teardown() {
-	for _, process := range n.processes {
-		_ = process.Kill()
+	for _, p := range n.processes {
+		if err := p.Signal(os.Interrupt); err != nil {
+			log.Warn(err)
+		}
 	}
+}
+
+func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
+
+	blockchainExec, blindBidExec, _, err := n.getExec()
+	if err != nil {
+		return err
+	}
+
+	// create node folder
+	nodeDir := workspace + "/node-" + node.Id
+	if err := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm); err != nil {
+		return err
+	}
+
+	node.Dir = nodeDir
+
+	// Load wallet path as walletX.dat are hard-coded for now
+	// Later they could be generated on the fly per each test execution
+	walletsPath, _ := os.Getwd()
+	walletsPath += "/../data/"
+
+	// Generate node default config file
+	tomlFilePath, err := n.generateConfig(i, walletsPath)
+	if err != nil {
+		return err
+	}
+
+	// Run dusk-blockchain node process
+	if err := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); err != nil {
+		return err
+	}
+
+	// Run blindbid node process
+	if err := n.start(nodeDir, blindBidExec); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // generateConfig loads config profile assigned to this node

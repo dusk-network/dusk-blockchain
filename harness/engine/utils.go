@@ -5,53 +5,58 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"fmt"
 	"net"
 	"net/http"
+	"testing"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
+	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
 )
 
 // PublishTopic publishes an event bus topic to the specified node via
 // rpc call
 func (n *Network) PublishTopic(nodeIndex uint, topic, payload string) error {
 
-	if nodeIndex >= uint(len(n.Nodes)) {
-		return errors.New("invalid node index")
-	}
+	/*
+		if nodeIndex >= uint(len(n.Nodes)) {
+			return errors.New("invalid node index")
+		}
 
-	targetNode := n.Nodes[nodeIndex]
-	addr := "http://127.0.0.1:" + targetNode.Cfg.RPC.Address
-	request := &rpc.JSONRequest{Method: "publishTopic"}
-	request.Params = []string{topic, payload}
+		targetNode := n.Nodes[nodeIndex]
+		addr := "http://127.0.0.1:" + targetNode.Cfg.RPC.Address
+		request := &rpc.JSONRequest{Method: "publishTopic"}
+		request.Params = []string{topic, payload}
 
-	data, err := json.Marshal(request)
-	if err != nil {
+		data, err := json.Marshal(request)
+		if err != nil {
+			return err
+		}
+
+		buf := bytes.Buffer{}
+		if _, err := buf.Write(data); err != nil {
+			return err
+		}
+
+		_, err = http.Post(addr, "application/json", &buf)
 		return err
-	}
-
-	buf := bytes.Buffer{}
-	if _, err := buf.Write(data); err != nil {
-		return err
-	}
-
-	_, err = http.Post(addr, "application/json", &buf)
-	return err
+	*/
+	return nil
 }
 
 // SendQuery sends a graphql query to the specified network node
 func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) error {
-
 	if nodeIndex >= uint(len(n.Nodes)) {
 		return errors.New("invalid node index")
 	}
 
 	targetNode := n.Nodes[nodeIndex]
-	addr := "http://127.0.0.1:" + targetNode.Cfg.Gql.Port
+	addr := "http://" + targetNode.Cfg.Gql.Address + "/graphql"
 
 	buf := bytes.Buffer{}
 	if _, err := buf.Write([]byte(query)); err != nil {
@@ -70,82 +75,65 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	return nil
 }
 
-// SendCommand sends a jsonrpc request to the specified network node
-func (n *Network) SendCommand(nodeIndex uint, method string, params []string) ([]byte, error) {
+// LoadWalletCmd sends gRPC command LoadWallet and returns pubkey (if loaded)
+func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 
-	if nodeIndex >= uint(len(n.Nodes)) {
-		return nil, errors.New("invalid node index")
+	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
+
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	client := pb.NewNodeClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	req := pb.LoadRequest{Password: password}
+	resp, err := client.LoadWallet(ctx, &req)
+	if err != nil {
+		return "", err
 	}
 
-	targetNode := n.Nodes[nodeIndex]
+	return string(resp.GetKey().PublicKey), nil
+}
 
-	req := rpc.JSONRequest{
-		Method: method,
-		Params: params,
+// SendBidCmd sends gRPC command SendBid and returns tx hash
+func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) {
+
+	addr := "unix://" + n.Nodes[ind].Cfg.RPC.Address
+
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return nil, err
 	}
+	defer conn.Close()
 
-	var data []byte
-	data, err := json.Marshal(req)
+	client := pb.NewNodeClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	req := pb.ConsensusTxRequest{Amount: amount, LockTime: locktime}
+	resp, err := client.SendBid(ctx, &req)
 	if err != nil {
 		return nil, err
 	}
 
-	buf := bytes.Buffer{}
-	if _, err := buf.Write([]byte(data)); err != nil {
-		return nil, err
-	}
-
-	addr := targetNode.Cfg.RPC.Address
-	network := targetNode.Cfg.RPC.Network
-
-	httpc := http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-				return net.Dial(network, addr)
-			},
-		},
-	}
-
-	url := "http://" + addr
-	if network == "unix" {
-		url = "http://unix" + addr
-	}
-
-	resp, err := httpc.Post(url, "application/json", &buf)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var jsonResp rpc.JSONResponse
-	if err := json.Unmarshal(body, &jsonResp); err != nil {
-		return nil, err
-	}
-
-	// TODO: Simplify
-	data, err = jsonResp.Result.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return resp.Hash, nil
 }
 
 // SendWireMsg sends a P2P message to the specified network node
 // NB: Handshaking procedure must be performed prior to the message sending
-func (n *Network) SendWireMsg(nodeIndex uint, msg []byte, writeTimeout int) error {
+func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 
-	if nodeIndex >= uint(len(n.Nodes)) {
+	if ind >= uint(len(n.Nodes)) {
 		return errors.New("invalid node index")
 	}
 
-	targetNode := n.Nodes[nodeIndex]
+	targetNode := n.Nodes[ind]
 	addr := "127.0.0.1:" + targetNode.Cfg.Network.Port
 
 	// connect to this socket
@@ -201,4 +189,64 @@ func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 	// TODO: Append Checksum
 
 	return msg, nil
+}
+
+// WaitUntil blocks until the node at index ind reaches the target height
+func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor time.Duration, tick time.Duration) {
+
+	condition := func() bool {
+		// Construct query to fetch block height
+		query := fmt.Sprintf(
+			"{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}",
+		)
+
+		var result map[string]map[string][]map[string]map[string]int
+		if err := n.SendQuery(ind, query, &result); err != nil {
+			return false
+		}
+
+		if result["data"]["blocks"][0]["header"]["height"] >= int(targetHeight) {
+			return true
+		}
+
+		return false
+	}
+
+	assert.Eventually(t, condition, waitFor, tick)
+}
+
+// WaitUntilTx blocks until the node at index ind accepts the specified Tx
+// Returns hash of the block that includes this tx
+func (n *Network) WaitUntilTx(t *testing.T, ind uint, txID string) string {
+
+	var blockhash string
+	condition := func() bool {
+		// Construct query to fetch txid
+		query := fmt.Sprintf(
+			"{\"query\" : \"{ transactions (txid: \\\"%s\\\") { txid blockhash } }\"}",
+			txID)
+
+		var resp map[string]map[string][]map[string]string
+		if err := n.SendQuery(ind, query, &resp); err != nil {
+			return false
+		}
+
+		result, ok := resp["data"]
+		if !ok || len(result["transactions"]) == 0 {
+			// graphql request processed but still txid not found
+			return false
+		}
+
+		if result["transactions"][0]["txid"] != txID {
+			return false
+		}
+
+		blockhash = result["transactions"][0]["blockhash"]
+		return true
+	}
+
+	// asserts that given condition will be met in 1 minute, by checking condition function each second.
+	assert.Eventuallyf(t, condition, 1*time.Minute, time.Second, "failed node %s", ind)
+
+	return blockhash
 }

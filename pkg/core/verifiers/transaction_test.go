@@ -13,11 +13,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/verifiers"
 	"github.com/dusk-network/dusk-crypto/mlsag"
-	"github.com/dusk-network/dusk-wallet/block"
-	walletdb "github.com/dusk-network/dusk-wallet/database"
-	"github.com/dusk-network/dusk-wallet/key"
-	"github.com/dusk-network/dusk-wallet/transactions"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
+	"github.com/dusk-network/dusk-wallet/v2/key"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,9 +43,26 @@ func TestLockedInputs(t *testing.T) {
 	defer os.RemoveAll("alice")
 	defer os.Remove("alice.dat")
 
-	// Create stake tx
+	// Credit alice with a standard output first, so that we have a decoy
 	var amount ristretto.Scalar
-	amount.SetBigInt(big.NewInt(1000000))
+	amount.SetBigInt(big.NewInt(10))
+	tx, err := alice.NewStandardTx(100)
+	assert.NoError(t, err)
+	alicePubAddr, err := alice.PublicAddress()
+	assert.NoError(t, err)
+	tx.AddOutput(key.PublicAddress(alicePubAddr), amount)
+	err = alice.Sign(tx)
+	assert.NoError(t, err)
+	// Rip out the change to avoid random failures
+	tx.Outputs = tx.Outputs[0:1]
+	// Database setup for test
+	_, db := heavy.CreateDBConnection()
+	blk := writeTxToDatabase(t, db, tx, 0)
+	_, _, err = alice.CheckWireBlock(*blk)
+	assert.NoError(t, err)
+
+	// Create stake tx
+	amount.SetBigInt(big.NewInt(10000000))
 	stake, err := alice.NewStakeTx(100, 10000, amount)
 	assert.NoError(t, err)
 	err = alice.Sign(stake)
@@ -53,9 +70,7 @@ func TestLockedInputs(t *testing.T) {
 	// Rip out the change output so that the test will not randomly fail
 	stake.Outputs = stake.Outputs[0:1]
 
-	// Database setup for test
-	_, db := heavy.CreateDBConnection()
-	blk := writeTxToDatabase(t, db, stake)
+	blk = writeTxToDatabase(t, db, stake, 1)
 	_, _, err = alice.CheckWireBlock(*blk)
 	assert.NoError(t, err)
 
@@ -68,7 +83,7 @@ func TestLockedInputs(t *testing.T) {
 	alice, err = wallet.LoadFromFile(2, aliceDB, fetchDecoys, fetchInputs, "pass", "alice.dat")
 
 	// Create a standard tx, using the locked output that we sent to alice
-	tx, err := alice.NewStandardTx(100)
+	tx, err = alice.NewStandardTx(100)
 	assert.NoError(t, err)
 	amount.SetBigInt(big.NewInt(1000000))
 	tx.AddOutput(key.PublicAddress("pippo"), amount)
@@ -80,9 +95,9 @@ func TestLockedInputs(t *testing.T) {
 }
 
 // Write a block with one transaction to the db.
-func writeTxToDatabase(t *testing.T, db database.DB, tx transactions.Transaction) *block.Block {
+func writeTxToDatabase(t *testing.T, db database.DB, tx transactions.Transaction, height uint64) *block.Block {
 	blk := block.NewBlock()
-	blk.Header.Height = 0
+	blk.Header.Height = height
 	blk.Header.Version = 0
 	blk.Header.Timestamp = time.Now().Unix()
 	blk.Header.Hash = make([]byte, 32)

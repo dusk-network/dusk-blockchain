@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/secondstep"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
@@ -25,7 +26,7 @@ func TestCorrectHeader(t *testing.T) {
 
 	// Subscribe to gossip topic. We will catch the outgoing reduction votes
 	// on this channel.
-	gossipChan := make(chan bytes.Buffer, 2)
+	gossipChan := make(chan message.Message, 2)
 	bus.Subscribe(topics.Gossip, eventbus.NewChanListener(gossipChan))
 
 	// Create reduction events from the future, enough to reach quorum for either
@@ -34,9 +35,11 @@ func TestCorrectHeader(t *testing.T) {
 	// Step 1
 	hlp.Forward(0)
 	hash, _ := crypto.RandEntropy(32)
+	// spawning reductions
 	evs1 := hlp.Spawn(hash)
 	// Step 2
 	hlp.Forward(0)
+	//// spawning reductions
 	evs2 := hlp.Spawn(hash)
 	evs := append(evs1, evs2...)
 
@@ -50,17 +53,22 @@ func TestCorrectHeader(t *testing.T) {
 	// Collect two outgoing reduction messages. The first one should have step 1
 	// in it's header, and the second should have step 2.
 	r1 := <-gossipChan
+	p1 := r1.Payload().(bytes.Buffer)
+	hdr1 := retrieveHeader(t, p1)
+	if !assert.Equal(t, uint8(1), hdr1.Step) {
+		t.FailNow()
+	}
+
 	// We discard the message in the middle, as it will be an Agreement message,
 	// as a result of the emptying of the queue resulting on quorum.
 	<-gossipChan
 	r2 := <-gossipChan
 
 	// Retrieve headers from both reduction messages
-	hdr1 := retrieveHeader(t, r1)
-	hdr2 := retrieveHeader(t, r2)
+	p2 := r2.Payload().(bytes.Buffer)
+	hdr2 := retrieveHeader(t, p2)
 
 	// Check correctness
-	assert.Equal(t, uint8(1), hdr1.Step)
 	assert.Equal(t, uint8(2), hdr2.Step)
 }
 
@@ -68,12 +76,6 @@ func retrieveHeader(t *testing.T, r bytes.Buffer) header.Header {
 	// Discard topic
 	topicBuf := make([]byte, 1)
 	if _, err := r.Read(topicBuf); err != nil {
-		t.Fatal(err)
-	}
-
-	// Discard Ed25519 fields
-	buf := make([]byte, 96)
-	if _, err := r.Read(buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -93,27 +95,14 @@ func sendBestScore(t *testing.T, bus *eventbus.EventBus, round uint64, step uint
 		PubKeyBLS: blsPubKey,
 	}
 
-	buf := new(bytes.Buffer)
-	if err := header.Marshal(buf, hdr); err != nil {
-		t.Fatal(err)
-	}
-
-	bus.Publish(topics.BestScore, buf)
+	msg := message.New(topics.BestScore, hdr)
+	bus.Publish(topics.BestScore, msg)
 }
 
-func collectEvents(t *testing.T, c *consensus.Coordinator, evs []consensus.Event) {
+func collectEvents(t *testing.T, c *consensus.Coordinator, evs []message.Reduction) {
 	for _, ev := range evs {
-		buf := new(bytes.Buffer)
-		if err := header.Marshal(buf, ev.Header); err != nil {
-			t.Fatal(err)
-		}
-
-		if _, err := buf.ReadFrom(&ev.Payload); err != nil {
-			t.Fatal(err)
-		}
-
-		topics.Prepend(buf, topics.Reduction)
-		c.CollectEvent(*buf)
+		msg := message.New(topics.Reduction, ev)
+		c.CollectEvent(msg)
 	}
 }
 
@@ -123,12 +112,10 @@ func wireReduction(t *testing.T, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus) 
 	f2 := secondstep.NewFactory(bus, rpcBus, hlp.Keys[0], 1*time.Second)
 	c := consensus.Start(bus, hlp.Keys[0], f1, f2)
 	// Starting the coordinator
-	ru := *consensus.MockRoundUpdateBuffer(1, hlp.P, nil)
-	if err := c.CollectRoundUpdate(ru); err != nil {
+	ru := consensus.MockRoundUpdate(1, hlp.P, nil)
+	msg := message.New(topics.RoundUpdate, ru)
+	if err := c.CollectRoundUpdate(msg); err != nil {
 		t.Fatal(err)
 	}
-	// Remove the republisher and ed25519 verification
-	bus.RemoveAllProcessors()
-
 	return c, hlp
 }

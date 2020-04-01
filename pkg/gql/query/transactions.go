@@ -1,14 +1,16 @@
 package query
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/graphql-go/graphql"
 	"github.com/pkg/errors"
 
-	core "github.com/dusk-network/dusk-wallet/transactions"
+	core "github.com/dusk-network/dusk-wallet/v2/transactions"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,7 +41,10 @@ type (
 
 		// non-StandardTx data fields
 		BlockHash []byte
-		Size      uint64
+		Size      int
+
+		// Coinbase Tx fields
+		Score []byte
 	}
 )
 
@@ -71,6 +76,22 @@ func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 	}
 
 	qd.BlockHash = blockHash
+
+	// Populate Score value if available
+	if tx.Type() == core.CoinbaseType {
+		x, ok := tx.(*core.Coinbase)
+		if ok {
+			qd.Score = x.Score
+		}
+	}
+
+	// Populate marshalling size
+	buf := new(bytes.Buffer)
+	if err := message.MarshalTx(buf, tx); err != nil {
+		return queryTx{}, err
+	}
+
+	qd.Size = buf.Len()
 
 	return qd, nil
 }

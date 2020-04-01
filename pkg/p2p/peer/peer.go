@@ -2,6 +2,7 @@ package peer
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net"
 	"sync"
@@ -13,12 +14,17 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/dupemap"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/responding"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 
 var readWriteTimeout = 60 * time.Second // Max idle time for a peer
+var keepAliveTime = 30 * time.Second    // Send keepalive message after inactivity for this amount of time
+
+var l *log.Entry = log.WithField("process", "peer")
 
 // Connection holds the TCP connection to another node, and it's known protocol magic.
 // The `net.Conn` is guarded by a mutex, to allow both multicast and one-to-one
@@ -29,12 +35,30 @@ type Connection struct {
 	gossip *processing.Gossip
 }
 
+// GossipConnector calls Gossip.Process on the message stream incoming from the
+// ringbuffer
+// It absolves the function previously carried over by the Gossip preprocessor.
+type GossipConnector struct {
+	gossip *processing.Gossip
+	*Connection
+}
+
+func (g *GossipConnector) Write(b []byte) (int, error) {
+	buf := bytes.NewBuffer(b)
+	if err := g.gossip.Process(buf); err != nil {
+		return 0, err
+	}
+
+	return g.Connection.Write(buf.Bytes())
+}
+
 // Writer abstracts all of the logic and fields needed to write messages to
 // other network nodes.
 type Writer struct {
 	*Connection
 	subscriber eventbus.Subscriber
 	gossipID   uint32
+	keepAlive  time.Duration
 	// TODO: add service flag
 }
 
@@ -50,13 +74,18 @@ type Reader struct {
 // NewWriter returns a Writer. It will still need to be initialized by
 // subscribing to the gossip topic with a stream handler, and by running the WriteLoop
 // in a goroutine..
-func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber) *Writer {
+func NewWriter(conn net.Conn, gossip *processing.Gossip, subscriber eventbus.Subscriber, keepAlive ...time.Duration) *Writer {
+	kas := 30 * time.Second
+	if len(keepAlive) > 0 {
+		kas = keepAlive[0]
+	}
 	pw := &Writer{
 		Connection: &Connection{
 			Conn:   conn,
 			gossip: gossip,
 		},
 		subscriber: subscriber,
+		keepAlive:  kas,
 	}
 
 	return pw
@@ -72,20 +101,22 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 
 	_, db := heavy.CreateDBConnection()
 
-	dataRequestor := processing.NewDataRequestor(db, rpcBus, responseChan)
+	dataRequestor := responding.NewDataRequestor(db, rpcBus, responseChan)
 
 	reader := &Reader{
 		Connection: pconn,
 		exitChan:   exitChan,
 		router: &messageRouter{
-			publisher:       publisher,
-			dupeMap:         dupeMap,
-			blockHashBroker: processing.NewBlockHashBroker(db, responseChan),
-			synchronizer:    chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
-			dataRequestor:   dataRequestor,
-			dataBroker:      processing.NewDataBroker(db, rpcBus, responseChan),
-			ponger:          processing.NewPonger(responseChan),
-			peerInfo:        conn.RemoteAddr().String(),
+			publisher:         publisher,
+			dupeMap:           dupeMap,
+			blockHashBroker:   responding.NewBlockHashBroker(db, responseChan),
+			synchronizer:      chainsync.NewChainSynchronizer(publisher, rpcBus, responseChan, counter),
+			dataRequestor:     dataRequestor,
+			dataBroker:        responding.NewDataBroker(db, rpcBus, responseChan),
+			roundResultBroker: responding.NewRoundResultBroker(rpcBus, responseChan),
+			candidateBroker:   responding.NewCandidateBroker(rpcBus, responseChan),
+			ponger:            processing.NewPonger(responseChan),
+			peerInfo:          conn.RemoteAddr().String(),
 		},
 	}
 
@@ -93,10 +124,7 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 	// txs from the new peer
 	go func() {
 		if err := dataRequestor.RequestMempoolItems(); err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error sending topics.Mempool message")
+			l.WithError(err).Warnln("error sending topics.Mempool message")
 		}
 	}()
 
@@ -105,7 +133,6 @@ func NewReader(conn net.Conn, gossip *processing.Gossip, dupeMap *dupemap.DupeMa
 
 // ReadMessage reads from the connection
 func (c *Connection) ReadMessage() ([]byte, error) {
-	// COBS  c.reader.ReadBytes(0x00)
 	length, err := c.gossip.UnpackLength(c.Conn)
 	if err != nil {
 		return nil, err
@@ -148,10 +175,8 @@ func (w *Writer) Serve(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct
 
 	// Any gossip topics are written into interrupt-driven ringBuffer
 	// Single-consumer pushes messages to the socket
-	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(w.Connection))
-
-	// Ping loop - ensures connection stays alive during quiet periods
-	go w.pingLoop()
+	g := &GossipConnector{w.gossip, w.Connection}
+	w.gossipID = w.subscriber.Subscribe(topics.Gossip, eventbus.NewStreamListener(g))
 
 	// writeQueue - FIFO queue
 	// writeLoop pushes first-in message to the socket
@@ -164,57 +189,18 @@ func (w *Writer) onDisconnect() {
 	w.subscriber.Unsubscribe(topics.Gossip, w.gossipID)
 }
 
-func (w *Writer) pingLoop() {
-	// We ping every 30 seconds to keep the connection alive
-	ticker := time.NewTicker(30 * time.Second)
-
-	for {
-		<-ticker.C
-		if err := w.ping(); err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error pinging peer")
-			// Clean up ticker
-			ticker.Stop()
-			return
-		}
-	}
-}
-
-func (w *Writer) ping() error {
-	buf := new(bytes.Buffer)
-	if err := topics.Prepend(buf, topics.Ping); err != nil {
-		return err
-	}
-
-	if err := w.Connection.gossip.Process(buf); err != nil {
-		return err
-	}
-
-	_, err := w.Connection.Write(buf.Bytes())
-	return err
-}
-
 func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan struct{}) {
 
 	for {
 		select {
 		case buf := <-writeQueueChan:
 			if err := w.gossip.Process(buf); err != nil {
-				log.WithFields(log.Fields{
-					"process": "peer",
-					"error":   err,
-				}).Warnln("error processing outgoing message")
+				l.WithError(err).Warnln("error processing outgoing message")
 				continue
 			}
 
 			if _, err := w.Connection.Write(buf.Bytes()); err != nil {
-				log.WithFields(log.Fields{
-					"process": "peer",
-					"queue":   "writequeue",
-					"error":   err,
-				}).Warnln("error writing message")
+				l.WithField("queue", "writequeue").WithError(err).Warnln("error writing message")
 				exitChan <- struct{}{}
 			}
 		case <-exitChan:
@@ -227,26 +213,97 @@ func (w *Writer) writeLoop(writeQueueChan <-chan *bytes.Buffer, exitChan chan st
 // is reached. Should be called in a go-routine, after a successful handshake with
 // a peer. Eventual duplicated messages are silently discarded.
 func (p *Reader) ReadLoop() {
+
+	// As the peer ReadLoop is at the front-line of P2P network, receiving a
+	// malformed frame by an adversary node could lead to a panic.
+	// In such situation, the node should survive but adversary conn gets dropped
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Peer %s failed with critical issue: %v", p.RemoteAddr(), r)
+		}
+	}()
+
+	p.readLoop()
+}
+
+func (p *Reader) readLoop() {
 	defer p.Conn.Close()
+
+	// Set up a timer, which triggers the sending of a `keepalive` message
+	// when fired.
+	timer, quitChan := p.keepAliveLoop()
+
 	defer func() {
 		p.exitChan <- struct{}{}
+		quitChan <- struct{}{}
 	}()
 
 	for {
 		// Refresh the read deadline
-		p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+		err := p.Conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+		if err != nil {
+			l.WithError(err).Warnf("error setting read timeout")
+		}
 
 		b, err := p.ReadMessage()
 		if err != nil {
-			log.WithFields(log.Fields{
-				"process": "peer",
-				"error":   err,
-			}).Warnln("error reading message")
+			l.WithError(err).Warnln("error reading message")
 			return
 		}
 
-		p.router.Collect(bytes.NewBuffer(b))
+		message, cs, err := checksum.Extract(b)
+		if err != nil {
+			l.WithError(err).Warnln("error reading message")
+			return
+		}
+
+		if !checksum.Verify(message, cs) {
+			l.WithError(errors.New("invalid checksum")).Warnln("error reading message")
+			return
+		}
+
+		// TODO: error here should be checked in order to decrease reputation
+		// or blacklist spammers
+		err = p.router.Collect(message)
+		if err != nil {
+			log.WithError(err).Errorln("error routing message")
+		}
+
+		// Reset the keepalive timer
+		timer.Reset(keepAliveTime)
 	}
+}
+
+func (p *Reader) keepAliveLoop() (*time.Timer, chan struct{}) {
+	timer := time.NewTimer(keepAliveTime)
+	quitChan := make(chan struct{}, 1)
+	go func(p *Reader, t *time.Timer, quitChan chan struct{}) {
+		for {
+			select {
+			case <-t.C:
+				p.Connection.keepAlive()
+			case <-quitChan:
+				t.Stop()
+				return
+			}
+		}
+	}(p, timer, quitChan)
+
+	return timer, quitChan
+}
+
+func (c *Connection) keepAlive() error {
+	buf := new(bytes.Buffer)
+	if err := topics.Prepend(buf, topics.Ping); err != nil {
+		return err
+	}
+
+	if err := c.gossip.Process(buf); err != nil {
+		return err
+	}
+
+	_, err := c.Write(buf.Bytes())
+	return err
 }
 
 // Write a message to the connection.

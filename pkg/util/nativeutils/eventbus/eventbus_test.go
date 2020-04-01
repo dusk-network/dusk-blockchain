@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
@@ -17,58 +18,6 @@ import (
 func TestNewEventBus(t *testing.T) {
 	eb := New()
 	assert.NotNil(t, eb)
-}
-
-//*******************
-// PREPROCESSOR TESTS
-//*******************
-func TestProcessor(t *testing.T) {
-	topic := topics.Test
-	bus := New()
-
-	resultChan := make(chan bytes.Buffer, 1)
-	collector := NewSimpleCollector(resultChan, nil)
-
-	ids := bus.Register(topic, NewAdder("pippo"), NewAdder("pippo"))
-	NewTopicListener(bus, collector, topic, ChannelType)
-
-	expected := *(bytes.NewBufferString("pippopippo"))
-	bus.Publish(topic, bytes.NewBufferString(""))
-	bus.Publish(topic, bytes.NewBufferString(""))
-
-	result1 := <-resultChan
-	result2 := <-resultChan
-	assert.Equal(t, expected, result1)
-	assert.Equal(t, expected, result2)
-
-	// testing RemoveProcessor
-	bus.RemoveProcessor(topic, ids[0])
-
-	expected = *(bytes.NewBufferString("pippo"))
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res := <-resultChan
-	assert.Equal(t, expected, res)
-
-	// removing the same preprocessor does not yield any different result
-	bus.RemoveProcessor(topic, ids[0])
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res = <-resultChan
-	assert.Equal(t, expected, res)
-
-	// adding a preprocessor
-	expected = *(bytes.NewBufferString("pippopappo"))
-	otherID := bus.Register(topic, NewAdder("pappo"))
-	assert.Equal(t, 1, len(otherID))
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res = <-resultChan
-	assert.Equal(t, expected, res)
-
-	// removing another
-	expected = *(bytes.NewBufferString("pappo"))
-	bus.RemoveProcessor(topic, ids[1])
-	bus.Publish(topic, bytes.NewBufferString(""))
-	res = <-resultChan
-	assert.Equal(t, expected, res)
 }
 
 //******************
@@ -87,7 +36,7 @@ func TestListenerMap(t *testing.T) {
 
 func TestSubscribe(t *testing.T) {
 	eb := New()
-	myChan := make(chan bytes.Buffer, 10)
+	myChan := make(chan message.Message, 10)
 	cl := NewChanListener(myChan)
 	assert.NotNil(t, eb.Subscribe(topics.Test, cl))
 }
@@ -95,7 +44,8 @@ func TestSubscribe(t *testing.T) {
 func TestUnsubscribe(t *testing.T) {
 	eb, myChan, id := newEB(t)
 	eb.Unsubscribe(topics.Test, id)
-	eb.Publish(topics.Test, bytes.NewBufferString("whatever2"))
+	msg := message.New(topics.Test, *(bytes.NewBufferString("whatever2")))
+	eb.Publish(topics.Test, msg)
 
 	select {
 	case <-myChan:
@@ -106,45 +56,21 @@ func TestUnsubscribe(t *testing.T) {
 }
 
 //*********************
-// TOPIC LISTENER TESTS
+// STREAMER TESTS
 //*********************
-func TestLameSubscriber(t *testing.T) {
-	bus := New()
-	resultChan := make(chan bytes.Buffer, 1)
-
-	collector := NewSimpleCollector(resultChan, nil)
-	tbuf := ranbuf()
-
-	sub := NewTopicListener(bus, collector, topics.Test, ChannelType)
-
-	bus.Publish(topics.Test, tbuf)
-	bus.Publish(topics.Test, tbuf)
-
-	assert.Equal(t, <-resultChan, *tbuf)
-	assert.Equal(t, <-resultChan, *tbuf)
-
-	sub.Quit()
-	bus.Publish(topics.Test, tbuf)
-
-	select {
-	case <-resultChan:
-		assert.FailNow(t, "unexpected message published after quitting a topic listener")
-	case <-time.After(50 * time.Millisecond):
-		//
-	}
-}
-
 func TestStreamer(t *testing.T) {
 	topic := topics.Gossip
 	bus, streamer := CreateFrameStreamer(topic)
-	bus.Publish(topic, bytes.NewBufferString("pluto"))
+	msg := message.New(topics.Test, *(bytes.NewBufferString("pluto")))
+	bus.Publish(topic, msg)
 
 	packet, err := streamer.(*SimpleStreamer).Read()
 	if !assert.NoError(t, err) {
 		assert.FailNow(t, "error in reading from the subscribed stream")
 	}
 
-	assert.Equal(t, "pluto", string(packet))
+	// first 4 bytes of packet are the checksum
+	assert.Equal(t, "pluto", string(packet[4:]))
 }
 
 //******************
@@ -152,36 +78,29 @@ func TestStreamer(t *testing.T) {
 //******************
 func TestDefaultListener(t *testing.T) {
 	eb := New()
-	msgChan := make(chan struct {
-		topic topics.Topic
-		buf   bytes.Buffer
-	})
-
-	cb := func(r bytes.Buffer) error {
-		tpc, _ := topics.Extract(&r)
-
-		msgChan <- struct {
-			topic topics.Topic
-			buf   bytes.Buffer
-		}{tpc, r}
-		return nil
-	}
+	msgChan := make(chan message.Message)
 
 	eb.AddDefaultTopic(topics.Reject)
 	eb.AddDefaultTopic(topics.Unknown)
-	eb.SubscribeDefault(NewCallbackListener(cb))
+	eb.SubscribeDefault(NewChanListener(msgChan))
 
-	eb.Publish(topics.Reject, bytes.NewBufferString("pluto"))
+	m := message.New(topics.Reject, *(bytes.NewBufferString("pluto")))
+	eb.Publish(topics.Reject, m)
 	msg := <-msgChan
-	assert.Equal(t, topics.Reject, msg.topic)
-	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
+	assert.Equal(t, topics.Reject, msg.Category())
 
-	eb.Publish(topics.Unknown, bytes.NewBufferString("pluto"))
+	payload := msg.Payload().(bytes.Buffer)
+	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
+
+	m = message.New(topics.Unknown, *(bytes.NewBufferString("pluto")))
+	eb.Publish(topics.Unknown, m)
 	msg = <-msgChan
-	assert.Equal(t, topics.Unknown, msg.topic)
-	assert.Equal(t, []byte("pluto"), msg.buf.Bytes())
+	assert.Equal(t, topics.Unknown, msg.Category())
+	payload = msg.Payload().(bytes.Buffer)
+	assert.Equal(t, []byte("pluto"), (&payload).Bytes())
 
-	eb.Publish(topics.Gossip, bytes.NewBufferString("pluto"))
+	m = message.New(topics.Gossip, *(bytes.NewBufferString("pluto")))
+	eb.Publish(topics.Gossip, m)
 	select {
 	case <-msgChan:
 		t.FailNow()
@@ -193,18 +112,20 @@ func TestDefaultListener(t *testing.T) {
 //****************
 // SETUP FUNCTIONS
 //****************
-func newEB(t *testing.T) (*EventBus, chan bytes.Buffer, uint32) {
+func newEB(t *testing.T) (*EventBus, chan message.Message, uint32) {
 	eb := New()
-	myChan := make(chan bytes.Buffer, 10)
+	myChan := make(chan message.Message, 10)
 	cl := NewChanListener(myChan)
 	id := eb.Subscribe(topics.Test, cl)
 	assert.NotNil(t, id)
 	b := bytes.NewBufferString("whatever")
-	eb.Publish(topics.Test, b)
+	m := message.New(topics.Test, *b)
+	eb.Publish(topics.Test, m)
 
 	select {
 	case received := <-myChan:
-		assert.Equal(t, "whatever", received.String())
+		payload := received.Payload().(bytes.Buffer)
+		assert.Equal(t, "whatever", (&payload).String())
 	case <-time.After(50 * time.Millisecond):
 		assert.FailNow(t, "We should have received a message by now")
 	}
@@ -222,7 +143,8 @@ func TestExitChan(t *testing.T) {
 	// Put something on ring buffer
 	val := new(bytes.Buffer)
 	val.Write([]byte{0})
-	eb.Publish(topic, val)
+	m := message.New(topic, *val)
+	eb.Publish(topic, m)
 	// Wait for event to be handled
 	// NB: 'Writer' must return error to force consumer termination
 	time.Sleep(100 * time.Millisecond)

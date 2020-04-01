@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,12 +30,12 @@ type (
 	LogProcessor struct {
 		*log.Logger
 		lastBlock         *block.Block
-		p                 eventbus.Publisher
+		p                 eventbus.Broker
 		entry             *log.Entry
 		acceptedBlockChan <-chan block.Block
 		EntryChan         chan []byte
 		quitChan          chan struct{}
-		listener          eventbus.TopicListener
+		idBlockSub        uint32
 	}
 )
 
@@ -48,7 +49,7 @@ func New(p eventbus.Broker, w io.WriteCloser, formatter log.Formatter) *LogProce
 	entry := logger.WithFields(log.Fields{
 		"process": "monitor",
 	})
-	acceptedBlockChan, listener := consensus.InitAcceptedBlockUpdate(p)
+	acceptedBlockChan, id := consensus.InitAcceptedBlockUpdate(p)
 	return &LogProcessor{
 		p:                 p,
 		Logger:            logger,
@@ -56,7 +57,7 @@ func New(p eventbus.Broker, w io.WriteCloser, formatter log.Formatter) *LogProce
 		acceptedBlockChan: acceptedBlockChan,
 		EntryChan:         make(chan []byte, 100),
 		quitChan:          make(chan struct{}, 1),
-		listener:          listener,
+		idBlockSub:        id,
 	}
 }
 
@@ -90,7 +91,7 @@ func (l *LogProcessor) logNumGoroutine() {
 
 // Close the listener and the Writer
 func (l *LogProcessor) Close() error {
-	l.listener.Quit()
+	l.p.Unsubscribe(topics.AcceptedBlock, l.idBlockSub)
 	l.quitChan <- struct{}{}
 	return l.Out.(io.WriteCloser).Close()
 }
@@ -118,7 +119,8 @@ func (l *LogProcessor) Send(entry []byte) error {
 // ReportError publishes an error on the MonitorTopic
 func (l *LogProcessor) ReportError(bErr byte, err error) {
 	b := bytes.NewBuffer([]byte{bErr})
-	l.p.Publish(topics.Monitor, b)
+	msg := message.New(topics.Monitor, b)
+	l.p.Publish(topics.Monitor, msg)
 }
 
 // WithTime decorates the log with time info

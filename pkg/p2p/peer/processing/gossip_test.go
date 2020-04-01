@@ -29,9 +29,10 @@ func TestProcess(t *testing.T) {
 		assert.FailNow(t, fmt.Sprintf("error in reading the message with length %d", length))
 	}
 
-	buf := protocol.DevNet.ToBuffer()
-	buf.Write([]byte("pippo"))
-	assert.Equal(t, buf.Bytes(), msg)
+	buf := new(bytes.Buffer)
+	_, _ = buf.Write([]byte("pippo"))
+	// First 8 bytes of `msg` are the magic and checksum
+	assert.Equal(t, buf.Bytes(), msg[8:])
 }
 
 func TestUnpackLength(t *testing.T) {
@@ -44,5 +45,6 @@ func TestUnpackLength(t *testing.T) {
 	length, err := g.UnpackLength(b)
 	assert.NoError(t, err)
 
-	assert.Equal(t, len(test), int(length))
+	// Checksum was added, so we remove 4 from int(length)
+	assert.Equal(t, len(test), int(length)-4)
 }

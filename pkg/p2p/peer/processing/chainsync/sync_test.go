@@ -4,22 +4,27 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	"github.com/stretchr/testify/assert"
 )
 
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
 // are sufficiently behind the chain tip.
 func TestSynchronizeBehind(t *testing.T) {
-	cs, _, responseChan := setupSynchronizer(t)
+	cs, eb, responseChan := setupSynchronizer(t)
+	// Create a listener for HighestSeen topic
+	highestSeenChan := make(chan message.Message, 1)
+	eb.Subscribe(topics.HighestSeen, eventbus.NewChanListener(highestSeenChan))
 
 	// Create a block that is a few rounds in the future
-	blk := randomBlockBuffer(t, 5, 20)
+	height := uint64(5)
+	blk := randomBlockBuffer(t, height, 20)
 
 	if err := cs.Synchronize(blk, "test_peer"); err != nil {
 		t.Fatal(err)
@@ -33,6 +38,12 @@ func TestSynchronizeBehind(t *testing.T) {
 	if topic != topics.GetBlocks {
 		t.Fatal("did not receive expected GetBlocks message")
 	}
+
+	// Check highest seen
+	highestSeenHeightMsg := <-highestSeenChan
+	highestSeenHeight := highestSeenHeightMsg.Payload().(uint64)
+
+	assert.Equal(t, highestSeenHeight, height)
 }
 
 // Check the behaviour of the ChainSynchronizer when receiving a block, when we
@@ -41,7 +52,7 @@ func TestSynchronizeSynced(t *testing.T) {
 	cs, eb, _ := setupSynchronizer(t)
 
 	// subscribe to topics.Block
-	blockChan := make(chan bytes.Buffer, 1)
+	blockChan := make(chan message.Message, 1)
 	listener := eventbus.NewChanListener(blockChan)
 	_ = eb.Subscribe(topics.Block, listener)
 
@@ -53,14 +64,17 @@ func TestSynchronizeSynced(t *testing.T) {
 	}
 
 	// The synchronizer should put this block on the blockChan
-	<-blockChan
+	msg := <-blockChan
+
+	// Payload should be of type block.Block
+	assert.NotPanics(t, func() { _ = msg.Payload().(block.Block) })
 }
 
 // Returns an encoded representation of a `helper.RandomBlock`.
 func randomBlockBuffer(t *testing.T, height uint64, txBatchCount uint16) *bytes.Buffer {
 	blk := helper.RandomBlock(t, height, txBatchCount)
 	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, blk); err != nil {
+	if err := message.MarshalBlock(buf, blk); err != nil {
 		panic(err)
 	}
 
@@ -81,7 +95,7 @@ func setupSynchronizer(t *testing.T) (*chainsync.ChainSynchronizer, *eventbus.Ev
 // requests the last block.
 func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
 	g := make(chan rpcbus.Request, 1)
-	rpcBus.Register(rpcbus.GetLastBlock, g)
+	rpcBus.Register(topics.GetLastBlock, g)
 	r := <-g
-	r.RespChan <- rpcbus.Response{*randomBlockBuffer(t, 0, 1), nil}
+	r.RespChan <- rpcbus.Response{*helper.RandomBlock(t, 0, 1), nil}
 }

@@ -7,7 +7,8 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/sortedset"
 	"github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/wallet"
+	"github.com/dusk-network/dusk-wallet/v2/wallet"
+	log "github.com/sirupsen/logrus"
 )
 
 // VotingCommittee represents a set of provisioners with voting rights at a certain
@@ -74,6 +75,24 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 	members := copyMembers(p.Members)
 	p.Members = members
 
+	// Remove stakes which have not yet become active, or have expired
+	for _, m := range p.Members {
+		i := 0
+		for {
+			if i == len(m.Stakes) {
+				break
+			}
+
+			if m.Stakes[i].StartHeight > round || m.Stakes[i].EndHeight < round {
+				subtractFromTotalWeight(W, m.Stakes[i].Amount)
+				m.RemoveStake(i)
+				continue
+			}
+
+			i++
+		}
+	}
+
 	for i := 0; votingCommittee.Size() < size; i++ {
 		if W.Uint64() == 0 {
 			// We ran out of staked DUSK, so we return the result prematurely
@@ -82,7 +101,7 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 
 		hash, err := createSortitionHash(round, step, i)
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 
 		score := generateSortitionScore(hash, W)
@@ -105,19 +124,23 @@ func (p Provisioners) CreateVotingCommittee(round uint64, step uint8, size int) 
 // each node's stake from the passed score until we reach zero. The public key
 // of the node that the function ends on will be returned as a hexadecimal string.
 func (p Provisioners) extractCommitteeMember(score uint64) []byte {
+	var m *Member
+	var e error
 	for i := 0; ; i++ {
-		// make sure we wrap around the provisioners array
-		if i >= len(p.Members) {
-			i = 0
+		if m, e = p.MemberAt(i); e != nil {
+			// handling the eventuality of an out of bound error
+			m, e = p.MemberAt(0)
+			if e != nil {
+				log.Panic(e)
+			}
 		}
 
-		m := p.MemberAt(i)
 		stake, err := p.GetStake(m.PublicKeyBLS)
 		if err != nil {
 			// If we get an error from GetStake, it means we either got a public key of a
 			// provisioner who is no longer in the set, or we got a malformed public key.
 			// We can't repair our committee on the fly, so we have to panic.
-			panic(err)
+			log.Panic(err)
 		}
 
 		if stake >= score {

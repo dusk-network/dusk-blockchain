@@ -5,14 +5,15 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"sync"
 	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/peermsg"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
+	"github.com/dusk-network/dusk-wallet/v2/block"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -27,6 +28,11 @@ type ChainSynchronizer struct {
 	rpcBus    *rpcbus.RPCBus
 	*Counter
 	responseChan chan<- *bytes.Buffer
+
+	lock sync.RWMutex
+	// Highest block we've seen. We keep track of it, so that we do not
+	// spam the `Chain` with messages during a sync.
+	highestSeen uint64
 }
 
 // NewChainSynchronizer returns an initialized ChainSynchronizer. The passed responseChan
@@ -49,58 +55,85 @@ func (s *ChainSynchronizer) Synchronize(blkBuf *bytes.Buffer, peerInfo string) e
 		return err
 	}
 
-	blk, err := s.getLastBlock()
+	// Notify `Chain` of our highest seen block
+	if s.getHighestSeen() < height {
+		s.setHighestSeen(height)
+		s.publishHighestSeen(height)
+	}
+
+	lastBlk, err := s.getLastBlock()
 	if err != nil {
 		return err
 	}
 
-	log.WithField("our height", blk.Header.Height).WithField("received block height", height).Debugln("block received")
+	log.WithField("our height", lastBlk.Header.Height).WithField("received block height", height).Debugln("block received")
 	// Only ask for missing blocks if we are not currently syncing, to prevent
 	// asking many peers for (generally) the same blocks.
-	diff := compareHeights(blk.Header.Height, height)
+	diff := compareHeights(lastBlk.Header.Height, height)
 	if !s.IsSyncing() && diff > 1 {
 
-		hash := base64.StdEncoding.EncodeToString(blk.Header.Hash)
+		hash := base64.StdEncoding.EncodeToString(lastBlk.Header.Hash)
 		log.Debugf("Start syncing from %s", peerInfo)
-		log.Debugf("Local tip: height %d [%s]", blk.Header.Height, hash)
+		log.Debugf("Local tip: height %d [%s]", lastBlk.Header.Height, hash)
 
-		msg := createGetBlocksMsg(blk.Header.Hash)
+		msg := createGetBlocksMsg(lastBlk.Header.Hash)
 		buf, err := marshalGetBlocks(msg)
 		if err != nil {
 			return err
 		}
 
 		s.responseChan <- buf
-		s.startSyncing(uint64(diff))
+		s.StartSyncing(uint64(diff))
 		return nil
 	}
 
+	// Does the block come directly after our most recent one?
 	if diff == 1 {
-		// Write bufio.Reader into a bytes.Buffer so we can send it over the event bus.
+		// Write bufio.Reader into a bytes.Buffer and unmarshal it so we can send it over the event bus.
 		buf := new(bytes.Buffer)
 		if _, err := buf.ReadFrom(r); err != nil {
 			return err
 		}
 
-		s.publisher.Publish(topics.Block, buf)
+		blk := block.NewBlock()
+		if err := message.UnmarshalBlock(buf, blk); err != nil {
+			return err
+		}
+
+		msg := message.New(topics.Block, *blk)
+		s.publisher.Publish(topics.Block, msg)
 	}
 
 	return nil
 }
 
-func (s *ChainSynchronizer) getLastBlock() (*block.Block, error) {
-	req := rpcbus.NewRequest(bytes.Buffer{})
-	blkBuf, err := s.rpcBus.Call(rpcbus.GetLastBlock, req, 2*time.Second)
+func (s *ChainSynchronizer) getLastBlock() (block.Block, error) {
+	req := rpcbus.NewRequest(nil)
+	resp, err := s.rpcBus.Call(topics.GetLastBlock, req, 2*time.Second)
 	if err != nil {
-		return nil, err
+		return block.Block{}, err
 	}
-
-	blk := block.NewBlock()
-	if err := marshalling.UnmarshalBlock(&blkBuf, blk); err != nil {
-		return nil, err
-	}
-
+	blk := resp.(block.Block)
 	return blk, nil
+}
+
+func (s *ChainSynchronizer) getHighestSeen() uint64 {
+	s.lock.RLock()
+	height := s.highestSeen
+	s.lock.RUnlock()
+	return height
+}
+
+func (s *ChainSynchronizer) setHighestSeen(height uint64) {
+	s.lock.Lock()
+	s.highestSeen = height
+	s.lock.Unlock()
+}
+
+// TODO: interface - get rid of the marshalling
+func (s *ChainSynchronizer) publishHighestSeen(height uint64) {
+	msg := message.New(topics.HighestSeen, height)
+	s.publisher.Publish(topics.HighestSeen, msg)
 }
 
 func compareHeights(ourHeight, theirHeight uint64) int64 {
@@ -116,7 +149,7 @@ func createGetBlocksMsg(latestHash []byte) *peermsg.GetBlocks {
 func marshalGetBlocks(msg *peermsg.GetBlocks) (*bytes.Buffer, error) {
 	buf := topics.GetBlocks.ToBuffer()
 	if err := msg.Encode(&buf); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	return &buf, nil

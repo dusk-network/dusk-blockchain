@@ -10,9 +10,10 @@ import (
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/utils"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
+	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -39,15 +40,14 @@ var (
 	// Key values prefixes to provide prefix-based sorting mechanism
 	// Refer to README.md for overview idea
 
-	HeaderPrefix         = []byte{0x01}
-	TxPrefix             = []byte{0x02}
-	HeightPrefix         = []byte{0x03}
-	TxIDPrefix           = []byte{0x04}
-	KeyImagePrefix       = []byte{0x05}
-	CandidateBlockPrefix = []byte{0x06}
-	StatePrefix          = []byte{0x07}
-	OutputKeyPrefix      = []byte{0x08}
-	BidValuesPrefix      = []byte{0x09}
+	HeaderPrefix    = []byte{0x01}
+	TxPrefix        = []byte{0x02}
+	HeightPrefix    = []byte{0x03}
+	TxIDPrefix      = []byte{0x04}
+	KeyImagePrefix  = []byte{0x05}
+	StatePrefix     = []byte{0x06}
+	OutputKeyPrefix = []byte{0x07}
+	BidValuesPrefix = []byte{0x08}
 )
 
 type transaction struct {
@@ -90,7 +90,7 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	// Value = encoded(block.fields)
 
 	blockHeaderFields := new(bytes.Buffer)
-	if err := marshalling.MarshalHeader(blockHeaderFields, b.Header); err != nil {
+	if err := message.MarshalHeader(blockHeaderFields, b.Header); err != nil {
 		return err
 	}
 
@@ -194,7 +194,32 @@ func (t transaction) StoreBlock(b *block.Block) error {
 	value = b.Header.Hash
 	t.put(key, value)
 
-	return nil
+	// Delete expired bid values
+	key = BidValuesPrefix
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
+	defer iterator.Release()
+
+	for iterator.Next() {
+		if len(iterator.Key()) != 9 {
+			// Malformed key found, however we should not abort the entire
+			// operation just because of it.
+			log.WithFields(log.Fields{
+				"process": "database",
+				"key":     iterator.Key(),
+			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
+			// Let's remove it though, so that we don't keep logging errors
+			// for the same entry.
+			t.batch.Delete(iterator.Key())
+			continue
+		}
+
+		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
+		if height < b.Header.Height {
+			t.batch.Delete(iterator.Key())
+		}
+	}
+
+	return iterator.Error()
 }
 
 // Commit writes a batch to LevelDB storage. See also fsyncEnabled variable
@@ -281,9 +306,19 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 	defer iterator.Release()
 
 	decoysPubKeys := make([]ristretto.Point, 0, numDecoys)
-	var i int
+
+	currentHeight, err := t.FetchCurrentHeight()
+	if err != nil {
+		log.Panic(err)
+	}
 
 	for iterator.Next() {
+		// We only take unlocked decoys
+		unlockHeight := binary.LittleEndian.Uint64(iterator.Value())
+		if unlockHeight > currentHeight {
+			continue
+		}
+
 		// Output public key is the iterator key minus the `OutputKeyPrefix`
 		// (1 byte)
 		value := iterator.Key()[1:]
@@ -294,10 +329,9 @@ func (t transaction) FetchDecoys(numDecoys int) []ristretto.Point {
 		p.SetBytes(&pBytes)
 
 		decoysPubKeys = append(decoysPubKeys, p)
-		if i == numDecoys {
+		if len(decoysPubKeys) == numDecoys {
 			break
 		}
-		i++
 	}
 
 	return decoysPubKeys
@@ -318,7 +352,7 @@ func (t transaction) FetchBlockHeader(hash []byte) (*block.Header, error) {
 	}
 
 	header := block.NewHeader()
-	err = marshalling.UnmarshalHeader(bytes.NewBuffer(value), header)
+	err = message.UnmarshalHeader(bytes.NewBuffer(value), header)
 
 	if err != nil {
 		return nil, err
@@ -402,7 +436,7 @@ func (t transaction) put(key []byte, value []byte) {
 		t.batch.Put(key, value)
 	} else {
 		// fail-fast when a writable transaction is not capable of storing data
-		panic("leveldb batch is unreachable")
+		log.Panic("leveldb batch is unreachable")
 	}
 }
 
@@ -481,99 +515,6 @@ func (t transaction) FetchKeyImageExists(keyImage []byte) (bool, []byte, error) 
 	return true, txID, nil
 }
 
-// StoreCandidateBlock stores a candidate block to be proposed in next consensus
-// round. it overwrites an entry of block with same height
-func (t transaction) StoreCandidateBlock(b *block.Block) error {
-
-	// Schema Key = CandidateBlockPrefix + block.header.Hash + block.header.height
-	//
-	// Value = block.Encoded()
-
-	// Append height value
-	heightBuf := new(bytes.Buffer)
-	if err := utils.WriteUint64(heightBuf, b.Header.Height); err != nil {
-		return err
-	}
-
-	if heightBuf.Len() != block.HeightSize {
-		panic("invalid height buffer")
-	}
-
-	key := append(CandidateBlockPrefix, b.Header.Hash...)
-	key = append(key, heightBuf.Bytes()...)
-
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalBlock(buf, b); err != nil {
-		return err
-	}
-
-	t.put(key, buf.Bytes())
-
-	return nil
-}
-
-// FetchCandidateBlock fetches a candidate block by hash
-func (t transaction) FetchCandidateBlock(hash []byte) (*block.Block, error) {
-
-	// Fetch all stored candidate blocks
-	scanFilter := append(CandidateBlockPrefix, hash...)
-
-	// as the key is composed of CandidateBlockPrefix + blockHash + blockHeight,
-	// here it's needed to use a search by prefix
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
-	defer iterator.Release()
-
-	if iterator.First() {
-		b := block.NewBlock()
-		if err := marshalling.UnmarshalBlock(bytes.NewBuffer(iterator.Value()), b); err != nil {
-			return nil, err
-		}
-
-		return b, nil
-	}
-
-	return nil, database.ErrBlockNotFound
-}
-
-// DeleteCandidateBlocks deletes all candidate blocks if maxHeight is not 0, it
-// deletes only blocks with a height lower than maxHeight or equal.
-// Returns number of deleted candidate blocks
-func (t transaction) DeleteCandidateBlocks(maxHeight uint64) (uint32, error) {
-
-	// Fetch all stored candidate blocks
-	scanFilter := append(CandidateBlockPrefix)
-
-	iterator := t.snapshot.NewIterator(util.BytesPrefix(scanFilter), nil)
-	defer iterator.Release()
-
-	var count uint32
-	for iterator.Next() {
-
-		// Extract height from the key to avoid the need of block decoding
-		if maxHeight != 0 {
-			reader := bytes.NewReader(iterator.Key())
-			buf := make([]byte, block.HeightSize)
-
-			offset := int64(len(scanFilter) + block.HeaderHashSize)
-			if _, err := reader.ReadAt(buf[:], offset); err != nil {
-				return count, fmt.Errorf("malformed height data: %s", err.Error())
-			}
-
-			height := byteOrder.Uint64(buf[:])
-
-			if height <= maxHeight {
-				t.batch.Delete(iterator.Key())
-				count++
-			}
-		} else {
-			t.batch.Delete(iterator.Key())
-			count++
-		}
-	}
-
-	return count, nil
-}
-
 func (t transaction) FetchBlock(hash []byte) (*block.Block, error) {
 	header, err := t.FetchBlockHeader(hash)
 	if err != nil {
@@ -620,25 +561,53 @@ func (t transaction) FetchCurrentHeight() (uint64, error) {
 	return header.Height, nil
 }
 
-func (t transaction) StoreBidValues(d, k []byte) error {
+func (t transaction) StoreBidValues(d, k []byte, lockTime uint64) error {
 	// First, delete the old values (if any)
-	key := BidValuesPrefix
-	exists, err := t.snapshot.Has(key, nil)
-	if exists && err == nil {
-		t.batch.Delete(key)
-	}
+	heightBytes := make([]byte, 8)
+	currentHeight, err := t.FetchCurrentHeight()
 	if err != nil {
 		return err
 	}
 
+	// NOTE: this expiry height is not accurate, and is just an
+	// approximation. On average, it will vary only a few blocks, but
+	// we can not know beforehand when a bid transaction is accepted.
+	binary.LittleEndian.PutUint64(heightBytes, lockTime+currentHeight)
+	key := append(BidValuesPrefix, heightBytes...)
 	t.put(key, append(d, k...))
 	return nil
 }
 
 func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	key := BidValuesPrefix
-	value, err := t.snapshot.Get(key, nil)
-	if err != nil {
+	iterator := t.snapshot.NewIterator(util.BytesPrefix(key), nil)
+	defer iterator.Release()
+
+	// Let's always return the bid values with the lowest height as
+	// those are most likely to be valid.
+	lowestSeen := uint64(1<<64 - 1)
+	var value []byte
+	for iterator.Next() {
+		if len(iterator.Key()) != 9 {
+			// Malformed key found, however we should not abort the entire
+			// operation just because of it.
+			log.WithFields(log.Fields{
+				"process": "database",
+				"key":     iterator.Key(),
+			}).WithError(errors.New("bid values entry with malformed key found")).Errorln("error when iterating over bid values")
+			continue
+		}
+
+		// height is the last 8 bytes
+		height := binary.LittleEndian.Uint64(iterator.Key()[1:])
+
+		if height < lowestSeen {
+			lowestSeen = height
+			value = iterator.Value()
+		}
+	}
+
+	if err := iterator.Error(); err != nil {
 		return nil, nil, err
 	}
 
@@ -648,4 +617,49 @@ func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 	}
 
 	return value[0:32], value[32:64], nil
+}
+
+// FetchBlockHeightSince uses binary search to find a block height
+func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (uint64, error) {
+
+	tip, err := t.FetchCurrentHeight()
+	if err != nil {
+		return 0, err
+	}
+
+	n := uint64(math.Min(float64(tip), float64(offset)))
+
+	pos, err := utils.Search(n, func(pos uint64) (bool, error) {
+		height := tip - uint64(n) + uint64(pos)
+		hash, err := t.FetchBlockHashByHeight(height)
+		if err != nil {
+			return false, err
+		}
+
+		header, err := t.FetchBlockHeader(hash)
+		if err != nil {
+			return false, err
+		}
+
+		return header.Timestamp >= sinceUnixTime, nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return tip - uint64(n) + uint64(pos), nil
+
+}
+
+// ClearDatabase will wipe all of the data currently in the database.
+func (t transaction) ClearDatabase() error {
+	iter := t.snapshot.NewIterator(nil, nil)
+	defer iter.Release()
+
+	for iter.Next() {
+		t.batch.Delete(iter.Key())
+	}
+
+	return iter.Error()
 }

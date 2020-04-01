@@ -47,30 +47,45 @@ type walletConfiguration struct {
 }
 
 // pprof configs
-type profConfiguration struct {
-	Address string
-
-	// enables CPU profiling for the current process.
-	// While profiling, the profile will be buffered and written to CPUProf file.
-	CPUFile string
-	// Write mem profile to the specified file
-	MemFile string
+// See also utils/diagnostics/ProfileSet
+type profileConfiguration struct {
+	Name     string
+	Interval uint
+	Duration uint
+	Start    bool
 }
 
 // pkg/rpc package configs
 type rpcConfiguration struct {
 	Network string
 	Address string
-	Enabled bool
-	User    string
-	Pass    string
+
+	EnableTLS bool
+	CertFile  string
+	KeyFile   string
+
+	User string
+	Pass string
 }
 
 type gqlConfiguration struct {
-	Port    string
+	// TODO: Keep 'Enabled' option?
 	Enabled bool
-	User    string
-	Pass    string
+	Network string
+	Address string
+
+	EnableTLS bool
+	CertFile  string
+	KeyFile   string
+
+	MaxRequestLimit uint
+
+	Notification notificationConfiguration
+}
+
+type notificationConfiguration struct {
+	BrokersNum       uint
+	ClientsPerBroker uint
 }
 
 // Performance parameters
@@ -88,5 +103,4 @@ type mempoolConfiguration struct {
 type consensusConfiguration struct {
 	DefaultLockTime uint64
 	DefaultAmount   uint64
-	DefaultOffset   uint64
 }

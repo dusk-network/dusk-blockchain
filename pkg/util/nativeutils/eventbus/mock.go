@@ -3,28 +3,29 @@ package eventbus
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"sync"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/checksum"
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 )
 
-var _ wire.EventCollector = (*Collector)(nil)
-
 // Collector is a very stupid implementation of the wire.EventCollector interface
 // in case no function would be supplied, it would use a channel to publish the collected packets
 type Collector struct {
-	f func(bytes.Buffer) error
+	f func(message.Message) error
 }
 
 // NewSimpleCollector is a simple wrapper around a callback that redirects collected buffers into a channel
-func NewSimpleCollector(rChan chan bytes.Buffer, f func(bytes.Buffer) error) *Collector {
+func NewSimpleCollector(rChan chan message.Message, f func(message.Message) error) *Collector {
 	if f == nil {
-		f = func(b bytes.Buffer) error {
-			rChan <- b
+		f = func(m message.Message) error {
+			rChan <- m
 			return nil
 		}
 	}
@@ -32,34 +33,14 @@ func NewSimpleCollector(rChan chan bytes.Buffer, f func(bytes.Buffer) error) *Co
 }
 
 // Collect redirects a buffer copy to a channel
-func (m *Collector) Collect(b bytes.Buffer) error {
+func (m *Collector) Collect(b message.Message) error {
 	return m.f(b)
-}
-
-var _ Preprocessor = (*Adder)(nil)
-
-// Adder is a very simple Preprocessor for test purposes
-type Adder struct {
-	token string
-}
-
-// NewAdder creates a new Adder
-func NewAdder(tkn string) *Adder {
-	return &Adder{tkn}
-}
-
-// Process a buffer by appending a string to it
-func (a *Adder) Process(buf *bytes.Buffer) error {
-	buf.WriteString(a.token)
-	return nil
 }
 
 // CreateGossipStreamer sets up and event bus, subscribes a SimpleStreamer to the
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 	eb := New()
-	eb.Register(topics.Gossip, processing.NewGossip(protocol.TestNet))
-	// subscribe to gossip topic
 	streamer := NewGossipStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topics.Gossip, streamListener)
@@ -71,8 +52,6 @@ func CreateGossipStreamer() (*EventBus, *GossipStreamer) {
 // gossip topic, and sets the right preprocessors up for the gossip topic.
 func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 	eb := New()
-	eb.Register(topic, processing.NewGossip(protocol.TestNet))
-	// subscribe to gossip topic
 	streamer := NewSimpleStreamer(protocol.TestNet)
 	streamListener := NewStreamListener(streamer)
 	eb.Subscribe(topic, streamListener)
@@ -82,6 +61,60 @@ func CreateFrameStreamer(topic topics.Topic) (*EventBus, io.WriteCloser) {
 
 // SimpleStreamer is a WriteCloser
 var _ io.WriteCloser = (*SimpleStreamer)(nil)
+var _ io.WriteCloser = (*StupidStreamer)(nil)
+
+// StupidStreamer is a streamer meant for using when testing internal
+// forwarding of binary packets through the ring buffer. It does *not* add
+// magic, frames or other wraps on the forwarded packet
+type StupidStreamer struct {
+	*bufio.Reader
+	*bufio.Writer
+}
+
+// NewStupidStreamer returns an initialized SimpleStreamer.
+func NewStupidStreamer() *StupidStreamer {
+	r, w := io.Pipe()
+	return &StupidStreamer{
+		Reader: bufio.NewReader(r),
+		Writer: bufio.NewWriter(w),
+	}
+}
+
+// Write receives the packets from the ringbuffer and writes it on the internal
+// pipe immediatelyh
+func (sss *StupidStreamer) Write(p []byte) (n int, err error) {
+	lg := make([]byte, 4)
+	binary.LittleEndian.PutUint32(lg, uint32(len(p)))
+	b := bytes.NewBuffer(lg)
+	b.Write(p)
+
+	n, err = sss.Writer.Write(b.Bytes())
+	if err != nil {
+		return n, err
+	}
+
+	return n, sss.Writer.Flush()
+}
+
+func (sss *StupidStreamer) Read() ([]byte, error) {
+	length := make([]byte, 4)
+	if _, err := io.ReadFull(sss.Reader, length); err != nil {
+		return nil, err
+	}
+
+	l := binary.LittleEndian.Uint32(length)
+	payload := make([]byte, l)
+	if _, err := io.ReadFull(sss.Reader, payload); err != nil {
+		return nil, err
+	}
+
+	return payload, nil
+}
+
+// Close implements io.WriteCloser.
+func (sss *StupidStreamer) Close() error {
+	return nil
+}
 
 // SimpleStreamer is a test helper which can capture information that gets gossiped
 // by the node. It can read from the gossip stream, and stores the topics that it has
@@ -105,8 +138,15 @@ func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 	}
 }
 
+// Write receives the packets from the ringbuffer and writes it on the internal
+// pipe immediatelyh
 func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
-	n, err = ms.Writer.Write(p)
+	b := bytes.NewBuffer(p)
+	if err := ms.gossip.Process(b); err != nil {
+		return 0, err
+	}
+
+	n, err = ms.Writer.Write(b.Bytes())
 	if err != nil {
 		return n, err
 	}
@@ -121,7 +161,7 @@ func (ms *SimpleStreamer) Read() ([]byte, error) {
 	}
 
 	packet := make([]byte, length)
-	if read, err := ms.Reader.Read(packet); err != nil {
+	if read, err := io.ReadFull(ms.Reader, packet); err != nil {
 		return nil, err
 	} else if uint64(read) != length {
 		return nil, io.EOF
@@ -147,11 +187,19 @@ func (ms *GossipStreamer) Read() ([]byte, error) {
 
 	decoded := bytes.NewBuffer(b)
 
+	// remove checksum
+	m, _, err := checksum.Extract(decoded.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
 	// check the topic
+	decoded = bytes.NewBuffer(m)
 	topic, err := topics.Extract(decoded)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(topic)
 
 	ms.lock.Lock()
 	ms.seenTopics = append(ms.seenTopics, topic)

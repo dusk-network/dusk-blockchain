@@ -22,6 +22,7 @@ const (
 	heightInd
 	stateInd
 	bidValuesInd
+	outputKeyInd
 	maxInd
 )
 
@@ -36,35 +37,17 @@ type DB struct {
 	path     string
 }
 
-var (
-	pool map[string]*DB
-	mu   sync.RWMutex
-)
-
 // This should be the ideal situation with lowest latency on storing or fetching data
 // In-memory only (as result autoDeleted)
 // multi-instances (no singlton)
 func NewDatabase(path string, network protocol.Magic, readonly bool) (database.DB, error) {
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	if pool == nil {
-		pool = make(map[string]*DB)
-	}
-
-	exists := false
 	var db *DB
-	if db, exists = pool[path]; !exists {
-
-		var tables [maxInd]table
-		for i := 0; i < len(tables); i++ {
-			tables[i] = make(table)
-		}
-
-		db = &DB{path: path, readOnly: readonly, storage: tables}
-		pool[path] = db
+	var tables [maxInd]table
+	for i := 0; i < len(tables); i++ {
+		tables[i] = make(table)
 	}
+
+	db = &DB{path: path, readOnly: readonly, storage: tables}
 
 	return db, nil
 }
@@ -127,9 +110,5 @@ func (db *DB) View(fn func(database.Transaction) error) error {
 }
 
 func (db *DB) Close() error {
-	mu.Lock()
-	defer mu.Unlock()
-	delete(pool, db.path)
-
 	return nil
 }

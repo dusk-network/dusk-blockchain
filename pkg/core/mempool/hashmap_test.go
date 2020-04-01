@@ -10,7 +10,7 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
 func TestSortedKeys(t *testing.T) {
@@ -86,6 +86,44 @@ func TestStableSortedKeys(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf(err.Error())
+	}
+}
+
+func TestGet(t *testing.T) {
+	txsCount := 10
+	pool := HashMap{Capacity: uint32(txsCount)}
+
+	// Generate 10 random txs
+	hashes := make([][]byte, txsCount)
+	for i := 0; i < txsCount; i++ {
+
+		tx := helper.RandomStandardTx(t, false)
+
+		constFee := big.NewInt(0).SetUint64(20)
+		tx.Fee.SetBigInt(constFee)
+
+		hash, _ := tx.CalculateHash()
+		tx.TxID = hash
+		hashes[i] = tx.TxID
+
+		td := TxDesc{tx: tx, received: time.Now()}
+		if err := pool.Put(td); err != nil {
+			t.Fatal(err.Error())
+		}
+	}
+
+	// Get a random tx from the pool
+	n := rand.Intn(txsCount)
+	tx := pool.Get(hashes[n])
+	if tx == nil {
+		t.Fatal("tx is not supposed to be nil")
+	}
+
+	// Now get a tx for a hash that is not in the pool
+	hash, _ := crypto.RandEntropy(32)
+	tx = pool.Get(hash)
+	if tx != nil {
+		t.Fatal("should not have gotten a tx")
 	}
 }
 

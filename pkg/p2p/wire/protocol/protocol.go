@@ -9,6 +9,7 @@ import (
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	log "github.com/sirupsen/logrus"
 )
 
 // ServiceFlag indicates the services provided by the Node.
@@ -85,7 +86,7 @@ func fromUint32(n uint32) Magic {
 func asBuffer(magic uint32) bytes.Buffer {
 	buf := new(bytes.Buffer)
 	if err := encoding.WriteUint32LE(buf, magic); err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return *buf
 }
@@ -103,7 +104,8 @@ func MagicFromConfig() Magic {
 	}
 
 	// An invalid network identifier might cause node unexpected  behaviour
-	panic(fmt.Sprintf("not a valid network: %s", magic))
+	log.Panic(fmt.Sprintf("not a valid network: %s", magic))
+	return 0
 }
 
 // Extract the magic from io.Reader. In case of unknown Magic, it returns DevNet

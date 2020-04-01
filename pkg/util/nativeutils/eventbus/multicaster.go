@@ -6,14 +6,13 @@ import (
 
 // Multicaster allows for a single Listener to listen to multiple topics
 type Multicaster interface {
-
 	AddDefaultTopic(topics.Topic)
 	SubscribeDefault(Listener) uint32
 }
 
 // AddDefaultTopic adds a topic to the default multiListener
 func (bus *EventBus) AddDefaultTopic(topic topics.Topic) {
-	bus.defaultListener.Add([]byte{byte(topic)})
+	bus.defaultListener.Add(topic)
 }
 
 // SubscribeDefault subscribes a Listener to the default multiListener.

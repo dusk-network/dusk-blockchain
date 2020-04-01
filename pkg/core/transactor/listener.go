@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
+	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/initiator"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-blockchain/pkg/core/marshalling"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	"github.com/dusk-network/dusk-wallet/block"
-	"github.com/dusk-network/dusk-wallet/transactions"
+	"github.com/dusk-network/dusk-protobuf/autogen/go/node"
+	"github.com/dusk-network/dusk-wallet/v2/block"
+	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -23,6 +24,11 @@ var (
 	errWalletNotLoaded     = errors.New("wallet is not loaded yet")
 	errWalletAlreadyLoaded = errors.New("wallet is already loaded")
 )
+
+func loadResponse(pubKey []byte) *node.LoadResponse {
+	pk := &node.PubKey{PublicKey: pubKey}
+	return &node.LoadResponse{Key: pk}
+}
 
 func (t *Transactor) Listen() {
 	for {
@@ -35,6 +41,10 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleCreateFromSeed, "CreateWalletFromSeed")
 		case r := <-t.loadWalletChan:
 			handleRequest(r, t.handleLoadWallet, "LoadWallet")
+		case r := <-t.automateConsensusTxsChan:
+			handleRequest(r, t.handleAutomateConsensusTxs, "AutomateConsensusTxs")
+		case r := <-t.clearWalletDatabaseChan:
+			handleRequest(r, t.handleClearWalletDatabase, "ClearWalletDatabase")
 
 		// Transaction requests to respond to
 		case r := <-t.sendBidTxChan:
@@ -43,10 +53,18 @@ func (t *Transactor) Listen() {
 			handleRequest(r, t.handleSendStakeTx, "StakeTx")
 		case r := <-t.sendStandardTxChan:
 			handleRequest(r, t.handleSendStandardTx, "StandardTx")
+
+		// Information requests to respond to
 		case r := <-t.getBalanceChan:
 			handleRequest(r, t.handleBalance, "Balance")
+		case r := <-t.getUnconfirmedBalanceChan:
+			handleRequest(r, t.handleUnconfirmedBalance, "UnconfirmedBalance")
 		case r := <-t.getAddressChan:
 			handleRequest(r, t.handleAddress, "Address")
+		case r := <-t.getTxHistoryChan:
+			handleRequest(r, t.handleGetTxHistory, "GetTxHistory")
+		case r := <-t.isWalletLoadedChan:
+			handleRequest(r, t.handleIsWalletLoaded, "IsWalletLoaded")
 
 		// Event list to handle
 		case b := <-t.acceptedBlockChan:
@@ -74,25 +92,16 @@ func (t *Transactor) handleCreateWallet(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
-	var password string
-	password, err := encoding.ReadString(&r.Params)
-	if err != nil {
-		return err
-	}
+	req := r.Params.(*node.CreateRequest)
 
-	pubKey, err := t.createWallet(password)
+	pubKey, err := t.createWallet(req.Password)
 	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{loadResponse([]byte(pubKey)), nil}
 
 	return nil
 }
@@ -107,12 +116,34 @@ func (t *Transactor) handleAddress(r rpcbus.Request) error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	if _, err := buf.WriteString(addr); err != nil {
+	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(addr)}}
+	r.RespChan <- rpcbus.Response{resp, nil}
+	return nil
+}
+
+func (t *Transactor) handleGetTxHistory(r rpcbus.Request) error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	records, err := t.w.FetchTxHistory()
+	if err != nil {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	resp := &node.TxHistoryResponse{Records: make([]*node.TxRecord, len(records))}
+	for i, record := range records {
+		resp.Records[i] = &node.TxRecord{
+			Direction:    node.Direction(record.Direction),
+			Timestamp:    record.Timestamp,
+			Height:       record.Height,
+			Type:         node.TxType(record.TxType),
+			Amount:       record.Amount,
+			UnlockHeight: record.UnlockHeight,
+		}
+	}
+
+	r.RespChan <- rpcbus.Response{resp, nil}
 	return nil
 }
 
@@ -121,23 +152,13 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
-	var password string
-	password, err := encoding.ReadString(&r.Params)
+	req := r.Params.(*node.LoadRequest)
+	pubKey, err := t.loadWallet(req.Password)
 	if err != nil {
 		return err
 	}
 
-	pubKey, err := t.loadWallet(password)
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, pubKey); err != nil {
-		return err
-	}
-
-	// Sync with genesis
+	// Sync with genesis if this is a new wallet
 	if _, err := t.w.GetSavedHeight(); err != nil {
 		t.w.UpdateWalletHeight(0)
 		b := cfg.DecodeGenesis()
@@ -148,8 +169,8 @@ func (t *Transactor) handleLoadWallet(r rpcbus.Request) error {
 	}
 
 	t.launchConsensus()
-
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	resp := &node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}
+	r.RespChan <- rpcbus.Response{resp, nil}
 
 	return nil
 }
@@ -159,31 +180,15 @@ func (t *Transactor) handleCreateFromSeed(r rpcbus.Request) error {
 		return errWalletAlreadyLoaded
 	}
 
-	var seed string
-	seed, err := encoding.ReadString(&r.Params)
+	req := r.Params.(*node.CreateRequest)
+	pubKey, err := t.createFromSeed(string(req.Seed), req.Password)
 	if err != nil {
-		return err
-	}
-
-	var password string
-	password, err = encoding.ReadString(&r.Params)
-	if err != nil {
-		return err
-	}
-
-	pubKey, err := t.createFromSeed(seed, password)
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteString(buf, pubKey); err != nil {
 		return err
 	}
 
 	t.launchConsensus()
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{&node.LoadResponse{Key: &node.PubKey{PublicKey: []byte(pubKey)}}, nil}
 
 	return nil
 }
@@ -193,21 +198,11 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	// read tx parameters
-	var amount uint64
-	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
-		return err
-	}
-
-	var lockTime uint64
-	if err := encoding.ReadUint64LE(&r.Params, &lockTime); err != nil {
-		return err
-	}
-
+	req := r.Params.(*node.ConsensusTxRequest)
 	// create and sign transaction
-	log.Tracef("Create a bid tx (%d,%d)", amount, lockTime)
+	log.Tracef("Create a bid tx (%d,%d)", req.Amount, req.LockTime)
 
-	tx, err := t.CreateBidTx(amount, lockTime)
+	tx, err := t.CreateBidTx(req.Amount, req.LockTime)
 	if err != nil {
 		return err
 	}
@@ -223,7 +218,7 @@ func (t *Transactor) handleSendBidTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
+	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
 	return nil
 }
 
@@ -233,21 +228,11 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	// read tx parameters
-	var amount uint64
-	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
-		return err
-	}
-
-	var lockTime uint64
-	if err := encoding.ReadUint64LE(&r.Params, &lockTime); err != nil {
-		return err
-	}
-
+	req := r.Params.(*node.ConsensusTxRequest)
 	// create and sign transaction
-	log.Tracef("Create a stake tx (%d,%d)", amount, lockTime)
+	log.Tracef("Create a stake tx (%d,%d)", req.Amount, req.LockTime)
 
-	tx, err := t.CreateStakeTx(amount, lockTime)
+	tx, err := t.CreateStakeTx(req.Amount, req.LockTime)
 	if err != nil {
 		return err
 	}
@@ -258,7 +243,7 @@ func (t *Transactor) handleSendStakeTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
+	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
 
 	return nil
 }
@@ -269,21 +254,11 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	var amount uint64
-	if err := encoding.ReadUint64LE(&r.Params, &amount); err != nil {
-		return err
-	}
-
-	var destPubKey string
-	destPubKey, err := encoding.ReadString(&r.Params)
-	if err != nil {
-		return err
-	}
-
+	req := r.Params.(*node.TransferRequest)
 	// create and sign transaction
-	log.Tracef("Create a standard tx (%d,%s)", amount, destPubKey)
+	log.Tracef("Create a standard tx (%d,%s)", req.Amount, string(req.Address))
 
-	tx, err := t.CreateStandardTx(amount, destPubKey)
+	tx, err := t.CreateStandardTx(req.Amount, string(req.Address))
 	if err != nil {
 		return err
 	}
@@ -294,7 +269,7 @@ func (t *Transactor) handleSendStandardTx(r rpcbus.Request) error {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*bytes.NewBuffer(txid), nil}
+	r.RespChan <- rpcbus.Response{&node.TransferResponse{Hash: txid}, nil}
 
 	return nil
 }
@@ -305,45 +280,88 @@ func (t *Transactor) handleBalance(r rpcbus.Request) error {
 		return errWalletNotLoaded
 	}
 
-	walletBalance, mempoolBalance, err := t.Balance()
+	unlockedBalance, lockedBalance, err := t.Balance()
 	if err != nil {
 		return err
 	}
 
-	log.Tracef("wallet balance: %d, mempool balance: %d", walletBalance, mempoolBalance)
+	log.Tracef("wallet balance: %d, mempool balance: %d", unlockedBalance, lockedBalance)
 
-	buf := new(bytes.Buffer)
-	if err := encoding.WriteUint64LE(buf, uint64(walletBalance)); err != nil {
+	r.RespChan <- rpcbus.Response{&node.BalanceResponse{UnlockedBalance: unlockedBalance, LockedBalance: lockedBalance}, nil}
+	return nil
+}
+
+func (t *Transactor) handleUnconfirmedBalance(r rpcbus.Request) error {
+	if t.w == nil {
+		return errWalletNotLoaded
+	}
+
+	// Retrieve mempool txs
+	resp, err := t.rb.Call(topics.GetMempoolTxs, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 2*time.Second)
+	if err != nil {
+		return err
+	}
+	txs := resp.([]transactions.Transaction)
+
+	unconfirmedBalance, err := t.w.CheckUnconfirmedBalance(txs)
+	if err != nil {
 		return err
 	}
 
-	if err := encoding.WriteUint64LE(buf, uint64(mempoolBalance)); err != nil {
+	log.Tracef("unconfirmed wallet balance: %d", unconfirmedBalance)
+
+	r.RespChan <- rpcbus.Response{&node.BalanceResponse{UnlockedBalance: unconfirmedBalance}, nil}
+	return nil
+}
+
+func (t *Transactor) handleAutomateConsensusTxs(r rpcbus.Request) error {
+	if err := t.launchMaintainer(); err != nil {
 		return err
 	}
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Consensus transactions are now being automated."}, nil}
+	return nil
+}
+
+func (t *Transactor) handleClearWalletDatabase(r rpcbus.Request) error {
+	if t.w == nil {
+		if err := os.RemoveAll(cfg.Get().Wallet.Store); err != nil {
+			return err
+		}
+
+		r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Wallet database deleted."}, nil}
+		return nil
+	}
+
+	if err := t.w.ClearDatabase(); err != nil {
+		return err
+	}
+
+	r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Wallet database deleted."}, nil}
+	return nil
+}
+
+func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
+	r.RespChan <- rpcbus.Response{&node.WalletStatusResponse{Loaded: t.w != nil}, nil}
 	return nil
 }
 
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := marshalling.MarshalTx(buf, tx); err != nil {
-		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
-	}
-
 	hash, err := tx.CalculateHash()
 	if err != nil {
 		// If we found a valid bid tx, we should under no circumstance have issues marshalling it
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 
-	t.eb.Publish(topics.Tx, buf)
+	_, err = t.rb.Call(topics.SendMempoolTx, rpcbus.Request{tx, make(chan rpcbus.Response, 1)}, 0)
+	if err != nil {
+		return nil, err
+	}
 
 	return hash, nil
 }
 
 func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
-
 	if t.w == nil {
 		return
 	}
@@ -367,6 +385,6 @@ func (t *Transactor) writeBidValues(tx transactions.Transaction) error {
 			return err
 		}
 
-		return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes())
+		return tr.StoreBidValues(tx.StandardTx().Outputs[0].Commitment.Bytes(), k.Bytes(), tx.LockTime())
 	})
 }

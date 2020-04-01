@@ -156,3 +156,30 @@ func TestTxInput(t *testing.T) {
 	`
 	assertQuery(t, query, response)
 }
+
+func TestTxSize(t *testing.T) {
+
+	query := `
+		{
+			transactions(last: 1)
+			{
+				size
+				txtype
+			}
+		}
+	`
+
+	response := `
+		{
+			"data": {
+				"transactions": [
+					{
+						"size": 766,
+						"txtype": "3"
+					}
+				]
+			}
+		}
+	`
+	assertQuery(t, query, response)
+}

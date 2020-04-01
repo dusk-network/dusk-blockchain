@@ -2,6 +2,7 @@ package peermsg
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
@@ -32,6 +33,12 @@ func (g *GetBlocks) Decode(r *bytes.Buffer) error {
 	lenLocators, err := encoding.ReadVarInt(r)
 	if err != nil {
 		return err
+	}
+
+	// lenLocators should never exceed 500, as that is the maximum amount
+	// of blocks a peer can request
+	if lenLocators > 500 {
+		return errors.New("too many locators in GetBlocks message")
 	}
 
 	g.Locators = make([][]byte, lenLocators)
