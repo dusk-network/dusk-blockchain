@@ -95,6 +95,9 @@ const (
 	// Cross-network RPCBus topics
 	GetRoundResults
 	GetCandidate
+
+	// Monitoring topics
+	SyncProgress
 )
 
 type topicBuf struct {
@@ -171,6 +174,9 @@ var Topics = [...]topicBuf{
 	topicBuf{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
 	topicBuf{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
+
+	// monitor related topics
+	topicBuf{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
 }
 
 func checkConsistency(topics []topicBuf) {

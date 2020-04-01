@@ -14,6 +14,8 @@ type Publisher interface {
 // Publish executes callback defined for a topic.
 // topic is explicitly set as it might be different from the message Category
 // (i.e. in the Gossip case)
+// Publishing is a fire and forget. If there is no listener for a topic, the
+// messages are lost
 func (bus *EventBus) Publish(topic topics.Topic, m message.Message) {
 	logEB.WithFields(logrus.Fields{
 		"topic":    topic,

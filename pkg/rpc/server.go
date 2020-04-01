@@ -1,3 +1,5 @@
+// This package represents the GRPC server exposing functions to interoperate
+// with the node components as well as the wallet
 package rpc
 
 import (
@@ -88,6 +90,9 @@ func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
 	return wrapper, nil
 }
 
+// SelectTx returns the transactions from the Mempool. It accepts a
+// SelectRequest carrying either the ID of a specific transaction or the types
+// of transactions as in "COINBASE", "BID", "STAKE", "STANDARD", "TIMELOCK", "CONTRACT"
 func (n *nodeServer) SelectTx(ctx context.Context, req *node.SelectRequest) (*node.SelectResponse, error) {
 	txs, err := n.rpcBus.Call(topics.GetMempoolView, rpcbus.NewRequest(req), 5*time.Second)
 	if err != nil {
@@ -97,6 +102,7 @@ func (n *nodeServer) SelectTx(ctx context.Context, req *node.SelectRequest) (*no
 	return txs.(*node.SelectResponse), nil
 }
 
+// CreateWallet creates a new wallet from a password or seed
 func (n *nodeServer) CreateWallet(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	resp, err := n.rpcBus.Call(topics.CreateWallet, rpcbus.NewRequest(c), 5*time.Second)
 	if err != nil {
@@ -106,6 +112,7 @@ func (n *nodeServer) CreateWallet(ctx context.Context, c *node.CreateRequest) (*
 	return resp.(*node.LoadResponse), nil
 }
 
+// LoadWallet from a password
 func (n *nodeServer) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node.LoadResponse, error) {
 	resp, err := n.rpcBus.Call(topics.LoadWallet, rpcbus.NewRequest(l), 5*time.Second)
 	if err != nil {
@@ -115,6 +122,7 @@ func (n *nodeServer) LoadWallet(ctx context.Context, l *node.LoadRequest) (*node
 	return resp.(*node.LoadResponse), nil
 }
 
+// CreateFromSeed creates a wallet from a seed
 func (n *nodeServer) CreateFromSeed(ctx context.Context, c *node.CreateRequest) (*node.LoadResponse, error) {
 	resp, err := n.rpcBus.Call(topics.CreateFromSeed, rpcbus.NewRequest(c), 5*time.Second)
 	if err != nil {

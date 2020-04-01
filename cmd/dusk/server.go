@@ -2,8 +2,9 @@ package main
 
 import (
 	"bytes"
-	"github.com/sirupsen/logrus"
 	"net"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
 	"github.com/dusk-network/dusk-blockchain/pkg/rpc"
@@ -37,7 +38,10 @@ type Server struct {
 	rpcWrapper *rpc.RPCSrvWrapper
 }
 
-// Setup creates a new EventBus, generates the BLS and the ED25519 Keys, launches a new `CommitteeStore`, launches the Blockchain process and inits the Stake and Blind Bid channels
+// Setup creates a new EventBus, generates the BLS and the ED25519 Keys,
+// launches a new `CommitteeStore`, launches the Blockchain process, creates
+// and launches a monitor client (if configuration demands it), and inits the
+// Stake and Blind Bid channels
 func Setup() *Server {
 	// creating the eventbus
 	eventBus := eventbus.New()
@@ -100,7 +104,7 @@ func Setup() *Server {
 	go transactorComponent.Listen()
 
 	// Connecting to the log based monitoring system
-	if err := ConnectToLogMonitor(eventBus); err != nil {
+	if err := LaunchMonitor(eventBus); err != nil {
 		log.Panic(err)
 	}
 
