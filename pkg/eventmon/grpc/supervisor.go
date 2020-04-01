@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "grpc-supervisor")
+var lg = log.WithField("process", "monitor-client")
 
 // Supervisor is an implementation of monitor.Supervisor interface
 type Supervisor struct {
@@ -62,17 +62,22 @@ func (s *Supervisor) Fire(entry *log.Entry) error {
 
 // Start triggers an Hello grpc call on the underlying client
 func (s *Supervisor) Start() error {
+	lg.Infoln("sending start notification to server")
 	return s.client.Hello()
 }
 
 // Stop halts the listening for accepted blocks and sends a Bye grpc message to
 // the monitoring server
 func (s *Supervisor) Stop() error {
+	lg.Infoln("sending stop notification to server")
 	_ = s.Halt()
 	return s.client.Bye()
 }
 
+// Halt unsubscribes the supervisor from the EventBus AcceptedBlock
+// notifications and stops the Slowdown alert detection routine
 func (s *Supervisor) Halt() error {
+	lg.Debugln("halting")
 	s.broker.Unsubscribe(topics.AcceptedBlock, s.idBlockUpdate)
 	s.stopChan <- struct{}{}
 	return nil
