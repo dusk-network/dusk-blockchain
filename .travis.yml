@@ -12,7 +12,8 @@ git:
 matrix:
   include:
     - name: "Lint"
-      - make lint
+      script:
+        - make lint
 
     - name: "Tests"
       before_script:
