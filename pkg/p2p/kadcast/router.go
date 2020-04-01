@@ -15,6 +15,10 @@ const K int = 20
 // ask for new nodes with `FIND_NODES` messages.
 const Alpha int = 3
 
+// InitHeight sets the default initial height for a
+// broadcast process.
+const InitHeight byte = 128
+
 // Router holds all of the data needed to interact with
 // the routing data and also the networking utils.
 type Router struct {
@@ -212,4 +216,31 @@ func (router Router) sendNodes(receiver Peer) {
 		return
 	}
 	sendUDPPacket("udp", receiver.getUDPAddr(), packet.asBytes())
+}
+
+// BroadcastPacket sends a `CHUNKS` message across the network
+// following the Kadcast broadcasting rules with the specified height.
+func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
+	// Get `Beta` random peers from each Bucket.
+	for _, bucket := range router.tree.buckets {
+		// Skip first bucket from the iteration (it contains our peer).
+		if bucket.idLength == 0 {continue}
+		destPeer, err := bucket.getRandomPeer()
+		if err != nil {
+			continue
+		}
+		// Create empty packet and set headers.
+		var packet Packet
+		// Set headers info. 
+		packet.setHeadersInfo(tipus, router, *destPeer)
+		// Set payload. 
+		packet.setChunksPayloadInfo(height, payload)
+		sendTCPStream(destPeer.getUDPAddr(), packet.asBytes())
+	}
+}
+
+// StartPacketBroadcast sends a `CHUNKS` message across the network
+// following the Kadcast broadcasting rules with the InitHeight.
+func (router Router) StartPacketBroadcast(tipus byte, payload []byte) {
+	router.broadcastPacket(InitHeight, tipus, payload)
 }

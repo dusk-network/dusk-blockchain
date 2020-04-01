@@ -88,6 +88,15 @@ func verifyIDNonce(id [16]byte, nonce [4]byte) error {
 	return errors.New("Id and Nonce are not valid parameters") //TODO: Create error type.
 }
 
+// Returns the ID associated to the chunk sent.
+// The ID is the half of the result of the hash of the chunk.
+func computeChunkID(chunk []byte) [16]byte {
+	var halfLenID [16]byte
+	fullID := sha3.Sum256(chunk)
+	copy(halfLenID[0:16], fullID[0:16])
+	return halfLenID
+}
+
 // ------------------ NET UTILS ------------------ //
 
 // Gets the local IP address of the machine where
@@ -145,9 +154,9 @@ func getBytesFromUint16(num uint16) [2]byte {
 	return res
 }
 
-// Encode a received packet to send it through the
+// Encodes received UDP packets to send it through the
 // Ring to the packetProcess rutine.
-func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
+func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
 	encodedLen := len(payload) + 8
 	enc := make([]byte, encodedLen)
 	// Get numBytes as slice of bytes.
@@ -164,7 +173,26 @@ func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byt
 	return enc
 }
 
-// Decode a CircularQueue packet and return the
+// Encodes received TCP packets to send it through the
+// Ring to the packetProcess rutine.
+func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
+	peerDataStr := peerAddr.String()
+	encodedLen := len(payload) + 8
+	enc := make([]byte, encodedLen)
+	// Get numBytes as slice of bytes.
+	numBytes := getBytesFromUint16(byteNum)
+	// Append it to the resulting slice.
+	copy(enc[0:2], numBytes[0:2])
+	// Append Peer IP.
+	copy(enc[2:6], peerDataStr[0:4])
+	// Append Port
+	copy(enc[6:8], peerDataStr[4:6])
+	// Append Payload
+	copy(enc[8:encodedLen], payload[0:len(payload)])
+	return enc
+}
+
+// Decodes a CircularQueue packet and returns the
 // elements of the original received packet.
 func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)

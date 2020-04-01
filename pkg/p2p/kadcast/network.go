@@ -1,9 +1,11 @@
 package kadcast
 
 import (
-	log "github.com/sirupsen/logrus"
+	"io"
 	"net"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
@@ -11,7 +13,7 @@ import (
 // StartUDPListener listens infinitely for UDP packet arrivals and
 // executes it's processing inside a gorutine by sending
 // the packets to the circularQueue.
-func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer, ) {
+func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 
 	lAddr := getLocalUDPAddress()
 	// Set listening port.
@@ -35,11 +37,11 @@ PacketConnCreation:
 			log.WithError(err).Warn("Error on packet read")
 			pc.Close()
 			goto PacketConnCreation
-		} 
+		}
 		// Set a new deadline for the connection.
 		pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
-		encodedPack := encodeRedPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
+		encodedPack := encodeReadUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
 	}
@@ -61,5 +63,61 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	if err != nil {
 		log.WithError(err).Warn("Error while writting to the filedescriptor.")
 		return
-	} 
+	}
+}
+
+// StartTCPListener listens infinitely for TCP packet arrivals and
+// executes it's processing inside a gorutine by sending
+// the packets to the circularQueue.
+func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
+	lAddr := getLocalTCPAddress()
+	// Set listening port.
+	lAddr.Port = int(MyPeerInfo.port)
+PacketConnCreation:
+	// listen to incoming TCP packets
+	listener, err := net.ListenTCP(netw, &lAddr)
+	if err != nil {
+		log.Panic(err)
+	}
+	// Set initial deadline.
+	listener.SetDeadline(time.Now().Add(time.Minute))
+
+	// Instanciate the buffer
+	buffer := make([]byte, 5000000)
+	for {
+		// Read TCP packet.
+		pc, err := listener.AcceptTCP()
+		uAddr := pc.RemoteAddr()
+		byteNum, err := io.ReadFull(pc, buffer)
+		if err != nil {
+			log.WithError(err).Warn("Error on packet read")
+			pc.Close()
+			goto PacketConnCreation
+		}
+		// Set a new deadline for the connection.
+		pc.SetDeadline(time.Now().Add(5 * time.Minute))
+		// Serialize the packet.
+		encodedPack := encodeReadTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
+		// Send the packet to the Consumer putting it on the queue.
+		queue.Put(encodedPack)
+		// Empty the buffer to read again.
+		buffer = make([]byte, 5000000)
+	}
+}
+
+// Opens a TCP connection with the peer sent on the params and transmits
+// a stream of bytes. Once transmited, closes the connection.
+func sendTCPStream(addr net.UDPAddr, payload []byte) {
+	conn, err := net.Dial("tcp", string(addr.IP)+":"+string(addr.Port))
+	if err != nil {
+		log.WithError(err).Warn("Could not stablish a connection with the dest Peer.")
+		return
+	}
+	defer conn.Close()
+	// Write our message to the connection.
+	_, err = conn.Write(payload)
+	if err != nil {
+		log.WithError(err).Warn("Error while writting to the filedescriptor.")
+		return
+	}
 }
