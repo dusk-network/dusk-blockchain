@@ -51,7 +51,7 @@ func TestNotifyError(t *testing.T) {
 	}
 
 	Suite(t, 100, call)
-	s.Stop()
+	s.Halt()
 }
 
 func TestNotifySlowdown(t *testing.T) {
@@ -62,7 +62,7 @@ func TestNotifySlowdown(t *testing.T) {
 	testData := helper.RandomBlock(t, height, 2)
 	callBlockSetup := callTest{
 		clientMethod: func() error {
-			return s.Client.NotifyBlockUpdate(*testData)
+			return s.Client().NotifyBlockUpdate(*testData)
 		},
 
 		tester: emptyFunc,
@@ -87,7 +87,7 @@ func TestNotifySlowdown(t *testing.T) {
 	}
 
 	Suite(t, 200, callBlockSetup, callSlowdown)
-	s.Stop()
+	s.Halt()
 }
 
 func TestNotifySlowdownAtStart(t *testing.T) {
@@ -117,5 +117,5 @@ func TestNotifySlowdownAtStart(t *testing.T) {
 	}
 
 	Suite(t, 100, call)
-	s.Stop()
+	s.Halt()
 }

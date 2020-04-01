@@ -16,8 +16,12 @@ output = "debug"
 [logger.monitor]
 # enabling log based monitoring
 enabled = false
-# file whereto dumping info parsed by monitor
-target = "/var/log/dusk-monitor"
+rpc="grpc"
+# transport
+transport="unix"
+# target
+address="/tmp/dusk-monitor.sock"
+
 # tell logger to stream errors and warnings to monitoring process
 streamErrors=true
     
