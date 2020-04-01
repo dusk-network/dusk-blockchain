@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"strings"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
@@ -12,32 +12,33 @@ import (
 
 var lg = log.WithField("process", "monitoring")
 
-// ConnectToLogMonitor launches the monitoring process in a goroutine. The goroutine performs 5 attempts before giving up
-func ConnectToLogMonitor(bus eventbus.Broker) error {
+// New creates a new monitor.Supervisor which notifies a remote monitoring server with alerts and data
+func New(bus eventbus.Broker) (monitor.Supervisor, error) {
 	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
-		monitorURL := cfg.Get().Logger.Monitor.Target
-		lg.WithField("process", "monitoring").Infof("Connecting to log process on %v\n", monitorURL)
-		go startMonitoring(bus, monitorURL)
-	}
+		mon := cfg.Get().Logger.Monitor
+		rpcType := strings.ToLower(mon.Rpc)
+		transport := strings.ToLower(mon.Transport)
+		addr := strings.ToLower(mon.Address)
 
-	return nil
-}
+		monitorURL := transport + "://" + addr
+		lg.WithField("process", "monitoring").Info("Monitor configuration parsed: sending data to", monitorURL)
 
-func startMonitoring(bus eventbus.Broker, monURL string) {
-	for i := 0; i < 5; i++ {
-		lg.Traceln("Trying to (re)start the monitoring process")
-		supervisor, err := monitor.Launch(bus, monURL)
+		blockTimeThreshold := 20 * time.Second
+
+		supervisor, err := monitor.New(bus, blockTimeThreshold, rpcType, monitorURL)
 		if err != nil {
-			lg.Warnln(fmt.Sprintf("error in starting the monitoring. Attempt: %d. Error: %s", i, err.Error()))
-			delay := 2 + 2*i
-			lg.Warnln(fmt.Sprintf("waiting for %d before retrying", delay))
-			time.Sleep(time.Duration(delay) * time.Second)
-			continue
+			lg.WithError(err).Errorln("Monitoring could not get started")
+			return nil, err
 		}
+
 		if cfg.Get().Logger.Monitor.StreamErrors {
+			lg.Infoln("sending errors to", monitorURL)
 			log.AddHook(supervisor)
 		}
-		return
+
+		lg.Debugln("monitor instantiated")
+		return supervisor, nil
 	}
-	lg.Errorln("Monitoring could not get started")
+
+	return nil, nil
 }
