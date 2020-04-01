@@ -2,21 +2,21 @@ package main
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"time"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/monitor"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
-	log "github.com/sirupsen/logrus"
 )
 
-var lg = log.WithField("process", "monitoring")
+var lg = logrus.WithField("process", "monitoring")
 
 // ConnectToLogMonitor launches the monitoring process in a goroutine. The goroutine performs 5 attempts before giving up
 func ConnectToLogMonitor(bus eventbus.Broker) error {
 	if cfg.Get().General.Network == "testnet" && cfg.Get().Logger.Monitor.Enabled {
 		monitorURL := cfg.Get().Logger.Monitor.Target
-		lg.WithField("process", "monitoring").Infof("Connecting to log process on %v\n", monitorURL)
+		lg.Infof("Connecting to log process on %v\n", monitorURL)
 		go startMonitoring(bus, monitorURL)
 	}
 
@@ -35,7 +35,7 @@ func startMonitoring(bus eventbus.Broker, monURL string) {
 			continue
 		}
 		if cfg.Get().Logger.Monitor.StreamErrors {
-			log.AddHook(supervisor)
+			logrus.AddHook(supervisor)
 		}
 		return
 	}

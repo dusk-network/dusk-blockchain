@@ -42,12 +42,14 @@ chain  dusk7001.log  dusk-grpc.sock dusk.toml  pipe-channel  walletDB
 
 ###### Configure
 
-The following ENV variables must be declared to enable testing.
+Considering that you have previously cloned and built `dusk-blindbidproof`, `dusk-seeder` in the root directory as `dusk-blockchain`,
+configure your env vars like this:
 
 ```bash
-DUSK_BLINDBID="/dusk-blockchain/launch/testnet/blindbid-avx2"
-DUSK_BLOCKCHAIN="/dusk-blockchain/launch/testnet/testnet"
-DUSK_SEEDER="dusk-voucher-seeder/dusk-voucher-seeder"
+DUSK_HOME=/opt/gocode/src/github.com/dusk-network
+DUSK_BLINDBID=$DUSK_HOME/dusk-blindbidproof/target/debug/blindbid
+DUSK_BLOCKCHAIN=$DUSK_HOME/dusk-blockchain/bin/dusk
+DUSK_SEEDER=$DUSK_HOME/dusk-seeder/voucher
 DUSK_WALLET_PASS="default"
 ```
 
@@ -57,3 +59,5 @@ tests$ go test -v --count=1 --test.timeout=0  ./... -args -enable
 ```
 
  
+Alternatively, you can have a one liner do it all (run it from dusk-blockchain root dir):
+`DUSK_BLOCKCHAIN=$PWD/bin/dusk DUSK_BLINDBID=$PWD/../dusk-blindbidproof/target/debug/blindbid DUSK_SEEDER=$PWD/../dusk-seeder/voucher DUSK_WALLET_PASS="default" make test-harness`

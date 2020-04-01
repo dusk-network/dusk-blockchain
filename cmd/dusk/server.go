@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"github.com/sirupsen/logrus"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/gql"
@@ -19,10 +20,11 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/peer/processing/chainsync"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/protocol"
-	log "github.com/sirupsen/logrus"
 
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
+
+var logServer = logrus.WithField("process", "server")
 
 // Server is the main process of the node
 type Server struct {
@@ -49,11 +51,11 @@ func Setup() *Server {
 	m.Run()
 
 	// creating and firing up the chain process
-	chain, err := chain.New(eventBus, rpcBus, counter)
+	chainProcess, err := chain.New(eventBus, rpcBus, counter)
 	if err != nil {
 		log.Panic(err)
 	}
-	go chain.Listen()
+	go chainProcess.Listen()
 
 	// Setting up the candidate broker
 	candidateBroker := candidate.NewBroker(eventBus, rpcBus)
@@ -70,13 +72,12 @@ func Setup() *Server {
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
-		gqlServer, err := gql.NewHTTPServer(eventBus, rpcBus)
-		if err != nil {
+		if gqlServer, err := gql.NewHTTPServer(eventBus, rpcBus); err != nil {
 			log.Errorf("GraphQL http server error: %s", err.Error())
-		}
-
-		if err := gqlServer.Start(); err != nil {
-			log.Errorf("GraphQL failed to start: %s", err.Error())
+		} else {
+			if err := gqlServer.Start(); err != nil {
+				log.Errorf("GraphQL failed to start: %s", err.Error())
+			}
 		}
 	}
 
@@ -84,7 +85,7 @@ func Setup() *Server {
 	srv := &Server{
 		eventBus:   eventBus,
 		rpcBus:     rpcBus,
-		chain:      chain,
+		chain:      chainProcess,
 		dupeMap:    dupeBlacklist,
 		counter:    counter,
 		gossip:     processing.NewGossip(protocol.TestNet),
@@ -92,11 +93,11 @@ func Setup() *Server {
 	}
 
 	// Setting up the transactor component
-	transactor, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil, cfg.Get().General.WalletOnly)
+	transactorComponent, err := transactor.New(eventBus, rpcBus, nil, srv.counter, nil, nil, cfg.Get().General.WalletOnly)
 	if err != nil {
 		log.Panic(err)
 	}
-	go transactor.Listen()
+	go transactorComponent.Listen()
 
 	// Connecting to the log based monitoring system
 	if err := ConnectToLogMonitor(eventBus); err != nil {
@@ -125,20 +126,14 @@ func (s *Server) OnAccept(conn net.Conn) {
 	exitChan := make(chan struct{}, 1)
 	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
 	if err != nil {
-		log.Panic(err)
+		logServer.Panic(err)
 	}
 
 	if err := peerReader.Accept(); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem performing handshake")
+		logServer.WithError(err).Warnln("problem performing handshake")
 		return
 	}
-	log.WithFields(log.Fields{
-		"process": "server",
-		"address": peerReader.Addr(),
-	}).Debugln("connection established")
+	logServer.WithField("address", peerReader.Addr()).Debugln("connection established")
 
 	go peerReader.ReadLoop()
 
@@ -152,16 +147,11 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 	peerWriter := peer.NewWriter(conn, s.gossip, s.eventBus)
 
 	if err := peerWriter.Connect(); err != nil {
-		log.WithFields(log.Fields{
-			"process": "server",
-			"error":   err,
-		}).Warnln("problem performing handshake")
+		logServer.WithError(err).Warnln("problem performing handshake")
 		return
 	}
-	log.WithFields(log.Fields{
-		"process": "server",
-		"address": peerWriter.Addr(),
-	}).Debugln("connection established")
+	logServer.WithField("address", peerWriter.Addr()).
+		Debugln("connection established")
 
 	exitChan := make(chan struct{}, 1)
 	peerReader, err := peer.NewReader(conn, s.gossip, s.dupeMap, s.eventBus, s.rpcBus, s.counter, writeQueueChan, exitChan)
@@ -176,7 +166,7 @@ func (s *Server) OnConnection(conn net.Conn, addr string) {
 // Close the chain and the connections created through the RPC bus
 func (s *Server) Close() {
 	// TODO: disconnect peers
-	s.chain.Close()
+	_ = s.chain.Close()
 	s.rpcBus.Close()
 	s.rpcWrapper.Shutdown()
 }

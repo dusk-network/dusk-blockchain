@@ -3,35 +3,51 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
-	"os"
-	"os/signal"
-	"time"
-
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/diagnostics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/logging"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
+	"math/rand"
+	"os"
+	"os/signal"
+	"time"
 )
 
-const (
-	// name (wihtout ext) for the config file to look for
-	configFileName = "dusk"
+var (
+	log     *logrus.Entry
+	config  string
+	datadir string
 )
 
-func main() {
+func action(ctx *cli.Context) error {
+
+	// check arguments
+	if arguments := ctx.Args(); len(arguments) > 0 {
+		return fmt.Errorf("failed to read command argument: %q", arguments[0])
+	}
+
+	if datadir = ctx.GlobalString(DataDirFlag.Name); datadir != "" {
+		datadir = "~/./dusk"
+		//TODO:
+	}
+
+	if config = ctx.GlobalString(ConfigFlag.Name); config != "" {
+		config = "dusk"
+	}
+
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	fmt.Fprintln(os.Stdout, "initializing node...")
+	log.Info("initializing node...")
+
 	// Loading all node configurations. Fail-fast if critical error occurs
-	err := cfg.Load(configFileName, nil, nil)
+	err := cfg.Load(config, nil, nil)
 	if err != nil {
-		fmt.Printf("%v\n", err)
-		os.Exit(1)
+		log.WithError(err).Fatal("Could not load config ")
 	}
 
 	port := cfg.Get().Network.Port
@@ -46,15 +62,17 @@ func main() {
 		if err != nil {
 			log.Panic(err)
 		}
-		defer logFile.Close()
+		defer func() {
+			_ = logFile.Close()
+		}()
 	} else {
 		logFile = os.Stdout
 	}
 
 	logging.InitLog(logFile)
 
-	log.Infof("Loaded config file %s", cfg.Get().UsedConfigFile)
-	log.Infof("Selected network  %s", cfg.Get().General.Network)
+	log.Info("Loaded config file", "UsedConfigFile", cfg.Get().UsedConfigFile)
+	log.Info("Selected network", "Network", cfg.Get().General.Network)
 
 	// Setting up the EventBus and the startup processes (like Chain and CommitteeStore)
 	srv := Setup()
@@ -81,7 +99,7 @@ func main() {
 		}
 	}
 
-	fmt.Fprintln(os.Stdout, "initialization complete")
+	log.Info("initialization complete")
 
 	// Wait until the interrupt signal is received from an OS signal or
 	// shutdown is requested through one of the subsystems such as the RPC
@@ -93,6 +111,8 @@ func main() {
 	srv.eventBus.Publish(topics.Quit, msg)
 
 	log.WithField("prefix", "main").Info("Terminated")
+
+	return nil
 }
 
 func setupProfiles(r *rpcbus.RPCBus) *diagnostics.ProfileSet {
@@ -111,7 +131,7 @@ func setupProfiles(r *rpcbus.RPCBus) *diagnostics.ProfileSet {
 
 			p := diagnostics.NewProfile(i.Name, i.Interval, i.Duration, i.Start)
 			if err := s.Spawn(p); err != nil {
-				log.Panicf("Profiling task error: %s", err.Error())
+				log.WithError(err).Panic("Profiling task error")
 			}
 		}
 

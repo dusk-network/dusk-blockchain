@@ -51,18 +51,18 @@ go get github.com/dusk-network/dusk-blockchain
 ```
 Then, navigate to the testnet folder, like so:
 ```bash
-cd $GOPATH/src/github.com/dusk-network/dusk-blockchain/launch/testnet
+cd $GOPATH/src/github.com/dusk-network/dusk-blockchain
 ```
 Then, to build the binary, simply run:
 ```bash
-go build
+make build
 ```
 
 Next up, we build the rust part of the node. Instructions for building the `blindbid` module can be found [here](https://github.com/dusk-network/dusk-blindbidproof/blob/master/Readme.md#how-to-build). After building, make sure you move the executable into the `testnet` folder.
 
 Finally, to start your node, type:
 ```bash
-./start-node.sh
+./bin/dusk --config=dusk.toml
 ```
 
 ## Features
