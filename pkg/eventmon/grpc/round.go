@@ -8,8 +8,10 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
-//NotifyBlockUpdate opens a connection to the monitoring server any time there
-//is an update. It is questionable whether this should be a stream instead
+//NotifyBlockUpdate sends an alert with the Block data any time a new block is
+//finalized and added to the blockchain. It opens a connection to the monitoring
+// server any time there is an update. It is questionable whether this should
+// be a stream instead
 func (c *Client) NotifyBlockUpdate(parent context.Context, blk block.Block) error {
 	return c.send(parent, func(mon pb.MonitorClient, ctx context.Context) error {
 		blockUpdate := &pb.BlockUpdate{
@@ -29,6 +31,8 @@ func (c *Client) NotifyBlockUpdate(parent context.Context, blk block.Block) erro
 	})
 }
 
+// NotifyBlockSlowdown sends an alert with the data about the slowdown in
+// accepting blocks
 func (c *Client) NotifyBlockSlowdown(parent context.Context) error {
 	return c.send(parent, func(mon pb.MonitorClient, ctx context.Context) error {
 		if c.lastBlock != nil {
@@ -41,7 +45,6 @@ func (c *Client) NotifyBlockSlowdown(parent context.Context) error {
 			_, err := mon.NotifySlowdown(ctx, alert)
 			return err
 		}
-
 		_, err := mon.NotifySlowdown(ctx, &pb.SlowdownAlert{})
 		return err
 	})

@@ -86,7 +86,7 @@ func TestNotifySlowdown(t *testing.T) {
 		},
 	}
 
-	Suite(t, 200, callBlockSetup, callSlowdown)
+	Suite(t, 2000, callBlockSetup, callSlowdown)
 	s.Halt()
 }
 

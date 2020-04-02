@@ -99,8 +99,8 @@ func (s *Supervisor) listenAcceptedBlock(ctx context.Context, entryChan <-chan *
 			s.client.NotifyError(ctx, entry)
 
 		case blk := <-blockChan:
-			s.timeoutBlock = initialTimeoutBlockAcceptance
 			timer.Stop()
+			s.timeoutBlock = initialTimeoutBlockAcceptance
 			lg.WithField("timeout", s.timeoutBlock.Milliseconds()).Traceln("slowdown timeout reset")
 			if err := s.client.NotifyBlockUpdate(ctx, blk); err != nil {
 				lg.WithError(err).Warnln("could not send block to monitoring")
@@ -115,6 +115,8 @@ func (s *Supervisor) listenAcceptedBlock(ctx context.Context, entryChan <-chan *
 			}
 			lg.Traceln("slowdown alert sent")
 		case <-ctx.Done():
+			timer.Stop()
+			s.timeoutBlock = initialTimeoutBlockAcceptance
 			lg.Traceln("supervisor stopped")
 			return
 		}
