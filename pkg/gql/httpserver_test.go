@@ -36,7 +36,9 @@ func TestWebsocketEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+	}()
 
 	response := make(chan string)
 	go func() {
@@ -69,7 +71,7 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	expMsg, err := notifications.MarshalBlockMsg(*blk)
 	if err != nil {
-		t.Errorf("marshalling failed")
+		t.Errorf("marshaling failed")
 	}
 
 	if message == "no response" {

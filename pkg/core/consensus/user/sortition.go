@@ -55,7 +55,7 @@ func createSortitionHash(round uint64, step uint8, i int) ([]byte, error) {
 	msg := make([]byte, 12)
 	binary.LittleEndian.PutUint64(msg[:8], round)
 	binary.LittleEndian.PutUint32(msg[8:12], uint32(i))
-	msg = append(msg, byte(step))
+	msg = append(msg, step)
 	return hash.Sha3256(msg)
 }
 

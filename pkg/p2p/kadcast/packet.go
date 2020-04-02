@@ -14,13 +14,13 @@ type Packet struct {
 	payload []byte
 }
 
-// Builds a `Packet` from the headers and the payload.
-func makePacket(headers [24]byte, payload []byte) Packet {
-	return Packet{
-		headers: headers,
-		payload: payload,
-	}
-}
+//// Builds a `Packet` from the headers and the payload.
+//func makePacket(headers [24]byte, payload []byte) Packet {
+//	return Packet{
+//		headers: headers,
+//		payload: payload,
+//	}
+//}
 
 // -------- General Packet De/Serialization tools -------- //
 
@@ -103,8 +103,8 @@ func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 }
 
 // Analyzes if the announced number of Peers included on the
-// `NODES` message payload is the same as the recieved one.
-// Returns `true` if it is correct and `false` otherways.
+// `NODES` message payload is the same as the received one.
+// Returns `true` if it is correct and `false` otherwise.
 func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 	// Get number of Peers announced.
 	peerNum := binary.BigEndian.Uint16(pac.payload[0:2])
@@ -117,13 +117,13 @@ func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 // Gets a `NODES` message and returns a slice of the
 // `Peers` found inside of it
 func (pac Packet) getNodesPayloadInfo() []Peer {
-	// Get number of Peers recieved.
+	// Get number of Peers received.
 	peerNum := int(binary.BigEndian.Uint16(pac.payload[0:2]))
 	// Create Peer-struct slice
 	var peers []Peer
 	// Slice the payload into `Peers` in bytes format and deserialize
 	// every single one of them.
-	var i, j int = 3, PeerBytesSize + 1
+	var i, j = 3, PeerBytesSize + 1
 	for m := 0; m < peerNum; m++ {
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
@@ -161,7 +161,7 @@ func (pac Packet) getChunksPayloadInfo() (byte, *[16]byte, []byte, error) {
 		return 0, nil, nil, errors.New("payload length insuficient")
 	}
 	height := pac.payload[0]
-	var chunkID [16]byte 
+	var chunkID [16]byte
 	copy(chunkID[0:16], pac.payload[1:17])
 	payload := pac.payload[17:]
 	return height, &chunkID, payload, nil
@@ -176,7 +176,6 @@ func (pac *Packet) decreaseChunksHeight() error {
 	pac.payload[0] = pac.payload[0] - 1
 	return nil
 }
-
 
 // ----------- Message Handlers ----------- //
 
@@ -214,7 +213,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
-		log.Info("NODES message recieved with corrupted payload. Packet ignored.")
+		log.Info("NODES message received with corrupted payload. Packet ignored.")
 		return
 	}
 
@@ -222,7 +221,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 
 	// Deserialize the payload to get the peerInfo of every
-	// recieved peer.
+	// received peer.
 	peers := packet.getNodesPayloadInfo()
 
 	// Send `PING` messages to all of the peers to then
@@ -232,6 +231,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	}
 }
 
+//nolint:unparam
 func handleChunks(chunkMap map[[16]byte]bool, peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// Deserialize the packet.
 	height, chunkID, payload, err := packet.getChunksPayloadInfo()

@@ -9,7 +9,7 @@ import (
 )
 
 // Config package should avoid importing any dusk-go packages in order to
-// prevent any cyclic-dependancy issues
+// prevent any cyclic-dependency issues
 
 const (
 	// current working dir
@@ -33,6 +33,7 @@ type Base struct {
 	ConfigFileName string
 
 	// custom commandline loader
+	//nolint:structcheck
 	loadFlagsFn func() (string, error)
 }
 

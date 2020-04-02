@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/heavy"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database/lite"
@@ -82,7 +84,9 @@ func _TestDriver(m *testing.M, driverName string) int {
 	}
 
 	// Cleanup backend files only when running in testing mode
-	defer os.RemoveAll(storeDir)
+	defer func() {
+		_ = os.RemoveAll(storeDir)
+	}()
 
 	// Retrieve a handler to an existing driver.
 	drvr, err = database.From(driverName)
@@ -101,7 +105,9 @@ func _TestDriver(m *testing.M, driverName string) int {
 		return 1
 	}
 
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	// Generate a few blocks to be used as sample objects
 	// Less blocks are used as we have CI out-of-memory error
@@ -120,7 +126,7 @@ func _TestDriver(m *testing.M, driverName string) int {
 	}
 
 	// Try to store all blocks in append-only manner
-	err = storeBlocks(nil, db, blocks)
+	err = storeBlocks(db, blocks)
 	if err != nil {
 		fmt.Println(err)
 		return 1
@@ -530,7 +536,9 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 		test.Fatalf("Cannot create read-write database ")
 	}
 
-	defer dbReadWrite.Close()
+	defer func() {
+		_ = dbReadWrite.Close()
+	}()
 
 	// Re-open the storage in read-only mode
 	readonly = true
@@ -543,7 +551,9 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 		test.Fatalf("Cannot open database in read-only mode")
 	}
 
-	defer dbReadOnly.Close()
+	defer func() {
+		_ = dbReadOnly.Close()
+	}()
 
 	// Initialize db and a slice of 10 blocks with 2 transactions.Transaction each
 	genBlocks, err := generateChainBlocks(test, 2)
@@ -553,8 +563,8 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 
 	// Store all blocks with read-write DB
 	err = dbReadWrite.Update(func(t database.Transaction) error {
-		for _, block := range genBlocks {
-			err := t.StoreBlock(block)
+		for _, b := range genBlocks {
+			err := t.StoreBlock(b)
 			if err != nil {
 				return err
 			}
@@ -709,8 +719,10 @@ func TestClearDatabase(test *testing.T) {
 		return nil
 	})
 
+	require.Nil(test, err)
+
 	// repopulate db for the other tests
-	if err := storeBlocks(test, db, blocks); err != nil {
+	if err := storeBlocks(db, blocks); err != nil {
 		test.Fatal(err)
 	}
 }
@@ -888,7 +900,9 @@ func TestStoreFetchBidValues(test *testing.T) {
 func _TestPersistence() int {
 
 	// Closing the driver should release all allocated resources
-	drvr.Close()
+	func() {
+		_ = drvr.Close()
+	}()
 
 	// Rename the storage folder
 	newStoreDir := storeDir + "_renamed"
@@ -905,7 +919,9 @@ func _TestPersistence() int {
 	// Force reload storage and fetch blocks
 	{
 		db, err := drvr.Open(newStoreDir, protocol.DevNet, true)
-		defer drvr.Close()
+		defer func() {
+			_ = drvr.Close()
+		}()
 
 		// For instance, `resource temporarily unavailable` would be observed if
 		// _storage.Close() is missed

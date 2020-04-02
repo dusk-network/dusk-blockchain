@@ -24,7 +24,7 @@ func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 }
 
 func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
-	// message.Marshal takes care of prepending the topic, marshalling the
+	// message.Marshal takes care of prepending the topic, marshaling the
 	// header, etc
 	buf, err := message.Marshal(msg)
 	if err != nil {
@@ -114,7 +114,9 @@ func (h *Helper) StartSelection() {
 func (h *Helper) SendBatch(hash []byte) {
 	batch := h.Spawn(hash)
 	for _, ev := range batch {
-		go h.Selector.CollectScoreEvent(ev)
+		go func() {
+			_ = h.Selector.CollectScoreEvent(ev)
+		}()
 	}
 }
 

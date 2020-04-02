@@ -7,13 +7,16 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
+//nolint:golint
 const Length = 4
 
+// Generate a blake2b Sum256 digest
 func Generate(m []byte) []byte {
 	digest := blake2b.Sum256(m)
 	return digest[:Length]
 }
 
+// Extract message and checksum from  buffer
 func Extract(m []byte) ([]byte, []byte, error) {
 	// First 4 bytes are the checksum
 	if len(m) < Length {
@@ -25,6 +28,7 @@ func Extract(m []byte) ([]byte, []byte, error) {
 	return message, checksum, nil
 }
 
+// Verify blake2b Sum256 digest
 func Verify(m []byte, checksum []byte) bool {
 	digest := blake2b.Sum256(m)
 	return bytes.Equal(checksum, digest[:Length])

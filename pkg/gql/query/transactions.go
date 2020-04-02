@@ -85,7 +85,7 @@ func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 		}
 	}
 
-	// Populate marshalling size
+	// Populate marshaling size
 	buf := new(bytes.Buffer)
 	if err := message.MarshalTx(buf, tx); err != nil {
 		return queryTx{}, err

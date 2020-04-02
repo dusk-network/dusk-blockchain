@@ -3,12 +3,13 @@ package kadcast
 import (
 	"encoding/binary"
 	"net"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
 
-// ProcessTCPPacket recieves a Packet and processes it according to
+// ProcessTCPPacket receives a Packet and processes it according to
 // it's type. It gets the packets from the circularqueue that
 // connects the listeners with the packet processor.
 func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
@@ -20,7 +21,7 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 	var tcpPayload []byte
 	var packet Packet
 	chunkIDmap := make(map[[16]byte]bool)
-	
+
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
@@ -37,7 +38,6 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 			tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
 
 			// Verify IDNonce
-			err = verifyIDNonce(senderID, nonce)
 			// If we get an error, we just skip the whole process since the
 			// Peer was not validated.
 			if err := verifyIDNonce(senderID, nonce); err != nil {
@@ -53,18 +53,19 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 			peerInf := MakePeer(ip, port)
 
 			switch tipus {
-			case 0: {
-				handleChunks(chunkIDmap, peerInf, packet, router, byteNum)
-				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved CHUNKS message")
-			}
+			case 0:
+				{
+					handleChunks(chunkIDmap, peerInf, packet, router, byteNum)
+					log.WithField(
+						"Source-IP", peerInf.ip[:],
+					).Infoln("Received CHUNKS message")
+				}
 			}
 		}
 	}
 }
 
-// ProcessUDPPacket recieves a Packet and processes it according to
+// ProcessUDPPacket receives a Packet and processes it according to
 // it's type. It gets the packets from the circularqueue that
 // connects the listeners with the packet processor.
 func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
@@ -111,24 +112,24 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 			case 0:
 				log.WithField(
 					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved PING message")
+				).Infoln("Received PING message")
 				handlePing(peerInf, router)
 			case 1:
 				log.WithField(
 					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved PONG message")
+				).Infoln("Received PONG message")
 				handlePong(peerInf, router)
 
 			case 2:
 				log.WithField(
 					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved FIND_NODES message")
+				).Infoln("Received FIND_NODES message")
 				handleFindNodes(peerInf, router)
 
 			case 3:
 				log.WithField(
 					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved NODES message")
+				).Infoln("Received NODES message")
 				handleNodes(peerInf, packet, router, byteNum)
 			}
 		}

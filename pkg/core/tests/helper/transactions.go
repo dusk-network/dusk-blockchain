@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"testing"
 
-	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-crypto/mlsag"
 	"github.com/dusk-network/dusk-crypto/rangeproof"
@@ -61,7 +61,7 @@ func RandomBidTx(t *testing.T, malformed bool) (*transactions.Bid, error) {
 		return tx, err
 	}
 	rp := randomRangeProofBuffer(t)
-	tx.RangeProof.Decode(rp, true)
+	_ = tx.RangeProof.Decode(rp, true)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs)
@@ -106,7 +106,7 @@ func RandomTLockTx(t *testing.T, malformed bool) *transactions.Timelock {
 		t.Fatal(err)
 	}
 	rp := randomRangeProofBuffer(t)
-	tx.RangeProof.Decode(rp, true)
+	_ = tx.RangeProof.Decode(rp, true)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs)
@@ -163,7 +163,7 @@ func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
 		return tx, err
 	}
 	rp := randomRangeProofBuffer(t)
-	tx.RangeProof.Decode(rp, true)
+	_ = tx.RangeProof.Decode(rp, true)
 
 	// Inputs
 	tx.Inputs = RandomInputs(t, numInputs)
@@ -182,28 +182,28 @@ func RandomStakeTx(t *testing.T, malformed bool) (*transactions.Stake, error) {
 	return tx, nil
 }
 
-func fetchDecoys(numMixins int) []mlsag.PubKeys {
-	var decoys []ristretto.Point
-	for i := 0; i < numMixins; i++ {
-		decoy := ristretto.Point{}
-		decoy.Rand()
-
-		decoys = append(decoys, decoy)
-	}
-
-	var pubKeys []mlsag.PubKeys
-	for i := 0; i < numMixins; i++ {
-		var keyVector mlsag.PubKeys
-		keyVector.AddPubKey(decoys[i])
-
-		var secondaryKey ristretto.Point
-		secondaryKey.Rand()
-		keyVector.AddPubKey(secondaryKey)
-
-		pubKeys = append(pubKeys, keyVector)
-	}
-	return pubKeys
-}
+//func fetchDecoys(numMixins int) []mlsag.PubKeys {
+//	var decoys []ristretto.Point
+//	for i := 0; i < numMixins; i++ {
+//		decoy := ristretto.Point{}
+//		decoy.Rand()
+//
+//		decoys = append(decoys, decoy)
+//	}
+//
+//	var pubKeys []mlsag.PubKeys
+//	for i := 0; i < numMixins; i++ {
+//		var keyVector mlsag.PubKeys
+//		keyVector.AddPubKey(decoys[i])
+//
+//		var secondaryKey ristretto.Point
+//		secondaryKey.Rand()
+//		keyVector.AddPubKey(secondaryKey)
+//
+//		pubKeys = append(pubKeys, keyVector)
+//	}
+//	return pubKeys
+//}
 
 func randomRangeProofBuffer(t *testing.T) *bytes.Buffer {
 	lenComm := uint32(1)

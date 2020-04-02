@@ -156,6 +156,8 @@ func (n *Network) generateConfig(nodeIndex int, walletPath string) (string, erro
 
 // Start an OS process with TMPDIR=nodeDir, manageable by the network
 func (n *Network) start(nodeDir string, name string, arg ...string) error {
+	//TODO: is this really required ?
+	//nolint:gosec
 	cmd := exec.Command(name, arg...)
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
 	if err := cmd.Start(); err != nil {

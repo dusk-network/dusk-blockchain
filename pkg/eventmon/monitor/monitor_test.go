@@ -307,7 +307,7 @@ func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
 			resChan <- msg
 		}
 		_ = conn.Close()
-		srv.Close()
+		_ = srv.Close()
 		wg.Done()
 	}()
 

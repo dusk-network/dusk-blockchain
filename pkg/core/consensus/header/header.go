@@ -4,6 +4,7 @@ package header
 
 import (
 	"bytes"
+	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/rand"
@@ -44,6 +45,7 @@ const (
 	After
 )
 
+// New will create a Header instance
 func New() Header {
 	return Header{
 		PubKeyBLS: make([]byte, 33),
@@ -66,7 +68,7 @@ func (h Header) Sender() []byte {
 	return h.PubKeyBLS
 }
 
-// Compare headers to establish time order
+// CompareRoundAndStep Compare headers to establish time order
 func (h Header) CompareRoundAndStep(round uint64, step uint8) Phase {
 	comparison := h.CompareRound(round)
 	if comparison == Same {
@@ -84,6 +86,7 @@ func (h Header) CompareRoundAndStep(round uint64, step uint8) Phase {
 	return comparison
 }
 
+// CompareRound compares the actual h Header v @round returning the respective phase
 func (h Header) CompareRound(round uint64) Phase {
 	if h.Round < round {
 		return Before
@@ -98,12 +101,12 @@ func (h Header) CompareRound(round uint64) Phase {
 
 func (h Header) String() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("round='%d' step='%d'", h.Round, h.Step))
-	sb.WriteString(" sender='")
-	sb.WriteString(util.StringifyBytes(h.PubKeyBLS))
-	sb.WriteString("' block hash='")
-	sb.WriteString(util.StringifyBytes(h.BlockHash))
-	sb.WriteString("'")
+	_, _ = sb.WriteString(fmt.Sprintf("round='%d' step='%d'", h.Round, h.Step))
+	_, _ = sb.WriteString(" sender='")
+	_, _ = sb.WriteString(util.StringifyBytes(h.PubKeyBLS))
+	_, _ = sb.WriteString("' block hash='")
+	_, _ = sb.WriteString(util.StringifyBytes(h.BlockHash))
+	_, _ = sb.WriteString("'")
 	return sb.String()
 }
 
@@ -199,12 +202,13 @@ func VerifySignatures(round uint64, step uint8, blockHash []byte, apk *bls.Apk, 
 	return bls.Verify(apk, signed.Bytes(), sig)
 }
 
+// Mock a Header
 func Mock() Header {
 	hash, _ := crypto.RandEntropy(32)
 	k, _ := key.NewRandConsensusKeys()
 	pubkey := k.BLSPubKeyBytes
 	buf := make([]byte, 8)
-	rand.Read(buf)
+	_, _ = crand.Read(buf)
 	round := binary.LittleEndian.Uint64(buf)
 	step := rand.Intn(8)
 

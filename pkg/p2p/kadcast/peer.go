@@ -7,7 +7,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// PeerBytesSize represents the ammount of bytes
+// PeerBytesSize represents the amount of bytes
 // necessary to represent .
 const PeerBytesSize int = 22
 
@@ -100,6 +100,7 @@ func (peer Peer) getUDPAddr() net.UDPAddr {
 }
 
 // Builds the Peer info from a UPDAddress struct.
+//nolint:unparam
 func getPeerNetworkInfo(udpAddress net.UDPAddr) ([4]byte, uint16) {
 	var ip [4]byte
 	copy(ip[:], udpAddress.IP[:])

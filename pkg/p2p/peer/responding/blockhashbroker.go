@@ -105,6 +105,6 @@ func marshalInv(inv *peermsg.Inv) (*bytes.Buffer, error) {
 		return nil, err
 	}
 
-	topics.Prepend(buf, topics.Inv)
+	_ = topics.Prepend(buf, topics.Inv)
 	return buf, nil
 }

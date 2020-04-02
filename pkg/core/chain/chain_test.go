@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// This test ensures the correct behaviour from the Chain, when
+// This test ensures the correct behavior from the Chain, when
 // accepting a block from a peer.
 func TestAcceptFromPeer(t *testing.T) {
 	eb, _, c := setupChainTest(t, false)
@@ -86,7 +86,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	assert.Equal(t, uint64(2), round)
 }
 
-// This test ensures the correct behaviour when accepting a block
+// This test ensures the correct behavior when accepting a block
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
 	eb, rpc, c := setupChainTest(t, false)
@@ -184,7 +184,9 @@ func TestFetchTip(t *testing.T) {
 	chain, err := New(eb, rpc, nil)
 
 	assert.Nil(t, err)
-	defer chain.Close()
+	defer func() {
+		err = chain.Close()
+	}()
 
 	// on a modern chain, state(tip) must point at genesis
 	var s *database.State
@@ -207,7 +209,9 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	counter := chainsync.NewCounter(eb)
 	chain, err := New(eb, rpc, counter)
 	assert.Nil(t, err)
-	defer chain.Close()
+	defer func() {
+		_ = chain.Close()
+	}()
 
 	// Add some provisioners to our chain, including one that is just about to expire
 	p, k := consensus.MockProvisioners(3)

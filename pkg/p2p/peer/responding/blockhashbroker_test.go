@@ -13,11 +13,13 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
-// Test the behaviour of the block hash broker, upon receiving a GetBlocks message.
+// Test the behavior of the block hash broker, upon receiving a GetBlocks message.
 func TestAdvertiseBlocks(t *testing.T) {
 	// Set up db
 	_, db := lite.CreateDBConnection()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	// Generate 5 blocks and store them in the db. Save the hashes for later checking.
 	hashes, blocks := generateBlocks(t, 5)

@@ -69,11 +69,11 @@ func (e ScoreProposal) Sender() []byte {
 
 func (e ScoreProposal) String() string {
 	var sb strings.Builder
-	sb.WriteString(e.hdr.String())
-	sb.WriteString(" score='")
-	sb.WriteString(util.StringifyBytes(e.Score))
-	sb.WriteString(" seed='")
-	sb.WriteString(util.StringifyBytes(e.Seed))
+	_, _ = sb.WriteString(e.hdr.String())
+	_, _ = sb.WriteString(" score='")
+	_, _ = sb.WriteString(util.StringifyBytes(e.Score))
+	_, _ = sb.WriteString(" seed='")
+	_, _ = sb.WriteString(util.StringifyBytes(e.Seed))
 	return sb.String()
 }
 
@@ -103,11 +103,11 @@ func (e Score) Equal(s Score) bool {
 
 func (e Score) String() string {
 	var sb strings.Builder
-	sb.WriteString(e.ScoreProposal.String())
-	sb.WriteString(" prev_hash='")
-	sb.WriteString(util.StringifyBytes(e.PrevHash))
-	sb.WriteString(" vote_hash='")
-	sb.WriteString(util.StringifyBytes(e.VoteHash))
+	_, _ = sb.WriteString(e.ScoreProposal.String())
+	_, _ = sb.WriteString(" prev_hash='")
+	_, _ = sb.WriteString(util.StringifyBytes(e.PrevHash))
+	_, _ = sb.WriteString(" vote_hash='")
+	_, _ = sb.WriteString(util.StringifyBytes(e.VoteHash))
 	return sb.String()
 }
 
@@ -177,7 +177,7 @@ func UnmarshalScore(r *bytes.Buffer, sev *Score) error {
 // Field order is the following:
 // * Blind Bid Fields [Score, Proof, Z, BidList, Seed, Candidate Block Hash]
 func MarshalScore(r *bytes.Buffer, sev Score) error {
-	// Marshalling header first
+	// Marshaling header first
 	if err := header.Marshal(r, sev.hdr); err != nil {
 		return err
 	}

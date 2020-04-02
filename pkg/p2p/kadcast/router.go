@@ -2,8 +2,8 @@ package kadcast
 
 import (
 	"net"
-	"sync"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -113,14 +113,14 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 }
 
 // Sends a `FIND_NODES` messages to the `alpha` closest peers
-// the node knows and waits for a certain time in order to wait 
+// the node knows and waits for a certain time in order to wait
 // for the `PONG` message arrivals.
 // Then looks for the closest peer to the node itself into the
 // buckets and returns it.
 func (router Router) pollClosestPeer(t time.Duration) Peer {
 	var wg sync.WaitGroup
 	var ps []Peer
-	wg.Add(1) 
+	wg.Add(1)
 	router.sendFindNodes()
 
 	timer := time.AfterFunc(t, func() {
@@ -134,20 +134,20 @@ func (router Router) pollClosestPeer(t time.Duration) Peer {
 }
 
 // Sends a `PING` messages to the bootstrap nodes that
-// the node knows and waits for a certain time in order to wait 
+// the node knows and waits for a certain time in order to wait
 // for the `PONG` message arrivals.
 // Returns back the new number of peers the node is connected to.
 func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) uint64 {
 	var wg sync.WaitGroup
 	var peerNum uint64
 
-	wg.Add(1) 
+	wg.Add(1)
 	for _, peer := range bootNodes {
 		router.sendPing(peer)
 	}
 
 	timer := time.AfterFunc(t, func() {
-		peerNum = uint64(router.tree.getTotalPeers())
+		peerNum = router.tree.getTotalPeers()
 		wg.Done()
 	})
 
@@ -224,16 +224,18 @@ func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 	// Get `Beta` random peers from each Bucket.
 	for _, bucket := range router.tree.buckets {
 		// Skip first bucket from the iteration (it contains our peer).
-		if bucket.idLength == 0 {continue}
+		if bucket.idLength == 0 {
+			continue
+		}
 		destPeer, err := bucket.getRandomPeer()
 		if err != nil {
 			continue
 		}
 		// Create empty packet and set headers.
 		var packet Packet
-		// Set headers info. 
+		// Set headers info.
 		packet.setHeadersInfo(tipus, router, *destPeer)
-		// Set payload. 
+		// Set payload.
 		packet.setChunksPayloadInfo(height, payload)
 		sendTCPStream(destPeer.getUDPAddr(), packet.asBytes())
 	}

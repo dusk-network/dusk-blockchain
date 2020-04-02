@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/bwesterb/go-ristretto"
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
@@ -81,6 +83,7 @@ func TestLockedInputs(t *testing.T) {
 
 	// Now, set our FetchInputs function to get inputs from the db
 	alice, err = wallet.LoadFromFile(2, aliceDB, fetchDecoys, fetchInputs, "pass", "alice.dat")
+	require.Nil(t, err)
 
 	// Create a standard tx, using the locked output that we sent to alice
 	tx, err = alice.NewStandardTx(100)

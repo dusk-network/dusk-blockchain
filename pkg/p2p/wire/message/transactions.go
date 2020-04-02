@@ -222,7 +222,7 @@ func UnmarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
 	}
-	s.R.UnmarshalBinary(RBytes)
+	_ = s.R.UnmarshalBinary(RBytes)
 
 	if err := encoding.ReadUint8(w, &s.Version); err != nil {
 		return err
@@ -328,7 +328,7 @@ func UnmarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
 	}
-	c.R.UnmarshalBinary(RBytes)
+	_ = c.R.UnmarshalBinary(RBytes)
 
 	c.Score = make([]byte, 32)
 	if err := encoding.Read256(w, c.Score); err != nil {
@@ -388,25 +388,25 @@ func UnmarshalOutput(r *bytes.Buffer, o *transactions.Output) error {
 	if err := encoding.Read256(r, commBytes); err != nil {
 		return err
 	}
-	o.Commitment.UnmarshalBinary(commBytes)
+	_ = o.Commitment.UnmarshalBinary(commBytes)
 
 	pubKeyBytes := make([]byte, 32)
 	if err := encoding.Read256(r, pubKeyBytes); err != nil {
 		return err
 	}
-	o.PubKey.P.UnmarshalBinary(pubKeyBytes)
+	_ = o.PubKey.P.UnmarshalBinary(pubKeyBytes)
 
 	var encAmountBytes []byte
 	if err := encoding.ReadVarBytes(r, &encAmountBytes); err != nil {
 		return err
 	}
-	o.EncryptedAmount.UnmarshalBinary(encAmountBytes)
+	_ = o.EncryptedAmount.UnmarshalBinary(encAmountBytes)
 
 	var encMaskBytes []byte
 	if err := encoding.ReadVarBytes(r, &encMaskBytes); err != nil {
 		return err
 	}
-	o.EncryptedMask.UnmarshalBinary(encMaskBytes)
+	_ = o.EncryptedMask.UnmarshalBinary(encMaskBytes)
 	return nil
 }
 
@@ -443,19 +443,19 @@ func UnmarshalInput(r *bytes.Buffer, i *transactions.Input) error {
 	if err := encoding.Read256(r, keyImageBytes); err != nil {
 		return err
 	}
-	i.KeyImage.UnmarshalBinary(keyImageBytes)
+	_ = i.KeyImage.UnmarshalBinary(keyImageBytes)
 
 	pubKeyBytes := make([]byte, 32)
 	if err := encoding.Read256(r, pubKeyBytes); err != nil {
 		return err
 	}
-	i.PubKey.P.UnmarshalBinary(pubKeyBytes)
+	_ = i.PubKey.P.UnmarshalBinary(pubKeyBytes)
 
 	pseudoCommBytes := make([]byte, 32)
 	if err := encoding.Read256(r, pseudoCommBytes); err != nil {
 		return err
 	}
-	i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
+	_ = i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
 
 	var sigBytes []byte
 	if err := encoding.ReadVarBytes(r, &sigBytes); err != nil {

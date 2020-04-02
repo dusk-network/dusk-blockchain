@@ -52,11 +52,11 @@ type (
 // String representation of the Agreement
 func (a Agreement) String() string {
 	var sb strings.Builder
-	sb.WriteString(a.hdr.String())
-	sb.WriteString(" signature='")
-	sb.WriteString(util.StringifyBytes(a.signedVotes))
-	sb.WriteString(" repr='")
-	sb.WriteString(util.StringifyBytes(a.Repr.Bytes()))
+	_, _ = sb.WriteString(a.hdr.String())
+	_, _ = sb.WriteString(" signature='")
+	_, _ = sb.WriteString(util.StringifyBytes(a.signedVotes))
+	_, _ = sb.WriteString(" repr='")
+	_, _ = sb.WriteString(util.StringifyBytes(a.Repr.Bytes()))
 	return sb.String()
 }
 
@@ -87,7 +87,7 @@ func (s StepVotes) IsEmpty() bool {
 // String representation
 func (s StepVotes) String() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("BitSet: %d Step: %d\n Sig: %v\n Apk: %v\n", s.BitSet, s.Step, s.Signature, s.Apk))
+	_, _ = sb.WriteString(fmt.Sprintf("BitSet: %d Step: %d\n Sig: %v\n Apk: %v\n", s.BitSet, s.Step, s.Signature, s.Apk))
 	return sb.String()
 }
 
@@ -403,7 +403,7 @@ func MockCommitteeVoteSet(p *user.Provisioners, k []key.ConsensusKeys, hash []by
 	return events
 }
 
-// GenVotes randomly generates a slice of StepVotes with the indicated lenght.
+// GenVotes randomly generates a slice of StepVotes with the indicated length.
 // Albeit random, the generation is consistent with the rules of Votes
 func GenVotes(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, p *user.Provisioners) []*StepVotes {
 	if len(keys) < 2 {

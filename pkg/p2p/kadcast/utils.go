@@ -3,8 +3,9 @@ package kadcast
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/sirupsen/logrus"
 	"net"
+
+	"github.com/sirupsen/logrus"
 
 	"golang.org/x/crypto/sha3"
 
@@ -108,7 +109,9 @@ func getLocalUDPAddress() net.UDPAddr {
 	if err != nil {
 		logrus.WithError(err).Warn("Network Unreachable.")
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return *localAddr
@@ -123,12 +126,13 @@ func getLocalTCPAddress() net.TCPAddr {
 	if err != nil {
 		logrus.WithError(err).Warn("Network Unreachable.")
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
 	return *localAddr
 }
-
 
 // ------------------ ENC/DEC UTILS ------------------ //
 
@@ -169,7 +173,7 @@ func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) [
 	port := getBytesFromUint16(uint16(peerAddr.Port))
 	copy(enc[6:8], port[0:2])
 	// Append Payload
-	copy(enc[8:encodedLen], payload[0:len(payload)])
+	copy(enc[8:encodedLen], payload[0:])
 	return enc
 }
 
@@ -188,13 +192,13 @@ func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []by
 	// Append Port
 	copy(enc[6:8], peerDataStr[4:6])
 	// Append Payload
-	copy(enc[8:encodedLen], payload[0:len(payload)])
+	copy(enc[8:encodedLen], payload[0:])
 	return enc
 }
 
 // Decodes a CircularQueue packet and returns the
 // elements of the original received packet.
-func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
+func decodeRedPacket(packet []byte) (int, *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)
 	byteNum := int(binary.LittleEndian.Uint16(packet[0:2]))
 	if (redPackLen) != (byteNum + 8) {
@@ -203,9 +207,9 @@ func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	ip := packet[2:6]
 	port := int(binary.LittleEndian.Uint16(packet[6:8]))
 	payload := packet[8:]
-	
-	peerAddr := net.UDPAddr {
-		IP: ip,
+
+	peerAddr := net.UDPAddr{
+		IP:   ip,
 		Port: port,
 		Zone: "N/A",
 	}

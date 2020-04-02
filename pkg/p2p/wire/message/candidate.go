@@ -51,19 +51,19 @@ func (c Candidate) State() header.Header {
 // String representation of the Candidate
 func (c Candidate) String() string {
 	var sb strings.Builder
-	sb.WriteString(c.State().String())
-	sb.WriteString(" nr. of tx in the Block='")
-	sb.WriteString(strconv.Itoa(len(c.Block.Txs)))
+	_, _ = sb.WriteString(c.State().String())
+	_, _ = sb.WriteString(" nr. of tx in the Block='")
+	_, _ = sb.WriteString(strconv.Itoa(len(c.Block.Txs)))
 	if c.Certificate.Step == 0 {
-		sb.WriteString("' certificate='<empty>'")
+		_, _ = sb.WriteString("' certificate='<empty>'")
 	} else {
-		sb.WriteString("' certificate step='")
-		sb.WriteString(strconv.FormatUint(uint64(c.Certificate.Step), 10))
-		sb.WriteString("' certificate signature first step='")
-		sb.WriteString(util.StringifyBytes(c.Certificate.StepOneBatchedSig))
-		sb.WriteString("' certificate signature second step='")
-		sb.WriteString(util.StringifyBytes(c.Certificate.StepTwoBatchedSig))
-		sb.WriteString("'")
+		_, _ = sb.WriteString("' certificate step='")
+		_, _ = sb.WriteString(strconv.FormatUint(uint64(c.Certificate.Step), 10))
+		_, _ = sb.WriteString("' certificate signature first step='")
+		_, _ = sb.WriteString(util.StringifyBytes(c.Certificate.StepOneBatchedSig))
+		_, _ = sb.WriteString("' certificate signature second step='")
+		_, _ = sb.WriteString(util.StringifyBytes(c.Certificate.StepTwoBatchedSig))
+		_, _ = sb.WriteString("'")
 	}
 	return sb.String()
 }

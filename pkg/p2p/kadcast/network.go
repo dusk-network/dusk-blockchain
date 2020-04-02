@@ -25,9 +25,9 @@ PacketConnCreation:
 		log.Panic(err)
 	}
 	// Set initial deadline.
-	pc.SetDeadline(time.Now().Add(time.Minute))
+	_ = pc.SetDeadline(time.Now().Add(time.Minute))
 
-	// Instanciate the buffer
+	// Instantiate the buffer
 	buffer := make([]byte, 1024)
 	for {
 		// Read UDP packet.
@@ -35,11 +35,11 @@ PacketConnCreation:
 
 		if err != nil {
 			log.WithError(err).Warn("Error on packet read")
-			pc.Close()
+			_ = pc.Close()
 			goto PacketConnCreation
 		}
 		// Set a new deadline for the connection.
-		pc.SetDeadline(time.Now().Add(5 * time.Minute))
+		_ = pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
 		encodedPack := encodeReadUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
@@ -48,7 +48,8 @@ PacketConnCreation:
 }
 
 // Gets the local address of the sender `Peer` and the UDPAddress of the
-// reciever `Peer` and sends to it a UDP Packet with the payload inside.
+// receiver `Peer` and sends to it a UDP Packet with the payload inside.
+//nolint:unparam
 func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 	localAddr := getLocalUDPAddress()
 	conn, err := net.DialUDP(netw, &localAddr, &addr)
@@ -56,12 +57,14 @@ func sendUDPPacket(netw string, addr net.UDPAddr, payload []byte) {
 		log.WithError(err).Warn("Could not stablish a connection with the dest Peer.")
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	// Simple write
 	_, err = conn.Write(payload)
 	if err != nil {
-		log.WithError(err).Warn("Error while writting to the filedescriptor.")
+		log.WithError(err).Warn("Error while witting to the file descriptor.")
 		return
 	}
 }
@@ -80,22 +83,27 @@ PacketConnCreation:
 		log.Panic(err)
 	}
 	// Set initial deadline.
-	listener.SetDeadline(time.Now().Add(time.Minute))
+	_ = listener.SetDeadline(time.Now().Add(time.Minute))
 
-	// Instanciate the buffer
+	// Instantiate the buffer
 	buffer := make([]byte, 5000000)
 	for {
 		// Read TCP packet.
 		pc, err := listener.AcceptTCP()
+		if err != nil {
+			log.WithError(err).Warn("Error on packet read")
+			_ = pc.Close()
+			goto PacketConnCreation
+		}
 		uAddr := pc.RemoteAddr()
 		byteNum, err := io.ReadFull(pc, buffer)
 		if err != nil {
 			log.WithError(err).Warn("Error on packet read")
-			pc.Close()
+			_ = pc.Close()
 			goto PacketConnCreation
 		}
 		// Set a new deadline for the connection.
-		pc.SetDeadline(time.Now().Add(5 * time.Minute))
+		_ = pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
 		encodedPack := encodeReadTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
@@ -106,18 +114,20 @@ PacketConnCreation:
 }
 
 // Opens a TCP connection with the peer sent on the params and transmits
-// a stream of bytes. Once transmited, closes the connection.
+// a stream of bytes. Once transmitted, closes the connection.
 func sendTCPStream(addr net.UDPAddr, payload []byte) {
 	conn, err := net.Dial("tcp", string(addr.IP)+":"+string(addr.Port))
 	if err != nil {
 		log.WithError(err).Warn("Could not stablish a connection with the dest Peer.")
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 	// Write our message to the connection.
 	_, err = conn.Write(payload)
 	if err != nil {
-		log.WithError(err).Warn("Error while writting to the filedescriptor.")
+		log.WithError(err).Warn("Error while witting to the file descriptor.")
 		return
 	}
 }

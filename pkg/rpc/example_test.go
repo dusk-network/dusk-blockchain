@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"testing"
 	"time"
 
 	pb "github.com/dusk-network/dusk-protobuf/autogen/go/node"
@@ -17,7 +18,7 @@ import (
 //
 // Could be useful in development networks (localnet, devnet) Also useful when
 // client co-deployed with the node
-func ExampleInsecureSend() {
+func TestExampleInsecureSend(t *testing.T) {
 
 	address := "unix://tmp/dusk-grpc.sock"
 	password := "nopass"
@@ -34,7 +35,9 @@ func ExampleInsecureSend() {
 		log.WithError(err).Error("could not connect")
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	client := pb.NewNodeClient(conn)
 
@@ -56,7 +59,9 @@ func ExampleInsecureSend() {
 // Basic HTTP authorization and TLS enabled over TCP
 //
 // Could be useful in public networks (testnet,mainnet)
-func ExampleSecureSend() {
+func TestExampleSecureSend(t *testing.T) {
+
+	t.Skip("test requires manual setup")
 
 	address := "127.0.0.1:9000"
 	password := "nopass"
@@ -89,7 +94,9 @@ func ExampleSecureSend() {
 		log.WithError(err).Error("could not connect")
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	client := pb.NewNodeClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

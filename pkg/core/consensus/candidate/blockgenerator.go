@@ -22,7 +22,7 @@ import (
 
 var _ consensus.Component = (*Generator)(nil)
 
-var lg *log.Entry = log.WithField("process", "candidate generator")
+var lg = log.WithField("process", "candidate generator")
 
 // TBD along with block size and processing.MaxFrameSize
 const MaxTxSetSize = 150000
