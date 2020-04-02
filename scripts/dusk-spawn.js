@@ -9,7 +9,7 @@ const basepath = require("os").tmpdir();
 var isLinux = process.platform === "linux";
 
 const whenComplete = async (proc) =>
-  new Promise(resolve => proc.on("close", resolve))
+  new Promise(resolve => proc.on("close", resolve));
 
 async function* lines(chunks) {
   let previous = "";
@@ -32,7 +32,7 @@ async function stdout(prefix, readable) {
 
 async function main(nodes = 1, ...flags) {
 
-  blindBid = isLinux ? "./blindbid-avx2" : "./blindbid-mac"
+  blindBid = isLinux ? "./blindbid-avx2" : "./blindbid-mac";
 
 
   for (let i = 0; i < +nodes; i++) {
@@ -42,7 +42,7 @@ async function main(nodes = 1, ...flags) {
     process.env["TMPDIR"] = path.join(basepath, "nodes", String(port));
     await mkdir(process.env["TMPDIR"], { recursive: true });
 
-    await whenComplete(spawn("rm",[ "-rf", "walletDB*", "demo"+port]))
+    await whenComplete(spawn("rm",[ "-rf", "walletDB*", "demo"+port]));
 
     const node = spawn(
       "./testnet",

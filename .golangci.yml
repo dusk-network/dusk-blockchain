@@ -173,7 +173,6 @@ linters:
     - govet
     - staticcheck
     - megacheck
-    - goimports
     - gosec
     - bodyclose
     - goprintffuncname
@@ -230,15 +229,6 @@ issues:
     - linters:
         - golint
       text: "don't use underscores in Go names;"
-
-    - linters:
-        - gocyclo
-      text: "cyclomatic complexity 36 of func " #runtime/imports.go: registerImports
-
-    - linters:
-        - gocyclo
-      text: "cyclomatic complexity 42 of func " # codec/decode.go: (*Decoder).DecodeTuple
-
 
     # Exclude lll issues for long lines with go:generate
     - linters:
