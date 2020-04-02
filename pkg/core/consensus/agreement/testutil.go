@@ -59,7 +59,7 @@ func (hlp *Helper) createResultChan() {
 func (hlp *Helper) SendBatch(hash []byte) {
 	batch := hlp.Spawn(hash)
 	for _, ev := range batch {
-		go hlp.Aggro.CollectAgreementEvent(ev)
+		_ = hlp.Aggro.CollectAgreementEvent(ev)
 	}
 }
 

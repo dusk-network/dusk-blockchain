@@ -25,7 +25,7 @@ const (
 )
 
 // LogProcessor is a TopicProcessor that intercepts messages on the gossip to create statistics and push the to the monitoring process
-// It creates a new instance of logrus and writes on a io.Writer (preferrably UNIX sockets but any kind of connection will do)
+// It creates a new instance of logrus and writes on a io.Writer (preferably UNIX sockets but any kind of connection will do)
 type (
 	LogProcessor struct {
 		*log.Logger

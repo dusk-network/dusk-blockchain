@@ -33,7 +33,7 @@ type Base struct {
 	ConfigFileName string
 
 	// custom commandline loader
-	//nolint:structcheck
+	//nolint
 	loadFlagsFn func() (string, error)
 }
 

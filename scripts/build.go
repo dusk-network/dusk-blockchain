@@ -41,7 +41,7 @@ func main() {
 	case "lint":
 		lint()
 	default:
-		log.Fatal("cmd not found", os.Args[1])
+		log.Fatal("cmd not found: ", os.Args[1])
 	}
 }
 
