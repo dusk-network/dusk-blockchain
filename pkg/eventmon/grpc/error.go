@@ -12,24 +12,32 @@ import (
 
 //NotifyError opens a connection to the monitoring server any time there
 //is an error happening within the node
-func (c *Client) NotifyError(parent context.Context, entry *log.Entry) error {
+func (c *Client) NotifyError(parent context.Context, alert *pb.ErrorAlert) error {
 	return c.send(parent, func(mon pb.MonitorClient, ctx context.Context) error {
-		alert := &pb.ErrorAlert{
-			Level:           convertLevel(entry.Level),
-			Msg:             entry.Message,
-			TimestampMillis: entry.Time.Format(time.StampMilli),
-			Fields:          convertFields(entry.Data),
-		}
-
-		if entry.Caller != nil {
-			alert.File = entry.Caller.File
-			alert.Line = uint32(entry.Caller.Line)
-			alert.Function = entry.Caller.Function
-		}
-
+		lg.WithField("log", alert.Msg).Debugln("notifying error to monitoring client")
 		_, err := mon.NotifyError(ctx, alert)
+		lg.Debugln("error notified")
 		return err
 	})
+}
+
+// ConvertToAlert converts a log.Entry into a monitor.ErrorAlert. It is done
+// outside NotifyError function to not incur in locking problems with logrus
+// trying to use the entry while it gets processed in the supervisor's loop
+func ConvertToAlert(entry *log.Entry) *pb.ErrorAlert {
+	alert := &pb.ErrorAlert{
+		Level:           convertLevel(entry.Level),
+		Msg:             entry.Message,
+		TimestampMillis: entry.Time.Format(time.StampMilli),
+		Fields:          convertFields(entry.Data),
+	}
+
+	if entry.Caller != nil {
+		alert.File = entry.Caller.File
+		alert.Line = uint32(entry.Caller.Line)
+		alert.Function = entry.Caller.Function
+	}
+	return alert
 }
 
 func convertFields(fields log.Fields) []*pb.Field {

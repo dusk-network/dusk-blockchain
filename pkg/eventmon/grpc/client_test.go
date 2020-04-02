@@ -2,6 +2,7 @@
 package grpc_test
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"testing"
@@ -58,9 +59,10 @@ func newSrv(network, addr string) *helloSrv {
 func Suite(t *testing.T, timeoutMillis time.Duration, calls ...callTest) {
 	semverSrv := newSrv(testUrl.Scheme, testUrl.Host)
 	defer semverSrv.srv.GracefulStop()
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
-	for _, call := range calls {
+	for i, call := range calls {
+		timer := time.NewTimer(timeoutMillis * time.Millisecond)
 		// if clientMethod is nil, it means the test relies on some other way
 		// to trigger the rpc call
 		if call.clientMethod != nil {
@@ -68,9 +70,15 @@ func Suite(t *testing.T, timeoutMillis time.Duration, calls ...callTest) {
 				t.FailNow()
 			}
 		}
-		response := <-semverSrv.requestChan
-		if !assert.NoError(t, call.tester(response)) {
-			t.FailNow()
+		select {
+		case response := <-semverSrv.requestChan:
+			timer.Stop()
+			if !assert.NoError(t, call.tester(response)) {
+				t.FailNow()
+				return
+			}
+		case <-timer.C:
+			assert.FailNow(t, fmt.Sprintf("timeout in receiving packet #%d", i+1))
 			return
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
+	pb "github.com/dusk-network/dusk-protobuf/autogen/go/monitor"
 	"github.com/dusk-network/dusk-wallet/v2/block"
 	log "github.com/sirupsen/logrus"
 )
@@ -24,7 +25,7 @@ type Supervisor struct {
 
 	lock          sync.RWMutex
 	idBlockUpdate uint32 // id of the subscription channel for the block updates
-	entryChan     chan *log.Entry
+	entryChan     chan *pb.ErrorAlert
 	cancel        context.CancelFunc
 }
 
@@ -35,7 +36,7 @@ func NewSupervisor(broker eventbus.Broker, uri *url.URL, timeout time.Duration) 
 		broker:       broker,
 		lock:         sync.RWMutex{},
 		timeoutBlock: timeout,
-		entryChan:    make(chan *log.Entry, 1),
+		entryChan:    make(chan *pb.ErrorAlert, 100),
 	}
 
 	blockChan, id := consensus.InitAcceptedBlockUpdate(broker)
@@ -62,7 +63,11 @@ func (_ *Supervisor) Levels() []log.Level {
 
 // Fire is part of logrus.Hook interface
 func (s *Supervisor) Fire(entry *log.Entry) error {
-	s.entryChan <- entry
+	// drop events if the queue is filled up
+	select {
+	case s.entryChan <- ConvertToAlert(entry):
+	default:
+	}
 	return nil
 }
 
@@ -89,14 +94,18 @@ func (s *Supervisor) Halt() error {
 	return nil
 }
 
-func (s *Supervisor) listenAcceptedBlock(ctx context.Context, entryChan <-chan *log.Entry, blockChan <-chan block.Block) {
+func (s *Supervisor) listenAcceptedBlock(ctx context.Context, entryChan <-chan *pb.ErrorAlert, blockChan <-chan block.Block) {
+	lg.Debugln("main loop starting")
 	initialTimeoutBlockAcceptance := s.timeoutBlock
 	for {
 		timer := time.NewTimer(s.timeoutBlock)
 		lg.WithField("timeout", s.timeoutBlock.Milliseconds()).Traceln("slowdown timeout (re)created")
 		select {
 		case entry := <-entryChan:
-			s.client.NotifyError(ctx, entry)
+			lg.Traceln("notifying log entry to remote monitoring")
+			if err := s.client.NotifyError(ctx, entry); err != nil {
+				lg.WithError(err).Debugln("error in notify log entry to the monitoring server")
+			}
 
 		case blk := <-blockChan:
 			timer.Stop()
