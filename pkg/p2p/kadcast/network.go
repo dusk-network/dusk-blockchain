@@ -1,7 +1,6 @@
 package kadcast
 
 import (
-	"io"
 	"net"
 	"time"
 
@@ -25,7 +24,7 @@ PacketConnCreation:
 		log.Panic(err)
 	}
 	// Set initial deadline.
-	pc.SetDeadline(time.Now().Add(time.Minute))
+	_ = pc.SetDeadline(time.Now().Add(time.Minute))
 
 	// Instanciate the buffer
 	buffer := make([]byte, 1024)
@@ -39,7 +38,7 @@ PacketConnCreation:
 			goto PacketConnCreation
 		}
 		// Set a new deadline for the connection.
-		pc.SetDeadline(time.Now().Add(5 * time.Minute))
+		_ = pc.SetDeadline(time.Now().Add(5 * time.Minute))
 		// Serialize the packet.
 		encodedPack := encodeReadUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
@@ -79,29 +78,33 @@ PacketConnCreation:
 	if err != nil {
 		log.Panic(err)
 	}
-	// Set initial deadline.
-	listener.SetDeadline(time.Now().Add(time.Minute))
 
-	// Instanciate the buffer
-	buffer := make([]byte, 5000000)
 	for {
-		// Read TCP packet.
+		_ = listener.SetDeadline(time.Now().Add(time.Minute))
 		pc, err := listener.AcceptTCP()
-		uAddr := pc.RemoteAddr()
-		byteNum, err := io.ReadFull(pc, buffer)
 		if err != nil {
-			log.WithError(err).Warn("Error on packet read")
-			pc.Close()
+			log.WithError(err).Warn("Error on tcp accept")
 			goto PacketConnCreation
 		}
+
+		// Read frame payload
 		// Set a new deadline for the connection.
-		pc.SetDeadline(time.Now().Add(5 * time.Minute))
+		_ = pc.SetDeadline(time.Now().Add(time.Minute))
+
+		payload, byteNum, err := readTCPFrame(pc)
+		if err != nil {
+			log.WithError(err).Warn("Error on frame read")
+			pc.Close()
+			continue
+		}
+
+		uAddr := pc.RemoteAddr()
+
 		// Serialize the packet.
-		encodedPack := encodeReadTCPPacket(uint16(byteNum), uAddr, buffer[0:byteNum])
+		encodedPack := encodeReadTCPPacket(uint16(byteNum), uAddr, payload[:])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
-		// Empty the buffer to read again.
-		buffer = make([]byte, 5000000)
+		payload = nil
 	}
 }
 
@@ -114,10 +117,10 @@ func sendTCPStream(addr net.UDPAddr, payload []byte) {
 		return
 	}
 	defer conn.Close()
+
 	// Write our message to the connection.
-	_, err = conn.Write(payload)
-	if err != nil {
-		log.WithError(err).Warn("Error while writting to the filedescriptor.")
+	if err = writeTCPFrame(conn, payload); err != nil {
+		log.WithError(err).Warnf("Could not write to addr %s", addr.String())
 		return
 	}
 }
