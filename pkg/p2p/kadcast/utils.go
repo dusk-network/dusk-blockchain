@@ -1,16 +1,28 @@
 package kadcast
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"net"
 
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	"github.com/sirupsen/logrus"
 
 	"golang.org/x/crypto/sha3"
 
 	// Just for debugging purposes
 	_ "fmt"
+)
+
+const (
+	// MaxFrameSize is set based on max block size expected
+	MaxFrameSize = 5000000
+)
+
+var (
+	ErrExceedMaxLen = errors.New("message size exceeds max frame length")
 )
 
 // ------------------ DISTANCE UTILS ------------------ //
@@ -214,4 +226,53 @@ func decodeRedPacket(packet []byte) (int, *net.UDPAddr, []byte, error) {
 		Zone: "N/A",
 	}
 	return byteNum, &peerAddr, payload, nil
+}
+
+func readTCPFrame(r io.Reader) ([]byte, int, error) {
+
+	// Read frame length.
+	ln := make([]byte, 4)
+	n, err := io.ReadFull(r, ln)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	length := binary.LittleEndian.Uint32(ln[:])
+	if length > MaxFrameSize {
+		return nil, 0, ErrExceedMaxLen
+	}
+
+	// Read packet payload
+	payload := make([]byte, length)
+	if _, err := io.ReadFull(r, payload); err != nil {
+		return nil, 0, err
+	}
+
+	return payload, n, nil
+}
+
+func writeTCPFrame(w io.Writer, payload []byte) error {
+
+	frameLength := uint32(len(payload))
+	if frameLength > MaxFrameSize {
+		return ErrExceedMaxLen
+	}
+
+	// Add packet length
+	frame := new(bytes.Buffer)
+	if err := encoding.WriteUint32LE(frame, frameLength); err != nil {
+		return err
+	}
+
+	// Append packet payload
+	if _, err := frame.Write(payload); err != nil {
+		return err
+	}
+
+	// Write data stream
+	if _, err := w.Write(frame.Bytes()); err != nil {
+		return err
+	}
+
+	return nil
 }
