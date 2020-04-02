@@ -174,19 +174,6 @@ func (c *Chain) Listen() {
 	}
 }
 
-// TODO: interface - solve the inconsistencies of unmarshaling the topic
-// internally in the Marshal, or externally
-func (c *Chain) propagateBlock(blk block.Block) error {
-	buffer := topics.Block.ToBuffer()
-	if err := message.MarshalBlock(&buffer, &blk); err != nil {
-		return err
-	}
-
-	msg := message.New(topics.Block, blk)
-	c.eventBus.Publish(topics.Gossip, msg)
-	return nil
-}
-
 func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
 	var bid user.Bid
 	x := calculateXFromBytes(tx.Outputs[0].Commitment.Bytes(), tx.M)
@@ -510,12 +497,6 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, startHeight, 
 func (c *Chain) removeProvisioner(pubKeyBLS []byte) bool {
 	delete(c.p.Members, string(pubKeyBLS))
 	return c.p.Set.Remove(pubKeyBLS)
-}
-
-func (c *Chain) marshalProvisioners() (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
-	err := user.MarshalProvisioners(buf, c.p)
-	return buf, err
 }
 
 func calculateXFromBytes(d, m []byte) ristretto.Scalar {

@@ -197,7 +197,7 @@ func (s *Server) Stop() error {
 	s.started = false
 	s.pool.Close()
 	if err := s.listener.Close(); err != nil {
-		log.Errorf("error shutting down, %v\n", err)
+		log.Errorf("error shutting down, %v", err)
 		return err
 	}
 

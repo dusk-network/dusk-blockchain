@@ -274,8 +274,8 @@ func spinSrv(addr string) (<-chan map[string]interface{}, *sync.WaitGroup) {
 	resChan := make(chan map[string]interface{}, 5)
 	wg := &sync.WaitGroup{}
 
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		var conn net.Conn
 		srv, err := net.Listen("unix", addr)
 		if err != nil {

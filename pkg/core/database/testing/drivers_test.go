@@ -153,7 +153,7 @@ func TestStoreBlock(test *testing.T) {
 	done := false
 	err = db.Update(func(t database.Transaction) error {
 		for _, block := range genBlocks {
-			err := t.StoreBlock(block)
+			err = t.StoreBlock(block)
 			if err != nil {
 				return err
 			}
@@ -172,9 +172,9 @@ func TestStoreBlock(test *testing.T) {
 
 	// Ensure chain tip is updated too
 	err = db.View(func(t database.Transaction) error {
-		s, err := t.FetchState()
-		if err != nil {
-			return err
+		s, err1 := t.FetchState()
+		if err1 != nil {
+			return err1
 		}
 
 		if !bytes.Equal(genBlocks[len(genBlocks)-1].Header.Hash, s.TipHash) {
@@ -579,7 +579,7 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Storage Lookup by Height to ensure read-only DB can read
 	_ = dbReadOnly.View(func(t database.Transaction) error {
 		for _, block := range genBlocks {
-			headerHash, err := t.FetchBlockHashByHeight(uint64(block.Header.Height))
+			headerHash, err := t.FetchBlockHashByHeight(block.Header.Height)
 			if err != nil {
 				test.Fatalf(err.Error())
 				return nil
@@ -596,9 +596,9 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Ensure read-only DB cannot write
 	err = dbReadOnly.Update(func(t database.Transaction) error {
 		for _, block := range blocks {
-			err := t.StoreBlock(block)
-			if err != nil {
-				return err
+			err1 := t.StoreBlock(block)
+			if err1 != nil {
+				return err1
 			}
 		}
 		return nil
@@ -710,8 +710,8 @@ func TestClearDatabase(test *testing.T) {
 	err = db.View(func(t database.Transaction) error {
 		// All lookups should now fail
 		for _, block := range blocks {
-			blk, err := t.FetchBlock(block.Header.Hash)
-			if err == nil && blk != nil {
+			blk, err1 := t.FetchBlock(block.Header.Hash)
+			if err1 == nil && blk != nil {
 				return errors.New("database was not empty")
 			}
 		}
@@ -933,9 +933,9 @@ func _TestPersistence() int {
 		// Blocks lookup by Height
 		err = db.View(func(t database.Transaction) error {
 			for _, block := range blocks {
-				headerHash, err := t.FetchBlockHashByHeight(block.Header.Height)
-				if err != nil {
-					return err
+				headerHash, err1 := t.FetchBlockHashByHeight(block.Header.Height)
+				if err1 != nil {
+					return err1
 				}
 
 				if !bytes.Equal(block.Header.Hash, headerHash) {

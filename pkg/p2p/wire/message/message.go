@@ -75,10 +75,6 @@ func (m simple) Id() []byte {
 	return m.marshaled.Bytes()
 }
 
-func (m *simple) setPayload(i interface{}) {
-	m.payload = i
-}
-
 func (m simple) Category() topics.Topic {
 	return m.category
 }

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"math/rand"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
 // Bid is the 32 byte X value, created from a bidding transaction amount and M.
@@ -86,6 +84,7 @@ func (b BidList) Contains(bid Bid) bool {
 	return false
 }
 
+// Remove idx from BidList
 func (b *BidList) Remove(idx int) {
 	list := *b
 	if idx == len(list)-1 {
@@ -94,66 +93,4 @@ func (b *BidList) Remove(idx int) {
 		list = append(list[:idx], list[idx+1:]...)
 	}
 	*b = list
-}
-
-func MarshalBidList(r *bytes.Buffer, bidList BidList) error {
-	if err := encoding.WriteVarInt(r, uint64(len(bidList))); err != nil {
-		return err
-	}
-
-	for _, bid := range bidList {
-		if err := marshalBid(r, bid); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func marshalBid(r *bytes.Buffer, bid Bid) error {
-	if err := encoding.Write256(r, bid.X[:]); err != nil {
-		return err
-	}
-
-	if err := encoding.Write256(r, bid.M[:]); err != nil {
-		return err
-	}
-
-	if err := encoding.WriteUint64LE(r, bid.EndHeight); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func UnmarshalBidList(r *bytes.Buffer) (BidList, error) {
-	lBidList, err := encoding.ReadVarInt(r)
-	if err != nil {
-		return BidList{}, err
-	}
-
-	bidList := make([]Bid, lBidList)
-	for i := uint64(0); i < lBidList; i++ {
-		if err := unmarshalBid(r, &bidList[i]); err != nil {
-			return BidList{}, err
-		}
-	}
-
-	return bidList, nil
-}
-
-func unmarshalBid(r *bytes.Buffer, bid *Bid) error {
-	if err := encoding.Read256(r, bid.X[:]); err != nil {
-		return err
-	}
-
-	if err := encoding.Read256(r, bid.M[:]); err != nil {
-		return err
-	}
-
-	if err := encoding.ReadUint64LE(r, &bid.EndHeight); err != nil {
-		return err
-	}
-
-	return nil
 }

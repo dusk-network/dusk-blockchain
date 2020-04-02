@@ -69,7 +69,7 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 
 	seedBytes, err := hex.DecodeString(seed)
 	if err != nil {
-		return "", fmt.Errorf("error attempting to decode seed: %v\n", err)
+		return "", fmt.Errorf("error attempting to decode seed: %v", err)
 	}
 
 	// First load the database
@@ -95,6 +95,7 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 	return walletAddr, nil
 }
 
+// CreateStandardTx will create a tx for given amount and address
 func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactions.Transaction, error) {
 
 	// Create a new standard tx
@@ -122,6 +123,7 @@ func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactio
 	return tx, nil
 }
 
+// CreateStakeTx create a stake for amount and lockTime
 func (t *Transactor) CreateStakeTx(amount, lockTime uint64) (transactions.Transaction, error) {
 
 	// Turn amount into a scalar
@@ -143,6 +145,7 @@ func (t *Transactor) CreateStakeTx(amount, lockTime uint64) (transactions.Transa
 	return tx, nil
 }
 
+// CreateBidTx for a amount and lockTime
 func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transaction, error) {
 
 	// Turn amount into a scalar
@@ -181,13 +184,13 @@ func (t *Transactor) syncWallet() error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("error fetching block from node db: %v\n", err)
+			return fmt.Errorf("error fetching block from node db: %v", err)
 		}
 
 		// call wallet.CheckBlock
 		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk)
 		if err != nil {
-			return fmt.Errorf("error checking block: %v\n", err)
+			return fmt.Errorf("error checking block: %v", err)
 		}
 
 		totalSpent += spentCount
@@ -217,6 +220,7 @@ func (t *Transactor) Balance() (uint64, uint64, error) {
 	return t.w.Balance()
 }
 
+// Address is a wrapper around wallet PublicAddress
 func (t *Transactor) Address() (string, error) {
 	return t.w.PublicAddress()
 }

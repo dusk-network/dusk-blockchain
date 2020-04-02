@@ -161,11 +161,9 @@ func (s *roundStore) DispatchFinalize() {
 // which aim is to centralize the state of the coordinator Component while decoupling them from each other and the EventBus
 type Coordinator struct {
 	*SyncState
-	eventBus  *eventbus.EventBus
-	keys      key.ConsensusKeys
-	factories []ComponentFactory
-	//nolint:structcheck
-	components []Component
+	eventBus   *eventbus.EventBus
+	keys       key.ConsensusKeys
+	factories  []ComponentFactory
 	eventqueue *Queue
 	roundQueue *Queue
 

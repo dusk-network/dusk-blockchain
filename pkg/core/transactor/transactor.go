@@ -17,8 +17,8 @@ import (
 	zkproof "github.com/dusk-network/dusk-zkproof"
 )
 
-// TODO: rename
-type Transactor struct {
+//nolint
+type Transactor struct { // TODO: rename
 	w                 *wallet.Wallet
 	db                database.DB
 	eb                *eventbus.EventBus
@@ -48,7 +48,7 @@ type Transactor struct {
 	clearWalletDatabaseChan   chan rpcbus.Request
 }
 
-// Instantiate a new Transactor struct.
+// New Instantiate a new Transactor struct.
 func New(eb *eventbus.EventBus, rb *rpcbus.RPCBus, db database.DB,
 	counter *chainsync.Counter, fdecoys transactions.FetchDecoys,
 	finputs wallet.FetchInputs, walletOnly bool) (*Transactor, error) {
@@ -152,6 +152,7 @@ func (t *Transactor) registerMethods() error {
 	return t.rb.Register(topics.ClearWalletDatabase, t.clearWalletDatabaseChan)
 }
 
+// Wallet return wallet instance and err
 func (t *Transactor) Wallet() (*wallet.Wallet, error) {
 	if t.w == nil {
 		return nil, errWalletNotLoaded

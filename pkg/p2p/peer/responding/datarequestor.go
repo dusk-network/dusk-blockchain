@@ -30,7 +30,7 @@ func NewDataRequestor(db database.DB, rpcBus *rpcbus.RPCBus, responseChan chan<-
 	}
 }
 
-// AskForMissingItems takes an inventory message, checks it for any items that the node
+// RequestMissingItems takes an inventory message, checks it for any items that the node
 // is missing, puts these items in a GetData wire message, and sends it off to the peer's
 // outgoing message queue, requesting the items in full.
 func (d *DataRequestor) RequestMissingItems(m *bytes.Buffer) error {

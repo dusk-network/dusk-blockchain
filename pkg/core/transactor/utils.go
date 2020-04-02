@@ -43,7 +43,7 @@ func fetchDecoys(numMixins int) []mlsag.PubKeys {
 
 	var pubKeys []mlsag.PubKeys
 	var decoys []ristretto.Point
-	db.View(func(t database.Transaction) error {
+	_ = db.View(func(t database.Transaction) error {
 		decoys = t.FetchDecoys(numMixins)
 		return nil
 	})

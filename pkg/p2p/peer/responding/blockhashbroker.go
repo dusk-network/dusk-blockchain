@@ -47,7 +47,7 @@ func (b *BlockHashBroker) AdvertiseMissingBlocks(m *bytes.Buffer) error {
 		height++
 
 		var hash []byte
-		err := b.db.View(func(t database.Transaction) error {
+		err = b.db.View(func(t database.Transaction) error {
 			hash, err = t.FetchBlockHashByHeight(height)
 			return err
 		})
