@@ -10,6 +10,7 @@ import (
 	g "google.golang.org/grpc"
 )
 
+// Client of the grpc remote monitoring server 
 type Client struct {
 	tgt       *url.URL
 	lastBlock *block.Block

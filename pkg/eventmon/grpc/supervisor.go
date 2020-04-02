@@ -53,7 +53,7 @@ func (s *Supervisor) Client() *Client {
 }
 
 // Levels as used by the log.Hook interface
-func (_ *Supervisor) Levels() []log.Level {
+func (s *Supervisor) Levels() []log.Level {
 	return []log.Level{
 		log.ErrorLevel,
 		log.FatalLevel,

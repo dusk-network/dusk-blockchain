@@ -21,6 +21,7 @@ func (c *Client) Hello() error {
 	})
 }
 
+// Bye notifies the monitor about the node's shutdown
 func (c *Client) Bye() error {
 	return c.sendUnlinked(func(mon pb.MonitorClient, ctx context.Context) error {
 		_, err := mon.Bye(ctx, &pb.EmptyRequest{})

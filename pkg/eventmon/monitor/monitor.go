@@ -19,8 +19,8 @@ type Supervisor interface {
 }
 
 // New is a factory method to create a Supervisor
-func New(broker eventbus.Broker, blockTimeThreshold time.Duration, monType, monUrl string) (Supervisor, error) {
-	uri, err := url.Parse(monUrl)
+func New(broker eventbus.Broker, blockTimeThreshold time.Duration, monType, monURL string) (Supervisor, error) {
+	uri, err := url.Parse(monURL)
 	if err != nil {
 		return nil, err
 	}
