@@ -11,17 +11,19 @@ git:
 
 matrix:
   include:
+    - name: "Lint"
+      script:
+        - make lint
+
     - name: "Tests"
       before_script:
         - go get ./...
-        - go get -u golang.org/x/lint/golint
 
       # Send a notification to the Dusk build Status Telegram channel once the CI build completes
       after_script:
         - bash <(curl -s https://raw.githubusercontent.com/dusk-network/tools/master/bash/telegram_ci_notifications.sh)
 
       script:
-        - golint ./...
         - go test -v -p 1 -race -coverprofile=coverage.txt -covermode=atomic ./... # Run all the tests with the race detector enabled
 
       after_success:

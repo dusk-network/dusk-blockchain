@@ -7,7 +7,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 .PHONY: all dep build clean test coverage coverhtml lint
 all: build
 lint: ## Lint the files
-	@golint -set_exit_status ${PKG_LIST}
+	GOBIN=$(PWD)/bin go run scripts/build.go lint
 test: ## Run unittests
 	@go test $(TFLAGS) -p 1 -short ${PKG_LIST}
 test-harness: ## Run harness tests
