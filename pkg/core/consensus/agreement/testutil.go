@@ -8,6 +8,7 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/v2/key"
+	"sync"
 )
 
 // Helper is a struct that facilitates sending semi-real Events with minimum effort
@@ -58,8 +59,16 @@ func (hlp *Helper) createResultChan() {
 // SendBatch let agreement collect  additional batches of consensus events
 func (hlp *Helper) SendBatch(hash []byte) {
 	batch := hlp.Spawn(hash)
-	for _, ev := range batch {
-		_ = hlp.Aggro.CollectAgreementEvent(ev)
+	var wg sync.WaitGroup
+	// Tell the 'wg' WaitGroup how many threads/goroutines
+	//   that are about to run concurrently.
+	wg.Add(len(batch))
+	for i := 0; i < len(batch); i++ {
+		go func(i int) {
+			defer wg.Done()
+			ev := batch[i]
+			_ = hlp.Aggro.CollectAgreementEvent(ev)
+		}(i)
 	}
 }
 
