@@ -1,6 +1,7 @@
 package selection
 
 import (
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -113,10 +114,16 @@ func (h *Helper) StartSelection() {
 // SendBatch generates a batch of score events and sends them to the selector.
 func (h *Helper) SendBatch(hash []byte) {
 	batch := h.Spawn(hash)
-	for _, ev := range batch {
-		go func() {
+	var wg sync.WaitGroup
+	// Tell the 'wg' WaitGroup how many threads/goroutines
+	//   that are about to run concurrently.
+	wg.Add(len(batch))
+	for i := 0; i < len(batch); i++ {
+		go func(i int) {
+			defer wg.Done()
+			ev := batch[i]
 			_ = h.Selector.CollectScoreEvent(ev)
-		}()
+		}(i)
 	}
 }
 
