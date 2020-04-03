@@ -3,6 +3,7 @@ package kadcast
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -14,35 +15,21 @@ type Packet struct {
 	payload []byte
 }
 
-// Builds a `Packet` from the headers and the payload.
-func makePacket(headers [24]byte, payload []byte) Packet {
-	return Packet{
-		headers: headers,
-		payload: payload,
-	}
-}
-
 // -------- General Packet De/Serialization tools -------- //
 
 // Gets a stream of bytes and slices it between headers of Kadcast
 // protocol and the payload.
-func getPacketFromStream(stream []byte) Packet {
-	var headers [24]byte
-	copy(headers[:], stream[0:23])
-	return Packet{
-		headers: headers,
-		payload: stream[23:],
-	}
+func unmarshalPacket(buf []byte, p *Packet) {
+	copy(p.headers[:], buf[0:24])
+	p.payload = buf[24:]
 }
 
 // Deserializes the packet into an slice of bytes.
-func (pac Packet) asBytes() []byte {
-	hl := len(pac.headers)
-	l := hl + len(pac.payload)
-	byteRepr := make([]byte, l)
-	copy(byteRepr, pac.headers[:])
-	copy(byteRepr[hl:], pac.payload[:])
-	return byteRepr
+func marshalPacket(p Packet) []byte {
+	b := make([]byte, 0)
+	b = append(b, p.headers[:]...)
+	b = append(b, p.payload[:]...)
+	return b
 }
 
 // Returns the headers info sliced into three pieces:
@@ -71,7 +58,7 @@ func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	idNonce := getBytesFromUint32(router.myPeerNonce)
 	copy(headers[17:21], idNonce[0:4])
 	// Attach Port
-	port := getBytesFromUint16(destPeer.port)
+	port := getBytesFromUint16(router.MyPeerInfo.port)
 	copy(headers[21:23], port[0:2])
 
 	// Build headers array from the slice.
@@ -92,8 +79,9 @@ func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
 	// Compute the amount of Peers that will be sent and add it
 	// as a two-byte array.
-	count := getBytesFromUint16(uint16(len(kClosestPeers)))
-	pac.payload = append(pac.payload[:], count[:]...)
+	numBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(numBytes, uint16(len(kClosestPeers)))
+	pac.payload = append(pac.payload[:], numBytes...)
 	// Serialize the Peers to get them in `wire-format`,
 	// basically, represented as bytes.
 	for _, peer := range kClosestPeers {
@@ -106,8 +94,9 @@ func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 // `NODES` message payload is the same as the recieved one.
 // Returns `true` if it is correct and `false` otherways.
 func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
+
 	// Get number of Peers announced.
-	peerNum := binary.BigEndian.Uint16(pac.payload[0:2])
+	peerNum := binary.LittleEndian.Uint16(pac.payload[0:2])
 	// Get peerSlice length subtracting headers and count.
 	peerSliceLen := byteNum - (len(pac.headers) + 2)
 
@@ -118,12 +107,13 @@ func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 // `Peers` found inside of it
 func (pac Packet) getNodesPayloadInfo() []Peer {
 	// Get number of Peers recieved.
-	peerNum := int(binary.BigEndian.Uint16(pac.payload[0:2]))
+	peerNum := int(binary.LittleEndian.Uint16(pac.payload[0:2]))
 	// Create Peer-struct slice
 	var peers []Peer
 	// Slice the payload into `Peers` in bytes format and deserialize
 	// every single one of them.
-	var i, j int = 3, PeerBytesSize + 1
+	var i int = 2
+	j := i + PeerBytesSize
 	for m := 0; m < peerNum; m++ {
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
@@ -161,7 +151,7 @@ func (pac Packet) getChunksPayloadInfo() (byte, *[16]byte, []byte, error) {
 		return 0, nil, nil, errors.New("payload length insuficient")
 	}
 	height := pac.payload[0]
-	var chunkID [16]byte 
+	var chunkID [16]byte
 	copy(chunkID[0:16], pac.payload[1:17])
 	payload := pac.payload[17:]
 	return height, &chunkID, payload, nil
@@ -176,7 +166,6 @@ func (pac *Packet) decreaseChunksHeight() error {
 	pac.payload[0] = pac.payload[0] - 1
 	return nil
 }
-
 
 // ----------- Message Handlers ----------- //
 
@@ -213,7 +202,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// See if the packet info is consistent:
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
-		// Since the packet is not consisten, we just discard it.
+		// Since the packet is not consistent, we just discard it.
 		log.Info("NODES message recieved with corrupted payload. Packet ignored.")
 		return
 	}
@@ -232,23 +221,24 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	}
 }
 
-func handleChunks(chunkMap map[[16]byte]bool, peerInf Peer, packet Packet, router *Router, byteNum int) {
+func handleChunks(peerInf Peer, packet Packet, router *Router, byteNum int) error {
 	// Deserialize the packet.
 	height, chunkID, payload, err := packet.getChunksPayloadInfo()
 	if err != nil {
 		log.Info("Empty CHUNKS payload. Packet ignored.")
-		return
+		return err
 	}
 	// Verify chunkID on the memmoryMap. If we already have it stored,+
 	// means that the packet is repeated and we just ignore it.
-	if chunkMap[*chunkID] == true {
-		log.WithFields(log.Fields{
-			"chunk_id": *chunkID,
-		}).Warn("Chunk ID already registered. Ignoring packet.")
-		return
+	if _, ok := router.chunkIDmap[*chunkID]; ok {
+		return fmt.Errorf("chunk ID already registered: %v", *chunkID)
 	}
-	// Set chunkID to true on the map.
-	chunkMap[*chunkID] = true
+
+	// Set chunkIDmap to true on the map.
+	router.chunkIDmap[*chunkID] = nil
+	if router.storeChunks {
+		router.chunkIDmap[*chunkID] = payload
+	}
 
 	// Verify height, if != 0, decrease it by one and broadcast the
 	// packet again.
@@ -256,6 +246,6 @@ func handleChunks(chunkMap map[[16]byte]bool, peerInf Peer, packet Packet, route
 		router.broadcastPacket(height-1, 0, payload)
 	}
 
-	// HERE WE SHOULD SEND THE PAYLOAD TO THE `EVENTBUS`.
-
+	// TODO: HERE WE SHOULD SEND THE PAYLOAD TO THE `EVENTBUS`.
+	return nil
 }
