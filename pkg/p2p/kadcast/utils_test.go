@@ -2,18 +2,11 @@ package kadcast
 
 import (
 	"bytes"
-	"encoding/binary"
-	"fmt"
 	"testing"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 )
 
-func TestConv(t *testing.T) {
-	var slce []byte = []byte{0, 0}
-	peerNum := binary.BigEndian.Uint16(slce)
-	fmt.Printf("%v", peerNum)
-}
 func TestPOW(t *testing.T) {
 	a := Peer{
 		ip:   [4]byte{192, 169, 1, 1},

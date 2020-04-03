@@ -5,10 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"log"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
-	"github.com/sirupsen/logrus"
 
 	"golang.org/x/crypto/sha3"
 
@@ -112,34 +112,31 @@ func computeChunkID(chunk []byte) [16]byte {
 
 // ------------------ NET UTILS ------------------ //
 
-// Gets the local IP address of the machine where
-// the node is running in `net.UDPAddr` format.
-//
-// Panics if it there's not connection.
-func getLocalUDPAddress() net.UDPAddr {
+// Get outbound IP returns local address
+// TODO To be replaced with config param
+func getOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		logrus.WithError(err).Warn("Network Unreachable.")
+		log.Fatal(err)
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return *localAddr
+	return localAddr.IP
 }
 
-// Gets the local IP address of the machine where
-// the node is running in `net.UDPAddr` format.
-//
-// Panics if it there's not connection.
-func getLocalTCPAddress() net.TCPAddr {
-	conn, err := net.Dial("tcp", "8.8.8.8:80")
-	if err != nil {
-		logrus.WithError(err).Warn("Network Unreachable.")
-	}
-	defer conn.Close()
+// Format the UDP address, the UDP listener binds on
+func getLocalUDPAddress(port int) net.UDPAddr {
+	laddr := net.UDPAddr{IP: getOutboundIP()}
+	laddr.Port = port
+	return laddr
+}
 
-	localAddr := conn.LocalAddr().(*net.TCPAddr)
-	return *localAddr
+// Gets the TCP address, the TCP listener binds on
+func getLocalTCPAddress(port int) net.TCPAddr {
+	laddr := net.TCPAddr{IP: getOutboundIP()}
+	laddr.Port = port
+	return laddr
 }
 
 // ------------------ ENC/DEC UTILS ------------------ //
@@ -176,7 +173,11 @@ func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) [
 	// Append it to the resulting slice.
 	copy(enc[0:2], numBytes[0:2])
 	// Append Peer IP.
-	copy(enc[2:6], peerAddr.IP[0:4])
+
+	l := len(peerAddr.IP)
+	ip := peerAddr.IP[l-4 : l]
+
+	copy(enc[2:6], ip)
 	// Append Port
 	port := getBytesFromUint16(uint16(peerAddr.Port))
 	copy(enc[6:8], port[0:2])
@@ -188,7 +189,7 @@ func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) [
 // Encodes received TCP packets to send it through the
 // Ring to the packetProcess rutine.
 func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
-	peerDataStr := peerAddr.String()
+
 	encodedLen := len(payload) + 8
 	enc := make([]byte, encodedLen)
 	// Get numBytes as slice of bytes.
@@ -196,9 +197,15 @@ func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []by
 	// Append it to the resulting slice.
 	copy(enc[0:2], numBytes[0:2])
 	// Append Peer IP.
-	copy(enc[2:6], peerDataStr[0:4])
+
+	tcpAddr, _ := net.ResolveTCPAddr(peerAddr.Network(), peerAddr.String())
+	l := len(tcpAddr.IP)
+	ip := tcpAddr.IP[l-4 : l]
+
+	copy(enc[2:6], ip)
 	// Append Port
-	copy(enc[6:8], peerDataStr[4:6])
+	port := getBytesFromUint16(uint16(tcpAddr.Port))
+	copy(enc[6:8], port[0:2])
 	// Append Payload
 	copy(enc[8:encodedLen], payload[0:len(payload)])
 	return enc
@@ -219,7 +226,7 @@ func decodeRedPacket(packet []byte) (int, *net.UDPAddr, []byte, error) {
 	peerAddr := net.UDPAddr{
 		IP:   ip,
 		Port: port,
-		Zone: "N/A",
+		Zone: "",
 	}
 	return byteNum, &peerAddr, payload, nil
 }
@@ -228,7 +235,7 @@ func readTCPFrame(r io.Reader) ([]byte, int, error) {
 
 	// Read frame length.
 	ln := make([]byte, 4)
-	n, err := io.ReadFull(r, ln)
+	_, err := io.ReadFull(r, ln)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -239,8 +246,9 @@ func readTCPFrame(r io.Reader) ([]byte, int, error) {
 	}
 
 	// Read packet payload
+	var n int
 	payload := make([]byte, length)
-	if _, err := io.ReadFull(r, payload); err != nil {
+	if n, err = io.ReadFull(r, payload); err != nil {
 		return nil, 0, err
 	}
 
