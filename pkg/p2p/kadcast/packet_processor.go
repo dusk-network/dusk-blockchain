@@ -3,6 +3,7 @@ package kadcast
 import (
 	"encoding/binary"
 	"net"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
@@ -18,9 +19,7 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 	var byteNum int
 	var senderAddr *net.UDPAddr
 	var tcpPayload []byte
-	var packet Packet
-	chunkIDmap := make(map[[16]byte]bool)
-	
+
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
@@ -32,12 +31,13 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 				continue
 			}
 			// Build packet struct
-			packet = getPacketFromStream(tcpPayload[:])
+			var packet Packet
+			unmarshalPacket(tcpPayload[:], &packet)
+
 			// Extract headers info.
 			tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
 
 			// Verify IDNonce
-			err = verifyIDNonce(senderID, nonce)
 			// If we get an error, we just skip the whole process since the
 			// Peer was not validated.
 			if err := verifyIDNonce(senderID, nonce); err != nil {
@@ -53,12 +53,17 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 			peerInf := MakePeer(ip, port)
 
 			switch tipus {
-			case 0: {
-				handleChunks(chunkIDmap, peerInf, packet, router, byteNum)
-				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved CHUNKS message")
-			}
+			case 0:
+				{
+					if err := handleChunks(peerInf, packet, router, byteNum); err != nil {
+						log.WithError(err).
+							WithField("peer", router.MyPeerInfo.String()).Warn("Ignoring CHUNKS message")
+					} else {
+						log.WithField("from", peerInf.String()).
+							WithField("peer", router.MyPeerInfo.String()).
+							Info("Recieved CHUNKS message")
+					}
+				}
 			}
 		}
 	}
@@ -74,7 +79,7 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 	var byteNum int
 	var senderAddr *net.UDPAddr
 	var udpPayload []byte
-	var packet Packet
+
 	for {
 		// Get all of the packets that are now on the queue.
 		queuePackets, _ := queue.GetAll()
@@ -85,8 +90,11 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 				log.WithError(err).Warn("Error decoding the UDP packet taken from the ring.")
 				continue
 			}
+
 			// Build packet struct
-			packet = getPacketFromStream(udpPayload[:])
+			var packet Packet
+			unmarshalPacket(udpPayload[:], &packet)
+
 			// Extract headers info.
 			tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
 
@@ -110,24 +118,24 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 			switch tipus {
 			case 0:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
+					"src", peerInf.String(),
 				).Infoln("Recieved PING message")
 				handlePing(peerInf, router)
 			case 1:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
+					"src", peerInf.String(),
 				).Infoln("Recieved PONG message")
 				handlePong(peerInf, router)
 
 			case 2:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
+					"src", peerInf.String(),
 				).Infoln("Recieved FIND_NODES message")
 				handleFindNodes(peerInf, router)
 
 			case 3:
 				log.WithField(
-					"Source-IP", peerInf.ip[:],
+					"src", peerInf.String(),
 				).Infoln("Recieved NODES message")
 				handleNodes(peerInf, packet, router, byteNum)
 			}
