@@ -2,8 +2,8 @@ package kadcast
 
 import (
 	"net"
-	"sync"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -32,17 +32,27 @@ type Router struct {
 	MyPeerInfo    Peer
 	// Holds the Nonce that satisfies: `H(ID || Nonce) < Tdiff`.
 	myPeerNonce uint32
+
+	// Store all received Chunk payload. Useful on testing.
+	// Will be removed when kadcast is integrated with eventbus
+	storeChunks bool
+	chunkIDmap  map[[16]byte][]byte
 }
 
 // MakeRouter allows to create a router which holds the peerInfo and
 // also the routing tree information.
 func MakeRouter(externIP [4]byte, port uint16) Router {
 	myPeer := MakePeer(externIP, port)
+	return makeRouterFromPeer(myPeer)
+}
+
+func makeRouterFromPeer(peer Peer) Router {
 	return Router{
-		tree:          makeTree(myPeer),
-		myPeerUDPAddr: myPeer.getUDPAddr(),
-		MyPeerInfo:    myPeer,
-		myPeerNonce:   myPeer.computePeerNonce(),
+		tree:          makeTree(peer),
+		myPeerUDPAddr: peer.getUDPAddr(),
+		MyPeerInfo:    peer,
+		myPeerNonce:   peer.computePeerNonce(),
+		chunkIDmap:    make(map[[16]byte][]byte),
 	}
 }
 
@@ -113,14 +123,14 @@ func (router Router) getXClosestPeersTo(peerNum int, refPeer Peer) []Peer {
 }
 
 // Sends a `FIND_NODES` messages to the `alpha` closest peers
-// the node knows and waits for a certain time in order to wait 
+// the node knows and waits for a certain time in order to wait
 // for the `PONG` message arrivals.
 // Then looks for the closest peer to the node itself into the
 // buckets and returns it.
 func (router Router) pollClosestPeer(t time.Duration) Peer {
 	var wg sync.WaitGroup
 	var ps []Peer
-	wg.Add(1) 
+	wg.Add(1)
 	router.sendFindNodes()
 
 	timer := time.AfterFunc(t, func() {
@@ -134,14 +144,15 @@ func (router Router) pollClosestPeer(t time.Duration) Peer {
 }
 
 // Sends a `PING` messages to the bootstrap nodes that
-// the node knows and waits for a certain time in order to wait 
+// the node knows and waits for a certain time in order to wait
 // for the `PONG` message arrivals.
 // Returns back the new number of peers the node is connected to.
 func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) uint64 {
 	var wg sync.WaitGroup
 	var peerNum uint64
 
-	wg.Add(1) 
+	wg.Add(1)
+
 	for _, peer := range bootNodes {
 		router.sendPing(peer)
 	}
@@ -161,29 +172,29 @@ func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) u
 // Builds and sends a `PING` packet
 func (router Router) sendPing(receiver Peer) {
 	// Build empty packet.
-	var packet Packet
+	var p Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	packet.setHeadersInfo(0, router, receiver)
+	p.setHeadersInfo(0, router, receiver)
 
 	// Since return values from functions are not addressable, we need to
 	// allocate the receiver UDPAddr
 	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
+	sendUDPPacket("udp", router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
 }
 
 // Builds and sends a `PONG` packet
 func (router Router) sendPong(receiver Peer) {
 	// Build empty packet.
-	var packet Packet
+	var p Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	packet.setHeadersInfo(1, router, receiver)
+	p.setHeadersInfo(1, router, receiver)
 
 	// Since return values from functions are not addressable, we need to
 	// allocate the receiver UDPAddr
 	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", destUDPAddr, packet.asBytes())
+	sendUDPPacket("udp", router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
 }
 
 // Builds and sends a `FIND_NODES` packet.
@@ -193,29 +204,29 @@ func (router Router) sendFindNodes() {
 	// Fill the headers with the type, ID, Nonce and destPort.
 	for _, peer := range destPeers {
 		// Build the packet
-		var packet Packet
-		packet.setHeadersInfo(2, router, peer)
+		var p Packet
+		p.setHeadersInfo(2, router, peer)
 		// We don't need to add the ID to the payload snce we already have
 		// it in the headers.
 		// Send the packet
-		sendUDPPacket("udp", peer.getUDPAddr(), packet.asBytes())
+		sendUDPPacket("udp", router.myPeerUDPAddr, peer.getUDPAddr(), marshalPacket(p))
 	}
 }
 
 // Builds and sends a `NODES` packet.
 func (router Router) sendNodes(receiver Peer) {
 	// Build empty packet
-	var packet Packet
+	var p Packet
 	// Set headers
-	packet.setHeadersInfo(3, router, receiver)
+	p.setHeadersInfo(3, router, receiver)
 	// Set payload with the `k` peers closest to receiver.
-	peersToSend := packet.setNodesPayload(router, receiver)
+	peersToSend := p.setNodesPayload(router, receiver)
 	// If we don't have any peers to announce, we just skip sending
 	// the `NODES` messsage.
 	if peersToSend == 0 {
 		return
 	}
-	sendUDPPacket("udp", receiver.getUDPAddr(), packet.asBytes())
+	sendUDPPacket("udp", router.myPeerUDPAddr, receiver.getUDPAddr(), marshalPacket(p))
 }
 
 // BroadcastPacket sends a `CHUNKS` message across the network
@@ -224,18 +235,20 @@ func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 	// Get `Beta` random peers from each Bucket.
 	for _, bucket := range router.tree.buckets {
 		// Skip first bucket from the iteration (it contains our peer).
-		if bucket.idLength == 0 {continue}
+		if bucket.idLength == 0 {
+			continue
+		}
 		destPeer, err := bucket.getRandomPeer()
 		if err != nil {
 			continue
 		}
 		// Create empty packet and set headers.
-		var packet Packet
-		// Set headers info. 
-		packet.setHeadersInfo(tipus, router, *destPeer)
-		// Set payload. 
-		packet.setChunksPayloadInfo(height, payload)
-		sendTCPStream(destPeer.getUDPAddr(), packet.asBytes())
+		var p Packet
+		// Set headers info.
+		p.setHeadersInfo(tipus, router, *destPeer)
+		// Set payload.
+		p.setChunksPayloadInfo(height, payload)
+		sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
 	}
 }
 
