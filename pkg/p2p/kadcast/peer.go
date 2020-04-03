@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
 
 	"golang.org/x/crypto/sha3"
@@ -29,14 +30,36 @@ func MakePeer(ip [4]byte, port uint16) Peer {
 	return peer
 }
 
+// mockMakePeer create a peer with ID computed over port number only
+// Suitable only for localnet testing
+func mockPeer(port uint16) Peer {
+
+	// Peer host is always local address
+	lAddr := getLocalUDPAddress(int(port))
+	var ip [4]byte
+	copy(ip[:], lAddr.IP)
+
+	peer := MakePeer(ip, port)
+
+	// Overwrite ID
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, port)
+	var bytes [4]byte
+	copy(bytes[:], b)
+	peer.id = computePeerID(bytes)
+	return peer
+}
+
 // Deserializes a `Peer` structure as an array of bytes
 // that allows to send it through a wire.
 func (peer Peer) deserialize() []byte {
 	serPeer := make([]byte, 22)
 	// Add Peer IP.
+
 	copy(serPeer[0:4], peer.ip[0:4])
 	// Serialize and add Peer port.
-	portByt := getBytesFromUint16(peer.port)
+	portByt := make([]byte, 2)
+	binary.LittleEndian.PutUint16(portByt, peer.port)
 	copy(serPeer[4:6], portByt[0:2])
 	// Add Peer ID.
 	copy(serPeer[6:22], peer.id[0:16])
@@ -49,6 +72,7 @@ func serializePeer(peerBytes []byte) Peer {
 	// Get Ip
 	var ip [4]byte
 	copy(ip[:], peerBytes[0:4])
+
 	// Get Port
 	port := binary.LittleEndian.Uint16(peerBytes[4:6])
 	// Get Id
@@ -95,8 +119,14 @@ func (peer Peer) getUDPAddr() net.UDPAddr {
 	return net.UDPAddr{
 		IP:   peer.ip[:],
 		Port: int(peer.port),
-		Zone: "N/A",
+		Zone: "",
 	}
+}
+
+func (peer Peer) String() string {
+	idNum := binary.LittleEndian.Uint16(peer.id[:])
+	return fmt.Sprintf("Addr: %d.%d.%d.%d:%d, ID: %d",
+		peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3], peer.port, idNum)
 }
 
 // Builds the Peer info from a UPDAddress struct.
