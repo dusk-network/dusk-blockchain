@@ -76,7 +76,7 @@ Finally, to start your node, type:
 
 These features will be introduced in the later iterations of the Testnet (starting from v2).
 1. Virtual Machine Module - Will include the implementation of the WebAssembly-based (WASM) Turing-complete Virtual Machine with zero-knowledge proof verification capabilities, as well as an account-based state-layer confidential transaction model and the implementation of XSC standard.
-2. Guru Module - Will include the reputation module incorporated to aid the consensus combat malicious behaviour.
+2. Guru Module - Will include the reputation module incorporated to aid the consensus combat malicious behavior.
 3. Cryptoeconomics Model - Will include an optimized reward mechanism for the consensus alongside the slashing conditions as well as introducing the lower and upper thresholds for the bids and stakes. The cryptoeconomics model will also include the rolling transaction fee model.
 4. Poseidon Hash Function - Will include the Poseidon hash function which will supersede LongsightL as the new zero-knowledge proof-friendly hash function.
 5. Anonymous Networking Layer - Will include the anonymous P2P communication model based on onion routing.
