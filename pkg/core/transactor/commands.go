@@ -110,13 +110,12 @@ func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactio
 	amountScalar.SetBigInt(big.NewInt(0).SetUint64(amount))
 
 	// Send amount to address
-	if err := tx.AddOutput(key.PublicAddress(address), amountScalar); err != nil {
-		return nil, err
+	if e := tx.AddOutput(key.PublicAddress(address), amountScalar); e != nil {
+		return nil, e
 	}
 
 	// Sign tx
-	err = t.w.Sign(tx)
-	if err != nil {
+	if err := t.w.Sign(tx); err != nil {
 		return nil, err
 	}
 
