@@ -27,7 +27,7 @@ func (h *helloSrv) NotifySlowdown(ctx context.Context, req *monitor.SlowdownAler
 
 func TestNotifyError(t *testing.T) {
 	eb := eventbus.New()
-	s := grpc.NewSupervisor(eb, testUrl, 20*time.Second)
+	s := grpc.NewSupervisor(eb, testURL, 20*time.Second)
 	log.AddHook(s)
 
 	call := callTest{
@@ -56,7 +56,7 @@ func TestNotifyError(t *testing.T) {
 
 func TestNotifySlowdown(t *testing.T) {
 	eb := eventbus.New()
-	s := grpc.NewSupervisor(eb, testUrl, 200*time.Millisecond)
+	s := grpc.NewSupervisor(eb, testURL, 200*time.Millisecond)
 	log.AddHook(s)
 	height := uint64(200)
 	testData := helper.RandomBlock(t, height, 2)
@@ -92,7 +92,7 @@ func TestNotifySlowdown(t *testing.T) {
 
 func TestNotifySlowdownAtStart(t *testing.T) {
 	eb := eventbus.New()
-	s := grpc.NewSupervisor(eb, testUrl, 50*time.Millisecond)
+	s := grpc.NewSupervisor(eb, testURL, 50*time.Millisecond)
 	log.AddHook(s)
 
 	call := callTest{

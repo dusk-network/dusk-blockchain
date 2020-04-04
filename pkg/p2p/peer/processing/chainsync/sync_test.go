@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Check the behaviour of the ChainSynchronizer when receiving a block, when we
+// Check the behavior of the ChainSynchronizer when receiving a block, when we
 // are sufficiently behind the chain tip.
 func TestSynchronizeBehind(t *testing.T) {
 	cs, eb, responseChan := setupSynchronizer(t)
@@ -46,7 +46,7 @@ func TestSynchronizeBehind(t *testing.T) {
 	assert.Equal(t, highestSeenHeight, height)
 }
 
-// Check the behaviour of the ChainSynchronizer when receiving a block, when we
+// Check the behavior of the ChainSynchronizer when receiving a block, when we
 // are synced with other peers.
 func TestSynchronizeSynced(t *testing.T) {
 	cs, eb, _ := setupSynchronizer(t)

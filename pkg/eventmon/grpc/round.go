@@ -36,7 +36,7 @@ func (c *Client) NotifyBlockUpdate(parent context.Context, blk block.Block) erro
 func (c *Client) NotifyBlockSlowdown(parent context.Context) error {
 	return c.send(parent, func(mon pb.MonitorClient, ctx context.Context) error {
 		if c.lastBlock != nil {
-			t := time.Now().Sub(time.Unix(c.lastBlock.Header.Timestamp, int64(0)))
+			t := time.Since(time.Unix(c.lastBlock.Header.Timestamp, int64(0)))
 			alert := &pb.SlowdownAlert{
 				LastKnownHash:         c.lastBlock.Header.Hash,
 				LastKnownHeight:       c.lastBlock.Header.Height,

@@ -71,7 +71,9 @@ func TestWriteRingBuffer(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
-		defer p.Conn.Close()
+		defer func() {
+			_ = p.Conn.Close()
+		}()
 	}
 
 	ev := makeAgreementGossip(10)
@@ -122,7 +124,9 @@ func BenchmarkWriter(b *testing.B) {
 
 	for i := 0; i < 100; i++ {
 		p := addPeer(bus, receiveFn)
-		defer p.Conn.Close()
+		defer func() {
+			_ = p.Conn.Close()
+		}()
 	}
 
 	msg := makeAgreementGossip(10)
@@ -133,6 +137,7 @@ func BenchmarkWriter(b *testing.B) {
 	}
 }
 
+//nolint:unparam
 func makeAgreementGossip(keyAmount int) message.Message {
 	p, keys := consensus.MockProvisioners(keyAmount)
 	aggro := message.MockAgreement(make([]byte, 32), 1, 1, keys, p)

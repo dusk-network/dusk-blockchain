@@ -40,7 +40,7 @@ type Pool interface {
 	// FilterByType returns all verified transactions for a specific type.
 	FilterByType(transactions.TxType) []transactions.Transaction
 
-	// Size is total number of bytes of all txs marshalling size
+	// Size is total number of bytes of all txs marshaling size
 	Size() uint32
 	// Len returns the number of tx entries
 	Len() int

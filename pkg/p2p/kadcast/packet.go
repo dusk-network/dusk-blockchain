@@ -2,11 +2,9 @@ package kadcast
 
 import (
 	"encoding/binary"
-	"net"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
-
-	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
 )
 
 // Packet represents a Kadcast packet which is
@@ -16,13 +14,13 @@ type Packet struct {
 	payload []byte
 }
 
-// Builds a `Packet` from the headers and the payload.
-func makePacket(headers [24]byte, payload []byte) Packet {
-	return Packet{
-		headers: headers,
-		payload: payload,
-	}
-}
+//// Builds a `Packet` from the headers and the payload.
+//func makePacket(headers [24]byte, payload []byte) Packet {
+//	return Packet{
+//		headers: headers,
+//		payload: payload,
+//	}
+//}
 
 // -------- General Packet De/Serialization tools -------- //
 
@@ -61,7 +59,7 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 	return typ, senderID, nonce, peerPort
 }
 
-// Gets the Packet headers parts and puts them into the
+// Gets the Packet headers items and puts them into the
 // header attribute of the Packet.
 func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
 	headers := make([]byte, 24)
@@ -105,8 +103,8 @@ func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 }
 
 // Analyzes if the announced number of Peers included on the
-// `NODES` message payload is the same as the recieved one.
-// Returns `true` if it is correct and `false` otherways.
+// `NODES` message payload is the same as the received one.
+// Returns `true` if it is correct and `false` otherwise.
 func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 	// Get number of Peers announced.
 	peerNum := binary.BigEndian.Uint16(pac.payload[0:2])
@@ -119,13 +117,13 @@ func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 // Gets a `NODES` message and returns a slice of the
 // `Peers` found inside of it
 func (pac Packet) getNodesPayloadInfo() []Peer {
-	// Get number of Peers recieved.
+	// Get number of Peers received.
 	peerNum := int(binary.BigEndian.Uint16(pac.payload[0:2]))
 	// Create Peer-struct slice
 	var peers []Peer
 	// Slice the payload into `Peers` in bytes format and deserialize
 	// every single one of them.
-	var i, j int = 3, PeerBytesSize + 1
+	var i, j = 3, PeerBytesSize + 1
 	for m := 0; m < peerNum; m++ {
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
@@ -137,76 +135,49 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 	return peers
 }
 
-// ProcessPacket recieves a Packet and processes it according to
-// it's type. It gets the packets from the circularqueue that
-// connects the listeners with the packet processor.
-func ProcessPacket(queue *ring.Buffer, router *Router) {
-	// Instantiate now the variables to not pollute
-	// the stack.
-	var err error
-	var byteNum int
-	var senderAddr *net.UDPAddr
-	var udpPayload []byte
-	var packet Packet
-	for {
-		// Get all of the packets that are now on the queue.
-		queuePackets, _ := queue.GetAll()
-		for _, item := range queuePackets {
-			// Get items from the queue packet taken.
-			byteNum, senderAddr, udpPayload, err = decodeRedPacket(item)
-			if err != nil {
-				log.WithError(err).Warn("Error decoding the packet taken from the ring.")
-				continue
-			}
-			// Build packet struct
-			packet = getPacketFromStream(udpPayload[:])
-			// Extract headers info.
-			tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
+// -------- CHUNKS Packet De/Serialization tools -------- //
 
-			// Verify IDNonce
-			err = verifyIDNonce(senderID, nonce)
-			// If we get an error, we just skip the whole process since the
-			// Peer was not validated.
-			if err := verifyIDNonce(senderID, nonce); err != nil {
-				log.WithError(err).Warn("Incorrect packet sender ID. Skipping its processing.")
-				continue
-			}
-
-			// Build Peer info and put the right port on it subsituting the one
-			// used to send the message by the one where the peer wants to receive
-			// the messages.
-			ip, _ := getPeerNetworkInfo(*senderAddr)
-			port := binary.LittleEndian.Uint16(peerRecepPort[:])
-			peerInf := MakePeer(ip, port)
-
-			// Check packet type and process it.
-			switch tipus {
-			case 0:
-				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved PING message")
-				handlePing(peerInf, router)
-			case 1:
-				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved PONG message")
-				handlePong(peerInf, router)
-
-			case 2:
-				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved FIND_NODES message")
-				handleFindNodes(peerInf, router)
-
-			case 3:
-				log.WithField(
-					"Source-IP", peerInf.ip[:],
-				).Infoln("Recieved NODES message")
-				handleNodes(peerInf, packet, router, byteNum)
-			}
-		}
-	}
+// Sets the payload of a `CHUNKS` message by setting the
+// initial height, chunk ID and finally the payload.
+func (pac *Packet) setChunksPayloadInfo(height byte, payload []byte) {
+	payloadLen := len(payload)
+	packPayload := make([]byte, payloadLen+17)
+	// Set packet height.
+	packPayload[0] = height
+	// Set packet ChunkID.
+	chunkID := computeChunkID(payload)
+	copy(packPayload[1:17], chunkID[0:16])
+	// Set the rest of the payload.
+	copy(packPayload[17:], payload[0:payloadLen])
+	pac.payload = packPayload
 }
+
+// Gets the payload of a `CHUNKS` message and deserializes
+// it returning height, chunkID and the payload.
+func (pac Packet) getChunksPayloadInfo() (byte, *[16]byte, []byte, error) {
+	// Get payload length.
+	payloadLen := len(pac.payload)
+	if payloadLen < 17 {
+		return 0, nil, nil, errors.New("payload length insuficient")
+	}
+	height := pac.payload[0]
+	var chunkID [16]byte
+	copy(chunkID[0:16], pac.payload[1:17])
+	payload := pac.payload[17:]
+	return height, &chunkID, payload, nil
+}
+
+// Gets a packet and decreases by one the `CHUNKS`
+// message height.
+func (pac *Packet) decreaseChunksHeight() error {
+	if len(pac.payload) > 0 {
+		return errors.New("payload length insuficient")
+	}
+	pac.payload[0] = pac.payload[0] - 1
+	return nil
+}
+
+// ----------- Message Handlers ----------- //
 
 // Processes the `PING` packet info sending back a
 // `PONG` message and adding the sender to the buckets.
@@ -242,7 +213,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consisten, we just discard it.
-		log.Info("NODES message recieved with corrupted payload. Packet ignored.")
+		log.Info("NODES message received with corrupted payload. Packet ignored.")
 		return
 	}
 
@@ -250,7 +221,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 
 	// Deserialize the payload to get the peerInfo of every
-	// recieved peer.
+	// received peer.
 	peers := packet.getNodesPayloadInfo()
 
 	// Send `PING` messages to all of the peers to then
@@ -258,4 +229,33 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	for _, peer := range peers {
 		router.sendPing(peer)
 	}
+}
+
+//nolint:unparam
+func handleChunks(chunkMap map[[16]byte]bool, peerInf Peer, packet Packet, router *Router, byteNum int) {
+	// Deserialize the packet.
+	height, chunkID, payload, err := packet.getChunksPayloadInfo()
+	if err != nil {
+		log.Info("Empty CHUNKS payload. Packet ignored.")
+		return
+	}
+	// Verify chunkID on the memmoryMap. If we already have it stored,+
+	// means that the packet is repeated and we just ignore it.
+	if chunkMap[*chunkID] == true {
+		log.WithFields(log.Fields{
+			"chunk_id": *chunkID,
+		}).Warn("Chunk ID already registered. Ignoring packet.")
+		return
+	}
+	// Set chunkID to true on the map.
+	chunkMap[*chunkID] = true
+
+	// Verify height, if != 0, decrease it by one and broadcast the
+	// packet again.
+	if height > 0 {
+		router.broadcastPacket(height-1, 0, payload)
+	}
+
+	// HERE WE SHOULD SEND THE PAYLOAD TO THE `EVENTBUS`.
+
 }

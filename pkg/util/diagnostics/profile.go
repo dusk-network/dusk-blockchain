@@ -10,8 +10,6 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
-	_ "net/http/pprof"
 )
 
 const (
@@ -188,7 +186,7 @@ func stopProfiling(f *os.File, name string) {
 
 	defer func() {
 		if f != nil {
-			f.Close()
+			_ = f.Close()
 			f = nil
 		}
 	}()

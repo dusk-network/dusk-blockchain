@@ -21,7 +21,6 @@ type Supervisor struct {
 	client       *Client
 	timeoutBlock time.Duration
 	broker       eventbus.Broker
-	stopChan     chan struct{}
 
 	lock          sync.RWMutex
 	idBlockUpdate uint32 // id of the subscription channel for the block updates

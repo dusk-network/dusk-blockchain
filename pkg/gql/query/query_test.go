@@ -24,7 +24,9 @@ func TestMain(m *testing.M) {
 
 	// Setup lite DB
 	_, db = lite.CreateDBConnection()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	initializeDB(db)
 

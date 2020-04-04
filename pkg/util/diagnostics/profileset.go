@@ -3,8 +3,6 @@ package diagnostics
 import (
 	"errors"
 
-	_ "net/http/pprof"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 )
 

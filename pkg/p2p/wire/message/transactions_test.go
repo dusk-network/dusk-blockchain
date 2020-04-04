@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
@@ -271,6 +273,8 @@ func calcTxAndStandardHash(t *testing.T, tx transactions.Transaction) ([]byte, [
 
 	standard := tx.StandardTx()
 	standardHash, err := standard.CalculateHash()
+	require.Nil(t, err)
+
 	// Clear TxID field, as it will be populated by the underlying Standard struct
 	standard.TxID = nil
 

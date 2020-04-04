@@ -349,7 +349,7 @@ func (t *Transactor) handleIsWalletLoaded(r rpcbus.Request) error {
 func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	hash, err := tx.CalculateHash()
 	if err != nil {
-		// If we found a valid bid tx, we should under no circumstance have issues marshalling it
+		// If we found a valid bid tx, we should under no circumstance have issues marshaling it
 		return nil, fmt.Errorf("error encoding transaction: %v\n", err)
 	}
 
@@ -361,6 +361,7 @@ func (t *Transactor) publishTx(tx transactions.Transaction) ([]byte, error) {
 	return hash, nil
 }
 
+//nolint:unparam
 func (t *Transactor) onAcceptedBlockEvent(b block.Block) {
 	if t.w == nil {
 		return

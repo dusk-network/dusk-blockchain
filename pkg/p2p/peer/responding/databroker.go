@@ -62,7 +62,7 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 			}
 
 		case peermsg.InvTypeMempoolTx:
-			// Try to retireve tx from local mempool state. It might not be
+			// Try to retrieve tx from local mempool state. It might not be
 			// available
 			txs, err := GetMempoolTxs(d.rpcBus, obj.Hash)
 			if err != nil {

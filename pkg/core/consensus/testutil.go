@@ -12,7 +12,7 @@ const (
 	RUNNING
 )
 
-// SimplePlayer is used within tests to simulate the behaviour of the
+// SimplePlayer is used within tests to simulate the behavior of the
 // consensus.EventPlayer
 type SimplePlayer struct {
 	lock  sync.RWMutex

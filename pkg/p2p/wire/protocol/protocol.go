@@ -45,7 +45,7 @@ const (
 const (
 	mainnetUint32 uint32 = 0x7630401f
 	testnetUint32 uint32 = 0x74746e41
-	devnetUint32  uint32 = 0x74736e40
+	//devnetUint32  uint32 = 0x74736e40
 )
 
 type magicObj struct {
@@ -103,7 +103,7 @@ func MagicFromConfig() Magic {
 		}
 	}
 
-	// An invalid network identifier might cause node unexpected  behaviour
+	// An invalid network identifier might cause node unexpected behavior
 	log.Panic(fmt.Sprintf("not a valid network: %s", magic))
 	return 0
 }

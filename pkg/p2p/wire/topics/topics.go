@@ -106,77 +106,77 @@ type topicBuf struct {
 	str string
 }
 
+// Topics represents the associated string and byte representation respectively
+// of the Topic objects
 // NOTE: this needs to be in the same order in which the topics are declared
 var Topics = [...]topicBuf{
-	topicBuf{Version, *(bytes.NewBuffer([]byte{byte(Version)})), "version"},
-	topicBuf{VerAck, *(bytes.NewBuffer([]byte{byte(VerAck)})), "verack"},
-	topicBuf{Ping, *(bytes.NewBuffer([]byte{byte(Ping)})), "ping"},
-	topicBuf{Pong, *(bytes.NewBuffer([]byte{byte(Pong)})), "pong"},
-	topicBuf{Addr, *(bytes.NewBuffer([]byte{byte(Addr)})), "addr"},
-	topicBuf{GetAddr, *(bytes.NewBuffer([]byte{byte(GetAddr)})), "getaddr"},
-	topicBuf{GetData, *(bytes.NewBuffer([]byte{byte(GetData)})), "getdata"},
-	topicBuf{GetBlocks, *(bytes.NewBuffer([]byte{byte(GetBlocks)})), "getblocks"},
-	topicBuf{GetHeaders, *(bytes.NewBuffer([]byte{byte(GetHeaders)})), "getheaders"},
-	topicBuf{Tx, *(bytes.NewBuffer([]byte{byte(Tx)})), "tx"},
-	topicBuf{Block, *(bytes.NewBuffer([]byte{byte(Block)})), "block"},
-	topicBuf{AcceptedBlock, *(bytes.NewBuffer([]byte{byte(AcceptedBlock)})), "acceptedblock"},
-	topicBuf{Headers, *(bytes.NewBuffer([]byte{byte(Headers)})), "headers"},
-	topicBuf{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
-	topicBuf{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
-	topicBuf{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
-	topicBuf{RoundResults, *(bytes.NewBuffer([]byte{byte(RoundResults)})), "roundresults"},
-	topicBuf{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
-	topicBuf{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
-	topicBuf{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
-	topicBuf{Agreement, *(bytes.NewBuffer([]byte{byte(Agreement)})), "agreement"},
-	topicBuf{Gossip, *(bytes.NewBuffer([]byte{byte(Gossip)})), "gossip"},
-	topicBuf{NotFound, *(bytes.NewBuffer([]byte{byte(NotFound)})), "notfound"},
-	topicBuf{Unknown, *(bytes.NewBuffer([]byte{byte(Unknown)})), "unknown"},
-	topicBuf{Reject, *(bytes.NewBuffer([]byte{byte(Reject)})), "reject"},
-	topicBuf{Initialization, *(bytes.NewBuffer([]byte{byte(Initialization)})), "initialization"},
-	topicBuf{RoundUpdate, *(bytes.NewBuffer([]byte{byte(RoundUpdate)})), "roundupdate"},
-	topicBuf{BestScore, *(bytes.NewBuffer([]byte{byte(BestScore)})), "bestscore"},
-	topicBuf{Quit, *(bytes.NewBuffer([]byte{byte(Quit)})), "quit"},
-	topicBuf{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
-	topicBuf{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
-	topicBuf{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
-	topicBuf{StepVotes, *(bytes.NewBuffer([]byte{byte(StepVotes)})), "stepvotes"},
-	topicBuf{ScoreEvent, *(bytes.NewBuffer([]byte{byte(ScoreEvent)})), "scoreevent"},
-	topicBuf{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
-	topicBuf{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
-	topicBuf{StopConsensus, *(bytes.NewBuffer([]byte{byte(StopConsensus)})), "stopconsensus"},
-	topicBuf{IntermediateBlock, *(bytes.NewBuffer([]byte{byte(IntermediateBlock)})), "intermediateblock"},
-	topicBuf{HighestSeen, *(bytes.NewBuffer([]byte{byte(HighestSeen)})), "highestseen"},
-	topicBuf{ValidCandidateHash, *(bytes.NewBuffer([]byte{byte(ValidCandidateHash)})), "validcandidatehash"},
-	topicBuf{GetLastBlock, *(bytes.NewBuffer([]byte{byte(GetLastBlock)})), "getlastblock"},
-	topicBuf{GetMempoolTxs, *(bytes.NewBuffer([]byte{byte(GetMempoolTxs)})), "getmempooltxs"},
-	topicBuf{GetMempoolTxsBySize, *(bytes.NewBuffer([]byte{byte(GetMempoolTxsBySize)})), "getmempooltxsbysize"},
-	topicBuf{VerifyCandidateBlock, *(bytes.NewBuffer([]byte{byte(VerifyCandidateBlock)})), "verifycandidateblock"},
-	topicBuf{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
-	topicBuf{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
-	topicBuf{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
-	topicBuf{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
-	topicBuf{CreateFromSeed, *(bytes.NewBuffer([]byte{byte(CreateFromSeed)})), "createfromseed"},
-	topicBuf{LoadWallet, *(bytes.NewBuffer([]byte{byte(LoadWallet)})), "loadwallet"},
-	topicBuf{SendBidTx, *(bytes.NewBuffer([]byte{byte(SendBidTx)})), "sendbidtx"},
-	topicBuf{SendStakeTx, *(bytes.NewBuffer([]byte{byte(SendStakeTx)})), "sendstaketx"},
-	topicBuf{SendStandardTx, *(bytes.NewBuffer([]byte{byte(SendStandardTx)})), "sendstandardtx"},
-	topicBuf{GetBalance, *(bytes.NewBuffer([]byte{byte(GetBalance)})), "getbalance"},
-	topicBuf{GetUnconfirmedBalance, *(bytes.NewBuffer([]byte{byte(GetUnconfirmedBalance)})), "getunconfirmedbalance"},
-	topicBuf{GetAddress, *(bytes.NewBuffer([]byte{byte(GetAddress)})), "getaddress"},
-	topicBuf{GetTxHistory, *(bytes.NewBuffer([]byte{byte(GetTxHistory)})), "gettxhistory"},
-	topicBuf{AutomateConsensusTxs, *(bytes.NewBuffer([]byte{byte(AutomateConsensusTxs)})), "automateconsensustxs"},
-	topicBuf{GetSyncProgress, *(bytes.NewBuffer([]byte{byte(GetSyncProgress)})), "getsyncprogress"},
-	topicBuf{IsWalletLoaded, *(bytes.NewBuffer([]byte{byte(IsWalletLoaded)})), "iswalletloaded"},
-	topicBuf{RebuildChain, *(bytes.NewBuffer([]byte{byte(RebuildChain)})), "rebuildchain"},
-	topicBuf{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
-	topicBuf{StartProfile, *(bytes.NewBuffer([]byte{byte(StartProfile)})), "startprofile"},
-	topicBuf{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
-	topicBuf{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
-	topicBuf{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
-
-	// monitor related topics
-	topicBuf{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
+	{Version, *(bytes.NewBuffer([]byte{byte(Version)})), "version"},
+	{VerAck, *(bytes.NewBuffer([]byte{byte(VerAck)})), "verack"},
+	{Ping, *(bytes.NewBuffer([]byte{byte(Ping)})), "ping"},
+	{Pong, *(bytes.NewBuffer([]byte{byte(Pong)})), "pong"},
+	{Addr, *(bytes.NewBuffer([]byte{byte(Addr)})), "addr"},
+	{GetAddr, *(bytes.NewBuffer([]byte{byte(GetAddr)})), "getaddr"},
+	{GetData, *(bytes.NewBuffer([]byte{byte(GetData)})), "getdata"},
+	{GetBlocks, *(bytes.NewBuffer([]byte{byte(GetBlocks)})), "getblocks"},
+	{GetHeaders, *(bytes.NewBuffer([]byte{byte(GetHeaders)})), "getheaders"},
+	{Tx, *(bytes.NewBuffer([]byte{byte(Tx)})), "tx"},
+	{Block, *(bytes.NewBuffer([]byte{byte(Block)})), "block"},
+	{AcceptedBlock, *(bytes.NewBuffer([]byte{byte(AcceptedBlock)})), "acceptedblock"},
+	{Headers, *(bytes.NewBuffer([]byte{byte(Headers)})), "headers"},
+	{MemPool, *(bytes.NewBuffer([]byte{byte(MemPool)})), "mempool"},
+	{Inv, *(bytes.NewBuffer([]byte{byte(Inv)})), "inv"},
+	{Certificate, *(bytes.NewBuffer([]byte{byte(Certificate)})), "certificate"},
+	{RoundResults, *(bytes.NewBuffer([]byte{byte(RoundResults)})), "roundresults"},
+	{Candidate, *(bytes.NewBuffer([]byte{byte(Candidate)})), "candidate"},
+	{Score, *(bytes.NewBuffer([]byte{byte(Score)})), "score"},
+	{Reduction, *(bytes.NewBuffer([]byte{byte(Reduction)})), "reduction"},
+	{Agreement, *(bytes.NewBuffer([]byte{byte(Agreement)})), "agreement"},
+	{Gossip, *(bytes.NewBuffer([]byte{byte(Gossip)})), "gossip"},
+	{NotFound, *(bytes.NewBuffer([]byte{byte(NotFound)})), "notfound"},
+	{Unknown, *(bytes.NewBuffer([]byte{byte(Unknown)})), "unknown"},
+	{Reject, *(bytes.NewBuffer([]byte{byte(Reject)})), "reject"},
+	{Initialization, *(bytes.NewBuffer([]byte{byte(Initialization)})), "initialization"},
+	{RoundUpdate, *(bytes.NewBuffer([]byte{byte(RoundUpdate)})), "roundupdate"},
+	{BestScore, *(bytes.NewBuffer([]byte{byte(BestScore)})), "bestscore"},
+	{Quit, *(bytes.NewBuffer([]byte{byte(Quit)})), "quit"},
+	{Log, *(bytes.NewBuffer([]byte{byte(Log)})), "log"},
+	{Monitor, *(bytes.NewBuffer([]byte{byte(Log)})), "monitor_topic"},
+	{Test, *(bytes.NewBuffer([]byte{byte(Test)})), "__test"},
+	{StepVotes, *(bytes.NewBuffer([]byte{byte(StepVotes)})), "stepvotes"},
+	{ScoreEvent, *(bytes.NewBuffer([]byte{byte(ScoreEvent)})), "scoreevent"},
+	{Generation, *(bytes.NewBuffer([]byte{byte(Generation)})), "generation"},
+	{Restart, *(bytes.NewBuffer([]byte{byte(Restart)})), "restart"},
+	{StopConsensus, *(bytes.NewBuffer([]byte{byte(StopConsensus)})), "stopconsensus"},
+	{IntermediateBlock, *(bytes.NewBuffer([]byte{byte(IntermediateBlock)})), "intermediateblock"},
+	{HighestSeen, *(bytes.NewBuffer([]byte{byte(HighestSeen)})), "highestseen"},
+	{ValidCandidateHash, *(bytes.NewBuffer([]byte{byte(ValidCandidateHash)})), "validcandidatehash"},
+	{GetLastBlock, *(bytes.NewBuffer([]byte{byte(GetLastBlock)})), "getlastblock"},
+	{GetMempoolTxs, *(bytes.NewBuffer([]byte{byte(GetMempoolTxs)})), "getmempooltxs"},
+	{GetMempoolTxsBySize, *(bytes.NewBuffer([]byte{byte(GetMempoolTxsBySize)})), "getmempooltxsbysize"},
+	{VerifyCandidateBlock, *(bytes.NewBuffer([]byte{byte(VerifyCandidateBlock)})), "verifycandidateblock"},
+	{GetLastCertificate, *(bytes.NewBuffer([]byte{byte(GetLastCertificate)})), "getlastcertificate"},
+	{SendMempoolTx, *(bytes.NewBuffer([]byte{byte(SendMempoolTx)})), "sendmempooltx"},
+	{GetMempoolView, *(bytes.NewBuffer([]byte{byte(GetMempoolView)})), "getmempoolview"},
+	{CreateWallet, *(bytes.NewBuffer([]byte{byte(CreateWallet)})), "createwallet"},
+	{CreateFromSeed, *(bytes.NewBuffer([]byte{byte(CreateFromSeed)})), "createfromseed"},
+	{LoadWallet, *(bytes.NewBuffer([]byte{byte(LoadWallet)})), "loadwallet"},
+	{SendBidTx, *(bytes.NewBuffer([]byte{byte(SendBidTx)})), "sendbidtx"},
+	{SendStakeTx, *(bytes.NewBuffer([]byte{byte(SendStakeTx)})), "sendstaketx"},
+	{SendStandardTx, *(bytes.NewBuffer([]byte{byte(SendStandardTx)})), "sendstandardtx"},
+	{GetBalance, *(bytes.NewBuffer([]byte{byte(GetBalance)})), "getbalance"},
+	{GetUnconfirmedBalance, *(bytes.NewBuffer([]byte{byte(GetUnconfirmedBalance)})), "getunconfirmedbalance"},
+	{GetAddress, *(bytes.NewBuffer([]byte{byte(GetAddress)})), "getaddress"},
+	{GetTxHistory, *(bytes.NewBuffer([]byte{byte(GetTxHistory)})), "gettxhistory"},
+	{AutomateConsensusTxs, *(bytes.NewBuffer([]byte{byte(AutomateConsensusTxs)})), "automateconsensustxs"},
+	{GetSyncProgress, *(bytes.NewBuffer([]byte{byte(GetSyncProgress)})), "getsyncprogress"},
+	{IsWalletLoaded, *(bytes.NewBuffer([]byte{byte(IsWalletLoaded)})), "iswalletloaded"},
+	{RebuildChain, *(bytes.NewBuffer([]byte{byte(RebuildChain)})), "rebuildchain"},
+	{ClearWalletDatabase, *(bytes.NewBuffer([]byte{byte(ClearWalletDatabase)})), "clearwalletdatabase"},
+	{StartProfile, *(bytes.NewBuffer([]byte{byte(StartProfile)})), "startprofile"},
+	{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
+	{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
+	{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
+	{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
 }
 
 func checkConsistency(topics []topicBuf) {
@@ -191,15 +191,9 @@ func init() {
 	checkConsistency(Topics[:])
 }
 
+// ToBuffer returns Topic as a Buffer
 func (t Topic) ToBuffer() bytes.Buffer {
-	var buf bytes.Buffer
-	if len(Topics) < int(t) {
-		buf = *(new(bytes.Buffer))
-	}
-
-	// XXX: this looks like a bug. The buf is reassigned no matter what
-	buf = Topics[int(t)].Buffer
-	return buf
+	return Topics[int(t)].Buffer
 }
 
 // String representation of a known topic
@@ -221,6 +215,7 @@ func StringToTopic(topic string) Topic {
 	return Unknown
 }
 
+// Prepend a topic to a buffer
 func Prepend(b *bytes.Buffer, t Topic) error {
 	var buf bytes.Buffer
 	if int(t) > len(Topics) {

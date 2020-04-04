@@ -44,33 +44,15 @@ func convertFields(fields log.Fields) []*pb.Field {
 	converted := make([]*pb.Field, 0)
 	for name, value := range fields {
 		var strVal string
-		switch value.(type) {
+		switch value := value.(type) {
 		case string:
-			strVal = value.(string)
-		case int:
-			strVal = fmt.Sprintf("%d", int64(value.(int)))
-		case int8:
-			strVal = fmt.Sprintf("%d", value.(int8))
-		case int16:
-			strVal = fmt.Sprintf("%d", value.(int16))
-		case int32:
-			strVal = fmt.Sprintf("%d", value.(int32))
-		case int64:
-			strVal = fmt.Sprintf("%d", value.(int64))
-		case uint:
-			strVal = fmt.Sprintf("%d", value.(uint))
-		case uint8:
-			strVal = fmt.Sprintf("%d", value.(uint8))
-		case uint16:
-			strVal = fmt.Sprintf("%d", value.(uint16))
-		case uint32:
-			strVal = fmt.Sprintf("%d", value.(uint32))
-		case uint64:
-			strVal = fmt.Sprintf("%d", value.(uint64))
+			strVal = value
+		case int, int8, int16, int32, int64, uint8, uint16, uint32, uint64:
+			strVal = fmt.Sprintf("%d", value)
 		case bool:
-			strVal = strconv.FormatBool(value.(bool))
+			strVal = strconv.FormatBool(value)
 		case []byte:
-			strVal = string(value.([]byte))
+			strVal = string(value)
 		case error:
 			err := value.(error)
 			strVal = fmt.Sprintf("%v", err)

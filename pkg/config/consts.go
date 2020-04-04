@@ -38,7 +38,7 @@ func DecodeGenesis() *block.Block {
 		}
 
 		var buf bytes.Buffer
-		buf.Write(blob)
+		_, _ = buf.Write(blob)
 		if err := message.UnmarshalBlock(&buf, b); err != nil {
 			log.Panic(err)
 		}

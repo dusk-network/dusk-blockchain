@@ -21,7 +21,7 @@ func (h *helloSrv) NotifyBlock(ctx context.Context, req *monitor.BlockUpdate) (*
 // TestNotifyBlockUpdate tests the correct sending and reception of a
 // BlockUpdate
 func TestNotifyBlockUpdate(t *testing.T) {
-	client := grpc.New(testUrl)
+	client := grpc.New(testURL)
 
 	height := uint64(200)
 	testData := helper.RandomBlock(t, height, 2)
@@ -62,7 +62,7 @@ func TestNotifyBlockUpdate(t *testing.T) {
 
 // TestBlockTime tests the correct calculation and reception of the blocktime
 func TestBlockTime(t *testing.T) {
-	client := grpc.New(testUrl)
+	client := grpc.New(testURL)
 
 	height := uint64(200)
 	firstBlock := helper.RandomBlock(t, height, 2)

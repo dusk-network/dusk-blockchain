@@ -1,15 +1,28 @@
 package kadcast
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/sirupsen/logrus"
+	"io"
 	"net"
+
+	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
+	"github.com/sirupsen/logrus"
 
 	"golang.org/x/crypto/sha3"
 
 	// Just for debugging purposes
 	_ "fmt"
+)
+
+const (
+	// MaxFrameSize is set based on max block size expected
+	MaxFrameSize = 5000000
+)
+
+var (
+	ErrExceedMaxLen = errors.New("message size exceeds max frame length")
 )
 
 // ------------------ DISTANCE UTILS ------------------ //
@@ -88,6 +101,15 @@ func verifyIDNonce(id [16]byte, nonce [4]byte) error {
 	return errors.New("Id and Nonce are not valid parameters") //TODO: Create error type.
 }
 
+// Returns the ID associated to the chunk sent.
+// The ID is the half of the result of the hash of the chunk.
+func computeChunkID(chunk []byte) [16]byte {
+	var halfLenID [16]byte
+	fullID := sha3.Sum256(chunk)
+	copy(halfLenID[0:16], fullID[0:16])
+	return halfLenID
+}
+
 // ------------------ NET UTILS ------------------ //
 
 // Gets the local IP address of the machine where
@@ -99,7 +121,9 @@ func getLocalUDPAddress() net.UDPAddr {
 	if err != nil {
 		logrus.WithError(err).Warn("Network Unreachable.")
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return *localAddr
@@ -114,12 +138,13 @@ func getLocalTCPAddress() net.TCPAddr {
 	if err != nil {
 		logrus.WithError(err).Warn("Network Unreachable.")
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
 	return *localAddr
 }
-
 
 // ------------------ ENC/DEC UTILS ------------------ //
 
@@ -145,9 +170,9 @@ func getBytesFromUint16(num uint16) [2]byte {
 	return res
 }
 
-// Encode a received packet to send it through the
+// Encodes received UDP packets to send it through the
 // Ring to the packetProcess rutine.
-func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
+func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byte {
 	encodedLen := len(payload) + 8
 	enc := make([]byte, encodedLen)
 	// Get numBytes as slice of bytes.
@@ -160,13 +185,32 @@ func encodeRedPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) []byt
 	port := getBytesFromUint16(uint16(peerAddr.Port))
 	copy(enc[6:8], port[0:2])
 	// Append Payload
-	copy(enc[8:encodedLen], payload[0:len(payload)])
+	copy(enc[8:encodedLen], payload[0:])
 	return enc
 }
 
-// Decode a CircularQueue packet and return the
+// Encodes received TCP packets to send it through the
+// Ring to the packetProcess rutine.
+func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []byte {
+	peerDataStr := peerAddr.String()
+	encodedLen := len(payload) + 8
+	enc := make([]byte, encodedLen)
+	// Get numBytes as slice of bytes.
+	numBytes := getBytesFromUint16(byteNum)
+	// Append it to the resulting slice.
+	copy(enc[0:2], numBytes[0:2])
+	// Append Peer IP.
+	copy(enc[2:6], peerDataStr[0:4])
+	// Append Port
+	copy(enc[6:8], peerDataStr[4:6])
+	// Append Payload
+	copy(enc[8:encodedLen], payload[0:])
+	return enc
+}
+
+// Decodes a CircularQueue packet and returns the
 // elements of the original received packet.
-func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
+func decodeRedPacket(packet []byte) (int, *net.UDPAddr, []byte, error) {
 	redPackLen := len(packet)
 	byteNum := int(binary.LittleEndian.Uint16(packet[0:2]))
 	if (redPackLen) != (byteNum + 8) {
@@ -175,11 +219,60 @@ func decodeRedPacket(packet []byte) (int,  *net.UDPAddr, []byte, error) {
 	ip := packet[2:6]
 	port := int(binary.LittleEndian.Uint16(packet[6:8]))
 	payload := packet[8:]
-	
-	peerAddr := net.UDPAddr {
-		IP: ip,
+
+	peerAddr := net.UDPAddr{
+		IP:   ip,
 		Port: port,
 		Zone: "N/A",
 	}
 	return byteNum, &peerAddr, payload, nil
+}
+
+func readTCPFrame(r io.Reader) ([]byte, int, error) {
+
+	// Read frame length.
+	ln := make([]byte, 4)
+	n, err := io.ReadFull(r, ln)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	length := binary.LittleEndian.Uint32(ln[:])
+	if length > MaxFrameSize {
+		return nil, 0, ErrExceedMaxLen
+	}
+
+	// Read packet payload
+	payload := make([]byte, length)
+	if _, err := io.ReadFull(r, payload); err != nil {
+		return nil, 0, err
+	}
+
+	return payload, n, nil
+}
+
+func writeTCPFrame(w io.Writer, payload []byte) error {
+
+	frameLength := uint32(len(payload))
+	if frameLength > MaxFrameSize {
+		return ErrExceedMaxLen
+	}
+
+	// Add packet length
+	frame := new(bytes.Buffer)
+	if err := encoding.WriteUint32LE(frame, frameLength); err != nil {
+		return err
+	}
+
+	// Append packet payload
+	if _, err := frame.Write(payload); err != nil {
+		return err
+	}
+
+	// Write data stream
+	if _, err := w.Write(frame.Bytes()); err != nil {
+		return err
+	}
+
+	return nil
 }

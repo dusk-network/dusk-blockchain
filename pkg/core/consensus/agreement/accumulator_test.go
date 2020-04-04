@@ -202,6 +202,7 @@ func (m *mockAccumulatorHandler) IsMember(pubKeyBLS []byte, round uint64, step u
 }
 */
 
+//nolint:unparam
 func newAggroFactory(provisionersNr int) func(uint64, uint8, int) message.Agreement {
 	hash, _ := crypto.RandEntropy(32)
 	p, ks := consensus.MockProvisioners(provisionersNr)

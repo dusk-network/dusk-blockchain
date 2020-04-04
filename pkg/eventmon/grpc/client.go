@@ -10,7 +10,7 @@ import (
 	g "google.golang.org/grpc"
 )
 
-// Client of the grpc remote monitoring server 
+// Client of the grpc remote monitoring server
 type Client struct {
 	tgt       *url.URL
 	lastBlock *block.Block
@@ -31,7 +31,9 @@ func (c *Client) send(parentCtx context.Context, callback sendCB) error {
 		return err
 	}
 
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 	mon := pb.NewMonitorClient(conn)
 	ctx, cancel := context.WithTimeout(parentCtx, 2*time.Second)
 

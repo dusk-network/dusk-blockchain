@@ -13,11 +13,11 @@ import (
 	g "google.golang.org/grpc"
 )
 
-var testUrl *url.URL
+var testURL *url.URL
 
 func init() {
 	var err error
-	testUrl, err = url.Parse("tcp://:7878")
+	testURL, err = url.Parse("tcp://:7878")
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +57,7 @@ func newSrv(network, addr string) *helloSrv {
 // which apply to the payload received. Each tester is supposed to test a
 // correspondent payload
 func Suite(t *testing.T, timeoutMillis time.Duration, calls ...callTest) {
-	semverSrv := newSrv(testUrl.Scheme, testUrl.Host)
+	semverSrv := newSrv(testURL.Scheme, testURL.Host)
 	defer semverSrv.srv.GracefulStop()
 	time.Sleep(200 * time.Millisecond)
 

@@ -18,7 +18,6 @@ const (
 	txsInd
 	txHashInd
 	keyImagesInd
-	candidatesTableInd
 	heightInd
 	stateInd
 	bidValuesInd

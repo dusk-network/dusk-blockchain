@@ -259,7 +259,7 @@ func TestRemoveAccepted(t *testing.T) {
 
 	for _, tx := range txs {
 		// We avoid sharing this pointer between the mempool and the block
-		// by marshalling and unmarshalling the tx
+		// by marshaling and unmarshaling the tx
 		buf := new(bytes.Buffer)
 		if err := message.MarshalTx(buf, tx); err != nil {
 			t.Fatal(err)

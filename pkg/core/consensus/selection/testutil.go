@@ -1,6 +1,7 @@
 package selection
 
 import (
+	"sync"
 	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
@@ -24,7 +25,7 @@ func (m *mockSigner) Sign(header.Header) ([]byte, error) {
 }
 
 func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
-	// message.Marshal takes care of prepending the topic, marshalling the
+	// message.Marshal takes care of prepending the topic, marshaling the
 	// header, etc
 	buf, err := message.Marshal(msg)
 	if err != nil {
@@ -113,8 +114,16 @@ func (h *Helper) StartSelection() {
 // SendBatch generates a batch of score events and sends them to the selector.
 func (h *Helper) SendBatch(hash []byte) {
 	batch := h.Spawn(hash)
-	for _, ev := range batch {
-		go h.Selector.CollectScoreEvent(ev)
+	var wg sync.WaitGroup
+	// Tell the 'wg' WaitGroup how many threads/goroutines
+	//   that are about to run concurrently.
+	wg.Add(len(batch))
+	for i := 0; i < len(batch); i++ {
+		go func(i int) {
+			defer wg.Done()
+			ev := batch[i]
+			_ = h.Selector.CollectScoreEvent(ev)
+		}(i)
 	}
 }
 

@@ -23,7 +23,7 @@ func NewBuffer(length int) *Buffer {
 	cv2 := sync.NewCond(m)
 
 	return &Buffer{
-		items:      make([][]byte, length, length),
+		items:      make([][]byte, length),
 		notEmpty:   cv,
 		notFull:    cv2,
 		mu:         m,
@@ -58,6 +58,7 @@ func (r *Buffer) Put(item []byte) {
 	r.notEmpty.Signal()
 }
 
+// Close will close the Buffer
 func (r *Buffer) Close() {
 
 	r.mu.Lock()
@@ -68,6 +69,7 @@ func (r *Buffer) Close() {
 	r.notEmpty.Signal()
 }
 
+// GetAll get all items in a buffer
 func (r *Buffer) GetAll() ([][]byte, bool) {
 
 	r.mu.Lock()
@@ -91,6 +93,7 @@ func (r *Buffer) GetAll() ([][]byte, bool) {
 	return items, r.close
 }
 
+// Has check if item exists
 func (r *Buffer) Has(item []byte) bool {
 
 	if item == nil {
@@ -109,6 +112,7 @@ func (r *Buffer) Has(item []byte) bool {
 	return false
 }
 
+// Closed check if buffer is closed
 func (r *Buffer) Closed() bool {
 	r.mu.Lock()
 	closed := r.close

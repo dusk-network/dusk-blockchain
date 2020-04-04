@@ -513,6 +513,7 @@ func (m *Mempool) Quit() {
 }
 
 // Send Inventory message to all peers
+//nolint:unparam
 func (m *Mempool) advertiseTx(txID []byte) error {
 
 	msg := &peermsg.Inv{}
@@ -528,7 +529,7 @@ func (m *Mempool) advertiseTx(txID []byte) error {
 		log.Panic(err)
 	}
 
-	// TODO: interface - marshalling should done after the Gossip, not before
+	// TODO: interface - marshaling should done after the Gossip, not before
 	packet := message.New(topics.Inv, *buf)
 	m.eventBus.Publish(topics.Gossip, packet)
 	return nil
@@ -555,19 +556,4 @@ func handleRequest(r rpcbus.Request, handler func(r rpcbus.Request) (interface{}
 	r.RespChan <- rpcbus.Response{Resp: result, Err: nil}
 
 	log.Tracef("Handled %s request", name)
-}
-
-func marshalTxs(w *bytes.Buffer, txs []transactions.Transaction) error {
-	lTxs := uint64(len(txs))
-	if err := encoding.WriteVarInt(w, lTxs); err != nil {
-		return err
-	}
-
-	for _, tx := range txs {
-		if err := message.MarshalTx(w, tx); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

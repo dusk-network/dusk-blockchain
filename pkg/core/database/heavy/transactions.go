@@ -34,9 +34,6 @@ var (
 	// writeOptions used by both non-Batch and Batch leveldb.Put
 	writeOptions = &opt.WriteOptions{NoWriteMerge: optionNoWriteMerge, Sync: optionFsyncEnabled}
 
-	// ByteOrder to be used on any internal en/decoding
-	byteOrder = binary.LittleEndian
-
 	// Key values prefixes to provide prefix-based sorting mechanism
 	// Refer to README.md for overview idea
 
@@ -379,7 +376,7 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 			return nil, err
 		}
 
-		// If we don't fetch the correct indeces (tx positions), merkle tree
+		// If we don't fetch the correct indexes (tx positions), merkle tree
 		// changes and as result we've got new block hash
 		if _, ok := tempTxs[txIndex]; ok {
 			return nil, errors.New("duplicated tx index")
@@ -388,7 +385,7 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 		tempTxs[txIndex] = tx
 	}
 
-	// Reorder Tx slice as per retrieved indeces
+	// Reorder Tx slice as per retrieved indexes
 	resultTxs := make([]transactions.Transaction, len(tempTxs))
 	for k, v := range tempTxs {
 		resultTxs[k] = v
@@ -613,7 +610,7 @@ func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 
 	// Let's avoid any runtime panics by doing a sanity check on the value length before
 	if len(value) != 64 {
-		return nil, nil, errors.New("bid values non-existant or incorrectly encoded")
+		return nil, nil, errors.New("bid values non-existent or incorrectly encoded")
 	}
 
 	return value[0:32], value[32:64], nil
