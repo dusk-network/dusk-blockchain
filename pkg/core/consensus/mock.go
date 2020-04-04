@@ -1,11 +1,7 @@
 package consensus
 
 import (
-	"bytes"
-	"encoding/binary"
-
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/v2/key"
 )
@@ -32,33 +28,33 @@ func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) R
 	}
 }
 
-func MockRoundUpdateBuffer(round uint64, p *user.Provisioners, bidList user.BidList) *bytes.Buffer {
-	init := make([]byte, 8)
-	binary.LittleEndian.PutUint64(init, round)
-	buf := bytes.NewBuffer(init)
-
-	if p == nil {
-		p, _ = MockProvisioners(1)
-	}
-	user.MarshalProvisioners(buf, p)
-
-	if bidList == nil {
-		bidList = MockBidList(1)
-	}
-	user.MarshalBidList(buf, bidList)
-
-	seed, _ := crypto.RandEntropy(33)
-	if err := encoding.WriteBLS(buf, seed); err != nil {
-		panic(err)
-	}
-
-	hash, _ := crypto.RandEntropy(32)
-	if err := encoding.Write256(buf, hash); err != nil {
-		panic(err)
-	}
-
-	return buf
-}
+//func MockRoundUpdateBuffer(round uint64, p *user.Provisioners, bidList user.BidList) *bytes.Buffer {
+//	init := make([]byte, 8)
+//	binary.LittleEndian.PutUint64(init, round)
+//	buf := bytes.NewBuffer(init)
+//
+//	if p == nil {
+//		p, _ = MockProvisioners(1)
+//	}
+//	user.MarshalProvisioners(buf, p)
+//
+//	if bidList == nil {
+//		bidList = MockBidList(1)
+//	}
+//	user.MarshalBidList(buf, bidList)
+//
+//	seed, _ := crypto.RandEntropy(33)
+//	if err := encoding.WriteBLS(buf, seed); err != nil {
+//		panic(err)
+//	}
+//
+//	hash, _ := crypto.RandEntropy(32)
+//	if err := encoding.Write256(buf, hash); err != nil {
+//		panic(err)
+//	}
+//
+//	return buf
+//}
 
 func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
 	p := user.NewProvisioners()

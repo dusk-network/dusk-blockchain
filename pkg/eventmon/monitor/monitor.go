@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var MaxAttempts int = 3
+var MaxAttempts = 3
 var lg = log.WithField("process", "monitor")
 
 type Supervisor interface {

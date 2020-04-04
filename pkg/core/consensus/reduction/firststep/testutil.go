@@ -69,7 +69,7 @@ func (hlp *Helper) shouldFailVerification() bool {
 
 func (hlp *Helper) provideCandidateBlock() {
 	c := make(chan rpcbus.Request, 1)
-	hlp.RBus.Register(topics.GetCandidate, c)
+	_ = hlp.RBus.Register(topics.GetCandidate, c)
 	for {
 		r := <-c
 		if hlp.shouldFailFetching() {
@@ -108,7 +108,7 @@ func (hlp *Helper) ActivateReduction(hash []byte) {
 	hlp.Reducer.(*Reducer).CollectBestScore(hdr)
 }
 
-// NextBatch forwards additional batches of consensus.Event. It takes care of marshalling the right Step when creating the Signature
+// NextBatch forwards additional batches of consensus.Event. It takes care of marshaling the right Step when creating the Signature
 func (hlp *Helper) NextBatch() []byte {
 	blockHash, _ := crypto.RandEntropy(32)
 	hlp.ActivateReduction(blockHash)

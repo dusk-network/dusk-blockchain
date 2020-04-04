@@ -19,7 +19,6 @@ import (
 
 var _ EventPlayer = (*Coordinator)(nil)
 var _ Signer = (*Coordinator)(nil)
-var emptyPayload = new(bytes.Buffer)
 
 var lg = log.WithField("process", "coordinator")
 
@@ -162,9 +161,10 @@ func (s *roundStore) DispatchFinalize() {
 // which aim is to centralize the state of the coordinator Component while decoupling them from each other and the EventBus
 type Coordinator struct {
 	*SyncState
-	eventBus   *eventbus.EventBus
-	keys       key.ConsensusKeys
-	factories  []ComponentFactory
+	eventBus  *eventbus.EventBus
+	keys      key.ConsensusKeys
+	factories []ComponentFactory
+	//nolint:structcheck
 	components []Component
 	eventqueue *Queue
 	roundQueue *Queue
@@ -303,7 +303,7 @@ func (c *Coordinator) CollectEvent(m message.Message) error {
 	switch m.Payload().(type) {
 	case bytes.Buffer:
 		p := m.Payload().(bytes.Buffer)
-		topics.Extract(&p)
+		_, _ = topics.Extract(&p)
 		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category())
 	case InternalPacket:
 		msg = m.Payload().(InternalPacket)
@@ -405,14 +405,14 @@ func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 
 // Gossip concatenates the topic, the header and the payload,
 // and gossips it to the rest of the network.
-// TODO: interface - marshalling should actually be done after the Gossip to
-// respect the simmetry of the architecture
+// TODO: interface - marshaling should actually be done after the Gossip to
+// respect the symmetry of the architecture
 func (c *Coordinator) Gossip(msg message.Message, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
 
-	// message.Marshal takes care of prepending the topic, marshalling the
+	// message.Marshal takes care of prepending the topic, marshaling the
 	// header, etc
 	buf, err := message.Marshal(msg)
 	if err != nil {

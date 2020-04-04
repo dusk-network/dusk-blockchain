@@ -19,13 +19,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var l = log.WithField("process", "consensus initiator")
-
 func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	storeBidValues(eventBroker, rpcBus, w)
 	startProvisioner(eventBroker, rpcBus, w, counter)
 }
 
+//nolint:unparam
 func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
 	// Setting up the consensus factory
 	pubKey := w.PublicKey()
@@ -48,6 +47,7 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 // storeBidValues finds the most recent bid belonging to the given
 // wallet, and stores the relevant values needed by the consensus.
 // This allows the components for block generation to properly function.
+//nolint:unparam
 func storeBidValues(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) {
 	k, err := w.ReconstructK()
 	if err != nil {

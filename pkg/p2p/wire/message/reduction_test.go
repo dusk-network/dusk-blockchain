@@ -30,7 +30,7 @@ func TestReductionUnMarshal(t *testing.T) {
 	assert.Equal(t, ev, *ev2)
 }
 
-// This test ensures proper functionality of marshalling and unmarshalling slices of
+// This test ensures proper functionality of marshaling and unmarshaling slices of
 // Reduction events.
 func TestVoteSetUnMarshal(t *testing.T) {
 	// Mock a slice of Reduction events

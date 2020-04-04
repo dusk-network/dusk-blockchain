@@ -25,7 +25,7 @@ const (
 )
 
 // LogProcessor is a TopicProcessor that intercepts messages on the gossip to create statistics and push the to the monitoring process
-// It creates a new instance of logrus and writes on a io.Writer (preferrably UNIX sockets but any kind of connection will do)
+// It creates a new instance of logrus and writes on a io.Writer (preferably UNIX sockets but any kind of connection will do)
 type (
 	LogProcessor struct {
 		*log.Logger
@@ -68,7 +68,7 @@ func (l *LogProcessor) Listen() {
 	for {
 		select {
 		case entry := <-l.EntryChan:
-			l.Send(entry)
+			_ = l.Send(entry)
 		case blk := <-l.acceptedBlockChan:
 			l.PublishBlockEvent(&blk)
 		case <-ticker.C:
@@ -100,7 +100,7 @@ func (l *LogProcessor) Close() error {
 func (l *LogProcessor) Send(entry []byte) error {
 	// Set a write deadline in case we are writing to a connection, to avoid hangs
 	if conn, ok := l.Out.(net.Conn); ok {
-		conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
+		_ = conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	}
 
 	if _, err := l.Out.Write(entry); err != nil {
@@ -110,7 +110,7 @@ func (l *LogProcessor) Send(entry []byte) error {
 	// Set deadline back to zero, to avoid problems with other
 	// functions that use the logger
 	if conn, ok := l.Out.(net.Conn); ok {
-		conn.SetWriteDeadline(time.Time{})
+		_ = conn.SetWriteDeadline(time.Time{})
 	}
 
 	return nil

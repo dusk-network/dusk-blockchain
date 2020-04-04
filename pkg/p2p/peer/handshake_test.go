@@ -36,7 +36,9 @@ func TestHandshake(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	g := processing.NewGossip(protocol.TestNet)
 	pw := peer.NewWriter(client, g, eb)
-	defer pw.Conn.Close()
+	defer func() {
+		_ = pw.Conn.Close()
+	}()
 	if err := pw.Handshake(); err != nil {
 		t.Fatal(err)
 	}

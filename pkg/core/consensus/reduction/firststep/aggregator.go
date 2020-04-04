@@ -85,7 +85,6 @@ func (a *aggregator) collectVote(ev message.Reduction) error {
 		// StepVotes
 		if !bytes.Equal(blockHash, emptyHash[:]) {
 			if err := verifyCandidateBlock(a.rpcBus, blockHash); err != nil {
-				blockHash = emptyHash[:]
 				a.requestHalt(emptyHash[:])
 				return nil
 			}

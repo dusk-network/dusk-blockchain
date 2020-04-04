@@ -20,7 +20,7 @@ func TestRPCall(t *testing.T) {
 
 	// produce the call
 	buf := bytes.Buffer{}
-	buf.WriteString("input params")
+	_, _ = buf.WriteString("input params")
 
 	d := NewRequest(buf)
 	resp, err := bus.Call(m, d, 10*time.Second)
@@ -41,7 +41,7 @@ func TestRPCallWithError(t *testing.T) {
 
 	// produce the call
 	buf := bytes.Buffer{}
-	buf.WriteString("")
+	_, _ = buf.WriteString("")
 
 	d := NewRequest(buf)
 	resp, err := bus.Call(m, d, 10*time.Second)
@@ -62,7 +62,7 @@ func TestTimeoutCalls(t *testing.T) {
 
 	// produce the call
 	buf := bytes.Buffer{}
-	buf.WriteString("input params")
+	_, _ = buf.WriteString("input params")
 
 	d := NewRequest(buf)
 	resp, err := bus.Call(m, d, 1*time.Second)
@@ -96,7 +96,7 @@ func TestNonExistingMethod(t *testing.T) {
 
 	// produce the call
 	buf := bytes.Buffer{}
-	buf.WriteString("input params")
+	_, _ = buf.WriteString("input params")
 
 	d := NewRequest(buf)
 	resp, err := bus.Call(0xff, d, 2*time.Second)

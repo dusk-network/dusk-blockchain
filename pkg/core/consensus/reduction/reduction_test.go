@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/header"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/reduction/firststep"
@@ -96,13 +98,15 @@ func sendBestScore(t *testing.T, bus *eventbus.EventBus, round uint64, step uint
 	}
 
 	msg := message.New(topics.BestScore, hdr)
+	require.NotNil(t, msg)
 	bus.Publish(topics.BestScore, msg)
 }
 
 func collectEvents(t *testing.T, c *consensus.Coordinator, evs []message.Reduction) {
 	for _, ev := range evs {
 		msg := message.New(topics.Reduction, ev)
-		c.CollectEvent(msg)
+		err := c.CollectEvent(msg)
+		require.Nil(t, err)
 	}
 }
 

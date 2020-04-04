@@ -31,10 +31,10 @@ func NewReduction(hdr header.Header) *Reduction {
 
 func (r Reduction) String() string {
 	var sb strings.Builder
-	sb.WriteString(r.hdr.String())
-	sb.WriteString(" signature' ")
-	sb.WriteString(util.StringifyBytes(r.SignedHash))
-	sb.WriteString("'")
+	_, _ = sb.WriteString(r.hdr.String())
+	_, _ = sb.WriteString(" signature' ")
+	_, _ = sb.WriteString(util.StringifyBytes(r.SignedHash))
+	_, _ = sb.WriteString("'")
 	return sb.String()
 }
 

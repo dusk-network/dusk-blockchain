@@ -12,10 +12,12 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/block"
 )
 
-// Test the behaviour of the data broker, when it receives a GetData message.
+// Test the behavior of the data broker, when it receives a GetData message.
 func TestSendData(t *testing.T) {
 	_, db := lite.CreateDBConnection()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	// Generate 5 blocks and store them in the db, and save the hashes for later checking.
 	hashes, blocks := generateBlocks(t, 5)

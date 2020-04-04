@@ -123,7 +123,7 @@ func (v *Set) Bits(subset Set) uint64 {
 	head, subset = subset[0], subset[1:]
 	for i, elem := range *v {
 		if elem.Cmp(head) == 0 {
-			ret |= (1 << uint(i)) // flip the i-th bit to 1
+			ret |= 1 << uint(i) // flip the i-th bit to 1
 			if len(subset) == 0 {
 				break
 			}
@@ -136,11 +136,11 @@ func (v *Set) Bits(subset Set) uint64 {
 func (v Set) String() string {
 	var str strings.Builder
 	for i, bi := range v {
-		str.WriteString("idx: ")
-		str.WriteString(strconv.Itoa(i))
-		str.WriteString(" nr: ")
-		str.WriteString(shortStr(bi))
-		str.WriteString("\n")
+		_, _ = str.WriteString("idx: ")
+		_, _ = str.WriteString(strconv.Itoa(i))
+		_, _ = str.WriteString(" nr: ")
+		_, _ = str.WriteString(shortStr(bi))
+		_, _ = str.WriteString("\n")
 	}
 	return str.String()
 }
@@ -148,7 +148,7 @@ func (v Set) String() string {
 func (v Set) Whole() uint64 {
 	ret := uint64(0)
 	for i := range v {
-		ret |= (1 << uint(i))
+		ret |= 1 << uint(i)
 	}
 	return ret
 }
@@ -156,8 +156,8 @@ func (v Set) Whole() uint64 {
 func shortStr(i *big.Int) string {
 	var str strings.Builder
 	iStr := i.String()
-	str.WriteString(iStr[:3])
-	str.WriteString("...")
-	str.WriteString(iStr[len(iStr)-3:])
+	_, _ = str.WriteString(iStr[:3])
+	_, _ = str.WriteString("...")
+	_, _ = str.WriteString(iStr[len(iStr)-3:])
 	return str.String()
 }

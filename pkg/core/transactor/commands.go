@@ -8,7 +8,7 @@ import (
 
 	"math/big"
 
-	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
@@ -29,13 +29,13 @@ func (t *Transactor) loadWallet(password string) (string, error) {
 	// Then load the wallet
 	w, err := wallet.LoadFromFile(testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
 	walletAddr, err := w.PublicAddress()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
@@ -51,13 +51,13 @@ func (t *Transactor) createWallet(password string) (string, error) {
 
 	w, err := wallet.New(rand.Read, testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
 	walletAddr, err := w.PublicAddress()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
@@ -81,13 +81,13 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 	// Then load the wallet
 	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
 	walletAddr, err := w.PublicAddress()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
@@ -171,7 +171,7 @@ func (t *Transactor) syncWallet() error {
 		// Get Wallet height
 		walletHeight, err := t.w.GetSavedHeight()
 		if err != nil {
-			t.w.UpdateWalletHeight(0)
+			_ = t.w.UpdateWalletHeight(0)
 		}
 
 		// Get next block using walletHeight and tipHash of the node

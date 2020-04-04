@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var hdr header.Header
 var blsPubKey, _ = crypto.RandEntropy(32)
 
 func mockAgreement(id string, blockHash []byte, step uint8) message.Agreement {

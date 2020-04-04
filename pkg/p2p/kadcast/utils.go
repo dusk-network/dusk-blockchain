@@ -121,7 +121,9 @@ func getLocalUDPAddress() net.UDPAddr {
 	if err != nil {
 		logrus.WithError(err).Warn("Network Unreachable.")
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return *localAddr
@@ -136,7 +138,9 @@ func getLocalTCPAddress() net.TCPAddr {
 	if err != nil {
 		logrus.WithError(err).Warn("Network Unreachable.")
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
 	return *localAddr
@@ -181,7 +185,7 @@ func encodeReadUDPPacket(byteNum uint16, peerAddr net.UDPAddr, payload []byte) [
 	port := getBytesFromUint16(uint16(peerAddr.Port))
 	copy(enc[6:8], port[0:2])
 	// Append Payload
-	copy(enc[8:encodedLen], payload[0:len(payload)])
+	copy(enc[8:encodedLen], payload[0:])
 	return enc
 }
 
@@ -200,7 +204,7 @@ func encodeReadTCPPacket(byteNum uint16, peerAddr net.Addr, payload []byte) []by
 	// Append Port
 	copy(enc[6:8], peerDataStr[4:6])
 	// Append Payload
-	copy(enc[8:encodedLen], payload[0:len(payload)])
+	copy(enc[8:encodedLen], payload[0:])
 	return enc
 }
 

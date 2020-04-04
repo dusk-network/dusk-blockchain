@@ -5,7 +5,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
-	"github.com/dusk-network/dusk-crypto/rangeproof"
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 	"github.com/pkg/errors"
 )
@@ -163,16 +162,12 @@ func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.Timelock) e
 	return nil
 }
 
+//nolint:unparam
 func checkLockTimeValid(lockTime, blockTime uint64) error {
 	if lockTime > transactions.MaxLockTime {
 		return errors.New("timelock greater than MaxTimeLock")
 	}
 	return nil
-}
-
-func checkRangeProof(p rangeproof.Proof) error {
-	_, err := rangeproof.Verify(p)
-	return err
 }
 
 // checks that the transaction has not been spent by checking the database for that key image

@@ -16,6 +16,6 @@ func NewPonger(responseChan chan<- *bytes.Buffer) Ponger {
 
 func (p *Ponger) Pong() {
 	buf := new(bytes.Buffer)
-	topics.Prepend(buf, topics.Pong)
+	_ = topics.Prepend(buf, topics.Pong)
 	p.responseChan <- buf
 }

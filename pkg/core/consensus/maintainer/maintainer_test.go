@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
-	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/stretchr/testify/require"
+
+	"github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/maintainer"
@@ -31,8 +33,10 @@ const pass = "password"
 // one is about to expire, or if none exist.
 func TestMaintainStakesAndBids(t *testing.T) {
 	bus, c, p, keys, m := setupMaintainerTest(t)
-	defer os.Remove("wallet.dat")
-	defer os.RemoveAll("walletDB")
+	defer func() {
+		_ = os.Remove("wallet.dat")
+		_ = os.RemoveAll("walletDB")
+	}()
 
 	// Send round update, to start the maintainer.
 	ru := consensus.MockRoundUpdate(1, p, nil)
@@ -40,7 +44,7 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// receive first txs
-	txs := receiveTxs(t, c)
+	txs := receiveTxs(c)
 	// Check correctness
 	// We get the bid first
 	assert.True(t, txs[0].Type() == transactions.BidType)
@@ -70,7 +74,7 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// We should get another set of two txs
-	txs = receiveTxs(t, c)
+	txs = receiveTxs(c)
 	// Check correctness
 	assert.True(t, txs[0].Type() == transactions.BidType)
 	assert.True(t, txs[1].Type() == transactions.StakeType)
@@ -79,8 +83,10 @@ func TestMaintainStakesAndBids(t *testing.T) {
 // Ensure the maintainer does not keep sending bids and stakes until they are included.
 func TestSendOnce(t *testing.T) {
 	bus, c, p, _, _ := setupMaintainerTest(t)
-	defer os.Remove("wallet.dat")
-	defer os.RemoveAll("walletDB")
+	defer func() {
+		_ = os.Remove("wallet.dat")
+		_ = os.RemoveAll("walletDB")
+	}()
 
 	// Send round update, to start the maintainer.
 	ru := consensus.MockRoundUpdate(1, p, nil)
@@ -88,7 +94,7 @@ func TestSendOnce(t *testing.T) {
 	bus.Publish(topics.RoundUpdate, ruMsg)
 
 	// receive first txs
-	_ = receiveTxs(t, c)
+	_ = receiveTxs(c)
 
 	// Update round
 	ru = consensus.MockRoundUpdate(2, p, nil)
@@ -121,7 +127,7 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	}
 	go tr.Listen()
 
-	os.Remove(cfg.Get().Wallet.File)
+	_ = os.Remove(cfg.Get().Wallet.File)
 	assert.NoError(t, createWallet(rpcBus, pass))
 
 	time.Sleep(100 * time.Millisecond)
@@ -140,12 +146,13 @@ func setupMaintainerTest(t *testing.T) (*eventbus.EventBus, chan rpcbus.Request,
 	// Note: we don't need to mock the bidlist as we should not be included if we want to trigger a bid transaction
 
 	c := make(chan rpcbus.Request, 1)
-	rpcBus.Register(topics.SendMempoolTx, c)
+	err = rpcBus.Register(topics.SendMempoolTx, c)
+	require.Nil(t, err)
 
 	return bus, c, p, w.ConsensusKeys(), mScalar
 }
 
-func receiveTxs(t *testing.T, c chan rpcbus.Request) []transactions.Transaction {
+func receiveTxs(c chan rpcbus.Request) []transactions.Transaction {
 	var txs []transactions.Transaction
 	for i := 0; i < 2; i++ {
 		r := <-c

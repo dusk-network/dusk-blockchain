@@ -86,7 +86,7 @@ func (sss *StupidStreamer) Write(p []byte) (n int, err error) {
 	lg := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lg, uint32(len(p)))
 	b := bytes.NewBuffer(lg)
-	b.Write(p)
+	_, _ = b.Write(p)
 
 	n, err = sss.Writer.Write(b.Bytes())
 	if err != nil {
@@ -120,6 +120,7 @@ func (sss *StupidStreamer) Close() error {
 // by the node. It can read from the gossip stream, and stores the topics that it has
 // seen.
 type SimpleStreamer struct {
+	//nolint:structcheck
 	lock       sync.RWMutex
 	seenTopics []topics.Topic
 	*bufio.Reader

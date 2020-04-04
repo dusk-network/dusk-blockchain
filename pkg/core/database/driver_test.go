@@ -103,7 +103,7 @@ func TestRetrieveDriver(t *testing.T) {
 
 	driver, err := From("driver_a")
 	if driver == nil || err != nil {
-		t.Fatal("A registerd driver not found")
+		t.Fatal("A registered driver not found")
 	}
 
 	driver, err = From("driver_non")

@@ -63,6 +63,7 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 		return errors.New("invalid query")
 	}
 
+	//nolint:gosec
 	resp, err := http.Post(addr, "application/json", &buf)
 	if err != nil {
 		return err
@@ -85,7 +86,9 @@ func (n *Network) LoadWalletCmd(ind uint, password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	client := pb.NewNodeClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -110,7 +113,9 @@ func (n *Network) SendBidCmd(ind uint, amount, locktime uint64) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	client := pb.NewNodeClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

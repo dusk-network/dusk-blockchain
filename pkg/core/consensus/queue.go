@@ -40,7 +40,7 @@ func (eq *Queue) PutEvent(round uint64, step uint8, m message.Message) {
 	eq.lock.Lock()
 	defer eq.lock.Unlock()
 
-	// Initialise the map on this round if it was not yet created
+	// Initialize the map on this round if it was not yet created
 	if eq.entries[round] == nil {
 		eq.entries[round] = make(map[uint8][]message.Message)
 	}

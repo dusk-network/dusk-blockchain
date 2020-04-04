@@ -21,7 +21,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
-var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "gql"})
+var log = logger.WithFields(logger.Fields{"prefix": "gql"})
 
 const (
 	endpointWS  = "/ws"

@@ -42,7 +42,7 @@ func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 }
 
 // Collect as specified in the EventCollector interface. In this case Collect simply
-// performs unmarshalling of the round event
+// performs unmarshaling of the round event
 func (r *roundCollector) Collect(m message.Message) error {
 	update := m.Payload().(RoundUpdate)
 	r.roundChan <- update

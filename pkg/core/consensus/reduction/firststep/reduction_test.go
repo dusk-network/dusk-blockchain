@@ -41,12 +41,12 @@ func TestFirstStep(t *testing.T) {
 
 func TestMoreSteps(t *testing.T) {
 	bus, rpcBus := eventbus.New(), rpcbus.New()
-	hlp, hash := ProduceFirstStepVotes(bus, rpcBus, 50, 1*time.Second)
+	hlp, _ := ProduceFirstStepVotes(bus, rpcBus, 50, 1*time.Second)
 
 	// Wait for resulting StepVotes
 	<-hlp.StepVotesChan
 
-	hash = hlp.NextBatch()
+	hash := hlp.NextBatch()
 	svMsg := <-hlp.StepVotesChan
 
 	// Retrieve StepVotes

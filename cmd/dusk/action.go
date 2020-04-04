@@ -3,6 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"os"
+	"os/signal"
+	"time"
+
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
@@ -11,10 +16,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/rpcbus"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"math/rand"
-	"os"
-	"os/signal"
-	"time"
 )
 
 var (

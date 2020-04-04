@@ -35,7 +35,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-var log *logger.Entry = logger.WithFields(logger.Fields{"process": "chain"})
+var log = logger.WithFields(logger.Fields{"process": "chain"})
 
 // Chain represents the nodes blockchain
 // This struct will be aware of the current state of the node.
@@ -174,7 +174,7 @@ func (c *Chain) Listen() {
 	}
 }
 
-// TODO: interface - solve the inconsistencies of unmarshalling the topic
+// TODO: interface - solve the inconsistencies of unmarshaling the topic
 // internally in the Marshal, or externally
 func (c *Chain) propagateBlock(blk block.Block) error {
 	buffer := topics.Block.ToBuffer()
@@ -243,7 +243,9 @@ func (c *Chain) onAcceptBlock(m message.Message) error {
 		// round update, to reinstantiating the consensus, to setting off
 		// the first consensus loop. So, we do this in a goroutine to
 		// avoid blocking other requests to the chain.
-		go c.sendRoundUpdate()
+		go func() {
+			_ = c.sendRoundUpdate()
+		}()
 	}
 
 	return nil
@@ -594,7 +596,9 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	msg := message.New(topics.IntermediateBlock, *cm.Block)
 	c.eventBus.Publish(topics.IntermediateBlock, msg)
 
-	go c.sendRoundUpdate()
+	go func() {
+		_ = c.sendRoundUpdate()
+	}()
 }
 
 func (c *Chain) finalizeIntermediateBlock(cert *block.Certificate) error {

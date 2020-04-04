@@ -13,7 +13,7 @@ func ReadUint8(r *bytes.Buffer, v *uint8) error {
 	if _, err := r.Read(b[:]); err != nil {
 		return err
 	}
-	*v = uint8(b[0])
+	*v = b[0]
 	return nil
 }
 
