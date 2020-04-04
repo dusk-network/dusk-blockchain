@@ -21,7 +21,7 @@ func NewRoundResultBroker(rpcBus *rpcbus.RPCBus, responseChan chan<- *bytes.Buff
 
 // ProvideRoundResult will call the rpc endpoint for round results and prepend it to a topic
 func (r *RoundResultBroker) ProvideRoundResult(m *bytes.Buffer) error {
-	resp, err := r.rpcBus.Call(topics.GetRoundResults, rpcbus.Request{*m, make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := r.rpcBus.Call(topics.GetRoundResults, rpcbus.NewRequest(*m), 5*time.Second)
 	if err != nil {
 		return err
 	}

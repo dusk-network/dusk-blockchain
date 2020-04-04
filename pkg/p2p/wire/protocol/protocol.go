@@ -60,14 +60,17 @@ var magics = [...]magicObj{
 	{DevNet, asBuffer(0x74736e40), "devnet"},
 }
 
+// Len returns the amount of bytes of the Magic sequence
 func (m Magic) Len() int {
 	return magics[m].buf.Len()
 }
 
+// String representation of Magic
 func (m Magic) String() string {
 	return magics[m].str
 }
 
+// ToBuffer returns the buffer representation of the Magic
 func (m Magic) ToBuffer() bytes.Buffer {
 	return magics[m].buf
 }

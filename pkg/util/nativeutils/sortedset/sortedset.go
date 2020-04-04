@@ -8,18 +8,27 @@ import (
 	"strings"
 )
 
+// All represents the bitmap of the whole set
 const All uint64 = math.MaxUint64
 
+// Set is an ordered set of big.Int
 type Set []*big.Int
 
-func (v Set) Len() int           { return len(v) }
-func (v Set) Swap(i, j int)      { v[i], v[j] = v[j], v[i] }
+// Len complies with the Sort interface
+func (v Set) Len() int { return len(v) }
+
+// Swap complies with the Sort interface
+func (v Set) Swap(i, j int) { v[i], v[j] = v[j], v[i] }
+
+// Less complies with the Sort interface
 func (v Set) Less(i, j int) bool { return v[i].Cmp(v[j]) < 0 }
 
+// New creates a new instance of a sorted set
 func New() Set {
 	return make([]*big.Int, 0)
 }
 
+// Equal tests a set for equality
 func (v Set) Equal(other Set) bool {
 	sort.Sort(other)
 	for i := 0; i < len(v); i++ {
@@ -145,6 +154,7 @@ func (v Set) String() string {
 	return str.String()
 }
 
+// Whole returns the bitmap of all the elements within the set
 func (v Set) Whole() uint64 {
 	ret := uint64(0)
 	for i := range v {

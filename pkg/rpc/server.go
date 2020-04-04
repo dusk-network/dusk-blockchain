@@ -26,11 +26,13 @@ type nodeServer struct {
 	rpcBus *rpcbus.RPCBus
 }
 
-type RPCSrvWrapper struct {
+// SrvWrapper is a wrapper for the grpc server
+type SrvWrapper struct {
 	grpcServer *grpc.Server
 }
 
-func (r *RPCSrvWrapper) Shutdown() {
+// Shutdown the wrapper
+func (r *SrvWrapper) Shutdown() {
 	r.grpcServer.GracefulStop()
 }
 
@@ -38,7 +40,7 @@ func (r *RPCSrvWrapper) Shutdown() {
 // the rust process. It only returns an error, as we want to keep the
 // gRPC service running until the process is killed, thus we do not
 // need to return the server itself.
-func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
+func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*SrvWrapper, error) {
 
 	conf := config.Get().RPC
 	l, err := net.Listen(conf.Network, conf.Address)
@@ -72,7 +74,7 @@ func StartgRPCServer(rpcBus *rpcbus.RPCBus) (*RPCSrvWrapper, error) {
 	grpc.EnableTracing = false
 
 	node.RegisterNodeServer(grpcServer, &nodeServer{rpcBus})
-	wrapper := &RPCSrvWrapper{grpcServer}
+	wrapper := &SrvWrapper{grpcServer}
 
 	// This function is blocking, so we run it in a goroutine
 	go func() {

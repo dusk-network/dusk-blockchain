@@ -53,11 +53,12 @@ func NewScoreProposal(hdr header.Header, seed []byte, proof zkproof.ZkProof) Sco
 	}
 }
 
+// IsEmpty tests a ScoreProposal for emptyness
 func (e ScoreProposal) IsEmpty() bool {
 	return e.Score == nil
 }
 
-// Header is used to comply to the consensus.Message interface
+// State is used to comply to the consensus.Message interface
 func (e ScoreProposal) State() header.Header {
 	return e.hdr
 }
@@ -67,6 +68,7 @@ func (e ScoreProposal) Sender() []byte {
 	return e.Z
 }
 
+// String representation of the ScoreProposal
 func (e ScoreProposal) String() string {
 	var sb strings.Builder
 	_, _ = sb.WriteString(e.hdr.String())
@@ -97,10 +99,12 @@ func EmptyScore() Score {
 	}
 }
 
+// Equal tests if two Scores are equal
 func (e Score) Equal(s Score) bool {
 	return e.hdr.Equal(s.hdr) && bytes.Equal(e.VoteHash, s.VoteHash)
 }
 
+// String representation of a Score
 func (e Score) String() string {
 	var sb strings.Builder
 	_, _ = sb.WriteString(e.ScoreProposal.String())
@@ -119,6 +123,7 @@ func makeScore() *Score {
 	}
 }
 
+// UnmarshalScoreMessage unmarshal a ScoreMessage from a buffer
 func UnmarshalScoreMessage(r *bytes.Buffer, m SerializableMessage) error {
 	sc := makeScore()
 
@@ -218,6 +223,7 @@ func MarshalScore(r *bytes.Buffer, sev Score) error {
 	return nil
 }
 
+// MockScoreProposal mocks a ScoreProposal up
 func MockScoreProposal(hdr header.Header) ScoreProposal {
 	score, _ := crypto.RandEntropy(32)
 	proof, _ := crypto.RandEntropy(1477)

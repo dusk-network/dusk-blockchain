@@ -35,7 +35,7 @@ func (h *listenerMap) Store(key topics.Topic, value Listener) uint32 {
 // Load a copy of the listeners stored for a given key
 func (h *listenerMap) Load(key topics.Topic) []idListener {
 	h.lock.RLock()
-	listeners, _ := h.listeners[key]
+	listeners := h.listeners[key]
 	h.lock.RUnlock()
 	return listeners
 }

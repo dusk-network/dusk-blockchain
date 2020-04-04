@@ -60,6 +60,7 @@ func (a Agreement) String() string {
 	return sb.String()
 }
 
+// NewStepVotesMsg creates a StepVotesMsg
 func NewStepVotesMsg(round uint64, hash []byte, sender []byte, sv StepVotes) StepVotesMsg {
 	return StepVotesMsg{
 		hdr: header.Header{
@@ -91,29 +92,34 @@ func (s StepVotes) String() string {
 	return sb.String()
 }
 
-// Header returns the message header. This is to comply to the
+// State returns the message header. This is to comply to the
 // consensus.Message interface
 func (a Agreement) State() header.Header {
 	return a.hdr
 }
 
+// Sender returns the BLS public key of the Sender
 func (a Agreement) Sender() []byte {
 	return a.hdr.Sender()
 }
 
+// Cmp compares the big.Int representation of two agreement messages
 func (a Agreement) Cmp(other Agreement) int {
 	return a.Repr.Cmp(other.Repr)
 }
 
+//SetSignature set a signature to the Agreement
 func (a *Agreement) SetSignature(signedVotes []byte) {
 	a.Repr = new(big.Int).SetBytes(signedVotes)
 	a.signedVotes = signedVotes
 }
 
+// SignedVotes returns the signed vote
 func (a Agreement) SignedVotes() []byte {
 	return a.signedVotes
 }
 
+// Equal checks if two agreement messages are the same
 func (a Agreement) Equal(aev Agreement) bool {
 	return a.Repr.Cmp(aev.Repr) == 0
 }
@@ -155,21 +161,21 @@ func NewStepVotes() *StepVotes {
 }
 
 // Equal checks if two StepVotes structs are the same.
-func (sv *StepVotes) Equal(other *StepVotes) bool {
-	return bytes.Equal(sv.Apk.Marshal(), other.Apk.Marshal()) &&
-		bytes.Equal(sv.Signature.Marshal(), other.Signature.Marshal())
+func (s *StepVotes) Equal(other *StepVotes) bool {
+	return bytes.Equal(s.Apk.Marshal(), other.Apk.Marshal()) &&
+		bytes.Equal(s.Signature.Marshal(), other.Signature.Marshal())
 }
 
 // Add a vote to the StepVotes struct.
-func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
-	if sv.Apk == nil {
+func (s *StepVotes) Add(signature, sender []byte, step uint8) error {
+	if s.Apk == nil {
 		pk, err := bls.UnmarshalPk(sender)
 		if err != nil {
 			return err
 		}
-		sv.Step = step
-		sv.Apk = bls.NewApk(pk)
-		sv.Signature, err = bls.UnmarshalSignature(signature)
+		s.Step = step
+		s.Apk = bls.NewApk(pk)
+		s.Signature, err = bls.UnmarshalSignature(signature)
 		if err != nil {
 			return err
 		}
@@ -177,14 +183,14 @@ func (sv *StepVotes) Add(signature, sender []byte, step uint8) error {
 		return nil
 	}
 
-	if step != sv.Step {
-		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", sv.Step, step)
+	if step != s.Step {
+		return fmt.Errorf("mismatched step in aggregating vote set. Expected %d, got %d", s.Step, step)
 	}
 
-	if err := sv.Apk.AggregateBytes(sender); err != nil {
+	if err := s.Apk.AggregateBytes(sender); err != nil {
 		return err
 	}
-	if err := sv.Signature.AggregateBytes(signature); err != nil {
+	if err := s.Signature.AggregateBytes(signature); err != nil {
 		return err
 	}
 
@@ -210,7 +216,7 @@ func MarshalAgreement(r *bytes.Buffer, a Agreement) error {
 	return nil
 }
 
-// Unmarshal unmarshals the buffer into an Agreement
+// UnmarshalAgreement unmarshals the buffer into an Agreement
 // Field order is the following:
 // * Header [BLS Public Key; Round; Step]
 // * Agreement [Signed Vote Set; Vote Set; BlockHash]
@@ -308,14 +314,14 @@ func UnmarshalStepVotes(r *bytes.Buffer) (*StepVotes, error) {
 	}
 
 	// BitSet
-	if err := encoding.ReadUint64LE(r, &sv.BitSet); err != nil {
-		return nil, err
+	if e := encoding.ReadUint64LE(r, &sv.BitSet); e != nil {
+		return nil, e
 	}
 
 	// Signature
 	signature := make([]byte, 33)
-	if err := encoding.ReadBLS(r, signature); err != nil {
-		return nil, err
+	if e := encoding.ReadBLS(r, signature); e != nil {
+		return nil, e
 	}
 
 	sv.Signature, err = bls.UnmarshalSignature(signature)
@@ -394,6 +400,7 @@ func MockAgreement(hash []byte, round uint64, step uint8, keys []key.ConsensusKe
 	return *a
 }
 
+//MockCommitteeVoteSet mocks a VoteSet
 func MockCommitteeVoteSet(p *user.Provisioners, k []key.ConsensusKeys, hash []byte, committeeSize int, round uint64, step uint8) []Reduction {
 	c1 := p.CreateVotingCommittee(round, step-2, len(k))
 	c2 := p.CreateVotingCommittee(round, step-1, len(k))

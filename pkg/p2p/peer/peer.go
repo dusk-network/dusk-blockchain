@@ -149,9 +149,9 @@ func (c *Connection) ReadMessage() ([]byte, error) {
 }
 
 // Connect will perform the protocol handshake with the peer. If successful
-func (p *Writer) Connect() error {
-	if err := p.Handshake(); err != nil {
-		_ = p.Conn.Close()
+func (w *Writer) Connect() error {
+	if err := w.Handshake(); err != nil {
+		_ = w.Conn.Close()
 		return err
 	}
 

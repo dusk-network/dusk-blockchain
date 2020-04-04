@@ -110,6 +110,7 @@ func MarshalCandidate(b *bytes.Buffer, c Candidate) error {
 	return MarshalCertificate(b, c.Certificate)
 }
 
+// MockCertificate mocks a certificate
 func MockCertificate(hash []byte, round uint64, keys []key.ConsensusKeys, p *user.Provisioners) *block.Certificate {
 	votes := GenVotes(hash, round, 3, keys, p)
 	return &block.Certificate{

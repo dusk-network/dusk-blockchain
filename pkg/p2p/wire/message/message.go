@@ -9,6 +9,11 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
+// Message is the core of the message-oriented architecture of the node. It is
+// particularly important within the consensus, but in practice any component
+// ends up dealing with it. It encapsulates the data exchanged by different
+// nodes as well as internal components. The Message transits inside of the
+// eventbus and is de- serialized through the Gossip procedure
 type Message interface {
 	//fmt.Stringer
 	Category() topics.Topic
@@ -17,10 +22,12 @@ type Message interface {
 	Id() []byte
 }
 
+// Serializable allows to set a payload
 type Serializable interface {
 	SetPayload(interface{})
 }
 
+// SerializableMessage is a Serializable and a Message
 type SerializableMessage interface {
 	Message
 	Serializable
@@ -64,6 +71,8 @@ func (m simple) String() string {
 
 }
 
+// Id is the Id the Message
+// nolint:golint
 func (m simple) Id() []byte {
 	if m.marshaled == nil {
 		buf, err := Marshal(m)
@@ -183,9 +192,9 @@ func marshal(s Message, b *bytes.Buffer) error {
 		return nil
 	}
 
-	switch payload.(type) {
+	switch payload := payload.(type) {
 	case bytes.Buffer:
-		*b = payload.(bytes.Buffer)
+		*b = payload
 
 	default:
 		if err := marshalMessage(s.Category(), payload, b); err != nil {
