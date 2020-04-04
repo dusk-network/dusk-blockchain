@@ -87,7 +87,7 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 
 	l, err := newLoader(db)
 	if err != nil {
-		return nil, fmt.Errorf("%s on loading chain db '%s'", err.Error(), cfg.Get().Database.Dir)
+		return nil, fmt.Errorf("error on loading chain db '%s' - %v", cfg.Get().Database.Dir, err)
 	}
 
 	// set up collectors
@@ -101,12 +101,24 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 	getRoundResultsChan := make(chan rpcbus.Request, 1)
 	getSyncProgressChan := make(chan rpcbus.Request, 1)
 	rebuildChainChan := make(chan rpcbus.Request, 1)
-	rpcBus.Register(topics.GetLastBlock, getLastBlockChan)
-	rpcBus.Register(topics.VerifyCandidateBlock, verifyCandidateBlockChan)
-	rpcBus.Register(topics.GetLastCertificate, getLastCertificateChan)
-	rpcBus.Register(topics.GetRoundResults, getRoundResultsChan)
-	rpcBus.Register(topics.GetSyncProgress, getSyncProgressChan)
-	rpcBus.Register(topics.RebuildChain, rebuildChainChan)
+	if err := rpcBus.Register(topics.GetLastBlock, getLastBlockChan); err != nil {
+		return nil, err
+	}
+	if err := rpcBus.Register(topics.VerifyCandidateBlock, verifyCandidateBlockChan); err != nil {
+		return nil, err
+	}
+	if err := rpcBus.Register(topics.GetLastCertificate, getLastCertificateChan); err != nil {
+		return nil, err
+	}
+	if err := rpcBus.Register(topics.GetRoundResults, getRoundResultsChan); err != nil {
+		return nil, err
+	}
+	if err := rpcBus.Register(topics.GetSyncProgress, getSyncProgressChan); err != nil {
+		return nil, err
+	}
+	if err := rpcBus.Register(topics.RebuildChain, rebuildChainChan); err != nil {
+		return nil, err
+	}
 
 	chain := &Chain{
 		eventBus:                 eventBus,
@@ -140,7 +152,9 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 		chain.intermediateBlock = blk
 	}
 
-	chain.restoreConsensusData()
+	if err := chain.restoreConsensusData(); err != nil {
+		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from chain.New. The error is not propagated")
+	}
 
 	// Hook the chain up to the required topics
 	cbListener := eventbus.NewCallbackListener(chain.onAcceptBlock)
@@ -154,8 +168,8 @@ func New(eventBus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.
 func (c *Chain) Listen() {
 	for {
 		select {
-		case certMsg := <-c.certificateChan:
-			c.handleCertificateMessage(certMsg)
+		case certificateMsg := <-c.certificateChan:
+			c.handleCertificateMessage(certificateMsg)
 		case height := <-c.highestSeenChan:
 			c.highestSeen = height
 		case r := <-c.getLastBlockChan:
@@ -183,6 +197,7 @@ func (c *Chain) addBidder(tx *transactions.Bid, startHeight uint64) {
 	c.addBid(bid)
 }
 
+// Close the Chain DB
 func (c *Chain) Close() error {
 	log.Info("Close database")
 	drvr, err := database.From(cfg.Get().Database.Driver)
@@ -356,13 +371,13 @@ func (c *Chain) processCandidateVerificationRequest(r rpcbus.Request) {
 	// intermediate block. The intermediate block would be the most
 	// recent block before the candidate.
 	if c.intermediateBlock == nil {
-		r.RespChan <- rpcbus.Response{nil, errors.New("no intermediate block hash known")}
+		r.RespChan <- rpcbus.Response{Resp: nil, Err: errors.New("no intermediate block hash known")}
 		return
 	}
 	cm := r.Params.(message.Candidate)
 
 	err := verifiers.CheckBlock(c.db, *c.intermediateBlock, *cm.Block)
-	r.RespChan <- rpcbus.Response{nil, err}
+	r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
 }
 
 // Send Inventory message to all peers
@@ -386,7 +401,7 @@ func (c *Chain) advertiseBlock(b block.Block) error {
 
 // TODO: consensus data should be persisted to disk, to decrease
 // startup times
-func (c *Chain) restoreConsensusData() {
+func (c *Chain) restoreConsensusData() error {
 	var currentHeight uint64
 	err := c.db.View(func(t database.Transaction) error {
 		var err error
@@ -395,6 +410,7 @@ func (c *Chain) restoreConsensusData() {
 	})
 
 	if err != nil {
+		log.WithError(err).Warnln("could not fetch current height from disk")
 		currentHeight = 0
 	}
 
@@ -416,6 +432,7 @@ func (c *Chain) restoreConsensusData() {
 		})
 
 		if err != nil {
+			log.WithError(err).Debugln("cannot fetch hash by heigth, quitting restoreConsensusData routine")
 			break
 		}
 
@@ -425,7 +442,9 @@ func (c *Chain) restoreConsensusData() {
 				// Only add them if their stake is still valid
 				if searchingHeight+t.Lock > currentHeight {
 					amount := t.Outputs[0].EncryptedAmount.BigInt().Uint64()
-					c.addProvisioner(t.PubKeyEd, t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock)
+					if err := c.addProvisioner(t.PubKeyEd, t.PubKeyBLS, amount, searchingHeight+2, searchingHeight+t.Lock); err != nil {
+						return fmt.Errorf("unexpected error in adding provisioner following a stake transaction: %v", err)
+					}
 				}
 			case *transactions.Bid:
 				// TODO: The commitment to D is turned (in quite awful fashion) from a Point into a Scalar here,
@@ -439,7 +458,8 @@ func (c *Chain) restoreConsensusData() {
 
 		searchingHeight++
 	}
-	return
+
+	return nil
 }
 
 // RemoveExpired removes Provisioners which stake expired
@@ -471,7 +491,7 @@ func (c *Chain) addProvisioner(pubKeyEd, pubKeyBLS []byte, amount, startHeight, 
 	}
 
 	i := string(pubKeyBLS)
-	stake := user.Stake{amount, startHeight, endHeight}
+	stake := user.Stake{Amount: amount, StartHeight: startHeight, EndHeight: endHeight}
 
 	// Check for duplicates
 	_, inserted := c.p.Set.IndexOf(pubKeyBLS)
@@ -549,7 +569,7 @@ func (c *Chain) handleCertificateMessage(cMsg certMsg) {
 	c.lastCertificate = cMsg.cert
 
 	// Fetch new intermediate block and corresponding certificate
-	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.Request{*bytes.NewBuffer(cMsg.hash), make(chan rpcbus.Response, 1)}, 5*time.Second)
+	resp, err := c.rpcBus.Call(topics.GetCandidate, rpcbus.NewRequest(*bytes.NewBuffer(cMsg.hash)), 5*time.Second)
 	if err != nil {
 		// If the we can't get the block, we will fall
 		// back and catch up later.
@@ -638,55 +658,55 @@ func (c *Chain) provideLastBlock(r rpcbus.Request) {
 	c.mu.RLock()
 	prevBlock := c.prevBlock
 	c.mu.RUnlock()
-	r.RespChan <- rpcbus.Response{prevBlock, nil}
+	r.RespChan <- rpcbus.NewResponse(prevBlock, nil)
 }
 
 func (c *Chain) provideLastCertificate(r rpcbus.Request) {
 	if c.lastCertificate == nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no last certificate present")}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("no last certificate present"))
 		return
 	}
 
 	buf := new(bytes.Buffer)
 	err := message.MarshalCertificate(buf, c.lastCertificate)
-	r.RespChan <- rpcbus.Response{*buf, err}
+	r.RespChan <- rpcbus.NewResponse(*buf, err)
 }
 
 func (c *Chain) provideRoundResults(r rpcbus.Request) {
 	if c.intermediateBlock == nil || c.lastCertificate == nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block or certificate currently known")}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("no intermediate block or certificate currently known"))
 		return
 	}
 	params := r.Params.(bytes.Buffer)
 
 	if params.Len() < 8 {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("round cannot be read from request param")}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("round cannot be read from request param"))
 		return
 	}
 
 	round := binary.LittleEndian.Uint64(params.Bytes())
 	if round != c.intermediateBlock.Header.Height {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("no intermediate block and certificate for the given round")}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("no intermediate block and certificate for the given round"))
 		return
 	}
 
 	buf := new(bytes.Buffer)
 	if err := message.MarshalBlock(buf, c.intermediateBlock); err != nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
 		return
 	}
 
 	if err := message.MarshalCertificate(buf, c.lastCertificate); err != nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
 		return
 	}
 
-	r.RespChan <- rpcbus.Response{*buf, nil}
+	r.RespChan <- rpcbus.NewResponse(*buf, nil)
 }
 
 func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 	if c.highestSeen == 0 {
-		r.RespChan <- rpcbus.Response{&node.SyncProgressResponse{Progress: 0}, nil}
+		r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: 0}, nil)
 		return
 	}
 
@@ -703,7 +723,7 @@ func (c *Chain) provideSyncProgress(r rpcbus.Request) {
 		progressPercentage = 100
 	}
 
-	r.RespChan <- rpcbus.Response{&node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil}
+	r.RespChan <- rpcbus.NewResponse(&node.SyncProgressResponse{Progress: float32(progressPercentage)}, nil)
 }
 
 // mocks an intermediate block with a coinbase attributed to a standard
@@ -745,7 +765,7 @@ func mockDeterministicCoinbase() transactions.Transaction {
 	var reward ristretto.Scalar
 	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 
-	tx.AddReward(*keyPair.PublicKey(), reward)
+	_ = tx.AddReward(*keyPair.PublicKey(), reward)
 	return tx
 }
 
@@ -763,7 +783,7 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 		return t.ClearDatabase()
 	})
 	if err != nil {
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, err}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, err)
 		return
 	}
 
@@ -785,11 +805,11 @@ func (c *Chain) rebuild(r rpcbus.Request) {
 	}
 
 	// Clear walletDB
-	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0*time.Second); err != nil {
+	if _, err := c.rpcBus.Call(topics.ClearWalletDatabase, rpcbus.NewRequest(bytes.Buffer{}), 0*time.Second); err != nil {
 		log.Panic(err)
 	}
 
-	r.RespChan <- rpcbus.Response{&node.GenericResponse{Response: "Blockchain deleted. Syncing from scratch..."}, nil}
+	r.RespChan <- rpcbus.NewResponse(&node.GenericResponse{Response: "Blockchain deleted. Syncing from scratch..."}, nil)
 }
 
 func (c *Chain) resetState() error {
@@ -802,6 +822,8 @@ func (c *Chain) resetState() error {
 	c.intermediateBlock = intermediateBlock
 
 	c.lastCertificate = block.EmptyCertificate()
-	c.restoreConsensusData()
+	if err := c.restoreConsensusData(); err != nil {
+		log.WithError(err).Warnln("error in calling chain.restoreConsensusData from resetState. The error is not propagated")
+	}
 	return nil
 }
