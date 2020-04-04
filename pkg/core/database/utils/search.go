@@ -7,7 +7,7 @@ func Search(n uint64, f func(uint64) (bool, error)) (uint64, error) {
 	var i uint64
 	j := n
 	for i < j {
-		h := uint64(i+j) >> 1 // avoid overflow when computing h
+		h := i + j>>1 // avoid overflow when computing h
 		// i ≤ h < j
 		res, err := f(h)
 		if err != nil {

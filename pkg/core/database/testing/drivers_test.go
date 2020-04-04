@@ -564,9 +564,8 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Store all blocks with read-write DB
 	err = dbReadWrite.Update(func(t database.Transaction) error {
 		for _, b := range genBlocks {
-			err := t.StoreBlock(b)
-			if err != nil {
-				return err
+			if e := t.StoreBlock(b); e != nil {
+				return e
 			}
 		}
 		return nil
@@ -579,9 +578,9 @@ func TestReadOnlyDB_Mode(test *testing.T) {
 	// Storage Lookup by Height to ensure read-only DB can read
 	_ = dbReadOnly.View(func(t database.Transaction) error {
 		for _, block := range genBlocks {
-			headerHash, err := t.FetchBlockHashByHeight(block.Header.Height)
-			if err != nil {
-				test.Fatalf(err.Error())
+			headerHash, e := t.FetchBlockHashByHeight(block.Header.Height)
+			if e != nil {
+				test.Fatalf("error in fetching block hash by height - %v", e)
 				return nil
 			}
 
