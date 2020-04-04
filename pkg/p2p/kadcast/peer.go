@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// PeerBytesSize represents the ammount of bytes
+// PeerBytesSize represents the amount of bytes
 // necessary to represent .
 const PeerBytesSize int = 22
 
@@ -27,26 +27,6 @@ type Peer struct {
 func MakePeer(ip [4]byte, port uint16) Peer {
 	id := computePeerID(ip)
 	peer := Peer{ip, port, id}
-	return peer
-}
-
-// mockMakePeer create a peer with ID computed over port number only
-// Suitable only for localnet testing
-func mockPeer(port uint16) Peer {
-
-	// Peer host is always local address
-	lAddr := getLocalUDPAddress(int(port))
-	var ip [4]byte
-	copy(ip[:], lAddr.IP)
-
-	peer := MakePeer(ip, port)
-
-	// Overwrite ID
-	b := make([]byte, 2)
-	binary.LittleEndian.PutUint16(b, port)
-	var bytes [4]byte
-	copy(bytes[:], b)
-	peer.id = computePeerID(bytes)
 	return peer
 }
 
@@ -130,10 +110,10 @@ func (peer Peer) String() string {
 }
 
 // Builds the Peer info from a UPDAddress struct.
-func getPeerNetworkInfo(udpAddress net.UDPAddr) ([4]byte, uint16) {
+func getPeerNetworkInfo(udpAddress net.UDPAddr) [4]byte {
 	var ip [4]byte
 	copy(ip[:], udpAddress.IP[:])
-	return ip, uint16(udpAddress.Port)
+	return ip
 }
 
 // PeerSort is a helper type to sort `Peers`

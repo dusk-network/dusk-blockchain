@@ -25,11 +25,10 @@ func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 
 	log.Infof("Starting UDP Listener on %s", lAddr.String())
 
-	// Instanciate the buffer
-	buffer := make([]byte, 1024)
 	for {
 		// Read UDP packet.
 		_ = listener.SetDeadline(time.Now().Add(5 * time.Minute))
+		buffer := make([]byte, 1024)
 		byteNum, uAddr, err := listener.ReadFromUDP(buffer)
 		if err != nil {
 			log.WithError(err).Warn("Error on packet read")
@@ -39,14 +38,15 @@ func StartUDPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 		encodedPack := encodeReadUDPPacket(uint16(byteNum), *uAddr, buffer[0:byteNum])
 		// Send the packet to the Consumer putting it on the queue.
 		queue.Put(encodedPack)
+		buffer = nil
 	}
 }
 
 // Gets the local address of the sender `Peer` and the UDPAddress of the
-// reciever `Peer` and sends to it a UDP Packet with the payload inside.
+// receiver `Peer` and sends to it a UDP Packet with the payload inside.
 func sendUDPPacket(netw string, laddr, raddr net.UDPAddr, payload []byte) {
 
-	log.WithField("dest", raddr.String()).Traceln("Dialing udp")
+	log.WithField("dest", raddr.String()).Tracef("Dialing %s", netw)
 
 	// Send from same IP that the UDP listener is bound on but choose random port
 	laddr.Port = 0
@@ -63,7 +63,7 @@ func sendUDPPacket(netw string, laddr, raddr net.UDPAddr, payload []byte) {
 	// Simple write
 	_, err = conn.Write(payload)
 	if err != nil {
-		log.WithError(err).Warn("Error while writting to the filedescriptor.")
+		log.WithError(err).Warn("Error while writing to the filedescriptor.")
 		return
 	}
 }
@@ -98,7 +98,7 @@ func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 		payload, byteNum, err := readTCPFrame(conn)
 		if err != nil {
 			log.WithError(err).Warn("Error on frame read")
-			conn.Close()
+			_ = conn.Close()
 			continue
 		}
 
@@ -109,12 +109,12 @@ func StartTCPListener(netw string, queue *ring.Buffer, MyPeerInfo Peer) {
 		payload = nil
 
 		// Current impl expects only one TCPFrame per connection
-		conn.Close()
+		_ = conn.Close()
 	}
 }
 
 // Opens a TCP connection with the peer sent on the params and transmits
-// a stream of bytes. Once transmited, closes the connection.
+// a stream of bytes. Once transmitted, closes the connection.
 func sendTCPStream(raddr net.UDPAddr, payload []byte) {
 
 	address := raddr.IP.String() + ":" + strconv.Itoa(raddr.Port)

@@ -48,7 +48,7 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 
 // Gets the Packet headers items and puts them into the
 // header attribute of the Packet.
-func (pac *Packet) setHeadersInfo(tipus byte, router Router, destPeer Peer) {
+func (pac *Packet) setHeadersInfo(tipus byte, router Router) {
 	headers := make([]byte, 24)
 	// Add `Packet` type.
 	headers[0] = tipus
@@ -91,7 +91,7 @@ func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 }
 
 // Analyzes if the announced number of Peers included on the
-// `NODES` message payload is the same as the recieved one.
+// `NODES` message payload is the same as the received one.
 // Returns `true` if it is correct and `false` otherways.
 func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 
@@ -106,7 +106,7 @@ func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 // Gets a `NODES` message and returns a slice of the
 // `Peers` found inside of it
 func (pac Packet) getNodesPayloadInfo() []Peer {
-	// Get number of Peers recieved.
+	// Get number of Peers received.
 	peerNum := int(binary.LittleEndian.Uint16(pac.payload[0:2]))
 	// Create Peer-struct slice
 	var peers []Peer
@@ -157,16 +157,6 @@ func (pac Packet) getChunksPayloadInfo() (byte, *[16]byte, []byte, error) {
 	return height, &chunkID, payload, nil
 }
 
-// Gets a packet and decreases by one the `CHUNKS`
-// message height.
-func (pac *Packet) decreaseChunksHeight() error {
-	if len(pac.payload) > 0 {
-		return errors.New("payload length insuficient")
-	}
-	pac.payload[0] = pac.payload[0] - 1
-	return nil
-}
-
 // ----------- Message Handlers ----------- //
 
 // Processes the `PING` packet info sending back a
@@ -203,7 +193,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	// peerNum announced <=> bytesPerPeer * peerNum
 	if !packet.checkNodesPayloadConsistency(byteNum) {
 		// Since the packet is not consistent, we just discard it.
-		log.Info("NODES message recieved with corrupted payload. Packet ignored.")
+		log.Info("NODES message received with corrupted payload. Packet ignored.")
 		return
 	}
 
@@ -211,7 +201,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	router.tree.addPeer(router.MyPeerInfo, peerInf)
 
 	// Deserialize the payload to get the peerInfo of every
-	// recieved peer.
+	// received peer.
 	peers := packet.getNodesPayloadInfo()
 
 	// Send `PING` messages to all of the peers to then
@@ -221,7 +211,7 @@ func handleNodes(peerInf Peer, packet Packet, router *Router, byteNum int) {
 	}
 }
 
-func handleChunks(peerInf Peer, packet Packet, router *Router, byteNum int) error {
+func handleChunks(packet Packet, router *Router) error {
 	// Deserialize the packet.
 	height, chunkID, payload, err := packet.getChunksPayloadInfo()
 	if err != nil {
@@ -230,14 +220,14 @@ func handleChunks(peerInf Peer, packet Packet, router *Router, byteNum int) erro
 	}
 	// Verify chunkID on the memmoryMap. If we already have it stored,+
 	// means that the packet is repeated and we just ignore it.
-	if _, ok := router.chunkIDmap[*chunkID]; ok {
+	if _, ok := router.ChunkIDmap[*chunkID]; ok {
 		return fmt.Errorf("chunk ID already registered: %v", *chunkID)
 	}
 
 	// Set chunkIDmap to true on the map.
-	router.chunkIDmap[*chunkID] = nil
-	if router.storeChunks {
-		router.chunkIDmap[*chunkID] = payload
+	router.ChunkIDmap[*chunkID] = nil
+	if router.StoreChunks {
+		router.ChunkIDmap[*chunkID] = payload
 	}
 
 	// Verify height, if != 0, decrease it by one and broadcast the

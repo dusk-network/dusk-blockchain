@@ -35,8 +35,8 @@ type Router struct {
 
 	// Store all received Chunk payload. Useful on testing.
 	// Will be removed when kadcast is integrated with eventbus
-	storeChunks bool
-	chunkIDmap  map[[16]byte][]byte
+	StoreChunks bool
+	ChunkIDmap  map[[16]byte][]byte
 }
 
 // MakeRouter allows to create a router which holds the peerInfo and
@@ -52,7 +52,7 @@ func makeRouterFromPeer(peer Peer) Router {
 		myPeerUDPAddr: peer.getUDPAddr(),
 		MyPeerInfo:    peer,
 		myPeerNonce:   peer.computePeerNonce(),
-		chunkIDmap:    make(map[[16]byte][]byte),
+		ChunkIDmap:    make(map[[16]byte][]byte),
 	}
 }
 
@@ -158,7 +158,7 @@ func (router Router) pollBootstrappingNodes(bootNodes []Peer, t time.Duration) u
 	}
 
 	timer := time.AfterFunc(t, func() {
-		peerNum = uint64(router.tree.getTotalPeers())
+		peerNum = router.tree.getTotalPeers()
 		wg.Done()
 	})
 
@@ -174,7 +174,7 @@ func (router Router) sendPing(receiver Peer) {
 	// Build empty packet.
 	var p Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	p.setHeadersInfo(0, router, receiver)
+	p.setHeadersInfo(0, router)
 
 	// Since return values from functions are not addressable, we need to
 	// allocate the receiver UDPAddr
@@ -188,7 +188,7 @@ func (router Router) sendPong(receiver Peer) {
 	// Build empty packet.
 	var p Packet
 	// Fill the headers with the type, ID, Nonce and destPort.
-	p.setHeadersInfo(1, router, receiver)
+	p.setHeadersInfo(1, router)
 
 	// Since return values from functions are not addressable, we need to
 	// allocate the receiver UDPAddr
@@ -205,7 +205,7 @@ func (router Router) sendFindNodes() {
 	for _, peer := range destPeers {
 		// Build the packet
 		var p Packet
-		p.setHeadersInfo(2, router, peer)
+		p.setHeadersInfo(2, router)
 		// We don't need to add the ID to the payload snce we already have
 		// it in the headers.
 		// Send the packet
@@ -218,7 +218,7 @@ func (router Router) sendNodes(receiver Peer) {
 	// Build empty packet
 	var p Packet
 	// Set headers
-	p.setHeadersInfo(3, router, receiver)
+	p.setHeadersInfo(3, router)
 	// Set payload with the `k` peers closest to receiver.
 	peersToSend := p.setNodesPayload(router, receiver)
 	// If we don't have any peers to announce, we just skip sending
@@ -245,7 +245,7 @@ func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 		// Create empty packet and set headers.
 		var p Packet
 		// Set headers info.
-		p.setHeadersInfo(tipus, router, *destPeer)
+		p.setHeadersInfo(tipus, router)
 		// Set payload.
 		p.setChunksPayloadInfo(height, payload)
 		sendTCPStream(destPeer.getUDPAddr(), marshalPacket(p))
@@ -256,4 +256,9 @@ func (router Router) broadcastPacket(height byte, tipus byte, payload []byte) {
 // following the Kadcast broadcasting rules with the InitHeight.
 func (router Router) StartPacketBroadcast(tipus byte, payload []byte) {
 	router.broadcastPacket(InitHeight, tipus, payload)
+}
+
+// GetTotalPeers the total amount of peers that a `Peer` is connected to
+func (router Router) GetTotalPeers() uint64 {
+	return router.tree.getTotalPeers()
 }

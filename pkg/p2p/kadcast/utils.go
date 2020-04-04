@@ -22,6 +22,7 @@ const (
 )
 
 var (
+	// ErrExceedMaxLen max message size of a frame on the wire
 	ErrExceedMaxLen = errors.New("message size exceeds max frame length")
 )
 
@@ -88,6 +89,11 @@ func computePeerID(externIP [4]byte) [16]byte {
 	return halfLenID
 }
 
+// ComputePeerID exposes computePeerID
+func ComputePeerID(buf [4]byte) [16]byte {
+	return computePeerID(buf)
+}
+
 // This function is a middleware that allows the peer to verify
 // other Peers nonce's and validate them if they are correct.
 func verifyIDNonce(id [16]byte, nonce [4]byte) error {
@@ -119,9 +125,10 @@ func getOutboundIP() net.IP {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	_ = conn.Close()
+
 	return localAddr.IP
 }
 

@@ -19,6 +19,6 @@ func TestPacketMarshalling(t *testing.T) {
 	data := marshalPacket(p)
 
 	if !bytes.Equal(data, buf) {
-		t.Error("packet marshalling failed")
+		t.Error("packet marshaling failed")
 	}
 }
