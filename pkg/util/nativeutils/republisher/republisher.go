@@ -1,4 +1,3 @@
-// TODO: interface - work with message.Message
 package republisher
 
 import (
@@ -11,6 +10,10 @@ import (
 )
 
 type (
+	// Validator is a function used by the Republisher to establish if the
+	// message should be forwarded to the network or otherwise. For instance,
+	// the republisher should not propagate transaction being invalid, or
+	// messages which Signature check fails, etc
 	Validator func(message.Message) error
 
 	// Republisher handles the repropagation of messages propagated with a
@@ -28,15 +31,23 @@ type (
 	encodingError         struct{ *repuberr }
 )
 
+// Error as demanded by the error interface
 func (rerr *repuberr) Error() string {
 	return rerr.err.Error()
 }
 
+// DuplicatePayloadError is the error returned when the republisher detects a
+// duplicate
 var DuplicatePayloadError = &duplicatePayloadError{&repuberr{errors.New("duplicatePayloadError")}}
+
+// EncodingError is returned when wire un- marshaling fails
 var EncodingError = &encodingError{&repuberr{errors.New("encoding failed")}}
+
+// InvalidError is returned when the payload is invalid
 var InvalidError = &invalidError{&repuberr{errors.New("invalid payload")}}
 
-// New creates a Republisher
+// New creates a Republisher for a given topic. Multiple Validator functions
+// can be specified for the Republisher to run before forwarding the message
 func New(eb eventbus.Broker, tpc topics.Topic, v ...Validator) *Republisher {
 	r := &Republisher{
 		broker:     eb,
