@@ -24,6 +24,7 @@ type (
 		Members map[string]*Member
 	}
 
+	// Stake of the Provisioner
 	Stake struct {
 		Amount      uint64
 		StartHeight uint64
@@ -31,15 +32,18 @@ type (
 	}
 )
 
+// AddStake appends a stake to the stake set
 func (m *Member) AddStake(stake Stake) {
 	m.Stakes = append(m.Stakes, stake)
 }
 
+// RemoveStake removes a Stake (most likely because it expired)
 func (m *Member) RemoveStake(idx int) {
 	m.Stakes[idx] = m.Stakes[len(m.Stakes)-1]
 	m.Stakes = m.Stakes[:len(m.Stakes)-1]
 }
 
+// SubtractFromStake detracts an amount from the Stake of a Provisioner
 func (m *Member) SubtractFromStake(amount uint64) uint64 {
 	for i := 0; i < len(m.Stakes); i++ {
 		if m.Stakes[i].Amount > 0 {
@@ -47,16 +51,16 @@ func (m *Member) SubtractFromStake(amount uint64) uint64 {
 				subtracted := m.Stakes[i].Amount
 				m.Stakes[i].Amount = 0
 				return subtracted
-			} else {
-				m.Stakes[i].Amount -= amount
-				return amount
 			}
+			m.Stakes[i].Amount -= amount
+			return amount
 		}
 	}
 
 	return 0
 }
 
+// NewProvisioners instantiates the Provisioners sortedset of members
 func NewProvisioners() *Provisioners {
 	return &Provisioners{
 		Set:     sortedset.New(),
@@ -106,8 +110,7 @@ func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 		return 0, fmt.Errorf("public key is %v bytes long instead of 129", len(pubKeyBLS))
 	}
 
-	i := string(pubKeyBLS)
-	m, found := p.Members[i]
+	m, found := p.Members[string(pubKeyBLS)]
 	if !found {
 		return 0, fmt.Errorf("public key %v not found among provisioner set", pubKeyBLS)
 	}
@@ -120,6 +123,7 @@ func (p Provisioners) GetStake(pubKeyBLS []byte) (uint64, error) {
 	return totalStake, nil
 }
 
+// TotalWeight is the sum of all stakes of the provisioners
 func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 	for _, member := range p.Members {
 		for _, stake := range member.Stakes {
@@ -130,6 +134,7 @@ func (p *Provisioners) TotalWeight() (totalWeight uint64) {
 	return totalWeight
 }
 
+// MarshalProvisioners ...
 func MarshalProvisioners(r *bytes.Buffer, p *Provisioners) error {
 	if err := encoding.WriteVarInt(r, uint64(len(p.Members))); err != nil {
 		return err
@@ -182,6 +187,7 @@ func marshalStake(r *bytes.Buffer, stake Stake) error {
 	return nil
 }
 
+// UnmarshalProvisioners unmarshal provisioner set from a buffer
 func UnmarshalProvisioners(r *bytes.Buffer) (Provisioners, error) {
 	lMembers, err := encoding.ReadVarInt(r)
 	if err != nil {

@@ -16,6 +16,8 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
+// MaxCommitteeSize represents the maximum size of the committee for an
+// Agreement quorum
 const MaxCommitteeSize = 64
 
 // Handler interface is handy for tests
@@ -33,6 +35,7 @@ type handler struct {
 }
 
 // NewHandler returns an initialized handler.
+//nolint:golint
 func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *handler {
 	return &handler{
 		Handler: committee.NewHandler(keys, p),
@@ -44,18 +47,24 @@ func (a *handler) AmMember(round uint64, step uint8) bool {
 	return a.Handler.AmMember(round, step, MaxCommitteeSize)
 }
 
+// IsMember delegates the committee.Handler to check if a Provisioner is in the
+// committee for a specified round and step
 func (a *handler) IsMember(pubKeyBLS []byte, round uint64, step uint8) bool {
 	return a.Handler.IsMember(pubKeyBLS, round, step, MaxCommitteeSize)
 }
 
+// Committee returns a VotingCommittee for a given round and step
 func (a *handler) Committee(round uint64, step uint8) user.VotingCommittee {
 	return a.Handler.Committee(round, step, MaxCommitteeSize)
 }
 
+// VotesFor delegates embedded committee.Handler to accumulate a vote for a
+// given round
 func (a *handler) VotesFor(pubKeyBLS []byte, round uint64, step uint8) int {
 	return a.Handler.VotesFor(pubKeyBLS, round, step, MaxCommitteeSize)
 }
 
+// Quorum returns the amount of committee members necessary to reach a quorum
 func (a *handler) Quorum(round uint64) int {
 	return int(math.Ceil(float64(a.CommitteeSize(round, MaxCommitteeSize)) * 0.75))
 }

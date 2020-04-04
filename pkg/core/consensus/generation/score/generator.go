@@ -133,6 +133,7 @@ func (g *Generator) Prove(seed []byte, bidList user.BidList) zkproof.ZkProof {
 	return zkproof.Prove(g.d, g.k, seedScalar, bidListScalars)
 }
 
+// Collect complies to the consensus.Component interface
 func (g *Generator) Collect(e consensus.InternalPacket) error {
 	defer func() {
 		g.lock.Lock()

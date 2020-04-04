@@ -46,7 +46,6 @@ func TestGenerateGenesis(t *testing.T) {
 }
 
 func TestGenesisBlock(t *testing.T) {
-	return
 	// read the hard-coded genesis blob for testnet
 	blob, err := hex.DecodeString(cfg.TestNetGenesisBlob)
 	if err != nil {

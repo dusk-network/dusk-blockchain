@@ -32,7 +32,7 @@ func (m *mockSigner) Gossip(msg message.Message, id uint32) error {
 		return err
 	}
 
-	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
+	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshaling
 	// is performed where it is supposed to (i.e. after the Gossip)
 	serialized := message.New(msg.Category(), buf)
 

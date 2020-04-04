@@ -6,6 +6,7 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
+// MockRoundUpdate mocks a round update
 func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) RoundUpdate {
 	var provisioners = p
 	if p == nil {
@@ -56,6 +57,7 @@ func MockRoundUpdate(round uint64, p *user.Provisioners, bidList user.BidList) R
 //	return buf
 //}
 
+// MockProvisioners mock a Provisioner set
 func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
 	p := user.NewProvisioners()
 
@@ -71,6 +73,7 @@ func MockProvisioners(amount int) (*user.Provisioners, []key.ConsensusKeys) {
 	return p, k
 }
 
+// MockMember mocks a Provisioner
 func MockMember(keys key.ConsensusKeys) *user.Member {
 	member := &user.Member{}
 	member.PublicKeyEd = keys.EdPubKeyBytes
@@ -81,6 +84,7 @@ func MockMember(keys key.ConsensusKeys) *user.Member {
 	return member
 }
 
+// MockBidList mocks a bid list
 func MockBidList(amount int) user.BidList {
 	bidList := make([]user.Bid, amount)
 	for i := 0; i < amount; i++ {
@@ -90,7 +94,7 @@ func MockBidList(amount int) user.BidList {
 		var m [32]byte
 		copy(x[:], xSlice)
 		copy(m[:], mSlice)
-		bidList[i] = user.Bid{x, m, 10}
+		bidList[i] = user.Bid{X: x, M: m, EndHeight: 10}
 	}
 	return bidList
 }

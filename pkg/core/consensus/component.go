@@ -115,18 +115,21 @@ func (s *SimpleListener) Priority() Priority {
 	return s.priority
 }
 
+// Paused returns whether this Listener is Paused
 func (s *SimpleListener) Paused() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.paused
 }
 
+// Pause the SimpleListener
 func (s *SimpleListener) Pause() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.paused = true
 }
 
+// Resume the SimpleListener
 func (s *SimpleListener) Resume() {
 	s.lock.Lock()
 	defer s.lock.Unlock()

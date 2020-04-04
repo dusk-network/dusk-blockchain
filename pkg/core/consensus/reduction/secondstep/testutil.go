@@ -43,8 +43,7 @@ func (hlp *Helper) ActivateReduction(hash []byte, sv message.StepVotes) error {
 	// e := consensus.Event{header.Header{Round: hlp.Round, Step: hlp.Step(), PubKeyBLS: hlp.PubKeyBLS, BlockHash: hash}, *buf}
 	msg := message.NewStepVotesMsg(hlp.Round, hlp.PubKeyBLS, hash, sv)
 
-	hlp.Reducer.(*Reducer).CollectStepVotes(msg)
-	return nil
+	return hlp.Reducer.(*Reducer).CollectStepVotes(msg)
 }
 
 // Kickstart creates a Helper and wires up the tests

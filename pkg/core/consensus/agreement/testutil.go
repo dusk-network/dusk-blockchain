@@ -1,6 +1,8 @@
 package agreement
 
 import (
+	"sync"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/consensus/user"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
@@ -8,7 +10,6 @@ import (
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/dusk-network/dusk-wallet/v2/key"
-	"sync"
 )
 
 // Helper is a struct that facilitates sending semi-real Events with minimum effort
@@ -21,6 +22,7 @@ type Helper struct {
 	nr              int
 }
 
+// WireAgreement ...
 func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
 	eb := eventbus.New()
 	h := NewHelper(eb, nrProvisioners)
@@ -88,6 +90,7 @@ func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
 	hlp.Aggro.Initialize(consensus.NewSimplePlayer(), nil, ru)
 }
 
+// LaunchHelper configures and launches a LaunchHelper
 func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	hlp := NewHelper(eb, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, hlp.P, nil)

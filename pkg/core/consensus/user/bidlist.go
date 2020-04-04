@@ -29,17 +29,17 @@ func ReconstructBidListSubset(pl []byte) (BidList, error) {
 
 	numBids := len(pl) / 32
 	r := bytes.NewReader(pl)
-	BidList := make(BidList, numBids)
+	bl := make(BidList, numBids)
 	for i := 0; i < numBids; i++ {
 		var bid Bid
 		if _, err := r.Read(bid.X[:]); err != nil {
 			return nil, err
 		}
 
-		BidList[i] = bid
+		bl[i] = bid
 	}
 
-	return BidList, nil
+	return bl, nil
 }
 
 // ValidateBids will check if the passed BidList subset contains valid bids.
