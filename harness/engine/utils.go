@@ -68,6 +68,9 @@ func (n *Network) SendQuery(nodeIndex uint, query string, result interface{}) er
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
 		return err
@@ -154,6 +157,7 @@ func (n *Network) SendWireMsg(ind uint, msg []byte, writeTimeout int) error {
 	return err
 }
 
+// ConstructWireFrame creates a frame according to the wire protocol
 func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.Buffer) ([]byte, error) {
 	// Write magic
 	buf := magic.ToBuffer()
@@ -176,6 +180,7 @@ func ConstructWireFrame(magic protocol.Magic, cmd topics.Topic, payload *bytes.B
 	return frame.Bytes(), nil
 }
 
+// WriteFrame writes a frame to a buffer
 // TODO: remove *bytes.Buffer from the returned parameters
 func WriteFrame(buf *bytes.Buffer) (*bytes.Buffer, error) {
 
