@@ -22,6 +22,7 @@ var (
 	r *Registry
 )
 
+// Base configurations structure
 type Base struct {
 	// UsedConfigFile points at the loaded config file
 	UsedConfigFile string
