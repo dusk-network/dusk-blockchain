@@ -38,17 +38,17 @@ func MarshalBlockMsg(blk block.Block) (string, error) {
 			break
 		}
 
-		txid, err := tx.CalculateHash()
-		if err != nil {
-			return "", err
+		txid, e := tx.CalculateHash()
+		if e != nil {
+			return "", e
 		}
 
 		p.Txs = append(p.Txs, hex.EncodeToString(txid))
 	}
 
-	msg, err := json.Marshal(p)
-	if err != nil {
-		return "", err
+	msg, marshalErr := json.Marshal(p)
+	if marshalErr != nil {
+		return "", marshalErr
 	}
 
 	return string(msg), nil

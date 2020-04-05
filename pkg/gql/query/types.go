@@ -8,6 +8,7 @@ import (
 	"github.com/graphql-go/graphql/language/ast"
 )
 
+// Block is the graphql object representing blocks
 var Block = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Block",
@@ -23,6 +24,7 @@ var Block = graphql.NewObject(
 	},
 )
 
+// Header is the graphql object representing block header
 var Header = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Header",
@@ -52,6 +54,7 @@ var Header = graphql.NewObject(
 	},
 )
 
+// Transaction is the graphql object representing transactions
 var Transaction = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Transaction",
@@ -81,6 +84,7 @@ var Transaction = graphql.NewObject(
 	},
 )
 
+// Output is the graphql object representing output
 var Output = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Output",
@@ -92,6 +96,7 @@ var Output = graphql.NewObject(
 	},
 )
 
+// Input is the graphql object representing input
 var Input = graphql.NewObject(
 	graphql.ObjectConfig{
 		Name: "Input",
@@ -103,6 +108,7 @@ var Input = graphql.NewObject(
 	},
 )
 
+// Hex is the graphql object representing a hex scalar
 var Hex = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "Hex",
 	Description: "Hex scalar type represents a byte array",
@@ -132,6 +138,7 @@ var Hex = graphql.NewScalar(graphql.ScalarConfig{
 	},
 })
 
+// UnixTimestamp the one and only
 var UnixTimestamp = graphql.NewScalar(graphql.ScalarConfig{
 	Name:        "UnixTimestamp",
 	Description: "UnixTimestamp scalar type represents a unix time field",
