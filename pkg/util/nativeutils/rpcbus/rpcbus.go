@@ -31,21 +31,25 @@ type RPCBus struct {
 	registry map[topics.Topic]chan<- Request
 }
 
+// Request is the request object forwarded to the RPC endpoint
 type Request struct {
 	Params   interface{}
 	RespChan chan Response
 }
 
+// Response is the response to the request forwarded to the RPC endpoint
 type Response struct {
 	Resp interface{}
 	Err  error
 }
 
+//EmptyRequest returns a Request instance with no parameters
 func EmptyRequest() Request {
 	return NewRequest(bytes.Buffer{})
 }
 
-// NewRequest builds a new request with params
+// NewRequest builds a new request with params. It creates the response channel
+// under the hood
 func NewRequest(p interface{}) Request {
 	return Request{
 		Params:   p,
@@ -53,6 +57,15 @@ func NewRequest(p interface{}) Request {
 	}
 }
 
+// NewResponse builds a new response
+func NewResponse(p interface{}, err error) Response {
+	return Response{
+		Resp: p,
+		Err:  err,
+	}
+}
+
+// New creates an RPCBus instance
 func New() *RPCBus {
 	return &RPCBus{
 		registry: make(map[topics.Topic]chan<- Request),
@@ -124,14 +137,14 @@ func (bus *RPCBus) getReqChan(t topics.Topic) (chan<- Request, error) {
 	return nil, ErrMethodNotExists
 }
 
+// Close the RPCBus by resetting the registry
 func (bus *RPCBus) Close() {
 	bus.mu.Lock()
+	defer bus.mu.Unlock()
 
 	// Channels should be closed only by the goroutines/components
 	// that make them
 
 	// Reset registry
 	bus.registry = make(map[topics.Topic]chan<- Request)
-
-	bus.mu.Unlock()
 }

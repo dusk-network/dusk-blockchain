@@ -133,6 +133,7 @@ func (db DB) Begin(writable bool) (database.Transaction, error) {
 	return t, nil
 }
 
+// Update a record within a transaction
 func (db DB) Update(fn func(database.Transaction) error) error {
 
 	// Create a writable transaction for atomic update
@@ -157,6 +158,7 @@ func (db DB) Update(fn func(database.Transaction) error) error {
 	return t.Commit()
 }
 
+// View is the equivalent of a Select SQL statement
 func (db DB) View(fn func(database.Transaction) error) error {
 
 	t, err := db.Begin(false)

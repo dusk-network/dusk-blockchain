@@ -31,14 +31,15 @@ func NewProfileSet() ProfileSet {
 	}
 }
 
-func (s *ProfileSet) drop(name string) {
+//func (s *ProfileSet) drop(name string) {
+//
+//	if item, ok := s.profiles[name]; ok {
+//		close(item.quit)
+//		delete(s.profiles, name)
+//	}
+//}
 
-	if item, ok := s.profiles[name]; ok {
-		close(item.quit)
-		delete(s.profiles, name)
-	}
-}
-
+// Spawn a ProfileSet from a Profile
 func (ps *ProfileSet) Spawn(p Profile) error {
 
 	if err := isSupported(p.name); err != nil {
@@ -101,7 +102,7 @@ var stopProfile = func(s *Server, params []string) (string, error) {
 
 // Listen listens rpcbus commands to allow enabling/disabling
 // any profile in runtime (e.g via rpc)
-func (s *ProfileSet) Listen(rpc *rpcbus.RPCBus) {
+func (ps *ProfileSet) Listen(rpc *rpcbus.RPCBus) {
 
 	/*
 		startCmdChan := make(chan rpcbus.Request, 1)
@@ -153,6 +154,7 @@ func (s *ProfileSet) Listen(rpc *rpcbus.RPCBus) {
 	*/
 }
 
-func (p ProfileSet) Close() {
-	close(p.quit)
+// Close the internal quit channel
+func (ps ProfileSet) Close() {
+	close(ps.quit)
 }

@@ -22,11 +22,12 @@ var (
 	// It's useful when additional manual tests should be done
 	KeepAlive = flag.Bool("keepalive", false, "Keep Test Harness alive after tests pass")
 
-	// Errors
-	// ErrDisabledHarness
+	// ErrDisabledHarness yields a disabled test harness
 	ErrDisabledHarness = errors.New("disabled test harness")
 )
 
+// Network describes the current network configuration in terms of nodes and
+// processes
 type Network struct {
 	Nodes     []*DuskNode
 	processes []*os.Process
@@ -78,6 +79,7 @@ func (n *Network) Bootstrap(workspace string) error {
 	return nil
 }
 
+// Teardown the network
 func (n *Network) Teardown() {
 	for _, p := range n.processes {
 		if err := p.Signal(os.Interrupt); err != nil {
@@ -86,6 +88,7 @@ func (n *Network) Teardown() {
 	}
 }
 
+// StartNode locally
 func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
 	blockchainExec, blindBidExec, _, err := n.getExec()
@@ -95,8 +98,8 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 
 	// create node folder
 	nodeDir := workspace + "/node-" + node.Id
-	if err := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm); err != nil {
-		return err
+	if e := os.Mkdir(nodeDir, os.ModeDir|os.ModePerm); e != nil {
+		return e
 	}
 
 	node.Dir = nodeDir
@@ -107,19 +110,19 @@ func (n *Network) StartNode(i int, node *DuskNode, workspace string) error {
 	walletsPath += "/../data/"
 
 	// Generate node default config file
-	tomlFilePath, err := n.generateConfig(i, walletsPath)
-	if err != nil {
-		return err
+	tomlFilePath, tomlErr := n.generateConfig(i, walletsPath)
+	if tomlErr != nil {
+		return tomlErr
 	}
 
 	// Run dusk-blockchain node process
-	if err := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); err != nil {
-		return err
+	if startErr := n.start(nodeDir, blockchainExec, "--config", tomlFilePath); startErr != nil {
+		return startErr
 	}
 
 	// Run blindbid node process
-	if err := n.start(nodeDir, blindBidExec); err != nil {
-		return err
+	if bbErr := n.start(nodeDir, blindBidExec); bbErr != nil {
+		return bbErr
 	}
 
 	return nil
@@ -162,10 +165,9 @@ func (n *Network) start(nodeDir string, name string, arg ...string) error {
 	cmd.Env = append(cmd.Env, "TMPDIR="+nodeDir)
 	if err := cmd.Start(); err != nil {
 		return err
-	} else {
-		n.processes = append(n.processes, cmd.Process)
 	}
 
+	n.processes = append(n.processes, cmd.Process)
 	return nil
 }
 

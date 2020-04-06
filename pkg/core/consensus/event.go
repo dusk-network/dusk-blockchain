@@ -6,7 +6,7 @@ import (
 
 var emptyHash [32]byte
 
-// Message is a specialization of the Payload of message.Message. It is used to
+// InternalPacket is a specialization of the Payload of message.Message. It is used to
 // unify messages used by the consensus, which need to carry the header.Header
 // for consensus specific operations
 // TODO: interface - consider breaking the Header down into
@@ -17,10 +17,12 @@ type InternalPacket interface {
 
 type empty struct{}
 
+// State returns an empty Header
 func (e empty) State() header.Header {
 	return header.Header{}
 }
 
+// EmptyPacket returns an empty InternalPacket
 func EmptyPacket() InternalPacket {
 	return empty{}
 }
@@ -31,7 +33,7 @@ type Packet interface {
 	Sender() []byte
 }
 
-// InternalMsgFactory is used by the signer/coordinator to create internal
+// PacketFactory is used by the signer/coordinator to create internal
 // messages
 type PacketFactory interface {
 	Create([]byte, uint64, uint8) InternalPacket
@@ -41,6 +43,7 @@ type PacketFactory interface {
 // Reduction
 type Restarter struct{}
 
+// Create a Restart message to restart the consensus
 func (r Restarter) Create(sender []byte, round uint64, step uint8) InternalPacket {
 	return header.Header{
 		Round:     round,

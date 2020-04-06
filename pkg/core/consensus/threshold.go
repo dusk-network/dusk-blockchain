@@ -31,9 +31,5 @@ func (t *Threshold) Lower() {
 // Exceeds checks whether the Threshold exceeds a given score.
 func (t *Threshold) Exceeds(score []byte) bool {
 	scoreInt := big.NewInt(0).SetBytes(score)
-	if scoreInt.Cmp(t.limit) == -1 {
-		return true
-	}
-
-	return false
+	return scoreInt.Cmp(t.limit) == -1
 }

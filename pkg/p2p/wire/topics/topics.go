@@ -103,6 +103,7 @@ type topicBuf struct {
 	str string
 }
 
+// Topics is the slice of all the topicBuf
 // NOTE: this needs to be in the same order in which the topics are declared
 var Topics = [...]topicBuf{
 	{Version, *(bytes.NewBuffer([]byte{byte(Version)})), "version"},
@@ -209,6 +210,7 @@ func StringToTopic(topic string) Topic {
 	return Unknown
 }
 
+// Prepend a topic to a binary-serialized form of a message
 func Prepend(b *bytes.Buffer, t Topic) error {
 	var buf bytes.Buffer
 	if int(t) > len(Topics) {

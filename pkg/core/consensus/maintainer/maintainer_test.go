@@ -61,7 +61,7 @@ func TestMaintainStakesAndBids(t *testing.T) {
 	bl := make([]user.Bid, 1)
 	var mArr [32]byte
 	copy(mArr[:], m.Bytes())
-	bid := user.Bid{mArr, mArr, 10}
+	bid := user.Bid{X: mArr, M: mArr, EndHeight: 10}
 	bl[0] = bid
 	// Then, send a round update to update the values on the maintainer
 	ru = consensus.MockRoundUpdate(2, p, bl)
@@ -158,7 +158,7 @@ func receiveTxs(c chan rpcbus.Request) []transactions.Transaction {
 		r := <-c
 		tx := r.Params.(transactions.Transaction)
 		txs = append(txs, tx)
-		r.RespChan <- rpcbus.Response{nil, nil}
+		r.RespChan <- rpcbus.NewResponse(nil, nil)
 	}
 
 	return txs

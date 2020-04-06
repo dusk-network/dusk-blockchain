@@ -53,37 +53,39 @@ func TestRequestCandidate(t *testing.T) {
 
 	// Fetch a candidate we don't have
 	genesis := config.DecodeGenesis()
-	go func() {
-		resp, err := rpc.Call(topics.GetCandidate, rpcbus.Request{*bytes.NewBuffer(genesis.Header.Hash), make(chan rpcbus.Response, 1)}, 0)
+	go func(errChan chan<- error) {
+		req := rpcbus.NewRequest(*bytes.NewBuffer(genesis.Header.Hash))
+		resp, err := rpc.Call(topics.GetCandidate, req, 0)
 		if err != nil {
-			doneChan <- err
+			errChan <- err
 			return
 		}
 		c := resp.(message.Candidate)
 
 		if !assert.True(t, c.Block.Equals(genesis)) {
-			var err error
 			if !c.Block.Header.Equals(genesis.Header) {
-				err = fmt.Errorf("Candidate Header (hash: %s) is not equal to Genesis Header (hash: %s)", c, util.StringifyBytes(genesis.Header.Hash))
-			} else if len(c.Block.Txs) != len(genesis.Txs) {
-				err = fmt.Errorf("Candidate block (%s) has a different number of txs from Genesis (%s)", c, strconv.Itoa(len(genesis.Txs)))
-			} else {
-				for i, tx := range genesis.Txs {
-					otherTx := c.Block.Txs[i]
-
-					if !tx.Equals(otherTx) {
-						err = fmt.Errorf("Candidate Block Tx #%d is different from genesis block Tx", i)
-						break
-					}
-				}
-				panic("problem with block.Block.Equals")
+				errChan <- fmt.Errorf("Candidate Header (hash: %s) is not equal to Genesis Header (hash: %s)", c, util.StringifyBytes(genesis.Header.Hash))
+				return
 			}
-			doneChan <- err
-			return
+
+			if len(c.Block.Txs) != len(genesis.Txs) {
+				errChan <- fmt.Errorf("Candidate block (%s) has a different number of txs from Genesis (%s)", c, strconv.Itoa(len(genesis.Txs)))
+				return
+			}
+
+			for i, tx := range genesis.Txs {
+				otherTx := c.Block.Txs[i]
+
+				if !tx.Equals(otherTx) {
+					errChan <- fmt.Errorf("Candidate Block Tx #%d is different from genesis block Tx", i)
+					return
+				}
+			}
+			panic("problem with block.Block.Equals")
 		}
 
-		doneChan <- nil
-	}()
+		errChan <- nil
+	}(doneChan)
 
 	// Make sure we receive a GetCandidate message
 	bin, err := streamer.Read()

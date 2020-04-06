@@ -18,6 +18,7 @@ const (
 	mutexProfileRate = 1
 )
 
+// Profile represents the cpu or memory profile sampled at regular intervals
 type Profile struct {
 	name  string
 	n, d  uint
@@ -25,6 +26,7 @@ type Profile struct {
 	quit  chan struct{}
 }
 
+// NewProfile returns a new instance of a Profile
 func NewProfile(name string, n, d uint, start bool) Profile {
 	return Profile{
 		name:  name,
@@ -74,7 +76,6 @@ func NewProfile(name string, n, d uint, start bool) Profile {
 // goroutines with contended mutexes. (find too wide protected regions)
 // (suitable in development)
 // output: mutex_$timestamp.prof file
-
 func (p *Profile) loop() {
 
 	var err error
@@ -122,6 +123,7 @@ func (p *Profile) loop() {
 
 // startProfiling initializes the profile selected by name and starts samples
 // fetching
+//nolint:goconst
 func startProfiling(name string) (*os.File, error) {
 
 	createFile := func(name string) *os.File {

@@ -240,7 +240,7 @@ func TestEqualsMethodTimeLock(t *testing.T) {
 	assert.True(a.Equals(c))
 }
 
-// Test that the tx type has overriden the standard hash function
+// Test that the tx type has overridden the standard hash function
 func TestBidHashNotStandard(t *testing.T) {
 
 	assert := assert.New(t)

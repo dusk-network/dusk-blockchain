@@ -29,11 +29,6 @@ func (v VotingCommittee) Size() int {
 	return v.TotalOccurrences()
 }
 
-// Remove a member from the VotingCommittee by its BLS public key.
-func (v *VotingCommittee) Remove(pk []byte) bool {
-	return v.Remove(pk)
-}
-
 // MemberKeys returns the BLS public keys of all the members in a VotingCommittee.
 func (v VotingCommittee) MemberKeys() [][]byte {
 	return v.Unravel()
@@ -186,9 +181,7 @@ func copyMembers(members map[string]*Member) map[string]*Member {
 			PublicKeyBLS: v.PublicKeyBLS,
 		}
 
-		for _, stake := range v.Stakes {
-			member.Stakes = append(member.Stakes, stake)
-		}
+		member.Stakes = append(member.Stakes, v.Stakes...)
 		m[k] = member
 	}
 

@@ -40,6 +40,9 @@ func RandomSlice(t *testing.T, size uint32) []byte {
 	return randSlice
 }
 
+// StartPeerReader creates a Peer reader for testing purposese. The reader is
+// at the receiving end of a binary-serialized Gossip notification and communicates through the
+// eventbus
 func StartPeerReader(conn net.Conn, bus *eventbus.EventBus, rpcBus *rpcbus.RPCBus, counter *chainsync.Counter, responseChan chan<- *bytes.Buffer) (*peer.Reader, error) {
 	dupeMap := dupemap.NewDupeMap(5)
 	exitChan := make(chan struct{}, 1)

@@ -95,35 +95,41 @@ func (h *Helper) Initialize(ru consensus.RoundUpdate) {
 
 func provideCertificate(rpcBus *rpcbus.RPCBus) {
 	c := make(chan rpcbus.Request, 1)
-	rpcBus.Register(topics.GetLastCertificate, c)
+	if err := rpcBus.Register(topics.GetLastCertificate, c); err != nil {
+		panic(err)
+	}
 
 	go func(c chan rpcbus.Request) {
 		r := <-c
 		buf := new(bytes.Buffer)
 		cert := block.EmptyCertificate()
-		message.MarshalCertificate(buf, cert)
-		r.RespChan <- rpcbus.Response{*buf, nil}
+		err := message.MarshalCertificate(buf, cert)
+		r.RespChan <- rpcbus.NewResponse(*buf, err)
 	}(c)
 }
 
 // TriggerBlockGeneration creates a random ScoreEvent and triggers block generation
 func (h *Helper) TriggerBlockGeneration() {
 	sev := randomScoreEvent()
-	h.Generator.Collect(sev)
+	if err := h.Generator.Collect(sev); err != nil {
+		panic(err)
+	}
 }
 
 // ProvideTransactions sends a set of transactions upon the request of
 // the blockgenerator, standing in place of the mempool.
 func (h *Helper) ProvideTransactions(t *testing.T) {
 	reqChan := make(chan rpcbus.Request, 1)
-	h.RBus.Register(topics.GetMempoolTxsBySize, reqChan)
+	if err := h.RBus.Register(topics.GetMempoolTxsBySize, reqChan); err != nil {
+		panic(err)
+	}
 
 	go func(reqChan chan rpcbus.Request) {
 		r := <-reqChan
 		txs := helper.RandomSliceOfTxs(t, h.txBatchCount)
 		// Remove coinbase
 		txs = txs[1:]
-		r.RespChan <- rpcbus.Response{txs, nil}
+		r.RespChan <- rpcbus.NewResponse(txs, nil)
 	}(reqChan)
 }
 

@@ -40,7 +40,7 @@ func TestShortRead(t *testing.T) {
 	buffer := make([]byte, 4)
 	pw, pr := net.Pipe()
 
-	go delayedWrite(t, pw)
+	go delayedWrite(pw)
 
 	if _, err := pr.Read(buffer); err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestShortRead(t *testing.T) {
 	buffer = make([]byte, 4)
 	pw, pr = net.Pipe()
 
-	go delayedWrite(t, pw)
+	go delayedWrite(pw)
 
 	if _, err := io.ReadFull(pr, buffer); err != nil {
 		t.Fatal(err)
@@ -63,14 +63,14 @@ func TestShortRead(t *testing.T) {
 	assert.Equal(t, []byte{1, 2, 3, 4}, buffer)
 }
 
-func delayedWrite(t *testing.T, c net.Conn) {
+func delayedWrite(c net.Conn) {
 	// Send first two bytes
 	if _, err := c.Write([]byte{1, 2}); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	// Wait a bit, and write the other two
 	time.Sleep(100 * time.Millisecond)
 	if _, err := c.Write([]byte{3, 4}); err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 }

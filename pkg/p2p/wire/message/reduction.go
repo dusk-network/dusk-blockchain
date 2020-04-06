@@ -21,7 +21,7 @@ type (
 	}
 )
 
-// New returns and empty Reduction event.
+// NewReduction returns and empty Reduction event.
 func NewReduction(hdr header.Header) *Reduction {
 	return &Reduction{
 		hdr:        hdr,
@@ -38,12 +38,12 @@ func (r Reduction) String() string {
 	return sb.String()
 }
 
-// Header is used to comply to consensus.Message
+// State is used to comply to consensus.Message
 func (r Reduction) State() header.Header {
 	return r.hdr
 }
 
-// Header is used to comply to consensus.Message
+// Sender is used to comply to consensus.Message
 func (r Reduction) Sender() []byte {
 	return r.hdr.Sender()
 }
@@ -54,6 +54,7 @@ func (r Reduction) Equal(msg Message) bool {
 	return ok && r.hdr.Equal(m.hdr) && bytes.Equal(r.SignedHash, m.SignedHash)
 }
 
+//UnmarshalReductionMessage unmarshals a serializzation from a buffer
 func UnmarshalReductionMessage(r *bytes.Buffer, m SerializableMessage) error {
 	bev := NewReduction(header.Header{})
 	if err := UnmarshalReduction(r, bev); err != nil {
@@ -64,7 +65,7 @@ func UnmarshalReductionMessage(r *bytes.Buffer, m SerializableMessage) error {
 	return nil
 }
 
-// Unmarshal unmarshals the buffer into a Reduction event.
+// UnmarshalReduction unmarshals the buffer into a Reduction event.
 func UnmarshalReduction(r *bytes.Buffer, bev *Reduction) error {
 	if err := header.Unmarshal(r, &bev.hdr); err != nil {
 		return err
@@ -74,7 +75,7 @@ func UnmarshalReduction(r *bytes.Buffer, bev *Reduction) error {
 	return encoding.ReadBLS(r, bev.SignedHash)
 }
 
-// Marshal a Reduction event into a buffer.
+// MarshalReduction a Reduction event into a buffer.
 func MarshalReduction(r *bytes.Buffer, bev Reduction) error {
 	if err := header.Marshal(r, bev.State()); err != nil {
 		return err
@@ -87,6 +88,7 @@ func MarshalReduction(r *bytes.Buffer, bev Reduction) error {
 	return nil
 }
 
+// UnmarshalVoteSet unmarshals a Reduction slice from a buffer
 func UnmarshalVoteSet(r *bytes.Buffer) ([]Reduction, error) {
 	length, err := encoding.ReadVarInt(r)
 	if err != nil {
@@ -125,7 +127,7 @@ func MarshalVoteSet(r *bytes.Buffer, evs []Reduction) error {
 /* MOCKUP FUNCTIONS */
 /********************/
 
-// MockEvent mocks a Reduction event and returns it.
+// MockReduction mocks a Reduction event and returns it.
 // It includes a vararg iterativeIdx to help avoiding duplicates when testing
 func MockReduction(hash []byte, round uint64, step uint8, keys []key.ConsensusKeys, iterativeIdx ...int) Reduction {
 	idx := 0

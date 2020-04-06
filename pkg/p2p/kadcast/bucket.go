@@ -84,7 +84,7 @@ func (b *bucket) addPeer(peer Peer) {
 	if len(b.entries) < int(MaxBucketPeers) {
 		// Insert it into the set if not present
 		// on the current entries set.
-		if b.lruPresent[peer] == false {
+		if !b.lruPresent[peer] {
 			b.entries = append(b.entries, peer)
 			b.peerCount++
 			b.lruPresent[peer] = true
@@ -99,7 +99,7 @@ func (b *bucket) addPeer(peer Peer) {
 	//
 	// Check if peer is not already present into the
 	// entries set
-	if b.lruPresent[peer] == false {
+	if !b.lruPresent[peer] {
 		// Search for the least recently used peer.
 		var index, _ = b.findLRUPeerIndex()
 		// Remove it from the entries set and from

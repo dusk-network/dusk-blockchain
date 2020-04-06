@@ -17,6 +17,7 @@ type connmgr struct {
 }
 
 //NewConnMgr creates a new connection manager
+//nolint:golint
 func NewConnMgr(cfg CmgrConfig) *connmgr {
 	cnnmgr := &connmgr{
 		cfg,

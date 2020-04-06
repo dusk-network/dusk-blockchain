@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	// MaxFrameSize is set at 250000 bytes
 	MaxFrameSize = uint64(250000)
 )
 
@@ -50,6 +51,8 @@ func WriteFrame(buf *bytes.Buffer, magic protocol.Magic, cs []byte) error {
 	return nil
 }
 
+// ReadFrame extract the bytes representing the size of the packet and thus
+// read the amount of bytes specified by such prefix in little endianness
 func ReadFrame(r io.Reader) (uint64, error) {
 	var length uint64
 	sizeBytes := make([]byte, 8)
