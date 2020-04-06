@@ -231,7 +231,7 @@ func handleChunks(chunkMap map[[16]byte]bool, peerInf Peer, packet Packet, route
 	}
 	// Verify chunkID on the memmoryMap. If we already have it stored,+
 	// means that the packet is repeated and we just ignore it.
-	if chunkMap[*chunkID] == true {
+	if chunkMap[*chunkID] {
 		log.WithFields(log.Fields{
 			"chunk_id": *chunkID,
 		}).Warn("Chunk ID already registered. Ignoring packet.")

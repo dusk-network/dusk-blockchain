@@ -97,7 +97,7 @@ PacketConnCreation:
 		payload, byteNum, err := readTCPFrame(pc)
 		if err != nil {
 			log.WithError(err).Warn("Error on frame read")
-			pc.Close()
+			_ = pc.Close()
 			continue
 		}
 

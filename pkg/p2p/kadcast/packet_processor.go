@@ -92,7 +92,7 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 			tipus, senderID, nonce, peerRecepPort := packet.getHeadersInfo()
 
 			// Verify IDNonce
-			err = verifyIDNonce(senderID, nonce)
+			//err = verifyIDNonce(senderID, nonce)
 			// If we get an error, we just skip the whole process since the
 			// Peer was not validated.
 			if err := verifyIDNonce(senderID, nonce); err != nil {

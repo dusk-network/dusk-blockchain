@@ -206,9 +206,7 @@ func (n *Network) WaitUntil(t *testing.T, ind uint, targetHeight uint64, waitFor
 
 	condition := func() bool {
 		// Construct query to fetch block height
-		query := fmt.Sprintf(
-			"{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}",
-		)
+		query := "{\"query\" : \"{ blocks (last: 1) { header { height } } }\"}"
 
 		var result map[string]map[string][]map[string]map[string]int
 		if err := n.SendQuery(ind, query, &result); err != nil {

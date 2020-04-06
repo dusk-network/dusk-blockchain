@@ -22,6 +22,8 @@ const (
 )
 
 var (
+	//ErrExceedMaxLen is the error thrown if the message size exceeds the max
+	//frame length
 	ErrExceedMaxLen = errors.New("message size exceeds max frame length")
 )
 
