@@ -15,6 +15,7 @@ import (
 
 var testURL *url.URL
 
+// init sets up the url for local testing
 func init() {
 	var err error
 	testURL, err = url.Parse("tcp://:7878")
@@ -23,11 +24,16 @@ func init() {
 	}
 }
 
+// helloSrv is a test grpc server to test that packets are received correctly
+// through the grpc client
 type helloSrv struct {
 	requestChan chan interface{}
 	srv         *g.Server
 }
 
+// callTest is a utility struct inspired by table testing. It is used to
+// specify the client method that a test is supposed to call during a setup
+// phase and a tester callback to apply to the received packet
 type callTest struct {
 	clientMethod func() error
 	tester       func(interface{}) error
@@ -52,7 +58,7 @@ func newSrv(network, addr string) *helloSrv {
 	return hs
 }
 
-// TestMain automates testing of BlockUpdates received through the grpc call. It
+// Suite automates testing of BlockUpdates received through the grpc call. It
 // accepts a clientMethod to prep the test, and a varargs of tester functions
 // which apply to the payload received. Each tester is supposed to test a
 // correspondent payload
