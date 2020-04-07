@@ -357,26 +357,26 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 
 	n := uint64(math.Min(float64(tip), float64(offset)))
 
-	pos, err := utils.Search(n, func(pos uint64) (bool, error) {
-		height := tip - uint64(n) + uint64(pos)
-		hash, err := t.FetchBlockHashByHeight(height)
-		if err != nil {
-			return false, err
+	pos, searchErr := utils.Search(n, func(pos uint64) (bool, error) {
+		height := tip - n + pos
+		hash, e := t.FetchBlockHashByHeight(height)
+		if e != nil {
+			return false, e
 		}
 
-		header, err := t.FetchBlockHeader(hash)
-		if err != nil {
-			return false, err
+		header, fetchErr := t.FetchBlockHeader(hash)
+		if fetchErr != nil {
+			return false, fetchErr
 		}
 
 		return header.Timestamp >= sinceUnixTime, nil
 	})
 
-	if err != nil {
-		return 0, err
+	if searchErr != nil {
+		return 0, searchErr
 	}
 
-	return tip - uint64(n) + uint64(pos), nil
+	return tip - n + pos, nil
 
 }
 

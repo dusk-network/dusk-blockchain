@@ -180,7 +180,7 @@ func (router Router) sendPing(receiver Peer) {
 	// allocate the receiver UDPAddr
 	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
+	sendUDPPacket(router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
 }
 
 // Builds and sends a `PONG` packet
@@ -194,7 +194,7 @@ func (router Router) sendPong(receiver Peer) {
 	// allocate the receiver UDPAddr
 	destUDPAddr := receiver.getUDPAddr()
 	// Send the packet
-	sendUDPPacket("udp", router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
+	sendUDPPacket(router.myPeerUDPAddr, destUDPAddr, marshalPacket(p))
 }
 
 // Builds and sends a `FIND_NODES` packet.
@@ -209,7 +209,7 @@ func (router Router) sendFindNodes() {
 		// We don't need to add the ID to the payload snce we already have
 		// it in the headers.
 		// Send the packet
-		sendUDPPacket("udp", router.myPeerUDPAddr, peer.getUDPAddr(), marshalPacket(p))
+		sendUDPPacket(router.myPeerUDPAddr, peer.getUDPAddr(), marshalPacket(p))
 	}
 }
 
@@ -226,7 +226,7 @@ func (router Router) sendNodes(receiver Peer) {
 	if peersToSend == 0 {
 		return
 	}
-	sendUDPPacket("udp", router.myPeerUDPAddr, receiver.getUDPAddr(), marshalPacket(p))
+	sendUDPPacket(router.myPeerUDPAddr, receiver.getUDPAddr(), marshalPacket(p))
 }
 
 // BroadcastPacket sends a `CHUNKS` message across the network

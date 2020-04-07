@@ -8,6 +8,7 @@ import (
 )
 
 type (
+	//nolint:golint
 	TmpMap struct {
 		lock      sync.RWMutex
 		height    uint64
@@ -16,6 +17,7 @@ type (
 	}
 )
 
+// NewTmpMap creates a TmpMap instance
 func NewTmpMap(tolerance uint64) *TmpMap {
 	msgSets := make(map[uint64]*hashset.Set)
 	return &TmpMap{
@@ -25,6 +27,7 @@ func NewTmpMap(tolerance uint64) *TmpMap {
 	}
 }
 
+// UpdateHeight for a round
 func (t *TmpMap) UpdateHeight(round uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -39,12 +42,14 @@ func (t *TmpMap) UpdateHeight(round uint64) {
 	}
 }
 
+//nolint:golint
 func (t *TmpMap) Height() uint64 {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	return t.height
 }
 
+//nolint:golint
 func (t *TmpMap) Has(b *bytes.Buffer) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -121,7 +126,7 @@ func (t *TmpMap) AddAt(b *bytes.Buffer, height uint64) bool {
 	return t.add(b, height)
 }
 
-// Clean the TmpMap up to the upto argument
+// clean the TmpMap up to the upto argument
 func (t *TmpMap) clean() {
 	if t.height <= t.tolerance {
 		// don't clean

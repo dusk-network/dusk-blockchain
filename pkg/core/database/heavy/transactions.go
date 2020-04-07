@@ -34,19 +34,24 @@ var (
 	// writeOptions used by both non-Batch and Batch leveldb.Put
 	writeOptions = &opt.WriteOptions{NoWriteMerge: optionNoWriteMerge, Sync: optionFsyncEnabled}
 
-	// ByteOrder to be used on any internal en/decoding
-	byteOrder = binary.LittleEndian
-
 	// Key values prefixes to provide prefix-based sorting mechanism
 	// Refer to README.md for overview idea
 
-	HeaderPrefix    = []byte{0x01}
-	TxPrefix        = []byte{0x02}
-	HeightPrefix    = []byte{0x03}
-	TxIDPrefix      = []byte{0x04}
-	KeyImagePrefix  = []byte{0x05}
-	StatePrefix     = []byte{0x06}
+	// HeaderPrefix is the prefix to identify the Header
+	HeaderPrefix = []byte{0x01}
+	// TxPrefix is the prefix to identify Transactions
+	TxPrefix = []byte{0x02}
+	// HeightPrefix is the prefix to identify the Height
+	HeightPrefix = []byte{0x03}
+	// TxIDPrefix is the prefix to identify the Transaction ID
+	TxIDPrefix = []byte{0x04}
+	// KeyImagePrefix is the prefix to identify the Key Image
+	KeyImagePrefix = []byte{0x05}
+	// StatePrefix is the prefix to identify the State
+	StatePrefix = []byte{0x06}
+	// OutputKeyPrefix is the prefix to identify the Output
 	OutputKeyPrefix = []byte{0x07}
+	// BidValuesPrefix is the prefix to identify Bid Values
 	BidValuesPrefix = []byte{0x08}
 )
 
@@ -123,15 +128,15 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		//
 		// For the retrival of transactions data by block.header.hash
 
-		key := append(TxPrefix, b.Header.Hash...)
-		key = append(key, txID...)
-		value, err := utils.EncodeBlockTx(tx, uint32(i))
+		keys := append(TxPrefix, b.Header.Hash...)
+		keys = append(keys, txID...)
+		entry, err := utils.EncodeBlockTx(tx, uint32(i))
 
 		if err != nil {
 			return err
 		}
 
-		t.put(key, value)
+		t.put(keys, entry)
 
 		// Schema
 		//
@@ -159,13 +164,13 @@ func (t transaction) StoreBlock(b *block.Block) error {
 		//
 		// To make FetchOutputKey functioning
 		for i, output := range tx.StandardTx().Outputs {
-			value := make([]byte, 8)
+			v := make([]byte, 8)
 			// Only lock the first output, so that change outputs are
 			// not affected.
 			if i == 0 {
-				binary.LittleEndian.PutUint64(value, tx.LockTime()+b.Header.Height)
+				binary.LittleEndian.PutUint64(v, tx.LockTime()+b.Header.Height)
 			}
-			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), value)
+			t.put(append(OutputKeyPrefix, output.PubKey.P.Bytes()...), v)
 		}
 
 	}
@@ -379,7 +384,7 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 			return nil, err
 		}
 
-		// If we don't fetch the correct indeces (tx positions), merkle tree
+		// If we don't fetch the correct indexes (tx positions), merkle tree
 		// changes and as result we've got new block hash
 		if _, ok := tempTxs[txIndex]; ok {
 			return nil, errors.New("duplicated tx index")
@@ -388,7 +393,7 @@ func (t transaction) FetchBlockTxs(hashHeader []byte) ([]transactions.Transactio
 		tempTxs[txIndex] = tx
 	}
 
-	// Reorder Tx slice as per retrieved indeces
+	// Reorder Tx slice as per retrieved indexes
 	resultTxs := make([]transactions.Transaction, len(tempTxs))
 	for k, v := range tempTxs {
 		resultTxs[k] = v
@@ -482,13 +487,13 @@ func (t transaction) FetchBlockTxByHash(txID []byte) (transactions.Transaction, 
 
 		// TxID matched. Decode the Tx data
 		value := iterator.Value()
-		tx, txIndex, err := utils.DecodeBlockTx(value, database.AnyTxType)
+		tx, idx, err := utils.DecodeBlockTx(value, database.AnyTxType)
 
 		if err != nil {
-			return nil, txIndex, hashHeader, err
+			return nil, idx, hashHeader, err
 		}
 
-		return tx, txIndex, hashHeader, nil
+		return tx, idx, hashHeader, nil
 	}
 
 	return nil, txIndex, nil, errors.New("block tx is available but fetching it fails")
@@ -613,7 +618,7 @@ func (t transaction) FetchBidValues() ([]byte, []byte, error) {
 
 	// Let's avoid any runtime panics by doing a sanity check on the value length before
 	if len(value) != 64 {
-		return nil, nil, errors.New("bid values non-existant or incorrectly encoded")
+		return nil, nil, errors.New("bid values non-existent or incorrectly encoded")
 	}
 
 	return value[0:32], value[32:64], nil
@@ -630,15 +635,15 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 	n := uint64(math.Min(float64(tip), float64(offset)))
 
 	pos, err := utils.Search(n, func(pos uint64) (bool, error) {
-		height := tip - uint64(n) + uint64(pos)
-		hash, err := t.FetchBlockHashByHeight(height)
-		if err != nil {
-			return false, err
+		height := tip - n + pos
+		hash, heightErr := t.FetchBlockHashByHeight(height)
+		if heightErr != nil {
+			return false, heightErr
 		}
 
-		header, err := t.FetchBlockHeader(hash)
-		if err != nil {
-			return false, err
+		header, blockHdrErr := t.FetchBlockHeader(hash)
+		if blockHdrErr != nil {
+			return false, blockHdrErr
 		}
 
 		return header.Timestamp >= sinceUnixTime, nil
@@ -648,7 +653,7 @@ func (t transaction) FetchBlockHeightSince(sinceUnixTime int64, offset uint64) (
 		return 0, err
 	}
 
-	return tip - uint64(n) + uint64(pos), nil
+	return tip - n + pos, nil
 
 }
 

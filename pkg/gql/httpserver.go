@@ -21,7 +21,7 @@ import (
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 )
 
-var log *logger.Entry = logger.WithFields(logger.Fields{"prefix": "gql"})
+var log = logger.WithFields(logger.Fields{"prefix": "gql"})
 
 const (
 	endpointWS  = "/ws"
@@ -117,6 +117,8 @@ func (s *Server) listenOnHTTPServer(httpServer *http.Server) {
 	}
 }
 
+// EnableGraphQL sets up the GraphQL service, wires the request handler, sets
+// the limiter, instantiates the Schema and creates a DB connection
 func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 
 	// GraphQL service
@@ -151,6 +153,8 @@ func (s *Server) EnableGraphQL(serverMux *http.ServeMux) error {
 	return nil
 }
 
+// EnableNotifications uses the configured amount of brokers and clients (per
+// broker) to push graphql notifications over websocket
 func (s *Server) EnableNotifications(serverMux *http.ServeMux) error {
 
 	nc := cfg.Get().Gql.Notification
@@ -197,7 +201,7 @@ func (s *Server) Stop() error {
 	s.started = false
 	s.pool.Close()
 	if err := s.listener.Close(); err != nil {
-		log.Errorf("error shutting down, %v\n", err)
+		log.Errorf("error shutting down, %v", err)
 		return err
 	}
 

@@ -14,7 +14,9 @@ import (
 
 func TestRequestData(t *testing.T) {
 	_, db := lite.CreateDBConnection()
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	responseChan := make(chan *bytes.Buffer, 100)
 	dataRequestor := responding.NewDataRequestor(db, nil, responseChan)

@@ -92,7 +92,7 @@ func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 
 // Analyzes if the announced number of Peers included on the
 // `NODES` message payload is the same as the received one.
-// Returns `true` if it is correct and `false` otherways.
+// Returns `true` if it is correct and `false` otherwise.
 func (pac Packet) checkNodesPayloadConsistency(byteNum int) bool {
 
 	// Get number of Peers announced.

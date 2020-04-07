@@ -22,9 +22,10 @@ import (
 
 var _ consensus.Component = (*Generator)(nil)
 
-var lg *log.Entry = log.WithField("process", "candidate generator")
+var lg = log.WithField("process", "candidate generator")
 
-// TBD along with block size and processing.MaxFrameSize
+// MaxTxSetSize defines the maximum amount of transactions.
+// It is TBD along with block size and processing.MaxFrameSize
 const MaxTxSetSize = 150000
 
 // Generator is responsible for generating candidate blocks, and propagating them
@@ -81,7 +82,8 @@ type ScoreFactory struct {
 	voteHash []byte
 }
 
-// Create
+// Create a score message by setting the right header. It complies with the
+// consensus.PacketFactory interface
 func (sf ScoreFactory) Create(sender []byte, round uint64, step uint8) consensus.InternalPacket {
 	hdr := sf.sp.State()
 	if hdr.Round != round || hdr.Step != step {
@@ -107,8 +109,8 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	score := bg.signer.Compose(scoreFactory)
 	lg.Debugln("sending score")
 	msg := message.New(topics.Score, score)
-	if err := bg.signer.Gossip(msg, bg.ID()); err != nil {
-		return err
+	if e := bg.signer.Gossip(msg, bg.ID()); e != nil {
+		return e
 	}
 
 	// Create candidate message
@@ -132,6 +134,7 @@ func (bg *Generator) Collect(e consensus.InternalPacket) error {
 	return bg.signer.Gossip(msg, bg.ID())
 }
 
+// Generate a Block
 func (bg *Generator) Generate(sev message.ScoreProposal) (*block.Block, error) {
 	return bg.GenerateBlock(bg.roundInfo.Round, sev.Seed, sev.Proof, sev.Score, bg.roundInfo.Hash)
 }
@@ -234,10 +237,10 @@ func constructCoinbaseTx(rewardReceiver *key.PublicKey, proof []byte, score []by
 	reward.SetBigInt(big.NewInt(int64(config.GeneratorReward)))
 
 	// Store the reward in the coinbase tx
-	tx.AddReward(*rewardReceiver, reward)
+	// TODO: what happens if the maximum amount of outputs has been reached?
+	_ = tx.AddReward(*rewardReceiver, reward)
 
 	// TODO: Optional here could be to verify if the reward is spendable by the generator wallet.
 	// This could be achieved with a request to dusk-wallet/v2
-
 	return tx
 }

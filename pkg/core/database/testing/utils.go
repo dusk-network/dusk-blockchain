@@ -2,10 +2,8 @@ package test
 
 import (
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/tests/helper"
@@ -23,7 +21,7 @@ var (
 
 // storeBlocks is a helper function to store a slice of blocks in a
 // sequential manner.
-func storeBlocks(test *testing.T, db database.DB, blocks []*block.Block) error {
+func storeBlocks(db database.DB, blocks []*block.Block) error {
 	err := db.Update(func(t database.Transaction) error {
 		for _, block := range blocks {
 			// Store block
@@ -42,7 +40,7 @@ func storeBlocks(test *testing.T, db database.DB, blocks []*block.Block) error {
 // A helper function to generate a set of blocks that can be chained
 func generateChainBlocks(test *testing.T, blocksCount int) ([]*block.Block, error) {
 
-	overallBlockTxs := (1 + 4*int(sampleTxsBatchCount))
+	overallBlockTxs := 1 + 4*int(sampleTxsBatchCount)
 	overallTxsCount := blocksCount * overallBlockTxs
 	fmt.Printf("--- MSG  Generate sample data of %d blocks with %d txs each (overall txs %d)\n", blocksCount, overallBlockTxs, overallTxsCount)
 
@@ -71,18 +69,4 @@ func generateRandomBlocks(test *testing.T, blocksCount int) []*block.Block {
 		newBlocks[i] = helper.RandomBlock(test, uint64(i+1), sampleTxsBatchCount)
 	}
 	return newBlocks
-}
-
-func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
-	c := make(chan struct{})
-	go func() {
-		defer close(c)
-		wg.Wait()
-	}()
-	select {
-	case <-c:
-		return false // completed normally
-	case <-time.After(timeout):
-		return true // timed out
-	}
 }

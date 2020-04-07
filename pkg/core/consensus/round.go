@@ -19,7 +19,6 @@ import (
 
 var _ EventPlayer = (*Coordinator)(nil)
 var _ Signer = (*Coordinator)(nil)
-var emptyPayload = new(bytes.Buffer)
 
 var lg = log.WithField("process", "coordinator")
 
@@ -165,7 +164,6 @@ type Coordinator struct {
 	eventBus   *eventbus.EventBus
 	keys       key.ConsensusKeys
 	factories  []ComponentFactory
-	components []Component
 	eventqueue *Queue
 	roundQueue *Queue
 
@@ -212,6 +210,7 @@ func Start(eventBus *eventbus.EventBus, keys key.ConsensusKeys, factories ...Com
 	return c
 }
 
+//StopConsensus stop the consensus for this round, finalizes the Round, instantiate a new Store
 func (c *Coordinator) StopConsensus(m message.Message) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -262,10 +261,8 @@ func (c *Coordinator) CollectRoundUpdate(m message.Message) error {
 
 func (c *Coordinator) flushRoundQueue() {
 	evs := c.roundQueue.Flush(c.Round())
-	if evs != nil {
-		for _, ev := range evs {
-			c.store.Dispatch(ev)
-		}
+	for _, ev := range evs {
+		c.store.Dispatch(ev)
 	}
 }
 
@@ -298,12 +295,15 @@ func (c *Coordinator) reinstantiateStore() {
 	c.swapStore(store)
 }
 
+// CollectEvent collects the consensus message and reroutes it to the proper
+// component.
+// It is the callback passed to the eventbus.Multicaster
 func (c *Coordinator) CollectEvent(m message.Message) error {
 	var msg InternalPacket
 	switch m.Payload().(type) {
 	case bytes.Buffer:
 		p := m.Payload().(bytes.Buffer)
-		topics.Extract(&p)
+		_, _ = topics.Extract(&p)
 		return fmt.Errorf("trying to feed the Coordinator a bytes.Buffer for message: %s", m.Category())
 	case InternalPacket:
 		msg = m.Payload().(InternalPacket)
@@ -364,6 +364,8 @@ func (c *Coordinator) swapStore(store *roundStore) {
 	c.store = store
 }
 
+// FinalizeRound triggers the store to dispatch a finalize to the Components
+// and clear the internal EventQueue
 func (c *Coordinator) FinalizeRound() {
 	if c.store != nil {
 		c.store.DispatchFinalize()
@@ -371,6 +373,9 @@ func (c *Coordinator) FinalizeRound() {
 	}
 }
 
+// Forward complies to the EventPlayer interface. It increments the internal
+// step count and returns it. It is used as a callback by the consensus
+// components
 func (c *Coordinator) Forward(id uint32) uint8 {
 	if c.store.hasComponent(id) {
 		lg.WithField("id", id).Traceln("incrementing step")
@@ -386,9 +391,9 @@ func (c *Coordinator) dispatchQueuedEvents() {
 	}
 }
 
-// XXX: adjust the signature verification on reduction (and agreement)
 // Sign uses the blockhash (which is lost when decoupling the Header and the Payload) to recompose the Header and sign the Payload
 // by adding it to the signature. Argument packet can be nil
+// XXX: adjust the signature verification on reduction (and agreement)
 func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 	preimage := new(bytes.Buffer)
 	if err := header.MarshalSignableVote(preimage, h); err != nil {
@@ -405,21 +410,21 @@ func (c *Coordinator) Sign(h header.Header) ([]byte, error) {
 
 // Gossip concatenates the topic, the header and the payload,
 // and gossips it to the rest of the network.
-// TODO: interface - marshalling should actually be done after the Gossip to
-// respect the simmetry of the architecture
+// TODO: interface - marshaling should actually be done after the Gossip to
+// respect the symmetry of the architecture
 func (c *Coordinator) Gossip(msg message.Message, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)
 	}
 
-	// message.Marshal takes care of prepending the topic, marshalling the
+	// message.Marshal takes care of prepending the topic, marshaling the
 	// header, etc
 	buf, err := message.Marshal(msg)
 	if err != nil {
 		return err
 	}
 
-	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshalling
+	// TODO: interface - setting the payload to a buffer will go away as soon as the Marshaling
 	// is performed where it is supposed to (i.e. after the Gossip)
 	serialized := message.New(msg.Category(), buf)
 
@@ -428,10 +433,15 @@ func (c *Coordinator) Gossip(msg message.Message, id uint32) error {
 	return nil
 }
 
+// Compose complies with the consensus.Signer interface.
+// It is a callback used by the consensus components to create the
+// appropriate Header for the Consensus
 func (c *Coordinator) Compose(pf PacketFactory) InternalPacket {
 	return pf.Create(c.keys.BLSPubKeyBytes, c.Round(), c.Step())
 }
 
+// SendInternally publish a message for internal consumption (and therefore
+// does not carry the topic, nor needs binary de- serialization)
 func (c *Coordinator) SendInternally(topic topics.Topic, msg message.Message, id uint32) error {
 	if !c.store.hasComponent(id) {
 		return fmt.Errorf("caller with ID %d is unregistered", id)

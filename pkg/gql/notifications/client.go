@@ -29,7 +29,7 @@ func (c *wsClient) writeLoop() {
 		// proxies and other intermediaries.
 		_ = c.conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(time.Second))
 
-		c.conn.Close()
+		_ = c.conn.Close()
 
 		log.Tracef("Close websocket client %s", c.id)
 	}()

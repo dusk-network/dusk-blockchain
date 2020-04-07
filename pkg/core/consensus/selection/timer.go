@@ -20,5 +20,5 @@ func (t *timer) stop() {
 }
 
 func (t *timer) trigger() {
-	t.s.sendBestEvent()
+	_ = t.s.sendBestEvent()
 }

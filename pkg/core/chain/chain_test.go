@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// This test ensures the correct behaviour from the Chain, when
+// This test ensures the correct behavior from the Chain, when
 // accepting a block from a peer.
 func TestAcceptFromPeer(t *testing.T) {
 	eb, _, c := setupChainTest(t, false)
@@ -54,14 +54,19 @@ func TestAcceptFromPeer(t *testing.T) {
 	blk = mockAcceptableBlock(t, c.prevBlock)
 	msg = message.New(topics.AcceptedBlock, *blk)
 
-	go func() {
+	errChan := make(chan error, 1)
+	go func(chan error) {
 		if err := c.onAcceptBlock(msg); err.Error() != "request timeout" {
-			t.Fatal(err)
+			errChan <- err
 		}
-	}()
+	}(errChan)
 
 	// Should receive a StopConsensus message
-	<-stopConsensusChan
+	select {
+	case err := <-errChan:
+		t.Fatal(err)
+	case <-stopConsensusChan:
+	}
 
 	// Discard block gossip
 	if _, err := streamer.Read(); err != nil {
@@ -86,7 +91,7 @@ func TestAcceptFromPeer(t *testing.T) {
 	assert.Equal(t, uint64(2), round)
 }
 
-// This test ensures the correct behaviour when accepting a block
+// This test ensures the correct behavior when accepting a block
 // directly from the consensus.
 func TestAcceptIntermediate(t *testing.T) {
 	eb, rpc, c := setupChainTest(t, false)
@@ -163,7 +168,7 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 
 	go func() {
 		r := <-c
-		r.RespChan <- rpcbus.Response{cm, nil}
+		r.RespChan <- rpcbus.NewResponse(cm, nil)
 	}()
 }
 
@@ -184,7 +189,9 @@ func TestFetchTip(t *testing.T) {
 	chain, err := New(eb, rpc, nil)
 
 	assert.Nil(t, err)
-	defer chain.Close()
+	defer func() {
+		err = chain.Close()
+	}()
 
 	// on a modern chain, state(tip) must point at genesis
 	var s *database.State
@@ -207,7 +214,9 @@ func TestCertificateExpiredProvisioner(t *testing.T) {
 	counter := chainsync.NewCounter(eb)
 	chain, err := New(eb, rpc, counter)
 	assert.Nil(t, err)
-	defer chain.Close()
+	defer func() {
+		_ = chain.Close()
+	}()
 
 	// Add some provisioners to our chain, including one that is just about to expire
 	p, k := consensus.MockProvisioners(3)
@@ -359,7 +368,7 @@ func TestRebuildChain(t *testing.T) {
 	}
 
 	// Now, send a request to rebuild the chain
-	if _, err := rb.Call(topics.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
+	if _, err := rb.Call(topics.RebuildChain, rpcbus.NewRequest(bytes.Buffer{}), 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -390,7 +399,7 @@ func createBid(t *testing.T) user.Bid {
 
 	var arr [32]byte
 	copy(arr[:], b)
-	return user.Bid{arr, arr, 1000}
+	return user.Bid{X: arr, M: arr, EndHeight: 1000}
 }
 
 func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
@@ -398,7 +407,7 @@ func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
 	rb.Register(topics.ClearWalletDatabase, c)
 	go func() {
 		r := <-c
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, nil)
 	}()
 }
 

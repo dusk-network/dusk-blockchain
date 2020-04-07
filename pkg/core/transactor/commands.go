@@ -8,7 +8,7 @@ import (
 
 	"math/big"
 
-	ristretto "github.com/bwesterb/go-ristretto"
+	"github.com/bwesterb/go-ristretto"
 	cfg "github.com/dusk-network/dusk-blockchain/pkg/config"
 	"github.com/dusk-network/dusk-blockchain/pkg/core/database"
 	walletdb "github.com/dusk-network/dusk-wallet/v2/database"
@@ -29,13 +29,13 @@ func (t *Transactor) loadWallet(password string) (string, error) {
 	// Then load the wallet
 	w, err := wallet.LoadFromFile(testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
 	walletAddr, err := w.PublicAddress()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
@@ -51,13 +51,13 @@ func (t *Transactor) createWallet(password string) (string, error) {
 
 	w, err := wallet.New(rand.Read, testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
 	walletAddr, err := w.PublicAddress()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
@@ -69,7 +69,7 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 
 	seedBytes, err := hex.DecodeString(seed)
 	if err != nil {
-		return "", fmt.Errorf("error attempting to decode seed: %v\n", err)
+		return "", fmt.Errorf("error attempting to decode seed: %v", err)
 	}
 
 	// First load the database
@@ -81,13 +81,13 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 	// Then load the wallet
 	w, err := wallet.LoadFromSeed(seedBytes, testnet, db, t.fetchDecoys, t.fetchInputs, password, cfg.Get().Wallet.File)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
 	walletAddr, err := w.PublicAddress()
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return "", err
 	}
 
@@ -95,6 +95,7 @@ func (t *Transactor) createFromSeed(seed string, password string) (string, error
 	return walletAddr, nil
 }
 
+// CreateStandardTx will create a tx for given amount and address
 func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactions.Transaction, error) {
 
 	// Create a new standard tx
@@ -109,19 +110,19 @@ func (t *Transactor) CreateStandardTx(amount uint64, address string) (transactio
 	amountScalar.SetBigInt(big.NewInt(0).SetUint64(amount))
 
 	// Send amount to address
-	if err := tx.AddOutput(key.PublicAddress(address), amountScalar); err != nil {
-		return nil, err
+	if e := tx.AddOutput(key.PublicAddress(address), amountScalar); e != nil {
+		return nil, e
 	}
 
 	// Sign tx
-	err = t.w.Sign(tx)
-	if err != nil {
+	if err := t.w.Sign(tx); err != nil {
 		return nil, err
 	}
 
 	return tx, nil
 }
 
+// CreateStakeTx create a stake for amount and lockTime
 func (t *Transactor) CreateStakeTx(amount, lockTime uint64) (transactions.Transaction, error) {
 
 	// Turn amount into a scalar
@@ -143,6 +144,7 @@ func (t *Transactor) CreateStakeTx(amount, lockTime uint64) (transactions.Transa
 	return tx, nil
 }
 
+// CreateBidTx for a amount and lockTime
 func (t *Transactor) CreateBidTx(amount, lockTime uint64) (transactions.Transaction, error) {
 
 	// Turn amount into a scalar
@@ -171,7 +173,7 @@ func (t *Transactor) syncWallet() error {
 		// Get Wallet height
 		walletHeight, err := t.w.GetSavedHeight()
 		if err != nil {
-			t.w.UpdateWalletHeight(0)
+			_ = t.w.UpdateWalletHeight(0)
 		}
 
 		// Get next block using walletHeight and tipHash of the node
@@ -181,13 +183,13 @@ func (t *Transactor) syncWallet() error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("error fetching block from node db: %v\n", err)
+			return fmt.Errorf("error fetching block from node db: %v", err)
 		}
 
 		// call wallet.CheckBlock
 		spentCount, receivedCount, err := t.w.CheckWireBlock(*blk)
 		if err != nil {
-			return fmt.Errorf("error checking block: %v\n", err)
+			return fmt.Errorf("error checking block: %v", err)
 		}
 
 		totalSpent += spentCount
@@ -217,6 +219,7 @@ func (t *Transactor) Balance() (uint64, uint64, error) {
 	return t.w.Balance()
 }
 
+// Address is a wrapper around wallet PublicAddress
 func (t *Transactor) Address() (string, error) {
 	return t.w.PublicAddress()
 }

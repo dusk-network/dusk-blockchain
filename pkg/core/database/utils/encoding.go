@@ -16,7 +16,7 @@ var (
 	byteOrder = binary.LittleEndian
 )
 
-// encodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
+// EncodeBlockTx tries to serialize type, index and encoded value of transactions.Transaction
 func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) {
 
 	buf := new(bytes.Buffer)
@@ -43,6 +43,7 @@ func EncodeBlockTx(tx transactions.Transaction, txIndex uint32) ([]byte, error) 
 	return buf.Bytes(), nil
 }
 
+// DecodeBlockTx tries to deserialize the type, index and decoded value of a tx
 func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Transaction, uint32, error) {
 
 	txIndex := uint32(math.MaxUint32)
@@ -66,15 +67,15 @@ func DecodeBlockTx(data []byte, typeFilter transactions.TxType) (transactions.Tr
 	}
 
 	// Read tx index field
-	if err := ReadUint32(reader, &txIndex); err != nil {
-		return nil, txIndex, err
+	if e := ReadUint32(reader, &txIndex); e != nil {
+		return nil, txIndex, e
 	}
 
 	tx, err = message.UnmarshalTx(reader)
 	return tx, txIndex, err
 }
 
-// writeUint32 Tx utility to use a Tx byteOrder on internal encoding
+// WriteUint32 Tx utility to use a Tx byteOrder on internal encoding
 func WriteUint32(w io.Writer, value uint32) error {
 	var b [4]byte
 	byteOrder.PutUint32(b[:], value)
@@ -94,7 +95,7 @@ func ReadUint32(r io.Reader, v *uint32) error {
 	return nil
 }
 
-// writeUint64 Tx utility to use a common byteOrder on internal encoding
+// WriteUint64 Tx utility to use a common byteOrder on internal encoding
 func WriteUint64(w io.Writer, value uint64) error {
 	var b [8]byte
 	byteOrder.PutUint64(b[:], value)

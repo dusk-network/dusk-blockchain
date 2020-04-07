@@ -65,6 +65,7 @@ func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServ
 	return res, err
 }
 
+//nolint:unparam
 func streamInterceptorHandler(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 
 	if err := authenticate(stream.Context(), token); err != nil {
@@ -74,6 +75,7 @@ func streamInterceptorHandler(srv interface{}, stream grpc.ServerStream, info *g
 	return handler(srv, stream)
 }
 
+//nolint:unparam
 func unaryInterceptorHandler(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 
 	if err := authenticate(ctx, token); err != nil {

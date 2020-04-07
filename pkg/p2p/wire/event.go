@@ -6,7 +6,7 @@ import (
 
 type (
 
-	// The Event is an Entity that represents the Messages travelling on the EventBus.
+	// The Event is an Entity that represents the Messages traveling on the EventBus.
 	// It would normally present always the same fields.
 	Event interface {
 		Sender() []byte
@@ -29,8 +29,8 @@ type (
 		Marshal(*bytes.Buffer, Event) error
 	}
 
-	// EventUnMarshaller is a convenient interface providing both Marshalling and
-	// Unmarshalling capabilities
+	// EventUnMarshaller is a convenient interface providing both Marshaling and
+	// Unmarshaling capabilities
 	EventUnMarshaller interface {
 		EventMarshaller
 		EventUnmarshaller
@@ -50,7 +50,7 @@ type (
 	// EventCollector is the interface for collecting Events. Pretty much processors
 	// involves some degree of Event collection (either until a Quorum is reached or
 	// until a Timeout). This Interface is typically implemented by a struct that will
-	// perform some Event unmarshalling.
+	// perform some Event unmarshaling.
 	EventCollector interface {
 		Collect(bytes.Buffer) error
 	}

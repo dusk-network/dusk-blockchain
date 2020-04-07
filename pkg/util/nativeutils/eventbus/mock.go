@@ -86,7 +86,7 @@ func (sss *StupidStreamer) Write(p []byte) (n int, err error) {
 	lg := make([]byte, 4)
 	binary.LittleEndian.PutUint32(lg, uint32(len(p)))
 	b := bytes.NewBuffer(lg)
-	b.Write(p)
+	_, _ = b.Write(p)
 
 	n, err = sss.Writer.Write(b.Bytes())
 	if err != nil {
@@ -120,6 +120,7 @@ func (sss *StupidStreamer) Close() error {
 // by the node. It can read from the gossip stream, and stores the topics that it has
 // seen.
 type SimpleStreamer struct {
+	//nolint:structcheck
 	lock       sync.RWMutex
 	seenTopics []topics.Topic
 	*bufio.Reader
@@ -142,8 +143,8 @@ func NewSimpleStreamer(magic protocol.Magic) *SimpleStreamer {
 // pipe immediatelyh
 func (ms *SimpleStreamer) Write(p []byte) (n int, err error) {
 	b := bytes.NewBuffer(p)
-	if err := ms.gossip.Process(b); err != nil {
-		return 0, err
+	if e := ms.gossip.Process(b); e != nil {
+		return 0, e
 	}
 
 	n, err = ms.Writer.Write(b.Bytes())
@@ -169,16 +170,21 @@ func (ms *SimpleStreamer) Read() ([]byte, error) {
 	return packet, nil
 }
 
+// GossipStreamer is a SimpleStreamer which removes the checksum and the topic
+// when reading. It is supposed to be used when testing data that needs to be
+// streamed over the network
 type GossipStreamer struct {
 	*SimpleStreamer
 }
 
+// NewGossipStreamer creates a new GossipStreamer instance
 func NewGossipStreamer(magic protocol.Magic) *GossipStreamer {
 	return &GossipStreamer{
 		SimpleStreamer: NewSimpleStreamer(magic),
 	}
 }
 
+// Read the stream
 func (ms *GossipStreamer) Read() ([]byte, error) {
 	b, err := ms.SimpleStreamer.Read()
 	if err != nil {

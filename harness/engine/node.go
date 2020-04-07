@@ -7,8 +7,9 @@ import (
 	"github.com/machinebox/graphql"
 )
 
+// DuskNode is the struct representing a node instance in the local Network
 type DuskNode struct {
-	Id              string
+	Id              string //nolint
 	ConfigProfileID string
 
 	// fields represents a dusk-blockchain instance
@@ -19,17 +20,18 @@ type DuskNode struct {
 	Dir string
 }
 
-func NewDuskNode(graphqlPort, nodeId int, profileID string) *DuskNode {
+// NewDuskNode instantiates a new DuskNode
+func NewDuskNode(graphqlPort, nodeID int, profileID string) *DuskNode {
 
 	node := new(DuskNode)
-	node.Id = strconv.Itoa(nodeId)
+	node.Id = strconv.Itoa(nodeID)
 	node.ConfigProfileID = profileID
 
 	node.Cfg = config.Registry{}
 	node.Cfg.Gql.Address = "127.0.0.1:" + strconv.Itoa(graphqlPort)
 	node.Cfg.Gql.Network = "tcp"
 
-	if *RPCNetworkType == "unix" {
+	if *RPCNetworkType == "unix" { //nolint
 		node.Cfg.RPC.Network = "unix"
 		node.Cfg.RPC.Address = "/dusk-grpc.sock"
 	} else {

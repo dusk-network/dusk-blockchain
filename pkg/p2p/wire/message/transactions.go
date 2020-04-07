@@ -12,6 +12,7 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/transactions"
 )
 
+// UnmarshalTxMessage unmarshals a Message carrying a tx from a buffer
 func UnmarshalTxMessage(r *bytes.Buffer, m SerializableMessage) error {
 	tx, err := UnmarshalTx(r)
 	if err != nil {
@@ -21,6 +22,7 @@ func UnmarshalTxMessage(r *bytes.Buffer, m SerializableMessage) error {
 	return nil
 }
 
+//UnmarshalTx unmarshals a tx from a buffer
 func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
 	var txType uint8
 	if err := encoding.ReadUint8(r, &txType); err != nil {
@@ -66,6 +68,7 @@ func UnmarshalTx(r *bytes.Buffer) (transactions.Transaction, error) {
 	}
 }
 
+// MarshalTx marshals a tx into a buffer
 func MarshalTx(r *bytes.Buffer, tx transactions.Transaction) error {
 	switch tx.Type() {
 	case transactions.StandardType:
@@ -83,6 +86,7 @@ func MarshalTx(r *bytes.Buffer, tx transactions.Transaction) error {
 	}
 }
 
+// MarshalStandard marshals a standard transaction into a buffer
 func MarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	return marshalStandard(w, s, true)
 }
@@ -96,7 +100,7 @@ func marshalStandard(w *bytes.Buffer, s *transactions.Standard, encodeSignature 
 		return err
 	}
 
-	if err := encoding.WriteUint8(w, uint8(s.Version)); err != nil {
+	if err := encoding.WriteUint8(w, s.Version); err != nil {
 		return err
 	}
 
@@ -135,6 +139,7 @@ func marshalStandard(w *bytes.Buffer, s *transactions.Standard, encodeSignature 
 	return encoding.WriteVarBytes(w, buf.Bytes())
 }
 
+// MarshalTimelock marshals a time lock into a buffer
 func MarshalTimelock(r *bytes.Buffer, tx *transactions.Timelock) error {
 	return marshalTimelock(r, tx, true)
 }
@@ -151,6 +156,7 @@ func marshalTimelock(r *bytes.Buffer, tx *transactions.Timelock, encodeSignature
 	return nil
 }
 
+// MarshalBid into a buffer
 func MarshalBid(r *bytes.Buffer, tx *transactions.Bid) error {
 	return marshalBid(r, tx, true)
 }
@@ -167,6 +173,7 @@ func marshalBid(r *bytes.Buffer, tx *transactions.Bid, encodeSignature bool) err
 	return nil
 }
 
+// MarshalStake into a buffer
 func MarshalStake(r *bytes.Buffer, tx *transactions.Stake) error {
 	return marshalStake(r, tx, true)
 }
@@ -187,6 +194,7 @@ func marshalStake(r *bytes.Buffer, tx *transactions.Stake, encodeSignature bool)
 	return nil
 }
 
+// MarshalCoinbase into a buffer
 func MarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	if err := encoding.WriteUint8(w, uint8(c.TxType)); err != nil {
 		return err
@@ -217,12 +225,13 @@ func MarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	return nil
 }
 
+// UnmarshalStandard tx from a buffer
 func UnmarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	RBytes := make([]byte, 32)
 	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
 	}
-	s.R.UnmarshalBinary(RBytes)
+	_ = s.R.UnmarshalBinary(RBytes)
 
 	if err := encoding.ReadUint8(w, &s.Version); err != nil {
 		return err
@@ -242,8 +251,8 @@ func UnmarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	s.Inputs = make(transactions.Inputs, lInputs)
 	for i := range s.Inputs {
 		s.Inputs[i] = &transactions.Input{Proof: mlsag.NewDualKey(), Signature: &mlsag.Signature{}}
-		if err := UnmarshalInput(w, s.Inputs[i]); err != nil {
-			return err
+		if e := UnmarshalInput(w, s.Inputs[i]); e != nil {
+			return e
 		}
 	}
 
@@ -278,6 +287,7 @@ func UnmarshalStandard(w *bytes.Buffer, s *transactions.Standard) error {
 	return s.RangeProof.Decode(bytes.NewBuffer(rangeProofBuf), true)
 }
 
+// UnmarshalTimelock tx from a buffer
 func UnmarshalTimelock(r *bytes.Buffer, tx *transactions.Timelock) error {
 	err := UnmarshalStandard(r, tx.Standard)
 	if err != nil {
@@ -291,6 +301,7 @@ func UnmarshalTimelock(r *bytes.Buffer, tx *transactions.Timelock) error {
 	return nil
 }
 
+// UnmarshalBid tx from a buffer
 func UnmarshalBid(r *bytes.Buffer, tx *transactions.Bid) error {
 	err := UnmarshalTimelock(r, tx.Timelock)
 	if err != nil {
@@ -305,6 +316,7 @@ func UnmarshalBid(r *bytes.Buffer, tx *transactions.Bid) error {
 	return nil
 }
 
+// UnmarshalStake from a buffer
 func UnmarshalStake(r *bytes.Buffer, tx *transactions.Stake) error {
 	err := UnmarshalTimelock(r, tx.Timelock)
 	if err != nil {
@@ -323,12 +335,13 @@ func UnmarshalStake(r *bytes.Buffer, tx *transactions.Stake) error {
 	return nil
 }
 
+// UnmarshalCoinbase from a buffer
 func UnmarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	RBytes := make([]byte, 32)
 	if err := encoding.Read256(w, RBytes); err != nil {
 		return err
 	}
-	c.R.UnmarshalBinary(RBytes)
+	_ = c.R.UnmarshalBinary(RBytes)
 
 	c.Score = make([]byte, 32)
 	if err := encoding.Read256(w, c.Score); err != nil {
@@ -361,7 +374,7 @@ func UnmarshalCoinbase(w *bytes.Buffer, c *transactions.Coinbase) error {
 	return nil
 }
 
-// Encode an Output struct and write to w.
+// MarshalOutput encode an Output struct and write to w.
 func MarshalOutput(w *bytes.Buffer, o *transactions.Output) error {
 	if err := encoding.Write256(w, o.Commitment.Bytes()); err != nil {
 		return err
@@ -382,31 +395,31 @@ func MarshalOutput(w *bytes.Buffer, o *transactions.Output) error {
 	return nil
 }
 
-// Decode an Output object from r into an output struct.
+// UnmarshalOutput decodes an Output object from r into an output struct.
 func UnmarshalOutput(r *bytes.Buffer, o *transactions.Output) error {
 	commBytes := make([]byte, 32)
 	if err := encoding.Read256(r, commBytes); err != nil {
 		return err
 	}
-	o.Commitment.UnmarshalBinary(commBytes)
+	_ = o.Commitment.UnmarshalBinary(commBytes)
 
 	pubKeyBytes := make([]byte, 32)
 	if err := encoding.Read256(r, pubKeyBytes); err != nil {
 		return err
 	}
-	o.PubKey.P.UnmarshalBinary(pubKeyBytes)
+	_ = o.PubKey.P.UnmarshalBinary(pubKeyBytes)
 
 	var encAmountBytes []byte
 	if err := encoding.ReadVarBytes(r, &encAmountBytes); err != nil {
 		return err
 	}
-	o.EncryptedAmount.UnmarshalBinary(encAmountBytes)
+	_ = o.EncryptedAmount.UnmarshalBinary(encAmountBytes)
 
 	var encMaskBytes []byte
 	if err := encoding.ReadVarBytes(r, &encMaskBytes); err != nil {
 		return err
 	}
-	o.EncryptedMask.UnmarshalBinary(encMaskBytes)
+	_ = o.EncryptedMask.UnmarshalBinary(encMaskBytes)
 	return nil
 }
 
@@ -437,25 +450,25 @@ func MarshalInput(w *bytes.Buffer, i *transactions.Input, encodeSignature bool) 
 	return nil
 }
 
-// Decode an Input object from a bytes.Buffer.
+// UnmarshalInput from a bytes.Buffer.
 func UnmarshalInput(r *bytes.Buffer, i *transactions.Input) error {
 	keyImageBytes := make([]byte, 32)
 	if err := encoding.Read256(r, keyImageBytes); err != nil {
 		return err
 	}
-	i.KeyImage.UnmarshalBinary(keyImageBytes)
+	_ = i.KeyImage.UnmarshalBinary(keyImageBytes)
 
 	pubKeyBytes := make([]byte, 32)
 	if err := encoding.Read256(r, pubKeyBytes); err != nil {
 		return err
 	}
-	i.PubKey.P.UnmarshalBinary(pubKeyBytes)
+	_ = i.PubKey.P.UnmarshalBinary(pubKeyBytes)
 
 	pseudoCommBytes := make([]byte, 32)
 	if err := encoding.Read256(r, pseudoCommBytes); err != nil {
 		return err
 	}
-	i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
+	_ = i.PseudoCommitment.UnmarshalBinary(pseudoCommBytes)
 
 	var sigBytes []byte
 	if err := encoding.ReadVarBytes(r, &sigBytes); err != nil {

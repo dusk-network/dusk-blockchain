@@ -43,7 +43,7 @@ type Broker struct {
 func NewBroker(broker eventbus.Broker, rpcBus *rpcbus.RPCBus) *Broker {
 	acceptedBlockChan, _ := consensus.InitAcceptedBlockUpdate(broker)
 	getCandidateChan := make(chan rpcbus.Request, 1)
-	rpcBus.Register(topics.GetCandidate, getCandidateChan)
+	_ = rpcBus.Register(topics.GetCandidate, getCandidateChan)
 	bestScoreChan := make(chan message.Message, 1)
 	broker.Subscribe(topics.BestScore, eventbus.NewChanListener(bestScoreChan))
 
@@ -95,7 +95,7 @@ func (b *Broker) Listen() {
 func (b *Broker) filterWinningCandidates() {
 	b.lock.Lock()
 	for k, cm := range b.queue {
-		if _, ok := b.validHashes[string(k)]; ok {
+		if _, ok := b.validHashes[k]; ok {
 			b.storeCandidateMessage(cm)
 		}
 
@@ -108,10 +108,10 @@ func (b *Broker) filterWinningCandidates() {
 func (b *Broker) provideCandidate(r rpcbus.Request) {
 	b.lock.RLock()
 	params := r.Params.(bytes.Buffer)
-	cm, ok := b.queue[string(params.Bytes())]
+	cm, ok := b.queue[params.String()]
 	b.lock.RUnlock()
 	if ok {
-		r.RespChan <- rpcbus.Response{cm, nil}
+		r.RespChan <- rpcbus.Response{Resp: cm, Err: nil}
 		return
 	}
 
@@ -121,12 +121,12 @@ func (b *Broker) provideCandidate(r rpcbus.Request) {
 		var err error
 		cm, err = b.requestCandidate(params.Bytes())
 		if err != nil {
-			r.RespChan <- rpcbus.Response{nil, err}
+			r.RespChan <- rpcbus.Response{Resp: nil, Err: err}
 			return
 		}
 	}
 
-	r.RespChan <- rpcbus.Response{cm, nil}
+	r.RespChan <- rpcbus.Response{Resp: cm, Err: nil}
 }
 
 // requestCandidate from peers around this node. The candidate can only be
@@ -168,6 +168,8 @@ func (b *Broker) requestCandidate(hash []byte) (message.Candidate, error) {
 	}
 }
 
+// Validate that the candidate block carried by a message has not been already republished.
+// This function complies to the republisher.Validator interface
 func (b *Broker) Validate(m message.Message) error {
 	cm := m.Payload().(message.Candidate)
 	b.lock.Lock()
@@ -180,6 +182,8 @@ func (b *Broker) Validate(m message.Message) error {
 	return nil
 }
 
+// AddValidHash to the local cache for a score. Broker.validHashes uses a map
+// to implement a HashSet
 func (b *Broker) AddValidHash(m message.Message) error {
 	s := m.Payload().(message.Score)
 	b.lock.Lock()

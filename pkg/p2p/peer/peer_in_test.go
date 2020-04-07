@@ -64,7 +64,9 @@ func TestPingLoop(t *testing.T) {
 func TestIncompleteChecksum(t *testing.T) {
 
 	peer, _, w, _ := testReader(t)
-	defer peer.Close()
+	defer func() {
+		_ = peer.Close()
+	}()
 
 	// Construct an invalid frame
 	frame := new(bytes.Buffer)
@@ -96,7 +98,9 @@ func TestIncompleteChecksum(t *testing.T) {
 func TestZeroLength(t *testing.T) {
 
 	peer, _, w, _ := testReader(t)
-	defer peer.Close()
+	defer func() {
+		_ = peer.Close()
+	}()
 
 	// Construct an invalid frame
 	frame := new(bytes.Buffer)
@@ -124,7 +128,9 @@ func TestZeroLength(t *testing.T) {
 func TestOverflowLength(t *testing.T) {
 
 	peer, _, w, _ := testReader(t)
-	defer peer.Close()
+	defer func() {
+		_ = peer.Close()
+	}()
 
 	// Construct an invalid frame with large length field
 	frame := new(bytes.Buffer)
@@ -145,7 +151,9 @@ func TestOverflowLength(t *testing.T) {
 func TestInvalidPayload(t *testing.T) {
 
 	peer, _, w, _ := testReader(t)
-	defer peer.Close()
+	defer func() {
+		_ = peer.Close()
+	}()
 
 	// Send for all possible topic values with a malformed
 	// payload
@@ -168,6 +176,7 @@ func TestInvalidPayload(t *testing.T) {
 	}
 }
 
+//nolint:unparam
 func testReader(t *testing.T) (*Reader, net.Conn, net.Conn, chan<- *bytes.Buffer) {
 
 	bus := eventbus.New()

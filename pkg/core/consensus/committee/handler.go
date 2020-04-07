@@ -8,8 +8,12 @@ import (
 	"github.com/dusk-network/dusk-wallet/v2/key"
 )
 
+// PregenerationAmount is the size of a pregenerated committee
 var PregenerationAmount uint8 = 8
 
+// Handler is injected in the consensus components that work with the various
+// committee. It generates and maintains a list of active and valid committee members and
+// handle the votes
 type Handler struct {
 	key.ConsensusKeys
 	Provisioners user.Provisioners
@@ -17,6 +21,8 @@ type Handler struct {
 	lock         sync.RWMutex
 }
 
+// NewHandler creates a new committee.Handler by instantiating the committee
+// slice, setting the keys and setting the Provisioner set
 func NewHandler(keys key.ConsensusKeys, p user.Provisioners) *Handler {
 	return &Handler{
 		ConsensusKeys: keys,

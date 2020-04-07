@@ -154,6 +154,7 @@ func (s *Selector) IncreaseTimeOut() {
 	s.timeout = s.timeout * 2
 }
 
+//nolint:unparam
 func (s *Selector) sendBestEvent() error {
 	var bestEvent consensus.InternalPacket
 	s.eventPlayer.Pause(s.scoreID)
@@ -167,15 +168,8 @@ func (s *Selector) sendBestEvent() error {
 	}
 
 	msg := message.New(topics.BestScore, bestEvent)
-	s.signer.SendInternally(topics.BestScore, msg, s.ID())
+	_ = s.signer.SendInternally(topics.BestScore, msg, s.ID())
 	s.handler.LowerThreshold()
 	s.IncreaseTimeOut()
-	return nil
-}
-
-// repropagate tells the Coordinator/Signer to gossip the score
-func (s *Selector) repropagate(ev message.Score) error {
-	msg := message.New(topics.Score, ev)
-	s.signer.Gossip(msg, s.ID())
 	return nil
 }

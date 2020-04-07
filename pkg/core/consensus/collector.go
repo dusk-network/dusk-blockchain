@@ -20,6 +20,8 @@ type (
 		blockChan chan<- block.Block
 	}
 
+	// RoundUpdate carries the data about the new Round, such as the active
+	// Provisioners, the BidList, the Seed and the Hash
 	RoundUpdate struct {
 		Round   uint64
 		P       user.Provisioners
@@ -42,7 +44,7 @@ func InitRoundUpdate(subscriber eventbus.Subscriber) <-chan RoundUpdate {
 }
 
 // Collect as specified in the EventCollector interface. In this case Collect simply
-// performs unmarshalling of the round event
+// performs unmarshaling of the round event
 func (r *roundCollector) Collect(m message.Message) error {
 	update := m.Payload().(RoundUpdate)
 	r.roundChan <- update

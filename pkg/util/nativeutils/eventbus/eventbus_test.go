@@ -8,7 +8,6 @@ import (
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/message"
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/topics"
-	crypto "github.com/dusk-network/dusk-crypto/hash"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -159,11 +158,6 @@ func TestExitChan(t *testing.T) {
 		}
 	}
 	assert.FailNow(t, "stream listener not found")
-}
-
-func ranbuf() *bytes.Buffer {
-	tbytes, _ := crypto.RandEntropy(32)
-	return bytes.NewBuffer(tbytes)
 }
 
 type mockWriteCloser struct {

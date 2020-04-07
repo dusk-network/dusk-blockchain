@@ -29,7 +29,7 @@ func TestCollectEvent(t *testing.T) {
 	comp := cmps[0].(*mockComponent)
 
 	for _, tt := range collectEventTable {
-		ev := mockMessage(t, topics.Reduction, tt.eventRound, tt.eventStep)
+		ev := mockMessage(topics.Reduction, tt.eventRound, tt.eventStep)
 		c.CollectEvent(ev)
 		assert.Equal(t, tt.receivedEventsLen, len(comp.receivedEvents))
 		assert.Equal(t, tt.queuedEventsLen, len(c.eventqueue.entries[tt.eventRound][tt.eventStep]))
@@ -43,7 +43,7 @@ func TestQueuedDispatch(t *testing.T) {
 	comp := cmps[0].(*mockComponent)
 
 	// Send an event which should get queued
-	ev := mockMessage(t, topics.Reduction, 1, 1)
+	ev := mockMessage(topics.Reduction, 1, 1)
 	c.CollectEvent(ev)
 
 	// Mock component should have no events saved
@@ -60,7 +60,7 @@ func TestQueuedDispatch(t *testing.T) {
 	assert.Equal(t, 0, len(c.eventqueue.entries[1][1]))
 
 	// Send another event which should get queued for the next round
-	ev = mockMessage(t, topics.Reduction, 2, 0)
+	ev = mockMessage(topics.Reduction, 2, 0)
 	c.CollectEvent(ev)
 	// Queue should now hold one event on round 2, step 0
 	assert.Equal(t, 1, len(c.eventqueue.entries[2][0]))
@@ -86,21 +86,21 @@ func TestPausePlay(t *testing.T) {
 	comp := cmps[0].(*mockComponent)
 
 	// Send an event with the correct state. It should be received
-	ev := mockMessage(t, topics.Reduction, 1, 0)
+	ev := mockMessage(topics.Reduction, 1, 0)
 	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 
 	c.Pause(comp.id)
 
 	// Send another event with the correct state. It should not be received
-	ev = mockMessage(t, topics.Reduction, 1, 0)
+	ev = mockMessage(topics.Reduction, 1, 0)
 	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(comp.receivedEvents))
 
 	c.Play(comp.id)
 
 	// Send one more event, which should be received.
-	ev = mockMessage(t, topics.Reduction, 1, 0)
+	ev = mockMessage(topics.Reduction, 1, 0)
 	c.CollectEvent(ev)
 	assert.Equal(t, 2, len(comp.receivedEvents))
 }
@@ -112,17 +112,17 @@ func TestEventFilter(t *testing.T) {
 	agComp := comp[1].(*mockComponent)
 
 	// Send a Reduction event with the correct state. It should be received
-	ev := mockMessage(t, topics.Reduction, 1, 0)
+	ev := mockMessage(topics.Reduction, 1, 0)
 	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(redComp.receivedEvents))
 
 	// Send a Reduction event with future state. It should be queued
-	ev = mockMessage(t, topics.Reduction, 1, 1)
+	ev = mockMessage(topics.Reduction, 1, 1)
 	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(c.eventqueue.entries[1][1]))
 
 	// Send an Agreement event with future state. It should be received
-	ev = mockMessage(t, topics.Agreement, 1, 1)
+	ev = mockMessage(topics.Agreement, 1, 1)
 	c.CollectEvent(ev)
 	assert.Equal(t, 1, len(agComp.receivedEvents))
 }
@@ -134,7 +134,7 @@ func TestQueueDispatchAgreement(t *testing.T) {
 
 	// Send an Agreement event from a future round.
 	// It should be queued
-	ev := mockMessage(t, topics.Agreement, 2, 3)
+	ev := mockMessage(topics.Agreement, 2, 3)
 	c.CollectEvent(ev)
 	// Should be queued on round 2
 	assert.Equal(t, 1, len(c.roundQueue.entries[2][3]))
@@ -172,7 +172,7 @@ func initCoordinatorTest(t *testing.T, tpcs ...topics.Topic) (*Coordinator, []Co
 	return c, c.store.components
 }
 
-func mockMessage(t *testing.T, topic topics.Topic, round uint64, step uint8) message.Message {
+func mockMessage(topic topics.Topic, round uint64, step uint8) message.Message {
 	h := header.Header{
 		Round:     round,
 		Step:      step,

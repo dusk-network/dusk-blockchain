@@ -54,13 +54,13 @@ type transactions struct {
 // newQueryTx constructs query tx data from core tx and block hash
 func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 
-	txId, err := tx.CalculateHash()
+	txID, err := tx.CalculateHash()
 	if err != nil {
 		return queryTx{}, err
 	}
 
 	qd := queryTx{}
-	qd.TxID = txId
+	qd.TxID = txID
 	qd.TxType = tx.StandardTx().TxType
 
 	qd.Outputs = make([]queryOutput, 0)
@@ -85,7 +85,7 @@ func newQueryTx(tx core.Transaction, blockHash []byte) (queryTx, error) {
 		}
 	}
 
-	// Populate marshalling size
+	// Populate marshaling size
 	buf := new(bytes.Buffer)
 	if err := message.MarshalTx(buf, tx); err != nil {
 		return queryTx{}, err
@@ -180,7 +180,7 @@ func (t transactions) fetchTxsByHash(db database.DB, txids []interface{}) ([]que
 }
 
 // Fetch #count# number of txs from lastly accepted blocks
-func (b transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error) {
+func (t transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error) {
 
 	txs := make([]queryTx, 0)
 
@@ -207,7 +207,7 @@ func (b transactions) fetchLastTxs(db database.DB, count int) ([]queryTx, error)
 
 		for {
 
-			hash, err := t.FetchBlockHashByHeight(uint64(height))
+			hash, err := t.FetchBlockHashByHeight(height)
 			if err != nil {
 				return err
 			}

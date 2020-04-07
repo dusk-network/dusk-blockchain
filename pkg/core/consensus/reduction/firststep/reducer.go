@@ -1,7 +1,6 @@
 package firststep
 
 import (
-	"bytes"
 	"encoding/hex"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 
 var lg = log.WithField("process", "first-step reduction")
 var emptyHash = [32]byte{}
-var regenerationPackage = new(bytes.Buffer)
 
 // Reducer for the firststep. Although its logic is fairly close to the second step reducer, there are nuances that prevent the use of a generalized Reducer for both steps.
 // For instance, the first step reducer produces a StepVote as a result (as opposed to an Agreement), while the start of Reduction event collection should happen after a BestScore event is received (as opposed to a first StepVote)
@@ -176,7 +174,7 @@ func (r *Reducer) Halt(hash []byte, svs ...*message.StepVotes) {
 	}
 
 	msg := message.New(topics.StepVotes, svm)
-	r.signer.SendInternally(topics.StepVotes, msg, r.ID())
+	_ = r.signer.SendInternally(topics.StepVotes, msg, r.ID())
 }
 
 // CollectBestScore activates the 2-step reduction cycle.

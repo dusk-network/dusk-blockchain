@@ -1,25 +1,15 @@
 package prerror
 
+// Priority is the priority High,Medium,Low
 type Priority int
 
-const (
-	High = iota
-	Medium
-	Low
-)
-
+//nolint:golint
 type PrError struct {
 	Priority
 	Err error
 }
 
-func New(prio Priority, err error) *PrError {
-	return &PrError{
-		prio,
-		err,
-	}
-}
-
+//nolint:golint
 func (e *PrError) Error() string {
 	return e.Err.Error()
 }
