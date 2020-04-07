@@ -61,11 +61,11 @@ func provideRoundResult(rb *rpcbus.RPCBus, correctRound uint64) chan struct{} {
 				}
 
 				if round == correctRound {
-					r.RespChan <- rpcbus.Response{*bytes.NewBufferString(successStr), nil}
+					r.RespChan <- rpcbus.NewResponse(*bytes.NewBufferString(successStr), nil)
 					continue
 				}
 
-				r.RespChan <- rpcbus.Response{bytes.Buffer{}, errors.New("not found")}
+				r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, errors.New("not found"))
 			case <-quitChan:
 				return
 			}

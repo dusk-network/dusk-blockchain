@@ -97,5 +97,5 @@ func respond(t *testing.T, rpcBus *rpcbus.RPCBus) {
 	g := make(chan rpcbus.Request, 1)
 	rpcBus.Register(topics.GetLastBlock, g)
 	r := <-g
-	r.RespChan <- rpcbus.Response{*helper.RandomBlock(t, 0, 1), nil}
+	r.RespChan <- rpcbus.NewResponse(*helper.RandomBlock(t, 0, 1), nil)
 }

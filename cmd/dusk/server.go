@@ -35,7 +35,7 @@ type Server struct {
 	dupeMap       *dupemap.DupeMap
 	counter       *chainsync.Counter
 	gossip        *processing.Gossip
-	rpcWrapper    *rpc.RPCSrvWrapper
+	rpcWrapper    *rpc.SrvWrapper
 	cancelMonitor StopFunc
 }
 
@@ -77,11 +77,11 @@ func Setup() *Server {
 
 	// Instantiate GraphQL server
 	if cfg.Get().Gql.Enabled {
-		if gqlServer, err := gql.NewHTTPServer(eventBus, rpcBus); err != nil {
-			log.Errorf("GraphQL http server error: %s", err.Error())
+		if gqlServer, e := gql.NewHTTPServer(eventBus, rpcBus); e != nil {
+			log.Errorf("GraphQL http server error: %v", e)
 		} else {
-			if err := gqlServer.Start(); err != nil {
-				log.Errorf("GraphQL failed to start: %s", err.Error())
+			if e := gqlServer.Start(); e != nil {
+				log.Errorf("GraphQL failed to start: %v", e)
 			}
 		}
 	}

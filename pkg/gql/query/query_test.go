@@ -45,7 +45,7 @@ func initializeDB(db database.DB) {
 	chain := make([]*block.Block, 0)
 
 	// Even random func is used, particular fields are hard-coded to make
-	// comparision easier
+	// comparison easier
 
 	// block height 0
 	t := &testing.T{}
@@ -89,7 +89,7 @@ func execute(query string, schema graphql.Schema, db database.DB) *graphql.Resul
 	result := graphql.Do(graphql.Params{
 		Schema:        schema,
 		RequestString: query,
-		Context:       context.WithValue(context.Background(), "database", db),
+		Context:       context.WithValue(context.Background(), "database", db), //nolint
 	})
 
 	// Error check

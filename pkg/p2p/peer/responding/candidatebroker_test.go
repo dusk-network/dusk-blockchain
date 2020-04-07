@@ -57,11 +57,11 @@ func provideCandidate(rb *rpcbus.RPCBus, correctHash []byte) chan struct{} {
 					blk := helper.RandomBlock(&testing.T{}, 2, 1)
 					cm := message.NewCandidate()
 					cm.Block = blk
-					r.RespChan <- rpcbus.Response{*cm, nil}
+					r.RespChan <- rpcbus.NewResponse(*cm, nil)
 					continue
 				}
 
-				r.RespChan <- rpcbus.Response{nil, errors.New("not found")}
+				r.RespChan <- rpcbus.NewResponse(nil, errors.New("not found"))
 			case <-quitChan:
 				return
 			}

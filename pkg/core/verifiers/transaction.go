@@ -120,10 +120,12 @@ func CheckSpecialFields(txIndex uint64, blockTime uint64, tx transactions.Transa
 	}
 }
 
+// VerifyStandard transaction
 func VerifyStandard(tx *transactions.Standard) error {
 	return nil
 }
 
+// VerifyCoinbase transaction
 func VerifyCoinbase(txIndex uint64, tx *transactions.Coinbase) error {
 	if txIndex != 0 {
 		return errors.New("coinbase transaction is not in the first position")
@@ -141,6 +143,7 @@ func VerifyCoinbase(txIndex uint64, tx *transactions.Coinbase) error {
 	return nil
 }
 
+// VerifyBid tx
 func VerifyBid(index uint64, blockTime uint64, tx *transactions.Bid) error {
 	if err := checkLockTimeValid(tx.Lock, blockTime); err != nil {
 		return err
@@ -148,6 +151,7 @@ func VerifyBid(index uint64, blockTime uint64, tx *transactions.Bid) error {
 	return nil
 }
 
+//VerifyStake tx
 func VerifyStake(index uint64, blockTime uint64, tx *transactions.Stake) error {
 	if err := checkLockTimeValid(tx.Lock, blockTime); err != nil {
 		return err
@@ -155,6 +159,7 @@ func VerifyStake(index uint64, blockTime uint64, tx *transactions.Stake) error {
 	return nil
 }
 
+// VerifyTimelock tx
 func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.Timelock) error {
 	if err := checkLockTimeValid(tx.Lock, blockTime); err != nil {
 		return err
@@ -162,6 +167,7 @@ func VerifyTimelock(index uint64, blockTime uint64, tx *transactions.Timelock) e
 	return nil
 }
 
+// TODO: use the blockTime to verify the lockTime
 //nolint:unparam
 func checkLockTimeValid(lockTime, blockTime uint64) error {
 	if lockTime > transactions.MaxLockTime {

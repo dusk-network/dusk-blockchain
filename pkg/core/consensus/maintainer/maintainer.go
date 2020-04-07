@@ -40,6 +40,9 @@ type StakeAutomaton struct {
 // renewed.
 const renewalOffset = 100
 
+// New creates a new instance of StakeAutomaton that is used to automate the
+// resending of stakes and alleviate the burden for a user to having to
+// manually manage restaking
 func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m ristretto.Scalar) *StakeAutomaton {
 	return &StakeAutomaton{
 		eventBroker:    eventBroker,
@@ -52,44 +55,42 @@ func New(eventBroker eventbus.Broker, rpcBus *rpcbus.RPCBus, pubKeyBLS []byte, m
 	}
 }
 
+// Listen to round updates and takes the proper decision Stake-wise
 func (m *StakeAutomaton) Listen() {
-	for {
-		select {
-		case roundUpdate := <-m.roundChan:
-			// Rehydrate consensus state
-			m.p = roundUpdate.P
-			m.bidList = roundUpdate.BidList
+	for roundUpdate := range m.roundChan {
+		// Rehydrate consensus state
+		m.p = roundUpdate.P
+		m.bidList = roundUpdate.BidList
 
-			// TODO: handle new provisioners and bidlist coming from roundupdate
-			if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
-				endHeight := m.findMostRecentBid()
+		// TODO: handle new provisioners and bidlist coming from roundupdate
+		if roundUpdate.Round+renewalOffset >= m.bidEndHeight {
+			endHeight := m.findMostRecentBid()
 
-				// Only send bid if this is the first time we notice it's about to expire
-				if endHeight > m.bidEndHeight {
-					m.bidEndHeight = endHeight
-				} else if m.bidEndHeight != 0 {
-					if err := m.sendBid(); err != nil {
-						l.WithError(err).Warnln("could not send bid tx")
-						continue
-					}
-					// Set end height to 0 to ensure we only send a transaction once
-					m.bidEndHeight = 0
+			// Only send bid if this is the first time we notice it's about to expire
+			if endHeight > m.bidEndHeight {
+				m.bidEndHeight = endHeight
+			} else if m.bidEndHeight != 0 {
+				if err := m.sendBid(); err != nil {
+					l.WithError(err).Warnln("could not send bid tx")
+					continue
 				}
+				// Set end height to 0 to ensure we only send a transaction once
+				m.bidEndHeight = 0
 			}
+		}
 
-			if roundUpdate.Round+renewalOffset >= m.stakeEndHeight {
-				endHeight := m.findMostRecentStake()
+		if roundUpdate.Round+renewalOffset >= m.stakeEndHeight {
+			endHeight := m.findMostRecentStake()
 
-				// Only send stake if this is the first time we notice it's about to expire
-				if endHeight > m.stakeEndHeight {
-					m.stakeEndHeight = endHeight
-				} else if m.stakeEndHeight != 0 {
-					if err := m.sendStake(); err != nil {
-						l.WithError(err).Warnln("could not send stake tx")
-						continue
-					}
-					m.stakeEndHeight = 0
+			// Only send stake if this is the first time we notice it's about to expire
+			if endHeight > m.stakeEndHeight {
+				m.stakeEndHeight = endHeight
+			} else if m.stakeEndHeight != 0 {
+				if err := m.sendStake(); err != nil {
+					l.WithError(err).Warnln("could not send stake tx")
+					continue
 				}
+				m.stakeEndHeight = 0
 			}
 		}
 	}

@@ -110,6 +110,7 @@ func (s *Supervisor) listenAcceptedBlock(ctx context.Context, entryChan <-chan *
 			timer.Stop()
 			s.timeoutBlock = initialTimeoutBlockAcceptance
 			lg.WithField("timeout", s.timeoutBlock.Milliseconds()).Traceln("slowdown timeout reset")
+			lg.Debugln("sending slowdown alert")
 			if err := s.client.NotifyBlockUpdate(ctx, blk); err != nil {
 				lg.WithError(err).Warnln("could not send block to monitoring")
 			}

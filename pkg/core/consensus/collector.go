@@ -20,6 +20,8 @@ type (
 		blockChan chan<- block.Block
 	}
 
+	// RoundUpdate carries the data about the new Round, such as the active
+	// Provisioners, the BidList, the Seed and the Hash
 	RoundUpdate struct {
 		Round   uint64
 		P       user.Provisioners

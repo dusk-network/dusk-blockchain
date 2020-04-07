@@ -7,12 +7,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// InitLog initializes a logrus global instance
 func InitLog(logFile *os.File) {
 	// apply logger level from configurations
 	SetToLevel(cfg.Get().Logger.Level)
 	log.SetOutput(logFile)
 }
 
+// SetToLevel sets logrus instance to a specified level
 func SetToLevel(l string) {
 	level, err := log.ParseLevel(l)
 	if err == nil {

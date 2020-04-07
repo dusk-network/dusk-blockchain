@@ -71,6 +71,8 @@ func (a *Accumulator) Accumulate() {
 	}
 }
 
+//CreateWorkers creates an amount of workers that verify Agreement messages
+//concurrently
 func (a *Accumulator) CreateWorkers(amount int) {
 	var wg sync.WaitGroup
 

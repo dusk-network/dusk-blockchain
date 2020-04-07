@@ -39,7 +39,7 @@ func (t mempool) resolve(p graphql.ResolveParams) (interface{}, error) {
 			if err != nil {
 				return nil, errors.New("invalid txid")
 			}
-			payload.Write(txidBytes)
+			_, _ = payload.Write(txidBytes)
 		}
 
 		resp, err := t.rpcBus.Call(topics.GetMempoolTxs, rpcbus.NewRequest(payload), 5*time.Second)

@@ -85,6 +85,7 @@ func (s *SyncState) IncrementStep() {
 	s.bufRepr = recreate(s.round, s.step)
 }
 
+// ToBuffer returns a binary representation of the round and the step
 func (s *SyncState) ToBuffer() bytes.Buffer {
 	s.Lock.RLock()
 	defer s.Lock.RUnlock()

@@ -112,6 +112,7 @@ func TestExampleSecureSend(t *testing.T) {
 	///Output: Sending request
 }
 
+// nolint
 type basicAuth struct {
 	username string
 	password string

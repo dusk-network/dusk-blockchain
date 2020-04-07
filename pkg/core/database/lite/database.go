@@ -29,6 +29,7 @@ var (
 	stateKey = []byte{1}
 )
 
+// DB represents the db struct
 type DB struct {
 	storage  memdb
 	mu       sync.RWMutex
@@ -36,6 +37,7 @@ type DB struct {
 	path     string
 }
 
+// NewDatabase returns a DB instance
 // This should be the ideal situation with lowest latency on storing or fetching data
 // In-memory only (as result autoDeleted)
 // multi-instances (no singlton)
@@ -67,6 +69,7 @@ func (db *DB) Begin(writable bool) (database.Transaction, error) {
 	return t, nil
 }
 
+// Update the DB within a transaction
 func (db *DB) Update(fn func(database.Transaction) error) error {
 
 	db.mu.Lock()
@@ -94,6 +97,7 @@ func (db *DB) Update(fn func(database.Transaction) error) error {
 	return t.Commit()
 }
 
+// View performs the equivalent of a Select SQL statement
 func (db *DB) View(fn func(database.Transaction) error) error {
 
 	db.mu.RLock()
@@ -108,6 +112,7 @@ func (db *DB) View(fn func(database.Transaction) error) error {
 	return fn(t)
 }
 
+// Close is actually a dummy method on a lite driver
 func (db *DB) Close() error {
 	return nil
 }

@@ -56,7 +56,7 @@ func handleQuery(schema *graphql.Schema, w http.ResponseWriter, r *http.Request,
 		RequestString:  req.Query,
 		VariableValues: req.Variables,
 		OperationName:  req.Operation,
-		Context:        context.WithValue(context.Background(), "database", db),
+		Context:        context.WithValue(context.Background(), "database", db), //nolint
 	})
 
 	// Error check

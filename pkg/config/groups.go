@@ -14,7 +14,7 @@ type loggerConfiguration struct {
 // log based monitoring defined in pkg/eventmon/logger
 type logMonitorConfiguration struct {
 	Enabled      bool
-	Rpc          string
+	Rpc          string //nolint
 	Transport    string
 	Address      string
 	StreamErrors bool

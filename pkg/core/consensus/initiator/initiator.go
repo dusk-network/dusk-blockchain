@@ -19,22 +19,24 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
+// LaunchConsensus start the whole consensus algorithm
+func LaunchConsensus(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, _ *chainsync.Counter) {
 	storeBidValues(eventBroker, rpcBus, w)
-	startProvisioner(eventBroker, rpcBus, w, counter)
+	if err := startProvisioner(eventBroker, rpcBus, w); err != nil {
+		log.Panic(err)
+	}
 }
 
-//nolint:unparam
-func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet, counter *chainsync.Counter) {
+func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *wallet.Wallet) error {
 	// Setting up the consensus factory
 	pubKey := w.PublicKey()
 	f := factory.New(eventBroker, rpcBus, cfg.ConsensusTimeOut, &pubKey, w.ConsensusKeys())
 	f.StartConsensus()
 
 	// If we are on genesis, we should kickstart the consensus
-	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 0)
+	resp, err := rpcBus.Call(topics.GetLastBlock, rpcbus.NewRequest(bytes.Buffer{}), 0)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 	blk := resp.(block.Block)
 
@@ -42,6 +44,7 @@ func startProvisioner(eventBroker *eventbus.EventBus, rpcBus *rpcbus.RPCBus, w *
 		msg := message.New(topics.Initialization, bytes.Buffer{})
 		eventBroker.Publish(topics.Initialization, msg)
 	}
+	return nil
 }
 
 // storeBidValues finds the most recent bid belonging to the given

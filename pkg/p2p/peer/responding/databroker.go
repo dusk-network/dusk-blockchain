@@ -92,6 +92,7 @@ func (d *DataBroker) SendItems(m *bytes.Buffer) error {
 	return nil
 }
 
+// SendTxsItems will run tx items
 func (d *DataBroker) SendTxsItems() error {
 
 	var maxItemsSent = config.Get().Mempool.MaxInvItems

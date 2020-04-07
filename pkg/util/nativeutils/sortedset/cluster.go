@@ -29,7 +29,7 @@ func (c Cluster) Equal(other Cluster) bool {
 	return true
 }
 
-// Size returns the amount of elements in the cluster
+// TotalOccurrences returns the amount of elements in the cluster
 func (c Cluster) TotalOccurrences() int {
 	size := 0
 	for _, v := range c.elements {
@@ -107,6 +107,8 @@ func (c *Cluster) Remove(b []byte) bool {
 	return true
 }
 
+// IntersectCluster performs an intersect operation with a Cluster represented
+// through a uint64 bitmap
 func (c *Cluster) IntersectCluster(committeeSet uint64) Cluster {
 	set := c.Intersect(committeeSet)
 	elems := make(map[string]int)

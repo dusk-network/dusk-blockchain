@@ -46,9 +46,9 @@ func (p *Reader) Handshake() error {
 }
 
 func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
-	message, err := p.createVersionBuffer()
-	if err != nil {
-		return err
+	message, e := p.createVersionBuffer()
+	if e != nil {
+		return e
 	}
 
 	if err := topics.Prepend(message, topics.Version); err != nil {
@@ -59,8 +59,8 @@ func (p *Connection) writeLocalMsgVersion(g *processing.Gossip) error {
 		return err
 	}
 
-	_, err = p.Write(message.Bytes())
-	return err
+	_, e = p.Write(message.Bytes())
+	return e
 }
 
 func (p *Connection) readRemoteMsgVersion() error {

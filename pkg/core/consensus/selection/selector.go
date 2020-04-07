@@ -173,10 +173,3 @@ func (s *Selector) sendBestEvent() error {
 	s.IncreaseTimeOut()
 	return nil
 }
-
-// repropagate tells the Coordinator/Signer to gossip the score
-func (s *Selector) repropagate(ev message.Score) error {
-	msg := message.New(topics.Score, ev)
-	_ = s.signer.Gossip(msg, s.ID())
-	return nil
-}

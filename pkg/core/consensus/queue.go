@@ -45,7 +45,7 @@ func (eq *Queue) PutEvent(round uint64, step uint8, m message.Message) {
 		eq.entries[round] = make(map[uint8][]message.Message)
 	}
 
-	// Initialise the array on this step if it was not yet created
+	// Initialize the array on this step if it was not yet created
 	if eq.entries[round][step] == nil {
 		eq.entries[round][step] = make([]message.Message, 0)
 	}

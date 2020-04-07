@@ -291,8 +291,8 @@ func (m *Mempool) removeAccepted(b block.Block) {
 		// if not, then keep it in the mempool for the next block
 		err = m.verified.Range(func(k txHash, t TxDesc) error {
 			if r, _ := tree.VerifyContent(t.tx); !r {
-				if err := s.Put(t); err != nil {
-					return err
+				if e := s.Put(t); e != nil {
+					return e
 				}
 			}
 			return nil

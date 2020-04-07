@@ -32,9 +32,9 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	// Set up a websocket client
 	u := url.URL{Scheme: "ws", Host: "127.0.0.1:22222", Path: "/ws"}
-	c, _, err := websocket.DefaultDialer.DialContext(dialCtx, u.String(), nil)
-	if err != nil {
-		t.Fatal(err)
+	c, _, e := websocket.DefaultDialer.DialContext(dialCtx, u.String(), nil)
+	if e != nil {
+		t.Fatal(e)
 	}
 	defer func() {
 		_ = c.Close()
@@ -42,8 +42,8 @@ func TestWebsocketEndpoint(t *testing.T) {
 
 	response := make(chan string)
 	go func() {
-		_, msg, err := c.ReadMessage()
-		if err != nil {
+		_, msg, readErr := c.ReadMessage()
+		if readErr != nil {
 			return
 		}
 		response <- string(msg)

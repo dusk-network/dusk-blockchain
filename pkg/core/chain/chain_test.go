@@ -54,14 +54,19 @@ func TestAcceptFromPeer(t *testing.T) {
 	blk = mockAcceptableBlock(t, c.prevBlock)
 	msg = message.New(topics.AcceptedBlock, *blk)
 
-	go func() {
+	errChan := make(chan error, 1)
+	go func(chan error) {
 		if err := c.onAcceptBlock(msg); err.Error() != "request timeout" {
-			t.Fatal(err)
+			errChan <- err
 		}
-	}()
+	}(errChan)
 
 	// Should receive a StopConsensus message
-	<-stopConsensusChan
+	select {
+	case err := <-errChan:
+		t.Fatal(err)
+	case <-stopConsensusChan:
+	}
 
 	// Discard block gossip
 	if _, err := streamer.Read(); err != nil {
@@ -163,7 +168,7 @@ func provideCandidate(rpc *rpcbus.RPCBus, cm message.Candidate) {
 
 	go func() {
 		r := <-c
-		r.RespChan <- rpcbus.Response{cm, nil}
+		r.RespChan <- rpcbus.NewResponse(cm, nil)
 	}()
 }
 
@@ -363,7 +368,7 @@ func TestRebuildChain(t *testing.T) {
 	}
 
 	// Now, send a request to rebuild the chain
-	if _, err := rb.Call(topics.RebuildChain, rpcbus.Request{bytes.Buffer{}, make(chan rpcbus.Response, 1)}, 5*time.Second); err != nil {
+	if _, err := rb.Call(topics.RebuildChain, rpcbus.NewRequest(bytes.Buffer{}), 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -394,7 +399,7 @@ func createBid(t *testing.T) user.Bid {
 
 	var arr [32]byte
 	copy(arr[:], b)
-	return user.Bid{arr, arr, 1000}
+	return user.Bid{X: arr, M: arr, EndHeight: 1000}
 }
 
 func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
@@ -402,7 +407,7 @@ func catchClearWalletDatabaseRequest(rb *rpcbus.RPCBus) {
 	rb.Register(topics.ClearWalletDatabase, c)
 	go func() {
 		r := <-c
-		r.RespChan <- rpcbus.Response{bytes.Buffer{}, nil}
+		r.RespChan <- rpcbus.NewResponse(bytes.Buffer{}, nil)
 	}()
 }
 

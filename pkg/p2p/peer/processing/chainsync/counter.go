@@ -47,12 +47,14 @@ func (s *Counter) decrement(m message.Message) error {
 	return nil
 }
 
+// IsSyncing notifies whether the counter is syncing
 func (s *Counter) IsSyncing() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	return s.blocksRemaining > 0
 }
 
+// StartSyncing with the peers
 func (s *Counter) StartSyncing(heightDiff uint64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()

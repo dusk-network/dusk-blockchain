@@ -65,7 +65,7 @@ func newSrv(network, addr string) *helloSrv {
 func Suite(t *testing.T, timeoutMillis time.Duration, calls ...callTest) {
 	semverSrv := newSrv(testURL.Scheme, testURL.Host)
 	defer semverSrv.srv.GracefulStop()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	for i, call := range calls {
 		timer := time.NewTimer(timeoutMillis * time.Millisecond)

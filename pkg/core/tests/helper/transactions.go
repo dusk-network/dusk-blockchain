@@ -132,8 +132,8 @@ func RandomStandardTx(t *testing.T, malformed bool) *transactions.Standard {
 		t.Fatal(err)
 	}
 	rp := randomRangeProofBuffer(t)
-	if err := tx.RangeProof.Decode(rp, true); err != nil {
-		t.Fatal(err)
+	if e := tx.RangeProof.Decode(rp, true); e != nil {
+		t.Fatal(e)
 	}
 
 	// Inputs
@@ -308,7 +308,7 @@ func fixedRangeProof(t *testing.T) rangeproof.Proof {
 func FixedStandardTx(t *testing.T, seed uint64) transactions.Transaction {
 
 	seedScalar := ristretto.Scalar{}
-	seedScalar.SetBigInt(big.NewInt(0).SetUint64(uint64(seed)))
+	seedScalar.SetBigInt(big.NewInt(0).SetUint64(seed))
 
 	seedPoint := ristretto.Point{}
 	seedPoint.ScalarMultBase(&seedScalar)

@@ -215,7 +215,7 @@ func StringToTopic(topic string) Topic {
 	return Unknown
 }
 
-// Prepend a topic to a buffer
+// Prepend a topic to a binary-serialized form of a message
 func Prepend(b *bytes.Buffer, t Topic) error {
 	var buf bytes.Buffer
 	if int(t) > len(Topics) {

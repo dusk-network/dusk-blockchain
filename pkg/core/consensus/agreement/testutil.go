@@ -22,6 +22,7 @@ type Helper struct {
 	nr              int
 }
 
+// WireAgreement ...
 func WireAgreement(nrProvisioners int) (*consensus.Coordinator, *Helper) {
 	eb := eventbus.New()
 	h := NewHelper(eb, nrProvisioners)
@@ -89,6 +90,7 @@ func (hlp *Helper) Initialize(ru consensus.RoundUpdate) {
 	hlp.Aggro.Initialize(consensus.NewSimplePlayer(), nil, ru)
 }
 
+// LaunchHelper configures and launches a LaunchHelper
 func LaunchHelper(eb *eventbus.EventBus, nr int) (*Helper, []byte) {
 	hlp := NewHelper(eb, nr)
 	roundUpdate := consensus.MockRoundUpdate(1, hlp.P, nil)

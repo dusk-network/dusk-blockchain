@@ -56,7 +56,7 @@ func TestNotifyError(t *testing.T) {
 
 func TestNotifySlowdown(t *testing.T) {
 	eb := eventbus.New()
-	s := grpc.NewSupervisor(eb, testURL, 200*time.Millisecond)
+	s := grpc.NewSupervisor(eb, testURL, 120*time.Millisecond)
 	log.AddHook(s)
 	height := uint64(200)
 	testData := helper.RandomBlock(t, height, 2)
@@ -116,6 +116,6 @@ func TestNotifySlowdownAtStart(t *testing.T) {
 		},
 	}
 
-	Suite(t, 100, call)
+	Suite(t, 2000, call)
 	s.Halt()
 }

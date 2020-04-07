@@ -25,11 +25,11 @@ func TestHandshake(t *testing.T) {
 	go func() {
 		peerReader, err := helper.StartPeerReader(srv, eb, rpcBus, counter, nil)
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 
 		if err := peerReader.Accept(); err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 	}()
 

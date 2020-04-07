@@ -12,6 +12,8 @@ import (
 
 var lg = log.WithField("process", "monitoring")
 
+// StopFunc is invoked when the monitor should be stopped. It is intended to
+// perform the closing operations on the GRPC server and connections
 type StopFunc func()
 
 // LaunchMonitor creates a Supervisor if the configuration demands it, and starts it

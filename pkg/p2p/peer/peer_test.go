@@ -49,20 +49,26 @@ func TestReader(t *testing.T) {
 
 	go peerReader.ReadLoop()
 
-	go func() {
+	errChan := make(chan error, 1)
+	go func(eChan chan error) {
 		msg := makeAgreementGossip(10)
 		buf, err := message.Marshal(msg)
 		if err != nil {
-			t.Fatal(err)
+			eChan <- err
 		}
 		if err := g.Process(&buf); err != nil {
-			t.Fatal(err)
+			eChan <- err
 		}
 		client.Write(buf.Bytes())
-	}()
+	}(errChan)
 
 	// We should get the message through this channel
-	<-agreementChan
+	select {
+	case err := <-errChan:
+		t.Fatal(err)
+
+	case <-agreementChan:
+	}
 }
 
 // Test the functionality of the peer.Writer through the use of the ring buffer.
