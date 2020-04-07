@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net"
 
@@ -25,14 +26,14 @@ type Peer struct {
 // MakePeer constructs a `Peer` by setting it's IP, Port
 // and computing and setting it's ID.
 func MakePeer(ip [4]byte, port uint16) Peer {
-	id := computePeerID(ip)
+	id := computePeerID(ip, port)
 	peer := Peer{ip, port, id}
 	return peer
 }
 
 // Deserializes a `Peer` structure as an array of bytes
 // that allows to send it through a wire.
-func (peer Peer) deserialize() []byte {
+func marshalPeer(peer *Peer) []byte {
 	serPeer := make([]byte, 22)
 	// Add Peer IP.
 
@@ -48,7 +49,7 @@ func (peer Peer) deserialize() []byte {
 
 // Serializes an array of bytes that contains a Peer
 // on it returning a `Peer` structure.
-func serializePeer(peerBytes []byte) Peer {
+func unmarshalPeer(peerBytes []byte) Peer {
 	// Get Ip
 	var ip [4]byte
 	copy(ip[:], peerBytes[0:4])
@@ -88,8 +89,8 @@ func (peer Peer) computePeerNonce() uint32 {
 	}
 }
 
-// Computes the XOR distance between two Peers.
-func (peer Peer) computeDistance(otherPeer Peer) uint16 {
+// computeDistance returns both bucket number and XOR distance between two Peers.
+func (peer Peer) computeDistance(otherPeer Peer) (uint16, [16]byte) {
 	return idXor(peer.id, otherPeer.id)
 }
 
@@ -104,9 +105,7 @@ func (peer Peer) getUDPAddr() net.UDPAddr {
 }
 
 func (peer Peer) String() string {
-	idNum := binary.LittleEndian.Uint16(peer.id[:])
-	return fmt.Sprintf("Addr: %d.%d.%d.%d:%d, ID: %d",
-		peer.ip[0], peer.ip[1], peer.ip[2], peer.ip[3], peer.port, idNum)
+	return fmt.Sprintf("addr: %d, id: %s", peer.port, hex.EncodeToString(peer.id[:]))
 }
 
 // Builds the Peer info from a UPDAddress struct.
