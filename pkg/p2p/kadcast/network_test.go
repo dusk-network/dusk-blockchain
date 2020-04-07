@@ -38,12 +38,14 @@ func TestBroadcastChunksMsg(t *testing.T) {
 		}
 
 		received := false
+		r.MapMutex.RLock()
 		for _, chunk := range r.ChunkIDmap {
 			if bytes.Equal(chunk, payload) {
 				received = true
 				break
 			}
 		}
+		r.MapMutex.RUnlock()
 
 		if !received {
 			t.Errorf("Peer %s did not receive CHUNK message", r.MyPeerInfo.String())

@@ -49,7 +49,7 @@ func (pac Packet) getHeadersInfo() (byte, [16]byte, [4]byte, [2]byte) {
 
 // Gets the Packet headers items and puts them into the
 // header attribute of the Packet.
-func (pac *Packet) setHeadersInfo(tipus byte, router Router) {
+func (pac *Packet) setHeadersInfo(tipus byte, router *Router) {
 	headers := make([]byte, 24)
 	// Add `Packet` type.
 	headers[0] = tipus
@@ -75,7 +75,7 @@ func (pac *Packet) setHeadersInfo(tipus byte, router Router) {
 // deserializing and adding to the packet's payload the
 // peerInfo of the `K` closest Peers in respect to a certain
 // target Peer.
-func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
+func (pac *Packet) setNodesPayload(router *Router, targetPeer Peer) int {
 	// Get `K` closest peers to `targetPeer`.
 	kClosestPeers := router.getXClosestPeersTo(K, targetPeer)
 	// Compute the amount of Peers that will be sent and add it
@@ -227,10 +227,12 @@ func handleChunks(packet Packet, router *Router) error {
 	}
 
 	// Set chunkIDmap to true on the map.
+	router.MapMutex.Lock()
 	router.ChunkIDmap[*chunkID] = nil
 	if router.StoreChunks {
 		router.ChunkIDmap[*chunkID] = payload
 	}
+	router.MapMutex.Unlock()
 
 	// Verify height, if != 0, decrease it by one and broadcast the
 	// packet again.
