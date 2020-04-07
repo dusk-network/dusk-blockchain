@@ -1,35 +1,47 @@
 package kadcast
 
 import (
+	"encoding/hex"
+
 	"github.com/dusk-network/dusk-blockchain/pkg/util/container/ring"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
-// testPeer creates a peer with local IP and
-// ID that is computed over port number but not IP
+// TraceRoutingState logs the routing table of a peer
+func TraceRoutingState(r *Router) {
+	peer := r.MyPeerInfo
+	log.Tracef("this_peer: %s, bucket peers num %d", peer.String(), r.tree.getTotalPeers())
+	for bucketID, b := range r.tree.buckets {
+		if bucketID == 0 {
+			continue
+		}
+
+		for _, p := range b.entries {
+			_, dist := peer.computeDistance(p)
+			log.Tracef("bucket: %d, peer: %s, distance: %s", b.idLength, p.String(), hex.EncodeToString(dist[:]))
+		}
+	}
+}
+
+// testPeer creates a peer with local IP
 func testPeer(port uint16) Peer {
 
 	lAddr := getLocalUDPAddress(int(port))
 	var ip [4]byte
 	copy(ip[:], lAddr.IP)
 
-	// ID is computed over port number but not IP
-	var b [4]byte
-	b[0] = byte(port)
-	b[1] = byte(port >> 8)
-	id := computePeerID(b)
-
-	return Peer{ip, port, id}
+	peer := MakePeer(ip, port)
+	return peer
 }
 
 // TestNode starts a node for testing purposes. A node is represented by a
 // routing state, TCP listener and UDP listener
 func TestNode(port int) *Router {
 
-	log.Infoln("Starting Kadcast Node at :", port)
-
 	peer := testPeer(uint16(port))
 	router := makeRouterFromPeer(peer)
+
+	log.Infof("Starting Kadcast Node on: %s", peer.String())
 
 	// Force each node to store all chunk messages
 	// Needed only for testing purposes
@@ -74,7 +86,6 @@ func TestNetwork(num int, basePort int) ([]*Router, error) {
 	}
 
 	// Once the bootstrap succeeded, start the network discovery.
-	// TODO: Should we trigger network discovery for each peer
 	for _, r := range routers {
 		StartNetworkDiscovery(r)
 	}

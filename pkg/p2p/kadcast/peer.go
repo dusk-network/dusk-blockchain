@@ -105,7 +105,7 @@ func (peer Peer) getUDPAddr() net.UDPAddr {
 }
 
 func (peer Peer) String() string {
-	return fmt.Sprintf("addr: %d, id: %s", peer.port, hex.EncodeToString(peer.id[:]))
+	return fmt.Sprintf("%v:%d, %s", peer.ip, peer.port, hex.EncodeToString(peer.id[:])[0:6])
 }
 
 // Builds the Peer info from a UPDAddress struct.

@@ -223,7 +223,7 @@ func handleChunks(packet Packet, router *Router) error {
 	// Verify chunkID on the memmoryMap. If we already have it stored,+
 	// means that the packet is repeated and we just ignore it.
 	if _, ok := router.ChunkIDmap[*chunkID]; ok {
-		return fmt.Errorf("chunk ID already registered: %s", hex.EncodeToString((*chunkID)[:]))
+		return fmt.Errorf("chunk %s already registered", hex.EncodeToString((*chunkID)[:]))
 	}
 
 	// Set chunkIDmap to true on the map.

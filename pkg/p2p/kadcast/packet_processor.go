@@ -55,12 +55,11 @@ func ProcessTCPPacket(queue *ring.Buffer, router *Router) {
 			case 0:
 				{
 					if err := handleChunks(packet, router); err != nil {
-						log.WithError(err).
-							WithField("peer", router.MyPeerInfo.String()).Warn("Ignoring CHUNKS message")
+						log.WithField("peer", router.MyPeerInfo.String()).Warnln(err)
 					} else {
 						log.WithField("from", peerInf.String()).
 							WithField("peer", router.MyPeerInfo.String()).
-							Info("Received CHUNKS message")
+							Trace("Received CHUNKS message")
 					}
 				}
 			}
@@ -116,24 +115,24 @@ func ProcessUDPPacket(queue *ring.Buffer, router *Router) {
 			case 0:
 				log.WithField(
 					"src", peerInf.String(),
-				).Infoln("Received PING message")
+				).Traceln("Received PING message")
 				handlePing(peerInf, router)
 			case 1:
 				log.WithField(
 					"src", peerInf.String(),
-				).Infoln("Received PONG message")
+				).Traceln("Received PONG message")
 				handlePong(peerInf, router)
 
 			case 2:
 				log.WithField(
 					"src", peerInf.String(),
-				).Infoln("Received FIND_NODES message")
+				).Traceln("Received FIND_NODES message")
 				handleFindNodes(peerInf, router)
 
 			case 3:
 				log.WithField(
 					"src", peerInf.String(),
-				).Infoln("Received NODES message")
+				).Traceln("Received NODES message")
 				handleNodes(peerInf, packet, router, byteNum)
 			}
 		}
