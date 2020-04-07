@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math/bits"
 	"net"
 
 	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire/encoding"
@@ -45,26 +46,23 @@ func idXor(a [16]byte, b [16]byte) (uint16, [16]byte) {
 	return classifyDistance(distance), distance
 }
 
-// This function gets the XOR distance as a byte-array
-// and collapses it to classify the distance on one of the
-// 128 buckets.
-func classifyDistance(arr [16]byte) uint16 {
-	var collDist uint16 = 0
-	for i := 0; i < 16; i++ {
-		collDist += countSetBits(arr[i])
-	}
+// classifyDistance calculates floor of log2 of the distance between two nodes
+// As per that, classifyDistance returns rank of most significant bit in LE format
+func classifyDistance(distance [16]byte) uint16 {
 
-	return collDist
-}
+	for i := len(distance) - 1; i >= 0; i-- {
+		if distance[i] == 0 {
+			continue
+		}
+		// Len8 returns the minimum number of bits required to represent x
+		// That said, most significant bit rank in Little Endian
+		msbRank := bits.Len8(distance[i])
+		msbRank--
 
-// Counts the number of setted bits in the given byte.
-func countSetBits(byt byte) uint16 {
-	var count uint16 = 0
-	for byt != 0 {
-		count += uint16(byt & 1)
-		byt >>= 1
+		pos := uint16(msbRank + i*8)
+		return pos
 	}
-	return count
+	return 0
 }
 
 // Evaluates if an XOR-distance of two peers is
