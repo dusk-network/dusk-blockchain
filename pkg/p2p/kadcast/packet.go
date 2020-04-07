@@ -2,6 +2,7 @@ package kadcast
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -85,7 +86,7 @@ func (pac *Packet) setNodesPayload(router Router, targetPeer Peer) int {
 	// Serialize the Peers to get them in `wire-format`,
 	// basically, represented as bytes.
 	for _, peer := range kClosestPeers {
-		pac.payload = append(pac.payload[:], peer.deserialize()...)
+		pac.payload = append(pac.payload[:], marshalPeer(&peer)...)
 	}
 	return len(kClosestPeers)
 }
@@ -117,7 +118,8 @@ func (pac Packet) getNodesPayloadInfo() []Peer {
 	for m := 0; m < peerNum; m++ {
 		// Get the peer structure from the payload and
 		// append the peer to the returned slice of Peer structs.
-		peers = append(peers[:], serializePeer(pac.payload[i:j]))
+		p := unmarshalPeer(pac.payload[i:j])
+		peers = append(peers[:], p)
 
 		i += PeerBytesSize
 		j += PeerBytesSize
@@ -221,7 +223,7 @@ func handleChunks(packet Packet, router *Router) error {
 	// Verify chunkID on the memmoryMap. If we already have it stored,+
 	// means that the packet is repeated and we just ignore it.
 	if _, ok := router.ChunkIDmap[*chunkID]; ok {
-		return fmt.Errorf("chunk ID already registered: %v", *chunkID)
+		return fmt.Errorf("chunk ID already registered: %s", hex.EncodeToString((*chunkID)[:]))
 	}
 
 	// Set chunkIDmap to true on the map.
