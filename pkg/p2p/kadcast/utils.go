@@ -40,9 +40,9 @@ func xor(a [16]byte, b [16]byte) [16]byte {
 
 // Computes the XOR distance between 2 different
 // ids and classifies it between the range 0-128.
-func idXor(a [16]byte, b [16]byte) uint16 {
+func idXor(a [16]byte, b [16]byte) (uint16, [16]byte) {
 	distance := xor(a, b)
-	return classifyDistance(distance)
+	return classifyDistance(distance), distance
 }
 
 // This function gets the XOR distance as a byte-array
@@ -53,6 +53,7 @@ func classifyDistance(arr [16]byte) uint16 {
 	for i := 0; i < 16; i++ {
 		collDist += countSetBits(arr[i])
 	}
+
 	return collDist
 }
 
@@ -82,17 +83,30 @@ func xorIsBigger(a [16]byte, b [16]byte) bool {
 // Performs the hash of the wallet public
 // IP address and gets the first 16 bytes of
 // it.
-func computePeerID(externIP [4]byte) [16]byte {
+func computePeerID(ip [4]byte, port uint16) [16]byte {
+
+	seed := make([]byte, 2)
+	binary.LittleEndian.PutUint16(seed, port)
+	seed = append(seed, ip[:]...)
+
+	doubleLenID := sha3.Sum256(seed[:])
 	var halfLenID [16]byte
-	doubleLenID := sha3.Sum256(externIP[:])
 	copy(halfLenID[:], doubleLenID[0:16])
+
 	return halfLenID
 }
 
-// ComputePeerID exposes computePeerID
-func ComputePeerID(buf [4]byte) [16]byte {
-	return computePeerID(buf)
+/*
+// computePeerDummyID is helpful on simplifying ID on local net
+func computePeerDummyID(ip [4]byte, port uint16) [16]byte {
+	var id [16]byte
+	port -= 9000
+	seed := make([]byte, 16)
+	binary.LittleEndian.PutUint16(seed, port)
+	copy(id[:], seed[0:16])
+	return id
 }
+*/
 
 // This function is a middleware that allows the peer to verify
 // other Peers nonce's and validate them if they are correct.

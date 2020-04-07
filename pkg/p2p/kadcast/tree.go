@@ -23,7 +23,7 @@ func makeTree(myPeer Peer) Tree {
 
 // Classifies and adds a Peer to the routing storage tree.
 func (tree *Tree) addPeer(myPeer Peer, otherPeer Peer) {
-	idl := myPeer.computeDistance(otherPeer)
+	idl, _ := myPeer.computeDistance(otherPeer)
 	if idl == 0 {
 		return
 	}
