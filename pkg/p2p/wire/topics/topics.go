@@ -95,6 +95,9 @@ const (
 	// Cross-network RPCBus topics
 	GetRoundResults
 	GetCandidate
+
+	// Monitoring topics
+	SyncProgress
 )
 
 type topicBuf struct {
@@ -103,7 +106,8 @@ type topicBuf struct {
 	str string
 }
 
-// Topics is the slice of all the topicBuf
+// Topics represents the associated string and byte representation respectively
+// of the Topic objects
 // NOTE: this needs to be in the same order in which the topics are declared
 var Topics = [...]topicBuf{
 	{Version, *(bytes.NewBuffer([]byte{byte(Version)})), "version"},
@@ -172,6 +176,7 @@ var Topics = [...]topicBuf{
 	{StopProfile, *(bytes.NewBuffer([]byte{byte(StopProfile)})), "stopprofile"},
 	{GetRoundResults, *(bytes.NewBuffer([]byte{byte(GetRoundResults)})), "getroundresults"},
 	{GetCandidate, *(bytes.NewBuffer([]byte{byte(GetCandidate)})), "getcandidate"},
+	{SyncProgress, *(bytes.NewBuffer([]byte{byte(SyncProgress)})), "syncprogress"},
 }
 
 func checkConsistency(topics []topicBuf) {

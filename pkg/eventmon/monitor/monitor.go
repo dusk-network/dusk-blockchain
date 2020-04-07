@@ -1,54 +1,33 @@
 package monitor
 
 import (
-	"bytes"
+	"errors"
+	"net/url"
+	"time"
 
-	"github.com/dusk-network/dusk-blockchain/pkg/p2p/wire"
+	"github.com/dusk-network/dusk-blockchain/pkg/eventmon/grpc"
 	"github.com/dusk-network/dusk-blockchain/pkg/util/nativeutils/eventbus"
 	log "github.com/sirupsen/logrus"
 )
 
-// Supervisor ...
+// Supervisor is a monitor client that pushes data and alerts to a server. It
+// is also a logrus Hook to facilitate capturing error logs when emitted
 type Supervisor interface {
-	wire.EventCollector
-	Reconnect() error
+	log.Hook
+	Start() error
 	Stop() error
 }
 
-// LogSupervisor ...
-type LogSupervisor interface {
-	Supervisor
-	log.Hook
-}
-
-type mockSupervisor struct {
-}
-
-// Launch ...
-func Launch(broker eventbus.Broker, monURL string) (LogSupervisor, error) {
-	return &mockSupervisor{}, nil
-}
-
-func (m *mockSupervisor) Levels() []log.Level {
-	return []log.Level{
-		log.ErrorLevel,
-		log.FatalLevel,
-		log.PanicLevel,
+// New is a factory method to create a Supervisor
+func New(broker eventbus.Broker, blockTimeThreshold time.Duration, monType, monURL string) (Supervisor, error) {
+	uri, err := url.Parse(monURL)
+	if err != nil {
+		return nil, err
 	}
-}
-
-func (m *mockSupervisor) Fire(entry *log.Entry) error {
-	return nil
-}
-
-func (m *mockSupervisor) Collect(b bytes.Buffer) error {
-	return nil
-}
-
-func (m *mockSupervisor) Reconnect() error {
-	return nil
-}
-
-func (m *mockSupervisor) Stop() error {
-	return nil
+	switch monType {
+	case "grpc":
+		return grpc.NewSupervisor(broker, uri, blockTimeThreshold), nil
+	default:
+		return nil, errors.New("unsupported monitor type")
+	}
 }
