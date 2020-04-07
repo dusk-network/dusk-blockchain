@@ -12,7 +12,7 @@ import (
 // broadcast a message to all network peers
 func TestBroadcastChunksMsg(t *testing.T) {
 
-	nodes, err := kadcast.TestNetwork(1000, 9000)
+	nodes, err := kadcast.TestNetwork(7, 9000)
 	if err != nil {
 		t.Error(err)
 	}
